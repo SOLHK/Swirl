@@ -32,6 +32,10 @@ intptr_t swirl_import_xray_v1(const uint8_t *input, size_t input_len,
                             uint8_t *output, size_t output_capacity);
 
 uint32_t swirl_core_abi_version(void);
+/* UTF-8 JSON: abi_version, build_id, source_sha, package_version, target.
+ * Returns bytes excluding NUL, -1 for a null/short buffer, -2 for caught panic.
+ * A 4096-byte buffer is sufficient. No configuration or credentials are included. */
+intptr_t swirl_core_build_info(uint8_t *output, size_t output_capacity);
 /* Existing lifecycle ABI: output_capacity must be at least 1 MiB; serialize
  * lifecycle calls and stop all handles before unloading the shared library. */
 intptr_t swirl_core_command(const uint8_t *input, size_t input_len,

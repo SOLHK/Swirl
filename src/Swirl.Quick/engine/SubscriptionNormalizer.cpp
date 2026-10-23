@@ -44,8 +44,8 @@ void issue(QStringList &issues,const QString &message){if(!issues.contains(messa
 void append(Result &r,QJsonObject node,QJsonObject original,QStringList issues={}){
     if(r.nodes.size()>=2000){r.error="节点数量超过 2000；原节点保持不变。";return;}
     if(node.value("name").toString().isEmpty())node["name"]=node.value("server").toString()+":"+node.value("port").toVariant().toString();
-    // Reality requires uTLS in Mihomo. Some INI clients omit the implicit
-    // fingerprint; make Swirl's default explicit and retain an inspectable note.
+    // Preserve the historical import marker for clients omitting a fingerprint.
+    // Rust activation rejects this inferred value; it is not permission to run.
     if(node.contains("reality-opts")&&!node.contains("client-fingerprint")){
         node["client-fingerprint"]="chrome";original["_swirl-default-client-fingerprint"]=true;
     }
@@ -61,7 +61,7 @@ void transport(QJsonObject &node,const QString &network,const QString &path,cons
     if(network=="ws")node["ws-opts"]=QJsonObject{{"path",path.isEmpty()?"/":path},{"headers",host.isEmpty()?QJsonObject():QJsonObject{{"Host",host}}}};
     else if(network=="grpc")node["grpc-opts"]=QJsonObject{{"grpc-service-name",path}};
     else if(network=="h2")node["h2-opts"]=QJsonObject{{"path",path.isEmpty()?"/":path},{"host",host.isEmpty()?QJsonArray():QJsonArray{host}}};
-    else issue(issues,"此传输层尚未完成到 Mihomo 的映射。");
+    else issue(issues,"此传输层尚未完成到 Swirl 节点模型的映射。");
 }
 void hysteria2Uri(Result &r,const QString &line,qsizetype split){
     // RFC 3986 authority split by hand: QUrl cannot parse Hysteria2's

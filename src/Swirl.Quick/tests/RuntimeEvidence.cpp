@@ -51,7 +51,7 @@ static void captureRenderedFrame(QQuickWindow *window,const QString &path){
 // Test-build-only harness. It drives THIS Swirl window with the real encrypted
 // node store copy and real engine. It has no fixtures or access to other apps.
 void startRuntimeEvidence(QQuickWindow *window,EngineController *controller,SystemDataProvider *system,DiagnosticService *diagnostics,const QString &commandPath,const QString &statePath){
- controller->setControlPort(19097);controller->setProxyPort(17988);
+ controller->setProxyPort(17988);
  // Set an isolated global route before the first engine start.
  // A saved production rule or DIRECT mode must never leak into this run.
  if(!controller->prepareRealAcceptance()||controller->routingMode()!=QStringLiteral("global")){

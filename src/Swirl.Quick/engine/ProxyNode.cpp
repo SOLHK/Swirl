@@ -62,12 +62,10 @@ QString ProxyNode::validate(const ProxyNode &n) {
     if (n.name.trimmed().isEmpty() || n.name.size() > 128 || n.name.contains(QRegularExpression("[\\x00-\\x1f]")))
         return QStringLiteral("节点名称不能为空、超过 128 字符或包含控制字符。");
     bool supportedProtocol=protocols().contains(n.protocol);
-#ifdef SWIRL_USE_RUST_CORE
-    // Imported native protocols do not expand the existing editor dropdown or
-    // claim that the retained Mihomo compatibility build can execute them.
+    // This is a preservation/validation catalog, not execution capability.
+    // RustCoreEngine and SwirlProtocolRegistry decide which nodes can run.
     supportedProtocol=supportedProtocol||n.protocol=="socks4"||n.protocol=="socks4a";
-#endif
-    if (!supportedProtocol) return QStringLiteral("固定版本引擎不支持此节点协议。");
+    if (!supportedProtocol) return QStringLiteral("此节点协议不在可保存的数据格式目录中。");
     const bool peerTransport=QStringList{"wireguard","tailscale","zerotier","easytier","openvpn"}.contains(n.protocol);
     const bool portRange=(n.protocol=="mieru" && !n.parameters.value("port-range").toString().isEmpty()) ||
         (QStringList{"hysteria","hysteria2"}.contains(n.protocol) && !n.parameters.value("ports").toString().isEmpty());
@@ -88,7 +86,7 @@ QString ProxyNode::validate(const ProxyNode &n) {
     return {};
 }
 QStringList ProxyNode::protocols() {
-    // Exactly the outbound transports in the pinned Mihomo v1.19.32 parser.
+    // Historical imported protocol catalog; it must not claim runtime support.
     // direct/dns/reject/rematch are routing actions, not remote node protocols.
     return {"socks5","ss","trojan","http","ssr","vmess","vless","snell","hysteria","hysteria2",
         "wireguard","tuic","shadowquic","gost-relay","ssh","mieru","anytls","sudoku","masque",
@@ -118,6 +116,6 @@ QVariantMap ProxyNode::publicInfo() const {
         {"importSource",importSource},{"sourceLabel",isXray()?origin+(sourceFingerprint.isEmpty()?QString():QStringLiteral(" · ")+sourceFingerprint.left(12)):sourceFormat},
         {"nativeExecutable",executable},{"networkVerified",false},{"unsupportedReason",capability.value("reason")},
         {"conversionIssues",conversionIssues},{"capability",capability},
-        {"normalizationNotes",originalConfiguration.value("_swirl-default-client-fingerprint").toBool()?QStringLiteral("源配置未指定 Reality 指纹；Swirl 使用 chrome。"):QString()},
+        {"normalizationNotes",originalConfiguration.value("_swirl-default-client-fingerprint").toBool()?QStringLiteral("源配置未指定 Reality 指纹；保留历史归一化标记，Rust 拒绝推断执行。"):QString()},
         {"hasCredentials",!password.isEmpty() || !parameters.isEmpty()}};
 }

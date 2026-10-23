@@ -13,11 +13,7 @@
 // QML sees only Swirl's generic business facade. Engine implementations are injected in C++.
 class EngineController final : public QObject {
     Q_OBJECT
-    Q_PROPERTY(QString executablePath READ executablePath WRITE setExecutablePath NOTIFY optionsChanged)
     Q_PROPERTY(bool rustCoreBuild READ rustCoreBuild CONSTANT)
-    Q_PROPERTY(int controlPort READ controlPort WRITE setControlPort NOTIFY optionsChanged)
-    Q_PROPERTY(QString expectedVersion READ expectedVersion CONSTANT)
-    Q_PROPERTY(QString expectedSha256 READ expectedSha256 CONSTANT)
     Q_PROPERTY(QString stateText READ stateText NOTIFY statusChanged)
     Q_PROPERTY(QString error READ error NOTIFY statusChanged)
     Q_PROPERTY(QString errorCode READ errorCode NOTIFY statusChanged)
@@ -72,22 +68,11 @@ class EngineController final : public QObject {
     Q_PROPERTY(QString networkConfigurationError READ networkConfigurationError NOTIFY optionsChanged)
     Q_PROPERTY(ConnectionDiagnostics* diagnostics READ diagnostics CONSTANT)
     Q_PROPERTY(QString proxyEnvironmentAdvice READ proxyEnvironmentAdvice NOTIFY optionsChanged)
-    Q_PROPERTY(bool preferCompatibility READ preferCompatibility WRITE setPreferCompatibility NOTIFY optionsChanged)
 public:
     explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {},bool realAcceptance=false);
     bool rustCoreBuild() const {
-#ifdef SWIRL_USE_RUST_CORE
         return true;
-#else
-        return false;
-#endif
     }
-    QString executablePath() const { return m_options.executablePath; }
-    int controlPort() const { return m_options.controlPort; }
-    void setExecutablePath(const QString &path);
-    void setControlPort(int port);
-    QString expectedVersion() const { return m_options.expectedVersion; }
-    QString expectedSha256() const { return QString::fromLatin1(m_options.expectedSha256); }
     QString stateText() const;
     QString error() const { return m_engine->status().message; }
     QString errorCode() const;
@@ -156,8 +141,6 @@ public:
     QString networkConfigurationError() const { return m_networkError; }
     ConnectionDiagnostics *diagnostics() {return &m_diagnostics;}
     QString proxyEnvironmentAdvice() const;
-    bool preferCompatibility() const {return m_options.preferCompatibility;}
-    void setPreferCompatibility(bool enabled);
     bool tunRequested() const { return m_options.tunEnabled; }
     Q_INVOKABLE void setCaptureProxyPort(int port);
     bool tunEnabled() const { return m_engine->status().tunEnabled&&apiHealthy()&&processAlive(); }

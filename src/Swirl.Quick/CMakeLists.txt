@@ -6,7 +6,6 @@ set(CMAKE_AUTOMOC ON)
 set(SWIRL_TEST_FONT_DIRECTORY "C:/Windows/Fonts" CACHE PATH "Offscreen test font directory")
 option(SWIRL_BUILD_UI_TESTS "Build the Qt input-driven overview checks" OFF)
 option(SWIRL_FONT_TESTS_ONLY "Configure only the independent Qt font tests, without the application or proxy engine" OFF)
-option(SWIRL_USE_RUST_CORE "Use Swirl Rust Core for production sessions and node probes; reject unsupported capabilities without external fallback" OFF)
 option(SWIRL_XRAY_UI_TESTS "Build the isolated JSON import acceptance profile in the real Rust application" OFF)
 
 # Keep the standalone CI and the existing UI suite on the same font targets.
@@ -47,6 +46,13 @@ if(SWIRL_FONT_TESTS_ONLY)
  return()
 endif()
 
+# The old runtime selector is accepted only as ON for existing build scripts.
+# Font-only projects return above and never acquire a proxy runtime dependency.
+if(DEFINED SWIRL_USE_RUST_CORE AND NOT SWIRL_USE_RUST_CORE)
+ message(FATAL_ERROR "SWIRL_USE_RUST_CORE=OFF is no longer supported; Rust is the only product runtime")
+endif()
+set(SWIRL_USE_RUST_CORE ON CACHE BOOL "Deprecated: the product always uses Rust Core" FORCE)
+
 find_package(Qt6 6.9 REQUIRED COMPONENTS Quick Qml QuickControls2 Network Svg GuiPrivate ShaderTools)
 qt_standard_project_setup(REQUIRES 6.8)
 qt_policy(SET QTP0004 NEW)
@@ -70,22 +76,10 @@ qt_add_resources(Swirl harmony_fonts PREFIX "/swirl/fonts" BASE "${CMAKE_CURRENT
 add_library(SwirlEngine STATIC
  app/DiagnosticService.h app/DiagnosticService.cpp
  engine/TelemetryService.h engine/TelemetryService.cpp
- engine/ProxyLatencyProbe.h engine/ProxyLatencyProbe.cpp
  engine/NodeTestService.h engine/NodeTestService.cpp
  engine/SystemProxySession.h engine/SystemProxySession.cpp
  engine/ProxyEngine.h
  engine/EngineController.h engine/EngineController.cpp)
-if(NOT SWIRL_USE_RUST_CORE OR SWIRL_BUILD_UI_TESTS)
- # Compatibility sources remain available to the legacy build and its test fixtures.
- target_sources(SwirlEngine PRIVATE
-  engine/OwnedProcess.h engine/OwnedProcess.cpp
-  engine/MihomoAdapter.h engine/MihomoAdapter.cpp
-  engine/MihomoLogDiagnostic.h engine/MihomoLogDiagnostic.cpp
-  engine/SwirlEngineManager.h engine/SwirlEngineManager.cpp
-  engine/SwirlProxyEngine.h engine/SwirlProxyEngine.cpp
-  engine/NativeDuplexRelay.h engine/NativeDuplexRelay.cpp
-  engine/SwirlUdpExchange.h engine/SwirlUdpExchange.cpp)
-endif()
 target_sources(SwirlEngine PRIVATE engine/ProxyNode.h engine/ProxyNode.cpp engine/NodeStore.h engine/NodeStore.cpp)
 target_sources(SwirlEngine PRIVATE engine/NodeImporter.h engine/NodeImporter.cpp)
 target_sources(SwirlEngine PRIVATE engine/XrayJsonBridge.h engine/XrayJsonBridge.cpp)
@@ -94,33 +88,11 @@ target_sources(SwirlEngine PRIVATE engine/SwirlProtocolRegistry.h engine/SwirlPr
 target_sources(SwirlEngine PRIVATE engine/ConnectionDiagnostics.h engine/ConnectionDiagnostics.cpp)
 target_sources(SwirlEngine PRIVATE engine/NodeImportService.h engine/NodeImportService.cpp)
 target_sources(SwirlEngine PRIVATE engine/RustCoreEngine.h engine/RustCoreEngine.cpp)
-if(SWIRL_USE_RUST_CORE)
- if(NOT WIN32)
-  message(FATAL_ERROR "Rust Qt packaging is currently validated on Windows only")
- endif()
- find_program(SWIRL_CARGO cargo REQUIRED)
- get_filename_component(SWIRL_RUST_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/../../core" ABSOLUTE)
- set(SWIRL_RUST_TARGET "${CMAKE_CURRENT_BINARY_DIR}/rust-target" CACHE PATH "Cargo target directory for the exact-source Rust application runtime")
- file(GLOB_RECURSE SWIRL_RUST_INPUTS CONFIGURE_DEPENDS
-  "${SWIRL_RUST_SOURCE}/crates/*.rs" "${SWIRL_RUST_SOURCE}/crates/Cargo.toml" "${SWIRL_RUST_SOURCE}/crates/*/Cargo.toml"
-  "${SWIRL_RUST_SOURCE}/vendor/*.rs" "${SWIRL_RUST_SOURCE}/vendor/*/Cargo.toml")
- add_custom_command(OUTPUT "${SWIRL_RUST_TARGET}/release/swirl_api.dll"
-  COMMAND "${SWIRL_CARGO}" build --release --locked --manifest-path "${SWIRL_RUST_SOURCE}/Cargo.toml" --target-dir "${SWIRL_RUST_TARGET}" -p swirl-api
-  DEPENDS ${SWIRL_RUST_INPUTS} "${SWIRL_RUST_SOURCE}/Cargo.toml" "${SWIRL_RUST_SOURCE}/Cargo.lock"
-  VERBATIM)
- # Refresh the deployed DLL even when only Rust sources changed and no Qt
- # target needs relinking (POST_BUILD alone leaves a stale runtime in that case).
- add_custom_target(SwirlRustCore
-  COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:Swirl>"
-  COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_RUST_TARGET}/release/swirl_api.dll" "$<TARGET_FILE_DIR:Swirl>/swirl_api.dll"
-  DEPENDS "${SWIRL_RUST_TARGET}/release/swirl_api.dll")
- add_dependencies(SwirlEngine SwirlRustCore)
- target_compile_definitions(SwirlEngine PUBLIC SWIRL_USE_RUST_CORE)
- add_custom_command(TARGET Swirl POST_BUILD COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-  "${SWIRL_RUST_TARGET}/release/swirl_api.dll" "$<TARGET_FILE_DIR:Swirl>/swirl_api.dll")
- add_custom_command(TARGET Swirl POST_BUILD COMMAND "${CMAKE_COMMAND}" -E copy_directory
-  "${CMAKE_CURRENT_SOURCE_DIR}/packaging/rules" "$<TARGET_FILE_DIR:Swirl>/rules")
-endif()
+include(cmake/SwirlRustCore.cmake)
+swirl_pair_rust_core(SwirlEngine)
+swirl_stage_rust_core(Swirl)
+target_sources(SwirlEngine PRIVATE engine/RustCoreLibrary.h engine/RustCoreLibrary.cpp)
+target_sources(Swirl PRIVATE engine/RustCoreSelfTest.h engine/RustCoreSelfTest.cpp)
 target_link_libraries(SwirlEngine PUBLIC Qt6::Core Qt6::Network Qt6::Gui)
 add_library(SwirlExtensions STATIC app/ExtensionService.h app/ExtensionService.cpp)
 target_link_libraries(SwirlExtensions PUBLIC SwirlEngine Qt6::Core Qt6::Qml)
@@ -167,10 +139,6 @@ endif()
 target_sources(Swirl PRIVATE network/GatewayService.h network/GatewayService.cpp network/GatewayRouting.h network/GatewayRouting.cpp network/DhcpServer.h network/DhcpServer.cpp network/Http2Session.h network/Http2Session.cpp network/TlsCertificateService.h network/TlsCertificateService.cpp)
 target_link_libraries(Swirl PRIVATE SwirlEngine SwirlHttp2 SwirlExtensions)
 add_dependencies(Swirl SwirlScriptRunner)
-if(NOT SWIRL_USE_RUST_CORE OR SWIRL_BUILD_UI_TESTS)
- qt_add_resources(Swirl engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging"
-  FILES packaging/mihomo-manifest.json)
-endif()
 set(SWIRL_QML_FILES
  qml/controls/SwirlText.qml qml/controls/SwirlFontBinding.qml
  qml/controls/SwirlTextArea.qml qml/controls/SwirlToolTip.qml
@@ -256,6 +224,7 @@ if(SWIRL_XRAY_UI_TESTS)
  target_link_libraries(Swirl PRIVATE Qt6::Test Qt6::QuickTest)
 endif()
 if(SWIRL_BUILD_UI_TESTS)
+ enable_testing()
  add_executable(SwirlStoragePathsTests tests/StoragePathsTests.cpp)
  target_link_libraries(SwirlStoragePathsTests PRIVATE Qt6::Core)
  add_test(NAME swirl-storage-paths COMMAND SwirlStoragePathsTests)
@@ -277,16 +246,13 @@ if(SWIRL_BUILD_UI_TESTS)
  if(SWIRL_USE_RUST_CORE)
   add_executable(SwirlRustCoreTests tests/RustCoreTests.cpp)
   target_link_libraries(SwirlRustCoreTests PRIVATE SwirlEngine Qt6::Test)
-  add_custom_command(TARGET SwirlRustCore POST_BUILD
-   COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:SwirlRustCoreTests>"
-   COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_RUST_TARGET}/release/swirl_api.dll" "$<TARGET_FILE_DIR:SwirlRustCoreTests>/swirl_api.dll")
+  swirl_stage_rust_core(SwirlRustCoreTests)
+  include(cmake/RustCoreLibraryTests.cmake)
+  swirl_add_rust_library_tests()
   target_compile_definitions(SwirlRustCoreTests PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
   if(MSVC)
    target_compile_options(SwirlRustCoreTests PRIVATE /utf-8)
   endif()
-  add_custom_command(TARGET SwirlRustCoreTests POST_BUILD
-   COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_RUST_TARGET}/release/swirl_api.dll" "$<TARGET_FILE_DIR:SwirlRustCoreTests>/swirl_api.dll"
-   COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/packaging/rules" "$<TARGET_FILE_DIR:SwirlRustCoreTests>/rules")
   # Qt's Windows text logger may use OutputDebugString when the runner has no
   # console. Keep an explicit report so CI can show the actual failed assertion.
   add_test(NAME swirl-rust-qt-integration COMMAND SwirlRustCoreTests
@@ -311,13 +277,11 @@ if(SWIRL_BUILD_UI_TESTS)
  endif()
  target_link_libraries(SwirlExtensionTests PRIVATE SwirlExtensions Qt6::Test)
  add_dependencies(SwirlExtensionTests SwirlScriptRunner)
- qt_add_resources(SwirlExtensionTests extension_engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging" FILES packaging/mihomo-manifest.json)
  add_test(NAME swirl-local-extensions COMMAND SwirlExtensionTests)
  set_tests_properties(swirl-local-extensions PROPERTIES TIMEOUT 60)
  add_executable(SwirlTelemetryTests tests/TelemetryTests.cpp)
  target_link_libraries(SwirlTelemetryTests PRIVATE SwirlEngine Qt6::Test)
  target_compile_definitions(SwirlTelemetryTests PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
- qt_add_resources(SwirlTelemetryTests telemetry_engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging" FILES packaging/mihomo-manifest.json)
  if(MSVC)
   target_compile_options(SwirlTelemetryTests PRIVATE /utf-8)
  endif()
@@ -344,39 +308,20 @@ if(SWIRL_BUILD_UI_TESTS)
    target_compile_options(SwirlAcceptance PRIVATE /utf-8)
   endif()
  endif()
- add_executable(SwirlEngineFixture tests/EngineFixture.cpp)
- target_link_libraries(SwirlEngineFixture PRIVATE Qt6::Core Qt6::Network)
- add_executable(SwirlEngineTests tests/EngineTests.cpp)
- target_link_libraries(SwirlEngineTests PRIVATE SwirlEngine Qt6::Test)
- target_compile_definitions(SwirlEngineTests PRIVATE SWIRL_TEST_MANIFEST="${CMAKE_CURRENT_SOURCE_DIR}/packaging/mihomo-manifest.json")
- if(MSVC)
-  target_compile_options(SwirlEngineTests PRIVATE /utf-8)
- endif()
- add_dependencies(SwirlEngineTests SwirlEngineFixture)
  add_executable(SwirlNodeTests tests/NodeTests.cpp tests/ControlledNetwork.h)
  target_link_libraries(SwirlNodeTests PRIVATE SwirlEngine Qt6::Test)
- qt_add_resources(SwirlNodeTests node_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging" FILES packaging/mihomo-manifest.json)
- target_compile_definitions(SwirlNodeTests PRIVATE SWIRL_TEST_MANIFEST="${CMAKE_CURRENT_SOURCE_DIR}/packaging/mihomo-manifest.json" SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+ target_compile_definitions(SwirlNodeTests PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
  if(MSVC)
   target_compile_options(SwirlNodeTests PRIVATE /utf-8)
  endif()
  add_test(NAME swirl-node-real-chain COMMAND SwirlNodeTests -o node-chain.txt,txt)
- add_executable(SwirlNativeTests tests/NativeEngineTests.cpp tests/ControlledProtocolPeers.h)
- target_link_libraries(SwirlNativeTests PRIVATE SwirlEngine Qt6::Test)
- target_compile_definitions(SwirlNativeTests PRIVATE SWIRL_TEST_MANIFEST="${CMAKE_CURRENT_SOURCE_DIR}/packaging/mihomo-manifest.json" SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
- if(MSVC)
-  target_compile_options(SwirlNativeTests PRIVATE /utf-8)
- endif()
  add_executable(SwirlNetworkRegressionTests tests/NetworkRegressionTests.cpp)
  target_link_libraries(SwirlNetworkRegressionTests PRIVATE SwirlEngine Qt6::Test)
- qt_add_resources(SwirlNetworkRegressionTests regression_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging" FILES packaging/mihomo-manifest.json)
- target_compile_definitions(SwirlNetworkRegressionTests PRIVATE SWIRL_TEST_MANIFEST="${CMAKE_CURRENT_SOURCE_DIR}/packaging/mihomo-manifest.json" SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+ target_compile_definitions(SwirlNetworkRegressionTests PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
  add_test(NAME swirl-stream-regression COMMAND SwirlNetworkRegressionTests -o stream-regression.txt,txt)
  set_tests_properties(swirl-stream-regression PROPERTIES TIMEOUT 180)
- add_test(NAME swirl-native-engine COMMAND SwirlNativeTests -o native-engine.txt,txt)
- set_tests_properties(swirl-native-engine PROPERTIES TIMEOUT 180)
  add_executable(SwirlImportTests tests/ImportTests.cpp tests/ControlledNetwork.h)
- add_executable(SwirlSubscriptionFormatTests tests/SubscriptionFormatTests.cpp tests/ControlledProtocolPeers.h)
+ add_executable(SwirlSubscriptionFormatTests tests/SubscriptionFormatTests.cpp tests/ControlledNetwork.h)
  add_executable(SwirlPrivateSubscriptionInspect tools/InspectPrivateSubscription.cpp)
  target_link_libraries(SwirlPrivateSubscriptionInspect PRIVATE SwirlEngine)
  if(MSVC)
@@ -391,7 +336,6 @@ if(SWIRL_BUILD_UI_TESTS)
  set_tests_properties(swirl-subscription-formats PROPERTIES TIMEOUT 180)
  target_link_libraries(SwirlImportTests PRIVATE SwirlEngine Qt6::Test)
  target_compile_definitions(SwirlImportTests PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
- qt_add_resources(SwirlImportTests import_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging" FILES packaging/mihomo-manifest.json)
  if(MSVC)
   target_compile_options(SwirlImportTests PRIVATE /utf-8)
  endif()
@@ -401,12 +345,6 @@ if(SWIRL_BUILD_UI_TESTS)
   -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-import-boundaries.xml,xml" -o -,txt)
  set_tests_properties(swirl-import-boundaries PROPERTIES TIMEOUT 30)
  set_tests_properties(swirl-node-real-chain PROPERTIES TIMEOUT 180)
- add_test(NAME swirl-engine-contract COMMAND SwirlEngineTests -o engine-contract.txt,txt)
- add_test(NAME swirl-native-dns-compatibility-guard COMMAND SwirlEngineTests nativeDnsQueryPolicyCannotBeLostOrRunByCompatibilityCore networkPreferencesValidateAndPersist
-  -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-native-dns-compatibility-guard.xml,xml" -o -,txt)
- set_tests_properties(swirl-engine-contract PROPERTIES TIMEOUT 90)
- add_test(NAME swirl-engine-real COMMAND SwirlEngineTests realEngine -o engine-real.txt,txt)
- set_tests_properties(swirl-engine-real PROPERTIES TIMEOUT 90 ENVIRONMENT "SWIRL_REAL_ENGINE_TEST=1")
  target_sources(Swirl PRIVATE tests/EngineUiChecks.cpp tests/EngineUiChecks.h tests/NodeUiChecks.cpp tests/NodeUiChecks.h tests/MotionChecks.cpp tests/MotionChecks.h)
  target_compile_definitions(Swirl PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
  add_test(NAME swirl-node-ui COMMAND Swirl --node-self-test)
@@ -457,3 +395,12 @@ if(WIN32)
  target_sources(Swirl PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/Swirl.rc")
  target_link_libraries(Swirl PRIVATE dwmapi advapi32 psapi shell32)
 endif()
+
+foreach(runtime_target IN ITEMS SwirlProxyGuard SwirlExtensionTests SwirlTelemetryTests
+ SwirlDiagnosticTests SwirlSystemProxyTests SwirlAcceptance SwirlNodeTests
+ SwirlNetworkRegressionTests SwirlImportTests SwirlSubscriptionFormatTests
+ SwirlPrivateSubscriptionInspect)
+ if(TARGET ${runtime_target})
+  swirl_stage_rust_core(${runtime_target})
+ endif()
+endforeach()

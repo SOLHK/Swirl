@@ -33,7 +33,7 @@ EngineStartOptions probeOptions(const ProxyNode &node) {
     options.nodes = {node};
     options.selectedNodeId = node.id;
     options.routingMode = QStringLiteral("global");
-    options.executablePath = QStringLiteral("must-not-start-an-external-core.exe");
+    // The Rust-only EngineStartOptions has no external executable setting.
     return options;
 }
 
@@ -212,14 +212,38 @@ private slots:
         QCOMPARE(runners.size(), 1);
         QPointer<ProxyEngine> runner = runners.first();
         QCOMPARE(runner->status().engineKind, QStringLiteral("rust"));
-        QVERIFY(runner->status().processAlive);
-        QCOMPARE(runner->status().processId, QCoreApplication::applicationPid());
-        QVERIFY(runner->property("probeStarted").toBool());
+        QCOMPARE(runner->status().state, ProxyEngine::State::Starting);
+        QVERIFY(!runner->property("probeStarted").toBool());
         QCOMPARE(peer.headers.size(), 0);
-        // apiHealthy queued the probe for the next event-loop turn. A catalog
-        // mutation now must cancel that task before it can reach the endpoint.
+        // R1 starts on a worker thread. Invalidate before consuming its first
+        // snapshot: neither queued startup nor a late snapshot may issue I/O.
         service.invalidateResults();
         QTRY_VERIFY_WITH_TIMEOUT(runner.isNull(), 5000);
+        QVERIFY(!service.busy());
+        QCOMPARE(peer.headers.size(), 0);
+        verifyEmptyResults(service);
+    }
+
+    void invalidationCancelsQueuedNativeProbeAfterStartup() {
+        HeldConnectPeer peer;
+        QVERIFY(peer.listen(QHostAddress::LocalHost, 0));
+        const auto node = legacyNode(peer.serverPort());
+        NodeTestService service;
+        service.start(probeOptions(node), {node.id}, probeUrl());
+        const auto runners = service.findChildren<ProxyEngine *>();
+        QCOMPARE(runners.size(), 1);
+        QPointer<ProxyEngine> runner = runners.first();
+        bool cancelledAtReady = false;
+        connect(runner, &ProxyEngine::statusChanged, &service, [&] {
+            if (cancelledAtReady || !runner->status().apiHealthy) return;
+            QVERIFY(runner->status().processAlive);
+            QCOMPARE(runner->status().processId, QCoreApplication::applicationPid());
+            QVERIFY(runner->property("probeStarted").toBool());
+            QCOMPARE(peer.headers.size(), 0);
+            cancelledAtReady = true;
+            service.invalidateResults();
+        });
+        QTRY_VERIFY_WITH_TIMEOUT(cancelledAtReady && runner.isNull(), 5000);
         QVERIFY(!service.busy());
         QCOMPARE(peer.headers.size(), 0);
         verifyEmptyResults(service);

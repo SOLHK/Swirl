@@ -622,29 +622,13 @@ jobs:
           cmake -S src/Swirl.Quick -B build/rust-qt -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=ON
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake --build build/rust-qt --config Release --target SwirlRustCoreTests SwirlStoragePathsTests SwirlImportTests SwirlPrivateSubscriptionInspect --parallel
-      - name: Reject native DNS policy in compatibility builds without starting a core
+      - name: Reject the removed runtime build option
         working-directory: .
-        env:
-          QT_FORCE_STDERR_LOGGING: '1'
+        shell: pwsh
         run: |
-          cmake -S src/Swirl.Quick -B build/compat-dns -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=OFF -DSWIRL_BUILD_UI_TESTS=ON
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cmake --build build/compat-dns --config Release --target SwirlEngineTests SwirlImportTests --parallel
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          windeployqt --release build/compat-dns/Release/SwirlEngineTests.exe
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $env:SWIRL_TEST_ROOT=Join-Path $env:RUNNER_TEMP 'swirl-compat-dns-tests'
-          New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
-          ctest --test-dir build/compat-dns -C Release -R '^swirl-(native-dns-compatibility-guard|import-boundaries)$' --output-on-failure -V
-          $compatQtExit = $LASTEXITCODE
-          foreach ($compatQtReport in @(
-            'build/compat-dns/swirl-native-dns-compatibility-guard.xml',
-            'build/compat-dns/swirl-import-boundaries.xml'
-          )) {
-            if (-not (Test-Path $compatQtReport -PathType Leaf)) { throw 'Required compatibility Qt XML report missing' }
-            Get-Content -LiteralPath $compatQtReport
-          }
-          if ($compatQtExit -ne 0) { exit $compatQtExit }
+          cmake -S src/Swirl.Quick -B build/removed-runtime -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=OFF
+          if ($LASTEXITCODE -eq 0) { throw 'Removed runtime option was accepted.' }
+          exit 0
       - name: Run Qt to Rust integration without Mihomo
         working-directory: .
         env:

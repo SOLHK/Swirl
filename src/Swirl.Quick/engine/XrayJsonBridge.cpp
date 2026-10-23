@@ -3,23 +3,14 @@
 #include <QCryptographicHash>
 #include <QJsonArray>
 #include <QJsonDocument>
-#include <QLibrary>
+#include "RustCoreLibrary.h"
 #include <QRegularExpression>
 #include <QSet>
 #include <QUuid>
 #include <algorithm>
 
 namespace {
-using Import = qintptr (*)(const unsigned char *, size_t, unsigned char *, size_t);
 constexpr qsizetype MaximumResponse = 64 * 1024 * 1024;
-struct Api {
-    QLibrary library{QCoreApplication::applicationDirPath() + QStringLiteral("/swirl_api")};
-    Import import = nullptr;
-    Api() {
-        library.setLoadHints(QLibrary::ResolveAllSymbolsHint | QLibrary::PreventUnloadHint);
-        if (library.load()) import = reinterpret_cast<Import>(library.resolve("swirl_import_xray_v1"));
-    }
-};
 QString diagnostic(const QJsonObject &item) {
     // Only Rust's fixed code and sanitized structural path cross into the UI.
     const auto code = item.value("code").toString();
@@ -82,19 +73,21 @@ NodeImporter::Result XrayJsonBridge::parse(const QByteArray &bytes) {
         result.error = QStringLiteral("JSON 内容为空或超过 4 MiB；原节点保持不变。");
         return result;
     }
-    static Api api;
-    if (!api.import) {
-        result.error = QStringLiteral("Rust 严格 JSON 导入接口不可用，请安装包含 swirl_api 的完整版本。");
+    auto &api = RustCoreLibrary::instance();
+    if (!api.load() || !api.importXray()) {
+        result.error = api.errorString().isEmpty()
+            ? QStringLiteral("Rust 严格 JSON 导入接口不可用，请安装包含 swirl_api 的完整版本。")
+            : api.errorString();
         return result;
     }
     const auto *input = reinterpret_cast<const unsigned char *>(bytes.constData());
-    const auto required = api.import(input, size_t(bytes.size()), nullptr, 0);
+    const auto required = api.importXray()(input, size_t(bytes.size()), nullptr, 0);
     if (required <= 0 || required > MaximumResponse) {
         result.error = QStringLiteral("Rust JSON 导入失败或响应超出安全上限；原节点保持不变。");
         return result;
     }
     QByteArray output(required, Qt::Uninitialized);
-    const auto count = api.import(input, size_t(bytes.size()), reinterpret_cast<unsigned char *>(output.data()), size_t(output.size()));
+    const auto count = api.importXray()(input, size_t(bytes.size()), reinterpret_cast<unsigned char *>(output.data()), size_t(output.size()));
     if (count != required) {
         output.fill('\0');
         result.error = QStringLiteral("Rust JSON 导入接口返回无效响应；原节点保持不变。");

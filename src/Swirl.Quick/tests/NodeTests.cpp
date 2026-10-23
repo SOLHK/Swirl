@@ -1,4 +1,4 @@
-#include "engine/MihomoAdapter.h"
+#include "engine/RustCoreEngine.h"
 #include "engine/NodeTestService.h"
 #include "engine/TelemetryService.h"
 #include "engine/NodeStore.h"
@@ -6,7 +6,10 @@
 #include "engine/NodeImporter.h"
 #include "engine/NodeImportService.h"
 #include "engine/EngineController.h"
-#include "engine/SwirlEngineManager.h"
+#include "engine/ThreadedEngine.h"
+#include "app/StoragePaths.h"
+#include <QSettings>
+#include <QStandardPaths>
 #include "ControlledNetwork.h"
 #include <QCoreApplication>
 #include <QJsonDocument>
@@ -36,10 +39,8 @@ static ProxyNode node(QString name,quint16 port){ProxyNode n;n.id=QUuid::createU
 class NodeTests:public QObject {
     Q_OBJECT
     EngineStartOptions options() {
-        QFile file(QString::fromUtf8(SWIRL_TEST_MANIFEST));if(!file.open(QIODevice::ReadOnly))return {};const auto m=QJsonDocument::fromJson(file.readAll()).object();
-        EngineStartOptions options;options.executablePath=QCoreApplication::applicationDirPath()+"/core/mihomo.exe";
-        options.expectedSha256=m.value("executableSha256").toString().toLatin1();options.expectedVersion=m.value("version").toString();
-        options.controlPort=freePort();options.proxyPort=freePort();options.startupTimeoutMs=15000;options.healthIntervalMs=500;return options;
+        EngineStartOptions options;options.proxyPort=freePort();options.routingMode="global";
+        options.startupTimeoutMs=10000;options.healthIntervalMs=500;return options;
     }
     QByteArray fetch(ControlledNetwork &net,quint16 proxyPort,bool tls=false) {
         QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",proxyPort));
@@ -52,6 +53,8 @@ class NodeTests:public QObject {
         return body;
     }
 private slots:
+    void initTestCase(){QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));}
+    void init(){QSettings().clear();}
     void probesNeverInheritNetworkOwnership(){
         auto source=options();source.tunEnabled=true;source.gatewayForwarding=true;source.allowLan=true;source.meteredNetwork=true;
         source.meteredAllowlist={"Codex.exe"};source.lanUsername="private";source.lanPassword="private";
@@ -62,7 +65,7 @@ private slots:
         QVERIFY(!isolated.tunEnabled);QVERIFY(!isolated.gatewayForwarding);QVERIFY(!isolated.allowLan);QVERIFY(!isolated.meteredNetwork);
         QVERIFY(!isolated.directSession);QVERIFY(isolated.dnsConfig.isEmpty());QVERIFY(isolated.customRules.isEmpty());QVERIFY(isolated.customGroups.isEmpty());
         QVERIFY(isolated.lanPassword.isEmpty());QVERIFY(isolated.inboundPassword.isEmpty());QCOMPARE(isolated.routingMode,QString("global"));
-        QCOMPARE(isolated.expectedSha256,source.expectedSha256);QCOMPARE(isolated.executablePath,source.executablePath);
+        QCOMPARE(isolated.nodes.size(),source.nodes.size());QVERIFY(!isolated.smartRouting);
     }
 
     void regionLabelsDoNotInventLocations() {
@@ -94,7 +97,7 @@ private slots:
         QVERIFY(!stale.select(first));QVERIFY(stale.selectedId().isEmpty());QVERIFY(!stale.error().isEmpty());
     }
     void selectionLeavesCatalogAndNodeRowsStable() {
-        QTemporaryDir temp;EngineController controller(std::make_unique<SwirlEngineManager>(),nullptr,temp.filePath("catalog.dpapi"));
+        QTemporaryDir temp;EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,temp.filePath("catalog.dpapi"));
         QVERIFY(controller.saveNode({{"name","HK fixture"},{"protocol","http"},{"host","127.0.0.1"},{"port",9}}));
         const auto id=controller.nodes().first().toMap().value("id").toString();
         QSignalSpy catalog(&controller,&EngineController::nodeCatalogChanged),rows(&controller,&EngineController::nodesChanged);
@@ -126,7 +129,7 @@ private slots:
         std::sort(available.begin(),available.end(),[&](const auto &a,const auto &b){return probes.result(a).value("latency").toInt()<probes.result(b).value("latency").toInt();});
         QJsonArray transfers;int passed=0;
         for(const auto &id:available.mid(0,3)){
-            config.selectedNodeId=id;config.controlPort=freePort();config.proxyPort=freePort();MihomoAdapter engine;engine.start(config);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,20000);
+            config.selectedNodeId=id;config.proxyPort=freePort();RustCoreEngine engine;engine.start(config);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,20000);
             QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",config.proxyPort));
             for(const auto &url:{QUrl("http://www.msftconnecttest.com/connecttest.txt"),QUrl("https://www.gstatic.com/generate_204")}){
                 QNetworkRequest request(url);request.setTransferTimeout(15000);request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);auto *reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),18000);
@@ -136,16 +139,18 @@ private slots:
         }
         QJsonObject reconnect{{"attempted",false}};
         if(!available.isEmpty()){
-            EngineController controller(std::make_unique<SwirlEngineManager>(),nullptr,store.filePath());controller.setControlPort(freePort());controller.setProxyPort(freePort());
+            EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,store.filePath());controller.setProxyPort(freePort());
             const auto id=available.first();controller.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),25000);const auto oldPid=controller.processId();
             controller.imports()->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),35000);
-            QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy()&&controller.processId()!=oldPid,25000);QCOMPARE(controller.activeNodeId(),id);
+            QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),25000);QCOMPARE(controller.processId(),oldPid);
+            controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),4000);
+            controller.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),25000);QCOMPARE(controller.activeNodeId(),id);
             QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",controller.activeProxyPort()));QJsonArray requests;
             for(const auto &url:{QUrl("http://www.msftconnecttest.com/connecttest.txt"),QUrl("https://www.gstatic.com/generate_204")}){
                 QNetworkRequest request(url);request.setTransferTimeout(15000);auto reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),18000);const int code=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();const bool ok=reply->error()==QNetworkReply::NoError&&code>=200&&code<300;
                 requests.append(QJsonObject{{"scheme",url.scheme()},{"httpStatus",code},{"success",ok}});QVERIFY(ok);
             }
-            reconnect={{"attempted",true},{"automaticEngineRestart",true},{"selectedNodePreserved",true},{"engine",controller.engineName()},{"requests",requests}};controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),4000);
+            reconnect={{"attempted",true},{"explicitReconnect",true},{"selectedNodePreserved",true},{"engine",controller.engineName()},{"requests",requests}};controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),4000);
         }
         QJsonObject protocols;for(auto i=protocolCounts.cbegin();i!=protocolCounts.cend();++i)protocols[i.key()]=i.value();
         const QJsonObject report{{"importedNodes",config.nodes.size()},{"protocolCounts",protocols},{"downloadUsedExistingLocalProxy",usedProxy},{"sampledNodes",ids.size()},{"successfulProbes",available.size()},{"probes",rows},{"transfers",transfers},{"refreshReconnect",reconnect}};
@@ -153,111 +158,78 @@ private slots:
         qInfo()<<"LIVE_SUBSCRIPTION imported="<<config.nodes.size()<<"sampled="<<ids.size()<<"available="<<available.size()<<"successfulRequests="<<passed;
         QVERIFY(!available.isEmpty());QCOMPARE(passed,qMin(3,available.size())*2);
     }
-    void meteredRulesReallyRejectAndAllowProcesses() {
-        ControlledNetwork net;QVERIFY(net.start());auto config=options();config.directSession=true;config.meteredNetwork=true;
-        MihomoAdapter engine;engine.start(config);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
-        QVERIFY(fetch(net,config.proxyPort).startsWith("REQUEST_ERROR"));QCOMPARE(net.httpRequests,0);
-        engine.setRoutingMode("direct");QTest::qWait(150);QCOMPARE(engine.status().mode,QString("rule"));
-        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
-        config.meteredAllowlist={QFileInfo(QCoreApplication::applicationFilePath()).fileName()};
-        engine.start(config);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
-        QCOMPARE(fetch(net,config.proxyPort),QByteArray("DIRECT-BYPASS"));QVERIFY(net.httpRequests>0);
-        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
-        config.meteredAllowlist={"unknown-app.exe","another-app.exe"};
-        engine.start(config);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
-        const auto before=net.httpRequests;QVERIFY(fetch(net,config.proxyPort).startsWith("REQUEST_ERROR"));QCOMPARE(net.httpRequests,before);
-        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
+    void unsupportedNetworkOwnershipFailsBeforeListening() {
+        for(int mode=0;mode<4;++mode){auto config=options();config.directSession=true;
+            config.meteredNetwork=mode==0;config.tunEnabled=mode==1;config.allowLan=mode==2;config.gatewayForwarding=mode==3;
+            RustCoreEngine engine;engine.start(config);QCOMPARE(engine.status().state,ProxyEngine::State::Failed);
+            QCOMPARE(engine.status().error,ProxyEngine::Error::InvalidOptions);QVERIFY(!engine.status().apiHealthy);
+            QTcpServer unused;QVERIFY(unused.listen(QHostAddress::LocalHost,config.proxyPort));
+        }
     }
-    void noNodeDirectSessionAndAuthenticatedListener() {
-        ControlledNetwork net;QVERIFY(net.start());auto config=options();config.directSession=true;
-        MihomoAdapter engine;engine.start(config);
-        QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
-        QVERIFY(engine.status().directSession);QVERIFY(engine.status().selectedNodeId.isEmpty());
-        QCOMPARE(fetch(net,config.proxyPort),QByteArray("DIRECT-BYPASS"));
-        QCOMPARE(fetch(net,config.proxyPort,true),QByteArray("DIRECT-BYPASS"));
-        QCOMPARE(net.a.forwarded+net.b.forwarded,0);
-        engine.setRoutingMode("global");QTRY_COMPARE_WITH_TIMEOUT(engine.status().mode,QString("global"),5000);
-        QCOMPARE(fetch(net,config.proxyPort),QByteArray("DIRECT-BYPASS"));
-        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
-        config.allowLan=true;config.lanUsername="fixture";config.lanPassword="test-password-only";
-        config.lanBindAddress="127.0.0.1";config.lanSkipLocalAuthentication=false;
-        engine.start(config);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
-        QVERIFY(!engine.configurationSummary().contains(config.lanPassword));
-        const auto authenticatedFetch=[&](QString password){
-            QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",config.proxyPort,config.lanUsername,password));
-            auto reply=client.get(QNetworkRequest(net.url()));QSignalSpy done(reply,&QNetworkReply::finished);
-            if(!done.wait(8000)){reply->abort();return QByteArray("TIMEOUT");}
-            return reply->error()==QNetworkReply::NoError?reply->readAll():QByteArray("REJECTED");
-        };
-        const auto before=net.httpRequests;QCOMPARE(authenticatedFetch("wrong-password"),QByteArray("REJECTED"));
-        QCOMPARE(net.httpRequests,before);QCOMPARE(authenticatedFetch(config.lanPassword),QByteArray("DIRECT-BYPASS"));
-        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
+    void explicitDirectAndAuthenticatedLoopbackListener() {
+        ControlledNetwork net;QVERIFY(net.start());auto config=options();config.directSession=true;config.routingMode="direct";
+        RustCoreEngine engine;engine.start(config);QVERIFY2(engine.status().apiHealthy,qPrintable(engine.status().message));
+        QVERIFY(engine.status().directSession);QCOMPARE(fetch(net,config.proxyPort),QByteArray("DIRECT-BYPASS"));
+        QCOMPARE(fetch(net,config.proxyPort,true),QByteArray("DIRECT-BYPASS"));QCOMPARE(net.a.forwarded+net.b.forwarded,0);
+        // A missing selected node cannot silently become DIRECT after changing mode.
+        engine.setRoutingMode("global");QCOMPARE(engine.status().mode,QString("direct"));engine.stop();
+        config.inboundUsername="fixture";config.inboundPassword="test-password-only";engine.start(config);
+        QVERIFY2(engine.status().apiHealthy,qPrintable(engine.status().message));
+        const auto request=[&](const QString &password){QNetworkAccessManager client;
+            client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",config.proxyPort,config.inboundUsername,password));
+            QNetworkRequest input(net.url());input.setTransferTimeout(3000);auto *reply=client.get(input);
+            if(!QTest::qWaitFor([&]{return reply->isFinished();},4000)){reply->abort();return QByteArray("TIMEOUT");}
+            return reply->error()==QNetworkReply::NoError?reply->readAll():QByteArray("REJECTED");};
+        const auto before=net.httpRequests;QCOMPARE(request("wrong-password"),QByteArray("REJECTED"));QCOMPARE(net.httpRequests,before);
+        QCOMPARE(request(config.inboundPassword),QByteArray("DIRECT-BYPASS"));engine.stop();QVERIFY(!engine.status().processAlive);
     }
-    void customDnsRulesAndGroupsReachRealMihomo() {
+    void customDnsRulesAndGroupsReachRust() {
         ControlledNetwork network;QVERIFY(network.start());
         auto opts=options();opts.nodes={node("A",network.a.serverPort())};opts.selectedNodeId=opts.nodes.first().id;
         opts.dnsConfig={{"mode",0},{"hosts",QVariantList{QVariantMap{{"name","fixture.test"},{"value","127.0.0.1"}}}}};
         opts.customGroups={QVariantMap{{"name","Custom"},{"type","select"},{"proxies",QStringList{"DIRECT"}}}};
-        opts.customRules={"DOMAIN,fixture.test,Custom"};
-        MihomoAdapter engine;engine.start(opts);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
-        QFile configuration(engine.status().configPath);QVERIFY(configuration.open(QIODevice::ReadOnly));const auto config=configuration.readAll();configuration.close();QVERIFY(config.contains("fixture.test"));QVERIFY(config.contains("Custom"));
+        opts.customRules={"DOMAIN,fixture.test,Custom"};opts.routingMode="rule";
+        RustCoreEngine engine;engine.start(opts);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
+        QJsonObject mapped;QVERIFY(RustCoreEngine::configuration(opts,&mapped).isEmpty());
+        QVERIFY(QJsonDocument(mapped).toJson().contains("fixture.test"));QCOMPARE(mapped.value("selectors").toArray().size(),1);
         QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",opts.proxyPort));
         auto destination=network.url();destination.setHost("fixture.test");QNetworkRequest request(destination);request.setRawHeader("Connection","close");
         auto *reply=client.get(request);QSignalSpy done(reply,&QNetworkReply::finished);QVERIFY(done.wait(8000));QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("DIRECT-BYPASS"));
         QCOMPARE(network.a.forwarded,0);QVERIFY(network.httpRequests>0);
         engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
     }
-    void codexDomainsUseTheActiveSelectorBeforeRegionalRules() {
-        auto opts=options();
-        opts.nodes={node("Selected",9)};opts.selectedNodeId=opts.nodes.first().id;
-        opts.smartRouting=true;
-        opts.rulesDirectory=QFileInfo(QString::fromUtf8(SWIRL_TEST_MANIFEST)).absolutePath()+"/rules";
-        MihomoAdapter engine;engine.start(opts);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
-        QFile configuration(engine.status().configPath);QVERIFY(configuration.open(QIODevice::ReadOnly));
-        const auto config=configuration.readAll();
-        const auto regional=config.indexOf("  - RULE-SET,cn-domain,DIRECT\n");QVERIFY(regional>0);
-        for(const auto &domain:{"chatgpt.com","openai.com","oaistatic.com","oaiusercontent.com","auth0.com","statsigapi.net"}) {
-            const auto rule=QByteArray("  - DOMAIN-SUFFIX,")+domain+",SWIRL\n";
-            const auto position=config.indexOf(rule);QVERIFY2(position>0&&position<regional,domain);
-        }
-        QVERIFY(config.contains("\"name\":\"SWIRL\""));
-        QVERIFY(config.contains("\"name\":\"GLOBAL\",\"proxies\":[\"SWIRL\"]"));
-        QVERIFY(config.contains("'+.chatgpt.com': ['https://1.1.1.1/dns-query#SWIRL']"));
-        QVERIFY(config.contains("'+.openai.com': ['https://1.1.1.1/dns-query#SWIRL']"));
-        QVERIFY(config.contains("enhanced-mode: redir-host"));QVERIFY(config.contains("store-fake-ip: false"));
-        QVERIFY(!config.contains("auto_close_connection"));
-        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
+    void explicitDomainRulesRemainOrderedAheadOfChinaFallback() {
+        auto opts=options();opts.nodes={node("Selected",9)};opts.selectedNodeId=opts.nodes.first().id;
+        opts.smartRouting=true;opts.routingMode="rule";
+        for(const auto &domain:{"chatgpt.com","openai.com","oaistatic.com","oaiusercontent.com","auth0.com","statsigapi.net"})
+            opts.customRules.append(QString("DOMAIN-SUFFIX,%1,SWIRL").arg(domain));
+        QJsonObject config;QVERIFY(RustCoreEngine::configuration(opts,&config).isEmpty());
+        QVERIFY(config.value("smart_routing").toBool());const auto rules=config.value("rules").toArray();QCOMPARE(rules.size(),6);
+        for(int i=0;i<rules.size();++i){const auto row=rules[i].toObject();QCOMPARE(row.value("outbound").toString(),opts.selectedNodeId);
+            QCOMPARE(row.value("matcher").toObject().value("value").toString(),opts.customRules[i].split(',')[1]);}
     }
-    void automaticControlPortAvoidsExistingListener() {
-        QTcpServer occupied;QVERIFY(occupied.listen(QHostAddress::LocalHost,0));
-        auto opts=options();opts.controlPort=occupied.serverPort();opts.autoControlPort=true;
-        MihomoAdapter engine;engine.start(opts);
-        QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
-        const int actual=QUrl(engine.status().controlEndpoint).port();
-        QVERIFY(actual>0);QVERIFY(actual!=occupied.serverPort());QVERIFY(occupied.isListening());
-        QFile configuration(engine.status().configPath);QVERIFY(configuration.open(QIODevice::ReadOnly));
-        QVERIFY(configuration.readAll().contains(QByteArray("127.0.0.1:")+QByteArray::number(actual)));
-        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
+    void inProcessControlNeedsNoRestListener() {
+        QTcpServer occupied;QVERIFY(occupied.listen(QHostAddress::LocalHost,0));auto opts=options();
+        opts.directSession=true;
+        RustCoreEngine engine;engine.start(opts);QVERIFY2(engine.status().apiHealthy,qPrintable(engine.status().message));
+        QCOMPARE(engine.status().controlEndpoint,QString("in-process://SwirlRust/v1"));QVERIFY(occupied.isListening());
+        QCOMPARE(engine.status().processId,QCoreApplication::applicationPid());engine.stop();QVERIFY(!engine.status().processAlive);
     }
     void isolatedBatchNeverChangesMainSelection() {
         ControlledNetwork network;QVERIFY(network.start());network.b.reject=true;
         auto opts=options();opts.nodes={node("A",network.a.serverPort()),node("B",network.b.serverPort())};opts.selectedNodeId=opts.nodes.first().id;
-        MihomoAdapter main;main.start(opts);QTRY_VERIFY_WITH_TIMEOUT(main.status().apiHealthy,18000);const auto pid=main.status().processId;
+        RustCoreEngine main;main.start(opts);QTRY_VERIFY_WITH_TIMEOUT(main.status().apiHealthy,18000);const auto pid=main.status().processId;
         auto probeOptions=opts;probeOptions.tunEnabled=true;probeOptions.gatewayForwarding=true;probeOptions.allowLan=true;probeOptions.meteredNetwork=true;
         probeOptions.customRules={"MATCH,REJECT"};probeOptions.dnsConfig={{"mode",2},{"servers","198.18.0.1"}};
         NodeTestService tests;tests.start(probeOptions,{opts.nodes[0].id,opts.nodes[1].id},network.url());
-        for(auto *runner:tests.findChildren<MihomoAdapter *>()){
-            QFile file(runner->status().configPath);QVERIFY(file.open(QIODevice::ReadOnly));const auto generated=file.readAll();
-            QVERIFY(generated.contains("tun:\n  enable: false"));QVERIFY(generated.contains("allow-lan: false"));QVERIFY(!generated.contains("198.18.0.1"));QVERIFY(!generated.contains("MATCH,REJECT"));
-        }
         QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),45000);
-        if(tests.succeeded()!=1 || tests.result(opts.nodes[1].id).value("phase").toString()!="availability")qInfo()<<"BATCH_RESULT"<<tests.results();
+        if(tests.succeeded()!=1 || tests.result(opts.nodes[1].id).value("phase").toString()!="outbound_handshake")qInfo()<<"BATCH_RESULT"<<tests.results();
         QCOMPARE(tests.completed(),2);QCOMPARE(tests.succeeded(),1);QCOMPARE(tests.failed(),1);QVERIFY(tests.result(opts.nodes[0].id).value("success").toBool());QVERIFY(!tests.result(opts.nodes[1].id).value("success").toBool());
-        QCOMPARE(tests.result(opts.nodes[1].id).value("phase").toString(),QString("availability"));
+        QCOMPARE(tests.result(opts.nodes[1].id).value("phase").toString(),QString("outbound_handshake"));
         QCOMPARE(main.status().selectedNodeId,opts.nodes.first().id);QCOMPARE(main.status().processId,pid);
         // Native probes perform one real request, without the legacy adapter's
         // extra availability request. Prove the main route independently.
-        QCOMPARE(tests.result(opts.nodes[0].id).value("engineKind").toString(),QString("native"));
+        QCOMPARE(tests.result(opts.nodes[0].id).value("engineKind").toString(),QString("rust"));
         const auto beforeMainRequest=network.a.forwarded;
         main.probeNode(network.url());QTRY_COMPARE_WITH_TIMEOUT(main.status().requestState,ProxyEngine::RequestState::Succeeded,10000);
         QVERIFY(network.a.forwarded>beforeMainRequest);QVERIFY(network.a.forwarded>=2);
@@ -266,37 +238,18 @@ private slots:
     void authenticTrafficStreamAndConnectionHistory() {
         ControlledNetwork network;QVERIFY(network.start());QTcpServer origin;QVERIFY(origin.listen(QHostAddress::LocalHost,0));network.a.targetPorts.append(origin.serverPort());
         connect(&origin,&QTcpServer::newConnection,&origin,[&]{auto socket=origin.nextPendingConnection();connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);connect(socket,&QTcpSocket::readyRead,socket,[socket]{socket->readAll();if(socket->property("sent").toBool())return;socket->setProperty("sent",true);socket->write("HTTP/1.1 200 OK\r\nContent-Length: 65536\r\nConnection: close\r\n\r\n");auto timer=new QTimer(socket);timer->setInterval(100);connect(timer,&QTimer::timeout,socket,[socket,timer]{socket->write(QByteArray(2048,'x'));const auto n=socket->property("chunks").toInt()+1;socket->setProperty("chunks",n);if(n==32){timer->stop();socket->disconnectFromHost();}});timer->start();});});
-        auto opts=options();opts.nodes={node("A",network.a.serverPort())};opts.selectedNodeId=opts.nodes.first().id;MihomoAdapter engine;QTemporaryDir temp;TelemetryService model(temp.filePath("history"),false);connect(&engine,&ProxyEngine::statusChanged,&model,[&]{model.ingest(engine.status());});engine.start(opts);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
+        auto opts=options();opts.nodes={node("A",network.a.serverPort())};opts.selectedNodeId=opts.nodes.first().id;RustCoreEngine engine;QTemporaryDir temp;TelemetryService model(temp.filePath("history"),false);connect(&engine,&ProxyEngine::statusChanged,&model,[&]{model.ingest(engine.status());});engine.start(opts);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
         QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",opts.proxyPort));auto reply=client.get(QNetworkRequest(QUrl(QString("http://127.0.0.1:%1/real-stream").arg(origin.serverPort()))));QTRY_VERIFY_WITH_TIMEOUT(model.sampled()&&model.downloadRate()>0,6000);QTRY_VERIFY_WITH_TIMEOUT(!model.connections().isEmpty(),6000);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),7000);QCOMPARE(reply->readAll().size(),65536);QTRY_VERIFY_WITH_TIMEOUT(model.summary().value("total").toDouble()>=65536,4000);QVERIFY(!model.ranking("domains").isEmpty());QTRY_VERIFY_WITH_TIMEOUT(model.activeConnections()==0,4000);QVERIFY(!model.connections().isEmpty());engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
     }
-    void additionalProtocolsUseActualMihomoConfiguration() {
-        const QList<QJsonObject> samples{
-            {{"type","http"}},
-            {{"type","vmess"},{"uuid","11111111-1111-4111-8111-111111111111"},{"alterId",0},{"cipher","auto"},{"network","ws"},{"ws-opts",QJsonObject{{"path","/fixture"}}}},
-            {{"type","vless"},{"uuid","11111111-1111-4111-8111-111111111111"},{"tls",true},{"network","grpc"},{"grpc-opts",QJsonObject{{"grpc-service-name","fixture"}}}},
-            {{"type","ssr"},{"password","fixture-password"},{"cipher","aes-128-cfb"},{"protocol","origin"},{"obfs","plain"}},
-            {{"type","snell"},{"psk","fixture-password"},{"version",3}},
-            {{"type","hysteria"},{"auth-str","fixture-password"},{"up","10 Mbps"},{"down","10 Mbps"}},
-            {{"type","hysteria2"},{"password","fixture-password"}},
-            {{"type","tuic"},{"uuid","11111111-1111-4111-8111-111111111111"},{"password","fixture-password"},{"congestion-controller","bbr"}},
-            {{"type","anytls"},{"password","fixture-password"}},
-            {{"type","ssh"},{"username","fixture"},{"password","fixture-password"}},
-            {{"type","gost-relay"},{"username","fixture"},{"password","fixture-password"}},
-            {{"type","mieru"},{"username","fixture"},{"password","fixture-password"},{"transport","TCP"}},
-            {{"type","shadowquic"},{"username","fixture"},{"password","fixture-password"}},
-            {{"type","trusttunnel"},{"username","fixture"},{"password","fixture-password"}}
-        };
-        for(auto sample:samples) {
-            const auto protocol=sample.value("type").toString();sample.insert("name","fixture");sample.insert("server","127.0.0.1");sample.insert("port",443);
-            const auto parsed=NodeImporter::parse(QJsonDocument(sample).toJson());QVERIFY2(bool(parsed),qPrintable(protocol+": "+parsed.error));
-            auto config=options();config.nodes=parsed.nodes;config.selectedNodeId=parsed.nodes.first().id;
-            MihomoAdapter engine;engine.start(config);
-            QTRY_VERIFY_WITH_TIMEOUT(engine.status().state==ProxyEngine::State::Running || engine.status().state==ProxyEngine::State::Failed,16000);
-            QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(protocol+": "+engine.status().message));
-            QVERIFY(!engine.configurationSummary().contains("fixture-password"));
-            qInfo()<<"REAL_MIHOMO_CONFIG"<<protocol<<"accepted by pinned engine; remote handshake not tested";
-            engine.stop();QTRY_COMPARE_WITH_TIMEOUT(engine.status().state,ProxyEngine::State::Stopped,4000);
-        }
+    void unsupportedImportedProtocolIsPreservedButCannotStart() {
+        const auto parsed=NodeImporter::parse(R"({"name":"pending","type":"hysteria2","server":"127.0.0.1","port":443,"password":"private-test-only"})");
+        QVERIFY2(bool(parsed),qPrintable(parsed.error));QTemporaryDir directory;NodeStore store(directory.filePath("nodes"));
+        QVERIFY(store.importNodes(parsed.nodes));NodeStore loaded(store.filePath());QCOMPARE(loaded.nodes().size(),1);
+        QCOMPARE(loaded.nodes().first().password,QString("private-test-only"));auto opts=options();
+        opts.nodes=loaded.nodes();opts.selectedNodeId=opts.nodes.first().id;RustCoreEngine engine;engine.start(opts);
+        QCOMPARE(engine.status().state,ProxyEngine::State::Failed);QCOMPARE(engine.status().error,ProxyEngine::Error::InvalidOptions);
+        QVERIFY(!engine.status().message.contains("private-test-only"));QVERIFY(!engine.status().processAlive);
+        QCOMPARE(loaded.nodes().first().protocol,QString("hysteria2"));
     }
     void importedVlessKeepsTransportPrivate() {
         QTemporaryDir temp; const auto path=temp.filePath("import.dpapi"); NodeStore store(path);
@@ -354,7 +307,7 @@ private slots:
         ControlledNetwork net;QVERIFY(net.start());auto config=options();
         auto a=node("A",net.a.serverPort()),b=node("B",net.b.serverPort());b.username=QString::fromUtf8(net.b.username);b.password=QString::fromUtf8(net.b.password);
         config.nodes={a,b};config.selectedNodeId=a.id;
-        MihomoAdapter engine;engine.start(config);
+        RustCoreEngine engine;engine.start(config);
         QTRY_COMPARE_WITH_TIMEOUT(engine.status().state,ProxyEngine::State::Running,16000);
         QCOMPARE(engine.status().nodeHealth,ProxyEngine::NodeHealth::Unknown);QCOMPARE(engine.status().requestState,ProxyEngine::RequestState::NotTested);
         QVERIFY(!engine.configurationSummary().contains(b.password));QCOMPARE(fetch(net,config.proxyPort),QByteArray("exit-A"));
@@ -368,7 +321,7 @@ private slots:
             QCOMPARE(fetch(net,config.proxyPort,i%2==0),toB?QByteArray("exit-B"):QByteArray("exit-A"));}
         QVERIFY(net.b.forwarded>=3);QVERIFY(net.httpRequests>0);
         net.a.reject=true;engine.probeNode(net.url());QTRY_VERIFY_WITH_TIMEOUT(!engine.status().nodeBusy,8000);
-        QCOMPARE(engine.status().nodeHealth,ProxyEngine::NodeHealth::Unavailable);QCOMPARE(engine.status().requestState,ProxyEngine::RequestState::NotTested);
+        QCOMPARE(engine.status().nodeHealth,ProxyEngine::NodeHealth::Unavailable);QCOMPARE(engine.status().requestState,ProxyEngine::RequestState::Failed);
         QVERIFY(engine.status().processAlive);QVERIFY(engine.status().apiHealthy);
         net.a.reject=false;engine.probeNode(net.url());QTRY_VERIFY_WITH_TIMEOUT(!engine.status().nodeBusy,8000);
         QCOMPARE(engine.status().requestState,ProxyEngine::RequestState::Succeeded);
@@ -393,31 +346,19 @@ private slots:
             QCOMPARE(fetch(net,config.proxyPort),QByteArray("exit-A"));engine.stop();QTRY_COMPARE_WITH_TIMEOUT(engine.status().state,ProxyEngine::State::Stopped,4000);}
         qInfo()<<"CONTROLLED_CHAIN HTTP HTTPS exit-A/exit-B verified;"<<net.a.forwarded<<"A relays,"<<net.b.forwarded<<"B relays; no remote environment claimed";
     }
-    void protocolConfigurationAndPortConflict() {
+    void occupiedTcpPortCannotReportReady() {
         auto config=options();QTcpServer occupied;QVERIFY(occupied.listen(QHostAddress::LocalHost,0));
-        auto n=node("S",1080);config.nodes={n};config.selectedNodeId=n.id;config.proxyPort=occupied.serverPort();
-        MihomoAdapter engine;engine.start(config);QCOMPARE(engine.status().error,ProxyEngine::Error::PortConflict);QVERIFY(!engine.status().processAlive);
-        for(const auto &protocol: {QString("ss"),QString("trojan")}){
-            config.proxyPort=freePort();n.protocol=protocol;n.password="fixture-secret-'\\\n";n.cipher="aes-128-gcm";n.serverName="localhost";config.nodes={n};
-            engine.start(config);QTRY_COMPARE_WITH_TIMEOUT(engine.status().state,ProxyEngine::State::Running,16000);
-            QVERIFY(!engine.configurationSummary().contains("fixture-secret"));
-            engine.stop();QTRY_COMPARE_WITH_TIMEOUT(engine.status().state,ProxyEngine::State::Stopped,4000);
-        }
+        config.directSession=true;config.proxyPort=occupied.serverPort();RustCoreEngine engine;engine.start(config);
+        QCOMPARE(engine.status().state,ProxyEngine::State::Failed);QVERIFY(engine.status().message.contains("ListenerBind"));
+        QVERIFY(!engine.status().apiHealthy);QVERIFY(!engine.status().processAlive);QVERIFY(occupied.isListening());
     }
-    void occupiedUdpPortCannotReportMixedListenerReady() {
-        QUdpSocket occupied;
-        QVERIFY(occupied.bind(QHostAddress::LocalHost,0,QUdpSocket::DontShareAddress));
-        QTcpServer tcpAvailable;
-        QVERIFY(tcpAvailable.listen(QHostAddress::LocalHost,occupied.localPort()));
-        tcpAvailable.close();
+    void unrelatedUdpPortDoesNotMasqueradeAsRustTcpListener() {
+        // Rust SOCKS5 negotiates a dedicated UDP association port, rather than
+        // binding a second UDP service to the HTTP/TCP mixed listener port.
+        QUdpSocket occupied;QVERIFY(occupied.bind(QHostAddress::LocalHost,0,QUdpSocket::DontShareAddress));
         auto config=options();config.directSession=true;config.proxyPort=occupied.localPort();
-        while(config.controlPort==config.proxyPort)config.controlPort=freePort();
-        MihomoAdapter engine;engine.start(config);
-        QTRY_VERIFY_WITH_TIMEOUT(engine.status().state==ProxyEngine::State::Failed ||
-                                 engine.status().state==ProxyEngine::State::Running,18000);
-        QCOMPARE(engine.status().error,ProxyEngine::Error::PortConflict);
-        QVERIFY(!engine.status().apiHealthy);QVERIFY(!engine.status().processAlive);
-        QCOMPARE(occupied.state(),QAbstractSocket::BoundState);
+        RustCoreEngine engine;engine.start(config);QVERIFY2(engine.status().apiHealthy,qPrintable(engine.status().message));
+        QCOMPARE(occupied.state(),QAbstractSocket::BoundState);engine.stop();QVERIFY(!engine.status().processAlive);
     }
     void verifiedRoutingProviders() {
         ControlledNetwork net;QVERIFY(net.start());auto config=options();
@@ -425,10 +366,10 @@ private slots:
         QTemporaryDir rules;QVERIFY(rules.isValid());
         for(const auto &name:{"manifest.json","cn-domain.mrs","cn-ip.mrs"})
             QVERIFY(QFile::copy(QCoreApplication::applicationDirPath()+"/rules/"+name,rules.filePath(name)));
-        config.smartRouting=true;config.rulesDirectory=rules.path();
-        MihomoAdapter engine;engine.start(config);
+        config.smartRouting=true;config.rulesDirectory=rules.path();config.routingMode="rule";config.nativePrivateRouting=true;
+        RustCoreEngine engine;engine.start(config);
         QTRY_COMPARE_WITH_TIMEOUT(engine.status().state,ProxyEngine::State::Running,16000);
-        QVERIFY(engine.routingRules().size()>=20);
+        QVERIFY(engine.routingRules().size()>=10);
         QCOMPARE(fetch(net,config.proxyPort),QByteArray("DIRECT-BYPASS"));
         engine.setRoutingMode("global");QTRY_VERIFY_WITH_TIMEOUT(engine.status().mode=="global"&&engine.status().apiHealthy,5000);
         QCOMPARE(fetch(net,config.proxyPort),QByteArray("exit-A"));

@@ -60,7 +60,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     if(!check(ports.reserve(),"distinct UI TCP/UDP and control ports are reserved together")) {
         qInfo()<<"Port reservation evidence"<<ports.errorString();return 2;
     }
-    controller->setProxyPort(ports.proxyPort());controller->setControlPort(ports.controlPort());
+    controller->setProxyPort(ports.proxyPort());
     ports.release();
     const auto waitEngineReady=[&]{
         const bool ready=QTest::qWaitFor([&]{return controller->apiHealthy();},15000);
@@ -68,7 +68,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         return ready;
     };
     select(0);click("nodeConnectButton");
-    if(check(waitEngineReady(),"UI starts actual pinned Mihomo")) {
+    if(check(waitEngineReady(),"UI starts actual Rust Core")) {
         check(!controller->requestSucceeded(),"running engine does not imply successful request");fill("nodeTestUrl",net.url().toString());
         probeSelected(net.a,net.b,"UI real request passes only through selected node A");
         const auto pid=controller->processId();
@@ -98,7 +98,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     check(item("importContentField") && item("importContentField")->property("text").toString().isEmpty(),"import clears credential-bearing input after submission");
     auto *dialog=window->findChild<QObject *>("nodeImportDialog");if(dialog)QMetaObject::invokeMethod(dialog,"close");QTest::qWait(350);
     select(0);click("nodeConnectButton");
-    check(waitEngineReady(),"UI imported node starts real Mihomo");
+    check(waitEngineReady(),"UI imported node starts real Rust Core");
     fill("nodeTestUrl",net.url().toString());click("nodeTestButton");
     check(QTest::qWaitFor([&]{return !controller->tests()->busy();},41000) && controller->tests()->result(controller->selectedNodeId()).value("success").toBool(),"UI imported node forwards a real HTTP request");
     controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive();},4000),"UI imported node cleanup reaps owned engine");

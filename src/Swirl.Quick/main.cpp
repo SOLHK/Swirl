@@ -1,4 +1,5 @@
 #include <QGuiApplication>
+#include "engine/RustCoreSelfTest.h"
 #include "app/SingleInstance.h"
 #include "app/ShutdownCoordinator.h"
 #include "app/FontManager.h"
@@ -77,9 +78,6 @@
 #include "app/HdrOutput.h"
 #include "network/CaptureService.h"
 #include "network/GatewayService.h"
-#ifndef SWIRL_USE_RUST_CORE
-#include "engine/MihomoAdapter.h"
-#endif
 #include "engine/ThreadedEngine.h"
 #include "engine/EngineController.h"
 
@@ -97,6 +95,15 @@ static void recordQtDiagnostic(QtMsgType type, const QMessageLogContext &, const
 
 int main(int argc, char *argv[])
 {
+    // Package verification runs the real EXE/DLL, before any UI, NodeStore,
+    // system-proxy ownership, or persisted settings are opened.
+    for (int i = 1; i < argc; ++i) {
+        if (QByteArray(argv[i]) == "--rust-core-self-test") {
+            QCoreApplication selfTest(argc, argv);
+            if (i + 1 >= argc) return 64;
+            return runRustCoreSelfTest(QString::fromLocal8Bit(argv[i + 1]));
+        }
+    }
 #ifdef Q_OS_WIN
     SetCurrentProcessExplicitAppUserModelID(L"SOLHK.Swirl.Desktop");
 #endif
@@ -224,13 +231,7 @@ int main(int argc, char *argv[])
     QTemporaryDir isolatedNodes(xrayUiTest?SwirlPaths::testRoot()+QStringLiteral("/xray-ui-nodes-XXXXXX")
                                         :QDir::tempPath()+QStringLiteral("/Swirl-XXXXXX"));
     if(xrayUiTest&&!isolatedNodes.isValid())return 2;
-    std::unique_ptr<ProxyEngine> runtimeEngine;
-#ifndef SWIRL_USE_RUST_CORE
-    if(nodeTest||engineTest)runtimeEngine=std::make_unique<MihomoAdapter>(); // Pinned legacy regression fixtures.
-    else runtimeEngine=std::make_unique<ThreadedEngine>();
-#else
-    runtimeEngine=std::make_unique<ThreadedEngine>();
-#endif
+    auto runtimeEngine=std::make_unique<ThreadedEngine>();
     EngineController engineController(std::move(runtimeEngine),nullptr,realAcceptance?runtimeStore:isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString(),realAcceptance);
     ExtensionService extensions(&engineController,isolatedRun?isolatedNodes.filePath("extensions.dpapi"):QString());
     GatewayService gateway(&engineController,isolatedRun?isolatedNodes.filePath("gateway.json"):QString());
@@ -326,8 +327,8 @@ int main(int argc, char *argv[])
         const auto fixture=qEnvironmentVariable("SWIRL_LIFECYCLE_ENGINE");
         if(!fixture.isEmpty()){
             QTcpServer reserve;reserve.listen(QHostAddress::LocalHost);const auto port=reserve.serverPort();reserve.close();
-            engineController.setProxyPort(port);engineController.setRoutingMode("global");
-            engineController.setPreferCompatibility(fixture=="compatibility");
+            if(fixture!="rust")return 64;
+            engineController.setProxyPort(port);engineController.setRoutingMode("direct");
             QObject::connect(&engineController,&EngineController::statusChanged,&app,[&]{if(engineController.processAlive())app.setProperty("lifecycleEnginePid",engineController.processId());});
             engineController.connectNode("");
         }

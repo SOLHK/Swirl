@@ -5,14 +5,8 @@
 #include <QVariantList>
 #include "ProxyNode.h"
 
-// Swirl-owned contract. No Mihomo JSON or transport objects cross this boundary.
+// Swirl-owned UI/control contract; forwarding belongs exclusively to Rust.
 struct EngineStartOptions {
-    bool preferCompatibility=false;
-    QString executablePath;
-    QByteArray expectedSha256;
-    QString expectedVersion;
-    quint16 controlPort = 9097;
-    bool autoControlPort = false;
     int startupTimeoutMs = 10000;
     int requestTimeoutMs = 1000;
     int healthIntervalMs = 2000;
@@ -62,9 +56,8 @@ public:
         qint64 processId = 0;
         qint64 uptimeSeconds = 0;
         QString version;
-        QString engineName="Mihomo 兼容",engineKind="compatibility",sessionId,engineReason;
+        QString engineName="Swirl Core Rust",engineKind="rust",sessionId,engineReason;
         QString mode;
-        QString executablePath;
         QString configPath;
         QString controlEndpoint;
         QString selectedNodeId;
@@ -75,6 +68,9 @@ public:
         int latencyMs = -1;
         int responseCode = 0;
         QString nodeMessage;
+        QString probeFailureStage;
+        qint64 probeOutboundConnectMs=-1,probeOriginTlsMs=-1;
+        quint64 probeRequestTag=0;
         QVariantList connections;
         qint64 connectionsAt = 0;
         qint64 trafficAt = 0;
@@ -98,6 +94,12 @@ public:
     virtual void refresh() = 0;
     virtual void selectNode(const QString &id) = 0;
     virtual void probeNode(const QUrl &url) = 0;
+    // The UI uses a request tag to distinguish periodic telemetry from a
+    // concurrent user-selected URL. Zero identifies an ordinary manual probe.
+    virtual void probeNodeTagged(const QUrl &url,quint64 tag) {
+        Q_UNUSED(url);
+        emit probeRequestRejected(tag,QStringLiteral("probe-unavailable"));
+    }
     virtual void setRoutingMode(const QString &mode) { Q_UNUSED(mode); }
     virtual Status status() const = 0;
     virtual QString configurationSummary() const = 0;
@@ -105,4 +107,5 @@ public:
 signals:
     void statusChanged();
     void diagnostic(const QString &module,const QString &code,const QString &message);
+    void probeRequestRejected(quint64 tag,const QString &code);
 };

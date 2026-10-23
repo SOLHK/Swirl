@@ -218,7 +218,6 @@ QVariantList RustCoreEngine::routingRulesForOptions(const EngineStartOptions &op
  return rows;
 }
 QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *output){
- if(o.preferCompatibility)return "已选择优先使用兼容内核。此 Rust 版本不会启动 Mihomo；请在“设置”关闭兼容模式后重试。";
  if(o.tunEnabled||o.gatewayForwarding)return "当前会话要求增强模式或网关转发，但 Rust 版尚未支持。请在“概览”关闭增强模式后重试。";
  if(o.allowLan)return "当前会话要求局域网代理，但 Rust 版尚未支持。请在“概览”关闭局域网代理后重试。";
  if(o.meteredNetwork)return "当前会话要求计费网络模式，但 Rust 版尚未支持。请在“设置”关闭计费网络模式后重试。";
@@ -422,18 +421,14 @@ void RustCoreEngine::start(const EngineStartOptions &options){
  stop();m_options=options;m_status={};m_status.engineName="Swirl Core Rust";m_status.engineKind="rust";
  QJsonObject config;const auto reason=configuration(options,&config);if(!reason.isEmpty()){fail(Error::InvalidOptions,reason);return;}
  if(!m_command){
-  m_library.setFileName(QCoreApplication::applicationDirPath()+"/swirl_api");
-  // Keep code mapped: cancelled OS DNS work can finish after bounded shutdown.
-  m_library.setLoadHints(QLibrary::PreventUnloadHint);
-  if(!m_library.load()){fail(Error::MissingExecutable,"Swirl Rust DLL 不可用；未切换到外部内核。");return;}
-  auto version=reinterpret_cast<quint32(*)()>(m_library.resolve("swirl_core_abi_version"));
-  m_command=reinterpret_cast<Command>(m_library.resolve("swirl_core_command"));
-  if(!version||version()!=1||!m_command){m_command=nullptr;fail(Error::InvalidResponse,"Rust ABI 版本不兼容。");return;}
+  if(!m_library.load()){fail(Error::MissingExecutable,m_library.errorString());return;}
+  m_command=m_library.command();
+  emit diagnostic("SwirlRust","LibraryReady",QString::fromUtf8(QJsonDocument(m_library.diagnostics()).toJson(QJsonDocument::Compact)));
  }
  const auto response=call({{"op","start"},{"config",config}});
  if(!response["ok"].toBool()){fail(Error::ConfigurationFailed,response["error"].toString("RustStartFailed"));return;}
  m_handle=quint64(response["handle"].toInteger());m_status.sessionId=QUuid::createUuid().toString(QUuid::WithoutBraces);
- m_status.processId=QCoreApplication::applicationPid();m_status.version="Swirl Core Rust 0.1";m_status.controlEndpoint="in-process://SwirlRust/v1";
+ m_status.processId=QCoreApplication::applicationPid();m_status.version="Swirl Core Rust "+m_library.diagnostics().value("package_version").toString();m_status.controlEndpoint="in-process://SwirlRust/v1";
  m_status.mode=options.routingMode;m_status.directSession=options.directSession||options.routingMode=="direct";
  m_status.selectedNodeId=options.selectedNodeId;m_status.proxyPort=options.proxyPort;
  m_uptime.start();m_rateClock.start();m_poll.start();refresh();

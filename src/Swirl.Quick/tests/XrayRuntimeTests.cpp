@@ -50,7 +50,8 @@ EngineStartOptions options(const QList<ProxyNode> &nodes, quint16 port = 17898) 
     result.proxyPort = port;
     result.routingMode = QStringLiteral("global");
     result.startupTimeoutMs = 5000;
-    result.executablePath = QStringLiteral("must-not-start-an-external-core.exe");
+    // R1 removes the external executable option entirely. The actual runtime
+    // identity and process ID assertions below remain mandatory.
     return result;
 }
 

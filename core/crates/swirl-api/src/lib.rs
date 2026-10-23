@@ -139,6 +139,36 @@ pub extern "C" fn swirl_core_abi_version() -> u32 {
     1
 }
 
+/// Read immutable, non-secret build identity before invoking runtime commands.
+/// Returns the UTF-8 byte count (without a NUL terminator), -1 for a null/short
+/// output buffer, or -2 for a panic. A 4096-byte caller buffer is sufficient.
+///
+/// # Safety
+/// output must point to output_capacity writable bytes, valid for this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn swirl_core_build_info(output: *mut u8, output_capacity: usize) -> isize {
+    if output.is_null() {
+        return -1;
+    }
+    std::panic::catch_unwind(|| {
+        let metadata = json!({
+            "abi_version": swirl_core_abi_version(),
+            "build_id": env!("SWIRL_BUILD_ID"),
+            "source_sha": env!("SWIRL_SOURCE_SHA"),
+            "package_version": env!("CARGO_PKG_VERSION"),
+            "target": env!("SWIRL_BUILD_TARGET"),
+        });
+        let bytes = metadata.to_string().into_bytes();
+        if bytes.len() > output_capacity {
+            return -1;
+        }
+        // SAFETY: the caller owns a writable region and the size was checked.
+        unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), output, bytes.len()) };
+        bytes.len() as isize
+    })
+    .unwrap_or(-2)
+}
+
 /// Execute one bounded UTF-8 JSON command. Returns response length, or -1 for
 /// invalid buffers, -2 for panic, -3 for unavailable state. Never unwinds into Qt.
 ///
@@ -200,6 +230,40 @@ mod tests {
             c.dispatch(br#"{"op":"snapshot","handle":999}"#)["error"],
             "UnknownHandle"
         );
+    }
+
+    #[test]
+    fn build_identity_is_bounded_and_matches_compiled_inputs() {
+        let mut output = [0xa5; 4096];
+        // SAFETY: output is a writable local array of the declared size.
+        let count = unsafe { swirl_core_build_info(output.as_mut_ptr(), output.len()) };
+        assert!(count > 0 && count < 1024);
+        let count = count as usize;
+        assert!(output[count..].iter().all(|b| *b == 0xa5));
+        let metadata: Value = serde_json::from_slice(&output[..count]).unwrap();
+        assert_eq!(metadata["abi_version"], swirl_core_abi_version());
+        assert_eq!(metadata["build_id"], env!("SWIRL_BUILD_ID"));
+        assert_eq!(metadata["source_sha"], env!("SWIRL_SOURCE_SHA"));
+        assert_eq!(metadata["package_version"], env!("CARGO_PKG_VERSION"));
+        assert_eq!(metadata["target"], env!("SWIRL_BUILD_TARGET"));
+        assert_eq!(metadata.as_object().unwrap().len(), 5);
+
+        let mut short = [0xa5; 1];
+        // SAFETY: short is a writable local array of the declared size.
+        assert_eq!(unsafe { swirl_core_build_info(short.as_mut_ptr(), 1) }, -1);
+        assert_eq!(short, [0xa5]);
+        // SAFETY: a null pointer is explicitly rejected before dereferencing.
+        assert_eq!(
+            unsafe { swirl_core_build_info(std::ptr::null_mut(), 4096) },
+            -1
+        );
+        let mut exact = vec![0; count];
+        // SAFETY: exact has count writable bytes.
+        assert_eq!(
+            unsafe { swirl_core_build_info(exact.as_mut_ptr(), exact.len()) },
+            count as isize
+        );
+        assert_eq!(exact, output[..count]);
     }
 }
 

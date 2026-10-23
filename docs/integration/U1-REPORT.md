@@ -91,3 +91,33 @@ an unimplemented code capability, not a physical-device-only validation item.
 Windows physical-device use, private subscription/provider connectivity and
 like-for-like Loon/Clash performance remain separate from CI and controlled
 reference-server tests. No credentials or private raw sources belong here.
+
+## U1-C1: R1 merge and checked ABI unification
+
+The R1 source `5d96214ac80d63985cdccf4942c3c1d79035e793` is retained as
+the second parent of this integration merge. Eight explicit conflicts were
+resolved by preserving JSON import/async storage and the R1 runtime removal.
+The combined header exports both bounded import and build-identity functions.
+The product and the importer now share one mutex-protected, identity-checked
+library loader. Probe workers deliberately own isolated Rust sessions; they do
+not create an alternative proxy engine or replace the product's live session.
+
+The independent Qt product test project now builds its Rust library from the
+same checkout, checks the EXE/library build identity, and stages packaged rules.
+No cached/prebuilt library is accepted as evidence for this target. A concurrent
+loader test checks eight callers see the same checked command/import exports.
+
+An integration regression exposed a lifecycle mismatch: old catalogue tests
+assumed synchronous startup while R1 starts on a network thread. Cancellation
+now invalidates queued worker operations through an atomic generation and a
+guarded next-turn probe callback. Tests cover cancellation before startup,
+after the actual in-process runtime becomes healthy, and during a live request;
+the original process-identity and no-late-traffic assertions are retained.
+
+Candidate validation before this checkpoint uses Linux x86_64, Qt 6.10.3,
+GCC 13.3, Rust 1.99.1 and the isolated checkout. Commands: `cargo fmt --all
+--check`, `cargo check --workspace --locked --offline`,
+`python tools/test_rust_only_runtime.py`, `python tools/test_rust_build_chain.py`,
+and CMake/CTest in `src/Swirl.Quick/tests/xray`. These are checkpoint checks,
+not final U1 acceptance. The final SHA will be rebuilt and tested after the
+subscription bridge, security and CI changes are integrated.

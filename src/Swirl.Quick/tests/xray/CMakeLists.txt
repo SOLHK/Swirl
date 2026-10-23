@@ -11,10 +11,7 @@ enable_testing()
 
 get_filename_component(SWIRL_QUICK_SOURCE "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 get_filename_component(SWIRL_REPOSITORY "${SWIRL_QUICK_SOURCE}/../.." ABSOLUTE)
-set(SWIRL_RUST_LIBRARY "" CACHE FILEPATH "Exact-source swirl-api cdylib built with cargo --locked")
-if(NOT IS_ABSOLUTE "${SWIRL_RUST_LIBRARY}" OR NOT EXISTS "${SWIRL_RUST_LIBRARY}")
-    message(FATAL_ERROR "Build swirl-api first and pass its absolute path as SWIRL_RUST_LIBRARY; no mock or external core is used")
-endif()
+include("${SWIRL_QUICK_SOURCE}/cmake/SwirlRustCore.cmake")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
 foreach(configuration IN ITEMS DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
@@ -29,8 +26,6 @@ add_library(SwirlXrayProduct STATIC
     "${SWIRL_QUICK_SOURCE}/engine/NodeTestService.cpp"
     "${SWIRL_QUICK_SOURCE}/engine/TelemetryService.h"
     "${SWIRL_QUICK_SOURCE}/engine/TelemetryService.cpp"
-    "${SWIRL_QUICK_SOURCE}/engine/ProxyLatencyProbe.h"
-    "${SWIRL_QUICK_SOURCE}/engine/ProxyLatencyProbe.cpp"
     "${SWIRL_QUICK_SOURCE}/engine/SystemProxySession.h"
     "${SWIRL_QUICK_SOURCE}/engine/SystemProxySession.cpp"
     "${SWIRL_QUICK_SOURCE}/engine/ConnectionDiagnostics.h"
@@ -49,10 +44,12 @@ add_library(SwirlXrayProduct STATIC
     "${SWIRL_QUICK_SOURCE}/engine/SwirlProtocolRegistry.cpp"
     "${SWIRL_QUICK_SOURCE}/engine/XrayJsonBridge.h"
     "${SWIRL_QUICK_SOURCE}/engine/XrayJsonBridge.cpp"
+    "${SWIRL_QUICK_SOURCE}/engine/RustCoreLibrary.h"
+    "${SWIRL_QUICK_SOURCE}/engine/RustCoreLibrary.cpp"
     "${SWIRL_QUICK_SOURCE}/engine/RustCoreEngine.h"
     "${SWIRL_QUICK_SOURCE}/engine/RustCoreEngine.cpp")
 target_include_directories(SwirlXrayProduct PUBLIC "${SWIRL_QUICK_SOURCE}")
-target_compile_definitions(SwirlXrayProduct PUBLIC SWIRL_USE_RUST_CORE)
+swirl_pair_rust_core(SwirlXrayProduct)
 target_link_libraries(SwirlXrayProduct PUBLIC Qt6::Core Qt6::Network Qt6::Gui)
 if(WIN32)
     target_compile_definitions(SwirlXrayProduct PUBLIC NOMINMAX)
@@ -62,15 +59,7 @@ if(MSVC)
     target_compile_options(SwirlXrayProduct PRIVATE /utf-8)
 endif()
 
-# Copy on every build, including a Rust-only rebuild with unchanged Qt objects.
-# QLibrary resolves libswirl_api.{so,dylib} or swirl_api.dll in the executable dir.
-add_custom_target(SwirlXrayRustRuntime ALL
-    COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-        "${SWIRL_RUST_LIBRARY}" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
-    DEPENDS "${SWIRL_RUST_LIBRARY}"
-    VERBATIM)
-
+# All executables stage the same content-paired library and verified rules.
 function(swirl_add_xray_test target source test_name)
     add_executable(${target} "${SWIRL_QUICK_SOURCE}/tests/${source}")
     target_link_libraries(${target} PRIVATE SwirlXrayProduct Qt6::Test)
@@ -80,7 +69,7 @@ function(swirl_add_xray_test target source test_name)
     if(MSVC)
         target_compile_options(${target} PRIVATE /utf-8)
     endif()
-    add_dependencies(${target} SwirlXrayRustRuntime)
+    swirl_stage_rust_core(${target})
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${test_name}-state")
     add_test(NAME ${test_name} COMMAND ${target}
         -o "${CMAKE_CURRENT_BINARY_DIR}/${test_name}.xml,xml" -o "-,txt")
@@ -102,3 +91,6 @@ execute_process(COMMAND git rev-parse HEAD WORKING_DIRECTORY "${SWIRL_REPOSITORY
     OUTPUT_VARIABLE SWIRL_SOURCE_SHA OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/xray-toolchain.txt"
     "Source=${SWIRL_SOURCE_SHA}\nQt=${Qt6_VERSION}\nCompiler=${CMAKE_CXX_COMPILER_ID}\nCompilerVersion=${CMAKE_CXX_COMPILER_VERSION}\nSystem=${CMAKE_SYSTEM_NAME}\nArchitecture=${CMAKE_SYSTEM_PROCESSOR}\nRustLibrary=${SWIRL_RUST_LIBRARY}\n")
+
+include("${SWIRL_QUICK_SOURCE}/cmake/RustCoreLibraryTests.cmake")
+swirl_add_rust_library_tests()
