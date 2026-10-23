@@ -62,6 +62,7 @@ jobs:
               for name, path in paths.items():
                   destination.write(f'{name}={path.resolve()}\n')
           inputs = ('tools/Run-U1NativeSupplement.py', 'tools/tests/test_u1_native_supplement.py',
+                    'tools/tests/test_r1_public_proxy.py',
                     '.github/workflows/u1-native-supplement.yml', 'tools/Build-XrayPeer.py',
                     'tools/Fetch-TransportPeers.py', 'tools/tests/xray_peer/lock.json',
                     'tools/tests/transport-peer-lock.json', 'core/Cargo.lock')
@@ -109,6 +110,48 @@ jobs:
         run: python tools/Build-XrayPeer.py --output "${{ runner.temp }}/u1-source-xray-peer"
       - name: Fetch the separately pinned official release required by strict VMess
         run: python tools/Fetch-TransportPeers.py --output "${{ runner.temp }}/u1-release-xray-peers"
+      - name: Verify strict public TLS diagnostic controls on this OS
+        if: ${{ !cancelled() }}
+        shell: python
+        run: |
+          import json, os, pathlib, subprocess, sys, unittest
+          sys.path.insert(0, str(pathlib.Path('tools/tests').resolve()))
+          expected = [
+              'test_r1_public_proxy.PublicTlsControlTests.test_control_records_missing_close_notify_as_failure_after_204',
+              'test_r1_public_proxy.PublicTlsControlTests.test_control_rejects_untrusted_tls_before_http',
+              'test_r1_public_proxy.PublicTlsControlTests.test_control_requires_verified_tls_response_and_orderly_close',
+          ]
+          suite = unittest.defaultTestLoader.loadTestsFromName('test_r1_public_proxy.PublicTlsControlTests')
+          def ids(node):
+              if isinstance(node, unittest.TestSuite):
+                  return [item for child in node for item in ids(child)]
+              return [node.id()]
+          discovered = ids(suite)
+          executed = []
+          class Recorded(unittest.TextTestResult):
+              def startTest(self, test):
+                  executed.append(test.id())
+                  super().startTest(test)
+          result = unittest.TextTestRunner(verbosity=2, resultclass=Recorded).run(suite)
+          source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          clean = not subprocess.check_output(
+              ['git', 'status', '--porcelain', '--untracked-files=all'], text=True)
+          report = {'source_sha': source, 'source_clean': clean, 'runner_os': os.environ['RUNNER_OS'],
+                    'discovered': discovered, 'executed': executed, 'tests_run': result.testsRun,
+                    'failed': [test.id() for test, _ in result.failures],
+                    'errors': [test.id() for test, _ in result.errors],
+                    'skipped': [test.id() for test, _ in result.skipped],
+                    'expected_failures': [test.id() for test, _ in result.expectedFailures],
+                    'unexpected_successes': [test.id() for test in result.unexpectedSuccesses],
+                    'scope': 'Actual loopback TLS controls; not public-origin or proxy acceptance'}
+          output = pathlib.Path(os.environ['RUNNER_TEMP']) / 'u1-native-supplement'
+          output.mkdir(parents=True, exist_ok=True)
+          (output / 'public-tls-controls.json').write_text(json.dumps(report, indent=2) + '\n')
+          valid = (source == os.environ['SWIRL_SOURCE_SHA'] and clean
+                   and discovered == executed == expected and result.testsRun == 3
+                   and result.wasSuccessful() and not result.skipped and not result.expectedFailures)
+          if not valid:
+              raise SystemExit('Strict TLS diagnostic controls did not pass the complete exact-SHA menu')
       - name: Verify the thin runner cannot hide missing, skipped or failed tests
         if: ${{ !cancelled() }}
         run: python -m unittest discover -s tools/tests -p test_u1_native_supplement.py -v

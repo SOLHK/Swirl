@@ -1,5 +1,21 @@
 # U1 source-resolution and Core audit
 
+Latest source-only recheck: [U1-f6-source-recheck.json](U1-f6-source-recheck.json)
+records 50 remote branches at the final freeze. All subscription/Core heads remain unchanged.
+The independently active visual branch advanced from
+`0b15f777d564a2edc778b69abb4cf5c74ea376d2` to
+`2a4891ca758dfc55f62ad7e78ce692ddd25f491d`; its actual compare was reviewed.
+Only visual controls, geometry, versioning and visual acceptance material changed.
+No new Core, engine, subscription, DNS or network implementation was found there.
+Those changes and that branch's new UI-specific instructions remain outside U1.
+A last pre-publication check found `work/ui-window-node-performance-20261023`
+at `5e9c150ebd92ccd0bc26af8f24f02b37dd254b0a`, a child of that same UI tip.
+Its eight changed paths add window/sidebar geometry and UI-only tests/evidence;
+actual patches contain no new subscription, Core, DNS, routing or network code.
+It remains excluded. Older shared nodes-only/timing fixes were already adapted
+from their original product source; this branch is not merged again.
+This inventory is source provenance, not acceptance of the latest integration SHA.
+
 ## Audit scope and identity
 
 Git ancestry and source comparisons below are anchored to `208e50dbd5f0b05b607afab0386fd4bb0dae8b79`. The initial API inventory contains 45 branches; the second API inventory contains 47 (the new integration branch and Activity V7). All 45 original heads were unchanged. Full snapshots remain in `U1-source-snapshot.json` and `U1-source-recheck.json`. There are 136 distinct source-only commit IDs in the initial inventory, before removing merge commits and overlapping branch ranges. This audit examined changed paths and executable implementations; titles and old test reports were not used as acceptance evidence.
@@ -79,7 +95,7 @@ neither source branch nor worktree was modified. See
 | `bbb4ea33d3a3ae596027b840af630260ba6bdbcc` | Nodes-only service/store/selection semantics retained via `dbfdc0bd355383234aecb1a537accaa5b9e592ca`; accurate timing retained with the performance adaptation in 748. Old preview version/installer and visual changes are not copied over R1 packaging. |
 | `871cc6e93a083c8624aadae8d9f4c1fe8db6e7e8` | Nodes-only policy-preservation assertions ported to Rust Qt tests without reintroducing Mihomo; inherited D5 asynchronous storage and D6 identity guards remain. |
 | `2b186783a704af3f4c1a91cd835997485282e2ec` | Engine/telemetry redundant-notification coalescing retained in 748; no fabricated or cached latency substituted for a handshake. |
-| `9e892b3746012ef8b1d983467b45cf6f336ddbe7` | Full HTTPS timing labels retained in 748; probe metrics distinguish whole HTTPS request latency from bare RTT. |
+| `9e892b3746012ef8b1d983467b45cf6f336ddbe7` | Timing labels retained and clarified in U1: node probes use cumulative HEAD response-header time and outbound setup time, with a separate origin TLS field; neither is bare RTT or full-body download time. |
 | `564e213ce604d7b79bb2414cd3aefba5744d46eb` | Read-only Windows proxy-store observations and generic-URI/credential/Unicode-host privacy checks adapted in `b3a6f624372ecb4f67debc18bcf250a723f05c1f`, prepared for the next root candidate; current ownership/recovery logic is retained. Visual window changes excluded. |
 | `ac4b051f2ac048bb56144245e558d5244f3f4d54` | Selectively ported here: `CodexNetwork/PublicEndpointReachable` reports INFO; failures remain ERROR. Current `SystemDataProvider` previously classified every telemetry diagnostic as ERROR. |
 | `3410ffb2ab872d4dd264e8431fd083193e0a8741` | Selectively ported here: content/Qt/build-flavor QML disk-cache isolation. Adapted to the newer explicit `SWIRL_TEST_ROOT`: QA stays inside that root, production honors an explicit cache override, old cache files are preserved. No UI layout/version changes. |

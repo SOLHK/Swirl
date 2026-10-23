@@ -153,7 +153,7 @@ def imported_configuration(peer):
     require(value["report"]["parsed"] is True and value["report"]["original_preserved"] is True,
             "SubscriptionSourceNotPreserved")
     expected = {"type": "vless", "host": "127.0.0.1", "port": peer.port, "uuid": peer.uuid,
-                "tls": None, "websocket": None, "reality": {
+                "tls": None, "websocket": None, "udp": False, "reality": {
                     "server_name": SNI, "public_key": peer.public_key,
                     "short_id": peer.short_id, "fingerprint": peer.fingerprint, "alpn": []}}
     if peer.flow:

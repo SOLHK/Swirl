@@ -4,6 +4,8 @@
 
 **本文是功能与缺口审计，不是最终同一 SHA 的验收证明。** 独立组件、候选工作树和来源分支上的测试不能相加为统一产品通过。最终干净提交 SHA、完整命令、环境、Actions 链接和重跑结果由 [U1 总报告](U1-REPORT.md) 记录。本文所述正在修复的项目，必须在最终提交重新检查实现与测试后才能改成通过。
 
+> 后续集成状态说明：本文以 208e50db 的源码审计为历史基线，文中 U4/U5、后台取消等“待提交”表述不是最新分支的状态。这些实现已进入后续 U1 提交。F5 `2340f835a7f35321567554cbaf4613b425b54638` 的三平台九套导入回归、Windows 实际 DPAPI/取消/重试、七协议业务、九槽及完整 31 项捕获测试已有对应实际记录，详见 [U1 总报告](U1-REPORT.md) 的 F6 历史表。F6 的新 SHA 仍需重新回归，不能继承这些绿灯。非 Windows 加密存储、CA 生成/导入/签发及部署安装包仍是代码或交付缺口，不是仅待真机的事项。
+
 ## 1. 当前结论
 
 订阅和手动节点已共用 NodeImportService、NodeStore、ProxyNode，并接入同一个主业务 RustCoreEngine。Xray/V2Ray JSON 与通用 URI/Clash 节点都经过同一 Rust DLL 的权威转换和运行时配置校验，不存在因为 Qt 解析成功就直接标记真实联网成功的许可。主业务节点切换、停止与重启沿同一所有权链管理。
@@ -57,7 +59,7 @@
 | 缓存与更新差异 | S1 | NodeImportService 的 HTTP 完成和应用结果路径 | 未实现条件缓存/304 重用及结构化差异摘要；当前报告解析数量，不是净新增/变更/删除数量 | A 类代码缺口；无测试可以替代尚未实现的行为 |
 | Qt 下载安全 | S9、U4 | [HttpRequestPolicy](../../src/Swirl.Quick/network/HttpRequestPolicy.h)、NodeImportService 请求构造 | 已集成请求级 HTTP/2 缓解；TLS 验证保持；统一下载路径调用该策略，不另留旧订阅下载器 | 适用版本与官方公告核对见统一安全报告；本文只证明产品请求调用关系和回归边界 |
 | 主业务 Core 生命周期、节点切换 | S8、S7、U1 | [main.cpp](../../src/Swirl.Quick/main.cpp)、[EngineController](../../src/Swirl.Quick/engine/EngineController.cpp)、[ThreadedEngine](../../src/Swirl.Quick/engine/ThreadedEngine.h)、[RustCoreEngine](../../src/Swirl.Quick/engine/RustCoreEngine.cpp) | 已集成；一个主业务 Core 所有权链，启动/配置/选择/关闭沿同一 handle；无 Mihomo 回退 | L2 和受控 SOCKS L3 证据；真实 UI/存储/路由/切换/重启 L4 待最终平台验收 |
-| 测速与时间口径 | S12、S8 | [NodeTestService](../../src/Swirl.Quick/engine/NodeTestService.cpp) | 已集成；至多三个独立 Rust 测速 worker，与主业务 handle 隔离；完整 HTTPS 耗时不冒充网络 RTT | 不能据此宣称比 Loon/Clash 更快；需同节点/目标/协议/网络条件的测量 |
+| 测速与时间口径 | S12、S8 | [NodeTestService](../../src/Swirl.Quick/engine/NodeTestService.cpp) | 已集成；至多三个独立 Rust 测速 worker，与主业务 handle 隔离；HEAD 最终响应首部累计耗时、出站建立累计耗时及目标 TLS 耗时分别记录。出站值包含节点 DNS/TCP 或 QUIC/协议握手，不是裸 RTT；不包含响应体下载或 Core 启动 | 不能据此宣称比 Loon/Clash 更快；需同节点/目标/协议/网络条件的测量 |
 | 敏感信息保护 | S1、S6、U1、U5 | ProxyNode::publicInfo、publicSubscriptions、桥接诊断过滤、[DiagnosticService](../../src/Swirl.Quick/app/DiagnosticService.cpp) | 已集成基础脱敏；U5 为待提交候选补强；URL/凭据不作为下载错误文本；日志/导出统一处理 | U5 有持久化/重载/导出脱敏回归；不是对任意未来日志的形式化无泄漏证明 |
 
 ## 4. 数据完整性与并发检查

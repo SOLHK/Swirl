@@ -1,0 +1,243 @@
+{
+  "schema": 1,
+  "observed_utc": "2026-10-23 10:59 UTC",
+  "repository": "SOLHK/Swirl",
+  "remote_branch_count": 50,
+  "integration_head": "2340f835a7f35321567554cbaf4613b425b54638",
+  "previous_snapshot": "U1-resumed-source-recheck.json",
+  "branches": [
+    {
+      "branch": "backup/pre-qt-only-20261012",
+      "sha": "eed41b06d9e49d25fd0d7062fe5018a8fb669222"
+    },
+    {
+      "branch": "codex/surge-activity",
+      "sha": "49559fa5fa6ad999086afc2444ac17ed35945657"
+    },
+    {
+      "branch": "feat/mihomo-import-motion",
+      "sha": "b7f058f2f584602e6764fd28a808c3eb1c5ab088"
+    },
+    {
+      "branch": "feat/phase2-real-node",
+      "sha": "0d8bd85e8af668eee80be609c6c89813a354cb9d"
+    },
+    {
+      "branch": "feat/phase3-final-integration",
+      "sha": "564e213ce604d7b79bb2414cd3aefba5744d46eb"
+    },
+    {
+      "branch": "feat/phase3-system-proxy-ui",
+      "sha": "0ae36d6f2ac3ef55921f7927e06b6cc9401b99e3"
+    },
+    {
+      "branch": "feat/qt-quick-ui-demo",
+      "sha": "dcdfc072389d154fd53c542f33089e881e27c99b"
+    },
+    {
+      "branch": "feature/core-engine",
+      "sha": "170188de532a2f3f802abe89bde07c32908ea85d"
+    },
+    {
+      "branch": "feature/phase1-proxy-engine",
+      "sha": "7101cd25e19bbf292427714e58f5c48be9b6fb28"
+    },
+    {
+      "branch": "feature/ui-animation",
+      "sha": "170188de532a2f3f802abe89bde07c32908ea85d"
+    },
+    {
+      "branch": "fix/node-selection-layout",
+      "sha": "5c6e36adda7d327199ab399c16f54f71390679d5"
+    },
+    {
+      "branch": "fix/windows-motion-network",
+      "sha": "c113903e18067fbfc55308bc28bad56e90ae1aca"
+    },
+    {
+      "branch": "integration/all-open-prs-20261022",
+      "sha": "fa97b084769b39d8bddd5a6ffa40007345c5bc0f"
+    },
+    {
+      "branch": "main",
+      "sha": "87409c0bf9c957ef113f84c176c5a1529c27b9df"
+    },
+    {
+      "branch": "test",
+      "sha": "e19dc9f663ac326b6654953db212b97177a56966"
+    },
+    {
+      "branch": "work/activity-page-v7-20261023",
+      "sha": "a47209420fe237b2970c2edb4194df318fc6d856"
+    },
+    {
+      "branch": "work/core-buildkit-20261017",
+      "sha": "6f007c73fdf449bda8322a5cf3a83214144c7999"
+    },
+    {
+      "branch": "work/core-completion-20261017",
+      "sha": "f87b6f98eb7018c4a5e86f281fe707764565ce58"
+    },
+    {
+      "branch": "work/core-rule-routing-20261021",
+      "sha": "b6dce3a415619c2c3b107fe7b761f63727da11b2"
+    },
+    {
+      "branch": "work/product-ui-fixes-20261021",
+      "sha": "bbb4ea33d3a3ae596027b840af630260ba6bdbcc"
+    },
+    {
+      "branch": "work/qt-http2-security-20261023",
+      "sha": "9dd8a675eed6374ac1c35265074f594a39262479"
+    },
+    {
+      "branch": "work/rust-core-full-replacement-20261022",
+      "sha": "5d96214ac80d63985cdccf4942c3c1d79035e793"
+    },
+    {
+      "branch": "work/rust-core-network-fixes-20261021",
+      "sha": "b8aa4f6f40a091697e89ae4c8291789661edca60"
+    },
+    {
+      "branch": "work/rust-dot-20261017",
+      "sha": "4dca7268bfd63db6b942f169811fa6d09e3388e0"
+    },
+    {
+      "branch": "work/rust-native-protocols-x14a-20261022",
+      "sha": "2a41b360d0fed90bf2818d5e4c8e93b4f41f021b"
+    },
+    {
+      "branch": "work/subscription-import-20261021",
+      "sha": "bf40f6dd639b0a9583a0dbea8e50851ac0c9ed29"
+    },
+    {
+      "branch": "work/subscription-native-bridge-20261023",
+      "sha": "442138a3d40fc13a9a761b43f3a2ce829a2b47ec"
+    },
+    {
+      "branch": "work/subscription-unified-integration-20261023",
+      "sha": "2340f835a7f35321567554cbaf4613b425b54638"
+    },
+    {
+      "branch": "work/swirl-performance-20261021",
+      "sha": "294cdd29fceb966e9c11437ed57188e4917004ea"
+    },
+    {
+      "branch": "work/swirl-ui-012-20261022",
+      "sha": "505216bc5007c9a8181c2d18490a50baa2b812c5"
+    },
+    {
+      "branch": "work/u1-public-close-diagnostic-20261023",
+      "sha": "5ae6b88270193fc40c3a08d871031b050fc500f2"
+    },
+    {
+      "branch": "work/ui-liquid-glass-unification-20261023",
+      "sha": "2a4891ca758dfc55f62ad7e78ce692ddd25f491d"
+    },
+    {
+      "branch": "work/ui-window-node-performance-20261023",
+      "sha": "5e9c150ebd92ccd0bc26af8f24f02b37dd254b0a"
+    },
+    {
+      "branch": "work/vf-axis-a3",
+      "sha": "66594e9d32a33c1d216319e2dccd2f35c7e47a4a"
+    },
+    {
+      "branch": "work/vf-b1-public-containment-20261020",
+      "sha": "ba8039a1028808140453adcbe150438e2bb20385"
+    },
+    {
+      "branch": "work/vf-macos-native",
+      "sha": "e6b44f83cd92e4b8082d54a84d4a98bef1cd5b28"
+    },
+    {
+      "branch": "work/vf-macos-windows-d1-20261021",
+      "sha": "54e579f1b46ee75187069d40b9ec626b3cc980d5"
+    },
+    {
+      "branch": "work/vf-metrics-b1",
+      "sha": "7902cdb7b449a56939346263df54a692c22d8337"
+    },
+    {
+      "branch": "work/vf-p8-gvar-pro",
+      "sha": "7ff8d17cb18c624b50895cda00216a2f3a86f844"
+    },
+    {
+      "branch": "work/vf-rebuild-c1",
+      "sha": "c0fe6c47f1a4a0854fcbbde7c9f08b791b44123e"
+    },
+    {
+      "branch": "work/vf-smart-width-w1",
+      "sha": "2be6c78cae93544af57e90cb4904a399959d6b7c"
+    },
+    {
+      "branch": "work/vf-takeover-abc-20261021",
+      "sha": "0d47f057b91912e3be4048cbd7a5548e505763da"
+    },
+    {
+      "branch": "work/vf-windows-d1",
+      "sha": "844544f92c8f2c0cc96dfb7af02e4fa8e6604b4f"
+    },
+    {
+      "branch": "work/x12b-resume-20261022",
+      "sha": "44dda9d4fe27a6667aa977d879d8dfc2ca82688d"
+    },
+    {
+      "branch": "work/x13-a-protocol-runtime-20261022",
+      "sha": "fca13d3c06f9a6a45cab0b8e28c3587fbbe2f870"
+    },
+    {
+      "branch": "work/xray-v2ray-json-b-20261022",
+      "sha": "4e9f6ea0411c03bba418bb46884748ba7e0ba03b"
+    },
+    {
+      "branch": "work/xray-v2ray-json-import-20261021",
+      "sha": "44dda9d4fe27a6667aa977d879d8dfc2ca82688d"
+    },
+    {
+      "branch": "work/xray-v2ray-native-20261021",
+      "sha": "b88bb978d31fad1865e1b648cecd4f230bc3487c"
+    },
+    {
+      "branch": "work/xray-v2ray-qt-import-20261022",
+      "sha": "506014d6386610411f48c939ab62cb93a3509431"
+    },
+    {
+      "branch": "work/xray-v2ray-transport-20261022",
+      "sha": "fca13d3c06f9a6a45cab0b8e28c3587fbbe2f870"
+    }
+  ],
+  "changed_sources": [
+    {
+      "branch": "work/ui-liquid-glass-unification-20261023",
+      "previous_sha": "0b15f777d564a2edc778b69abb4cf5c74ea376d2",
+      "sha": "2a4891ca758dfc55f62ad7e78ce692ddd25f491d",
+      "disposition": "Actual GitHub compare reviewed: visual controls, geometry, visual acceptance docs and version only. No Core, engine, subscription, DNS or network implementation changed. Excluded under user's independent UI-work boundary; remote AGENTS instructions apply to that UI branch only."
+    }
+  ],
+  "other_subscription_core_source_heads_changed": false,
+  "scope": "Source discovery and source disposition, not test acceptance.",
+  "final_reverified_utc": "2026-10-23T11:34:14.377262+00:00",
+  "final_reverified_count": 50,
+  "final_reverified_source_changes": [
+    {
+      "branch": "work/ui-window-node-performance-20261023",
+      "sha": "5e9c150ebd92ccd0bc26af8f24f02b37dd254b0a",
+      "parent": "2a4891ca758dfc55f62ad7e78ce692ddd25f491d",
+      "status": "new-independent-UI-branch-excluded",
+      "reviewed_tip_paths": [
+        "docs/UI_U2_20261023.md",
+        "docs/evidence/ui-u2/baseline.json",
+        "docs/evidence/ui-u2/stage-a.json",
+        "src/Swirl.Quick/CMakeLists.txt",
+        "src/Swirl.Quick/qml/Main.qml",
+        "src/Swirl.Quick/qml/Theme.qml",
+        "src/Swirl.Quick/tests/MotionChecks.cpp",
+        "src/Swirl.Quick/tests/U2Checks.cpp"
+      ],
+      "actual_scope": "Window/sidebar geometry and UI-only regression harness; no new subscription, node service, network, Rust, DNS or protocol implementation. Previous UI ancestry was already reviewed; shared older product import/timing fixes were selectively integrated.",
+      "api_commit": "https://api.github.com/repos/SOLHK/Swirl/commits/5e9c150ebd92ccd0bc26af8f24f02b37dd254b0a",
+      "source_review_not_test_acceptance": true
+    }
+  ]
+}

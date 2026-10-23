@@ -633,24 +633,53 @@ class PublicTlsControlTests(unittest.TestCase):
             class Handler(socketserver.BaseRequestHandler):
                 def handle(self):
                     stream = self.request
-                    stream.settimeout(3)
+                    deadline = time.monotonic() + 3
+                    stream.settimeout(remaining(deadline, 3))
                     try:
-                        stream = server_context.wrap_socket(stream, server_side=True,
-                                                            suppress_ragged_eofs=False)
-                        requests.append(read_header(stream, time.monotonic() + 3))
+                        try:
+                            stream = server_context.wrap_socket(stream, server_side=True,
+                                                                suppress_ragged_eofs=False)
+                        except ssl.SSLError:
+                            if trusted:
+                                raise
+                            return
+                        except ConnectionResetError as error:
+                            # Windows can reset this handshake after the client
+                            # rejects our CA. The client must still report the
+                            # exact certificate error before sending any HTTP.
+                            if (trusted or sys.platform != 'win32'
+                                    or error.errno != 10054
+                                    or getattr(error, 'winerror', None) != 10054):
+                                raise
+                            return
+                        requests.append(read_header(stream, deadline))
+                        stream.settimeout(remaining(deadline, 3))
                         stream.sendall(b'HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n')
-                        if not truncate:
+                        if truncate:
+                            # Send TCP FIN without TLS close_notify. Drain the
+                            # client's alert before releasing the raw socket so
+                            # an unread alert cannot turn this into a TCP reset.
+                            stream = socket.socket(fileno=stream.detach())
+                            stream.settimeout(remaining(deadline, 3))
+                            stream.shutdown(socket.SHUT_WR)
+                            while True:
+                                stream.settimeout(remaining(deadline, 3))
+                                if not stream.recv(4096):
+                                    break
+                            closed.set()
+                        else:
+                            stream.settimeout(remaining(deadline, 3))
                             stream = stream.unwrap()
                             stream.shutdown(socket.SHUT_WR)
+                            stream.settimeout(remaining(deadline, 3))
                             require(stream.recv(1) == b'', 'ControlClientDidNotClose')
                             closed.set()
-                    except ssl.SSLError:
-                        if trusted:
-                            raise
                     finally:
                         stream.close()
 
             server = Server(('127.0.0.1', 0), Handler)
+            server.daemon_threads = False
+            server.block_on_close = True
             server.errors, server.fixture_kind = [], 'public-close-control'
             thread = threading.Thread(target=server.serve_forever,
                                       kwargs={'poll_interval': 0.01}, daemon=True)
@@ -668,6 +697,8 @@ class PublicTlsControlTests(unittest.TestCase):
                 thread.join(1)
                 self.assertFalse(thread.is_alive())
                 self.assertEqual(server.errors, [])
+                if trusted:
+                    self.assertTrue(closed.is_set())
 
     def test_control_requires_verified_tls_response_and_orderly_close(self):
         result, requests = self.run_control()
@@ -686,6 +717,7 @@ class PublicTlsControlTests(unittest.TestCase):
         self.assertEqual(result['http_status'], 204)
         self.assertEqual(result['failure_phase'], 'origin-close')
         self.assertEqual(result['failure']['type'], 'SSLEOFError')
+        self.assertNotIn('orderly_close', result)
         self.assertEqual(len(requests), 1)
 
     def test_control_rejects_untrusted_tls_before_http(self):
@@ -694,6 +726,8 @@ class PublicTlsControlTests(unittest.TestCase):
         self.assertFalse(result['certificate_verified'])
         self.assertEqual(result['failure_phase'], 'origin-tls')
         self.assertEqual(result['failure']['type'], 'SSLCertVerificationError')
+        self.assertNotIn('http_status', result)
+        self.assertNotIn('orderly_close', result)
         self.assertEqual(requests, [])
 
 

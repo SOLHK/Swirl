@@ -186,8 +186,11 @@ HTTP CONNECT and verified TLS, redirects, rejected certificates and retry.
 Performance changes from `2b186783a704af3f4c1a91cd835997485282e2ec` and
 `9e892b3746012ef8b1d983467b45cf6f336ddbe7` merge redundant UI notifications
 and distinguish outbound establishment, origin TLS, HEAD response-header time
-and complete Qt GET response time. A displayed outbound duration requires a
-successful real request. No latency is fabricated, cached as a new result or
+and the cumulative time to validated final HEAD response headers. The source
+performance branch's older complete-GET wording is not the unified Rust probe's
+measurement contract. A displayed outbound duration requires a successful real
+request and includes node resolution and protocol setup; it is not bare RTT.
+No latency is fabricated, cached as a new result or
 compared against Loon/Clash measurements with different definitions.
 
 The final X14 source checkpoint `2a41b360d0fed90bf2818d5e4c8e93b4f41f021b`
@@ -521,3 +524,189 @@ only explicit visual/preview work advanced. Those independent UI branches are
 excluded. Non-Windows secure storage, unsupported product/protocol modes,
 strict-close failures and real-device/provider acceptance remain separate A/C/D
 issues. No earlier stage's green jobs transfer to the newly published SHA.
+
+## U1-F6: exact public candidate checks and explicit MRS resource boundaries
+
+This checkpoint follows published F5
+`2340f835a7f35321567554cbaf4613b425b54638`. All results in the following table
+belong to **F5 only**. They do not establish acceptance of the new checkpoint.
+
+| F5 workflow | Actual observed result and scope |
+| --- | --- |
+| [Native protocols 39940862341](https://github.com/SOLHK/Swirl/actions/runs/39940862341) | All six jobs passed. Rust: Windows 675 and Linux/macOS 674 each, zero failures/ignored. Official/reference-peer method executions: Windows/macOS 127, Linux 145 including its constrained-stack Hysteria2 run. The Windows QUIC lifecycle, reconnect, cancellation and actual FFI checks executed. |
+| [Transports 39940862513](https://github.com/SOLHK/Swirl/actions/runs/39940862513) | All three jobs passed. Each executed 132 DNS/routing methods and 61 transport method executions, zero skips, no reported cleanup errors. China IP matching uses actual bundled IPv4/IPv6 MRS data; controlled socket routing is not a visit to a Chinese public site. |
+| [Retained network regressions 39940862543](https://github.com/SOLHK/Swirl/actions/runs/39940862543) | All three jobs failed, with their failures retained. Each completed all 76 original deterministic methods and both vectors, no skips/xfail. Both original strict VMess methods executed on every OS. Linux's four original public REALITY menus stopped at an exact import assertion; its separate public DIRECT/system-DNS/native-DoH menu passed three checks. |
+| [Qt security 39940862370](https://github.com/SOLHK/Swirl/actions/runs/39940862370) | All seven jobs passed. Six OS/Qt combinations each passed 11 downloader incidents with zero failures/skips. Windows Qt 6.11.3 full-product security XML has five passing incidents; actual telemetry, request-policy and capture CTest entries exited successfully. No unavailable per-case capture count is inferred from the exit code. |
+| [Observation 39940862415](https://github.com/SOLHK/Swirl/actions/runs/39940862415) | Windows PowerShell 5.1, Windows PowerShell 7 and Linux PowerShell 7 each passed all 42 identity assertions. |
+| [Source/package guards 39940862301](https://github.com/SOLHK/Swirl/actions/runs/39940862301) | Both jobs passed. Runtime guards 8/8, build guards 3/3, PowerShell package checks 28 original plus 14 Release-cache cases on each Windows shell. Actual MRS copying and missing/corrupt-resource rejection passed. All 2,099 source-package files were checked against their Git blobs. |
+| [Qt importer 39940862364](https://github.com/SOLHK/Swirl/actions/runs/39940862364) | All three jobs passed. Nine Qt suites: Windows 222, Linux 182 and macOS 181 passing incidents, zero failures/skips. Each platform executed seven real controlled HTTP/verified-HTTPS protocol cases. Windows also verified actual DPAPI persistence/reload, the product DLL as the tested input, final byte-for-byte product/test/network DLL equality, 61 mounted pages and import UI at both 1.0/1.5 scales. Portable persistence/reload remains explicitly false. |
+| [Nine Qt fixtures 39940862353](https://github.com/SOLHK/Swirl/actions/runs/39940862353) | Job passed. All nine slots, 23 invocations, all five lifecycle modes, 22 XML files and 67 passing incidents executed with zero failed/skipped. The entire capture module ran 31 discovered/31 executed methods, zero failures/errors/skips/xfail/xpass, including all four mandatory private-inspector cases. Eight public REALITY/Vision HTTP/HTTPS requests passed with actual DPAPI reload, preserved parameters, selection restoration, rejection and stop cleanup. This menu does not assert the separate Python strict TLS-close contract or physical-device/provider acceptance. |
+| [Unified product 39940862307](https://github.com/SOLHK/Swirl/actions/runs/39940862307) | Linux/macOS complete Qt 6.11.3 products, 25-incident loader menus and actual executable loopback self-tests passed. Linux Rust fmt/check/Clippy/674 tests passed; its mandatory public Shadowsocks test failed at strict TLS shutdown. Windows passed all 14 relevant product CTest entries, actual Qt DPAPI/import/select/route checks, production build, strict product/test DLL identity, clean-directory actual EXE roundtrips, missing-DLL refusal, two UI starts and candidate NSIS/ZIP compilation. Its final public module ran four methods with one pass and three failures: two Windows diagnostic-fixture contract failures and the retained strict public TLS-close failure. |
+| Local F5 | Clean-source Rust fmt, all-target check/Clippy and 674 workspace tests passed with permitted loopback sockets; the earlier sandbox-denied listener attempt remains a separate failure. Full Qt 6.11.3 product and importer builds, actual executable HTTP/SOCKS5/CONNECT cleanup, and nine importer suites (182 incidents, zero failures/skips) passed. Of the 15 relevant product suites, six passed and nine remained failed after two locally mis-permissioned ELF executables were retested with unchanged binary hashes. Independent font/visual/gateway suites were outside this network integration menu. |
+
+All 32 F5 jobs completed: 27 succeeded and five failed (the three retained
+network jobs and the Linux/Windows mandatory public-product jobs). Windows
+candidate artifact `12498610290` has verified archive SHA-256
+`8ace8291afae5f7f1905e9d3ddad99965bb0daa02629767e66bc45254aa865ff`.
+Its 1,510 staging-manifest entries match the packaged bytes; actual AMD64 EXE,
+native identity and both bundled MRS files match F5. The portable ZIP also
+contains the subsequently generated diagnostic log. NSIS compilation is not an
+observed installation/uninstall or signed-release acceptance. Windows public
+HTTP 200 and verified TLS 1.3/HTTPS 204 precede `SSLEOFError` at origin closure;
+a diagnostic direct connection to the same `142.251.153.120` address also fails
+that strict closure contract. Neither direct result overrides the proxy failure.
+
+QTest incidents include initialization, cleanup and data rows; they are not
+distinct test methods. The nine-slot Windows job closes only its explicit
+conditional fixture menu. A missing private-provider environment and the
+Linux product's existing conditional skips cannot be reported as executed.
+
+### Exact REALITY candidate mismatch
+
+The restored original Linux public verifier rejected all four combinations of
+rustls/Chrome and plain REALITY/Vision **before traffic**, with
+`NativeCandidateParametersChanged`. The actual U1 inspector now includes
+`udp: false` in its TCP VLESS candidate. The old expected whole-object literal
+predated that field. This checkpoint explicitly requires the disabled UDP field;
+it retains complete list/dictionary equality, all credentials, REALITY values,
+TLS/WebSocket/flow values and the terminal REJECT route. It does not strip fields
+or compare a permissive subset. Isolated source:
+`a30cc4c09ffc275e750692a545b408285e1e59f2`.
+
+Candidate validation replayed the actual F5 inspector for all four combinations:
+the old verifier rejected all four, the corrected verifier preserved every
+candidate, and all 64 deliberate field/missing-UDP/unknown-option mutations
+remained rejected. This is input-conversion evidence only. Public networking
+and strict shutdown must execute again on the new published source.
+
+### MRS resource-boundary regressions
+
+Three additional parser regressions cover a concrete gap in the original menu.
+They exercise a matching-checksum compressed container over the explicit 16 MiB
+contract, real streamed Zstandard expansion at exactly 64 MiB and one byte over,
+and domain/IP rule counts and extra-header lengths at and beyond their limits.
+The exact-bound controls reach the intentionally invalid later payload version;
+over-limit cases must fail at the specific size/header gate. Test inputs retain
+valid checksums so checksum rejection cannot conceal an untested resource limit.
+The production parser, checksum/version requirements, 2,000,000-item ceiling and
+all previous tests remain unchanged. Fourteen existing-plus-new MRS tests passed
+in the candidate Linux run; final three-platform workspace execution is required.
+
+The Windows security and R1 product uploads now retain the already-generated
+capture diagnostics; R1 also retains the actual Node UI diagnostic file.
+Only three exact upload paths change, so test commands, assertions, conditions
+and verdicts remain intact. Isolated source:
+`fdc105ab34a6ff535a45ca8ff5ff4f4239a15750`. F5 capture success remains the
+observed CTest exit status, without inventing unavailable per-case counts.
+
+### Deterministic Windows TLS diagnostic controls
+
+F5's Windows public module exposed two additional controlled-fixture failures.
+The intentional missing-close-notify peer used an immediate socket close,
+which produced `ConnectionAbortedError` on Windows instead of the precisely
+asserted `SSLEOFError`. The repaired fixture explicitly detaches TLS, sends a
+TCP write-side FIN without TLS close_notify, and drains the client's alert before
+closing the raw socket. All operations share a cumulative three-second deadline.
+The exact `SSLEOFError`, failed result, verified certificate and HTTP 204 checks
+remain, with an additional prohibition on an orderly-close success field.
+
+For the untrusted-CA case, the F5 log records a server-side Windows
+`ConnectionResetError` with errno and winerror both 10054 during `wrap_socket`'s
+handshake. Only that precise platform/error/stage combination is handled for the
+untrusted fixture. The client must still report `SSLCertVerificationError`
+before HTTP, with no requests, response status or orderly-close claim. Trusted
+connections, other errors and later phases still fail. Non-daemon bounded
+handlers are joined before checking the unchanged empty server-error list.
+The formal public proxy class and direct-origin diagnostic helper are unchanged.
+Isolated source: `e972e3a67d9106dffa2809d3295a53976fcde0f4`.
+
+The repaired three original control methods passed on candidate Linux with zero
+failures/skips. The three-OS retained-network workflow now executes this exact
+three-method menu independently, records actual discovered/executed IDs and
+source identity, and fails on missing, skipped or failed methods. This does not
+replace the complete mandatory public module in the Linux/Windows product jobs,
+change public endpoints, relax TLS closure, or turn the public failure into a
+diagnostic pass. Final Windows/macOS/Linux results require the new published SHA.
+
+### Failures and platform gaps remain explicit
+
+F5 strict VMess produced five failed assertions on Linux, three on macOS and five
+on Windows. Every platform transferred all four 4 MiB + 17 payloads with matching
+hashes; orderly authenticated closure did not pass for every transport.
+The concurrent method stopped on failure after eight, six and seven recorded
+sessions respectively. Recorded payloads were complete and cleanup errors were
+empty, but these facts do not convert strict-close failures to passes. The
+fixed client/reference-peer combination remains unaccepted for that contract;
+the evidence does not by itself assign every root cause to Xray.
+
+Linux's mandatory public Shadowsocks test received HTTP 200, then verified TLS
+1.3 and HTTPS 204 before `SSLEOFError` at `origin-close`. The bounded direct
+control to the same selected `142.251.219.35` address also failed strict closure.
+The failure-time Core snapshot has active=0/failed=0, exact peer byte totals and
+successful Core/process/listener cleanup. No weaker EOF handling, endpoint swap
+or direct-control pass substitution is introduced.
+
+Non-Windows node encryption remains unimplemented; NodeStore fails closed and
+does not save plaintext. Linux's node/import regressions consequently fail,
+and the node UI test reaches a later empty-list access after failed save checks.
+Capture has a separate implementation gap: non-Windows `TlsCertificateService`
+cannot generate/import a CA or issue a leaf identity. Its real service returns
+empty certificate/key values, and the existing capture/Engine UI tests fail.
+An independent Qt 6.11.3 trusted TLS/ALPN h2 positive control passed, so these
+capture failures are not evidence that the Qt upgrade disables native HTTP/2.
+Neither platform gap is classified as merely awaiting a physical device.
+
+Portable CI builds bare Linux/macOS executables and tested native libraries.
+It does not produce a deployed Linux package, macOS .app/DMG, code signature or
+notarization result. CMake copies rules beside the actual executable, and Release
+lookup is executable-relative; the portable loopback self-test does not exercise
+an installed smart-routing package. Windows package evidence cannot replace
+those missing portable deployment checks.
+
+### Runtime and diagnostic-service boundaries
+
+The production constructor has one primary `ThreadedEngine` whose implementation
+is `RustCoreEngine`. Node selection and reconfiguration use its existing handle;
+stopping clears it. Runtime, native import and Xray import share the checked
+`RustCoreLibrary` loader and its ABI/source/build identity gates. No selectable
+Mihomo or old C++ `ProxyEngine` fallback was found. Isolated node-speed workers
+create up to three additional Rust handles from that same library; this is not
+a claim that the entire process can only ever contain one Core instance.
+
+Qt product services remain. With Core running, CaptureService sends HTTP and
+CONNECT upstream through the Rust listener. Explicit independent capture uses
+Qt direct connections when Core is absent; an already enabled capture listener
+does not stop merely because the primary Core stops. The full application exit
+does stop it. Explicit rewrite TCP port-forward rules also use direct Qt sockets,
+including while Core is running. These are retained diagnostic/product services,
+not a hidden alternate ProxyEngine, but all C++ forwarding paths have **not**
+been eliminated. A broader requirement that every diagnostic forwarding socket
+must pass through Rust is still unmet. `SwirlProxyGuard` only monitors ownership
+and restores the system-proxy journal; it does not listen or forward traffic.
+
+### Speed measurements and unproven comparisons
+
+The node list displays `outbound_connect_ms` after a successful Rust HEAD probe;
+details retain cumulative `response_headers_ms` and `origin_tls_ms`. The first
+includes applicable node resolution, dialing, transport and protocol request
+setup. Some protocols only write their authentication request before returning
+the connector, so it is neither a bare node RTT nor universally a completed
+authentication exchange. The cumulative HEAD value stops at validated final
+headers, excluding response-body download, EOF and Core/UI startup. Rust exposes
+additional microsecond resolution, TCP, proxy TLS/REALITY, QUIC/TLS, transport and
+authentication observations; Qt currently projects only the three millisecond
+fields. Unperformed phases are null, phases can overlap, and summing them is not
+a valid reconstruction of total latency.
+
+The three native timing methods produce eight observations per OS using HTTP
+origins, so their origin TLS values are null. A separate existing HTTPS HEAD test
+verifies the origin TLS phase. The repository's October 21 corrected GET samples
+use the same target IP but different node names/exits and lack a source/binary
+identity; they are historical measurements, not a controlled final-U1 comparison.
+There is no accepted same-node/target/protocol/network Loon or Clash performance
+comparison for this integration SHA. No ranking or speedup is claimed.
+
+The latest source-only inventory is
+[U1-f6-source-recheck.json](U1-f6-source-recheck.json). The final acceptance report
+must identify the new full SHA, freshly executed commands, actual Actions runs,
+and any remaining A/B/C/D issues. Historical F5 greens are not carried forward.

@@ -218,6 +218,8 @@ jobs:
           name: R1-Windows-evidence-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             build/r1-tests/Testing/Temporary/LastTest.log
+            build/r1-tests/Release/Swirl-diagnostics.txt
+            build/r1-tests/Release/Swirl-node-ui-diagnostics.txt
             build/r1-tests/*.xml
             build/r1-tests/node-chain.txt
             build/r1-tests/import-subscription.txt
