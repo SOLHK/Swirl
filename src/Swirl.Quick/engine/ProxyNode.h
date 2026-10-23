@@ -2,6 +2,7 @@
 #include <QString>
 #include <QVariantMap>
 #include <QJsonObject>
+#include <QByteArray>
 
 // Engine-neutral node data. Protocol-specific serialization stays in the adapter.
 struct ProxyNode {
@@ -12,6 +13,15 @@ struct ProxyNode {
     QJsonObject originalConfiguration;
     QString sourceFormat;
     QStringList conversionIssues;
+    // Xray source is authoritative. Copies share the bounded document in memory;
+    // the encrypted store deduplicates it. Never expose it or nativeOutbound to QML.
+    QByteArray sourceDocument;
+    int sourceNodeIndex = -1;
+    QString importSource, parameterState, transportType, securityType, sourceFingerprint;
+    QJsonObject nativeOutbound;
+    QStringList runtimeIssues;
+    bool nativeExecutable = false;
+    bool isXray() const { return sourceFormat == QStringLiteral("xray-v2ray-json"); }
     quint16 port = 0;
     static QString validate(const ProxyNode &node);
     static QStringList protocols();

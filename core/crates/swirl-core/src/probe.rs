@@ -5,7 +5,7 @@ use std::{
     future::Future,
     sync::{Arc, Mutex},
 };
-use swirl_protocol::{UrlTestFailure, UrlTestMetrics, UrlTestStage};
+use swirl_protocol::{ConnectTimings, UrlTestFailure, UrlTestMetrics, UrlTestStage};
 use tokio::{runtime::Handle, task::JoinHandle};
 
 type Result<T> = std::result::Result<T, &'static str>;
@@ -26,6 +26,8 @@ pub struct ProbeMetrics {
     pub origin_tls_ms: Option<u64>,
     pub response_headers_ms: u64,
     pub http_status: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub outbound_timing: Option<ConnectTimings>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -34,6 +36,8 @@ pub struct ProbeFailure {
     pub code: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub http_status: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub outbound_timing: Option<ConnectTimings>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -134,6 +138,7 @@ impl ProbeRuntime {
                     origin_tls_ms: metrics.origin_tls_ms,
                     response_headers_ms: metrics.response_headers_ms,
                     http_status: metrics.http_status,
+                    outbound_timing: metrics.outbound_timing,
                 }),
                 failure: None,
             },
@@ -155,6 +160,7 @@ impl ProbeRuntime {
                     },
                     code: error.code,
                     http_status: error.http_status,
+                    outbound_timing: error.outbound_timing.map(|timing| *timing),
                 }),
             },
         };

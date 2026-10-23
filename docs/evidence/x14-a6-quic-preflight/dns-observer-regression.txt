@@ -1,0 +1,11 @@
+   Compiling swirl-transport v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-transport)
+   Compiling swirl-dns v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-dns)
+   Compiling swirl-protocol v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-protocol)
+    Finished `test` profile [unoptimized] target(s) in 5.00s
+     Running tests/quic_preflight.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/quic_preflight-21ee7301bc697d17)
+
+running 1 test
+test invalid_quic_trust_anchor_is_rejected_before_tcp_or_udp_dns ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+

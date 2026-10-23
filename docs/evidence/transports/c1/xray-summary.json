@@ -1,0 +1,150 @@
+{
+  "evidence_level": "independent_official_xray_loopback",
+  "public_network_tested": false,
+  "xray_commit": "1b1647cd9ddf0abc34b981d4611fc03bcac1ca74",
+  "xray_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)\nA unified platform for anti-censorship.\n",
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "rust_harness_sha256": "8d0eed5844c6ff1cd8cc1e7c19bf66788843e55885878dd4b2fb2d5cff0927ea",
+  "tests_run": 6,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "elapsed_seconds": 3.812467560999721,
+  "cases": [
+    {
+      "case": "01-vless-raw-plain",
+      "protocol": "vless",
+      "transport": "raw",
+      "tls": false,
+      "xray_accepted": 1,
+      "expected_proxy_requests": 1,
+      "additive_transport_api": true,
+      "client_report": {
+        "close": "clean",
+        "connect_us": 333,
+        "downloaded": 131328,
+        "ok": true,
+        "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+        "transfer_us": 5249,
+        "uploaded": 69
+      }
+    },
+    {
+      "case": "02-vless-ws-plain",
+      "protocol": "vless",
+      "transport": "ws",
+      "tls": false,
+      "xray_accepted": 1,
+      "expected_proxy_requests": 1,
+      "additive_transport_api": true,
+      "client_report": {
+        "close": "clean",
+        "connect_us": 813,
+        "downloaded": 131328,
+        "ok": true,
+        "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+        "transfer_us": 5367,
+        "uploaded": 69
+      }
+    },
+    {
+      "case": "03-vless-ws-tls",
+      "protocol": "vless",
+      "transport": "ws",
+      "tls": true,
+      "xray_accepted": 1,
+      "expected_proxy_requests": 1,
+      "additive_transport_api": true,
+      "client_report": {
+        "close": "transport_error",
+        "connect_us": 2459,
+        "downloaded": 131328,
+        "ok": true,
+        "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+        "transfer_us": 5409,
+        "uploaded": 69
+      }
+    },
+    {
+      "case": "04-vless-raw-plain",
+      "protocol": "vless",
+      "transport": "raw",
+      "tls": false,
+      "xray_accepted": 2,
+      "expected_proxy_requests": 2
+    },
+    {
+      "case": "05-vless-raw-tls",
+      "protocol": "vless",
+      "transport": "raw",
+      "tls": true,
+      "xray_accepted": 2,
+      "expected_proxy_requests": 2
+    },
+    {
+      "case": "06-vless-ws-plain",
+      "protocol": "vless",
+      "transport": "ws",
+      "tls": false,
+      "xray_accepted": 2,
+      "expected_proxy_requests": 2
+    },
+    {
+      "case": "07-vless-ws-tls",
+      "protocol": "vless",
+      "transport": "ws",
+      "tls": true,
+      "xray_accepted": 2,
+      "expected_proxy_requests": 2
+    },
+    {
+      "case": "08-trojan-raw-tls",
+      "protocol": "trojan",
+      "transport": "raw",
+      "tls": true,
+      "xray_accepted": 2,
+      "expected_proxy_requests": 2
+    },
+    {
+      "case": "09-trojan-ws-tls",
+      "protocol": "trojan",
+      "transport": "ws",
+      "tls": true,
+      "xray_accepted": 2,
+      "expected_proxy_requests": 2
+    },
+    {
+      "case": "10-vless-ws-tls",
+      "protocol": "vless",
+      "transport": "ws",
+      "tls": true,
+      "xray_accepted": 1,
+      "expected_proxy_requests": 1
+    },
+    {
+      "case": "11-vless-ws-tls",
+      "protocol": "vless",
+      "transport": "ws",
+      "tls": true,
+      "xray_accepted": 1,
+      "expected_proxy_requests": 1
+    },
+    {
+      "case": "12-vless-ws-plain",
+      "protocol": "vless",
+      "transport": "ws",
+      "tls": false,
+      "xray_accepted": 9,
+      "expected_proxy_requests": 9
+    },
+    {
+      "case": "13-vless-ws-tls",
+      "protocol": "vless",
+      "transport": "ws",
+      "tls": true,
+      "xray_accepted": 9,
+      "expected_proxy_requests": 9
+    }
+  ],
+  "exit_code": 0
+}

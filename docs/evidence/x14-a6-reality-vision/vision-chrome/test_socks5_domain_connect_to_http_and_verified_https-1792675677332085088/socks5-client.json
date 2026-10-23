@@ -1,0 +1,27 @@
+{
+  "exchanges": [
+    {
+      "inbound": "socks5",
+      "method": "no-auth",
+      "address_type": "domain",
+      "host": "localhost",
+      "port": 47889,
+      "path": "/socks-domain-http",
+      "tls": false,
+      "certificate_verified": false,
+      "authenticated_tls_close": false
+    },
+    {
+      "inbound": "socks5",
+      "method": "no-auth",
+      "address_type": "domain",
+      "host": "localhost",
+      "port": 51615,
+      "path": "/socks-domain-https",
+      "tls": true,
+      "certificate_verified": true,
+      "authenticated_tls_close": true,
+      "tls_version": "TLSv1.3"
+    }
+  ]
+}

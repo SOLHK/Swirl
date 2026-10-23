@@ -1,0 +1,103 @@
+{
+  "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+  "observations": [
+    {
+      "network": "grpc",
+      "fingerprint": "rustls",
+      "offered_alpn": [
+        "h2"
+      ],
+      "exit_code": 1,
+      "native_report": {
+        "alpn": null,
+        "cipher_suite": 4866,
+        "client_close_notify": true,
+        "error": "SyntheticPeerUnexpectedTail",
+        "error_kind": "InvalidInput",
+        "group": 29,
+        "handshake_verified": true,
+        "payload_matches": true,
+        "received_bytes": 0,
+        "server_close_notify": false,
+        "stage": "close",
+        "status": "error",
+        "uploaded_bytes": 0
+      },
+      "scope": "authenticated REALITY handshake and ALPN observation only; zero proxy bytes; no full proxy interop claim"
+    },
+    {
+      "network": "grpc",
+      "fingerprint": "chrome_133",
+      "offered_alpn": [
+        "h2",
+        "http/1.1"
+      ],
+      "exit_code": 1,
+      "native_report": {
+        "alpn": null,
+        "cipher_suite": 4866,
+        "client_close_notify": true,
+        "error": "SyntheticPeerUnexpectedTail",
+        "error_kind": "InvalidInput",
+        "group": 29,
+        "handshake_verified": true,
+        "payload_matches": true,
+        "received_bytes": 0,
+        "server_close_notify": false,
+        "stage": "close",
+        "status": "error",
+        "uploaded_bytes": 0
+      },
+      "scope": "authenticated REALITY handshake and ALPN observation only; zero proxy bytes; no full proxy interop claim"
+    },
+    {
+      "network": "xhttp",
+      "fingerprint": "rustls",
+      "offered_alpn": [
+        "h2"
+      ],
+      "exit_code": 0,
+      "native_report": {
+        "alpn": null,
+        "cipher_suite": 4866,
+        "client_close_notify": true,
+        "group": 29,
+        "handshake_verified": true,
+        "payload_matches": true,
+        "received_bytes": 0,
+        "server_close_notify": true,
+        "stage": "close",
+        "status": "ok",
+        "transport_read_bytes": 733,
+        "transport_written_bytes": 1548,
+        "uploaded_bytes": 0
+      },
+      "scope": "authenticated REALITY handshake and ALPN observation only; zero proxy bytes; no full proxy interop claim"
+    },
+    {
+      "network": "xhttp",
+      "fingerprint": "chrome_133",
+      "offered_alpn": [
+        "h2",
+        "http/1.1"
+      ],
+      "exit_code": 0,
+      "native_report": {
+        "alpn": null,
+        "cipher_suite": 4866,
+        "client_close_notify": true,
+        "group": 29,
+        "handshake_verified": true,
+        "payload_matches": true,
+        "received_bytes": 0,
+        "server_close_notify": true,
+        "stage": "close",
+        "status": "ok",
+        "transport_read_bytes": 805,
+        "transport_written_bytes": 1936,
+        "uploaded_bytes": 0
+      },
+      "scope": "authenticated REALITY handshake and ALPN observation only; zero proxy bytes; no full proxy interop claim"
+    }
+  ]
+}

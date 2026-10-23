@@ -36,6 +36,18 @@ static bool validHost(const QString &host) {
     return true;
 }
 QString ProxyNode::validate(const ProxyNode &n) {
+    if (n.isXray()) {
+        // Invalid/unsupported imported nodes are safe data and remain visible.
+        // Execution always replays the original document through Rust; these
+        // presence/budget checks grant no runtime permission.
+        if (QUuid(n.id).isNull() || n.name.trimmed().isEmpty() || n.name.size() > 128 ||
+            n.name.contains(QRegularExpression("[\\x00-\\x1f]"))) return QStringLiteral("JSON 节点标识或名称无效。");
+        if (n.sourceDocument.isEmpty() || n.sourceDocument.size() > 4 * 1024 * 1024 ||
+            n.sourceNodeIndex < 0 || n.sourceNodeIndex >= 2000 || n.conversionIssues.size() > 64 ||
+            n.runtimeIssues.size() > 64 || n.importSource.size() > 128)
+            return QStringLiteral("JSON 节点缺少有界原始配置；请重新导入。");
+        return {};
+    }
     if(QJsonDocument(n.originalConfiguration).toJson(QJsonDocument::Compact).size()>256*1024||n.conversionIssues.size()>32||n.sourceFormat.size()>128)return QStringLiteral("订阅原始差异超过保存上限。");
     int budget=10000;
     if(QJsonDocument(n.parameters).toJson(QJsonDocument::Compact).size()>256*1024 || !safeParameters(n.parameters,0,budget))return QStringLiteral("扩展选项超出安全范围：不允许本地文件、系统网络设置、额外监听、脚本或关闭证书验证。");
@@ -50,12 +62,10 @@ QString ProxyNode::validate(const ProxyNode &n) {
     if (n.name.trimmed().isEmpty() || n.name.size() > 128 || n.name.contains(QRegularExpression("[\\x00-\\x1f]")))
         return QStringLiteral("节点名称不能为空、超过 128 字符或包含控制字符。");
     bool supportedProtocol=protocols().contains(n.protocol);
-#ifdef SWIRL_USE_RUST_CORE
-    // Imported native protocols do not expand the existing editor dropdown or
-    // claim that the retained Mihomo compatibility build can execute them.
+    // This is a preservation/validation catalog, not execution capability.
+    // RustCoreEngine and SwirlProtocolRegistry decide which nodes can run.
     supportedProtocol=supportedProtocol||n.protocol=="socks4"||n.protocol=="socks4a";
-#endif
-    if (!supportedProtocol) return QStringLiteral("固定版本引擎不支持此节点协议。");
+    if (!supportedProtocol) return QStringLiteral("此节点协议不在可保存的数据格式目录中。");
     const bool peerTransport=QStringList{"wireguard","tailscale","zerotier","easytier","openvpn"}.contains(n.protocol);
     const bool portRange=(n.protocol=="mieru" && !n.parameters.value("port-range").toString().isEmpty()) ||
         (QStringList{"hysteria","hysteria2"}.contains(n.protocol) && !n.parameters.value("ports").toString().isEmpty());
@@ -76,7 +86,7 @@ QString ProxyNode::validate(const ProxyNode &n) {
     return {};
 }
 QStringList ProxyNode::protocols() {
-    // Exactly the outbound transports in the pinned Mihomo v1.19.32 parser.
+    // Historical imported protocol catalog; it must not claim runtime support.
     // direct/dns/reject/rematch are routing actions, not remote node protocols.
     return {"socks5","ss","trojan","http","ssr","vmess","vless","snell","hysteria","hysteria2",
         "wireguard","tuic","shadowquic","gost-relay","ssh","mieru","anytls","sudoku","masque",
@@ -84,11 +94,28 @@ QStringList ProxyNode::protocols() {
 }
 QVariantMap ProxyNode::publicInfo() const {
     const auto region=NodeRegion::fromName(name);
+    const auto capability=SwirlProtocolRegistry::describe(*this);
+    const QHash<QString,QString> protocolLabels{{"ss","Shadowsocks"},{"socks4","SOCKS4"},{"socks4a","SOCKS4a"},{"socks5","SOCKS5"},{"vmess","VMess"},{"vless","VLESS"},{"trojan","Trojan"},{"http","HTTP"}};
+    const QHash<QString,QString> transportLabels{{"tcp","TCP"},{"web_socket","WebSocket"},{"grpc","gRPC"},{"http2","HTTP/2"},{"http_upgrade","HTTPUpgrade"},{"xhttp","XHTTP"}};
+    const QHash<QString,QString> securityLabels{{"none",QStringLiteral("无 TLS")},{"tls","TLS"},{"reality","REALITY"}};
+    const QHash<QString,QString> origins{{"file",QStringLiteral("JSON 文件")},{"text",QStringLiteral("JSON 文本")},{"clipboard",QStringLiteral("剪贴板 JSON")},{"url",QStringLiteral("HTTPS JSON URL")},{"subscription",QStringLiteral("JSON 订阅")}};
+    const auto parameterLabel=parameterState=="valid"?QStringLiteral("参数有效"):parameterState=="invalid"?QStringLiteral("参数无效"):QStringLiteral("参数待验证");
+    const auto executable=capability.value("native").toBool();
+    const auto state=isXray()?QStringLiteral("JSON 已解析 · %1 · %2 · 未验证业务流量").arg(parameterLabel,executable?QStringLiteral("Rust 可执行"):QStringLiteral("Rust 不可执行")):
+        conversionIssues.isEmpty()?QStringLiteral("已解析 · 待联网测试"):QStringLiteral("已解析 · 含未支持选项");
+    const auto origin=origins.value(importSource,QStringLiteral("JSON 配置"));
     return {{"id",id},{"name",name},{"protocol",protocol},{"host",host},{"port",port},
+        {"protocolLabel",protocolLabels.value(protocol,protocol.toUpper())},
         {"regionCode",region.code},{"regionName",region.name},
         {"cipher",cipher},{"serverName",serverName},{"sourceId",sourceId},{"sourceFormat",sourceFormat},
-        {"configurationState",conversionIssues.isEmpty()?QStringLiteral("已解析 · 待联网测试"):QStringLiteral("已解析 · 含未支持选项")},
-        {"conversionIssues",conversionIssues},{"capability",SwirlProtocolRegistry::describe(*this)},
-        {"normalizationNotes",originalConfiguration.value("_swirl-default-client-fingerprint").toBool()?QStringLiteral("源配置未指定 Reality 指纹；Swirl 使用 chrome。"):QString()},
+        {"configurationState",state},{"jsonParsed",isXray()},
+        {"parameterState",parameterState},{"parameterLabel",parameterLabel},
+        {"transportType",transportType},{"transportLabel",transportLabels.value(transportType,QStringLiteral("未知传输"))},
+        {"securityType",securityType},{"securityLabel",securityLabels.value(securityType,QStringLiteral("未知安全类型"))},
+        {"visionEnabled",isXray()&&parameters.value("authentication").toObject().value("flow").toString()=="xtls-rprx-vision"},
+        {"importSource",importSource},{"sourceLabel",isXray()?origin+(sourceFingerprint.isEmpty()?QString():QStringLiteral(" · ")+sourceFingerprint.left(12)):sourceFormat},
+        {"nativeExecutable",executable},{"networkVerified",false},{"unsupportedReason",capability.value("reason")},
+        {"conversionIssues",conversionIssues},{"capability",capability},
+        {"normalizationNotes",originalConfiguration.value("_swirl-default-client-fingerprint").toBool()?QStringLiteral("源配置未指定 Reality 指纹；保留历史归一化标记，Rust 拒绝推断执行。"):QString()},
         {"hasCredentials",!password.isEmpty() || !parameters.isEmpty()}};
 }

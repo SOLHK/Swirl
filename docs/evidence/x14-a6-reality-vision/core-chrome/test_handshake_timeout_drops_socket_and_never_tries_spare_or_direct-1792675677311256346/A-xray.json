@@ -1,0 +1,22 @@
+{
+  "identity": "A",
+  "protocol": "vless+reality",
+  "fingerprint": "chrome_133",
+  "client_hello_profile": "chrome_133",
+  "tcp_listener_established": true,
+  "reality_authenticated_sessions": 0,
+  "client_finished_verified_sessions": 0,
+  "camouflage_record_size_failures": 0,
+  "vless_accepted_sessions": 0,
+  "vless_target_ports": [],
+  "vision_padding_events": 0,
+  "vision_unpadding_events": 0,
+  "vision_direct_upload_commands": 0,
+  "vision_direct_download_commands": 0,
+  "camouflage_connections": 7,
+  "camouflage_application_bytes": 0,
+  "process_reaped": true,
+  "forced_kill": false,
+  "listener_closed": true,
+  "active_camouflage_connections": 0
+}

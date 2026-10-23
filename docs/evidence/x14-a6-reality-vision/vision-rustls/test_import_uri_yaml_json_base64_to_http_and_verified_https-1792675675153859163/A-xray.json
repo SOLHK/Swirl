@@ -1,0 +1,31 @@
+{
+  "identity": "A",
+  "protocol": "vless+reality+vision",
+  "fingerprint": "rustls",
+  "client_hello_profile": "rustls",
+  "tcp_listener_established": true,
+  "reality_authenticated_sessions": 8,
+  "client_finished_verified_sessions": 8,
+  "camouflage_record_size_failures": 0,
+  "vless_accepted_sessions": 8,
+  "vless_target_ports": [
+    53933,
+    54909,
+    53933,
+    54909,
+    53933,
+    54909,
+    53933,
+    54909
+  ],
+  "vision_padding_events": 12,
+  "vision_unpadding_events": 12,
+  "vision_direct_upload_commands": 4,
+  "vision_direct_download_commands": 4,
+  "camouflage_connections": 15,
+  "camouflage_application_bytes": 0,
+  "process_reaped": true,
+  "forced_kill": false,
+  "listener_closed": true,
+  "active_camouflage_connections": 0
+}

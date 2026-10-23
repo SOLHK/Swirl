@@ -1,0 +1,182 @@
+{
+  "client_sha256": "caf309da238281dea110d1b8e62c38f5eefa6db469c6a421d0b80a233b157a1d",
+  "official_server_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+  "count": 12,
+  "passed": 12,
+  "records": [
+    {
+      "iteration": 0,
+      "expected_success": true,
+      "passed": true,
+      "exit_code": 0,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 27633,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b03a3e1e12b699bd2c526e13a0d73f39b761de545f248b3d5faac391ad3b8d97",
+        "total_us": 81777,
+        "uploaded": 65536
+      },
+      "stderr": ""
+    },
+    {
+      "iteration": 1,
+      "expected_success": false,
+      "passed": true,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationRejected",
+        "ok": false
+      },
+      "stderr": ""
+    },
+    {
+      "iteration": 2,
+      "expected_success": true,
+      "passed": true,
+      "exit_code": 0,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 27829,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b03a3e1e12b699bd2c526e13a0d73f39b761de545f248b3d5faac391ad3b8d97",
+        "total_us": 82178,
+        "uploaded": 65536
+      },
+      "stderr": ""
+    },
+    {
+      "iteration": 3,
+      "expected_success": false,
+      "passed": true,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationRejected",
+        "ok": false
+      },
+      "stderr": ""
+    },
+    {
+      "iteration": 4,
+      "expected_success": true,
+      "passed": true,
+      "exit_code": 0,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 26717,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b03a3e1e12b699bd2c526e13a0d73f39b761de545f248b3d5faac391ad3b8d97",
+        "total_us": 73450,
+        "uploaded": 65536
+      },
+      "stderr": ""
+    },
+    {
+      "iteration": 5,
+      "expected_success": false,
+      "passed": true,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationRejected",
+        "ok": false
+      },
+      "stderr": ""
+    },
+    {
+      "iteration": 6,
+      "expected_success": true,
+      "passed": true,
+      "exit_code": 0,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 27459,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b03a3e1e12b699bd2c526e13a0d73f39b761de545f248b3d5faac391ad3b8d97",
+        "total_us": 34096,
+        "uploaded": 65536
+      },
+      "stderr": ""
+    },
+    {
+      "iteration": 7,
+      "expected_success": false,
+      "passed": true,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationRejected",
+        "ok": false
+      },
+      "stderr": ""
+    },
+    {
+      "iteration": 8,
+      "expected_success": true,
+      "passed": true,
+      "exit_code": 0,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 27042,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b03a3e1e12b699bd2c526e13a0d73f39b761de545f248b3d5faac391ad3b8d97",
+        "total_us": 34300,
+        "uploaded": 65536
+      },
+      "stderr": ""
+    },
+    {
+      "iteration": 9,
+      "expected_success": false,
+      "passed": true,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationRejected",
+        "ok": false
+      },
+      "stderr": ""
+    },
+    {
+      "iteration": 10,
+      "expected_success": true,
+      "passed": true,
+      "exit_code": 0,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 26538,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b03a3e1e12b699bd2c526e13a0d73f39b761de545f248b3d5faac391ad3b8d97",
+        "total_us": 76879,
+        "uploaded": 65536
+      },
+      "stderr": ""
+    },
+    {
+      "iteration": 11,
+      "expected_success": false,
+      "passed": true,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationRejected",
+        "ok": false
+      },
+      "stderr": ""
+    }
+  ]
+}

@@ -1,0 +1,1450 @@
+{
+  "archived_at_utc": "2026-10-22T13:29:38.739752+00:00",
+  "scope": "Independent official Xray v26.10.21 loopback, Rust connector and production Core ABI only",
+  "public_network_tested": false,
+  "qt_product_tested": false,
+  "files": [
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/source-identity.json",
+      "original_sha256": "560c10c100543e6a6a4d7d0fe1f438c126777396a72f6463136ec6c29b9e2333",
+      "archived_sha256": "560c10c100543e6a6a4d7d0fe1f438c126777396a72f6463136ec6c29b9e2333",
+      "bytes": 1838,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test-summary.json",
+      "original_sha256": "eaf850a786ab589d52a80734756e6148eac77fcbe0a0f4f678b7604700e6022b",
+      "archived_sha256": "eaf850a786ab589d52a80734756e6148eac77fcbe0a0f4f678b7604700e6022b",
+      "bytes": 306,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct-1792675677311256346/A-xray.json",
+      "original_sha256": "b6257709913b707b5211ff820834c602a77efca66e40df0adb6df3e76b74279b",
+      "archived_sha256": "b6257709913b707b5211ff820834c602a77efca66e40df0adb6df3e76b74279b",
+      "bytes": 664,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct-1792675677311256346/handshake-timeout.json",
+      "original_sha256": "c01abdc35b47de7e882c41112851671daea088ce74c328e5a9994202e884d1b6",
+      "archived_sha256": "c01abdc35b47de7e882c41112851671daea088ce74c328e5a9994202e884d1b6",
+      "bytes": 90,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct-1792675677311256346/origins.json",
+      "original_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "archived_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "bytes": 214,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct-1792675677311256346/runtime.json",
+      "original_sha256": "330a2109f9fed83ed99947e99b54b3e7dbd79da7701c2a4f78f3b9f814cc9e50",
+      "archived_sha256": "330a2109f9fed83ed99947e99b54b3e7dbd79da7701c2a4f78f3b9f814cc9e50",
+      "bytes": 954,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_import_uri_yaml_json_base64_to_http_and_verified_https-1792675677878269209/A-xray.json",
+      "original_sha256": "bc62a6d7aab25be265c59e1af1080e99fdcd7ad640a75df384983deacb39f3db",
+      "archived_sha256": "bc62a6d7aab25be265c59e1af1080e99fdcd7ad640a75df384983deacb39f3db",
+      "bytes": 802,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_import_uri_yaml_json_base64_to_http_and_verified_https-1792675677878269209/origins.json",
+      "original_sha256": "f0d643b622fbdcd71131f7fef1623e139b5f2d3007a195ee49d81dca914ebf40",
+      "archived_sha256": "f0d643b622fbdcd71131f7fef1623e139b5f2d3007a195ee49d81dca914ebf40",
+      "bytes": 510,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_import_uri_yaml_json_base64_to_http_and_verified_https-1792675677878269209/runtime.json",
+      "original_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "archived_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "bytes": 46,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_large_fragmented_concurrent_bidirectional_halfclose-1792675678593735410/A-xray.json",
+      "original_sha256": "d5dd223cfbd05931de3952b109ff9e0e540646b5a2de7fe1b912e58d75d50caa",
+      "archived_sha256": "d5dd223cfbd05931de3952b109ff9e0e540646b5a2de7fe1b912e58d75d50caa",
+      "bytes": 733,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_large_fragmented_concurrent_bidirectional_halfclose-1792675678593735410/origins.json",
+      "original_sha256": "7442bedcac70fbd1ba12b02315a74d4dd73ac315500fac196316c71b45fe315a",
+      "archived_sha256": "7442bedcac70fbd1ba12b02315a74d4dd73ac315500fac196316c71b45fe315a",
+      "bytes": 1770,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_large_fragmented_concurrent_bidirectional_halfclose-1792675678593735410/runtime.json",
+      "original_sha256": "a43741432c33654397bfd50efa52a5f172df0664a470c7824be99bfe048d0de7",
+      "archived_sha256": "a43741432c33654397bfd50efa52a5f172df0664a470c7824be99bfe048d0de7",
+      "bytes": 3143,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_ordered_routes_reject_direct_domain_and_selected_exit-1792675678921584886/A-xray.json",
+      "original_sha256": "9229cb1accec3bcb7eb40cc58c5f974e2a90b844dfe06aa153552fccae02b808",
+      "archived_sha256": "9229cb1accec3bcb7eb40cc58c5f974e2a90b844dfe06aa153552fccae02b808",
+      "bytes": 677,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_ordered_routes_reject_direct_domain_and_selected_exit-1792675678921584886/B-xray.json",
+      "original_sha256": "4b01e3e27f4842af6203353074e2fb9fd41f0660d76e49deffa082581eef3f01",
+      "archived_sha256": "4b01e3e27f4842af6203353074e2fb9fd41f0660d76e49deffa082581eef3f01",
+      "bytes": 677,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_ordered_routes_reject_direct_domain_and_selected_exit-1792675678921584886/origins.json",
+      "original_sha256": "e1618c361184c8b069d7bc643b7fe8fd5ada7659a5e68973798f345c7efd11fe",
+      "archived_sha256": "e1618c361184c8b069d7bc643b7fe8fd5ada7659a5e68973798f345c7efd11fe",
+      "bytes": 263,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_ordered_routes_reject_direct_domain_and_selected_exit-1792675678921584886/runtime.json",
+      "original_sha256": "ec072baa530fd0950031621354025a2b73204315105c2123c5595cce28f921fc",
+      "archived_sha256": "ec072baa530fd0950031621354025a2b73204315105c2123c5595cce28f921fc",
+      "bytes": 2421,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_runtime_cancellation_releases_authenticated_stream-1792675679518075971/A-xray.json",
+      "original_sha256": "1e66179d0bcfde805462de67a4d997231b9b2df330bb3d9b4d881314d7f06cb6",
+      "archived_sha256": "1e66179d0bcfde805462de67a4d997231b9b2df330bb3d9b4d881314d7f06cb6",
+      "bytes": 677,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_runtime_cancellation_releases_authenticated_stream-1792675679518075971/origins.json",
+      "original_sha256": "e41a03702f21f192f17657af9c0d77e0467209022190c1e96a3a1bbfa4db0b4f",
+      "archived_sha256": "e41a03702f21f192f17657af9c0d77e0467209022190c1e96a3a1bbfa4db0b4f",
+      "bytes": 383,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_runtime_cancellation_releases_authenticated_stream-1792675679518075971/runtime.json",
+      "original_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "archived_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "bytes": 46,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_socks5_domain_connect_to_http_and_verified_https-1792675679822988575/A-xray.json",
+      "original_sha256": "5724a0a9a9d3a64c99f80dd49c423da35c9d6a03bcfa5f6dde192f686b98f355",
+      "archived_sha256": "5724a0a9a9d3a64c99f80dd49c423da35c9d6a03bcfa5f6dde192f686b98f355",
+      "bytes": 688,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_socks5_domain_connect_to_http_and_verified_https-1792675679822988575/origins.json",
+      "original_sha256": "aebccadc9c1b207e8d666631a3d24315de7106812b139407107d05f52bfef68d",
+      "archived_sha256": "aebccadc9c1b207e8d666631a3d24315de7106812b139407107d05f52bfef68d",
+      "bytes": 290,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_socks5_domain_connect_to_http_and_verified_https-1792675679822988575/runtime.json",
+      "original_sha256": "eb4075bb55729c9532c58e50fcd8f34729ddf0bf93741c60728d7471a90b93d2",
+      "archived_sha256": "eb4075bb55729c9532c58e50fcd8f34729ddf0bf93741c60728d7471a90b93d2",
+      "bytes": 1319,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_socks5_domain_connect_to_http_and_verified_https-1792675679822988575/socks5-client.json",
+      "original_sha256": "40a72b938a6303ddb440ac59d89adf6e9092187b5b62672226f4f25c67120270",
+      "archived_sha256": "40a72b938a6303ddb440ac59d89adf6e9092187b5b62672226f4f25c67120270",
+      "bytes": 612,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_switch_preserves_old_session_and_routes_new_session_to_b-1792675680171495260/A-xray.json",
+      "original_sha256": "b27d285524f1f9cd9a2703da5805df77bcb8629f385406c2a9ecabc25ab27291",
+      "archived_sha256": "b27d285524f1f9cd9a2703da5805df77bcb8629f385406c2a9ecabc25ab27291",
+      "bytes": 677,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_switch_preserves_old_session_and_routes_new_session_to_b-1792675680171495260/B-xray.json",
+      "original_sha256": "2b5b46e6b6d200f81021665b37a870e73776ecc2fd4f1279edfdf95cd65ff8ed",
+      "archived_sha256": "2b5b46e6b6d200f81021665b37a870e73776ecc2fd4f1279edfdf95cd65ff8ed",
+      "bytes": 677,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_switch_preserves_old_session_and_routes_new_session_to_b-1792675680171495260/origins.json",
+      "original_sha256": "033d857f850459bc54e5b5f324a681f7166464d406415b8cb9f2a47d829359f2",
+      "archived_sha256": "033d857f850459bc54e5b5f324a681f7166464d406415b8cb9f2a47d829359f2",
+      "bytes": 483,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_switch_preserves_old_session_and_routes_new_session_to_b-1792675680171495260/runtime.json",
+      "original_sha256": "cc7a27aea0b442f6f8acc15837b625739756d49667f614da33fba063efe081ba",
+      "archived_sha256": "cc7a27aea0b442f6f8acc15837b625739756d49667f614da33fba063efe081ba",
+      "bytes": 1312,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_wrong_reality_authentication_and_vless_uuid_never_reach_target-1792675680777956222/A-xray.json",
+      "original_sha256": "f4f7a094df85a90573b60e922f6d8af7147d439a4da6284c84400817b5918c51",
+      "archived_sha256": "f4f7a094df85a90573b60e922f6d8af7147d439a4da6284c84400817b5918c51",
+      "bytes": 665,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_wrong_reality_authentication_and_vless_uuid_never_reach_target-1792675680777956222/B-xray.json",
+      "original_sha256": "5796149a33c95d52007923256ff7a5631ec7b54c9920b10153d1872fa42f55ca",
+      "archived_sha256": "5796149a33c95d52007923256ff7a5631ec7b54c9920b10153d1872fa42f55ca",
+      "bytes": 664,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_wrong_reality_authentication_and_vless_uuid_never_reach_target-1792675680777956222/origins.json",
+      "original_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "archived_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "bytes": 214,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/test_wrong_reality_authentication_and_vless_uuid_never_reach_target-1792675680777956222/runtime.json",
+      "original_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "archived_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "bytes": 46,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome/tests.log",
+      "original_sha256": "6bd4db4a148689203afa353ec4b0970d2306b9fe756835b369dd3f7821643217",
+      "archived_sha256": "6bd4db4a148689203afa353ec4b0970d2306b9fe756835b369dd3f7821643217",
+      "bytes": 1434,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/source-identity.json",
+      "original_sha256": "63c5a14971e266759035fa0550cd7741cb2259806bf2ee89ae8201ef61b20350",
+      "archived_sha256": "63c5a14971e266759035fa0550cd7741cb2259806bf2ee89ae8201ef61b20350",
+      "bytes": 3508,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test-summary.json",
+      "original_sha256": "3ba4cae370342a14037c0c6925f9bd0f5d4dbb600e05cfe5a08a6dc8df19bfb3",
+      "archived_sha256": "3ba4cae370342a14037c0c6925f9bd0f5d4dbb600e05cfe5a08a6dc8df19bfb3",
+      "bytes": 302,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct-1792675598705191778/A-xray.json",
+      "original_sha256": "4c494262a1729dc1774b73989030b30068153af4d824474f14ffba039e760619",
+      "archived_sha256": "4c494262a1729dc1774b73989030b30068153af4d824474f14ffba039e760619",
+      "bytes": 656,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct-1792675598705191778/handshake-timeout.json",
+      "original_sha256": "b32410a7e7b0a9ea35fe98c0e940900be84920bdb6b2e14f74cd9d0b1604b01b",
+      "archived_sha256": "b32410a7e7b0a9ea35fe98c0e940900be84920bdb6b2e14f74cd9d0b1604b01b",
+      "bytes": 90,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct-1792675598705191778/origins.json",
+      "original_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "archived_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "bytes": 214,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct-1792675598705191778/runtime.json",
+      "original_sha256": "5010e2e68d5a6e45f820bca98e8330001777c1bc1723b174ba56881de3dc8d3b",
+      "archived_sha256": "5010e2e68d5a6e45f820bca98e8330001777c1bc1723b174ba56881de3dc8d3b",
+      "bytes": 954,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_import_uri_yaml_json_base64_to_http_and_verified_https-1792675599232357161/A-xray.json",
+      "original_sha256": "998c09e495b7a8ad259c72667293531d9c723fee727b68827682f9b95328acd8",
+      "archived_sha256": "998c09e495b7a8ad259c72667293531d9c723fee727b68827682f9b95328acd8",
+      "bytes": 747,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_import_uri_yaml_json_base64_to_http_and_verified_https-1792675599232357161/origins.json",
+      "original_sha256": "091a2bc3b333022a332861b013202648af539f0d344feab02d08321a7231b19b",
+      "archived_sha256": "091a2bc3b333022a332861b013202648af539f0d344feab02d08321a7231b19b",
+      "bytes": 410,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_import_uri_yaml_json_base64_to_http_and_verified_https-1792675599232357161/runtime.json",
+      "original_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "archived_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "bytes": 46,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_large_fragmented_concurrent_bidirectional_halfclose-1792675599790431986/A-xray.json",
+      "original_sha256": "cee4d4c4796b0dc339cafb1407904015b2db5febce839c3caaca1a702198e9e6",
+      "archived_sha256": "cee4d4c4796b0dc339cafb1407904015b2db5febce839c3caaca1a702198e9e6",
+      "bytes": 725,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_large_fragmented_concurrent_bidirectional_halfclose-1792675599790431986/origins.json",
+      "original_sha256": "82c6fed20e76294e234402f644ec0dec600868726919f07a17c206d21f402a83",
+      "archived_sha256": "82c6fed20e76294e234402f644ec0dec600868726919f07a17c206d21f402a83",
+      "bytes": 1770,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_large_fragmented_concurrent_bidirectional_halfclose-1792675599790431986/runtime.json",
+      "original_sha256": "80c876c5df3fc44d8af96a3cdd294320c6cb186270c23753637207089d8e539e",
+      "archived_sha256": "80c876c5df3fc44d8af96a3cdd294320c6cb186270c23753637207089d8e539e",
+      "bytes": 3143,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_ordered_routes_reject_direct_domain_and_selected_exit-1792675600138993131/A-xray.json",
+      "original_sha256": "33e4d27aff90fae2944f4487057b37f533f2b380e4fc68edc7519b6461841ca1",
+      "archived_sha256": "33e4d27aff90fae2944f4487057b37f533f2b380e4fc68edc7519b6461841ca1",
+      "bytes": 669,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_ordered_routes_reject_direct_domain_and_selected_exit-1792675600138993131/B-xray.json",
+      "original_sha256": "4f08542bcfd8e208e5b6c7932fcd02c209a8780672c5eaea3cfd8d39743fb3b0",
+      "archived_sha256": "4f08542bcfd8e208e5b6c7932fcd02c209a8780672c5eaea3cfd8d39743fb3b0",
+      "bytes": 669,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_ordered_routes_reject_direct_domain_and_selected_exit-1792675600138993131/origins.json",
+      "original_sha256": "e1618c361184c8b069d7bc643b7fe8fd5ada7659a5e68973798f345c7efd11fe",
+      "archived_sha256": "e1618c361184c8b069d7bc643b7fe8fd5ada7659a5e68973798f345c7efd11fe",
+      "bytes": 263,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_ordered_routes_reject_direct_domain_and_selected_exit-1792675600138993131/runtime.json",
+      "original_sha256": "c3b029173c9fa5b16d2aa1d973bb79ac0bd2447e0b516fa2e178e9fd590d7dbd",
+      "archived_sha256": "c3b029173c9fa5b16d2aa1d973bb79ac0bd2447e0b516fa2e178e9fd590d7dbd",
+      "bytes": 2419,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_runtime_cancellation_releases_authenticated_stream-1792675600723303984/A-xray.json",
+      "original_sha256": "e581f1d3494c8b66cabe47519aca458e2cbc1086f2e560079afdea506ad56808",
+      "archived_sha256": "e581f1d3494c8b66cabe47519aca458e2cbc1086f2e560079afdea506ad56808",
+      "bytes": 669,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_runtime_cancellation_releases_authenticated_stream-1792675600723303984/origins.json",
+      "original_sha256": "e41a03702f21f192f17657af9c0d77e0467209022190c1e96a3a1bbfa4db0b4f",
+      "archived_sha256": "e41a03702f21f192f17657af9c0d77e0467209022190c1e96a3a1bbfa4db0b4f",
+      "bytes": 383,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_runtime_cancellation_releases_authenticated_stream-1792675600723303984/runtime.json",
+      "original_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "archived_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "bytes": 46,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_socks5_domain_connect_to_http_and_verified_https-1792675601068282987/A-xray.json",
+      "original_sha256": "afff2511fd4d70d6cda22a899af224639581283a25159e27fb04820b86b59e71",
+      "archived_sha256": "afff2511fd4d70d6cda22a899af224639581283a25159e27fb04820b86b59e71",
+      "bytes": 680,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_socks5_domain_connect_to_http_and_verified_https-1792675601068282987/origins.json",
+      "original_sha256": "aebccadc9c1b207e8d666631a3d24315de7106812b139407107d05f52bfef68d",
+      "archived_sha256": "aebccadc9c1b207e8d666631a3d24315de7106812b139407107d05f52bfef68d",
+      "bytes": 290,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_socks5_domain_connect_to_http_and_verified_https-1792675601068282987/runtime.json",
+      "original_sha256": "0735810407985a93ab7cba7837a98a62357869f5d7b104deadb4bb17487dccc9",
+      "archived_sha256": "0735810407985a93ab7cba7837a98a62357869f5d7b104deadb4bb17487dccc9",
+      "bytes": 1319,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_socks5_domain_connect_to_http_and_verified_https-1792675601068282987/socks5-client.json",
+      "original_sha256": "0eabf6c0f4a9e59fa68b1d6e47749dedecd8815184d5ecb084a8ed00838385a3",
+      "archived_sha256": "0eabf6c0f4a9e59fa68b1d6e47749dedecd8815184d5ecb084a8ed00838385a3",
+      "bytes": 612,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_switch_preserves_old_session_and_routes_new_session_to_b-1792675601404921684/A-xray.json",
+      "original_sha256": "e512f2500c9a6c1904dd726cc34db62412d8d46bda97b1542fbeb31cf3a3f3a8",
+      "archived_sha256": "e512f2500c9a6c1904dd726cc34db62412d8d46bda97b1542fbeb31cf3a3f3a8",
+      "bytes": 669,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_switch_preserves_old_session_and_routes_new_session_to_b-1792675601404921684/B-xray.json",
+      "original_sha256": "633b594dd3dee15e963e31d3846dd6e0558c171784eb036bd6befa12969704ef",
+      "archived_sha256": "633b594dd3dee15e963e31d3846dd6e0558c171784eb036bd6befa12969704ef",
+      "bytes": 669,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_switch_preserves_old_session_and_routes_new_session_to_b-1792675601404921684/origins.json",
+      "original_sha256": "033d857f850459bc54e5b5f324a681f7166464d406415b8cb9f2a47d829359f2",
+      "archived_sha256": "033d857f850459bc54e5b5f324a681f7166464d406415b8cb9f2a47d829359f2",
+      "bytes": 483,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_switch_preserves_old_session_and_routes_new_session_to_b-1792675601404921684/runtime.json",
+      "original_sha256": "112f5a9a6700b7bf7623a9de906e0f720e28f4f6e485650987635ad0d2aa5c34",
+      "archived_sha256": "112f5a9a6700b7bf7623a9de906e0f720e28f4f6e485650987635ad0d2aa5c34",
+      "bytes": 1313,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_wrong_reality_authentication_and_vless_uuid_never_reach_target-1792675602044789234/A-xray.json",
+      "original_sha256": "b4accf35b262f0b2d09cc505b01f89dc33f1fe1a1b58e13435447d7644027560",
+      "archived_sha256": "b4accf35b262f0b2d09cc505b01f89dc33f1fe1a1b58e13435447d7644027560",
+      "bytes": 657,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_wrong_reality_authentication_and_vless_uuid_never_reach_target-1792675602044789234/B-xray.json",
+      "original_sha256": "15fa767194cadfc9ed0ebad5d91f3ee426166823a745439ff2cc72cff988cb3f",
+      "archived_sha256": "15fa767194cadfc9ed0ebad5d91f3ee426166823a745439ff2cc72cff988cb3f",
+      "bytes": 656,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_wrong_reality_authentication_and_vless_uuid_never_reach_target-1792675602044789234/origins.json",
+      "original_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "archived_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "bytes": 214,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/test_wrong_reality_authentication_and_vless_uuid_never_reach_target-1792675602044789234/runtime.json",
+      "original_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "archived_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "bytes": 46,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls/tests.log",
+      "original_sha256": "4f517bbda7237086d0b898d6e45d3d88ed3a5a29eca8ea78143280c5787354b3",
+      "archived_sha256": "4f517bbda7237086d0b898d6e45d3d88ed3a5a29eca8ea78143280c5787354b3",
+      "bytes": 1434,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-10kdjq0i/reality-01-grpc-tun-rustls-access.log",
+      "original_sha256": "2b4fc4d0161188d92df90f7112dedaf26d8bd3ac8451eb736ab1a58344c50e03",
+      "archived_sha256": "2b4fc4d0161188d92df90f7112dedaf26d8bd3ac8451eb736ab1a58344c50e03",
+      "bytes": 184,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-10kdjq0i/reality-01-grpc-tun-rustls-process.log",
+      "original_sha256": "5deaddca3f6d794dcc96ffb54ed35cafd2f65401c1a9e96bef39cae88aaf0d1e",
+      "archived_sha256": "cbdfa74b0607f60898fc6b6f653d79ae1e376382ab9f5204700339060d089ba8",
+      "bytes": 5436,
+      "redacted_lines": 4
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-10kdjq0i/reality-01-grpc-tun-rustls-xray.json",
+      "original_sha256": "f2a55d6681cf7b4c277f9f56ad8ecdab7de6684a438926fb1c6e71125f5c2b81",
+      "archived_sha256": "f2a55d6681cf7b4c277f9f56ad8ecdab7de6684a438926fb1c6e71125f5c2b81",
+      "bytes": 705,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-10kdjq0i/reality-02-grpc-tun_multi-rustls-access.log",
+      "original_sha256": "5ce61582a49b7530f2b15c3442623742621ff764bc9116804c73cce7c6321e11",
+      "archived_sha256": "5ce61582a49b7530f2b15c3442623742621ff764bc9116804c73cce7c6321e11",
+      "bytes": 184,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-10kdjq0i/reality-02-grpc-tun_multi-rustls-process.log",
+      "original_sha256": "a588646d0508bf6d23e59ab02552f77bdcade8690913b647ec26f9da8b0748e3",
+      "archived_sha256": "cd15c16389f0698d49a77dc75f32730461644020d88e77d766aa20ca9b05a538",
+      "bytes": 5442,
+      "redacted_lines": 4
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-10kdjq0i/reality-02-grpc-tun_multi-rustls-xray.json",
+      "original_sha256": "d66f9132915c163b325c28ed451d4af5e5a4d983c39b1bc37c8df8a28b377f99",
+      "archived_sha256": "d66f9132915c163b325c28ed451d4af5e5a4d983c39b1bc37c8df8a28b377f99",
+      "bytes": 711,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-10kdjq0i/results.json",
+      "original_sha256": "2b0dc1698c80aa6ca5924ce5333688f2fddb8d55d0eb654698efaca0d1aee8c2",
+      "archived_sha256": "2b0dc1698c80aa6ca5924ce5333688f2fddb8d55d0eb654698efaca0d1aee8c2",
+      "bytes": 4490,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-374lz3bz/reality-01-grpc-tun-rustls-access.log",
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-374lz3bz/reality-01-grpc-tun-rustls-process.log",
+      "original_sha256": "eaec1740eddf25c07188f64dc5876ca0c79dc1e30d2d2a13d1921562e2aac6ad",
+      "archived_sha256": "eaec1740eddf25c07188f64dc5876ca0c79dc1e30d2d2a13d1921562e2aac6ad",
+      "bytes": 1199,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-374lz3bz/reality-01-grpc-tun-rustls-xray.json",
+      "original_sha256": "57f403ab0415287029f4ab53ef32a15c165ad72494734556ee727b4c220cc6d8",
+      "archived_sha256": "57f403ab0415287029f4ab53ef32a15c165ad72494734556ee727b4c220cc6d8",
+      "bytes": 681,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-374lz3bz/results.json",
+      "original_sha256": "bbeef576f506f286abf9b3aaff0adcbd4fe86b985794a46ec591f0a5003a9975",
+      "archived_sha256": "bbeef576f506f286abf9b3aaff0adcbd4fe86b985794a46ec591f0a5003a9975",
+      "bytes": 4971,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-3nec8eah/reality-01-grpc-tun-rustls-access.log",
+      "original_sha256": "4121d5079e0166d5ffb74412f249e7041015d89b7e634f988783f0bb540c8c3e",
+      "archived_sha256": "4121d5079e0166d5ffb74412f249e7041015d89b7e634f988783f0bb540c8c3e",
+      "bytes": 92,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-3nec8eah/reality-01-grpc-tun-rustls-process.log",
+      "original_sha256": "bc5c2e6e1fdf57f0d47401177a0b72ee8cfad0aa63cc682ad26a8e87785d6ae9",
+      "archived_sha256": "d0b301adca69b4e3d51f1c4f470064c1bd739f9d0748a11e1a3ce6f4cd269556",
+      "bytes": 3475,
+      "redacted_lines": 2
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-3nec8eah/reality-01-grpc-tun-rustls-xray.json",
+      "original_sha256": "462094b71f1992657c47bafd4518ce650e16d4a3ad006f322c0d18d0013f976d",
+      "archived_sha256": "462094b71f1992657c47bafd4518ce650e16d4a3ad006f322c0d18d0013f976d",
+      "bytes": 694,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-3nec8eah/reality-02-xhttp-tun-rustls-access.log",
+      "original_sha256": "04cce5d195497e44abbe463e6f70487fc4295d3713b586838d8178f732d885bc",
+      "archived_sha256": "04cce5d195497e44abbe463e6f70487fc4295d3713b586838d8178f732d885bc",
+      "bytes": 92,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-3nec8eah/reality-02-xhttp-tun-rustls-process.log",
+      "original_sha256": "9a69fcf2637c88204ebd27b42b7cfd6e4943580e4e9c5f812ffd5fa848283b2f",
+      "archived_sha256": "f7a5e8d840c33b804e6d88e13924b25d1f76280091669328a202aac856938284",
+      "bytes": 3122,
+      "redacted_lines": 2
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-3nec8eah/reality-02-xhttp-tun-rustls-xray.json",
+      "original_sha256": "d76c484bf11ebd9a1b615dd70d0f6264a4604528310197be869f6ef21ddf0f44",
+      "archived_sha256": "d76c484bf11ebd9a1b615dd70d0f6264a4604528310197be869f6ef21ddf0f44",
+      "bytes": 695,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-3nec8eah/results.json",
+      "original_sha256": "900b5a23bd09d40d7dc94ada15de3353445854db41746149f2c98bee5db21d67",
+      "archived_sha256": "900b5a23bd09d40d7dc94ada15de3353445854db41746149f2c98bee5db21d67",
+      "bytes": 2168,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-a3jei0k9/reality-01-raw-tun-rustls-access.log",
+      "original_sha256": "0b639cc6dfe0fdb5c6554f947cec135cb10ef2a78445bc78aa61443acab38d93",
+      "archived_sha256": "0b639cc6dfe0fdb5c6554f947cec135cb10ef2a78445bc78aa61443acab38d93",
+      "bytes": 92,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-a3jei0k9/reality-01-raw-tun-rustls-process.log",
+      "original_sha256": "aa582abb0cc0d7ea9d6d7c87ab3c0c437e14520bd356282fd84410a8e3ad2c15",
+      "archived_sha256": "2dd707c89927bbc07a0f9a8841ea37f4e79079b248907916a9d6ece52ea82c22",
+      "bytes": 3014,
+      "redacted_lines": 2
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-a3jei0k9/reality-01-raw-tun-rustls-xray.json",
+      "original_sha256": "002a60722afd6f6e838dfd176e807720bb9791309d5c3a5c41a92b72096910a6",
+      "archived_sha256": "002a60722afd6f6e838dfd176e807720bb9791309d5c3a5c41a92b72096910a6",
+      "bytes": 693,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-a3jei0k9/results.json",
+      "original_sha256": "4d36d43033c24c6b29d8cbbf0bd2296d3062216bcbb7020d919cfb33f6f04b6d",
+      "archived_sha256": "4d36d43033c24c6b29d8cbbf0bd2296d3062216bcbb7020d919cfb33f6f04b6d",
+      "bytes": 1426,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-e_h7jeiv/reality-01-xhttp-tun-rustls-access.log",
+      "original_sha256": "71deac0e9d4775f0d33c02f70bf8cc09693e2030bd0f77c9d7f62c9ad3576cdf",
+      "archived_sha256": "71deac0e9d4775f0d33c02f70bf8cc09693e2030bd0f77c9d7f62c9ad3576cdf",
+      "bytes": 276,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-e_h7jeiv/reality-01-xhttp-tun-rustls-process.log",
+      "original_sha256": "4a61a9d63dda05f97764d2ddcff14ae64a7d7bc0df0a891bd128437c0a46fa97",
+      "archived_sha256": "f37836857112aee62748d796d9e50b733d39eba986feb950f9b4c96ac15b025b",
+      "bytes": 6792,
+      "redacted_lines": 6
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-e_h7jeiv/reality-01-xhttp-tun-rustls-xray.json",
+      "original_sha256": "45936f0234fab89f7c75757184d4f89940811c3736743959b2a9077cdd37a835",
+      "archived_sha256": "45936f0234fab89f7c75757184d4f89940811c3736743959b2a9077cdd37a835",
+      "bytes": 718,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-e_h7jeiv/results.json",
+      "original_sha256": "8912b74e532368ab13694bb640e7cec23427917438ad4a2dc2a7411ca474ed27",
+      "archived_sha256": "8912b74e532368ab13694bb640e7cec23427917438ad4a2dc2a7411ca474ed27",
+      "bytes": 3358,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-f8_nu9yy/reality-01-raw-tun-chrome_133-access.log",
+      "original_sha256": "1172ffa4e310dfd9ef63955f91f15d6cdeb5a09487367411a983f4a3eb50211a",
+      "archived_sha256": "1172ffa4e310dfd9ef63955f91f15d6cdeb5a09487367411a983f4a3eb50211a",
+      "bytes": 92,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-f8_nu9yy/reality-01-raw-tun-chrome_133-process.log",
+      "original_sha256": "882ce6ad254892f5dc5fe7537ea3d0fd9dc0f97de8f2753e307547e6b149deac",
+      "archived_sha256": "6f99ec1c931e6d0ee9ddeff4282f8beb82b596f64675fcb63d23f2235cd7f8ea",
+      "bytes": 3726,
+      "redacted_lines": 2
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-f8_nu9yy/reality-01-raw-tun-chrome_133-xray.json",
+      "original_sha256": "e7a2170454b047ff9371be9dbd749c0ff8276a16298626db9e900d9116f8703d",
+      "archived_sha256": "e7a2170454b047ff9371be9dbd749c0ff8276a16298626db9e900d9116f8703d",
+      "bytes": 712,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-f8_nu9yy/results.json",
+      "original_sha256": "4f2b8243cdd344b95b5d510fe855f3de761c94df65afbc29a771fe088144c46b",
+      "archived_sha256": "4f2b8243cdd344b95b5d510fe855f3de761c94df65afbc29a771fe088144c46b",
+      "bytes": 1428,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-lc2tuhje/reality-01-grpc-tun-rustls-access.log",
+      "original_sha256": "b999bcd66a0bad4bcacc032487a18167244df2542e3f04c961ee42d75f89f3dd",
+      "archived_sha256": "b999bcd66a0bad4bcacc032487a18167244df2542e3f04c961ee42d75f89f3dd",
+      "bytes": 142,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-lc2tuhje/reality-01-grpc-tun-rustls-process.log",
+      "original_sha256": "838668976950dd2c50bfc0ecd06e4de507d2a884e037c091d0c061e78384f5d0",
+      "archived_sha256": "61fe1dd8ef50ecb074301b0237ec9d164ecce703d8e708a195082cead3805269",
+      "bytes": 3714,
+      "redacted_lines": 5
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-lc2tuhje/reality-01-grpc-tun-rustls-xray.json",
+      "original_sha256": "0dbcfc3bd9cad1cf329b052beba2cdde9827aee407fffeaead32b8c3de0f765b",
+      "archived_sha256": "0dbcfc3bd9cad1cf329b052beba2cdde9827aee407fffeaead32b8c3de0f765b",
+      "bytes": 682,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-lc2tuhje/reality-02-xhttp-tun-rustls-access.log",
+      "original_sha256": "599ea56528c2e6dce31a493817e9bbb28b3951cc4a7a02d7892950c4124f2e35",
+      "archived_sha256": "599ea56528c2e6dce31a493817e9bbb28b3951cc4a7a02d7892950c4124f2e35",
+      "bytes": 142,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-lc2tuhje/reality-02-xhttp-tun-rustls-process.log",
+      "original_sha256": "3759b9d348a8a237fc6a424af1e11e66b57dca7641a6d53251d5953119a43ffb",
+      "archived_sha256": "3fdb49e718e10d22663ddb780aff2fa314aa4b2c6183f1f4cbdb0ad528462174",
+      "bytes": 3453,
+      "redacted_lines": 5
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-lc2tuhje/reality-02-xhttp-tun-rustls-xray.json",
+      "original_sha256": "071a7df7677473cfae263a07b0a25d9c1c2c3f4c090c1a24f2ed68d49ba5752c",
+      "archived_sha256": "071a7df7677473cfae263a07b0a25d9c1c2c3f4c090c1a24f2ed68d49ba5752c",
+      "bytes": 683,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-lc2tuhje/results.json",
+      "original_sha256": "a60361c76e13311bf9aa4e7033656ca63c3de50b935323d83ef34a9ae342e665",
+      "archived_sha256": "a60361c76e13311bf9aa4e7033656ca63c3de50b935323d83ef34a9ae342e665",
+      "bytes": 5506,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-lecwlnn0/reality-01-grpc-tun-rustls-access.log",
+      "original_sha256": "4292af4c104de7142882e41c474ecc26d1ebb5e790a58d6f562ca05e28e5cf35",
+      "archived_sha256": "4292af4c104de7142882e41c474ecc26d1ebb5e790a58d6f562ca05e28e5cf35",
+      "bytes": 92,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-lecwlnn0/reality-01-grpc-tun-rustls-process.log",
+      "original_sha256": "bc7b97ea626c05f93941c1674f7d30549bf8f3d1b3588484a45263bb4d66c12d",
+      "archived_sha256": "02acf57758a6e8f30f5b03e760a547ee9beded777344bbfcef7687b34780827d",
+      "bytes": 3483,
+      "redacted_lines": 2
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-lecwlnn0/reality-01-grpc-tun-rustls-xray.json",
+      "original_sha256": "bfbf0fdc3a5565107a449fde72e0d29f38a99767733d1f162d0491b6ba20bec9",
+      "archived_sha256": "bfbf0fdc3a5565107a449fde72e0d29f38a99767733d1f162d0491b6ba20bec9",
+      "bytes": 694,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-lecwlnn0/reality-02-xhttp-tun-rustls-access.log",
+      "original_sha256": "9ac5cbc2e8db0508ad0a9da7c2aa921fc12499daefd2bfeb6a1f6872cef8127f",
+      "archived_sha256": "9ac5cbc2e8db0508ad0a9da7c2aa921fc12499daefd2bfeb6a1f6872cef8127f",
+      "bytes": 92,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-lecwlnn0/reality-02-xhttp-tun-rustls-process.log",
+      "original_sha256": "64c4c6acd32c8d2b19aa7cbfd39c5e0a1acc6faea6b48d1684baec3b5f3fb1fb",
+      "archived_sha256": "f7e9c9e2fd6ff3fe5a9c87392dfcfa31d6884ffae9f75d530d6467c30d28ee9c",
+      "bytes": 2893,
+      "redacted_lines": 2
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-lecwlnn0/reality-02-xhttp-tun-rustls-xray.json",
+      "original_sha256": "de73b79bd5bc6187bda13e27652a1c051226761e73ac684ed5ab9cf6d2120780",
+      "archived_sha256": "de73b79bd5bc6187bda13e27652a1c051226761e73ac684ed5ab9cf6d2120780",
+      "bytes": 695,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-lecwlnn0/results.json",
+      "original_sha256": "72a7aee61814595143e77199517828e1a30bf8d6205a39bf50b9c92b213fb11d",
+      "archived_sha256": "72a7aee61814595143e77199517828e1a30bf8d6205a39bf50b9c92b213fb11d",
+      "bytes": 3686,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-p9ota5o5/reality-01-grpc-tun-chrome_133-access.log",
+      "original_sha256": "9114639a0bc82cd7b20c5412182434f181c84d11248d7cb4e361a1d24493b7bf",
+      "archived_sha256": "9114639a0bc82cd7b20c5412182434f181c84d11248d7cb4e361a1d24493b7bf",
+      "bytes": 92,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-p9ota5o5/reality-01-grpc-tun-chrome_133-process.log",
+      "original_sha256": "934eec965cb23a066750b0d235f9af09f20bc29dba5f846e7450c564828bff7c",
+      "archived_sha256": "255686626e7df00ac565ed375d3e6443a6e9746105c05af40079e16f70e815f7",
+      "bytes": 3480,
+      "redacted_lines": 2
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-p9ota5o5/reality-01-grpc-tun-chrome_133-xray.json",
+      "original_sha256": "bb518361cf047f163db0a8ff96a39a7febf2edfc96eb3e64b92642d9a04670fd",
+      "archived_sha256": "bb518361cf047f163db0a8ff96a39a7febf2edfc96eb3e64b92642d9a04670fd",
+      "bytes": 706,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-p9ota5o5/reality-02-xhttp-tun-chrome_133-access.log",
+      "original_sha256": "2abb0b83acb59ade9f6f43e318c4496a692e16d6b2dbff5997d92f8ea5fda619",
+      "archived_sha256": "2abb0b83acb59ade9f6f43e318c4496a692e16d6b2dbff5997d92f8ea5fda619",
+      "bytes": 92,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-p9ota5o5/reality-02-xhttp-tun-chrome_133-process.log",
+      "original_sha256": "ee58026a2f3cef48d34f3c052a21b23d2840bb86fe751877640d08989a765e90",
+      "archived_sha256": "a77039278df35b7b3aa2ebd079d676e17e8e467f947312099b39288b8930f688",
+      "bytes": 2898,
+      "redacted_lines": 2
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-p9ota5o5/reality-02-xhttp-tun-chrome_133-xray.json",
+      "original_sha256": "d5cf6a5c2766e6ea6b546634b41b7e977eef53004e7055f7942cd9bb1755f635",
+      "archived_sha256": "d5cf6a5c2766e6ea6b546634b41b7e977eef53004e7055f7942cd9bb1755f635",
+      "bytes": 707,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-p9ota5o5/results.json",
+      "original_sha256": "fe1b7255ab73aed540c6766372697a647a442dd0dd9dad9f7701d3477d30bb65",
+      "archived_sha256": "fe1b7255ab73aed540c6766372697a647a442dd0dd9dad9f7701d3477d30bb65",
+      "bytes": 2591,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-tlgey28f/reality-01-grpc-tun_multi-rustls-access.log",
+      "original_sha256": "a492e914f41d79fdbf1c54ba6a032e5896bd71e8b08b8ef66129630d1e4a3289",
+      "archived_sha256": "a492e914f41d79fdbf1c54ba6a032e5896bd71e8b08b8ef66129630d1e4a3289",
+      "bytes": 368,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-tlgey28f/reality-01-grpc-tun_multi-rustls-process.log",
+      "original_sha256": "7340b0e77703ce2e75d48ee8e87405113f85ae817a2325a2d7154a28c528213b",
+      "archived_sha256": "f603d22ae5c27d7f051f1e3bfe685ef924bbe3fb3a668b467b49924fa975ea32",
+      "bytes": 10333,
+      "redacted_lines": 8
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-tlgey28f/reality-01-grpc-tun_multi-rustls-xray.json",
+      "original_sha256": "9519c3d4b0c649a1a88aade23d2c7a3c00a8d7a65b5d0b80ba669e39921a09b6",
+      "archived_sha256": "9519c3d4b0c649a1a88aade23d2c7a3c00a8d7a65b5d0b80ba669e39921a09b6",
+      "bytes": 734,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-tlgey28f/reality-02-xhttp-tun_multi-rustls-access.log",
+      "original_sha256": "42f6bf1eddba78e187f27aeaaf1546dde16a96aa04290aaf397d992aa49ea99f",
+      "archived_sha256": "42f6bf1eddba78e187f27aeaaf1546dde16a96aa04290aaf397d992aa49ea99f",
+      "bytes": 368,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-tlgey28f/reality-02-xhttp-tun_multi-rustls-process.log",
+      "original_sha256": "b728f3099a1c94cc4dd63e0863c58e371ffbde743fc37af0250445d8d5aca9a7",
+      "archived_sha256": "20b429db16e0e0e9f8a42477d2064b220502328810fbe7ff1c8ff5cb9847b550",
+      "bytes": 9700,
+      "redacted_lines": 8
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-tlgey28f/reality-02-xhttp-tun_multi-rustls-xray.json",
+      "original_sha256": "d76714b421060f6e84324dc6e75408faad65b90267122cc965371543140dc5a6",
+      "archived_sha256": "d76714b421060f6e84324dc6e75408faad65b90267122cc965371543140dc5a6",
+      "bytes": 735,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport/swirl-C6-reality-tlgey28f/results.json",
+      "original_sha256": "79d3cf38b3c5af89ed5e8bc2c6f9bd3ca5fa330bceabff825e971058b9945ccd",
+      "archived_sha256": "79d3cf38b3c5af89ed5e8bc2c6f9bd3ca5fa330bceabff825e971058b9945ccd",
+      "bytes": 7278,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/source-identity.json",
+      "original_sha256": "70f5a7d17e2c66f0d3ae7f4254e5746e033db09f9700b843b81f551f88786a83",
+      "archived_sha256": "70f5a7d17e2c66f0d3ae7f4254e5746e033db09f9700b843b81f551f88786a83",
+      "bytes": 3516,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test-summary.json",
+      "original_sha256": "6ac20877a2fc0c855a9ba149acf0b04f78251dbbffb8fb9eefc38d02a1cec4e4",
+      "archived_sha256": "6ac20877a2fc0c855a9ba149acf0b04f78251dbbffb8fb9eefc38d02a1cec4e4",
+      "bytes": 315,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct-1792675674710823877/A-xray.json",
+      "original_sha256": "b88df48f8ecf19698c08250cccd4a78a1a1c7392c13b78c7cafa06ce1579bd1d",
+      "archived_sha256": "b88df48f8ecf19698c08250cccd4a78a1a1c7392c13b78c7cafa06ce1579bd1d",
+      "bytes": 671,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct-1792675674710823877/handshake-timeout.json",
+      "original_sha256": "cc316c663769df133c7f97238ca423932e6a9bd388d57f53b781a10b6b3e3bb2",
+      "archived_sha256": "cc316c663769df133c7f97238ca423932e6a9bd388d57f53b781a10b6b3e3bb2",
+      "bytes": 90,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct-1792675674710823877/origins.json",
+      "original_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "archived_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "bytes": 214,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct-1792675674710823877/runtime.json",
+      "original_sha256": "0e3b2b53bdd4c94a4b5ca4fa040efb7d1c3a786d75e1043759e7afaf24dfcca1",
+      "archived_sha256": "0e3b2b53bdd4c94a4b5ca4fa040efb7d1c3a786d75e1043759e7afaf24dfcca1",
+      "bytes": 954,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_import_uri_yaml_json_base64_to_http_and_verified_https-1792675675258621385/A-xray.json",
+      "original_sha256": "56961f6cc5443fa9b4874c2b1d877581422f606634db40ce038e63b3d346767f",
+      "archived_sha256": "56961f6cc5443fa9b4874c2b1d877581422f606634db40ce038e63b3d346767f",
+      "bytes": 811,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_import_uri_yaml_json_base64_to_http_and_verified_https-1792675675258621385/origins.json",
+      "original_sha256": "f0d643b622fbdcd71131f7fef1623e139b5f2d3007a195ee49d81dca914ebf40",
+      "archived_sha256": "f0d643b622fbdcd71131f7fef1623e139b5f2d3007a195ee49d81dca914ebf40",
+      "bytes": 510,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_import_uri_yaml_json_base64_to_http_and_verified_https-1792675675258621385/runtime.json",
+      "original_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "archived_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "bytes": 46,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_large_fragmented_concurrent_bidirectional_halfclose-1792675676001334185/A-xray.json",
+      "original_sha256": "48cb21e5053d3abd7c911d5b3b467bb456026fcc8e54e3225d8ca664f49fb712",
+      "archived_sha256": "48cb21e5053d3abd7c911d5b3b467bb456026fcc8e54e3225d8ca664f49fb712",
+      "bytes": 741,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_large_fragmented_concurrent_bidirectional_halfclose-1792675676001334185/origins.json",
+      "original_sha256": "8038067b05080ba9f206e37a0c92236baf38542e03bb7c5ed5b30558d08cbe3c",
+      "archived_sha256": "8038067b05080ba9f206e37a0c92236baf38542e03bb7c5ed5b30558d08cbe3c",
+      "bytes": 1770,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_large_fragmented_concurrent_bidirectional_halfclose-1792675676001334185/runtime.json",
+      "original_sha256": "02789efae3dbc9a3dab270d382a01888b704c6ede34f1eb7da936e66aa2588a1",
+      "archived_sha256": "02789efae3dbc9a3dab270d382a01888b704c6ede34f1eb7da936e66aa2588a1",
+      "bytes": 3143,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_ordered_routes_reject_direct_domain_and_selected_exit-1792675676377294566/A-xray.json",
+      "original_sha256": "2314dd088aa8019ab73710cff839762fb2c4bf7b436711f0a8ad584886c20857",
+      "archived_sha256": "2314dd088aa8019ab73710cff839762fb2c4bf7b436711f0a8ad584886c20857",
+      "bytes": 684,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_ordered_routes_reject_direct_domain_and_selected_exit-1792675676377294566/B-xray.json",
+      "original_sha256": "005d4d4d7045fc3cfc619db40cb1c8ab0e3b449ab87406c3f76597e4071830d5",
+      "archived_sha256": "005d4d4d7045fc3cfc619db40cb1c8ab0e3b449ab87406c3f76597e4071830d5",
+      "bytes": 684,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_ordered_routes_reject_direct_domain_and_selected_exit-1792675676377294566/origins.json",
+      "original_sha256": "e1618c361184c8b069d7bc643b7fe8fd5ada7659a5e68973798f345c7efd11fe",
+      "archived_sha256": "e1618c361184c8b069d7bc643b7fe8fd5ada7659a5e68973798f345c7efd11fe",
+      "bytes": 263,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_ordered_routes_reject_direct_domain_and_selected_exit-1792675676377294566/runtime.json",
+      "original_sha256": "e83676888b13bc6511ae6245065d762df865f791df0532f67754c64c42b0afa3",
+      "archived_sha256": "e83676888b13bc6511ae6245065d762df865f791df0532f67754c64c42b0afa3",
+      "bytes": 2418,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_runtime_cancellation_releases_authenticated_stream-1792675676983196267/A-xray.json",
+      "original_sha256": "f1686235c3282345298b432ce61483237a4b2ea887fff3f792746062213757b3",
+      "archived_sha256": "f1686235c3282345298b432ce61483237a4b2ea887fff3f792746062213757b3",
+      "bytes": 684,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_runtime_cancellation_releases_authenticated_stream-1792675676983196267/origins.json",
+      "original_sha256": "e41a03702f21f192f17657af9c0d77e0467209022190c1e96a3a1bbfa4db0b4f",
+      "archived_sha256": "e41a03702f21f192f17657af9c0d77e0467209022190c1e96a3a1bbfa4db0b4f",
+      "bytes": 383,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_runtime_cancellation_releases_authenticated_stream-1792675676983196267/runtime.json",
+      "original_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "archived_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "bytes": 46,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_socks5_domain_connect_to_http_and_verified_https-1792675677332085088/A-xray.json",
+      "original_sha256": "4782ee223d5bf1494811fcf5b3f955e32d7d47ed832f769beb6dcc8dc49fb999",
+      "archived_sha256": "4782ee223d5bf1494811fcf5b3f955e32d7d47ed832f769beb6dcc8dc49fb999",
+      "bytes": 695,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_socks5_domain_connect_to_http_and_verified_https-1792675677332085088/origins.json",
+      "original_sha256": "aebccadc9c1b207e8d666631a3d24315de7106812b139407107d05f52bfef68d",
+      "archived_sha256": "aebccadc9c1b207e8d666631a3d24315de7106812b139407107d05f52bfef68d",
+      "bytes": 290,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_socks5_domain_connect_to_http_and_verified_https-1792675677332085088/runtime.json",
+      "original_sha256": "17af51319ba3303df4222d52c6b2e6bbd3a5da818759fa777a966c8c8b1d55dc",
+      "archived_sha256": "17af51319ba3303df4222d52c6b2e6bbd3a5da818759fa777a966c8c8b1d55dc",
+      "bytes": 1319,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_socks5_domain_connect_to_http_and_verified_https-1792675677332085088/socks5-client.json",
+      "original_sha256": "5d9e756397f5730a8eb5bd27cc0fbb9e1e8f1569bdb9fa9f42de9ff28408f79e",
+      "archived_sha256": "5d9e756397f5730a8eb5bd27cc0fbb9e1e8f1569bdb9fa9f42de9ff28408f79e",
+      "bytes": 612,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_switch_preserves_old_session_and_routes_new_session_to_b-1792675677694131227/A-xray.json",
+      "original_sha256": "97c287b0aeb40c9cd627cc05d67a1b3d9aa30868975cd8fc16b723f357de789c",
+      "archived_sha256": "97c287b0aeb40c9cd627cc05d67a1b3d9aa30868975cd8fc16b723f357de789c",
+      "bytes": 684,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_switch_preserves_old_session_and_routes_new_session_to_b-1792675677694131227/B-xray.json",
+      "original_sha256": "56ef17fbb8c434a3c9c0aeaf6a32f06f6e26b603aa2994a86694adceb27f8528",
+      "archived_sha256": "56ef17fbb8c434a3c9c0aeaf6a32f06f6e26b603aa2994a86694adceb27f8528",
+      "bytes": 684,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_switch_preserves_old_session_and_routes_new_session_to_b-1792675677694131227/origins.json",
+      "original_sha256": "033d857f850459bc54e5b5f324a681f7166464d406415b8cb9f2a47d829359f2",
+      "archived_sha256": "033d857f850459bc54e5b5f324a681f7166464d406415b8cb9f2a47d829359f2",
+      "bytes": 483,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_switch_preserves_old_session_and_routes_new_session_to_b-1792675677694131227/runtime.json",
+      "original_sha256": "e823f852e2e31ebd05856dd3228ce0b32781a930becc92a08ecef6317587c64b",
+      "archived_sha256": "e823f852e2e31ebd05856dd3228ce0b32781a930becc92a08ecef6317587c64b",
+      "bytes": 1313,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_tls12_remains_in_authenticated_vision_outer_stream-1792675678302557917/A-xray.json",
+      "original_sha256": "50cfe8be9031c0a22fb3aa3e1103261af6527c74b98d0d25498023b36ce1c58c",
+      "archived_sha256": "50cfe8be9031c0a22fb3aa3e1103261af6527c74b98d0d25498023b36ce1c58c",
+      "bytes": 684,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_tls12_remains_in_authenticated_vision_outer_stream-1792675678302557917/origins.json",
+      "original_sha256": "01295c30eee13fc23a202453fdf27fc42d5b6f113a90fd8ede8fcfd29abaff82",
+      "archived_sha256": "01295c30eee13fc23a202453fdf27fc42d5b6f113a90fd8ede8fcfd29abaff82",
+      "bytes": 255,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_tls12_remains_in_authenticated_vision_outer_stream-1792675678302557917/runtime.json",
+      "original_sha256": "9803f024f58c3e0140b8ad56ff1993121c05a372b726aef047eb542d1f5a81b4",
+      "archived_sha256": "9803f024f58c3e0140b8ad56ff1993121c05a372b726aef047eb542d1f5a81b4",
+      "bytes": 877,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_tls13_server_first_direct_large_transfer_and_inner_authenticated_close-1792675678628633580/A-xray.json",
+      "original_sha256": "98ead1509ef5e8ffe64b25181a5c3da04692220d053480efc206102a58cd8ef9",
+      "archived_sha256": "98ead1509ef5e8ffe64b25181a5c3da04692220d053480efc206102a58cd8ef9",
+      "bytes": 684,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_tls13_server_first_direct_large_transfer_and_inner_authenticated_close-1792675678628633580/origins.json",
+      "original_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "archived_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "bytes": 214,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_tls13_server_first_direct_large_transfer_and_inner_authenticated_close-1792675678628633580/runtime.json",
+      "original_sha256": "54ae1c6b41bf8c189189e75fa1f0c0a567bb69f95180d193497b04e3af344cee",
+      "archived_sha256": "54ae1c6b41bf8c189189e75fa1f0c0a567bb69f95180d193497b04e3af344cee",
+      "bytes": 887,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_tls13_server_first_direct_large_transfer_and_inner_authenticated_close-1792675678628633580/tls13-direct-target.json",
+      "original_sha256": "263c36e6e869eb3074b66458c950e7403543a02225bd47d85e5c8a439664ed82",
+      "archived_sha256": "263c36e6e869eb3074b66458c950e7403543a02225bd47d85e5c8a439664ed82",
+      "bytes": 572,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_wrong_reality_authentication_and_vless_uuid_never_reach_target-1792675681576652502/A-xray.json",
+      "original_sha256": "a93479377798adb49830811b1c767587f48520344cb372bff4aa2e3b6d641053",
+      "archived_sha256": "a93479377798adb49830811b1c767587f48520344cb372bff4aa2e3b6d641053",
+      "bytes": 672,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_wrong_reality_authentication_and_vless_uuid_never_reach_target-1792675681576652502/B-xray.json",
+      "original_sha256": "da0d6e293be092520729df2e5957b4ea28a7ce18d1175e2ed7f85ee40705e538",
+      "archived_sha256": "da0d6e293be092520729df2e5957b4ea28a7ce18d1175e2ed7f85ee40705e538",
+      "bytes": 671,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_wrong_reality_authentication_and_vless_uuid_never_reach_target-1792675681576652502/origins.json",
+      "original_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "archived_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "bytes": 214,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/test_wrong_reality_authentication_and_vless_uuid_never_reach_target-1792675681576652502/runtime.json",
+      "original_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "archived_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "bytes": 46,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome/tests.log",
+      "original_sha256": "09279995f5e0ac272742a75bd03e0ee2cabf865cb22d6022b822589601467d3b",
+      "archived_sha256": "09279995f5e0ac272742a75bd03e0ee2cabf865cb22d6022b822589601467d3b",
+      "bytes": 1781,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/source-identity.json",
+      "original_sha256": "63c5a14971e266759035fa0550cd7741cb2259806bf2ee89ae8201ef61b20350",
+      "archived_sha256": "63c5a14971e266759035fa0550cd7741cb2259806bf2ee89ae8201ef61b20350",
+      "bytes": 3508,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test-summary.json",
+      "original_sha256": "a70ae2633af1bd5dc486aa3c41e1d89e6221694e4d254b183a291ffa20472d9b",
+      "archived_sha256": "a70ae2633af1bd5dc486aa3c41e1d89e6221694e4d254b183a291ffa20472d9b",
+      "bytes": 311,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct-1792675674626413872/A-xray.json",
+      "original_sha256": "b243a7f6b984590bdcf39d57d3f88e1e9ec1c8f0d7210c9afa8acb8bb4b98e25",
+      "archived_sha256": "b243a7f6b984590bdcf39d57d3f88e1e9ec1c8f0d7210c9afa8acb8bb4b98e25",
+      "bytes": 663,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct-1792675674626413872/handshake-timeout.json",
+      "original_sha256": "b32410a7e7b0a9ea35fe98c0e940900be84920bdb6b2e14f74cd9d0b1604b01b",
+      "archived_sha256": "b32410a7e7b0a9ea35fe98c0e940900be84920bdb6b2e14f74cd9d0b1604b01b",
+      "bytes": 90,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct-1792675674626413872/origins.json",
+      "original_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "archived_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "bytes": 214,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct-1792675674626413872/runtime.json",
+      "original_sha256": "df59570cdbcb60bb3e045e9f82699879f4705e2b462af82eabab4ef8efe6f497",
+      "archived_sha256": "df59570cdbcb60bb3e045e9f82699879f4705e2b462af82eabab4ef8efe6f497",
+      "bytes": 954,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_import_uri_yaml_json_base64_to_http_and_verified_https-1792675675153859163/A-xray.json",
+      "original_sha256": "a4bbeb3497020b6035fa8c0f397335243ca597536f143ab3164f15d49b89a13b",
+      "archived_sha256": "a4bbeb3497020b6035fa8c0f397335243ca597536f143ab3164f15d49b89a13b",
+      "bytes": 756,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_import_uri_yaml_json_base64_to_http_and_verified_https-1792675675153859163/origins.json",
+      "original_sha256": "091a2bc3b333022a332861b013202648af539f0d344feab02d08321a7231b19b",
+      "archived_sha256": "091a2bc3b333022a332861b013202648af539f0d344feab02d08321a7231b19b",
+      "bytes": 410,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_import_uri_yaml_json_base64_to_http_and_verified_https-1792675675153859163/runtime.json",
+      "original_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "archived_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "bytes": 46,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_large_fragmented_concurrent_bidirectional_halfclose-1792675675726041365/A-xray.json",
+      "original_sha256": "398922723ec597f793fe248f8f0e40b1599723651e40e234dd3c0e0feaebd5cf",
+      "archived_sha256": "398922723ec597f793fe248f8f0e40b1599723651e40e234dd3c0e0feaebd5cf",
+      "bytes": 733,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_large_fragmented_concurrent_bidirectional_halfclose-1792675675726041365/origins.json",
+      "original_sha256": "219b311fff13e7c121c85951b8c1ce5724725b013477a4e775e775804a5e9fbd",
+      "archived_sha256": "219b311fff13e7c121c85951b8c1ce5724725b013477a4e775e775804a5e9fbd",
+      "bytes": 1770,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_large_fragmented_concurrent_bidirectional_halfclose-1792675675726041365/runtime.json",
+      "original_sha256": "45715ba0641f138a86f000c97137f83eee0ff8858f749970a9738eb840f1a842",
+      "archived_sha256": "45715ba0641f138a86f000c97137f83eee0ff8858f749970a9738eb840f1a842",
+      "bytes": 3143,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_ordered_routes_reject_direct_domain_and_selected_exit-1792675676147544213/A-xray.json",
+      "original_sha256": "256dcfc2f11546778c966d72045e5da0fc38cd88003ed0dfdd9e85d0d68cd219",
+      "archived_sha256": "256dcfc2f11546778c966d72045e5da0fc38cd88003ed0dfdd9e85d0d68cd219",
+      "bytes": 676,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_ordered_routes_reject_direct_domain_and_selected_exit-1792675676147544213/B-xray.json",
+      "original_sha256": "0f0c927fe6550553ea20a231377a638b46316d6f50165d69f9259021f7656aa5",
+      "archived_sha256": "0f0c927fe6550553ea20a231377a638b46316d6f50165d69f9259021f7656aa5",
+      "bytes": 676,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_ordered_routes_reject_direct_domain_and_selected_exit-1792675676147544213/origins.json",
+      "original_sha256": "e1618c361184c8b069d7bc643b7fe8fd5ada7659a5e68973798f345c7efd11fe",
+      "archived_sha256": "e1618c361184c8b069d7bc643b7fe8fd5ada7659a5e68973798f345c7efd11fe",
+      "bytes": 263,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_ordered_routes_reject_direct_domain_and_selected_exit-1792675676147544213/runtime.json",
+      "original_sha256": "31b42714d0ee8b362dbfbffd788961a716cb0ece9eaaa62e03eb24f0d6110c11",
+      "archived_sha256": "31b42714d0ee8b362dbfbffd788961a716cb0ece9eaaa62e03eb24f0d6110c11",
+      "bytes": 2419,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_runtime_cancellation_releases_authenticated_stream-1792675676766927447/A-xray.json",
+      "original_sha256": "5d5b4c71195f6f46a1facc0462226e6e6d121fba284e63dae9ab73128d46e62f",
+      "archived_sha256": "5d5b4c71195f6f46a1facc0462226e6e6d121fba284e63dae9ab73128d46e62f",
+      "bytes": 676,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_runtime_cancellation_releases_authenticated_stream-1792675676766927447/origins.json",
+      "original_sha256": "e41a03702f21f192f17657af9c0d77e0467209022190c1e96a3a1bbfa4db0b4f",
+      "archived_sha256": "e41a03702f21f192f17657af9c0d77e0467209022190c1e96a3a1bbfa4db0b4f",
+      "bytes": 383,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_runtime_cancellation_releases_authenticated_stream-1792675676766927447/runtime.json",
+      "original_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "archived_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "bytes": 46,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_socks5_domain_connect_to_http_and_verified_https-1792675677114005378/A-xray.json",
+      "original_sha256": "942aaa3dc4c560c74d56a934199fb1dfbccf3a54312c3d291196f1b8b41d9b13",
+      "archived_sha256": "942aaa3dc4c560c74d56a934199fb1dfbccf3a54312c3d291196f1b8b41d9b13",
+      "bytes": 687,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_socks5_domain_connect_to_http_and_verified_https-1792675677114005378/origins.json",
+      "original_sha256": "aebccadc9c1b207e8d666631a3d24315de7106812b139407107d05f52bfef68d",
+      "archived_sha256": "aebccadc9c1b207e8d666631a3d24315de7106812b139407107d05f52bfef68d",
+      "bytes": 290,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_socks5_domain_connect_to_http_and_verified_https-1792675677114005378/runtime.json",
+      "original_sha256": "97d5d77fb80e9324e3b73014d0ae5d3ab57cbe72af76d182f211a9064d4dda59",
+      "archived_sha256": "97d5d77fb80e9324e3b73014d0ae5d3ab57cbe72af76d182f211a9064d4dda59",
+      "bytes": 1319,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_socks5_domain_connect_to_http_and_verified_https-1792675677114005378/socks5-client.json",
+      "original_sha256": "1663be0388e809c9a262185db56ced80365b2dfb080329e37ffcf74346b9ed45",
+      "archived_sha256": "1663be0388e809c9a262185db56ced80365b2dfb080329e37ffcf74346b9ed45",
+      "bytes": 612,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_switch_preserves_old_session_and_routes_new_session_to_b-1792675677478481667/A-xray.json",
+      "original_sha256": "f7450dacc2eaa0e4a8489db0e09f8ba0d168161b92725466f7b7a0a610765380",
+      "archived_sha256": "f7450dacc2eaa0e4a8489db0e09f8ba0d168161b92725466f7b7a0a610765380",
+      "bytes": 676,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_switch_preserves_old_session_and_routes_new_session_to_b-1792675677478481667/B-xray.json",
+      "original_sha256": "0c1567eb30178fea12b3963fcb3b5d51f86e9a1a679d5cd055a037f5ff956428",
+      "archived_sha256": "0c1567eb30178fea12b3963fcb3b5d51f86e9a1a679d5cd055a037f5ff956428",
+      "bytes": 676,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_switch_preserves_old_session_and_routes_new_session_to_b-1792675677478481667/origins.json",
+      "original_sha256": "033d857f850459bc54e5b5f324a681f7166464d406415b8cb9f2a47d829359f2",
+      "archived_sha256": "033d857f850459bc54e5b5f324a681f7166464d406415b8cb9f2a47d829359f2",
+      "bytes": 483,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_switch_preserves_old_session_and_routes_new_session_to_b-1792675677478481667/runtime.json",
+      "original_sha256": "aef45b5f6484d5d9ecb7eca1bfd4663cb5cde93be43ff4d54984021869ecbcb1",
+      "archived_sha256": "aef45b5f6484d5d9ecb7eca1bfd4663cb5cde93be43ff4d54984021869ecbcb1",
+      "bytes": 1312,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_tls12_remains_in_authenticated_vision_outer_stream-1792675678048190624/A-xray.json",
+      "original_sha256": "0bb7aa3ed7c970081fda1937ce153cdad4073c3f1ea7a6ff73b056cab115b243",
+      "archived_sha256": "0bb7aa3ed7c970081fda1937ce153cdad4073c3f1ea7a6ff73b056cab115b243",
+      "bytes": 676,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_tls12_remains_in_authenticated_vision_outer_stream-1792675678048190624/origins.json",
+      "original_sha256": "01295c30eee13fc23a202453fdf27fc42d5b6f113a90fd8ede8fcfd29abaff82",
+      "archived_sha256": "01295c30eee13fc23a202453fdf27fc42d5b6f113a90fd8ede8fcfd29abaff82",
+      "bytes": 255,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_tls12_remains_in_authenticated_vision_outer_stream-1792675678048190624/runtime.json",
+      "original_sha256": "b0657fa40f9cff82daa1c9768deaba40ecb6a789374e58409be90296e721d3eb",
+      "archived_sha256": "b0657fa40f9cff82daa1c9768deaba40ecb6a789374e58409be90296e721d3eb",
+      "bytes": 877,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_tls13_server_first_direct_large_transfer_and_inner_authenticated_close-1792675678392989129/A-xray.json",
+      "original_sha256": "1cb876a4dd7594325f129719430de306a2f0cec9c845041d802a4eced544a5f6",
+      "archived_sha256": "1cb876a4dd7594325f129719430de306a2f0cec9c845041d802a4eced544a5f6",
+      "bytes": 676,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_tls13_server_first_direct_large_transfer_and_inner_authenticated_close-1792675678392989129/origins.json",
+      "original_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "archived_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "bytes": 214,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_tls13_server_first_direct_large_transfer_and_inner_authenticated_close-1792675678392989129/runtime.json",
+      "original_sha256": "991462f92cdf9f935ee832247a0552abb254f2481609355b5580b774d4497f64",
+      "archived_sha256": "991462f92cdf9f935ee832247a0552abb254f2481609355b5580b774d4497f64",
+      "bytes": 887,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_tls13_server_first_direct_large_transfer_and_inner_authenticated_close-1792675678392989129/tls13-direct-target.json",
+      "original_sha256": "263c36e6e869eb3074b66458c950e7403543a02225bd47d85e5c8a439664ed82",
+      "archived_sha256": "263c36e6e869eb3074b66458c950e7403543a02225bd47d85e5c8a439664ed82",
+      "bytes": 572,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_wrong_reality_authentication_and_vless_uuid_never_reach_target-1792675681476713953/A-xray.json",
+      "original_sha256": "6ae90be5e424bab9572354430a30d06bc2fe18d400451dd4fa32a1b7954d48a5",
+      "archived_sha256": "6ae90be5e424bab9572354430a30d06bc2fe18d400451dd4fa32a1b7954d48a5",
+      "bytes": 664,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_wrong_reality_authentication_and_vless_uuid_never_reach_target-1792675681476713953/B-xray.json",
+      "original_sha256": "2838bd8974f71678bf04c8cff17f01562c3f063076848e3b25bf6b2321c95785",
+      "archived_sha256": "2838bd8974f71678bf04c8cff17f01562c3f063076848e3b25bf6b2321c95785",
+      "bytes": 663,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_wrong_reality_authentication_and_vless_uuid_never_reach_target-1792675681476713953/origins.json",
+      "original_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "archived_sha256": "d103a35f7a38fbe1b6eff867c5c5c7ac13f43c94cd5ea93b8e8e646820826e18",
+      "bytes": 214,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/test_wrong_reality_authentication_and_vless_uuid_never_reach_target-1792675681476713953/runtime.json",
+      "original_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "archived_sha256": "0a4189321b90561cebc31c67567f37c1aab05d32fb2e60521200e6d3af2737c0",
+      "bytes": 46,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls/tests.log",
+      "original_sha256": "dc03e959a2ed4cbf643d777db7012737afb20a21f98174e147629bf07e3cc2b6",
+      "archived_sha256": "dc03e959a2ed4cbf643d777db7012737afb20a21f98174e147629bf07e3cc2b6",
+      "bytes": 1781,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/transport-tests.txt",
+      "original_sha256": "2be58d3135b71b098c1822c7099b9708ff8f839ffbe0eec0da25426769f92fe4",
+      "archived_sha256": "2be58d3135b71b098c1822c7099b9708ff8f839ffbe0eec0da25426769f92fe4",
+      "bytes": 1763,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-rustls-tests.txt",
+      "original_sha256": "4f517bbda7237086d0b898d6e45d3d88ed3a5a29eca8ea78143280c5787354b3",
+      "archived_sha256": "4f517bbda7237086d0b898d6e45d3d88ed3a5a29eca8ea78143280c5787354b3",
+      "bytes": 1434,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/core-chrome-tests.txt",
+      "original_sha256": "6bd4db4a148689203afa353ec4b0970d2306b9fe756835b369dd3f7821643217",
+      "archived_sha256": "6bd4db4a148689203afa353ec4b0970d2306b9fe756835b369dd3f7821643217",
+      "bytes": 1434,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-rustls-tests.txt",
+      "original_sha256": "dc03e959a2ed4cbf643d777db7012737afb20a21f98174e147629bf07e3cc2b6",
+      "archived_sha256": "dc03e959a2ed4cbf643d777db7012737afb20a21f98174e147629bf07e3cc2b6",
+      "bytes": 1781,
+      "redacted_lines": 0
+    },
+    {
+      "file": "docs/evidence/x14-a6-reality-vision/vision-chrome-tests.txt",
+      "original_sha256": "09279995f5e0ac272742a75bd03e0ee2cabf865cb22d6022b822589601467d3b",
+      "archived_sha256": "09279995f5e0ac272742a75bd03e0ee2cabf865cb22d6022b822589601467d3b",
+      "bytes": 1781,
+      "redacted_lines": 0
+    }
+  ],
+  "redaction": {
+    "purpose": "Do not publish ephemeral REALITY authentication bytes or short IDs from server debug output",
+    "lines_redacted": 56,
+    "private_key_files_copied": false,
+    "configuration_files_copied": false,
+    "outcome_or_payload_receipts_modified": false
+  }
+}

@@ -1,6 +1,6 @@
 #pragma once
 #include "ProxyEngine.h"
-#include <QLibrary>
+#include "RustCoreLibrary.h"
 #include <QTimer>
 #include <QElapsedTimer>
 
@@ -34,7 +34,7 @@ private:
  void cancelProbe();
  void failProbe(const QString &stage,const QString &code,int httpStatus=0);
  void updateProbe(const QJsonObject &);
- QLibrary m_library;
+ RustCoreLibrary &m_library = RustCoreLibrary::instance();
  Command m_command=nullptr;
  quint64 m_handle=0;
  EngineStartOptions m_options;

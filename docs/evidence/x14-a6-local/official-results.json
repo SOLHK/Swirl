@@ -1,0 +1,50 @@
+{
+  "started_utc": "2026-10-22T13:42:40.274595+00:00",
+  "purpose": "official interoperability after QUIC preflight/cache correction",
+  "clients_sha256": {
+    "HY2_CLIENT": "3d1385db3f69cf5f5ee9d3b9548042bb854536b4aaeb3ea903eb40f17d11459c",
+    "SWIRL_TUIC_CLIENT": "c1bb12f14cb6a45936d421355f808743b5eb44c4e6d00e71b793d01589548cff",
+    "SWIRL_TRANSPORT_RUNTIME": "e5077d1b59f50805eb4e4ecf9096ef1a0c6b11c40eee4c0d51c70c46f615f949"
+  },
+  "commands": [
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "-v",
+        "test_hysteria2_official"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 19.564,
+      "log": "test_hysteria2_official.log",
+      "result_tail": "ertificate_pin (test_hysteria2_official.Hysteria2Official.test_14_explicit_insecure_still_enforces_certificate_pin) ... ok\ntest_15_negotiated_bandwidth_is_enforced_in_real_transfers (test_hysteria2_official.Hysteria2Official.test_15_negotiated_bandwidth_is_enforced_in_real_transfers) ... ok\ntest_16_ipv6_quic_and_ipv6_tcp_udp_targets (test_hysteria2_official.Hysteria2Official.test_16_ipv6_quic_and_ipv6_tcp_udp_targets) ... ok\ntest_17_concurrent_connections_and_multi_address_resolution (test_hysteria2_official.Hysteria2Official.test_17_concurrent_connections_and_multi_address_resolution) ... ok\n\n----------------------------------------------------------------------\nRan 17 tests in 19.323s\n\nOK\n"
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "-v",
+        "test_tuic_reference"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 12.873,
+      "log": "test_tuic_reference.log",
+      "result_tail": "tion_large_bidirectional_transfer_and_half_close (test_tuic_reference.TuicReferenceTests.test_tcp_authentication_large_bidirectional_transfer_and_half_close) ... ok\ntest_tls_ca_sni_alpn_and_pin_fail_closed (test_tuic_reference.TuicReferenceTests.test_tls_ca_sni_alpn_and_pin_fail_closed) ... ok\ntest_udp_native_and_quic_modes_small_and_fragmented (test_tuic_reference.TuicReferenceTests.test_udp_native_and_quic_modes_small_and_fragmented) ... ok\ntest_wrong_password_and_uuid_never_reach_destination (test_tuic_reference.TuicReferenceTests.test_wrong_password_and_uuid_never_reach_destination) ... ok\n\n----------------------------------------------------------------------\nRan 9 tests in 12.757s\n\nOK\n"
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "-v",
+        "test_quic_core"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 20.183,
+      "log": "test_quic_core.log",
+      "result_tail": "reTests.test_tuic_dns_configuration_change_does_not_reuse_an_old_resolved_endpoint) ... ok\ntest_tuic_heartbeat_keeps_idle_authenticated_stream_open (test_quic_core.QuicCoreTests.test_tuic_heartbeat_keeps_idle_authenticated_stream_open) ... ok\ntest_udp_association_fragments_dns_and_control_close (test_quic_core.QuicCoreTests.test_udp_association_fragments_dns_and_control_close) ... ok\ntest_wrong_credentials_never_forward_tcp_or_udp_and_existing_session_survives_selection (test_quic_core.QuicCoreTests.test_wrong_credentials_never_forward_tcp_or_udp_and_existing_session_survives_selection) ... ok\n\n----------------------------------------------------------------------\nRan 6 tests in 20.067s\n\nOK\n"
+    }
+  ]
+}

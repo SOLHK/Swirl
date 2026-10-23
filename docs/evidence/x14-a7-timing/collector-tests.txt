@@ -1,0 +1,41 @@
+   Compiling swirl-protocol v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-protocol)
+    Finished `test` profile [unoptimized] target(s) in 7.27s
+     Running unittests src/lib.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/swirl_protocol-04d4463d2a41c0b7)
+
+running 3 tests
+test timing::tests::cancelled_phase_retains_elapsed_without_a_success_claim ... ok
+test timing::tests::scopes_are_isolated_and_spawned_drivers_do_not_inherit_them ... ok
+test timing::tests::tcp_attempt_count_and_winner_do_not_include_the_resolution_delay ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 111 filtered out; finished in 0.00s
+
+     Running tests/quic_preflight.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/quic_preflight-21ee7301bc697d17)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/vision.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/vision-45d7f52bf55f3cae)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 21 filtered out; finished in 0.00s
+
+     Running tests/vision_record.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/vision_record-0f6a939f0a463840)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/vision_stream.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/vision_stream-6a1ddfd3e091099a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.00s
+
+     Running tests/vision_tls.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/vision_tls-c4a0f4238e0b80ae)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+

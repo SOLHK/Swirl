@@ -1,0 +1,17 @@
+test_eight_mib_bidirectional_flow_control (test_transport_xhttp_xray.XHttpXrayTests.test_eight_mib_bidirectional_flow_control) ... ok
+test_eight_parallel_streams_and_client_cancel (test_transport_xhttp_xray.XHttpXrayTests.test_eight_parallel_streams_and_client_cancel) ... ok
+test_server_cancellation_interrupts_stream_and_new_server_recovers (test_transport_xhttp_xray.XHttpXrayTests.test_server_cancellation_interrupts_stream_and_new_server_recovers) ... ok
+test_server_disallows_stream_one_without_transport_fallback (test_transport_xhttp_xray.XHttpXrayTests.test_server_disallows_stream_one_without_transport_fallback) ... ok
+test_stream_one_h2c_and_tls_with_custom_path_host_and_https_origin (test_transport_xhttp_xray.XHttpXrayTests.test_stream_one_h2c_and_tls_with_custom_path_host_and_https_origin) ... ok
+test_trojan_over_stream_one_tls (test_transport_xhttp_xray.XHttpXrayTests.test_trojan_over_stream_one_tls) ... ok
+test_truncated_destination_fails_and_new_session_recovers (test_transport_xhttp_xray.XHttpXrayTests.test_truncated_destination_fails_and_new_session_recovers) ... ok
+test_unsupported_modes_options_and_http3_fail_explicitly (test_transport_xhttp_xray.XHttpXrayTests.test_unsupported_modes_options_and_http3_fail_explicitly) ... ok
+test_untrusted_certificate_wrong_sni_and_authentication_fail (test_transport_xhttp_xray.XHttpXrayTests.test_untrusted_certificate_wrong_sni_and_authentication_fail) ... ok
+test_wrong_path_and_host_return_errors (test_transport_xhttp_xray.XHttpXrayTests.test_wrong_path_and_host_return_errors) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 1.901s
+
+OK
+
+actual_exit_code=0

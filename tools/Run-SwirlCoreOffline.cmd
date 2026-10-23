@@ -1,6 +1,6 @@
 @echo off
 setlocal
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Test-SwirlCoreOffline.ps1"
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0Test-SwirlCoreOffline.ps1" %*
 set "result=%ERRORLEVEL%"
 echo.
 if "%result%"=="0" echo PASS: The active local proxy is the Swirl Rust build.

@@ -1,0 +1,28 @@
+{
+  "http_paths": [
+    "/uri",
+    "/json",
+    "/yaml",
+    "/base64"
+  ],
+  "https_paths": [
+    "/uri-tls",
+    "/json-tls",
+    "/yaml-tls",
+    "/base64-tls"
+  ],
+  "https_sni": [
+    "localhost",
+    "localhost",
+    "localhost",
+    "localhost"
+  ],
+  "https_authenticated_closes": 4,
+  "echo_bytes": 0,
+  "echo_sessions": [],
+  "origin_errors": {
+    "http": [],
+    "https": [],
+    "echo": []
+  }
+}

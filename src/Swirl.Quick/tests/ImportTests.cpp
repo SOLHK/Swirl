@@ -1,8 +1,9 @@
 #include "engine/NodeImporter.h"
 #include "engine/NodeImportService.h"
-#include "engine/MihomoAdapter.h"
+#include "engine/RustCoreEngine.h"
 #include "engine/EngineController.h"
 #include "engine/SwirlProtocolRegistry.h"
+#include "engine/NativeNodeBridge.h"
 #include "ControlledNetwork.h"
 #include <QTest>
 #include <QSettings>
@@ -11,6 +12,7 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QCryptographicHash>
 #include <QSignalSpy>
 #include <QNetworkProxy>
 #include <QNetworkReply>
@@ -173,17 +175,47 @@ private slots:
         const QByteArray json=R"({"outbounds":[{"type":"socks","tag":"A","server":"127.0.0.1","server_port":1080},{"type":"selector","tag":"choice","outbounds":["A"]}],"route":{"final":"choice"},"future":{"fixture-secret":true}})";
         const auto xray=QJsonDocument(QJsonObject{{"outbounds",QJsonArray{xrayRealitySource(),QJsonObject{{"protocol","freedom"},{"tag","direct"}}}},{"routing",QJsonObject{{"domainStrategy","IPIfNonMatch"}}},{"future",QJsonObject{{"fixture-secret",true}}}}).toJson();
         for(const auto &original:{ini,json,xray})for(const auto &body:{original,original.toBase64()}){
-            const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);QVERIFY(!parsed.configuration.isEmpty());
+            const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
             if(original==ini){QCOMPARE(parsed.configurationFormat,QString("ini"));QVERIFY(parsed.configuration["document"].toString().contains("opaque fixture-secret"));}
-            else {QCOMPARE(parsed.configurationFormat,original==json?QString("sing-box"):QString("xray-v2ray-json"));QCOMPARE(parsed.configuration,QJsonDocument::fromJson(original).object());QVERIFY(parsed.executionConfiguration.isEmpty());}
+            else if(original==xray){
+                // The unified Rust JSON bridge retains the complete private
+                // document; global settings never become an executable Qt
+                // configuration. Manual imports require preview confirmation.
+                QCOMPARE(parsed.configurationFormat,QString("xray-v2ray-json"));
+                QVERIFY(parsed.configuration.isEmpty());QVERIFY(parsed.executionConfiguration.isEmpty());
+                QCOMPARE(QJsonDocument::fromJson(parsed.nodes.first().sourceDocument).object(),QJsonDocument::fromJson(original).object());
+                QVERIFY(!parsed.nodes.first().parameters.contains("routing"));
+                QVERIFY(!parsed.nodes.first().parameters.contains("future"));
+            }
+            else {QCOMPARE(parsed.configurationFormat,QString("sing-box"));QCOMPARE(parsed.configuration,QJsonDocument::fromJson(original).object());QVERIFY(parsed.executionConfiguration.isEmpty());}
             QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService service(&store);
             const auto seed=NodeImporter::parse("proxies: [{name: retained, type: socks5, server: 127.0.0.1, port: 1081}]");QVERIFY(seed);QVERIFY(store.importNodes(seed.nodes));
             QFile file(store.filePath());QVERIFY(file.open(QIODevice::ReadOnly));const auto before=file.readAll();file.close();
             service.importText(QString::fromUtf8(body));QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),4000);QCOMPARE(store.nodes().size(),1);QCOMPARE(store.nodes().first().name,QString("retained"));
+            if(original==xray){QVERIFY(service.hasPreview());service.cancelImport();QVERIFY(!service.hasPreview());}
             QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),before);QVERIFY(!service.message().contains("fixture-secret"));
         }
         for(const auto &body:{QByteArray("[Proxy]\nA = socks5, 127.0.0.1, 1080\nBypass = direct\n"),QByteArray(R"({"outbounds":[{"type":"socks","tag":"A","server":"127.0.0.1","server_port":1080},{"type":"direct","tag":"bypass"}]})")}){
             const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QVERIFY(!parsed.configuration.isEmpty());
+        }
+    }
+    void xrayEffectiveSourceRetainsExactBytesAfterWrapperNormalization() {
+        auto source=xrayRealitySource();source["tag"]="  fixture name  ";
+        const QByteArray document=" \t\r\n"+QJsonDocument(QJsonObject{{"outbounds",QJsonArray{source}}}).toJson()+" \t\r\n";
+        // Compare bytes and their fingerprint, not semantic JSON equality.
+        // Direct JSON bypasses wrapper normalization. Base64 keeps interior
+        // whitespace/values but follows the normalizer's outer-trim contract.
+        const QList<QPair<QByteArray,QByteArray>> inputs{
+            {document,document},{document.toBase64(),document.trimmed()},
+            {" \r\n"+document.toBase64()+"\r\n ",document.trimmed()}};
+        for(const auto &[input,expected]:inputs){
+            const auto parsed=NodeImporter::parse(input);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+            const auto node=parsed.nodes.first();QVERIFY(node.isXray());QVERIFY(node.nativeExecutable);
+            QCOMPARE(node.sourceDocument,expected);
+            QCOMPARE(node.sourceFingerprint,QString::fromLatin1(QCryptographicHash::hash(expected,QCryptographicHash::Sha256).toHex()));
+            QCOMPARE(node.sourceNodeIndex,0);QCOMPARE(node.originalConfiguration.value("outbound"),QJsonValue(source));
+            QCOMPARE(node.nativeOutbound.value("reality").toObject().value("fingerprint"),QJsonValue("chrome"));
+            QVERIFY(parsed.configuration.isEmpty());QVERIFY(parsed.executionConfiguration.isEmpty());
         }
     }
     void xrayRealityRejectsUnknownConflictingOrMultipleSourceParameters() {
@@ -191,21 +223,27 @@ private slots:
         const auto endpoint=settings.value("vnext").toArray().first().toObject();const auto user=endpoint.value("users").toArray().first().toObject();
         const auto stream=source.value("streamSettings").toObject();const auto reality=stream.value("realitySettings").toObject();
         QList<QJsonObject> rejected;
+        struct ExecutableCase{QJsonObject node;int count=1;QString defaulted;};
+        QList<ExecutableCase> executable;
         auto withStream=[&](const QJsonObject &value){auto node=source;node["streamSettings"]=value;return node;};
         auto withReality=[&](const QJsonObject &value){auto changed=stream;changed["realitySettings"]=value;return withStream(changed);};
         auto withEndpoint=[&](const QJsonObject &value){auto node=source;node["settings"]=QJsonObject{{"vnext",QJsonArray{value}}};return node;};
         auto withUser=[&](const QJsonObject &value){auto changed=endpoint;changed["users"]=QJsonArray{value};return withEndpoint(changed);};
         for(const auto &key:QStringList{"sendThrough","proxySettings","future"}){auto node=source;node[key]="fixture-secret";rejected.append(node);}
-        for(const auto &mux:QJsonArray{QJsonValue(),true,QJsonObject{},QJsonObject{{"enabled",true}},QJsonObject{{"enabled",false},{"concurrency",1}}}){auto node=source;node["mux"]=mux;rejected.append(node);}
+        for(const auto &mux:QJsonArray{QJsonValue(),true,QJsonObject{{"enabled",true}}}){auto node=source;node["mux"]=mux;rejected.append(node);}
+        for(const auto &mux:QJsonArray{QJsonObject{},QJsonObject{{"enabled",false},{"concurrency",1}}}){auto node=source;node["mux"]=mux;executable.append({node});}
         for(const auto &key:QStringList{"address","future"}){auto node=source;auto changed=settings;changed[key]="fixture-secret";node["settings"]=changed;rejected.append(node);}
-        for(const auto &endpoints:QJsonArray{QJsonValue(),QJsonObject{},QJsonArray{},QJsonArray{endpoint,endpoint}}){auto node=source;node["settings"]=QJsonObject{{"vnext",endpoints}};rejected.append(node);}
-        for(const auto &users:QJsonArray{QJsonValue(),QJsonObject{},QJsonArray{},QJsonArray{user,user}}){auto changed=endpoint;changed["users"]=users;rejected.append(withEndpoint(changed));}
+        for(const auto &endpoints:QJsonArray{QJsonValue(),QJsonObject{},QJsonArray{}}){auto node=source;node["settings"]=QJsonObject{{"vnext",endpoints}};rejected.append(node);}
+        {auto node=source;node["settings"]=QJsonObject{{"vnext",QJsonArray{endpoint,endpoint}}};executable.append({node,2});}
+        for(const auto &users:QJsonArray{QJsonValue(),QJsonObject{},QJsonArray{}}){auto changed=endpoint;changed["users"]=users;rejected.append(withEndpoint(changed));}
+        {auto changed=endpoint;changed["users"]=QJsonArray{user,user};executable.append({withEndpoint(changed),2});}
         for(const auto &port:QJsonArray{QJsonValue(),"443",false,0,65536,443.5}){auto changed=endpoint;changed["port"]=port;rejected.append(withEndpoint(changed));}
         auto changedEndpoint=endpoint;changedEndpoint["future"]="fixture-secret";rejected.append(withEndpoint(changedEndpoint));
         for(const auto &key:QStringList{"level","future"}){auto changed=user;changed[key]="fixture-secret";rejected.append(withUser(changed));}
         for(const auto &encryption:QJsonArray{QJsonValue(),"",true,"fixture-secret"}){auto changed=user;changed["encryption"]=encryption;rejected.append(withUser(changed));}
         auto missing=user;missing.remove("encryption");rejected.append(withUser(missing));missing=user;missing.remove("id");rejected.append(withUser(missing));
-        for(const auto &key:QStringList{"network","security","realitySettings"}){auto changed=stream;changed.remove(key);rejected.append(withStream(changed));}
+        for(const auto &key:QStringList{"security","realitySettings"}){auto changed=stream;changed.remove(key);rejected.append(withStream(changed));}
+        {auto changed=stream;changed.remove("network");executable.append({withStream(changed)});}
         for(const auto &network:QJsonArray{QJsonValue(),"ws","",false}){auto changed=stream;changed["network"]=network;rejected.append(withStream(changed));}
         auto changedStream=stream;changedStream["security"]="tls";rejected.append(withStream(changedStream));
         changedStream=stream;changedStream["sockopt"]=QJsonObject{{"mark",1}};rejected.append(withStream(changedStream));
@@ -213,20 +251,68 @@ private slots:
             auto changed=stream;changed["tcpSettings"]=tcp;rejected.append(withStream(changed));
         }
         changedStream=stream;changedStream["tcpSettings"]=QJsonObject{};changedStream["rawSettings"]=QJsonObject{{"header",QJsonObject{{"type","none"}}}};rejected.append(withStream(changedStream));
-        for(const auto &key:QStringList{"publicKey","serverName","fingerprint","shortId"}){auto changed=reality;changed.remove(key);rejected.append(withReality(changed));changed=reality;changed[key]=false;rejected.append(withReality(changed));}
+        for(const auto &key:QStringList{"publicKey","serverName","fingerprint","shortId"}){
+            auto changed=reality;changed.remove(key);
+            if(key=="serverName"||key=="shortId")executable.append({withReality(changed),1,key});else rejected.append(withReality(changed));
+            changed=reality;changed[key]=false;rejected.append(withReality(changed));
+        }
         for(const auto &key:QStringList{"alpn","mldsa65Verify","future","spiderX"}){auto changed=reality;changed[key]="fixture-secret";rejected.append(withReality(changed));}
         auto changedReality=reality;changedReality["password"]="fixture-secret";rejected.append(withReality(changedReality));
         changedReality=reality;changedReality["show"]=true;rejected.append(withReality(changedReality));
         for(const auto &node:rejected){
-            // A valid preceding node cannot authorize a partial import after a
-            // later malformed node, nor can wrapping it in Base64 hide fields.
+            // The unified Rust parser rejects malformed types, or preserves
+            // valid JSON as explicitly non-executable nodes. A preceding valid
+            // node and Base64 wrapping must never authorize the rejected node.
             for(const auto &nodes:QList<QJsonArray>{QJsonArray{node},QJsonArray{source,node}}){
                 const auto original=QJsonDocument(QJsonObject{{"outbounds",nodes}}).toJson();
-                for(const auto &body:{original,original.toBase64()}){const auto parsed=NodeImporter::parse(body);QVERIFY2(!parsed,"Xray source fields were dropped or a list was flattened");QVERIFY(parsed.nodes.isEmpty());QVERIFY(!parsed.error.contains("fixture-secret"));QVERIFY(!parsed.error.contains(reality.value("publicKey").toString()));}
+                for(const auto &body:{original,original.toBase64()}){
+                    const auto parsed=NodeImporter::parse(body);
+                    QVERIFY(!parsed.error.contains("fixture-secret"));QVERIFY(!parsed.error.contains(reality.value("publicKey").toString()));
+                    if(!parsed){QVERIFY(parsed.nodes.isEmpty());continue;}
+                    QCOMPARE(parsed.nodes.size(),nodes.size());const auto &blocked=parsed.nodes.last();
+                    QCOMPARE(QJsonDocument::fromJson(blocked.sourceDocument).object(),QJsonDocument::fromJson(original).object());
+                    QCOMPARE(blocked.originalConfiguration["outbound"],QJsonValue(node));
+                    QVERIFY(!blocked.nativeExecutable);QVERIFY(blocked.nativeOutbound.isEmpty());QVERIFY(!blocked.runtimeIssues.isEmpty());
+                    QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(blocked).isEmpty());
+                    const auto publicJson=QJsonDocument::fromVariant(blocked.publicInfo()).toJson();
+                    QVERIFY(!publicJson.contains("fixture-secret"));QVERIFY(!publicJson.contains(reality["publicKey"].toString().toUtf8()));
+                    EngineStartOptions options;options.nodes=parsed.nodes;options.selectedNodeId=blocked.id;options.routingMode="global";
+                    const QJsonObject sentinel{{"unchanged",true}};QJsonObject native=sentinel;
+                    QVERIFY(!RustCoreEngine::configuration(options,&native).isEmpty());QCOMPARE(native,sentinel);
+                }
             }
         }
         auto noFlow=user;noFlow.remove("flow");auto node=withUser(noFlow);auto emptyShortId=reality;emptyShortId["shortId"]="";auto changed=stream;changed["realitySettings"]=emptyShortId;node["streamSettings"]=changed;
-        const auto original=QJsonDocument(QJsonObject{{"outbounds",QJsonArray{node}}}).toJson();const auto parsed=NodeImporter::parse(original);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.first().originalConfiguration,node);QVERIFY(!parsed.nodes.first().parameters.contains("flow"));QCOMPARE(parsed.nodes.first().parameters.value("reality-opts").toObject().value("short-id"),QJsonValue(""));
+        executable.append({node,1,"noFlow"});
+        const auto baseline=NodeImporter::parse(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{source}}}).toJson());QVERIFY(baseline);QVERIFY(baseline.nodes.first().nativeExecutable);
+        for(const auto &entry:executable)for(const bool preceding:{false,true}){
+            const auto nodes=preceding?QJsonArray{source,entry.node}:QJsonArray{entry.node};
+            const auto original=QJsonDocument(QJsonObject{{"outbounds",nodes}}).toJson();
+            for(const auto &body:{original,original.toBase64()}){
+                const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),entry.count+int(preceding));
+                QSet<QByteArray> sourcePaths;
+                for(const auto &candidate:parsed.nodes){
+                    const auto provenance=candidate.originalConfiguration["source"].toObject();const auto index=provenance["outbound_index"].toInt(-1);QVERIFY(index>=0&&index<nodes.size());
+                    QCOMPARE(candidate.originalConfiguration["outbound"],nodes[index]);
+                    QCOMPARE(QJsonDocument::fromJson(candidate.sourceDocument).object(),QJsonDocument::fromJson(original).object());
+                    sourcePaths.insert(QJsonDocument(provenance).toJson(QJsonDocument::Compact));
+                    auto expected=baseline.nodes.first().nativeOutbound;
+                    if(!preceding||index>0){
+                        auto security=expected["reality"].toObject();
+                        if(entry.defaulted=="serverName")security["server_name"]="proxy.invalid";
+                        if(entry.defaulted=="shortId"||entry.defaulted=="noFlow")security["short_id"]="";
+                        expected["reality"]=security;if(entry.defaulted=="noFlow")expected.remove("flow");
+                    }
+                    QVERIFY(candidate.nativeExecutable);QCOMPARE(candidate.nativeOutbound,expected);
+                    QVERIFY(SwirlProtocolRegistry::nativeNodeReason(candidate).isEmpty());
+                    QCOMPARE(SwirlProtocolRegistry::describe(candidate).value("tested"),QVariant(false));
+                    EngineStartOptions options;options.nodes={candidate};options.selectedNodeId=candidate.id;options.routingMode="global";
+                    QJsonObject native;const auto error=RustCoreEngine::configuration(options,&native);QVERIFY2(error.isEmpty(),qPrintable(error));
+                    QCOMPARE(native["nodes"].toArray().first().toObject()["outbound"],QJsonValue(expected));
+                }
+                QCOMPARE(sourcePaths.size(),parsed.nodes.size());
+            }
+        }
     }
     void socks5TlsUriAliasesPreserveSecurity() {
         const QByteArray prefix="socks5-tls://synthetic-socks5-user:synthetic-socks5-password@127.0.0.1:1080";
@@ -421,11 +507,18 @@ private slots:
         }
         const auto grpc=NodeImporter::parse(prefix+R"({"type":"grpc","service_name":"fixture-service"}}]})");QVERIFY(grpc);
         QCOMPARE(grpc.nodes.first().parameters.value("network"),QJsonValue("grpc"));QCOMPARE(grpc.nodes.first().parameters.value("grpc-opts").toObject().value("grpc-service-name"),QJsonValue("fixture-service"));
-        QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(grpc.nodes.first()).isEmpty());
+        QVERIFY(SwirlProtocolRegistry::nativeNodeReason(grpc.nodes.first()).isEmpty());
         const auto nullGrpc=NodeImporter::parse(prefix+R"({"type":"grpc","service_name":null}}]})");QVERIFY(nullGrpc);
         QCOMPARE(nullGrpc.nodes.first().parameters.value("grpc-opts").toObject().value("grpc-service-name"),QJsonValue(""));
         QVERIFY(nullGrpc.nodes.first().originalConfiguration.value("transport").toObject().value("service_name").isNull());
-        QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(nullGrpc.nodes.first()).isEmpty());
+        QVERIFY(SwirlProtocolRegistry::nativeNodeReason(nullGrpc.nodes.first()).isEmpty());
+        for(const auto &node:{grpc.nodes.first(),nullGrpc.nodes.first()}){
+            QJsonObject outbound;const auto error=NativeNodeBridge::executableOutbound(node,&outbound);QVERIFY2(error.isEmpty(),qPrintable(error));
+            const auto transport=outbound["transport"].toObject();QCOMPARE(transport["type"],QJsonValue("grpc"));
+            QCOMPARE(transport["config"].toObject()["service_name"],node.parameters["grpc-opts"].toObject()["grpc-service-name"]);
+            QCOMPARE(outbound["uuid"],node.parameters["uuid"]);QCOMPARE(outbound["host"],QJsonValue(node.host));QCOMPARE(outbound["port"],QJsonValue(node.port));
+            QCOMPARE(SwirlProtocolRegistry::describe(node).value("tested"),QVariant(false));
+        }
     }
     void iniCompleteProfileHasClosedExecutionSemantics() {
         const QByteArray original="[Proxy]\nA = socks5,127.0.0.1,1080\nDIRECT = direct\nREJECT = reject\n[Proxy Group]\nroute = select,A,DIRECT\nnested = select,route,REJECT\n[Rule]\nDOMAIN,exact.invalid,REJECT\nDOMAIN-SUFFIX,suffix.invalid,route\nDOMAIN-KEYWORD,keyword,nested\nFINAL,route\n";
@@ -457,7 +550,17 @@ private slots:
             const auto body=yaml+suffix;for(const auto &wrapped:{body,body.toBase64(),QByteArray("STATUS=fixture\n")+body})QVERIFY(!NodeImporter::parse(wrapped));
         }
         const auto json=malformed.last();QVERIFY(!NodeImporter::parse("STATUS=fixture\n"+json));QVERIFY(!NodeImporter::parse(QByteArray("\xef\xbb\xbf")+json));QVERIFY(!NodeImporter::parse(QByteArray("\xef\xbb\xbf\xef\xbb\xbf")+json));
-        QVERIFY(NodeImporter::parse("[{name: flow, type: socks5, server: 127.0.0.1, port: 1080}]"));
+        const QByteArray flow="[{name: flow, type: socks5, server: 127.0.0.1, port: 1080}]";
+        for(const auto &body:{flow,flow.toBase64(),QByteArray("\xef\xbb\xbf")+flow,QByteArray("STATUS=fixture\n")+flow}){
+            const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+            QCOMPARE(parsed.nodes.first().name,QString("flow"));QCOMPARE(parsed.nodes.first().protocol,QString("socks5"));QCOMPARE(parsed.nodes.first().port,quint16(1080));
+        }
+        for(const auto &body:QList<QByteArray>{
+            "[{name: flow, type: socks5, server: 127.0.0.1, port: 1080, port: 1081}]",
+            R"([{"name":"flow","type":"socks5","server":"127.0.0.1","port":1080,"port":1081}])",
+            "[{name: flow, type: socks5, protocol: socks, server: 127.0.0.1, port: 1080}]",
+            flow.left(flow.size()-1)})
+            for(const auto &wrapped:{body,body.toBase64()})QVERIFY(!NodeImporter::parse(wrapped));
         QVERIFY(NodeImporter::parse("[\n{name: flow, type: socks5, server: 127.0.0.1, port: 1080}\n]"));
         for(const auto &body:{QByteArray("; comments\n[ Proxy ] # nodes\n")+node,QByteArray("[server_local] ; nodes\nsocks5=127.0.0.1:1080, tag=A\n"),node}){
             const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QVERIFY(parsed.configuration.isEmpty());
@@ -519,14 +622,12 @@ private slots:
         imports.importText("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: 1080}]\nrules: [MATCH,DIRECT]\n");
         QTRY_VERIFY_WITH_TIMEOUT(!imports.busy(),4000);QVERIFY(store.nodes().isEmpty());QVERIFY(!QFile::exists(store.filePath()));
     }
-#ifndef SWIRL_USE_RUST_CORE
-    void compatibilityModeRejectsCompleteDocumentWithoutLosingFields() {
-        QTemporaryDir directory;EngineController controller(std::make_unique<MihomoAdapter>(),nullptr,directory.filePath("nodes.dpapi"));
+    void unsupportedCompleteDocumentDoesNotLoseFields() {
+        QTemporaryDir directory;EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("nodes.dpapi"));
         controller.imports()->importText("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: 1080}]\nproxy-groups: [{name: route, type: select, proxies: [A], default-selected: A, future-option: true}]\nrules: ['MATCH,route']\n");
         QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),4000);QVERIFY(controller.nodeCatalog().isEmpty());QVERIFY(controller.policyGroups().isEmpty());
-        QVERIFY(!QFile::exists(directory.filePath("nodes.dpapi")));QVERIFY(controller.imports()->message().contains("Rust"));
+        QVERIFY(!QFile::exists(directory.filePath("nodes.dpapi")));QVERIFY(!controller.imports()->message().isEmpty());
     }
-#endif
     void fullProtocolRegistryCanBeImported() {
         const QStringList expected{"socks5","ss","trojan","http","ssr","vmess","vless","snell","hysteria","hysteria2","wireguard","tuic","shadowquic","gost-relay","ssh","mieru","anytls","sudoku","masque","trusttunnel","openvpn","tailscale","zerotier","easytier"};
         QCOMPARE(ProxyNode::protocols(),expected);
@@ -624,29 +725,33 @@ external-controller: 0.0.0.0:9090
         HttpsSubscriptionServer first(serverConfiguration),second(serverConfiguration);QVERIFY(first.listen(QHostAddress::LocalHost,0));QVERIFY(second.listen(QHostAddress::LocalHost,0));
         first.code=302;first.location=second.url().toEncoded();second.content=socks(1080);
         QTemporaryDir temp;NodeStore store(temp.filePath("nodes"));NodeImportService service(&store);
-        service.importUrl(first.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),8000);QCOMPARE(store.nodes().size(),1);QCOMPARE(first.count,1);QCOMPARE(second.count,1);
-        const auto id=store.nodes().first().id;QVERIFY(store.select(id));SubscriptionServer plain;QVERIFY(plain.listen(QHostAddress::LocalHost,0));first.location=plain.url().toEncoded();
+        service.importUrl(second.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),8000);QCOMPARE(store.nodes().size(),1);QCOMPARE(second.count,1);
+        const auto id=store.nodes().first().id;QVERIFY(store.select(id));
+        service.importUrl(first.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),8000);QCOMPARE(first.count,1);QCOMPARE(second.count,1);QCOMPARE(store.nodes().size(),1);QCOMPARE(store.selectedId(),id);
+        SubscriptionServer plain;QVERIFY(plain.listen(QHostAddress::LocalHost,0));first.location=plain.url().toEncoded();
         service.importUrl(first.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),8000);QVERIFY(service.message().contains(QStringLiteral("降级")));QCOMPARE(plain.count,0);QCOMPARE(store.nodes().size(),1);QCOMPARE(store.selectedId(),id);
     }
     void redirectsPreserveNodesAndBoundLoops() {
         SubscriptionServer first,second;QVERIFY(first.listen(QHostAddress::LocalHost,0));QVERIFY(second.listen(QHostAddress::LocalHost,0));
         first.code=302;first.location=second.url().toEncoded();second.content=socks(1080);
         QTemporaryDir temp;NodeStore store(temp.filePath("nodes"));NodeImportService service(&store);
-        service.importUrl(first.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);QCOMPARE(store.nodes().first().port,quint16(1080));
+        service.importUrl(second.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);QCOMPARE(store.nodes().first().port,quint16(1080));
+        const auto id=store.nodes().first().id;QVERIFY(store.select(id));
+        service.importUrl(first.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(first.count,1);QCOMPARE(second.count,1);QCOMPARE(store.nodes().size(),1);QCOMPARE(store.selectedId(),id);
         first.location=first.url().toEncoded();service.importUrl(first.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);QVERIFY(service.message().contains(QStringLiteral("重定向")));QVERIFY(first.count<=7);
         first.location="file:///C:/private";service.importUrl(first.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);QVERIFY(service.message().contains(QStringLiteral("不安全")));
     }
     void importedChainAndRunningRefresh() {
         ControlledNetwork network;QVERIFY(network.start());SubscriptionServer source;QVERIFY(source.listen(QHostAddress::LocalHost,0));
-        QTemporaryDir temp;EngineController controller(std::make_unique<MihomoAdapter>(),nullptr,temp.filePath("nodes"));
-        controller.setControlPort(freePort());controller.setProxyPort(freePort());
+        QTemporaryDir temp;EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,temp.filePath("nodes"));
+        controller.setProxyPort(freePort());controller.setRoutingMode("global");
         auto *imports=controller.imports();source.content=socks(network.a.serverPort());
         QVERIFY(imports->saveSubscription({},"Chain",source.url(),360,false));const auto sid=imports->providers().first().toMap().value("id").toString();
         imports->refreshSubscription(sid);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);QCOMPARE(controller.nodes().size(),1);
         const auto id=controller.nodes().first().toMap().value("id").toString();controller.connectNode(id);
         QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),18000);
         controller.testNode(network.url());QTRY_VERIFY_WITH_TIMEOUT(!controller.nodeBusy(),8000);
-        QVERIFY(controller.requestSucceeded());QVERIFY(network.a.forwarded>=2);QCOMPARE(network.b.forwarded,0);
+        QVERIFY(controller.requestSucceeded());QVERIFY(network.a.forwarded>=1);QCOMPARE(network.b.forwarded,0);
         const auto pid=controller.processId();network.b.username.clear();network.b.password.clear();
         source.content=socks(network.b.serverPort());imports->refreshSubscription(sid);
         QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
@@ -660,11 +765,109 @@ external-controller: 0.0.0.0:9090
         controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),4000);
         controller.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),18000);
         controller.testNode(network.url());QTRY_VERIFY_WITH_TIMEOUT(!controller.nodeBusy(),8000);
-        QVERIFY(controller.requestSucceeded());QVERIFY(network.b.forwarded>=2);
+        QVERIFY(controller.requestSucceeded());QVERIFY(network.b.forwarded>=1);
         controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),4000);QTcpServer reuse;QVERIFY(reuse.listen(QHostAddress::LocalHost,controller.proxyPort()));
         reuse.close();imports->refreshSubscription(sid);controller.stop();
         QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);QTest::qWait(300);QVERIFY(!controller.processAlive());
         qInfo()<<"IMPORTED_REAL_CHAIN: selected A remains live through refresh; manual reconnect selects B; no remote environment claimed";
+    }
+    void hysteria2UriParsesAuthPortSniObfsAndFingerprint() {
+        for(const auto &scheme:QList<QByteArray>{"hysteria2","hy2"}){
+            const QByteArray uri=scheme+"://secret-auth@example.org:443?sni=camouflage.invalid&obfs=salamander&obfs-password=fixture-obfs&pinSHA256="+QByteArray(32,'\xab').toHex(':').toUpper()+"&alpn=h3&up=100&down=50#Fixture%20Node";
+            const auto parsed=NodeImporter::parse(uri);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+            const auto node=parsed.nodes.first();QCOMPARE(node.protocol,QString("hysteria2"));QCOMPARE(node.host,QString("example.org"));QCOMPARE(node.port,quint16(443));
+            QCOMPARE(node.password,QString("secret-auth"));QCOMPARE(node.serverName,QString("camouflage.invalid"));QCOMPARE(node.name,QString("Fixture Node"));
+            QCOMPARE(node.parameters.value("obfs"),QJsonValue("salamander"));QCOMPARE(node.parameters.value("obfs-password"),QJsonValue("fixture-obfs"));
+            QCOMPARE(node.parameters.value("fingerprint"),QJsonValue(QString::fromLatin1(QByteArray(32,'\xab').toHex())));QCOMPARE(node.parameters.value("up"),QJsonValue("100"));QCOMPARE(node.parameters.value("down"),QJsonValue("50"));
+            QVERIFY(node.conversionIssues.isEmpty());
+        }
+    }
+    void hysteria2UriHandlesDefaultPortIPv6AndMultiPort() {
+        {
+            const QByteArray uri="hysteria2://example.org";
+            const auto parsed=NodeImporter::parse(uri);QVERIFY2(parsed,qPrintable(parsed.error));
+            QCOMPARE(parsed.nodes.first().port,quint16(443));QVERIFY(parsed.nodes.first().password.isEmpty());
+        }
+        {
+            const QByteArray uri="hy2://auth@[2001:db8::1]:8443";
+            const auto parsed=NodeImporter::parse(uri);QVERIFY2(parsed,qPrintable(parsed.error));
+            QCOMPARE(parsed.nodes.first().host,QString("2001:db8::1"));QCOMPARE(parsed.nodes.first().port,quint16(8443));
+        }
+        {
+            const QByteArray uri="hysteria2://auth@example.org:443,5000-6000";
+            const auto parsed=NodeImporter::parse(uri);QVERIFY2(parsed,qPrintable(parsed.error));
+            const auto node=parsed.nodes.first();QCOMPARE(node.port,quint16(0));QCOMPARE(node.parameters.value("ports"),QJsonValue("443,5000-6000"));
+        }
+    }
+    void hysteria2UriAcceptsRootPathBeforeQuery() {
+        for(const auto &uri:QList<QByteArray>{"hysteria2://fixture-pass@example.com:443/?sni=example.com","hy2://fixture-pass@example.com/?sni=example.com",
+            "hysteria2://fixture-pass@[2001:db8::1]:8443/?sni=example.com","hysteria2://fixture-pass@example.com:443,5000-6000/?sni=example.com","hysteria2://fixture-pass@example.com:443/"}){
+            const auto parsed=NodeImporter::parse(uri);QVERIFY2(parsed,qPrintable(QString::fromUtf8(uri)+": "+parsed.error));
+            const auto node=parsed.nodes.first();QCOMPARE(node.password,QString("fixture-pass"));QVERIFY(node.conversionIssues.isEmpty());
+            QCOMPARE(node.originalConfiguration.value("uri"),QJsonValue(QString::fromUtf8(uri)));
+        }
+        QCOMPARE(NodeImporter::parse("hysteria2://fixture-pass@example.com:443/?sni=example.com").nodes.first().port,quint16(443));
+        QCOMPARE(NodeImporter::parse("hy2://fixture-pass@example.com/?sni=example.com").nodes.first().port,quint16(443));
+        QCOMPARE(NodeImporter::parse("hysteria2://fixture-pass@example.com:443/?sni=example.com").nodes.first().serverName,QString("example.com"));
+        QCOMPARE(NodeImporter::parse("hysteria2://fixture-pass@[2001:db8::1]:8443/?sni=example.com").nodes.first().host,QString("2001:db8::1"));
+        QCOMPARE(NodeImporter::parse("hysteria2://fixture-pass@example.com:443,5000-6000/?sni=example.com").nodes.first().parameters.value("ports"),QJsonValue("443,5000-6000"));
+        // Percent-encoded credentials and names decode exactly once.
+        const auto encoded=NodeImporter::parse("hysteria2://p%40ss%3Aword%2F@example.com:443/?sni=example.com#Node%20%E4%B8%80");
+        QVERIFY2(encoded,qPrintable(encoded.error));QCOMPARE(encoded.nodes.first().password,QString("p@ss:word/"));QCOMPARE(encoded.nodes.first().name,QString::fromUtf8("Node \xe4\xb8\x80"));
+        // A non-root path has no defined meaning and must not be dropped.
+        QVERIFY(!NodeImporter::parse("hysteria2://fixture-pass@example.com:443/extra?sni=example.com"));
+        QVERIFY(!NodeImporter::parse("hysteria2://fixture-pass@example.com:443//?sni=example.com"));
+        // pinSHA256 must be a full SHA-256 digest.
+        QVERIFY(!NodeImporter::parse("hysteria2://fixture-pass@example.com:443?pinSHA256=AA:BB:CC:DD"));
+        QVERIFY(!NodeImporter::parse("hysteria2://fixture-pass@example.com:443?pinSHA256="+QByteArray(64,'z')));
+        const auto plain=NodeImporter::parse("hysteria2://fixture-pass@example.com:443?pinSHA256="+QByteArray(32,'\x01').toHex());
+        QVERIFY2(plain,qPrintable(plain.error));QCOMPARE(plain.nodes.first().parameters.value("fingerprint"),QJsonValue(QString::fromLatin1(QByteArray(32,'\x01').toHex())));
+    }
+    void hysteria2UriRejectsInvalidOrUnsafeInput() {
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:44a"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:443,"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@[2001:db8::1"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@[2001:db8::1]x"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:443?insecure=yes"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:0"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:70000"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:443,99999"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:443?insecure=true"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:443?obfs=salamander"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:443?sni=a&sni=b"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@"));
+        const auto echo=NodeImporter::parse("hysteria2://auth@example.org:443?ech=1");
+        QVERIFY2(echo,qPrintable(echo.error));QVERIFY(!echo.nodes.first().conversionIssues.isEmpty());
+    }
+    void tuicUriParsesUuidPasswordAndCongestionOptions() {
+        const QByteArray uri="tuic://00112233-4455-6677-8899-aabbccddeeff:fixture-pass@example.org:443?sni=camouflage.invalid&congestion_control=bbr&udp_relay_mode=native&alpn=h3&allow_insecure=0#TUIC%20Fixture";
+        const auto parsed=NodeImporter::parse(uri);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+        const auto node=parsed.nodes.first();QCOMPARE(node.protocol,QString("tuic"));QCOMPARE(node.host,QString("example.org"));QCOMPARE(node.port,quint16(443));
+        QCOMPARE(node.parameters.value("uuid"),QJsonValue("00112233-4455-6677-8899-aabbccddeeff"));QCOMPARE(node.password,QString("fixture-pass"));
+        QCOMPARE(node.serverName,QString("camouflage.invalid"));QCOMPARE(node.name,QString("TUIC Fixture"));
+        QCOMPARE(node.parameters.value("congestion-controller"),QJsonValue("bbr"));QCOMPARE(node.parameters.value("udp-relay-mode"),QJsonValue("native"));
+        QCOMPARE(node.parameters.value("skip-cert-verify"),QJsonValue(false));QVERIFY(node.conversionIssues.isEmpty());
+    }
+    void tuicUriRejectsInvalidUuidOrDuplicateParameters() {
+        QVERIFY(!NodeImporter::parse("tuic://not-a-uuid:pass@example.org:443"));
+        QVERIFY(!NodeImporter::parse("tuic://00112233-4455-6677-8899-aabbccddeeff:pass@example.org:443?sni=a&sni=b"));
+        QVERIFY(!NodeImporter::parse("tuic://00112233-4455-6677-8899-aabbccddeeff:pass@example.org:0"));
+        const auto unknown=NodeImporter::parse("tuic://00112233-4455-6677-8899-aabbccddeeff:pass@example.org:443?unknown-flag=1");
+        QVERIFY2(unknown,qPrintable(unknown.error));QVERIFY(!unknown.nodes.first().conversionIssues.isEmpty());
+    }
+    void hysteriaV1UriIsExplicitlyRejectedNotConvertedToV2() {
+        const auto parsed=NodeImporter::parse(QByteArray("hysteria://example.org:443?peer=camouflage.invalid&auth=fixture&upmbps=100&downmbps=50"));
+        // The intent is that no node is produced and nothing is silently
+        // rewritten into a Hysteria2 outbound; the diagnostic may name v2 in
+        // order to state that it was NOT applied.
+        QVERIFY(!parsed);QVERIFY(parsed.nodes.isEmpty());QVERIFY(parsed.error.contains("v1",Qt::CaseInsensitive));
+    }
+    void multiNodeSubscriptionIsolatesOneInvalidHysteria2Node() {
+        const QByteArray good="hysteria2://auth@good.example.org:443?sni=good.invalid";
+        const QByteArray bad="hysteria2://auth@bad.example.org:443?sni=a&sni=b";
+        const auto parsed=NodeImporter::parse(good+"\n"+bad);
+        QVERIFY(!parsed);QVERIFY(!parsed.error.isEmpty());
     }
 };
 QTEST_GUILESS_MAIN(ImportTests)

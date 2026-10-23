@@ -1,0 +1,441 @@
+{
+  "schema": 1,
+  "repository": "https://github.com/SOLHK/Swirl",
+  "branch": "work/xray-v2ray-transport-20261022",
+  "observed_at_utc": "2026-10-22 04:27:45 UTC",
+  "scope": "Completed push workflow runs through C5; C6 source changes and the Windows legacy-peer environment change were uncommitted and are not verified by this snapshot.",
+  "workflow": ".github/workflows/rust-transport.yml",
+  "sources": {
+    "runs_api": "https://api.github.com/repos/SOLHK/Swirl/actions/runs?branch=work%2Fxray-v2ray-transport-20261022&per_page=12",
+    "jobs_api": "https://api.github.com/repos/SOLHK/Swirl/actions/runs/{run_id}/jobs",
+    "job_logs_api": "https://api.github.com/repos/SOLHK/Swirl/actions/jobs/{job_id}/logs"
+  },
+  "runs": [
+    {
+      "stage": "C5",
+      "sha": "a2fd0fd782841dafaaa5a1bcf5f2c0f45b479572",
+      "run_id": 39721621067,
+      "run_attempt": 1,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39721621067",
+      "updated_at": "2026-10-22T04:24:48Z",
+      "jobs": [
+        {
+          "job_id": 119636147087,
+          "platform": "ubuntu-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39721621067/job/119636147087",
+          "checks": {
+            "fmt": "success",
+            "check": "success",
+            "clippy": "success",
+            "test": "success",
+            "build": "success",
+            "C1": "success",
+            "C2": "success",
+            "C3": "success",
+            "C4": "success",
+            "C5": "success",
+            "artifact": "success"
+          }
+        },
+        {
+          "job_id": 119636147374,
+          "platform": "windows-latest",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39721621067/job/119636147374",
+          "checks": {
+            "fmt": "success",
+            "check": "success",
+            "clippy": "success",
+            "test": "success",
+            "build": "success",
+            "C1": "success",
+            "C2": "success",
+            "C3": "failure",
+            "C4": "skipped",
+            "C5": "skipped",
+            "artifact": "success"
+          }
+        },
+        {
+          "job_id": 119636147412,
+          "platform": "macos-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39721621067/job/119636147412",
+          "checks": {
+            "fmt": "success",
+            "check": "success",
+            "clippy": "success",
+            "test": "success",
+            "build": "success",
+            "C1": "success",
+            "C2": "success",
+            "C3": "success",
+            "C4": "success",
+            "C5": "success",
+            "artifact": "success"
+          }
+        }
+      ]
+    },
+    {
+      "stage": "C4",
+      "sha": "a63d33235e2abe33ffcb1d7dc632b100c2be8ce0",
+      "run_id": 39720933394,
+      "run_attempt": 1,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39720933394",
+      "updated_at": "2026-10-22T04:18:33Z",
+      "jobs": [
+        {
+          "job_id": 119633939767,
+          "platform": "windows-latest",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39720933394/job/119633939767",
+          "checks": {
+            "fmt": "success",
+            "check": "success",
+            "clippy": "success",
+            "test": "success",
+            "build": "success",
+            "C1": "success",
+            "C2": "success",
+            "C3": "failure",
+            "C4": "skipped",
+            "artifact": "success"
+          }
+        },
+        {
+          "job_id": 119633939982,
+          "platform": "ubuntu-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39720933394/job/119633939982",
+          "checks": {
+            "fmt": "success",
+            "check": "success",
+            "clippy": "success",
+            "test": "success",
+            "build": "success",
+            "C1": "success",
+            "C2": "success",
+            "C3": "success",
+            "C4": "success",
+            "artifact": "success"
+          }
+        },
+        {
+          "job_id": 119633940132,
+          "platform": "macos-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39720933394/job/119633940132",
+          "checks": {
+            "fmt": "success",
+            "check": "success",
+            "clippy": "success",
+            "test": "success",
+            "build": "success",
+            "C1": "success",
+            "C2": "success",
+            "C3": "success",
+            "C4": "success",
+            "artifact": "success"
+          }
+        }
+      ]
+    },
+    {
+      "stage": "C3",
+      "sha": "63613b3d94774199ea4dc289776240e7ad08fc96",
+      "run_id": 39720581183,
+      "run_attempt": 1,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39720581183",
+      "updated_at": "2026-10-22T04:12:29Z",
+      "jobs": [
+        {
+          "job_id": 119632853681,
+          "platform": "ubuntu-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39720581183/job/119632853681",
+          "checks": {
+            "fmt": "success",
+            "check": "success",
+            "clippy": "success",
+            "test": "success",
+            "build": "success",
+            "C1": "success",
+            "C2": "success",
+            "C3": "success",
+            "artifact": "success"
+          }
+        },
+        {
+          "job_id": 119632853838,
+          "platform": "macos-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39720581183/job/119632853838",
+          "checks": {
+            "fmt": "success",
+            "check": "success",
+            "clippy": "success",
+            "test": "success",
+            "build": "success",
+            "C1": "success",
+            "C2": "success",
+            "C3": "success",
+            "artifact": "success"
+          }
+        },
+        {
+          "job_id": 119632853991,
+          "platform": "windows-latest",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39720581183/job/119632853991",
+          "checks": {
+            "fmt": "success",
+            "check": "success",
+            "clippy": "success",
+            "test": "success",
+            "build": "success",
+            "C1": "success",
+            "C2": "success",
+            "C3": "failure",
+            "artifact": "success"
+          }
+        }
+      ]
+    },
+    {
+      "stage": "C2",
+      "sha": "14661bff03c7e391fafa70d08159cb46cb703f32",
+      "run_id": 39720068070,
+      "run_attempt": 1,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39720068070",
+      "updated_at": "2026-10-22T04:08:34Z",
+      "jobs": [
+        {
+          "job_id": 119631238911,
+          "platform": "macos-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39720068070/job/119631238911",
+          "checks": {
+            "fmt": "success",
+            "check": "success",
+            "clippy": "success",
+            "test": "success",
+            "build": "success",
+            "C1": "success",
+            "C2": "success",
+            "artifact": "success"
+          }
+        },
+        {
+          "job_id": 119631239223,
+          "platform": "ubuntu-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39720068070/job/119631239223",
+          "checks": {
+            "fmt": "success",
+            "check": "success",
+            "clippy": "success",
+            "test": "success",
+            "build": "success",
+            "C1": "success",
+            "C2": "success",
+            "artifact": "success"
+          }
+        },
+        {
+          "job_id": 119631239485,
+          "platform": "windows-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39720068070/job/119631239485",
+          "checks": {
+            "fmt": "success",
+            "check": "success",
+            "clippy": "success",
+            "test": "success",
+            "build": "success",
+            "C1": "success",
+            "C2": "success",
+            "artifact": "success"
+          }
+        }
+      ]
+    },
+    {
+      "stage": "C1",
+      "sha": "4ad768303f4dbea289d87714974e752f544c2542",
+      "run_id": 39717767373,
+      "run_attempt": 1,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39717767373",
+      "updated_at": "2026-10-22T03:42:30Z",
+      "jobs": [
+        {
+          "job_id": 119623886987,
+          "platform": "macos-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39717767373/job/119623886987",
+          "checks": {
+            "fmt": "success",
+            "check": "success",
+            "clippy": "success",
+            "test": "success",
+            "build": "success",
+            "C1": "success",
+            "artifact": "success"
+          }
+        },
+        {
+          "job_id": 119623887096,
+          "platform": "ubuntu-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39717767373/job/119623887096",
+          "checks": {
+            "fmt": "success",
+            "check": "success",
+            "clippy": "success",
+            "test": "success",
+            "build": "success",
+            "C1": "success",
+            "artifact": "success"
+          }
+        },
+        {
+          "job_id": 119623887155,
+          "platform": "windows-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39717767373/job/119623887155",
+          "checks": {
+            "fmt": "success",
+            "check": "success",
+            "clippy": "success",
+            "test": "success",
+            "build": "success",
+            "C1": "success",
+            "artifact": "success"
+          }
+        }
+      ]
+    }
+  ],
+  "windows_failure_excerpts": [
+    {
+      "stage": "C5",
+      "run_id": 39721621067,
+      "job_id": 119636147374,
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39721621067/job/119636147374",
+      "failed_step": "Independent legacy HTTP2 Xray interoperability",
+      "summary": [
+        "Ran 8 tests in 9.242s",
+        "FAILED (failures=2)",
+        "##[error]Process completed with exit code 1."
+      ],
+      "failures": [
+        {
+          "test": "test_eight_concurrent_connections_and_client_drop_release_targets",
+          "excerpt": [
+            "FAIL: test_eight_concurrent_connections_and_client_drop_release_targets (__main__.Http2XrayTests.test_eight_concurrent_connections_and_client_drop_release_targets)",
+            "  File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_transport_http2_xray.py\", line 76, in test_eight_concurrent_connections_and_client_drop_release_targets",
+            "    self.wait_for(lambda: not origin.active)",
+            "    self.assertTrue(predicate())",
+            "AssertionError: False is not true"
+          ]
+        },
+        {
+          "test": "test_eight_mib_bidirectional_flow_control_and_half_close",
+          "excerpt": [
+            "FAIL: test_eight_mib_bidirectional_flow_control_and_half_close (__main__.Http2XrayTests.test_eight_mib_bidirectional_flow_control_and_half_close)",
+            "  File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_transport_http2_xray.py\", line 63, in test_eight_mib_bidirectional_flow_control_and_half_close",
+            "    self.wait_for(lambda: origin.client_closes == 1)",
+            "    self.assertTrue(predicate())",
+            "AssertionError: False is not true"
+          ]
+        }
+      ]
+    },
+    {
+      "stage": "C4",
+      "run_id": 39720933394,
+      "job_id": 119633939767,
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39720933394/job/119633939767",
+      "failed_step": "Independent legacy HTTP2 Xray interoperability",
+      "summary": [
+        "Ran 8 tests in 9.294s",
+        "FAILED (failures=2)",
+        "##[error]Process completed with exit code 1."
+      ],
+      "failures": [
+        {
+          "test": "test_eight_concurrent_connections_and_client_drop_release_targets",
+          "excerpt": [
+            "FAIL: test_eight_concurrent_connections_and_client_drop_release_targets (__main__.Http2XrayTests.test_eight_concurrent_connections_and_client_drop_release_targets)",
+            "  File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_transport_http2_xray.py\", line 76, in test_eight_concurrent_connections_and_client_drop_release_targets",
+            "    self.wait_for(lambda: not origin.active)",
+            "    self.assertTrue(predicate())",
+            "AssertionError: False is not true"
+          ]
+        },
+        {
+          "test": "test_eight_mib_bidirectional_flow_control_and_half_close",
+          "excerpt": [
+            "FAIL: test_eight_mib_bidirectional_flow_control_and_half_close (__main__.Http2XrayTests.test_eight_mib_bidirectional_flow_control_and_half_close)",
+            "  File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_transport_http2_xray.py\", line 63, in test_eight_mib_bidirectional_flow_control_and_half_close",
+            "    self.wait_for(lambda: origin.client_closes == 1)",
+            "    self.assertTrue(predicate())",
+            "AssertionError: False is not true"
+          ]
+        }
+      ]
+    }
+  ],
+  "interpretation": {
+    "c1_c2": "All three platform jobs passed at their respective stage commits.",
+    "c3_c4_c5": "Linux and macOS jobs passed. Windows Rust gates, native library/examples build, C1 and C2 passed; legacy HTTP2 closure assertions failed.",
+    "windows_c4_c5": "HTTPUpgrade and XHTTP Windows steps were skipped after the C3 failure. They have no Windows interoperability pass in these runs.",
+    "pending_peer_adjustment": "The proposed C6 fixture sets xray.buf.readv=disable only for official Xray 1.8.24 on Windows and records the environment override. Original native assertions are unchanged. A subsequent Windows run is required to verify that adjustment.",
+    "source_for_peer_adjustment": "https://github.com/XTLS/Xray-core/blob/6baad79f9881ee2cf75bdc825b3e2e92b289477a/common/buf/readv_windows.go",
+    "limitation": "Target-close failures alone do not prove the root cause. The legacy Windows WSARecv source motivates the peer setting; this snapshot does not claim the pending setting has fixed Windows."
+  },
+  "check_names": {
+    "fmt": "Format",
+    "check": "Check",
+    "clippy": "Clippy",
+    "test": "Unit and local network tests",
+    "build": "Build native binaries and dynamic library",
+    "C1": "Independent TCP and WebSocket Xray interoperability",
+    "C2": "Independent streaming gRPC Xray interoperability",
+    "C3": "Independent legacy HTTP2 Xray interoperability",
+    "C4": "Independent HTTPUpgrade Xray interoperability",
+    "C5": "Independent XHTTP stream-one Xray interoperability",
+    "artifact": "Preserve peer identity and raw test evidence"
+  }
+}

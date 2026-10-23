@@ -9,6 +9,8 @@ mod inspect_boundaries;
 mod inspect_reality;
 #[path = "inspect_socks4.rs"]
 mod inspect_socks4;
+#[path = "inspect_stream.rs"]
+mod inspect_stream;
 #[path = "inspect_websocket.rs"]
 mod inspect_websocket;
 use base64::{
@@ -228,6 +230,9 @@ fn ss_percent(value: &str) -> Result<String, &'static str> {
     percent(value)
 }
 fn uri(line: &str) -> Result<Value, &'static str> {
+    if line.starts_with("hysteria2://") || line.starts_with("hy2://") {
+        return crate::hysteria2::parse_uri(line);
+    }
     if let Some(encoded) = line.strip_prefix("vmess://") {
         let raw: Value =
             serde_json::from_slice(&decode(encoded.as_bytes())?).map_err(|_| "VmessJson")?;
@@ -300,8 +305,14 @@ fn uri(line: &str) -> Result<Value, &'static str> {
             n["cipher"] = cipher.into();
             n["password"] = password.into();
         }
-        "trojan" | "hysteria2" | "anytls" => n["password"] = percent(u.username())?.into(),
-        "vless" | "tuic" => n["uuid"] = percent(u.username())?.into(),
+        "trojan" | "anytls" => n["password"] = percent(u.username())?.into(),
+        "vless" => n["uuid"] = percent(u.username())?.into(),
+        "tuic" => {
+            n["uuid"] = percent(u.username())?.into();
+            if let Some(password) = u.password() {
+                n["password"] = percent(password)?.into();
+            }
+        }
         _ => {
             n["username"] = percent(u.username())?.into();
             if let Some(pass) = u.password() {
@@ -765,7 +776,15 @@ fn ss_outbound(raw: &Value, family: &str) -> Result<Outbound, &'static str> {
     {
         return Err("ConflictingCipher");
     }
-    if !["aes-128-gcm", "aes-256-gcm", "chacha20-ietf-poly1305"].contains(&cipher) {
+    if ![
+        "aes-128-gcm",
+        "aes-256-gcm",
+        "chacha20-ietf-poly1305",
+        "2022-blake3-aes-128-gcm",
+        "2022-blake3-aes-256-gcm",
+    ]
+    .contains(&cipher)
+    {
         return Err("CipherNotImplemented");
     }
     let obfs_http = if let Some(plugin) = raw.get("plugin") {
@@ -882,6 +901,9 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
         ],
         "unknown",
     );
+    if matches!(kind, "vless" | "trojan") && inspect_stream::declared(raw) {
+        return inspect_stream::inspect(raw, index, family);
+    }
     if kind == "vless" && inspect_reality::declared(raw) {
         return inspect_reality::inspect(raw, index, family);
     }
@@ -994,6 +1016,21 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
     let udp = raw.get("udp").and_then(Value::as_bool) == Some(true);
     let mut diagnostic = "ProtocolNotImplemented";
     let mut candidate = None;
+    let native = match kind {
+        "vmess" => Some(crate::vmess::from_raw(raw)),
+        "hysteria2" => Some(crate::hysteria2::from_raw(raw).map(Outbound::Hysteria2)),
+        "tuic" => Some(crate::Tuic::from_raw(raw).map(Outbound::Tuic)),
+        _ => None,
+    };
+    if let Some(result) = native {
+        match result {
+            Ok(outbound) => {
+                candidate = Some(outbound);
+                diagnostic = "TcpCandidateNotYetVerified";
+            }
+            Err(code) => diagnostic = code,
+        }
+    }
     if kind == "ss" {
         match ss_outbound(raw, family) {
             Ok(outbound) => {
@@ -1137,6 +1174,10 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                     .or_else(|| raw.get("servername"))
                     .or_else(|| raw.pointer("/tls/server_name"))
                     .and_then(Value::as_str)
+                    // Clash's omitted/empty SNI both use the endpoint name;
+                    // aliases and source types were checked above. Retaining
+                    // an empty source string must not break saved Qt nodes.
+                    .filter(|name| !name.is_empty())
                     .unwrap_or(&host)
                     .to_string();
                 let alpn = raw
@@ -1184,6 +1225,8 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                     websocket: None,
                     reality: None,
                     flow: None,
+                    transport: None,
+                    udp,
                 }),
                 "trojan" => tls.map(|tls| Outbound::Trojan {
                     host,
@@ -1191,6 +1234,8 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                     password,
                     tls,
                     websocket: None,
+                    transport: None,
+                    udp,
                 }),
                 "http" => Some(Outbound::HttpConnect {
                     host,
@@ -1242,7 +1287,11 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             udp_declared: udp,
             unrecognized_fields: unrecognized,
             native_tcp_candidate: candidate.is_some(),
-            native_udp_supported: ["ss", "socks5"].contains(&kind) && udp && candidate.is_some(),
+            native_udp_supported: (["ss", "socks5", "vless", "trojan"].contains(&kind)
+                && udp
+                && candidate.is_some())
+                || matches!(&candidate, Some(Outbound::Hysteria2(config)) if config.udp)
+                || matches!(&candidate, Some(Outbound::Tuic(config)) if config.udp),
             real_network_verified: false,
             diagnostic,
         },
@@ -1728,7 +1777,7 @@ mod tests {
             assert!(result.report.nodes[0].native_tcp_candidate);
             assert_eq!(result.originals[0]["udp"], declared);
             assert_eq!(result.report.nodes[0].udp_declared, declared);
-            assert!(!result.report.nodes[0].native_udp_supported);
+            assert_eq!(result.report.nodes[0].native_udp_supported, declared);
             assert_eq!(result.originals[0]["raw-uri"], input);
             assert_eq!(result.original, input.as_bytes());
             for query in [

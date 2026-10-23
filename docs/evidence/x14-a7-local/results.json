@@ -1,0 +1,77 @@
+{
+  "started_utc": "2026-10-22T14:01:02.724320+00:00",
+  "head": "42fd5782c1d30f32bb4cc2aef21857c52af50dc7",
+  "worktree_modified": true,
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "cargo_lock_sha256": "2a2c7bc86a0f2fbce9fbb62843e81d6ec77f6eb66a83d39b187bc94caf2ae301",
+  "commands": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.594,
+      "log": "fmt.log"
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--workspace",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.244,
+      "log": "check.log"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.872,
+      "log": "clippy.log"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 16.652,
+      "log": "test.log",
+      "test_totals": {
+        "passed": 639,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--workspace",
+        "--lib",
+        "--bins",
+        "--examples",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.101,
+      "log": "build.log"
+    }
+  ]
+}

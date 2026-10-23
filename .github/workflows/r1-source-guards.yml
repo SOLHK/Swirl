@@ -1,0 +1,66 @@
+name: R1 source and package guards
+on:
+  push:
+    branches: [work/rust-core-full-replacement-20261022, work/subscription-unified-integration-20261023, work/swirl-s3-max-ultra-20261023]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Reject removed runtime sources and product fallback paths
+        run: python tools/test_rust_only_runtime.py -v
+      - name: Preserve approved U2 window, sidebar and navigation sources
+        run: python tools/Verify-S3UiBaseline.py
+      - name: CMake dependency graph regression
+        run: python tools/test_rust_build_chain.py -v
+      - name: Preserve exact reviewable source snapshot without font binaries
+        if: always()
+        shell: python
+        run: |
+          import hashlib, json, os, pathlib, subprocess, zipfile
+          root = pathlib.Path.cwd()
+          names = subprocess.check_output(['git','ls-files','-z']).decode().split('\0')
+          output = pathlib.Path(os.environ['RUNNER_TEMP']) / 'r1-review-source.zip'
+          manifest = {'source_sha': os.environ['GITHUB_SHA'], 'files': []}
+          with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
+              for name in names:
+                  path = root / name
+                  if not name or not path.is_file() or path.is_symlink():
+                      continue
+                  if path.suffix.lower() in {'.ttf','.otf','.ttc','.woff','.woff2','.eot','.private','.dpapi'}:
+                      continue
+                  data = path.read_bytes()
+                  archive.writestr(name, data)
+                  manifest['files'].append({'path': name, 'sha256': hashlib.sha256(data).hexdigest()})
+              archive.writestr('r1-review-manifest.json', json.dumps(manifest, indent=2))
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R1-review-source-${{ github.sha }}
+          path: ${{ runner.temp }}/r1-review-source.zip
+          if-no-files-found: error
+          retention-days: 7
+  package-policy:
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: PowerShell 7 package path tests
+        shell: pwsh
+        run: ./scripts/tests/Test-RustProductPackagePolicy.ps1
+      - name: Windows PowerShell 5.1 package path tests
+        shell: powershell
+        run: ./scripts/tests/Test-RustProductPackagePolicy.ps1
+      - name: Actual Windows MRS rule package copy and missing/corrupt rejection
+        shell: pwsh
+        run: ./tools/tests/Test-WindowsRustRulePackage.ps1

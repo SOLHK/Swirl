@@ -1,6 +1,7 @@
 //! SOCKS4/4a CONNECT (original NEC specification). USERID is not password
 //! authentication. BIND and UDP are explicitly unsupported; IPv6 is rejected.
 use super::{Inbound, InboundKind, Result, Target};
+use crate::timing::{self, Phase};
 use std::net::{IpAddr, Ipv4Addr};
 use swirl_dns::Resolver;
 use swirl_subscription::{Credentials, valid_host};
@@ -86,7 +87,10 @@ pub(super) async fn connect(
         Err(_) => super::within(
             deadline,
             "UpstreamDnsTimeout",
-            resolver.resolve(&target.host, target.port),
+            timing::measure(
+                Phase::Resolution,
+                resolver.resolve(&target.host, target.port),
+            ),
         )
         .await?
         .iter()
@@ -127,21 +131,25 @@ pub(super) async fn connect(
         request.extend(domain.as_bytes());
         request.push(0);
     }
-    super::within(deadline, "UpstreamProtocolTimeout", async {
-        stream
-            .write_all(&request)
-            .await
-            .map_err(|_| "Socks4Write")?;
-        let mut reply = [0; 8];
-        stream
-            .read_exact(&mut reply)
-            .await
-            .map_err(|_| "Socks4Read")?;
-        if reply[0] != 0 || reply[1] != 90 {
-            return Err("Socks4Rejected");
-        }
-        Ok(())
-    })
+    super::within(
+        deadline,
+        "UpstreamProtocolTimeout",
+        timing::measure(Phase::ProxyConnectExchange, async {
+            stream
+                .write_all(&request)
+                .await
+                .map_err(|_| "Socks4Write")?;
+            let mut reply = [0; 8];
+            stream
+                .read_exact(&mut reply)
+                .await
+                .map_err(|_| "Socks4Read")?;
+            if reply[0] != 0 || reply[1] != 90 {
+                return Err("Socks4Rejected");
+            }
+            Ok(())
+        }),
+    )
     .await?;
     Ok(Box::new(stream))
 }

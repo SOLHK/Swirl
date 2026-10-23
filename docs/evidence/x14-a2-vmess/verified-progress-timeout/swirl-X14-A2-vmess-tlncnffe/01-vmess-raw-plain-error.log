@@ -1,0 +1,5 @@
+2026/10/22 22:07:27.369773 [Debug] app/log: Logger started
+2026/10/22 22:07:27.369919 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:42965
+2026/10/22 22:07:27.371793 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:42965
+2026/10/22 22:07:27.371901 [Warning] core: Xray 26.10.21 started
+2026/10/22 22:07:27.377352 [Info] [376181375] app/proxyman/inbound: connection ends > proxy/vmess/encoding: failed to read request header > EOF

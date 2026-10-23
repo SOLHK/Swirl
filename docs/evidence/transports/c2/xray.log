@@ -1,0 +1,16 @@
+test_eight_concurrent_connections_and_client_cancellation_release_targets (__main__.GrpcXrayTests.test_eight_concurrent_connections_and_client_cancellation_release_targets) ... ok
+test_network_timeout_cancels_accepted_proxy_stream (__main__.GrpcXrayTests.test_network_timeout_cancels_accepted_proxy_stream) ... ok
+test_server_interruption_is_detected_and_a_new_session_works (__main__.GrpcXrayTests.test_server_interruption_is_detected_and_a_new_session_works) ... ok
+test_service_name_percent_escape_and_custom_tun_paths (__main__.GrpcXrayTests.test_service_name_percent_escape_and_custom_tun_paths) ... ok
+test_trojan_tls_authentication_uses_same_native_grpc_adapter (__main__.GrpcXrayTests.test_trojan_tls_authentication_uses_same_native_grpc_adapter) ... ok
+test_truncated_target_response_is_not_successful_proxy_result (__main__.GrpcXrayTests.test_truncated_target_response_is_not_successful_proxy_result) ... ok
+test_tun_and_multi_plain_tls_http_and_verified_https (__main__.GrpcXrayTests.test_tun_and_multi_plain_tls_http_and_verified_https) ... ok
+test_two_modes_eight_mib_duplex_and_half_close (__main__.GrpcXrayTests.test_two_modes_eight_mib_duplex_and_half_close) ... ok
+test_unsupported_grpc_options_and_metadata_fail_without_downgrade (__main__.GrpcXrayTests.test_unsupported_grpc_options_and_metadata_fail_without_downgrade) ... ok
+test_untrusted_certificate_wrong_sni_alpn_and_uuid_are_rejected (__main__.GrpcXrayTests.test_untrusted_certificate_wrong_sni_alpn_and_uuid_are_rejected) ... ok
+test_wrong_service_name_returns_rpc_error_without_origin_access (__main__.GrpcXrayTests.test_wrong_service_name_returns_rpc_error_without_origin_access) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 5.243s
+
+OK

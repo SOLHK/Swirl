@@ -1043,6 +1043,14 @@ class CoreDevelopmentTests(unittest.TestCase):
             self.assertEqual(present.returncode, 0, present.stderr)
             self.assertEqual(present.stdout.strip(), "SUITE_STARTED")
 
+    def test_xray_json_import_branch_preserves_existing_ci_branch_gate(self):
+        checked_in = (Path(__file__).resolve().parents[2] / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
+        self.assertIn("work/xray-v2ray-json-import-20261021", checked_in)
+        self.assertIn("work/rust-core-network-fixes-20261021", checked_in)
+        self.assertEqual(development.updated_workflow(checked_in), checked_in)
+        with self.assertRaises(ValueError):
+            development.updated_workflow(checked_in.replace("work/xray-v2ray-json-import-20261021", "work/unreviewed-xray-branch", 1))
+
     def test_branch_and_menu_drift_fail_closed(self):
         checked_in = (Path(__file__).resolve().parents[2] / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
         self.assertEqual(development.updated_workflow(checked_in), checked_in)

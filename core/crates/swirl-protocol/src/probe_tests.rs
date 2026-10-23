@@ -123,6 +123,13 @@ async fn url_test_head_returns_before_peer_body_or_close() {
     assert_eq!(result.http_status, 200);
     assert!(result.origin_tls_ms.is_none());
     assert!(result.outbound_connect_ms <= result.response_headers_ms);
+    let timing = result.outbound_timing.unwrap();
+    assert!(timing.resolution_us.is_some());
+    assert!(timing.tcp_dial_us.is_some());
+    assert!(timing.tcp_connected_attempt_us.is_some());
+    assert_eq!(timing.tcp_attempts, 1);
+    assert!(timing.proxy_tls_handshake_us.is_none());
+    assert!(timing.quic_handshake_including_tls_us.is_none());
     release.send(()).unwrap();
     peer.await.unwrap();
 }
@@ -146,6 +153,9 @@ async fn url_test_head_reports_http_status_failure_without_latency() {
     assert_eq!(failure.stage, UrlTestStage::HttpStatus);
     assert_eq!(failure.http_status, Some(503));
     assert_eq!(failure.code, "UrlTestStatus");
+    let timing = failure.outbound_timing.unwrap();
+    assert!(timing.tcp_connected_attempt_us.is_some());
+    assert_eq!(timing.tcp_attempts, 1);
     peer.await.unwrap();
 }
 
@@ -230,7 +240,59 @@ async fn url_test_head_authenticates_https_and_reports_origin_tls_phase() {
     .unwrap();
     assert_eq!(metrics.http_status, 204);
     assert!(metrics.origin_tls_ms.is_some());
+    // Origin TLS is outside the outbound scope; it must not appear as the
+    // proxy TLS stage, even though both use the same transport TLS helper.
+    assert!(
+        metrics
+            .outbound_timing
+            .unwrap()
+            .proxy_tls_handshake_us
+            .is_none()
+    );
     assert!(metrics.outbound_connect_ms <= metrics.response_headers_ms);
+    release.send(()).unwrap();
+    peer.await.unwrap();
+}
+
+#[tokio::test]
+async fn url_test_tls_timeout_keeps_partial_outbound_timing() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let mut probe = options(port);
+    probe.timeout_ms = 150;
+    let outbound = Outbound::HttpConnect {
+        host: "127.0.0.1".into(),
+        port,
+        auth: None,
+        tls: Some(Tls {
+            server_name: "localhost".into(),
+            alpn: vec![],
+            ca_der_base64: None,
+        }),
+    };
+    let (release, held) = oneshot::channel::<()>();
+    let peer = tokio::spawn(async move {
+        let (mut socket, _) = listener.accept().await.unwrap();
+        let mut record = [0; 5];
+        socket.read_exact(&mut record).await.unwrap();
+        assert_eq!(record[0], 22, "expected an actual TLS handshake record");
+        let _ = held.await;
+    });
+    let failure = timeout(
+        Duration::from_secs(2),
+        url_test_head(&outbound, &probe, &Resolver::default(), None),
+    )
+    .await
+    .expect("outbound TLS ignored the URL-test deadline")
+    .unwrap_err();
+    let timing = failure.outbound_timing.unwrap();
+    assert!(timing.resolution_us.is_some());
+    assert!(timing.tcp_connected_attempt_us.is_some());
+    assert!(timing.proxy_tls_handshake_us.is_some());
+    assert!(timing.quic_handshake_including_tls_us.is_none());
+    assert!(timing.protocol_request_encode_write_us.is_none());
+    assert!(!timing.authentication_response_accepted);
+    assert!(timing.interrupted);
     release.send(()).unwrap();
     peer.await.unwrap();
 }

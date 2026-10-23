@@ -1,0 +1,6 @@
+2026-10-22T22:07:25.896956+09:00  INFO main ThreadId(01) shadowsocks_rust::service::server: shadowsocks server 1.25.0 build 2026-08-26T23:15:24.779049808+00:00
+2026-10-22T22:07:25.897414529+09:00  INFO main ThreadId(01) shadowsocks_service::server::tcprelay: shadowsocks tcp server listening on 127.0.0.1:57025, inbound address 127.0.0.1:57025
+2026-10-22T22:07:25.897424824+09:00  INFO main ThreadId(01) shadowsocks_service::server::udprelay: shadowsocks udp server listening on 127.0.0.1:57025, inbound address 127.0.0.1:57025
+2026-10-22T22:07:25.916249025+09:00 DEBUG main ThreadId(01) shadowsocks_service::server::tcprelay: tcp handshake failed, received EOF before a complete target Address, peer: 127.0.0.1:45392
+2026-10-22T22:07:25.919919801+09:00  WARN main ThreadId(01) shadowsocks_service::server::tcprelay: tcp handshake failed. peer: 127.0.0.1:45406, decrypt header chunk failed
+2026-10-22T22:07:25.934669412+09:00  INFO main ThreadId(01) shadowsocks_rust::monitor::imp: received SIGTERM, exiting

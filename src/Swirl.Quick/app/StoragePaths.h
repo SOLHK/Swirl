@@ -63,4 +63,14 @@ inline void initializeTestStorage() {
     qputenv("QSG_RHI_PIPELINE_CACHE_SAVE", pipeline.toUtf8());
     qputenv("QSG_RHI_PIPELINE_CACHE_LOAD", QFileInfo::exists(pipeline) ? pipeline.toUtf8() : QByteArray());
 }
+inline void initializeQmlCache(const QString &revision, const QString &flavor) {
+    // Preserve explicit production overrides. An isolated test root already
+    // owns its cache environment and must never reuse another build's bytecode.
+    if (testRoot().isEmpty() && !qEnvironmentVariableIsEmpty("QML_DISK_CACHE_PATH")) return;
+    const auto cache = writableLocation(QStandardPaths::CacheLocation)
+        + QStringLiteral("/qmlcache/%1-qt%2-%3")
+              .arg(revision, QString::fromLatin1(qVersion()), flavor);
+    // Keep old versions intact so switching back to an earlier build is safe.
+    qputenv("QML_DISK_CACHE_PATH", cache.toUtf8());
+}
 }

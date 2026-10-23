@@ -1,0 +1,5 @@
+2026/10/22 22:07:33.476598 [Debug] app/log: Logger started
+2026/10/22 22:07:33.476615 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:59967
+2026/10/22 22:07:33.478715 [Info] transport/internet/websocket: listening tcp(for WS) on 127.0.0.1:59967
+2026/10/22 22:07:33.479819 [Warning] core: Xray 26.10.21 started
+2026/10/22 22:07:33.491583 [Info] transport/internet/websocket: failed to validate path, request:/incorrect-path, config:/native/nested

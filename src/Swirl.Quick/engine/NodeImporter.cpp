@@ -1,5 +1,6 @@
 #include "NodeImporter.h"
 #include "SubscriptionNormalizer.h"
+#include "XrayJsonBridge.h"
 #include "../third_party/fkYAML/node.hpp"
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -10,6 +11,57 @@
 #include <stdexcept>
 
 namespace {
+QJsonValue singleDocument(const QByteArray &bytes);
+bool safeShape(const QByteArray &bytes);
+bool xrayJsonCandidate(const QByteArray &bytes) {
+    auto view = bytes.trimmed();
+    if (view.startsWith("\xef\xbb\xbf")) view = view.mid(3).trimmed();
+    if (!view.startsWith('{') && !view.startsWith('[')) return false;
+    // This is only dialect selection. Every Xray candidate, including invalid
+    // JSON, is passed unmodified to Rust before a single node is constructed.
+    const auto sniff = QJsonDocument::fromJson(view);
+    // A section header such as [Proxy] or [server_local] belongs to the INI
+    // normalizer. Do not let the JSON array prefix capture those subscriptions.
+    // Valid JSON arrays and every other malformed JSON candidate remain on the
+    // strict Rust path; the INI parser still validates headers and all content.
+    if (sniff.isNull() && view.startsWith('[') &&
+        QRegularExpression("^\\[\\s*[A-Za-z][A-Za-z0-9 _-]*(?:\\]|$)").match(QString::fromUtf8(view.split('\n').first())).hasMatch())
+        return false;
+    // A Clash flow sequence uses the same '[' prefix as a JSON array, but
+    // permits unquoted YAML keys. Only a complete, bounded, strict YAML
+    // sequence of typed Clash nodes can leave the JSON path. Malformed JSON,
+    // duplicate keys and mixed/Xray dialects still reach Rust unchanged.
+    if (sniff.isNull() && view.startsWith('[') && safeShape(view)) {
+        try {
+            const auto root = singleDocument(view);
+            const auto nodes = root.toArray();
+            if (!nodes.isEmpty() && std::all_of(nodes.cbegin(), nodes.cend(), [](const auto &node) {
+                return node.isObject() && node.toObject().value("type").isString()
+                    && !node.toObject().contains("protocol");
+            })) return false;
+        } catch (...) {
+            // Parser messages may contain credentials and are never exposed.
+        }
+    }
+    if (sniff.isObject()) {
+        const auto object = sniff.object();
+        for (const auto &key : {"protocol", "outbound", "outboundDetour", "inbound", "inboundDetour"})
+            if (object.contains(key)) return true;
+        if (object.contains("outbounds")) {
+            const auto outbounds = object.value("outbounds").toArray();
+            return outbounds.isEmpty() || std::any_of(outbounds.cbegin(), outbounds.cend(), [](const auto &node) {
+                return !node.isObject() || !node.toObject().contains("type") || node.toObject().contains("protocol");
+            });
+        }
+        if (object.contains("proxies") || object.contains("type")) return false;
+    } else if (sniff.isArray()) {
+        const auto nodes = sniff.array();
+        if (!nodes.isEmpty() && std::all_of(nodes.cbegin(), nodes.cend(), [](const auto &node) {
+            return node.isObject() && node.toObject().contains("type") && !node.toObject().contains("protocol");
+        })) return false;
+    }
+    return true;
+}
 QJsonValue convert(const fkyaml::node &value, int depth, int &budget) {
     if (depth > 32 || --budget < 0) throw std::runtime_error("limit");
     if (value.is_null()) return QJsonValue();
@@ -87,17 +139,20 @@ QJsonObject NodeImporter::strictJsonObject(const QByteArray &bytes){
 }
 NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
     Result result;
-    if(bytes.isEmpty() || bytes.size()>MaximumBytes || !safeShape(bytes)) {
+    if(bytes.isEmpty() || bytes.size()>MaximumBytes) {
         result.error=QStringLiteral("导入内容为空、超过 4 MiB 或嵌套过深；原节点保持不变。"); return result;
     }
+    if (xrayJsonCandidate(bytes)) return XrayJsonBridge::parse(bytes);
+    if(!safeShape(bytes)){result.error=QStringLiteral("导入内容嵌套过深；原节点保持不变。");return result;}
     QJsonValue root;
     const auto normalized=SubscriptionNormalizer::normalize(bytes);
     result.format=normalized.format;
     result.configuration=normalized.configuration;
     result.executionConfiguration=normalized.executionConfiguration;
     result.configurationFormat=normalized.configurationFormat;
-    if(!normalized.error.isEmpty()){result.error=normalized.error;return result;}
     const auto effective=normalized.decodedDocument.isEmpty()?bytes:normalized.decodedDocument;
+    if (!normalized.decodedDocument.isEmpty() && xrayJsonCandidate(effective)) return XrayJsonBridge::parse(effective);
+    if(!normalized.error.isEmpty()){result.error=normalized.error;return result;}
     if(!safeShape(effective)){result.error=QStringLiteral("订阅解码后嵌套过深。");return result;}
     if(normalized.handled){
         // QJsonDocument accepts duplicate keys. Validate the original JSON

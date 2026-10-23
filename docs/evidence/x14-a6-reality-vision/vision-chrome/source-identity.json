@@ -1,0 +1,73 @@
+{
+  "git_sha": "930be89374a64d600730b3056e8a756bba5fcde4",
+  "tracked_worktree_changes": [
+    " M .github/workflows/rust-native-protocols.yml",
+    " M core/Cargo.lock",
+    " M core/Cargo.toml",
+    " M core/crates/swirl-api/tests/xray_boundary.rs",
+    " M core/crates/swirl-core/src/lib.rs",
+    " M core/crates/swirl-core/src/socks5_udp.rs",
+    " M core/crates/swirl-core/src/transport_tests.rs",
+    " M core/crates/swirl-core/tests/xray_import.rs",
+    " M core/crates/swirl-protocol/Cargo.toml",
+    " M core/crates/swirl-protocol/src/lib.rs",
+    " M core/crates/swirl-protocol/src/probe.rs",
+    " M core/crates/swirl-protocol/src/transport.rs",
+    " M core/crates/swirl-protocol/src/tuic.rs",
+    " M core/crates/swirl-protocol/src/vless.rs",
+    " M core/crates/swirl-protocol/src/vmess.rs",
+    " M core/crates/swirl-subscription/Cargo.toml",
+    " M core/crates/swirl-subscription/src/inspect.rs",
+    " M core/crates/swirl-subscription/src/inspect_reality.rs",
+    " M core/crates/swirl-subscription/src/inspect_websocket.rs",
+    " M core/crates/swirl-subscription/src/lib.rs",
+    " M core/crates/swirl-subscription/src/xray.rs",
+    " M core/crates/swirl-subscription/src/xray/convert/native.rs",
+    " M core/crates/swirl-subscription/src/xray/convert/protocols.rs",
+    " M core/crates/swirl-subscription/src/xray/security.rs",
+    " M core/crates/swirl-subscription/tests/xray_conversion_password.rs",
+    " M core/crates/swirl-subscription/tests/xray_conversion_security.rs",
+    " M core/crates/swirl-subscription/tests/xray_native.rs",
+    " M core/crates/swirl-subscription/tests/xray_native_selection.rs",
+    " M core/crates/swirl-transport/src/lib.rs",
+    " M docs/TUIC_NATIVE_INTEROP_20261022.md",
+    " M tools/tests/test_tuic_reference.py",
+    " M tools/tests/test_vmess_xray.py"
+  ],
+  "binaries": {
+    "SWIRL_XRAY_BINARY": {
+      "file": "xray",
+      "sha256": "a27e3f95ab6ce270956d0cecd32eda4686a811afc71c64a6a734a3dede14883e"
+    },
+    "SWIRL_RUST_HARNESS": {
+      "file": "swirl-api",
+      "sha256": "386da2129ff82f8c4e5e6154362a1c4386820eb1b8810c8e8b02f9bdeac08cbc"
+    },
+    "SWIRL_RUST_INSPECTOR": {
+      "file": "swirl-inspect",
+      "sha256": "d13654ce37ef2cb70005a3fe9d43315ce45442678ea8a692d6cf73a0bdec98ab"
+    }
+  },
+  "official_release": {
+    "release": "v26.10.21",
+    "commit": "1b1647cd9ddf0abc34b981d4611fc03bcac1ca74",
+    "platform": "linux-64",
+    "binary_sha256": "a27e3f95ab6ce270956d0cecd32eda4686a811afc71c64a6a734a3dede14883e",
+    "archive_sha256": "0eec3ed4163c273d8c8bf821f7d219e257921cf584aa3fb970715e458e631978",
+    "lock_sha256": "40bf940cd0ac0d325f75dcc83869d8935cb7b49ead962e2f6a96b90e4f15dec7",
+    "verification": "archive_digest_and_exact_binary_contents",
+    "version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)\nA unified platform for anti-censorship."
+  },
+  "test_sha256": "7a9aa8a019d23126b76ec36dc4ca63a9816a1a4d9fa0e50d43dc501287224cd0",
+  "reused_test_sha256": "7a1ad40efd4e75b0264d0fb9a2699204bf794a5ce4a36a09651b654c13d4d610",
+  "cargo_lock_sha256": "2a2c7bc86a0f2fbce9fbb62843e81d6ec77f6eb66a83d39b187bc94caf2ae301",
+  "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "openssl": "OpenSSL 3.5.8 25 Aug 2026",
+  "platform": "linux",
+  "github_run_id": null,
+  "scope": "production Rust control ABI with portable JSON test host",
+  "public_network_tested": false,
+  "qt_product_tested": false,
+  "fingerprint": "chrome_133",
+  "client_hello_profile": "chrome_133"
+}

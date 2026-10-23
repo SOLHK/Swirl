@@ -5,6 +5,7 @@
 #include <QNetworkReply>
 #include <QNetworkProxy>
 #include <QPointer>
+#include <QSignalSpy>
 #include <QElapsedTimer>
 #include <QTemporaryDir>
 #include <QFile>
@@ -161,9 +162,33 @@ int runCaptureChecks(CaptureService *capture)
     // Use the currently selected CA after the import tests.
     const auto handshakeIdentity=tls->identityFor("localhost");
     const auto originalSsl=QSslConfiguration::defaultConfiguration();auto trustedSsl=originalSsl;trustedSsl.addCaCertificate(tls->certificate());QSslConfiguration::setDefaultConfiguration(trustedSsl);
-    QSslServer secureOrigin;auto serverSsl=trustedSsl;serverSsl.setLocalCertificateChain({handshakeIdentity.certificate,tls->certificate()});serverSsl.setPrivateKey(handshakeIdentity.key);serverSsl.setPeerVerifyMode(QSslSocket::VerifyNone);serverSsl.setAllowedNextProtocols({QByteArray("http/1.1")});secureOrigin.setSslConfiguration(serverSsl);
+    QList<QByteArray> upstreamProtocols,upstreamRequestLines;
+    QSslServer secureOrigin;auto serverSsl=trustedSsl;serverSsl.setLocalCertificateChain({handshakeIdentity.certificate,tls->certificate()});serverSsl.setPrivateKey(handshakeIdentity.key);serverSsl.setPeerVerifyMode(QSslSocket::VerifyNone);serverSsl.setAllowedNextProtocols({QByteArray("h2"),QByteArray("http/1.1")});secureOrigin.setSslConfiguration(serverSsl);
     check(secureOrigin.listen(QHostAddress::LocalHost,0),"isolated TLS origin starts without installing a certificate into Windows");
-    QObject::connect(&secureOrigin,&QSslServer::pendingConnectionAvailable,&secureOrigin,[&]{while(secureOrigin.hasPendingConnections()){auto *socket=secureOrigin.nextPendingConnection();QObject::connect(socket,&QTcpSocket::readyRead,socket,[socket]{const auto data=socket->readAll();if(!data.contains("\r\n\r\n"))return;const QByteArray body=data.contains(" /h2-large ")?QByteArray(3*1024*1024,'h'):QByteArray("{\"tls\":\"cleartext\"}");socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: "+QByteArray::number(body.size())+"\r\n\r\n"+body);socket->disconnectFromHost();});QObject::connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);}});
+    QObject::connect(&secureOrigin,&QSslServer::pendingConnectionAvailable,&secureOrigin,[&]{
+        while(secureOrigin.hasPendingConnections()){
+            auto *socket=qobject_cast<QSslSocket *>(secureOrigin.nextPendingConnection());if(!socket)continue;
+            const auto protocol=socket->sslConfiguration().nextNegotiatedProtocol();upstreamProtocols.append(protocol);
+            QObject::connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+            // h2 negotiation is sufficient to expose an unprotected Qt client;
+            // this fixture never constructs malformed HTTP/2 traffic.
+            if(protocol=="h2"){socket->disconnectFromHost();continue;}
+            auto data=std::make_shared<QByteArray>();
+            const auto respond=[&,socket,data]{
+                *data+=socket->readAll();if(!data->contains("\r\n\r\n")||socket->property("responded").toBool())return;
+                socket->setProperty("responded",true);upstreamRequestLines.append(data->left(data->indexOf("\r\n")));
+                const QByteArray body=data->contains(" /h2-large ")?QByteArray(3*1024*1024,'h'):QByteArray("{\"tls\":\"cleartext\"}");
+                socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: "+QByteArray::number(body.size())+"\r\n\r\n"+body);socket->disconnectFromHost();
+            };
+            QObject::connect(socket,&QTcpSocket::readyRead,socket,respond);if(socket->bytesAvailable())respond();
+        }
+    });
+    QSslSocket alpnControl;alpnControl.setProxy(QNetworkProxy::NoProxy);
+    auto controlSsl=trustedSsl;controlSsl.setAllowedNextProtocols({QByteArray("h2"),QByteArray("http/1.1")});alpnControl.setSslConfiguration(controlSsl);
+    QSignalSpy controlEncrypted(&alpnControl,&QSslSocket::encrypted);alpnControl.connectToHostEncrypted("localhost",secureOrigin.serverPort());
+    check(until([&]{return !controlEncrypted.isEmpty()&&!upstreamProtocols.isEmpty();})&&upstreamProtocols.first()=="h2",
+          "verified TLS positive control negotiates h2 with the upstream fixture");
+    alpnControl.abort();upstreamProtocols.clear();
     tls->setHostnames({"localhost"});tls->setEnabled(true);
     QNetworkRequest secureRequest(QUrl(QStringLiteral("https://localhost:%1/decrypted").arg(secureOrigin.serverPort())));secureRequest.setSslConfiguration(trustedSsl);secureRequest.setAttribute(QNetworkRequest::Http2AllowedAttribute,false);
     auto *secure=browser.get(secureRequest);
@@ -190,6 +215,10 @@ int runCaptureChecks(CaptureService *capture)
     check(until([&]{return h2Mock->isFinished();})&&h2Mock->error()==QNetworkReply::NoError&&h2Mock->attribute(QNetworkRequest::Http2WasUsedAttribute).toBool()&&h2Mock->readAll().contains("h2mock"),"HTTP/2 mock response uses real HEADERS and DATA frames");h2Mock->deleteLater();
     auto largeH2Url=h2Request.url();largeH2Url.setPath("/h2-large");h2Request.setUrl(largeH2Url);auto *largeH2=browser.get(h2Request);
     check(until([&]{return largeH2->isFinished();})&&largeH2->error()==QNetworkReply::NoError&&largeH2->attribute(QNetworkRequest::Http2WasUsedAttribute).toBool()&&largeH2->readAll()==QByteArray(3*1024*1024,'h'),"large HTTP/2 response honors native flow control without capture buffer truncation");largeH2->deleteLater();
+    bool upstreamHttp1=upstreamProtocols.size()==7&&upstreamRequestLines.size()==7;
+    for(const auto &protocol:upstreamProtocols)upstreamHttp1=upstreamHttp1&&(protocol.isEmpty()||protocol=="http/1.1");
+    for(const auto &line:upstreamRequestLines)upstreamHttp1=upstreamHttp1&&line.startsWith("GET ")&&line.endsWith(" HTTP/1.1");
+    check(upstreamHttp1,"Qt upstream stays HTTP/1.1 while decrypted incoming HTTP/2 streams and large responses remain supported");
     capture->removeRewriteRule(capture->rewriteRules().first().toMap().value("id").toString());capture->setRewriteEnabled(false);tls->setHttp2Enabled(false);
     tls->setEnabled(false);QSslConfiguration::setDefaultConfiguration(originalSsl);
     capture->stop();capture->clear();capture->setLimits(0,0,1);capture->setFilter("nonmatching-filter");

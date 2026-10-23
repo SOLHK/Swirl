@@ -1,0 +1,25 @@
+{
+  "official_server": "shadowsocks-rust v1.25.0",
+  "server_only": true,
+  "server_sha256": "ce2ed6278044693b801c592642f3a5366b5d8b70db1bc537432c017ac4a844f7",
+  "commands": [
+    [
+      "/workspace/scratch/63c2b083dcfa/ss2022-research/ssserver",
+      "--config",
+      "/tmp/swirl-ss2022-w3g7rjry/00-2022-blake3-aes-128-gcm.json",
+      "--single-threaded",
+      "-v"
+    ]
+  ],
+  "records": [],
+  "origins": [
+    {
+      "type": "udp",
+      "requests": 1,
+      "received": null,
+      "client_closes": null,
+      "tls_closes": null,
+      "errors": []
+    }
+  ]
+}

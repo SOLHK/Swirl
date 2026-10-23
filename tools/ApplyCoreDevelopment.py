@@ -815,7 +815,11 @@ def _previous_workflow(source: str) -> str:
         "  push:\n    branches: [test, main, work/core-completion-20261017, "
         "work/core-rule-routing-20261021, work/rust-core-network-fixes-20261021]\n"
     )
-    if source.count(current_branch_list) + source.count(network_fixes_branch_list) == 1:
+    xray_branch_list = network_fixes_branch_list.replace(
+        "]\n", ", work/xray-v2ray-json-import-20261021]\n"
+    )
+    if (source.count(current_branch_list) + source.count(network_fixes_branch_list)
+            + source.count(xray_branch_list)) == 1:
         if source.count("  push:\n") != 1:
             raise ValueError("Rust CI push branch list has drifted or is ambiguous; review required")
     else:

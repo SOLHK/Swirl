@@ -1,11 +1,13 @@
-# Read-only, localhost-only check of the currently running Windows Swirl proxy.
+﻿# Read-only, localhost-only check of the currently running Windows Swirl proxy.
 # This script does not send a SOCKS CONNECT request or contact a public target.
 param(
     [ValidateRange(1,65535)][int]$Port = 7898,
-    [ValidateRange(1,30)][int]$TimeoutSeconds = 3
+    [ValidateRange(1,30)][int]$TimeoutSeconds = 3,
+    [string]$ExpectedSourceSha = ''
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'SwirlCoreIdentity.ps1')
 $result = [ordered]@{
     schemaVersion = 1
     status = 'BLOCKED'
@@ -14,6 +16,10 @@ $result = [ordered]@{
     listenerPid = $null
     processName = $null
     sourceSha = $null
+    productIdentityFormat = $null
+    rustBuildId = $null
+    rulesHashesVerified = $false
+    publisherAuthenticity = 'NOT_VERIFIED'
     executableHashMatchesManifest = $false
     rustDllHashMatchesManifest = $false
     rustDllLoadedInListener = $false
@@ -24,6 +30,12 @@ $result = [ordered]@{
     systemProxyPointsToListener = 'UNKNOWN'
     publicEgressIndependence = 'NOT_TESTED'
     changedNetworkSettings = $false
+}
+
+if (-not [Environment]::Is64BitProcess) {
+    $result.reason = '64-bit Windows PowerShell is required to inspect the Swirl Rust DLL.'
+    $result | ConvertTo-Json -Depth 3
+    exit 2
 }
 
 function Get-ListenerPid([int]$LocalPort) {
@@ -58,25 +70,16 @@ try {
     if (-not $process.ExecutablePath) { throw 'Swirl.exe path is unavailable to this user.' }
     $exe = [System.IO.Path]::GetFullPath($process.ExecutablePath)
     $folder = Split-Path -Parent $exe
-    $manifestPath = Join-Path $folder 'PRODUCT.json'
-    $buildPath = Join-Path $folder 'BUILD.txt'
     $dllPath = Join-Path $folder 'swirl_api.dll'
-    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf) -or
-        -not (Test-Path -LiteralPath $buildPath -PathType Leaf) -or
-        -not (Test-Path -LiteralPath $dllPath -PathType Leaf)) {
-        throw 'PRODUCT.json, BUILD.txt, or swirl_api.dll is missing beside Swirl.exe.'
-    }
-    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-    $build = Get-Content -LiteralPath $buildPath -Raw
-    $result.sourceSha = [string]$manifest.sourceSha
-    $result.productDeclaresRustCore = ($manifest.rustCore -eq $true -and
-        $manifest.kind -eq 'windows-rust-product-preview' -and
-        $manifest.mihomoBundled -eq $false -and
-        $result.sourceSha -match '^[0-9a-fA-F]{40}$')
-    $result.rustBuildFlagEnabled = ($build -match 'SWIRL_USE_RUST_CORE=ON' -and
-        $build -match [regex]::Escape($result.sourceSha))
-    $result.executableHashMatchesManifest = ((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -eq $manifest.exeSha256)
-    $result.rustDllHashMatchesManifest = ((Get-FileHash -LiteralPath $dllPath -Algorithm SHA256).Hash -eq $manifest.rustDllSha256)
+    $identity = Get-SwirlInstalledIdentity -Directory $folder -ExpectedSourceSha $ExpectedSourceSha
+    $result.sourceSha = $identity.sourceSha
+    $result.productIdentityFormat = $identity.format
+    $result.rustBuildId = $identity.buildId
+    $result.rulesHashesVerified = $identity.rulesHashesVerified
+    $result.productDeclaresRustCore = $identity.productDeclaresRustCore
+    $result.rustBuildFlagEnabled = $identity.rustBuildFlagEnabled
+    $result.executableHashMatchesManifest = $identity.executableHashMatchesManifest
+    $result.rustDllHashMatchesManifest = $identity.rustDllHashMatchesManifest
 
     $live = Get-Process -Id $pidBefore -ErrorAction Stop
     $start = $live.StartTime.ToUniversalTime()
@@ -127,7 +130,7 @@ try {
     }
     if ((Get-ListenerPid $Port) -ne $pidBefore) { throw 'Listener PID changed during the local challenge.' }
     $result.status = 'PASS'
-    $result.reason = 'Active local listener matches the Rust product build and answered a local SOCKS5 greeting.'
+    $result.reason = 'Active listener matches the reported Rust package and answered a local SOCKS5 greeting; public routing and publisher authenticity were not verified.'
 } catch {
     if ($result.status -ne 'FAIL') {
         $result.status = if ($result.socks5LocalGreeting -eq 'PASS') { 'FAIL' } else { 'BLOCKED' }

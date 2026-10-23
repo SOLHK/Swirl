@@ -1,0 +1,613 @@
+{
+  "httpupgrade": {
+    "evidence": "/workspace/scratch/ece554ece7c1/c6-release-httpupgrade",
+    "test_methods": 9,
+    "native_invocations": 22,
+    "successful": 13,
+    "negative_cases": 9,
+    "successful_close": {
+      "clean": 7,
+      "cancelled": 6
+    },
+    "errors": {
+      "HttpRead": 4,
+      "HttpUpgradeResponseRead": 2,
+      "TlsVerificationOrHandshake": 2,
+      "HttpUpgradeAlpnUnsupported": 1
+    },
+    "uploaded_bytes": 11534745,
+    "downloaded_bytes": 12190976,
+    "max_remaining_native_tasks": 0,
+    "cleanup_errors": [],
+    "origin_observations": {
+      "count": 14,
+      "keys": [
+        "mode",
+        "tls",
+        "requests",
+        "received",
+        "client_closes",
+        "tls_closes",
+        "interruptions",
+        "errors"
+      ],
+      "received": 11534336,
+      "client_closes": 11,
+      "tls_closes": 2,
+      "interruptions": 0,
+      "records": [
+        {
+          "mode": "disconnect",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 0,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": true,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 1,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": true,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 1,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 0,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "stall",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 0,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 0,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "echo",
+          "tls": false,
+          "requests": 6,
+          "received": 3145728,
+          "client_closes": 6,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "echo",
+          "tls": false,
+          "requests": 1,
+          "received": 4194304,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "echo",
+          "tls": false,
+          "requests": 1,
+          "received": 4194304,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        }
+      ]
+    }
+  },
+  "xhttp": {
+    "evidence": "/workspace/scratch/ece554ece7c1/c6-release-xhttp",
+    "test_methods": 10,
+    "native_invocations": 31,
+    "successful": 14,
+    "negative_cases": 17,
+    "successful_close": {
+      "cancelled": 8,
+      "clean": 6
+    },
+    "errors": {
+      "HttpRead": 6,
+      "TlsVerificationOrHandshake": 2,
+      "XHttpModeUnsupported": 5,
+      "InputSyntax": 3,
+      "TlsAlpnUnsupported": 1
+    },
+    "uploaded_bytes": 12583329,
+    "downloaded_bytes": 13239552,
+    "max_remaining_native_tasks": 0,
+    "cleanup_errors": [],
+    "origin_observations": {
+      "count": 13,
+      "keys": [
+        "mode",
+        "tls",
+        "requests",
+        "received",
+        "client_closes",
+        "tls_closes",
+        "interruptions",
+        "errors"
+      ],
+      "received": 12582912,
+      "client_closes": 12,
+      "tls_closes": 2,
+      "interruptions": 0,
+      "records": [
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 0,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 0,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 0,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "echo",
+          "tls": false,
+          "requests": 8,
+          "received": 4194304,
+          "client_closes": 8,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "echo",
+          "tls": false,
+          "requests": 1,
+          "received": 8388608,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "disconnect",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "stall",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": true,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 1,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": true,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 1,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 0,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        }
+      ]
+    }
+  },
+  "reality": {
+    "evidence": "/workspace/scratch/ece554ece7c1/c6-release-reality",
+    "test_methods": 10,
+    "native_invocations": 41,
+    "successful": 21,
+    "negative_cases": 20,
+    "successful_close": {
+      "clean": 13,
+      "cancelled": 8
+    },
+    "errors": {
+      "RealityAuthenticationOrHandshake": 6,
+      "HttpRead": 2,
+      "TlsVerificationOrHandshake": 2,
+      "RealityTransportUnsupported": 3,
+      "VisionTransportUnsupported": 2,
+      "InputSyntax": 2,
+      "RealityFingerprintUnsupported": 1,
+      "RealityAlpnUnsupported": 2
+    },
+    "uploaded_bytes": 8389508,
+    "downloaded_bytes": 9964544,
+    "max_remaining_native_tasks": 0,
+    "cleanup_errors": [],
+    "origin_observations": {
+      "count": 20,
+      "keys": [
+        "mode",
+        "tls",
+        "requests",
+        "received",
+        "client_closes",
+        "tls_closes",
+        "interruptions",
+        "errors"
+      ],
+      "received": 8388608,
+      "client_closes": 17,
+      "tls_closes": 4,
+      "interruptions": 2,
+      "records": [
+        {
+          "mode": "http",
+          "tls": true,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 1,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "echo",
+          "tls": false,
+          "requests": 4,
+          "received": 2097152,
+          "client_closes": 4,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "echo",
+          "tls": false,
+          "requests": 4,
+          "received": 2097152,
+          "client_closes": 4,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 0,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 0,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": true,
+          "requests": 0,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 1,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": true,
+          "requests": 0,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 1,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": true,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 1,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": true,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 1,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": true,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 1,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "echo",
+          "tls": false,
+          "requests": 1,
+          "received": 4194304,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 0,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        }
+      ]
+    },
+    "official_server_observations": {
+      "reality_authenticated_sessions": 25,
+      "client_finished_verified_sessions": 25,
+      "vless_accepted_sessions": 23,
+      "camouflage_application_bytes": 0,
+      "camouflage_record_size_failures": 0,
+      "vision_padding_events": 2,
+      "vision_unpadding_events": 3,
+      "vision_direct_upload_commands": 1,
+      "vision_direct_download_commands": 1,
+      "active_camouflage_connections": 0,
+      "peers": 16,
+      "all_processes_reaped": true,
+      "any_forced_kill": false,
+      "all_listeners_closed": true
+    }
+  }
+}

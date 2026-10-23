@@ -1,0 +1,266 @@
+{
+  "run_id": 39787300601,
+  "head_sha": "40be930b6328e3d292eb913bc14e45c27ea95f42",
+  "url": "https://github.com/SOLHK/Swirl/actions/runs/39787300601",
+  "scope": "Remote actual native Rust and official independent server interop; includes negative tests and separately recorded upstream limitation probes. No Qt or public-node acceptance.",
+  "jobs": [
+    {
+      "job_id": 119853790390,
+      "name": "native-protocols (windows-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39787300601/job/119853790390",
+      "started_at": "2026-10-22T13:29:36Z",
+      "completed_at": "2026-10-22T13:32:33Z",
+      "rust_test_counts": {
+        "passed": 632,
+        "failed": 0,
+        "ignored": 0
+      },
+      "completed_steps": [
+        "Set up job",
+        "Run actions/checkout@v4",
+        "Install Rust tools",
+        "Format",
+        "Check",
+        "Clippy",
+        "Unit and local network tests",
+        "Post Run actions/checkout@v4",
+        "Complete job"
+      ]
+    },
+    {
+      "job_id": 119853790649,
+      "name": "native-protocols (ubuntu-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39787300601/job/119853790649",
+      "started_at": "2026-10-22T13:29:36Z",
+      "completed_at": "2026-10-22T13:31:17Z",
+      "rust_test_counts": {
+        "passed": 631,
+        "failed": 0,
+        "ignored": 0
+      },
+      "completed_steps": [
+        "Set up job",
+        "Run actions/checkout@v4",
+        "Install Rust tools",
+        "Format",
+        "Check",
+        "Clippy",
+        "Unit and local network tests",
+        "Post Run actions/checkout@v4",
+        "Complete job"
+      ]
+    },
+    {
+      "job_id": 119853790695,
+      "name": "official-interop (macos-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39787300601/job/119853790695",
+      "started_at": "2026-10-22T13:29:35Z",
+      "completed_at": "2026-10-22T13:31:55Z",
+      "official_suites": [
+        {
+          "methods": 13,
+          "seconds": 10.96
+        },
+        {
+          "methods": 17,
+          "seconds": 19.151
+        },
+        {
+          "methods": 9,
+          "seconds": 13.122
+        },
+        {
+          "methods": 6,
+          "seconds": 21.361
+        },
+        {
+          "methods": 5,
+          "seconds": 8.51
+        },
+        {
+          "methods": 8,
+          "seconds": 18.592
+        },
+        {
+          "methods": 12,
+          "seconds": 6.14
+        }
+      ],
+      "completed_steps": [
+        "Set up job",
+        "Run actions/checkout@v4",
+        "Run actions/setup-python@v5",
+        "Install test certificate library",
+        "Install Rust",
+        "Build native clients and Core harness",
+        "Download pinned official Xray peers",
+        "Download pinned Hysteria and TUIC server peers",
+        "Download pinned official Shadowsocks server peer",
+        "Measure and prepare disposable runner UDP prerequisites",
+        "Set native client and evidence paths",
+        "VMess official Xray data and completed-response closure",
+        "Hysteria2 official server including retained limitation probes",
+        "TUIC historical official reference including retained limitation probe",
+        "Native Core ingress TCP UDP DNS HTTPS and node switching",
+        "Imported Xray V2Ray transport configs through ordinary Core start",
+        "VLESS and Trojan UDP through official Xray",
+        "Shadowsocks 2022 official data and replay rejection",
+        "Upload actual interoperability receipts",
+        "Post Run actions/setup-python@v5",
+        "Post Run actions/checkout@v4",
+        "Complete job"
+      ]
+    },
+    {
+      "job_id": 119853790740,
+      "name": "native-protocols (macos-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39787300601/job/119853790740",
+      "started_at": "2026-10-22T13:29:39Z",
+      "completed_at": "2026-10-22T13:31:35Z",
+      "rust_test_counts": {
+        "passed": 631,
+        "failed": 0,
+        "ignored": 0
+      },
+      "completed_steps": [
+        "Set up job",
+        "Run actions/checkout@v4",
+        "Install Rust tools",
+        "Format",
+        "Check",
+        "Clippy",
+        "Unit and local network tests",
+        "Post Run actions/checkout@v4",
+        "Complete job"
+      ]
+    },
+    {
+      "job_id": 119853790747,
+      "name": "official-interop (windows-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39787300601/job/119853790747",
+      "started_at": "2026-10-22T13:29:36Z",
+      "completed_at": "2026-10-22T13:33:56Z",
+      "official_suites": [
+        {
+          "methods": 13,
+          "seconds": 14.461
+        },
+        {
+          "methods": 17,
+          "seconds": 21.336
+        },
+        {
+          "methods": 9,
+          "seconds": 15.315
+        },
+        {
+          "methods": 6,
+          "seconds": 20.056
+        },
+        {
+          "methods": 5,
+          "seconds": 11.805
+        },
+        {
+          "methods": 8,
+          "seconds": 21.162
+        },
+        {
+          "methods": 12,
+          "seconds": 8.698
+        }
+      ],
+      "completed_steps": [
+        "Set up job",
+        "Run actions/checkout@v4",
+        "Run actions/setup-python@v5",
+        "Install test certificate library",
+        "Install Rust",
+        "Build native clients and Core harness",
+        "Download pinned official Xray peers",
+        "Download pinned Hysteria and TUIC server peers",
+        "Download pinned official Shadowsocks server peer",
+        "Measure and prepare disposable runner UDP prerequisites",
+        "Set native client and evidence paths",
+        "VMess official Xray data and completed-response closure",
+        "Hysteria2 official server including retained limitation probes",
+        "TUIC historical official reference including retained limitation probe",
+        "Native Core ingress TCP UDP DNS HTTPS and node switching",
+        "Imported Xray V2Ray transport configs through ordinary Core start",
+        "VLESS and Trojan UDP through official Xray",
+        "Shadowsocks 2022 official data and replay rejection",
+        "Upload actual interoperability receipts",
+        "Post Run actions/setup-python@v5",
+        "Post Run actions/checkout@v4",
+        "Complete job"
+      ]
+    },
+    {
+      "job_id": 119853790852,
+      "name": "official-interop (ubuntu-latest)",
+      "conclusion": "success",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39787300601/job/119853790852",
+      "started_at": "2026-10-22T13:29:36Z",
+      "completed_at": "2026-10-22T13:32:14Z",
+      "official_suites": [
+        {
+          "methods": 13,
+          "seconds": 9.865
+        },
+        {
+          "methods": 17,
+          "seconds": 19.058
+        },
+        {
+          "methods": 9,
+          "seconds": 11.561
+        },
+        {
+          "methods": 6,
+          "seconds": 19.965
+        },
+        {
+          "methods": 5,
+          "seconds": 16.583
+        },
+        {
+          "methods": 8,
+          "seconds": 14.377
+        },
+        {
+          "methods": 12,
+          "seconds": 4.911
+        }
+      ],
+      "completed_steps": [
+        "Set up job",
+        "Run actions/checkout@v4",
+        "Run actions/setup-python@v5",
+        "Install test certificate library",
+        "Install Rust",
+        "Build native clients and Core harness",
+        "Download pinned official Xray peers",
+        "Download pinned Hysteria and TUIC server peers",
+        "Download pinned official Shadowsocks server peer",
+        "Measure and prepare disposable runner UDP prerequisites",
+        "Set native client and evidence paths",
+        "VMess official Xray data and completed-response closure",
+        "Hysteria2 official server including retained limitation probes",
+        "TUIC historical official reference including retained limitation probe",
+        "Native Core ingress TCP UDP DNS HTTPS and node switching",
+        "Imported Xray V2Ray transport configs through ordinary Core start",
+        "VLESS and Trojan UDP through official Xray",
+        "Shadowsocks 2022 official data and replay rejection",
+        "Upload actual interoperability receipts",
+        "Post Run actions/setup-python@v5",
+        "Post Run actions/checkout@v4",
+        "Complete job"
+      ]
+    }
+  ]
+}

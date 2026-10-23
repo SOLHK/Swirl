@@ -1,0 +1,48 @@
+{
+  "command": [
+    "/workspace/scratch/63c2b083dcfa/build-rust/debug/examples/transport-client"
+  ],
+  "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+  "peers": [
+    {
+      "label": "01-vmess-ws-tls",
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "environment_overrides": {}
+    }
+  ],
+  "records": [
+    {
+      "stage": "X14-A2-vmess",
+      "platform": "Linux",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "server_environment_overrides": {},
+      "transport": "websocket",
+      "protocol": "vmess",
+      "tls": true,
+      "reality": false,
+      "target_tls": false,
+      "mode": "http",
+      "exit_code": 1,
+      "elapsed_ms": 5.85,
+      "result": {
+        "driver_drain_us": 4,
+        "error": "WebSocketUpgradeRejected",
+        "ok": false,
+        "remaining_tasks": 0
+      }
+    }
+  ],
+  "cleanup_errors": [],
+  "origins": [
+    {
+      "mode": "http",
+      "tls": false,
+      "requests": 0,
+      "received": 0,
+      "client_closes": 0,
+      "tls_closes": 0,
+      "interruptions": 0,
+      "errors": []
+    }
+  ]
+}

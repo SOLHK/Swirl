@@ -1,21 +1,13 @@
-Swirl - Windows development preview
+Swirl - Rust Core Windows development preview
 
-This build includes a separate Mihomo engine, real proxy configuration,
-optional Windows system proxy/TUN, HTTP capture and scoped HTTPS decryption,
-rewrites, local JavaScript execution, configuration overlays and DHCP gateway
-control. Credentials and local private keys use Windows DPAPI. Network
-takeover and certificate trust require explicit user actions. Unimplemented
-features remain unavailable. See the source documentation for limitations.
+All proxy node forwarding is implemented by the in-process Swirl Rust Core.
+Qt/C++ supplies the UI, configuration/import, operating-system integration and
+HTTP debugging/capture tools. No external proxy engine is included or started.
+TUN, LAN proxy and gateway forwarding are not yet supported by this Rust product;
+unsupported settings are preserved and explicitly rejected, never downgraded.
 
-Mihomo v1.19.32, Copyright MetaCubeX and other contributors, is bundled as an
-unmodified, separate executable under GPL version 3. Its full license is in
-licenses/mihomo-GPL-3.0.txt. Version, upstream asset URL, archive SHA-256 and
-executable SHA-256 are recorded in core/mihomo-manifest.json. Swirl verifies
-the executable against its compiled-in manifest before each launch.
-Corresponding upstream source for this exact version:
-https://github.com/MetaCubeX/mihomo/tree/v1.19.32
-https://github.com/MetaCubeX/mihomo/archive/refs/tags/v1.19.32.tar.gz
-Mihomo API documentation: https://wiki.metacubex.one/en/api/
+Clash-compatible subscription parsing is a data-format feature. The proxy
+runtime is Swirl Rust Core, with no external core executable or fallback.
 
 Qt 6.10.3 is dynamically linked. Copyright The Qt Company Ltd. and other
 contributors. Qt is used under LGPL version 3; corresponding license texts
@@ -40,7 +32,7 @@ https://gcc.gnu.org/releases.html
 https://www.mingw-w64.org/license/
 
 Swirl source and reproducible Windows build instructions:
-https://github.com/SOLHK/Swirl/tree/test/src/Swirl.Quick
+https://github.com/SOLHK/Swirl/tree/work/rust-core-full-replacement-20261022/src/Swirl.Quick
 
 Other Windows fonts used during validation are system-installed fonts and are
 not redistributed in this installer. Swirl's brand SVG artwork is preserved;

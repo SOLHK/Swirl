@@ -1,7 +1,7 @@
 //! Explicit health requests run through the selected native outbound. The
 //! measured interval ends at validated final response headers, not at a TCP
 //! connect or an unrelated direct request. No application traffic is replayed.
-use crate::{Result, Target};
+use crate::{ConnectTimings, Result, Target, Transport, timing};
 use std::time::Instant;
 use swirl_dns::Resolver;
 use swirl_subscription::{HealthProbe, Outbound};
@@ -29,11 +29,14 @@ pub enum UrlTestStage {
 }
 
 /// Fixed, redacted failure code with the stage and optional HTTP status.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UrlTestFailure {
     pub stage: UrlTestStage,
     pub code: &'static str,
     pub http_status: Option<u16>,
+    /// One fixed-size allocation on a failed observation keeps the public
+    /// Result error variant small; the task-local collector itself is inline.
+    pub outbound_timing: Option<Box<ConnectTimings>>,
 }
 
 impl UrlTestFailure {
@@ -42,6 +45,7 @@ impl UrlTestFailure {
             stage,
             code,
             http_status: None,
+            outbound_timing: None,
         }
     }
 
@@ -49,9 +53,14 @@ impl UrlTestFailure {
         let stage = match crate::failure_stage(code) {
             "dns" => UrlTestStage::Dns,
             "tcp_connect" => UrlTestStage::TcpConnect,
-            "tls_handshake" | "reality_handshake" | "websocket_upgrade" | "protocol_handshake" => {
-                UrlTestStage::OutboundHandshake
-            }
+            "tls_handshake"
+            | "reality_handshake"
+            | "websocket_upgrade"
+            | "protocol_handshake"
+            | "quic_handshake"
+            | "quic_tls_handshake"
+            | "http3_handshake"
+            | "protocol_authentication" => UrlTestStage::OutboundHandshake,
             _ => UrlTestStage::OutboundConnect,
         };
         Self::at(stage, code)
@@ -91,6 +100,9 @@ pub struct UrlTestMetrics {
     pub origin_tls_ms: Option<u64>,
     pub response_headers_ms: u64,
     pub http_status: u16,
+    /// Additive connector phase observations. The existing cumulative fields
+    /// keep their meaning; request-write timing is not authentication proof.
+    pub outbound_timing: Option<ConnectTimings>,
 }
 
 fn elapsed_ms(started: Instant) -> u64 {
@@ -112,6 +124,35 @@ pub async fn url_test_head(
     resolver: &Resolver,
     expected_status: Option<u16>,
 ) -> std::result::Result<UrlTestMetrics, UrlTestFailure> {
+    url_test_head_selected(outbound, options, resolver, expected_status, None).await
+}
+
+/// Run the same bounded HEAD probe through an explicit native transport. The
+/// node and its transport remain fixed for the entire probe, with no fallback.
+pub async fn url_test_head_with_transport(
+    outbound: &Outbound,
+    options: &HealthProbe,
+    resolver: &Resolver,
+    expected_status: Option<u16>,
+    transport: &Transport,
+) -> std::result::Result<UrlTestMetrics, UrlTestFailure> {
+    url_test_head_selected(
+        outbound,
+        options,
+        resolver,
+        expected_status,
+        Some(transport),
+    )
+    .await
+}
+
+async fn url_test_head_selected(
+    outbound: &Outbound,
+    options: &HealthProbe,
+    resolver: &Resolver,
+    expected_status: Option<u16>,
+    transport: Option<&Transport>,
+) -> std::result::Result<UrlTestMetrics, UrlTestFailure> {
     if expected_status.is_some_and(|status| !(200..=299).contains(&status)) {
         return Err(UrlTestFailure::at(
             UrlTestStage::Input,
@@ -121,9 +162,9 @@ pub async fn url_test_head(
     let target = options.target().map_err(UrlTestFailure::input)?;
     let started = Instant::now();
     let deadline = tokio::time::Instant::now() + Duration::from_millis(options.timeout_ms);
-    let mut stream = timeout_at(
+    let (connected, outbound_timing) = timing::collect(timeout_at(
         deadline,
-        crate::connect(
+        crate::connect_selected(
             outbound,
             &Target {
                 host: target.host.clone(),
@@ -131,19 +172,36 @@ pub async fn url_test_head(
             },
             resolver,
             Duration::from_millis(options.timeout_ms),
+            transport,
+            false,
         ),
-    )
-    .await
-    .map_err(|_| UrlTestFailure::at(UrlTestStage::OutboundConnect, "UrlTestTimeout"))?
-    .map_err(UrlTestFailure::outbound)?;
+    ))
+    .await;
+    let observed_failure = |mut failure: UrlTestFailure| {
+        failure.outbound_timing = Some(Box::new(outbound_timing));
+        failure
+    };
+    let mut stream = connected
+        .map_err(|_| {
+            observed_failure(UrlTestFailure::at(
+                UrlTestStage::OutboundConnect,
+                "UrlTestTimeout",
+            ))
+        })?
+        .map_err(|code| observed_failure(UrlTestFailure::outbound(code)))?;
     let outbound_connect_ms = elapsed_ms(started);
 
     let origin_tls_ms = if let Some(tls) = target.tls {
         let tls_started = Instant::now();
         stream = timeout_at(deadline, swirl_transport::secure(stream, &tls))
             .await
-            .map_err(|_| UrlTestFailure::at(UrlTestStage::OriginTls, "UrlTestTimeout"))?
-            .map_err(|code| UrlTestFailure::at(UrlTestStage::OriginTls, code))?;
+            .map_err(|_| {
+                observed_failure(UrlTestFailure::at(
+                    UrlTestStage::OriginTls,
+                    "UrlTestTimeout",
+                ))
+            })?
+            .map_err(|code| observed_failure(UrlTestFailure::at(UrlTestStage::OriginTls, code)))?;
         Some(elapsed_ms(tls_started))
     } else {
         None
@@ -157,19 +215,35 @@ pub async fn url_test_head(
         stream.flush().await
     })
     .await
-    .map_err(|_| UrlTestFailure::at(UrlTestStage::RequestWrite, "UrlTestTimeout"))?
-    .map_err(|_| UrlTestFailure::at(UrlTestStage::RequestWrite, "UrlTestWrite"))?;
+    .map_err(|_| {
+        observed_failure(UrlTestFailure::at(
+            UrlTestStage::RequestWrite,
+            "UrlTestTimeout",
+        ))
+    })?
+    .map_err(|_| {
+        observed_failure(UrlTestFailure::at(
+            UrlTestStage::RequestWrite,
+            "UrlTestWrite",
+        ))
+    })?;
 
     let status = timeout_at(deadline, response_code(&mut stream))
         .await
-        .map_err(|_| UrlTestFailure::at(UrlTestStage::ResponseHeaders, "UrlTestTimeout"))?
-        .map_err(UrlTestFailure::response)?;
+        .map_err(|_| {
+            observed_failure(UrlTestFailure::at(
+                UrlTestStage::ResponseHeaders,
+                "UrlTestTimeout",
+            ))
+        })?
+        .map_err(|code| observed_failure(UrlTestFailure::response(code)))?;
     let response_headers_ms = elapsed_ms(started);
     if !expected_status.map_or((200..=299).contains(&status), |expected| status == expected) {
         return Err(UrlTestFailure {
             stage: UrlTestStage::HttpStatus,
             code: "UrlTestStatus",
             http_status: Some(status),
+            outbound_timing: Some(Box::new(outbound_timing)),
         });
     }
     // A HEAD response has no body. Drop our owned stream rather than waiting
@@ -180,6 +254,7 @@ pub async fn url_test_head(
         origin_tls_ms,
         response_headers_ms,
         http_status: status,
+        outbound_timing: Some(outbound_timing),
     })
 }
 
@@ -188,12 +263,32 @@ pub async fn health_probe(
     options: &HealthProbe,
     resolver: &Resolver,
 ) -> Result<u64> {
+    health_probe_selected(outbound, options, resolver, None).await
+}
+
+/// Run an automatic-policy health request through the node's explicit native
+/// transport, preserving the existing shared timeout and shutdown semantics.
+pub async fn health_probe_with_transport(
+    outbound: &Outbound,
+    options: &HealthProbe,
+    resolver: &Resolver,
+    transport: &Transport,
+) -> Result<u64> {
+    health_probe_selected(outbound, options, resolver, Some(transport)).await
+}
+
+async fn health_probe_selected(
+    outbound: &Outbound,
+    options: &HealthProbe,
+    resolver: &Resolver,
+    transport: Option<&Transport>,
+) -> Result<u64> {
     let target = options.target()?;
     let started = Instant::now();
     // Resolution, proxy negotiation, origin TLS, request, response and write
     // shutdown share a single deadline. Redirects and retries are forbidden.
     timeout(Duration::from_millis(options.timeout_ms), async {
-        let mut stream = crate::connect(
+        let mut stream = crate::connect_selected(
             outbound,
             &Target {
                 host: target.host.clone(),
@@ -201,6 +296,8 @@ pub async fn health_probe(
             },
             resolver,
             Duration::from_millis(options.timeout_ms),
+            transport,
+            false,
         )
         .await?;
         if let Some(tls) = target.tls {

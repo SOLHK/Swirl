@@ -14,7 +14,7 @@ concurrency:
 jobs:
   build-qt-ui:
     runs-on: windows-2022
-    timeout-minutes: 35
+    timeout-minutes: 55
     permissions:
       contents: read
     steps:
@@ -23,6 +23,8 @@ jobs:
       - name: Validate scoped Codex proxy launcher
         shell: pwsh
         run: ./tools/tests/Test-CodexProxyLauncher.ps1
+      - name: Install Rust MSVC tools
+        run: rustup toolchain install stable --profile minimal --target x86_64-pc-windows-msvc
       - name: Set up Qt desktop SDK
         uses: jurplel/install-qt-action@v4
         with:
@@ -32,6 +34,11 @@ jobs:
           arch: win64_msvc2022_64
           modules: qtshadertools
           cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install independent network test certificate support
+        run: python -m pip install cryptography==50.0.2
       - name: Configure Qt UI independently
         shell: pwsh
         run: cmake -S src/Swirl.Quick -B build/swirl-quick -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON -DSWIRL_TEST_FONT_DIRECTORY="${{ github.workspace }}/build/swirl-quick/Release/lib/fonts"
@@ -43,6 +50,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item build/swirl-quick/Release/Swirl.exe dist/
+          Copy-Item build/swirl-quick/Release/swirl_api.dll,build/swirl-quick/Release/swirl-rust-build.json dist/
           Copy-Item build/swirl-quick/Release/SwirlProxyGuard.exe dist/
           Copy-Item build/swirl-quick/Release/SwirlGatewayGuard.exe dist/
           Copy-Item build/swirl-quick/Release/SwirlScriptRunner.exe dist/
@@ -51,11 +59,6 @@ jobs:
           Copy-Item src/Swirl.Quick/packaging/rules dist/rules -Recurse
           Copy-Item src/Swirl.Quick/packaging/rules build/swirl-quick/Release/rules -Recurse
           windeployqt --release --qmldir src/Swirl.Quick/qml dist/Swirl.exe
-      - name: Stage pinned and verified Mihomo for integration and installer
-        shell: pwsh
-        run: |
-          ./scripts/stage-mihomo.ps1 -Destination dist
-          Copy-Item -LiteralPath dist/core -Destination build/swirl-quick/Release/core -Recurse
       # Qt's offscreen QPA font database reads appdir/lib/fonts and does not
       # automatically discover the fonts installed on a Windows CI runner.
       # These fixtures are used for synthetic screenshot tests ONLY.
@@ -225,36 +228,15 @@ jobs:
           $fonts = "dist/lib/fonts"
           if (Test-Path $fonts) { Remove-Item -LiteralPath $fonts -Recurse -Force }
           if (Test-Path $fonts) { throw "Test fonts must not be distributed in Swirl preview." }
-      - name: Build production EXE without test harness
+      - name: Build and verify independent production files
         shell: pwsh
         run: |
-          cmake -S src/Swirl.Quick -B build/swirl-quick -DSWIRL_BUILD_UI_TESTS=OFF
-          if ($LASTEXITCODE -ne 0) { throw "Production configure failed" }
-          cmake --build build/swirl-quick --config Release --parallel
-          if ($LASTEXITCODE -ne 0) { throw "Production build failed" }
-          Copy-Item build/swirl-quick/Release/Swirl.exe dist/ -Force
-          Copy-Item build/swirl-quick/Release/SwirlProxyGuard.exe dist/
-          Copy-Item build/swirl-quick/Release/SwirlGatewayGuard.exe dist/
-          Copy-Item build/swirl-quick/Release/SwirlScriptRunner.exe dist/
-          Copy-Item build/swirl-quick/Release/SwirlCodexLauncher.exe dist/
-          Remove-Item -LiteralPath "dist/Qt6Test.dll" -ErrorAction SilentlyContinue
-      - name: Prepare standalone installer files
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path installer-bin, out | Out-Null
-          Copy-Item -Path "dist/*" -Destination "installer-bin" -Recurse -Force
-          Copy-Item "src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt" "installer-bin/"
-          $icon = "build/swirl-quick/brand/Swirl.ico"
-          if (!(Test-Path -LiteralPath $icon)) { throw "Missing SVG-derived Windows icon: $icon" }
-          Copy-Item -LiteralPath $icon -Destination "installer-bin/Swirl-brand-phase3.ico"
-          Copy-Item -LiteralPath $icon -Destination "installer-bin/Swirl-brand-phase3-v2.ico"
-          Copy-Item "src/Swirl.Quick/packaging/licenses" "installer-bin/licenses" -Recurse -Force
-          New-Item -ItemType Directory -Force -Path "installer-bin/docs" | Out-Null
-          Copy-Item -LiteralPath 'src/Swirl.Quick/CAPTURE.md','docs/LOCAL_EXTENSIONS.md','docs/FONTS.md','docs/ANIMATION_DEPENDENCY_RESEARCH.md','docs/PR12_GRAPHICS_UPGRADE.md','docs/PR12_NATIVE_ACCEPTANCE.md','docs/PR12_NATIVE_UI_FIXES.md','docs/SWIRL_NATIVE_RESEARCH.md' -Destination "installer-bin/docs"
-          Copy-Item -LiteralPath 'docs/CODEX_LOGIN_WINDOWS.md','docs/NETWORK_RELIABILITY_6A.md' -Destination "installer-bin/docs"
-          Copy-Item -LiteralPath 'docs/CODEX_PROXY_MANAGEMENT.md' -Destination "installer-bin/docs"
-          Remove-Item -Path "installer-bin/Swirl-*-preview.png", "installer-bin/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
-          if (!(Test-Path "installer-bin/Swirl.exe")) { throw "Missing Swirl.exe" }
+          cmake -S src/Swirl.Quick -B build/swirl-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=OFF
+          if ($LASTEXITCODE -ne 0) { throw 'Production configure failed.' }
+          cmake --build build/swirl-product --config Release --target Swirl --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw 'Production build failed.' }
+          ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/swirl-product -Destination installer-bin
+          New-Item -ItemType Directory -Force -Path out | Out-Null
       - name: Install NSIS packaging tools
         shell: pwsh
         run: |
@@ -267,7 +249,7 @@ jobs:
           $nsis = "C:/Program Files (x86)/NSIS/makensis.exe"
           $appDist = (Resolve-Path "installer-bin").Path
           $outDir = (Resolve-Path "out").Path
-          $icon = (Resolve-Path "build/swirl-quick/brand/Swirl.ico").Path
+          $icon = (Resolve-Path "build/swirl-product/brand/Swirl.ico").Path
           $appVersion = (Get-Content -LiteralPath 'src/Swirl.Quick/PRODUCT_VERSION.txt' -Raw).Trim()
           if ($appVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid PRODUCT_VERSION.txt' }
           & $nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$appDist" "/DOUT_DIR=$outDir" "/DAPP_ICON=$icon" "/DAPP_VERSION=$appVersion" "src/Swirl.Quick/packaging/Swirl.nsi"
@@ -285,7 +267,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Swirl-Quick-UI-win-x64
-          path: dist/
+          path: installer-bin/
           if-no-files-found: error
           retention-days: 14
 
@@ -314,5 +296,5 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "Swirl · 测试版 ${SHORT_SHA}" \
-            --notes "Windows 开发测试版：C++23 / Qt Quick，Swirl 原生 TCP 与 Mihomo 兼容引擎，真实节点与订阅、路由和网络活动监控、本机 HTTP/HTTPS 调试。系统代理、TUN、LAN 和证书信任需用户明确启用；高级协议与实际网络环境的验证范围请查阅随版本文档。没有演示联网成功，未实现功能保持禁用。请勿作为正式版本使用。" \
+            --notes "Windows 开发测试版：C++23 / Qt Quick，Swirl 自研 Rust 唯一代理内核，真实节点与订阅、路由和网络活动监控、本机 HTTP/HTTPS 调试。系统代理和证书信任需用户明确启用；TUN、LAN 和网关转发尚未支持；高级协议与实际网络环境的验证范围请查阅随版本文档。没有演示联网成功，未实现功能保持禁用。请勿作为正式版本使用。" \
             --prerelease

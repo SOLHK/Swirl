@@ -3,6 +3,7 @@
 #include <QJsonObject>
 #include <QTimer>
 #include <QProcess>
+#include <QVariantMap>
 
 // Current-user WinINET connection settings plus their legacy registry view.
 // The independent guard compares both stores before restoring their snapshots.
@@ -11,6 +12,8 @@ class SystemProxySession final : public QObject {
     Q_PROPERTY(bool enabled READ enabled NOTIFY changed)
     Q_PROPERTY(bool owned READ owned NOTIFY changed)
     Q_PROPERTY(bool systemEnabled READ systemEnabled NOTIFY changed)
+    Q_PROPERTY(bool stateDiffers READ stateDiffers NOTIFY changed)
+    Q_PROPERTY(QString stateReadError READ stateReadError NOTIFY changed)
     Q_PROPERTY(QString error READ error NOTIFY changed)
 public:
     explicit SystemProxySession(QObject *parent=nullptr, QString journal={});
@@ -18,6 +21,9 @@ public:
     bool enabled() const { return m_enabled; }
     bool owned() const { return m_owned; }
     bool systemEnabled() const { return m_systemEnabled; }
+    bool stateDiffers() const { return m_stateDiffers; }
+    QString stateReadError() const { return m_readError; }
+    QVariantMap diagnosticState() const;
     QString error() const { return m_error; }
     bool enable(int port, qint64 enginePid);
     Q_INVOKABLE bool disable();
@@ -30,9 +36,9 @@ public:
 signals:
     void changed();
 private:
-    QString m_journal, m_error, m_session;
+    QString m_journal, m_error, m_session, m_readError;
     bool m_enabled=false, m_owned=false;
-    bool m_systemEnabled=false;
+    bool m_systemEnabled=false, m_stateDiffers=false;
     QTimer m_poll;
     QProcess m_guard;
 };

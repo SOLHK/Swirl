@@ -1,0 +1,20 @@
+[
+  {
+    "suite": "test_transport_http_xray",
+    "evidence": "/workspace/scratch/ece554ece7c1/c6-release-httpupgrade",
+    "log": "/workspace/scratch/ece554ece7c1/transport-evidence/c6-release-httpupgrade.log",
+    "exit_code": 0
+  },
+  {
+    "suite": "test_transport_xhttp_xray",
+    "evidence": "/workspace/scratch/ece554ece7c1/c6-release-xhttp",
+    "log": "/workspace/scratch/ece554ece7c1/transport-evidence/c6-release-xhttp.log",
+    "exit_code": 0
+  },
+  {
+    "suite": "test_transport_reality_xray",
+    "evidence": "/workspace/scratch/ece554ece7c1/c6-release-reality",
+    "log": "/workspace/scratch/ece554ece7c1/transport-evidence/c6-release-reality.log",
+    "exit_code": 0
+  }
+]

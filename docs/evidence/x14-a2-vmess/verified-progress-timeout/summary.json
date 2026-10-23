@@ -1,0 +1,17 @@
+{
+  "evidence_level": "independent_official_xray_loopback",
+  "suite": "data_and_completed_response_close",
+  "target_half_close_accepted": false,
+  "public_network_tested": false,
+  "qt_product_tested": false,
+  "server_release": "v26.10.21",
+  "server_commit": "1b1647cd9ddf0abc34b981d4611fc03bcac1ca74",
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "tests_run": 13,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "elapsed_seconds": 10.19,
+  "client_sha256": "7ed9db742c4388614ec9c0b58f35070d1d8e7d58012986579e0601b5d22d0449",
+  "exit_code": 0
+}

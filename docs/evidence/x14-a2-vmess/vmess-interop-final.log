@@ -1,0 +1,18 @@
+test_abrupt_peer_disconnect_and_new_session_recovery (__main__.VmessXrayTests.test_abrupt_peer_disconnect_and_new_session_recovery) ... ok
+test_clash_vmess_uri_and_xray_json_import_to_real_connection (__main__.VmessXrayTests.test_clash_vmess_uri_and_xray_json_import_to_real_connection) ... ok
+test_core_node_switch_preserves_established_vmess_session (__main__.VmessXrayTests.test_core_node_switch_preserves_established_vmess_session) ... ok
+test_eight_concurrent_independent_sessions (__main__.VmessXrayTests.test_eight_concurrent_independent_sessions) ... ok
+test_four_transports_four_mib_duplex_and_completed_response_close (__main__.VmessXrayTests.test_four_transports_four_mib_duplex_and_completed_response_close) ... ok
+test_https_target_certificate_and_tls_close_over_vmess_tls (__main__.VmessXrayTests.test_https_target_certificate_and_tls_close_over_vmess_tls) ... ok
+test_ipv6_peer_and_domain_destination (__main__.VmessXrayTests.test_ipv6_peer_and_domain_destination) ... ok
+test_legacy_alterid_and_invalid_cipher_never_dial (__main__.VmessXrayTests.test_legacy_alterid_and_invalid_cipher_never_dial) ... ok
+test_streamed_64_mib_over_tcp_tls_with_authenticated_clean_close (__main__.VmessXrayTests.test_streamed_64_mib_over_tcp_tls_with_authenticated_clean_close) ... ok
+test_tcp_tls_ws_wss_aes_and_chacha_authentication_data_and_close (__main__.VmessXrayTests.test_tcp_tls_ws_wss_aes_and_chacha_authentication_data_and_close) ... ok
+test_untrusted_certificate_and_incorrect_sni_are_rejected (__main__.VmessXrayTests.test_untrusted_certificate_and_incorrect_sni_are_rejected) ... ok
+test_wrong_uuid_never_reaches_origin_on_any_transport (__main__.VmessXrayTests.test_wrong_uuid_never_reaches_origin_on_any_transport) ... ok
+test_wrong_websocket_path_is_rejected_without_origin_access (__main__.VmessXrayTests.test_wrong_websocket_path_is_rejected_without_origin_access) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 10.188s
+
+OK

@@ -17,7 +17,7 @@ use std::{
     time::{Duration, Instant},
 };
 use swirl_dns::Resolver;
-use swirl_protocol::{Inbound, Result, Target};
+use swirl_protocol::{Inbound, Result, Target, Transport};
 use swirl_routing::{ChinaRules, load_rules_from_directory, shared_bundled_rules};
 use swirl_subscription::{Config, HealthProbe, Outbound, PolicyStrategy};
 use swirl_transport::{Counters, bind_udp};
@@ -31,6 +31,31 @@ use tokio::{
 };
 
 type ChinaRulePair = (Option<Arc<ChinaRules>>, Option<Arc<ChinaRules>>);
+
+fn validate_transports(config: &Config, transports: &BTreeMap<String, Transport>) -> Result<()> {
+    for node in &config.nodes {
+        let configured = Transport::configured(&node.outbound);
+        if let Some(transport) = &configured {
+            if transports.contains_key(&node.id) {
+                return Err("TransportConflict");
+            }
+            transport.validate_for(&node.outbound)?;
+        }
+        swirl_protocol::validate_tls(
+            &node.outbound,
+            configured.as_ref().or_else(|| transports.get(&node.id)),
+        )?;
+    }
+    for (id, transport) in transports {
+        let node = config
+            .nodes
+            .iter()
+            .find(|node| &node.id == id)
+            .ok_or("TransportNodeMissing")?;
+        transport.validate_for(&node.outbound)?;
+    }
+    Ok(())
+}
 
 fn load_china_rules(config: &Config) -> Result<ChinaRulePair> {
     if !config.smart_routing {
@@ -116,6 +141,7 @@ pub struct Snapshot {
 }
 struct Plan {
     config: Arc<Config>,
+    transports: Arc<BTreeMap<String, Transport>>,
     resolver: Arc<Resolver>,
     policies: Arc<PolicyRuntime>,
     cn_domains: Option<Arc<ChinaRules>>,
@@ -123,6 +149,7 @@ struct Plan {
 }
 struct SessionPlan {
     config: Arc<Config>,
+    transports: Arc<BTreeMap<String, Transport>>,
     resolver: Arc<Resolver>,
     policies: Arc<PolicyView>,
     cn_domains: Option<Arc<ChinaRules>>,
@@ -132,6 +159,7 @@ impl Plan {
     fn session(&self) -> Result<Arc<SessionPlan>> {
         Ok(Arc::new(SessionPlan {
             config: self.config.clone(),
+            transports: self.transports.clone(),
             resolver: self.resolver.clone(),
             policies: Arc::new(self.policies.view(&self.config)?),
             cn_domains: self.cn_domains.clone(),
@@ -151,7 +179,20 @@ pub struct Core {
 
 impl Core {
     pub fn start(config: Config) -> Result<Self> {
+        Self::start_with_transports(config, BTreeMap::new())
+    }
+
+    /// Start the native runtime with transport settings keyed by concrete node
+    /// ID. This additive boundary leaves the subscription IR unchanged. Invalid
+    /// node IDs or protocol/transport combinations fail before any listener or
+    /// policy probe starts; an absent entry retains that node's legacy settings.
+    pub fn start_with_transports(
+        config: Config,
+        transports: BTreeMap<String, Transport>,
+    ) -> Result<Self> {
         config.validate()?;
+        validate_transports(&config, &transports)?;
+        let transports = Arc::new(transports);
         let runtime = Builder::new_multi_thread()
             .worker_threads(2)
             .max_blocking_threads(4)
@@ -171,9 +212,11 @@ impl Core {
             runtime.handle().clone(),
             config.clone(),
             resolver.clone(),
+            transports.clone(),
         ));
         let plan = Arc::new(RwLock::new(Arc::new(Plan {
             config,
+            transports,
             resolver,
             policies,
             cn_domains,
@@ -227,11 +270,34 @@ impl Core {
         })
     }
     pub fn configure(&self, config: Config) -> Result<()> {
+        self.configure_selected(config, None)
+    }
+
+    /// Atomically replace the configuration and its explicit transport map.
+    /// Existing sessions retain their immutable previous settings. The legacy
+    /// `configure` method preserves and revalidates the current map instead.
+    pub fn configure_with_transports(
+        &self,
+        config: Config,
+        transports: BTreeMap<String, Transport>,
+    ) -> Result<()> {
+        self.configure_selected(config, Some(transports))
+    }
+
+    fn configure_selected(
+        &self,
+        config: Config,
+        transports: Option<BTreeMap<String, Transport>>,
+    ) -> Result<()> {
         if self.runtime.is_none() {
             return Err("CoreStopped");
         }
         config.validate()?;
         let mut plan = self.plan.write().map_err(|_| "ConfigState")?;
+        let transports = transports
+            .map(Arc::new)
+            .unwrap_or_else(|| plan.transports.clone());
+        validate_transports(&config, &transports)?;
         if config.listen != plan.config.listen
             || config.limits.max_connections != plan.config.limits.max_connections
         {
@@ -240,13 +306,18 @@ impl Core {
         let resolver = Arc::new(plan.resolver.with_config(&config.dns)?);
         let (cn_domains, cn_ips) = load_china_rules(&config)?;
         let config = Arc::new(config);
-        let policies = Arc::new(plan.policies.reconfigured(config.clone(), resolver.clone()));
+        let policies = Arc::new(plan.policies.reconfigured(
+            config.clone(),
+            resolver.clone(),
+            transports.clone(),
+        ));
         // All fallible validation has completed. Stop the replaced worker even
         // if an old session still owns its immutable configuration and choices.
         self.probe.invalidate()?;
         plan.policies.stop();
         *plan = Arc::new(Plan {
             config,
+            transports,
             resolver,
             policies,
             cn_domains,
@@ -266,6 +337,7 @@ impl Core {
         self.probe.invalidate()?;
         *plan = Arc::new(Plan {
             config: Arc::new(next),
+            transports: plan.transports.clone(),
             resolver: plan.resolver.clone(),
             policies: plan.policies.clone(),
             cn_domains: plan.cn_domains.clone(),
@@ -296,6 +368,7 @@ impl Core {
         self.probe.invalidate()?;
         *plan = Arc::new(Plan {
             config: Arc::new(next),
+            transports: plan.transports.clone(),
             resolver: plan.resolver.clone(),
             policies: plan.policies.clone(),
             cn_domains: plan.cn_domains.clone(),
@@ -341,9 +414,21 @@ impl Core {
             return Err("ProbeSelectedNodeRejected");
         }
         let outbound = node.outbound.clone();
+        let transport = plan.transports.get(&node.id).cloned();
         let resolver = plan.resolver.clone();
         self.probe.start_with(async move {
-            swirl_protocol::url_test_head(&outbound, &options, &resolver, expected_status).await
+            if let Some(transport) = transport {
+                swirl_protocol::url_test_head_with_transport(
+                    &outbound,
+                    &options,
+                    &resolver,
+                    expected_status,
+                    &transport,
+                )
+                .await
+            } else {
+                swirl_protocol::url_test_head(&outbound, &options, &resolver, expected_status).await
+            }
         })
     }
     pub fn probe_status(&self) -> Result<ProbeStatus> {
@@ -531,6 +616,15 @@ async fn session(
         // Only route-equivalent DIRECT addresses reach this scheduler. The
         // selected outbound and matched rule cannot change after a TCP miss.
         swirl_protocol::connect_direct_resolved(direct_addresses, limit).await
+    } else if let Some(transport) = plan.transports.get(&node.id) {
+        swirl_protocol::connect_with_transport(
+            &node.outbound,
+            &routed_target,
+            resolver,
+            limit,
+            transport,
+        )
+        .await
     } else {
         swirl_protocol::connect(&node.outbound, &routed_target, resolver, limit).await
     };
@@ -714,7 +808,7 @@ enum UdpTransport {
         address: SocketAddr,
         packet: Vec<u8>,
     },
-    Socks5 {
+    ProxySession {
         target: Target,
         payload: Vec<u8>,
     },
@@ -750,7 +844,41 @@ async fn prepare_udp(
             ..
         } => {
             return Ok(UdpDispatch {
-                transport: UdpTransport::Socks5 { target, payload },
+                transport: UdpTransport::ProxySession { target, payload },
+                payload_len,
+                node_id: node.id.clone(),
+                permit,
+            });
+        }
+        Outbound::Hysteria2(config) if config.udp => {
+            return Ok(UdpDispatch {
+                transport: UdpTransport::ProxySession { target, payload },
+                payload_len,
+                node_id: node.id.clone(),
+                permit,
+            });
+        }
+        Outbound::Tuic(config) if config.udp => {
+            return Ok(UdpDispatch {
+                transport: UdpTransport::ProxySession { target, payload },
+                payload_len,
+                node_id: node.id.clone(),
+                permit,
+            });
+        }
+        Outbound::Vless { udp: true, .. } | Outbound::Trojan { udp: true, .. } => {
+            return Ok(UdpDispatch {
+                transport: UdpTransport::ProxySession { target, payload },
+                payload_len,
+                node_id: node.id.clone(),
+                permit,
+            });
+        }
+        Outbound::Shadowsocks {
+            cipher, udp: true, ..
+        } if cipher.starts_with("2022-") => {
+            return Ok(UdpDispatch {
+                transport: UdpTransport::ProxySession { target, payload },
                 payload_len,
                 node_id: node.id.clone(),
                 permit,
@@ -841,7 +969,7 @@ async fn udp_associate(
                 let UdpDispatch {transport,payload_len,node_id,permit}=match prepared {Ok(Ok(d))=>d,_=>{udp_drop(&counters,&total);continue;}};
                 let (address,packet)=match transport {
                     UdpTransport::Datagram {address,packet}=>(address,packet),
-                    UdpTransport::Socks5 {target,payload}=>{socks.send(node_id,target,payload,permit);continue;}
+                    UdpTransport::ProxySession {target,payload}=>{socks.send(node_id,target,payload,permit);continue;}
                 };
                 destinations.retain(|_,(at,_)|at.elapsed()<Duration::from_secs(30));
                 if (destinations.len()>=64 && !destinations.contains_key(&address)) || destinations.get(&address).is_some_and(|(_,id)|id!=&node_id){udp_drop(&counters,&total);continue;}
@@ -951,3 +1079,6 @@ async fn udp_response(
 #[cfg(test)]
 #[path = "route_tests.rs"]
 mod route_tests;
+
+#[cfg(test)]
+mod transport_tests;

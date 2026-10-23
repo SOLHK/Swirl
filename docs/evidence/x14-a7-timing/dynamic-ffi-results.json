@@ -1,0 +1,577 @@
+{
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "scope": "native Core HEAD phase observation; not Qt acceptance",
+  "control_boundary": "exported_c_abi_dynamic_library",
+  "runtime_sha256": "1e0241aef55dc8f1e9bc9f0522e03516f5bb6c3bc1b7a171bf7c68c8f98e493d",
+  "tuic_reference_version": "1.0.0",
+  "tuic_reference_sha256": "adb808944ca829857bf408d2ee438a156e8171543dbbed3e94964b66b4135393",
+  "hysteria2_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+  "observations": [
+    {
+      "case": "test_hysteria_authentication_response_and_rejection_are_observed",
+      "protocol": "hysteria2",
+      "expected_success": true,
+      "probe": {
+        "metrics": {
+          "http_status": 204,
+          "origin_tls_ms": null,
+          "outbound_connect_ms": 8,
+          "outbound_timing": {
+            "authentication_exchange_us": 1529,
+            "authentication_request_encode_write_us": null,
+            "authentication_response_accepted": true,
+            "failed_operations": 0,
+            "interrupted": false,
+            "protocol_request_encode_write_us": null,
+            "proxy_connect_exchange_us": 868,
+            "proxy_negotiation_us": null,
+            "proxy_tls_handshake_us": null,
+            "quic_connection_reused": false,
+            "quic_handshake_including_tls_us": 4922,
+            "reality_handshake_us": null,
+            "resolution_us": 12,
+            "tcp_attempts": 0,
+            "tcp_cancelled_attempts": 0,
+            "tcp_connected_attempt_us": null,
+            "tcp_dial_us": null,
+            "tcp_failed_attempts": 0,
+            "transport_setup_us": 158
+          },
+          "response_headers_ms": 9
+        },
+        "request_id": 1,
+        "state": "succeeded"
+      },
+      "target_requests_before": 0,
+      "target_requests_after": 1,
+      "target_received_bytes": 114,
+      "target_sent_bytes": 65,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_hysteria_authentication_response_and_rejection_are_observed",
+      "protocol": "hysteria2",
+      "expected_success": false,
+      "probe": {
+        "failure": {
+          "code": "Hysteria2AuthenticationRejected",
+          "outbound_timing": {
+            "authentication_exchange_us": 1282,
+            "authentication_request_encode_write_us": null,
+            "authentication_response_accepted": false,
+            "failed_operations": 1,
+            "interrupted": false,
+            "protocol_request_encode_write_us": null,
+            "proxy_connect_exchange_us": null,
+            "proxy_negotiation_us": null,
+            "proxy_tls_handshake_us": null,
+            "quic_connection_reused": false,
+            "quic_handshake_including_tls_us": 5173,
+            "reality_handshake_us": null,
+            "resolution_us": 6,
+            "tcp_attempts": 0,
+            "tcp_cancelled_attempts": 0,
+            "tcp_connected_attempt_us": null,
+            "tcp_dial_us": null,
+            "tcp_failed_attempts": 0,
+            "transport_setup_us": 436
+          },
+          "stage": "outbound_handshake"
+        },
+        "request_id": 1,
+        "state": "failed"
+      },
+      "target_requests_before": 1,
+      "target_requests_after": 1,
+      "target_received_bytes": 114,
+      "target_sent_bytes": 65,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_tuic_auth_write_and_live_connection_reuse_are_not_fake_handshakes",
+      "protocol": "tuic:native",
+      "expected_success": true,
+      "probe": {
+        "metrics": {
+          "http_status": 204,
+          "origin_tls_ms": null,
+          "outbound_connect_ms": 5,
+          "outbound_timing": {
+            "authentication_exchange_us": null,
+            "authentication_request_encode_write_us": 1154,
+            "authentication_response_accepted": false,
+            "failed_operations": 0,
+            "interrupted": false,
+            "protocol_request_encode_write_us": 69,
+            "proxy_connect_exchange_us": null,
+            "proxy_negotiation_us": null,
+            "proxy_tls_handshake_us": null,
+            "quic_connection_reused": false,
+            "quic_handshake_including_tls_us": 3934,
+            "reality_handshake_us": null,
+            "resolution_us": 4,
+            "tcp_attempts": 0,
+            "tcp_cancelled_attempts": 0,
+            "tcp_connected_attempt_us": null,
+            "tcp_dial_us": null,
+            "tcp_failed_attempts": 0,
+            "transport_setup_us": null
+          },
+          "response_headers_ms": 6
+        },
+        "request_id": 1,
+        "state": "succeeded"
+      },
+      "target_requests_before": 0,
+      "target_requests_after": 1,
+      "target_received_bytes": 114,
+      "target_sent_bytes": 65,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_tuic_auth_write_and_live_connection_reuse_are_not_fake_handshakes",
+      "protocol": "tuic:native",
+      "expected_success": true,
+      "probe": {
+        "metrics": {
+          "http_status": 204,
+          "origin_tls_ms": null,
+          "outbound_connect_ms": 0,
+          "outbound_timing": {
+            "authentication_exchange_us": null,
+            "authentication_request_encode_write_us": null,
+            "authentication_response_accepted": false,
+            "failed_operations": 0,
+            "interrupted": false,
+            "protocol_request_encode_write_us": 24,
+            "proxy_connect_exchange_us": null,
+            "proxy_negotiation_us": null,
+            "proxy_tls_handshake_us": null,
+            "quic_connection_reused": true,
+            "quic_handshake_including_tls_us": null,
+            "reality_handshake_us": null,
+            "resolution_us": 2,
+            "tcp_attempts": 0,
+            "tcp_cancelled_attempts": 0,
+            "tcp_connected_attempt_us": null,
+            "tcp_dial_us": null,
+            "tcp_failed_attempts": 0,
+            "transport_setup_us": null
+          },
+          "response_headers_ms": 1
+        },
+        "request_id": 2,
+        "state": "succeeded"
+      },
+      "target_requests_before": 1,
+      "target_requests_after": 2,
+      "target_received_bytes": 228,
+      "target_sent_bytes": 130,
+      "expected_outcome_verified": true,
+      "live_stream_echo_bytes": 94
+    },
+    {
+      "case": "test_tuic_auth_write_and_live_connection_reuse_are_not_fake_handshakes",
+      "protocol": "tuic:native",
+      "expected_success": false,
+      "probe": {
+        "failure": {
+          "code": "UrlTestRead",
+          "outbound_timing": {
+            "authentication_exchange_us": null,
+            "authentication_request_encode_write_us": 1059,
+            "authentication_response_accepted": false,
+            "failed_operations": 0,
+            "interrupted": false,
+            "protocol_request_encode_write_us": 20,
+            "proxy_connect_exchange_us": null,
+            "proxy_negotiation_us": null,
+            "proxy_tls_handshake_us": null,
+            "quic_connection_reused": false,
+            "quic_handshake_including_tls_us": 9211,
+            "reality_handshake_us": null,
+            "resolution_us": 4,
+            "tcp_attempts": 0,
+            "tcp_cancelled_attempts": 0,
+            "tcp_connected_attempt_us": null,
+            "tcp_dial_us": null,
+            "tcp_failed_attempts": 0,
+            "transport_setup_us": null
+          },
+          "stage": "response_headers"
+        },
+        "request_id": 1,
+        "state": "failed"
+      },
+      "target_requests_before": 2,
+      "target_requests_after": 2,
+      "target_received_bytes": 228,
+      "target_sent_bytes": 130,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_vmess_wss_and_failed_status_keep_distinct_setup_phases",
+      "protocol": "vmess",
+      "expected_success": true,
+      "probe": {
+        "metrics": {
+          "http_status": 204,
+          "origin_tls_ms": null,
+          "outbound_connect_ms": 7,
+          "outbound_timing": {
+            "authentication_exchange_us": null,
+            "authentication_request_encode_write_us": null,
+            "authentication_response_accepted": false,
+            "failed_operations": 0,
+            "interrupted": false,
+            "protocol_request_encode_write_us": 1256,
+            "proxy_connect_exchange_us": null,
+            "proxy_negotiation_us": null,
+            "proxy_tls_handshake_us": 3066,
+            "quic_connection_reused": false,
+            "quic_handshake_including_tls_us": null,
+            "reality_handshake_us": null,
+            "resolution_us": 8,
+            "tcp_attempts": 1,
+            "tcp_cancelled_attempts": 0,
+            "tcp_connected_attempt_us": 356,
+            "tcp_dial_us": 397,
+            "tcp_failed_attempts": 0,
+            "transport_setup_us": 1891
+          },
+          "response_headers_ms": 9
+        },
+        "request_id": 1,
+        "state": "succeeded"
+      },
+      "target_requests_before": 0,
+      "target_requests_after": 1,
+      "target_received_bytes": 114,
+      "target_sent_bytes": 65,
+      "expected_outcome_verified": true,
+      "official_xray_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)"
+    },
+    {
+      "case": "test_vmess_wss_and_failed_status_keep_distinct_setup_phases",
+      "protocol": "vmess",
+      "expected_success": false,
+      "probe": {
+        "failure": {
+          "code": "UrlTestStatus",
+          "http_status": 503,
+          "outbound_timing": {
+            "authentication_exchange_us": null,
+            "authentication_request_encode_write_us": null,
+            "authentication_response_accepted": false,
+            "failed_operations": 0,
+            "interrupted": false,
+            "protocol_request_encode_write_us": 1564,
+            "proxy_connect_exchange_us": null,
+            "proxy_negotiation_us": null,
+            "proxy_tls_handshake_us": 4392,
+            "quic_connection_reused": false,
+            "quic_handshake_including_tls_us": null,
+            "reality_handshake_us": null,
+            "resolution_us": 5,
+            "tcp_attempts": 1,
+            "tcp_cancelled_attempts": 0,
+            "tcp_connected_attempt_us": 676,
+            "tcp_dial_us": 727,
+            "tcp_failed_attempts": 0,
+            "transport_setup_us": 1350
+          },
+          "stage": "http_status"
+        },
+        "request_id": 2,
+        "state": "failed"
+      },
+      "target_requests_before": 1,
+      "target_requests_after": 2,
+      "target_received_bytes": 228,
+      "target_sent_bytes": 139,
+      "expected_outcome_verified": true,
+      "official_xray_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)"
+    },
+    {
+      "case": "test_vmess_wss_and_failed_status_keep_distinct_setup_phases",
+      "protocol": "vmess",
+      "expected_success": false,
+      "probe": {
+        "failure": {
+          "code": "UrlTestRead",
+          "outbound_timing": {
+            "authentication_exchange_us": null,
+            "authentication_request_encode_write_us": null,
+            "authentication_response_accepted": false,
+            "failed_operations": 0,
+            "interrupted": false,
+            "protocol_request_encode_write_us": 3419,
+            "proxy_connect_exchange_us": null,
+            "proxy_negotiation_us": null,
+            "proxy_tls_handshake_us": 3413,
+            "quic_connection_reused": false,
+            "quic_handshake_including_tls_us": null,
+            "reality_handshake_us": null,
+            "resolution_us": 9,
+            "tcp_attempts": 1,
+            "tcp_cancelled_attempts": 0,
+            "tcp_connected_attempt_us": 2393,
+            "tcp_dial_us": 2433,
+            "tcp_failed_attempts": 0,
+            "transport_setup_us": 840
+          },
+          "stage": "response_headers"
+        },
+        "request_id": 1,
+        "state": "failed"
+      },
+      "target_requests_before": 2,
+      "target_requests_after": 2,
+      "target_received_bytes": 228,
+      "target_sent_bytes": 139,
+      "expected_outcome_verified": true,
+      "official_xray_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)"
+    }
+  ],
+  "core_sessions": [
+    {
+      "case": "test_hysteria_authentication_response_and_rejection_are_observed",
+      "protocol": "hysteria2",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_hysteria_authentication_response_and_rejection_are_observed",
+      "protocol": "hysteria2",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_tuic_auth_write_and_live_connection_reuse_are_not_fake_handshakes",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 94,
+      "downloaded": 94,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_tuic_auth_write_and_live_connection_reuse_are_not_fake_handshakes",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_vmess_wss_and_failed_status_keep_distinct_setup_phases",
+      "protocol": "vmess",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_vmess_wss_and_failed_status_keep_distinct_setup_phases",
+      "protocol": "vmess",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    }
+  ],
+  "ffi_hosts": [
+    {
+      "case": "test_hysteria_authentication_response_and_rejection_are_observed",
+      "startup": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "1e0241aef55dc8f1e9bc9f0522e03516f5bb6c3bc1b7a171bf7c68c8f98e493d",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 8,
+        "command_counts": {},
+        "handles_started": 0,
+        "handles_stopped": 0,
+        "active_handles": 0
+      },
+      "before_eof": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "1e0241aef55dc8f1e9bc9f0522e03516f5bb6c3bc1b7a171bf7c68c8f98e493d",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 20,
+        "command_counts": {
+          "start": 2,
+          "probe_start": 2,
+          "probe_status": 2,
+          "snapshot": 4,
+          "stop": 2
+        },
+        "handles_started": 2,
+        "handles_stopped": 2,
+        "active_handles": 0
+      }
+    },
+    {
+      "case": "test_tuic_auth_write_and_live_connection_reuse_are_not_fake_handshakes",
+      "startup": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "1e0241aef55dc8f1e9bc9f0522e03516f5bb6c3bc1b7a171bf7c68c8f98e493d",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 8,
+        "command_counts": {},
+        "handles_started": 0,
+        "handles_stopped": 0,
+        "active_handles": 0
+      },
+      "before_eof": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "1e0241aef55dc8f1e9bc9f0522e03516f5bb6c3bc1b7a171bf7c68c8f98e493d",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 23,
+        "command_counts": {
+          "start": 2,
+          "probe_start": 3,
+          "probe_status": 3,
+          "snapshot": 5,
+          "stop": 2
+        },
+        "handles_started": 2,
+        "handles_stopped": 2,
+        "active_handles": 0
+      }
+    },
+    {
+      "case": "test_vmess_wss_and_failed_status_keep_distinct_setup_phases",
+      "startup": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "1e0241aef55dc8f1e9bc9f0522e03516f5bb6c3bc1b7a171bf7c68c8f98e493d",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 8,
+        "command_counts": {},
+        "handles_started": 0,
+        "handles_stopped": 0,
+        "active_handles": 0
+      },
+      "before_eof": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "1e0241aef55dc8f1e9bc9f0522e03516f5bb6c3bc1b7a171bf7c68c8f98e493d",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 22,
+        "command_counts": {
+          "start": 2,
+          "probe_start": 3,
+          "probe_status": 3,
+          "snapshot": 4,
+          "stop": 2
+        },
+        "handles_started": 2,
+        "handles_stopped": 2,
+        "active_handles": 0
+      }
+    }
+  ]
+}

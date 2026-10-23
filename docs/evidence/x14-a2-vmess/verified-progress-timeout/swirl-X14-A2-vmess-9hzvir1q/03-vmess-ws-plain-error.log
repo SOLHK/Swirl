@@ -1,0 +1,5 @@
+2026/10/22 22:07:33.348908 [Debug] app/log: Logger started
+2026/10/22 22:07:33.349033 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:46289
+2026/10/22 22:07:33.351155 [Info] transport/internet/websocket: listening tcp(for WS) on 127.0.0.1:46289
+2026/10/22 22:07:33.351272 [Warning] core: Xray 26.10.21 started
+2026/10/22 22:07:33.366115 [Info] [865953665] app/proxyman/inbound: connection ends > proxy/vmess/inbound: invalid request from 127.0.0.1:38810 > proxy/vmess/encoding: invalid user > user do not exist

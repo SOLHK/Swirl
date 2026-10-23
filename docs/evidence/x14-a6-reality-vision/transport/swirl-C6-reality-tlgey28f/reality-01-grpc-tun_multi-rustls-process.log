@@ -1,0 +1,112 @@
+Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)
+A unified platform for anti-censorship.
+2026/10/22 22:25:24.155045 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-C6-reality-tlgey28f/reality-01-grpc-tun_multi-rustls/xray-config.json Format:json}
+2026/10/22 22:25:24.155957 [Warning] common/errors: The feature gRPC transport (with unnecessary costs, etc.) is deprecated, not recommended for using and might be removed. Please migrate to XHTTP stream-up H2 as soon as possible.
+2026/10/22 22:25:24.155971 [Warning] infra/conf: REALITY: Listening on non-443 ports will increase the likelihood of your server's IP being blocked by the GFW
+2026/10/22 22:25:24.156788 [Debug] app/log: Logger started
+2026/10/22 22:25:24.156960 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:41417
+2026/10/22 22:25:24.160485 [Warning] core: Xray 26.10.21 started
+2026/10/22 22:25:24.161111 [Debug] transport/internet/grpc: gRPC listen for service name `swirl-reality` tun `Tun` multi tun `TunMulti`
+REALITY remoteAddr: 127.0.0.1:47590
+REALITY remoteAddr: 127.0.0.1:47590	hs.c.isHandshakeComplete.Load(): false
+REALITY remoteAddr: 127.0.0.1:47602
+REALITY remoteAddr: 127.0.0.1:47616
+REALITY remoteAddr: 127.0.0.1:47626
+REALITY remoteAddr: 127.0.0.1:47640
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:47602	hs.c.ClientVer: [0 1 0]
+REALITY remoteAddr: 127.0.0.1:47602	hs.c.ClientTime: 2026-10-22 22:25:24 +0900 KST
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:47602	hs.c.conn == conn: true
+REALITY remoteAddr: 127.0.0.1:47602	len(s2cSaved): 709	Server Hello: 127
+REALITY remoteAddr: 127.0.0.1:47602	len(s2cSaved): 582	Change Cipher Spec: 6
+REALITY remoteAddr: 127.0.0.1:47602	len(s2cSaved): 576	Encrypted Extensions: 41
+REALITY remoteAddr: 127.0.0.1:47602	len(s2cSaved): 535	Certificate: 367
+REALITY remoteAddr: 127.0.0.1:47602	len(s2cSaved): 168	Certificate Verify: 94
+REALITY remoteAddr: 127.0.0.1:47602	len(s2cSaved): 74	Finished: 74
+REALITY remoteAddr: 127.0.0.1:47602	is using X25519MLKEM768 for TLS' communication: false
+REALITY remoteAddr: 127.0.0.1:47602	is using ML-DSA-65 for cert's extra signature: false
+REALITY remoteAddr: 127.0.0.1:47602	hs.handshake() err: <nil>
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:47616	hs.c.ClientVer: [0 1 0]
+REALITY remoteAddr: 127.0.0.1:47616	hs.c.ClientTime: 2026-10-22 22:25:24 +0900 KST
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:47616	hs.c.conn == conn: true
+REALITY remoteAddr: 127.0.0.1:47616	len(s2cSaved): 709	Server Hello: 127
+REALITY remoteAddr: 127.0.0.1:47616	len(s2cSaved): 582	Change Cipher Spec: 6
+REALITY remoteAddr: 127.0.0.1:47616	len(s2cSaved): 576	Encrypted Extensions: 41
+REALITY remoteAddr: 127.0.0.1:47616	len(s2cSaved): 535	Certificate: 367
+REALITY remoteAddr: 127.0.0.1:47616	len(s2cSaved): 168	Certificate Verify: 94
+REALITY remoteAddr: 127.0.0.1:47616	len(s2cSaved): 74	Finished: 74
+REALITY remoteAddr: 127.0.0.1:47616	is using X25519MLKEM768 for TLS' communication: false
+REALITY remoteAddr: 127.0.0.1:47616	is using ML-DSA-65 for cert's extra signature: false
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:47626	hs.c.ClientVer: [0 1 0]
+REALITY remoteAddr: 127.0.0.1:47626	hs.c.ClientTime: 2026-10-22 22:25:24 +0900 KST
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:47626	hs.c.conn == conn: true
+REALITY remoteAddr: 127.0.0.1:47616	hs.handshake() err: <nil>
+REALITY remoteAddr: 127.0.0.1:47626	len(s2cSaved): 709	Server Hello: 127
+REALITY remoteAddr: 127.0.0.1:47626	len(s2cSaved): 582	Change Cipher Spec: 6
+REALITY remoteAddr: 127.0.0.1:47626	len(s2cSaved): 576	Encrypted Extensions: 41
+REALITY remoteAddr: 127.0.0.1:47626	len(s2cSaved): 535	Certificate: 367
+REALITY remoteAddr: 127.0.0.1:47626	len(s2cSaved): 168	Certificate Verify: 94
+REALITY remoteAddr: 127.0.0.1:47626	len(s2cSaved): 74	Finished: 74
+REALITY remoteAddr: 127.0.0.1:47626	is using X25519MLKEM768 for TLS' communication: false
+REALITY remoteAddr: 127.0.0.1:47626	is using ML-DSA-65 for cert's extra signature: false
+REALITY remoteAddr: 127.0.0.1:47626	hs.handshake() err: <nil>
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:47640	hs.c.ClientVer: [0 1 0]
+REALITY remoteAddr: 127.0.0.1:47640	hs.c.ClientTime: 2026-10-22 22:25:24 +0900 KST
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:47640	hs.c.conn == conn: true
+REALITY remoteAddr: 127.0.0.1:47602	hs.readClientFinished() err: <nil>
+REALITY remoteAddr: 127.0.0.1:47602	hs.c.isHandshakeComplete.Load(): true
+REALITY remoteAddr: 127.0.0.1:47640	len(s2cSaved): 709	Server Hello: 127
+REALITY remoteAddr: 127.0.0.1:47640	len(s2cSaved): 582	Change Cipher Spec: 6
+REALITY remoteAddr: 127.0.0.1:47640	len(s2cSaved): 576	Encrypted Extensions: 41
+REALITY remoteAddr: 127.0.0.1:47640	len(s2cSaved): 535	Certificate: 367
+REALITY remoteAddr: 127.0.0.1:47640	len(s2cSaved): 168	Certificate Verify: 94
+REALITY remoteAddr: 127.0.0.1:47640	len(s2cSaved): 74	Finished: 74
+REALITY remoteAddr: 127.0.0.1:47640	is using X25519MLKEM768 for TLS' communication: false
+REALITY remoteAddr: 127.0.0.1:47640	is using ML-DSA-65 for cert's extra signature: false
+REALITY remoteAddr: 127.0.0.1:47640	hs.handshake() err: <nil>
+REALITY remoteAddr: 127.0.0.1:47616	hs.readClientFinished() err: <nil>
+REALITY remoteAddr: 127.0.0.1:47616	hs.c.isHandshakeComplete.Load(): true
+REALITY remoteAddr: 127.0.0.1:47626	hs.readClientFinished() err: <nil>
+REALITY remoteAddr: 127.0.0.1:47626	hs.c.isHandshakeComplete.Load(): true
+2026/10/22 22:25:24.178420 [Info] [2922135462] proxy/vless/inbound: firstLen = 26
+2026/10/22 22:25:24.178437 [Info] [2922135462] proxy/vless/inbound: received request for tcp:127.0.0.1:59213
+2026/10/22 22:25:24.178442 [Info] [2922135462] app/dispatcher: taking detour [origin-59213] for [tcp:127.0.0.1:59213]
+2026/10/22 22:25:24.178553 [Info] [2922135462] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:59213
+2026/10/22 22:25:24.178562 [Debug] [2922135462] transport/internet: dialing to tcp:127.0.0.1:59213
+2026/10/22 22:25:24.178672 [Info] [2922135462] proxy/freedom: connection opened to tcp:127.0.0.1:59213, local endpoint 127.0.0.1:45398, remote endpoint 127.0.0.1:59213
+2026/10/22 22:25:24.178729 [Debug] [2922135462] proxy: CopyRawConn (maybe) readv
+2026/10/22 22:25:24.179331 [Info] [2943927484] proxy/vless/inbound: firstLen = 26
+2026/10/22 22:25:24.179335 [Info] [2943927484] proxy/vless/inbound: received request for tcp:127.0.0.1:59213
+2026/10/22 22:25:24.179339 [Info] [2943927484] app/dispatcher: taking detour [origin-59213] for [tcp:127.0.0.1:59213]
+2026/10/22 22:25:24.179342 [Info] [2943927484] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:59213
+2026/10/22 22:25:24.179344 [Debug] [2943927484] transport/internet: dialing to tcp:127.0.0.1:59213
+2026/10/22 22:25:24.179454 [Info] [2943927484] proxy/freedom: connection opened to tcp:127.0.0.1:59213, local endpoint 127.0.0.1:45412, remote endpoint 127.0.0.1:59213
+2026/10/22 22:25:24.179470 [Debug] [2943927484] proxy: CopyRawConn (maybe) readv
+2026/10/22 22:25:24.179723 [Info] [3130701661] proxy/vless/inbound: firstLen = 26
+2026/10/22 22:25:24.179738 [Info] [3130701661] proxy/vless/inbound: received request for tcp:127.0.0.1:59213
+2026/10/22 22:25:24.179741 [Info] [3130701661] app/dispatcher: taking detour [origin-59213] for [tcp:127.0.0.1:59213]
+2026/10/22 22:25:24.179744 [Info] [3130701661] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:59213
+2026/10/22 22:25:24.179747 [Debug] [3130701661] transport/internet: dialing to tcp:127.0.0.1:59213
+2026/10/22 22:25:24.179838 [Info] [3130701661] proxy/freedom: connection opened to tcp:127.0.0.1:59213, local endpoint 127.0.0.1:45420, remote endpoint 127.0.0.1:59213
+2026/10/22 22:25:24.179848 [Debug] [3130701661] proxy: CopyRawConn (maybe) readv
+REALITY remoteAddr: 127.0.0.1:47640	hs.readClientFinished() err: <nil>
+REALITY remoteAddr: 127.0.0.1:47640	hs.c.isHandshakeComplete.Load(): true
+2026/10/22 22:25:24.183745 [Info] [513616864] proxy/vless/inbound: firstLen = 26
+2026/10/22 22:25:24.186739 [Info] [513616864] proxy/vless/inbound: received request for tcp:127.0.0.1:59213
+2026/10/22 22:25:24.186745 [Info] [513616864] app/dispatcher: taking detour [origin-59213] for [tcp:127.0.0.1:59213]
+2026/10/22 22:25:24.186748 [Info] [513616864] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:59213
+2026/10/22 22:25:24.186921 [Debug] [513616864] transport/internet: dialing to tcp:127.0.0.1:59213
+2026/10/22 22:25:24.187317 [Info] [513616864] proxy/freedom: connection opened to tcp:127.0.0.1:59213, local endpoint 127.0.0.1:45428, remote endpoint 127.0.0.1:59213
+2026/10/22 22:25:24.187324 [Debug] [513616864] proxy: CopyRawConn (maybe) readv
+2026/10/22 22:25:24.247168 [Info] [3130701661] app/proxyman/outbound: app/proxyman/outbound: failed to process outbound traffic > proxy/freedom: connection ends > proxy/freedom: failed to process request > transport/internet/grpc/encoding: failed to fetch hunk from gRPC tunnel > rpc error: code = Canceled desc = context canceled
+2026/10/22 22:25:24.247205 [Info] [2943927484] app/proxyman/outbound: app/proxyman/outbound: failed to process outbound traffic > proxy/freedom: connection ends > proxy/freedom: failed to process request > transport/internet/grpc/encoding: failed to fetch hunk from gRPC tunnel > rpc error: code = Canceled desc = context canceled
+2026/10/22 22:25:24.255700 [Info] [513616864] app/proxyman/outbound: app/proxyman/outbound: failed to process outbound traffic > proxy/freedom: connection ends > proxy/freedom: failed to process request > transport/internet/grpc/encoding: failed to fetch hunk from gRPC tunnel > rpc error: code = Canceled desc = context canceled
+2026/10/22 22:25:24.266984 [Info] [2922135462] app/proxyman/outbound: app/proxyman/outbound: failed to process outbound traffic > proxy/freedom: connection ends > proxy/freedom: failed to process request > transport/internet/grpc/encoding: failed to fetch hunk from gRPC tunnel > rpc error: code = Canceled desc = context canceled
+2026/10/22 22:25:24.526513 [Debug] app/log: Logger closing

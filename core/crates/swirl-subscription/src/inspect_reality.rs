@@ -242,6 +242,8 @@ fn outbound(raw: &Value, family: &str) -> Result<Outbound, &'static str> {
             alpn,
         }),
         flow,
+        transport: None,
+        udp: raw.get("udp").and_then(Value::as_bool).unwrap_or(false),
     };
     Config {
         schema: 1,

@@ -1,0 +1,135 @@
+{
+  "command": [
+    "/workspace/scratch/63c2b083dcfa/build-rust/debug/examples/transport-client"
+  ],
+  "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+  "peers": [
+    {
+      "label": "reality-01-grpc-tun-rustls",
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "environment_overrides": {}
+    },
+    {
+      "label": "reality-02-xhttp-tun-rustls",
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "environment_overrides": {}
+    }
+  ],
+  "records": [
+    {
+      "stage": "C6-reality",
+      "platform": "Linux",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "server_environment_overrides": {},
+      "transport": "grpc",
+      "protocol": "vless",
+      "tls": false,
+      "reality": true,
+      "target_tls": false,
+      "mode": "http",
+      "exit_code": 0,
+      "elapsed_ms": 37.967,
+      "result": {
+        "close": "clean",
+        "close_detail": null,
+        "connect_us": 11017,
+        "downloaded": 131328,
+        "driver_drain_us": 3552,
+        "ok": true,
+        "remaining_tasks": 0,
+        "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+        "transfer_us": 14469,
+        "uploaded": 69
+      }
+    },
+    {
+      "stage": "C6-reality",
+      "platform": "Linux",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "server_environment_overrides": {},
+      "transport": "grpc",
+      "protocol": "vless",
+      "tls": false,
+      "reality": true,
+      "target_tls": false,
+      "mode": "http",
+      "exit_code": 1,
+      "elapsed_ms": 4.082,
+      "result": {
+        "driver_drain_us": 3,
+        "error": "RealityAlpnUnsupported",
+        "ok": false,
+        "remaining_tasks": 0
+      }
+    },
+    {
+      "stage": "C6-reality",
+      "platform": "Linux",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "server_environment_overrides": {},
+      "transport": "xhttp",
+      "protocol": "vless",
+      "tls": false,
+      "reality": true,
+      "target_tls": false,
+      "mode": "http",
+      "exit_code": 0,
+      "elapsed_ms": 34.809,
+      "result": {
+        "close": "clean",
+        "close_detail": null,
+        "connect_us": 13788,
+        "downloaded": 131328,
+        "driver_drain_us": 2163,
+        "ok": true,
+        "remaining_tasks": 0,
+        "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+        "transfer_us": 8995,
+        "uploaded": 69
+      }
+    },
+    {
+      "stage": "C6-reality",
+      "platform": "Linux",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "server_environment_overrides": {},
+      "transport": "xhttp",
+      "protocol": "vless",
+      "tls": false,
+      "reality": true,
+      "target_tls": false,
+      "mode": "http",
+      "exit_code": 1,
+      "elapsed_ms": 5.484,
+      "result": {
+        "driver_drain_us": 7,
+        "error": "RealityAlpnUnsupported",
+        "ok": false,
+        "remaining_tasks": 0
+      }
+    }
+  ],
+  "cleanup_errors": [],
+  "origins": [
+    {
+      "mode": "http",
+      "tls": false,
+      "requests": 1,
+      "received": 0,
+      "client_closes": 1,
+      "tls_closes": 0,
+      "interruptions": 0,
+      "errors": []
+    },
+    {
+      "mode": "http",
+      "tls": false,
+      "requests": 1,
+      "received": 0,
+      "client_closes": 1,
+      "tls_closes": 0,
+      "interruptions": 0,
+      "errors": []
+    }
+  ]
+}

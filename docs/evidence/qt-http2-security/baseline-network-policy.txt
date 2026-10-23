@@ -1,0 +1,39 @@
+********* Start testing of QtNetworkPolicyTests *********
+Config: Using QtTest library 6.10.3, Qt 6.10.3 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 11.4.1 20231218 (Red Hat 11.4.1-3)), ubuntu 24.04
+QINFO  : QtNetworkPolicyTests::initTestCase() Qt 6.10.3 TLS backend "openssl" "OpenSSL 3.0.13 30 Jan 2024"
+QINFO  : QtNetworkPolicyTests::initTestCase() Independent TLS fixture {"event": "prepared", "tls": "OpenSSL 3.5.8 25 Aug 2026", "leaf_days": 2}
+PASS   : QtNetworkPolicyTests::initTestCase()
+QWARN  : QtNetworkPolicyTests::unprotectedClientNegotiatesHttp2PositiveControl() qt.network.http2: stream 1 error: "Connection closed"
+QWARN  : QtNetworkPolicyTests::unprotectedClientNegotiatesHttp2PositiveControl() qt.network.http2: stream 1 finished with error: "HTTP/2 protocol error"
+PASS   : QtNetworkPolicyTests::unprotectedClientNegotiatesHttp2PositiveControl()
+QWARN  : QtNetworkPolicyTests::subscriptionHttpsDownloadsAndParsesOverHttp1() qt.network.http2: stream 1 error: "Connection closed"
+QWARN  : QtNetworkPolicyTests::subscriptionHttpsDownloadsAndParsesOverHttp1() qt.network.http2: stream 1 finished with error: "HTTP/2 protocol error"
+FAIL!  : QtNetworkPolicyTests::subscriptionHttpsDownloadsAndParsesOverHttp1() Compared values are not the same
+   Actual   (download.applied): 0
+   Expected (1)               : 1
+   Loc: [/workspace/scratch/3a49b1a53628/Swirl-qt-http2-before/src/Swirl.Quick/tests/QtNetworkPolicyTests.cpp(183)]
+FAIL!  : QtNetworkPolicyTests::subscriptionHttpsDownloadsAndParsesOverHttp1() Compared values are not the same
+   Actual   (origin.requests.size()): 0
+   Expected (count)                 : 1
+   Loc: [/workspace/scratch/3a49b1a53628/Swirl-qt-http2-before/src/Swirl.Quick/tests/QtNetworkPolicyTests.cpp(172)]
+QWARN  : QtNetworkPolicyTests::subscriptionHttpsRedirectsStayOnHttp1() qt.network.http2: stream 1 error: "Connection closed"
+QWARN  : QtNetworkPolicyTests::subscriptionHttpsRedirectsStayOnHttp1() qt.network.http2: stream 1 finished with error: "HTTP/2 protocol error"
+FAIL!  : QtNetworkPolicyTests::subscriptionHttpsRedirectsStayOnHttp1() Compared values are not the same
+   Actual   (download.applied): 0
+   Expected (1)               : 1
+   Loc: [/workspace/scratch/3a49b1a53628/Swirl-qt-http2-before/src/Swirl.Quick/tests/QtNetworkPolicyTests.cpp(183)]
+FAIL!  : QtNetworkPolicyTests::subscriptionHttpsRedirectsStayOnHttp1() Compared values are not the same
+   Actual   (second.protocols.size()): 0
+   Expected (1)                      : 1
+   Loc: [/workspace/scratch/3a49b1a53628/Swirl-qt-http2-before/src/Swirl.Quick/tests/QtNetworkPolicyTests.cpp(286)]
+FAIL!  : QtNetworkPolicyTests::cleartextSubscriptionIgnoresH2cEnvironment() '!request.toLower().contains("upgrade: h2c")' returned FALSE. ()
+   Loc: [/workspace/scratch/3a49b1a53628/Swirl-qt-http2-before/src/Swirl.Quick/tests/QtNetworkPolicyTests.cpp(178)]
+PASS   : QtNetworkPolicyTests::cleanupTestCase()
+Totals: 3 passed, 3 failed, 0 skipped, 0 blacklisted, 1184ms
+********* Finished testing of QtNetworkPolicyTests *********
+
+Baseline HEAD=5d96214ac80d63985cdccf4942c3c1d79035e793
+NodeImportService actual git blob=20320ae5b753ba85cfe1f4e66823d4cf9952cc41
+NodeImportService HEAD git blob=20320ae5b753ba85cfe1f4e66823d4cf9952cc41
+Production downloader unchanged: true
+Exit code: 3 (expected regression failures)
