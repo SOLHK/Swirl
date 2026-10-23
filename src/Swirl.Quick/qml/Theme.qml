@@ -79,21 +79,21 @@ QtObject {
     readonly property color navigationPressed: dark ? "#636871" : "#B4BAC3"
     readonly property color selected: dark ? "#484848" : "#E3E4E7"
     readonly property color segmentSelected: dark ? "#64666A" : "#FFFFFF"
-    readonly property color hover: dark ? "#3A4B65" : "#E6EDFA"
-    readonly property color pressed: dark ? "#465A78" : "#D7E3F7"
+    readonly property color hover: dark ? "#484848" : "#E3E3E5"
+    readonly property color pressed: dark ? "#555555" : "#D5D5D8"
     readonly property color controlBorder: pillRim
     readonly property color focusBorder: dark ? "#9AC8FF" : "#005BBF"
     readonly property color tableToolbar: dark ? "#333333" : "#ECECED"
-    readonly property color buttonBase: dark ? "#3B3D40" : "#E4E5E7"
+    readonly property color buttonBase: navigationSelected
     readonly property color field: dark ? "#2C3A50" : "#F2F5FC"
     readonly property color capsuleSurface: dark ? "#38383C" : "#ECEDEF"
     readonly property color green: dark ? "#75DD91" : "#30C759"
     readonly property color statusGreen: dark ? "#75DD91" : "#00B832"
     readonly property color orange: dark ? "#F5C67D" : "#FF9229"
     readonly property color red: dark ? "#FF9A93" : "#CF3029"
-    // One typographic point is 96/72 Windows logical pixels. Keep the HWND
-    // contour independent of content zoom; Qt maps these DIP to screen pixels.
-    readonly property real windowRadius: 10 * 96 / 72
+    // Shell and floating sidebar share one contour, independent of content zoom.
+    // Qt maps these logical pixels to each screen's device pixel ratio.
+    readonly property real windowRadius: 16
     // Cards at the same hierarchy share a token, including the settings grid.
     readonly property real cardRadius: dp(20)
     readonly property real containerRadius: cardRadius

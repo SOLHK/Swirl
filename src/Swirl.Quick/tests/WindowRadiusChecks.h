@@ -40,8 +40,8 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
         return result;
     };
     eval("Theme.mode='Light';Theme.reduceMotion=true;Theme.resetScale()");
-    check(qAbs(eval("Theme.windowRadius").toReal() - 10.0 * 96.0 / 72.0) < 0.0001,
-          "window token is 10pt = 13.333333 Qt DIP");
+    check(qAbs(eval("Theme.windowRadius").toReal() - 16.0) < 0.0001,
+          "window token matches the 16 DIP sidebar contour");
     check(eval("Theme.cardRadius===Theme.independentCardRadius && Theme.cardRadius===Theme.containerRadius").toBool(),
           "same-level card tokens share one radius");
     const HWND previousForeground = GetForegroundWindow();
@@ -69,7 +69,7 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
         RECT bounds{};
         GetWindowRect(hwnd, &bounds);
         const int width = bounds.right - bounds.left, height = bounds.bottom - bounds.top;
-        const qreal radius = 10.0 * 96.0 / 72.0 * window->devicePixelRatio();
+        const qreal radius = 16.0 * window->devicePixelRatio();
         const bool alpha=window->rendererInterface()->graphicsApi()!=QSGRendererInterface::Software;
         bool symmetric = alpha?kind==ERROR:kind==COMPLEXREGION, geometric = symmetric;
         for (int y = 0; !alpha && y <= qCeil(radius); ++y) {
@@ -84,7 +84,7 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
         }
         check(backdrop->exactCorners() && symmetric, phase + ": contour ownership matches renderer");
         check(geometric, phase + ": accelerated alpha has no binary clip; software keeps compatibility region");
-        check(qAbs(backdrop->cornerRadius() - 10.0 * 96.0 / 72.0) < 0.0001, phase + ": active logical radius is 10pt");
+        check(qAbs(backdrop->cornerRadius() - 16.0) < 0.0001, phase + ": active logical radius is 16 DIP");
         DeleteObject(region);
     };
     verifyRegion("normal");
@@ -142,15 +142,15 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
     check(!image.isNull() && image.save(directory + "/window-and-shadow.png"), "actual compositor contour and shadow saved");
     int shadowPixels = 0;
     const auto alphaImage=window->grabWindow();int fractionalAlpha=0;
-    if(!alphaImage.isNull())for(int y=0;y<qCeil(14*dpr);++y)for(int x=0;x<qCeil(14*dpr);++x){const auto a=alphaImage.pixelColor(x,y).alpha();if(a>0&&a<255)++fractionalAlpha;}
+    if(!alphaImage.isNull())for(int y=0;y<qCeil(17*dpr);++y)for(int x=0;x<qCeil(17*dpr);++x){const auto a=alphaImage.pixelColor(x,y).alpha();if(a>0&&a<255)++fractionalAlpha;}
     check(fractionalAlpha>3,"GPU contour contains fractional coverage instead of an integer staircase");
     int outsideCornerPixels = 0, outsideCornerBrightPixels = 0;
     if (!image.isNull()) {
         image.copy(padding, padding, width, height).save(directory + "/window.png");
-        const int extent = qCeil(10.0 * 96.0 / 72.0 * dpr) + 3;
+        const int extent = qCeil(16.0 * dpr) + 3;
         for (int i = 0; i < 4; ++i) image.copy(padding + (i % 2 ? width - extent : 0),
             padding + (i / 2 ? height - extent : 0), extent, extent).save(directory + QString("/corner-%1.png").arg(i));
-        const qreal cornerRadius = 10.0 * 96.0 / 72.0 * dpr;
+        const qreal cornerRadius = 16.0 * dpr;
         for (int y = 0; y < qCeil(cornerRadius); ++y) for (int x = 0; x < qCeil(cornerRadius); ++x) {
             const qreal dx = cornerRadius - x - 0.5, dy = cornerRadius - y - 0.5;
             if (std::hypot(dx,dy) <= cornerRadius + 0.75) continue;
@@ -170,7 +170,7 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
             }
     }
     check(outsideCornerPixels > 0 && outsideCornerBrightPixels == 0,
-          "actual pixels outside all four 10pt corners show only background or dark shadow, never a pale material square");
+          "actual pixels outside all four 16 DIP corners show only background or dark shadow, never a pale material square");
     check(shadowPixels > 10 && backdrop->compatibilityShadow(), "a visible compatibility shadow follows the exact contour");
     const HWND shadow = reinterpret_cast<HWND>(backdrop->compatibilityShadowHandle());
     const auto shadowStyle = shadow ? GetWindowLongPtrW(shadow, GWL_EXSTYLE) : 0;
@@ -200,7 +200,7 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
     if (IsWindow(previousForeground)) SetForegroundWindow(previousForeground);
     QFile report(directory + "/window-radius.json");
     if (report.open(QIODevice::WriteOnly)) report.write(QJsonDocument(QJsonObject{
-        {"dpr", dpr}, {"logicalRadius", 10.0 * 96.0 / 72.0}, {"physicalRadius", 10.0 * 96.0 / 72.0 * dpr},
+        {"dpr", dpr}, {"logicalRadius", 16.0}, {"physicalRadius", 16.0 * dpr},
         {"shadowPixels", shadowPixels}, {"outsideCornerPixels", outsideCornerPixels}, {"outsideCornerBrightPixels", outsideCornerBrightPixels},
         {"shadowKind", "cached input-transparent compatibility HWND"}, {"checks", checks}, {"failures", failures},
         {"scaleNote", "Qt scale-factor validation; no Windows global display setting is changed"}}).toJson());

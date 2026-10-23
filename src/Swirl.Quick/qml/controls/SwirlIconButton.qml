@@ -12,11 +12,9 @@ SwirlMotionButton {
     implicitWidth:Theme.controlHeight; implicitHeight:Theme.controlHeight
     hoverEnabled: true
     background: SwirlClearGlassSurface {
-        elevated:false
         Behavior on color { ColorAnimation {duration:SwirlMotion.duration} }
-        radius:Theme.controlRadius
-        color:control.down?Theme.interactionPressed:control.hovered?Theme.interactionHover:control.quiet?"transparent":Theme.glassFill
-        glassEnabled:Theme.transparency && !Theme.increaseContrast && !control.quiet
+        radius:height/2
+        color:control.down?Theme.pressed:control.hovered?Theme.hover:control.quiet?"transparent":Theme.buttonBase
         border.width:control.activeFocus || Theme.increaseContrast?1/Screen.devicePixelRatio:0
         hovered: control.hovered; pressed: control.down
         border.color: control.activeFocus ? Theme.focusBorder : Theme.pillRim

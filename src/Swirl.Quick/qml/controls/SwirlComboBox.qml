@@ -34,9 +34,8 @@ ComboBox {
         source:"image://swirl/chevron-up-down/"+Theme.text.toString().slice(1)
     }
     background: SwirlClearGlassSurface {
-        elevated:false
         hovered:control.hovered;pressed:control.pressed;focused:control.activeFocus
-        radius: Theme.controlRadius
+        radius: height/2
         antialiasing: true
         color: control.pressed ? Theme.pressed : control.hovered ? Theme.hover : Theme.buttonBase
         border.width:control.activeFocus || Theme.increaseContrast?1/Screen.devicePixelRatio:0
@@ -58,7 +57,7 @@ ComboBox {
             Image{visible:control.currentIndex===index;x:Theme.dp(3);anchors.verticalCenter:parent.verticalCenter;width:Theme.dp(14);height:width;source:"image://swirl/checkmark/"+(parent.parent.highlighted?"ffffff":Theme.text.toString().slice(1))}
         }
         background: Rectangle {
-            radius: Theme.controlRadius; antialiasing:true; color: parent.highlighted ? Theme.accent : "transparent"
+            radius: height/2; antialiasing:true; color: parent.highlighted ? Theme.accent : "transparent"
             Behavior on color { ColorAnimation { duration: Math.min(100,SwirlMotion.duration) } }
         }
     }
@@ -86,7 +85,7 @@ ComboBox {
             }
         }
         exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} } }
-        background: SwirlClearGlassSurface { radius:Theme.popupRadius; elevated:false }
+        background: SwirlClearGlassSurface { radius:Theme.popupRadius; color:Theme.material("floating") }
         contentItem: ListView { pixelAligned: true;
             clip: true
             implicitHeight: contentHeight

@@ -40,7 +40,7 @@ ApplicationWindow {
     function preparePreviewState(state){const item=pageLoader.item;if(item&&item.preparePreviewState)item.preparePreviewState(state)}
     function previewScrollBottom() { if(pageLoader.item && pageLoader.item.scrollToBottom)pageLoader.item.scrollToBottom() }
     property real swirlWindowRadius:Theme.windowRadius
-    // DWM's ROUND preference is a system preset, not an exact 10pt radius.
+    // DWM's ROUND preset cannot match the shared shell/sidebar radius exactly.
     property bool swirlExactWindowRadius:true
     readonly property real shellRadius:window.visibility===Window.Maximized || window.visibility===Window.FullScreen ? 0 : Theme.windowRadius
     Binding { target:window.captureProviderContext; property:"upstreamProxyPort"; value:window.engineControllerContext.processAlive?window.engineControllerContext.activeProxyPort:0 }

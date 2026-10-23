@@ -1,5 +1,5 @@
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import SwirlQuick
 import "../components"
 TextField {
@@ -24,8 +24,6 @@ TextField {
     background: SwirlPillSurface {
         hovered:control.hovered||control.activeFocus
         radius: Theme.controlRadius
-        gradient: null
-        subtleShadow: false
         antialiasing: true
         color:Theme.dark?Theme.field:Theme.surface
         border.width:Theme.dp(control.activeFocus?2:control.borderless?0:1)

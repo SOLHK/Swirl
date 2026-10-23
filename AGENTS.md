@@ -1,5 +1,12 @@
 # UI/UX Guidance
 
+## UI update delivery requirements (2026-10-23)
+
+- Continue the accepted `0b15f77` UI on `work/ui-liquid-glass-unification-20261023`, preserving the latest sidebar material, shadow and interactions.
+- The next UI update is 0.1.3; increment the patch version for every subsequent delivered update (0.1.4, 0.1.5, ...). Update `src/Swirl.Quick/PRODUCT_VERSION.txt` before building so application and installer versions agree.
+- After validating each completed UI update, commit and push it to GitHub on the UI branch. Report the commit and any unverified acceptance items. Do not update `main` without explicit authorization.
+- Buttons and related controls use the sidebar selection's flat neutral rounded style. Do not add raised button shadows or 3D gradients; preserve interaction feedback and motion.
+
 ## User development requirements (2026-10-17)
 
 - Before implementation, look for mature open-source approaches on GitHub and

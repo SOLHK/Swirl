@@ -69,7 +69,7 @@ Dialog {
         exit:Transition{enabled:!SwirlMotion.reduced;ParallelAnimation{NumberAnimation{property:"opacity";to:0;duration:SwirlMotion.exitDuration}}}
         onAboutToShow:dismissals.push(discardPrompt,owner)
         onClosed:dismissals.pop(discardPrompt)
-        background:SwirlClearGlassSurface{radius:Theme.popupRadius}
+        background:SwirlClearGlassSurface{radius:Theme.popupRadius;color:Theme.material("floating")}
         contentItem:ColumnLayout {
             SwirlText {text:"关闭后将丢失尚未保存的内容。";color:Theme.text;wrapMode:Text.Wrap;Layout.fillWidth:true}
             RowLayout {Layout.alignment:Qt.AlignRight

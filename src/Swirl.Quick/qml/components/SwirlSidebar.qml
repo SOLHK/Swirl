@@ -16,7 +16,7 @@ Item {
   id:floatingBackground;objectName:"sidebarFloatingBackground"
   x:Theme.dp(8);y:Theme.dp(8)
   width:sidebar.width-Theme.dp(16);height:sidebar.height-Theme.dp(16)
-  radius:Theme.dp(16);antialiasing:true
+  radius:Theme.windowRadius;antialiasing:true
   color:"transparent"
   border.width:Theme.increaseContrast?1/Screen.devicePixelRatio:0
   border.color:Theme.text
@@ -52,7 +52,6 @@ Item {
   Behavior on y {enabled:!SwirlMotion.reduced;SmoothedAnimation {duration:SwirlMotion.selectionDuration;velocity:-1;reversingMode:SmoothedAnimation.Immediate}}
   Behavior on scale {NumberAnimation {duration:SwirlMotion.releaseDuration;easing.type:Easing.OutCubic}}
   Behavior on color {ColorAnimation {duration:SwirlMotion.pressDuration}}
-  RectangularShadow {anchors.fill:parent;z:-1;radius:selection.radius;blur:Theme.dp(5);offset:Qt.vector2d(0,Theme.dp(1));color:Theme.withAlpha("#000000",0.035);visible:Theme.effectsSupported}
  }
  property bool compactByWindow:false
  readonly property bool effectivelyCollapsed:false

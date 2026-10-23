@@ -1,6 +1,5 @@
 import QtQuick
-import QtQuick.Controls
-import QtQuick.Effects
+import QtQuick.Controls.Basic
 import SwirlQuick
 Switch {
     id: control
@@ -27,12 +26,6 @@ Switch {
             x:Math.round(Theme.dp(2)+(parent.width-width-2*Theme.dp(2))*thumbPosition); y:Theme.dp(2)
             radius: height * 0.5
             color: "#FEFEFF"
-            RectangularShadow {
-                anchors.fill:parent; z:-1
-                visible:Theme.effectsSupported
-                radius:parent.radius; blur:Theme.dp(6)
-                offset:Qt.vector2d(0,Theme.dp(2)); color:"#30000000"
-            }
             Behavior on thumbPosition {enabled:!SwirlMotion.reduced;NumberAnimation {duration:SwirlMotion.switchDuration;easing.type:Easing.OutCubic}}
         }
         Behavior on color { ColorAnimation { duration: Theme.motion } }

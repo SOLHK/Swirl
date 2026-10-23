@@ -10,12 +10,12 @@ Item {
     property bool accentSelection: false
     property bool clearGlass: false
     property int textPixelSize: 11
-    property bool rounded: false
+    property bool rounded: true
     function segmentStart(index) { return Math.round((width-Theme.dp(4))*index/Math.max(1,options.length)*Screen.devicePixelRatio)/Screen.devicePixelRatio }
     function segmentWidth(index) { return segmentStart(index+1)-segmentStart(index) }
     signal activated(int index, string value)
     implicitHeight:Theme.statusHeight; implicitWidth:Theme.dp(295)
-    SwirlClearGlassSurface { anchors.fill:parent; elevated:false; radius:control.rounded ? height/2 : Theme.segmentedRadius }
+    SwirlClearGlassSurface { anchors.fill:parent; radius:control.rounded ? height/2 : Theme.segmentedRadius }
     Rectangle {
         property real selectionPosition:control.currentIndex
         x:Theme.dp(2)+control.segmentStart(selectionPosition);y:Theme.dp(2)

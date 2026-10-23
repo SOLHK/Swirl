@@ -23,11 +23,9 @@ SwirlMotionButton {
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     property bool outlined:false
     background:SwirlClearGlassSurface {
-        elevated:false
         hovered:control.hovered;pressed:control.down;focused:control.activeFocus
-        glassEnabled:Theme.transparency && !Theme.increaseContrast && !control.primary && !control.quiet
-        radius:Theme.controlRadius
-        color:control.primary?(control.down?Qt.darker(Theme.primaryControl,1.15):control.hovered?Qt.lighter(Theme.primaryControl,1.08):Theme.primaryControl):control.down?Theme.pressed:control.hovered?Theme.hover:control.quiet?"transparent":Theme.buttonBase
+        radius:height/2
+        color:control.down?Theme.pressed:control.hovered?Theme.hover:control.quiet?"transparent":Theme.buttonBase
         border.width:control.activeFocus || Theme.increaseContrast || control.outlined?1/Screen.devicePixelRatio:0
         border.color:control.activeFocus?Theme.focusBorder:Theme.controlBorder
         Behavior on color {ColorAnimation{duration:SwirlMotion.hoverDuration}}
@@ -45,7 +43,7 @@ SwirlMotionButton {
         SwirlIcon {
             visible: control.iconName !== ""
             name: control.iconName; size:Theme.dp(16)
-            color: !control.enabled ? Theme.muted : control.primary ? "white" : control.danger ? Theme.red : Theme.muted
+            color: !control.enabled ? Theme.muted : control.danger ? Theme.red : control.primary ? Theme.accent : Theme.muted
         }
         SwirlText {
             text: AppState.zh(control.text)+(control.development?" · 研发中":"")
@@ -54,7 +52,7 @@ SwirlMotionButton {
             font.weight: control.font.weight
             textRole: "button"
             Layout.fillWidth: true; elide: Text.ElideRight
-            color: !control.enabled ? Theme.muted : control.primary ? "white" : control.danger ? Theme.red : Theme.text
+            color: !control.enabled ? Theme.muted : control.danger ? Theme.red : control.primary ? Theme.accent : Theme.text
             Layout.alignment: Qt.AlignVCenter
             horizontalAlignment:Text.AlignHCenter
             verticalAlignment:Text.AlignVCenter

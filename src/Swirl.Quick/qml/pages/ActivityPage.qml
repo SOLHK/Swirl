@@ -110,12 +110,13 @@ Item {
         property string caption: ""
         signal navigate()
         implicitHeight: Theme.dp(34); hoverEnabled: true
-        topPadding: 0; bottomPadding: 0; leftPadding: Theme.dp(9); rightPadding: Theme.dp(9)
+        topInset: 0; bottomInset: 0
+        topPadding: Theme.dp(6); bottomPadding: Theme.dp(6); leftPadding: Theme.dp(9); rightPadding: Theme.dp(9)
         background: SwirlClearGlassSurface { radius: height / 2; focused: titleControl.activeFocus; pressed: titleControl.down; hovered: titleControl.hovered }
         contentItem: RowLayout {
             spacing: Theme.dp(5)
-            SwirlText { text: titleControl.caption; color: Theme.text; font.pixelSize: Theme.fontSize(16); font.weight: Font.DemiBold }
-            SwirlIcon { name: "chevron-right"; size: Theme.dp(15); color: Theme.text }
+            SwirlText { Layout.fillHeight: true; verticalAlignment: Text.AlignVCenter; text: titleControl.caption; color: Theme.text; font.pixelSize: Theme.fontSize(16); font.weight: Font.DemiBold }
+            SwirlIcon { Layout.alignment: Qt.AlignVCenter; name: "chevron-right"; size: Theme.dp(15); color: Theme.text }
         }
         Accessible.name: caption + "详情"
         onClicked: navigate()
@@ -284,7 +285,7 @@ Item {
                     Layout.preferredWidth: page.wide ? (content.width - 2 * bottomSections.columnSpacing) * 0.35 : content.width
                     Layout.preferredHeight: Theme.dp(204)
                     SectionTitle { caption: "上传和下载"; onNavigate: page.goTraffic(uploadSection, "uploadRate") }
-                    Item { width: parent.width; height: Theme.dp(2) }
+                    Item { width: parent.width; height: Theme.dp(10) }
                     StatRow { id: uploadRateRow; caption: "当前上传速度"; value: page.telemetry.sampled ? page.telemetry.formatBytes(page.telemetry.uploadRate) + "/s" : "—"; marker: Theme.magenta }
                     StatRow { caption: "上传累计流量"; value: page.bytes(page.totals.up, page.totals.sampled) }
                     StatRow { caption: "当前下载速度"; value: page.telemetry.sampled ? page.telemetry.formatBytes(page.telemetry.downloadRate) + "/s" : "—"; marker: Theme.cyan }
@@ -298,7 +299,7 @@ Item {
                     Layout.preferredWidth: page.wide ? (content.width - 2 * bottomSections.columnSpacing) * 0.29 : content.width
                     Layout.preferredHeight: Theme.dp(204)
                     SectionTitle { caption: "活动连接"; onNavigate: SwirlMotion.navigateFrom(connectionsSection, "connections", "activeConnections") }
-                    Item { width: parent.width; height: Theme.dp(2) }
+                    Item { width: parent.width; height: Theme.dp(10) }
                     StatRow { id: connectionCountRow; caption: "活动连接数量"; value: page.telemetry.connectionsSampled ? String(page.telemetry.activeConnections) : "—" }
                     StatRow { caption: "进程"; value: page.telemetry.connectionsSampled ? String(page.telemetry.activeProcesses) : "—" }
                     StatRow { caption: "设备"; value: page.telemetry.connectionsSampled ? String(page.activeDeviceCount) : "—" }
@@ -311,11 +312,11 @@ Item {
                     readonly property Item motionSurface: totalSection
                     Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(204)
                     Item {
-                        width: parent.width; height: Theme.dp(36)
+                        width: parent.width; height: Theme.dp(44)
                         SectionTitle { caption: "总计"; onNavigate: page.goTraffic(totalSection, "totalTraffic") }
                         SwirlSegmentedControl {
                             objectName: "activityPeriodFilter"
-                            anchors.right: parent.right; y: Theme.dp(1)
+                            anchors.right: parent.right; y: Theme.dp(3)
                             width: Theme.dp(117); height: Theme.dp(28)
                             clearGlass: true
                             options: ["今日", "本月"]; currentIndex: page.period
