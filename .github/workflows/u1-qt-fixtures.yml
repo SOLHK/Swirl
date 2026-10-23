@@ -1,7 +1,7 @@
 name: U1 complete Windows Qt independent fixtures
 on:
   push:
-    branches: [work/subscription-unified-integration-20261023, work/swirl-s3-max-ultra-20261023]
+    branches: [work/subscription-unified-integration-20261023, work/swirl-s3-max-ultra-20261023, work/swirl-s4-final-completion-20261023]
   workflow_dispatch:
 permissions:
   contents: read
@@ -81,7 +81,13 @@ jobs:
           cache: false
       - name: Build and repeat-verify the locked official Xray peer
         run: python tools/Build-XrayPeer.py --output "$env:SWIRL_XRAY_PEER_DIR"
-      - name: Exercise all nine Qt fixture slots with zero skips
+      - name: Fetch and verify pinned independent QUIC peers
+        run: |
+          python tools/Fetch-NativeProtocolPeers.py --output "$env:RUNNER_TEMP/s4-qt-quic-peers"
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned QUIC peer fetch failed.' }
+          "HY2_SERVER=$env:RUNNER_TEMP/s4-qt-quic-peers/hysteria2/hysteria.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SWIRL_TUIC_SERVER=$env:RUNNER_TEMP/s4-qt-quic-peers/tuic/tuic-server.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Exercise all ten Qt fixture slots with zero skips
         run: python tools/Run-U1QtFixtures.py --output "$env:RUNNER_TEMP/u1-qt-fixture-evidence" --qt-version 6.11.3
       - name: Verify isolated persistent storage and per-build QML cache paths
         run: ctest --test-dir build/u1-qt-fixtures -C Release -R '^swirl-storage-paths$' --output-on-failure --no-tests=error
@@ -169,7 +175,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: U1-Windows-Qt-nine-fixtures-${{ github.sha }}-${{ github.run_attempt }}
+          name: S4-Windows-Qt-ten-fixtures-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/u1-qt-fixture-evidence
             ${{ runner.temp }}/u1-qt-xray-peer/build-manifest.json

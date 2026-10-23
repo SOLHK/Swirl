@@ -204,7 +204,7 @@ private slots:
   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(o.proxyPort);
   QCOMPARE(controller.routingMode(),QString("rule"));QVERIFY(controller.prepareRealAcceptance());
   QCOMPARE(controller.routingMode(),QString("global"));
-  QCOMPARE(controller.engineIdentityLabel(),QString::fromUtf8("Swirl Core · v9.8.7"));
+  QCOMPARE(controller.engineIdentityLabel(),QString::fromUtf8("Swirl · v9.8.7"));
   QCOMPARE(QSettings().value("Proxy/routingMode").toString(),QString("rule"));
   const QJsonObject node{{"name","synthetic"},{"type","socks5"},{"server","127.0.0.1"},{"port",net.a.serverPort()}};
   controller.imports()->importText(QString::fromUtf8(QJsonDocument(QJsonObject{{"proxies",QJsonArray{node}}}).toJson()));
@@ -214,7 +214,7 @@ private slots:
   QVERIFY(controller.chooseNode(id));controller.connectNode(id);
   QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),5000);
   QCOMPARE(controller.routingMode(),QString("global"));QCOMPARE(controller.engineKind(),QString("rust"));
-  QCOMPARE(controller.engineIdentityLabel(),QString::fromUtf8("Swirl Core · v9.8.7"));
+  QCOMPARE(controller.engineIdentityLabel(),QString::fromUtf8("Swirl · v9.8.7"));
   QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));
   QNetworkRequest request(net.url());request.setTransferTimeout(4000);
   auto *reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);
@@ -222,7 +222,7 @@ private slots:
   QCOMPARE(net.a.forwarded,1);
   QCOMPARE(QSettings().value("Proxy/routingMode").toString(),QString("rule"));
   controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),5000);
-  QCOMPARE(controller.engineIdentityLabel(),QString::fromUtf8("Swirl Core · v9.8.7"));
+  QCOMPARE(controller.engineIdentityLabel(),QString::fromUtf8("Swirl · v9.8.7"));
  }
  void savedRuleModeStartsWithBundledRulesWithoutChangingSavedRouting(){
   ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;QVERIFY(directory.isValid());
@@ -1438,6 +1438,65 @@ private slots:
   const auto valid=NodeImporter::parse(socks5Sources(1080,false,0,true).first());QVERIFY(bool(valid));
   o.nodes=valid.nodes;o.selectedNodeId=o.nodes.first().id;o.nodes.first().parameters["skip-cert-verify"]=true;
   QJsonObject config=sentinel;QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());QCOMPARE(config,sentinel);
+ }
+ void singBoxQuicProductChainAgainstIndependentPeer(){
+  if(!qEnvironmentVariableIsSet("SWIRL_QT_QUIC_FIXTURE"))QSKIP("The independent QUIC harness supplies synthetic servers and targets.");
+#ifndef Q_OS_WIN
+  QSKIP("The product persistence gate requires Windows DPAPI.");
+#endif
+  const auto fixturePath=qEnvironmentVariable("SWIRL_QT_QUIC_FIXTURE"),reportPath=qEnvironmentVariable("SWIRL_QT_QUIC_REPORT");
+  QVERIFY(QFileInfo(reportPath).isAbsolute()&&fixturePath!=reportPath);QFile fixtureFile(fixturePath);QVERIFY(fixtureFile.open(QIODevice::ReadOnly));QVERIFY(fixtureFile.size()<=NodeImporter::MaximumBytes);
+  const auto fixture=NodeImporter::strictJsonObject(fixtureFile.readAll());QVERIFY(!fixture.isEmpty());
+  const auto subscription=fixture["subscription"].toString();QVERIFY(!subscription.isEmpty());
+  const auto tcpPort=fixture["tcp_port"].toInt(),udpPort=fixture["udp_port"].toInt();QVERIFY(tcpPort>0&&tcpPort<=65535&&udpPort>0&&udpPort<=65535);
+  const bool reject=fixture["reject"].toBool();
+  QJsonObject report{{"schema",1},{"imported",false},{"encrypted_store_reloaded",false},{"in_process_rust",false},{"tcp_verified",false},{"udp_verified",false},{"rejected",false},{"listener_released",false}};
+  const auto save=[&]{QSaveFile file(reportPath);const auto bytes=QJsonDocument(report).toJson();return file.open(QIODevice::WriteOnly)&&file.write(bytes)==bytes.size()&&file.commit();};
+  const auto reportGuard=qScopeGuard([&]{save();});QVERIFY(save());
+  QTemporaryDir directory;const auto path=directory.filePath("quic.dpapi");QString selected;QJsonObject original,parameters;
+  {
+   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);
+   controller.imports()->importText(subscription);QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),5000);
+   NodeStore stored(path);QVERIFY2(stored.nodes().size()==1,qPrintable(controller.imports()->message()));selected=stored.nodes().first().id;
+   original=stored.nodes().first().originalConfiguration;parameters=stored.nodes().first().parameters;
+   QVERIFY(!original.isEmpty()&&original["tls"].isObject());QVERIFY(controller.chooseNode(selected));
+   QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto encrypted=file.readAll();QVERIFY(encrypted.startsWith("SWIRLNODE1\n"));QVERIFY(!encrypted.contains(stored.nodes().first().password.toUtf8()));
+   report["imported"]=true;
+  }
+  QTcpServer reservation;QVERIFY(reservation.listen(QHostAddress::LocalHost));const auto proxyPort=reservation.serverPort();reservation.close();
+  EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);controller.setRoutingMode("global");
+  NodeStore restored(path);QCOMPARE(restored.nodes().size(),1);QCOMPARE(restored.nodes().first().originalConfiguration,original);QCOMPARE(restored.nodes().first().parameters,parameters);QCOMPARE(restored.selectedId(),selected);report["encrypted_store_reloaded"]=true;
+  controller.connectNode({});QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),5000);
+  QCOMPARE(controller.engineKind(),QString("rust"));QCOMPARE(controller.processId(),QString::number(QCoreApplication::applicationPid()));report["in_process_rust"]=true;
+  QTcpSocket tcp;tcp.setProxy(QNetworkProxy::NoProxy);tcp.connectToHost(QHostAddress::LocalHost,proxyPort);QTRY_COMPARE_WITH_TIMEOUT(tcp.state(),QAbstractSocket::ConnectedState,5000);
+  const auto authority="127.0.0.1:"+QByteArray::number(tcpPort);const auto connect="CONNECT "+authority+" HTTP/1.1\r\nHost: "+authority+"\r\n\r\n";QCOMPARE(tcp.write(connect),connect.size());
+  QByteArray response;QVERIFY(QTest::qWaitFor([&]{response+=tcp.readAll();return response.contains("\r\n\r\n")||tcp.state()==QAbstractSocket::UnconnectedState;},7000));
+  if(reject){
+   const auto failed=QByteArray("HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+   if(original["type"]=="tuic"&&response!=failed){
+    // TUIC v5 has no positive authentication response. A CONNECT reply only
+    // acknowledges the local tunnel; the peer must then reject before any
+    // target data arrives. The harness independently requires zero target
+    // connections, so an optimistic local reply cannot hide authentication loss.
+    QCOMPARE(response,QByteArray("HTTP/1.1 200 Connection Established\r\n\r\n"));const QByteArray payload="must-not-reach-origin";
+    if(tcp.state()==QAbstractSocket::ConnectedState){const auto written=tcp.write(payload);QVERIFY(written==-1||written==payload.size());}
+    response.clear();QVERIFY(QTest::qWaitFor([&]{response+=tcp.readAll();return tcp.state()==QAbstractSocket::UnconnectedState;},7000));response+=tcp.readAll();QVERIFY(response.isEmpty());
+   }else QCOMPARE(response,failed);
+   report["rejected"]=true;
+  }else{
+   QCOMPARE(response,QByteArray("HTTP/1.1 200 Connection Established\r\n\r\n"));const QByteArray payload(65553,'q');QCOMPARE(tcp.write(payload),payload.size());response.clear();
+   QVERIFY(QTest::qWaitFor([&]{response+=tcp.readAll();return response.size()>=payload.size()||tcp.state()==QAbstractSocket::UnconnectedState;},7000));QCOMPARE(response,payload);report["tcp_verified"]=true;
+   tcp.disconnectFromHost();QTRY_COMPARE_WITH_TIMEOUT(tcp.state(),QAbstractSocket::UnconnectedState,5000);
+   QUdpSocket udp;udp.setProxy(QNetworkProxy::NoProxy);QVERIFY(udp.bind(QHostAddress::LocalHost,0,QUdpSocket::DontShareAddress));
+   QTcpSocket control;control.setProxy(QNetworkProxy::NoProxy);control.connectToHost(QHostAddress::LocalHost,proxyPort);QTRY_COMPARE_WITH_TIMEOUT(control.state(),QAbstractSocket::ConnectedState,5000);
+   QCOMPARE(control.write(QByteArray::fromHex("050100")),qint64(3));QTRY_VERIFY_WITH_TIMEOUT(control.bytesAvailable()>=2,5000);QCOMPARE(control.read(2),QByteArray::fromHex("0500"));
+   auto associate=QByteArray::fromHex("050300017f000001");associate.append(char(udp.localPort()>>8));associate.append(char(udp.localPort()&255));QCOMPARE(control.write(associate),associate.size());QTRY_VERIFY_WITH_TIMEOUT(control.bytesAvailable()>=10,5000);
+   const auto bound=control.read(10);QCOMPARE(bound.left(8),QByteArray::fromHex("050000017f000001"));const auto relayPort=quint16((quint16(quint8(bound[8]))<<8)|quint8(bound[9]));QVERIFY(relayPort>0);
+   auto header=QByteArray::fromHex("000000017f000001");header.append(char(udpPort>>8));header.append(char(udpPort&255));const auto packet=header+QByteArray("s4-quic-udp-payload");
+   QCOMPARE(udp.writeDatagram(packet,QHostAddress::LocalHost,relayPort),packet.size());QTRY_VERIFY_WITH_TIMEOUT(udp.hasPendingDatagrams(),7000);const auto datagram=udp.receiveDatagram();QCOMPARE(datagram.senderPort(),int(relayPort));QCOMPARE(datagram.data(),packet);report["udp_verified"]=true;
+   control.disconnectFromHost();QTRY_COMPARE_WITH_TIMEOUT(control.state(),QAbstractSocket::UnconnectedState,5000);
+  }
+  tcp.abort();controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive()&&!controller.busy(),5000);QTcpServer reclaimed;QVERIFY(reclaimed.listen(QHostAddress::LocalHost,proxyPort));report["listener_released"]=true;QVERIFY(save());
  }
  void socks5UdpThroughIndependentPeer(){
   const bool hasPeer=qEnvironmentVariableIsSet("SWIRL_SOCKS5_UDP_REFERENCE_PORT");

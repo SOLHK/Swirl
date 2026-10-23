@@ -467,6 +467,24 @@ void singBox(Result &r,const QJsonArray &array){
         if(QStringList{"direct","block","dns","selector","urltest"}.contains(type)){
             auto policies=r.configuration.value("outbounds").toArray();policies.append(raw);r.configuration["outbounds"]=policies;continue;
         }
+        if(type=="tuic"||type=="hysteria2"){
+            // Retain every protocol option, including unknown requirements.
+            // Rust owns the sing-box dialect, units, defaults and execution
+            // gate. Only the UI's endpoint/display aliases are adapted here.
+            const auto port=raw.value("server_port");const auto host=raw.value("server");
+            if(!port.isDouble()||port.toDouble()!=port.toInt()||port.toInt()<1||port.toInt()>65535||
+                !host.isString()||host.toString()!=host.toString().trimmed()||
+                (raw.contains("tag")&&!raw.value("tag").isString())){
+                r.error="sing-box QUIC 端点或名称类型无效；未以默认值替换。";return;
+            }
+            auto node=raw;node.remove("tag");node.remove("server_port");
+            node["name"]=raw.value("tag");node["port"]=raw.value("server_port");
+            if(raw.contains("name")||raw.contains("port")||raw.contains("sni")||raw.contains("servername")||raw.contains("_swirl-source-format")){
+                r.error="sing-box 出站包含保留的内部字段；未覆盖源参数。";return;
+            }
+            node["_swirl-source-format"]="sing-box";
+            append(r,node,raw);if(!r.error.isEmpty())return;continue;
+        }
         QStringList issues;QJsonObject n{{"name",raw.value("tag")},{"type",protocol(type)},{"server",raw.value("server")},{"port",raw.value("server_port")}};
         // sing-box's SOCKS version is a string. Keep 4 versus 4a explicit so
         // destination DNS never changes silently while normalizing the node.

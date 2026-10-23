@@ -241,8 +241,8 @@ QString EngineController::engineIdentityLabel() const {
     const auto status=m_engine->status();
     QString identity;
     if(status.processAlive) {
-        identity=status.engineKind==QStringLiteral("rust")?QStringLiteral("Swirl Core"):QStringLiteral("未知内核");
-    } else identity=QStringLiteral("Swirl Core");
+        identity=status.engineKind==QStringLiteral("rust")?QStringLiteral("Swirl"):QStringLiteral("未知内核");
+    } else identity=QStringLiteral("Swirl");
     const auto version=QCoreApplication::applicationVersion();
     return version.isEmpty()?identity:identity+QStringLiteral(" · v")+version;
 }

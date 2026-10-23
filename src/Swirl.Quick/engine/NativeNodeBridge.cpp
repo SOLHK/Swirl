@@ -28,7 +28,16 @@ QString NativeNodeBridge::executableOutbound(const ProxyNode &node, QJsonObject 
     for (const auto &key : {"sni", "servername"})
         if (raw.contains(key) && raw.value(key) != QJsonValue(node.serverName))
             return QStringLiteral("TLS 名称字段不一致；未覆盖源配置。");
-    if (!node.serverName.isEmpty()) {
+    const bool singBoxQuic = raw.value("_swirl-source-format") == QJsonValue("sing-box") &&
+        (node.protocol == "tuic" || node.protocol == "hysteria2");
+    if (singBoxQuic) {
+        // SNI is exposed to the editor, but the source dialect remains nested.
+        // Reject stale editor/source disagreement instead of inventing aliases
+        // or overwriting the retained security requirements.
+        const auto tls = raw.value("tls").toObject();
+        if (!node.serverName.isEmpty() && tls.value("server_name") != QJsonValue(node.serverName))
+            return QStringLiteral("TLS 名称字段不一致；未覆盖源配置。");
+    } else if (!node.serverName.isEmpty()) {
         // VMess's existing Clash parser uses servername; other protocol
         // parsers explicitly validate the sni/servername aliases.
         if (!put(node.protocol == "vmess" ? "servername" : "sni", node.serverName))

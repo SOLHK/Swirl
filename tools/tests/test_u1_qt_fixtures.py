@@ -1,4 +1,4 @@
-"""Offline guards for U1's real nine-slot Qt evidence collector.
+"""Offline guards for the real ten-slot Qt evidence collector.
 
 Synthetic XML here validates the gate, never counts as a Qt product test.
 """
@@ -34,16 +34,16 @@ class EvidenceGuards(unittest.TestCase):
         ET.ElementTree(root).write(self.xml, encoding="utf-8", xml_declaration=True)
         return self.xml
 
-    def test_current_cpp_inventory_contains_exactly_the_nine_fixture_slots(self):
+    def test_current_cpp_inventory_contains_exactly_the_ten_fixture_slots(self):
         source = (ROOT / "src/Swirl.Quick/tests/RustCoreTests.cpp").read_text(encoding="utf-8")
         self.assertEqual(gate.fixture_slots(source), gate.SLOTS)
-        self.assertEqual(len(gate.SLOTS), 9)
+        self.assertEqual(len(gate.SLOTS), 10)
 
     def test_complete_xml_requires_every_selected_slot(self):
         result = gate.verified_xml(self.save(self.document(sorted(gate.SLOTS))), sorted(gate.SLOTS), "6.11.3")
         self.assertTrue(result["success"])
         self.assertEqual(result["skipped"], 0)
-        self.assertEqual(len(result["slots"]), 9)
+        self.assertEqual(len(result["slots"]), 10)
 
     def test_failure_skip_and_expected_failure_cannot_be_passes(self):
         for kind in ("fail", "skip", "xfail", "xpass"):

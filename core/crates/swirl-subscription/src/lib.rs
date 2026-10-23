@@ -10,6 +10,7 @@ pub use hysteria2::Hysteria2;
 pub use tuic::Tuic;
 mod policy;
 mod reality;
+mod singbox_quic;
 pub mod stream_transport;
 mod websocket;
 pub use policy::{HealthProbe, PolicyStrategy, ProbeTarget};

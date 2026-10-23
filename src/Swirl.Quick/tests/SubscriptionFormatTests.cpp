@@ -40,6 +40,35 @@ class SubscriptionFormatTests:public QObject {
     }
 private slots:
     void initTestCase(){QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));}
+    void singBoxQuicParametersSurviveStorageAndRustConversion(){
+        for(const auto &type:QStringList{"tuic","hysteria2"}){
+            QJsonObject raw{{"type",type},{"tag","synthetic"},{"server","localhost"},{"server_port",443},{"password","synthetic:password"},{"network","tcp"},
+                {"tls",QJsonObject{{"enabled",true},{"server_name","origin.test"},{"alpn",QJsonArray{"h3"}}}}};
+            if(type=="tuic"){raw["uuid"]="00112233-4455-6677-8899-aabbccddeeff";raw["heartbeat"]="1s250ms";raw["congestion_control"]="new_reno";raw["udp_relay_mode"]="quic";raw["zero_rtt_handshake"]=false;}
+            else{raw["up_mbps"]=3;raw["down_mbps"]=5;raw["obfs"]=QJsonObject{{"type","salamander"},{"password","synthetic-obfs"}};}
+            const auto parsed=NodeImporter::parse(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{raw}}}).toJson());
+            QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);QCOMPARE(parsed.nodes.first().originalConfiguration,raw);
+            QCOMPARE(parsed.nodes.first().serverName,QString("origin.test"));
+            QTemporaryDir directory;NodeStore store(directory.filePath("nodes"));QVERIFY(store.importNodes(parsed.nodes));NodeStore restored(store.filePath());
+            QCOMPARE(restored.nodes().first().originalConfiguration,raw);QCOMPARE(restored.nodes().first().parameters,parsed.nodes.first().parameters);
+            QFile encrypted(store.filePath());QVERIFY(encrypted.open(QIODevice::ReadOnly));const auto bytes=encrypted.readAll();QVERIFY(!bytes.contains("synthetic:password"));QVERIFY(!bytes.contains("synthetic-obfs"));
+            EngineStartOptions options;options.nodes=restored.nodes();options.selectedNodeId=options.nodes.first().id;options.routingMode="global";
+            QJsonObject config;const auto error=RustCoreEngine::configuration(options,&config);QVERIFY2(error.isEmpty(),qPrintable(error));
+            const auto outbound=config["nodes"].toArray().first().toObject()["outbound"].toObject();QCOMPARE(outbound["type"].toString(),type);QCOMPARE(outbound["password"].toString(),QString("synthetic:password"));QCOMPARE(outbound["udp"].toBool(),false);
+            QCOMPARE(outbound["tls"].toObject()["server_name"].toString(),QString("origin.test"));
+            if(type=="tuic"){QCOMPARE(outbound["heartbeat_interval_ms"].toInt(),1250);QCOMPARE(outbound["congestion_control"].toString(),QString("new_reno"));QCOMPARE(outbound["udp_relay_mode"].toString(),QString("quic"));}
+            else {QCOMPARE(outbound["obfs"].toString(),QString("salamander"));QCOMPARE(outbound["obfs_password"].toString(),QString("synthetic-obfs"));QCOMPARE(outbound["up_mbps"].toInt(),3);QCOMPARE(outbound["down_mbps"].toInt(),5);}
+            for(const auto &extra:QJsonArray{QJsonObject{{"unknown",true}},QJsonObject{{"network","udp"}},QJsonObject{{"tls",QJsonObject{{"enabled",false}}}},QJsonObject{{"tls",QJsonObject{{"enabled",true},{"insecure",true},{"alpn",QJsonArray{"h3"}}}}}}){
+                auto rejected=raw;const auto object=extra.toObject();for(auto it=object.begin();it!=object.end();++it)rejected[it.key()]=it.value();
+                const auto imported=NodeImporter::parse(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{rejected}}}).toJson());QVERIFY2(imported,qPrintable(imported.error));QCOMPARE(imported.nodes.first().originalConfiguration,rejected);
+                options.nodes=imported.nodes;options.selectedNodeId=options.nodes.first().id;const QJsonObject sentinel{{"unchanged",true}};config=sentinel;QVERIFY(!RustCoreEngine::configuration(options,&config).isEmpty());QCOMPARE(config,sentinel);
+            }
+            for(const auto &extra:QJsonArray{QJsonObject{{"server_port","443"}},QJsonObject{{"server_port",443.5}},QJsonObject{{"tag",123}},QJsonObject{{"server"," localhost "}},QJsonObject{{"port",443}},QJsonObject{{"sni","origin.test"}},QJsonObject{{"_swirl-source-format","other"}}}){
+                auto rejected=raw;const auto object=extra.toObject();for(auto it=object.begin();it!=object.end();++it)rejected[it.key()]=it.value();
+                QVERIFY(!NodeImporter::parse(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{rejected}}}).toJson()));
+            }
+        }
+    }
     void formatFixturesKeepProtocolOptionsDistinctAndRejectCrossProtocolFields(){
         for(int format=0;format<17;++format){
             const auto parsed=NodeImporter::parse(fixture(format,443,"synthetic-format-password"));

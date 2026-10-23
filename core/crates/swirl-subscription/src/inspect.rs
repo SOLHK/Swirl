@@ -1018,6 +1018,11 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
     let mut candidate = None;
     let native = match kind {
         "vmess" => Some(crate::vmess::from_raw(raw)),
+        "hysteria2" | "tuic"
+            if family == "sing-box-json" || raw.get("_swirl-source-format").is_some() =>
+        {
+            Some(crate::singbox_quic::outbound(raw))
+        }
         "hysteria2" => Some(crate::hysteria2::from_raw(raw).map(Outbound::Hysteria2)),
         "tuic" => Some(crate::Tuic::from_raw(raw).map(Outbound::Tuic)),
         _ => None,
@@ -1275,6 +1280,11 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             }
         }
     }
+    let (transport, udp, unrecognized) = match &candidate {
+        Some(Outbound::Hysteria2(config)) => ("quic", config.udp, 0),
+        Some(Outbound::Tuic(config)) => ("quic", config.udp, 0),
+        _ => (transport, udp, unrecognized),
+    };
     (
         NodeCapability {
             index,

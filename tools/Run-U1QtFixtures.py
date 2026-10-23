@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the existing independent Windows Qt fixtures and require all nine slots.
+"""Run the independent Windows Qt fixtures and require all ten slots.
 
 Every subprocess is real. The observer only adds a second Qt XML output and
 checks it; existing peer traffic assertions, credentials, deadlines and tests
@@ -32,6 +32,7 @@ SLOTS = frozenset({
     "socks5UdpThroughIndependentPeer", "socks4ThroughIndependentPeer",
     "webSocketThroughIndependentPeer", "vlessThroughIndependentPeer",
     "shadowsocksThroughIndependentPeer", "loonShadowsocksThroughIndependentPeer",
+    "singBoxQuicProductChainAgainstIndependentPeer",
 })
 LIFECYCLE_MODES = frozenset({"tls12", "http-control", "authentication-failure", "cancel", "reject"})
 BASIC_TESTS = (
@@ -214,6 +215,14 @@ def main() -> int:
 
         with patch.object(subprocess, "run", observer.run):
             stage("basic-and-subscription", basic)
+            os.environ["SWIRL_SINGBOX_QUIC_EVIDENCE"] = str(output / "singbox-quic")
+            def quic(row):
+                suite = unittest.defaultTestLoader.loadTestsFromName("test_singbox_quic_product.SingBoxQuicProduct")
+                result = unittest.TextTestRunner(verbosity=2).run(suite)
+                row.update(executed=result.testsRun, skipped=len(result.skipped), failures=len(result.failures), errors=len(result.errors))
+                if result.testsRun != 6 or result.skipped or not result.wasSuccessful():
+                    raise AssertionError("Required sing-box QUIC product fixture failed or skipped")
+            stage("singbox-quic-product", quic)
             for name, options in (("reality", []), ("vision", ["--vision"]),
                                   ("chrome-vision-lifecycle", ["--vision", "--fingerprint", "chrome"])):
                 os.environ["SWIRL_REALITY_RUNTIME_EVIDENCE"] = str(output / name)
