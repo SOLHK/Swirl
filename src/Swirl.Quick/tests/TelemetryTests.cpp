@@ -10,6 +10,7 @@
 #include "engine/SwirlProxyEngine.h"
 #include "engine/MihomoAdapter.h"
 #include <QJsonDocument>
+#include <QFileInfo>
 class TelemetryTests:public QObject {
  Q_OBJECT
  ProxyEngine::Status sample(qint64 time,int up,int down){ProxyEngine::Status s;s.processAlive=true;s.processId=1;s.apiHealthy=true;s.connectionsAt=time;s.trafficAt=time;s.uploadTotal=up;s.downloadTotal=down;s.uploadRate=up;s.downloadRate=down;s.connections={QVariantMap{{"id","connection-a"},{"host","fixture.test"},{"process","fixture.exe"},{"policy","DIRECT"},{"category","direct"},{"uploadBytes",up},{"downloadBytes",down},{"time",QDateTime::fromMSecsSinceEpoch(time).toString(Qt::ISODateWithMs)}}};return s;}
@@ -23,6 +24,7 @@ private slots:
   ProxyNode node;node.id=QUuid::createUuid().toString(QUuid::WithoutBraces);node.name="Probe node";node.protocol="socks5";node.host="127.0.0.1";node.port=net.a.serverPort();options.nodes={node};options.selectedNodeId=node.id;
   std::unique_ptr<ProxyEngine> engine;
   if(compatibility){
+   if(!QFileInfo::exists(QCoreApplication::applicationDirPath()+"/core/mihomo.exe"))QSKIP("Compatibility fixture is not staged in this Rust Core build");
    engine=std::make_unique<MihomoAdapter>();QFile manifest(":/engine/mihomo-manifest.json");QVERIFY(manifest.open(QIODevice::ReadOnly));const auto config=QJsonDocument::fromJson(manifest.readAll()).object();
    options.executablePath=QCoreApplication::applicationDirPath()+"/core/mihomo.exe";options.expectedSha256=config.value("executableSha256").toString().toLatin1();options.expectedVersion=config.value("version").toString();options.healthIntervalMs=250;
    QTcpServer control;QVERIFY(control.listen(QHostAddress::LocalHost,0));options.controlPort=control.serverPort();control.close();
@@ -144,6 +146,42 @@ private slots:
   s.connectionsAt+=1000;s.trafficAt=s.connectionsAt;s.uploadTotal=400;s.downloadTotal=900;row["uploadBytes"]=400;row["downloadBytes"]=900;s.connections={row};model.ingest(s);
   QCOMPARE(model.ranking("apps").first().toMap().value("speed").toDouble(),1000.0);QCOMPARE(model.ranking("devices").first().toMap().value("total").toDouble(),1300.0);QCOMPARE(model.ranking("devices").first().toMap().value("speed").toDouble(),1000.0);
   s.connectionsAt++;s.connections.clear();model.ingest(s);QCOMPARE(model.ranking("apps").first().toMap().value("speed").toDouble(),0.0);}
+ void proxyRankingsFilterEverySourceAndPersist(){
+  QTemporaryDir temp;const auto path=temp.filePath("proxy-rankings.json");TelemetryService model(path,false);
+  const auto now=QDateTime::currentMSecsSinceEpoch();auto s=sample(now,100,200);
+  auto proxy=s.connections.first().toMap();proxy["id"]="proxy";proxy["process"]="proxy.exe";proxy["host"]="proxy.test";proxy["sourceIp"]="192.0.2.1";proxy["policy"]="Proxy A";proxy["category"]="proxy";proxy["uploadBytes"]=70;proxy["downloadBytes"]=130;
+  auto direct=proxy;direct["id"]="direct";direct["process"]="direct.exe";direct["host"]="direct.test";direct["sourceIp"]="192.0.2.2";direct["policy"]="DIRECT";direct["category"]="direct";direct["uploadBytes"]=30;direct["downloadBytes"]=70;
+  s.connections={proxy,direct};model.ingest(s);
+  QVERIFY(model.proxyRankingAvailable());QCOMPARE(model.summary().value("total").toDouble(),300.0);
+  for(const auto &kind:{"apps","devices","domains","nodes"}){
+   QCOMPARE(model.ranking(kind).size(),2);
+   const auto rows=model.ranking(kind,0,50,true);QCOMPARE(rows.size(),1);
+   QCOMPARE(rows.first().toMap().value("total").toDouble(),200.0);
+   QCOMPARE(rows.first().toMap().value("connections").toDouble(),1.0);
+   QCOMPARE(rows.first().toMap().value("percent").toString(),QStringLiteral("100.0%"));
+  }
+  s.connectionsAt+=1000;s.trafficAt=s.connectionsAt;s.uploadTotal=120;s.downloadTotal=220;
+  proxy["uploadBytes"]=80;proxy["downloadBytes"]=140;direct["uploadBytes"]=40;direct["downloadBytes"]=80;s.connections={proxy,direct};model.ingest(s);
+  QCOMPARE(model.ranking("apps",0,50,true).first().toMap().value("total").toDouble(),220.0);
+  QCOMPARE(model.ranking("apps",0,50,true).first().toMap().value("speed").toDouble(),20.0);
+  QCOMPARE(model.ranking("apps",0,50,true).first().toMap().value("connections").toDouble(),1.0);
+  QCOMPARE(model.ranking("apps",0,50,true).first().toMap().value("percent").toString(),QStringLiteral("100.0%"));
+  model.flush();TelemetryService restored(path,false);
+  QVERIFY(restored.proxyRankingAvailable(3));
+  QCOMPARE(restored.ranking("apps",3,50,true).first().toMap().value("total").toDouble(),220.0);
+ }
+ void legacyDaysCannotClaimCompleteProxyRankings(){
+  QTemporaryDir temp;const auto path=temp.filePath("legacy-rankings.json");TelemetryService model(path,false);
+  const auto date=QDate::currentDate().toString(Qt::ISODate);
+  model.m_days[date]=QJsonObject{{"sampled",true},{"up",40},{"down",60},
+   {"apps",QJsonObject{{"legacy.exe",QJsonObject{{"up",40},{"down",60},{"count",1}}}}},
+   {"categories",QJsonObject{{"proxy",QJsonObject{{"up",40},{"down",60},{"count",1}}}}}};
+  QVERIFY(!model.proxyRankingAvailable());QVERIFY(!model.proxyRankingAvailable(3));
+  QCOMPARE(model.ranking("apps").size(),1);QVERIFY(model.ranking("apps",0,50,true).isEmpty());
+  auto s=sample(QDateTime::currentMSecsSinceEpoch(),10,20);auto row=s.connections.first().toMap();row["category"]="proxy";s.connections={row};model.ingest(s);
+  QVERIFY(!model.proxyRankingAvailable());QVERIFY(model.ranking("apps",0,50,true).isEmpty());
+  model.flush();TelemetryService restored(path,false);QVERIFY(!restored.proxyRankingAvailable(3));
+ }
  void accounting(){QTemporaryDir temp;TelemetryService model(temp.filePath("history.json"),false);QVERIFY(!model.sampled());auto s=sample(QDateTime::currentMSecsSinceEpoch(),10,20);model.ingest(s);QVERIFY(model.sampled());QCOMPARE(model.summary().value("total").toInt(),30);model.ingest(s);QCOMPARE(model.summary().value("total").toInt(),30);s=sample(s.connectionsAt+1,15,30);model.ingest(s);QCOMPARE(model.summary().value("total").toInt(),45);auto rank=model.ranking("apps");QCOMPARE(rank.first().toMap().value("connections").toInt(),1);QCOMPARE(rank.first().toMap().value("total").toInt(),45);QCOMPARE(model.activeProcesses(),1);s.connectionsAt++;s.connections.clear();model.ingest(s);QCOMPARE(model.activeConnections(),0);QCOMPARE(model.connections().size(),1);QCOMPARE(model.connections().first().toMap().value("status").toString(),QStringLiteral("已结束"));model.flush();TelemetryService restored(temp.filePath("history.json"),false);QCOMPARE(restored.summary().value("total").toInt(),45);QVERIFY(!restored.sampled());QCOMPARE(restored.ranking("apps").first().toMap().value("connections").toInt(),1);}
  void resetsAndNewProcess(){QTemporaryDir temp;TelemetryService model(temp.filePath("history.json"),false);auto s=sample(QDateTime::currentMSecsSinceEpoch(),100,200);model.ingest(s);s=sample(s.connectionsAt+1,5,10);model.ingest(s);QCOMPARE(model.summary().value("total").toInt(),315);s=sample(s.connectionsAt+1,7,14);s.processId=2;model.ingest(s);QCOMPARE(model.summary().value("total").toInt(),336);QCOMPARE(model.ranking("apps").first().toMap().value("connections").toInt(),2);}
  void idleAndUncollected(){QTemporaryDir temp;TelemetryService model(temp.filePath("history.json"),false);auto s=sample(QDateTime::currentMSecsSinceEpoch(),0,0);model.ingest(s);QVERIFY(model.sampled());QCOMPARE(model.downloadRate(),0.0);QVERIFY(model.summary().value("sampled").toBool());s.trafficAt=0;s.connectionsAt=0;s.apiHealthy=false;model.ingest(s);QVERIFY(!model.sampled());QVERIFY(!model.connectionsSampled());}

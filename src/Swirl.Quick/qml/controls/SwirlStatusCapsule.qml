@@ -12,7 +12,7 @@ SwirlMotionButton {
  leftPadding:Theme.dp(8);rightPadding:Theme.dp(8)
  topPadding:0;bottomPadding:0
  hoverEnabled:true
- background:Rectangle { radius:height/2;border.width:Theme.borderWidth;border.color:control.activeFocus?Theme.focusBorder:Theme.border;color:control.down?Theme.pressed:control.hovered?Theme.hover:Theme.capsuleSurface;Behavior on color{ColorAnimation{duration:SwirlMotion.hoverDuration}} }
+ background:Rectangle { radius:height/2;border.width:Theme.borderWidth;border.color:control.activeFocus?Theme.focusBorder:Theme.border;color:control.down?Theme.pressed:control.hovered?Theme.hover:Theme.dark?Theme.capsuleSurface:Theme.withAlpha("#FFFFFF",0.88);Behavior on color{ColorAnimation{duration:SwirlMotion.hoverDuration}} }
  contentItem:RowLayout { id:content;spacing:Theme.dp(7)
   Rectangle { Layout.preferredWidth:Theme.dp(6);Layout.preferredHeight:Theme.dp(6);radius:width/2;color:control.tone==="success"?Theme.statusGreen:control.tone==="warning"?Theme.orange:control.tone==="info"?Theme.accent:Theme.muted;Behavior on color{ColorAnimation{duration:SwirlMotion.duration}} }
   SwirlText {textRole:"smallLabel";renderType:Text.NativeRendering; text:control.label;color:Theme.text;font.pixelSize:Theme.fontSize(11);verticalAlignment:Text.AlignVCenter }

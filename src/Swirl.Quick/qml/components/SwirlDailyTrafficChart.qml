@@ -1,29 +1,91 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import SwirlQuick
+
 Item {
- id:graph
- property bool proxyOnly:false
- property int period:0
- property var records:[]
- property bool dirty:true
- readonly property real maximum:Math.max(1,...records.map(r=>r.value))
- function refresh(){if(!visible)return;const now=Date.now();const next=engineController.telemetry.periodTraffic(period,proxyOnly).filter(r=>r.time<=now);if(JSON.stringify(next)!==JSON.stringify(records))records=next;dirty=false;repaint()}
- function repaint(){if(visible && Window.window && Window.window.visibility!==Window.Minimized)plot.requestPaint()}
- onProxyOnlyChanged:{dirty=true;refresh()}
- onPeriodChanged:{dirty=true;refresh()}
- onRecordsChanged:repaint()
- onVisibleChanged:if(visible)refresh()
- Component.onCompleted:refresh()
- Connections {target:engineController.telemetry;function onChanged(){graph.dirty=true}}
- Timer {interval:500;running:graph.visible&&graph.dirty;repeat:true;onTriggered:graph.refresh()}
- Connections {target:Theme;function onDarkChanged(){graph.repaint()}}
- Canvas {
-  id:plot;anchors.fill:parent;anchors.topMargin:Theme.dp(20);anchors.bottomMargin:Theme.dp(24)
-  onWidthChanged:graph.repaint();onHeightChanged:graph.repaint()
-  onPaint:{const c=getContext("2d");c.reset();c.strokeStyle=Theme.border;c.lineWidth=1;for(let i=0;i<3;i++){c.beginPath();c.moveTo(0,i*height/2);c.lineTo(width,i*height/2);c.stroke()}const n=Math.max(1,graph.records.length);c.fillStyle=Theme.cyan;for(let i=0;i<n;i++){const row=graph.records[i];if(!row || !row.sampled)continue;const bar=Math.max(1,width/n-Theme.dp(3));const value=row.value/graph.maximum*(height-Theme.dp(5));c.fillRect(i*width/n,height-value,bar,value)}}
- }
- SwirlText {anchors.top:parent.top;anchors.right:parent.right;text:graph.records.some(r=>r.sampled)?engineController.telemetry.formatBytes(graph.maximum)+(graph.period===3?" / 天":" / 30 分钟"):graph.period===3?"单位：B / 天":"单位：B / 30 分钟";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
- SwirlText {anchors.centerIn:plot;visible:!graph.records.some(r=>r.sampled);text:graph.period===3?"尚未采集本月流量":"尚未采集今日流量";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
- SwirlText {anchors.left:parent.left;anchors.bottom:parent.bottom;text:graph.period===3?"本月 1 日":"00:00";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
- SwirlText {anchors.right:parent.right;anchors.bottom:parent.bottom;text:graph.records.length?Qt.formatDateTime(new Date(graph.records[graph.records.length-1].time),graph.period===3?"M月d日":"HH:mm"):"现在";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+    id: graph
+    property bool proxyOnly: false
+    property var records: []
+    property bool dirty: true
+    readonly property var samples: records.filter(row => row.sampled)
+    readonly property real maximumRate: Math.max(1, ...samples.map(row => row.value / 1800))
+    readonly property real axisMaximum: samples.length ? maximumRate * 1.1 : 1
+
+    function refresh() {
+        if (!visible) return
+        const next = engineController.telemetry.dailyTraffic(proxyOnly)
+        if (JSON.stringify(next) !== JSON.stringify(records)) records = next
+        dirty = false
+    }
+
+    onProxyOnlyChanged: { dirty = true; refresh() }
+    onVisibleChanged: if (visible) refresh()
+    Component.onCompleted: refresh()
+    Connections { target: engineController.telemetry; function onChanged() { graph.dirty = true } }
+    Timer { interval: 400; running: graph.visible && graph.dirty; repeat: true; onTriggered: graph.refresh() }
+
+    Item {
+        id: plot
+        x: Theme.dp(58); y: Theme.dp(2)
+        width: Math.max(0, graph.width - x - Theme.dp(2))
+        height: Math.max(0, graph.height - Theme.dp(23))
+
+        Repeater {
+            model: 3
+            Item {
+                required property int index
+                y: index * (plot.height - Theme.dp(1)) / 2
+                width: plot.width; height: Theme.dp(1)
+                Repeater {
+                    model: Math.floor(parent.width / Theme.dp(5))
+                    Rectangle {
+                        required property int index
+                        x: index * Theme.dp(5)
+                        width: Theme.dp(2); height: Theme.dp(1)
+                        color: Theme.border
+                    }
+                }
+            }
+        }
+        Rectangle { width: Theme.dp(1); height: plot.height; color: Theme.border }
+
+        Repeater {
+            model: graph.records
+            Rectangle {
+                required property int index
+                required property var modelData
+                visible: modelData.sampled
+                width: Theme.dp(5); height: width; radius: width / 2
+                x: (index + 0.5) * plot.width / 48 - width / 2
+                y: plot.height * (1 - modelData.value / 1800 / graph.axisMaximum) - height / 2
+                color: Theme.cyan
+                Accessible.ignored: true
+            }
+        }
+    }
+
+    Repeater {
+        model: 3
+        SwirlText {
+            required property int index
+            x: 0; y: index * plot.height / 2 - Theme.dp(7)
+            width: Theme.dp(52); height: Theme.dp(15)
+            horizontalAlignment: Text.AlignRight
+            text: index === 2 ? "0 B/s" : graph.samples.length
+                ? engineController.telemetry.formatBytes(graph.axisMaximum * (1 - index / 2)) + "/s" : "—"
+            color: Theme.muted; font.pixelSize: Theme.fontSize(10)
+        }
+    }
+    Repeater {
+        model: ["12AM", "6AM", "12PM", "6PM"]
+        SwirlText {
+            required property int index
+            required property string modelData
+            x: plot.x + index * plot.width / 4 - (index === 0 ? 0 : Theme.dp(16))
+            y: plot.y + plot.height + Theme.dp(5)
+            width: Theme.dp(36); height: Theme.dp(16)
+            text: modelData; color: Theme.muted; font.pixelSize: Theme.fontSize(10)
+            horizontalAlignment: index === 0 ? Text.AlignLeft : Text.AlignHCenter
+        }
+    }
 }

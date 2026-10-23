@@ -282,27 +282,74 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     auto *activity=qobject_cast<QQuickItem *>(item());
     auto *upload=findVisual(activity,"activityUpload");
     auto *activityScroll=findVisual(activity,"activityScroll");
-    auto *traffic=findVisual(activity,"activityTotal"),*diagnostic=findVisual(activity,"internetDiagnosticCard");
-    check("activity-three-metrics-and-one-traffic-card",upload&&findVisual(activity,"activityDownload")&&findVisual(activity,"activityConnections")&&traffic&&diagnostic);
-    if(traffic&&diagnostic&&activityScroll){
-        const bool wide=eval("pageLoader.item.statsWide").toBool();
-        const auto aligned=[&]{const auto top=traffic->mapToItem(activity,0,0).y(),other=diagnostic->mapToItem(activity,0,0).y();return wide?qAbs(top-other)<2:top+traffic->height()<other;};
-        check("activity-statistics-and-diagnostic-top-align",aligned());
-        const auto collapsed=diagnostic->height();
-        const auto contentHeight=activityScroll->property("contentHeight").toDouble();
-        eval("pageLoader.item.diagnosticOpen=true");wait(850);
-        check("activity-expanded-diagnostic-reflows-with-statistics",aligned()&&diagnostic->height()>collapsed+20&&activityScroll->property("contentHeight").toDouble()>contentHeight+20&&(!wide||qAbs(traffic->height()-diagnostic->height())<3));
-        eval("pageLoader.item.diagnosticOpen=false");wait(850);
-        check("activity-collapse-restores-aligned-cards",aligned()&&qAbs(diagnostic->height()-collapsed)<3);
-        const auto originalSize=window->size();window->resize(qMax(originalSize.width(),1200),qMax(originalSize.height(),760));wait(250);
-        const auto wideTop=[&]{return qAbs(traffic->mapToItem(activity,0,0).y()-diagnostic->mapToItem(activity,0,0).y())<2;};
-        qInfo()<<"ACTIVITY_WIDE_GEOMETRY"<<window->size()<<eval("pageLoader.item.statsWide").toBool()<<traffic->size()<<diagnostic->size()<<traffic->mapToItem(activity,0,0)<<diagnostic->mapToItem(activity,0,0);
-        check("activity-wide-statistics-spans-two-cells",eval("pageLoader.item.statsWide").toBool()&&wideTop()&&traffic->width()>diagnostic->width());
-        eval("pageLoader.item.diagnosticOpen=true");wait(850);
-        check("activity-wide-expansion-keeps-row-aligned",wideTop()&&qAbs(traffic->height()-diagnostic->height())<3);
-        eval("pageLoader.item.diagnosticOpen=false");wait(850);window->resize(originalSize);wait(250);
+    auto *connections=findVisual(activity,"activityConnections"),*total=findVisual(activity,"activityTotal");
+    auto *diagnostic=findVisual(activity,"internetDiagnosticCard"),*trafficCard=findVisual(activity,"activityTrafficCard");
+    auto *trafficFilter=findVisual(activity,"activityTrafficFilter"),*sourceFilter=findVisual(activity,"activitySourceFilter");
+    auto *periodFilter=findVisual(activity,"activityPeriodFilter"),*trafficChart=findVisual(activity,"activityTrafficChart");
+    check("activity-v7-two-cards-three-sections-present",activity&&activityScroll&&diagnostic&&trafficCard&&upload&&connections&&total);
+    if(activity&&activityScroll&&diagnostic&&trafficCard&&upload&&connections&&total){
+        const auto originalSize=window->size();
+        const QSize normalSize(qRound(eval("Theme.dp(914)").toDouble()),qRound(eval("Theme.dp(672)").toDouble()));
+        window->resize(normalSize);wait(250);
+        const auto diagnosticAt=diagnostic->mapToItem(activity,0,0),trafficAt=trafficCard->mapToItem(activity,0,0);
+        const auto uploadAt=upload->mapToItem(activity,0,0),connectionsAt=connections->mapToItem(activity,0,0),totalAt=total->mapToItem(activity,0,0);
+        std::function<int(QQuickItem *)> panelCount=[&](QQuickItem *root){
+            int count=root->property("independentCard").isValid()?1:0;
+            for(auto *child:root->childItems())count+=panelCount(child);
+            return count;
+        };
+        check("activity-v7-only-two-top-cards",panelCount(activity)==2&&diagnostic->isVisible()&&trafficCard->isVisible()
+            &&diagnostic->parentItem()==trafficCard->parentItem()&&qAbs(diagnosticAt.y()-trafficAt.y())<2
+            &&qAbs(diagnostic->height()-trafficCard->height())<2&&trafficAt.x()>=diagnosticAt.x()+diagnostic->width()
+            &&diagnostic->width()/trafficCard->width()>0.8&&diagnostic->width()/trafficCard->width()<1.0);
+        const auto unboxed=[](QQuickItem *section){return !section->property("color").isValid()&&!section->property("background").isValid();};
+        check("activity-v7-three-unboxed-sections",upload->parentItem()==connections->parentItem()&&connections->parentItem()==total->parentItem()
+            &&unboxed(upload)&&unboxed(connections)&&unboxed(total)
+            &&uploadAt.y()>diagnosticAt.y()+diagnostic->height()&&qAbs(uploadAt.y()-connectionsAt.y())<2&&qAbs(uploadAt.y()-totalAt.y())<2
+            &&uploadAt.x()+upload->width()<connectionsAt.x()&&connectionsAt.x()+connections->width()<totalAt.x());
+        const double contentHeight=activityScroll->property("contentHeight").toDouble();
+        const double sectionBottom=total->mapToItem(activityScroll,0,total->height()).y();
+        qInfo()<<"ACTIVITY_V7_NORMAL_GEOMETRY"<<window->size()<<activityScroll->size()<<contentHeight
+               <<diagnostic->size()<<trafficCard->size()<<upload->size()<<connections->size()<<total->size();
+        check("activity-v7-normal-914x672-no-scroll",window->size()==normalSize&&eval("pageLoader.item.wide").toBool()
+            &&contentHeight<=activityScroll->height()+1&&qAbs(activityScroll->property("contentY").toDouble())<1
+            &&sectionBottom<=activityScroll->height()+1);
+        const auto visibleControl=[&](QQuickItem *control){
+            return control&&control->isVisible()&&control->isEnabled()&&control->width()>0&&control->height()>0
+                &&control->mapToItem(activityScroll,0,0).y()>=-1
+                &&control->mapToItem(activityScroll,0,control->height()).y()<=activityScroll->height()+1;
+        };
+        check("activity-v7-filters-visible",visibleControl(trafficFilter)&&visibleControl(sourceFilter)&&visibleControl(periodFilter)&&trafficChart&&trafficChart->isVisible());
+        const auto clickSegment=[&](QQuickItem *control,int index,int count){
+            const auto point=control->mapToScene(QPointF(control->width()*(index+0.5)/count,control->height()/2)).toPoint();
+            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point);wait(100);
+        };
+        if(visibleControl(trafficFilter)&&trafficChart){
+            clickSegment(trafficFilter,1,2);
+            check("activity-v7-proxy-filter-switches-chart",eval("pageLoader.item.trafficKind===1").toBool()
+                &&trafficFilter->property("currentIndex").toInt()==1&&trafficChart->property("proxyOnly").toBool());
+            clickSegment(trafficFilter,0,2);
+            check("activity-v7-all-filter-restores-chart",eval("pageLoader.item.trafficKind===0").toBool()
+                &&trafficFilter->property("currentIndex").toInt()==0&&!trafficChart->property("proxyOnly").toBool());
+        }
+        if(visibleControl(sourceFilter)){
+            clickSegment(sourceFilter,1,3);
+            check("activity-v7-domain-filter-switches-source",eval("pageLoader.item.rankingKind===1").toBool()&&sourceFilter->property("currentIndex").toInt()==1);
+            clickSegment(sourceFilter,2,3);
+            check("activity-v7-strategy-filter-switches-source",eval("pageLoader.item.rankingKind===2").toBool()&&sourceFilter->property("currentIndex").toInt()==2);
+            clickSegment(sourceFilter,0,3);
+            check("activity-v7-source-filter-restores-processes",eval("pageLoader.item.rankingKind===0").toBool()&&sourceFilter->property("currentIndex").toInt()==0);
+        }
+        if(visibleControl(periodFilter)){
+            clickSegment(periodFilter,1,2);
+            check("activity-v7-month-filter-switches-period",eval("pageLoader.item.period===1").toBool()&&periodFilter->property("currentIndex").toInt()==1);
+            clickSegment(periodFilter,0,2);
+            check("activity-v7-today-filter-restores-period",eval("pageLoader.item.period===0").toBool()&&periodFilter->property("currentIndex").toInt()==0);
+        }
+        window->resize(originalSize);wait(250);
     }
-    if(activityScroll)activityScroll->setProperty("contentY",20);
+    const double activityScrollBefore=activityScroll?qMax(0.0,qMin(20.0,activityScroll->property("contentHeight").toDouble()-activityScroll->height())):0.0;
+    if(activityScroll)activityScroll->setProperty("contentY",activityScrollBefore);
     if(upload){
         qmlEngine(window)->rootContext()->setContextProperty("motionTestOrigin",upload);
         eval("SwirlMotion.navigateFrom(motionTestOrigin,'traffic','uploadRate')");
@@ -316,7 +363,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         eval("SwirlMotion.navigateFrom(motionTestOrigin,'traffic','uploadRate')");wait(25);
         check("reopen-keeps-latest-route",eval("AppState.currentPage==='traffic'").toBool());
         settle();eval("SwirlMotion.returnToHub(null)");wait(25);settle();
-        check("activity-return-preserves-scroll",item()==activity&&activityScroll&&qAbs(activityScroll->property("contentY").toDouble()-20)<1);
+        check("activity-return-preserves-scroll",item()==activity&&activityScroll&&qAbs(activityScroll->property("contentY").toDouble()-activityScrollBefore)<1);
         check("shared-surfaces-restored",!upload->property("surfaceHidden").toBool()&&host->property("sourceSurface").value<QObject *>()==nullptr);
     }
     auto *capsule=findVisual(window->contentItem(),"proxyCapsule");
