@@ -21,7 +21,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     std::function<QQuickItem *(QQuickItem *,const QString &)> find;
     find=[&](QQuickItem *p,const QString &n)->QQuickItem *{if(p->objectName()==n)return p;for(auto *c:p->childItems())if(auto *f=find(c,n))return f;return nullptr;};
     const auto item=[&](const QString &n){return find(window->contentItem(),n);};
-    const auto eval=[&](const QString &s){QQmlExpression e(qmlContext(window),window,s);auto v=e.evaluate();check(!e.hasError(),"QML expression valid");return v;};
+    const auto eval=[&](const QString &s){if(s.contains("resultCount"))QTest::qWaitFor([&]{auto *model=window->findChild<QObject *>("nodeViewModel");return model&&model->property("total").toInt()==controller->nodes().size();},1000);QQmlExpression e(qmlContext(window),window,s);auto v=e.evaluate();check(!e.hasError(),"QML expression valid");return v;};
     const auto click=[&](const QString &n){QTest::qWaitFor([&]{auto *hero=item("nodeHero");return !hero||!hero->property("moving").toBool();},3500);auto *t=item(n);if(check(t&&t->isEnabled(),"node input exists and is enabled"))QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,t->mapToScene(QPointF(t->width()/2,t->height()/2)).toPoint());QTest::qWait(300);};
     const auto fill=[&](const QString &n,const QString &v){auto *t=item(n);if(check(t!=nullptr,"node field exists"))t->setProperty("text",v);};
     const auto select=[&](int index){ eval("pageLoader.item.dismissDetail()"); QTest::qWait(450);

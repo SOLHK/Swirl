@@ -197,13 +197,9 @@ impl Resolver {
 
 fn system_hosts() -> Result<HashMap<String, IpAddr>, &'static str> {
     use std::io::Read;
-    #[cfg(windows)]
-    let path = std::path::PathBuf::from(
-        std::env::var_os("SystemRoot").unwrap_or_else(|| "C:\\Windows".into()),
-    )
-    .join("System32/drivers/etc/hosts");
-    #[cfg(not(windows))]
-    let path = std::path::PathBuf::from("/etc/hosts");
+    let Some(path) = swirl_platform::system_hosts_path() else {
+        return Ok(HashMap::new());
+    };
     let file = match std::fs::File::open(path) {
         Ok(f) => f,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(HashMap::new()),

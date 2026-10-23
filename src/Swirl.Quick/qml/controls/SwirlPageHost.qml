@@ -50,6 +50,7 @@ Item {
  }
  function surfaceFor(page,key){return page.motionSurfaces && page.motionSurfaces[key] || page.motionSurface || null}
  function trimCache(){
+  if(cachedPageCount<=maximumCachedPages)return
   const next=Object.assign({},pages),saved=Object.assign({},savedPages)
   for(const key of accessOrder){if(Object.keys(next).length<=maximumCachedPages)break;const loader=next[key];if(!loader || loader===activeLoader || loader===leavingLoader || loader===pendingLoader || !loader.item || !loader.item.exportCacheState || (SwirlMotion.returnShared && SwirlMotion.returnShared.previous===key))continue;saved[key]=loader.item.exportCacheState();loader.destroy();delete next[key]}
   pages=next;savedPages=saved

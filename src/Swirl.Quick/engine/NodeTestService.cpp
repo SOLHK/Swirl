@@ -1,6 +1,7 @@
 #include "NodeTestService.h"
 #ifdef SWIRL_USE_RUST_CORE
 #include "RustCoreEngine.h"
+#include "ThreadedEngine.h"
 #else
 #include "MihomoAdapter.h"
 #include "SwirlProxyEngine.h"
@@ -41,7 +42,8 @@ void NodeTestService::start(const EngineStartOptions &options,const QStringList 
  if(busy())return;
  if(!url.isValid()||(url.scheme()!="https"&&url.scheme()!="http")||url.host().isEmpty()||!url.userInfo().isEmpty()||url.hasFragment()||url.toString().size()>2048){m_message="测试地址必须为有效且不含凭据的 HTTP/HTTPS URL";emit changed();return;}
  m_options=options;m_url=url;m_completed=0;m_succeeded=0;m_failed=0;m_queue.clear();
- for(const auto &id:ids)if(!m_queue.contains(id)){bool found=false;for(const auto &n:options.nodes)if(n.id==id)found=true;if(found)m_queue.enqueue(id);}
+ QSet<QString> known,queued;for(const auto &node:options.nodes)known.insert(node.id);
+ for(const auto &id:ids)if(known.contains(id)&&!queued.contains(id)){queued.insert(id);m_queue.enqueue(id);}
  for(const auto &id:m_queue)m_results.remove(id);
  m_total=m_queue.size();m_message=m_total?"正在独立测试节点":"没有可测试的节点";emit changed();next();
 }
@@ -54,7 +56,7 @@ void NodeTestService::next(){
   // Test a natively supported node through its actual native implementation.
   // No automatic compatibility retry can turn a native failure into success.
 #ifdef SWIRL_USE_RUST_CORE
-  ProxyEngine *runner=new RustCoreEngine(this);
+  ProxyEngine *runner=new ThreadedEngine;runner->setParent(this);
   runner->setProperty("probeEngineKind","rust");
 #else
   const bool native=SwirlProtocolRegistry::nativeSessionReason(opts).isEmpty();
@@ -70,14 +72,13 @@ void NodeTestService::next(){
    if(runner->property("probeStarted").toBool()&&!status.nodeBusy&&(status.requestState==ProxyEngine::RequestState::Succeeded||status.requestState==ProxyEngine::RequestState::Failed||status.nodeHealth==ProxyEngine::NodeHealth::Unavailable)){
     QString phase=status.nodeHealth==ProxyEngine::NodeHealth::Unavailable?"availability":"request";
 #ifdef SWIRL_USE_RUST_CORE
-    const auto probeStage=static_cast<RustCoreEngine *>(runner)->probeFailureStage();
+    const auto probeStage=runner->probeFailureStage();
     if(!probeStage.isEmpty())phase=probeStage;
 #endif
     QVariantMap result{{"success",status.requestState==ProxyEngine::RequestState::Succeeded},{"latency",status.latencyMs},{"http",status.responseCode},{"phase",phase},{"error",status.requestState==ProxyEngine::RequestState::Succeeded?QString():status.nodeMessage}};
 #ifdef SWIRL_USE_RUST_CORE
-    const auto *rust=static_cast<RustCoreEngine *>(runner);
-    result.insert("outboundConnectMs",rust->probeOutboundConnectMs());
-    result.insert("originTlsMs",rust->probeOriginTlsMs());
+    result.insert("outboundConnectMs",runner->probeOutboundConnectMs());
+    result.insert("originTlsMs",runner->probeOriginTlsMs());
 #endif
     finish(id,runner,result);
    }

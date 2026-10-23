@@ -17,9 +17,9 @@ public:
  void setRoutingMode(const QString &) override;
  void probeNode(const QUrl &) override;
  Status status() const override {return m_status;}
- QString probeFailureStage() const {return m_probeFailureStage;}
- qint64 probeOutboundConnectMs() const {return m_probeOutboundConnectMs;}
- qint64 probeOriginTlsMs() const {return m_probeOriginTlsMs;}
+ QString probeFailureStage() const override {return m_probeFailureStage;}
+ qint64 probeOutboundConnectMs() const override {return m_probeOutboundConnectMs;}
+ qint64 probeOriginTlsMs() const override {return m_probeOriginTlsMs;}
  QString configurationSummary() const override;
  QVariantList routingRules() const override;
  static QVariantList routingRulesForOptions(const EngineStartOptions &);

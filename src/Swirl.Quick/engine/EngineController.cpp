@@ -219,7 +219,9 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         emit nodesChanged();
     });
     connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this] {
-        emit nodesChanged();
+        const auto nodeStatus=m_engine->status();
+        const QVariantList presentation{int(nodeStatus.state),nodeStatus.selectedNodeId,int(nodeStatus.nodeHealth),int(nodeStatus.requestState),nodeStatus.processAlive,nodeStatus.nodeBusy,nodeStatus.latencyMs,m_connectionRequested,m_options.selectedNodeId};
+        if(presentation!=m_previousNodePresentation){m_previousNodePresentation=presentation;emit nodesChanged();}
         if (!m_shuttingDown && m_restartPending && m_engine->status().state==ProxyEngine::State::Stopped) {
             m_restartPending=false;
             QTimer::singleShot(0,this,[this]{if(!m_shuttingDown && m_connectionRequested && (!m_options.selectedNodeId.isEmpty()||m_options.directSession))m_engine->start(m_options);});

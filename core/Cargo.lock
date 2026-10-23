@@ -920,10 +920,15 @@ name = "swirl-dns"
 version = "0.1.0"
 dependencies = [
  "ring",
+ "swirl-platform",
  "swirl-subscription",
  "swirl-transport",
  "tokio",
 ]
+
+[[package]]
+name = "swirl-platform"
+version = "0.1.0"
 
 [[package]]
 name = "swirl-protocol"

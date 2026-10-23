@@ -23,8 +23,10 @@ public:
             connect(m_engine,&ProxyEngine::statusChanged,m_context,[this]{
                 const auto status=m_engine->status();const auto summary=m_engine->configurationSummary();
                 const auto rules=m_engine->routingRules();const auto epoch=m_workerEpoch;
-                QMetaObject::invokeMethod(this,[this,status,summary,rules,epoch]{
+                const auto probeStage=m_engine->probeFailureStage();const auto outbound=m_engine->probeOutboundConnectMs(),tls=m_engine->probeOriginTlsMs();
+                QMetaObject::invokeMethod(this,[this,status,summary,rules,epoch,probeStage,outbound,tls]{
                     if(epoch!=m_epoch)return;
+                    m_probeStage=probeStage;m_probeOutbound=outbound;m_probeTls=tls;
                     m_status=status;m_summary=summary;m_rules=rules;emit statusChanged();
                 },Qt::QueuedConnection);
             });
@@ -57,6 +59,9 @@ public:
     Status status() const override{return m_status;}
     QString configurationSummary() const override{return m_summary;}
     QVariantList routingRules() const override{return m_rules;}
+    QString probeFailureStage() const override{return m_probeStage;}
+    qint64 probeOutboundConnectMs() const override{return m_probeOutbound;}
+    qint64 probeOriginTlsMs() const override{return m_probeTls;}
 private:
     template<class F> void post(F action){QMetaObject::invokeMethod(m_context,[this,action]{action(m_engine);},Qt::QueuedConnection);}
     QThread m_thread;
@@ -65,5 +70,7 @@ private:
     Status m_status;
     QString m_summary;
     QVariantList m_rules;
+    QString m_probeStage;
+    qint64 m_probeOutbound=-1,m_probeTls=-1;
     quint64 m_epoch=0,m_workerEpoch=0;
 };

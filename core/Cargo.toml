@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 exclude = ["vendor/rustls"]
-members = ["crates/swirl-subscription", "crates/swirl-dns", "crates/swirl-routing", "crates/swirl-protocol", "crates/swirl-transport", "crates/swirl-core", "crates/swirl-api"]
+members = ["crates/swirl-platform", "crates/swirl-subscription", "crates/swirl-dns", "crates/swirl-routing", "crates/swirl-protocol", "crates/swirl-transport", "crates/swirl-core", "crates/swirl-api"]
 
 [workspace.package]
 version = "0.1.0"
@@ -36,6 +36,7 @@ swirl-routing = { path = "crates/swirl-routing" }
 swirl-protocol = { path = "crates/swirl-protocol" }
 swirl-transport = { path = "crates/swirl-transport" }
 swirl-core = { path = "crates/swirl-core" }
+swirl-platform = { path = "crates/swirl-platform" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

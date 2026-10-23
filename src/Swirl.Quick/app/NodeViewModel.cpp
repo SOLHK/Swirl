@@ -8,38 +8,43 @@
 QVariant NodeRows::data(const QModelIndex &index,int role) const {
     return index.isValid()&&index.row()<rows.size()&&role==Qt::UserRole?QVariant(rows[index.row()]):QVariant();
 }
-void NodeRows::update(const QVariantList &values) {
+bool NodeRows::update(const QVariantList &values) {
+    bool changed=false;
     QSet<QString> incoming;for(const auto &v:values)incoming.insert(v.toMap().value("id").toString());
-    for(int i=rows.size()-1;i>=0;--i)if(!incoming.contains(rows[i].value("id").toString())){beginRemoveRows({},i,i);rows.removeAt(i);endRemoveRows();}
+    for(int i=rows.size()-1;i>=0;--i)if(!incoming.contains(rows[i].value("id").toString())){beginRemoveRows({},i,i);rows.removeAt(i);endRemoveRows();changed=true;}
     QHash<QString,int> indices;for(int i=0;i<rows.size();++i)indices.insert(rows[i].value("id").toString(),i);
     QList<QVariantMap> added;
     for(const auto &v:values){const auto row=v.toMap();const auto id=row.value("id").toString();if(id.isEmpty())continue;
         const int index=indices.value(id,-1);
         if(index<0){indices.insert(id,rows.size()+added.size());added.append(row);}
-        else if(index<rows.size()&&rows[index]!=row){rows[index]=row;emit dataChanged(this->index(index),this->index(index),{Qt::UserRole});}
+        else if(index<rows.size()&&rows[index]!=row){rows[index]=row;emit dataChanged(this->index(index),this->index(index),{Qt::UserRole});changed=true;}
     }
-    if(!added.isEmpty()){beginInsertRows({},rows.size(),rows.size()+added.size()-1);rows.append(added);endInsertRows();}
+    if(!added.isEmpty()){beginInsertRows({},rows.size(),rows.size()+added.size()-1);rows.append(added);endInsertRows();changed=true;}
+    return changed;
 }
 NodeViewModel::NodeViewModel(QObject *parent):QSortFilterProxyModel(parent),m_rows(this) {
     QSettings settings;const auto saved=settings.value("NodePreferences/favorites").toStringList();m_favorites=QSet<QString>(saved.begin(),saved.end());
     m_recent=settings.value("NodePreferences/recent").toStringList();m_recent=m_recent.mid(0,32);
     setSourceModel(&m_rows);setDynamicSortFilter(true);setSortRole(Qt::UserRole);sort(0);
+    m_refreshTimer.setInterval(50);m_refreshTimer.setSingleShot(true);connect(&m_refreshTimer,&QTimer::timeout,this,&NodeViewModel::refresh);
 }
 void NodeViewModel::notify(){++m_revision;emit changed();}
 void NodeViewModel::setController(EngineController *value){
     if(m_controller==value)return;if(m_controller)disconnect(m_controller,nullptr,this,nullptr);m_controller=value;
-    if(value){connect(value,&EngineController::nodesChanged,this,&NodeViewModel::refresh);connect(value,&EngineController::statusChanged,this,[this]{
+    m_refreshTimer.stop();
+    if(value){connect(value,&EngineController::nodesChanged,this,&NodeViewModel::scheduleRefresh);connect(value,&EngineController::statusChanged,this,[this]{
         if(m_controller->connected()&&m_controller->requestSucceeded()&&!m_controller->activeNodeId().isEmpty()){
             const auto id=m_controller->activeNodeId();if(id!=m_lastConnected){m_lastConnected=id;m_recent.removeAll(id);m_recent.prepend(id);m_recent=m_recent.mid(0,32);QSettings().setValue("NodePreferences/recent",m_recent);}
-        }else m_lastConnected.clear();refresh();
+        }else m_lastConnected.clear();scheduleRefresh();
     });}
     refresh();emit controllerChanged();
 }
 void NodeViewModel::refresh(){updateRows(m_controller?m_controller->nodes():QVariantList());}
+void NodeViewModel::scheduleRefresh(){if(!m_refreshTimer.isActive())m_refreshTimer.start();}
 void NodeViewModel::updateRows(const QVariantList &values){
     QVariantList rows;rows.reserve(values.size());
     for(const auto &v:values){auto row=v.toMap();const auto id=row.value("id").toString();row["favorite"]=m_favorites.contains(id);row["recentIndex"]=m_recent.indexOf(id);rows.append(row);}
-    m_rows.update(rows);notify();
+    if(m_rows.update(rows))notify();
 }
 void NodeViewModel::setQuery(const QString &value){const auto query=value.trimmed();if(m_query==query)return;m_query=query;invalidateFilter();notify();}
 void NodeViewModel::setFilters(const QVariantMap &value){if(m_filters==value)return;m_filters=value;invalidate();sort(0,value.value("descending").toBool()?Qt::DescendingOrder:Qt::AscendingOrder);notify();}

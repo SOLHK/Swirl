@@ -214,6 +214,7 @@ private:
     NodeTestService m_tests;
     ConnectionDiagnostics m_diagnostics;
     QString m_previousProxyState;
+    QVariantList m_previousNodePresentation;
     ProxyEngine::State m_previousEngineState=ProxyEngine::State::Stopped;
     QJsonObject serializedNetworkConfiguration();
     bool saveNetworkConfiguration();

@@ -102,6 +102,9 @@ public:
     virtual Status status() const = 0;
     virtual QString configurationSummary() const = 0;
     virtual QVariantList routingRules() const { return {}; }
+    virtual QString probeFailureStage() const { return {}; }
+    virtual qint64 probeOutboundConnectMs() const { return -1; }
+    virtual qint64 probeOriginTlsMs() const { return -1; }
 signals:
     void statusChanged();
     void diagnostic(const QString &module,const QString &code,const QString &message);

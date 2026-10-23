@@ -12,6 +12,9 @@ private slots:
         NodeViewModel model;QVariantList rows;
         for(int i=0;i<5000;++i)rows.append(QVariantMap{{"id",QString::number(i)},{"name",QString("日本 Tokyo %1").arg(i)},{"host","node.example.test"},{"protocol",i%2?"vless":"ss"},{"regionCode","JP"},{"regionName","日本"},{"sourceId",i%3?"provider-a":"provider-b"},{"status","未测试"},{"latency","—"}});
         model.updateRows(rows);QCOMPARE(model.rowCount(),5000);
+        QSignalSpy notifications(&model,&NodeViewModel::changed);
+        for(int i=0;i<10;++i)model.updateRows(rows);
+        QCOMPARE(notifications.size(),0);
         QSignalSpy resets(model.sourceModel(),&QAbstractItemModel::modelReset),changes(model.sourceModel(),&QAbstractItemModel::dataChanged);
         QElapsedTimer timer;timer.start();
         for(int i=0;i<30;++i){model.setQuery(i%2?"TOKYO":"日本");QCOMPARE(model.rowCount(),5000);}

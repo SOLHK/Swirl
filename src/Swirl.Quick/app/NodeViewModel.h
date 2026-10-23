@@ -3,6 +3,7 @@
 #include <QSortFilterProxyModel>
 #include <QPointer>
 #include <QSet>
+#include <QTimer>
 #include <QtQml/qqmlregistration.h>
 #include "engine/EngineController.h"
 
@@ -12,7 +13,7 @@ public:
     int rowCount(const QModelIndex &parent={}) const override { return parent.isValid()?0:rows.size(); }
     QVariant data(const QModelIndex &index,int role) const override;
     QHash<int,QByteArray> roleNames() const override { return {{Qt::UserRole,"entry"}}; }
-    void update(const QVariantList &values);
+    bool update(const QVariantList &values);
     QList<QVariantMap> rows;
 };
 
@@ -49,6 +50,7 @@ protected:
     bool lessThan(const QModelIndex &left,const QModelIndex &right) const override;
 private:
     void refresh();
+    void scheduleRefresh();
     void notify();
     NodeRows m_rows;
     QPointer<EngineController> m_controller;
@@ -57,4 +59,5 @@ private:
     QSet<QString> m_favorites;
     QStringList m_recent;
     int m_revision=0;
+    QTimer m_refreshTimer;
 };

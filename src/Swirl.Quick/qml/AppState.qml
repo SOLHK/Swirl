@@ -57,6 +57,7 @@ QtObject {
         navigationDirection=1
         navigationDepths=navigationDepths.slice(0,historyIndex+1).concat([detail?detailDepth+1:0])
         navigationHistory = navigationHistory.slice(0,historyIndex+1).concat([id])
+        if(navigationHistory.length>128){navigationHistory=navigationHistory.slice(-128);navigationDepths=navigationDepths.slice(-128)}
         historyIndex = navigationHistory.length-1
         currentPage = id
     }
