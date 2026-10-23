@@ -93,7 +93,7 @@ ApplicationWindow {
         // DWM supplies the native material underneath the sharp QML content.
         width:window.width; height:window.height
         SwirlGlassMaterial {
-            anchors.fill:parent;targetWindow:window;sidebarGlassWidth:window.actualSidebarWidth-Theme.dp(5)
+            anchors.fill:parent;targetWindow:window
         }
 
         MouseArea {

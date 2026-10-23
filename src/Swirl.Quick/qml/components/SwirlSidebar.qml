@@ -12,12 +12,16 @@ Item {
  readonly property Item selectedEntry:entries[AppState.sidebarPage] || null
  function registerEntry(item){const next=Object.assign({},entries);next[item.pageId]=item;entries=next}
  function unregisterEntry(item){const next=Object.assign({},entries);delete next[item.pageId];entries=next}
- RectangularShadow {
-  anchors.fill:floatingBackground
-  radius:floatingBackground.radius
-  blur:Theme.dp(16)
-  offset:Qt.vector2d(Theme.dp(2),Theme.dp(3))
-  color:Theme.withAlpha(Theme.dark?"#000000":"#4C6380",Theme.dark?0.22:0.14)
+ Rectangle {
+  x:floatingBackground.x+floatingBackground.width
+  y:floatingBackground.y+floatingBackground.radius
+  width:Theme.dp(10)
+  height:floatingBackground.height-2*floatingBackground.radius
+  gradient:Gradient {
+   orientation:Gradient.Horizontal
+   GradientStop {position:0;color:Theme.withAlpha("#000000",Theme.dark?0.12:0.055)}
+   GradientStop {position:1;color:"transparent"}
+  }
   visible:Theme.effectsSupported
  }
  Rectangle {
@@ -25,15 +29,9 @@ Item {
   x:Theme.dp(5);y:Theme.dp(5)
   width:sidebar.width-Theme.dp(10);height:sidebar.height-Theme.dp(10)
   radius:Theme.dp(14)
-  color:"transparent"
-  gradient:Gradient {
-   orientation:Gradient.Horizontal
-   GradientStop {position:0;color:sidebar.glassEnabled?Theme.withAlpha(Theme.dark?"#7890AA":"#FFFFFF",Theme.dark?0.26:0.31):Theme.dark?"#333B46":"#F6F9FD"}
-   GradientStop {position:0.55;color:sidebar.glassEnabled?Theme.withAlpha(Theme.dark?"#6C849E":"#FFFFFF",Theme.dark?0.16:0.16):Theme.dark?"#333B46":"#F6F9FD"}
-   GradientStop {position:1;color:sidebar.glassEnabled?Theme.withAlpha(Theme.dark?"#7890AA":"#FFFFFF",Theme.dark?0.24:0.24):Theme.dark?"#333B46":"#F6F9FD"}
-  }
+  color:sidebar.glassEnabled?Theme.withAlpha("#FFFFFF",Theme.dark?0.05:0.04):Theme.dark?"#333B46":"#FBFBFB"
   border.width:Theme.dp(1)
-  border.color:Theme.dark?Theme.withAlpha("#9CB2CD",0.34):Theme.withAlpha("#FFFFFF",0.55)
+  border.color:Theme.dark?Theme.withAlpha("#FFFFFF",0.18):Theme.withAlpha("#777777",0.12)
  }
  // A single visual owner: retarget y from its rendered position, in local coordinates.
  Rectangle {

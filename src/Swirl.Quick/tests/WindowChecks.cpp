@@ -143,8 +143,11 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
         image.save(directory+"/taskbar-native-icon.png");SelectObject(dc,previous);DeleteObject(bitmap);DeleteDC(dc);
     }
 #endif
+    state("Theme.mode='Light'");QTest::qWait(300);
     QCursor::setPos(window->screen()->availableGeometry().topLeft()+QPoint(10,10));QTest::qWait(300);
     auto red=grab("backdrop-red");
+    const auto lightShell=sample(red,0.995,0.5);
+    check(lightShell.red()>=230&&lightShell.green()>=230&&lightShell.blue()>=230,"light shell reads neutral white in the native compositor");
     const QColor behind("#D72D31");
     const auto cornerShowsBackground=[&](QColor pixel){
         // DWM's frame shadow also surrounds Qt's own alpha outline. Check
@@ -177,15 +180,16 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     check(exactOpaque ? sidebarChange<=3 : sidebarChange>=4&&sidebarChange<(backdrop->blurActive()?160:40),"sidebar follows the effective composition capability");
     check(exactOpaque ? contentChange<=3 : contentChange>=4&&contentChange<(backdrop->blurActive()?160:40),"workspace follows the effective composition capability");
     if(backdrop->blurActive()){
-        check(sidebarChange>contentChange+8,"floating sidebar reveals more live desktop color than the workspace");
+        check(qAbs(sidebarChange-contentChange)<=12,"sidebar and workspace share one neutral shell material while responding to live desktop color");
         const auto scale=window->devicePixelRatio();const auto divider=state("window.actualSidebarWidth").toReal();
-        const auto lhs=red.pixelColor(qRound((divider-12)*scale),qRound(8*scale));
-        const auto rhs=red.pixelColor(qRound((divider+12)*scale),qRound(8*scale));
-        check(distance(lhs,rhs)>=12,"floating sidebar has a visible soft edge against the workspace");
+        const auto lhs=red.pixelColor(qRound((divider-12)*scale),qRound(20*scale));
+        const auto rhs=red.pixelColor(qRound((divider+12)*scale),qRound(20*scale));
+        check(distance(lhs,rhs)<=20,"sidebar floats above the workspace without a hard material seam");
     }
-    // Cards remain readable while the shell and page gutter reveal the desktop.
+    // The shared light shell stays white while still allowing restrained live blur.
     const auto materialAlpha=window->grabWindow().pixelColor(int(window->width()*0.995*window->devicePixelRatio()),int(window->height()*0.5*window->devicePixelRatio())).alpha();
-    check(exactOpaque ? materialAlpha==255 : backdrop->blurActive()?materialAlpha>=207&&materialAlpha<=211:backdrop->translucent()?materialAlpha>=240&&materialAlpha<=244:materialAlpha>=227&&materialAlpha<=231,"actual alpha matches the single material tint");
+    const int expectedBlurAlpha=state("Theme.dark").toBool()?204:245;
+    check(exactOpaque ? materialAlpha==255 : backdrop->blurActive()?qAbs(materialAlpha-expectedBlurAlpha)<=2:backdrop->translucent()?materialAlpha>=240&&materialAlpha<=244:materialAlpha>=227&&materialAlpha<=231,"actual alpha matches the single material tint");
     // Move Swirl relative to a split-color native QML window to verify position-
     // dependent composition. The scene is a test window, not a wallpaper image.
     QQuickItem split;
