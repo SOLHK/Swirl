@@ -11,6 +11,23 @@ Item {
  readonly property Item selectedEntry:entries[AppState.sidebarPage] || null
  function registerEntry(item){const next=Object.assign({},entries);next[item.pageId]=item;entries=next}
  function unregisterEntry(item){const next=Object.assign({},entries);delete next[item.pageId];entries=next}
+ RectangularShadow {
+  anchors.fill:floatingBackground
+  radius:floatingBackground.radius
+  blur:Theme.dp(16)
+  offset:Qt.vector2d(Theme.dp(2),Theme.dp(3))
+  color:Theme.withAlpha(Theme.dark?"#000000":"#4C6380",Theme.dark?0.22:0.14)
+  visible:Theme.effectsSupported
+ }
+ Rectangle {
+  id:floatingBackground;objectName:"sidebarFloatingBackground"
+  x:Theme.dp(5);y:Theme.dp(5)
+  width:sidebar.width-Theme.dp(10);height:sidebar.height-Theme.dp(10)
+  radius:Theme.dp(14)
+  color:Theme.dark?Theme.withAlpha("#333B46",0.90):Theme.withAlpha("#FFFFFF",0.88)
+  border.width:Theme.dp(1)
+  border.color:Theme.dark?Theme.withAlpha("#758296",0.42):Theme.withAlpha("#FFFFFF",0.78)
+ }
  // A single visual owner: retarget y from its rendered position, in local coordinates.
  Rectangle {
   id:selection;objectName:"sidebarSelectionIndicator"
