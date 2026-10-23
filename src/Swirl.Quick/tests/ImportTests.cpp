@@ -616,15 +616,19 @@ external-controller: 0.0.0.0:9090
         HttpsSubscriptionServer first(serverConfiguration),second(serverConfiguration);QVERIFY(first.listen(QHostAddress::LocalHost,0));QVERIFY(second.listen(QHostAddress::LocalHost,0));
         first.code=302;first.location=second.url().toEncoded();second.content=socks(1080);
         QTemporaryDir temp;NodeStore store(temp.filePath("nodes"));NodeImportService service(&store);
-        service.importUrl(first.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),8000);QCOMPARE(store.nodes().size(),1);QCOMPARE(first.count,1);QCOMPARE(second.count,1);
-        const auto id=store.nodes().first().id;QVERIFY(store.select(id));SubscriptionServer plain;QVERIFY(plain.listen(QHostAddress::LocalHost,0));first.location=plain.url().toEncoded();
+        service.importUrl(second.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),8000);QCOMPARE(store.nodes().size(),1);QCOMPARE(second.count,1);
+        const auto id=store.nodes().first().id;QVERIFY(store.select(id));
+        service.importUrl(first.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),8000);QCOMPARE(first.count,1);QCOMPARE(second.count,1);QCOMPARE(store.nodes().size(),1);QCOMPARE(store.selectedId(),id);
+        SubscriptionServer plain;QVERIFY(plain.listen(QHostAddress::LocalHost,0));first.location=plain.url().toEncoded();
         service.importUrl(first.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),8000);QVERIFY(service.message().contains(QStringLiteral("降级")));QCOMPARE(plain.count,0);QCOMPARE(store.nodes().size(),1);QCOMPARE(store.selectedId(),id);
     }
     void redirectsPreserveNodesAndBoundLoops() {
         SubscriptionServer first,second;QVERIFY(first.listen(QHostAddress::LocalHost,0));QVERIFY(second.listen(QHostAddress::LocalHost,0));
         first.code=302;first.location=second.url().toEncoded();second.content=socks(1080);
         QTemporaryDir temp;NodeStore store(temp.filePath("nodes"));NodeImportService service(&store);
-        service.importUrl(first.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);QCOMPARE(store.nodes().first().port,quint16(1080));
+        service.importUrl(second.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);QCOMPARE(store.nodes().first().port,quint16(1080));
+        const auto id=store.nodes().first().id;QVERIFY(store.select(id));
+        service.importUrl(first.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(first.count,1);QCOMPARE(second.count,1);QCOMPARE(store.nodes().size(),1);QCOMPARE(store.selectedId(),id);
         first.location=first.url().toEncoded();service.importUrl(first.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);QVERIFY(service.message().contains(QStringLiteral("重定向")));QVERIFY(first.count<=7);
         first.location="file:///C:/private";service.importUrl(first.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);QVERIFY(service.message().contains(QStringLiteral("不安全")));
     }

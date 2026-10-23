@@ -1,5 +1,6 @@
 #include "RustCoreEngine.h"
 #include "RustDnsConfiguration.h"
+#include "XrayJsonBridge.h"
 #include <QCoreApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -231,6 +232,15 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   const auto it=std::find_if(o.nodes.cbegin(),o.nodes.cend(),[&](const auto &n){return n.id==selected;});
   if(it==o.nodes.cend())return "未选择节点。";
   const auto &n=*it;
+  if(n.isXray()){
+   // Persisted capability/cache fields are display data, never authority to
+   // start a proxy. Replay the exact bounded source through the Rust parser
+   // and converter each time this node enters a selected or rule route.
+   if(!ProxyNode::validate(n).isEmpty())return "JSON 节点来源或标识无效；请重新导入。";
+   QJsonObject outbound;const auto error=XrayJsonBridge::executableOutbound(n,&outbound);
+   if(!error.isEmpty())return error;
+   nodes.append(QJsonObject{{"id",n.id},{"outbound",outbound}});
+  }else{
   if(!n.conversionIssues.isEmpty()||!ProxyNode::validate(n).isEmpty())return "节点含无效或未映射参数，Rust 拒绝执行。";
   if(!QStringList{"http","socks4","socks4a","socks5","trojan","ss","vless"}.contains(n.protocol))return "此节点协议尚未迁移到 Rust；未使用外部内核。";
   if(n.protocol!="ss"&&!n.cipher.isEmpty())return "Rust 尚未映射此协议声明的 cipher；未丢弃加密参数。";
@@ -346,6 +356,7 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
    }else if(n.parameters.contains("ws-opts"))return "TCP 传输不能附带 WebSocket 配置。";
   }
   nodes.append(QJsonObject{{"id",n.id},{"outbound",outbound}});
+  }
  }
  QJsonArray rules,selectors;const auto routingError=routingConfiguration(o,selected,&nodes,&rules,&selectors);if(!routingError.isEmpty())return routingError;
  QJsonObject config{{"schema",1},{"listen",QString("127.0.0.1:%1").arg(o.proxyPort)},{"selected",selected},{"nodes",nodes},{"rules",rules},{"selectors",selectors},{"dns",dns},{"smart_routing",o.smartRouting&&o.routingMode=="rule"&&!o.directSession},

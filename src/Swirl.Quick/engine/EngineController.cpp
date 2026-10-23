@@ -58,6 +58,20 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     // would add unrelated Rust connections and corrupt per-request deltas.
     : QObject(parent), m_engine(std::move(engine)), m_store(storePath),m_imports(&m_store,this),m_telemetry(storePath.isEmpty()?QString():storePath+".telemetry",storePath.isEmpty()&&!realAcceptance) {
     m_options.autoControlPort=true;
+    m_imports.setAsyncConfigurationApplier([this](const NodeImporter::Result &result,const QString &sourceId,
+                                                  NodeImportService::ApplyCompletion completion,QString *error) {
+        if(result.format!="xray-v2ray-json" || !result.configuration.isEmpty()) {
+            *error=QStringLiteral("此异步入口仅接受经过严格校验的 JSON 节点。");return false;
+        }
+        NodeStore::ImportPlan plan;
+        if(!m_store.prepareImport(result.nodes,sourceId,&plan)){*error=m_store.error();return false;}
+#ifdef SWIRL_USE_RUST_CORE
+        const auto nodes=plan.nodes();QVariantMap canonical;
+        if(!validateNetworkConfiguration(networkConfigurationSnapshot(),&canonical,&nodes)){*error=m_networkError;return false;}
+#endif
+        if(!m_store.commitImportAsync(plan,{},std::move(completion))){*error=m_store.error();return false;}
+        return true;
+    });
     m_imports.setConfigurationApplier([this](const NodeImporter::Result &result,const QString &sourceId,QString *error) {
         const auto &configuration=result.configurationFormat=="ini"?result.executionConfiguration:result.configuration;
         if(result.configuration.isEmpty()) {
@@ -198,6 +212,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     connect(m_engine.get(), &ProxyEngine::statusChanged, this, &EngineController::statusChanged);
     connect(&m_store,&NodeStore::changed,this,&EngineController::nodesChanged);
     connect(&m_store,&NodeStore::changed,this,&EngineController::nodeCatalogChanged);
+    connect(&m_store,&NodeStore::changed,this,[this]{m_tests.invalidateResults();});
     connect(&m_store,&NodeStore::selectionChanged,this,&EngineController::selectionChanged);
     connect(this,&EngineController::nodesChanged,this,&EngineController::selectionChanged);
     connect(&m_imports,&NodeImportService::changed,this,&EngineController::statusChanged);
@@ -206,7 +221,10 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         // A background subscription refresh must not interrupt live Codex/WS
         // streams. The current immutable engine snapshot lives until reconnect.
         if(m_connectionRequested && (processAlive() || busy())) {
-            m_nodeError=QStringLiteral("节点库已更新；当前连接继续使用启动时配置。新增节点与凭据更新在手动断开重连后生效。");
+            const auto active=m_engine->status().selectedNodeId;bool retained=false;
+            for(const auto &node:m_store.nodes())if(node.id==active){retained=true;break;}
+            m_nodeError=retained?QStringLiteral("节点库已更新；当前连接继续使用启动时配置。新增节点与凭据更新在手动断开重连后生效。"):
+                QStringLiteral("运行中的节点已从节点库移除；当前连接保留启动时配置直到断开，未自动切换其他节点。请重新选择节点后再连接。");
             emit diagnostic("EngineController","SubscriptionUpdateDeferred",m_nodeError);
         }
         emit nodesChanged();
@@ -302,7 +320,9 @@ QVariantList EngineController::nodes() const {
     for (auto &value : rows) {
         auto row=value.toMap(); const bool active=processAlive() && row.value("id").toString()==status.selectedNodeId;
         row.insert("address",row.value("host").toString().isEmpty()?QStringLiteral("协议扩展配置"):row.value("host").toString()+":"+row.value("port").toString());
-        row.insert("status",active?nodeStateText():QStringLiteral("未连接"));
+        const auto capability=row.value("capability").toMap();
+        const bool executable=capability.value("native").toBool()||capability.value("compatible").toBool();
+        row.insert("status",active?nodeStateText():!executable?QStringLiteral("不可执行"):QStringLiteral("未连接"));
         row.insert("latency",active && status.latencyMs>=0?QString::number(status.latencyMs):QStringLiteral("—"));
         const auto measured=m_tests.result(row.value("id").toString());
         if(!measured.isEmpty()){row.insert("latency",measured.value("latency").toInt()>=0?QString::number(measured.value("latency").toInt()):QStringLiteral("失败"));row.insert("testHttp",measured.value("http"));row.insert("testError",measured.value("error"));}
@@ -625,6 +645,9 @@ bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incom
             previousChoices.insert(group.value("name").toString(),group.value("default-selected",members.first()).toString());
     }
     QVariantList groups;const auto names=plan.nameToId();
+    for(auto it=names.cbegin();it!=names.cend();++it)if(it.value().isEmpty()) {
+        m_networkError=QStringLiteral("完整配置按名称引用了歧义节点；请为不同节点设置不同名称。旧节点与网络配置保持不变。");return false;
+    }
     QSet<QString> groupNames;for(const auto &entry:input.value("groups").toList())groupNames.insert(entry.toMap().value("name").toString());
     for(const auto &reserved:QStringList{"DIRECT","REJECT","SWIRL","GLOBAL"})if(names.contains(reserved)) {
         m_networkError=QStringLiteral("节点名称与保留策略名称冲突；未应用配置。");return false;

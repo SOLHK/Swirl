@@ -6,6 +6,7 @@
 #include <QTimer>
 #include <QQueue>
 #include <functional>
+#include <optional>
 
 class QNetworkReply;
 class NodeImportService final : public QObject {
@@ -13,12 +14,20 @@ class NodeImportService final : public QObject {
     Q_PROPERTY(QVariantList providers READ providers NOTIFY changed)
     Q_PROPERTY(bool busy READ busy NOTIFY changed)
     Q_PROPERTY(QString message READ message NOTIFY changed)
+    Q_PROPERTY(bool hasPreview READ hasPreview NOTIFY changed)
+    Q_PROPERTY(QVariantList preview READ preview NOTIFY changed)
+    Q_PROPERTY(QStringList previewDiagnostics READ previewDiagnostics NOTIFY changed)
 public:
     explicit NodeImportService(NodeStore *store,QObject *parent=nullptr,
         std::function<qint64()> clock={}, int pollIntervalMs=60000);
     QVariantList providers() const;
     bool busy() const { return m_busy; }
     QString message() const { return m_message; }
+    bool hasPreview() const { return m_pending.has_value(); }
+    QVariantList preview() const;
+    QStringList previewDiagnostics() const { return m_pending ? m_pending->diagnostics : QStringList{}; }
+    Q_INVOKABLE void confirmImport();
+    Q_INVOKABLE void cancelImport();
     Q_INVOKABLE void importText(const QString &text);
     Q_INVOKABLE void importClipboard();
     Q_INVOKABLE void importFile(const QUrl &file);
@@ -30,6 +39,9 @@ public:
     void shutdown();
     using ApplyConfiguration = std::function<bool(const NodeImporter::Result &,const QString &,QString *)>;
     void setConfigurationApplier(ApplyConfiguration apply) { m_apply=std::move(apply); }
+    using ApplyCompletion = std::function<void(bool,const QString &)>;
+    using ApplyConfigurationAsync = std::function<bool(const NodeImporter::Result &,const QString &,ApplyCompletion,QString *)>;
+    void setAsyncConfigurationApplier(ApplyConfigurationAsync apply) { m_applyAsync=std::move(apply); }
     void setDownloadProxy(int port) { m_proxyPort=port; }
 signals:
     void changed();
@@ -38,10 +50,15 @@ private:
     void checkDue();
     void next();
     void download(const QUrl &url,int redirects=0);
+    void parseText(const QString &text,const QString &origin);
     void parse(QByteArray bytes);
+    void parsed(NodeImporter::Result result);
+    void apply(NodeImporter::Result result);
+    void applied(const QString &format,qsizetype count,int incomplete);
     void finish(const QString &error={});
     NodeStore *m_store;
     ApplyConfiguration m_apply;
+    ApplyConfigurationAsync m_applyAsync;
     QNetworkAccessManager m_network;
     QPointer<QNetworkReply> m_reply;
     QTimer m_timer,m_deadline;
@@ -50,6 +67,12 @@ private:
     QHash<QString,qint64> m_attempts;
     std::function<qint64()> m_clock;
     QString m_message,m_source,m_formatHint="auto";
+    QString m_importSource;
+    std::optional<NodeImporter::Result> m_pending;
+    bool m_previewRequested=false;
+    quint64 m_generation=0;
     bool m_busy=false,m_shuttingDown=false;
+    bool m_downloadTimedOut=false;
+    bool m_committing=false;
     int m_proxyPort=0;
 };

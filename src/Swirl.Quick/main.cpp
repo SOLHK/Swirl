@@ -45,6 +45,9 @@
 #include "app/ExtensionService.h"
 #include "app/MotionPolicy.h"
 #include "app/DismissalController.h"
+#ifdef SWIRL_XRAY_UI_TESTS
+#include "tests/XrayUiChecks.h"
+#endif
 #ifdef SWIRL_UI_TESTS
 #include "tests/OverviewChecks.h"
 #include "tests/RuntimeEvidence.h"
@@ -160,6 +163,12 @@ int main(int argc, char *argv[])
     const bool hdrDisplayTest=app.arguments().contains("--hdr-display-test");
     const bool nodeTest=app.arguments().contains("--node-self-test");
     const bool engineTest=app.arguments().contains("--engine-self-test");
+    const bool xrayUiTest=app.arguments().contains("--xray-import-ui-test");
+#ifndef SWIRL_XRAY_UI_TESTS
+    if(xrayUiTest)return 4;
+#endif
+    // This profile must never fall back to the user's normal test-mode folders.
+    if(xrayUiTest&&!qEnvironmentVariableIsSet("SWIRL_TEST_ROOT"))return 2;
     QString runtimeStore,runtimeCommands,runtimeState;
 #ifdef SWIRL_UI_TESTS
     for(const auto &argument:app.arguments()){
@@ -173,7 +182,7 @@ int main(int argc, char *argv[])
 #ifdef SWIRL_UI_TESTS
     lifecycleTest=app.arguments().contains("--lifecycle-test");
 #endif
-    const bool isolatedRun=appearanceTest||lifecycleTest||realAcceptance||heroTest||navigationTest||radiusTest||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
+    const bool isolatedRun=xrayUiTest||appearanceTest||lifecycleTest||realAcceptance||heroTest||navigationTest||radiusTest||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
     SingleInstance instance;
     if(lifecycleTest || (!isolatedRun && !appearanceTest)) {
         const auto ownership=instance.acquire(lifecycleTest?QStringLiteral("isolated-lifecycle-test"):QStringLiteral("production"));
@@ -212,7 +221,9 @@ int main(int argc, char *argv[])
     QTemporaryDir isolatedTls;
     CaptureService capture(nullptr,isolatedRun?isolatedTls.filePath("ca.dpapi"):QString());
     ModuleDraftStore drafts;
-    QTemporaryDir isolatedNodes;
+    QTemporaryDir isolatedNodes(xrayUiTest?SwirlPaths::testRoot()+QStringLiteral("/xray-ui-nodes-XXXXXX")
+                                        :QDir::tempPath()+QStringLiteral("/Swirl-XXXXXX"));
+    if(xrayUiTest&&!isolatedNodes.isValid())return 2;
     std::unique_ptr<ProxyEngine> runtimeEngine;
 #ifndef SWIRL_USE_RUST_CORE
     if(nodeTest||engineTest)runtimeEngine=std::make_unique<MihomoAdapter>(); // Pinned legacy regression fixtures.
@@ -241,6 +252,8 @@ int main(int argc, char *argv[])
     const bool windowTest = app.arguments().contains("--window-test");
     bool qmlWarnings = false;
     bool previewCaptured = false;
+    bool xrayUiCompleted = false;
+    bool xrayUiTimedOut = false;
     QObject::connect(&engine, &QQmlEngine::warnings, &app,
                      [&qmlWarnings, smoke, interaction, captureTest, windowTest](const QList<QQmlError> &warnings) {
                          if (!warnings.isEmpty()) qmlWarnings = true;
@@ -261,13 +274,14 @@ int main(int argc, char *argv[])
         qCritical()<<"Preview font unavailable:"<<previewFont;return 2;
     }
     const QString previewState = argumentValue(QStringLiteral("--preview-state="));
-    if (appearanceTest || heroTest || navigationTest || radiusTest || nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
+    if (xrayUiTest || appearanceTest || heroTest || navigationTest || radiusTest || nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
         if(uiQualityTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-ui-quality.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-ui-quality.txt");}
         if(appearanceTest){const QString file=app.arguments().contains("--appearance-restore-test")?"Swirl-appearance-restore.txt":"Swirl-appearance.txt";app.setProperty("qtDiagnosticFile",file);QFile::remove(QCoreApplication::applicationDirPath()+"/"+file);}
         if(heroTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-hero-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-hero-diagnostics.txt");}
         else if(motionTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-motion-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-motion-diagnostics.txt");}
         if(nodeTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-node-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-node-ui-diagnostics.txt");}
         else if(interaction){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-input-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-input-diagnostics.txt");}
+        if(xrayUiTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-xray-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-xray-ui-diagnostics.txt");}
         QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/Swirl-diagnostics.txt"));
         qInstallMessageHandler(recordQtDiagnostic);
         qInfo()<<"Font rendering"<<qgetenv("QT_QPA_PLATFORM")<<fontManager.currentFamily()
@@ -330,6 +344,21 @@ int main(int argc, char *argv[])
     // rather than the user-facing window close/unsaved-change quit path.
     QTimer smokeFinish;smokeFinish.setSingleShot(true);smokeFinish.setInterval(0);
     if(rootWindow&&smoke){QObject::connect(rootWindow,SIGNAL(navigationSmokeCompleted()),&smokeFinish,SLOT(start()),Qt::QueuedConnection);QObject::connect(&smokeFinish,&QTimer::timeout,&app,[&app]{app.exit(0);});}
+#ifdef SWIRL_XRAY_UI_TESTS
+    if(xrayUiTest) {
+        QTimer::singleShot(60000,&app,[&app,&xrayUiTimedOut]{
+            xrayUiTimedOut=true;
+            qCritical()<<"XRAY_UI_FAIL timeout";
+            app.exit(3);
+        });
+        const auto testStore=isolatedNodes.filePath(QStringLiteral("nodes.dpapi"));
+        QTimer::singleShot(500,&app,[&app,rootWindow,&engineController,testStore,&xrayUiCompleted,&xrayUiTimedOut]{
+            const int outcome=runXrayUiChecks(rootWindow,&engineController,testStore);
+            xrayUiCompleted=outcome==0&&!xrayUiTimedOut;
+            app.exit(xrayUiTimedOut?3:outcome);
+        });
+    }
+#endif
 #ifdef SWIRL_UI_TESTS
     if(realAcceptance&&rootWindow)startRuntimeEvidence(rootWindow,&engineController,&systemData,&diagnostics,runtimeCommands,runtimeState);
 #endif
@@ -624,5 +653,10 @@ int main(int argc, char *argv[])
     // This also keeps scripted page-navigation shutdown free of incubation warnings.
     if (auto *controller = engine.incubationController())
         controller->incubateFor(100);
-    return (heroTest || radiusTest || nodeTest || motionTest || previewMode || engineTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
+    const int finalResult=(xrayUiTest || heroTest || radiusTest || nodeTest || motionTest || previewMode || engineTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
+    if(xrayUiTest) {
+        if(!xrayUiCompleted||xrayUiTimedOut)return finalResult==0?3:finalResult;
+        if(finalResult==0)qInfo()<<"XRAY_UI_PASS";
+    }
+    return finalResult;
 }

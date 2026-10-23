@@ -9,6 +9,9 @@ use std::{
 use swirl_core::Core;
 use swirl_subscription::Config;
 
+mod xray_import;
+pub use xray_import::swirl_import_xray_v1;
+
 const MAX_COMMAND: usize = 1024 * 1024;
 pub const OUTPUT_CAPACITY: usize = 1024 * 1024;
 #[derive(Deserialize)]

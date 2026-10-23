@@ -1,3 +1,25 @@
+# 2026-10-23: X1.5-A JSON subscription to native Qt product bridge
+
+The current independent integration branch is
+`work/subscription-native-bridge-20261023`. Read
+[the X1.5-A source checkpoint](SWIRL_SUBSCRIPTION_X15_A_NATIVE_BRIDGE_20261023.md)
+for scope, merge parents, native per-account mapping, Qt source replay and
+exact-source validation. It combines native `21c562a7` and Qt import `506014d6`
+without updating either original branch, `main` or `test`.
+
+The Qt import ABI consumes each expanded node's authoritative native candidate;
+the former VLESS/REALITY-only projection is removed. Six JSON protocol families
+can reach the existing Rust runtime when their exact options are supported.
+Private-provider/full-subscription completion is not implied. Windows packaging
+builds the final DLL before tests copy and exercise it, retaining hash equality
+and mounted QML gates.
+
+The newer user instruction to preserve parallel windows and use an independent
+branch applies to this stage; the single-branch entries below remain history.
+Never overwrite the other branches or borrow earlier CI success.
+
+---
+
 # 2026-10-20: retained Windows Qt reload failure and tested JSON comparison fix
 
 Exact source `f19b0ad51058580a8a0ed73008b22754e6f45ea0` passed Linux, macOS and App CI, plus Windows Rust 324 tests and one doctest. Its Windows Qt build and two earlier REALITY profiles passed. The new Chrome133/Vision group actually ran five methods: the existing product chain, TLS 1.2, incorrect credentials and active cancellation passed; the reachable REJECT case failed before its DIRECT positive control. The ordinary capture suite passed 29 with two explicit optional skips; the required standalone Qt offline inspector, public eight-request gate and complete Swirl.exe step were not executed on that SHA. Do not substitute the earlier `ac0069ec...` public success for them.

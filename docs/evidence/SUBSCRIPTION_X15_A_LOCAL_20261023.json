@@ -1,0 +1,373 @@
+{
+  "schema": 1,
+  "stage": "X1.5-A subscription native Qt bridge",
+  "branch": "work/subscription-native-bridge-20261023",
+  "source_scope": {
+    "kind": "restored local precommit merged worktree, newly executed validation",
+    "head": "21c562a7c7adc2654416636e4de2f038ffc220cd",
+    "merge_parent": "506014d6386610411f48c939ab62cb93a3509431",
+    "dirty": true,
+    "ci_claimed": false,
+    "source_sha256_at_checkpoint": {
+      ".github/workflows/xray-qt-import.yml": "5532ff2b388fa4a057f6bebfb29a9b92e018eda1561958866797af4e9be0696f",
+      "core/crates/swirl-api/include/swirl_api.h": "23c719b51e1ff2892b975e44fe138b85bf62f8cb66d3eb0e1719a49d11c3ea24",
+      "core/crates/swirl-api/src/lib.rs": "aee0efe676cf3992f2309257ea794de13d2a43ef8ab3815483bab4fdac8c4bd8",
+      "core/crates/swirl-api/src/xray_import.rs": "5e9cad3c9b275227c020af54dcb75a70dad4bc88fd21dcab4501b68e43a9859f",
+      "core/crates/swirl-api/src/xray_import_tests.rs": "c430d76faf97879591c8bbfeb0d0d54b43a84dd558e636a7af0c8108ac89d4dc",
+      "src/Swirl.Quick/CMakeLists.txt": "4d5626a419a6c0e3dec7c7c5602a0f650044b1975e51e6d91d652620e329d216",
+      "src/Swirl.Quick/engine/EngineController.cpp": "8ed70d2549a60f55d44d240c3e85ecb4840f7e31121360e53f6927bb0f802b7f",
+      "src/Swirl.Quick/engine/NodeImportService.cpp": "a877bf8c48122dd0d22569588df71aab1bdb44449ffa62fc91ff13b8827394b1",
+      "src/Swirl.Quick/engine/NodeImportService.h": "4458bb787846c25571edd8583b6eae58e47cf8f27e572b1ad2be9acd69226628",
+      "src/Swirl.Quick/engine/NodeImporter.cpp": "7ba5f121507c4b43c2ea20a9c73bd407f834a61f73a821085dcf54779414fdec",
+      "src/Swirl.Quick/engine/NodeImporter.h": "1af516f492a482a1c15c919961684aad79b5a4ce75978d06a46639fd0a818345",
+      "src/Swirl.Quick/engine/NodeStore.cpp": "50174bb9cc281d1b9351bc6e94027100f534bacf89284f9224ca7306891985b3",
+      "src/Swirl.Quick/engine/NodeStore.h": "2cd9b5f62ffe8c92c5a5902b32afbbb411b9eb8724dfe05edf942a165a6d8665",
+      "src/Swirl.Quick/engine/NodeTestService.cpp": "3f338eeea0ef7ae763761d86fcb76927a1dc48c07c3ddefa36ef2c996b582758",
+      "src/Swirl.Quick/engine/NodeTestService.h": "c03cdc44e755bcaced6bc23c44ff9c404db745a06a98e962973701d7fd6e3020",
+      "src/Swirl.Quick/engine/ProxyNode.cpp": "cf07ad90cc327592a18c350b27bdf2602634f0f373651b1ba4475e417dac994b",
+      "src/Swirl.Quick/engine/ProxyNode.h": "35806a557d9569d44dbc1ba0085247d416123ab6e5fd76038d98367f7bcf4b74",
+      "src/Swirl.Quick/engine/RustCoreEngine.cpp": "4004ec3efcebcbadb500c1df816936f7503d3a3342653ab993973ac5792d94f9",
+      "src/Swirl.Quick/engine/SwirlProtocolRegistry.cpp": "ace918458992077b22fe7138463e31164c69f5324a9e6cb3d3285a753ca21e24",
+      "src/Swirl.Quick/engine/XrayJsonBridge.cpp": "ae0465a2b6dbb3d82a6cfa7bafb0045999aa5ee432dbc79d7565b89bcc9b85cd",
+      "src/Swirl.Quick/engine/XrayJsonBridge.h": "d30c219e2e55864e40d0581f495888829a664ea10ef854b94ea97627ffb5e2de",
+      "src/Swirl.Quick/main.cpp": "01aca0aaa0ed6591500f108697e9a5dee6ba96384c51cc60478435462ad7ccd2",
+      "src/Swirl.Quick/qml/pages/ProxiesPage.qml": "346f11f8716795b4f23b59d7b99f8db2cbeade427104417798af09050405e1cd",
+      "src/Swirl.Quick/tests/ImportTests.cpp": "cf6a065954cc003b4db3882383c6bd6c4c4b7bf0fad8ca14322302f3c3205661",
+      "src/Swirl.Quick/tests/NodeTests.cpp": "498f6e9fbbb001d59579b7d911f516676ddb9bfc00a3129a0b10377ff46b012a",
+      "src/Swirl.Quick/tests/RustCoreTests.cpp": "2c98701f719fd5aa0af40e82ddbb023abb10778d40fe322fdff7a2eadf21dc9d",
+      "src/Swirl.Quick/tests/XrayCatalogTests.cpp": "c2a8c63158d7efa9fb6a29a4e1a2d7c7a33408213d2ef9f32443baca72ff62d3",
+      "src/Swirl.Quick/tests/XrayDownloadTests.cpp": "6fe57d79ef025cd8ba9e9146d1d0b2887ad86a7e269326aa54c9f9dd830d4a56",
+      "src/Swirl.Quick/tests/XrayImportTests.cpp": "61724889c84c8afb857b767bf20ccbe9545c0100065fcf1f10aa8c19cb52ae6e",
+      "src/Swirl.Quick/tests/XrayRuntimeTests.cpp": "eefe1b8ad9beec1ee4f7dd33545aa4c81472f437436f1f0d18ca7da47fb93fe7",
+      "src/Swirl.Quick/tests/XrayStoreTests.cpp": "67116fc4523b058c57ac93dbd7eaa83978b2f4dfc1a30d0f52b746198db4e296",
+      "src/Swirl.Quick/tests/XrayUiChecks.cpp": "e44104b8953d999800647ba3226c5ffc2d22a691a7f9377df53d209f398e9dd5",
+      "src/Swirl.Quick/tests/XrayUiChecks.h": "05a3eb7612ae9880c8924a5feec6b20962d56bffeec6e63c8c53fb352ef04451",
+      "src/Swirl.Quick/tests/fixtures/xray-download-server-cert.pem": "e1075d330aab28049a89ba8e64f5f93f8ddbe2573c022c28508bb2ac2df26f1b",
+      "src/Swirl.Quick/tests/fixtures/xray-download-server-key.pem": "da232e7a9ffdd91087e498ba3aaa3e6ab2c8ba2475ed15d3d9856333d1195f80",
+      "src/Swirl.Quick/tests/xray/CMakeLists.txt": "cb785c0a9f8c17e91b260470055c3a5e32a64b383b7ebab84b03bee1ab59b5fd",
+      "tools/tests/test_xray_qt_import.py": "b2d10a9e7b5424015cf98a3e016796f2d0ea48b11887e1eb745395400a80f707"
+    },
+    "network_phase_source": {
+      "git_sha": "21c562a7c7adc2654416636e4de2f038ffc220cd",
+      "tracked_diff_sha256": "91337a267c6dbe2fd9ce70ab95da0939eed6daa38f465ac566f48556a7cca562",
+      "source_files": {
+        "tools/tests/test_xray_qt_import.py": "b2d10a9e7b5424015cf98a3e016796f2d0ea48b11887e1eb745395400a80f707",
+        "src/Swirl.Quick/tests/XrayRuntimeTests.cpp": "eefe1b8ad9beec1ee4f7dd33545aa4c81472f437436f1f0d18ca7da47fb93fe7",
+        "src/Swirl.Quick/tests/XrayImportTests.cpp": "61724889c84c8afb857b767bf20ccbe9545c0100065fcf1f10aa8c19cb52ae6e",
+        "src/Swirl.Quick/engine/XrayJsonBridge.cpp": "ae0465a2b6dbb3d82a6cfa7bafb0045999aa5ee432dbc79d7565b89bcc9b85cd",
+        "src/Swirl.Quick/engine/RustCoreEngine.cpp": "4004ec3efcebcbadb500c1df816936f7503d3a3342653ab993973ac5792d94f9",
+        "core/crates/swirl-api/src/xray_import.rs": "5e9cad3c9b275227c020af54dcb75a70dad4bc88fd21dcab4501b68e43a9859f"
+      }
+    }
+  },
+  "environment": {
+    "platform": "Linux",
+    "rust": "1.99.1",
+    "qt": "6.10.3",
+    "go": "1.27.2",
+    "python": "3.12.14",
+    "openssl": "OpenSSL 3.5.8 25 Aug 2026"
+  },
+  "rust": {
+    "gates": [
+      {
+        "name": "rust-release",
+        "command": [
+          "cargo",
+          "build",
+          "--release",
+          "--locked",
+          "-p",
+          "swirl-api",
+          "--lib",
+          "--bins",
+          "--examples"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 62.533
+      },
+      {
+        "name": "rust-fmt",
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.506
+      },
+      {
+        "name": "rust-check",
+        "command": [
+          "cargo",
+          "check",
+          "--workspace",
+          "--locked"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 12.001
+      },
+      {
+        "name": "rust-clippy",
+        "command": [
+          "cargo",
+          "clippy",
+          "--workspace",
+          "--all-targets",
+          "--locked",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 8.707
+      },
+      {
+        "name": "rust-test-workspace",
+        "command": [
+          "cargo",
+          "test",
+          "--workspace",
+          "--locked"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 39.114
+      }
+    ],
+    "unit_and_integration_passed": 660,
+    "doctests_passed": 1,
+    "totals": {
+      "passed": 661,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0
+    },
+    "focused_abi": {
+      "passed": 17,
+      "failed": 0,
+      "fixture_correction": "Short custom ID has unverified status; replace it with explicitly malformed 36-character UUID to test invalid status. Production validator unchanged."
+    },
+    "final_release_build": {
+      "command": [
+        "cargo",
+        "build",
+        "--manifest-path",
+        "core/Cargo.toml",
+        "--release",
+        "--locked",
+        "-p",
+        "swirl-api",
+        "-p",
+        "swirl-protocol",
+        "--lib",
+        "--bins",
+        "--examples"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 72,
+      "reason": "A fresh build proves the fixture example is owned by swirl-protocol; the final Qt library must be copied after this command.",
+      "artifacts": {
+        "core/target/release/libswirl_api.so": {
+          "bytes": 9846192,
+          "sha256": "40c26374e428cbf51b3469cef9c2105ba155ebdacf1ad9b9902b6070e5c8e2f9"
+        },
+        "core/target/release/examples/transport-client": {
+          "bytes": 8152992,
+          "sha256": "299b884c445f72e1375d295e217a219c41199956cd68b54695257a2f933754a9"
+        }
+      }
+    }
+  },
+  "qt_components": {
+    "suites": {
+      "swirl-xray-catalog": {
+        "pass_incidents": 8,
+        "failed": 0,
+        "skipped": 0,
+        "test_functions_excluding_lifecycle": 6,
+        "report_sha256": "8c0764064d8c7c7655ec8534a138f47ab96e031ff3daa806bffcaa4dfb6e6168"
+      },
+      "swirl-xray-download": {
+        "pass_incidents": 17,
+        "failed": 0,
+        "skipped": 0,
+        "test_functions_excluding_lifecycle": 15,
+        "report_sha256": "d36dde875493a151d20efd32e8839b21c613fbb430ccfd73d5e39f4b9fd5ba74"
+      },
+      "swirl-xray-import": {
+        "pass_incidents": 27,
+        "failed": 0,
+        "skipped": 0,
+        "test_functions_excluding_lifecycle": 25,
+        "report_sha256": "7ac288d921e55e62734d3e485f7439d7c1831a70a1ba095eb0bca2d0ec97daa8"
+      },
+      "swirl-xray-runtime": {
+        "pass_incidents": 7,
+        "failed": 0,
+        "skipped": 0,
+        "test_functions_excluding_lifecycle": 5,
+        "report_sha256": "3ee3960b02737fd42dd53640dfbb72e10aa25390b5c803bad1d14bfb89ce0646"
+      },
+      "swirl-xray-store": {
+        "pass_incidents": 13,
+        "failed": 0,
+        "skipped": 0,
+        "test_functions_excluding_lifecycle": 11,
+        "report_sha256": "5f3a312e8ef76d55d0f618d4258683b4cb962f2b97baa544265e39c3a488ed7c"
+      }
+    },
+    "pass_incidents_including_lifecycle": 72,
+    "test_functions_excluding_lifecycle": 62,
+    "failed": 0,
+    "skipped": 0,
+    "tested_library_sha256": "40c26374e428cbf51b3469cef9c2105ba155ebdacf1ad9b9902b6070e5c8e2f9",
+    "validation_sequence": "Restored source was freshly configured and built, final two-package release library was copied and hash-checked, then all five Qt CTest suites were rerun together successfully. No prior-environment test result was reused."
+  },
+  "traffic": {
+    "profiles": [
+      {
+        "profile": "http",
+        "success": true,
+        "scope": "controlled-loopback",
+        "http_body_verified": true,
+        "https_certificate_body_and_shutdown_verified": true,
+        "accepted_requests": 2,
+        "failed_requests": 0,
+        "in_process": true,
+        "source_document_unchanged": true,
+        "listener_closed": true,
+        "persisted": false,
+        "reloaded": false,
+        "raw_receipt_sha256": "b6febd37d590c40138334bece926ccf149f0c9c638bbc59e15613e2ebd7a6061",
+        "peer_listener_closed": true
+      },
+      {
+        "profile": "socks5",
+        "success": true,
+        "scope": "controlled-loopback",
+        "http_body_verified": true,
+        "https_certificate_body_and_shutdown_verified": true,
+        "accepted_requests": 2,
+        "failed_requests": 0,
+        "in_process": true,
+        "source_document_unchanged": true,
+        "listener_closed": true,
+        "persisted": false,
+        "reloaded": false,
+        "raw_receipt_sha256": "bca4e5172eff7162b3d405ed9b9645c6f9c7a0cf3e92fd9abfd1bad379a703c3",
+        "peer_listener_closed": true
+      },
+      {
+        "profile": "ss",
+        "success": true,
+        "scope": "controlled-loopback",
+        "http_body_verified": true,
+        "https_certificate_body_and_shutdown_verified": true,
+        "accepted_requests": 2,
+        "failed_requests": 0,
+        "in_process": true,
+        "source_document_unchanged": true,
+        "listener_closed": true,
+        "persisted": false,
+        "reloaded": false,
+        "raw_receipt_sha256": "c7b924cb7bb2a288f4c4df389491357cce955f5991ded6f10bd60e910c7f63a9",
+        "peer_listener_closed": true
+      },
+      {
+        "profile": "vless",
+        "success": true,
+        "scope": "controlled-loopback",
+        "http_body_verified": true,
+        "https_certificate_body_and_shutdown_verified": true,
+        "accepted_requests": 2,
+        "failed_requests": 0,
+        "in_process": true,
+        "source_document_unchanged": true,
+        "listener_closed": true,
+        "persisted": false,
+        "reloaded": false,
+        "raw_receipt_sha256": "94a0038b5ec7aaf5458bb9adde1aaf02cb2f5782fe15830bdfc4461c22840b67",
+        "peer_listener_closed": true
+      },
+      {
+        "profile": "vless-reality",
+        "success": true,
+        "scope": "controlled-loopback",
+        "http_body_verified": true,
+        "https_certificate_body_and_shutdown_verified": true,
+        "accepted_requests": 2,
+        "failed_requests": 0,
+        "in_process": true,
+        "source_document_unchanged": true,
+        "listener_closed": true,
+        "persisted": false,
+        "reloaded": false,
+        "raw_receipt_sha256": "7d3acb6db2d2e3907a7b947887ab99ee890e8c02b8afc727e82131b00a3b3216"
+      },
+      {
+        "profile": "vmess",
+        "success": true,
+        "scope": "controlled-loopback",
+        "http_body_verified": true,
+        "https_certificate_body_and_shutdown_verified": true,
+        "accepted_requests": 2,
+        "failed_requests": 0,
+        "in_process": true,
+        "source_document_unchanged": true,
+        "listener_closed": true,
+        "persisted": false,
+        "reloaded": false,
+        "raw_receipt_sha256": "84381174f60b744fdfdae21fd6cb6e13654343650f1014d98b65cd292485cca0",
+        "peer_listener_closed": true
+      },
+      {
+        "profile": "trojan",
+        "success": true,
+        "scope": "controlled-loopback",
+        "http_body_verified": true,
+        "https_certificate_body_and_shutdown_verified": true,
+        "accepted_requests": 2,
+        "failed_requests": 0,
+        "in_process": true,
+        "source_document_unchanged": true,
+        "listener_closed": true,
+        "persisted": false,
+        "reloaded": false,
+        "raw_receipt_sha256": "5ecaa59d91c7c1377434fda228f2383445c0b553b2b2c591a88f74e396eecfa6",
+        "peer_listener_closed": true
+      }
+    ],
+    "total_http_and_https_requests": 14,
+    "provider_connection": false,
+    "scope": "controlled loopback origins through actual Qt import and in-process Rust",
+    "official_native_peer": {
+      "release": "v26.10.21",
+      "commit": "1b1647cd9ddf0abc34b981d4611fc03bcac1ca74",
+      "archive_sha256": "0eec3ed4163c273d8c8bf821f7d219e257921cf584aa3fb970715e458e631978",
+      "binary_sha256": "a27e3f95ab6ce270956d0cecd32eda4686a811afc71c64a6a734a3dede14883e"
+    },
+    "network_report_sha256": "b02d0b99df027c7e6eaba67dcd483b16dad6b2ace07cda79d72b87f0f3caa20e",
+    "qt_runtime_binary_sha256": "c3f86064708c6d014c9230077bad7ac51ef6e9f5d87096e0c1f2a2bb225fa42f"
+  },
+  "evidence_guard_tests": {
+    "passed": 7,
+    "failed": 0
+  },
+  "retained_history": {
+    "earlier_workspaces_recreated": true,
+    "previous_results_reused_as_current": false,
+    "original_store_fixture_failure": "1000 unsupported accounts correctly hit the unchanged diagnostic cap. Tests now retain real32 blocked / real1000 DiagnosticLimit / synthetic1000 shared1MiB prepareImport stress, with source execution replay still blocked.",
+    "clean_build_ci_fix": "transport-client belongs to swirl-protocol, so the final release command selects both packages. This final library was copied and tested again."
+  },
+  "boundaries": {
+    "windows_dpapi_executed_locally": false,
+    "macos_executed_locally": false,
+    "windows_complete_app_executed_locally": false,
+    "mounted_qml_executed_locally": false,
+    "private_provider_acceptance": false,
+    "all_18_subscriptions_accepted": false,
+    "physical_windows_desktop": false,
+    "exact_pushed_commit_ci": "Inspect the workflow for the actual published commit; precommit Linux evidence is not Windows/macOS CI."
+  }
+}
