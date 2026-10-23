@@ -1,5 +1,5 @@
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import SwirlQuick
 import "../components"
@@ -69,7 +69,7 @@ Dialog {
         exit:Transition{enabled:!SwirlMotion.reduced;ParallelAnimation{NumberAnimation{property:"opacity";to:0;duration:SwirlMotion.exitDuration}}}
         onAboutToShow:dismissals.push(discardPrompt,owner)
         onClosed:dismissals.pop(discardPrompt)
-        background:SwirlContinuousSurface{radius:Theme.popupRadius;color:Theme.material("floating");border.color:Theme.border;border.width:Theme.borderWidth}
+        background:SwirlClearGlassSurface{radius:Theme.popupRadius}
         contentItem:ColumnLayout {
             SwirlText {text:"关闭后将丢失尚未保存的内容。";color:Theme.text;wrapMode:Text.Wrap;Layout.fillWidth:true}
             RowLayout {Layout.alignment:Qt.AlignRight
@@ -101,13 +101,13 @@ Dialog {
     background: Item {
         id:heroBackground
         readonly property point origin:dialog.heroSource?dialog.heroSource.mapToItem(heroBackground,0,0):Qt.point(0,0)
-        SwirlContinuousSurface {
+        SwirlClearGlassSurface {
             x:Math.round(heroBackground.origin.x*(1-dialog.heroProgress));y:Math.round(heroBackground.origin.y*(1-dialog.heroProgress))
             width:Math.round(dialog.heroSource?dialog.heroSource.width+(parent.width-dialog.heroSource.width)*dialog.heroProgress:parent.width)
             height:Math.round(dialog.heroSource?dialog.heroSource.height+(parent.height-dialog.heroSource.height)*dialog.heroProgress:parent.height)
             color: Theme.material("floating")
             radius:dialog.heroSource?Theme.buttonRadius+(Theme.popupRadius-Theme.buttonRadius)*dialog.heroProgress:Theme.popupRadius
-            antialiasing:true; border.width:Theme.dp(1);border.color:Theme.glassRim
+            antialiasing:true
         }
     }
 }

@@ -1,5 +1,5 @@
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import SwirlQuick
 import "../components"
 SwirlMotionButton {
@@ -11,12 +11,13 @@ SwirlMotionButton {
     property color iconColor:Theme.muted
     implicitWidth:Theme.controlHeight; implicitHeight:Theme.controlHeight
     hoverEnabled: true
-    background: SwirlPillSurface {
+    background: SwirlClearGlassSurface {
+        elevated:false
         Behavior on color { ColorAnimation {duration:SwirlMotion.duration} }
         radius:Theme.controlRadius
-        color:control.quiet?"transparent":Theme.buttonBase
-        gradient:null
-        border.width:control.quiet?0:Theme.borderWidth
+        color:control.down?Theme.interactionPressed:control.hovered?Theme.interactionHover:control.quiet?"transparent":Theme.glassFill
+        glassEnabled:Theme.transparency && !Theme.increaseContrast && !control.quiet
+        border.width:control.activeFocus || Theme.increaseContrast?1/Screen.devicePixelRatio:0
         hovered: control.hovered; pressed: control.down
         border.color: control.activeFocus ? Theme.focusBorder : Theme.pillRim
         opacity: control.enabled ? 1 : 0.45

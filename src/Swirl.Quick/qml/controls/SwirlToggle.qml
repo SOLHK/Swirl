@@ -6,7 +6,7 @@ Switch {
     id: control
     property bool large: false
     property real motionScale:down?SwirlMotion.pressScale:1
-    Behavior on motionScale {enabled:!SwirlMotion.reduced;SwirlSpring{}}
+    Behavior on motionScale {enabled:!SwirlMotion.reduced;NumberAnimation {duration:control.down?SwirlMotion.pressDuration:SwirlMotion.releaseDuration;easing.type:Easing.OutCubic}}
     Binding {target:control.indicator;property:"scale";value:control.motionScale}
     onPressed:SwirlMotion.noteTrigger(control)
     implicitWidth: Theme.dp(large ? 52 : 36)

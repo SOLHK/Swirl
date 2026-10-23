@@ -100,7 +100,7 @@ Item {
         property color marker: "transparent"
         readonly property Item valueItem: valueText
         width: parent ? parent.width : 0; height: Theme.dp(40)
-        Rectangle { anchors.top: parent.top; width: parent.width; height: Theme.dp(1); color: Theme.border }
+        Rectangle { anchors.top: parent.top; width: parent.width; height: 1 / Screen.devicePixelRatio; color: Theme.separator }
         Rectangle { visible: statRow.marker.a > 0; x: Theme.dp(3); y: Theme.dp(15); width: Theme.dp(5); height: Theme.dp(13); radius: width / 2; color: statRow.marker }
         SwirlText { x: statRow.marker.a > 0 ? Theme.dp(22) : Theme.dp(8); anchors.verticalCenter: parent.verticalCenter; width: parent.width * 0.67 - x; text: statRow.caption; color: Theme.text; font.pixelSize: Theme.fontSize(12); elide: Text.ElideRight }
         SwirlText { id: valueText; anchors.right: parent.right; anchors.rightMargin: Theme.dp(5); anchors.verticalCenter: parent.verticalCenter; width: parent.width * 0.34; text: statRow.value; color: Theme.text; font.pixelSize: Theme.fontSize(12); horizontalAlignment: Text.AlignRight; elide: Text.ElideRight }
@@ -156,9 +156,7 @@ Item {
                     Layout.row: 0; Layout.column: 0
                     Layout.preferredWidth: page.wide ? (content.width - cards.columnSpacing) * 0.474 : content.width
                     Layout.preferredHeight: Theme.dp(276)
-                    cornerRadius: Theme.dp(9); independentCard: false
-                    color: "transparent"; border.width: 0
-                    SwirlClearGlassSurface { anchors.fill: parent; radius: diagnosticCard.cornerRadius; visible: !diagnosticCard.surfaceHidden }
+                    cornerRadius: Theme.dp(9); interactive: true
 
                     SwirlText { x: Theme.dp(18); y: Theme.dp(19); text: "INTERNET 延迟"; color: Theme.muted; font.pixelSize: Theme.fontSize(13) }
                     SwirlIconButton {
@@ -186,7 +184,7 @@ Item {
                         text: page.internetMeasured ? "" : (page.telemetry.measurementState || "尚未检测")
                         color: Theme.muted; font.pixelSize: Theme.fontSize(11); elide: Text.ElideRight
                     }
-                    Rectangle { x: Theme.dp(18); y: Theme.dp(150); width: parent.width - Theme.dp(36); height: Theme.dp(1); color: Theme.border }
+                    Rectangle { x: Theme.dp(18); y: Theme.dp(150); width: parent.width - Theme.dp(36); height: 1 / Screen.devicePixelRatio; color: Theme.separator }
                     Item {
                         id: latencyMetrics
                         x: Theme.dp(18); y: Theme.dp(172); width: parent.width - Theme.dp(36); height: Theme.dp(45)
@@ -208,7 +206,7 @@ Item {
                         }
                         Repeater {
                             model: 2
-                            Rectangle { required property int index; x: latencyMetrics.width * [0.325, 0.675][index]; width: Theme.dp(1); height: Theme.dp(40); color: Theme.border }
+                            Rectangle { required property int index; x: latencyMetrics.width * [0.325, 0.675][index]; width: 1 / Screen.devicePixelRatio; height: Theme.dp(40); color: Theme.separator }
                         }
                     }
                 }
@@ -218,9 +216,7 @@ Item {
                     objectName: "activityTrafficCard"
                     Layout.row: page.wide ? 0 : 1; Layout.column: page.wide ? 1 : 0
                     Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(276)
-                    cornerRadius: diagnosticCard.cornerRadius; independentCard: false
-                    color: "transparent"; border.width: 0
-                    SwirlClearGlassSurface { anchors.fill: parent; radius: trafficCard.cornerRadius; visible: !trafficCard.surfaceHidden }
+                    cornerRadius: diagnosticCard.cornerRadius; interactive: true
 
                     SwirlText { x: Theme.dp(18); y: Theme.dp(19); text: "流量"; color: Theme.muted; font.pixelSize: Theme.fontSize(14); font.weight: Font.DemiBold }
                     SwirlSegmentedControl {
@@ -262,7 +258,7 @@ Item {
                                     SwirlText { x: parent.width * 0.61; anchors.verticalCenter: parent.verticalCenter; width: parent.width * 0.17; text: rank.modelData.value; color: Theme.muted; font.pixelSize: Theme.fontSize(10); horizontalAlignment: Text.AlignRight; elide: Text.ElideRight }
                                     SwirlText { x: parent.width * 0.79; anchors.verticalCenter: parent.verticalCenter; width: parent.width * 0.15; text: rank.modelData.connections + " 连接"; color: Theme.muted; font.pixelSize: Theme.fontSize(10); horizontalAlignment: Text.AlignRight; elide: Text.ElideRight }
                                     SwirlIcon { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; size: Theme.dp(13); name: "chevron-right"; color: Theme.muted }
-                                    Rectangle { anchors.bottom: parent.bottom; x: Theme.dp(31); width: parent.width - x; height: Theme.dp(1); color: Theme.border }
+                                    Rectangle { anchors.bottom: parent.bottom; x: Theme.dp(31); width: parent.width - x; height: 1 / Screen.devicePixelRatio; color: Theme.separator }
                                 }
                                 Accessible.name: modelData.name + "详情"
                                 onClicked: page.openRank(modelData)

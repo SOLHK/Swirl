@@ -11,31 +11,30 @@ Item {
     property bool clearGlass: false
     property int textPixelSize: 11
     property bool rounded: false
-    function segmentStart(index) { return Math.round((width-(rounded?0:Theme.dp(4)))*index/Math.max(1,options.length)) }
+    function segmentStart(index) { return Math.round((width-Theme.dp(4))*index/Math.max(1,options.length)*Screen.devicePixelRatio)/Screen.devicePixelRatio }
     function segmentWidth(index) { return segmentStart(index+1)-segmentStart(index) }
     signal activated(int index, string value)
     implicitHeight:Theme.statusHeight; implicitWidth:Theme.dp(295)
-    Rectangle { anchors.fill:parent; visible:!control.clearGlass; radius:control.rounded ? height/2 : Theme.segmentedRadius; color:control.rounded?(control.accentSelection?Theme.buttonBase:Theme.surface):Theme.material("field"); border.width:control.rounded?0:Theme.borderWidth; border.color:Theme.border }
-    SwirlClearGlassSurface { anchors.fill:parent; visible:control.clearGlass; radius:control.rounded ? height/2 : Theme.segmentedRadius }
+    SwirlClearGlassSurface { anchors.fill:parent; elevated:false; radius:control.rounded ? height/2 : Theme.segmentedRadius }
     Rectangle {
         property real selectionPosition:control.currentIndex
-        x:(control.rounded?0:Theme.dp(2))+(control.width-(control.rounded?0:Theme.dp(4)))*selectionPosition/Math.max(1,control.options.length);y:control.rounded?0:Theme.dp(2)
+        x:Theme.dp(2)+control.segmentStart(selectionPosition);y:Theme.dp(2)
         width:control.segmentWidth(control.currentIndex)
-        height:control.height-(control.rounded?0:Theme.dp(4))
+        height:control.height-Theme.dp(4)
         radius:control.rounded?height/2:Theme.segmentedSelectedRadius
         color:control.accentSelection?Theme.primaryControl:control.clearGlass?Theme.withAlpha("#FFFFFF",Theme.dark?0.14:0.72):control.rounded?Theme.buttonBase:Theme.segmentSelected
-        border.width:control.clearGlass?Theme.dp(1):0
+        border.width:0
         border.color:control.clearGlass?Theme.withAlpha(Theme.dark?"#FFFFFF":"#777777",Theme.dark?0.14:0.10):"transparent"
         Behavior on selectionPosition{enabled:!SwirlMotion.reduced;NumberAnimation{duration:SwirlMotion.switchDuration;easing.type:Easing.OutCubic}}
     }
     Row {
-        anchors.fill: parent; anchors.margins:control.rounded?0:Theme.dp(2)
+        anchors.fill: parent; anchors.margins:Theme.dp(2)
         Repeater {
             model: control.options
             delegate: SwirlMotionButton {
                 required property int index
                 required property var modelData
-                width: control.segmentWidth(index); height: control.height-(control.rounded?0:Theme.dp(4))
+                width: control.segmentWidth(index); height: control.height-Theme.dp(4)
                 hoverEnabled:true
                 background: Rectangle {
                     radius:control.rounded ? height/2 : Theme.segmentedSelectedRadius

@@ -87,6 +87,11 @@ Item {
                                 }
                                 SwirlToggle { checked:Theme.transparency; onToggled:Theme.transparency=checked }
                             }
+                            RowLayout {
+                                Layout.fillWidth:true
+                                SwirlText {text:qsTr("增强对比度");color:Theme.text;font.pixelSize:Theme.fontSize(14);Layout.fillWidth:true}
+                                SwirlToggle {objectName:"increaseContrastToggle";checked:Theme.increaseContrast;onToggled:Theme.increaseContrast=checked;Accessible.name:qsTr("增强对比度")}
+                            }
                             SwirlText {text:"动画与交互";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
                             GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 Layout.fillWidth:true

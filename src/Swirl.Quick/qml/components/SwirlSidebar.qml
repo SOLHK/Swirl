@@ -16,6 +16,9 @@ Item {
   x:Theme.dp(5);y:Theme.dp(5)
   width:sidebar.width-Theme.dp(10);height:sidebar.height-Theme.dp(10)
   radius:Theme.dp(14)
+  topColor:Theme.sidebarGlassTop;baseColor:Theme.sidebarGlassBase
+  shadowBlur:Theme.dp(20);shadowOpacity:Theme.sidebarShadowOpacity
+  shadowOffset:Qt.vector2d(Theme.dp(4),Theme.dp(3))
  }
  // A single visual owner: retarget y from its rendered position, in local coordinates.
  Rectangle {
@@ -34,7 +37,6 @@ Item {
  readonly property bool effectivelyCollapsed:false
  property alias searchField:pageSearch
  function openSearch(){ searchPopup.open();pageSearch.forceActiveFocus() }
- SwirlTrafficLights{x:Theme.dp(8);y:Theme.dp(4);targetWindow:sidebar.Window.window}
  SwirlText {
   objectName:"engineIdentityLabel"
   x:Theme.dp(16);y:Theme.dp(31);width:sidebar.width-Theme.dp(32)

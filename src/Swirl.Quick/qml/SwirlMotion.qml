@@ -5,18 +5,18 @@ QtObject {
     id: motion
     // Animation policy only: no colors, sizes, fonts or layout tokens live here.
     property real speed: 1
-    readonly property bool reduced: Theme.reduceMotion || (Theme.followSystemMotion && motionPolicy.systemReducedMotion)
+    readonly property bool reduced: Theme.reduceMotion || !Theme.windowActive || (Theme.followSystemMotion && motionPolicy.systemReducedMotion)
     readonly property real spring: 3.2 * speed * speed
     readonly property real damping: 0.28
     function ms(value){return reduced ? 0 : Math.round(value/Math.max(0.25,speed))}
     readonly property int duration:ms(180)
     readonly property int pressDuration:ms(80)
-    readonly property int releaseDuration:ms(190)
-    readonly property int selectionDuration:ms(260)
-    readonly property int hoverDuration:ms(120)
+    readonly property int releaseDuration:ms(140)
+    readonly property int selectionDuration:ms(220)
+    readonly property int hoverDuration:ms(150)
     readonly property int switchDuration:ms(210)
     readonly property int pageDuration:ms(190)
-    readonly property int dialogDuration:ms(264)
+    readonly property int dialogDuration:ms(220)
     readonly property int exitDuration:ms(160)
     readonly property int expandDuration:ms(360)
     readonly property real pressScale: reduced ? 1 : 0.98

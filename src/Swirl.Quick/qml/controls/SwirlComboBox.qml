@@ -1,6 +1,7 @@
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import SwirlQuick
+import "../components"
 ComboBox {
     id: control
     implicitWidth:Theme.dp(146)
@@ -32,11 +33,13 @@ ComboBox {
         x:Math.round(control.width-width-Theme.dp(6));y:Math.round((control.height-height)/2);width:Theme.dp(14);height:width
         source:"image://swirl/chevron-up-down/"+Theme.text.toString().slice(1)
     }
-    background: SwirlContinuousSurface {
+    background: SwirlClearGlassSurface {
+        elevated:false
+        hovered:control.hovered;pressed:control.pressed;focused:control.activeFocus
         radius: Theme.controlRadius
         antialiasing: true
         color: control.pressed ? Theme.pressed : control.hovered ? Theme.hover : Theme.buttonBase
-        border.width:control.activeFocus?Theme.dp(2):Theme.borderWidth
+        border.width:control.activeFocus || Theme.increaseContrast?1/Screen.devicePixelRatio:0
         border.color: control.activeFocus ? Theme.focusBorder : Theme.controlBorder
         Behavior on color { ColorAnimation { duration: Math.min(100,SwirlMotion.duration) } }
     }
@@ -82,11 +85,7 @@ ComboBox {
             }
         }
         exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} } }
-        background: Rectangle {
-            color:Theme.surface
-            radius: Theme.popupRadius; antialiasing:true
-            border.width:Theme.dp(1); border.color: Theme.pillRim
-        }
+        background: SwirlClearGlassSurface { radius:Theme.popupRadius; elevated:false }
         contentItem: ListView { pixelAligned: true;
                     add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:1;duration:SwirlMotion.duration} }
                     remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }

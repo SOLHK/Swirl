@@ -242,7 +242,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     }
     click("windowMaximizeButton");QTest::qWait(500);grab("overview-maximized");
     qInfo()<<"Maximized geometry"<<window->geometry()<<"work area"<<available;
-    check(window->visibility()==QWindow::FullScreen&&window->geometry()==window->screen()->geometry(),"green traffic light enters true full screen without corner gaps");
+    check(window->visibility()==QWindow::Maximized&&window->geometry()==window->screen()->availableGeometry(),"Windows maximize respects the available work area and taskbar");
     click("windowMaximizeButton");QTest::qWait(300);
     check(window->visibility()==QWindow::Windowed,"restore returns to windowed state");
     click("windowMinimizeButton");QTest::qWait(300);
@@ -252,7 +252,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
 #ifdef Q_OS_WIN
     const HWND hwnd=reinterpret_cast<HWND>(window->winId());
     const auto style=GetWindowLongPtrW(hwnd,GWL_STYLE);
-    check(!(style&WS_CAPTION),"only Swirl traffic lights remain after window state changes");
+    check(!(style&WS_CAPTION),"one Windows-style caption control set remains after window state changes");
     check(!(GetWindowLongPtrW(hwnd,GWL_EXSTYLE)&WS_EX_LAYERED),"restore retains DWM-compatible alpha composition");
     check((style&WS_THICKFRAME)&&(style&WS_SYSMENU)&&(style&WS_MAXIMIZEBOX),"native resize and system menu styles preserved");
     RECT rect;GetWindowRect(hwnd,&rect);

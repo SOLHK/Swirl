@@ -19,6 +19,16 @@ QtObject {
     readonly property bool effectsSupported: gpuEffectsSupported
     property alias reduceMotion: appearanceStore.savedReduceMotion
     property alias followSystemMotion: appearanceStore.savedFollowSystemMotion
+    property alias increaseContrast: appearanceStore.savedIncreaseContrast
+    readonly property color interactionHover: withAlpha(dark ? "#FFFFFF" : "#000000", dark ? 0.10 : 0.045)
+    readonly property color interactionPressed: withAlpha(dark ? "#FFFFFF" : "#000000", dark ? 0.16 : 0.09)
+    readonly property color glassFill: withAlpha(dark ? "#363A40" : "#F0F1F3", transparency && !increaseContrast ? 0.88 : 1)
+    readonly property color glassTop: withAlpha(dark ? "#474B51" : "#FFFFFF", transparency && !increaseContrast ? 0.88 : 1)
+    readonly property color glassHoverTop: dark ? "#51565D" : "#FFFFFF"
+    readonly property color sidebarGlassTop: withAlpha(dark ? "#494F58" : "#FFFFFF", transparency && !increaseContrast ? 0.94 : 1)
+    readonly property color sidebarGlassBase: withAlpha(dark ? "#353B43" : "#FDFEFF", transparency && !increaseContrast ? 0.84 : 1)
+    readonly property real sidebarShadowOpacity: dark ? 0.24 : 0.13
+    readonly property color separator: increaseContrast ? text : withAlpha(dark ? "#FFFFFF" : "#18202B", dark ? 0.12 : 0.10)
     property string pageBranch: "B"
     // Qt already maps QML logical pixels to each screen's DPI. Automatic mode
     // therefore uses the native 100% logical design scale; manual scaling is a
@@ -30,6 +40,7 @@ QtObject {
         property bool savedTransparency: true
         property bool savedReduceMotion: false
         property bool savedFollowSystemMotion: false
+        property bool savedIncreaseContrast: false
         property int savedScalePercent: 100
         property bool followSystemScale: true
     }
@@ -39,7 +50,7 @@ QtObject {
     // The light canvas runs continuously beneath content and the floating sidebar.
     readonly property color canvas: dark ? "#24272C" : "#F8F8F8"
     readonly property color surface: dark ? "#292C31" : "#FFFFFF"
-    readonly property color independentCard: withAlpha(dark ? "#30343A" : "#FFFFFF", dark ? 0.96 : 0.98)
+    readonly property color independentCard: dark ? "#30343A" : "#FFFFFF"
     readonly property color primaryContainer: withAlpha(dark ? "#2A3546" : "#F2F7FD",transparency?0.78:1)
     readonly property color raised: dark ? "#292929" : "#F7F7F7"
     // Neutral QML tint above the native window backdrop. Fall back to opacity 1.
@@ -50,7 +61,7 @@ QtObject {
     readonly property real settingsOpacity:dark?0.98:0.96
     readonly property real popupOpacity:transparency && backdropActive ? (dark?0.98:0.99) : 1.0
     readonly property color sidebar: withAlpha(sidebarBase, sidebarOpacity)
-    readonly property color border: dark ? "#46566C" : "#D5E2F0"
+    readonly property color border: increaseContrast ? text : dark ? "#46505C" : "#D9DEE5"
     readonly property color glassRim: border
     readonly property color glassGlint: dark ? "#4A4A4A" : "#FFFFFF"
     readonly property color glassShadow: dark ? "#50000000" : "#18000000"
