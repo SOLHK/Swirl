@@ -189,8 +189,8 @@ void WindowsBackdrop::refresh() {
         active = allowed && SUCCEEDED(material) && SUCCEEDED(frame);
         status = active ? QStringLiteral("Windows Desktop Acrylic: DWM live backdrop, %1 contour").arg(exact ? QStringLiteral("exact HWND") : QStringLiteral("native preset"))
             : !m_enabled ? QStringLiteral("Opaque: application transparency disabled")
-            : translucent ? QStringLiteral("Alpha translucency: exact 10pt contour; system Acrylic unavailable for custom contours")
-            : exact ? QStringLiteral("Opaque: exact 10pt contour; system transparency policy or renderer requires fallback")
+            : translucent ? QStringLiteral("Alpha translucency: exact logical contour; system Acrylic unavailable for custom contours")
+            : exact ? QStringLiteral("Opaque: exact logical contour; system transparency policy or renderer requires fallback")
             : software ? QStringLiteral("Opaque: software renderer")
             : batterySaver ? QStringLiteral("Opaque: battery saver")
             : remote ? QStringLiteral("Opaque: remote desktop session")

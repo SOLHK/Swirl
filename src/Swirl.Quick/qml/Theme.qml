@@ -93,7 +93,9 @@ QtObject {
     readonly property color red: dark ? "#FF9A93" : "#CF3029"
     // Shell and floating sidebar share one contour, independent of content zoom.
     // Qt maps these logical pixels to each screen's device pixel ratio.
-    readonly property real windowRadius: 16
+    enum ShellMetrics { WindowCornerRadius = 14, SidebarCornerRadius = 14 }
+    readonly property real windowRadius: Theme.WindowCornerRadius
+    readonly property real sidebarRadius: Theme.SidebarCornerRadius
     // Cards at the same hierarchy share a token, including the settings grid.
     readonly property real cardRadius: dp(20)
     readonly property real containerRadius: cardRadius

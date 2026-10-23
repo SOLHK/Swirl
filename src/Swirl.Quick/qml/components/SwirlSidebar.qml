@@ -16,7 +16,7 @@ Item {
   id:floatingBackground;objectName:"sidebarFloatingBackground"
   x:Theme.dp(8);y:Theme.dp(8)
   width:sidebar.width-Theme.dp(16);height:sidebar.height-Theme.dp(16)
-  radius:Theme.windowRadius;antialiasing:true
+  radius:Theme.sidebarRadius;antialiasing:true
   color:"transparent"
   border.width:Theme.increaseContrast?1/Screen.devicePixelRatio:0
   border.color:Theme.text
