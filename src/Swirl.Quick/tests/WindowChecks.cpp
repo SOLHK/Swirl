@@ -177,7 +177,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     check(exactOpaque ? sidebarChange<=3 : sidebarChange>=4&&sidebarChange<(backdrop->blurActive()?160:40),"sidebar follows the effective composition capability");
     check(exactOpaque ? contentChange<=3 : contentChange>=4&&contentChange<(backdrop->blurActive()?160:40),"workspace follows the effective composition capability");
     if(backdrop->blurActive()){
-        check(sidebarChange<contentChange,"floating sidebar softens the live desktop tint");
+        check(sidebarChange>contentChange+8,"floating sidebar reveals more live desktop color than the workspace");
         const auto scale=window->devicePixelRatio();const auto divider=state("window.actualSidebarWidth").toReal();
         const auto lhs=red.pixelColor(qRound((divider-12)*scale),qRound(8*scale));
         const auto rhs=red.pixelColor(qRound((divider+12)*scale),qRound(8*scale));

@@ -6,6 +6,7 @@ import SwirlQuick
 import "../controls"
 Item {
  id:sidebar
+ readonly property bool glassEnabled:Theme.transparency && (backdrop.blurActive || backdrop.active || backdrop.translucent)
  property int geometryRevision:0
  property var entries:({})
  readonly property Item selectedEntry:entries[AppState.sidebarPage] || null
@@ -24,9 +25,15 @@ Item {
   x:Theme.dp(5);y:Theme.dp(5)
   width:sidebar.width-Theme.dp(10);height:sidebar.height-Theme.dp(10)
   radius:Theme.dp(14)
-  color:Theme.dark?Theme.withAlpha("#333B46",0.90):Theme.withAlpha("#FFFFFF",0.88)
+  color:"transparent"
+  gradient:Gradient {
+   orientation:Gradient.Horizontal
+   GradientStop {position:0;color:sidebar.glassEnabled?Theme.withAlpha(Theme.dark?"#7890AA":"#FFFFFF",Theme.dark?0.26:0.31):Theme.dark?"#333B46":"#F6F9FD"}
+   GradientStop {position:0.55;color:sidebar.glassEnabled?Theme.withAlpha(Theme.dark?"#6C849E":"#FFFFFF",Theme.dark?0.16:0.16):Theme.dark?"#333B46":"#F6F9FD"}
+   GradientStop {position:1;color:sidebar.glassEnabled?Theme.withAlpha(Theme.dark?"#7890AA":"#FFFFFF",Theme.dark?0.24:0.24):Theme.dark?"#333B46":"#F6F9FD"}
+  }
   border.width:Theme.dp(1)
-  border.color:Theme.dark?Theme.withAlpha("#758296",0.42):Theme.withAlpha("#FFFFFF",0.78)
+  border.color:Theme.dark?Theme.withAlpha("#9CB2CD",0.34):Theme.withAlpha("#FFFFFF",0.55)
  }
  // A single visual owner: retarget y from its rendered position, in local coordinates.
  Rectangle {
