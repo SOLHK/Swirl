@@ -1,0 +1,3009 @@
+{
+  "schema": 1,
+  "source_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+  "generated_utc": "2026-10-23T15:38:31.451283+00:00",
+  "rust_workspace": {
+    "suites": 40,
+    "passed": 680,
+    "failed": 0,
+    "ignored": 0
+  },
+  "main_ctest": {
+    "tests": 28,
+    "failures": 0,
+    "disabled": 0,
+    "statuses": {
+      "run": 28
+    },
+    "log": "qt-3c1.xml"
+  },
+  "import_ctest": {
+    "tests": 9,
+    "failures": 0,
+    "disabled": 0,
+    "statuses": {
+      "run": 9
+    },
+    "log": "import-3c1.xml"
+  },
+  "native": {
+    "methods": 103,
+    "seconds": 207.914,
+    "success": true,
+    "failure_assertions": 0,
+    "error_entries": 0,
+    "log": "native-3c1.log"
+  },
+  "strict_vmess": {
+    "methods": 2,
+    "seconds": 9.05,
+    "success": false,
+    "failure_assertions": 5,
+    "error_entries": 0,
+    "log": "vmess-strict-3c1.log"
+  },
+  "rust_qt": {
+    "incidents": {
+      "pass": 85,
+      "skip": 9
+    },
+    "skip_messages": 0
+  },
+  "loader": {
+    "incidents": {
+      "pass": 28
+    },
+    "skip_messages": 0
+  },
+  "import_suites": {
+    "swirl-native-node-bridge.xml": {
+      "incidents": {
+        "pass": 18
+      },
+      "skip_messages": 0
+    },
+    "swirl-node-import-scope.xml": {
+      "incidents": {
+        "pass": 48
+      },
+      "skip_messages": 0
+    },
+    "swirl-rust-library-loader.xml": {
+      "incidents": {
+        "pass": 28
+      },
+      "skip_messages": 0
+    },
+    "swirl-system-proxy-state.xml": {
+      "incidents": {
+        "pass": 24
+      },
+      "skip_messages": 0
+    },
+    "swirl-xray-catalog.xml": {
+      "incidents": {
+        "pass": 10
+      },
+      "skip_messages": 0
+    },
+    "swirl-xray-download.xml": {
+      "incidents": {
+        "pass": 35
+      },
+      "skip_messages": 0
+    },
+    "swirl-xray-import.xml": {
+      "incidents": {
+        "pass": 27
+      },
+      "skip_messages": 0
+    },
+    "swirl-xray-runtime.xml": {
+      "incidents": {
+        "pass": 7
+      },
+      "skip_messages": 0
+    },
+    "swirl-xray-store.xml": {
+      "incidents": {
+        "pass": 26
+      },
+      "skip_messages": 0
+    }
+  },
+  "product": {
+    "source_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+    "source_clean": true,
+    "rust": {
+      "abi_version": 1,
+      "build_id": "938d8e434ec8083f46a195dc7935d65a93805d77cc2b9d9913f5486f2adab391",
+      "source_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+      "target": "x86_64-pc-windows-gnu"
+    },
+    "executable_sha256": "eea664bd8590f7cbccf64732f2a2d1963b7a1a77f70c5e246b1d3f630dd12f05",
+    "executable_version": "0.1.6.0",
+    "library_sha256": "53cc55e6239b6fbdbc8e487b8276aacbde62428c513f2e214029c20abc8365c1",
+    "tested_library_matches": true,
+    "self_test_success": true,
+    "missing_dll_rejected": true,
+    "ui_launches": [
+      {
+        "phase": "first",
+        "exit_code": 0
+      },
+      {
+        "phase": "repeat",
+        "exit_code": 0
+      }
+    ],
+    "product_test_entry_points": "OFF",
+    "installed": false,
+    "private_subscription_tested": false,
+    "scope": "Windows GNU Release build, exact DLL, loopback self-test, negative load and isolated UI smoke; not an installer"
+  },
+  "qt_independent_fixtures": {
+    "source_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+    "success": true,
+    "required_slot_count": 9,
+    "executed_slot_count": 9,
+    "missing_slots": [],
+    "lifecycle_modes": [
+      "authentication-failure",
+      "cancel",
+      "http-control",
+      "reject",
+      "tls12"
+    ],
+    "executed_slots": [
+      "loonShadowsocksThroughIndependentPeer",
+      "publicRealityProductChainAgainstIndependentPeer",
+      "realityLifecycleProductChainAgainstIndependentPeer",
+      "shadowsocksThroughIndependentPeer",
+      "socks4ThroughIndependentPeer",
+      "socks5UdpThroughIndependentPeer",
+      "subscriptionProductChainAgainstIndependentPeer",
+      "vlessThroughIndependentPeer",
+      "webSocketThroughIndependentPeer"
+    ]
+  },
+  "private_subscription_tested": false,
+  "installed": false,
+  "clash_independence": "unproven",
+  "local_evidence_directory": "D:\\Codex\\outputs\\s3-max",
+  "ci": {
+    "source_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+    "runs": [
+      {
+        "id": 39975447359,
+        "name": "U1 complete Windows Qt independent fixtures",
+        "event": "push",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+        "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447359"
+      },
+      {
+        "id": 39975447372,
+        "name": "U1 retained native network regressions",
+        "event": "push",
+        "status": "completed",
+        "conclusion": "failure",
+        "head_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+        "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447372"
+      },
+      {
+        "id": 39975447333,
+        "name": "R1 source and package guards",
+        "event": "push",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+        "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447333"
+      },
+      {
+        "id": 39975447341,
+        "name": "Swirl Native Protocols X14",
+        "event": "push",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+        "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447341"
+      },
+      {
+        "id": 39975447386,
+        "name": "Rust sole runtime and unified product",
+        "event": "push",
+        "status": "completed",
+        "conclusion": "failure",
+        "head_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+        "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447386"
+      }
+    ],
+    "jobs": {
+      "39975447359": [
+        {
+          "id": 120488713250,
+          "name": "qt-fixtures",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447359/job/120488713250",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-23T15:06:50Z",
+              "completed_at": "2026-10-23T15:06:56Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-23T15:06:56Z",
+              "completed_at": "2026-10-23T15:07:07Z"
+            },
+            {
+              "name": "Run ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-23T15:07:07Z",
+              "completed_at": "2026-10-23T15:07:15Z"
+            },
+            {
+              "name": "Rust MSVC x64",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-23T15:07:15Z",
+              "completed_at": "2026-10-23T15:07:23Z"
+            },
+            {
+              "name": "Run jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-23T15:07:23Z",
+              "completed_at": "2026-10-23T15:08:59Z"
+            },
+            {
+              "name": "Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-23T15:08:59Z",
+              "completed_at": "2026-10-23T15:08:59Z"
+            },
+            {
+              "name": "Install independent fixture TLS implementation",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-23T15:08:59Z",
+              "completed_at": "2026-10-23T15:09:09Z"
+            },
+            {
+              "name": "Validate the fixture evidence gate",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-23T15:09:09Z",
+              "completed_at": "2026-10-23T15:09:11Z"
+            },
+            {
+              "name": "Build current-source Rust command hosts",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-23T15:09:11Z",
+              "completed_at": "2026-10-23T15:13:21Z"
+            },
+            {
+              "name": "Configure the paired Qt fixture executable",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-23T15:13:21Z",
+              "completed_at": "2026-10-23T15:14:04Z"
+            },
+            {
+              "name": "Build actual Qt product-chain and private-inspector tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-10-23T15:14:04Z",
+              "completed_at": "2026-10-23T15:17:38Z"
+            },
+            {
+              "name": "Deploy Qt dependencies and initialize isolated fixture paths",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-23T15:17:38Z",
+              "completed_at": "2026-10-23T15:17:42Z"
+            },
+            {
+              "name": "Install the toolchain pinned by the independent Xray peer lock",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-10-23T15:17:42Z",
+              "completed_at": "2026-10-23T15:18:03Z"
+            },
+            {
+              "name": "Build and repeat-verify the locked official Xray peer",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-10-23T15:18:03Z",
+              "completed_at": "2026-10-23T15:18:55Z"
+            },
+            {
+              "name": "Exercise all nine Qt fixture slots with zero skips",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-23T15:18:55Z",
+              "completed_at": "2026-10-23T15:19:33Z"
+            },
+            {
+              "name": "Verify isolated persistent storage and per-build QML cache paths",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-10-23T15:19:33Z",
+              "completed_at": "2026-10-23T15:19:35Z"
+            },
+            {
+              "name": "Complete subscription capture, DPAPI persistence and redaction regression",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-10-23T15:19:35Z",
+              "completed_at": "2026-10-23T15:19:41Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-10-23T15:19:41Z",
+              "completed_at": "2026-10-23T15:19:42Z"
+            },
+            {
+              "name": "Post Install the toolchain pinned by the independent Xray peer lock",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 33,
+              "started_at": "2026-10-23T15:19:42Z",
+              "completed_at": "2026-10-23T15:19:42Z"
+            },
+            {
+              "name": "Post Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 34,
+              "started_at": "2026-10-23T15:19:42Z",
+              "completed_at": "2026-10-23T15:19:42Z"
+            },
+            {
+              "name": "Post Run jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 35,
+              "started_at": "2026-10-23T15:19:42Z",
+              "completed_at": "2026-10-23T15:19:43Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 36,
+              "started_at": "2026-10-23T15:19:43Z",
+              "completed_at": "2026-10-23T15:19:44Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 37,
+              "started_at": "2026-10-23T15:19:44Z",
+              "completed_at": "2026-10-23T15:19:44Z"
+            }
+          ]
+        }
+      ],
+      "39975447372": [
+        {
+          "id": 120488712895,
+          "name": "retained-network-tests (macos-14)",
+          "status": "completed",
+          "conclusion": "failure",
+          "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447372/job/120488712895",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-23T15:06:55Z",
+              "completed_at": "2026-10-23T15:06:57Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-23T15:06:57Z",
+              "completed_at": "2026-10-23T15:07:00Z"
+            },
+            {
+              "name": "Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-23T15:07:00Z",
+              "completed_at": "2026-10-23T15:07:00Z"
+            },
+            {
+              "name": "Install Rust for the single release build",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-23T15:07:00Z",
+              "completed_at": "2026-10-23T15:07:09Z"
+            },
+            {
+              "name": "Install the locked Go toolchain for the independent source peer",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-23T15:07:09Z",
+              "completed_at": "2026-10-23T15:07:23Z"
+            },
+            {
+              "name": "Record the exact checkout and isolated fixture paths",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-23T15:07:23Z",
+              "completed_at": "2026-10-23T15:07:24Z"
+            },
+            {
+              "name": "Install the independent certificate fixture dependency",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-23T15:07:24Z",
+              "completed_at": "2026-10-23T15:07:25Z"
+            },
+            {
+              "name": "Build one release set of Core hosts and required native clients",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-23T15:07:25Z",
+              "completed_at": "2026-10-23T15:11:56Z"
+            },
+            {
+              "name": "Build and verify the original locked Xray REALITY source peer",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-23T15:11:56Z",
+              "completed_at": "2026-10-23T15:12:47Z"
+            },
+            {
+              "name": "Fetch the separately pinned official release required by strict VMess",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-23T15:12:47Z",
+              "completed_at": "2026-10-23T15:12:49Z"
+            },
+            {
+              "name": "Verify strict public TLS diagnostic controls on this OS",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-10-23T15:12:49Z",
+              "completed_at": "2026-10-23T15:12:49Z"
+            },
+            {
+              "name": "Verify the thin runner cannot hide missing, skipped or failed tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-23T15:12:49Z",
+              "completed_at": "2026-10-23T15:12:50Z"
+            },
+            {
+              "name": "Execute all 76 retained methods and both vector checks",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-10-23T15:12:50Z",
+              "completed_at": "2026-10-23T15:13:14Z"
+            },
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 14,
+              "started_at": "2026-10-23T15:13:14Z",
+              "completed_at": "2026-10-23T15:13:22Z"
+            },
+            {
+              "name": "Original public REALITY with the Rust TLS fingerprint",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 15,
+              "started_at": "2026-10-23T15:13:22Z",
+              "completed_at": "2026-10-23T15:13:22Z"
+            },
+            {
+              "name": "Original public REALITY and Vision with the Rust TLS fingerprint",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 16,
+              "started_at": "2026-10-23T15:13:22Z",
+              "completed_at": "2026-10-23T15:13:22Z"
+            },
+            {
+              "name": "Original public REALITY with the Chrome TLS fingerprint",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 17,
+              "started_at": "2026-10-23T15:13:22Z",
+              "completed_at": "2026-10-23T15:13:22Z"
+            },
+            {
+              "name": "Original public REALITY and Vision with the Chrome TLS fingerprint",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 18,
+              "started_at": "2026-10-23T15:13:22Z",
+              "completed_at": "2026-10-23T15:13:22Z"
+            },
+            {
+              "name": "Original public DIRECT and native DoH menu",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 19,
+              "started_at": "2026-10-23T15:13:22Z",
+              "completed_at": "2026-10-23T15:13:22Z"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 20,
+              "started_at": "2026-10-23T15:13:22Z",
+              "completed_at": "2026-10-23T15:13:23Z"
+            },
+            {
+              "name": "Preserve actual results, build identity and pinned-peer manifests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-10-23T15:13:23Z",
+              "completed_at": "2026-10-23T15:13:25Z"
+            },
+            {
+              "name": "Post Install the locked Go toolchain for the independent source peer",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 40,
+              "started_at": "2026-10-23T15:13:25Z",
+              "completed_at": "2026-10-23T15:13:25Z"
+            },
+            {
+              "name": "Post Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 41,
+              "started_at": "2026-10-23T15:13:25Z",
+              "completed_at": "2026-10-23T15:13:25Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 42,
+              "started_at": "2026-10-23T15:13:25Z",
+              "completed_at": "2026-10-23T15:13:25Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 43,
+              "started_at": "2026-10-23T15:13:25Z",
+              "completed_at": "2026-10-23T15:13:28Z"
+            }
+          ]
+        },
+        {
+          "id": 120488713297,
+          "name": "retained-network-tests (ubuntu-24.04)",
+          "status": "completed",
+          "conclusion": "failure",
+          "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447372/job/120488713297",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-23T15:06:50Z",
+              "completed_at": "2026-10-23T15:06:51Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-23T15:06:51Z",
+              "completed_at": "2026-10-23T15:06:53Z"
+            },
+            {
+              "name": "Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-23T15:06:53Z",
+              "completed_at": "2026-10-23T15:06:53Z"
+            },
+            {
+              "name": "Install Rust for the single release build",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-23T15:06:53Z",
+              "completed_at": "2026-10-23T15:07:02Z"
+            },
+            {
+              "name": "Install the locked Go toolchain for the independent source peer",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-23T15:07:02Z",
+              "completed_at": "2026-10-23T15:07:10Z"
+            },
+            {
+              "name": "Record the exact checkout and isolated fixture paths",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-23T15:07:10Z",
+              "completed_at": "2026-10-23T15:07:11Z"
+            },
+            {
+              "name": "Install the independent certificate fixture dependency",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-23T15:07:11Z",
+              "completed_at": "2026-10-23T15:07:13Z"
+            },
+            {
+              "name": "Build one release set of Core hosts and required native clients",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-23T15:07:13Z",
+              "completed_at": "2026-10-23T15:11:05Z"
+            },
+            {
+              "name": "Build and verify the original locked Xray REALITY source peer",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-23T15:11:05Z",
+              "completed_at": "2026-10-23T15:11:51Z"
+            },
+            {
+              "name": "Fetch the separately pinned official release required by strict VMess",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-23T15:11:51Z",
+              "completed_at": "2026-10-23T15:11:52Z"
+            },
+            {
+              "name": "Verify strict public TLS diagnostic controls on this OS",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-10-23T15:11:52Z",
+              "completed_at": "2026-10-23T15:11:52Z"
+            },
+            {
+              "name": "Verify the thin runner cannot hide missing, skipped or failed tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-23T15:11:52Z",
+              "completed_at": "2026-10-23T15:11:53Z"
+            },
+            {
+              "name": "Execute all 76 retained methods and both vector checks",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-10-23T15:11:53Z",
+              "completed_at": "2026-10-23T15:12:14Z"
+            },
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 14,
+              "started_at": "2026-10-23T15:12:14Z",
+              "completed_at": "2026-10-23T15:12:21Z"
+            },
+            {
+              "name": "Original public REALITY with the Rust TLS fingerprint",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-23T15:12:21Z",
+              "completed_at": "2026-10-23T15:12:26Z"
+            },
+            {
+              "name": "Original public REALITY and Vision with the Rust TLS fingerprint",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-10-23T15:12:26Z",
+              "completed_at": "2026-10-23T15:12:32Z"
+            },
+            {
+              "name": "Original public REALITY with the Chrome TLS fingerprint",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-10-23T15:12:32Z",
+              "completed_at": "2026-10-23T15:12:38Z"
+            },
+            {
+              "name": "Original public REALITY and Vision with the Chrome TLS fingerprint",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-10-23T15:12:38Z",
+              "completed_at": "2026-10-23T15:12:44Z"
+            },
+            {
+              "name": "Original public DIRECT and native DoH menu",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-10-23T15:12:44Z",
+              "completed_at": "2026-10-23T15:12:45Z"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 20,
+              "started_at": "2026-10-23T15:12:45Z",
+              "completed_at": "2026-10-23T15:12:45Z"
+            },
+            {
+              "name": "Preserve actual results, build identity and pinned-peer manifests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-10-23T15:12:45Z",
+              "completed_at": "2026-10-23T15:12:47Z"
+            },
+            {
+              "name": "Post Install the locked Go toolchain for the independent source peer",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 40,
+              "started_at": "2026-10-23T15:12:47Z",
+              "completed_at": "2026-10-23T15:12:47Z"
+            },
+            {
+              "name": "Post Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 41,
+              "started_at": "2026-10-23T15:12:47Z",
+              "completed_at": "2026-10-23T15:12:47Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 42,
+              "started_at": "2026-10-23T15:12:47Z",
+              "completed_at": "2026-10-23T15:12:47Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 43,
+              "started_at": "2026-10-23T15:12:47Z",
+              "completed_at": "2026-10-23T15:12:47Z"
+            }
+          ]
+        },
+        {
+          "id": 120488713437,
+          "name": "retained-network-tests (windows-2022)",
+          "status": "completed",
+          "conclusion": "failure",
+          "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447372/job/120488713437",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-23T15:06:52Z",
+              "completed_at": "2026-10-23T15:06:54Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-23T15:06:54Z",
+              "completed_at": "2026-10-23T15:07:03Z"
+            },
+            {
+              "name": "Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-23T15:07:03Z",
+              "completed_at": "2026-10-23T15:07:04Z"
+            },
+            {
+              "name": "Install Rust for the single release build",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-23T15:07:04Z",
+              "completed_at": "2026-10-23T15:07:24Z"
+            },
+            {
+              "name": "Install the locked Go toolchain for the independent source peer",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-23T15:07:24Z",
+              "completed_at": "2026-10-23T15:07:45Z"
+            },
+            {
+              "name": "Record the exact checkout and isolated fixture paths",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-23T15:07:45Z",
+              "completed_at": "2026-10-23T15:07:47Z"
+            },
+            {
+              "name": "Install the independent certificate fixture dependency",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-23T15:07:47Z",
+              "completed_at": "2026-10-23T15:07:53Z"
+            },
+            {
+              "name": "Build one release set of Core hosts and required native clients",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-23T15:07:53Z",
+              "completed_at": "2026-10-23T15:14:36Z"
+            },
+            {
+              "name": "Build and verify the original locked Xray REALITY source peer",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-23T15:14:36Z",
+              "completed_at": "2026-10-23T15:16:41Z"
+            },
+            {
+              "name": "Fetch the separately pinned official release required by strict VMess",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-23T15:16:41Z",
+              "completed_at": "2026-10-23T15:16:45Z"
+            },
+            {
+              "name": "Verify strict public TLS diagnostic controls on this OS",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-10-23T15:16:45Z",
+              "completed_at": "2026-10-23T15:16:45Z"
+            },
+            {
+              "name": "Verify the thin runner cannot hide missing, skipped or failed tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-23T15:16:45Z",
+              "completed_at": "2026-10-23T15:16:46Z"
+            },
+            {
+              "name": "Execute all 76 retained methods and both vector checks",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-10-23T15:16:46Z",
+              "completed_at": "2026-10-23T15:17:22Z"
+            },
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 14,
+              "started_at": "2026-10-23T15:17:22Z",
+              "completed_at": "2026-10-23T15:17:30Z"
+            },
+            {
+              "name": "Original public REALITY with the Rust TLS fingerprint",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 15,
+              "started_at": "2026-10-23T15:17:30Z",
+              "completed_at": "2026-10-23T15:17:30Z"
+            },
+            {
+              "name": "Original public REALITY and Vision with the Rust TLS fingerprint",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 16,
+              "started_at": "2026-10-23T15:17:30Z",
+              "completed_at": "2026-10-23T15:17:30Z"
+            },
+            {
+              "name": "Original public REALITY with the Chrome TLS fingerprint",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 17,
+              "started_at": "2026-10-23T15:17:30Z",
+              "completed_at": "2026-10-23T15:17:30Z"
+            },
+            {
+              "name": "Original public REALITY and Vision with the Chrome TLS fingerprint",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 18,
+              "started_at": "2026-10-23T15:17:30Z",
+              "completed_at": "2026-10-23T15:17:30Z"
+            },
+            {
+              "name": "Original public DIRECT and native DoH menu",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 19,
+              "started_at": "2026-10-23T15:17:30Z",
+              "completed_at": "2026-10-23T15:17:30Z"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 20,
+              "started_at": "2026-10-23T15:17:30Z",
+              "completed_at": "2026-10-23T15:17:31Z"
+            },
+            {
+              "name": "Preserve actual results, build identity and pinned-peer manifests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-10-23T15:17:31Z",
+              "completed_at": "2026-10-23T15:17:34Z"
+            },
+            {
+              "name": "Post Install the locked Go toolchain for the independent source peer",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 40,
+              "started_at": "2026-10-23T15:17:34Z",
+              "completed_at": "2026-10-23T15:17:34Z"
+            },
+            {
+              "name": "Post Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 41,
+              "started_at": "2026-10-23T15:17:34Z",
+              "completed_at": "2026-10-23T15:17:34Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 42,
+              "started_at": "2026-10-23T15:17:34Z",
+              "completed_at": "2026-10-23T15:17:35Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 43,
+              "started_at": "2026-10-23T15:17:35Z",
+              "completed_at": "2026-10-23T15:17:36Z"
+            }
+          ]
+        }
+      ],
+      "39975447333": [
+        {
+          "id": 120488712649,
+          "name": "source",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447333/job/120488712649",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-23T15:06:50Z",
+              "completed_at": "2026-10-23T15:06:51Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-23T15:06:51Z",
+              "completed_at": "2026-10-23T15:06:53Z"
+            },
+            {
+              "name": "Reject removed runtime sources and product fallback paths",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-23T15:06:53Z",
+              "completed_at": "2026-10-23T15:06:53Z"
+            },
+            {
+              "name": "Preserve approved U2 window, sidebar and navigation sources",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-23T15:06:53Z",
+              "completed_at": "2026-10-23T15:06:53Z"
+            },
+            {
+              "name": "CMake dependency graph regression",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-23T15:06:53Z",
+              "completed_at": "2026-10-23T15:06:56Z"
+            },
+            {
+              "name": "Preserve exact reviewable source snapshot without font binaries",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-23T15:06:56Z",
+              "completed_at": "2026-10-23T15:06:57Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-23T15:06:57Z",
+              "completed_at": "2026-10-23T15:06:59Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-10-23T15:06:59Z",
+              "completed_at": "2026-10-23T15:06:59Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-23T15:06:59Z",
+              "completed_at": "2026-10-23T15:06:59Z"
+            }
+          ]
+        },
+        {
+          "id": 120488713337,
+          "name": "package-policy",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447333/job/120488713337",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-23T15:06:50Z",
+              "completed_at": "2026-10-23T15:06:51Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-23T15:06:51Z",
+              "completed_at": "2026-10-23T15:07:00Z"
+            },
+            {
+              "name": "PowerShell 7 package path tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-23T15:07:00Z",
+              "completed_at": "2026-10-23T15:07:01Z"
+            },
+            {
+              "name": "Windows PowerShell 5.1 package path tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-23T15:07:01Z",
+              "completed_at": "2026-10-23T15:07:06Z"
+            },
+            {
+              "name": "Actual Windows MRS rule package copy and missing/corrupt rejection",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-23T15:07:06Z",
+              "completed_at": "2026-10-23T15:07:06Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-23T15:07:06Z",
+              "completed_at": "2026-10-23T15:07:08Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-10-23T15:07:08Z",
+              "completed_at": "2026-10-23T15:07:08Z"
+            }
+          ]
+        }
+      ],
+      "39975447341": [
+        {
+          "id": 120488712916,
+          "name": "official-interop (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447341/job/120488712916",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-23T15:06:50Z",
+              "completed_at": "2026-10-23T15:06:51Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-23T15:06:51Z",
+              "completed_at": "2026-10-23T15:06:54Z"
+            },
+            {
+              "name": "Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-23T15:06:54Z",
+              "completed_at": "2026-10-23T15:06:54Z"
+            },
+            {
+              "name": "Install test certificate library",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-23T15:06:54Z",
+              "completed_at": "2026-10-23T15:06:56Z"
+            },
+            {
+              "name": "Install Rust",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-23T15:06:56Z",
+              "completed_at": "2026-10-23T15:07:06Z"
+            },
+            {
+              "name": "Build native clients and Core harness",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-23T15:07:06Z",
+              "completed_at": "2026-10-23T15:07:41Z"
+            },
+            {
+              "name": "Download pinned official Xray peers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-23T15:07:41Z",
+              "completed_at": "2026-10-23T15:07:42Z"
+            },
+            {
+              "name": "Download pinned Hysteria and TUIC server peers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-23T15:07:42Z",
+              "completed_at": "2026-10-23T15:07:43Z"
+            },
+            {
+              "name": "Download pinned official Shadowsocks server peer",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-23T15:07:43Z",
+              "completed_at": "2026-10-23T15:07:45Z"
+            },
+            {
+              "name": "Measure and prepare disposable runner UDP prerequisites",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-23T15:07:45Z",
+              "completed_at": "2026-10-23T15:07:45Z"
+            },
+            {
+              "name": "Set native client and evidence paths",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-10-23T15:07:45Z",
+              "completed_at": "2026-10-23T15:07:45Z"
+            },
+            {
+              "name": "VMess official Xray data and completed-response closure",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-23T15:07:45Z",
+              "completed_at": "2026-10-23T15:07:54Z"
+            },
+            {
+              "name": "Hysteria2 official server including retained limitation probes",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-10-23T15:07:54Z",
+              "completed_at": "2026-10-23T15:08:13Z"
+            },
+            {
+              "name": "Hysteria2 original 17 methods with a measured 1 MiB main stack",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-10-23T15:08:13Z",
+              "completed_at": "2026-10-23T15:08:34Z"
+            },
+            {
+              "name": "Hysteria2 real future cancellation cleanup and same-runtime reconnect",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-23T15:08:34Z",
+              "completed_at": "2026-10-23T15:08:38Z"
+            },
+            {
+              "name": "Hysteria2 cancellation cleanup with a measured 1 MiB main stack",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-10-23T15:08:38Z",
+              "completed_at": "2026-10-23T15:08:42Z"
+            },
+            {
+              "name": "Require original Hysteria2 methods and lifecycle evidence on this runner",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-10-23T15:08:42Z",
+              "completed_at": "2026-10-23T15:08:42Z"
+            },
+            {
+              "name": "TUIC historical official reference including retained limitation probe",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-10-23T15:08:42Z",
+              "completed_at": "2026-10-23T15:08:55Z"
+            },
+            {
+              "name": "Native Core ingress TCP UDP DNS HTTPS and node switching",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-10-23T15:08:55Z",
+              "completed_at": "2026-10-23T15:09:15Z"
+            },
+            {
+              "name": "Dynamically loaded C ABI library through official QUIC peers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-10-23T15:09:15Z",
+              "completed_at": "2026-10-23T15:09:38Z"
+            },
+            {
+              "name": "Phase timing and authentication semantics through C ABI and official peers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-10-23T15:09:38Z",
+              "completed_at": "2026-10-23T15:09:40Z"
+            },
+            {
+              "name": "Imported Xray V2Ray transport configs through ordinary Core start",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 22,
+              "started_at": "2026-10-23T15:09:40Z",
+              "completed_at": "2026-10-23T15:10:00Z"
+            },
+            {
+              "name": "VLESS and Trojan UDP through official Xray",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-10-23T15:10:00Z",
+              "completed_at": "2026-10-23T15:10:15Z"
+            },
+            {
+              "name": "Shadowsocks 2022 official data and replay rejection",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-10-23T15:10:15Z",
+              "completed_at": "2026-10-23T15:10:21Z"
+            },
+            {
+              "name": "HTTP and SOCKS authentication TCP UDP and import through official Xray",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 25,
+              "started_at": "2026-10-23T15:10:21Z",
+              "completed_at": "2026-10-23T15:10:30Z"
+            },
+            {
+              "name": "REALITY Rustls through production Core and official Xray",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-10-23T15:10:30Z",
+              "completed_at": "2026-10-23T15:10:33Z"
+            },
+            {
+              "name": "REALITY Chrome133 through production Core and official Xray",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-10-23T15:10:33Z",
+              "completed_at": "2026-10-23T15:10:37Z"
+            },
+            {
+              "name": "Vision Rustls TLS13 Direct and authenticated closure",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 28,
+              "started_at": "2026-10-23T15:10:37Z",
+              "completed_at": "2026-10-23T15:10:44Z"
+            },
+            {
+              "name": "Vision Chrome133 TLS13 Direct and authenticated closure",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 29,
+              "started_at": "2026-10-23T15:10:44Z",
+              "completed_at": "2026-10-23T15:10:51Z"
+            },
+            {
+              "name": "Upload actual interoperability receipts",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 30,
+              "started_at": "2026-10-23T15:10:51Z",
+              "completed_at": "2026-10-23T15:10:53Z"
+            },
+            {
+              "name": "Post Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 59,
+              "started_at": "2026-10-23T15:10:53Z",
+              "completed_at": "2026-10-23T15:10:53Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 60,
+              "started_at": "2026-10-23T15:10:53Z",
+              "completed_at": "2026-10-23T15:10:53Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 61,
+              "started_at": "2026-10-23T15:10:53Z",
+              "completed_at": "2026-10-23T15:10:53Z"
+            }
+          ]
+        },
+        {
+          "id": 120488713047,
+          "name": "native-protocols (macos-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447341/job/120488713047",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-23T15:06:50Z",
+              "completed_at": "2026-10-23T15:06:50Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-23T15:06:50Z",
+              "completed_at": "2026-10-23T15:06:53Z"
+            },
+            {
+              "name": "Install Rust tools",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-23T15:06:53Z",
+              "completed_at": "2026-10-23T15:07:00Z"
+            },
+            {
+              "name": "Format",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-23T15:07:00Z",
+              "completed_at": "2026-10-23T15:07:00Z"
+            },
+            {
+              "name": "Check",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-23T15:07:00Z",
+              "completed_at": "2026-10-23T15:07:29Z"
+            },
+            {
+              "name": "Clippy",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-23T15:07:29Z",
+              "completed_at": "2026-10-23T15:07:36Z"
+            },
+            {
+              "name": "Unit and local network tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-23T15:07:36Z",
+              "completed_at": "2026-10-23T15:08:27Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-10-23T15:08:27Z",
+              "completed_at": "2026-10-23T15:08:27Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-23T15:08:27Z",
+              "completed_at": "2026-10-23T15:08:28Z"
+            }
+          ]
+        },
+        {
+          "id": 120488713094,
+          "name": "native-protocols (windows-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447341/job/120488713094",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-23T15:06:50Z",
+              "completed_at": "2026-10-23T15:06:51Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-23T15:06:51Z",
+              "completed_at": "2026-10-23T15:07:00Z"
+            },
+            {
+              "name": "Install Rust tools",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-23T15:07:00Z",
+              "completed_at": "2026-10-23T15:07:06Z"
+            },
+            {
+              "name": "Format",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-23T15:07:06Z",
+              "completed_at": "2026-10-23T15:07:17Z"
+            },
+            {
+              "name": "Check",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-23T15:07:17Z",
+              "completed_at": "2026-10-23T15:08:34Z"
+            },
+            {
+              "name": "Clippy",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-23T15:08:34Z",
+              "completed_at": "2026-10-23T15:08:51Z"
+            },
+            {
+              "name": "Unit and local network tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-23T15:08:51Z",
+              "completed_at": "2026-10-23T15:10:24Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-10-23T15:10:24Z",
+              "completed_at": "2026-10-23T15:10:26Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-23T15:10:26Z",
+              "completed_at": "2026-10-23T15:10:27Z"
+            }
+          ]
+        },
+        {
+          "id": 120488713130,
+          "name": "official-interop (windows-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447341/job/120488713130",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-23T15:06:50Z",
+              "completed_at": "2026-10-23T15:06:51Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-23T15:06:51Z",
+              "completed_at": "2026-10-23T15:07:00Z"
+            },
+            {
+              "name": "Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-23T15:07:00Z",
+              "completed_at": "2026-10-23T15:07:00Z"
+            },
+            {
+              "name": "Install test certificate library",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-23T15:07:00Z",
+              "completed_at": "2026-10-23T15:07:07Z"
+            },
+            {
+              "name": "Install Rust",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-23T15:07:07Z",
+              "completed_at": "2026-10-23T15:07:12Z"
+            },
+            {
+              "name": "Build native clients and Core harness",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-23T15:07:12Z",
+              "completed_at": "2026-10-23T15:08:33Z"
+            },
+            {
+              "name": "Download pinned official Xray peers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-23T15:08:33Z",
+              "completed_at": "2026-10-23T15:08:35Z"
+            },
+            {
+              "name": "Download pinned Hysteria and TUIC server peers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-23T15:08:35Z",
+              "completed_at": "2026-10-23T15:08:37Z"
+            },
+            {
+              "name": "Download pinned official Shadowsocks server peer",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-23T15:08:37Z",
+              "completed_at": "2026-10-23T15:08:39Z"
+            },
+            {
+              "name": "Measure and prepare disposable runner UDP prerequisites",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-23T15:08:39Z",
+              "completed_at": "2026-10-23T15:08:39Z"
+            },
+            {
+              "name": "Set native client and evidence paths",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-10-23T15:08:39Z",
+              "completed_at": "2026-10-23T15:08:39Z"
+            },
+            {
+              "name": "VMess official Xray data and completed-response closure",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-23T15:08:39Z",
+              "completed_at": "2026-10-23T15:08:53Z"
+            },
+            {
+              "name": "Hysteria2 official server including retained limitation probes",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-10-23T15:08:53Z",
+              "completed_at": "2026-10-23T15:09:14Z"
+            },
+            {
+              "name": "Hysteria2 original 17 methods with a measured 1 MiB main stack",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 14,
+              "started_at": "2026-10-23T15:09:14Z",
+              "completed_at": "2026-10-23T15:09:14Z"
+            },
+            {
+              "name": "Hysteria2 real future cancellation cleanup and same-runtime reconnect",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-23T15:09:14Z",
+              "completed_at": "2026-10-23T15:09:19Z"
+            },
+            {
+              "name": "Hysteria2 cancellation cleanup with a measured 1 MiB main stack",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 16,
+              "started_at": "2026-10-23T15:09:19Z",
+              "completed_at": "2026-10-23T15:09:19Z"
+            },
+            {
+              "name": "Require original Hysteria2 methods and lifecycle evidence on this runner",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-10-23T15:09:19Z",
+              "completed_at": "2026-10-23T15:09:19Z"
+            },
+            {
+              "name": "TUIC historical official reference including retained limitation probe",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-10-23T15:09:19Z",
+              "completed_at": "2026-10-23T15:09:34Z"
+            },
+            {
+              "name": "Native Core ingress TCP UDP DNS HTTPS and node switching",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-10-23T15:09:34Z",
+              "completed_at": "2026-10-23T15:09:55Z"
+            },
+            {
+              "name": "Dynamically loaded C ABI library through official QUIC peers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-10-23T15:09:55Z",
+              "completed_at": "2026-10-23T15:10:19Z"
+            },
+            {
+              "name": "Phase timing and authentication semantics through C ABI and official peers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-10-23T15:10:19Z",
+              "completed_at": "2026-10-23T15:10:22Z"
+            },
+            {
+              "name": "Imported Xray V2Ray transport configs through ordinary Core start",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 22,
+              "started_at": "2026-10-23T15:10:22Z",
+              "completed_at": "2026-10-23T15:10:34Z"
+            },
+            {
+              "name": "VLESS and Trojan UDP through official Xray",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-10-23T15:10:34Z",
+              "completed_at": "2026-10-23T15:10:55Z"
+            },
+            {
+              "name": "Shadowsocks 2022 official data and replay rejection",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-10-23T15:10:55Z",
+              "completed_at": "2026-10-23T15:11:02Z"
+            },
+            {
+              "name": "HTTP and SOCKS authentication TCP UDP and import through official Xray",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 25,
+              "started_at": "2026-10-23T15:11:02Z",
+              "completed_at": "2026-10-23T15:11:12Z"
+            },
+            {
+              "name": "REALITY Rustls through production Core and official Xray",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-10-23T15:11:12Z",
+              "completed_at": "2026-10-23T15:11:22Z"
+            },
+            {
+              "name": "REALITY Chrome133 through production Core and official Xray",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-10-23T15:11:22Z",
+              "completed_at": "2026-10-23T15:11:32Z"
+            },
+            {
+              "name": "Vision Rustls TLS13 Direct and authenticated closure",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 28,
+              "started_at": "2026-10-23T15:11:32Z",
+              "completed_at": "2026-10-23T15:11:45Z"
+            },
+            {
+              "name": "Vision Chrome133 TLS13 Direct and authenticated closure",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 29,
+              "started_at": "2026-10-23T15:11:45Z",
+              "completed_at": "2026-10-23T15:11:59Z"
+            },
+            {
+              "name": "Upload actual interoperability receipts",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 30,
+              "started_at": "2026-10-23T15:11:59Z",
+              "completed_at": "2026-10-23T15:12:01Z"
+            },
+            {
+              "name": "Post Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 59,
+              "started_at": "2026-10-23T15:12:01Z",
+              "completed_at": "2026-10-23T15:12:01Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 60,
+              "started_at": "2026-10-23T15:12:01Z",
+              "completed_at": "2026-10-23T15:12:02Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 61,
+              "started_at": "2026-10-23T15:12:02Z",
+              "completed_at": "2026-10-23T15:12:02Z"
+            }
+          ]
+        },
+        {
+          "id": 120488713237,
+          "name": "official-interop (macos-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447341/job/120488713237",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-23T15:06:50Z",
+              "completed_at": "2026-10-23T15:06:51Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-23T15:06:51Z",
+              "completed_at": "2026-10-23T15:06:54Z"
+            },
+            {
+              "name": "Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-23T15:06:54Z",
+              "completed_at": "2026-10-23T15:06:55Z"
+            },
+            {
+              "name": "Install test certificate library",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-23T15:06:55Z",
+              "completed_at": "2026-10-23T15:06:57Z"
+            },
+            {
+              "name": "Install Rust",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-23T15:06:57Z",
+              "completed_at": "2026-10-23T15:07:04Z"
+            },
+            {
+              "name": "Build native clients and Core harness",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-23T15:07:04Z",
+              "completed_at": "2026-10-23T15:07:50Z"
+            },
+            {
+              "name": "Download pinned official Xray peers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-23T15:07:50Z",
+              "completed_at": "2026-10-23T15:07:52Z"
+            },
+            {
+              "name": "Download pinned Hysteria and TUIC server peers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-23T15:07:52Z",
+              "completed_at": "2026-10-23T15:07:53Z"
+            },
+            {
+              "name": "Download pinned official Shadowsocks server peer",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-23T15:07:53Z",
+              "completed_at": "2026-10-23T15:07:55Z"
+            },
+            {
+              "name": "Measure and prepare disposable runner UDP prerequisites",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-23T15:07:55Z",
+              "completed_at": "2026-10-23T15:07:56Z"
+            },
+            {
+              "name": "Set native client and evidence paths",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-10-23T15:07:56Z",
+              "completed_at": "2026-10-23T15:07:56Z"
+            },
+            {
+              "name": "VMess official Xray data and completed-response closure",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-23T15:07:56Z",
+              "completed_at": "2026-10-23T15:08:08Z"
+            },
+            {
+              "name": "Hysteria2 official server including retained limitation probes",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-10-23T15:08:08Z",
+              "completed_at": "2026-10-23T15:08:29Z"
+            },
+            {
+              "name": "Hysteria2 original 17 methods with a measured 1 MiB main stack",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 14,
+              "started_at": "2026-10-23T15:08:29Z",
+              "completed_at": "2026-10-23T15:08:29Z"
+            },
+            {
+              "name": "Hysteria2 real future cancellation cleanup and same-runtime reconnect",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-23T15:08:29Z",
+              "completed_at": "2026-10-23T15:08:33Z"
+            },
+            {
+              "name": "Hysteria2 cancellation cleanup with a measured 1 MiB main stack",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 16,
+              "started_at": "2026-10-23T15:08:33Z",
+              "completed_at": "2026-10-23T15:08:33Z"
+            },
+            {
+              "name": "Require original Hysteria2 methods and lifecycle evidence on this runner",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-10-23T15:08:33Z",
+              "completed_at": "2026-10-23T15:08:33Z"
+            },
+            {
+              "name": "TUIC historical official reference including retained limitation probe",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-10-23T15:08:33Z",
+              "completed_at": "2026-10-23T15:08:46Z"
+            },
+            {
+              "name": "Native Core ingress TCP UDP DNS HTTPS and node switching",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-10-23T15:08:46Z",
+              "completed_at": "2026-10-23T15:09:08Z"
+            },
+            {
+              "name": "Dynamically loaded C ABI library through official QUIC peers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-10-23T15:09:08Z",
+              "completed_at": "2026-10-23T15:09:33Z"
+            },
+            {
+              "name": "Phase timing and authentication semantics through C ABI and official peers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-10-23T15:09:33Z",
+              "completed_at": "2026-10-23T15:09:35Z"
+            },
+            {
+              "name": "Imported Xray V2Ray transport configs through ordinary Core start",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 22,
+              "started_at": "2026-10-23T15:09:35Z",
+              "completed_at": "2026-10-23T15:09:45Z"
+            },
+            {
+              "name": "VLESS and Trojan UDP through official Xray",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-10-23T15:09:45Z",
+              "completed_at": "2026-10-23T15:10:03Z"
+            },
+            {
+              "name": "Shadowsocks 2022 official data and replay rejection",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-10-23T15:10:03Z",
+              "completed_at": "2026-10-23T15:10:11Z"
+            },
+            {
+              "name": "HTTP and SOCKS authentication TCP UDP and import through official Xray",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 25,
+              "started_at": "2026-10-23T15:10:11Z",
+              "completed_at": "2026-10-23T15:10:19Z"
+            },
+            {
+              "name": "REALITY Rustls through production Core and official Xray",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-10-23T15:10:19Z",
+              "completed_at": "2026-10-23T15:10:24Z"
+            },
+            {
+              "name": "REALITY Chrome133 through production Core and official Xray",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-10-23T15:10:24Z",
+              "completed_at": "2026-10-23T15:10:28Z"
+            },
+            {
+              "name": "Vision Rustls TLS13 Direct and authenticated closure",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 28,
+              "started_at": "2026-10-23T15:10:28Z",
+              "completed_at": "2026-10-23T15:10:35Z"
+            },
+            {
+              "name": "Vision Chrome133 TLS13 Direct and authenticated closure",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 29,
+              "started_at": "2026-10-23T15:10:35Z",
+              "completed_at": "2026-10-23T15:10:42Z"
+            },
+            {
+              "name": "Upload actual interoperability receipts",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 30,
+              "started_at": "2026-10-23T15:10:42Z",
+              "completed_at": "2026-10-23T15:10:44Z"
+            },
+            {
+              "name": "Post Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 59,
+              "started_at": "2026-10-23T15:10:44Z",
+              "completed_at": "2026-10-23T15:10:44Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 60,
+              "started_at": "2026-10-23T15:10:44Z",
+              "completed_at": "2026-10-23T15:10:44Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 61,
+              "started_at": "2026-10-23T15:10:44Z",
+              "completed_at": "2026-10-23T15:10:46Z"
+            }
+          ]
+        },
+        {
+          "id": 120488713352,
+          "name": "native-protocols (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447341/job/120488713352",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-23T15:06:50Z",
+              "completed_at": "2026-10-23T15:06:50Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-23T15:06:50Z",
+              "completed_at": "2026-10-23T15:06:52Z"
+            },
+            {
+              "name": "Install Rust tools",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-23T15:06:52Z",
+              "completed_at": "2026-10-23T15:07:02Z"
+            },
+            {
+              "name": "Format",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-23T15:07:02Z",
+              "completed_at": "2026-10-23T15:07:03Z"
+            },
+            {
+              "name": "Check",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-23T15:07:03Z",
+              "completed_at": "2026-10-23T15:07:31Z"
+            },
+            {
+              "name": "Clippy",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-23T15:07:31Z",
+              "completed_at": "2026-10-23T15:07:40Z"
+            },
+            {
+              "name": "Unit and local network tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-23T15:07:40Z",
+              "completed_at": "2026-10-23T15:08:33Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-10-23T15:08:33Z",
+              "completed_at": "2026-10-23T15:08:33Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-23T15:08:33Z",
+              "completed_at": "2026-10-23T15:08:33Z"
+            }
+          ]
+        }
+      ],
+      "39975447386": [
+        {
+          "id": 120489091635,
+          "name": "Complete Qt product and native loader / macos-14",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447386/job/120489091635",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-23T15:07:35Z",
+              "completed_at": "2026-10-23T15:07:39Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-23T15:07:39Z",
+              "completed_at": "2026-10-23T15:07:44Z"
+            },
+            {
+              "name": "Install native Rust toolchain",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-23T15:07:44Z",
+              "completed_at": "2026-10-23T15:07:51Z"
+            },
+            {
+              "name": "Linux Qt build dependencies",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 4,
+              "started_at": "2026-10-23T15:07:51Z",
+              "completed_at": "2026-10-23T15:07:51Z"
+            },
+            {
+              "name": "Install Qt 6.11.3 SDK",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-23T15:07:51Z",
+              "completed_at": "2026-10-23T15:08:05Z"
+            },
+            {
+              "name": "Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-23T15:08:05Z",
+              "completed_at": "2026-10-23T15:08:05Z"
+            },
+            {
+              "name": "Configure the complete production Qt application",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-23T15:08:05Z",
+              "completed_at": "2026-10-23T15:08:13Z"
+            },
+            {
+              "name": "Build C++ QML product and paired native library",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-23T15:08:13Z",
+              "completed_at": "2026-10-23T15:12:50Z"
+            },
+            {
+              "name": "Configure actual dynamic loader regression",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-23T15:12:50Z",
+              "completed_at": "2026-10-23T15:12:53Z"
+            },
+            {
+              "name": "Build actual native loader and malformed-library fixtures",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-23T15:12:53Z",
+              "completed_at": "2026-10-23T15:13:03Z"
+            },
+            {
+              "name": "Execute native ABI and library identity tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-10-23T15:13:03Z",
+              "completed_at": "2026-10-23T15:13:03Z"
+            },
+            {
+              "name": "Run the actual product HTTP SOCKS5 CONNECT and cleanup self-test",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-23T15:13:03Z",
+              "completed_at": "2026-10-23T15:13:05Z"
+            },
+            {
+              "name": "Preserve complete product and loader evidence",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-10-23T15:13:05Z",
+              "completed_at": "2026-10-23T15:13:06Z"
+            },
+            {
+              "name": "Post Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-10-23T15:13:06Z",
+              "completed_at": "2026-10-23T15:13:06Z"
+            },
+            {
+              "name": "Post Install Qt 6.11.3 SDK",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 25,
+              "started_at": "2026-10-23T15:13:06Z",
+              "completed_at": "2026-10-23T15:13:06Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-10-23T15:13:06Z",
+              "completed_at": "2026-10-23T15:13:07Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-10-23T15:13:07Z",
+              "completed_at": "2026-10-23T15:13:09Z"
+            }
+          ]
+        },
+        {
+          "id": 120489091941,
+          "name": "windows-product",
+          "status": "completed",
+          "conclusion": "failure",
+          "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447386/job/120489091941",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-23T15:07:35Z",
+              "completed_at": "2026-10-23T15:07:38Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-23T15:07:38Z",
+              "completed_at": "2026-10-23T15:07:45Z"
+            },
+            {
+              "name": "Initialize isolated product test directory on the runner",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-23T15:07:45Z",
+              "completed_at": "2026-10-23T15:07:45Z"
+            },
+            {
+              "name": "Run ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-23T15:07:45Z",
+              "completed_at": "2026-10-23T15:07:51Z"
+            },
+            {
+              "name": "Rust MSVC x64",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-23T15:07:51Z",
+              "completed_at": "2026-10-23T15:08:09Z"
+            },
+            {
+              "name": "Run jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-23T15:08:09Z",
+              "completed_at": "2026-10-23T15:08:45Z"
+            },
+            {
+              "name": "Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-23T15:08:45Z",
+              "completed_at": "2026-10-23T15:08:45Z"
+            },
+            {
+              "name": "Install the independent TLS fixture dependency",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-23T15:08:45Z",
+              "completed_at": "2026-10-23T15:08:51Z"
+            },
+            {
+              "name": "Configure isolated Qt integration tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-23T15:08:51Z",
+              "completed_at": "2026-10-23T15:09:23Z"
+            },
+            {
+              "name": "Build product, subscription, telemetry, stream, security and loader regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-23T15:09:23Z",
+              "completed_at": "2026-10-23T15:22:54Z"
+            },
+            {
+              "name": "Deploy test dependencies and inspect PE imports",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-10-23T15:22:54Z",
+              "completed_at": "2026-10-23T15:22:57Z"
+            },
+            {
+              "name": "Windows native product and subscription regression",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-23T15:22:57Z",
+              "completed_at": "2026-10-23T15:25:16Z"
+            },
+            {
+              "name": "Actual Windows Qt import, DPAPI restore, selection and routing",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-10-23T15:25:16Z",
+              "completed_at": "2026-10-23T15:25:22Z"
+            },
+            {
+              "name": "Configure separate production Release without test entry points",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-10-23T15:25:22Z",
+              "completed_at": "2026-10-23T15:25:35Z"
+            },
+            {
+              "name": "Build the real production executable and paired DLL",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-23T15:25:35Z",
+              "completed_at": "2026-10-23T15:33:46Z"
+            },
+            {
+              "name": "Require the product DLL to equal the tested exact-source DLL",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-10-23T15:33:46Z",
+              "completed_at": "2026-10-23T15:33:47Z"
+            },
+            {
+              "name": "Clean directory and actual Swirl.exe roundtrips",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-10-23T15:33:47Z",
+              "completed_at": "2026-10-23T15:33:50Z"
+            },
+            {
+              "name": "Negative packaged DLL gate",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-10-23T15:33:50Z",
+              "completed_at": "2026-10-23T15:33:50Z"
+            },
+            {
+              "name": "Start actual Qt UI twice with one isolated cache",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-10-23T15:33:50Z",
+              "completed_at": "2026-10-23T15:34:17Z"
+            },
+            {
+              "name": "Build candidate installer and portable archive",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-10-23T15:34:17Z",
+              "completed_at": "2026-10-23T15:35:35Z"
+            },
+            {
+              "name": "Windows native public Internet requests",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 21,
+              "started_at": "2026-10-23T15:35:35Z",
+              "completed_at": "2026-10-23T15:36:18Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 22,
+              "started_at": "2026-10-23T15:36:18Z",
+              "completed_at": "2026-10-23T15:36:19Z"
+            },
+            {
+              "name": "Preserve candidate package for review (not a release)",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-10-23T15:36:19Z",
+              "completed_at": "2026-10-23T15:36:24Z"
+            },
+            {
+              "name": "Post Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 44,
+              "started_at": "2026-10-23T15:36:24Z",
+              "completed_at": "2026-10-23T15:36:24Z"
+            },
+            {
+              "name": "Post Run jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 45,
+              "started_at": "2026-10-23T15:36:24Z",
+              "completed_at": "2026-10-23T15:36:24Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 46,
+              "started_at": "2026-10-23T15:36:24Z",
+              "completed_at": "2026-10-23T15:36:26Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 47,
+              "started_at": "2026-10-23T15:36:26Z",
+              "completed_at": "2026-10-23T15:36:26Z"
+            }
+          ]
+        },
+        {
+          "id": 120489092131,
+          "name": "rust",
+          "status": "completed",
+          "conclusion": "failure",
+          "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447386/job/120489092131",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-23T15:07:39Z",
+              "completed_at": "2026-10-23T15:07:40Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-23T15:07:40Z",
+              "completed_at": "2026-10-23T15:07:42Z"
+            },
+            {
+              "name": "Run rustup toolchain install stable --profile minimal --component rustfmt --component clippy",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-23T15:07:42Z",
+              "completed_at": "2026-10-23T15:07:53Z"
+            },
+            {
+              "name": "Rust workspace gates",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-23T15:07:53Z",
+              "completed_at": "2026-10-23T15:11:49Z"
+            },
+            {
+              "name": "Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-23T15:11:49Z",
+              "completed_at": "2026-10-23T15:11:49Z"
+            },
+            {
+              "name": "Independent proxy and failure tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-23T15:11:49Z",
+              "completed_at": "2026-10-23T15:12:56Z"
+            },
+            {
+              "name": "Public Internet through authenticated Rust Shadowsocks",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 7,
+              "started_at": "2026-10-23T15:12:56Z",
+              "completed_at": "2026-10-23T15:12:57Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-23T15:12:57Z",
+              "completed_at": "2026-10-23T15:12:58Z"
+            },
+            {
+              "name": "Post Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 15,
+              "started_at": "2026-10-23T15:12:58Z",
+              "completed_at": "2026-10-23T15:12:58Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-10-23T15:12:58Z",
+              "completed_at": "2026-10-23T15:12:58Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-10-23T15:12:58Z",
+              "completed_at": "2026-10-23T15:12:58Z"
+            }
+          ]
+        },
+        {
+          "id": 120489092259,
+          "name": "Complete Qt product and native loader / ubuntu-24.04",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447386/job/120489092259",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-23T15:07:39Z",
+              "completed_at": "2026-10-23T15:07:42Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-23T15:07:42Z",
+              "completed_at": "2026-10-23T15:07:47Z"
+            },
+            {
+              "name": "Install native Rust toolchain",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-23T15:07:47Z",
+              "completed_at": "2026-10-23T15:07:56Z"
+            },
+            {
+              "name": "Linux Qt build dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-23T15:07:56Z",
+              "completed_at": "2026-10-23T15:09:12Z"
+            },
+            {
+              "name": "Install Qt 6.11.3 SDK",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-23T15:09:12Z",
+              "completed_at": "2026-10-23T15:13:25Z"
+            },
+            {
+              "name": "Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-23T15:13:25Z",
+              "completed_at": "2026-10-23T15:13:26Z"
+            },
+            {
+              "name": "Configure the complete production Qt application",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-23T15:13:26Z",
+              "completed_at": "2026-10-23T15:13:28Z"
+            },
+            {
+              "name": "Build C++ QML product and paired native library",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-23T15:13:28Z",
+              "completed_at": "2026-10-23T15:19:13Z"
+            },
+            {
+              "name": "Configure actual dynamic loader regression",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-23T15:19:13Z",
+              "completed_at": "2026-10-23T15:19:14Z"
+            },
+            {
+              "name": "Build actual native loader and malformed-library fixtures",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-23T15:19:14Z",
+              "completed_at": "2026-10-23T15:19:28Z"
+            },
+            {
+              "name": "Execute native ABI and library identity tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-10-23T15:19:28Z",
+              "completed_at": "2026-10-23T15:19:28Z"
+            },
+            {
+              "name": "Run the actual product HTTP SOCKS5 CONNECT and cleanup self-test",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-23T15:19:28Z",
+              "completed_at": "2026-10-23T15:19:29Z"
+            },
+            {
+              "name": "Preserve complete product and loader evidence",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-10-23T15:19:29Z",
+              "completed_at": "2026-10-23T15:19:30Z"
+            },
+            {
+              "name": "Post Run actions/setup-python@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-10-23T15:19:30Z",
+              "completed_at": "2026-10-23T15:19:31Z"
+            },
+            {
+              "name": "Post Install Qt 6.11.3 SDK",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 25,
+              "started_at": "2026-10-23T15:19:31Z",
+              "completed_at": "2026-10-23T15:19:31Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-10-23T15:19:31Z",
+              "completed_at": "2026-10-23T15:19:31Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-10-23T15:19:31Z",
+              "completed_at": "2026-10-23T15:19:31Z"
+            }
+          ]
+        }
+      ]
+    },
+    "artifacts": {
+      "39975447359": [
+        {
+          "id": 12511548513,
+          "name": "U1-Windows-Qt-nine-fixtures-3c1fdf29cdb847c59680778efd74eb73a727a7fc-1",
+          "size_in_bytes": 89323,
+          "expired": false,
+          "digest": "sha256:16832842875d85afaffb47fb061abfdb90df994a15c91982b45a2b148e516ecd",
+          "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12511548513/zip"
+        }
+      ],
+      "39975447372": [
+        {
+          "id": 12511716432,
+          "name": "U1-retained-network-Linux-3c1fdf29cdb847c59680778efd74eb73a727a7fc-1",
+          "size_in_bytes": 309831,
+          "expired": false,
+          "digest": "sha256:ad07cf3278d6649e58a5f4325bbce649ae0f9b45d7f1ddf9ddf344044baa86a8",
+          "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12511716432/zip"
+        },
+        {
+          "id": 12511622510,
+          "name": "U1-retained-network-Windows-3c1fdf29cdb847c59680778efd74eb73a727a7fc-1",
+          "size_in_bytes": 253045,
+          "expired": false,
+          "digest": "sha256:f57dac76c1d584430749463004c6de75388a83e503805df8c7cc3c7b23647396",
+          "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12511622510/zip"
+        },
+        {
+          "id": 12511112541,
+          "name": "U1-retained-network-macOS-3c1fdf29cdb847c59680778efd74eb73a727a7fc-1",
+          "size_in_bytes": 251613,
+          "expired": false,
+          "digest": "sha256:49d18a51bed885e2c9ebf860c11e225211ade865240b94c8d98f45e7e5162b9f",
+          "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12511112541/zip"
+        }
+      ],
+      "39975447333": [
+        {
+          "id": 12511705493,
+          "name": "R1-review-source-3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+          "size_in_bytes": 13329263,
+          "expired": false,
+          "digest": "sha256:0e011c671639f3adad073b90175f95f645fcb7803ccf03333b412c88f885eec7",
+          "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12511705493/zip"
+        }
+      ],
+      "39975447341": [
+        {
+          "id": 12511007726,
+          "name": "native-protocol-interop-windows-latest-3c1fdf29cdb847c59680778efd74eb73a727a7fc-1",
+          "size_in_bytes": 286529,
+          "expired": false,
+          "digest": "sha256:424042e97928e434697038b179dc67da4947f2b031ea7e00a0b65593b0e8ee31",
+          "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12511007726/zip"
+        },
+        {
+          "id": 12510803330,
+          "name": "native-protocol-interop-ubuntu-latest-3c1fdf29cdb847c59680778efd74eb73a727a7fc-1",
+          "size_in_bytes": 289675,
+          "expired": false,
+          "digest": "sha256:ae3c48102fd3ac963611d4f838967f3aa945a895c3ffe7f951fc8160a0d1cff1",
+          "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12510803330/zip"
+        },
+        {
+          "id": 12510733670,
+          "name": "native-protocol-interop-macos-latest-3c1fdf29cdb847c59680778efd74eb73a727a7fc-1",
+          "size_in_bytes": 289359,
+          "expired": false,
+          "digest": "sha256:eb19ec943a92f283c8f2c9f55b14d96806f0c7f8835aa4ca42e5598d8456bbe7",
+          "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12510733670/zip"
+        }
+      ],
+      "39975447386": [
+        {
+          "id": 12512746961,
+          "name": "R1-Windows-evidence-3c1fdf29cdb847c59680778efd74eb73a727a7fc-1",
+          "size_in_bytes": 88458,
+          "expired": false,
+          "digest": "sha256:67d75ec4b8a16f7551f34c08d518c41d93431bef0041a13997b70abf0737c66e",
+          "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12512746961/zip"
+        },
+        {
+          "id": 12512101417,
+          "name": "U1-Qt-Product-ubuntu-24.04-3c1fdf29cdb847c59680778efd74eb73a727a7fc-1",
+          "size_in_bytes": 4182,
+          "expired": false,
+          "digest": "sha256:8e6fed9a32e50d3bacd53ab07d2b4ab34891ce018012ece32d28d41b8ef52a0c",
+          "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12512101417/zip"
+        },
+        {
+          "id": 12511774885,
+          "name": "Swirl-Rust-Windows-x64-candidate-3c1fdf29cdb847c59680778efd74eb73a727a7fc-1",
+          "size_in_bytes": 168678481,
+          "expired": false,
+          "digest": "sha256:e6eb8a4f90b666d749a3e4d1c6eaacd1d185c40b983c93986f800f7225b3dad6",
+          "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12511774885/zip"
+        },
+        {
+          "id": 12511402107,
+          "name": "R1-native-3c1fdf29cdb847c59680778efd74eb73a727a7fc-1",
+          "size_in_bytes": 2978,
+          "expired": false,
+          "digest": "sha256:0f4cc5fe8c61a75f82d802abcad98a466fd15283606528b8bb73287f125fb183",
+          "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12511402107/zip"
+        },
+        {
+          "id": 12510734082,
+          "name": "U1-Qt-Product-macos-14-3c1fdf29cdb847c59680778efd74eb73a727a7fc-1",
+          "size_in_bytes": 4150,
+          "expired": false,
+          "digest": "sha256:969b0570fe823edff37d3554cb66052fc2d549dc2e858b0164493a59275255ef",
+          "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12510734082/zip"
+        }
+      ]
+    },
+    "all_completed": true
+  },
+  "log_hashes": {
+    "rust-workspace-3c1.log": "9c267eb57db35d7043abbc1a8b4eee416dc3c0aa0f12c1f4c77f38246fbfbb00",
+    "native-3c1.log": "c9255cece3f36b2866776853891a0ad5c9d8d8ad3cc1bf16d0086b6bed829b9e",
+    "vmess-strict-3c1.log": "0e75d4a074f22f328256899908e6b5ed869121094a39485ce945425df99c2f75",
+    "ctest-3c1.log": "b146c110ed6910a6f3ca14663600e7230f17b76185e837eadbca529b6e544107",
+    "import-3c1.log": "57a054db65d6ab81d73a3b23560aab59a151e6d12845345a56455aa98990a2d7"
+  },
+  "historical_regression_logs": {
+    "quic-shutdown-before.log": {
+      "sha256": "05609a11ad38e1ce1bd1b84001a463de706277ef5d215339e50980ee5903c19c",
+      "scope": "61f9458 production code plus new regression tests: 0 pass / 2 fail"
+    },
+    "quic-shutdown-after.log": {
+      "sha256": "05e2784e1578989153ef3798a42234228886877fe5ec3b09b72e234c62530d81",
+      "scope": "working tree subsequently committed as 3c1fdf2: 2 pass / 0 fail"
+    }
+  }
+}

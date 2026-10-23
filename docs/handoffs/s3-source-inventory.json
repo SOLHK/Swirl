@@ -107,5 +107,19 @@
     "b88bb978d31fad1865e1b648cecd4f230bc3487c",
     "bf40f6dd639b0a9583a0dbea8e50851ac0c9ed29",
     "6760b492ccfea1e6db835932badd8954cb33bb71"
-  ]
+  ],
+  "freeze_recheck": {
+    "source_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+    "all_eight_source_heads_unchanged": true,
+    "refs": {
+      "refs/heads/work/core-rule-routing-20261021": "b6dce3a415619c2c3b107fe7b761f63727da11b2",
+      "refs/heads/work/qt-http2-security-20261023": "9dd8a675eed6374ac1c35265074f594a39262479",
+      "refs/heads/work/rust-core-full-replacement-20261022": "5d96214ac80d63985cdccf4942c3c1d79035e793",
+      "refs/heads/work/rust-native-protocols-x14a-20261022": "2a41b360d0fed90bf2818d5e4c8e93b4f41f021b",
+      "refs/heads/work/subscription-native-bridge-20261023": "442138a3d40fc13a9a761b43f3a2ce829a2b47ec",
+      "refs/heads/work/subscription-unified-integration-20261023": "384dfe7d15a6f37e206f6db0e4768fa07d4f717d",
+      "refs/heads/work/u1-public-close-diagnostic-20261023": "5ae6b88270193fc40c3a08d871031b050fc500f2",
+      "refs/heads/work/ui-window-node-performance-20261023": "7056dea1c920cee57208c1aae54b3550a850f758"
+    }
+  }
 }
