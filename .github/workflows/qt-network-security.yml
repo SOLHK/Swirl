@@ -63,6 +63,8 @@ jobs:
           host: ${{ matrix.host }}
           target: desktop
           arch: ${{ matrix.arch }}
+          # aqt 3.3.0 cannot resolve Qt >= 6.11 Windows repository directories.
+          aqtsource: ${{ runner.os == 'Windows' && matrix.qt-version == '6.11.3' && 'git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b' || '' }}
           cache: true
       - uses: actions/setup-python@v5
         with:
@@ -133,6 +135,8 @@ jobs:
           host: windows
           target: desktop
           arch: win64_msvc2022_64
+          # Pinned upstream PR #1000; retain the officially fixed Qt SDK.
+          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b'
           modules: qtshadertools
           cache: true
       - uses: actions/setup-python@v5

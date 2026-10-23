@@ -130,7 +130,8 @@ private slots:
    connect(socket,&QTcpSocket::readyRead,&origin,[&,socket]{request+=socket->readAll();});
    request+=socket->readAll();
   });
-  EngineStartOptions options;ProxyNode node;node.id="timing-fixture";node.name="Timing fixture";node.protocol="socks5";node.host="127.0.0.1";node.port=net.a.serverPort();options.nodes={node};
+  EngineStartOptions options;ProxyNode node;node.id=QUuid::createUuid().toString(QUuid::WithoutBraces);node.name="Timing fixture";node.protocol="socks5";node.host="127.0.0.1";node.port=net.a.serverPort();options.nodes={node};
+  const auto validation=ProxyNode::validate(node);QVERIFY2(validation.isEmpty(),qPrintable(validation));
   NodeTestService probes;const QUrl url(QString("http://127.0.0.1:%1/timing").arg(origin.serverPort()));
   probes.start(options,{node.id},url);QTRY_VERIFY_WITH_TIMEOUT(request.contains("\r\n\r\n"),5000);
   QVERIFY(request.startsWith("HEAD /timing HTTP/1.1"));QElapsedTimer headerDelay;headerDelay.start();QTest::qWait(100);

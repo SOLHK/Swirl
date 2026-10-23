@@ -64,12 +64,18 @@ jobs:
       QT_QPA_PLATFORM: offscreen
       QT_QUICK_BACKEND: software
       QT_FORCE_STDERR_LOGGING: '1'
-      SWIRL_TEST_ROOT: ${{ runner.temp }}/u1-product-tests
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Initialize isolated product test directory on the runner
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $u1TestRoot = Join-Path $env:RUNNER_TEMP 'u1-product-tests'
+          New-Item -ItemType Directory -Force -Path $u1TestRoot | Out-Null
+          "SWIRL_TEST_ROOT=$u1TestRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
@@ -81,6 +87,8 @@ jobs:
           host: windows
           target: desktop
           arch: win64_msvc2022_64
+          # Upstream aqt PR #1000 supports Qt 6.11's Windows per-architecture repositories.
+          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b'
           modules: qtshadertools
           cache: true
       - uses: actions/setup-python@v5
@@ -107,6 +115,22 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Rust dependency inspection failed.' }
       - name: Windows native product and subscription regression
         run: ctest --test-dir build/r1-tests -C Release -R "^swirl-(rust-library-loader|rust-qt-integration|node-real-chain|node-ui|engine-ui|stream-regression|import-subscription|import-boundaries|subscription-formats|telemetry-accounting|diagnostic-export|qt-network-policy|capture-network)$" --output-on-failure --no-tests=error
+      - name: Actual Windows Qt import, DPAPI restore, selection and routing
+        env:
+          SWIRL_RUST_QT_TESTS: ${{ github.workspace }}/build/r1-tests/Release/SwirlRustCoreTests.exe
+          SWIRL_PRODUCT_EVIDENCE: ${{ github.workspace }}/build/r1-tests/product-chain
+        shell: python
+        run: |
+          import json, os, pathlib, subprocess, sys
+          binary = pathlib.Path(os.environ['SWIRL_RUST_QT_TESTS'])
+          if not binary.is_file():
+              raise SystemExit('Required Windows product Qt executable missing')
+          subprocess.run([sys.executable, 'tools/tests/test_product_subscription_chain.py',
+                          'ProductQtIntegration', '-v'], check=True)
+          report = json.loads((pathlib.Path(os.environ['SWIRL_PRODUCT_EVIDENCE']) / 'result.json').read_text(encoding='utf-8'))
+          if (report['source_sha'] != os.environ['SWIRL_SOURCE_SHA'] or report['tests'] != 1
+                  or report['failures'] or report['errors'] or report['skipped'] or not report['success']):
+              raise SystemExit('Windows Qt subscription chain did not pass on the exact source without skips')
       - name: Configure separate production Release without test entry points
         run: cmake -S src/Swirl.Quick -B build/r1-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=OFF -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
       - name: Build the real production executable and paired DLL
@@ -189,6 +213,7 @@ jobs:
             build/r1-tests/stream-regression.txt
             build/r1-tests/swirl-rust-build.json
             build/r1-tests/rust-*.txt
+            build/r1-tests/product-chain
             build/r1-product/r1-missing-dll.json
             build/r1-product/public-proxy.json
             dist/Swirl-Rust-x64/rust-self-test.json

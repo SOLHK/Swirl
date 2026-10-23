@@ -197,3 +197,49 @@ Windows DPAPI only. Linux/macOS reject persistence instead of writing secrets
 in plaintext. Building those products and passing native/network tests does not
 close their persistent UI import/restart loop. This is remaining code work,
 not a physical-device validation item.
+
+## U1-D/F2: route regression, package observation and first CI corrections
+
+The U1 transport workflow now executes 131 additional existing Python cases:
+DoT, DoH, negative DNS cases, answer/connection routing policy, subscription
+import, diagnostics, streaming/half-close fixtures and the Rust product chain.
+It requires every discovered case to run with no skips or failures and records
+the full source SHA and built binary hashes. Windows product CI additionally
+executes the existing four-protocol Qt subscription/DPAPI/routing fixture.
+The bundled MRS package policy is checked in the Windows packaging guard.
+
+Read-only Core observation from the five core-completion source commits is
+selectively integrated. Current paired-package manifests, EXE/DLL/metadata/rule
+hashes and expected source SHA are checked; historical package formats remain
+diagnosable, and mixing formats is rejected. The tools do not start an external
+proxy, change system settings, install a background launcher or claim that a
+TCP snapshot proves DNS/QUIC routing. Monitoring defaults to one explicit manual
+sample. The separate monitor installer is excluded. See the full source and
+patch-ID audit in [U1-observation-source-audit.md](U1-observation-source-audit.md).
+All 36 package-identity/negative fixtures ran successfully in local PowerShell
+7.6.6 before this checkpoint; Windows PowerShell 5.1/7 run on the same pushed SHA.
+
+The first U1 CI at `748040cb84f4a71d79a99cc50ab3807f828b6351` found two
+startup defects. The R1 workflow used the unavailable `runner` context in a
+job-level environment declaration; its test directory is now created inside a
+PowerShell step. Qt 6.11.3 Windows changed repository layout, which aqt 3.3.0
+does not recognize. Windows installs now pin the upstream merged fix at
+`miurahr/aqtinstall@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b` through the
+action's supported `aqtsource` input. The requested SDK remains 6.11.3. These
+fixes require new-SHA remote execution before being called successful.
+
+Local full-product compilation succeeded with Qt 6.10.3. The full Qt regression
+exposed 28 RustCoreTests and one stream-test failure at non-Windows encrypted
+catalogue writes (DPAPI is not implemented there); these are real product gaps,
+not passing tests. Another timing fixture had an invalid non-UUID node ID and
+was rejected before networking. The fixture now uses a valid UUID and explicitly
+asserts production validation; its real SOCKS/HEAD timing and HTTP error checks
+pass. No production validation or timing assertion was weakened.
+
+A second GitHub API snapshot found 47 branches: all 45 original source heads
+are unchanged, plus U1 and a new Activity V7 visual branch. The new branch's
+three unique commits were inspected and excluded under the user's visual-work
+boundary. See [U1-source-recheck.json](U1-source-recheck.json). Source inclusion,
+checkpoint tests, CI builds, independent-peer traffic and physical Windows use
+remain separate evidence categories. None of these checkpoint results is final
+U1 acceptance.

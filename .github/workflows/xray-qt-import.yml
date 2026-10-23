@@ -66,6 +66,8 @@ jobs:
           host: ${{ matrix.qt-host }}
           target: desktop
           arch: ${{ matrix.qt-arch }}
+          # Pinned upstream aqt PR #1000 resolves Qt 6.11's Windows repository layout.
+          aqtsource: ${{ runner.os == 'Windows' && 'git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b' || '' }}
           modules: qtshadertools
           cache: true
       # The Qt action installs its own Python and changes PATH. Pin the

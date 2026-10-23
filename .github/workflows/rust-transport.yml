@@ -12,7 +12,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 40
     env:
       SWIRL_SOURCE_SHA: ${{ github.sha }}
     steps:
@@ -31,9 +31,22 @@ jobs:
       - name: Clippy
         working-directory: core
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - name: Unit and local network tests
+      - name: Workspace tests including real MRS assets and live routing
         working-directory: core
-        run: cargo test --workspace --locked
+        shell: python
+        run: |
+          import os, pathlib, subprocess, sys
+          folder = pathlib.Path(os.environ['RUNNER_TEMP']) / 'transport-evidence'
+          folder.mkdir(parents=True, exist_ok=True)
+          with (folder / 'workspace-tests.log').open('w', encoding='utf-8') as log:
+              with subprocess.Popen(['cargo', 'test', '--workspace', '--locked'],
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                    text=True, encoding='utf-8', errors='replace') as process:
+                  for line in process.stdout:
+                      print(line, end='', flush=True)
+                      log.write(line)
+                  status = process.wait()
+          sys.exit(status)
       - name: Build native binaries and dynamic library
         working-directory: core
         run: cargo build --release --workspace --lib --bins --examples --locked
@@ -42,6 +55,59 @@ jobs:
           python-version: '3.14'
       - name: Install synthetic certificate dependency
         run: python -m pip install cryptography==50.0.2
+      - name: Real DNS, routing policies and imported subscription traffic
+        env:
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api${{ runner.os == 'Windows' && '.exe' || '' }}
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect${{ runner.os == 'Windows' && '.exe' || '' }}
+          SWIRL_RUST_DIAGNOSTIC: ${{ github.workspace }}/core/target/release/swirl-diagnose${{ runner.os == 'Windows' && '.exe' || '' }}
+        shell: python
+        run: |
+          import hashlib, io, json, os, pathlib, subprocess, sys, unittest
+          root = pathlib.Path.cwd()
+          sys.path.insert(0, str(root / 'tools/tests'))
+          folder = pathlib.Path(os.environ['RUNNER_TEMP']) / 'transport-evidence' / 'dns-routing'
+          folder.mkdir(parents=True, exist_ok=True)
+          source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          if source != os.environ['SWIRL_SOURCE_SHA']:
+              raise SystemExit('DNS/routing checkout does not match the required source SHA')
+          binaries = {}
+          for key in ('SWIRL_RUST_HARNESS', 'SWIRL_RUST_INSPECTOR', 'SWIRL_RUST_DIAGNOSTIC'):
+              path = pathlib.Path(os.environ[key])
+              if not path.is_file():
+                  raise SystemExit(f'Required native test executable missing: {key}')
+              binaries[key] = {'filename': path.name, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+          # The complete workspace command above also exercises MRS parsing,
+          # corrupted/missing packaged rules and actual DIRECT/proxy/reject sockets.
+          # Windows product Qt/DPAPI cases run in rust-replacement, using its
+          # deployed SwirlRustCoreTests executable; they are not skipped here.
+          suites = (
+              'test_dns_tls', 'test_dns_https', 'test_dns_negative',
+              'test_policy_groups', 'test_subscription_import',
+              'test_connectivity_diagnostics',
+              'test_product_subscription_chain.RelayHalfCloseChecks',
+              'test_product_subscription_chain.ProductChainIntegration',
+          )
+          reports = []
+          for name in suites:
+              suite = unittest.defaultTestLoader.loadTestsFromName(name)
+              expected = suite.countTestCases()
+              log = io.StringIO()
+              result = unittest.TextTestRunner(stream=log, verbosity=2).run(suite)
+              output = log.getvalue()
+              print(output, end='', flush=True)
+              (folder / (name + '.log')).write_text(output, encoding='utf-8')
+              reports.append({'suite': name, 'expected': expected, 'executed': result.testsRun,
+                              'failures': len(result.failures), 'errors': len(result.errors),
+                              'skipped': [{'test': str(test), 'reason': reason} for test, reason in result.skipped],
+                              'success': result.wasSuccessful() and not result.skipped
+                                         and expected > 0 and result.testsRun == expected})
+          report = {'source_sha': source, 'runner_os': os.environ['RUNNER_OS'],
+                    'platform': sys.platform, 'binaries': binaries, 'suites': reports,
+                    'scope': 'real loopback DNS/DoT/DoH, routing and imported Rust proxy traffic',
+                    'success': all(item['success'] for item in reports)}
+          (folder / 'result.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
+          if not report['success']:
+              raise SystemExit('DNS/routing regression failed or skipped a required case; see result.json')
       - name: Fetch independent pinned test servers
         run: python tools/Fetch-TransportPeers.py --output "${{ runner.temp }}/transport-peers"
       - name: Independent TCP and WebSocket Xray interoperability
