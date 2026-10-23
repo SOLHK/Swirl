@@ -1,0 +1,170 @@
+name: U1 public TLS close observations (diagnostic only)
+on:
+  push:
+    branches: [work/u1-public-close-diagnostic-20261023]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: u1-public-close-diagnostic-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  observe:
+    name: Collect origin close observations / ${{ matrix.os }}
+    if: github.ref == 'refs/heads/work/u1-public-close-diagnostic-20261023'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            python: '3.14'
+          - os: windows-2022
+            python: '3.12'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    env:
+      PRODUCT_SOURCE_SHA: 1cd5a84315360c007fcca16c14752d0bc82c9f32
+      DIAGNOSTIC_WORKFLOW_SHA: ${{ github.sha }}
+    steps:
+      - name: Check out the unchanged F4 product and strict close helpers
+        uses: actions/checkout@v4
+        with:
+          ref: 1cd5a84315360c007fcca16c14752d0bc82c9f32
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install the dependency required by the unchanged F4 helpers
+        run: python -m pip install cryptography==50.0.2
+      - name: Record all three bounded direct-origin observations
+        shell: python
+        run: |
+          import hashlib
+          import ipaddress
+          import json
+          import os
+          from pathlib import Path
+          import platform
+          import socket
+          import ssl
+          import subprocess
+          import sys
+          import time
+
+          root = Path.cwd()
+          expected = os.environ['PRODUCT_SOURCE_SHA']
+          source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          if source != expected or subprocess.check_output(['git', 'status', '--porcelain'], text=True).strip():
+              raise SystemExit('Diagnostic requires the unchanged pinned F4 source')
+          sys.path.insert(0, str(root / 'tools/tests'))
+          from test_r1_public_proxy import public_response, public_verifier, safe_error
+
+          host, port = 'www.gstatic.com', 443
+          variants = ('keep-alive', 'close', 'omitted')
+          helpers = ('tools/tests/test_r1_public_proxy.py', 'tools/Verify-PublicRustCore.py',
+                     'tools/tests/test_rust_core.py', 'tools/tests/test_product_subscription_chain.py',
+                     'tools/tests/test_shadowsocks.py')
+          report = {
+              'schema': 1, 'scope': 'direct-origin-close-contract-diagnostic-only',
+              'source_sha': source, 'diagnostic_workflow_sha': os.environ['DIAGNOSTIC_WORKFLOW_SHA'],
+              'source_helpers_sha256': {name: hashlib.sha256((root / name).read_bytes()).hexdigest()
+                                       for name in helpers},
+              'runner_os': os.environ.get('RUNNER_OS', platform.system()),
+              'platform': platform.platform(), 'python': platform.python_version(),
+              'openssl': ssl.OPENSSL_VERSION, 'host': host, 'port': port, 'path': '/generate_204',
+              'product_acceptance_evaluated': False, 'formal_proxy_gate_unchanged': True,
+              'environment_proxy_used': False, 'dns_attempts': 1,
+              'attempts_per_variant': 1, 'seconds_per_variant': 8, 'observations': [],
+          }
+          phase = 'source-dns'
+          started = time.monotonic()
+          try:
+              # A single bounded resolver invocation chooses one public address for
+              # every variant. No address retry, target substitution or proxy is used.
+              resolver = (
+                  'import json,socket\n'
+                  'rows=socket.getaddrinfo("www.gstatic.com",443,type=socket.SOCK_STREAM)\n'
+                  'print(json.dumps([(row[0],row[4][0]) for row in rows]))\n')
+              resolved = subprocess.run([sys.executable, '-c', resolver], capture_output=True,
+                                        text=True, timeout=8, check=True)
+              if len(resolved.stdout) > 16384:
+                  raise ValueError('DiagnosticDnsAnswerLimit')
+              candidates = []
+              for family, address in json.loads(resolved.stdout):
+                  if family not in (socket.AF_INET, socket.AF_INET6):
+                      continue
+                  if not ipaddress.ip_address(address).is_global:
+                      raise ValueError('DiagnosticNonPublicAddress')
+                  if (family, address) not in candidates:
+                      candidates.append((family, address))
+              candidates.sort(key=lambda item: item[0] != socket.AF_INET)
+              if not candidates:
+                  raise ValueError('DiagnosticNoPublicAddress')
+              family, address = candidates[0]
+              report['endpoint'] = {'address': address, 'family': family,
+                                    'candidate_count': len(candidates)}
+
+              for connection in variants:
+                  begin = time.monotonic()
+                  deadline = begin + 8
+                  observation = {'connection': connection, 'address': address,
+                                 'attempted': True, 'certificate_verified': False,
+                                 'strict_close_succeeded': False}
+                  stream = None
+                  stage = 'tcp'
+                  try:
+                      stream = socket.socket(family, socket.SOCK_STREAM)
+                      stream.settimeout(public_verifier.remaining(deadline, 8))
+                      stream.connect((address, port))
+                      stage = 'origin-tls'
+                      context = ssl.create_default_context()
+                      context.set_alpn_protocols(['http/1.1'])
+                      stream = context.wrap_socket(stream, server_hostname=host,
+                                                   do_handshake_on_connect=False,
+                                                   suppress_ragged_eofs=False)
+                      stream.settimeout(public_verifier.remaining(deadline, 8))
+                      stream.do_handshake()
+                      observation.update(certificate_verified=True, tls_version=stream.version(),
+                                         selected_alpn=stream.selected_alpn_protocol(),
+                                         peer_certificate_sha256=hashlib.sha256(
+                                             stream.getpeercert(binary_form=True)).hexdigest())
+                      stage = 'public-response'
+                      header = '' if connection == 'omitted' else 'Connection: ' + connection + '\r\n'
+                      request = 'GET /generate_204 HTTP/1.1\r\nHost: ' + host + '\r\n' + header + '\r\n'
+                      stream.settimeout(public_verifier.remaining(deadline, 8))
+                      stream.sendall(request.encode('ascii'))
+                      status, body = public_response(stream, deadline, 204, observation)
+                      observation.update(http_status=status, body_bytes=len(body),
+                                         body_sha256=hashlib.sha256(body).hexdigest())
+                      stage = 'origin-close'
+                      # Use the exact F4 certificate/framing/unwrap/TCP-close checks.
+                      # An EOF without close_notify remains a failed observation.
+                      public_verifier.close_https(stream, deadline)
+                      observation['strict_close_succeeded'] = True
+                      stage = 'complete'
+                  except Exception as error:
+                      observation['failure'] = safe_error(error)
+                  finally:
+                      if stream is not None:
+                          stream.close()
+                      observation.update(stage=stage, elapsed_ms=round((time.monotonic() - begin) * 1000))
+                      report['observations'].append(observation)
+              phase = 'complete'
+          except Exception as error:
+              report['collection_failure'] = {'stage': phase, 'error': safe_error(error)}
+          finally:
+              report['diagnostic_execution_complete'] = len(report['observations']) == len(variants)
+              report['elapsed_ms'] = round((time.monotonic() - started) * 1000)
+              output = Path(os.environ['RUNNER_TEMP']) / 'u1-public-close-diagnostic.json'
+              output.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
+              print(json.dumps(report, indent=2))
+          if not report['diagnostic_execution_complete']:
+              raise SystemExit('Diagnostic observations incomplete; see the retained report')
+          print('Observation collection completed. This job does not evaluate product acceptance.')
+      - name: Preserve every diagnostic observation and exact helper identity
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: U1-public-close-observations-${{ matrix.os }}-${{ github.sha }}
+          path: ${{ runner.temp }}/u1-public-close-diagnostic.json
+          if-no-files-found: error
