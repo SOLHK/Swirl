@@ -26,6 +26,14 @@
       "sha256": "c3bc73a22c1d74fac704c743bf99585e7622631b4270caccd2304e48f0f11be1"
     },
     {
+      "path": "src/Swirl.Quick/app/WindowEdge.cpp",
+      "sha256": "57414babe12e1d032765c0d7055a5b3e5aed209f91198c4ef2bce0a8a13a3220"
+    },
+    {
+      "path": "src/Swirl.Quick/app/WindowEdge.h",
+      "sha256": "2668c1a23baefd57c675f4ff6fd22cb7a10cdfebc3bf60693db8635a14f82779"
+    },
+    {
       "path": "src/Swirl.Quick/app/WindowsBackdrop.cpp",
       "sha256": "02b0ecfd64bb6c7154700084b294f81e82f42ab49ba6ede872c0361cbe0bf723"
     },
@@ -315,7 +323,13 @@
     },
     {
       "path": "src/Swirl.Quick/qml/pages/DNSPage.qml",
-      "sha256": "0c3d30757f242329dab09574a73918972b83420d87bda8eaec77ad9293c84cb5"
+      "sha256": "0c3d30757f242329dab09574a73918972b83420d87bda8eaec77ad9293c84cb5",
+      "allowed_replacements": [
+        {
+          "before": "engineController.rustCoreBuild?\"DNS 配置已保存；连接时由 Swirl Rust Core 校验，支持的设置才会应用\":\"DNS 配置已保存，连接时应用到 Mihomo\"",
+          "after": "\"DNS 配置已保存；连接时由 Swirl Rust Core 校验，支持的设置才会应用\""
+        }
+      ]
     },
     {
       "path": "src/Swirl.Quick/qml/pages/ExternalToolsPage.qml",

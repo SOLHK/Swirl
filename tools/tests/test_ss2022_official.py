@@ -219,7 +219,12 @@ class Ss2022OfficialTests(unittest.TestCase):
             log_path = self.evidence / f"{label}-server.log"
             log = log_path.open("w")
             command = [self.server, "--config", str(path), "--single-threaded", "-v"]
-            process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
+            # Readiness requires the child's own TCP and UDP bind receipts.
+            # Host RUST_LOG=warn/off overrides -v in the pinned peer and hides
+            # both receipts. Scope deterministic logging to this synthetic
+            # server; leave the user's environment and every assertion intact.
+            peer_env = dict(os.environ, RUST_LOG="info", NO_COLOR="1")
+            process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env=peer_env)
             startup = {"attempt": attempt + 1, "fixed_port": port is not None, "port": selected_port,
                        "log": log_path.name, "reason": "pending", "exit_code": None}
             peer = {"process": process, "log": log, "command": command, "host": listen, "port": selected_port,
@@ -255,6 +260,13 @@ class Ss2022OfficialTests(unittest.TestCase):
                 startup["reason"] = "StartupTimeout"
                 self.fail(f"official ssserver startup timed out; see {log_path.name}")
         self.fail("official ssserver exhausted its bounded bind attempts")
+
+    def test_peer_owned_bind_receipts_survive_disabled_ambient_logging(self):
+        from unittest.mock import patch
+        with patch.dict(os.environ, {"RUST_LOG": "off"}):
+            peer = self.peer("2022-blake3-aes-128-gcm")
+            self.assertEqual(os.environ["RUST_LOG"], "off")
+            self.assertEqual(peer["startup"]["reason"], "ready")
 
     def test_random_startup_port_conflict_reselects_before_protocol_traffic(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as occupied:

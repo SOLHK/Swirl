@@ -86,6 +86,12 @@ extern "C" Q_DECL_EXPORT qintptr swirl_core_command(const unsigned char *, size_
 #include <array>
 #include <thread>
 
+#ifdef Q_OS_WIN
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
+
 namespace {
 QByteArray peHeader(quint16 machine = 0x8664)
 {
@@ -340,7 +346,13 @@ private slots:
     void productionRustLibraryLoadsAndExecutesCommand()
     {
         RustCoreLibrary library;
+#ifdef Q_OS_WIN
+        const auto previousMode = GetThreadErrorMode();
+#endif
         QVERIFY2(library.load(), qPrintable(library.errorString()));
+#ifdef Q_OS_WIN
+        QCOMPARE(GetThreadErrorMode(), previousMode);
+#endif
         QCOMPARE(library.diagnostics().value("actual_abi").toInt(), int(RustCoreLibrary::AbiVersion));
         QCOMPARE(library.diagnostics().value("build_id").toString(), RustCoreLibrary::expectedBuildId());
         QCOMPARE(library.diagnostics().value("source_sha").toString(), RustCoreLibrary::expectedSourceSha());
@@ -354,6 +366,22 @@ private slots:
         const auto response = QJsonDocument::fromJson(output).object();
         QCOMPARE(response.value("ok").toBool(true), false);
         QCOMPARE(response.value("error").toString(), QStringLiteral("UnknownHandle"));
+    }
+
+    void rejectedReplacementPreservesCheckedCommands()
+    {
+        RustCoreLibrary library;
+        QVERIFY2(library.load(), qPrintable(library.errorString()));
+        const auto command = library.command();
+        const auto nodeImport = library.importNode();
+        const auto xrayImport = library.importXray();
+        QVERIFY(!library.load(fixturePath(1)));
+        QCOMPARE(library.diagnostics().value("code").toString(), QStringLiteral("RustLibraryReplacementRejected"));
+        QCOMPARE(library.diagnostics().value("ready").toBool(), true);
+        QVERIFY(library.command() == command);
+        QVERIFY(library.importNode() == nodeImport);
+        QVERIFY(library.importXray() == xrayImport);
+        QVERIFY(library.load());
     }
 
 #ifdef Q_OS_WIN
@@ -389,7 +417,9 @@ private slots:
 #endif
         QVERIFY(writeFile(path, bytes));
         RustCoreLibrary library;
+        const auto previousMode = GetThreadErrorMode();
         QVERIFY(!library.load(path));
+        QCOMPARE(GetThreadErrorMode(), previousMode);
         const auto report = library.diagnostics();
         QCOMPARE(report.value("code").toString(), QStringLiteral("RustLibraryLoadFailed"));
         QVERIFY(!report.value("qt_error").toString().isEmpty());

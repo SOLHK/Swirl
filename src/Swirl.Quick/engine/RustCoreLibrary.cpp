@@ -33,6 +33,26 @@ QString architectureName(quint16 machine)
 }
 
 #ifdef Q_OS_WIN
+// A damaged DLL must return a diagnostic, never block a worker behind a hidden
+// Windows loader dialog. Keep the change local to this thread and restore the
+// caller's mode on every return (including failed ABI/source checks).
+class LoaderErrorMode final {
+public:
+    LoaderErrorMode()
+        : m_enabled(SetThreadErrorMode(GetThreadErrorMode() | SEM_FAILCRITICALERRORS
+                                       | SEM_NOOPENFILEERRORBOX, &m_previous))
+        , m_error(m_enabled ? ERROR_SUCCESS : GetLastError()) {}
+    ~LoaderErrorMode() { if (m_enabled) SetThreadErrorMode(m_previous, nullptr); }
+    LoaderErrorMode(const LoaderErrorMode &) = delete;
+    LoaderErrorMode &operator=(const LoaderErrorMode &) = delete;
+    bool enabled() const { return m_enabled; }
+    DWORD error() const { return m_error; }
+private:
+    DWORD m_previous = 0;
+    BOOL m_enabled;
+    DWORD m_error;
+};
+
 quint16 processMachine()
 {
 #if defined(Q_PROCESSOR_X86_64)
@@ -187,8 +207,12 @@ bool RustCoreLibrary::load(const QString &absolutePath)
     if (m_command) {
         if (QDir::cleanPath(absolutePath) == m_library.fileName())
             return true;
-        return fail("path", "RustLibraryReplacementRejected",
-                    QStringLiteral("已加载的 Rust 内核库不能在同一实例中切换到其他文件。"));
+        // Reject replacement without invalidating the already checked entry
+        // points. A failed candidate must not disable an active runtime.
+        m_message = QStringLiteral("已加载的 Rust 内核库不能在同一实例中切换到其他文件。");
+        m_diagnostics["stage"] = QStringLiteral("path");
+        m_diagnostics["code"] = QStringLiteral("RustLibraryReplacementRejected");
+        return false;
     }
     m_message.clear();
     m_diagnostics = {
@@ -230,6 +254,12 @@ bool RustCoreLibrary::load(const QString &absolutePath)
     }
     if (!processMachine() || inspected.machine != processMachine())
         return fail("architecture", "RustLibraryArchitectureMismatch", QStringLiteral("Rust DLL 与当前 Swirl.exe 的 CPU 架构不匹配。"));
+    const LoaderErrorMode loaderErrorMode;
+    if (!loaderErrorMode.enabled()) {
+        m_diagnostics["windows_error"] = qint64(loaderErrorMode.error());
+        m_diagnostics["windows_error_context"] = QStringLiteral("SetThreadErrorMode");
+        return fail("load", "RustLibraryErrorModeFailed", QStringLiteral("无法配置当前线程的 Rust DLL 错误处理。"));
+    }
 #endif
 
     if (m_library.isLoaded())
