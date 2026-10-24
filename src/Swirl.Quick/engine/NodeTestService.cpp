@@ -1,23 +1,10 @@
 #include "NodeTestService.h"
 #include "RustCoreEngine.h"
 #include "ThreadedEngine.h"
-#include <QTcpServer>
 #include <QSet>
 #include <QDateTime>
 #include <QPointer>
-#include <QUdpSocket>
 #include <QCryptographicHash>
-namespace {
-quint16 freePort(){
- QTcpServer tcp;QUdpSocket udp;
- for(int attempt=0;attempt<16;++attempt){
-  if(!tcp.listen(QHostAddress::LocalHost,0))return 0;
-  if(udp.bind(QHostAddress::LocalHost,tcp.serverPort(),QUdpSocket::DontShareAddress))return tcp.serverPort();
-  tcp.close();
- }
- return 0;
-}
-}
 NodeTestService::~NodeTestService(){cancel();}
 QString NodeTestService::nodeReference(const QString &id){
  return QString::fromLatin1(QCryptographicHash::hash(id.toUtf8(),QCryptographicHash::Sha256).toHex().left(12));
@@ -27,6 +14,7 @@ EngineStartOptions NodeTestService::isolatedOptions(const EngineStartOptions &so
  // authentication, external executable paths or the live resolver owner.
  EngineStartOptions result;
  result.nodes=source.nodes;
+ result.proxyPort=0;result.internalProbeListener=true;
  result.routingMode="global";result.smartRouting=false;
  result.healthIntervalMs=2000;result.requestTimeoutMs=3000;result.startupTimeoutMs=20000;
  return result;
@@ -89,7 +77,9 @@ void NodeTestService::next(){
   QJsonObject configuration;const auto reason=RustCoreEngine::configuration(opts,&configuration);
   if(!reason.isEmpty()){record(id,{{"success",false},{"latency",-1},{"http",0},{"phase","configuration"},{"failureCode","NodeConfigurationRejected"},{"error",reason}});continue;}
   const bool reuse=!m_idle.isEmpty();
-  if(!reuse){opts.proxyPort=freePort();if(!opts.proxyPort){record(id,{{"success",false},{"latency",-1},{"http",0},{"phase","listener"},{"failureCode","ProbePortUnavailable"},{"error","无法分配本机测试端口"}});continue;}}
+  // The Rust worker owns its TCP bind from allocation onward. A temporary Qt
+  // TCP/UDP reservation could reject a valid TCP-only probe or lose the port
+  // before Rust starts. No application proxy, UDP gate or port handoff is used.
   auto *runner=reuse?m_idle.dequeue():createWorker();
   m_running[id]=runner;runner->setProperty("probeNodeId",id);runner->setProperty("probeStarted",false);
   runner->findChild<QTimer *>("probeDeadline")->start();

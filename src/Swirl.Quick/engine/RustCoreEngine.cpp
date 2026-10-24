@@ -220,7 +220,8 @@ QVariantList RustCoreEngine::routingRulesForOptions(const EngineStartOptions &op
  return rows;
 }
 QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *output){
- if(o.proxyPort==0)return "本机代理端口无效，请设置 1 至 65535 之间的端口。";
+ if(o.proxyPort==0&&!o.internalProbeListener)return "本机代理端口无效，请设置 1 至 65535 之间的端口。";
+ if(o.internalProbeListener&&o.proxyPort!=0)return "内部节点检测监听必须由 Rust 自动分配端口。";
  if(o.tunEnabled||o.gatewayForwarding)return "当前会话要求增强模式或网关转发，但 Rust 版尚未支持。请在“概览”关闭增强模式后重试。";
  if(o.allowLan)return "当前会话要求局域网代理，但 Rust 版尚未支持。请在“概览”关闭局域网代理后重试。";
  if(o.meteredNetwork)return "当前会话要求计费网络模式，但 Rust 版尚未支持。请在“设置”关闭计费网络模式后重试。";
@@ -357,10 +358,20 @@ void RustCoreEngine::start(const EngineStartOptions &options){
  const auto response=call({{"op","start"},{"config",config}});
  if(!response["ok"].toBool()){fail(Error::ConfigurationFailed,response["error"].toString("RustStartFailed"));return;}
  m_reportedForwardingFailures.clear();m_forwardingFailureLimitReported=false;
- m_handle=quint64(response["handle"].toInteger());m_status.sessionId=QUuid::createUuid().toString(QUuid::WithoutBraces);
+ m_handle=quint64(response["handle"].toInteger());
+ const auto address=response.value("status").toObject().value("address").toString();
+ const auto bound=QRegularExpression("\\A127\\.0\\.0\\.1:([1-9][0-9]{0,4})\\z").match(address);
+ const auto boundPort=bound.hasMatch()?bound.captured(1).toUInt():0u;
+ if(!m_handle||boundPort==0||boundPort>65535||(!options.internalProbeListener&&boundPort!=options.proxyPort)){
+  if(m_handle)call({{"op","stop"},{"handle",qint64(m_handle)}});m_handle=0;
+  fail(Error::InvalidResponse,QStringLiteral("Rust 未返回与请求匹配的有效回环监听地址；节点检测未启动。"));return;
+ }
+ m_status.sessionId=QUuid::createUuid().toString(QUuid::WithoutBraces);
  m_status.processId=QCoreApplication::applicationPid();m_status.version="Swirl Core Rust "+m_library.diagnostics().value("package_version").toString();m_status.controlEndpoint="in-process://SwirlRust/v1";
  m_status.mode=options.routingMode;m_status.directSession=options.directSession||options.routingMode=="direct";
- m_status.selectedNodeId=options.selectedNodeId;m_status.proxyPort=options.proxyPort;
+ // Keep m_options.proxyPort==0 for internal configure calls: Core compares its
+ // original listen request, while snapshots expose the actual owned socket.
+ m_status.selectedNodeId=options.selectedNodeId;m_status.proxyPort=int(boundPort);
  m_uptime.start();m_rateClock.start();m_poll.start();refresh();
 }
 void RustCoreEngine::stop(){

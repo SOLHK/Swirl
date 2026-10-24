@@ -2479,6 +2479,37 @@ private slots:
   engine.stop();QVERIFY(QTest::qWaitFor([&]{return !engine.status().processAlive;},5000));
   QTcpServer reuse;QVERIFY(reuse.listen(QHostAddress::LocalHost,o.proxyPort));
  }
+ void internalNodeTestListenersAreAtomicallyOwnedAndPreserveUserPortValidation(){
+  ControlledNetwork net;QVERIFY(net.start());auto user=options(net);user.proxyPort=0;
+  QJsonObject configuration;QVERIFY(!RustCoreEngine::configuration(user,&configuration).isEmpty());
+  RustCoreEngine invalid;invalid.start(user);QCOMPARE(invalid.status().error,ProxyEngine::Error::InvalidOptions);QVERIFY(!invalid.status().processAlive);
+  auto isolated=NodeTestService::isolatedOptions(user);isolated.selectedNodeId=user.selectedNodeId;
+  QCOMPARE(isolated.proxyPort,quint16(0));QVERIFY(isolated.internalProbeListener);
+  QVERIFY(RustCoreEngine::configuration(isolated,&configuration).isEmpty());QCOMPARE(configuration.value("listen").toString(),QString("127.0.0.1:0"));
+  auto other=isolated.nodes.first();other.id=QUuid::createUuid().toString(QUuid::WithoutBraces);isolated.nodes.append(other);
+  RustCoreEngine first,second;first.start(isolated);second.start(isolated);
+  QVERIFY2(first.status().apiHealthy,qPrintable(first.status().message));QVERIFY2(second.status().apiHealthy,qPrintable(second.status().message));
+  const auto firstPort=first.status().proxyPort,secondPort=second.status().proxyPort;
+  QVERIFY(firstPort>0);QVERIFY(secondPort>0);QVERIFY(firstPort!=secondPort);
+  for(const auto port:{firstPort,secondPort}){
+   QTcpServer conflict;conflict.setProxy(QNetworkProxy::NoProxy);QVERIFY(!conflict.listen(QHostAddress::LocalHost,quint16(port)));
+  }
+  const auto request=[&](int port){
+   QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",quint16(port)));
+   QNetworkRequest input(net.url());input.setTransferTimeout(4000);auto *reply=client.get(input);
+   if(!QTest::qWaitFor([&]{return reply->isFinished();},5000)||reply->error()!=QNetworkReply::NoError)return QByteArray("request-failed");
+   return reply->readAll();
+  };
+  QCOMPARE(request(firstPort),QByteArray("exit-A"));QCOMPARE(request(secondPort),QByteArray("exit-A"));
+  const auto session=first.status().sessionId;first.selectNode(other.id);
+  QCOMPARE(first.status().selectedNodeId,other.id);QCOMPARE(first.status().sessionId,session);QCOMPARE(first.status().proxyPort,firstPort);
+  QCOMPARE(request(firstPort),QByteArray("exit-A"));
+  first.probeNode(net.url());second.probeNode(net.url());
+  QTRY_COMPARE_WITH_TIMEOUT(first.status().requestState,ProxyEngine::RequestState::Succeeded,5000);
+  QTRY_COMPARE_WITH_TIMEOUT(second.status().requestState,ProxyEngine::RequestState::Succeeded,5000);
+  QCOMPARE(first.status().responseCode,200);QCOMPARE(second.status().responseCode,200);QCOMPARE(net.a.forwarded,5);QCOMPARE(net.httpRequests,5);
+  first.stop();second.stop();QVERIFY(!first.status().processAlive);QVERIFY(!second.status().processAlive);
+ }
  void queuedProbesRecoverAfterPeerRejectionAndCancellation(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);
   const int count=qBound(24,qEnvironmentVariableIntValue("SWIRL_U2_PROBE_COUNT"),5000);

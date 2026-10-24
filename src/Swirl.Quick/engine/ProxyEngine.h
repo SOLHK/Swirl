@@ -16,6 +16,9 @@ struct EngineStartOptions {
     bool meteredNetwork = false;
     QStringList meteredAllowlist;
     quint16 proxyPort = 7898;
+    // Internal node-test capability only, never loaded from user settings or
+    // subscriptions. Rust atomically binds loopback port zero for these workers.
+    bool internalProbeListener = false;
     QString routingMode = QStringLiteral("rule");
     // Production uses verified, bundled China domain/IP MRS providers. The
     // controlled transport fixtures intentionally retain MATCH-only routing.

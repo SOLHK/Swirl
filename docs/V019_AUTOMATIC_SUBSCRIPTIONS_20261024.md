@@ -60,7 +60,7 @@ recovery on CI. They do not establish actual provider quality or real Codex
 account success. TUN remains unavailable in the current Rust product. The
 native format remains deferred until compatibility/network acceptance.
 
-## Local frozen-source checks before commit
+## Initial local checks before the first committed CI
 
 Qt 6.10.3 / MinGW local regression: Core 91 passed, 0 failed, 10 designated
 fixture-dependent skips; Import 54 passed, 0 failed, 0 skipped; Subscription
@@ -77,3 +77,34 @@ format, portable dependency, source/input-cache guard and offline privacy
 checks passed. Independent VMess transport and launcher evidence is described
 in the P0 note. These local checks do not replace the final committed
 CI, disposable proxy recovery and exact-source installer verification.
+
+## Windows CI exposed a real probe-allocation defect
+
+The first 0.1.9 commit, 1c2e362, passed Rust CI but failed Windows run
+40089664045 before production staging. The queue recovery test measured 19/24
+successful controlled nodes; five failed in local listener allocation, before
+any request reached an upstream. The other 12 CTest suites passed. No installer
+was produced or delivered from that run; compiler-cache output is not a pass.
+
+NodeTestService unnecessarily required UDP availability on the same temporary
+TCP port, although the Rust runtime binds only a TCP listener. The replacement
+lets Rust atomically bind loopback port zero for isolated probe workers. This
+also removes the Qt-reserve/close/Rust-rebind window. An internal C++ capability
+defaults off and cannot come from a subscription or saved settings; ordinary
+application port-zero requests remain invalid. The adapter publishes only the
+strictly validated actual bound port, retaining the original zero request for
+worker reconfiguration so the existing listener is reused.
+
+Windows UDP exclusions are a plausible trigger for the old extra check, but
+the failed CI did not record its OS error code. This defect cannot explain all
+of the user's old failed nodes: the new failure3 report records origin TLS
+timeouts instead. No expected success count, TLS policy or request assertion
+was lowered to make the queue pass.
+
+The atomic-listener follow-up passed its new real-listener/GET/HEAD/selection
+test without skips; the unchanged 24/24 recovery and cancellation case passed
+three consecutive runs. The complete local Core suite passed 92 cases, with
+0 failures and the same 10 designated fixture-dependent skips (42.477s).
+The earlier Import and Format results remain valid for unchanged parsing
+logic; final exact-source Windows CI reruns the required suite set before
+an installer can be delivered.
