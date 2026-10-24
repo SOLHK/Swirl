@@ -1,3 +1,9 @@
+# v0.2.3 REALITY wire compatibility follow-up (2026-10-24)
+
+- Version 0.2.2 recovered actual cached subscription nodes but did not prove private-node networking. Version 0.2.3 fixes a separately reproduced production REALITY authenticated-client version error: use the inspected and independently tested protocol baseline 26.10.17 rather than Swirl's application version. Keep server version/time/key/SNI/UUID checks and certificate acceptance strict.
+- Reuse the existing hash-pinned official Xray test peer for focused production import/authentication tests, independently of Windows packaging. Never ship that peer as the product core. Reuse encrypted cached private responses for the next isolated two-node comparison; do not repeat consumed source downloads or change this machine's proxy/TUN/routes/DNS/Codex processes.
+- A controlled independent-peer pass is not proof that the supplied subscription's actual nodes or Codex services work. Retain failed actual-provider evidence and label the installer diagnostic until private networking is confirmed.
+
 # v0.2.2 actual subscription regression follow-up (2026-10-24)
 
 - The user retested 0.2.0 and explicitly reported that the failures persist across client formats. 0.2.1 only optimized the build graph; it is not a claimed subscription fix. Continue on independent `work/swirl-019-subscription-regression-20261024`, preserve main/test/other windows, and deliver the next actual repair as 0.2.2.

@@ -132,10 +132,21 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--vision", action="store_true")
     parser.add_argument("--fingerprint", choices=("rustls", "chrome", "chrome_133"), default="rustls")
+    parser.add_argument("--wire-compatibility", action="store_true",
+                        help="run the focused production import/authenticated-version regression")
     args = parser.parse_args()
     case = VisionNativeReleaseInterop if args.vision else RealityNativeReleaseInterop
     case.fingerprint = args.fingerprint
-    suite = unittest.defaultTestLoader.loadTestsFromTestCase(case)
+    selected = (
+        "test_import_uri_yaml_json_base64_to_http_and_verified_https",
+        "test_production_reality_wire_version_satisfies_supported_server_minimum",
+        "test_production_reality_wire_version_respects_exact_supported_interval",
+        "test_production_reality_wire_version_incompatible_intervals_fail_closed",
+        "test_production_reality_stale_authenticated_hello_fails_server_clock_bound",
+        "test_wrong_reality_authentication_and_vless_uuid_never_reach_target",
+    ) if args.wire_compatibility else ()
+    suite = (unittest.TestSuite(case(name) for name in selected) if selected
+             else unittest.defaultTestLoader.loadTestsFromTestCase(case))
     expected_count = suite.countTestCases()
     evidence = Path(os.environ.get("SWIRL_REALITY_RUNTIME_EVIDENCE",
                                    ROOT / "build/reality-release-evidence")).resolve()
@@ -149,6 +160,7 @@ def main():
         "failures": len(result.failures), "errors": len(result.errors), "skipped": len(result.skipped),
         "successful": successful, "evidence_level": "independent_official_release_core_loopback",
         "protocol": "vless+reality+vision" if args.vision else "vless+reality",
+        "focused_wire_compatibility": args.wire_compatibility,
         "fingerprint": args.fingerprint, "public_network_tested": False, "qt_product_tested": False,
     })
     return 0 if successful else 1

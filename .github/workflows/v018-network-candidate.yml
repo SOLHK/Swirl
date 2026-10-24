@@ -63,6 +63,22 @@ jobs:
             test_vmess_xray.VmessXrayTests.test_https_target_certificate_and_tls_close_over_vmess_tls \
             test_vmess_xray.VmessXrayTests.test_core_node_switch_preserves_established_vmess_session \
             2>&1 | tee dist/v019-codex-evidence/focused-vmess.log
+      - name: REALITY production wire-version regression with the same verified Xray peer
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --manifest-path core/Cargo.toml --locked -p swirl-api -p swirl-subscription --bin swirl-api --bin swirl-inspect
+          export SWIRL_RUST_HARNESS="$PWD/core/target/debug/swirl-api"
+          export SWIRL_RUST_INSPECTOR="$PWD/core/target/debug/swirl-inspect"
+          export SWIRL_XRAY_BINARY="$PWD/build/v019-test-peers/current/xray"
+          export SWIRL_XRAY_RELEASE_MANIFEST="$PWD/build/v019-test-peers/manifest.json"
+          for profile in rustls chrome chrome-vision; do
+            export SWIRL_REALITY_RUNTIME_EVIDENCE="$PWD/dist/v019-codex-evidence/reality-$profile"
+            args=(--wire-compatibility --fingerprint rustls)
+            if [[ "$profile" == chrome* ]]; then args=(--wire-compatibility --fingerprint chrome_133); fi
+            if [[ "$profile" == chrome-vision ]]; then args+=(--vision); fi
+            python tools/tests/test_reality_native_release.py "${args[@]}"
+          done
       - name: Preserve controlled desktop-chain test evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

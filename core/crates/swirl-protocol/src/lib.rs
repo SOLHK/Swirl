@@ -39,6 +39,16 @@ use tokio::{
 };
 pub use transport::Transport;
 
+// REALITY's encrypted session ID carries an implementation compatibility
+// version, which servers may gate with minClientVer/maxClientVer. It is not
+// Swirl's package version. This baseline is the independently tested Xray
+// v26.10.17 / REALITY 83f6217 source pinned in tools/tests/xray_peer/lock.json:
+// TLS 1.3, authenticated session ID, X25519MLKEM768 before optional X25519 and
+// the pinned Chrome 133 profile. Optional/unsupported features still fail
+// their own validation; this does not claim every Xray feature is supported.
+// Production-runtime peer tests exercise both accepted and rejected bounds.
+const REALITY_WIRE_COMPATIBILITY_VERSION: [u8; 3] = [26, 10, 17];
+
 pub type Result<T> = std::result::Result<T, &'static str>;
 #[derive(Clone, Debug)]
 pub struct Target {
@@ -580,7 +590,7 @@ async fn connect_stream_selected(
             &reality.server_name,
             key,
             &short_id,
-            [0, 1, 0],
+            REALITY_WIRE_COMPATIBILITY_VERSION,
         )?
         .with_fingerprint(&reality.fingerprint)?;
         let tcp = connect_tcp(

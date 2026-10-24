@@ -36,6 +36,7 @@ from pathlib import Path
 import queue
 import random
 import re
+import select
 import socket
 import socketserver
 import ssl
@@ -59,6 +60,9 @@ from test_rust_core import exact, header
 
 ROOT = Path(__file__).resolve().parents[2]
 SNI = "swirl-reality-runtime.test"
+# Protocol compatibility is pinned to the independently inspected Xray/REALITY
+# source in xray_peer/lock.json, never Swirl's application/package version.
+REALITY_WIRE_BASELINE = [26, 10, 17]
 SYNTHETIC_SECRETS = set()
 
 
@@ -364,11 +368,15 @@ class Camouflage:
 class XrayRuntimePeer:
     """Complete official executable, no seeded cache or alternate VLESS handler."""
 
-    def __init__(self, binary, folder, evidence, identity, ports, flow="", fingerprint="rustls"):
+    def __init__(self, binary, folder, evidence, identity, ports, flow="", fingerprint="rustls",
+                 min_client_version=None, max_client_version=None, max_time_diff_ms=60000):
         self.binary, self.folder, self.evidence, self.identity = binary, folder, evidence, identity
         self.folder.mkdir()
         self.flow, self.ports = flow, list(ports)
         self.fingerprint = fingerprint
+        self.min_client_version = min_client_version
+        self.max_client_version = max_client_version
+        self.max_time_diff_ms = max_time_diff_ms
         self.camouflage = Camouflage(self.folder, fingerprint)
         self.uuid = str(uuid.uuid4())
         key = x25519.X25519PrivateKey.generate()
@@ -413,9 +421,14 @@ class XrayRuntimePeer:
                           "streamSettings": {"network": "raw", "security": "reality", "realitySettings": {
                               "show": True, "target": f"127.0.0.1:{self.camouflage.port}",
                               "serverNames": [SNI], "privateKey": self.private_key,
-                              "shortIds": [self.short_id], "maxTimeDiff": 60000}}}],
+                              "shortIds": [self.short_id], "maxTimeDiff": self.max_time_diff_ms}}}],
             "outbounds": outbounds, "routing": {"domainStrategy": "AsIs", "rules": rules},
         }
+        settings = config["inbounds"][0]["streamSettings"]["realitySettings"]
+        if self.min_client_version is not None:
+            settings["minClientVer"] = self.min_client_version
+        if self.max_client_version is not None:
+            settings["maxClientVer"] = self.max_client_version
         config_path = self.folder / "xray-config.json"
         write_json(config_path, config)
         checked = subprocess.run([str(self.binary), "run", "-test", "-config", str(config_path)],
@@ -493,9 +506,16 @@ class XrayRuntimePeer:
         log = self.log_path.read_text(encoding="utf-8", errors="replace") if self.log_path.exists() else ""
         access = self.access_path.read_text(encoding="utf-8", errors="replace") if self.access_path.exists() else ""
         accepted = [line for line in access.splitlines() if " accepted tcp:" in line]
+        versions = [list(map(int, match)) for match in re.findall(
+            r"ClientVer: \[(\d+) (\d+) (\d+)\]", log)]
         return {"identity": self.identity, "protocol": "vless+reality" + ("+vision" if self.flow else ""),
                 "fingerprint": self.fingerprint,
                 "client_hello_profile": "chrome_133" if self.fingerprint in ("chrome", "chrome_133") else "rustls",
+                "client_versions": [list(value) for value in sorted({tuple(value) for value in versions})],
+                "client_version_observations": versions,
+                "client_version_bounds": {"min": self.min_client_version,
+                                          "max": self.max_client_version},
+                "max_time_diff_ms": self.max_time_diff_ms,
                 "tcp_listener_established": self.process is not None,
                 "reality_authenticated_sessions": len(re.findall(r"isHandshakeComplete\.Load\(\): true", log)),
                 "client_finished_verified_sessions": len(re.findall(r"readClientFinished\(\) err: <nil>", log)),
@@ -630,10 +650,10 @@ class RealityRuntimeInterop(ChainBase):
             "echo_sessions": self.echo.sessions,
             "origin_errors": {"http": self.http.errors, "https": self.https.errors, "echo": self.echo.errors}})
 
-    def peer(self, identity="A", extra_ports=()):
+    def peer(self, identity="A", extra_ports=(), **settings):
         peer = XrayRuntimePeer(self.xray, Path(self.folder.name) / identity, self.case, identity,
                                [self.http.port, self.https.port, self.echo.port, *extra_ports],
-                               self.flow, self.fingerprint)
+                               self.flow, self.fingerprint, **settings)
         self.addCleanup(peer.close)
         peer.start()
         self.peers.append(peer)
@@ -741,6 +761,154 @@ class RealityRuntimeInterop(ChainBase):
         self.assertEqual(self.https.sni, ["localhost"])
         self.assertEqual(self.https.tls_closed, 1)
         write_json(self.case / "socks5-client.json", {"exchanges": exchanges})
+
+    def test_production_reality_wire_version_satisfies_supported_server_minimum(self):
+        # Older official server versions imposed this floor even when the
+        # operator omitted minClientVer. Exercise the production protocol path,
+        # not the low-level example that accepts an arbitrary test version.
+        peer = self.peer(min_client_version="26.3.27")
+        self.start(self.imported([peer], "uri"))
+        self.fetch(path="/minimum-version")
+        self.fetch(path="/minimum-version-tls", tls=True)
+        self.idle()
+        observed = self.observed(peer, 2)
+        self.assertEqual(observed["client_versions"], [REALITY_WIRE_BASELINE], observed)
+        self.assertEqual(self.https.tls_closed, 1)
+
+    def test_production_reality_wire_version_respects_exact_supported_interval(self):
+        peer = self.peer(min_client_version="26.10.17", max_client_version="26.10.17")
+        self.start(self.imported([peer], "uri"))
+        self.fetch(path="/exact-wire-version")
+        self.fetch(path="/exact-wire-version-tls", tls=True)
+        self.idle()
+        observed = self.observed(peer, 2)
+        self.assertEqual(observed["client_versions"], [REALITY_WIRE_BASELINE], observed)
+        self.assertEqual(self.https.tls_closed, 1)
+
+    def test_production_reality_wire_version_incompatible_intervals_fail_closed(self):
+        spare = self.peer("spare")
+        for identity, bounds in (("newer", {"min_client_version": "26.10.18"}),
+                                 ("older", {"max_client_version": "26.10.16"})):
+            with self.subTest(server_bounds=bounds):
+                peer = self.peer(identity, **bounds)
+                config = self.imported([peer, spare], "uri")
+                config["limits"] = {"max_connections": 8, "handshake_timeout_ms": 1500}
+                self.start(config)
+                with self.assertRaises((ConnectionError, EOFError, OSError)):
+                    self.fetch(path="/version-rejected-must-not-arrive")
+                self.idle(failures=1)
+                self.assertTrue(self.core.command(op="stop", handle=self.handle)["ok"])
+                observed = peer.observations()
+                self.assertEqual(observed["client_versions"], [REALITY_WIRE_BASELINE], observed)
+                self.assertEqual(observed["reality_authenticated_sessions"], 0, observed)
+                self.assertEqual(observed["client_finished_verified_sessions"], 0, observed)
+                self.assertEqual(observed["vless_accepted_sessions"], 0, observed)
+                self.assertEqual(observed["camouflage_application_bytes"], 0, observed)
+                self.assertEqual(spare.observations()["vless_accepted_sessions"], 0)
+                self.assertEqual(self.http.requests, [])
+                self.assertEqual(self.https.requests, [])
+                self.assertEqual(self.echo.payloads, [])
+
+    def test_production_reality_stale_authenticated_hello_fails_server_clock_bound(self):
+        peer = self.peer(min_client_version="26.3.27", max_time_diff_ms=2000)
+        spare = self.peer("spare")
+        config = self.imported([peer, spare], "uri")
+        self.start(config)
+        self.fetch(path="/clock-fresh-control")
+        self.idle()
+        self.observed(peer, 1)
+        self.assertTrue(self.core.command(op="stop", handle=self.handle)["ok"])
+
+        # Hold the real production ClientHello until its authenticated Unix
+        # timestamp is stale; neither the system clock nor the encrypted bytes
+        # are modified. This deliberate wire fault is not a scheduling wait.
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        listener.settimeout(0.2)
+        config["nodes"][0]["outbound"]["port"] = listener.getsockname()[1]
+        config["limits"] = {"max_connections": 8, "handshake_timeout_ms": 6000}
+        evidence = {"client_hello_received": False, "forwarding_delay_seconds": 0,
+                    "worker_error": None, "worker_finished": False}
+        finished, release = threading.Event(), threading.Event()
+
+        def delay_hello():
+            try:
+                while not release.is_set():
+                    try:
+                        accepted = listener.accept()[0]
+                        break
+                    except socket.timeout:
+                        continue
+                else:
+                    return
+                with accepted as client:
+                    client.settimeout(3)
+                    prefix = exact(client, 5)
+                    length = int.from_bytes(prefix[3:5], "big")
+                    assert prefix[0] == 22 and 0 < length <= 16384
+                    hello = exact(client, length)
+                    assert hello[0] == 1, "first record must contain ClientHello"
+                    evidence["client_hello_received"] = True
+                    began = time.monotonic()
+                    # Timestamp resolution is one second. A 3.25-second hold
+                    # exceeds the two-second server limit even at its boundary.
+                    if release.wait(3.25):
+                        return
+                    evidence["forwarding_delay_seconds"] = time.monotonic() - began
+                    with socket.create_connection(("127.0.0.1", peer.port), timeout=3) as server:
+                        server.sendall(prefix + hello)
+                        streams = {client: server, server: client}
+                        while streams and not release.is_set():
+                            readable, _, _ = select.select(list(streams), [], [], 0.1)
+                            for source in readable:
+                                data = source.recv(16384)
+                                if data:
+                                    streams[source].sendall(data)
+                                else:
+                                    streams[source].shutdown(socket.SHUT_WR)
+                                    del streams[source]
+            except (ConnectionResetError, BrokenPipeError):
+                # Authenticated-clock rejection may close either relay side.
+                pass
+            except OSError as error:
+                if not release.is_set():
+                    evidence["worker_error"] = type(error).__name__
+            except BaseException as error:
+                evidence["worker_error"] = type(error).__name__
+            finally:
+                evidence["worker_finished"] = True
+                finished.set()
+
+        worker = threading.Thread(target=delay_hello, daemon=True)
+        worker.start()
+        try:
+            self.start(config)
+            with self.assertRaises((ConnectionError, EOFError, OSError)):
+                self.fetch(path="/stale-clock-must-not-arrive")
+            self.idle(failures=1)
+            self.assertTrue(self.core.command(op="stop", handle=self.handle)["ok"])
+            self.assertTrue(evidence["client_hello_received"], evidence)
+            self.assertGreaterEqual(evidence["forwarding_delay_seconds"], 3.25, evidence)
+            observed = peer.observations()
+            self.assertEqual(observed["client_versions"], [REALITY_WIRE_BASELINE], observed)
+            self.assertEqual(observed["client_version_observations"], [REALITY_WIRE_BASELINE] * 2,
+                             "both the fresh control and stale authenticated hello must reach Xray")
+            self.assertEqual(observed["vless_accepted_sessions"], 1, observed)
+            self.assertEqual(observed["client_finished_verified_sessions"], 1, observed)
+            self.assertEqual(spare.observations()["vless_accepted_sessions"], 0)
+            self.assertEqual([r.split(b" ")[1] for r in self.http.requests], [b"/clock-fresh-control"])
+            self.assertEqual(self.https.requests, [])
+            self.assertEqual(self.echo.payloads, [])
+        finally:
+            release.set()
+            listener.close()
+            worker.join(timeout=4)
+            write_json(self.case / "clock-bound.json", evidence)
+            self.assertTrue(finished.is_set(), "delayed authentication retained its relay")
+            self.assertFalse(worker.is_alive())
+        self.assertIsNone(evidence["worker_error"], evidence)
+        self.assertFalse(worker.is_alive())
 
     def test_wrong_reality_authentication_and_vless_uuid_never_reach_target(self):
         peer, spare = self.peer(), self.peer("B")
