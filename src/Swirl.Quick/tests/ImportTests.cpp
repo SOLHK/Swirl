@@ -73,7 +73,7 @@ private slots:
         }
         QList<QByteArray> uris{prefix+"&type=",prefix+"&network="};
         for(const auto &network:QList<QByteArray>{"","&type=tcp","&network=tcp"})
-        for(const auto &parameter:QList<QByteArray>{"&path=%2Ffixture-secret","&host=fixture-secret.invalid","&serviceName=fixture-secret","&path=","&host=","&serviceName="})uris.append(prefix+network+parameter);
+        for(const auto &parameter:QList<QByteArray>{"&path=%2Ffixture-secret","&host=fixture-secret.invalid","&serviceName=fixture-secret","&path=%20","&host=%20","&serviceName=%09","&path=%2F","&futureTransportOption="})uris.append(prefix+network+parameter);
         for(const auto &uri:uris){
             for(const auto &body:{uri,uri.toBase64()}){
                 const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);QCOMPARE(parsed.incompleteNodes,1);
@@ -92,6 +92,54 @@ private slots:
         const QByteArray websocket="vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?type=ws&path=%2Fsocket&host=websocket.invalid";
         const auto parsed=NodeImporter::parse(websocket);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.incompleteNodes,0);
         const auto options=parsed.nodes.first().parameters.value("ws-opts").toObject();QCOMPARE(options.value("path"),QJsonValue("/socket"));QCOMPARE(options.value("headers").toObject().value("Host"),QJsonValue("websocket.invalid"));
+    }
+    void tcpUriEmptyInactiveTransportFieldsMatchAbsentAfterPersistence() {
+        const auto key=QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals);
+        const QByteArray prefix="vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?security=reality&sni=camouflage.invalid&fp=chrome&pbk="+key+"&sid=abcd";
+        for(const auto &flow:QList<QByteArray>{"","&flow=xtls-rprx-vision"})
+        for(const auto &network:QList<QByteArray>{"","&type=tcp","&network=tcp"}){
+            const auto baseline=NodeImporter::parse(prefix+flow+network);QVERIFY2(baseline,qPrintable(baseline.error));
+            QCOMPARE(baseline.nodes.size(),1);QCOMPARE(baseline.incompleteNodes,0);
+            const auto reference=baseline.nodes.first();QVERIFY(reference.conversionIssues.isEmpty());
+#ifdef SWIRL_USE_RUST_CORE
+            QJsonObject expectedOutbound;
+            const auto baselineError=NativeNodeBridge::executableOutbound(reference,&expectedOutbound);
+            QVERIFY2(baselineError.isEmpty(),qPrintable(baselineError));QVERIFY(!expectedOutbound.isEmpty());
+#endif
+            for(const auto &extra:QList<QByteArray>{"&path=","&host=","&serviceName=","&host=&path=&headerType=none&serviceName="}){
+                const auto uri=prefix+flow+network+extra;
+                for(const auto &body:{uri,uri.toBase64()}){
+                    const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));
+                    QCOMPARE(parsed.nodes.size(),1);QCOMPARE(parsed.incompleteNodes,0);
+                    const auto node=parsed.nodes.first();QVERIFY(node.conversionIssues.isEmpty());
+                    QCOMPARE(node.parameters,reference.parameters);
+                    QCOMPARE(node.originalConfiguration.value("uri"),QJsonValue(QString::fromUtf8(uri)));
+#ifdef SWIRL_USE_RUST_CORE
+                    QJsonObject outbound;const auto error=NativeNodeBridge::executableOutbound(node,&outbound);
+                    QVERIFY2(error.isEmpty(),qPrintable(error));QCOMPARE(outbound,expectedOutbound);
+#endif
+                    QTemporaryDir directory;QVERIFY(directory.isValid());const auto path=directory.filePath("empty-transport.dpapi");
+                    {NodeStore store(path);QVERIFY(store.importNodes(parsed.nodes));QVERIFY(store.select(node.id));}
+                    NodeStore restored(path);QCOMPARE(restored.nodes().size(),1);QCOMPARE(restored.selectedId(),node.id);
+                    const auto saved=restored.nodes().first();QCOMPARE(saved.parameters,reference.parameters);
+                    QCOMPARE(saved.originalConfiguration,node.originalConfiguration);QVERIFY(saved.conversionIssues.isEmpty());
+#ifdef SWIRL_USE_RUST_CORE
+                    QJsonObject savedOutbound;const auto savedError=NativeNodeBridge::executableOutbound(saved,&savedOutbound);
+                    QVERIFY2(savedError.isEmpty(),qPrintable(savedError));QCOMPARE(savedOutbound,expectedOutbound);
+#endif
+                }
+            }
+        }
+        // Empty placeholders must not hide a conflicting active alias.
+        for(const auto &extra:QList<QByteArray>{"&path=&serviceName=fixture-secret","&path=fixture-secret&serviceName="}){
+            const auto parsed=NodeImporter::parse(prefix+"&type=tcp"+extra);
+            QVERIFY(!parsed);QVERIFY(parsed.nodes.isEmpty());QVERIFY(!parsed.error.contains("fixture-secret"));
+        }
+        // The compatibility fix does not infer permission to use a fingerprint.
+        auto unspecifiedFingerprint=prefix+"&type=tcp&host=&path=&headerType=none&serviceName=";
+        unspecifiedFingerprint.replace("&fp=chrome","");
+        const auto unknown=NodeImporter::parse(unspecifiedFingerprint);QVERIFY(unknown);QCOMPARE(unknown.nodes.size(),1);
+        QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(unknown.nodes.first()).isEmpty());
     }
     void vlessUriAuthorityAndPathRequirementsRemainBlocked() {
         const auto key=QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals);
@@ -971,8 +1019,9 @@ external-controller: 0.0.0.0:9090
         QTemporaryDir directory;EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("nodes"));
         auto *service=controller.imports();QVERIFY(service->saveSubscription({},"Safety",server.url(),360,false,"auto"));
         service->refreshSubscription(service->providers().first().toMap().value("id").toString());QTRY_VERIFY_WITH_TIMEOUT(!service->busy(),8000);
-        QCOMPARE(server.count,2);QVERIFY(controller.nodeCatalog().isEmpty());
-        QVERIFY(service->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+        QCOMPARE(server.count,2);QCOMPARE(controller.nodeCatalog().size(),1);QVERIFY(!controller.processAlive());
+        QCOMPARE(service->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));
+        QVERIFY(service->providers().first().toMap().value("warning").toString().contains(QStringLiteral("脚本、重写、MITM")));
         QVERIFY(!service->message().contains("fixture-private-script"));
     }
     void sameOriginRedirectAndMissingLocation() {

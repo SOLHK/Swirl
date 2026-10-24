@@ -143,7 +143,7 @@ mod tests {
     }
 
     #[test]
-    fn fallback_is_granted_only_after_the_entire_document_safety_audit() {
+    fn data_only_extraction_does_not_authorize_foreign_profile_execution() {
         let basic = "[Proxy]\nA=socks5,proxy.invalid,1080\n";
         let node_only = call(
             &serde_json::to_vec(&json!({"format":"ini","configuration":{"document":basic}}))
@@ -161,16 +161,43 @@ mod tests {
         for suffix in [
             "[Script]\nrequest=https://private.invalid/PRIVATE_TOKEN\n",
             "[MITM]\nenable=true\n",
-            "[General]\nexternal-controller-access=PRIVATE_TOKEN\n",
+            "[Unknown Metadata]\nfile=C:\\PRIVATE_TOKEN\n",
         ] {
             let dangerous = call(&serde_json::to_vec(&json!({"format":"ini","configuration":{"document":format!("{incompatible}{suffix}")}})).unwrap());
             assert_eq!(dangerous["ok"], false);
-            assert_eq!(dangerous["safe_node_fallback"], false);
+            assert_eq!(dangerous["safe_node_fallback"], true);
+            assert_eq!(dangerous["network_verified"], false);
             assert!(!dangerous.to_string().contains("PRIVATE_TOKEN"));
             assert!(dangerous.get("configuration").is_none());
         }
         let malformed =
             call(br#"{"format":"ini","configuration":{"document":"[Proxy]"},"format":"clash"}"#);
         assert_eq!(malformed["safe_node_fallback"], false);
+    }
+
+    #[test]
+    fn foreign_global_data_grants_only_node_extraction_never_native_configuration() {
+        for (format, configuration) in [
+            (
+                "ini",
+                json!({"document":"[General]\nbypass-system=true\nhttp-listen=0.0.0.0:6152\n[Proxy]\nA=socks5,proxy.invalid,1080\n[Unknown Metadata]\nprivate-value=PRIVATE_TOKEN\n"}),
+            ),
+            (
+                "clash",
+                json!({"mixed-port":7890,"allow-lan":true,"tun":{"enable":true,"auto-route":true},"script":{"code":"PRIVATE_TOKEN"},"unknown-global":{"value":"PRIVATE_TOKEN","file":"C:\\PRIVATE_TOKEN"},"rules":["MATCH,DIRECT"]}),
+            ),
+        ] {
+            let result = call(
+                &serde_json::to_vec(&json!({"format":format,"configuration":configuration}))
+                    .unwrap(),
+            );
+            assert_eq!(result["schema"], 1);
+            assert_eq!(result["ok"], false);
+            assert_eq!(result["safe_node_fallback"], true);
+            assert_eq!(result["network_verified"], false);
+            assert!(result.get("configuration").is_none());
+            assert!(!result.to_string().contains("PRIVATE_TOKEN"));
+            assert!(!result.to_string().contains("0.0.0.0"));
+        }
     }
 }

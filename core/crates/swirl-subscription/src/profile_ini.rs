@@ -12,15 +12,6 @@ mod metadata;
 #[path = "profile_ini_qx.rs"]
 mod qx;
 
-pub(super) fn managed_headers_safe(text: &str) -> bool {
-    let mut metadata = metadata::Metadata::default();
-    let first = text.lines().map(str::trim).find(|line| !line.is_empty());
-    text.lines()
-        .map(str::trim)
-        .filter(|line| line.starts_with("#!MANAGED-CONFIG"))
-        .all(|line| metadata.managed(line, first == Some(line)).is_ok())
-}
-
 pub(super) fn client_setting_safe(key: &str, value: &str) -> bool {
     metadata::Metadata::default().general(key, value) == Ok(true)
 }

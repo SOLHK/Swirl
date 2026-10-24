@@ -13,16 +13,20 @@ mod scope;
 #[path = "singbox_profile.rs"]
 mod singbox;
 
-/// Whether an external document contains active non-node network semantics.
-/// This is a scope classifier, not a safety verdict; callers must still use
-/// `node_only_fallback_allowed` before importing any automatically reduced scope.
+/// Whether an external document declares non-node network semantics. This is a
+/// classifier, not permission to execute source fields. Full projection and
+/// data-only canonical node extraction have separate validation boundaries.
 pub fn has_profile_semantics(format: &str, configuration: &Value) -> bool {
     scope::has_semantics(format, configuration)
 }
 
-/// Audit the entire document before a recoverable complete-profile failure may
-/// become an explicit nodes-only result. The first projection error alone is
-/// insufficient: a later section may request a script or host operation.
+/// Bound the source shape before a complete-profile failure becomes an explicit
+/// DATA-ONLY nodes result. This flag never authorizes ANY source-global behavior:
+/// callers must independently validate canonical nodes, keep current native
+/// DNS/rules/groups and preserve all foreign settings only as inert encrypted
+/// provenance. Script, file, listener and provider declarations are never run,
+/// opened, fetched or implicitly promoted by this extraction path. Their full
+/// execution remains rejected by the separate strict projection boundary.
 pub fn node_only_fallback_allowed(format: &str, configuration: &Value) -> bool {
     scope::node_only_allowed(format, configuration)
 }

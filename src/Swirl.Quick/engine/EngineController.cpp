@@ -150,8 +150,9 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         QVariantMap input;bool safeNodeFallback=false,hasSemantics=true;
         if(!projectSubscriptionProfile(configuration,result.configurationFormat,&input,error,&safeNodeFallback,&hasSemantics)) {
             if(!automatic||!safeNodeFallback)return false;
-            auto reason=*error;reason.remove(QStringLiteral("；旧节点与网络配置保持不变。"));
-            const auto notice=QStringLiteral("检测到不兼容配置，未应用本次 DNS、规则与策略组；有效节点已保留。%1").arg(reason);
+            const auto reason=QRegularExpression(QStringLiteral("\\bProfile[A-Za-z0-9]+\\b")).match(*error);
+            const auto code=reason.hasMatch()?reason.captured():QStringLiteral("ProfileNotMapped");
+            const auto notice=QStringLiteral("已自动提取有效节点；原配置的脚本、重写、MITM、全局设置、DNS、规则、策略组、监听与 TUN 均未启用，继续使用现有 Swirl 网络配置。原文仅加密保留，不会执行。（兼容性代码：%1）").arg(code);
             error->clear();return importNodes("nodes-with-warning",notice);
         }
         const auto metadata=QJsonObject::fromVariantMap(input.take("importMetadata").toMap());

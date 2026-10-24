@@ -1022,7 +1022,7 @@ private slots:
    QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),before);file.close();QVERIFY(!controller.imports()->message().contains("fixture-secret"));QVERIFY(!controller.processAlive());
   }
  }
- void automaticSubscriptionKeepsValidNodesAndRejectsLateSafetyErrors(){
+ void automaticSubscriptionKeepsValidNodesAndRefusesForeignExecution(){
   QTemporaryDir directory;const auto path=directory.filePath("automatic.dpapi");
   ControlledNetwork net;QVERIFY(net.start());QTcpServer source;QVERIFY(source.listen(QHostAddress::LocalHost));
   const auto node=QJsonObject{{"name","A"},{"type","socks5"},{"server","127.0.0.1"},{"port",net.a.serverPort()}};
@@ -1070,13 +1070,66 @@ private slots:
   QCOMPARE(controller.nodeCatalog().first().toMap().value("id").toString(),id);
   QFile saved(path);QVERIFY(saved.open(QIODevice::ReadOnly));const auto retained=saved.readAll();saved.close();
   QVERIFY(!retained.contains("ProfileGroupUnsupported"));
-  // A recoverable first problem must never hide a dangerous later section.
+  // A later executable foreign section is refused full-profile execution;
+  // the existing manual nodes-only boundary can still recover its valid nodes.
   body=QString("[General]\nloglevel=notify\n[Proxy]\nA=socks5,127.0.0.1,%1\n[Proxy Group]\nroute=url-test,A,url=https://example.invalid/check\n[Rule]\nFINAL,route\n[Script]\nrequest=https://private.invalid/SYNTHETIC-SCRIPT-SECRET\n").arg(net.a.serverPort()).toUtf8();
   imports->refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
-  QVERIFY(imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+  QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+  QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));
+  QVERIFY(imports->providers().first().toMap().value("warning").toString().contains(QStringLiteral("脚本、重写、MITM")));
   QCOMPARE(controller.nodeCatalog().first().toMap().value("id").toString(),id);QCOMPARE(controller.networkConfigurationSnapshot(),original);
-  QVERIFY(saved.open(QIODevice::ReadOnly));QCOMPARE(saved.readAll(),retained);
+  QVERIFY(saved.open(QIODevice::ReadOnly));const auto extracted=saved.readAll();saved.close();QVERIFY(!extracted.contains("SYNTHETIC-SCRIPT-SECRET"));
   QVERIFY(!imports->message().contains("SYNTHETIC-SCRIPT-SECRET"));
+  imports->importText(QString::fromUtf8(body));QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
+  QVERIFY(imports->message().contains(QStringLiteral("失败")));QCOMPARE(controller.networkConfigurationSnapshot(),original);
+  QVERIFY(saved.open(QIODevice::ReadOnly));QCOMPARE(saved.readAll(),extracted);
+ }
+ void automaticForeignGlobalsAreInertData_data(){
+  QTest::addColumn<bool>("ini");QTest::newRow("surge-client-settings")<<true;QTest::newRow("clash-client-settings")<<false;
+ }
+ void automaticForeignGlobalsAreInertData(){
+  QFETCH(bool,ini);QTemporaryDir directory;const auto path=directory.filePath("inert.dpapi");
+  ControlledNetwork net;QVERIFY(net.start());net.a.username.clear();net.a.password.clear();
+  const QByteArray globals="[General]\nbypass-system=true\nskip-proxy=192.0.2.0/24\nbypass-tun=192.0.2.0/24\nhttp-listen=0.0.0.0:19870\nsocks5-listen=0.0.0.0:19871\nipv6-vif=always\ndns-server=192.0.2.53\nfuture-network-metadata=retained-fixture\n";
+  QByteArray body=ini?globals+QString("[Proxy]\nA=socks5,127.0.0.1,%1\n[Rule]\nRULE-SET,https://policy.invalid/rules,REJECT\nFINAL,REJECT\n").arg(net.a.serverPort()).toUtf8():
+   QString("mixed-port: 19870\nallow-lan: true\ntun: {enable: true}\nfuture-network-metadata: {opaque: retained-fixture}\nproxies: [{name: A, type: socks5, server: 127.0.0.1, port: %1}]\nrules: ['MATCH,REJECT']\n").arg(net.a.serverPort()).toUtf8();
+  const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+  QTcpServer source;QVERIFY(source.listen(QHostAddress::LocalHost));
+  connect(&source,&QTcpServer::newConnection,this,[&]{while(source.hasPendingConnections()){
+   auto *socket=source.nextPendingConnection();connect(socket,&QTcpSocket::readyRead,socket,[&,socket]{
+    socket->readAll();if(socket->property("done").toBool())return;socket->setProperty("done",true);
+    socket->write("HTTP/1.1 200 OK\r\nContent-Length: "+QByteArray::number(body.size())+"\r\nConnection: close\r\n\r\n"+body);socket->disconnectFromHost();
+   });connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+  }});
+  EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path,true);
+  QVERIFY(controller.replaceNetworkConfiguration({{"rules",QStringList{"MATCH,REJECT"}},{"groups",QVariantList{}}}));
+  const auto original=controller.networkConfigurationSnapshot();auto *imports=controller.imports();
+  QVERIFY(imports->saveSubscription({},"Foreign full profile",QUrl(QString("http://127.0.0.1:%1/source").arg(source.serverPort())),360,false,"auto"));
+  const auto sourceId=imports->providers().first().toMap().value("id").toString();imports->refreshSubscription(sourceId);
+  QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.networkConfigurationSnapshot(),original);
+  const auto outcome=imports->providers().first().toMap();QCOMPARE(outcome.value("importMode").toString(),QString("nodes-with-warning"));
+  QVERIFY(outcome.value("warning").toString().contains(QStringLiteral("监听与 TUN 均未启用")));
+  NodeStore reloaded(path);QCOMPARE(reloaded.nodes().size(),1);
+  const auto preserved=reloaded.networkConfiguration()["subscriptionImportResults"].toObject()[sourceId].toObject();
+  QCOMPARE(preserved["preservedConfiguration"],QJsonValue(parsed.configuration));
+  EngineController reopened(std::make_unique<RustCoreEngine>(),nullptr,path,true);QCOMPARE(reopened.networkConfigurationSnapshot(),original);
+  QCOMPARE(reopened.imports()->providers().first().toMap().value("warning"),outcome.value("warning"));
+  auto native=options(net);native.nodes=reloaded.nodes();native.selectedNodeId=native.nodes.first().id;native.routingMode="global";
+  RustCoreEngine engine;engine.start(native);QVERIFY2(engine.status().apiHealthy,qPrintable(engine.status().message));
+  QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",native.proxyPort));
+  QNetworkRequest request(net.url());request.setTransferTimeout(4000);auto *reply=client.get(request);
+  QVERIFY(QTest::qWaitFor([&]{return reply->isFinished();},5000));QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-A"));
+  QCOMPARE(net.a.forwarded,1);QCOMPARE(net.httpRequestsByExit.value("DIRECT-BYPASS"),0);engine.stop();
+  QFile encrypted(path);QVERIFY(encrypted.open(QIODevice::ReadOnly));const auto before=encrypted.readAll();encrypted.close();QVERIFY(!before.contains("retained-fixture"));
+  body+=ini?QByteArray("[Script]\nrequest=javascript:retained-fixture\n[MITM]\nhostname=fixture.invalid\n[URL Rewrite]\n^https://fixture.invalid https://ignored.invalid 302\n"):QByteArray("script: {code: retained-fixture}\n");
+  imports->refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
+  QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+  QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));
+  QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.networkConfigurationSnapshot(),original);
+  QVERIFY(encrypted.open(QIODevice::ReadOnly));const auto inert=encrypted.readAll();encrypted.close();QVERIFY(!inert.contains("retained-fixture"));
+  imports->importText(QString::fromUtf8(body));QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
+  QVERIFY(imports->message().contains(QStringLiteral("失败")));QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.networkConfigurationSnapshot(),original);
+  QVERIFY(encrypted.open(QIODevice::ReadOnly));QCOMPARE(encrypted.readAll(),inert);
  }
  void automaticManagedIniAppliesActualRoutingAndKeepsSwirlUpdateSource_data(){
   QTest::addColumn<bool>("quantumult");QTest::newRow("managed-ini")<<false;QTest::newRow("quantumult-x")<<true;
@@ -1192,9 +1245,11 @@ private slots:
   for(const auto &mutation:QList<QJsonObject>{QJsonObject{{"future-global",true}},QJsonObject{{"script",QJsonObject{{"code","SYNTHETIC-PRIVATE"}}}},QJsonObject{{"mixed-port",7890}},QJsonObject{{"dns",QJsonObject{{"enable",true},{"nameserver",QJsonArray{"file:///SYNTHETIC-PRIVATE"}}}}}}) {
    QVERIFY(saved.open(QIODevice::ReadOnly));const auto ciphertext=saved.readAll();saved.close();NodeStore before(path);const auto lastSuccess=before.subscriptions().first().lastSuccess;
    auto invalid=document;for(auto it=mutation.begin();it!=mutation.end();++it)invalid[it.key()]=it.value();body=QJsonDocument(invalid).toJson();imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);
-   QCOMPARE(controller.networkConfigurationSnapshot(),network);QCOMPARE(controller.nodeCatalog(),nodes);QVERIFY(imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
-   QVERIFY(!imports->message().contains("SYNTHETIC-PRIVATE"));QVERIFY(saved.open(QIODevice::ReadOnly));QCOMPARE(saved.readAll(),ciphertext);saved.close();
-   NodeStore after(path);QCOMPARE(after.subscriptions().first().lastSuccess,lastSuccess);
+   QCOMPARE(controller.networkConfigurationSnapshot(),network);QCOMPARE(controller.nodeCatalog(),nodes);QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+   QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));
+   QVERIFY(!imports->message().contains("SYNTHETIC-PRIVATE"));QVERIFY(saved.open(QIODevice::ReadOnly));const auto inert=saved.readAll();saved.close();QVERIFY(!inert.contains("SYNTHETIC-PRIVATE"));
+   imports->importText(QString::fromUtf8(body));QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QVERIFY(imports->message().contains(QStringLiteral("失败")));QCOMPARE(controller.networkConfigurationSnapshot(),network);QCOMPARE(controller.nodeCatalog(),nodes);
+   QVERIFY(saved.open(QIODevice::ReadOnly));QCOMPARE(saved.readAll(),inert);saved.close();
   }
   for(const auto &mutation:QList<QJsonObject>{QJsonObject{{"dns",QJsonObject{{"respect-rules",true}}}},QJsonObject{{"rules",QJsonArray{false}}},QJsonObject{{"proxy-groups","not-an-array"}},QJsonObject{{"rules",QJsonArray{"PROCESS-NAME,fixture.exe,route","MATCH,route"}}},QJsonObject{{"rules",QJsonArray{"DOMAIN,example.invalid,route"}}}}) {
    auto unsupported=document;for(auto it=mutation.begin();it!=mutation.end();++it)unsupported[it.key()]=it.value();body=QJsonDocument(unsupported).toJson();imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);
@@ -1254,15 +1309,17 @@ private slots:
    QCOMPARE(retained.networkConfiguration()["subscriptionImportResults"].toObject()[source].toObject()["notice"].toString(),outcome.value("warning").toString());
    QCOMPARE(retained.networkConfiguration()["importedConfiguration"].toObject()["configuration"].toObject(),disk.networkConfiguration()["importedConfiguration"].toObject()["configuration"].toObject());
   } else {
-   QVERIFY(imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
-   QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),ciphertext);file.close();
+   QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+   QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));
   }
-  // A dangerous request still rejects the whole update after a recoverable
-  // configuration, without changing the ciphertext or last successful update.
+  // Refuse foreign execution while retaining the canonical nodes and current
+  // policy. Strict full application still rejects it without a disk write.
   QVERIFY(file.open(QIODevice::ReadOnly));const auto beforeDanger=file.readAll();file.close();NodeStore beforeDangerStore(path);const auto lastSuccess=beforeDangerStore.subscriptions().first().lastSuccess;
   auto dangerous=bad;dangerous["script"]=QJsonObject{{"code","SYNTHETIC-PRIVATE"}};body=QJsonDocument(dangerous).toJson();imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
-  QVERIFY(imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));QVERIFY(!imports->message().contains("SYNTHETIC-PRIVATE"));QCOMPARE(controller.nodeCatalog(),nodes);QCOMPARE(controller.networkConfigurationSnapshot(),snapshot);
-  QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),beforeDanger);file.close();QCOMPARE(NodeStore(path).subscriptions().first().lastSuccess,lastSuccess);
+  QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));QVERIFY(!imports->message().contains("SYNTHETIC-PRIVATE"));QCOMPARE(controller.nodeCatalog(),nodes);QCOMPARE(controller.networkConfigurationSnapshot(),snapshot);
+  QVERIFY(file.open(QIODevice::ReadOnly));const auto inert=file.readAll();file.close();QVERIFY(inert!=beforeDanger);QVERIFY(!inert.contains("SYNTHETIC-PRIVATE"));
+  imports->importText(QString::fromUtf8(body));QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);QVERIFY(imports->message().contains(QStringLiteral("失败")));QCOMPARE(controller.nodeCatalog(),nodes);QCOMPARE(controller.networkConfigurationSnapshot(),snapshot);
+  QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),inert);file.close();
   EngineController reopened(std::make_unique<RustCoreEngine>(),nullptr,path,true);QCOMPARE(QJsonObject::fromVariantMap(reopened.networkConfigurationSnapshot()),QJsonObject::fromVariantMap(snapshot));
   NodeStore restored(path);const auto archivedNodes=disk.nodes();QCOMPARE(restored.selectedId(),id);QCOMPARE(restored.nodes().size(),archivedNodes.size());for(const auto &node:restored.nodes()){QCOMPARE(node.sourceId,source);QVERIFY(std::any_of(archivedNodes.cbegin(),archivedNodes.cend(),[&](const ProxyNode &before){return before.id==node.id&&before.name==node.name&&before.host==node.host&&before.port==node.port;}));}
   reopened.setProxyPort(proxyPort);reopened.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(reopened.apiHealthy(),5000);reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-B"));QCOMPARE(net.a.forwarded,0);QCOMPARE(net.b.forwarded,2);reply->deleteLater();reopened.stop();QTRY_VERIFY_WITH_TIMEOUT(!reopened.processAlive(),5000);
@@ -1309,8 +1366,18 @@ private slots:
    const auto outcome=imports->providers().first().toMap();QVERIFY2(!outcome.value("status").toString().contains(QStringLiteral("失败")),qPrintable(imports->message()));QCOMPARE(outcome.value("importMode").toString(),QString("nodes-with-warning"));QVERIFY(!outcome.value("warning").toString().isEmpty());
    NodeStore retained(path);for(const auto &node:retained.nodes())QCOMPARE(node.sourceId,source);QCOMPARE(retained.networkConfiguration()["subscriptionImportResults"].toObject()[source].toObject()["notice"].toString(),outcome.value("warning").toString());
   }
-  QList<QByteArray> dangerous{original+"[Remote Rule]\nhttps://fixture.invalid/rules,policy=route\n",original+"[Script]\nrequest=script-path=file:///SYNTHETIC-PRIVATE\n",original+"[MITM]\np12=SYNTHETIC-PRIVATE\n",original+"[General]\nhttp-listen=0.0.0.0:7890\n"};
-  {auto bad=original;bad.replace("select,B,A","select,B,A,policy-path=C:\\SYNTHETIC-PRIVATE");dangerous.append(bad);}
+  QList<QByteArray> opaqueGlobals{original+"[Remote Rule]\nhttps://fixture.invalid/rules,policy=route\n",original+"[Script]\nrequest=script-path=file:///SYNTHETIC-PRIVATE\n",original+"[MITM]\np12=SYNTHETIC-PRIVATE\n",original+"[General]\nhttp-listen=0.0.0.0:7890\n"};
+  {auto bad=original;bad.replace("select,B,A","select,B,A,policy-path=C:\\SYNTHETIC-PRIVATE");opaqueGlobals.append(bad);}
+  for(const auto &foreign:opaqueGlobals){
+   const auto beforeDownloads=downloads;body=foreign;imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);
+   QCOMPARE(downloads,beforeDownloads+1);QCOMPARE(controller.nodeCatalog(),beforeNodes);QCOMPARE(controller.networkConfigurationSnapshot(),beforeNetwork);
+   const auto outcome=imports->providers().first().toMap();QVERIFY(!outcome.value("status").toString().contains(QStringLiteral("失败")));QCOMPARE(outcome.value("importMode").toString(),QString("nodes-with-warning"));
+   QVERIFY(outcome.value("warning").toString().contains(QStringLiteral("不会执行")));QVERIFY(!imports->message().contains("SYNTHETIC-PRIVATE"));
+   QVERIFY(file.open(QIODevice::ReadOnly));const auto inert=file.readAll();file.close();QVERIFY(!inert.contains("SYNTHETIC-PRIVATE"));
+   imports->importText(QString::fromUtf8(foreign));QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QVERIFY(imports->message().contains(QStringLiteral("失败")));
+   QCOMPARE(controller.nodeCatalog(),beforeNodes);QCOMPARE(controller.networkConfigurationSnapshot(),beforeNetwork);QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),inert);file.close();
+  }
+  QList<QByteArray> dangerous;
   // This safe but incomplete update removes a node still referenced by the
   // retained policy. Nodes-only fallback must reject that dangling refresh.
   dangerous.append("[Proxy]\n"+a+"[Proxy Group]\nroute = select,A\n[Rule]\n"+QByteArray("DOMAIN,example.invalid,REJECT\n").repeated(1000)+"FINAL,route\n");
@@ -1336,7 +1403,7 @@ private slots:
   QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));QVERIFY(imports->providers().first().toMap().value("warning").toString().contains("ProfileIniUnknownPolicy"));
   QVERIFY(file.open(QIODevice::ReadOnly));const auto renamedCiphertext=file.readAll();file.close();
   body+="[Script]\nrequest=script-path=file:///SYNTHETIC-PRIVATE\n";imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);
-  QVERIFY(imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));QCOMPARE(controller.nodeCatalog(),renamedCatalog);QCOMPARE(controller.networkConfigurationSnapshot(),renamedNetwork);QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),renamedCiphertext);file.close();
+  QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));QCOMPARE(controller.nodeCatalog(),renamedCatalog);QCOMPARE(controller.networkConfigurationSnapshot(),renamedNetwork);QVERIFY(file.open(QIODevice::ReadOnly));const auto extractedCiphertext=file.readAll();QVERIFY(extractedCiphertext!=renamedCiphertext);QVERIFY(!extractedCiphertext.contains("SYNTHETIC-PRIVATE"));file.close();
   EngineController reopened(std::make_unique<RustCoreEngine>(),nullptr,path,true);QCOMPARE(reopened.selectedNodeId(),id);reopened.setProxyPort(proxyPort);reopened.connectNode(renamed);QTRY_VERIFY_WITH_TIMEOUT(reopened.apiHealthy(),4000);reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);QCOMPARE(reply->readAll(),QByteArray("exit-A"));reply->deleteLater();reopened.stop();QTRY_VERIFY_WITH_TIMEOUT(!reopened.processAlive(),4000);
  }
  void iniRealityCannotStartAsOrdinaryTls(){

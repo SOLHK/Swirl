@@ -377,12 +377,13 @@ void uri(Result &r,const QString &line){
         issue(issues,"URI 显式传输类型为空；原始参数已保留，不能当作省略后连接。");
     if(queryKeys.contains("headerType")&&!network.isEmpty()&&network!="tcp")
         issue(issues,"此传输不支持 URI 的 headerType；原始参数已保留，不能忽略后连接。");
-    // These are transport requirements, not decorative URI metadata. The
-    // ordinary TCP mapper cannot implement an HTTP path/Host or gRPC service.
-    // Even an explicitly empty value must not disappear into a TCP default;
-    // retain the complete original and prevent this node from being executed.
+    // Nonempty HTTP path/Host or gRPC service values are transport requirements
+    // that the ordinary TCP mapper cannot implement. Exporters also include
+    // literal empty placeholders for inactive transports; those carry the same
+    // requirements as absent fields. Do not trim: whitespace is still data.
+    // The complete original URI is retained in either case.
     if((network.isEmpty()||network=="tcp")&&
-       (queryKeys.contains("path")||queryKeys.contains("host")||queryKeys.contains("serviceName")))
+       (!path.isEmpty()||!host.isEmpty()))
         issue(issues,"TCP URI 的 path、host 或 serviceName 尚未映射；原始参数已保留，不能忽略后连接。");
     transport(node,network,path,host,issues);append(r,node,QJsonObject{{"uri",line}},issues);
 }
