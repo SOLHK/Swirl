@@ -106,7 +106,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         return true;
     });
     m_imports.setConfigurationApplier([this,retainedNodeConfiguration](const NodeImporter::Result &result,const QString &sourceId,bool nodesOnly,QString *error) {
-        const auto &configuration=result.configurationFormat=="ini"?result.executionConfiguration:result.configuration;
+        const auto &configuration=result.configuration;
         if(nodesOnly || result.configuration.isEmpty()) {
             NodeStore::ImportPlan plan;
             if(!m_store.prepareImport(result.nodes,sourceId,&plan)){*error=m_store.error();return false;}

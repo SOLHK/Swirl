@@ -418,7 +418,7 @@ fn uri(line: &str) -> Result<Value, &'static str> {
     }
     Ok(n)
 }
-fn clean_ini(text: &str) -> String {
+pub(crate) fn clean_ini(text: &str) -> String {
     let text = text.trim();
     if text.len() >= 2
         && ((text.starts_with('"') && text.ends_with('"'))
@@ -432,7 +432,7 @@ fn clean_ini(text: &str) -> String {
         text.to_string()
     }
 }
-fn csv(text: &str) -> Result<Vec<(String, bool)>, &'static str> {
+pub(crate) fn csv(text: &str) -> Result<Vec<(String, bool)>, &'static str> {
     let mut out = Vec::new();
     let mut field = String::new();
     let mut quote = None;
@@ -472,7 +472,7 @@ fn csv(text: &str) -> Result<Vec<(String, bool)>, &'static str> {
 // Only the section envelope is common across these client formats. Rule,
 // rewrite and script bodies have different grammars: retain them verbatim and
 // report unvalidated semantics instead of pretending to parse them as key=value.
-fn ini_section(line: &str) -> Result<Option<String>, &'static str> {
+pub(crate) fn ini_section(line: &str) -> Result<Option<String>, &'static str> {
     let Some(rest) = line.strip_prefix('[') else {
         return Ok(None);
     };

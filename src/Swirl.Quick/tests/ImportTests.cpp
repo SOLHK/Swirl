@@ -529,15 +529,52 @@ private slots:
         const QByteArray original="[Proxy]\nA = socks5,127.0.0.1,1080\nDIRECT = direct\nREJECT = reject\n[Proxy Group]\nroute = select,A,DIRECT\nnested = select,route,REJECT\n[Rule]\nDOMAIN,exact.invalid,REJECT\nDOMAIN-SUFFIX,suffix.invalid,route\nDOMAIN-KEYWORD,keyword,nested\nFINAL,route\n";
         for(const auto &body:{original,original.toBase64()}) {
             const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);QCOMPARE(parsed.configurationFormat,QString("ini"));QCOMPARE(parsed.configuration["document"],QJsonValue(QString::fromUtf8(original).trimmed()));
-            QCOMPARE(parsed.executionConfiguration["proxy-groups"].toArray().size(),2);const auto rules=parsed.executionConfiguration["rules"].toArray();QCOMPARE(rules.size(),4);QCOMPARE(rules.last(),QJsonValue("MATCH,route"));
+            QCOMPARE(parsed.executionConfiguration,parsed.configuration);
             QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService importer(&store);importer.importText(QString::fromUtf8(body));QTRY_VERIFY_WITH_TIMEOUT(!importer.busy(),4000);QVERIFY(store.nodes().isEmpty());
         }
         QList<QByteArray> rejected;
         for(const auto &tail:{"[General]\ndns-server=192.0.2.53\n", "[Remote Rule]\nhttps://fixture.invalid/rules,policy=route\n", "[Future]\nopaque=value\n", "DOMAIN,late.invalid,route\n"})rejected.append(original+tail);
         for(const auto &replacement:{"route = url-test,A,DIRECT", "route = select,A,A", "route = select,A,policy-path=remote", "route = select", "route = select,A\nroute = select,DIRECT"}) {auto body=original;body.replace("route = select,A,DIRECT",replacement);rejected.append(body);}
-        for(const auto &replacement:{"IP-CIDR,192.0.2.0/24,route", "PROCESS-NAME,fixture.exe,route", "DOMAIN,exact.invalid,route,no-resolve"}) {auto body=original;body.replace("DOMAIN,exact.invalid,REJECT",replacement);rejected.append(body);}
+        for(const auto &replacement:{"PROCESS-NAME,fixture.exe,route", "DOMAIN,exact.invalid,route,no-resolve"}) {auto body=original;body.replace("DOMAIN,exact.invalid,REJECT",replacement);rejected.append(body);}
         {auto body=original;body.replace("DIRECT = direct\n","DIRECT = direct\nDIRECT = direct\n");rejected.append(body);body=original;body.replace("DIRECT = direct","Bypass = direct");rejected.append(body);body=original;body.replace("FINAL,route\n","");rejected.append(body);}
-        for(const auto &body:rejected)for(const auto &wrapped:{body,body.toBase64()}){const auto parsed=NodeImporter::parse(wrapped);QVERIFY2(parsed,qPrintable(parsed.error));QVERIFY(!parsed.configuration.isEmpty());QVERIFY2(parsed.executionConfiguration.isEmpty(),"Unknown profile semantics became executable");}
+        QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);
+        controller.imports()->importText(QString::fromUtf8(original));QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),5000);
+        QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.policyGroups().size(),2);
+        QCOMPARE(controller.networkConfigurationSnapshot().value("rules").toStringList(),QStringList({"DOMAIN,exact.invalid,REJECT","DOMAIN-SUFFIX,suffix.invalid,route","DOMAIN-KEYWORD,keyword,nested","MATCH,route"}));
+        QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto before=file.readAll();file.close();
+        for(const auto &body:rejected)for(const auto &wrapped:{body,body.toBase64()}){
+            const auto parsed=NodeImporter::parse(wrapped);QVERIFY2(parsed,qPrintable(parsed.error));QVERIFY(!parsed.configuration.isEmpty());
+            controller.imports()->importText(QString::fromUtf8(wrapped));QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),5000);
+            QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),before);file.close();QCOMPARE(controller.nodeCatalog().size(),1);
+        }
+    }
+    void completeIniDnsRulesGroupsCarryTrafficThroughTheImportedNode() {
+        ControlledNetwork network;QVERIFY(network.start());QTemporaryDir directory;
+        const auto path=directory.filePath("nodes.dpapi");EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);
+        QVERIFY(controller.prepareRealAcceptance());controller.setProxyPort(freePort());controller.setRoutingMode("rule");
+        const auto body=QString("[General]\ndns-server=192.0.2.53\nipv6=false\n[Host]\nfixture.invalid=192.0.2.99\n[Proxy]\nA=socks5,127.0.0.1,%1,tfo=true\n[Proxy Group]\nroute=select,A,DIRECT\n[Rule]\nDOMAIN-SUFFIX,fixture.invalid,REJECT\nIP-CIDR,192.0.2.0/24,REJECT,no-resolve\nFINAL,route\n").arg(network.a.serverPort());
+        controller.imports()->importText(body);QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),5000);
+        QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.policyGroups().size(),1);
+        QCOMPARE(controller.networkConfigurationSnapshot().value("rules").toStringList(),QStringList({"DOMAIN-SUFFIX,fixture.invalid,REJECT","IP-CIDR,192.0.2.0/24,REJECT,no-resolve","MATCH,route"}));
+        QCOMPARE(controller.dnsConfiguration().value("servers").toString(),QString("192.0.2.53"));
+        QCOMPARE(controller.dnsConfiguration().value("queryFamily").toString(),QString("ipv4_only"));
+        const auto id=controller.nodeCatalog().first().toMap().value("id").toString();controller.connectNode(id);
+        QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),15000);controller.testNode(network.url());QTRY_VERIFY_WITH_TIMEOUT(!controller.nodeBusy(),8000);
+        QVERIFY(controller.requestSucceeded());QVERIFY(network.a.forwarded>0);QCOMPARE(network.b.forwarded,0);
+        controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),5000);
+        NodeStore restored(path);QCOMPARE(restored.nodes().size(),1);QCOMPARE(restored.networkConfiguration().value("importedConfiguration").toObject().value("format"),QJsonValue("ini"));
+        qInfo()<<"INI_NATIVE_CHAIN: explicit DNS family, hosts, rules and select groups committed atomically; actual loopback bytes traversed the imported SOCKS node";
+    }
+    void subscriptionMessageUsesDurableMergedNodeAndCapabilityCounts() {
+        ControlledNetwork network;QVERIFY(network.start());SubscriptionServer source;QVERIFY(source.listen(QHostAddress::LocalHost,0));
+        QTemporaryDir directory;EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("nodes.dpapi"));
+        auto *imports=controller.imports();QVERIFY(imports->saveSubscription({},"Counts",source.url(),360,false,"auto","nodes-only"));
+        const auto sid=imports->providers().first().toMap().value("id").toString();
+        source.content=QString("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: %1}, {name: B, type: socks5, server: 127.0.0.1, port: %1}, {name: C, type: ss, server: 127.0.0.1, port: %1, password: synthetic, cipher: rc4-md5}]\n").arg(network.a.serverPort()).toUtf8();
+        imports->refreshSubscription(sid);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
+        QCOMPARE(controller.nodeCatalog().size(),2);QCOMPARE(imports->providers().first().toMap().value("nodes").toInt(),2);
+        QVERIFY2(imports->message().contains("已解析 3 条节点记录"),qPrintable(imports->message()));
+        QVERIFY(imports->message().contains("保存 2 个节点"));QVERIFY(imports->message().contains("1 个已保存节点当前不可执行"));
     }
     void iniEnvelopeAndWrappedJsonFailClosed() {
         const QByteArray node="A = socks5, 127.0.0.1, 1080\n";

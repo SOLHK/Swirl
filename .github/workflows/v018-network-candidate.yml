@@ -7,7 +7,8 @@ permissions:
   contents: read
 concurrency:
   group: v018-network-candidate-${{ github.ref }}
-  cancel-in-progress: true
+  # Complete each independently deliverable installer, then reuse its cache.
+  cancel-in-progress: false
 env:
   CARGO_INCREMENTAL: '1'
   SWIRL_SOURCE_SHA: ${{ github.sha }}
@@ -121,9 +122,9 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/build-network-candidate.ps1 -QtDir $env:QT_ROOT_DIR -BuildDir build/v018-network -RustTargetDir core/target -OutDir dist/v018-network -Nsis 'C:/Program Files (x86)/NSIS/makensis.exe' -Parallel 4 -DisposableSystemProxyTests
-      - name: Save successful compiler outputs independently of delivery uploads
+      - name: Save compiler outputs without treating downstream failures as passes
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        if: ${{ !cancelled() && steps.candidate.outcome == 'success' && steps.build_cache.outputs.cache-hit != 'true' }}
+        if: ${{ !cancelled() && steps.candidate.outputs.cache-ready == 'true' && steps.build_cache.outputs.cache-hit != 'true' }}
         with:
           path: |
             ~/.cargo/registry

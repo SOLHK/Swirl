@@ -604,47 +604,6 @@ void singBox(Result &r,const QJsonArray &array){
     }
     if(r.nodes.isEmpty())r.error="sing-box 配置没有可导入的远端代理节点。";
 }
-// A deliberately closed, complete INI profile: manual groups and domain rules.
-// Source text is retained independently. Any additional section/option keeps
-// the profile unexecutable rather than silently inheriting different semantics.
-QJsonObject iniProfile(const QString &document,const QJsonArray &nodes){
-    QString section;QJsonArray groups,rules;QSet<QString> proxyNames,nodeNames,groupNames,declaredProxyNames;bool final=false,hasRules=false;
-    auto nameValid=[](const QString &name){return !name.isEmpty()&&!name.contains(',')&&!name.contains('=')&&!name.contains('\n');};
-    for(const auto &value:nodes){const auto name=value.toObject().value("name").toString();if(!nameValid(name)||nodeNames.contains(name))return {};nodeNames.insert(name);}
-    for(const auto &raw:document.split('\n')){
-        const auto line=raw.trimmed();if(line.isEmpty()||line.startsWith('#')||line.startsWith(';')||line.startsWith("//"))continue;
-        if(line.startsWith('[')){
-            const auto close=line.indexOf(']');if(close<0)return {};section=line.mid(1,close-1).trimmed().toLower();
-            if(section!="proxy"&&section!="proxy group"&&section!="rule")return {};
-            if(section=="rule")hasRules=true;continue;
-        }
-        if(section=="proxy"||section=="proxy group"){
-            const auto equal=line.indexOf('=');if(equal<1)return {};const auto name=clean(line.left(equal));if(!nameValid(name))return {};
-            bool ok=false;const auto fields=csv(line.mid(equal+1),&ok);if(!ok||fields.isEmpty())return {};const auto kind=clean(fields.first()).toLower();
-            if(section=="proxy"){
-                if(declaredProxyNames.contains(name))return {};declaredProxyNames.insert(name);
-                if(kind=="direct"||kind=="reject"){
-                    if(fields.size()!=1||name!=(kind=="direct"?"DIRECT":"REJECT"))return {};
-                }else {if(proxyNames.contains(name))return {};proxyNames.insert(name);}
-            }else {
-                if(kind!="select"||fields.size()<2||groupNames.contains(name))return {};groupNames.insert(name);QJsonArray members;QSet<QString> seen;
-                for(auto it=fields.cbegin()+1;it!=fields.cend();++it){const auto member=clean(*it);if(!nameValid(member)||seen.contains(member))return {};seen.insert(member);members.append(member);}
-                groups.append(QJsonObject{{"name",name},{"type","select"},{"proxies",members}});
-            }
-        }else if(section=="rule"){
-            if(final)return {};bool ok=false;auto fields=csv(line,&ok);if(!ok||fields.isEmpty())return {};for(auto &field:fields)field=clean(field);
-            const auto kind=fields.first().toUpper();
-            if(kind=="FINAL"){
-                if(fields.size()!=2||!nameValid(fields[1]))return {};rules.append("MATCH,"+fields[1]);final=true;
-            }else {
-                if(!QStringList{"DOMAIN","DOMAIN-SUFFIX","DOMAIN-KEYWORD"}.contains(kind)||fields.size()!=3||fields[1].isEmpty()||fields[1].contains(',')||!nameValid(fields[2]))return {};
-                rules.append(kind+","+fields[1]+","+fields[2]);
-            }
-        }else return {};
-    }
-    if(!hasRules||!final||proxyNames!=nodeNames)return {};
-    return {{"proxy-groups",groups},{"rules",rules}};
-}
 void ini(Result &r,const QString &document){
     r.handled=true;r.format="Surge / Surfboard / Loon";r.configurationFormat="ini";QString section;
     QSet<QString> sections;
@@ -769,7 +728,7 @@ void ini(Result &r,const QString &document){
         transport(n,network,path,wsHost,issues);append(r,n,QJsonObject{{"line",line}},issues);if(!r.error.isEmpty())return;
     }
     if(r.nodes.isEmpty())r.error="此 INI 配置不包含可导入的代理节点。";
-    else if(!r.configuration.isEmpty())r.executionConfiguration=iniProfile(document,r.nodes);
+    else if(!r.configuration.isEmpty())r.executionConfiguration=r.configuration; // Rust validates the complete original INI document.
 }
 }
 

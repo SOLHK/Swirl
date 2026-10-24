@@ -400,9 +400,21 @@ void NodeImportService::apply(NodeImporter::Result result) {
     applied(result.format,count,result.incompleteNodes);
 }
 void NodeImportService::applied(const QString &format,qsizetype count,int incomplete) {
-    m_message=QStringLiteral("%1 · 已解析并保存 %2 个节点；实际联网需检测。").arg(format).arg(count);
+    if(!m_source.isEmpty()){
+        qsizetype saved=0;int unsupported=0;
+        // The durable catalog has already merged identical source records.
+        // Reuse the same cached capability rows displayed by the node list.
+        for(const auto &value:m_store->publicRows()){
+            const auto row=value.toMap();if(row.value("sourceId").toString()!=m_source)continue;
+            ++saved;if(!row.value("nativeExecutable").toBool())++unsupported;
+        }
+        m_message=QStringLiteral("%1 · 已解析 %2 条节点记录，合并重复后保存 %3 个节点；实际联网需检测。").arg(format).arg(count).arg(saved);
+        if(unsupported)m_message+=QStringLiteral(" %1 个已保存节点当前不可执行，原始参数已加密保留。").arg(unsupported);
+    }else{
+        m_message=QStringLiteral("%1 · 已处理 %2 条节点记录，相同节点已合并保存；实际联网需检测。").arg(format).arg(count);
+        if(incomplete)m_message+=QStringLiteral(" %1 条记录含无效或尚未映射的参数，原始参数已加密保留。").arg(incomplete);
+    }
     if(m_nodesOnly)m_message+=QStringLiteral(" 本次仅更新节点；DNS、规则与策略组保持不变。");
-    if(incomplete)m_message+=QStringLiteral(" %1 个节点当前不可执行，原始参数已加密保留。").arg(incomplete);
     const QPointer<NodeImportService> guard(this);emit nodesApplied();if(guard)finish();
 }
 void NodeImportService::finish(const QString &error) {

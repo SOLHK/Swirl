@@ -50,12 +50,53 @@ pub async fn secure_with_alpn<S: Stream + 'static>(
     let stream = TlsConnector::from(config)
         .connect(name, stream)
         .await
-        .map_err(|_| "TlsVerificationOrHandshake")?;
+        .map_err(|error| tls_failure_code(&error))?;
     if required_alpn.is_some_and(|required| stream.get_ref().1.alpn_protocol() != Some(required)) {
         return Err("TlsAlpnNegotiation");
     }
     Ok(Box::new(stream))
 }
+
+// Preserve only typed, fixed categories. Rustls context can contain private
+// expected/presented names; neither its Display nor Debug text is exported.
+fn tls_failure_code(error: &io::Error) -> &'static str {
+    use tokio_rustls::rustls::{CertificateError, Error};
+    if let Some(tls_error) = error
+        .get_ref()
+        .and_then(|inner| inner.downcast_ref::<Error>())
+    {
+        return match tls_error {
+            Error::InvalidCertificate(certificate) => match certificate {
+                CertificateError::Expired | CertificateError::ExpiredContext { .. } => {
+                    "TlsCertificateExpired"
+                }
+                CertificateError::NotValidYet | CertificateError::NotValidYetContext { .. } => {
+                    "TlsCertificateNotValidYet"
+                }
+                CertificateError::NotValidForName
+                | CertificateError::NotValidForNameContext { .. } => "TlsCertificateNameMismatch",
+                CertificateError::UnknownIssuer => "TlsCertificateUnknownIssuer",
+                CertificateError::Revoked => "TlsCertificateRevoked",
+                _ => "TlsCertificateInvalid",
+            },
+            Error::NoCertificatesPresented => "TlsCertificateMissing",
+            _ => "TlsVerificationOrHandshake",
+        };
+    }
+    match error.kind() {
+        io::ErrorKind::UnexpectedEof => "TlsHandshakeEof",
+        io::ErrorKind::ConnectionReset => "TlsConnectionReset",
+        io::ErrorKind::ConnectionAborted => "TlsConnectionAborted",
+        io::ErrorKind::ConnectionRefused => "TlsConnectionRefused",
+        io::ErrorKind::TimedOut => "TlsHandshakeIoTimeout",
+        io::ErrorKind::BrokenPipe => "TlsHandshakeBrokenPipe",
+        _ => "TlsVerificationOrHandshake",
+    }
+}
+
+#[cfg(test)]
+#[path = "tls_failure_tests.rs"]
+mod tls_failure_tests;
 
 /// Validate certificate material, SNI and ALPN without opening a socket. The
 /// bounded cache also avoids rebuilding the root store on each TLS connection.

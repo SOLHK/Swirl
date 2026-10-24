@@ -113,4 +113,27 @@ mod tests {
             assert!(!result.to_string().contains("PRIVATE"));
         }
     }
+
+    #[test]
+    fn complete_ini_document_is_validated_in_portable_rust_including_rejected_sections() {
+        let document = "[General]\ndns-server=192.0.2.53\nipv6=false\n[Proxy]\nA=socks5,proxy.invalid,1080\n[Proxy Group]\nroute=select,A,DIRECT\n[Rule]\nFINAL,route\n";
+        let request = json!({"format":"ini","configuration":{"document":document}});
+        let result = call(&serde_json::to_vec(&request).unwrap());
+        assert_eq!(result["ok"], true);
+        assert_eq!(result["configuration"]["rules"], json!(["MATCH,route"]));
+        assert_eq!(result["configuration"]["dns"]["queryFamily"], "ipv4_only");
+        assert_eq!(result["network_verified"], false);
+        for suffix in [
+            "[Script]\nrequest=PRIVATE",
+            "[Remote Proxy]\nProvider=https://private.invalid?token=PRIVATE",
+        ] {
+            let request =
+                json!({"format":"ini","configuration":{"document":format!("{document}{suffix}")}});
+            let result = call(&serde_json::to_vec(&request).unwrap());
+            assert_eq!(result["ok"], false);
+            assert!(result.get("configuration").is_none());
+            assert!(!result.to_string().contains("PRIVATE"));
+            assert!(!result.to_string().contains("https://"));
+        }
+    }
 }

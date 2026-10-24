@@ -500,6 +500,29 @@ print(json.dumps(report), flush=True)
         with self.assertRaisesRegex(ValueError, "^DiagnosticOutputInvalid$"):
             DIAG.safe_report(report, "swirl-rust")
 
+    def test_native_typed_tcp_failures_keep_their_stage_and_closed_output_contract(self):
+        for code, outcome in (
+                ("UpstreamConnectionRefused", "refused"),
+                ("UpstreamConnectionReset", "other"),
+                ("UpstreamConnectionAborted", "other"),
+                ("UpstreamNetworkUnreachable", "unreachable"),
+                ("UpstreamPermissionDenied", "other")):
+            with self.subTest(code=code):
+                report = successful_report("swirl-rust")
+                report.update(ok=False, error_code=code, failure_stage="tcp_connect",
+                              private_endpoint="private-marker.invalid")
+                report["attempts"][0]["outcome"] = outcome
+                safe = DIAG.safe_report(report, "swirl-rust")
+                self.assertEqual((safe["error_code"], safe["failure_stage"]), (code, "tcp_connect"))
+                self.assertNotIn("private-marker", json.dumps(safe))
+                report["failure_stage"] = "dns"
+                with self.assertRaisesRegex(ValueError, "^DiagnosticOutputInvalid$"):
+                    DIAG.safe_report(report, "swirl-rust")
+        report["failure_stage"] = "tcp_connect"
+        report["error_code"] = "UpstreamFuturePrivateMessage"
+        with self.assertRaisesRegex(ValueError, "^DiagnosticOutputInvalid$"):
+            DIAG.safe_report(report, "swirl-rust")
+
     def test_duplicate_fields_are_rejected_before_private_input_can_dial(self):
         payload = b'{"host":"fixture.invalid","host":"private-marker.invalid","port":443}'
         process = subprocess.run([sys.executable, str(SCRIPT)], input=payload,
@@ -522,6 +545,24 @@ print(json.dumps(report), flush=True)
                 report = DIAG.diagnose_python(request)
                 self.assertEqual(report["error_code"], "InvalidDiagnosticInput")
                 thread.assert_not_called()
+
+    @unittest.skipUnless(RUST.exists(), "native diagnostic binary not built")
+    def test_native_refusal_keeps_typed_code_through_the_output_validator(self):
+        with socket.socket() as closed_listener:
+            closed_listener.bind(("127.0.0.1", 0))
+            closed_listener.listen()
+            port = closed_listener.getsockname()[1]
+        request = {"host": "127.0.0.1", "port": port,
+                   "total_budget_ms": 3000, "dns_budget_ms": 300}
+        process = subprocess.run([str(RUST)], input=json.dumps(request),
+                                 text=True, capture_output=True, timeout=4)
+        report = DIAG.safe_report(json.loads(process.stdout), "swirl-rust")
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["error_code"], "UpstreamConnectionRefused")
+        self.assertEqual(report["failure_stage"], "tcp_connect")
+        self.assertEqual([attempt["outcome"] for attempt in report["attempts"]], ["refused"])
+        self.assertNotIn("127.0.0.1", process.stdout)
+        self.assertNotIn('"port"', process.stdout)
 
     @unittest.skipUnless(RUST.exists(), "native diagnostic binary not built")
     def test_two_real_implementations_share_budget_and_close_without_payload(self):

@@ -263,6 +263,20 @@ fn ordered_addresses(addresses: Vec<SocketAddr>) -> Result<Vec<SocketAddr>> {
     Ok(ordered)
 }
 
+fn tcp_failure_code(error: &io::Error) -> &'static str {
+    match error.kind() {
+        io::ErrorKind::ConnectionRefused => "UpstreamConnectionRefused",
+        io::ErrorKind::ConnectionReset => "UpstreamConnectionReset",
+        io::ErrorKind::ConnectionAborted => "UpstreamConnectionAborted",
+        io::ErrorKind::TimedOut => "UpstreamTcpTimeout",
+        io::ErrorKind::NetworkUnreachable
+        | io::ErrorKind::HostUnreachable
+        | io::ErrorKind::NetworkDown => "UpstreamNetworkUnreachable",
+        io::ErrorKind::PermissionDenied => "UpstreamPermissionDenied",
+        _ => "UpstreamConnectFailed",
+    }
+}
+
 async fn dial_addresses<T, F: Future<Output = io::Result<T>>>(
     addresses: Vec<SocketAddr>,
     deadline: Instant,
@@ -283,6 +297,7 @@ async fn dial_addresses_observed<T, F: Future<Output = io::Result<T>>>(
     let mut attempts = Vec::with_capacity(PENDING_LIMIT);
     let mut next_start = Instant::now();
     let mut timed_out = false;
+    let mut failure_code = None;
     loop {
         let now = Instant::now();
         if now >= deadline {
@@ -310,7 +325,7 @@ async fn dial_addresses_observed<T, F: Future<Output = io::Result<T>>>(
             return Err(if timed_out {
                 "UpstreamTcpTimeout"
             } else {
-                "UpstreamConnectFailed"
+                failure_code.unwrap_or("UpstreamConnectFailed")
             });
         }
         tokio::select! {
@@ -337,7 +352,18 @@ async fn dial_addresses_observed<T, F: Future<Output = io::Result<T>>>(
                         observation.finish(ordinal, TcpOutcome::Success);
                         return Ok(stream);
                     },
-                    Ok(Err(error)) => observation.finish(ordinal, TcpOutcome::from_io(&error)),
+                    Ok(Err(error)) => {
+                        observation.finish(ordinal, TcpOutcome::from_io(&error));
+                        let code = tcp_failure_code(&error);
+                        // Different addresses may fail for different reasons.
+                        // Keep the generic code rather than picking whichever
+                        // concurrent OS error happened to complete last.
+                        failure_code = Some(match failure_code {
+                            None => code,
+                            Some(previous) if previous == code => code,
+                            _ => "UpstreamConnectFailed",
+                        });
+                    },
                     Err(_) => {
                         observation.finish(ordinal, TcpOutcome::Timeout);
                         timed_out = true;
@@ -353,6 +379,10 @@ async fn dial_addresses_observed<T, F: Future<Output = io::Result<T>>>(
         }
     }
 }
+
+#[cfg(test)]
+#[path = "dial_failure_tests.rs"]
+mod failure_tests;
 
 #[cfg(test)]
 mod tests {
@@ -498,7 +528,7 @@ mod tests {
                 |_| async { Err::<(), _>(io::ErrorKind::ConnectionRefused.into()) },
             )
             .await,
-            Err("UpstreamConnectFailed")
+            Err("UpstreamConnectionRefused")
         );
         let calls = Cell::new(0);
         let started = Instant::now();
@@ -811,8 +841,8 @@ mod tests {
             },
         )
         .await;
-        // Preserve the product's existing top-level error semantics: only an
-        // actual scheduler deadline changes this into UpstreamTcpTimeout.
+        // Different address errors, including one OS timeout, are ambiguous.
+        // Do not claim every endpoint timed out from this mixed result.
         assert_eq!(result, Err("UpstreamConnectFailed"));
         assert_eq!(
             report

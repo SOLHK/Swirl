@@ -114,3 +114,31 @@ fn client_dns_defaults_do_not_become_native_guesses() {
         "ProfileDnsHostsDisabled"
     );
 }
+
+#[test]
+fn an_explicit_loopback_restriction_is_a_typed_noop_not_permission_for_lan() {
+    let baseline = json!({"rules":["MATCH,DIRECT"]});
+    let mut restricted = baseline.clone();
+    restricted["allow-lan"] = json!(false);
+    assert_eq!(project(&restricted).unwrap(), project(&baseline).unwrap());
+    for value in [
+        json!(true),
+        json!("false"),
+        json!(0),
+        Value::Null,
+        json!({}),
+        json!([]),
+    ] {
+        restricted["allow-lan"] = value;
+        assert_eq!(
+            project(&restricted).unwrap_err(),
+            error("ProfileGlobalFieldUnsupported", "allow-lan")
+        );
+    }
+    restricted = baseline;
+    restricted["dns"] = json!({"enable":true,"nameserver":["192.0.2.53"],"allow-lan":false});
+    assert_eq!(
+        project(&restricted).unwrap_err().code,
+        "ProfileDnsFieldUnsupported"
+    );
+}

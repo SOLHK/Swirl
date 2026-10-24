@@ -6,11 +6,14 @@ use std::{
     collections::HashSet,
     net::{IpAddr, SocketAddr},
 };
+#[path = "profile_ini.rs"]
+mod ini;
 #[path = "singbox_profile.rs"]
 mod singbox;
 
 pub fn project_format(format: &str, configuration: &Value) -> Result<Value, ProfileError> {
     match format {
+        "ini" if configuration.get("document").is_some() => ini::project(configuration),
         "clash" | "ini" => project(configuration),
         "sing-box" => singbox::project(configuration),
         _ => Err(error("ProfileFormatUnsupported", "format")),
@@ -299,6 +302,12 @@ pub fn project(configuration: &Value) -> Result<Value, ProfileError> {
         .as_object()
         .ok_or_else(|| error("ProfileFieldType", "configuration"))?;
     for key in source.keys() {
+        // The Rust product exposes a fixed loopback listener and refuses LAN
+        // mode. An explicit false restriction is already satisfied; true and
+        // mistyped values cannot request a listener through a subscription.
+        if key == "allow-lan" && source[key] == Value::Bool(false) {
+            continue;
+        }
         if !["proxy-groups", "rules", "dns", "hosts"].contains(&key.as_str()) {
             return Err(error("ProfileGlobalFieldUnsupported", key));
         }

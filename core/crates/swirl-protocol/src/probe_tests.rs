@@ -315,7 +315,36 @@ async fn url_test_head_rejects_untrusted_https_certificate_at_origin_tls() {
     .expect("untrusted HTTPS certificate hung the probe")
     .unwrap_err();
     assert_eq!(failure.stage, UrlTestStage::OriginTls);
-    assert_eq!(failure.code, "TlsVerificationOrHandshake");
+    assert_eq!(failure.code, "TlsCertificateUnknownIssuer");
+    assert_eq!(failure.http_status, None);
+    peer.await.unwrap();
+}
+
+#[tokio::test]
+async fn url_test_head_rejects_wrong_certificate_name_without_sending_http() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let (der, acceptor) = tls_fixture();
+    let port = listener.local_addr().unwrap().port();
+    let mut probe = https_options(port, Some(&der));
+    probe.url = format!("https://wrong-name.invalid:{port}/check");
+    probe.tls.as_mut().unwrap().server_name = "wrong-name.invalid".into();
+    let resolver = Resolver::default().with_hosts(&[HostMapping {
+        name: "wrong-name.invalid".into(),
+        address: IpAddr::V4(std::net::Ipv4Addr::LOCALHOST),
+    }]);
+    let peer = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.unwrap();
+        assert!(acceptor.accept(socket).await.is_err());
+    });
+    let failure = timeout(
+        Duration::from_secs(3),
+        url_test_head(&Outbound::Direct {}, &probe, &resolver, None),
+    )
+    .await
+    .expect("certificate name mismatch hung the probe")
+    .unwrap_err();
+    assert_eq!(failure.stage, UrlTestStage::OriginTls);
+    assert_eq!(failure.code, "TlsCertificateNameMismatch");
     assert_eq!(failure.http_status, None);
     peer.await.unwrap();
 }

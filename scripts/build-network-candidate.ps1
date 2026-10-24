@@ -28,6 +28,7 @@ $oldTestRoot = $env:SWIRL_TEST_ROOT
 $env:PATH = "$(Join-Path (Resolve-Path -LiteralPath $QtDir).Path 'bin');$env:PATH"
 $env:CARGO_INCREMENTAL = '1'
 $env:SWIRL_TEST_ROOT = Join-Path $evidence 'isolated-test-data'
+New-Item -ItemType Directory -Path $env:SWIRL_TEST_ROOT | Out-Null
 if ($DisposableSystemProxyTests) {
     if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
         throw 'System proxy mutation checks require a disposable GitHub-hosted runner.'
@@ -37,7 +38,7 @@ if ($DisposableSystemProxyTests) {
 $report = [ordered]@{schema=1; source_sha=''; status='running'; cargo_incremental=$true;
     generator='Ninja'; build_directory=$build; rust_target_directory=$rustTarget;
     restored_cmake_cache=(Test-Path -LiteralPath (Join-Path $build 'CMakeCache.txt'));
-    restored_cargo_cache=(Test-Path -LiteralPath $rustTarget); steps=@();
+    restored_cargo_cache=(Test-Path -LiteralPath $rustTarget); compiler_cache_ready=$false; steps=@();
     system_proxy_mutation_requested=[bool]$DisposableSystemProxyTests;
     private_provider_verified=$false; codex_account_verified=$false; tun_verified=$false;
     dpi_visual_acceptance='user'; broad_ui_regression='unchanged prior evidence; not rerun by this network candidate script'}
@@ -83,6 +84,10 @@ try {
         'SwirlTelemetryTests','SwirlNodeViewModelTests')
     if ($DisposableSystemProxyTests) { $targets += 'SwirlSystemProxyTests' }
     Run-Step 'build-focused-tests' { Checked cmake (@('--build',$build,'--target')+$targets+@('--parallel',"$Parallel")) }
+    Assert-SwirlBuildSource -RepositoryRoot $repo -ExpectedSourceSha $report.source_sha
+    Run-Step 'save-compiled-input-times' { $null = Sync-SwirlBuildInputTimes -RepositoryRoot $repo -BuildDirectory $build }
+    $report.compiler_cache_ready = $true
+    if ($env:GITHUB_OUTPUT) { 'cache-ready=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append }
     Run-Step 'deploy-test-runtime' { Checked windeployqt @('--release','--compiler-runtime',(Join-Path $build 'SwirlRustCoreTests.exe')) }
     $pattern = '^swirl-(rust-library-loader|rust-qt-integration|node-real-chain|stream-regression|import-subscription|subscription-formats|diagnostic-export|system-proxy-state|qt-network-policy|codex-proxy-launcher|telemetry-accounting|node-view-model'
     if ($DisposableSystemProxyTests) { $pattern += '|system-proxy-recovery' }

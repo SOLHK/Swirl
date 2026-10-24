@@ -95,7 +95,14 @@ pub fn failure_stage(code: &str) -> &'static str {
     match code {
         "" => "",
         "UpstreamDnsTimeout" | "TuicDnsTimeout" | "Hysteria2DnsTimeout" => "dns",
-        "UpstreamTcpTimeout" | "UpstreamConnectFailed" | "UpstreamAddressLimit" => "tcp_connect",
+        "UpstreamTcpTimeout"
+        | "UpstreamConnectFailed"
+        | "UpstreamAddressLimit"
+        | "UpstreamConnectionRefused"
+        | "UpstreamConnectionReset"
+        | "UpstreamConnectionAborted"
+        | "UpstreamNetworkUnreachable"
+        | "UpstreamPermissionDenied" => "tcp_connect",
         "UpstreamTlsTimeout" => "tls_handshake",
         "QuicHandshakeTimeout" | "QuicHandshake" | "QuicConnect" | "QuicHandshakeData" => {
             "quic_handshake"

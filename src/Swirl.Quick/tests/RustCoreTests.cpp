@@ -1166,7 +1166,7 @@ private slots:
   beforeNetwork=controller.networkConfigurationSnapshot();
   QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto ciphertext=file.readAll();file.close();
   QList<QByteArray> invalid{original+"[General]\ndns-server=192.0.2.53\n",original+"[Remote Rule]\nhttps://fixture.invalid/rules,policy=route\n",original+"DOMAIN,late.invalid,route\n"};
-  for(const auto &replacement:{"IP-CIDR,192.0.2.0/24,route","PROCESS-NAME,fixture.exe,route","DOMAIN,example.invalid,route,no-resolve","DOMAIN,example.invalid,SWIRL"}){auto bad=original;bad.replace("DOMAIN,localhost,REJECT",replacement);invalid.append(bad);}
+  for(const auto &replacement:{"IP-CIDR,192.0.2.0/99,route","PROCESS-NAME,fixture.exe,route","DOMAIN,example.invalid,route,no-resolve","DOMAIN,example.invalid,SWIRL"}){auto bad=original;bad.replace("DOMAIN,localhost,REJECT",replacement);invalid.append(bad);}
   {auto bad=original;bad.replace("select,B,A","url-test,B,A");invalid.append(bad);bad=original;bad.replace("select,B,A","select,missing");invalid.append(bad);bad=original;bad.replace("FINAL,route\n","");invalid.append(bad);}
   invalid.append("[Proxy]\n"+a+"[Proxy Group]\nroute = select,A\n[Rule]\n"+QByteArray("DOMAIN,example.invalid,REJECT\n").repeated(1000)+"FINAL,route\n");
   for(const auto &bad:invalid){body=bad;imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(controller.nodeCatalog(),beforeNodes);QCOMPARE(controller.networkConfigurationSnapshot(),beforeNetwork);QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),ciphertext);file.close();}

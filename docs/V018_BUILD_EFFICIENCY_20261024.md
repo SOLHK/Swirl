@@ -64,6 +64,10 @@ on-disk state; the Actions cache restore log records the actual cache hit or
 prefix match. `source_timestamps_restored_by_content` counts verified input
 reuse. `engine_objects` counts unchanged tested objects retained by production.
 The final no-change rebuild must contain no source compilation or relink.
+Successful compiler outputs can be cached even if a subsequent test,
+environment check or package step fails. `compiler_cache_ready` records only
+compilation, and never changes the failed candidate status. Every later run
+still executes all selected tests and source/identity/package checks.
 
 Do not calculate a speedup until a successful candidate supplies actual after
 timings. The first run may have cold caches; later hits and misses must be
