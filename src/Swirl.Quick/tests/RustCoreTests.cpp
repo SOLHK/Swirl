@@ -107,7 +107,9 @@ private slots:
   else invalid.proxyPort=occupied.serverPort();
   QSignalSpy diagnostics(engine.get(),&ProxyEngine::diagnostic);engine->start(invalid);
   QTRY_VERIFY_WITH_TIMEOUT(!diagnostics.isEmpty(),5000);
-  QCOMPARE(engine->status().state,ProxyEngine::State::Running);
+  // The worker queues the rejection diagnostic before its restored snapshot.
+  // Observe that snapshot before checking the retained session and real traffic.
+  QTRY_COMPARE_WITH_TIMEOUT(engine->status().state,ProxyEngine::State::Running,5000);
   QVERIFY(engine->status().apiHealthy);QCOMPARE(engine->status().sessionId,previous.sessionId);
   QCOMPARE(engine->status().proxyPort,previous.proxyPort);QCOMPARE(engine->status().selectedNodeId,previous.selectedNodeId);
   QCOMPARE(diagnostics.last()[1].toString(),QString("CoreStartRejected"));
