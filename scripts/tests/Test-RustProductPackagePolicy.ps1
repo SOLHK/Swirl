@@ -53,7 +53,7 @@ $caseCount = 0
 try {
     foreach ($ending in @("`n", "`r`n")) {
         foreach ($case in $cacheCases) {
-            $lines = @('SWIRL_BUILD_UI_TESTS:BOOL=OFF', $case.Line,
+            $lines = @('SWIRL_BUILD_UI_TESTS:BOOL=OFF','SWIRL_BUILD_CORE_TESTS:BOOL=ON', $case.Line,
                 ('CMAKE_HOME_DIRECTORY:INTERNAL=' + (Join-Path $repo 'src/Swirl.Quick')),
                 'SWIRL_USE_RUST_CORE:BOOL=ON',
                 ('SWIRL_RUST_LIBRARY:INTERNAL=' + (Join-Path $build 'unused.dll')),
@@ -74,6 +74,15 @@ try {
             if (Test-Path -LiteralPath $destination) { throw 'Cache regression created a product stage.' }
             $caseCount++
         }
+        $uiLines = @('SWIRL_BUILD_UI_TESTS:BOOL=ON','SWIRL_BUILD_CORE_TESTS:BOOL=ON','CMAKE_BUILD_TYPE:STRING=Release')
+        [IO.File]::WriteAllText((Join-Path $build 'CMakeCache.txt'), (($uiLines -join $ending) + $ending))
+        $failure = $null
+        try { & $staging -BuildDirectory $build -Destination $destination } catch { $failure = $_.Exception.Message }
+        if ($failure -cne 'Never package an executable with UI test entry points enabled.') {
+            throw 'Standalone core tests must not permit packaging an application with UI test entry points.'
+        }
+        if (Test-Path -LiteralPath $destination) { throw 'UI test cache regression created a product stage.' }
+        $caseCount++
     }
 } finally {
     if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($cacheRoot)) -ne [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\','/')) { throw 'Unexpected test cleanup path.' }

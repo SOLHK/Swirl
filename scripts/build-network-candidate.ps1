@@ -42,7 +42,8 @@ $report = [ordered]@{schema=1; source_sha=''; status='running'; cargo_incrementa
     restored_cargo_cache=(Test-Path -LiteralPath $rustTarget); compiler_cache_ready=$false; steps=@();
     system_proxy_mutation_requested=[bool]$DisposableSystemProxyTests;
     private_provider_verified=$false; codex_account_verified=$false; tun_verified=$false;
-    dpi_visual_acceptance='user'; broad_ui_regression='unchanged prior evidence; not rerun by this network candidate script'}
+    dpi_visual_acceptance='user'; broad_ui_regression='not run by this network-only candidate; manual DPI acceptance belongs to the user';
+    standalone_core_tests=$true; application_ui_test_entry_points=$false; production_reconfigured=$false}
 $total = [Diagnostics.Stopwatch]::StartNew()
 function Run-Step([string]$Name, [scriptblock]$Body) {
     $timer = [Diagnostics.Stopwatch]::StartNew()
@@ -75,10 +76,19 @@ try {
     $report.source_sha = (& git rev-parse HEAD).Trim()
     Assert-SwirlBuildSource -RepositoryRoot $repo -ExpectedSourceSha $report.source_sha
     Run-Step 'restore-content-verified-input-times' { $report.source_timestamps_restored_by_content = Sync-SwirlBuildInputTimes -RepositoryRoot $repo -BuildDirectory $build -Restore }
+    Run-Step 'validate-standalone-production-graph' {
+        # This separate configure-only graph may exercise UI test mode without
+        # invalidating any generated files in the actual product build cache.
+        Checked python @('scripts/tests/Test-CMakeCoreProfile.py','--build-dir',(Join-Path $build 'profile-validation'),
+            '--','-DCMAKE_C_COMPILER=cl.exe','-DCMAKE_CXX_COMPILER=cl.exe',
+            "-DCMAKE_PREFIX_PATH=$QtDir","-DSWIRL_RUST_TARGET=$rustTarget")
+        Copy-Item -LiteralPath (Join-Path $build 'profile-validation/profile-graph-evidence') -Destination (Join-Path $evidence 'standalone-production-graph') -Recurse
+    }
     $configure = @('-S','src/Swirl.Quick','-B',$build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release',
         '-DCMAKE_C_COMPILER=cl.exe','-DCMAKE_CXX_COMPILER=cl.exe',"-DCMAKE_PREFIX_PATH=$QtDir",
-        "-DSWIRL_RUST_TARGET=$rustTarget")
-    Run-Step 'configure-focused-tests' { Checked cmake ($configure + '-DSWIRL_BUILD_UI_TESTS=ON') }
+        "-DSWIRL_RUST_TARGET=$rustTarget",'-DSWIRL_BUILD_CORE_TESTS=ON',
+        '-DSWIRL_BUILD_UI_TESTS=OFF','-DSWIRL_XRAY_UI_TESTS=OFF')
+    Run-Step 'configure-focused-tests' { Checked cmake $configure }
     $targets = @('SwirlRustCoreTests','SwirlRustCoreLibraryTests','SwirlNodeTests','SwirlImportTests',
         'SwirlSubscriptionFormatTests','SwirlNetworkRegressionTests','SwirlDiagnosticTests',
         'SwirlSystemProxyStateTests','SwirlQtNetworkPolicyTests','SwirlCodexLauncherTests',
@@ -100,9 +110,13 @@ try {
     $testedDllHash = (Get-FileHash -LiteralPath (Join-Path $build 'swirl_api.dll')).Hash
     $testedIdentity = Get-Content -LiteralPath (Join-Path $build 'swirl-rust-build.json') -Raw | ConvertFrom-Json
     $beforeObjects = Engine-Objects
-    # The application is built only with production flags. Shared engine objects
-    # remain in this same directory and are reused after changing test exposure.
-    Run-Step 'configure-production' { Checked cmake ($configure + '-DSWIRL_BUILD_UI_TESTS=OFF') }
+    # Standalone test executables do not change Swirl's production target.
+    # Switching UI_TESTS ON/OFF here used to invalidate every QML cache command.
+    # Retain one production application graph and the tested shared objects.
+    $cache = Get-Content -LiteralPath (Join-Path $build 'CMakeCache.txt') -Raw
+    foreach ($setting in @('SWIRL_BUILD_CORE_TESTS:BOOL=ON','SWIRL_BUILD_UI_TESTS:BOOL=OFF','SWIRL_XRAY_UI_TESTS:BOOL=OFF')) {
+        if ($cache -notmatch ('(?m)^'+[regex]::Escape($setting)+'\s*$')) { throw 'Application test exposure changed during the candidate build.' }
+    }
     Run-Step 'build-production-once' { Checked cmake @('--build',$build,'--target','Swirl','--parallel',"$Parallel") }
     $afterObjects = Engine-Objects
     $reused = @($beforeObjects.Keys | Where-Object { $afterObjects.ContainsKey($_) -and $afterObjects[$_] -ceq $beforeObjects[$_] }).Count
