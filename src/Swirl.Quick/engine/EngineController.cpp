@@ -464,10 +464,16 @@ void EngineController::setSystemProxy(bool enabled) {
     if(!enabled){m_systemProxy.disable();emit statusChanged();return;}
     if(m_systemProxy.owned()||m_proxyChecking)return;
     const auto s=m_engine->status();
-    if(!connected()&&m_store.selectedId().isEmpty()&&!busy()&&!m_imports.busy()){startConfiguredSession();return;}
+    if(!s.processAlive&&!busy()&&!m_imports.busy()){
+        startConfiguredSession();
+        if(!processAlive()&&!busy()){
+            m_proxyRequested=false;m_routingError=m_nodeError;emit statusChanged();
+        }
+        return;
+    }
     if(!s.processAlive||!s.apiHealthy||s.proxyPort<1||(!s.directSession&&s.selectedNodeId.isEmpty())||s.nodeHealth==ProxyEngine::NodeHealth::Unavailable){
         m_proxyRequested=false;m_routingError=QStringLiteral("请先连接可用节点，并等待引擎与控制接口健康。");emit statusChanged();return;}
-    m_proxyChecking=true;
+    m_proxyChecking=true;emit statusChanged();
     auto socket=new QTcpSocket(this);socket->setProxy(QNetworkProxy::NoProxy);
     auto timer=new QTimer(socket);timer->setSingleShot(true);timer->start(1500);
     connect(socket,&QTcpSocket::connected,this,[this,socket,timer,s] {
@@ -487,6 +493,21 @@ void EngineController::setSystemProxy(bool enabled) {
     connect(timer,&QTimer::timeout,this,failed);
     connect(socket,&QTcpSocket::errorOccurred,this,[failed](QAbstractSocket::SocketError){failed();});
     socket->connectToHost(QHostAddress::LocalHost,quint16(m_captureProxyPort>0?m_captureProxyPort:s.proxyPort));
+}
+void EngineController::toggleSystemProxy() {
+    if(m_shuttingDown||systemProxyBusy())return;
+    m_systemProxy.refresh();
+    if(!m_systemProxy.stateReadError().isEmpty())return;
+    if(m_systemProxy.systemEnabled()||m_systemProxy.owned()) {
+        m_proxyRequested=false;m_routingError.clear();
+        m_diagnostics.noteEvent(QStringLiteral("Swirl 操作"),QStringLiteral("用户请求关闭 Windows 系统代理。"));
+        m_systemProxy.turnOffSystemProxy();emit statusChanged();
+    } else {
+        setSystemProxy(true);
+        if(!processAlive()&&!busy()&&!m_nodeError.isEmpty()) {
+            m_proxyRequested=false;m_routingError=m_nodeError;emit statusChanged();
+        }
+    }
 }
 QString EngineController::proxyEnvironmentAdvice() const {
     return QStringLiteral("从新的 PowerShell 会话启动支持代理变量的应用：\n"

@@ -19,6 +19,9 @@ Var Parameters
 !ifndef UNINSTALL_LIST
 !error "UNINSTALL_LIST is required (generated from the verified package manifest)"
 !endif
+!ifndef REPO_ROOT
+!error "REPO_ROOT is required (absolute repository path supplied by the build caller)"
+!endif
 !include "${UNINSTALL_LIST}"
 !ifndef SWIRL_VERIFIED_SOURCE_SHA
 !error "The final package verification include is invalid"
@@ -79,8 +82,8 @@ VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}.0"
 !macro PreparePackageMaintenance
     InitPluginsDir
     SetOutPath "$PLUGINSDIR"
-    File /oname=Maintain-WindowsRustProduct.ps1 "${__FILEDIR__}\..\..\..\scripts\Maintain-WindowsRustProduct.ps1"
-    File /oname=RustProductPackagePolicy.ps1 "${__FILEDIR__}\..\..\..\scripts\RustProductPackagePolicy.ps1"
+    File /oname=Maintain-WindowsRustProduct.ps1 "${REPO_ROOT}\scripts\Maintain-WindowsRustProduct.ps1"
+    File /oname=RustProductPackagePolicy.ps1 "${REPO_ROOT}\scripts\RustProductPackagePolicy.ps1"
     File /oname=package-manifest.json "${APP_DIST}\package-manifest.json"
 !macroend
 !macro MaintainPackage Mode ExtraArguments FailureLabel

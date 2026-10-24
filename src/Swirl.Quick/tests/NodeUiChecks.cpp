@@ -11,6 +11,9 @@
 #include <QGuiApplication>
 #include <QDir>
 #include <QImage>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <cstdio>
 #include <functional>
 
@@ -72,6 +75,48 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     if(check(waitEngineReady(),"UI starts actual Rust Core")) {
         check(!controller->requestSucceeded(),"running engine does not imply successful request");fill("nodeTestUrl",net.url().toString());
         probeSelected(net.a,net.b,"UI real request passes only through selected node A");
+        if(qEnvironmentVariable("SWIRL_SYSTEM_PROXY_TEST")==QStringLiteral("1")) {
+            const auto original=SystemProxySession::snapshot();
+            if(!check(!original.isEmpty(),"disposable proxy UI test snapshots original settings"))return 2;
+            const int failuresBefore=failures;
+            struct RestoreProxy {
+                EngineController *controller;QJsonObject original;
+                ~RestoreProxy(){controller->setSystemProxy(false);SystemProxySession::apply(original);controller->systemProxy()->refresh();}
+            } restore{controller,original};
+            controller->setSystemProxy(false);
+            if(!check(controller->systemProxy()->turnOffSystemProxy(),"disposable proxy UI test starts from observed off state"))return 2;
+            eval("AppState.navigate('activity')");
+            check(QTest::qWaitFor([&]{return eval("AppState.currentPage==='activity' && !pageLoader.pendingGrab && !pageLoader.moving").toBool();},3500),"proxy action page settles before real input");
+            const auto pidBefore=controller->processId();
+            click("proxyCapsule");
+            if(check(QTest::qWaitFor([&]{return controller->systemProxy()->owned()&&controller->systemProxy()->enabled()&&controller->systemProxy()->systemEnabled();},5000),"actual activity button enables Windows proxy through the live Rust listener")) {
+                check(controller->processId()==pidBefore&&controller->apiHealthy(),"proxy enable reuses the existing healthy Rust runtime");
+                check(eval("AppState.currentPage==='activity'").toBool(),"actual proxy enable does not navigate");
+                click("proxyCapsule");
+                check(QTest::qWaitFor([&]{return !controller->systemProxy()->systemEnabled()&&!controller->systemProxy()->owned();},3000),"actual activity button disables Windows proxy");
+                check(eval("AppState.currentPage==='activity'").toBool(),"actual proxy disable does not navigate");
+                const auto savedSelection=controller->selectedNodeId();
+                controller->stop();
+                if(check(QTest::qWaitFor([&]{return controller->canStart();},4000),"one-click enable test stops the runtime while preserving its saved node")) {
+                    check(!savedSelection.isEmpty()&&controller->selectedNodeId()==savedSelection,"one-click enable retains the configured node while stopped");
+                    click("proxyCapsule");
+                    check(QTest::qWaitFor([&]{return controller->apiHealthy()&&controller->systemProxy()->owned()&&controller->systemProxy()->enabled();},15000),"actual activity button starts the saved node and enables Windows proxy in one click");
+                    check(eval("AppState.currentPage==='activity'").toBool(),"cold proxy enable does not navigate to the node page");
+                    click("proxyCapsule");
+                    check(QTest::qWaitFor([&]{return !controller->systemProxy()->systemEnabled()&&!controller->systemProxy()->owned();},3000),"actual activity button disables proxy after one-click runtime startup");
+                }
+            }
+            controller->setSystemProxy(false);
+            check(SystemProxySession::apply(original),"disposable proxy UI test restores original Windows settings");
+            controller->systemProxy()->refresh();
+            const bool restored=SystemProxySession::snapshot()==original;
+            check(restored,"disposable proxy UI test verifies original settings restored");
+            const auto reportPath=qEnvironmentVariable("SWIRL_SYSTEM_PROXY_UI_REPORT");
+            QFile report(reportPath);
+            if(check(!reportPath.isEmpty()&&report.open(QIODevice::WriteOnly),"disposable proxy UI evidence file opens"))
+                report.write(QJsonDocument(QJsonObject{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"executed",true},{"restored",restored},{"success",failures==failuresBefore}}).toJson());
+            eval("AppState.navigate('proxies')");QTest::qWait(350);
+        }
         const auto pid=controller->processId();
         const auto selectedBeforeNavigation=controller->selectedNodeId();
         for(const auto &route:QStringList{"featurehub","settings","fonts","dns","modules","profiles","scripts","subscriptions","proxies"}){

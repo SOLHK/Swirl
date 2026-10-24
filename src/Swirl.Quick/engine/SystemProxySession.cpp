@@ -243,20 +243,42 @@ bool SystemProxySession::enable(int port, qint64 enginePid) {
     }
     record.insert("applyUnconfirmed",false);
     if(!write(m_journal,record))m_error=QStringLiteral("代理已确认启用，但恢复记录确认标记未能更新；原始快照与守护仍保留。");
-    m_session=record.value("session").toString();m_owned=true;m_enabled=true;emit changed();return true;
+    m_session=record.value("session").toString();m_owned=true;m_enabled=true;refresh();emit changed();return true;
 }
 bool SystemProxySession::disable() {
     if(!m_owned)return true;
     m_error.clear();bool ok=recover(m_journal,&m_error,false,m_session);
     if(ok)m_owned=false;refresh();emit changed();return ok;
 }
+bool SystemProxySession::turnOffSystemProxy() {
+    m_error.clear();
+    // Release our recovery lease first. The subsequent explicit off action
+    // must not be undone by the old guard restoring another application's proxy.
+    if(m_owned&&!disable())return false;
+    const auto original=snapshot(&m_error);
+    if(original.isEmpty()){emit changed();return false;}
+    auto off=original;
+    off.insert("flags",1); // PROXY_TYPE_DIRECT: manual, PAC and auto-detect are off.
+    off.insert("pac",QString());
+#ifdef Q_OS_WIN
+    auto registry=original.value("registry").toObject();
+    const DWORD disabled=0;
+    registry.insert("ProxyEnable",QJsonObject{{"present",true},{"type",int(REG_DWORD)},
+        {"data",QString::fromLatin1(QByteArray(reinterpret_cast<const char *>(&disabled),sizeof(disabled)).toBase64())}});
+    registry.insert("AutoConfigURL",QJsonObject{{"present",false}});
+    off.insert("registry",registry);
+#endif
+    const bool ok=apply(off,&m_error);
+    refresh();emit changed();return ok;
+}
 void SystemProxySession::refresh() {
     const auto record=read(m_journal);QString readError;const auto current=snapshot(&readError);
     bool observationChanged=m_readError!=readError;m_readError=readError;
     if(!current.isEmpty()) {
         const auto state=SystemProxyState::inspect(current);
-        observationChanged=observationChanged||m_systemEnabled!=state.enabled()||m_stateDiffers!=state.differs();
-        m_systemEnabled=state.enabled();m_stateDiffers=state.differs();
+        const bool systemEnabled=SystemProxyState::configuredEnabled(current);
+        observationChanged=observationChanged||m_systemEnabled!=systemEnabled||m_stateDiffers!=state.differs();
+        m_systemEnabled=systemEnabled;m_stateDiffers=state.differs();
     }
     // A transient WinINET read failure is not an external ownership change.
     // Retain the encrypted recovery record so the independent guard can act.

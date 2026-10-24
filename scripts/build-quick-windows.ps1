@@ -73,7 +73,7 @@ try {
         $icon = (Resolve-Path -LiteralPath (Join-Path $BuildDir 'brand/Swirl.ico')).Path
         $appVersion = (Get-Content -LiteralPath 'src/Swirl.Quick/PRODUCT_VERSION.txt' -Raw).Trim()
         if ($appVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid PRODUCT_VERSION.txt' }
-        & $Nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$stage" "/DOUT_DIR=$out" "/DAPP_ICON=$icon" "/DAPP_VERSION=$appVersion" "/DUNINSTALL_LIST=$uninstallList" src/Swirl.Quick/packaging/Swirl.nsi
+        & $Nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$stage" "/DOUT_DIR=$out" "/DAPP_ICON=$icon" "/DAPP_VERSION=$appVersion" "/DUNINSTALL_LIST=$uninstallList" "/DREPO_ROOT=$repo" src/Swirl.Quick/packaging/Swirl.nsi
         if ($LASTEXITCODE) { throw 'NSIS failed; verified portable output is retained.' }
     }
     Write-Host "Verified Rust-only product: $stage"

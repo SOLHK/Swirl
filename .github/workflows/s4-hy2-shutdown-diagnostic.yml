@@ -2,11 +2,6 @@ name: S4 macOS Hysteria2 strict shutdown diagnosis
 on:
   push:
     branches: [work/swirl-s4-final-completion-20261023]
-    paths:
-      - 'core/**'
-      - 'tools/Run-Hysteria2ShutdownProbe.py'
-      - 'tools/tests/test_hysteria2_official.py'
-      - '.github/workflows/s4-hy2-shutdown-diagnostic.yml'
   workflow_dispatch:
 permissions:
   contents: read

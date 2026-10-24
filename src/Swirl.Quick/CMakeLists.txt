@@ -156,7 +156,7 @@ set(SWIRL_QML_FILES
  qml/components/SwirlWindowTitleBar.qml
  qml/controls/RewriteRulesDialog.qml
  qml/components/ReferenceSection.qml qml/components/ReferenceOutline.qml qml/components/ReferenceCheckBox.qml qml/pages/CaptureInspectorPage.qml
- qml/controls/SwirlStatusCapsule.qml qml/controls/SwirlScrollBar.qml qml/pages/ProcessesPage.qml
+ qml/controls/SwirlStatusCapsule.qml qml/controls/SwirlSystemProxyCapsule.qml qml/controls/SwirlScrollBar.qml qml/pages/ProcessesPage.qml
  qml/Main.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml qml/SwirlMotion.qml qml/SwirlTransitionRegistry.qml
  qml/controls/SwirlTransitionCoordinator.qml qml/controls/SwirlHeroCard.qml qml/controls/SwirlHeroTitle.qml
  qml/components/SwirlContinuousSurface.qml qml/components/SwirlShellOutline.qml qml/components/SwirlBlurLayer.qml qml/components/SwirlGlassMaterial.qml qml/components/SwirlWindowControls.qml qml/components/SwirlDailyTrafficChart.qml

@@ -18,6 +18,10 @@ CONTENT_EDITS = {
     "src/Swirl.Quick/qml/controls/SwirlPressMotion.qml",
     "src/Swirl.Quick/qml/controls/SwirlTransitionCoordinator.qml",
 }
+MAIN_PROXY_ACTION = (
+    'SwirlStatusCapsule {id:proxyCapsule;objectName:"proxyCapsule";Layout.preferredWidth:implicitWidth;Layout.preferredHeight:Theme.dp(28);label:window.proxyStatusLabel;tone:engineController.systemProxy.error.length||engineController.routingError.length?"warning":engineController.systemProxy.systemEnabled?"success":"neutral";detail:"打开节点管理";onClicked:AppState.navigate("proxies")}',
+    'SwirlSystemProxyCapsule {id:proxyCapsule;objectName:"proxyCapsule";Layout.preferredWidth:implicitWidth;Layout.preferredHeight:Theme.dp(28);controller:engineController}',
+)
 
 
 def inspect(root):
@@ -29,6 +33,11 @@ def inspect(root):
         count += 1
         path = root / entry["path"]
         content = path.read_bytes().replace(b"\r\n", b"\n") if path.is_file() else b""
+        if entry["path"] == "src/Swirl.Quick/qml/Main.qml":
+            before, after = (value.encode() for value in MAIN_PROXY_ACTION)
+            if content.count(after) != 1 or before in content:
+                changed.append(entry["path"])
+            content = content.replace(after, before)
         for replacement in entry.get("allowed_replacements", []):
             before, after = (replacement[key].encode() for key in ("before", "after"))
             if content.count(after) != 1 or before in content:

@@ -25,6 +25,7 @@ struct ManualProxy {
 };
 
 ManualProxy inspect(const QJsonObject &snapshot);
+bool configuredEnabled(const QJsonObject &snapshot);
 
 #ifdef Q_OS_WIN
 // Uses the same bounded native reader for the real Internet Settings key and

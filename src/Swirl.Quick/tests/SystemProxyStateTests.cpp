@@ -24,6 +24,25 @@ QJsonObject fixture(int flags, const QJsonObject &registry) {
 class SystemProxyStateTests : public QObject {
     Q_OBJECT
 private slots:
+    void configuredProxyModes_data() {
+        QTest::addColumn<int>("flags");QTest::addColumn<bool>("enabled");
+        QTest::newRow("direct")<<1<<false;
+        QTest::newRow("manual")<<3<<true;
+        QTest::newRow("pac-url")<<5<<true;
+        QTest::newRow("automatic-detection")<<9<<true;
+        QTest::newRow("manual-and-automatic")<<11<<true;
+    }
+    void configuredProxyModes() {
+        QFETCH(int,flags);QFETCH(bool,enabled);
+        QCOMPARE(SystemProxyState::configuredEnabled(fixture(flags,registryFlag(0))),enabled);
+    }
+    void invalidAutomaticConfigurationIsNotInferred() {
+        auto raw=fixture(5,registryFlag(0));raw.remove("pac");
+        QVERIFY(!SystemProxyState::configuredEnabled(raw));
+        raw["flags"]=QStringLiteral("9");QVERIFY(!SystemProxyState::configuredEnabled(raw));
+        raw["flags"]=1e20;QVERIFY(!SystemProxyState::configuredEnabled(raw));
+        raw=fixture(1,registryFlag(1));QVERIFY(SystemProxyState::configuredEnabled(raw));
+    }
     void manualStores_data() {
         QTest::addColumn<int>("flags");
         QTest::addColumn<quint32>("nativeFlag");
@@ -102,7 +121,7 @@ private slots:
             QCOMPARE(proxy.stateReadError(), state.value("readError").toString());
         } else {
             const auto expected = SystemProxyState::inspect(before);
-            QCOMPARE(proxy.systemEnabled(), expected.enabled());QCOMPARE(proxy.stateDiffers(), expected.differs());
+            QCOMPARE(proxy.systemEnabled(), SystemProxyState::configuredEnabled(before));QCOMPARE(proxy.stateDiffers(), expected.differs());
             QCOMPARE(state.value("winInetManualProxy"), expected.winInet);
             QCOMPARE(state.value("registryManualProxy"), expected.registry);
             QVERIFY(state.value("readError").toString().isEmpty());

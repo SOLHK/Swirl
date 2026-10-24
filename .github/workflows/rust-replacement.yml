@@ -99,7 +99,7 @@ jobs:
       - name: Configure isolated Qt integration tests
         run: cmake -S src/Swirl.Quick -B build/r1-tests -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=ON -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
       - name: Build product, subscription, telemetry, stream, security and loader regressions
-        run: cmake --build build/r1-tests --config Release --target Swirl SwirlRustCoreTests SwirlRustCoreLibraryTests SwirlNodeTests SwirlNodeViewModelTests SwirlImportTests SwirlSubscriptionFormatTests SwirlTelemetryTests SwirlNetworkRegressionTests SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlQtNetworkPolicyTests --parallel 4
+        run: cmake --build build/r1-tests --config Release --target Swirl SwirlRustCoreTests SwirlRustCoreLibraryTests SwirlNodeTests SwirlNodeViewModelTests SwirlImportTests SwirlSubscriptionFormatTests SwirlTelemetryTests SwirlNetworkRegressionTests SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlSystemProxyTests SwirlQtNetworkPolicyTests --parallel 4
       - name: Deploy test dependencies and inspect PE imports
         shell: pwsh
         run: |
@@ -117,6 +117,19 @@ jobs:
         run: ctest --test-dir build/r1-tests -C Release -R "^swirl-(rust-library-loader|rust-qt-integration|node-real-chain|node-ui|engine-ui|stream-regression|import-subscription|import-boundaries|subscription-formats|telemetry-accounting|diagnostic-export|system-proxy-state|qt-network-policy|capture-network)$" --output-on-failure --no-tests=error
       - name: S4 content, model and motion correctness (offscreen software renderer)
         run: ctest --test-dir build/r1-tests -C Release -R "^swirl-(motion|all-pages|appearance-ui|node-view-model)$" --output-on-failure --no-tests=error
+      - name: Explicit Windows proxy off and recovery on the disposable runner
+        shell: pwsh
+        env:
+          SWIRL_SYSTEM_PROXY_TEST: '1'
+        run: |
+          build/r1-tests/Release/SwirlSystemProxyTests.exe -o build/r1-tests/system-proxy-write.xml,xml -o -,txt
+          if ($LASTEXITCODE -ne 0) { throw 'Actual Windows proxy state and recovery tests failed.' }
+          $env:SWIRL_SYSTEM_PROXY_UI_REPORT=Join-Path $env:GITHUB_WORKSPACE 'build/r1-tests/system-proxy-ui.json'
+          $p=Start-Process build/r1-tests/Release/Swirl.exe -ArgumentList '--node-self-test' -WindowStyle Hidden -PassThru
+          if (-not $p.WaitForExit(150000)) { $p.Kill(); throw 'Real system proxy UI integration timed out.' }
+          if ($p.ExitCode -ne 0) { throw 'Real system proxy UI integration failed.' }
+          $result=Get-Content -LiteralPath $env:SWIRL_SYSTEM_PROXY_UI_REPORT -Raw | ConvertFrom-Json
+          if (-not $result.executed -or -not $result.success -or -not $result.restored -or $result.source_sha -cne $env:GITHUB_SHA) { throw 'Real system proxy UI evidence is incomplete or has the wrong source.' }
       - name: S4 synthetic node scale and fixed geometry (not native GPU acceptance)
         shell: pwsh
         env:
@@ -214,7 +227,8 @@ jobs:
           if ($appVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid product version.' }
           $uninstallList=Join-Path $dist 'Swirl-UninstallFiles.nsh'
           ./scripts/Finalize-WindowsRustProduct.ps1 -ApplicationDirectory $stage -EvidenceDirectory build/r1-product/package-evidence -UninstallList $uninstallList
-          & $nsis "/DAPP_VERSION=$appVersion" "/DAPP_DIST=$stage" "/DOUT_DIR=$dist" "/DAPP_ICON=$icon" "/DUNINSTALL_LIST=$uninstallList" src/Swirl.Quick/packaging/Swirl.nsi
+          $repo=(Resolve-Path .).Path
+          & $nsis "/DAPP_VERSION=$appVersion" "/DAPP_DIST=$stage" "/DOUT_DIR=$dist" "/DAPP_ICON=$icon" "/DUNINSTALL_LIST=$uninstallList" "/DREPO_ROOT=$repo" src/Swirl.Quick/packaging/Swirl.nsi
           if ($LASTEXITCODE -ne 0) { throw 'Installer build failed.' }
           Compress-Archive -Path "$stage/*" -DestinationPath (Join-Path $dist 'Swirl-Rust-x64.zip')
       - name: Windows native public Internet requests
@@ -240,6 +254,7 @@ jobs:
             build/r1-tests/Release/Swirl-diagnostics.txt
             build/r1-tests/Release/Swirl-node-ui-diagnostics.txt
             build/r1-tests/*.xml
+            build/r1-tests/system-proxy-ui.json
             build/r1-tests/node-chain.txt
             build/r1-tests/import-subscription.txt
             build/r1-tests/subscription-formats.txt

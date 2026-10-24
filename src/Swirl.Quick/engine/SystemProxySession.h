@@ -27,6 +27,7 @@ public:
     QString error() const { return m_error; }
     bool enable(int port, qint64 enginePid);
     Q_INVOKABLE bool disable();
+    bool turnOffSystemProxy(); // Explicit user action; unlike release, leaves Windows proxy off.
     Q_INVOKABLE void refresh();
     static QString journalPath();
     static QJsonObject snapshot(QString *error=nullptr);

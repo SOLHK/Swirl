@@ -2,7 +2,9 @@
 
 Recorded 2026-10-24 Asia/Shanghai. The real NSIS installer and uninstaller were
 compiled and executed against synthetic payloads in one unique D-drive test
-directory. **28/28 lifecycle and safety checks passed.** This verifies installer
+directory. **30/30 current lifecycle and safety checks passed**, including both
+absolute and product-workflow-relative NSIS script invocation. The preceding
+28-case result remains preserved below. This verifies installer
 mechanics and file preservation; it is not an installed Swirl application test,
 final release-package verification, or private-subscription acceptance.
 
@@ -115,3 +117,30 @@ a broad directory cleanup.
 Before delivery, rerun against the final integrated source and verify the real
 MSVC EXE/DLL source identity, final portable/NSIS contents and installed product.
 This fixture's synthetic file verification cannot substitute for those gates.
+
+## Relative NSIS path failure found in exact-source CI
+
+The product workflow for source `8a047f429c4b1ac8fb830cc8e95ea798707d87ad`,
+[run 39989389784](https://github.com/SOLHK/Swirl/actions/runs/39989389784),
+passed the 28-case lifecycle fixture and final payload manifest verification,
+but failed the actual candidate installer compilation. Its caller passed
+`src/Swirl.Quick/packaging/Swirl.nsi` as a relative path. NSIS then resolved the
+relative `${__FILEDIR__}` again from its script working directory, producing a
+doubled path and failing to find `Maintain-WindowsRustProduct.ps1`. No candidate
+artifact was generated; the known public TLS failure also remained in that run.
+
+The same relative invocation was reproduced locally before repair (exit 1).
+Active build callers now supply an absolute `REPO_ROOT` compiler definition;
+the NSIS source requires it and uses it for the two embedded maintenance files.
+It does not fall back to searching the working directory. The lifecycle fixture
+retains its absolute invocation for V1 and now uses the actual relative product
+invocation for V2, exercising installation, upgrade and uninstall in both cases.
+
+Post-repair: **30 passed / 0 failed**, exit 0. Raw report:
+`D:/Codex/outputs/s4/package-relative-fix/installer-lifecycle-2a6a15536625482591c43be43d5651ca.json`,
+SHA256 `a5fbea060668475b52ebd51feb38eeca9c040610af5df9c0db9a3342fe3e2199`.
+The original relative compiler failure is retained at
+`D:/Codex/outputs/s4/package-8a047f4/relative-nsis-before.log`; full CI job log and
+digest-verified evidence artifacts are retained in the same directory. This is
+working-source repair evidence; final integrated CI and actual final Swirl
+payload installation still require the new source SHA.

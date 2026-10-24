@@ -129,11 +129,19 @@ try {
             Record 'smoke-evidence-retained-outside-payload' ((Test-Path -LiteralPath (Join-Path $evidence 'Swirl-diagnostics.txt')) -and
                 -not (Test-Path -LiteralPath (Join-Path $payload 'Swirl-diagnostics.txt')))
         }
-        & $Nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$payload" "/DOUT_DIR=$buildOut" "/DAPP_ICON=$Icon" `
-            "/DAPP_VERSION=0.0.$version" "/DUNINSTALL_LIST=$include" "/DPACKAGE_TEST_TRACE=$root\maintenance-$version.log" (Join-Path $repo 'src/Swirl.Quick/packaging/Swirl.nsi') `
-            *> (Join-Path $root "nsis-$version.log")
-        if ($LASTEXITCODE -ne 0) { throw "NSIS fixture $version compilation failed." }
+        # Preserve absolute-path coverage and exercise the relative invocation
+        # used by the actual product workflow. NSIS changes its working directory.
+        $scriptPath = if ($version -eq '1') { Join-Path $repo 'src/Swirl.Quick/packaging/Swirl.nsi' } else { 'src/Swirl.Quick/packaging/Swirl.nsi' }
+        Push-Location $repo
+        try {
+            & $Nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$payload" "/DOUT_DIR=$buildOut" "/DAPP_ICON=$Icon" `
+                "/DAPP_VERSION=0.0.$version" "/DUNINSTALL_LIST=$include" "/DREPO_ROOT=$repo" "/DPACKAGE_TEST_TRACE=$root\maintenance-$version.log" $scriptPath `
+                *> (Join-Path $root "nsis-$version.log")
+            $compilerExit=$LASTEXITCODE
+        } finally { Pop-Location }
+        if ($compilerExit -ne 0) { throw "NSIS fixture $version compilation failed." }
         Record "nsis-build-$version" $true
+        Record $(if ($version -eq '1') { 'nsis-absolute-script-path' } else { 'nsis-relative-script-path-matches-product-workflow' }) $true
         $exitCode = Run-Hidden (Join-Path $buildOut 'Swirl-Setup.exe') "/S /ISOLATED /D=$target"
         Record "installer-exit-$version" ($exitCode -eq 0) "Exit $exitCode"
         if ($exitCode -ne 0) { throw 'Disposable installer refused fixture target.' }

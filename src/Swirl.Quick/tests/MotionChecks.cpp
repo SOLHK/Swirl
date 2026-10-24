@@ -5,6 +5,9 @@
 #include <QQuickItemGrabResult>
 #include <QQmlExpression>
 #include <QQmlContext>
+#include <QQmlComponent>
+#include "engine/SystemProxySession.h"
+#include <memory>
 #include <QTest>
 #include <QSignalSpy>
 #include <QDir>
@@ -377,10 +380,56 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     route("activity");
     auto *capsule=findVisual(window->contentItem(),"proxyCapsule");
     if(capsule){
-        const auto proxyBefore=eval("engineController.systemProxy.enabled");
-        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,capsule->mapToScene(QPointF(capsule->width()/2,capsule->height()/2)).toPoint());
-        check("proxy-capsule-opens-node-management",settle(3500) && eval("AppState.currentPage==='proxies'").toBool());
-        check("opening-node-management-does-not-toggle-proxy",eval("engineController.systemProxy.enabled")==proxyBefore);
+        const auto hostProxyBefore=SystemProxySession::snapshot();
+        QQmlComponent component(qmlEngine(window));
+        component.setData(R"(
+            import QtQuick
+            QtObject {
+                property bool busy: false
+                property bool systemProxyBusy: false
+                property string routingError: ""
+                property string error: ""
+                property int calls: 0
+                property bool reject: false
+                property QtObject systemProxy: QtObject {
+                    property bool systemEnabled: false
+                    property string stateReadError: ""
+                    property string error: ""
+                }
+                function toggleSystemProxy() {
+                    calls++
+                    if(reject) { routingError="test-operation-failed"; return }
+                    systemProxy.systemEnabled=!systemProxy.systemEnabled
+                }
+            }
+        )",QUrl());
+        std::unique_ptr<QObject> fake(component.create());
+        check("proxy-toggle-test-controller-created",fake!=nullptr);
+        if(fake){
+            const auto originalController=capsule->property("controller");
+            check("proxy-toggle-test-controller-bound",capsule->setProperty("controller",QVariant::fromValue(fake.get())));
+            const auto clickProxy=[&]{QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,capsule->mapToScene(QPointF(capsule->width()/2,capsule->height()/2)).toPoint());wait(30);};
+            check("proxy-off-offers-enable",capsule->property("label").toString()==QStringLiteral("开启系统代理"));
+            clickProxy();
+            check("proxy-enable-click-dispatches-once",fake->property("calls").toInt()==1);
+            check("proxy-on-offers-disable",capsule->property("label").toString()==QStringLiteral("关闭系统代理"));
+            check("proxy-enable-stays-on-activity",eval("AppState.currentPage==='activity'").toBool());
+            clickProxy();
+            check("proxy-disable-click-dispatches-once",fake->property("calls").toInt()==2);
+            check("proxy-disabled-state-updates-action",capsule->property("label").toString()==QStringLiteral("开启系统代理"));
+            fake->setProperty("systemProxyBusy",true);clickProxy();
+            check("proxy-pending-cannot-repeat-request",fake->property("calls").toInt()==2&&!capsule->isEnabled());
+            fake->setProperty("systemProxyBusy",false);
+            auto *fakeProxy=fake->property("systemProxy").value<QObject *>();
+            check("proxy-toggle-test-state-present",fakeProxy!=nullptr);
+            if(fakeProxy)fakeProxy->setProperty("error",QStringLiteral("stale-owner-error"));
+            fake->setProperty("reject",true);clickProxy();
+            check("proxy-failure-keeps-observed-state",fake->property("calls").toInt()==3&&capsule->property("label").toString()==QStringLiteral("开启系统代理"));
+            check("proxy-failure-visible",capsule->property("tone").toString()=="warning"&&capsule->property("detail").toString()=="test-operation-failed");
+            check("proxy-disable-and-error-stay-on-activity",eval("AppState.currentPage==='activity'").toBool());
+            check("proxy-toggle-controller-restored",capsule->setProperty("controller",originalController));
+        }
+        check("proxy-button-test-does-not-mutate-host-settings",SystemProxySession::snapshot()==hostProxyBefore);
     }
     QList<double> intervals;QList<double> warmIntervals;bool warmPhase=false;bool measuring=true;QMutex frameMutex;
     QElapsedTimer clock;clock.start();qint64 last=0;

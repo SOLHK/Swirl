@@ -16,6 +16,35 @@
 class ProxyTests : public QObject {
     Q_OBJECT
 private slots:
+    void explicitOffDisablesExternalAndOwnedProxy() {
+        const auto original=SystemProxySession::snapshot();QVERIFY(!original.isEmpty());
+        struct Restore {QJsonObject value;~Restore(){SystemProxySession::apply(value);}} restore{original};
+        QTemporaryDir temp;QTcpServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));
+        auto external=original;external.insert("server","127.0.0.1:65006");external.insert("flags",7);
+        external.insert("pac","http://127.0.0.1:65007/test.pac");
+        QVERIFY(SystemProxySession::apply(external));
+        SystemProxySession proxy(nullptr,temp.filePath("explicit-off.dpapi"));
+        proxy.refresh();QVERIFY(proxy.systemEnabled());QVERIFY(!proxy.owned());
+        QVERIFY2(proxy.turnOffSystemProxy(),qPrintable(proxy.error()));
+        QVERIFY(!proxy.systemEnabled());QVERIFY(!proxy.owned());
+        const auto off=SystemProxySession::snapshot();
+        QCOMPARE(off.value("flags").toInt(),1);QVERIFY(off.value("pac").toString().isEmpty());
+        QVERIFY(!off.value("registry").toObject().value("AutoConfigURL").toObject().value("present").toBool());
+        auto pacOnly=external;pacOnly.insert("flags",5);
+        QVERIFY(SystemProxySession::apply(pacOnly));proxy.refresh();QVERIFY(proxy.systemEnabled());
+        QVERIFY(proxy.turnOffSystemProxy());QVERIFY(!proxy.systemEnabled());
+        auto automatic=external;automatic.insert("flags",9);automatic.insert("pac",QString());
+        QVERIFY(SystemProxySession::apply(automatic));proxy.refresh();QVERIFY(proxy.systemEnabled());
+        QVERIFY(proxy.turnOffSystemProxy());QVERIFY(!proxy.systemEnabled());
+        QVERIFY(SystemProxySession::apply(external));
+        QVERIFY(proxy.enable(server.serverPort(),QCoreApplication::applicationPid()));
+        QVERIFY(proxy.systemEnabled());QVERIFY(proxy.owned());
+        QVERIFY2(proxy.turnOffSystemProxy(),qPrintable(proxy.error()));
+        QVERIFY(!proxy.systemEnabled());QVERIFY(!proxy.owned());QVERIFY(!proxy.enabled());
+        QVERIFY(!QFile::exists(temp.filePath("explicit-off.dpapi")));
+        QVERIFY(proxy.disable()); // Exit/release cannot restore the old external proxy.
+        QCOMPARE(SystemProxySession::snapshot(),off);
+    }
     void currentUserRecovery() {
         const auto original=SystemProxySession::snapshot();QVERIFY(!original.isEmpty());
         // Restore the user's real settings even when an assertion terminates a
@@ -128,6 +157,9 @@ private slots:
 };
 int main(int argc,char **argv) {
     QCoreApplication app(argc,argv);app.setApplicationName("SwirlProxyTests");app.setOrganizationName("SOLHK");
+    if(qEnvironmentVariable("SWIRL_SYSTEM_PROXY_TEST")!=QStringLiteral("1")){
+        qCritical("System proxy mutation tests require an explicitly opted-in disposable Windows runner.");return 2;
+    }
     if(app.arguments().contains("--engine-fixture"))return app.exec();
     if(app.arguments().contains("--crash-fixture")) {
         QTcpServer server;if(!server.listen(QHostAddress::LocalHost,0))return 2;

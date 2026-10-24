@@ -118,7 +118,7 @@ ApplicationWindow {
                 id:toolbar; visible:AppState.currentPage==="activity"; x:Theme.pagePadding+Theme.dp(7); y:Theme.dp(9); width:parent.width-x-windowControls.width-Theme.dp(16); height:Theme.dp(32); spacing:Theme.dp(8)
                 SwirlStatusCapsule { objectName:"eventsCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.dp(28); label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"暂无事件";tone:systemProvider.eventCount>0?"success":"neutral";detail:"查看事件与活动记录"; onClicked:AppState.navigate("logs") }
                 Item {Layout.fillWidth:true}
-                SwirlStatusCapsule {id:proxyCapsule;objectName:"proxyCapsule";Layout.preferredWidth:implicitWidth;Layout.preferredHeight:Theme.dp(28);label:window.proxyStatusLabel;tone:engineController.systemProxy.error.length||engineController.routingError.length?"warning":engineController.systemProxy.systemEnabled?"success":"neutral";detail:"打开节点管理";onClicked:AppState.navigate("proxies")}
+                SwirlSystemProxyCapsule {id:proxyCapsule;objectName:"proxyCapsule";Layout.preferredWidth:implicitWidth;Layout.preferredHeight:Theme.dp(28);controller:engineController}
 
                 SwirlStatusCapsule { objectName:"tunCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.dp(28); label:"TUN 模式";detail:engineController.routingError||(engineController.tunEnabled?"TUN 模式已开启，点击关闭":"点击开启 TUN 模式接管网络"); tone:engineController.tunEnabled?"success":"neutral"; enabled:!engineController.busy; onClicked:{if(!engineController.setTunEnabled(!engineController.tunRequested))AppState.notice(engineController.routingError||engineController.networkConfigurationError)} }
 

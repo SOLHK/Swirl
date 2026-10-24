@@ -29,6 +29,14 @@ ManualProxy inspect(const QJsonObject &snapshot) {
     return state;
 }
 
+bool configuredEnabled(const QJsonObject &snapshot) {
+    const auto manual=inspect(snapshot);
+    if(manual.enabled())return true;
+    if(!manual.winInet.isValid())return false;
+    const auto flags=quint32(snapshot.value("flags").toDouble());
+    return (flags&8u)!=0||((flags&4u)!=0&&!snapshot.value("pac").toString().isEmpty());
+}
+
 QVariantMap ManualProxy::diagnostics() const {
     // An allowlist: never copy server/PAC/bypass addresses or registry bytes.
     return {{"known", winInet.isValid()}, {"winInetManualProxy", winInet},

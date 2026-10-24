@@ -9,6 +9,7 @@ This branch is a **test candidate**, not a declaration that all strict protocol 
 - Existing motion/caches/effects are retained. Shared easing and activity tokens, render-thread spinner, status contrast, subscription states and product naming are refined. Window/sidebar geometry and contour source hashes remain fixed; five native DPI scales were checked.
 - Packaging validates inventory and every payload digest after smoke, saves diagnostics outside the archive, verifies installed bytes, removes only proven obsolete program files on upgrade and preserves unlisted or modified files during cleanup. No recursive application-directory uninstall is used. Installer test payloads are synthetic and distinct from actual final product installation.
 - Platform dependency guards resolve aliases and target-specific dependencies. Full desktop Rust/native suites, Android/iOS library compilation and explicitly limited OpenHarmony module compilation are wired to S4. Compilation does not grant system network/VPN permission.
+- The Activity system proxy capsule directly enables or disables the observed Windows system proxy without navigating. A stopped engine starts the saved selected node before takeover; explicit off disables manual/PAC/automatic detection. Ordinary exit/release retains snapshot restoration. See [button behavior and test boundaries](S4_SYSTEM_PROXY_BUTTON.md).
 
 ## Acceptance and retained failures
 
@@ -26,6 +27,8 @@ The implementation-stage evidence is detailed in:
 The original strict VMess half-close tests remain failures. Both Swirl and the same-version official Xray client receive the complete echoed payload but fail the stronger post-EOF receipt on all four tested transports. The independent direct control passes; the pinned server cancels the connection after upload completion. The test contract is retained rather than changing EOF into success.
 
 The original public Shadowsocks HTTPS test also remains a failure: verified TLS and HTTP 204 are followed by a missing orderly TLS close. A same-IP, same-certificate direct control shows the same failure. Controlled orderly-close, truncated-close and bad-certificate tests remain separate. Neither external comparison proves that every other Swirl network path is defect-free.
+
+The earlier integrated `8a047f4` run also exposed a rare macOS Hysteria2 `HttpShutdown` failure and a relative-path NSIS packaging failure. The packaging path is corrected with an explicit absolute repository root and a 30-check installer lifecycle regression. Hysteria2 diagnostics preserve strict shutdown errors; a later same-context macOS probe passes the original 17-method menu plus 200 additional HTTPS requests, with 208 orderly origin TLS-close receipts. The original macOS failure remains unresolved/nonreproduced; no production shutdown fix is claimed.
 
 The 20% memory-reduction target is **not achieved**. The comparable motion-run working set changed from 397.90 MB to 396.94 MB (about 0.24%); the long-frame count remained eight. Fresh-process message-loop readiness is not true cold-start or first-frame latency, and its noisy P95 difference is not attributed solely to this change. Do not substitute these metrics for input-to-photon or long-duration leak acceptance.
 

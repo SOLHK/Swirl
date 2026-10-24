@@ -127,10 +127,14 @@ int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
     }
     auto *proxy=find(window->contentItem(),"proxyCapsule");
     if(proxy){
-        const auto before=eval("engineController.systemProxy.enabled");
-        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,proxy->mapToScene(QPointF(proxy->width()/2,proxy->height()/2)).toPoint());
-        check(QTest::qWaitFor([&]{return eval("AppState.currentPage==='proxies' && pageLoader.activeLoader.routeId==='proxies' && !pageLoader.pendingGrab && !pageLoader.moving").toBool();},3500),"proxy capsule navigates directly to node management");
-        check(eval("engineController.systemProxy.enabled")==before,"node navigation preserves system proxy state");
-    } else check(false,"proxy navigation control exists");
+        // Appearance checks observe the real host but never click its network
+        // switch. Motion checks inject a controller into this same control;
+        // native setting mutations are tested only on disposable CI runners.
+        const bool active=eval("engineController.systemProxy.systemEnabled").toBool();
+        const bool pending=eval("engineController.systemProxyBusy").toBool();
+        check(proxy->property("proxyEnabled").toBool()==active,"proxy control reflects actual host observation");
+        const auto action=pending?QStringLiteral("正在设置系统代理…"):active?QStringLiteral("关闭系统代理"):QStringLiteral("开启系统代理");
+        check(proxy->property("label").toString()==action,"proxy control presents the matching direct action");
+    } else check(false,"system proxy switch exists");
     qInfo()<<"APPEARANCE_CHECKS failures"<<failures;return failures?2:0;
 }

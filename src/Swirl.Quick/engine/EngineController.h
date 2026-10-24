@@ -47,6 +47,7 @@ class EngineController final : public QObject {
     Q_PROPERTY(NodeImportService* imports READ imports CONSTANT)
     Q_PROPERTY(QStringList supportedProtocols READ supportedProtocols CONSTANT)
     Q_PROPERTY(SystemProxySession* systemProxy READ systemProxy CONSTANT)
+    Q_PROPERTY(bool systemProxyBusy READ systemProxyBusy NOTIFY statusChanged)
     Q_PROPERTY(QString routingMode READ routingMode NOTIFY statusChanged)
     Q_PROPERTY(QString routingError READ routingError NOTIFY statusChanged)
     Q_PROPERTY(bool routingBusy READ routingBusy NOTIFY statusChanged)
@@ -171,6 +172,8 @@ public:
     Q_INVOKABLE bool removePolicyGroup(const QString &name);
     Q_INVOKABLE void setRoutingMode(const QString &mode);
     Q_INVOKABLE void setSystemProxy(bool enabled);
+    Q_INVOKABLE void toggleSystemProxy();
+    bool systemProxyBusy() const { return m_proxyChecking||(m_proxyRequested&&busy()); }
 signals:
     void lanAddressesChanged();
     void interfacesChanged();
