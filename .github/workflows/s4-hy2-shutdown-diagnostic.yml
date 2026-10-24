@@ -52,7 +52,7 @@ jobs:
                     'rustc': subprocess.check_output(['rustc', '-vV'], text=True),
                     'original_test_assertions_reduced': False, 'private_inputs': False}
           (output / 'identity.json').write_text(json.dumps(report, indent=2) + '\n')
-      - name: Repeat unchanged HTTPS assertions and verify independent TLS close receipts
+      - name: Run original 17 methods before repeating 200 HTTPS requests with TLS close receipts
         run: python tools/Run-Hysteria2ShutdownProbe.py --output "$RUNNER_TEMP/s4-hy2-shutdown"
       - name: Require unchanged tracked source after the probe
         if: ${{ !cancelled() }}
