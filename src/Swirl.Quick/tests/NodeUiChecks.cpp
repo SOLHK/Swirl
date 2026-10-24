@@ -254,7 +254,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         auto *socket=subscriptions.nextPendingConnection();
         QObject::connect(socket,&QTcpSocket::readyRead,socket,[&,socket]{
             socket->readAll();if(socket->property("responded").toBool())return;socket->setProperty("responded",true);++subscriptionRequests;
-            const auto content=QString("proxies: [{name: %2 fixture, type: socks5, server: 127.0.0.1, port: %1}]\n").arg(net.a.serverPort()).arg(subscriptionRequests==1?"HK":"JP").toUtf8();
+            const auto content=QString("proxies: [{name: %2 fixture, type: socks5, server: 127.0.0.1, port: %1}]\nproxy-groups: [{name: fixture-route, type: select, proxies: ['%2 fixture']}]\nrules: ['MATCH,fixture-route']\n").arg(net.a.serverPort()).arg(subscriptionRequests==1?"HK":"JP").toUtf8();
             QTimer::singleShot(600,socket,[socket,content]{socket->write("HTTP/1.1 200 OK\r\nContent-Length: "+QByteArray::number(content.size())+"\r\nConnection: close\r\n\r\n"+content);socket->disconnectFromHost();});
         });
         QObject::connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
@@ -318,8 +318,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         click("deleteSubscription-"+id);QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(250);
         check(controller->imports()->providers().size()==1,"Escape cancels destructive subscription confirmation");
         click("deleteSubscription-"+id);click("confirmSubscriptionDelete");
-        check(controller->imports()->providers().isEmpty()&&controller->nodes().size()==1,"confirmed deletion retains nodes as documented");
-        controller->deleteNode(controller->nodes().first().toMap().value("id").toString());
+        check(controller->imports()->providers().isEmpty()&&controller->nodes().isEmpty(),"confirmed deletion removes the source's owned nodes");
     }
     // Large-list layout/transfer fixture uses reserved local endpoints only.
     QString batch="proxies:\n";

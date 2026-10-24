@@ -13,6 +13,8 @@ CONTENT_EDITS = {
     "src/Swirl.Quick/qml/SwirlMotion.qml",
     "src/Swirl.Quick/qml/components/SwirlStatusBadge.qml",
     "src/Swirl.Quick/qml/controls/SwirlActivityIndicator.qml",
+    # v0.1.7 explicitly authorizes repairing clipped dropdowns and popup bounds.
+    "src/Swirl.Quick/qml/controls/SwirlComboBox.qml",
     "src/Swirl.Quick/qml/controls/SwirlDataTable.qml",
     "src/Swirl.Quick/qml/controls/SwirlMotionButton.qml",
     "src/Swirl.Quick/qml/controls/SwirlPressMotion.qml",

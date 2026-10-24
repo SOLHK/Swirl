@@ -18,6 +18,7 @@
 #include <QPromise>
 #include <QThreadPool>
 #include "RustCoreEngine.h"
+#include "RustCoreLibrary.h"
 #include "RustDnsConfiguration.h"
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -25,6 +26,34 @@
 #endif
 
 namespace {
+bool projectSubscriptionProfile(const QJsonObject &configuration,const QString &format,QVariantMap *projected,QString *error) {
+    auto &library=RustCoreLibrary::instance();
+    if(!library.load()||!library.importProfile()) {
+        *error=QStringLiteral("Rust 完整配置接口不可用；请安装内核与应用匹配的完整版本。");return false;
+    }
+    auto bytes=QJsonDocument(QJsonObject{{"format",format},{"configuration",configuration}}).toJson(QJsonDocument::Compact);
+    constexpr qsizetype Maximum=4*1024*1024;
+    if(bytes.size()>Maximum){bytes.fill('\0');*error=QStringLiteral("完整配置超过 Rust 校验上限。");return false;}
+    const auto call=library.importProfile();const auto *input=reinterpret_cast<const unsigned char *>(bytes.constData());
+    const auto required=call(input,size_t(bytes.size()),nullptr,0);
+    if(required<=0||required>Maximum){bytes.fill('\0');*error=QStringLiteral("Rust 完整配置校验返回无效长度。");return false;}
+    QByteArray response(required,Qt::Uninitialized);
+    const auto count=call(input,size_t(bytes.size()),reinterpret_cast<unsigned char *>(response.data()),size_t(response.size()));bytes.fill('\0');
+    if(count!=required){response.fill('\0');*error=QStringLiteral("Rust 完整配置校验响应不完整。");return false;}
+    QJsonParseError parseError;const auto document=QJsonDocument::fromJson(response,&parseError);response.fill('\0');
+    if(parseError.error!=QJsonParseError::NoError||!document.isObject()||document.object().value("schema").toInt()!=1) {
+        *error=QStringLiteral("Rust 完整配置校验响应无效。");return false;
+    }
+    const auto result=document.object();
+    if(!result.value("ok").toBool()) {
+        const auto code=result.value("error").toString(),field=result.value("field").toString();
+        const auto safeCode=QRegularExpression("^[A-Za-z][A-Za-z0-9]{0,127}$").match(code).hasMatch()?code:QStringLiteral("ProfileInvalid");
+        const auto safeField=QRegularExpression("^[A-Za-z][A-Za-z0-9_.\\[\\]-]{0,95}$").match(field).hasMatch()?field:QStringLiteral("configuration");
+        *error=QStringLiteral("Rust 完整配置校验失败：%1（%2）；旧节点与网络配置保持不变。").arg(safeCode,safeField);return false;
+    }
+    if(!result.value("configuration").isObject()){*error=QStringLiteral("Rust 未返回完整配置投影。");return false;}
+    *projected=result.value("configuration").toObject().toVariantMap();return true;
+}
 QStringList routingRuleFields(const QString &rule) {
     auto fields=rule.split(',');
     for(auto &field:fields)field=field.trimmed();
@@ -86,30 +115,11 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             if(!m_store.commitImport(plan,retainedNodeConfiguration(sourceId,nodesOnly))){*error=m_store.error();return false;}
             return true;
         }
-        if(result.configurationFormat!="clash"&&(result.configurationFormat!="ini"||configuration.isEmpty())) {
+        if(result.configurationFormat!="clash"&&result.configurationFormat!="sing-box"&&(result.configurationFormat!="ini"||configuration.isEmpty())) {
             *error=QStringLiteral("此格式的完整配置尚未映射；未应用节点或全局配置，原有设置保持不变。");return false;
         }
-        // First executable document profile: self-contained Clash groups/rules.
-        // External DNS dialects and every other root semantic remain explicit
-        // rejection rather than silently becoming Qt defaults or DIRECT.
-        for(auto it=configuration.begin();it!=configuration.end();++it) {
-            if(it.key()!="proxy-groups" && it.key()!="rules" && it.key()!="dns") {
-                *error=QStringLiteral("完整订阅含尚未映射的全局配置；未应用节点或网络配置。");return false;
-            }
-        }
-        if(configuration.contains("dns")) {
-            *error=QStringLiteral("此订阅的 DNS 语义尚未映射到 Rust；未应用节点或网络配置。");return false;
-        }
-        if(configuration.contains("rules")) {
-            if(!configuration["rules"].isArray()){*error=QStringLiteral("规则必须为字符串数组。");return false;}
-            for(const auto &rule:configuration["rules"].toArray())if(!rule.isString()){*error=QStringLiteral("规则必须为字符串。");return false;}
-        }
-        const auto rules=configuration.value("rules").toArray();
-        if(rules.isEmpty() || !rules.last().toString().trimmed().startsWith("MATCH,")) {
-            *error=QStringLiteral("当前完整订阅档案要求显式末尾 MATCH 规则；未猜测默认出站策略。");return false;
-        }
-        const QVariantMap mapped{{"groups",configuration.value("proxy-groups").toVariant()},{"rules",configuration.value("rules").toVariant()}};
-        auto input=mapped;if(!configuration.contains("proxy-groups"))input.remove("groups");if(!configuration.contains("rules"))input.remove("rules");
+        QVariantMap input;
+        if(!projectSubscriptionProfile(configuration,result.configurationFormat,&input,error))return false;
         if(!importNodesAndConfiguration(result.nodes,sourceId,input,result.configuration,result.configurationFormat)){*error=m_networkError;return false;}
         return true;
     });
@@ -194,22 +204,52 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     });
     if(m_options.tunEnabled)m_routingError=QStringLiteral("已保存的增强模式配置尚不受 Rust Core 支持；请明确关闭后再连接。配置保持原值。");
     connect(m_engine.get(), &ProxyEngine::statusChanged, this, &EngineController::statusChanged);
-    connect(&m_store,&NodeStore::changed,this,&EngineController::nodesChanged);
-    connect(&m_store,&NodeStore::changed,this,&EngineController::nodeCatalogChanged);
-    connect(&m_store,&NodeStore::changed,this,[this]{m_tests.invalidateResults();});
+    m_options.nodes=m_store.nodes();
+    connect(&m_store,&NodeStore::changed,this,[this]{
+        const auto nodes=m_store.nodes();QSet<QString> present,removed,removedNames;
+        for(const auto &node:nodes)present.insert(node.id);
+        for(const auto &node:m_options.nodes)if(!present.contains(node.id)){removed.insert(node.id);removedNames.insert(node.name);}
+        const auto status=m_engine->status();
+        bool invalidated=removed.contains(status.selectedNodeId)||removed.contains(m_options.selectedNodeId)||
+            (!status.selectedNodeId.isEmpty()&&!present.contains(status.selectedNodeId))||
+            (!m_pendingSelection.isEmpty()&&!present.contains(m_pendingSelection));
+        for(const auto &entry:m_options.customGroups)for(const auto &member:entry.toMap().value("proxies").toStringList())
+            invalidated=invalidated||removed.contains(member);
+        for(const auto &node:m_options.nodes)invalidated=invalidated||removedNames.contains(node.parameters.value("dialer-proxy").toString());
+        for(const auto &rule:m_options.customRules){const auto fields=routingRuleFields(rule);invalidated=invalidated||removed.contains(fields.value(routingRuleTargetIndex(fields)));}
+        if(invalidated&&(m_connectionRequested||status.processAlive||busy())) {
+            // Revocation closes the Rust snapshot before it can continue using
+            // deleted credentials. Do not roll back a pending choice to a node
+            // that has just been removed, or automatically pick another exit.
+            m_pendingSelection.clear();m_previousSelection.clear();stop();
+            m_nodeError=QStringLiteral("正在使用的节点或策略依赖已删除；相应连接已停止，请重新选择节点。");
+            emit diagnostic("EngineController","NodeSourceRevoked",m_nodeError);
+        }
+        if(!m_connectionRequested) {
+            m_options.nodes=nodes;m_options.selectedNodeId=m_store.selectedId();
+            const auto configuration=m_store.networkConfiguration();
+            if(!removed.isEmpty()&&configuration.value("schema").toInt()==1) {
+                m_options.customRules.clear();for(const auto &rule:configuration.value("rules").toArray())m_options.customRules.append(rule.toString());
+                m_options.customGroups=configuration.value("groups").toArray().toVariantList();
+                m_nativeDocumentRouting=configuration.value("nativeDocumentRouting").toBool(false);updateRoutingFlags();
+            }
+            emit optionsChanged();
+        }
+        m_tests.invalidateResults();emit nodesChanged();emit nodeCatalogChanged();
+    });
     connect(&m_store,&NodeStore::selectionChanged,this,&EngineController::selectionChanged);
     connect(this,&EngineController::nodesChanged,this,&EngineController::selectionChanged);
     connect(&m_imports,&NodeImportService::changed,this,&EngineController::statusChanged);
     connect(&m_imports,&NodeImportService::nodesApplied,this,[this]{
-        m_nodeError.clear();
         // A background subscription refresh must not interrupt live Codex/WS
         // streams. The current immutable engine snapshot lives until reconnect.
         if(m_connectionRequested && (processAlive() || busy())) {
             const auto active=m_engine->status().selectedNodeId;bool retained=false;
             for(const auto &node:m_store.nodes())if(node.id==active){retained=true;break;}
-            m_nodeError=retained?QStringLiteral("节点库已更新；当前连接继续使用启动时配置。新增节点与凭据更新在手动断开重连后生效。"):
-                QStringLiteral("运行中的节点已从节点库移除；当前连接保留启动时配置直到断开，未自动切换其他节点。请重新选择节点后再连接。");
-            emit diagnostic("EngineController","SubscriptionUpdateDeferred",m_nodeError);
+            if(retained) {
+                m_nodeError=QStringLiteral("节点库已更新；当前连接继续使用启动时配置。新增节点与凭据更新在手动断开重连后生效。");
+                emit diagnostic("EngineController","SubscriptionUpdateDeferred",m_nodeError);
+            }
         }
         emit nodesChanged();
     });

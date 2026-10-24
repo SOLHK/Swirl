@@ -12,6 +12,9 @@ struct ProxyNode {
     // Encrypted provenance only. Neither raw source nor credentials enter QML.
     QJsonObject originalConfiguration;
     QString sourceFormat;
+    // Provider's imported alias, independent of user-edited display names.
+    // Persisted only inside the protected catalog; never returned to QML.
+    QString providerAlias;
     QStringList conversionIssues;
     // Xray source is authoritative. Copies share the bounded document in memory;
     // the encrypted store deduplicates it. Never expose it or nativeOutbound to QML.

@@ -181,6 +181,10 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
         }
         else if(obj.contains("type"))array.append(obj);
     }
+    if(!normalized.handled && !root.isArray() && (!root.isObject() || (!root.toObject().contains("proxies")&&!root.toObject().contains("type")))) {
+        result.errorKind="unsupported-format";result.format.clear();
+        result.error=QStringLiteral("实际内容未检测到受支持的节点列表；可能是登录页、错误正文或其它配置格式。原节点保持不变。");return result;
+    }
     if(array.isEmpty() || array.size()>2000) {
         result.error=QStringLiteral("需要包含 1–2000 个节点的 proxies 列表或单个节点；只导入节点，不执行订阅内的全局配置。");return result;
     }

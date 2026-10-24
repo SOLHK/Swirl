@@ -11,6 +11,10 @@ mod security;
 pub(crate) mod stream_transport;
 mod strict;
 
+pub(crate) fn parse_json_value(bytes: &[u8]) -> Result<Value, Diagnostic> {
+    strict::parse(bytes)
+}
+
 pub const MAX_JSON_INPUT: usize = 4 * 1024 * 1024;
 /// Maximum value depth, with the root at depth zero.
 pub const MAX_JSON_DEPTH: usize = 32;

@@ -1,7 +1,7 @@
 name: Rust sole runtime and unified product
 on:
   push:
-    branches: [work/rust-core-full-replacement-20261022, work/subscription-unified-integration-20261023, work/swirl-s3-max-ultra-20261023, work/swirl-s4-final-completion-20261023]
+    branches: [work/rust-core-full-replacement-20261022, work/subscription-unified-integration-20261023, work/swirl-s3-max-ultra-20261023, work/swirl-s4-final-completion-20261023, work/swirl-017-subscription-network-20261024]
   workflow_dispatch:
 permissions:
   contents: read
@@ -149,6 +149,24 @@ jobs:
           if ($p.ExitCode -ne 0) { throw 'Real system proxy UI integration failed.' }
           $result=Get-Content -LiteralPath $env:SWIRL_SYSTEM_PROXY_UI_REPORT -Raw | ConvertFrom-Json
           if (-not $result.executed -or -not $result.success -or -not $result.restored -or $result.source_sha -cne $env:GITHUB_SHA) { throw 'Real system proxy UI evidence is incomplete or has the wrong source.' }
+      - name: Subscription dialogs and node viewport at five DPI scales
+        if: ${{ !cancelled() && steps.deploy_tests.outcome == 'success' }}
+        shell: pwsh
+        env:
+          SWIRL_U2_CHECKS: subscription
+          QT_SCREEN_SCALE_FACTORS: '1'
+          QT_ENABLE_HIGHDPI_SCALING: '0'
+        run: |
+          foreach ($scale in @('1','1.25','1.5','1.75','2')) {
+            $env:QT_SCALE_FACTOR=$scale
+            $output=Join-Path $env:GITHUB_WORKSPACE ('build/r1-tests/subscription-ui/'+$scale+'/result.json')
+            $p=Start-Process build/r1-tests/Release/Swirl.exe -ArgumentList @('--motion-test', ('--motion-output='+$output)) -WindowStyle Hidden -PassThru
+            if (-not $p.WaitForExit(120000)) { $p.Kill(); throw 'Subscription DPI check timed out.' }
+            if ($p.ExitCode -ne 0) { throw "Subscription DPI check failed at $scale." }
+            $result=Get-Content $output -Raw | ConvertFrom-Json
+            if ($result.failures -ne 0) { throw "Subscription UI assertions failed at $scale." }
+          }
+          Remove-Item Env:QT_SCALE_FACTOR
       - name: S4 synthetic node scale and fixed geometry (not native GPU acceptance)
         id: s4_stress
         if: ${{ !cancelled() && steps.deploy_tests.outcome == 'success' }}
@@ -293,6 +311,7 @@ jobs:
             build/r1-tests/Release/Swirl-node-ui-diagnostics.txt
             build/r1-tests/*.xml
             build/r1-tests/system-proxy-ui.json
+            build/r1-tests/subscription-ui
             build/r1-tests/node-chain.txt
             build/r1-tests/import-subscription.txt
             build/r1-tests/subscription-formats.txt

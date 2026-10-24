@@ -47,6 +47,99 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
     const QSize initial=window->size();
     const double sidebar=eval("window.actualSidebarWidth").toDouble();
     sample("cold");
+    if(phase=="subscription"){
+        bool requestedScaleOk=false;const double requestedScale=qEnvironmentVariable("QT_SCALE_FACTOR").toDouble(&requestedScaleOk);
+        check("requested-dpi-scale-is-effective",requestedScaleOk&&qAbs(window->devicePixelRatio()-requestedScale)<0.02);
+        std::function<QQuickItem *(QQuickItem *,const QString &)> find=[&](QQuickItem *parent,const QString &name)->QQuickItem *{if(parent->objectName()==name)return parent;for(auto *child:parent->childItems())if(auto *found=find(child,name))return found;return nullptr;};
+        const auto item=[&](const QString &name){return find(window->contentItem(),name);};
+        const auto click=[&](const QString &name){auto *target=item(name);check("input-"+name,target&&target->isVisible()&&target->isEnabled());if(target)QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,target->mapToScene(QPointF(target->width()/2,target->height()/2)).toPoint());wait(250);};
+        navigate("subscriptions");click("addSubscription");
+        auto *dialog=window->findChild<QObject *>("subscriptionDialog");
+        auto *scope=item("subscriptionImportScope"),*format=item("subscriptionFormat"),*form=item("subscriptionFormViewport"),*name=item("subscriptionName");
+        auto *body=item("subscriptionFormBody"),*save=item("saveSubscription");
+        check("subscription-form-mounted",dialog&&scope&&format&&form&&name&&body&&save);
+        if(dialog&&scope&&format&&form&&name&&body&&save){
+            check("new-subscription-default-full-strict",scope->property("currentIndex").toInt()==0&&scope->property("currentText").toString()==QString::fromUtf8("完整配置（严格校验）"));
+            check("format-has-seven-distinct-choices",format->property("count").toInt()==7&&format->property("currentText").toString()==QString::fromUtf8("自动"));
+            const auto visibleIn=[&](QQuickItem *field,QQuickItem *viewport){const QRectF outer(viewport->mapToScene(QPointF()),viewport->size());return outer.adjusted(-1,-1,1,1).contains(QRectF(field->mapToScene(QPointF()),field->size()));};
+            check("first-input-visible-on-open",visibleIn(name,form));
+            check("dialog-footer-inside-window",QRectF(0,0,window->width(),window->height()).contains(QRectF(save->mapToScene(QPointF()),save->size())));
+            format->forceActiveFocus();wait(150);
+            check("focused-format-scrolls-fully-into-view",visibleIn(format,form));
+            auto *popup=format->property("popup").value<QObject *>();
+            if(popup){
+                QMetaObject::invokeMethod(popup,"open");wait(250);
+                const QRectF popupRect(popup->property("x").toReal(),popup->property("y").toReal(),popup->property("width").toReal(),popup->property("height").toReal());
+                check("format-popup-clamped-to-window",popup->property("visible").toBool()&&popupRect.height()>0&&QRectF(0,0,window->width(),window->height()).contains(popupRect));
+                auto *list=popup->property("contentItem").value<QQuickItem *>();
+                if(list){QMetaObject::invokeMethod(list,"positionViewAtEnd");wait(120);}
+                auto *last=item("swirlComboOption-6");
+                check("last-format-option-visible-and-tall-enough",last&&list&&last->property("text").toString()=="sing-box"&&last->height()>=eval("Theme.controlHeight").toReal()&&visibleIn(last,list));
+                if(auto *label=last?last->property("contentItem").value<QQuickItem *>():nullptr)check("format-option-label-not-vertically-clipped",label->property("contentHeight").toReal()<=label->height()+1);
+                window->grabWindow().save(QFileInfo(output).absolutePath()+"/subscription-form-popup.png");
+                QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,format->mapToScene(QPointF(format->width()/2,format->height()/2)).toPoint());wait(220);
+                check("format-click-toggles-popup-closed",!popup->property("visible").toBool());
+                QMetaObject::invokeMethod(popup,"open");wait(160);
+                QTest::keyClick(window,Qt::Key_Escape);wait(220);
+                check("escape-closes-format-before-form",!popup->property("visible").toBool()&&dialog->property("visible").toBool());
+            }else check("format-popup-present",false);
+            auto *flick=form->property("contentItem").value<QQuickItem *>();
+            if(flick)flick->setProperty("contentY",qMax(0.0,flick->property("contentHeight").toReal()-flick->height()));
+            QTest::keyClick(window,Qt::Key_Escape);wait(250);
+            check("escape-closes-unchanged-form",!dialog->property("visible").toBool());
+            click("addSubscription");
+            check("reopened-form-restores-first-field",visibleIn(name,form)&&flick&&qAbs(flick->property("contentY").toReal())<1);
+            name->setProperty("text",QString::fromUtf8("未保存的订阅"));
+            QTest::keyClick(window,Qt::Key_Escape);wait(220);
+            auto *discard=dialog->findChild<QObject *>("discardChangesPrompt");
+            check("escape-guards-unsaved-subscription",dialog->property("visible").toBool()&&discard&&discard->property("visible").toBool()&&name->property("text").toString()==QString::fromUtf8("未保存的订阅"));
+            QTest::keyClick(window,Qt::Key_Escape);wait(220);
+            check("escape-from-discard-keeps-draft",dialog->property("visible").toBool()&&discard&&!discard->property("visible").toBool()&&!name->property("text").toString().isEmpty());
+            QTest::keyClick(window,Qt::Key_Escape);wait(200);click("discardChangesConfirm");
+            check("explicit-discard-closes-form",!dialog->property("visible").toBool());
+        }
+        auto *legacy=window->findChild<QObject *>("legacyNodesDialog");
+        check("legacy-cleanup-dialog-mounted",legacy!=nullptr);
+        if(legacy){
+            QMetaObject::invokeMethod(legacy,"open");wait(250);
+            auto *confirm=item("confirmLegacyNodesDelete");
+            check("legacy-cleanup-confirmation-visible",confirm&&confirm->isVisible()&&legacy->property("visible").toBool());
+            check("legacy-cleanup-footer-inside-window",confirm&&QRectF(0,0,window->width(),window->height()).contains(QRectF(confirm->mapToScene(QPointF()),confirm->size())));
+            window->grabWindow().save(QFileInfo(output).absolutePath()+"/legacy-cleanup-dialog.png");
+            QTest::keyClick(window,Qt::Key_Escape);wait(250);
+            check("escape-cancels-legacy-cleanup",!legacy->property("visible").toBool());
+        }
+        navigate("proxies");
+        auto *model=window->findChild<NodeViewModel *>("nodeViewModel");
+        auto *table=item("realNodeTable"),*list=item("tableRowsViewport"),*search=item("nodeSearchField"),*source=item("nodeSourceFilter");
+        check("node-layout-mounted",model&&table&&list&&search&&source);
+        if(model&&table&&list&&search&&source){
+            auto *controller=model->controller();model->setController(nullptr);
+            QVariantList rows;for(int i=0;i<600;++i)rows.append(QVariantMap{{"id",QString::number(i)},{"name",QString("Node %1").arg(i,3,10,QChar('0'))},{"protocol","http"},{"host","node.example.test"},{"sourceKind",i%2?"subscription":"manual"},{"sourceId",i%2?"fixture-subscription":""},{"regionName","未知"},{"regionCode","ZZ"},{"status","未测试"},{"latency","—"}});
+            model->updateRows(rows);wait(180);
+            const QRectF tableBefore(table->mapToScene(QPointF()),table->size());
+            QMetaObject::invokeMethod(list,"positionViewAtEnd");wait(150);
+            QQmlExpression lastRow(qmlContext(list),list,"itemAtIndex(count-1)");auto *last=qobject_cast<QQuickItem *>(lastRow.evaluate().value<QObject *>());
+            const QRectF viewport(list->mapToScene(QPointF()),list->size());
+            check("last-of-600-nodes-fully-reachable",last&&viewport.adjusted(-1,-1,1,1).contains(QRectF(last->mapToScene(QPointF()),last->size())));
+            check("large-node-list-remains-virtualized",table->property("renderedRows").toInt()<100);
+            search->setProperty("text","no-such-node");wait(180);
+            check("empty-search-keeps-node-viewport",model->rowCount()==0&&QRectF(table->mapToScene(QPointF()),table->size())==tableBefore&&window->size()==initial);
+            search->setProperty("text","");wait(180);
+            QMetaObject::invokeMethod(source,"activated",Q_ARG(int,1));wait(180);
+            check("manual-source-filter-is-exclusive",model->rowCount()==300&&eval("pageLoader.item.sourceKind==='manual' && pageLoader.item.sourceId===''").toBool());
+            check("source-filter-keeps-node-viewport",QRectF(table->mapToScene(QPointF()),table->size())==tableBefore&&window->size()==initial);
+            if(auto *sort=item("nodeSortOrder")){sort->setProperty("currentIndex",1);wait(100);check("sorting-keeps-node-viewport",QRectF(table->mapToScene(QPointF()),table->size())==tableBefore&&window->size()==initial);sort->setProperty("currentIndex",0);}
+            QMetaObject::invokeMethod(source,"activated",Q_ARG(int,0));wait(150);
+            check("all-source-filter-restores-all-nodes",model->rowCount()==600);
+            window->grabWindow().save(QFileInfo(output).absolutePath()+"/node-source-layout.png");
+            model->setController(controller);
+        }
+        check("subscription-fixes-preserve-shell-size",window->size()==initial);
+        check("subscription-fixes-preserve-sidebar",eval("window.actualSidebarWidth").toDouble()==sidebar);
+        QFile file(output);QDir().mkpath(QFileInfo(output).absolutePath());if(!file.open(QIODevice::WriteOnly))return 2;
+        file.write(QJsonDocument(QJsonObject{{"phase",phase},{"checks",checks},{"failures",failures},{"logicalWidth",initial.width()},{"logicalHeight",initial.height()},{"dpr",window->devicePixelRatio()},{"note","Mounted QML layout, popup, Escape and synthetic 600-row virtualization checks only; subscription/network acceptance runs separately."}}).toJson());return failures?1:0;
+    }
     if(phase=="S4"){
         navigate("proxies");
         auto *model=window->findChild<NodeViewModel *>("nodeViewModel");

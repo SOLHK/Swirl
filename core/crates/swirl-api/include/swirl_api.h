@@ -39,6 +39,13 @@ intptr_t swirl_import_xray_v1(const uint8_t *input, size_t input_len,
 intptr_t swirl_import_node_v1(const uint8_t *input, size_t input_len,
                             uint8_t *output, size_t output_capacity);
 
+/* Offline strict profile projection. Input (at most 4 MiB) is
+ * {"format":"clash"|"ini"|"sing-box","configuration":{...}}. The normalized profile
+ * excludes nodes, which are validated independently before one atomic save.
+ * Same bounded query/write contract as the other import functions. */
+intptr_t swirl_import_profile_v1(const uint8_t *input, size_t input_len,
+                               uint8_t *output, size_t output_capacity);
+
 uint32_t swirl_core_abi_version(void);
 /* UTF-8 JSON: abi_version, build_id, source_sha, package_version, target.
  * Returns bytes excluding NUL, -1 for a null/short buffer, -2 for caught panic.

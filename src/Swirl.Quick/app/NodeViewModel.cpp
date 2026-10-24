@@ -78,7 +78,7 @@ void NodeViewModel::copySafeInfo(const QString &id) const {
 }
 bool NodeViewModel::filterAcceptsRow(int index,const QModelIndex &) const {
     const auto &r=m_rows.rows[index];
-    for(const auto &key:{"protocol","regionCode","sourceId","status"}){const auto f=m_filters.value(key).toString();if(!f.isEmpty()&&r.value(key).toString()!=f)return false;}
+    for(const auto &key:{"protocol","regionCode","sourceId","sourceKind","status"}){const auto f=m_filters.value(key).toString();if(!f.isEmpty()&&r.value(key).toString()!=f)return false;}
     const auto group=m_filters.value("group").toString();if(group=="favorites"&&!r.value("favorite").toBool())return false;if(group=="recent"&&r.value("recentIndex").toInt()<0)return false;
     const int maximum=m_filters.value("maxLatency",-1).toInt();bool measured=false;const int latency=r.value("latency").toString().toInt(&measured);
     if(maximum>=0&&(!measured||latency>maximum))return false;

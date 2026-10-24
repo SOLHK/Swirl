@@ -5,6 +5,9 @@ use crate::{Config, Credentials, Limits, Node, ObfsHttp, Outbound, Tls};
 #[cfg(test)]
 #[path = "inspect_boundaries.rs"]
 mod inspect_boundaries;
+#[cfg(test)]
+#[path = "inspect_formats_tests.rs"]
+mod inspect_formats_tests;
 #[path = "inspect_reality.rs"]
 mod inspect_reality;
 #[path = "inspect_socks4.rs"]
@@ -581,6 +584,7 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
             if let Some((key, value)) = parameter {
                 let key = key.trim();
                 let canonical = match key {
+                    "tag" if qx => "name",
                     "encrypt-method" | "method" => "cipher",
                     "tls-host" | "tls-name" => "sni",
                     "udp-relay" => "udp",
@@ -589,7 +593,9 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
                     "obfs-name" => "obfs",
                     _ => key,
                 };
-                if !seen.insert(canonical) || n.get(canonical).is_some() {
+                if !seen.insert(canonical)
+                    || (n.get(canonical).is_some() && !(qx && canonical == "name"))
+                {
                     return Err("DuplicateIniParameter");
                 }
                 let value = clean_ini(value);
@@ -641,12 +647,31 @@ fn parse(bytes: &[u8], depth: usize) -> Result<(&'static str, Value, Vec<Value>)
     if depth > 2 {
         return Err("EncodingDepth");
     }
-    let original_text = std::str::from_utf8(bytes)
-        .map_err(|_| "EncodingNotUtf8")?
-        .trim_start_matches('\u{feff}');
+    let decoded_text = std::str::from_utf8(bytes).map_err(|_| "EncodingNotUtf8")?;
+    let original_text = decoded_text
+        .strip_prefix('\u{feff}')
+        .unwrap_or(decoded_text);
     let text = original_text.trim();
     if text.is_empty() {
         return Err("EmptyDocument");
+    }
+    if text.starts_with('\u{feff}')
+        || text
+            .chars()
+            .any(|c| c.is_ascii_control() && !matches!(c, '\r' | '\n' | '\t'))
+    {
+        return Err("DocumentControlCharacter");
+    }
+    if text.starts_with('<') {
+        return Err("SubscriptionResponseIsHtml");
+    }
+    if text.starts_with("STATUS=") {
+        let (header, body) = text.split_once('\n').ok_or("ShadowrocketStatusHeader")?;
+        if header.len() > 4096 {
+            return Err("ShadowrocketStatusHeader");
+        }
+        let (_, document, nodes) = parse(body.as_bytes(), depth + 1)?;
+        return Ok(("shadowrocket", document, nodes));
     }
     if text
         .lines()
@@ -662,20 +687,23 @@ fn parse(bytes: &[u8], depth: usize) -> Result<(&'static str, Value, Vec<Value>)
     {
         return Ok(("ini", Value::String(text.to_string()), ini(original_text)?));
     }
-    if text.lines().filter(|l| !l.trim().is_empty()).all(|l| {
-        l.trim().split_once("://").is_some_and(|(scheme, _)| {
-            !scheme.is_empty()
-                && scheme.len() < 32
-                && scheme
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b"+.-".contains(&b))
+    let uri_lines = || {
+        text.lines().map(str::trim).filter(|line| {
+            !line.is_empty() && !line.starts_with(['#', ';']) && !line.starts_with("//")
         })
-    }) {
-        let nodes = text
-            .lines()
-            .filter(|l| !l.trim().is_empty())
-            .map(|l| uri(l.trim()))
-            .collect::<Result<Vec<_>, _>>()?;
+    };
+    if uri_lines().next().is_some()
+        && uri_lines().all(|l| {
+            l.trim().split_once("://").is_some_and(|(scheme, _)| {
+                !scheme.is_empty()
+                    && scheme.len() < 32
+                    && scheme
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b"+.-".contains(&b))
+            })
+        })
+    {
+        let nodes = uri_lines().map(uri).collect::<Result<Vec<_>, _>>()?;
         return Ok(("uri-list", Value::String(text.to_string()), nodes));
     }
     if text
@@ -1376,8 +1404,21 @@ pub fn inspect(bytes: &[u8]) -> Inspection {
         };
     }
     let mut candidates = Vec::new();
+    // An encoding wrapper is not a client dialect. In particular, sing-box
+    // QUIC nodes have nested TLS fields which cannot use Clash's projection.
+    let family = if document
+        .get("outbounds")
+        .and_then(Value::as_array)
+        .is_some_and(|nodes| nodes.iter().any(|node| node.get("protocol").is_some()))
+    {
+        "xray-v2ray-json"
+    } else if document.get("outbounds").is_some() {
+        "sing-box-json"
+    } else {
+        format
+    };
     for (index, node) in nodes.iter().enumerate() {
-        let (capability, candidate) = capability(node, index + 1, format);
+        let (capability, candidate) = capability(node, index + 1, family);
         *report.protocols.entry(capability.protocol).or_default() += 1;
         report.nodes.push(capability);
         candidates.push(candidate);

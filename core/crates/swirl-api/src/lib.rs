@@ -12,6 +12,8 @@ use swirl_subscription::Config;
 mod import_ffi;
 mod node_import;
 pub use node_import::swirl_import_node_v1;
+mod profile_import;
+pub use profile_import::swirl_import_profile_v1;
 mod xray_import;
 pub use xray_import::swirl_import_xray_v1;
 
