@@ -1,7 +1,7 @@
 name: Swirl incremental Windows network candidate
 on:
   push:
-    branches: [work/swirl-018-network-compat-20261024, work/swirl-019-subscription-regression-20261024]
+    branches: [work/swirl-018-network-compat-20261024, work/swirl-019-subscription-regression-20261024, work/swirl-ui-v2-20261024]
   workflow_dispatch:
 permissions:
   contents: read

@@ -60,7 +60,12 @@ void NodeViewModel::scheduleRefresh(){if(!m_refreshTimer.isActive())m_refreshTim
 void NodeViewModel::updateRows(const QVariantList &values){
     QVariantList rows;rows.reserve(values.size());
     for(const auto &v:values){auto row=v.toMap();const auto id=row.value("id").toString();row["favorite"]=m_favorites.contains(id);row["recentIndex"]=m_recent.indexOf(id);rows.append(row);}
-    if(m_rows.update(rows))notify();
+    if(m_rows.update(rows)){++m_catalogRevision;notify();}
+}
+QVariantList NodeViewModel::catalogRows() const {
+    QVariantList rows;rows.reserve(m_rows.rows.size());
+    for(const auto &row:m_rows.rows)rows.append(row);
+    return rows;
 }
 void NodeViewModel::setQuery(const QString &value){const auto query=value.trimmed();if(m_query==query)return;m_query=query;invalidateFilter();notify();}
 void NodeViewModel::setFilters(const QVariantMap &value){if(m_filters==value)return;m_filters=value;invalidate();sort(0,value.value("descending").toBool()?Qt::DescendingOrder:Qt::AscendingOrder);notify();}

@@ -136,6 +136,7 @@ public:
     TelemetryService *telemetry() { return &m_telemetry; }
     NodeTestService *tests() { return &m_tests; }
     Q_INVOKABLE void testAllNodes(const QUrl &url);
+    Q_INVOKABLE void testNodes(const QStringList &ids,const QUrl &url);
     Q_INVOKABLE void testSelectedNode(const QString &id,const QUrl &url);
     QVariantList routingRules() const;
     QVariantMap dnsConfiguration() const { return m_options.dnsConfig; }

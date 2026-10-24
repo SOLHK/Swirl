@@ -26,6 +26,7 @@ class NodeViewModel : public QSortFilterProxyModel {
     Q_PROPERTY(int count READ rowCount NOTIFY changed)
     Q_PROPERTY(int total READ total NOTIFY changed)
     Q_PROPERTY(int revision READ revision NOTIFY changed)
+    Q_PROPERTY(int catalogRevision READ catalogRevision NOTIFY changed)
 public:
     explicit NodeViewModel(QObject *parent=nullptr);
     EngineController *controller() const { return m_controller; }
@@ -36,6 +37,8 @@ public:
     void setFilters(const QVariantMap &value);
     int total() const { return m_rows.rowCount(); }
     int revision() const { return m_revision; }
+    int catalogRevision() const { return m_catalogRevision; }
+    QVariantList catalogRows() const;
     Q_INVOKABLE QVariantMap get(int row) const;
     Q_INVOKABLE QVariantMap find(const QString &id) const;
     Q_INVOKABLE void toggleFavorite(const QString &id);
@@ -59,5 +62,6 @@ private:
     QSet<QString> m_favorites;
     QStringList m_recent;
     int m_revision=0;
+    int m_catalogRevision=0;
     QTimer m_refreshTimer;
 };

@@ -155,7 +155,7 @@ set(SWIRL_QML_FILES
  qml/controls/SwirlTextArea.qml qml/controls/SwirlToolTip.qml
  qml/controls/SwirlLinkedDetail.qml
  qml/controls/SwirlNodeTransfer.qml
- qml/components/SwirlFontSettings.qml
+ qml/components/SwirlFontSettings.qml qml/components/NodeSourceHeader.qml
  qml/components/SwirlSecondaryWindow.qml
  qml/components/SwirlWindowTitleBar.qml
  qml/controls/RewriteRulesDialog.qml
@@ -210,7 +210,7 @@ qt_add_qml_module(Swirl
     RESOURCE_PREFIX /qt/qml
     NO_GENERATE_EXTRA_QMLDIRS
     QML_FILES ${SWIRL_QML_FILES}
-    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp app/WindowEdge.h app/WindowEdge.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp app/NodeViewModel.h app/NodeViewModel.cpp
+    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp app/WindowEdge.h app/WindowEdge.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp app/NodeViewModel.h app/NodeViewModel.cpp app/NodeSectionModel.h app/NodeSectionModel.cpp
 )
 set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 file(GLOB SWIRL_UI_ICONS CONFIGURE_DEPENDS "${SWIRL_ASSET_PATH}/icons/ui/*.svg")
@@ -259,6 +259,11 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  target_include_directories(SwirlNodeViewModelTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
  add_test(NAME swirl-node-view-model COMMAND SwirlNodeViewModelTests)
  set_tests_properties(swirl-node-view-model PROPERTIES TIMEOUT 60)
+ qt_add_executable(SwirlNodeSectionModelTests tests/NodeSectionModelTests.cpp app/NodeSectionModel.h app/NodeSectionModel.cpp app/NodeViewModel.h app/NodeViewModel.cpp)
+ target_link_libraries(SwirlNodeSectionModelTests PRIVATE SwirlEngine Qt6::Qml Qt6::Test)
+ target_include_directories(SwirlNodeSectionModelTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+ add_test(NAME swirl-node-section-model COMMAND SwirlNodeSectionModelTests)
+ set_tests_properties(swirl-node-section-model PROPERTIES TIMEOUT 60)
  swirl_add_font_tests()
  if(SWIRL_BUILD_UI_TESTS)
  target_sources(Swirl PRIVATE tests/GatewayChecks.cpp tests/GatewayChecks.h tests/HdrChecks.cpp tests/HdrChecks.h tests/OverviewChecks.cpp tests/OverviewChecks.h tests/CaptureChecks.cpp tests/CaptureChecks.h tests/WindowChecks.cpp tests/WindowChecks.h)

@@ -24,12 +24,19 @@ Item {
   SwirlText {textRole:"pageTitle";renderType:Text.NativeRendering;text:"策略";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold}
   SwirlSegmentedControl {Layout.fillWidth:true;Layout.maximumWidth:Theme.dp(600);rounded:true;objectName:"routingModePicker";optionIcons:["code","network","route"];options:["直接连接","全局代理","规则判定"];textPixelSize:13;accentSelection:true;currentIndex:page.modeIndex;enabled:!page.engineController.busy&&!page.engineController.routingBusy;onActivated:index=>page.engineController.setRoutingMode(["direct","global","rule"][index])}
   SwirlText {renderType:Text.NativeRendering;text:["直接连接目标服务器。","所有流量通过代理处理。","根据规则系统判定处理方式。"][page.modeIndex];color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+  RowLayout {
+   Layout.fillWidth:true;spacing:Theme.dp(10)
+   SwirlButton {objectName:"policyConnectButton";text:page.engineController.nodeBusy?qsTr("正在连接…"):page.engineController.processAlive?qsTr("断开出口"):qsTr("连接所选出口");primary:true;enabled:!page.engineController.nodeBusy&&(page.engineController.processAlive||page.engineController.selectedNodeId.length>0||page.engineController.routingMode==="direct");onClicked:{if(page.engineController.processAlive)page.engineController.disconnectNode();else page.engineController.connectNode(page.engineController.selectedNodeId)}}
+   Item {Layout.fillWidth:true}
+   SwirlText {text:qsTr("本机代理端口");color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+   SwirlTextField {objectName:"policyProxyPort";Layout.preferredWidth:Theme.dp(88);text:String(page.engineController.proxyPort);enabled:page.engineController.canStart;validator:IntValidator {bottom:1;top:65535}horizontalAlignment:TextInput.AlignHCenter;onEditingFinished:{if(acceptableInput)page.engineController.proxyPort=Number(text);text=String(page.engineController.proxyPort)}Accessible.name:qsTr("本机代理端口")}
+  }
   RowLayout {Layout.fillWidth:true;SwirlText {renderType:Text.NativeRendering;text:"代理";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}SwirlButton {text:"节点管理";quiet:true;iconName:"server";onClicked:page.Window.window.openSettings("proxies")}SwirlButton {text:"测试全部";quiet:true;iconName:"activity";enabled:page.engineController.nodes.length>0&&!page.engineController.tests.busy;onClicked:page.engineController.testAllNodes("https://www.gstatic.com/generate_204")}}
   SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:nodeGrid.implicitHeight+Theme.dp(page.engineController.nodes.length?80:32)
    Grid {id:nodeGrid;x:Theme.dp(16);y:Theme.dp(16);width:parent.width-Theme.dp(32);columns:page.nodeColumns;spacing:Theme.dp(12)
     Repeater {model:page.engineController.nodes.slice(page.nodePage*page.nodesPerPage,(page.nodePage+1)*page.nodesPerPage)
      SwirlMotionButton {
-      id:node;required property var modelData;width:Math.floor((nodeGrid.width-(nodeGrid.columns-1)*nodeGrid.spacing)/nodeGrid.columns);height:Theme.dp(94);padding:Theme.dp(12);hoverEnabled:true
+      id:node;required property var modelData;objectName:"policyNode-"+modelData.id;width:Math.floor((nodeGrid.width-(nodeGrid.columns-1)*nodeGrid.spacing)/nodeGrid.columns);height:Theme.dp(94);padding:Theme.dp(12);hoverEnabled:true
       background:Rectangle {radius:Theme.controlRadius;color:node.down?Theme.pressed:node.hovered?Theme.hover:node.modelData.id===page.engineController.selectedNodeId?Theme.selected:Theme.field;border.width:node.activeFocus?2:1;border.color:node.activeFocus?Theme.focusBorder:Theme.border}
       contentItem:ColumnLayout {spacing:Theme.dp(8)
        SwirlText {renderType:Text.NativeRendering;Layout.fillWidth:true;Layout.fillHeight:true;text:node.modelData.name;color:Theme.text;font.pixelSize:Theme.fontSize(13);wrapMode:Text.Wrap;maximumLineCount:2;elide:Text.ElideRight}

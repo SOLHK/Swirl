@@ -6,6 +6,8 @@ Menu {
     function requestDismiss(){close()}
     property var items: ["查看详情", "复制", "导出"]
     property string payload: ""
+    property bool handleItemsInternally:true
+    signal itemTriggered(int index)
     padding:Theme.dp(6)
     transformOrigin:Item.TopLeft
     onAboutToShow: {
@@ -48,6 +50,8 @@ Menu {
             }
             background: Rectangle { radius: Theme.roundedRadius(width,height); color: parent.highlighted ? Theme.selected : "transparent" }
             onTriggered: {
+                menu.itemTriggered(index)
+                if(!menu.handleItemsInternally)return
                 if (text === "复制" || text === "Copy") {
                     systemProvider.copyText(menu.payload)
                     AppState.toast = "已复制表格内容"

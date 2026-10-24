@@ -235,10 +235,13 @@ ApplicationWindow {
     QVERIFY(!manager.previewAutomatic());
     QVERIFY(manager.automatic()); // preview mode does not mutate the active UI
     const auto axisBinding = [](QObject *target) -> QObject * {
-        for (auto *child : target->children())
+        for (auto *child : target->children()) {
+            auto *publisher = child->property("axesBinding").value<QObject *>();
             if (child->property("target").value<QObject *>() == target
-                && child->property("property").toString() == QStringLiteral("font.variableAxes")
+                && publisher && publisher->property("target").value<QObject *>() == target
+                && publisher->property("property").toString() == QStringLiteral("font.variableAxes")
                 && child->metaObject()->indexOfMethod("refreshAxes()") >= 0) return child;
+        }
         return nullptr;
     };
     auto *previewLine = qobject_cast<VariableFontPreview *>(item("fontPreviewLine_0"));

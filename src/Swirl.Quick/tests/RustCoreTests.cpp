@@ -2621,6 +2621,25 @@ private slots:
   QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},3000));QCOMPARE(probes.failed(),1);
   QCOMPARE(probes.result(o.selectedNodeId).value("engineKind").toString(),QString("rust"));
  }
+ void filteredNodeBatchOnlyTestsRequestedIdentities(){
+  ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;
+  EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("nodes.dpapi"),true);
+  const auto body=QJsonDocument(QJsonObject{{"proxies",QJsonArray{
+   QJsonObject{{"name","A"},{"type","socks5"},{"server","127.0.0.1"},{"port",net.a.serverPort()}},
+   QJsonObject{{"name","B"},{"type","socks5"},{"server","127.0.0.1"},{"port",net.b.serverPort()},{"username",QString::fromUtf8(net.b.username)},{"password",QString::fromUtf8(net.b.password)}}}}}).toJson();
+  controller.imports()->importNodesOnlyText(QString::fromUtf8(body));
+  QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),4000);
+  const auto catalog=controller.nodeCatalog();QCOMPARE(catalog.size(),2);
+  const auto a=catalog.first().toMap().value("id").toString(),b=catalog.last().toMap().value("id").toString();
+  QVERIFY(controller.chooseNode(a));const auto saved=controller.selectedNodeId();
+  const auto beforeA=net.a.forwarded,beforeB=net.b.forwarded;
+  controller.testNodes({b,b,QStringLiteral("missing-resource")},net.url());
+  QTRY_VERIFY_WITH_TIMEOUT(!controller.tests()->busy(),6000);
+  QCOMPARE(controller.tests()->total(),1);QCOMPARE(controller.tests()->completed(),1);
+  QVERIFY(controller.tests()->result(b).value("success").toBool());
+  QVERIFY(controller.tests()->result(a).isEmpty());QCOMPARE(net.a.forwarded,beforeA);QVERIFY(net.b.forwarded>beforeB);
+  QCOMPARE(controller.selectedNodeId(),saved);QVERIFY(!controller.processAlive());
+ }
  void nodeListShowsValidatedOutboundSetupTime(){
   ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;
   EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("nodes.dpapi"),true);

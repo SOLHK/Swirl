@@ -11,10 +11,14 @@ Item {
     readonly property bool detailOpen:nodeHero.opened
 
     property string inspectedId:""
-    readonly property string selectedId:inspectedId||engineController.selectedNodeId
+    property string focusedId:""
+    readonly property string selectedId:inspectedId
     NodeViewModel { id:nodes;objectName:"nodeViewModel";controller:engineController }
+    NodeSectionModel { id:sections;objectName:"nodeSectionModel";source:nodes;providers:page.sources }
     readonly property var selected:{nodes.revision;return nodes.find(page.selectedId)}
+    readonly property var focused:{nodes.revision;return nodes.find(page.focusedId)}
     onSelectedChanged:if(selected.id===undefined){inspectedId="";if(nodeHero.opened)nodeHero.returnTo(null)}
+    onFocusedChanged:if(focused.id===undefined)focusedId=""
     readonly property bool selectedActive:selected.id!==undefined&&engineController.processAlive&&engineController.activeNodeId===selectedId
     property string sourceId:""
     property string sourceKind:""
@@ -37,14 +41,17 @@ Item {
     onFilterStateChanged:nodes.filters=filterState
     onSourcesChanged:if(sourceId&&!sources.some(s=>s.id===sourceId)){sourceId="";sourceKind=""}
     onSourceOptionsChanged:if(sourceKind==="legacy"&&!sourceOptions.some(s=>s.kind==="legacy"))sourceKind=""
-    Timer {id:searchDelay;interval:100;onTriggered:nodes.query=search.text}
+    Timer {id:searchDelay;interval:100;onTriggered:{nodes.query=search.text;nodeTable.scrollToBeginning()}}
     function dismissDetail(){if(!nodeHero.opened)return false;nodeHero.returnTo(nodeTable.selectedItem);return true}
-    function selectRow(row) {
-        // One mounted surface follows the selected row; interrupted motion starts here.
-        if(!row.capability.native&&!row.capability.compatible){inspectedId=row.id;nodeHero.start(nodeTable.selectedItem);return}
-        if(engineController.chooseNode(row.id)){inspectedId="";nodeHero.start(nodeTable.selectedItem)}
-        else AppState.notice(engineController.nodeError)
+    function selectRow(row) {if(row&&row.id)focusedId=row.id}
+    function inspectRow(row) {
+        if(!row||!row.id)return
+        focusedId=row.id;inspectedId=row.id;nodeHero.start(nodeTable.selectedItem)
     }
+    function sectionIndexForNode(id){return sections.indexOfNode(id)}
+    function resourceAt(index){return nodes.get(index)}
+    function filteredNodeIds(){return sections.nodeIds()}
+    Shortcut {sequences:[StandardKey.Find];enabled:page.visible&&!page.detailOpen;onActivated:search.forceActiveFocus()}
     property string editingId:""
     readonly property bool rustRequestMetric:engineController.rustCoreBuild
     property bool importPending:false
@@ -62,7 +69,7 @@ Item {
         RowLayout {
             Layout.fillWidth:true;spacing:Theme.dp(12)
             SwirlText {textRole:"pageTitle";id:routeTitle;renderType:Text.NativeRendering;text:"节点";color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
-            SwirlButton {objectName:"allNodesTestButton";text:engineController.tests.busy?"取消测速":"测速";quiet:true;iconName:"activity";enabled:nodes.total>0;onClicked:engineController.tests.busy?engineController.tests.cancel():engineController.testAllNodes(testUrl.text)}
+            SwirlButton {id:allTestsButton;objectName:"allNodesTestButton";text:engineController.tests.busy?qsTr("取消测速"):qsTr("测速 ⌄");quiet:true;iconName:"activity";enabled:nodes.total>0||engineController.tests.busy;onClicked:{if(engineController.tests.busy)engineController.tests.cancel();else{SwirlMotion.noteTrigger(allTestsButton);batchTestMenu.open()}}}
             SwirlButton {objectName:"nodeImportButton";text:"导入";quiet:true;iconName:"download";enabled:!engineController.imports.busy;onClicked:importDialog.open()}
             SwirlButton {objectName:"nodeAddButton";text:"添加节点";iconName:"plus";primary:true;enabled:engineController.canStart;onClicked:page.edit(null)}
         }
@@ -72,29 +79,41 @@ Item {
             SwirlIconButton {iconName:"close";tooltip:"清空搜索";enabled:search.text.length>0;opacity:enabled?1:0;onClicked:search.clear()}
             SwirlComboBox {objectName:"nodeSourceFilter";Layout.preferredWidth:Theme.dp(146);model:page.sourceOptions.map(s=>s.name);currentIndex:page.sourceIndex;onActivated:index=>page.selectSource(index);Accessible.name:qsTr("节点来源")}
             SwirlButton {objectName:"nodeFiltersButton";text:"筛选";quiet:true;onClicked:filtersDialog.open()}
-            SwirlComboBox {id:sortOrder;objectName:"nodeSortOrder";Layout.preferredWidth:Theme.dp(110);model:["名称排序","延迟排序","地区排序","协议排序"];Accessible.name:"节点排序"}
+            SwirlComboBox {id:sortOrder;objectName:"nodeSortOrder";Layout.preferredWidth:Theme.dp(110);model:[qsTr("名称排序"),qsTr("耗时排序"),qsTr("地区排序"),qsTr("协议排序")];Accessible.name:qsTr("来源内节点排序")}
         }
         RowLayout {
             Layout.fillWidth:true;spacing:Theme.dp(8)
-            SwirlSegmentedControl {Layout.preferredWidth:Theme.dp(240);options:["全部","最近使用","收藏"];currentIndex:page.groupIndex;onActivated:index=>page.groupIndex=index}
+            SwirlSegmentedControl {Layout.preferredWidth:Theme.dp(200);options:["全部","最近使用","收藏"];currentIndex:page.groupIndex;onActivated:index=>page.groupIndex=index}
             SwirlText {text:nodes.count+" / "+nodes.total+" 个节点";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;elide:Text.ElideRight}
-            SwirlText {text:engineController.tests.message;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.maximumWidth:Theme.dp(190);elide:Text.ElideRight}
+            SwirlButton {objectName:"nodeInspectButton";text:qsTr("详情");quiet:true;enabled:page.focused.id!==undefined;onClicked:page.inspectRow(page.focused)}
+            SwirlButton {objectName:"nodeFavoriteButton";text:page.focused.favorite?qsTr("取消收藏"):qsTr("收藏");quiet:true;enabled:page.focused.id!==undefined;onClicked:nodes.toggleFavorite(page.focusedId)}
         }
+        SwirlText {objectName:"nodeBatchProgress";visible:engineController.tests.busy||engineController.tests.message.length>0;text:engineController.tests.busy?qsTr("正在测速 %1 / %2").arg(engineController.tests.completed).arg(engineController.tests.total):engineController.tests.message;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;elide:Text.ElideRight}
         RowLayout {
             Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:0;spacing:Theme.dp(16)
             SwirlGlassPanel {
                 Layout.fillWidth:true;Layout.preferredWidth:1;Layout.minimumWidth:Theme.dp(262);Layout.fillHeight:true;Layout.minimumHeight:0;cornerRadius:Theme.independentCardRadius
                 color:Theme.surface;border.width:0
                 SwirlDataTable {
-                    id:nodeTable;objectName:"realNodeTable";minimal:true;managedSelection:true;incrementalRows:false;animateRowChanges:false;animateLatency:true;itemHeight:Theme.dp(44);headerHeight:Theme.tableHeaderHeight;textPixelSize:13
-                    anchors.fill:parent;anchors.margins:Theme.dp(16);externalModel:nodes;selectedId:page.selectedId
+                    id:nodeTable;objectName:"realNodeTable";minimal:true;managedSelection:true;incrementalRows:false;animateRowChanges:true;animateLatency:true;itemHeight:Theme.dp(44);headerHeight:Theme.tableHeaderHeight;textPixelSize:13
+                    sectioned:true;activateOnSingleClick:false
+                    sectionDelegate:Component {NodeSourceHeader {record:parent.record}}
+                    anchors.fill:parent;anchors.margins:Theme.dp(16);externalModel:sections;selectedId:page.focusedId
                     cellPadding:Theme.dp(8)
                     columns:[{key:"name",label:"节点名称",w:235,min:76},{key:"protocol",label:"协议",w:62,min:44},{key:"regionName",label:"地区提示",w:70,min:54},{key:"latency",label:page.rustRequestMetric?"出站 ms":"延迟",w:76,min:52},{key:"status",label:"状态",w:92,min:58}]
                     onRowSelected:function(row){page.selectRow(row)}
+                    onRowActivated:function(row,titleItem){page.inspectRow(row)}
+                    onSectionActivated:function(key){sections.toggleSection(key)}
                 }
                 SwirlEmptyState {anchors.centerIn:parent;visible:nodes.count===0;headline:nodes.total?"没有匹配的节点":"没有保存的节点";detail:nodes.total?"调整搜索、协议或地区筛选。":"添加节点，或导入配置、URI 与订阅"}
             }
         }
+    }
+    SwirlContextMenu {
+        id:batchTestMenu;parent:allTestsButton;y:allTestsButton.height+Theme.dp(4);width:Theme.dp(230)
+        handleItemsInternally:false
+        items:[qsTr("当前筛选结果（%1）").arg(nodes.count),qsTr("全部节点（%1）").arg(nodes.total)]
+        onItemTriggered:function(index){if(index===0)engineController.testNodes(sections.nodeIds(),testUrl.text.trim());else engineController.testAllNodes(testUrl.text.trim())}
     }
     Rectangle {objectName:"nodeDetailScrim";anchors.fill:parent;radius:Theme.cardRadius;antialiasing:true;z:10;visible:nodeHero.opened||nodeHero.moving;color:Theme.withAlpha("#000000",0.10*nodeHero.progress)
         MouseArea {anchors.fill:parent;onClicked:page.dismissDetail()}
@@ -132,18 +151,13 @@ Item {
                     cornerRadius:Theme.independentCardRadius;color:Theme.surface;border.width:0
                     ColumnLayout {
                         id:requestOptions;x:Theme.cardPadding;y:Theme.cardPadding;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(9)
-                        SwirlText {renderType:Text.NativeRendering;text:"请求与端口";color:Theme.text;font.pixelSize:Theme.fontSize(14);font.weight:Font.Medium}
+                        SwirlText {renderType:Text.NativeRendering;text:qsTr("独立节点测试");color:Theme.text;font.pixelSize:Theme.fontSize(14);font.weight:Font.Medium}
                         SwirlText {renderType:Text.NativeRendering;text:"测试 URL";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
                         SwirlTextField {id:testUrl;objectName:"nodeTestUrl";Layout.fillWidth:true;text:"https://www.gstatic.com/generate_204";enabled:!engineController.nodeBusy&&!engineController.tests.busy;selectByMouse:true;Accessible.name:"真实请求测试地址"}
-                        RowLayout {
-                            Layout.fillWidth:true;spacing:Theme.dp(10)
-                            SwirlText {renderType:Text.NativeRendering;text:"本机代理端口";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true}
-                            SwirlTextField {objectName:"nodeProxyPort";Layout.preferredWidth:Theme.dp(88);text:String(engineController.proxyPort);enabled:engineController.canStart;validator:IntValidator {bottom:1;top:65535}horizontalAlignment:TextInput.AlignHCenter;onEditingFinished:{if(acceptableInput)engineController.proxyPort=Number(text);text=String(engineController.proxyPort)}Accessible.name:"本机代理端口"}
-                        }
                         Rectangle {Layout.fillWidth:true;implicitHeight:Theme.dp(1);color:Theme.border}
-                        SwirlText {renderType:Text.NativeRendering;objectName:"nodeRequestState";text:engineController.tests.busy?engineController.tests.message:page.tested.time?(page.tested.success?"独立测试成功（不代表已连接）":"独立测试失败")+" · HTTP "+page.tested.http+" · "+(page.rustRequestMetric?(page.tested.success&&page.tested.outboundConnectMs>=0?"出站建立 "+page.tested.outboundConnectMs+" ms":"无出站耗时结果"):(page.tested.latency>=0?"完整请求 "+page.tested.latency+" ms":"无请求耗时结果"))+(page.tested.error?"\n"+page.tested.error:""):engineController.requestStateText;color:engineController.tests.busy?Theme.muted:page.tested.time?(page.tested.success?Theme.green:Theme.orange):engineController.requestSucceeded?Theme.green:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                        SwirlText {renderType:Text.NativeRendering;objectName:"nodeRequestState";text:engineController.tests.busy?engineController.tests.message:page.tested.time?(page.tested.success?"独立测试成功（不代表已连接）":"独立测试失败")+" · HTTP "+page.tested.http+" · "+(page.rustRequestMetric?(page.tested.success&&page.tested.outboundConnectMs>=0?"出站建立 "+page.tested.outboundConnectMs+" ms":"无出站耗时结果"):(page.tested.latency>=0?"完整请求 "+page.tested.latency+" ms":"无请求耗时结果"))+(page.tested.error?"\n"+page.tested.error:""):qsTr("尚未测试此节点");color:engineController.tests.busy?Theme.muted:page.tested.time?(page.tested.success?Theme.green:Theme.orange):Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
                         SwirlText {renderType:Text.NativeRendering;text:"出站建立耗时含 DNS 与节点握手；目标 HEAD 请求成功后才记录该值。此项不是 ICMP ping。";visible:page.rustRequestMetric;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
-                        SwirlText {renderType:Text.NativeRendering;text:engineController.nodeError||engineController.error;visible:text.length>0;color:Theme.orange;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                        SwirlText {renderType:Text.NativeRendering;text:page.tested.error||(page.selectedActive?(engineController.nodeError||engineController.error):"");visible:text.length>0;color:Theme.orange;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
                     }
                 }
                 }
@@ -191,7 +205,7 @@ Item {
                     SwirlStatusBadge {label:page.selected.id!==undefined?page.selected.protocol.toUpperCase():"未选择";tone:"neutral"}
                     SwirlStatusBadge {objectName:"nodeConnectionState";Layout.fillWidth:false;busy:page.selectedActive&&engineController.nodeBusy;label:page.selected.connectionState||"未连接";tone:page.selectedActive?(engineController.nodeError.length?"warning":"accent"):"neutral"}
                 }
-                SwirlText {renderType:Text.NativeRendering;text:page.selected.id!==undefined?page.selected.address:"选择一个节点开始连接";textFormat:Text.PlainText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {renderType:Text.NativeRendering;text:page.selected.id!==undefined?page.selected.address:qsTr("选择一个节点查看信息");textFormat:Text.PlainText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
                 SwirlText {objectName:"nodeExecutionState";text:page.selected.id!==undefined?"已导入 · "+(page.selected.nativeExecutable?"可执行":"当前不可执行")+" · "+(page.tested.time?(page.tested.success?"测速成功":"测速失败"):"未测速")+" · "+(page.selected.networkVerified?"当前会话请求已验证":"当前会话联网待验证"):"未选择节点";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.Wrap}
                 SwirlText {objectName:"nodeDiagnosticReference";text:page.selected.nodeReference?"诊断编号 #"+page.selected.nodeReference:"";visible:text.length>0;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                 SwirlText {text:qsTr("来源：%1").arg(page.selected.sourceName||((page.sources.find(s=>s.id===page.selected.sourceId)||{}).name)||(page.selected.sourceKind==="legacy"?qsTr("历史未归属"):qsTr("手动添加")));color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.Wrap}
@@ -202,12 +216,12 @@ Item {
                 SwirlText {renderType:Text.NativeRendering;text:page.selectedActive&&engineController.activeProxyPort>0?"本机入口  127.0.0.1:"+engineController.activeProxyPort:"";visible:text.length>0;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true}
                 GridLayout {
                     Layout.fillWidth:true;columns:2;rowSpacing:Theme.dp(8);columnSpacing:Theme.dp(8)
-                    SwirlButton {objectName:"nodeConnectButton";Layout.fillWidth:true;Layout.preferredWidth:1;implicitHeight:Theme.controlHeight;text:engineController.nodeBusy?"连接中…":page.selectedActive?"断开节点":"连接节点";primary:true;enabled:page.selected.id!==undefined&&!engineController.nodeBusy;onClicked:{if(page.selectedActive)engineController.disconnectNode();else engineController.connectNode(page.selectedId)}}
+                    SwirlButton {objectName:"nodePolicyButton";Layout.fillWidth:true;Layout.preferredWidth:1;text:qsTr("前往策略");quiet:true;onClicked:AppState.navigate("policies")}
                     SwirlButton {objectName:"nodeTestButton";text:engineController.tests.busy?"测试中…":"测试请求";Layout.fillWidth:true;Layout.preferredWidth:1;enabled:page.selected.id!==undefined&&!engineController.tests.busy&&/^https?:\/\/\S+$/i.test(testUrl.text.trim());onClicked:engineController.testSelectedNode(page.selectedId,testUrl.text.trim())}
                     SwirlButton {text:page.selected.favorite?"取消收藏":"收藏";Layout.fillWidth:true;enabled:page.selected.id!==undefined;onClicked:nodes.toggleFavorite(page.selectedId)}
                     SwirlButton {text:"复制安全信息";Layout.fillWidth:true;enabled:page.selected.id!==undefined;onClicked:nodes.copySafeInfo(page.selectedId)}
                     SwirlButton {objectName:"nodeEditButton";text:"编辑节点";Layout.fillWidth:true;Layout.preferredWidth:1;enabled:page.selected.id!==undefined&&!page.selected.sourceId&&engineController.canStart;onClicked:page.edit(page.selected)}
-                    SwirlButton {objectName:"nodeDeleteButton";text:"删除节点";danger:true;Layout.fillWidth:true;Layout.preferredWidth:1;enabled:page.selected.id!==undefined&&!page.selected.sourceId&&engineController.canStart;onClicked:engineController.deleteNode(page.selectedId)}
+                    SwirlButton {objectName:"nodeDeleteButton";text:"删除节点";danger:true;Layout.fillWidth:true;Layout.preferredWidth:1;enabled:page.selected.id!==undefined&&!page.selected.sourceId&&engineController.canStart;onClicked:{const id=page.selectedId;if(engineController.deleteNode(id)){page.dismissDetail();page.inspectedId="";if(page.focusedId===id)page.focusedId=""}}}
                 }
             }
         }
@@ -248,7 +262,7 @@ Item {
             RowLayout {
                 Layout.alignment:Qt.AlignRight
                 SwirlButton {text:"取消";onClicked:addDialog.requestDismiss()}
-                SwirlButton {objectName:"nodeSaveButton";text:"保存";primary:true;enabled:nodeName.text.trim().length>0&&(page.editingJson||nodePort.acceptableInput||["wireguard","tailscale","zerotier","easytier","openvpn"].indexOf(nodeProtocol.currentText)>=0);onClicked:{var input=page.editingJson?{id:page.editingId,name:nodeName.text}:{id:page.editingId,name:nodeName.text,protocol:nodeProtocol.currentText,host:nodeHost.text,port:Number(nodePort.text),username:nodeUsername.text,password:nodePassword.text,replaceCredentials:replaceCredentials.checked,cipher:nodeProtocol.currentText==="ss"?(nodeCipher.editText||nodeCipher.currentText):"",serverName:nodeSni.text};try{if(nodeOptions.text.trim().length)input.options=JSON.parse(nodeOptions.text);if(nodeUuid.text.trim().length){if(!input.options)input.options={};input.options.uuid=nodeUuid.text.trim()}}catch(e){AppState.notice("扩展选项须为合法 JSON 对象");return}if(engineController.saveNode(input)){engineController.chooseNode(page.editingId||engineController.nodes[engineController.nodes.length-1].id);addDialog.close()}}}
+                SwirlButton {objectName:"nodeSaveButton";text:"保存";primary:true;enabled:nodeName.text.trim().length>0&&(page.editingJson||nodePort.acceptableInput||["wireguard","tailscale","zerotier","easytier","openvpn"].indexOf(nodeProtocol.currentText)>=0);onClicked:{var input=page.editingJson?{id:page.editingId,name:nodeName.text}:{id:page.editingId,name:nodeName.text,protocol:nodeProtocol.currentText,host:nodeHost.text,port:Number(nodePort.text),username:nodeUsername.text,password:nodePassword.text,replaceCredentials:replaceCredentials.checked,cipher:nodeProtocol.currentText==="ss"?(nodeCipher.editText||nodeCipher.currentText):"",serverName:nodeSni.text};try{if(nodeOptions.text.trim().length)input.options=JSON.parse(nodeOptions.text);if(nodeUuid.text.trim().length){if(!input.options)input.options={};input.options.uuid=nodeUuid.text.trim()}}catch(e){AppState.notice("扩展选项须为合法 JSON 对象");return}if(engineController.saveNode(input)){addDialog.close()}}}
             }
         }
     }
@@ -303,12 +317,20 @@ Item {
             SwirlButton {text:"保存为自动更新订阅";enabled:!engineController.imports.busy;onClicked:{importDialog.close();AppState.navigate("subscriptions")}}
         }
     }
+    function clearHiddenFocus() {
+        if(!page.detailOpen&&page.focusedId.length&&sections.indexOfNode(page.focusedId)<0)page.focusedId=""
+    }
+    onDetailOpenChanged:if(!detailOpen)clearHiddenFocus()
+    Connections {target:sections;function onChanged(){page.clearHiddenFocus()}}
     Connections {
         target:engineController.imports
+        function onNodesApplied() {
+            if(!page.importPending)return
+            importContent.text="";importAddress.text="";page.importPending=false
+        }
         function onChanged() {
-            if(!page.importPending||engineController.imports.busy)return
+            if(!page.importPending||engineController.imports.busy||engineController.imports.hasPreview)return
             page.importPending=false
-            if(engineController.imports.message.indexOf("已解析并保存")>=0){importContent.text="";importAddress.text=""}
         }
     }
 }

@@ -156,6 +156,22 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
             QElapsedTimer load;load.start();model->updateRows(rows);const double updateMs=load.nsecsElapsed()/1e6;wait(180);
             check(QString("nodes-%1").arg(count),model->rowCount()==count);
             check(QString("virtualized-%1").arg(count),table->property("renderedRows").toInt()<100);
+            auto *sections=window->findChild<QObject *>("nodeSectionModel");int headerIndex=-1;
+            if(sections)QMetaObject::invokeMethod(sections,"rowForDisplayKey",Q_RETURN_ARG(int,headerIndex),Q_ARG(QString,QString("section:manual")));
+            check("keyboard-source-header-is-mounted",sections&&headerIndex>=0);
+            if(sections&&headerIndex>=0){
+                const auto configured=controller?controller->selectedNodeId():QString(),active=controller?controller->activeNodeId():QString();
+                const int expandedRows=sections->property("displayCount").toInt();
+                QMetaObject::invokeMethod(list,"positionViewAtIndex",Q_ARG(int,headerIndex),Q_ARG(int,0));wait(80);
+                list->setProperty("currentIndex",headerIndex);list->forceActiveFocus();
+                QTest::keyClick(window,Qt::Key_Space);
+                check("space-collapses-source-without-losing-filtered-test-scope",QTest::qWaitFor([&]{return sections->property("displayCount").toInt()==expandedRows-count;},1500)&&sections->property("count").toInt()==count&&model->rowCount()==count);
+                check("source-header-does-not-open-node-details",!hero->property("opened").toBool());
+                QTest::keyClick(window,Qt::Key_Return);
+                check("enter-restores-source-node-rows",QTest::qWaitFor([&]{return sections->property("displayCount").toInt()==expandedRows;},1500));
+                check("source-keyboard-actions-preserve-configured-and-running-exits",controller&&controller->selectedNodeId()==configured&&controller->activeNodeId()==active);
+                wait(180);
+            }
             sample(QString("nodes-%1-before").arg(count));
             QElapsedTimer search;search.start();
             for(int i=0;i<20;++i){model->setQuery(i%2?"TOKYO":"VLESS");check("search-count",model->rowCount()==(i%2?count:count/2));}
@@ -175,7 +191,7 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
             for(int i=0;i<80;++i){list->setProperty("contentY",extent*(i<40?i:79-i)/39.0);wait(8);
                 for(auto *row:content?content->childItems():QList<QQuickItem *>{}){
                     const auto value=row->property("record");
-                    const auto record=value.metaType()==QMetaType::fromType<QJSValue>()?value.value<QJSValue>().toVariant().toMap():value.toMap();if(record.isEmpty())continue;
+                    const auto record=value.metaType()==QMetaType::fromType<QJSValue>()?value.value<QJSValue>().toVariant().toMap():value.toMap();if(record.isEmpty()||record.value("rowKind")!="node")continue;
                     const auto id=record.value("id").toString();
                     if(identities.contains(row)&&identities.value(row)!=id){++reused;inspectLatency(row);}
                     identities.insert(row,id);
@@ -188,7 +204,9 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
             const auto percentile=[&](const QList<double> &values,double p){return values.isEmpty()?0:values[qMin(values.size()-1,qsizetype(values.size()*p))];};
             samples.append(QJsonObject{{"scenario",QString("nodes-%1-scroll").arg(count)},{"updateMs",updateMs},{"search20Ms",searchMs},{"renderedRows",table->property("renderedRows").toInt()},{"frames",frames.size()},{"p95FrameMs",percentile(frames,.95)},{"p99FrameMs",percentile(frames,.99)},{"maxEventLoopGapMs",maxGap},{"reusedDelegates",reused},{"staleLatencyOnReuse",stale}});
             list->setProperty("contentY",0);wait(150);
-            QQmlExpression firstRow(qmlContext(list),list,"itemAtIndex(0)");
+            const int firstNodeIndex=eval("pageLoader.item.sectionIndexForNode('0')").toInt();
+            check("latency-sample-is-a-real-node-row",firstNodeIndex>=0);
+            QQmlExpression firstRow(qmlContext(list),list,QString("itemAtIndex(%1)").arg(firstNodeIndex));
             auto *first=qobject_cast<QQuickItem *>(firstRow.evaluate().value<QObject *>());
             QQuickItem *latencyCell=nullptr;
             std::function<void(QQuickItem *)> findLatency=[&](QQuickItem *item){if(item->property("measured").isValid()&&item->property("measured").toDouble()>=0)latencyCell=item;for(auto *child:item->childItems())findLatency(child);};
@@ -199,10 +217,28 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
             wait(300);check("same-node-latency-settles-to-real-measurement",latencyCell&&qAbs(latencyCell->property("displayed").toDouble()-90)<.01);
             samples.append(QJsonObject{{"scenario",QString("nodes-%1-latency").arg(count)},{"intermediate",intermediate},{"settled",latencyCell?latencyCell->property("displayed").toDouble():-1},{"measured",latencyCell?latencyCell->property("measured").toDouble():-1}});
             for(int i=0;i<8;++i){
+                const auto nodeId=QString::number(i%4);
+                const int displayIndex=eval(QString("pageLoader.item.sectionIndexForNode('%1')").arg(nodeId)).toInt();
+                check("detail-node-has-source-section-index",displayIndex>=0);
+                if(displayIndex>=0)QMetaObject::invokeMethod(list,"positionViewAtIndex",Q_ARG(int,displayIndex),Q_ARG(int,0));
+                wait(80);
+                QQmlExpression targetRow(qmlContext(list),list,QString("itemAtIndex(%1)").arg(displayIndex));
+                auto *row=qobject_cast<QQuickItem *>(targetRow.evaluate().value<QObject *>());
+                check("detail-node-delegate-is-mounted",row!=nullptr);
+                const auto configured=controller?controller->selectedNodeId():QString();
+                const auto active=controller?controller->activeNodeId():QString();
+                const auto point=row?row->mapToScene(QPointF(85,row->height()/2)).toPoint():QPoint();
+                if(row)QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point);
+                check("single-click-focuses-resource-only",eval("pageLoader.item.focusedId").toString()==nodeId&&!hero->property("opened").toBool());
+                check("single-click-preserves-configured-and-running-exits",controller&&controller->selectedNodeId()==configured&&controller->activeNodeId()==active);
                 QElapsedTimer response;response.start();
-                QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,table->mapToScene(QPointF(85,table->property("headerHeight").toDouble()+table->property("itemHeight").toDouble()*(i%4+.5))).toPoint());
+                if(row){
+                    if(i<4)QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,point);
+                    else QTest::keyClick(window,Qt::Key_Return);
+                }
                 selectionResponses.append(response.nsecsElapsed()/1e6);
                 check("selection-opens-actual-detail",hero->property("opened").toBool());
+                check("opening-detail-preserves-configured-and-running-exits",controller&&controller->selectedNodeId()==configured&&controller->activeNodeId()==active);
                 check("selection-settles",QTest::qWaitFor([&]{return !hero->property("moving").toBool();},2500));selectionComplete.append(response.nsecsElapsed()/1e6);
                 QTest::keyClick(window,Qt::Key_Escape);check("escape-restores-list",QTest::qWaitFor([&]{return !hero->property("opened").toBool()&&!hero->property("moving").toBool();},2500));
             }
@@ -244,7 +280,10 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
         if(!model||!model->controller())return 2;
         auto *controller=model->controller();
         check("save-isolated-detail-node",controller->saveNode({{"name","详情验证 · 日本 Tokyo"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",9}}));
-        wait(100);const auto before=window->grabWindow();eval("pageLoader.item.selectRow(engineController.nodes[0])");
+        wait(100);const auto before=window->grabWindow();
+        const auto configured=controller->selectedNodeId(),active=controller->activeNodeId();
+        eval("pageLoader.item.inspectRow(engineController.nodes[0])");
+        check("detail-inspection-preserves-configured-and-running-exits",controller->selectedNodeId()==configured&&controller->activeNodeId()==active);
         auto *hero=window->findChild<QQuickItem *>("nodeHero");
         for(int i=0;i<40;++i){wait(50);if(hero)samples.append(QJsonObject{{"ms",(i+1)*50},{"reveal",hero->property("reveal").toDouble()},{"moving",hero->property("moving").toBool()},{"width",hero->property("cardWidth").toDouble()},{"height",hero->property("cardHeight").toDouble()}});}
         check("detail-fully-revealed",hero&&!hero->property("moving").toBool()&&hero->property("reveal").toDouble()>0.99);
@@ -261,9 +300,11 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
         auto *scroll=window->findChild<QQuickItem *>("nodeDetailScroll");
         auto *flick=scroll?scroll->property("contentItem").value<QQuickItem *>():nullptr;
         if(flick){flick->setProperty("contentY",qMax(0.0,flick->property("contentHeight").toDouble()-flick->height()));wait(150);}
-        auto *port=window->findChild<QQuickItem *>("nodeProxyPort");
+        auto *lastAction=window->findChild<QQuickItem *>("nodeDeleteButton");
+        auto *requestState=window->findChild<QQuickItem *>("nodeRequestState");
         const QRectF viewport=scroll?QRectF(scroll->mapToScene(QPointF()),QSizeF(scroll->width(),scroll->height())):QRectF();
-        check("minimum-size-detail-port-reachable",port&&viewport.contains(port->mapToScene(QPointF(port->width()/2,port->height()/2))));
+        check("minimum-size-last-detail-action-reachable",lastAction&&lastAction->isVisible()&&viewport.contains(lastAction->mapToScene(QPointF(lastAction->width()/2,lastAction->height()/2))));
+        check("minimum-size-independent-request-state-reachable",requestState&&requestState->isVisible()&&viewport.contains(requestState->mapToScene(QPointF(requestState->width()/2,requestState->height()/2))));
         auto *back=window->findChild<QQuickItem *>("nodeReturnButton");
         check("detail-back-header-stays-visible",back&&back->isVisible()&&QRectF(0,0,window->width(),window->height()).contains(back->mapToScene(QPointF(back->width()/2,back->height()/2))));
         window->grabWindow().save(QFileInfo(output).absolutePath()+"/detail-minimum.png");

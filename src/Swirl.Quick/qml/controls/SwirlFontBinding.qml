@@ -4,8 +4,12 @@ import SwirlQuick
 // Only the final axis map is assigned. Existing family, weight, size, spacing,
 // and fallback choices remain on the owner. No text/position/animation clock is
 // a dependency; a changing font size still receives its correct optical size.
-Binding {
+// Keep the scheduler outside Binding's deferred-property parser when controls
+// are incubated asynchronously. The inner Binding only publishes the axis map.
+QtObject {
     id: binding
+    property QtObject target: null
+    property bool when: true
     property string textRole: "body"
     property bool preview: false
     property bool fitWidth: false
@@ -15,12 +19,16 @@ Binding {
     readonly property real devicePixelRatio: fontWindow ? fontWindow.FontDisplayContext.devicePixelRatio : 1
     property var resolvedAxes: ({})
     property bool refreshQueued: false
-    property: "font.variableAxes"
     // Preview inputs already coalesce in Qt.callLater below. Publish that final
     // snapshot immediately, so polish does not see the previous axis tuple while
     // a second queued Binding update waits. Preserve normal text/layout timing.
-    delayed: !preview
-    value: resolvedAxes
+    property Binding axesBinding: Binding {
+        target: binding.target
+        property: "font.variableAxes"
+        when: binding.when && binding.target !== null
+        delayed: !binding.preview
+        value: binding.resolvedAxes
+    }
 
     // All QFont subproperties share fontChanged. Reading target.font directly
     // from Binding.value would create a loop when variableAxes writes it back.

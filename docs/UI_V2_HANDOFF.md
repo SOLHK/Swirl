@@ -5,7 +5,7 @@
 - 工作树：`D:/Codex/work/Swirl-ui-v2-20261024`
 - 分支：`work/swirl-ui-v2-20261024`
 - 产品基线：`4c8c9e076976e5cfb62f103daecdf2afc121eeb3` / 0.2.3。
-- 阶段 1 审计完成；阶段 2 设计及确认完成，用户在本聊天明确回答 **“确认这套架构”**。下一阶段是阶段 3 节点资源库开发，不重复请求相同架构批准。不要将设计提交解释为实现或新安装包。
+- 阶段 1 审计完成；阶段 2 用户明确 **“确认这套架构”**，并已切换后继续阶段 3。0.2.4 诊断节点资源库见 [阶段 3 交接](UI_V2_STAGE3_HANDOFF.md)，实际安装包身份以交付报告为准。下一实施阶段是 4 策略与 Rust 路由，不重复请求相同架构批准。
 - 先读 [阶段 2 主契约](UI_V2_STAGE2_ARCHITECTURE.md)、[UI 实施](UI_V2_STAGE2_UI.md)、[Rust 路由](UI_V2_STAGE2_ROUTING.md)、[事务/API](UI_V2_STAGE2_API.md)。[阶段 1 总表](UI_V2_STAGE1_AUDIT_20261024.md)保留源码证据。以 `git status`、`git rev-parse HEAD` 核实最新状态。
 
 ## 用户已确认
@@ -47,8 +47,8 @@
 - 阶段2运行7项portable guard、4份架构文档的内部链接/样例身份与引用/验收覆盖一致性检查；40项产品验收未执行。阶段1的99文件UI边界结果是历史证据。无产品代码变动，不重复编译或声称当前运行验收通过。
 - 0.2.3 仍是诊断版；真实节点抽测失败、Codex 未验收。不要把旧包或受控测试作为 V2 实际联网证据。
 - 新版本交付递增 PRODUCT_VERSION，核对 EXE/DLL/manifest/source SHA；安装包与人工教程一同交付，不覆盖现有安装。
-- 新分支不在 v018-network-candidate 的 push 分支名单；实施阶段按需 dispatch 或做经安全检查的触发修改，不在审计阶段重复构建。
+- 本分支已加入 v018-network-candidate 的 push 名单，新 NodeSectionModel 测试纳入既有门槛；已做 Actions 安全静态检查。MSVC/UI_TESTS=OFF/精确源码与DLL打包门槛保留。
 - `D:/Codex/build-swirl-019-tests-20261024` 的 CMakeCache 绑定原工作树，不能重新指向新树或覆盖其他窗口缓存。为本工作树分配独立构建目录，复用可验证的依赖/CI缓存。
 - 视觉 DPI 由用户验收；保留严格协议失败，测量真实 60FPS/长时稳定性而非推断。
 
-阶段2已由用户确认并关闭。阶段 2 完成，建议切换 GPT-6.1 Sol Ultra 开始实际开发；本次未自行切换模型。下一阶段集中节点资源库实施。
+阶段 2 已确认并关闭，阶段 3 已实施节点资源库。继续当前 GPT-6.1 Sol Ultra，下一阶段集中策略与 Rust 路由；本次未自行切换模型。

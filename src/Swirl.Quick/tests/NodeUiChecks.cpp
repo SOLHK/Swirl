@@ -18,6 +18,7 @@
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJSValue>
 #include <cstdio>
 #include <functional>
 #include <memory>
@@ -29,15 +30,35 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     std::function<QQuickItem *(QQuickItem *,const QString &)> find;
     find=[&](QQuickItem *p,const QString &n)->QQuickItem *{if(p->objectName()==n)return p;for(auto *c:p->childItems())if(auto *f=find(c,n))return f;return nullptr;};
     const auto item=[&](const QString &n){return find(window->contentItem(),n);};
-    const auto eval=[&](const QString &s){if(s.contains("resultCount"))QTest::qWaitFor([&]{auto *model=window->findChild<QObject *>("nodeViewModel");return model&&model->property("total").toInt()==controller->nodes().size();},1000);QQmlExpression e(qmlContext(window),window,s);auto v=e.evaluate();check(!e.hasError(),"QML expression valid");return v;};
-    const auto click=[&](const QString &n){QTest::qWaitFor([&]{auto *hero=item("nodeHero");return !hero||!hero->property("moving").toBool();},3500);auto *t=item(n);if(check(t&&t->isEnabled(),"node input exists and is enabled"))QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,t->mapToScene(QPointF(t->width()/2,t->height()/2)).toPoint());QTest::qWait(300);};
+    const auto eval=[&](const QString &s){if(s.contains("resultCount"))check(QTest::qWaitFor([&]{auto *model=window->findChild<QObject *>("nodeViewModel");return model&&model->property("total").toInt()==controller->nodes().size();},1000),"node catalog catches up before count assertion");QQmlExpression e(qmlContext(window),window,s);auto v=e.evaluate();check(!e.hasError(),"QML expression valid");return v;};
+    const auto click=[&](const QString &n){if(!check(QTest::qWaitFor([&]{auto *hero=item("nodeHero");auto *target=item(n);if((hero&&hero->property("moving").toBool())||!target||!target->isVisible())return false;qreal opacity=1;for(auto *parent=target;parent;parent=parent->parentItem())opacity*=parent->opacity();return opacity>0.95;},3500),"node input is visible after motion settles"))return;auto *t=item(n);if(check(t&&t->isEnabled(),"node input exists and is enabled"))QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,t->mapToScene(QPointF(t->width()/2,t->height()/2)).toPoint());QTest::qWait(300);};
     const auto fill=[&](const QString &n,const QString &v){auto *t=item(n);if(check(t!=nullptr,"node field exists"))t->setProperty("text",v);};
+    std::function<QQuickItem *(QQuickItem *,const QString &)> findNodeRow;
+    findNodeRow=[&](QQuickItem *parent,const QString &id)->QQuickItem *{
+        const auto value=parent->property("record");
+        const auto record=value.metaType()==QMetaType::fromType<QJSValue>()?value.value<QJSValue>().toVariant().toMap():value.toMap();
+        if(record.value("rowKind")=="node"&&record.value("id")==id&&!parent->property("pooled").toBool())return parent;
+        for(auto *child:parent->childItems())if(auto *found=findNodeRow(child,id))return found;
+        return nullptr;
+    };
     const auto select=[&](int index){ eval("pageLoader.item.dismissDetail()"); QTest::qWait(450);
         auto *t=item("realNodeTable");if(!check(t!=nullptr,"real node table exists"))return;
-        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,t->mapToScene(QPointF(80,39+t->property("itemHeight").toInt()*(index+0.5))).toPoint());
+        const auto id=eval(QString("pageLoader.item.resourceAt(%1).id").arg(index)).toString();
+        const auto displayRow=eval(QString("pageLoader.item.sectionIndexForNode('%1')").arg(id)).toInt();
+        auto *viewport=item("tableRowsViewport");
+        if(viewport)QMetaObject::invokeMethod(viewport,"positionViewAtIndex",Q_ARG(int,displayRow),Q_ARG(int,0));
+        QTest::qWait(80);
+        auto *row=findNodeRow(t,id);
+        if(!check(row!=nullptr,"source-grouped node delegate is visible"))return;
+        const auto selection=controller->selectedNodeId(),active=controller->activeNodeId();
+        const auto point=row->mapToScene(QPointF(70,row->height()/2)).toPoint();
+        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point);
+        check(controller->selectedNodeId()==selection&&controller->activeNodeId()==active,"single-click browsing preserves configured and running exits");
+        QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,point);
         // The next click targets a card which moves for longer than 150 ms.
         // Sample its hit position after the real transition has settled.
         check(QTest::qWaitFor([&]{auto *hero=item("nodeHero");return hero&&!hero->property("moving").toBool();},3500),"node card settles before next coordinate-based input");
+        check(controller->selectedNodeId()==selection&&controller->activeNodeId()==active,"opening node details preserves configured and running exits");
     };
     ControlledNetwork net;if(!check(net.start(),"controlled real TCP endpoints start"))return 2;
     const auto probeSelected=[&](SocksPeer &selected,SocksPeer &other,const char *label){
@@ -45,7 +66,8 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         const auto before=net.httpRequestsByExit;
         click("nodeTestButton");
         const bool finished=QTest::qWaitFor([&]{return !controller->tests()->busy();},41000);
-        const bool passed=finished&&controller->tests()->result(controller->selectedNodeId()).value("success").toBool()
+        const auto inspected=eval("pageLoader.item.selectedId").toString();
+        const bool passed=finished&&controller->tests()->result(inspected).value("success").toBool()
             &&selected.forwarded>forwarded&&other.forwarded==otherForwarded
             &&net.httpRequestsByExit.value(selected.label)>before.value(selected.label)
             &&net.httpRequestsByExit.value(other.label)==before.value(other.label)
@@ -57,26 +79,48 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     };
     window->resize(1450,884);eval("AppState.navigate('proxies')");
     auto *host=window->findChild<QObject *>("pageLoader");
+    const auto choosePolicy=[&](const QString &id,bool toggleConnection){
+        eval("pageLoader.item.dismissDetail()");QTest::qWait(450);
+        eval("AppState.navigate('policies')");
+        check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;return active&&active->property("routeId").toString()=="policies"&&!host->property("moving").toBool()&&!host->property("pendingGrab").toBool();},3500),"policy exit selector settles");
+        click("policyNode-"+id);
+        const bool wasRunning=controller->processAlive();
+        if(toggleConnection){
+            click("policyConnectButton");
+            check(QTest::qWaitFor([&]{return wasRunning?controller->canStart():controller->apiHealthy();},15000),"policy connection action reaches its real runtime state");
+        }else if(wasRunning){
+            check(QTest::qWaitFor([&]{return !controller->nodeBusy()&&controller->activeNodeId()==id;},5000),"policy exit selection is applied before resource inspection");
+        }
+        check(controller->selectedNodeId()==id,"policy selection updates the configured exit through real input");
+        eval("AppState.navigate('proxies')");
+        check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;return active&&active->property("routeId").toString()=="proxies"&&!host->property("moving").toBool()&&!host->property("pendingGrab").toBool();},3500),"policy action returns to the node library");
+    };
     check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;return active && active->property("routeId").toString()=="proxies" && !host->property("moving").toBool() && !host->property("pendingGrab").toBool();},3500),"node navigation animation settles before input");
     QTest::qWait(150);
     check(controller->nodes().isEmpty()&&!controller->processAlive(),"node page starts empty without starting engine");
     click("nodeAddButton");fill("nodeNameField","A");fill("nodeHostField","https://invalid");fill("nodePortField",QString::number(net.a.serverPort()));click("nodeSaveButton");
     check(controller->nodes().isEmpty()&&!controller->nodeError().isEmpty(),"invalid host rejected through UI without fake save");
     fill("nodeHostField","127.0.0.1");click("nodeSaveButton");check(controller->nodes().size()==1,"UI saves first real node");
+    check(controller->selectedNodeId().isEmpty()&&controller->activeNodeId().isEmpty(),"adding a resource does not choose a configured or running exit");
     click("nodeAddButton");fill("nodeNameField","B");fill("nodeHostField","127.0.0.1");fill("nodePortField",QString::number(net.b.serverPort()));fill("nodeUsernameField",QString::fromUtf8(net.b.username));fill("nodePasswordField",QString::fromUtf8(net.b.password));
     check(item("nodePasswordField")&&item("nodePasswordField")->property("echoMode").toInt()==2,"credential field is masked");click("nodeSaveButton");check(controller->nodes().size()==2,"UI saves authenticated SOCKS5 node");
+    check(controller->selectedNodeId().isEmpty()&&controller->activeNodeId().isEmpty(),"adding another resource still leaves exit selection to policies");
     LoopbackPortLease ports;
     if(!check(ports.reserve(),"distinct UI TCP/UDP and control ports are reserved together")) {
         qInfo()<<"Port reservation evidence"<<ports.errorString();return 2;
     }
     controller->setProxyPort(ports.proxyPort());
     ports.release();
+    controller->setRoutingMode(QStringLiteral("global"));
     const auto waitEngineReady=[&]{
         const bool ready=QTest::qWaitFor([&]{return controller->apiHealthy();},15000);
         if(!ready)qInfo()<<"Engine startup evidence"<<controller->stateText()<<controller->errorCode()<<controller->error();
         return ready;
     };
-    select(0);click("nodeConnectButton");
+    select(0);
+    check(item("nodeConnectButton")==nullptr,"node resource details have no connection control");
+    const auto nodeA=eval("pageLoader.item.selectedId").toString();
+    choosePolicy(nodeA,true);select(0);
     if(check(waitEngineReady(),"UI starts actual Rust Core")) {
         check(!controller->requestSucceeded(),"running engine does not imply successful request");fill("nodeTestUrl",net.url().toString());
         probeSelected(net.a,net.b,"UI real request passes only through selected node A");
@@ -214,14 +258,33 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
             check(controller->processId()==pid&&controller->apiHealthy()&&controller->selectedNodeId()==selectedBeforeNavigation,"all settings routes preserve the real running proxy and selected node");
         }
         select(1);
-        check(QTest::qWaitFor([&]{return !controller->nodeBusy();},5000)&&controller->activeNodeId()==controller->selectedNodeId()&&controller->processId()==pid,"row selection switches real engine node without restarting");
-        check(!controller->tests()->result(controller->selectedNodeId()).value("success").toBool(),"new selected node has no inherited request result");
+        const auto nodeB=eval("pageLoader.item.selectedId").toString();
+        check(controller->selectedNodeId()==selectedBeforeNavigation&&controller->activeNodeId()==selectedBeforeNavigation&&controller->processId()==pid,"browsing node B leaves the real running exit A unchanged");
+        eval("pageLoader.item.dismissDetail()");QTest::qWait(450);click("nodeFavoriteButton");
+        check(controller->selectedNodeId()==selectedBeforeNavigation&&controller->activeNodeId()==selectedBeforeNavigation,"favoriting another resource does not change the real exit");
+        select(1);
+        check(!controller->tests()->result(nodeB).value("success").toBool(),"new inspected node has no inherited request result");
+        probeSelected(net.b,net.a,"independent node B test uses B while the live exit remains A");
+        check(controller->activeNodeId()==selectedBeforeNavigation,"isolated test does not switch the live exit");
+        const auto liveBeforeA=net.a.forwarded,liveBeforeB=net.b.forwarded;
+        const auto liveReceipts=net.httpRequestsByExit;
+        controller->testNode(net.url());
+        check(QTest::qWaitFor([&]{return controller->requestSucceeded()&&!controller->nodeBusy();},8000)
+            &&net.a.forwarded>liveBeforeA&&net.b.forwarded==liveBeforeB
+            &&net.httpRequestsByExit.value(net.a.label)>liveReceipts.value(net.a.label)
+            &&net.httpRequestsByExit.value("DIRECT-BYPASS")==liveReceipts.value("DIRECT-BYPASS"),
+            "the actual live runtime still forwards through A after browsing and testing B");
+        choosePolicy(nodeB,false);select(1);
+        check(QTest::qWaitFor([&]{return !controller->nodeBusy();},5000)&&controller->activeNodeId()==nodeB&&controller->processId()==pid,"policy selection switches real exit without restarting");
         probeSelected(net.b,net.a,"UI new requests use authenticated selected node B");
-        check(item("nodeRequestState")&&item("nodeRequestState")->property("text").toString().contains("成功"),"visible request state follows actual result");click("nodeConnectButton");
+        check(item("nodeRequestState")&&item("nodeRequestState")->property("text").toString().contains("成功"),"visible request state follows actual result");
+        choosePolicy(nodeB,true);select(1);
         check(QTest::qWaitFor([&]{return controller->canStart();},4000)&&!controller->processAlive(),"UI disconnect reaps engine");
     }
     check(!controller->requestSucceeded() && controller->requestStateText()==QStringLiteral("尚未发起实际请求"),"disconnect clears stale request success text");
+    choosePolicy(nodeA,false);const auto lastActiveBeforeEdit=controller->activeNodeId();
     select(1);click("nodeEditButton");check(item("nodePasswordField")&&item("nodePasswordField")->property("text").toString().isEmpty(),"editing never reveals stored credentials");fill("nodeNameField","B edited");click("nodeSaveButton");check(controller->nodes().last().toMap().value("name").toString()=="B edited","UI edits saved metadata");
+    check(controller->selectedNodeId()==nodeA&&controller->activeNodeId()==lastActiveBeforeEdit&&!controller->processAlive(),"editing resource B preserves the configured exit A and stopped runtime snapshot");
     click("nodeDeleteButton");check(controller->nodes().size()==1,"UI deletes selected node");select(0);click("nodeDeleteButton");check(controller->nodes().isEmpty(),"UI removes all saved test nodes");
     controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive();},4000),"test cleanup reaps engine");
     QTcpServer reuse;check(reuse.listen(QHostAddress::LocalHost,controller->proxyPort()),"disconnected proxy port is reusable");reuse.close();
@@ -232,7 +295,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     check(QTest::qWaitFor([&]{return !controller->imports()->busy();},4000) && controller->nodes().size()==1,"UI one-click import saves an actual controlled proxy configuration");
     check(item("importContentField") && item("importContentField")->property("text").toString().isEmpty(),"import clears credential-bearing input after submission");
     auto *dialog=window->findChild<QObject *>("nodeImportDialog");if(dialog)QMetaObject::invokeMethod(dialog,"close");QTest::qWait(350);
-    select(0);click("nodeConnectButton");
+    select(0);const auto importedId=eval("pageLoader.item.selectedId").toString();choosePolicy(importedId,true);select(0);
     check(waitEngineReady(),"UI imported node starts real Rust Core");
     fill("nodeTestUrl",net.url().toString());click("nodeTestButton");
     check(QTest::qWaitFor([&]{return !controller->tests()->busy();},41000) && controller->tests()->result(controller->selectedNodeId()).value("success").toBool(),"UI imported node forwards a real HTTP request");
@@ -349,12 +412,14 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         QTest::qWait(400);
     }
     const auto qa=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");
+    eval("pageLoader.item.dismissDetail()");
+    check(QTest::qWaitFor([&]{return hero&&!hero->property("opened").toBool()&&!hero->property("moving").toBool();},3500),"node library is visible before source-list capture");
     if(!qa.isEmpty()){QDir().mkpath(qa);window->grabWindow().save(qa+"/nodes-minimum-180.png");}
     for(int i=0;i<180;++i){
         auto *viewport=item("tableRowsViewport");
         if(viewport)QMetaObject::invokeMethod(viewport,"positionViewAtIndex",Q_ARG(int,i),Q_ARG(int,0));
         QTest::qWait(5);
-        eval(QString("pageLoader.item.selectRow(engineController.nodes[%1])").arg(i));
+        eval(QString("pageLoader.item.inspectRow(engineController.nodes[%1])").arg(i));
     }
     check(QTest::qWaitFor([&]{return hero&&!hero->property("moving").toBool();},3500),"180 rapid node selections settle");
     check(eval("pageLoader.item.selected.name.indexOf('179')>=0").toBool(),"last of 180 rapid detail retargets retains its selected node");
