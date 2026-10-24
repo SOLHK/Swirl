@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$OutputPath)
+param([Parameter(Mandatory=$true)][string]$OutputPath,[string]$CodexLogDirectory)
 $ErrorActionPreference='Stop'
 # Read-only inventory. Never dumps command lines, environment blocks, tokens,
 # browser storage or request bodies. No Set-* network calls or cache flushes.
@@ -7,7 +7,7 @@ function EndpointSummary([string]$Value) {
     try{$uri=[uri]$Value;if($uri.IsAbsoluteUri){return @{scheme=$uri.Scheme;host=$uri.Host;port=$uri.Port;credentialsPresent=!!$uri.UserInfo}}}catch{}
     return @{configured=$true;format='not a URI; value omitted'}
 }
-$processes=Get-CimInstance Win32_Process
+$processes=Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,Name,ExecutablePath,CreationDate
 $selected=@($processes | Where-Object {
     $_.Name -match '^(codex|Swirl.*|.*mihomo.*|msedge|chrome)\.exe$' -or
     $_.ExecutablePath -match '\\OpenAI\.Codex_[^\\]+\\app\\'
@@ -15,7 +15,7 @@ $selected=@($processes | Where-Object {
 $ids=@($selected.ProcessId)
 $inventory=@($selected | ForEach-Object {
     [pscustomobject]@{pid=$_.ProcessId;parent=$_.ParentProcessId;name=$_.Name;path=$_.ExecutablePath;created=$_.CreationDate;
-        role=if($_.Name -ieq 'codex.exe' -and $_.CommandLine -match 'app-server'){'Codex app-server'}elseif($_.ExecutablePath -match '\\OpenAI\.Codex_'){'Codex desktop process'}elseif($_.Name -match '^(msedge|chrome)\.exe$'){'browser process'}else{'proxy or helper'}}
+        role=if($_.ExecutablePath -match '\\OpenAI\\Codex\\bin\\'){'Codex CLI or app-server; launch mode uninspected'}elseif($_.ExecutablePath -match '\\OpenAI\.Codex_'){'Codex desktop process'}elseif($_.Name -match '^(msedge|chrome)\.exe$'){'browser process'}else{'proxy or helper'}}
 })
 $tcp=@(Get-NetTCPConnection -ErrorAction SilentlyContinue | Where-Object OwningProcess -in $ids | Select-Object OwningProcess,State,LocalAddress,LocalPort,RemoteAddress,RemotePort)
 $settings=Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
@@ -33,7 +33,13 @@ $certificates=@(foreach($scope in @('Process','User','Machine')){foreach($name i
 }})
 $interfaces=@(Get-NetIPInterface -ErrorAction SilentlyContinue | Where-Object InterfaceAlias -match 'Swirl|Clash|TUN|Wintun' | Select-Object InterfaceAlias,InterfaceIndex,AddressFamily,ConnectionState,InterfaceMetric)
 $dns=@(Get-DnsClientCache -ErrorAction SilentlyContinue | Where-Object Entry -match '(^|\.)(chatgpt|openai|oaistatic|oaiusercontent)\.com$' | Select-Object Entry,@{Name='RecordType';Expression={$_.Type}},Data,TimeToLive)
-$report=@{timestamp=(Get-Date).ToString('o');processes=$inventory;tcp=$tcp;windowsProxy=$proxy;winHttp=(netsh winhttp show proxy | Out-String).Trim();environment=$environment;certificateEnvironment=$certificates;tunCandidates=$interfaces;dnsCache=$dns;
+$codexLogSummary=$null
+if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'CodexLogSummary.psm1')) {
+    Import-Module (Join-Path $PSScriptRoot 'CodexLogSummary.psm1') -Force
+    if (!$CodexLogDirectory) { $CodexLogDirectory=Join-Path $env:LOCALAPPDATA ('Codex/Logs/'+(Get-Date).ToString('yyyy/MM/dd')) }
+    $codexLogSummary=Get-CodexLogSummary -LogDirectory $CodexLogDirectory
+}
+$report=@{timestamp=(Get-Date).ToString('o');processes=$inventory;tcp=$tcp;windowsProxy=$proxy;winHttp=(netsh winhttp show proxy | Out-String).Trim();environment=$environment;certificateEnvironment=$certificates;tunCandidates=$interfaces;dnsCache=$dns;codexExistingLogSummary=$codexLogSummary;
     limitations=@('Process environment is the collector environment, not an inspection of already-running Codex processes.','TCP endpoints do not reveal encrypted WebSocket or SSE contents.','A TUN adapter name is a candidate, not proof of effective routing.','A loopback proxy connection and a TUN interface can coexist without proving a loop.')}
 $destination=[IO.Path]::GetFullPath($OutputPath)
 [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($destination))|Out-Null

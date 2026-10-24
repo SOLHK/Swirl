@@ -103,6 +103,13 @@ set(SWIRL_RUST_TRIPLE "${SWIRL_RUST_TRIPLE}" CACHE INTERNAL "Cargo target paired
 set(SWIRL_RUST_BUILD_ID "${SWIRL_RUST_BUILD_ID}" CACHE INTERNAL "Rust/Qt content build identity" FORCE)
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/swirl-rust-build.json"
  "{\"abi_version\":1,\"build_id\":\"${SWIRL_RUST_BUILD_ID}\",\"source_sha\":\"${SWIRL_SOURCE_SHA}\",\"target\":\"${SWIRL_RUST_TRIPLE}\"}\n")
+# Only the loader and diagnostic identity consumers need to recompile when the
+# source revision changes. Target-wide definitions previously invalidated every
+# C++ object, including the large embedded font resources, after each commit.
+# file(CONFIGURE) preserves the header timestamp when its content is unchanged.
+set(SWIRL_BUILD_IDENTITY_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated")
+file(CONFIGURE OUTPUT "${SWIRL_BUILD_IDENTITY_DIRECTORY}/SwirlBuildIdentity.h"
+ CONTENT "#pragma once\n#define SWIRL_RUST_BUILD_ID \"@SWIRL_RUST_BUILD_ID@\"\n#define SWIRL_SOURCE_SHA \"@SWIRL_SOURCE_SHA@\"\n" @ONLY)
 
 add_custom_target(SwirlRustCore
  COMMAND "${CMAKE_COMMAND}" -E env
@@ -118,8 +125,8 @@ add_custom_target(SwirlRustCore
 
 function(swirl_pair_rust_core target)
  add_dependencies(${target} SwirlRustCore)
- target_compile_definitions(${target} PUBLIC
-  SWIRL_USE_RUST_CORE SWIRL_RUST_BUILD_ID="${SWIRL_RUST_BUILD_ID}" SWIRL_SOURCE_SHA="${SWIRL_SOURCE_SHA}")
+ target_compile_definitions(${target} PUBLIC SWIRL_USE_RUST_CORE)
+ target_include_directories(${target} PUBLIC "${SWIRL_BUILD_IDENTITY_DIRECTORY}")
 endfunction()
 
 function(swirl_stage_rust_core target)

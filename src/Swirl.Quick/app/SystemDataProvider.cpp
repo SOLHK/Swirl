@@ -1,4 +1,5 @@
 #include "SystemDataProvider.h"
+#include "SwirlBuildIdentity.h"
 #include "DiagnosticService.h"
 #include "network/CaptureService.h"
 #include "engine/EngineController.h"
@@ -45,6 +46,7 @@ QVariantMap SystemDataProvider::diagnosticSnapshot() const {
         {"apiHealthy",m_engine->apiHealthy()},{"processAlive",m_engine->processAlive()},{"routingMode",m_engine->routingMode()},
         {"systemProxyEnabled",m_engine->systemProxy()->enabled()},{"systemProxyOwned",m_engine->systemProxy()->owned()},
         {"systemProxy",m_engine->systemProxy()->diagnosticState()},
+        {"nodeTests",m_engine->nodeDiagnosticRows()},
         {"systemProxyError",m_engine->systemProxy()->error()},{"networkType",currentNetwork().value("type")},
         {"trafficSampled",t->sampled()},{"connectionsSampled",t->connectionsSampled()},{"activeConnections",t->activeConnections()},
         {"activeProcesses",t->activeProcesses()},{"uploadRate",t->uploadRate()},{"downloadRate",t->downloadRate()},{"today",t->summary()},

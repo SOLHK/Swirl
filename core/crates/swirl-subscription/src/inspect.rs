@@ -14,6 +14,9 @@ mod inspect_reality;
 mod inspect_socks4;
 #[path = "inspect_stream.rs"]
 mod inspect_stream;
+#[cfg(test)]
+#[path = "inspect_tfo_tests.rs"]
+mod inspect_tfo_tests;
 #[path = "inspect_websocket.rs"]
 mod inspect_websocket;
 use base64::{
@@ -902,6 +905,28 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
         .and_then(Value::as_str)
         .unwrap_or("");
     let kind = protocol(source_protocol);
+    // TFO is an optional TCP handshake optimization, not part of the proxy
+    // authentication or wire protocol (Surge Common Policy Parameters). Keep
+    // the source unchanged and use the existing ordinary TCP transport. Only
+    // booleans on known TCP protocols qualify; malformed values, QUIC and every
+    // other security/transport option still pass through their strict parser.
+    if family != "xray-v2ray-json"
+        && matches!(
+            kind,
+            "ss" | "vmess" | "vless" | "trojan" | "http" | "socks5" | "socks4" | "socks4a"
+        )
+        && let Some(enabled) = raw.get("tfo").and_then(Value::as_bool)
+    {
+        let mut ordinary_tcp = raw.clone();
+        if let Some(object) = ordinary_tcp.as_object_mut() {
+            object.remove("tfo");
+        }
+        let (mut capability, outbound) = capability(&ordinary_tcp, index, family);
+        if enabled && outbound.is_some() {
+            capability.diagnostic = "TcpFastOpenFallbackToTcp";
+        }
+        return (capability, outbound);
+    }
     let implicit_tls = kind == "trojan"
         || source_protocol.eq_ignore_ascii_case("socks5-tls")
         || source_protocol.eq_ignore_ascii_case("https");
@@ -2227,7 +2252,7 @@ mod tests {
             "future,obfs.example",
             "http,obfs.example,future=retained",
             "http,obfs.example,extra-positional",
-            "http,obfs.example,fast-open=true",
+            "http,obfs.example,fast-open=invalid",
             "obfs-name=http,obfs-host=obfs.example,obfs-uri=/custom",
         ] {
             let input = format!(
@@ -2275,8 +2300,9 @@ mod tests {
             r.report.nodes[0].diagnostic,
             "CertificateVerificationDisabledUnsupported"
         );
-        assert_eq!(r.report.nodes[1].diagnostic, "TcpFastOpenNotImplemented");
-        assert!(r.tcp_candidates.iter().all(Option::is_none));
+        assert_eq!(r.report.nodes[1].diagnostic, "TcpFastOpenFallbackToTcp");
+        assert!(r.tcp_candidates[0].is_none());
+        assert!(r.tcp_candidates[1].is_some());
         assert_eq!(r.original, input);
         assert_eq!(r.originals[0]["skip-cert-verify"], true);
     }

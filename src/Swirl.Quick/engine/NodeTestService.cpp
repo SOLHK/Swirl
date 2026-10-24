@@ -6,6 +6,7 @@
 #include <QDateTime>
 #include <QPointer>
 #include <QUdpSocket>
+#include <QCryptographicHash>
 namespace {
 quint16 freePort(){
  QTcpServer tcp;QUdpSocket udp;
@@ -18,6 +19,9 @@ quint16 freePort(){
 }
 }
 NodeTestService::~NodeTestService(){cancel();}
+QString NodeTestService::nodeReference(const QString &id){
+ return QString::fromLatin1(QCryptographicHash::hash(id.toUtf8(),QCryptographicHash::Sha256).toHex().left(12));
+}
 EngineStartOptions NodeTestService::isolatedOptions(const EngineStartOptions &source){
  // Keep only node data. A test must not inherit saved TUN, LAN, routing,
  // authentication, external executable paths or the live resolver owner.
@@ -40,20 +44,20 @@ ProxyEngine *NodeTestService::createWorker(){
  auto *deadline=new QTimer(runner);deadline->setObjectName("probeDeadline");deadline->setSingleShot(true);deadline->setInterval(40000);
  connect(deadline,&QTimer::timeout,this,[this,runner]{
   const auto id=runner->property("probeNodeId").toString();
-  if(!id.isEmpty())finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"phase","timeout"},{"error","节点测试超时"}});
+  if(!id.isEmpty())finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"phase","timeout"},{"failureCode","ProbeDeadlineExceeded"},{"error","节点测试超时"}});
  });
  connect(runner,&ProxyEngine::diagnostic,this,[this,runner](const QString &,const QString &code,const QString &message){
   // A rejected configure keeps the old runtime alive. It must still finish the
   // newly assigned node as a failure, without testing the previous node.
   if(code!="SelectionUnsupported"&&code!="SelectionFailed")return;
   const auto id=runner->property("probeNodeId").toString();
-  if(!id.isEmpty())finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"phase","configuration"},{"error",message}});
+  if(!id.isEmpty())finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"phase","configuration"},{"failureCode",code},{"error",message}});
  });
  connect(runner,&ProxyEngine::statusChanged,this,[this,runner]{
   const auto id=runner->property("probeNodeId").toString();
   if(id.isEmpty()||m_running.value(id)!=runner)return;
   const auto status=runner->status();
-  if(status.state==ProxyEngine::State::Failed){finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"phase","startup"},{"engineError",int(status.error)},{"error",status.message}});return;}
+  if(status.state==ProxyEngine::State::Failed){finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"phase","startup"},{"failureCode","CoreStartupFailed"},{"engineError",int(status.error)},{"error",status.message}});return;}
   // Worker snapshots can already be queued while the next node is assigned.
   // Never let an old node's success satisfy a new node's test.
   if(status.selectedNodeId!=id)return;
@@ -71,6 +75,7 @@ ProxyEngine *NodeTestService::createWorker(){
   if(status.requestState!=ProxyEngine::RequestState::Succeeded&&status.requestState!=ProxyEngine::RequestState::Failed&&status.nodeHealth!=ProxyEngine::NodeHealth::Unavailable)return;
   const auto phase=!status.probeFailureStage.isEmpty()?status.probeFailureStage:status.nodeHealth==ProxyEngine::NodeHealth::Unavailable?QString("availability"):QString("request");
   finish(id,runner,{{"success",status.requestState==ProxyEngine::RequestState::Succeeded},{"latency",status.latencyMs},{"http",status.responseCode},{"phase",phase},
+   {"failureCode",status.probeFailureCode},
    {"error",status.requestState==ProxyEngine::RequestState::Succeeded?QString():status.nodeMessage},
    {"outboundConnectMs",status.probeOutboundConnectMs},{"originTlsMs",status.probeOriginTlsMs}});
  });
@@ -82,9 +87,9 @@ void NodeTestService::next(){
   // Validate imported data before reserving a runtime. Unsupported nodes stay
   // in the catalogue and receive an explicit per-node failure.
   QJsonObject configuration;const auto reason=RustCoreEngine::configuration(opts,&configuration);
-  if(!reason.isEmpty()){record(id,{{"success",false},{"latency",-1},{"http",0},{"phase","configuration"},{"error",reason}});continue;}
+  if(!reason.isEmpty()){record(id,{{"success",false},{"latency",-1},{"http",0},{"phase","configuration"},{"failureCode","NodeConfigurationRejected"},{"error",reason}});continue;}
   const bool reuse=!m_idle.isEmpty();
-  if(!reuse){opts.proxyPort=freePort();if(!opts.proxyPort){record(id,{{"success",false},{"latency",-1},{"http",0},{"phase","listener"},{"error","无法分配本机测试端口"}});continue;}}
+  if(!reuse){opts.proxyPort=freePort();if(!opts.proxyPort){record(id,{{"success",false},{"latency",-1},{"http",0},{"phase","listener"},{"failureCode","ProbePortUnavailable"},{"error","无法分配本机测试端口"}});continue;}}
   auto *runner=reuse?m_idle.dequeue():createWorker();
   m_running[id]=runner;runner->setProperty("probeNodeId",id);runner->setProperty("probeStarted",false);
   runner->findChild<QTimer *>("probeDeadline")->start();
@@ -103,9 +108,10 @@ void NodeTestService::finish(const QString &id,ProxyEngine *runner,const QVarian
  record(id,result);QTimer::singleShot(0,this,&NodeTestService::next);
 }
 void NodeTestService::record(const QString &id,QVariantMap row){
+ row["nodeReference"]=nodeReference(id);
  row["engineKind"]=QStringLiteral("rust");row["metricType"]=QStringLiteral("http_headers");row["resolverPolicy"]=QStringLiteral("isolated_default_dns");
  row["time"]=QDateTime::currentDateTime().toString(Qt::ISODate);m_results[id]=row;++m_completed;
- if(row.value("success").toBool())++m_succeeded;else{++m_failed;emit diagnostic("NodeTestFailed",row.value("error").toString());}
+ if(row.value("success").toBool())++m_succeeded;else{++m_failed;emit diagnostic("NodeTestFailed",QStringLiteral("节点 #%1 · %2 · %3 · %4").arg(row.value("nodeReference").toString(),row.value("phase").toString(),row.value("failureCode").toString(),row.value("error").toString()));}
  m_message=QString("%1/%2 · 成功 %3 · 失败 %4").arg(m_completed).arg(m_total).arg(m_succeeded).arg(m_failed);emit changed();
 }
 void NodeTestService::retire(ProxyEngine *runner){

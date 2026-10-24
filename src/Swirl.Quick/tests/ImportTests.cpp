@@ -622,6 +622,25 @@ private slots:
             }
         }
     }
+    void rejectedSecurityOptionsNameTheCauseWithoutEchoingPrivateValues() {
+        const QJsonObject base{{"name","fixture"},{"type","trojan"},{"server","proxy.invalid"},{"port",443},{"password","DO-NOT-ECHO-SECRET"}};
+        const QList<QPair<QJsonObject,QString>> cases{
+            {{{"skip-cert-verify",true}},QStringLiteral("skip-cert-verify=true")},
+            {{{"skip-cert-verify","false"}},QStringLiteral("布尔值 false")},
+            {{{"script","DO-NOT-ECHO-SECRET"}},QStringLiteral("script")},
+            {{{"DO-NOT-ECHO-SECRET-file","private-path"}},QStringLiteral("本地文件路径字段")},
+            {{{"listeners",QJsonArray{}}},QStringLiteral("listeners")}
+        };
+        for(const auto &[options,expected]:cases){
+            auto node=base;for(auto it=options.begin();it!=options.end();++it)node[it.key()]=it.value();
+            const auto parsed=NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{node}}}).toJson());
+            QVERIFY(!parsed);QVERIFY2(parsed.error.contains(expected),qPrintable(parsed.error));
+            QVERIFY(!parsed.error.contains("DO-NOT-ECHO-SECRET"));QVERIFY(!parsed.error.contains("private-path"));
+        }
+        auto safe=base;safe["skip-cert-verify"]=false;
+        const auto accepted=NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{safe}}}).toJson());
+        QVERIFY2(accepted,qPrintable(accepted.error));QCOMPARE(accepted.nodes.first().parameters.value("skip-cert-verify"),QJsonValue(false));
+    }
     void completeConfigurationWithoutOwnerDoesNotDiscardGlobals() {
         QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService imports(&store);
         imports.importText("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: 1080}]\nrules: [MATCH,DIRECT]\n");

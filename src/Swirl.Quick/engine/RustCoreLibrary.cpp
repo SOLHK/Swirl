@@ -1,4 +1,5 @@
 #include "RustCoreLibrary.h"
+#include "SwirlBuildIdentity.h"
 
 #include <QCoreApplication>
 #include <QDir>

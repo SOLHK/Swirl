@@ -82,6 +82,9 @@ fn response(input: &[u8], capacity: usize) -> Result<(usize, Option<Vec<u8>>), i
         Ok(outbound) => encoded_response(
             &json!({
                 "schema": 1, "ok": true, "native_outbound": outbound,
+                "warnings": if inspected.report.nodes[0].diagnostic == "TcpFastOpenFallbackToTcp" {
+                    vec!["TcpFastOpenFallbackToTcp"]
+                } else { Vec::<&str>::new() },
                 "network_verified": false
             }),
             capacity,

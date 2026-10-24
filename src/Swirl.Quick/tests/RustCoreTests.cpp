@@ -1622,7 +1622,7 @@ private slots:
    {{"port","1080"}},{{"port",1080.5}},{{"port",0}},{{"port",65536}},
    {{"tls",true}},{{"tls","false"}},{{"udp",true}},{{"udp","false"}},
    {{"sni","tls.fixture.invalid"}},{{"sni",1}},{{"cipher","none"}},{{"cipher",1}},
-   {{"tfo",true}},{{"network","ws"}},{{"network","udp"}},{{"remote_dns",false}},
+   {{"tfo","true"}},{{"network","ws"}},{{"network","udp"}},{{"remote_dns",false}},
    {{"future-option","preserved"}},{{"server_port",1080}}
   };
   const QJsonObject sentinel{{"unchanged",true}};
@@ -2258,7 +2258,7 @@ private slots:
   QCOMPARE(engine.status().engineKind,QString("rust"));QCOMPARE(engine.status().processId,QCoreApplication::applicationPid());
   engine.stop();
  }
- void disabledFastOpenIsAnExactNoOpAcrossNativeProtocols(){
+ void optionalFastOpenUsesOrdinaryTcpAcrossNativeProtocols(){
   ControlledNetwork net;QVERIFY(net.start());
   for(const auto &protocol:QStringList{"http","socks4","socks4a","socks5","ss","trojan","vless"}){
    auto o=options(net);auto &n=o.nodes.first();n.protocol=protocol;
@@ -2266,14 +2266,17 @@ private slots:
    if(protocol=="trojan")n.password="synthetic";
    if(protocol=="vless")n.parameters["uuid"]="11111111-1111-4111-8111-111111111111";
    QJsonObject baseline;QVERIFY2(RustCoreEngine::configuration(o,&baseline).isEmpty(),qPrintable(protocol));
-   n.parameters["tfo"]=false;QJsonObject disabled;QVERIFY2(RustCoreEngine::configuration(o,&disabled).isEmpty(),qPrintable(protocol));QCOMPARE(disabled,baseline);
-   for(const auto &invalid:QJsonArray{true,0,1,"false",QJsonValue(QJsonValue::Null),QJsonObject{},QJsonArray{}}){
+   for(const auto enabled:{false,true}){
+    n.parameters["tfo"]=enabled;QJsonObject fallback;QVERIFY2(RustCoreEngine::configuration(o,&fallback).isEmpty(),qPrintable(protocol));QCOMPARE(fallback,baseline);
+    QCOMPARE(n.publicInfo().value("normalizationNotes").toString().contains("普通 TCP"),enabled);
+   }
+   for(const auto &invalid:QJsonArray{0,1,"false",QJsonValue(QJsonValue::Null),QJsonObject{},QJsonArray{}}){
     n.parameters["tfo"]=invalid;QJsonObject unchanged{{"sentinel",true}};QVERIFY(!RustCoreEngine::configuration(o,&unchanged).isEmpty());QCOMPARE(unchanged,QJsonObject({{"sentinel",true}}));
    }
   }
  }
- void disabledFastOpenForwardsThroughNativeSocks5(){
-  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.nodes.first().parameters["tfo"]=false;
+ void optionalFastOpenForwardsThroughNativeSocks5(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.nodes.first().parameters["tfo"]=true;
   RustCoreEngine engine;engine.start(o);QCOMPARE(engine.status().state,ProxyEngine::State::Running);
   QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));
   auto reply=client.get(QNetworkRequest(net.url()));QVERIFY(QTest::qWaitFor([&]{return reply->isFinished();},5000));
@@ -2304,7 +2307,7 @@ private slots:
   bool valid=false;const int port=qEnvironmentVariableIntValue("SWIRL_SS_REFERENCE_PORT",&valid);
   if(!valid)QSKIP("Independent Python SS peer supplies the isolated port.");
   ControlledNetwork net;QVERIFY(net.start());
-  for(const auto &tail:QStringList{"http,obfs.example","obfs-name=http,obfs-host=obfs.example","obfs-name=http,obfs-host=obfs.example,fast-open=false"}){
+  for(const auto &tail:QStringList{"http,obfs.example","obfs-name=http,obfs-host=obfs.example","obfs-name=http,obfs-host=obfs.example,fast-open=false","obfs-name=http,obfs-host=obfs.example,fast-open=true"}){
    auto o=options(net);const auto source=QString("[Proxy]\nfixture = Shadowsocks,127.0.0.1,%1,aes-128-gcm,synthetic-ss-password,%2").arg(port).arg(tail).toUtf8();
    const auto parsed=NodeImporter::parse(source);QVERIFY2(bool(parsed),qPrintable(parsed.error));o.nodes=parsed.nodes;o.selectedNodeId=parsed.nodes.first().id;
    RustCoreEngine engine;engine.start(o);QCOMPARE(engine.status().state,ProxyEngine::State::Running);

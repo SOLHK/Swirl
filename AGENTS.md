@@ -1,4 +1,12 @@
-# v0.1.7 subscription and networking repair (2026-10-24)
+# v0.1.8 network and subscription repair (2026-10-24)
+
+- Work on independent `work/swirl-018-network-compat-20261024`, based on the latest fetched v0.1.8 `fad05a72070b5770708cf64af57936bc9f0e64a1`. Do not change main, test or other windows' branches; never force-push.
+- Preserve working V2Ray/VMess import and forwarding. Optional TCP acceleration may fall back to ordinary TCP only without changing authentication, transport, TLS or unknown-field validation.
+- Browser Google/YouTube, actual Codex services/workspace/login/chat, real provider measurements and system-proxy versus TUN comparison are assigned to the user. Controlled loopback/independent-peer automation is separate evidence. DPI visual acceptance is also manual.
+- Preserve this machine's working proxy/TUN/routes/DNS and Codex sessions. Use read-only existing logs; never export account credentials or private subscriptions. Mutating system-proxy recovery tests run only on disposable CI runners.
+- Retain Cargo/Ninja caches and exact EXE/DLL/source identity. Deliver independently verified stages with necessary security/network tests and clearly label unverified acceptance. Do not develop a native format ahead of subscription/network stability.
+
+# v0.1.7 subscription and networking repair (2026-10-24; historical)
 
 - Work on independent `work/swirl-017-subscription-network-20261024`, based on remote S4 `ca7015679aef49702a40302de55d83e367ed9e95`. Do not update S4, S3, main, test or parallel branches.
 - The current user authorizes subscription/node content and dialog layout repairs; preserve sidebar width, sidebar/frame radii and overall window geometry. Keep all existing motion and interactions.

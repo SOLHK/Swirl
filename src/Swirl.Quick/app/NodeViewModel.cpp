@@ -73,7 +73,7 @@ void NodeViewModel::toggleFavorite(const QString &id){
 }
 void NodeViewModel::copySafeInfo(const QString &id) const {
     const auto row=find(id);if(row.isEmpty())return;
-    QStringList lines;for(const auto &key:{"name","protocol","host","port","regionName","latency","status"})lines.append(QString::fromLatin1(key)+": "+row.value(key).toString());
+    QStringList lines;for(const auto &key:{"nodeReference","name","protocol","host","port","regionName","latency","status","connectionState"})lines.append(QString::fromLatin1(key)+": "+row.value(key).toString());
     QGuiApplication::clipboard()->setText(lines.join('\n'));
 }
 bool NodeViewModel::filterAcceptsRow(int index,const QModelIndex &) const {

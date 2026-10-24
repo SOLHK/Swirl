@@ -334,17 +334,16 @@ QVariantList EngineController::nodes() const {
         auto row=value.toMap(); const bool active=processAlive() && row.value("id").toString()==status.selectedNodeId;
         row.insert("address",row.value("host").toString().isEmpty()?QStringLiteral("协议扩展配置"):row.value("host").toString()+":"+row.value("port").toString());
         const auto id=row.value("id").toString();
+        row.insert("nodeReference",NodeTestService::nodeReference(id));
+        row.insert("connectionState",nodeConnectionState(id));
+        row.insert("networkVerified",active&&m_connectionRequested&&m_options.selectedNodeId==id&&status.requestState==ProxyEngine::RequestState::Succeeded&&status.nodeHealth!=ProxyEngine::NodeHealth::Unavailable&&status.state!=ProxyEngine::State::Failed);
         const auto measured=m_tests.result(id);
         QString nodeStatus=QStringLiteral("未测试");
         if(m_tests.testing(id))nodeStatus=QStringLiteral("测试中");
         else if(!measured.isEmpty())nodeStatus=measured.value("success").toBool()?QStringLiteral("可用"):
             measured.value("error").toString().contains("timeout",Qt::CaseInsensitive)||measured.value("error").toString().contains(QStringLiteral("超时"))?QStringLiteral("超时"):QStringLiteral("测试失败");
-        if(m_connectionRequested&&m_options.selectedNodeId==id){
-            if(status.state==ProxyEngine::State::Failed||status.requestState==ProxyEngine::RequestState::Failed||status.nodeHealth==ProxyEngine::NodeHealth::Unavailable)nodeStatus=QStringLiteral("连接失败");
-            else if(active&&status.requestState==ProxyEngine::RequestState::Succeeded)nodeStatus=QStringLiteral("已连接");
-            else if(busy()||status.nodeBusy)nodeStatus=QStringLiteral("正在连接");
-            else if(active)nodeStatus=QStringLiteral("会话就绪 · 未验证");
-        }
+        const auto connection=row.value("connectionState").toString();
+        if(connection!=QStringLiteral("未连接"))nodeStatus=connection;
         row.insert("status",nodeStatus);
         row.insert("testAvailable",!m_tests.testing(id)&&measured.value("success").toBool());
 #ifdef SWIRL_USE_RUST_CORE
@@ -362,20 +361,37 @@ QVariantList EngineController::nodes() const {
     }
     return rows;
 }
+QVariantList EngineController::nodeDiagnosticRows() const {
+    QVariantList result;
+    for(const auto &value:nodes()) {
+        const auto row=value.toMap();const auto measured=m_tests.result(row.value("id").toString());
+        // A stable opaque reference links the visible node, its result and log.
+        // Never export names, endpoints, IDs, credentials or source parameters.
+        result.append(QVariantMap{{"nodeReference",row.value("nodeReference")},{"protocol",row.value("protocol")},
+            {"imported",true},{"executable",row.value("nativeExecutable")},{"connectionState",row.value("connectionState")},
+            {"requestVerified",row.value("networkVerified")},{"tested",!measured.isEmpty()},
+            {"testSucceeded",measured.value("success",false)},{"phase",measured.value("phase")},
+            {"failureCode",measured.value("failureCode")},{"httpStatus",measured.value("http")},
+            {"outboundConnectMs",measured.value("outboundConnectMs",-1)},{"originTlsMs",measured.value("originTlsMs",-1)},
+            {"testedAt",measured.value("time")}});
+    }
+    return result;
+}
+QString EngineController::nodeConnectionState(const QString &id) const {
+    if(id.isEmpty()||!m_connectionRequested||m_options.selectedNodeId!=id)return QStringLiteral("未连接");
+    const auto status=m_engine->status();const bool active=processAlive()&&status.selectedNodeId==id;
+    if(status.state==ProxyEngine::State::Failed||status.requestState==ProxyEngine::RequestState::Failed||status.nodeHealth==ProxyEngine::NodeHealth::Unavailable)return QStringLiteral("连接失败");
+    if(active&&status.requestState==ProxyEngine::RequestState::Succeeded)return QStringLiteral("已连接");
+    if(busy()||status.nodeBusy)return QStringLiteral("正在连接");
+    return active?QStringLiteral("会话就绪 · 未验证"):QStringLiteral("未连接");
+}
 QString EngineController::selectedNodeName() const {
     for (const auto &n:m_store.nodes()) if(n.id==m_store.selectedId())return n.name;
     return QStringLiteral("未选择节点");
 }
 QString EngineController::nodeStateText() const {
     if (connected()&&m_engine->status().directSession)return QStringLiteral("直接连接");
-    if (!processAlive() || activeNodeId().isEmpty())return QStringLiteral("未连接");
-    switch(m_engine->status().nodeHealth) {
-    case ProxyEngine::NodeHealth::Unknown:return QStringLiteral("已选择 · 未检测");
-    case ProxyEngine::NodeHealth::Checking:return QStringLiteral("正在真实检测");
-    case ProxyEngine::NodeHealth::Available:return QStringLiteral("节点可用");
-    case ProxyEngine::NodeHealth::Unavailable:return QStringLiteral("节点检测失败");
-    }
-    return {};
+    return nodeConnectionState(activeNodeId());
 }
 QString EngineController::requestStateText() const {
     const auto s=m_engine->status();

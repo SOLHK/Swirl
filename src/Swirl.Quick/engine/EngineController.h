@@ -106,6 +106,7 @@ public:
     void shutdown();
     Q_INVOKABLE void refresh();
     QVariantList nodes() const;
+    QVariantList nodeDiagnosticRows() const;
     QVariantList nodeCatalog() const { return m_store.publicRows(); }
     QString selectedNodeId() const { return m_store.selectedId(); }
     QString selectedNodeName() const;
@@ -184,6 +185,7 @@ signals:
     void optionsChanged();
     void nodesChanged();
 private:
+    QString nodeConnectionState(const QString &id) const;
     void refreshLanAddresses();
     QStringList m_lanAddresses;
     QList<QNetworkInterface> m_interfaces;

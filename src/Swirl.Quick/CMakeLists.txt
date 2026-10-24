@@ -74,7 +74,7 @@ endif()
 if(NOT SWIRL_SOURCE_SHA)
  set(SWIRL_SOURCE_SHA "source-archive")
 endif()
-target_compile_definitions(Swirl PRIVATE SWIRL_APP_VERSION="${PROJECT_VERSION}" SWIRL_BUILD_REVISION="${SWIRL_BUILD_REVISION}" SWIRL_SOURCE_SHA="${SWIRL_SOURCE_SHA}")
+target_compile_definitions(Swirl PRIVATE SWIRL_APP_VERSION="${PROJECT_VERSION}")
 target_sources(Swirl PRIVATE app/FontManager.h app/FontManager.cpp app/FontAxisPolicy.h app/FontAxisPolicy.cpp)
 qt_add_resources(Swirl harmony_fonts PREFIX "/swirl/fonts" BASE "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts" FILES
  assets/fonts/HarmonyOS_Sans_SC_Regular.ttf assets/fonts/HarmonyOS_Sans_SC_Medium.ttf assets/fonts/HarmonyOS_Sans_SC_Bold.ttf assets/fonts/LICENSE_HarmonyOS_Sans.txt)

@@ -229,7 +229,7 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
             n.serverName=params.value("tls").toObject().value("server_name").toString();
         n.parameters=params;
         auto error=ProxyNode::validate(n);
-        if(!safeOptions(params))error=QStringLiteral("节点含本地文件、脚本或系统网络设置；请移除此类字段后导入。");
+        if(error.isEmpty()&&!safeOptions(params))error=QStringLiteral("节点含本地文件、脚本或系统网络设置；请移除此类字段后导入。");
         if(names.contains(n.name))error=QStringLiteral("节点名称重复，无法安全确定链式代理引用。");
         if(!error.isEmpty()) {
             result.nodes.clear();result.error=QStringLiteral("第 %1 个节点：%2").arg(i+1).arg(error);return result;

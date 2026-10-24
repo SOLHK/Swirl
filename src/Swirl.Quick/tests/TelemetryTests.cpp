@@ -54,8 +54,17 @@ private slots:
 #endif
    const auto verifyRow=[&](const QString &status){
 #ifdef Q_OS_WIN
-    QCOMPARE(controller.nodes().first().toMap().value("status").toString(),status);
-    QCOMPARE(controller.nodes().first().toMap().value("latency").toString(),QStringLiteral("—"));
+    const auto row=controller.nodes().first().toMap();
+    QCOMPARE(row.value("status").toString(),status);
+    QCOMPARE(row.value("latency").toString(),QStringLiteral("—"));
+    QCOMPARE(row.value("connectionState").toString(),status==QStringLiteral("未测试")?QStringLiteral("未连接"):status);
+    QCOMPARE(controller.nodeStateText(),row.value("connectionState").toString());
+    QCOMPARE(row.value("networkVerified").toBool(),status==QStringLiteral("已连接"));
+    QVERIFY(!row.value("testAvailable").toBool());
+    const auto diagnostic=controller.nodeDiagnosticRows().first().toMap();
+    QCOMPARE(diagnostic.value("connectionState"),row.value("connectionState"));
+    QCOMPARE(diagnostic.value("requestVerified"),row.value("networkVerified"));
+    QVERIFY(!diagnostic.contains("host"));QVERIFY(!diagnostic.contains("id"));QVERIFY(!diagnostic.contains("name"));
 #else
     Q_UNUSED(status);QVERIFY(controller.nodes().isEmpty());
 #endif

@@ -1,6 +1,7 @@
 // The fixture builds use this same source with SWIRL_LOADER_FIXTURE_KIND=1..10.
 // They are real shared libraries, so the tests exercise the platform loader,
 // symbol resolution and C ABI calls rather than a mocked QLibrary result.
+#include "SwirlBuildIdentity.h"
 #ifdef SWIRL_LOADER_FIXTURE_KIND
 
 #include <QByteArray>

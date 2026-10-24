@@ -1,4 +1,5 @@
 #include "NodeUiChecks.h"
+#include "SwirlBuildIdentity.h"
 #include "ControlledNetwork.h"
 #include "LoopbackPortLease.h"
 #include "engine/EngineController.h"

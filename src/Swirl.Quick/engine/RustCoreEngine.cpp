@@ -283,6 +283,7 @@ QJsonObject RustCoreEngine::call(QJsonObject command){
 }
 void RustCoreEngine::resetProbeState(){
  m_probeRequestId=0;m_probeFailureStage.clear();m_probeOutboundConnectMs=m_probeOriginTlsMs=-1;
+ m_status.probeFailureCode.clear();
  m_status.nodeBusy=false;m_status.requestState=RequestState::NotTested;m_status.nodeHealth=NodeHealth::Unknown;
  m_status.latencyMs=-1;m_status.responseCode=0;m_status.nodeMessage.clear();
 }
@@ -292,6 +293,7 @@ void RustCoreEngine::cancelProbe(){
 }
 void RustCoreEngine::failProbe(const QString &stage,const QString &code,int httpStatus){
  m_probeRequestId=0;m_probeFailureStage=stage;m_probeOutboundConnectMs=m_probeOriginTlsMs=-1;
+ m_status.probeFailureCode=code;
  m_status.nodeBusy=false;m_status.requestState=RequestState::Failed;
  m_status.nodeHealth=QStringList{"dns","tcp_connect","outbound_handshake","outbound_connect"}.contains(stage)
   ?NodeHealth::Unavailable:NodeHealth::Unknown;
@@ -313,6 +315,7 @@ void RustCoreEngine::updateProbe(const QJsonObject &probe){
   const auto code=metrics.value("http_status").toInt();
   if(elapsed<0||elapsed>std::numeric_limits<int>::max()||outbound<0||outbound>elapsed||(!tlsValue.isNull()&&originTls<0)||code<200||code>=300){failProbe("probe_status","ProbeMetricsInvalid");return;}
   m_probeRequestId=0;m_probeFailureStage.clear();m_status.nodeBusy=false;
+  m_status.probeFailureCode.clear();
   m_probeOutboundConnectMs=outbound;m_probeOriginTlsMs=originTls;
   m_status.requestState=RequestState::Succeeded;m_status.nodeHealth=NodeHealth::Available;
   m_status.latencyMs=int(elapsed);m_status.responseCode=code;

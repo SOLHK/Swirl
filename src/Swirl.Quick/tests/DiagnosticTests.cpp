@@ -6,6 +6,15 @@ class DiagnosticTests:public QObject {
  Q_OBJECT
 private slots:
  void bareBrowsingMetadataIsRemoved(){const auto safe=DiagnosticService::redact("TLS failure for private.example.net and https://private.example.net/path Cookie: session-private");QVERIFY(!safe.contains("private.example.net"));QVERIFY(!safe.contains("session-private"));}
+ void nodeFailureReferencesSurvivePrivateExport(){
+  QTemporaryDir temp;DiagnosticService log(temp.path());
+  const auto message=QStringLiteral("节点 #a137b946f6c1 · origin_tls · UrlTestTimeout · Rust HEAD 探测失败");
+  log.record("ERROR","NodeTest","NodeTestFailed",message);
+  const auto path=temp.filePath("node-diagnostics.zip");
+  QVERIFY(log.exportReport(QUrl::fromLocalFile(path),{{"nodeTests",QVariantList{QVariantMap{{"nodeReference","a137b946f6c1"},{"phase","origin_tls"},{"failureCode","UrlTestTimeout"},{"testSucceeded",false}}}}}));
+  QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto bytes=file.readAll();
+  QVERIFY(bytes.contains("a137b946f6c1"));QVERIFY(bytes.contains("origin_tls"));QVERIFY(bytes.contains("UrlTestTimeout"));
+ }
  void unicodeHostsAndProxyUrisAreRemoved(){const auto safe=DiagnosticService::redact(QStringLiteral("TLS failure for 私人.测试 socks5://fixture-user:fixture-secret@fixture.test:1080 tuic://fixture-id:fixture-pass@fixture.test username=fixture-account"));for(const auto &value:{QStringLiteral("私人.测试"),QStringLiteral("fixture-user"),QStringLiteral("fixture-secret"),QStringLiteral("fixture-pass"),QStringLiteral("fixture-account")})QVERIFY(!safe.contains(value));}
  void protocolCredentialsAreRemoved(){const auto safe=DiagnosticService::redact("psk=fixture-psk pre-shared-key=fixture-peer auth-str=fixture-auth private-key-passphrase=fixture-pass short-id=abcdef12");for(const auto &value:{"fixture-psk","fixture-peer","fixture-auth","fixture-pass","abcdef12"})QVERIFY(!safe.contains(value));}
  void nativeProtocolSecretsStayRemovedAfterRestartAndExport(){

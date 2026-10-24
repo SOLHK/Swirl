@@ -256,6 +256,9 @@ private slots:
         if(tests.succeeded()!=1 || tests.result(opts.nodes[1].id).value("phase").toString()!="outbound_handshake")qInfo()<<"BATCH_RESULT"<<tests.results();
         QCOMPARE(tests.completed(),2);QCOMPARE(tests.succeeded(),1);QCOMPARE(tests.failed(),1);QVERIFY(tests.result(opts.nodes[0].id).value("success").toBool());QVERIFY(!tests.result(opts.nodes[1].id).value("success").toBool());
         QCOMPARE(tests.result(opts.nodes[1].id).value("phase").toString(),QString("outbound_handshake"));
+        QVERIFY(!tests.result(opts.nodes[1].id).value("failureCode").toString().isEmpty());
+        QCOMPARE(tests.result(opts.nodes[1].id).value("nodeReference").toString(),NodeTestService::nodeReference(opts.nodes[1].id));
+        QVERIFY(tests.result(opts.nodes[0].id).value("failureCode").toString().isEmpty());
         QCOMPARE(main.status().selectedNodeId,opts.nodes.first().id);QCOMPARE(main.status().processId,pid);
         // Native probes perform one real request, without the legacy adapter's
         // extra availability request. Prove the main route independently.
@@ -264,6 +267,24 @@ private slots:
         main.probeNode(network.url());QTRY_COMPARE_WITH_TIMEOUT(main.status().requestState,ProxyEngine::RequestState::Succeeded,10000);
         QVERIFY(network.a.forwarded>beforeMainRequest);QVERIFY(network.a.forwarded>=2);
         tests.start(opts,{opts.nodes[0].id,opts.nodes[1].id},network.url());tests.cancel();QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),5000);main.stop();QTRY_VERIFY_WITH_TIMEOUT(!main.status().processAlive,4000);
+    }
+    void independentMeasurementDoesNotClaimAConnectedSession() {
+        ControlledNetwork network;QVERIFY(network.start());QTemporaryDir temp;
+        EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,temp.filePath("nodes.dpapi"));
+        QVERIFY(controller.saveNode({{"name","private-fixture-name"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",network.a.serverPort()}}));
+        const auto id=controller.nodes().first().toMap().value("id").toString();
+        controller.testSelectedNode(id,network.url());QTRY_VERIFY_WITH_TIMEOUT(!controller.tests()->busy(),45000);
+        QVERIFY(controller.tests()->result(id).value("success").toBool());QVERIFY(network.a.forwarded>0);
+        const auto row=controller.nodes().first().toMap();
+        QCOMPARE(row.value("status").toString(),QStringLiteral("可用"));
+        QCOMPARE(row.value("connectionState").toString(),QStringLiteral("未连接"));
+        QVERIFY(row.value("testAvailable").toBool());QVERIFY(!row.value("networkVerified").toBool());QVERIFY(!controller.processAlive());
+        const auto diagnostic=controller.nodeDiagnosticRows().first().toMap();
+        QCOMPARE(diagnostic.value("nodeReference").toString(),NodeTestService::nodeReference(id));
+        QVERIFY(diagnostic.value("tested").toBool());QVERIFY(diagnostic.value("testSucceeded").toBool());
+        QVERIFY(!diagnostic.value("requestVerified").toBool());QVERIFY(diagnostic.value("executable").toBool());
+        const auto json=QJsonDocument(QJsonObject::fromVariantMap(diagnostic)).toJson();
+        QVERIFY(!json.contains(id.toUtf8()));QVERIFY(!json.contains("private-fixture-name"));QVERIFY(!json.contains("127.0.0.1"));
     }
     void authenticTrafficStreamAndConnectionHistory() {
         ControlledNetwork network;QVERIFY(network.start());QTcpServer origin;QVERIFY(origin.listen(QHostAddress::LocalHost,0));network.a.targetPorts.append(origin.serverPort());

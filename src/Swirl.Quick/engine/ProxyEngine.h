@@ -69,6 +69,7 @@ public:
         int responseCode = 0;
         QString nodeMessage;
         QString probeFailureStage;
+        QString probeFailureCode;
         qint64 probeOutboundConnectMs=-1,probeOriginTlsMs=-1;
         quint64 probeRequestTag=0;
         QVariantList connections;

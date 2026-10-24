@@ -189,10 +189,11 @@ Item {
                 RowLayout {
                     Layout.fillWidth:true;spacing:Theme.dp(8)
                     SwirlStatusBadge {label:page.selected.id!==undefined?page.selected.protocol.toUpperCase():"未选择";tone:"neutral"}
-                    SwirlStatusBadge {Layout.fillWidth:false;busy:engineController.nodeBusy;label:page.selectedActive?engineController.nodeStateText:"未连接";tone:page.selectedActive?(engineController.nodeError.length?"warning":"accent"):"neutral"}
+                    SwirlStatusBadge {objectName:"nodeConnectionState";Layout.fillWidth:false;busy:page.selectedActive&&engineController.nodeBusy;label:page.selected.connectionState||"未连接";tone:page.selectedActive?(engineController.nodeError.length?"warning":"accent"):"neutral"}
                 }
                 SwirlText {renderType:Text.NativeRendering;text:page.selected.id!==undefined?page.selected.address:"选择一个节点开始连接";textFormat:Text.PlainText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
-                SwirlText {text:page.selected.status||"未测试";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {objectName:"nodeExecutionState";text:page.selected.id!==undefined?"已导入 · "+(page.selected.nativeExecutable?"可执行":"当前不可执行")+" · "+(page.tested.time?(page.tested.success?"测速成功":"测速失败"):"未测速")+" · "+(page.selected.networkVerified?"当前会话请求已验证":"当前会话联网待验证"):"未选择节点";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {objectName:"nodeDiagnosticReference";text:page.selected.nodeReference?"诊断编号 #"+page.selected.nodeReference:"";visible:text.length>0;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                 SwirlText {text:qsTr("来源：%1").arg(page.selected.sourceName||((page.sources.find(s=>s.id===page.selected.sourceId)||{}).name)||(page.selected.sourceKind==="legacy"?qsTr("历史未归属"):qsTr("手动添加")));color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.Wrap}
                 SwirlText {text:"地区："+(page.selected.regionName||"未知")+"（订阅名称提示，未经地理验证）";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(11)}
                 SwirlText {renderType:Text.NativeRendering;text:page.selected.id!==undefined?(page.selected.sourceFormat||"手动节点")+" · "+page.selected.capability.engine:"";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}

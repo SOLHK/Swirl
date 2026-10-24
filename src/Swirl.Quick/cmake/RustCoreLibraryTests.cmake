@@ -9,8 +9,8 @@ function(swirl_add_rust_library_tests)
  foreach(kind RANGE 1 10)
   add_library(SwirlLoaderFixture${kind} SHARED "${SWIRL_QUICK_SOURCE}/tests/RustCoreLibraryTests.cpp")
   target_link_libraries(SwirlLoaderFixture${kind} PRIVATE Qt6::Core)
-  target_compile_definitions(SwirlLoaderFixture${kind} PRIVATE
-   SWIRL_LOADER_FIXTURE_KIND=${kind} SWIRL_RUST_BUILD_ID="${SWIRL_RUST_BUILD_ID}" SWIRL_SOURCE_SHA="${SWIRL_SOURCE_SHA}")
+  target_compile_definitions(SwirlLoaderFixture${kind} PRIVATE SWIRL_LOADER_FIXTURE_KIND=${kind})
+  target_include_directories(SwirlLoaderFixture${kind} PRIVATE "${SWIRL_BUILD_IDENTITY_DIRECTORY}")
   set_target_properties(SwirlLoaderFixture${kind} PROPERTIES
    AUTOMOC OFF
    OUTPUT_NAME "swirl_loader_fixture_${kind}"

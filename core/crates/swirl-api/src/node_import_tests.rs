@@ -75,6 +75,26 @@ fn product_optional_shape_and_empty_tls_name_aliases_remain_compatible() {
 }
 
 #[test]
+fn tfo_fallback_is_reported_without_changing_outbound_or_certificate_policy() {
+    let mut raw = node("trojan");
+    raw["password"] = json!("synthetic-pass");
+    let baseline = native(raw.clone());
+    raw["tfo"] = json!(true);
+    let fallback = import(raw.clone());
+    assert_eq!(fallback["native_outbound"], baseline);
+    assert_eq!(fallback["warnings"], json!(["TcpFastOpenFallbackToTcp"]));
+    assert_eq!(fallback["network_verified"], false);
+    raw["skip-cert-verify"] = json!(true);
+    let rejected = import(raw);
+    assert_eq!(rejected["ok"], false);
+    assert_eq!(
+        rejected["error"],
+        "CertificateVerificationDisabledUnsupported"
+    );
+    assert!(rejected.get("native_outbound").is_none());
+}
+
+#[test]
 fn previous_http_and_socks_protocols_preserve_authentication_dns_and_udp() {
     for (kind, native_kind) in [
         ("http", "http_connect"),

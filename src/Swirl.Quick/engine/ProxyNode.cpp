@@ -9,20 +9,27 @@
 #include "SwirlProtocolRegistry.h"
 #include <functional>
 
-static bool safeParameters(const QJsonValue &value,int depth,int &budget) {
-    if(depth>32 || --budget<0)return false;
-    if(value.isArray()){for(const auto &entry:value.toArray())if(!safeParameters(entry,depth+1,budget))return false;}
+static QString parameterSafetyError(const QJsonValue &value,int depth,int &budget) {
+    if(depth>32 || --budget<0)return QStringLiteral("扩展选项嵌套过深或数量超过安全上限。");
+    if(value.isArray()){for(const auto &entry:value.toArray()){const auto error=parameterSafetyError(entry,depth+1,budget);if(!error.isEmpty())return error;}}
     if(value.isObject()){
         const auto object=value.toObject();
         for(auto it=object.begin();it!=object.end();++it){
             const auto key=it.key().toLower();
-            if(key.endsWith("-path") || key.endsWith("-file") || key.endsWith("-dir") ||
-                QStringList{"interface-name","routing-mark","iproute2-table-index","auto-route","script","command","planet","listeners","mapped-listeners","primary-port","secondary-port","enable-exit-node","proxy-networks"}.contains(key))return false;
-            if(key=="skip-cert-verify" && it.value().toVariant().toBool())return false;
-            if(!safeParameters(it.value(),depth+1,budget))return false;
+            // Do not echo arbitrary keys or values: both can contain private
+            // source data. Fixed schema names and fixed suffixes are safe.
+            if(key.endsWith("-path") || key.endsWith("-file") || key.endsWith("-dir"))
+                return QStringLiteral("扩展选项含本地文件路径字段（*-path、*-file 或 *-dir）；订阅不能访问本机文件。");
+            if(QStringList{"interface-name","routing-mark","iproute2-table-index","auto-route","script","command","planet","listeners","mapped-listeners","primary-port","secondary-port","enable-exit-node","proxy-networks"}.contains(key))
+                return QStringLiteral("扩展选项 %1 不允许由订阅设置（本地文件、脚本、系统网络或额外监听）。").arg(key);
+            if(key=="skip-cert-verify"){
+                if(!it.value().isBool())return QStringLiteral("skip-cert-verify 必须为布尔值 false；不能使用字符串或其它类型。");
+                if(it.value().toBool())return QStringLiteral("skip-cert-verify=true 请求关闭 TLS 证书验证，已拒绝。请使用证书验证开启的订阅配置。");
+            }
+            const auto error=parameterSafetyError(it.value(),depth+1,budget);if(!error.isEmpty())return error;
         }
     }
-    return true;
+    return {};
 }
 
 static bool validHost(const QString &host) {
@@ -52,7 +59,8 @@ QString ProxyNode::validate(const ProxyNode &n) {
     }
     if(QJsonDocument(n.originalConfiguration).toJson(QJsonDocument::Compact).size()>256*1024||n.conversionIssues.size()>32||n.sourceFormat.size()>128)return QStringLiteral("订阅原始差异超过保存上限。");
     int budget=10000;
-    if(QJsonDocument(n.parameters).toJson(QJsonDocument::Compact).size()>256*1024 || !safeParameters(n.parameters,0,budget))return QStringLiteral("扩展选项超出安全范围：不允许本地文件、系统网络设置、额外监听、脚本或关闭证书验证。");
+    if(QJsonDocument(n.parameters).toJson(QJsonDocument::Compact).size()>256*1024)return QStringLiteral("扩展选项超过 256 KiB 安全上限。");
+    const auto safetyError=parameterSafetyError(n.parameters,0,budget);if(!safetyError.isEmpty())return safetyError;
     if(n.protocol=="ssh" && !n.parameters.value("private-key").toString().isEmpty() && !n.parameters.value("private-key").toString().contains("PRIVATE KEY"))return QStringLiteral("SSH 私钥须为内嵌 PEM，不能引用本地文件。");
     for(const auto &key:QStringList{"certificate","ca","cert"}) {
         const auto value=n.parameters.value(key).toString();
@@ -118,6 +126,7 @@ QVariantMap ProxyNode::publicInfo() const {
         {"importSource",importSource},{"sourceLabel",isXray()?origin+(sourceFingerprint.isEmpty()?QString():QStringLiteral(" · ")+sourceFingerprint.left(12)):sourceFormat},
         {"nativeExecutable",executable},{"networkVerified",false},{"unsupportedReason",capability.value("reason")},
         {"conversionIssues",conversionIssues},{"capability",capability},
-        {"normalizationNotes",originalConfiguration.value("_swirl-default-client-fingerprint").toBool()?QStringLiteral("源配置未指定 Reality 指纹；保留历史归一化标记，Rust 拒绝推断执行。"):QString()},
+        {"normalizationNotes",originalConfiguration.value("_swirl-default-client-fingerprint").toBool()?QStringLiteral("源配置未指定 Reality 指纹；保留历史归一化标记，Rust 拒绝推断执行。"):
+            executable&&parameters.value("tfo")==QJsonValue(true)?QStringLiteral("TCP Fast Open 为可选加速项；当前使用普通 TCP，原始参数已保留，证书验证要求不变。"):QString()},
         {"hasCredentials",!password.isEmpty() || !parameters.isEmpty()}};
 }
