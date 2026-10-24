@@ -11,6 +11,7 @@
 #include <QSettings>
 #include <QStandardPaths>
 #include "ControlledNetwork.h"
+#include "LoopbackPortLease.h"
 #include <QCoreApplication>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -27,13 +28,9 @@
 #include <QUdpSocket>
 
 static quint16 freePort(){
-    QTcpServer tcp;QUdpSocket udp;
-    for(int attempt=0;attempt<16;++attempt){
-        if(!tcp.listen(QHostAddress::LocalHost,0))return 0;
-        if(udp.bind(QHostAddress::LocalHost,tcp.serverPort(),QUdpSocket::DontShareAddress))return tcp.serverPort();
-        tcp.close();
-    }
-    return 0;
+    LoopbackPortLease ports;
+    if(!ports.reserve()){qInfo()<<"FIXTURE_PORT_ALLOCATION_FAILURE"<<ports.errorString();QTest::qFail("Could not reserve a controlled loopback TCP/UDP port.",__FILE__,__LINE__);return 0;}
+    return ports.proxyPort();
 }
 static ProxyNode node(QString name,quint16 port){ProxyNode n;n.id=QUuid::createUuid().toString(QUuid::WithoutBraces);n.name=name;n.protocol="socks5";n.host="127.0.0.1";n.port=port;return n;}
 class NodeTests:public QObject {
@@ -42,14 +39,19 @@ class NodeTests:public QObject {
         EngineStartOptions options;options.proxyPort=freePort();options.routingMode="global";
         options.startupTimeoutMs=10000;options.healthIntervalMs=500;return options;
     }
-    QByteArray fetch(ControlledNetwork &net,quint16 proxyPort,bool tls=false) {
+    QByteArray fetch(ControlledNetwork &net,quint16 proxyPort,bool tls=false,RustCoreEngine *engine=nullptr) {
+        const auto evidence=[&]{
+            qInfo()<<"FIXTURE_PROXY_PORT"<<proxyPort;
+            if(engine){engine->refresh();const auto state=engine->status();qInfo()<<"FIXTURE_CORE_STATE proxyPort"<<state.proxyPort<<"healthy"<<state.apiHealthy<<"accepted"<<state.rustAccepted<<"failed"<<state.rustFailed<<"lastErrorStage"<<state.rustLastErrorStage;}
+        };
+        if(!proxyPort){qInfo()<<"FIXTURE_INVALID_PROXY_PORT";evidence();return "FIXTURE_INVALID_PROXY_PORT";}
         QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",proxyPort));
         QNetworkRequest request(net.url(tls));request.setAttribute(QNetworkRequest::Http2AllowedAttribute,false);request.setRawHeader("Connection","close");
         if(tls){auto ssl=QSslConfiguration::defaultConfiguration();ssl.addCaCertificate(net.certificate);request.setSslConfiguration(ssl);}
         auto *reply=client.get(request);QSignalSpy done(reply,&QNetworkReply::finished);
-        if(!done.wait(8000)){qInfo()<<"FIXTURE_TIMEOUT relays"<<net.a.forwarded<<net.b.forwarded<<"origins"<<net.httpRequests<<net.httpsRequests<<"sslBackend"<<QSslSocket::activeBackend();reply->abort();return "REQUEST_TIMEOUT";}
+        if(!done.wait(8000)){qInfo()<<"FIXTURE_TIMEOUT relays"<<net.a.forwarded<<net.b.forwarded<<"origins"<<net.httpRequests<<net.httpsRequests<<"sslBackend"<<QSslSocket::activeBackend();evidence();reply->abort();return "REQUEST_TIMEOUT";}
         const auto body=reply->readAll();const int code=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        if(reply->error()!=QNetworkReply::NoError || code!=200){qInfo()<<"FIXTURE_REQUEST_FAILURE HTTP"<<code<<"networkError"<<int(reply->error())<<reply->errorString()<<"relays"<<net.a.forwarded<<net.b.forwarded<<"origins"<<net.httpRequests<<net.httpsRequests;return QByteArray("REQUEST_ERROR_")+QByteArray::number(reply->error());}
+        if(reply->error()!=QNetworkReply::NoError || code!=200){qInfo()<<"FIXTURE_REQUEST_FAILURE HTTP"<<code<<"networkError"<<int(reply->error())<<reply->errorString()<<"relays"<<net.a.forwarded<<net.b.forwarded<<"origins"<<net.httpRequests<<net.httpsRequests;evidence();return QByteArray("REQUEST_ERROR_")+QByteArray::number(reply->error());}
         return body;
     }
 private slots:
@@ -160,17 +162,42 @@ private slots:
     }
     void unsupportedNetworkOwnershipFailsBeforeListening() {
         for(int mode=0;mode<4;++mode){auto config=options();config.directSession=true;
+            QVERIFY2(config.proxyPort>0,"The unsupported-feature test requires a successfully reserved nonzero proxy port.");
             config.meteredNetwork=mode==0;config.tunEnabled=mode==1;config.allowLan=mode==2;config.gatewayForwarding=mode==3;
             RustCoreEngine engine;engine.start(config);QCOMPARE(engine.status().state,ProxyEngine::State::Failed);
             QCOMPARE(engine.status().error,ProxyEngine::Error::InvalidOptions);QVERIFY(!engine.status().apiHealthy);
             QTcpServer unused;QVERIFY(unused.listen(QHostAddress::LocalHost,config.proxyPort));
         }
     }
+    void zeroQtListenerPortIsRejectedBeforeStart() {
+        EngineStartOptions config;config.proxyPort=0;config.directSession=true;config.routingMode="direct";
+        RustCoreEngine engine;engine.start(config);
+        QCOMPARE(engine.status().state,ProxyEngine::State::Failed);
+        QCOMPARE(engine.status().error,ProxyEngine::Error::InvalidOptions);
+        QVERIFY(!engine.status().processAlive);QVERIFY(!engine.status().apiHealthy);
+        QVERIFY(!engine.status().message.isEmpty());QCOMPARE(engine.status().proxyPort,0);
+    }
+    void zeroQtListenerPortCannotReplaceRunningSession() {
+        ControlledNetwork net;QVERIFY(net.start());auto config=options();QVERIFY(config.proxyPort>0);
+        config.directSession=true;config.routingMode="direct";RustCoreEngine engine;engine.start(config);
+        QVERIFY2(engine.status().apiHealthy,qPrintable(engine.status().message));
+        const auto original=engine.status();QCOMPARE(fetch(net,config.proxyPort,false,&engine),QByteArray("DIRECT-BYPASS"));
+        QSignalSpy diagnostic(&engine,&ProxyEngine::diagnostic);auto invalid=config;invalid.proxyPort=0;
+        engine.start(invalid);
+        QCOMPARE(diagnostic.size(),1);QCOMPARE(diagnostic.first().at(1).toString(),QString("CoreStartRejected"));
+        QVERIFY(engine.status().processAlive);QVERIFY(engine.status().apiHealthy);
+        QCOMPARE(engine.status().sessionId,original.sessionId);QCOMPARE(engine.status().proxyPort,original.proxyPort);
+        QCOMPARE(engine.status().processId,original.processId);
+        QCOMPARE(fetch(net,config.proxyPort,false,&engine),QByteArray("DIRECT-BYPASS"));QCOMPARE(net.httpRequests,2);
+        QCOMPARE(net.a.forwarded+net.b.forwarded,0);engine.stop();QVERIFY(!engine.status().processAlive);
+    }
     void explicitDirectAndAuthenticatedLoopbackListener() {
         ControlledNetwork net;QVERIFY(net.start());auto config=options();config.directSession=true;config.routingMode="direct";
+        QVERIFY2(config.proxyPort>0,"The controlled Qt request requires a successfully reserved nonzero proxy port.");
         RustCoreEngine engine;engine.start(config);QVERIFY2(engine.status().apiHealthy,qPrintable(engine.status().message));
-        QVERIFY(engine.status().directSession);QCOMPARE(fetch(net,config.proxyPort),QByteArray("DIRECT-BYPASS"));
-        QCOMPARE(fetch(net,config.proxyPort,true),QByteArray("DIRECT-BYPASS"));QCOMPARE(net.a.forwarded+net.b.forwarded,0);
+        QCOMPARE(engine.status().proxyPort,int(config.proxyPort));
+        QVERIFY(engine.status().directSession);QCOMPARE(fetch(net,config.proxyPort,false,&engine),QByteArray("DIRECT-BYPASS"));
+        QCOMPARE(fetch(net,config.proxyPort,true,&engine),QByteArray("DIRECT-BYPASS"));QCOMPARE(net.a.forwarded+net.b.forwarded,0);
         // A missing selected node cannot silently become DIRECT after changing mode.
         engine.setRoutingMode("global");QCOMPARE(engine.status().mode,QString("direct"));engine.stop();
         config.inboundUsername="fixture";config.inboundPassword="test-password-only";engine.start(config);
@@ -186,6 +213,7 @@ private slots:
     void customDnsRulesAndGroupsReachRust() {
         ControlledNetwork network;QVERIFY(network.start());
         auto opts=options();opts.nodes={node("A",network.a.serverPort())};opts.selectedNodeId=opts.nodes.first().id;
+        QVERIFY2(opts.proxyPort>0,"The controlled custom-DNS request requires a successfully reserved nonzero proxy port.");
         opts.dnsConfig={{"mode",0},{"hosts",QVariantList{QVariantMap{{"name","fixture.test"},{"value","127.0.0.1"}}}}};
         opts.customGroups={QVariantMap{{"name","Custom"},{"type","select"},{"proxies",QStringList{"DIRECT"}}}};
         opts.customRules={"DOMAIN,fixture.test,Custom"};opts.routingMode="rule";
@@ -194,7 +222,9 @@ private slots:
         QVERIFY(QJsonDocument(mapped).toJson().contains("fixture.test"));QCOMPARE(mapped.value("selectors").toArray().size(),1);
         QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",opts.proxyPort));
         auto destination=network.url();destination.setHost("fixture.test");QNetworkRequest request(destination);request.setRawHeader("Connection","close");
-        auto *reply=client.get(request);QSignalSpy done(reply,&QNetworkReply::finished);QVERIFY(done.wait(8000));QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("DIRECT-BYPASS"));
+        auto *reply=client.get(request);QSignalSpy done(reply,&QNetworkReply::finished);QVERIFY(done.wait(8000));
+        if(reply->error()!=QNetworkReply::NoError){engine.refresh();const auto state=engine.status();qInfo()<<"FIXTURE_CUSTOM_DNS_FAILURE requestedProxyPort"<<opts.proxyPort<<"coreProxyPort"<<state.proxyPort<<"networkError"<<int(reply->error())<<reply->errorString()<<"accepted"<<state.rustAccepted<<"failed"<<state.rustFailed<<"lastErrorStage"<<state.rustLastErrorStage<<"origins"<<network.httpRequests;}
+        QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("DIRECT-BYPASS"));
         QCOMPARE(network.a.forwarded,0);QVERIFY(network.httpRequests>0);
         engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
     }
