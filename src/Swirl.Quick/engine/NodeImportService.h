@@ -61,6 +61,8 @@ public:
 signals:
     void changed();
     void nodesApplied();
+    // Fixed request metadata only; never emit URLs, response bodies or headers.
+    void downloadDiagnostic(const QString &message);
 private:
     void checkDue();
     void next();
@@ -96,6 +98,9 @@ private:
     quint64 m_generation=0;
     bool m_busy=false,m_shuttingDown=false;
     bool m_downloadTimedOut=false;
+    bool m_compatibilityRequest=false;
+    int m_downloadAttempts=0;
+    QUrl m_downloadUrl;
     bool m_committing=false;
     int m_proxyPort=0;
     QSet<quint16> m_ownedProxyPorts;

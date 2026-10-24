@@ -24,13 +24,14 @@
 
 class SubscriptionServer:public QTcpServer {
 public:
-    QByteArray content,location,lastRequest,successPath;int count=0,code=200;bool hanging=false;
+    QByteArray content,location,lastRequest,successPath,acceptedAgent;QList<QByteArray> requests;int count=0,code=200,acceptedCode=200;bool hanging=false;
     SubscriptionServer(){connect(this,&QTcpServer::newConnection,this,[this]{while(hasPendingConnections()){
         auto *socket=nextPendingConnection();auto data=std::make_shared<QByteArray>();
         connect(socket,&QTcpSocket::readyRead,socket,[this,socket,data]{data->append(socket->readAll());if(!data->contains("\r\n\r\n"))return;
-            if(socket->property("done").toBool())return;socket->setProperty("done",true);++count;lastRequest=*data;
+            if(socket->property("done").toBool())return;socket->setProperty("done",true);++count;lastRequest=*data;requests.append(*data);
             if(hanging)return;
-            const auto status=!successPath.isEmpty()&&data->startsWith("GET "+successPath)?200:code;
+            const auto status=!acceptedAgent.isEmpty()&&data->toLower().contains("\r\nuser-agent: "+acceptedAgent.toLower()+"\r\n")?acceptedCode:
+                !successPath.isEmpty()&&data->startsWith("GET "+successPath)?200:code;
             socket->write("HTTP/1.1 "+QByteArray::number(status)+" Result\r\n"+(location.isEmpty()||status==200?QByteArray():"Location: "+location+"\r\n")+"Content-Length: "+QByteArray::number(content.size())+"\r\nConnection: close\r\n\r\n"+content);socket->disconnectFromHost();});
         connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
     }});}
@@ -891,6 +892,88 @@ external-controller: 0.0.0.0:9090
         server.content="<html><body>login required</body></html>";service.refreshSubscription(source);
         QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);
         QVERIFY(service.providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+    }
+    void automaticDownloadRetriesLegacyNegotiationWithoutChangingSignedUrl_data() {
+        QTest::addColumn<int>("status");
+        QTest::newRow("bad-request")<<400;
+        QTest::newRow("not-acceptable")<<406;
+        QTest::newRow("unsupported-media")<<415;
+    }
+    void automaticDownloadRetriesLegacyNegotiationWithoutChangingSignedUrl() {
+        QFETCH(int,status);
+        SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));server.content=socks(1080);server.code=status;
+        server.acceptedAgent="Clash.Meta/1.19.32 Swirl/1.0";
+        const auto url=QUrl::fromEncoded("http://127.0.0.1:"+QByteArray::number(server.serverPort())+"/signed%2Fpath?token=PRIVATE%2B%2F%3D&sig=a%252Fb%26c&duplicate=one&duplicate=two&empty=");
+        QTemporaryDir directory;NodeStore store(directory.filePath("nodes"));NodeImportService service(&store);
+        QSignalSpy diagnostics(&service,&NodeImportService::downloadDiagnostic);
+        QVERIFY(service.saveSubscription({},"Negotiation",url,360,false,"auto"));
+        const auto source=store.subscriptions().first().id;service.refreshSubscription(source);
+        QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);
+        QCOMPARE(server.count,2);QCOMPARE(store.nodes().size(),1);QCOMPARE(store.nodes().first().sourceId,source);
+        QCOMPARE(store.subscriptions().first().url.toEncoded(),url.toEncoded());
+        const auto expected="GET "+url.toEncoded(QUrl::RemoveScheme|QUrl::RemoveAuthority)+" HTTP/1.1\r\n";
+        for(const auto &request:server.requests)QVERIFY2(request.startsWith(expected),request.left(request.indexOf('\r')).constData());
+        QVERIFY(server.requests.first().contains("User-Agent: Swirl/"));
+        QVERIFY(server.requests.last().contains("User-Agent: Clash.Meta/1.19.32 Swirl/1.0\r\n"));
+        QCOMPARE(diagnostics.size(),2);
+        const auto initial=diagnostics.first().first().toString(),retry=diagnostics.last().first().toString();
+        QVERIFY(initial.contains("attempt=1; negotiation=native; format=auto; route=loopback-direct; http="+QString::number(status)));
+        QVERIFY(retry.contains("attempt=2; negotiation=legacy-auto; format=auto; route=loopback-direct; http=200; qt=0"));
+        for(const auto &event:diagnostics){const auto message=event.first().toString();QVERIFY(!message.contains("PRIVATE"));QVERIFY(!message.contains("token"));QVERIFY(!message.contains("127.0.0.1"));}
+        // Every refresh has its own bounded negotiation budget.
+        service.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(server.count,4);QCOMPARE(store.nodes().size(),1);
+    }
+    void automaticDownloadNegotiationIsBoundedAndDoesNotRetryAuthentication_data() {
+        QTest::addColumn<int>("status");QTest::addColumn<QString>("format");QTest::addColumn<int>("attempts");
+        QTest::newRow("permanent-400")<<400<<QString("auto")<<2;
+        QTest::newRow("auth-401")<<401<<QString("auto")<<1;
+        QTest::newRow("forbidden-403")<<403<<QString("auto")<<1;
+        QTest::newRow("rate-limited-429")<<429<<QString("auto")<<1;
+        QTest::newRow("server-500")<<500<<QString("auto")<<1;
+        QTest::newRow("explicit-surge")<<400<<QString("surge")<<1;
+        QTest::newRow("explicit-clash")<<400<<QString("clash")<<1;
+    }
+    void automaticDownloadNegotiationIsBoundedAndDoesNotRetryAuthentication() {
+        QFETCH(int,status);QFETCH(QString,format);QFETCH(int,attempts);
+        SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));server.content=socks(1080);
+        QTemporaryDir directory;NodeStore store(directory.filePath("nodes"));NodeImportService service(&store);
+        QVERIFY(service.saveSubscription({},"Retention",server.url(),360,false,format));const auto source=store.subscriptions().first().id;
+        service.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);
+        const auto selected=store.nodes().first().id;QVERIFY(store.select(selected));
+        QFile file(store.filePath());QVERIFY(file.open(QIODevice::ReadOnly));const auto saved=file.readAll();file.close();
+        server.count=0;server.requests.clear();server.code=status;
+        QSignalSpy diagnostics(&service,&NodeImportService::downloadDiagnostic);
+        service.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);
+        QCOMPARE(server.count,attempts);QCOMPARE(diagnostics.size(),attempts);QCOMPARE(store.nodes().size(),1);QCOMPARE(store.selectedId(),selected);
+        QVERIFY(service.message().contains("HTTP "+QString::number(status)));QVERIFY(!service.message().contains("PRIVATE-TOKEN"));
+        QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),saved);
+    }
+    void automaticDownloadNegotiationRespectsCancellationAndOriginBoundaries() {
+        SubscriptionServer server,other;QVERIFY(server.listen(QHostAddress::LocalHost,0));QVERIFY(other.listen(QHostAddress::LocalHost,0));
+        server.content=socks(1080);server.code=400;server.acceptedAgent="Clash.Meta/1.19.32 Swirl/1.0";
+        QTemporaryDir directory;NodeStore store(directory.filePath("nodes"));NodeImportService service(&store);
+        QVERIFY(service.saveSubscription({},"Cancellation",server.url(),360,false,"auto"));const auto source=store.subscriptions().first().id;
+        const auto connection=connect(&service,&NodeImportService::downloadDiagnostic,&service,[&](const QString &message){
+            if(message.contains("attempt=1;"))QVERIFY(service.cancelRefresh(source));
+        });
+        service.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(server.count,1);QVERIFY(store.nodes().isEmpty());
+        disconnect(connection);
+        // Negotiation does not grant permission to send signed credentials to
+        // another origin, even when the accepted UA receives a redirect.
+        server.acceptedCode=302;server.location=other.url().toEncoded();
+        service.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);
+        QCOMPARE(server.count,3);QCOMPARE(other.count,0);QVERIFY(store.nodes().isEmpty());
+        QVERIFY(service.message().contains(QStringLiteral("同一来源")));
+    }
+    void automaticDownloadNegotiationDoesNotBypassProfileSafety() {
+        SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));
+        server.content=socks(1080)+"script: {code: fixture-private-script}\n";server.code=400;server.acceptedAgent="Clash.Meta/1.19.32 Swirl/1.0";
+        QTemporaryDir directory;EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("nodes"));
+        auto *service=controller.imports();QVERIFY(service->saveSubscription({},"Safety",server.url(),360,false,"auto"));
+        service->refreshSubscription(service->providers().first().toMap().value("id").toString());QTRY_VERIFY_WITH_TIMEOUT(!service->busy(),8000);
+        QCOMPARE(server.count,2);QVERIFY(controller.nodeCatalog().isEmpty());
+        QVERIFY(service->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+        QVERIFY(!service->message().contains("fixture-private-script"));
     }
     void sameOriginRedirectAndMissingLocation() {
         SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));server.content=socks(1080);

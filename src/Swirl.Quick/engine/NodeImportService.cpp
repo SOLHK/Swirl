@@ -127,6 +127,7 @@ void NodeImportService::startUrl(const QUrl &url,bool nodesOnly) {
     if(m_busy || hasPreview() || m_shuttingDown)return;
     if(!NodeStore::allowedSubscriptionUrl(url)){m_message=QStringLiteral("请使用 HTTPS 地址；只有本机测试地址允许 HTTP。");emit changed();return;}
     m_previewRequested=true;m_importSource="url";m_downloadTimedOut=false;m_nodesOnly=nodesOnly;
+    m_downloadUrl=url;m_compatibilityRequest=false;m_downloadAttempts=0;
     m_busy=true;m_source.clear();m_formatHint="auto";m_message=QStringLiteral("正在安全下载节点配置…");
     const QPointer<NodeImportService> guard(this);const auto generation=m_generation;emit changed();
     if(!guard || m_shuttingDown || !m_busy || m_generation!=generation)return;
@@ -211,6 +212,7 @@ void NodeImportService::next() {
             const QPointer<NodeImportService> guard(this);
             m_cancelled.remove(id);
             m_previewRequested=false;m_importSource="subscription";m_downloadTimedOut=false;
+            m_downloadUrl=url;m_compatibilityRequest=false;m_downloadAttempts=0;
             // importScope is read only for old snapshot compatibility. A
             // subscription's downloaded content now determines its semantics.
             m_source=id;m_formatHint=s.formatHint;m_nodesOnly=false;m_automaticImport=true;
@@ -264,12 +266,22 @@ void NodeImportService::startDownload(const QUrl &url,int redirects,const QList<
     SwirlNetwork::applyHttp1OnlyPolicy(request);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
     const QHash<QString,QByteArray> agents{{"auto","Swirl/"+QCoreApplication::applicationVersion().toUtf8()},{"clash","Clash.Meta/1.19.32 Swirl"},{"loon","Loon/1.0"},{"shadowrocket","Shadowrocket/2.2.67"},{"surge","Surge/5.0"},{"quantumult-x","Quantumult X/1.0"},{"sing-box","sing-box/1.12"}};
-    request.setRawHeader("User-Agent",agents.value(m_formatHint,agents.value("auto")));
+    // Some subscription services negotiate solely through a known client UA.
+    // Keep Swirl's native request first, with one bounded retry using the exact
+    // previously shipped automatic identity. The response still determines its
+    // format and passes every existing parser/profile/security check.
+    request.setRawHeader("User-Agent",m_compatibilityRequest?QByteArray("Clash.Meta/1.19.32 Swirl/1.0"):agents.value(m_formatHint,agents.value("auto")));
     request.setRawHeader("Accept","application/json, application/yaml, text/yaml, text/plain, */*;q=0.5");
     request.setTransferTimeout(15000);
     m_network.setProxyFactory(new DownloadProxyFactory(proxies));
     auto *reply=m_network.get(request);m_reply=reply;reply->setReadBufferSize(64*1024);
     const auto generation=m_generation;
+    const auto attempt=++m_downloadAttempts;
+    const auto negotiation=m_compatibilityRequest?QStringLiteral("legacy-auto"):QStringLiteral("native");
+    const auto format=agents.contains(m_formatHint)?m_formatHint:QStringLiteral("auto");
+    const auto route=loopbackHost(url.host())?QStringLiteral("loopback-direct"):
+        proxies.size()==1 && proxies.first().type()==QNetworkProxy::NoProxy?QStringLiteral("direct-policy"):
+        proxies.size()==1 && loopbackHost(proxies.first().hostName())?QStringLiteral("loopback-proxy"):QStringLiteral("proxy-policy");
     auto bytes=std::make_shared<QByteArray>();auto tooLarge=std::make_shared<bool>(false);
     connect(reply,&QNetworkReply::metaDataChanged,this,[reply,tooLarge] {
         bool ok=false;const auto length=reply->header(QNetworkRequest::ContentLengthHeader).toLongLong(&ok);
@@ -285,12 +297,16 @@ void NodeImportService::startDownload(const QUrl &url,int redirects,const QList<
         }
     };
     connect(reply,&QNetworkReply::readyRead,this,drain);
-    connect(reply,&QNetworkReply::finished,this,[this,reply,bytes,tooLarge,url,redirects,generation,drain]{
+    connect(reply,&QNetworkReply::finished,this,[this,reply,bytes,tooLarge,url,redirects,generation,drain,proxies,attempt,negotiation,format,route]{
         if(m_shuttingDown || generation!=m_generation){reply->deleteLater();return;}
         if(m_reply==reply)m_reply=nullptr;
         drain();const auto code=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const auto redirect=reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl();
         const auto error=reply->error();reply->deleteLater();
+        const QPointer<NodeImportService> guard(this);
+        emit downloadDiagnostic(QStringLiteral("attempt=%1; negotiation=%2; format=%3; route=%4; http=%5; qt=%6")
+            .arg(attempt).arg(negotiation,format,route).arg(code).arg(int(error)));
+        if(!guard || guard->m_shuttingDown || guard->m_generation!=generation || !guard->m_busy)return;
         if(*tooLarge || bytes->size()>NodeImporter::MaximumBytes){finish(QStringLiteral("订阅内容超过 4 MiB；旧节点保持不变。"));return;}
         if(m_downloadTimedOut){finish(QStringLiteral("订阅下载超过 30 秒；旧节点保持不变。"));return;}
         if(code==301||code==302||code==303||code==307||code==308) {
@@ -308,6 +324,13 @@ void NodeImportService::startDownload(const QUrl &url,int redirects,const QList<
             download(nextUrl,redirects+1);return;
         }
         const auto errorName=QString::fromLatin1(QMetaEnum::fromType<QNetworkReply::NetworkError>().valueToKey(int(error)));
+        if(m_formatHint=="auto" && !m_compatibilityRequest && (code==400 || code==406 || code==415)) {
+            m_compatibilityRequest=true;
+            // Retry the saved QUrl without decoding/rebuilding its signed query.
+            // Preserve the proxy alternatives and the existing total deadline
+            // and redirect budget; never introduce a direct-connect fallback.
+            startDownload(m_downloadUrl,redirects,proxies);return;
+        }
         // A Qt enum such as ProtocolInvalidOperationError (302) is not
         // HTTP 302. Preserve the two namespaces without exposing errorString(),
         // which may contain the full credential-bearing request URL.
@@ -428,6 +451,7 @@ void NodeImportService::applied(const QString &format,qsizetype count,int incomp
         else m_message+=QStringLiteral(" 已自动提取节点；使用现有 Swirl DNS、规则与策略组。");
         if(!m_applicationNotice.isEmpty())m_message+=QStringLiteral(" ")+m_applicationNotice;
     }
+    if(m_compatibilityRequest)m_message+=QStringLiteral(" 已通过兼容客户端格式协商下载，内容仍按实际格式完成校验。");
     if(certificatesEnforced)m_message+=QStringLiteral(" %1 条 Trojan 记录原请求跳过证书验证；Swirl 已保持验证开启，证书异常仍会拒绝连接。详情页可查看说明。").arg(certificatesEnforced);
     const QPointer<NodeImportService> guard(this);emit nodesApplied();if(guard)finish();
 }
@@ -436,6 +460,7 @@ void NodeImportService::finish(const QString &error) {
     if(!m_source.isEmpty()){if(error.isEmpty())m_errors.remove(m_source);else m_errors.insert(m_source,error);}
     if(!error.isEmpty())m_message=error;
     m_source.clear();m_busy=false;m_committing=false;m_nodesOnly=false;m_automaticImport=false;
+    m_downloadUrl=QUrl();m_compatibilityRequest=false;m_downloadAttempts=0;
     m_appliedMode.clear();m_applicationNotice.clear();
     const QPointer<NodeImportService> guard(this);emit changed();if(guard)QTimer::singleShot(0,this,&NodeImportService::next);
 }
