@@ -1,29 +1,29 @@
 #include "engine/ThreadedEngine.h"
 #include "engine/NodeTestService.h"
 #include "engine/EngineController.h"
+#include "app/StoragePaths.h"
 #include <QTemporaryDir>
+#include <QCoreApplication>
 #include "ControlledNetwork.h"
+#include "LoopbackPortLease.h"
 #include <QTest>
+#include <QSettings>
+#include <QStandardPaths>
 #include <QCryptographicHash>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSignalSpy>
 #include <QNetworkProxy>
 #include <QUuid>
-#include <QUdpSocket>
 
 // Real TLS, RFC6455 handshake/masked frames and chunked SSE over the actual
 // mixed listener. Loopback peers only; never enable TUN or change Windows proxy.
 class NetworkRegressionTests : public QObject {
  Q_OBJECT
  static quint16 freeMixedPort(){
-  QTcpServer tcp;QUdpSocket udp;
-  for(int attempt=0;attempt<16;++attempt){
-   if(!tcp.listen(QHostAddress::LocalHost))return 0;
-   if(udp.bind(QHostAddress::LocalHost,tcp.serverPort(),QUdpSocket::DontShareAddress))return tcp.serverPort();
-   tcp.close();
-  }
-  return 0;
+  LoopbackPortLease ports;
+  if(!ports.reserve()){QTest::qFail(qPrintable(ports.errorString()),__FILE__,__LINE__);return 0;}
+  return ports.proxyPort();
  }
  EngineStartOptions options(ControlledNetwork &net,const QString &mode){
   EngineStartOptions o;o.routingMode=mode;
@@ -44,6 +44,14 @@ class NetworkRegressionTests : public QObject {
   socket.setPeerVerifyName("localhost");socket.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));socket.connectToHostEncrypted("127.0.0.1",port);
  }
 private slots:
+ void initTestCase(){
+  QCoreApplication::setOrganizationName(QStringLiteral("SwirlNetworkRegressionTests"));
+  QCoreApplication::setApplicationName(QStringLiteral("NetworkRegression"));
+  QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();
+  QSettings::setDefaultFormat(QSettings::IniFormat);
+  QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));
+ }
+ void init(){QSettings settings;settings.clear();settings.sync();QCOMPARE(settings.status(),QSettings::NoError);}
  void unsupportedProbeCannotStartAnotherRuntime(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net,"global");o.nodes.first().parameters["future-transport"]=true;
   NodeTestService probes;probes.start(o,{o.nodes.first().id},net.url());
@@ -66,7 +74,9 @@ private slots:
    connect(socket,&QTcpSocket::readyRead,socket,[socket]{socket->write(socket->readAll());});connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
   }});
   QTemporaryDir temporary;EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,temporary.filePath("nodes.dpapi"));
-  const auto o=options(net,"global");controller.setProxyPort(o.proxyPort);controller.setRoutingMode("global");
+  const auto o=options(net,"global");
+  QVERIFY2(o.proxyPort>0,"The controlled tunnel requires a successfully reserved nonzero proxy port.");
+  controller.setProxyPort(o.proxyPort);controller.setRoutingMode("global");
   QVERIFY(controller.saveNode({{"name","original"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",net.a.serverPort()}}));
   const auto id=controller.nodes().first().toMap().value("id").toString();controller.connectNode(id);QVERIFY(QTest::qWaitFor([&]{return controller.connected();},5000));
   const auto pid=controller.processId();QTcpSocket client;client.setProxy(QNetworkProxy::NoProxy);client.connectToHost(QHostAddress::LocalHost,controller.activeProxyPort());

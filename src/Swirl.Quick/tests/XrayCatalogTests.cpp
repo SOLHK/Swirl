@@ -11,11 +11,11 @@
 #include <QTcpSocket>
 #include <QTemporaryDir>
 #include <QTimer>
-#include <QUdpSocket>
 #include <QUuid>
 #include "app/StoragePaths.h"
 #include "engine/EngineController.h"
 #include "engine/RustCoreEngine.h"
+#include "LoopbackPortLease.h"
 
 namespace {
 ProxyNode legacyNode(quint16 port, const QString &name = QStringLiteral("catalog fixture")) {
@@ -103,15 +103,12 @@ private:
 
 #ifdef Q_OS_WIN
 quint16 freeRuntimePort() {
-    QTcpServer tcp;
-    QUdpSocket udp;
-    for (int attempt = 0; attempt < 16; ++attempt) {
-        if (!tcp.listen(QHostAddress::LocalHost, 0)) return 0;
-        if (udp.bind(QHostAddress::LocalHost, tcp.serverPort(), QUdpSocket::DontShareAddress))
-            return tcp.serverPort();
-        tcp.close();
+    LoopbackPortLease ports;
+    if (!ports.reserve()) {
+        QTest::qFail(qPrintable(ports.errorString()), __FILE__, __LINE__);
+        return 0;
     }
-    return 0;
+    return ports.proxyPort();
 }
 
 class SubscriptionFixture final : public QTcpServer {
