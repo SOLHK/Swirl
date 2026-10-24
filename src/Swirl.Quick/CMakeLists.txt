@@ -74,7 +74,9 @@ endif()
 if(NOT SWIRL_SOURCE_SHA)
  set(SWIRL_SOURCE_SHA "source-archive")
 endif()
-target_compile_definitions(Swirl PRIVATE SWIRL_APP_VERSION="${PROJECT_VERSION}")
+# These values are consumed only by main.cpp. Keep QML/version updates from
+# recompiling unrelated application objects and large embedded font resources.
+set_property(SOURCE main.cpp APPEND PROPERTY COMPILE_DEFINITIONS SWIRL_APP_VERSION="${PROJECT_VERSION}")
 target_sources(Swirl PRIVATE app/FontManager.h app/FontManager.cpp app/FontAxisPolicy.h app/FontAxisPolicy.cpp)
 qt_add_resources(Swirl harmony_fonts PREFIX "/swirl/fonts" BASE "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts" FILES
  assets/fonts/HarmonyOS_Sans_SC_Regular.ttf assets/fonts/HarmonyOS_Sans_SC_Medium.ttf assets/fonts/HarmonyOS_Sans_SC_Bold.ttf assets/fonts/LICENSE_HarmonyOS_Sans.txt)
@@ -199,7 +201,7 @@ foreach(qml IN LISTS SWIRL_QML_FILES)
 endforeach()
 string(SHA256 SWIRL_QML_CACHE_HASH "${SWIRL_QML_CACHE_INPUT}")
 string(SUBSTRING "${SWIRL_QML_CACHE_HASH}" 0 16 SWIRL_QML_CACHE_REVISION)
-target_compile_definitions(Swirl PRIVATE SWIRL_QML_CACHE_REVISION="${SWIRL_QML_CACHE_REVISION}")
+set_property(SOURCE main.cpp APPEND PROPERTY COMPILE_DEFINITIONS SWIRL_QML_CACHE_REVISION="${SWIRL_QML_CACHE_REVISION}")
 qt_add_qml_module(Swirl
     URI SwirlQuick
     VERSION 1.0

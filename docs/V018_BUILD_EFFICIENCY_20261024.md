@@ -39,6 +39,16 @@ measurements use different toolchains and must not be directly compared.
 - A generated identity header is included only by code that consumes the
   build/source identity. Every commit still refreshes the loader's expected
   source SHA and Rust build digest, without invalidating unrelated C++ objects.
+- The application version and QML cache revision are source-specific
+  definitions on `main.cpp`, their sole consumer. A QML cache revision change
+  must still refresh the startup cache namespace, while unchanged font/resource
+  objects no longer inherit that unrelated definition. The first transition
+  from old target-wide flags changes existing compile commands once; a cache
+  restore during that transition is not evidence that no objects recompiled.
+  Local CMake compile-command inspection found exactly one consumer of each
+  definition (`main.cpp`) and neither definition on all ten generated resource
+  compilation units. This validates dependency scope and quoting; it is not a
+  measured runtime or end-to-end build speedup.
 - One Ninja tree builds focused C++ tests, runs them, switches the application's
   test exposure OFF, and builds the production application once. The shared
   engine objects are reused; the script requires unchanged hashes **and**
@@ -72,6 +82,27 @@ still executes all selected tests and source/identity/package checks.
 Do not calculate a speedup until a successful candidate supplies actual after
 timings. The first run may have cold caches; later hits and misses must be
 reported separately. No build or Cargo target is deleted by this workflow.
+
+## First successful network candidate
+
+[Run 40084235219](https://github.com/SOLHK/Swirl/actions/runs/40084235219)
+at `a28258e16ebd6e45e63f802b12f262f2293bf4b0` passed both jobs and produced
+artifact `12557125151`. Its Windows build/package script took 640.284 seconds:
+235.008 seconds compiling focused tests, 187.635 seconds building production,
+and 0.509 seconds for a no-change rebuild with no source compilation/relink.
+All 18 tested engine objects were reused in production. Thirteen focused
+CTest suites passed, including disposable system-proxy recovery; the final
+1509-file inventory and every hash were verified.
+
+The first Windows compiler cache was cold (`restored_cmake_cache=false`,
+`restored_cargo_cache=false`); Cargo still reused the freshly built dependencies
+within the job, reporting 0.37 and 0.20 seconds for subsequent library checks.
+An Actions compiler-cache restore hit has not yet been established by this
+run. The earlier 42m44s Windows job includes setup and a broader historical
+test scope, so it must not be equated with this 10m40s script interval.
+The historical separate production build took 684.640 seconds; the observed
+new production phase is 187.635 seconds, with shared-object reuse explicitly
+measured. This is delivery evidence across commits, not a same-source benchmark.
 
 Primary references: [Cargo incremental profiles](https://doc.rust-lang.org/cargo/reference/profiles.html#incremental),
 [CMake content-stable generated files](https://cmake.org/cmake/help/latest/command/file.html#configure),
