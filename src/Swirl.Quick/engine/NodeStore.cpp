@@ -56,7 +56,8 @@ static QJsonObject serialize(const ProxyNode &n) {
         {"username",n.username},{"password",n.password},{"cipher",n.cipher},{"serverName",n.serverName},
         {"sourceId",n.sourceId},{"sourceFormat",n.sourceFormat},{"importSource",n.importSource},{"providerAlias",n.providerAlias},
         {"options",n.parameters},{"originalConfiguration",n.originalConfiguration},
-        {"conversionIssues",QJsonArray::fromStringList(n.conversionIssues)}};
+        {"conversionIssues",QJsonArray::fromStringList(n.conversionIssues)},
+        {"certificateVerificationEnforced",n.certificateVerificationEnforced}};
 }
 static ProxyNode deserialize(const QVariantMap &m) {
     ProxyNode n; n.id=m.value("id").toString(); n.name=m.value("name").toString().trimmed();
@@ -67,6 +68,7 @@ static ProxyNode deserialize(const QVariantMap &m) {
     n.parameters=QJsonObject::fromVariantMap(m.value("options").toMap());n.sourceId=m.value("sourceId").toString();
     n.originalConfiguration=QJsonObject::fromVariantMap(m.value("originalConfiguration").toMap());
     n.sourceFormat=m.value("sourceFormat").toString();n.conversionIssues=m.value("conversionIssues").toStringList();
+    n.certificateVerificationEnforced=m.value("certificateVerificationEnforced").toBool();
     n.importSource=m.value("importSource").toString();
     n.providerAlias=m.value("providerAlias").toString();
     n.transportType=m.value("transportType").toString();n.securityType=m.value("securityType").toString();
@@ -381,8 +383,8 @@ bool NodeStore::saveNode(const QVariantMap &input) {
         if(!input.contains("options"))n.parameters=nodes[index].parameters;
         else {auto merged=nodes[index].parameters;for(auto it=n.parameters.begin();it!=n.parameters.end();++it)merged.insert(it.key(),it.value());n.parameters=merged;}
     }
-    if(index>=0){n.sourceId=nodes[index].sourceId;n.sourceFormat=nodes[index].sourceFormat;n.originalConfiguration=nodes[index].originalConfiguration;n.conversionIssues=nodes[index].conversionIssues;n.importSource=nodes[index].importSource;n.providerAlias=nodes[index].providerAlias;}
-    else {n.sourceId.clear();n.sourceFormat.clear();n.importSource="manual";n.providerAlias.clear();n.originalConfiguration={};n.conversionIssues.clear();}
+    if(index>=0){n.sourceId=nodes[index].sourceId;n.sourceFormat=nodes[index].sourceFormat;n.originalConfiguration=nodes[index].originalConfiguration;n.conversionIssues=nodes[index].conversionIssues;n.importSource=nodes[index].importSource;n.providerAlias=nodes[index].providerAlias;n.certificateVerificationEnforced=nodes[index].certificateVerificationEnforced;}
+    else {n.sourceId.clear();n.sourceFormat.clear();n.importSource="manual";n.providerAlias.clear();n.originalConfiguration={};n.conversionIssues.clear();n.certificateVerificationEnforced=false;}
     if(index>=0 && n.protocol==nodes[index].protocol && n.protocol!="ss" && n.cipher.isEmpty())n.cipher=nodes[index].cipher;
     m_error=ProxyNode::validate(n); if (!m_error.isEmpty()) return false;
     if (index<0) { if (nodes.size()>=2000) { m_error=QStringLiteral("最多保存 2000 个节点。"); return false; } nodes.append(n); }
@@ -469,6 +471,11 @@ QJsonObject withoutRemovedNodes(QJsonObject configuration,const QSet<QString> &r
     if(configuration.contains("rules"))configuration.insert("rules",rules);
     if(!sourceId.isEmpty()&&configuration.value("importedConfiguration").toObject().value("sourceId").toString()==sourceId)
         configuration.remove("importedConfiguration");
+    if(!sourceId.isEmpty()&&configuration.value("subscriptionImportResults").isObject()) {
+        auto results=configuration.value("subscriptionImportResults").toObject();results.remove(sourceId);
+        if(results.isEmpty())configuration.remove("subscriptionImportResults");
+        else configuration.insert("subscriptionImportResults",results);
+    }
     return configuration;
 }
 }

@@ -28,6 +28,8 @@ public:
     QVariantList providers() const;
     bool busy() const { return m_busy; }
     QString message() const { return m_message; }
+    bool automaticImport() const { return m_automaticImport; }
+    void setImportOutcome(const QString &mode,const QString &notice={}) { m_appliedMode=mode;m_applicationNotice=notice; }
     int legacyNodeCount() const { return m_store->legacyNodeCount(); }
     bool hasPreview() const { return m_pending.has_value(); }
     QVariantList preview() const;
@@ -70,7 +72,7 @@ private:
     void parse(QByteArray bytes);
     void parsed(NodeImporter::Result result);
     void apply(NodeImporter::Result result);
-    void applied(const QString &format,qsizetype count,int incomplete);
+    void applied(const QString &format,qsizetype count,int incomplete,int certificatesEnforced=0);
     void finish(const QString &error={});
     NodeStore *m_store;
     ApplyConfiguration m_apply;
@@ -85,10 +87,12 @@ private:
     std::function<qint64()> m_clock;
     SystemProxyResolver m_systemProxyResolver;
     QString m_message,m_source,m_formatHint="auto";
+    QString m_appliedMode,m_applicationNotice;
     QString m_importSource;
     std::optional<NodeImporter::Result> m_pending;
     bool m_previewRequested=false;
     bool m_nodesOnly=false;
+    bool m_automaticImport=false;
     quint64 m_generation=0;
     bool m_busy=false,m_shuttingDown=false;
     bool m_downloadTimedOut=false;

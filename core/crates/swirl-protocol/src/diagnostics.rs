@@ -122,7 +122,15 @@ pub fn failure_stage(code: &str) -> &'static str {
         | "VmessHandshakeWrite"
         | "VmessResponseTimeout"
         | "Socks4Rejected" => "protocol_handshake",
-        "StreamIo" => "stream_io",
+        "StreamIo"
+        | "StreamConnectionReset"
+        | "StreamConnectionAborted"
+        | "StreamUnexpectedEof"
+        | "StreamTimedOut"
+        | "StreamBrokenPipe"
+        | "StreamInvalidData"
+        | "StreamWriteZero"
+        | "StreamPermissionDenied" => "stream_io",
         "HandshakeTimeout" | "InboundClosed" | "InboundAuthentication" | "InboundReply" => {
             "inbound"
         }

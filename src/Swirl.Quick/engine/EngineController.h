@@ -164,7 +164,7 @@ public:
     Q_INVOKABLE bool configureDns(const QVariantMap &configuration);
     Q_INVOKABLE QVariantMap networkConfigurationSnapshot() const;
     bool validateNetworkConfiguration(const QVariantMap &configuration,QVariantMap *canonical=nullptr,const QList<ProxyNode> *candidateNodes=nullptr);
-    bool importNodesAndConfiguration(const QList<ProxyNode> &nodes,const QString &sourceId,const QVariantMap &configuration,const QJsonObject &original = {},const QString &sourceFormat = QStringLiteral("clash"));
+    bool importNodesAndConfiguration(const QList<ProxyNode> &nodes,const QString &sourceId,const QVariantMap &configuration,const QJsonObject &original = {},const QString &sourceFormat = QStringLiteral("clash"),bool *candidateValidationFailed=nullptr);
     bool replaceNetworkConfiguration(const QVariantMap &configuration);
     void setModuleOverlayActive(bool active) { m_moduleOverlayActive=active; }
     Q_INVOKABLE bool saveRoutingRule(const QString &type,const QString &pattern,const QString &policy,int index=-1);

@@ -10,7 +10,7 @@ Item {
 
  property string expandedId:""
  property string editingId:""
-  function edit(record){editingId=record?record.id:"";displayName.text=record?record.name:"";urlField.text="";formatPreference.currentIndex=record?Math.max(0,["auto","clash","loon","shadowrocket","surge","quantumult-x","sing-box"].indexOf(record.formatHint)):0;importScope.currentIndex=record&&record.importScope==="nodes-only"?1:0;interval.currentIndex=record?Math.max(0,[360,720,1440,10080].indexOf(record.intervalMinutes)):0;autoEnabled.checked=record?record.enabled:true;addDialog.open();Qt.callLater(function(){subscriptionForm.contentItem.contentY=0;displayName.forceActiveFocus()})}
+  function edit(record){editingId=record?record.id:"";displayName.text=record?record.name:"";urlField.text="";formatPreference.currentIndex=record?Math.max(0,["auto","clash","loon","shadowrocket","surge","quantumult-x","sing-box"].indexOf(record.formatHint)):0;interval.currentIndex=record?Math.max(0,[360,720,1440,10080].indexOf(record.intervalMinutes)):0;autoEnabled.checked=record?record.enabled:true;addDialog.open();Qt.callLater(function(){subscriptionForm.contentItem.contentY=0;displayName.forceActiveFocus()})}
  function revealField(field){
   if(!addDialog.visible)return
   const flick=subscriptionForm.contentItem,top=field.mapToItem(subscriptionBody,0,0).y,bottom=top+field.height
@@ -62,11 +62,7 @@ Item {
         }
         SwirlText {text:qsTr('上次成功更新：%1').arg(provider.record.update);color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
         SwirlText {text:provider.record.error;textFormat:Text.PlainText;visible:text.length>0;color:Theme.orange;Layout.fillWidth:true;wrapMode:Text.WrapAnywhere;font.pixelSize:Theme.fontSize(12)}
-        SwirlButton {
-          text:'仅导入节点并重试';visible:provider.record.importScope==='full-profile'&&provider.record.error.indexOf('尚未映射')>=0
-          enabled:!engineController.imports.busy
-          onClicked:{if(engineController.imports.saveSubscription(provider.record.id,provider.record.name,'',provider.record.intervalMinutes,provider.record.enabled,provider.record.formatHint,'nodes-only'))engineController.imports.refreshSubscription(provider.record.id)}
-        }
+        SwirlText {text:provider.record.warning||"";textFormat:Text.PlainText;visible:text.length>0;color:Theme.orange;Layout.fillWidth:true;wrapMode:Text.WrapAnywhere;font.pixelSize:Theme.fontSize(12)}
       }
       Item {
         x:Theme.cardPadding;y:header.y+header.implicitHeight+Theme.dp(14);width:parent.width-2*Theme.cardPadding
@@ -82,7 +78,7 @@ Item {
             SwirlToggle {checked:provider.record.enabled;enabled:!engineController.imports.busy;onToggled:engineController.imports.saveSubscription(provider.record.id,provider.record.name,'',provider.record.intervalMinutes,checked)}
           }
           SwirlText {text:provider.record.enabled?'下次预计：'+provider.record.nextUpdate:'可在编辑中调整更新周期';color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
-          SwirlText {text:provider.record.importScope==='nodes-only'?'导入范围：仅节点':'导入范围：完整配置（严格校验）';color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true}
+          SwirlText {text:provider.record.importMode==='full'?'自动识别：已应用兼容配置':provider.record.importMode==='nodes-with-warning'?'自动识别：节点已保存，部分配置不兼容':provider.record.importMode==='nodes'?'自动识别：节点订阅':'自动识别：下载后按实际内容处理';color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
           SwirlText {text:'订阅地址已加密隐藏。更新失败时保留现有节点。';color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
         }
       }
@@ -134,9 +130,7 @@ Item {
             SwirlTextField { id:displayName;objectName:"subscriptionName"; Layout.fillWidth:true; placeholderText:AppState.zh("My subscription");onActiveFocusChanged:if(activeFocus)page.revealField(displayName) }
             SwirlText { text:"HTTPS 订阅地址"; color:Theme.text }
             SwirlTextField { id:urlField;objectName:"subscriptionUrl"; Layout.fillWidth:true;echoMode:TextInput.Password; placeholderText:page.editingId.length?"留空保留已加密地址":"https://…";Accessible.name:"订阅地址";onActiveFocusChanged:if(activeFocus)page.revealField(urlField) }
-            SwirlText {text:"导入范围";color:Theme.text}
-            SwirlComboBox {id:importScope;objectName:"subscriptionImportScope";Layout.fillWidth:true;model:[qsTr("完整配置（严格校验）"),qsTr("仅导入节点")];Accessible.name:"订阅导入范围";onActiveFocusChanged:if(activeFocus)page.revealField(importScope)}
-            SwirlText {text:importScope.currentIndex===1?"仅更新节点，不应用本次订阅的全局配置；已保存的规则与 DNS 保持不变，引用失效时更新失败。":"完整配置需要受支持的规则、DNS、代理组及全局字段；不支持时保留旧节点与网络配置。";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.WordWrap}
+            SwirlText {objectName:"subscriptionAutomaticImport";text:qsTr("Swirl 自动识别订阅内容并导入兼容配置。普通兼容性问题会保留有效节点并提示；危险配置会被拒绝。");color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.WordWrap}
             SwirlText {text:qsTr("订阅格式");color:Theme.text}
             SwirlComboBox{id:formatPreference;objectName:"subscriptionFormat";Layout.fillWidth:true;model:[qsTr("自动"),"Clash","Loon",qsTr("Shadowrocket / 通用"),"Surge / Surfboard","Quantumult X","sing-box"];Accessible.name:qsTr("订阅格式");onActiveFocusChanged:if(activeFocus)page.revealField(formatPreference)}
             SwirlText {text:"向服务端请求此客户端格式；下载后仍检测实际内容，不把客户端格式当成协议。";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
@@ -150,7 +144,7 @@ Item {
                 SwirlButton { text:AppState.zh("Cancel"); onClicked:addDialog.requestDismiss() }
                 SwirlButton { enabled:!engineController.imports.busy && displayName.text.trim().length>0 && (page.editingId.length>0 || urlField.text.trim().length>0);
                     objectName:"saveSubscription";text:"保存并更新"; primary:true
-                    onClicked:{if(engineController.imports.saveSubscription(page.editingId,displayName.text,urlField.text.trim(),[360,720,1440,10080][interval.currentIndex],autoEnabled.checked,["auto","clash","loon","shadowrocket","surge","quantumult-x","sing-box"][formatPreference.currentIndex],importScope.currentIndex===1?"nodes-only":"full-profile")){var id=page.editingId||engineController.imports.providers[engineController.imports.providers.length-1].id;addDialog.close();engineController.imports.refreshSubscription(id)}}
+                    onClicked:{if(engineController.imports.saveSubscription(page.editingId,displayName.text,urlField.text.trim(),[360,720,1440,10080][interval.currentIndex],autoEnabled.checked,["auto","clash","loon","shadowrocket","surge","quantumult-x","sing-box"][formatPreference.currentIndex])){var id=page.editingId||engineController.imports.providers[engineController.imports.providers.length-1].id;addDialog.close();engineController.imports.refreshSubscription(id)}}
                 }
             }
         }

@@ -1,3 +1,9 @@
+# v0.1.9 automatic subscription and network repair (2026-10-24)
+
+- The latest user asks for automatic subscription import: remove full-profile/node-only choices from the subscription page; recognize downloaded content, apply compatible complete profiles, preserve valid nodes with visible warnings only after a whole-document safety audit. Scripts, local files, extra listeners, system mutations and TLS validation bypass remain prohibited.
+- The next installer is 0.1.9. Increment PRODUCT_VERSION.txt for each subsequent delivered update; application, installer and artifact metadata must agree.
+- Keep the already verified node-only forwarding for Surge, Loon and Quantumult X. Real Codex/browser/provider acceptance remains assigned to the user.
+
 # v0.1.8 network and subscription repair (2026-10-24)
 
 - Work on independent `work/swirl-018-network-compat-20261024`, based on the latest fetched v0.1.8 `fad05a72070b5770708cf64af57936bc9f0e64a1`. Do not change main, test or other windows' branches; never force-push.

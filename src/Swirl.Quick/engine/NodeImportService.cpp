@@ -46,6 +46,10 @@ NodeImportService::NodeImportService(NodeStore *store,QObject *parent,std::funct
 QVariantList NodeImportService::providers() const {
     auto rows=m_store->publicSubscriptions();
     for(auto &row:rows){auto r=row.toMap();const auto id=r.value("id").toString();
+        const auto outcome=m_store->networkConfiguration().value("subscriptionImportResults").toObject().value(id).toObject();
+        const auto mode=outcome.value("mode").toString();
+        r.insert("importMode",QStringList{"nodes","full","nodes-with-warning"}.contains(mode)?mode:QString());
+        r.insert("warning",outcome.value("notice").toString().left(2048));
         const bool updating=m_busy&&id==m_source,queued=m_queue.contains(id);
         r.insert("status",updating?QStringLiteral("正在更新"):queued?QStringLiteral("等待更新"):m_cancelled.contains(id)?QStringLiteral("已取消"):m_errors.contains(id)?QStringLiteral("更新失败"):r.value("lastSuccess").toLongLong()>0?QStringLiteral("已保存真实节点"):QStringLiteral("等待更新"));
         r.insert("queued",queued);r.insert("canCancel",!m_shuttingDown&&(queued||(updating&&!m_committing)));
@@ -207,7 +211,10 @@ void NodeImportService::next() {
             const QPointer<NodeImportService> guard(this);
             m_cancelled.remove(id);
             m_previewRequested=false;m_importSource="subscription";m_downloadTimedOut=false;
-            m_source=id;m_formatHint=s.formatHint;m_nodesOnly=s.importScope=="nodes-only";m_busy=true;m_attempts.insert(id,m_clock());m_message=QStringLiteral("正在更新订阅（地址已隐藏）…");emit changed();
+            // importScope is read only for old snapshot compatibility. A
+            // subscription's downloaded content now determines its semantics.
+            m_source=id;m_formatHint=s.formatHint;m_nodesOnly=false;m_automaticImport=true;
+            m_appliedMode.clear();m_applicationNotice.clear();m_busy=true;m_attempts.insert(id,m_clock());m_message=QStringLiteral("正在下载并自动识别订阅（地址已隐藏）…");emit changed();
             if(!guard || m_shuttingDown || !m_busy || m_source!=id || m_generation!=generation)return;
             m_deadline.start();download(url);return;
         }
@@ -362,6 +369,7 @@ void NodeImportService::cancelImport() {
 }
 void NodeImportService::apply(NodeImporter::Result result) {
     const auto count=result.nodes.size();
+    int certificatesEnforced=0;for(const auto &node:result.nodes)if(node.certificateVerificationEnforced)++certificatesEnforced;
     if(m_nodesOnly && !m_apply && !m_applyAsync){
         finish(QStringLiteral("节点专用导入无法校验当前网络配置；旧节点保持不变。"));return;
     }
@@ -369,12 +377,12 @@ void NodeImportService::apply(NodeImporter::Result result) {
         const QPointer<NodeImportService> guard(this);const auto generation=m_generation;
         m_committing=true;m_message=QStringLiteral("正在加密并原子保存节点…");emit changed();
         if(!guard || m_shuttingDown || !m_busy || m_generation!=generation)return;
-        auto completion=[guard,generation,format=result.format,count,incomplete=result.incompleteNodes](bool ok,const QString &error) {
+        auto completion=[guard,generation,format=result.format,count,incomplete=result.incompleteNodes,certificatesEnforced](bool ok,const QString &error) {
             if(!guard || guard->m_shuttingDown || guard->m_generation!=generation)return;
             if(!ok){guard->finish(error.isEmpty()?QStringLiteral("节点保存失败；旧配置保持不变。"):error);return;}
             // Keep the write boundary through nodesApplied. Its direct signal
             // handlers must not report cancellation after the durable commit.
-            guard->applied(format,count,incomplete);
+            guard->applied(format,count,incomplete,certificatesEnforced);
         };
         QString error;bool queued=false;
         if(m_applyAsync)queued=m_applyAsync(result,m_source,m_nodesOnly,std::move(completion),&error);
@@ -397,9 +405,9 @@ void NodeImportService::apply(NodeImporter::Result result) {
             finish(m_nodesOnly?error:QStringLiteral("完整配置校验失败：%1").arg(error));return;
         }
     } else if(!m_store->importNodes(std::move(result.nodes),m_source)){finish(m_store->error());return;}
-    applied(result.format,count,result.incompleteNodes);
+    applied(result.format,count,result.incompleteNodes,certificatesEnforced);
 }
-void NodeImportService::applied(const QString &format,qsizetype count,int incomplete) {
+void NodeImportService::applied(const QString &format,qsizetype count,int incomplete,int certificatesEnforced) {
     if(!m_source.isEmpty()){
         qsizetype saved=0;int unsupported=0;
         // The durable catalog has already merged identical source records.
@@ -415,12 +423,19 @@ void NodeImportService::applied(const QString &format,qsizetype count,int incomp
         if(incomplete)m_message+=QStringLiteral(" %1 条记录含无效或尚未映射的参数，原始参数已加密保留。").arg(incomplete);
     }
     if(m_nodesOnly)m_message+=QStringLiteral(" 本次仅更新节点；DNS、规则与策略组保持不变。");
+    if(m_automaticImport) {
+        if(m_appliedMode=="full")m_message+=QStringLiteral(" 已自动应用兼容的 DNS、规则和策略组。");
+        else m_message+=QStringLiteral(" 已自动提取节点；使用现有 Swirl DNS、规则与策略组。");
+        if(!m_applicationNotice.isEmpty())m_message+=QStringLiteral(" ")+m_applicationNotice;
+    }
+    if(certificatesEnforced)m_message+=QStringLiteral(" %1 条 Trojan 记录原请求跳过证书验证；Swirl 已保持验证开启，证书异常仍会拒绝连接。详情页可查看说明。").arg(certificatesEnforced);
     const QPointer<NodeImportService> guard(this);emit nodesApplied();if(guard)finish();
 }
 void NodeImportService::finish(const QString &error) {
     m_deadline.stop();
     if(!m_source.isEmpty()){if(error.isEmpty())m_errors.remove(m_source);else m_errors.insert(m_source,error);}
     if(!error.isEmpty())m_message=error;
-    m_source.clear();m_busy=false;m_committing=false;m_nodesOnly=false;
+    m_source.clear();m_busy=false;m_committing=false;m_nodesOnly=false;m_automaticImport=false;
+    m_appliedMode.clear();m_applicationNotice.clear();
     const QPointer<NodeImportService> guard(this);emit changed();if(guard)QTimer::singleShot(0,this,&NodeImportService::next);
 }

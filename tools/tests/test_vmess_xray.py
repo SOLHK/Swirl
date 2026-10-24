@@ -13,8 +13,10 @@ import json
 import os
 from pathlib import Path
 import platform
+import queue
 import socket
 import socketserver
+import ssl
 import subprocess
 import threading
 import time
@@ -104,6 +106,129 @@ class _VmessXrayBase(unittest.TestCase):
 
 
 class VmessXrayTests(_VmessXrayBase):
+
+    def test_core_connect_preserves_verified_https_keepalive_large_headers_and_idle(self):
+        """Actual mixed-inbound Core, official WSS VMess and independent TLS.
+
+        A browser-sized small GET alone misses the native desktop's persistent
+        backend path. Send two authenticated-looking (synthetic) requests with a
+        12 KiB header and binary bodies, retaining the tunnel across application
+        idle longer than the proxy handshake budget. No account/public site is
+        involved and missing tools remain failures.
+        """
+        owner = self
+        requests = []
+        failures = []
+        finished = threading.Event()
+        payload = bytes(range(256)) * 129
+
+        class Handler(socketserver.BaseRequestHandler):
+            def handle(self):
+                wire = self.request
+                wire.settimeout(8)
+                try:
+                    stream = owner.fixture.context.wrap_socket(wire, server_side=True)
+                    for index in range(2):
+                        incoming = header(stream)
+                        requests.append(incoming)
+                        stream.sendall(b'HTTP/1.1 200 OK\r\nContent-Length: ' +
+                            str(len(payload)).encode() + b'\r\nConnection: keep-alive\r\n\r\n' + payload)
+                    # Send and receive authenticated TLS close_notify. The
+                    # separate strict target-half-close probe stays unchanged.
+                    wire = stream.unwrap()
+                    wire.shutdown(socket.SHUT_WR)
+                except Exception as error:
+                    failures.append(type(error).__name__)
+                finally:
+                    wire.close()
+                    finished.set()
+
+        origin = _Origin(('127.0.0.1', 0), Handler)
+        origin.errors = []
+        worker = threading.Thread(target=origin.serve_forever,
+            kwargs={'poll_interval': 0.02}, daemon=True)
+        worker.start()
+        self.addCleanup(lambda: (origin.shutdown(), origin.server_close(), worker.join(2)))
+        peer = self.peer('ws', True)
+        runtime = subprocess.Popen([os.environ['SWIRL_TRANSPORT_RUNTIME']],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        responses = queue.Queue(maxsize=8)
+
+        def read_control():
+            for response in iter(lambda: runtime.stdout.readline(65537), ''):
+                if len(response) > 65536 or not response.endswith('\n'):
+                    break
+                responses.put(response, timeout=1)
+            responses.put(None, timeout=1)
+        reader = threading.Thread(target=read_control, daemon=True)
+        reader.start()
+
+        def close_runtime():
+            runtime.stdin.close()
+            try:
+                runtime.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                runtime.kill()
+                runtime.wait(timeout=5)
+            reader.join(2)
+            if not reader.is_alive():
+                runtime.stdout.close()
+            runtime.stderr.close()
+            self.assertFalse(reader.is_alive(), 'native control reader did not finish')
+        self.addCleanup(close_runtime)
+
+        def command(**message):
+            runtime.stdin.write(json.dumps(message) + '\n')
+            runtime.stdin.flush()
+            response = responses.get(timeout=6)
+            self.assertIsNotNone(response, 'native control exited before replying')
+            result = json.loads(response)
+            self.assertTrue(result['ok'], result)
+            return result
+
+        config = {'schema': 1, 'listen': '127.0.0.1:0', 'selected': 'synthetic',
+            'nodes': [{'id': 'synthetic', 'outbound': copy.deepcopy(peer['outbound'])}],
+            'limits': {'max_connections': 16, 'handshake_timeout_ms': 1000}}
+        started = command(op='start', config=config, transports={'synthetic': peer['transport']})
+        port = int(started['status']['address'].rsplit(':', 1)[1])
+        destination = f'127.0.0.1:{origin.server_address[1]}'
+        with socket.create_connection(('127.0.0.1', port), timeout=8) as inbound:
+            inbound.sendall(f'CONNECT {destination} HTTP/1.1\r\nHost: {destination}\r\nProxy-Connection: Keep-Alive\r\nUser-Agent: synthetic-native-desktop\r\n\r\n'.encode())
+            self.assertIn(b'200 Connection Established', header(inbound))
+            context = ssl.create_default_context(cadata=self.fixture.ca_pem)
+            with context.wrap_socket(inbound, server_hostname='localhost') as stream:
+                for index in range(2):
+                    request = (f'GET /synthetic/settings/{index} HTTP/1.1\r\nHost: localhost\r\n'.encode() +
+                        b'Authorization: Bearer SYNTHETIC-' + b'x' * (12 * 1024) +
+                        b'\r\nConnection: keep-alive\r\n\r\n')
+                    # Fragment application bytes rather than relying on write
+                    # boundaries surviving TLS and VMess records.
+                    stream.sendall(request[:17])
+                    stream.sendall(request[17:])
+                    self.assertTrue(header(stream).startswith(b'HTTP/1.1 200 OK'))
+                    self.assertEqual(exact(stream, len(payload)), payload)
+                    if index == 0:
+                        threading.Event().wait(1.25)  # deliberate application idle
+                raw = stream.unwrap()
+                raw.shutdown(socket.SHUT_WR)
+                self.assertEqual(raw.recv(1), b'')
+                raw.close()
+        self.assertTrue(finished.wait(2))
+        self.assertEqual(failures, [])
+        self.assertEqual(len(requests), 2)
+        self.assertTrue(all(b'Authorization: Bearer SYNTHETIC-' in value for value in requests))
+        deadline = time.monotonic() + 3
+        while True:
+            state = command(op='status')['status']
+            if state['active'] == 0 or time.monotonic() >= deadline:
+                break
+            threading.Event().wait(0.01)
+        self.assertEqual(state['active'], 0, state)
+        self.assertEqual(state['failed'], 0, state)
+        self.assertEqual(state['accepted'], 1, state)
+        self.assertGreater(state['upload'], 24 * 1024)
+        self.assertGreater(state['download'], 2 * len(payload))
+        command(op='stop')
 
     def test_tcp_tls_ws_wss_aes_and_chacha_authentication_data_and_close(self):
         for network in ("raw", "ws"):

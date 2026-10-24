@@ -7,6 +7,23 @@ use super::{ProfileError, error};
 use crate::inspect::{clean_ini, csv, ini_section};
 use serde_json::{Map, Value, json};
 use std::collections::{HashMap, HashSet};
+#[path = "profile_ini_metadata.rs"]
+mod metadata;
+#[path = "profile_ini_qx.rs"]
+mod qx;
+
+pub(super) fn managed_headers_safe(text: &str) -> bool {
+    let mut metadata = metadata::Metadata::default();
+    let first = text.lines().map(str::trim).find(|line| !line.is_empty());
+    text.lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with("#!MANAGED-CONFIG"))
+        .all(|line| metadata.managed(line, first == Some(line)).is_ok())
+}
+
+pub(super) fn client_setting_safe(key: &str, value: &str) -> bool {
+    metadata::Metadata::default().general(key, value) == Ok(true)
+}
 
 fn fail(code: &'static str) -> ProfileError {
     // INI arbitrary names, keys and values may all contain credentials.
@@ -79,6 +96,15 @@ pub(super) fn project(configuration: &Value) -> Result<Value, ProfileError> {
     {
         return Err(fail("ProfileIniControlCharacter"));
     }
+    if text
+        .lines()
+        .any(|line| ini_section(line.trim()).ok().flatten().as_deref() == Some("server_local"))
+    {
+        return qx::project(text);
+    }
+    let mut metadata = metadata::Metadata::default();
+    let mut seen_general = HashSet::new();
+    let first_line = text.lines().map(str::trim).find(|line| !line.is_empty());
     let mut section = String::new();
     let mut sections = HashSet::new();
     let mut nodes = HashSet::new();
@@ -89,9 +115,8 @@ pub(super) fn project(configuration: &Value) -> Result<Value, ProfileError> {
     let mut general = HashMap::new();
     for line in text.lines().map(str::trim) {
         if line.starts_with("#!MANAGED-CONFIG") {
-            // Never follow a URL embedded in a downloaded configuration, nor
-            // claim its update interval was applied to a different source.
-            return Err(fail("ProfileSubscriptionUpdateUnsupported"));
+            metadata.managed(line, first_line == Some(line))?;
+            continue;
         }
         if line.is_empty() || line.starts_with(['#', ';']) || line.starts_with("//") {
             continue;
@@ -136,11 +161,20 @@ pub(super) fn project(configuration: &Value) -> Result<Value, ProfileError> {
         match section.as_str() {
             "general" => {
                 let key = key.to_ascii_lowercase();
+                if !seen_general.insert(key.clone()) {
+                    return Err(fail("ProfileIniDuplicateOption"));
+                }
                 if !matches!(
                     key.as_str(),
                     "dns-server" | "ipv6" | "doh-server" | "encrypted-dns-server"
                 ) {
-                    if key == "resource-parser" {
+                    if metadata.general(&key, value)? {
+                        continue;
+                    }
+                    if matches!(
+                        key.as_str(),
+                        "resource-parser" | "resource_parser_url" | "geo_location_checker"
+                    ) {
                         return Err(fail("ProfileIniScriptUnsupported"));
                     }
                     if matches!(
@@ -228,6 +262,11 @@ pub(super) fn project(configuration: &Value) -> Result<Value, ProfileError> {
             }
             _ => return Err(fail("ProfileIniMissingSection")),
         }
+    }
+    if !nodes.is_empty() && !super::has_profile_semantics("ini", configuration) {
+        let mut projected = json!({});
+        metadata.finish(&mut projected);
+        return Ok(projected);
     }
     if !sections.contains("proxy") || !sections.contains("rule") || nodes.is_empty() {
         return Err(fail("ProfileIniCompleteRulesRequired"));
@@ -326,7 +365,9 @@ pub(super) fn project(configuration: &Value) -> Result<Value, ProfileError> {
         }
         source["dns"] = json!({"enable":true,"nameserver":servers,"ipv6":ipv6});
     }
-    super::project(&source)
+    let mut projected = super::project(&source)?;
+    metadata.finish(&mut projected);
+    Ok(projected)
 }
 
 #[cfg(test)]

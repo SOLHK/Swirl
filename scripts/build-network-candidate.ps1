@@ -36,6 +36,7 @@ if ($DisposableSystemProxyTests) {
     $env:SWIRL_SYSTEM_PROXY_TEST = '1'
 } else { Remove-Item Env:SWIRL_SYSTEM_PROXY_TEST -ErrorAction SilentlyContinue }
 $report = [ordered]@{schema=1; source_sha=''; status='running'; cargo_incremental=$true;
+    product_version=(Get-Content -LiteralPath (Join-Path $repo 'src/Swirl.Quick/PRODUCT_VERSION.txt') -Raw).Trim();
     generator='Ninja'; build_directory=$build; rust_target_directory=$rustTarget;
     restored_cmake_cache=(Test-Path -LiteralPath (Join-Path $build 'CMakeCache.txt'));
     restored_cargo_cache=(Test-Path -LiteralPath $rustTarget); compiler_cache_ready=$false; steps=@();
@@ -93,6 +94,9 @@ try {
     if ($DisposableSystemProxyTests) { $pattern += '|system-proxy-recovery' }
     $pattern += ')$'
     Run-Step 'focused-core-security-network-tests' { Checked ctest @('--test-dir',$build,'-C','Release','-R',$pattern,'--output-on-failure','--no-tests=error','--output-junit',(Join-Path $evidence 'focused-tests.xml')) }
+    [xml]$testResults=Get-Content -LiteralPath (Join-Path $evidence 'focused-tests.xml') -Raw
+    $report.focused_ctest_suites=[int]$testResults.testsuite.tests
+    if([int]$testResults.testsuite.failures -ne 0 -or $report.focused_ctest_suites -ne $targets.Count) { throw 'Focused test report is incomplete or failed.' }
     $testedDllHash = (Get-FileHash -LiteralPath (Join-Path $build 'swirl_api.dll')).Hash
     $testedIdentity = Get-Content -LiteralPath (Join-Path $build 'swirl-rust-build.json') -Raw | ConvertFrom-Json
     $beforeObjects = Engine-Objects

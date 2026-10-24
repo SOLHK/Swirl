@@ -16,6 +16,10 @@ struct ProxyNode {
     // Persisted only inside the protected catalog; never returned to QML.
     QString providerAlias;
     QStringList conversionIssues;
+    // Import policy notice only; never grants execution or certificate trust.
+    // A source's insecure Trojan flag is retained in originalConfiguration,
+    // while executable parameters explicitly keep certificate verification on.
+    bool certificateVerificationEnforced = false;
     // Xray source is authoritative. Copies share the bounded document in memory;
     // the encrypted store deduplicates it. Never expose it or nativeOutbound to QML.
     QByteArray sourceDocument;

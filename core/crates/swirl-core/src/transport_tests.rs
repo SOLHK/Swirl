@@ -1,6 +1,26 @@
 use super::*;
 use swirl_protocol::{UrlTestFailure, UrlTestMetrics};
 
+#[test]
+fn forwarding_failures_preserve_observed_kind_without_exporting_error_text() {
+    use std::io::{Error, ErrorKind};
+    for (kind, expected) in [
+        (ErrorKind::ConnectionReset, "StreamConnectionReset"),
+        (ErrorKind::ConnectionAborted, "StreamConnectionAborted"),
+        (ErrorKind::UnexpectedEof, "StreamUnexpectedEof"),
+        (ErrorKind::TimedOut, "StreamTimedOut"),
+        (ErrorKind::BrokenPipe, "StreamBrokenPipe"),
+        (ErrorKind::InvalidData, "StreamInvalidData"),
+        (ErrorKind::WriteZero, "StreamWriteZero"),
+        (ErrorKind::PermissionDenied, "StreamPermissionDenied"),
+        (ErrorKind::Other, "StreamIo"),
+    ] {
+        let error = Error::new(kind, "PRIVATE-TARGET:443 PRIVATE-CREDENTIAL");
+        assert_eq!(stream_failure_code(&error), expected);
+        assert_eq!(swirl_protocol::failure_stage(expected), "stream_io");
+    }
+}
+
 fn configuration() -> Config {
     Config::parse(
         br#"{"schema":1,"listen":"127.0.0.1:0","selected":"a","nodes":[

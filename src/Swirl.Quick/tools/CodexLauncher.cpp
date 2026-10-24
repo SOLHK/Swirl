@@ -25,7 +25,7 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
         if(existing)throw CodexLaunch::Error{L"Codex 桌面已在运行。请保存工作并自行完全退出 Codex 后，再双击此启动器。现有进程不会被停止。"};
         auto environment=CodexLaunch::childEnvironment(CodexLaunch::currentEnvironment(),proxy);
         if(CodexLaunch::validateSettings(CodexLaunch::readSettings()).endpoint!=proxy.endpoint || CodexLaunch::existingDesktops(path))throw CodexLaunch::Error{L"代理或 Codex 进程在检查期间发生变化，请重试。"};
-        CodexLaunch::startChild(path,environment);CloseHandle(mutex);return 0;
+        CodexLaunch::startChild(path,environment,proxy);CloseHandle(mutex);return 0;
     } catch(const CodexLaunch::Error &error) {
         if(mutex)CloseHandle(mutex);
         if(!check)MessageBoxW(nullptr,error.message.c_str(),L"通过 Swirl 启动 Codex",MB_OK|MB_ICONINFORMATION);

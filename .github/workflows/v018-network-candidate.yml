@@ -45,6 +45,31 @@ jobs:
           cargo clippy --workspace --all-targets --locked -- -D warnings
           cargo test --workspace --locked
           python ../tools/tests/test_portable_core_boundary.py
+      - name: Focused desktop-chain VMess regression with independent loopback peers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -r tools/requirements-network-fixtures.txt
+          cargo build --manifest-path core/Cargo.toml --locked -p swirl-core --example transport-runtime -p swirl-protocol --example transport-client
+          python tools/Fetch-TransportPeers.py --output build/v019-test-peers
+          mkdir -p dist/v019-codex-evidence
+          export SWIRL_TRANSPORT_RUNTIME="$PWD/core/target/debug/examples/transport-runtime"
+          export SWIRL_TRANSPORT_CLIENT="$PWD/core/target/debug/examples/transport-client"
+          export SWIRL_XRAY_BINARY="$PWD/build/v019-test-peers/current/xray"
+          export SWIRL_TRANSPORT_EVIDENCE="$PWD/dist/v019-codex-evidence/peers"
+          export PYTHONPATH="$PWD/tools/tests"
+          python -m unittest -v \
+            test_vmess_xray.VmessXrayTests.test_core_connect_preserves_verified_https_keepalive_large_headers_and_idle \
+            test_vmess_xray.VmessXrayTests.test_https_target_certificate_and_tls_close_over_vmess_tls \
+            test_vmess_xray.VmessXrayTests.test_core_node_switch_preserves_established_vmess_session \
+            2>&1 | tee dist/v019-codex-evidence/focused-vmess.log
+      - name: Preserve controlled desktop-chain test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Swirl-controlled-Codex-chain-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist/v019-codex-evidence
+          if-no-files-found: warn
       - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         if: ${{ !cancelled() && steps.checks.outcome == 'success' && steps.rust_cache.outputs.cache-hit != 'true' }}
         with:
@@ -103,9 +128,16 @@ jobs:
         id: compiler
         shell: pwsh
         run: |
-          $identity=(& rustc -vV | Out-String)+(& cmake --version | Out-String)+$env:VCToolsVersion+$env:WindowsSDKVersion+$env:ImageVersion+$env:QT_ROOT_DIR+$env:GITHUB_WORKSPACE
+          # Hosted image labels changed between consecutive runs even though
+          # the actual compiler/SDK versions matched. Key actual tools instead;
+          # Ninja and Cargo still check their dependencies and command lines.
+          $tools=@('cl.exe','link.exe','cmake.exe') | ForEach-Object { $command=Get-Command $_ -ErrorAction Stop; (Get-FileHash -LiteralPath $command.Source -Algorithm SHA256).Hash }
+          $identity=([ordered]@{rust=(& rustc -vV | Out-String);cmake=(& cmake --version | Out-String);tools=$tools;msvc=$env:VCToolsVersion;sdk=$env:WindowsSDKVersion;qt=$env:QT_ROOT_DIR;workspace=$env:GITHUB_WORKSPACE} | ConvertTo-Json -Compress)
           $hash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($identity))).ToLowerInvariant()
           "hash=$hash" >> $env:GITHUB_OUTPUT
+          $version=(Get-Content -LiteralPath 'src/Swirl.Quick/PRODUCT_VERSION.txt' -Raw).Trim()
+          if($version -notmatch '^\d+\.\d+\.\d+$'){throw 'Invalid product version'}
+          "SWIRL_PRODUCT_VERSION=$version" >> $env:GITHUB_ENV
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         id: build_cache
         with:
@@ -143,7 +175,7 @@ jobs:
         if: ${{ success() && steps.candidate.outcome == 'success' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: Swirl-0.1.8-network-candidate-${{ github.sha }}-${{ github.run_attempt }}
+          name: Swirl-${{ env.SWIRL_PRODUCT_VERSION }}-network-candidate-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             dist/v018-network/Swirl-Setup.exe
             dist/v018-network/evidence/build-timings.json

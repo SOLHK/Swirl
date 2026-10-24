@@ -26,7 +26,9 @@
 #endif
 
 namespace {
-bool projectSubscriptionProfile(const QJsonObject &configuration,const QString &format,QVariantMap *projected,QString *error) {
+bool projectSubscriptionProfile(const QJsonObject &configuration,const QString &format,QVariantMap *projected,QString *error,bool *safeNodeFallback=nullptr,bool *hasSemantics=nullptr) {
+    if(safeNodeFallback)*safeNodeFallback=false;
+    if(hasSemantics)*hasSemantics=true;
     auto &library=RustCoreLibrary::instance();
     if(!library.load()||!library.importProfile()) {
         *error=QStringLiteral("Rust 完整配置接口不可用；请安装内核与应用匹配的完整版本。");return false;
@@ -45,6 +47,7 @@ bool projectSubscriptionProfile(const QJsonObject &configuration,const QString &
         *error=QStringLiteral("Rust 完整配置校验响应无效。");return false;
     }
     const auto result=document.object();
+    if(safeNodeFallback)*safeNodeFallback=result.value("safe_node_fallback")==QJsonValue(true);
     if(!result.value("ok").toBool()) {
         const auto code=result.value("error").toString(),field=result.value("field").toString();
         const auto safeCode=QRegularExpression("^[A-Za-z][A-Za-z0-9]{0,127}$").match(code).hasMatch()?code:QStringLiteral("ProfileInvalid");
@@ -52,7 +55,26 @@ bool projectSubscriptionProfile(const QJsonObject &configuration,const QString &
         *error=QStringLiteral("Rust 完整配置校验失败：%1（%2）；旧节点与网络配置保持不变。").arg(safeCode,safeField);return false;
     }
     if(!result.value("configuration").isObject()){*error=QStringLiteral("Rust 未返回完整配置投影。");return false;}
+    if(hasSemantics)*hasSemantics=result.value("has_profile_semantics")!=QJsonValue(false);
     *projected=result.value("configuration").toObject().toVariantMap();return true;
+}
+QString profileMetadataNotice(const QJsonObject &metadata) {
+    QStringList notices;
+    if(metadata.value("managedConfig").isObject())notices.append(QStringLiteral("原配置的托管地址已保留，不会另行下载；更新使用本订阅在 Swirl 中保存的地址和周期。"));
+    if(!metadata.value("preservedGeneral").toArray().isEmpty())notices.append(QStringLiteral("原客户端的界面、日志或连通性检测设置已保留，不会改写 Swirl 的对应设置。"));
+    return notices.join(' ');
+}
+QJsonObject recordSubscriptionOutcome(QJsonObject snapshot,const QString &sourceId,const QString &format,const QString &mode,const QString &notice,const QJsonObject &metadata={},const QJsonObject &preservedConfiguration={}) {
+    if(sourceId.isEmpty())return snapshot;
+    if(snapshot.isEmpty())snapshot.insert("schema",1);
+    auto outcomes=snapshot.value("subscriptionImportResults").toObject();
+    auto outcome=QJsonObject{{"mode",mode},{"format",format},{"notice",notice},{"metadata",metadata}};
+    // Incompatible/metadata-only profiles are inert private data. Preserve
+    // them in the bounded encrypted catalog for diagnostics or future mapping;
+    // never feed these retained bytes back into the active Core configuration.
+    if(!preservedConfiguration.isEmpty())outcome.insert("preservedConfiguration",preservedConfiguration);
+    outcomes.insert(sourceId,outcome);
+    snapshot.insert("subscriptionImportResults",outcomes);return snapshot;
 }
 QStringList routingRuleFields(const QString &rule) {
     auto fields=rule.split(',');
@@ -102,25 +124,47 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         const auto nodes=plan.nodes();QVariantMap canonical;
         if(!validateNetworkConfiguration(networkConfigurationSnapshot(),&canonical,&nodes)){*error=m_networkError;return false;}
 #endif
-        if(!m_store.commitImportAsync(plan,retainedNodeConfiguration(sourceId,nodesOnly),std::move(completion))){*error=m_store.error();return false;}
+        auto retained=retainedNodeConfiguration(sourceId,nodesOnly||m_imports.automaticImport());
+        if(m_imports.automaticImport())retained=recordSubscriptionOutcome(retained,sourceId,result.format,"nodes",{});
+        if(!m_store.commitImportAsync(plan,retained,std::move(completion))){*error=m_store.error();return false;}
         return true;
     });
     m_imports.setConfigurationApplier([this,retainedNodeConfiguration](const NodeImporter::Result &result,const QString &sourceId,bool nodesOnly,QString *error) {
         const auto &configuration=result.configuration;
-        if(nodesOnly || result.configuration.isEmpty()) {
+        const bool automatic=m_imports.automaticImport();
+        auto importNodes=[&](const QString &mode,const QString &notice,const QJsonObject &metadata=QJsonObject{}) {
             NodeStore::ImportPlan plan;
             if(!m_store.prepareImport(result.nodes,sourceId,&plan)){*error=m_store.error();return false;}
             const auto nodes=plan.nodes();QVariantMap canonical;
             if(!validateNetworkConfiguration(networkConfigurationSnapshot(),&canonical,&nodes)){*error=m_networkError;return false;}
-            if(!m_store.commitImport(plan,retainedNodeConfiguration(sourceId,nodesOnly))){*error=m_store.error();return false;}
+            auto retained=retainedNodeConfiguration(sourceId,nodesOnly||automatic);
+            if(automatic)retained=recordSubscriptionOutcome(retained,sourceId,result.format,mode,notice,metadata,result.configuration);
+            if(!m_store.commitImport(plan,retained)){*error=m_store.error();return false;}
+            if(automatic)m_imports.setImportOutcome(mode,notice);
             return true;
-        }
+        };
+        if(nodesOnly || result.configuration.isEmpty())return importNodes("nodes",{});
         if(result.configurationFormat!="clash"&&result.configurationFormat!="sing-box"&&(result.configurationFormat!="ini"||configuration.isEmpty())) {
             *error=QStringLiteral("此格式的完整配置尚未映射；未应用节点或全局配置，原有设置保持不变。");return false;
         }
-        QVariantMap input;
-        if(!projectSubscriptionProfile(configuration,result.configurationFormat,&input,error))return false;
-        if(!importNodesAndConfiguration(result.nodes,sourceId,input,result.configuration,result.configurationFormat)){*error=m_networkError;return false;}
+        QVariantMap input;bool safeNodeFallback=false,hasSemantics=true;
+        if(!projectSubscriptionProfile(configuration,result.configurationFormat,&input,error,&safeNodeFallback,&hasSemantics)) {
+            if(!automatic||!safeNodeFallback)return false;
+            auto reason=*error;reason.remove(QStringLiteral("；旧节点与网络配置保持不变。"));
+            const auto notice=QStringLiteral("检测到不兼容配置，未应用本次 DNS、规则与策略组；有效节点已保留。%1").arg(reason);
+            error->clear();return importNodes("nodes-with-warning",notice);
+        }
+        const auto metadata=QJsonObject::fromVariantMap(input.take("importMetadata").toMap());
+        if(automatic&&!hasSemantics)return importNodes("nodes",profileMetadataNotice(metadata),metadata);
+        if(!metadata.isEmpty())input.insert("importMetadata",metadata.toVariantMap());
+        bool candidateValidationFailed=false;
+        if(!importNodesAndConfiguration(result.nodes,sourceId,input,result.configuration,result.configurationFormat,&candidateValidationFailed)) {
+            if(automatic&&safeNodeFallback&&candidateValidationFailed) {
+                return importNodes("nodes-with-warning",QStringLiteral("ProfileNativeValidationUnsupported：本次 DNS、规则或策略参数无法由内核执行，未应用；有效节点已保留，继续使用现有 Swirl 网络配置。"));
+            }
+            *error=m_networkError;return false;
+        }
+        if(automatic)m_imports.setImportOutcome("full",profileMetadataNotice(metadata));
         return true;
     });
     connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this]{
@@ -611,6 +655,8 @@ QJsonObject EngineController::serializedNetworkConfiguration() {
     if(m_nativeDocumentRouting)snapshot.insert("nativeDocumentRouting",true);
     const auto original=m_store.networkConfiguration().value("importedConfiguration");
     if(!original.isUndefined())snapshot.insert("importedConfiguration",original);
+    const auto outcomes=m_store.networkConfiguration().value("subscriptionImportResults");
+    if(outcomes.isObject())snapshot.insert("subscriptionImportResults",outcomes);
     return snapshot;
 }
 bool EngineController::saveNetworkConfiguration() {
@@ -634,7 +680,8 @@ bool EngineController::commitRoutingConfiguration(const QStringList &rules,const
     m_options.customRules=rules;m_options.customGroups=groups;updateRoutingFlags();
     emit optionsChanged();emit statusChanged();return true;
 }
-bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incoming,const QString &sourceId,const QVariantMap &input,const QJsonObject &original,const QString &sourceFormat) {
+bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incoming,const QString &sourceId,const QVariantMap &input,const QJsonObject &original,const QString &sourceFormat,bool *candidateValidationFailed) {
+    if(candidateValidationFailed)*candidateValidationFailed=false;
     // Only this owner may apply while its importer is busy. Existing active
     // sessions and module overlays must never be reconfigured underneath them.
     if(m_shuttingDown || busy() || processAlive() || m_moduleOverlayActive) {
@@ -642,7 +689,12 @@ bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incom
     }
     NodeStore::ImportPlan plan;
     if(!m_store.prepareImport(incoming,sourceId,&plan)){m_networkError=m_store.error();return false;}
+    // Only this validation phase may be reduced to nodes after Rust has
+    // separately audited the entire original. Busy/ownership/store/I/O errors
+    // must never be mistaken for compatibility errors or trigger a second save.
+    if(candidateValidationFailed)*candidateValidationFailed=true;
     auto mapped=input;
+    const auto importMetadata=QJsonObject::fromVariantMap(mapped.take("importMetadata").toMap());
     // A subscription profile without DNS instructions must not erase the
     // user's secure resolver/hosts configuration and fall back to the system.
     if(!mapped.contains("dns"))mapped["dns"]=m_options.dnsConfig;
@@ -715,11 +767,13 @@ bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incom
     }
     QVariantMap canonical;const auto nodes=plan.nodes();
     if(!validateNetworkConfiguration(mapped,&canonical,&nodes))return false;
+    if(candidateValidationFailed)*candidateValidationFailed=false;
     const auto previous=networkConfigurationSnapshot();const bool previousNative=m_nativeDocumentRouting,previousSmart=m_options.smartRouting,previousPrivate=m_options.nativePrivateRouting;
     if(!original.isEmpty()){m_nativeDocumentRouting=true;m_options.smartRouting=false;m_options.nativePrivateRouting=false;}
     m_options.dnsConfig=canonical.value("dns").toMap();m_options.customRules=canonical.value("rules").toStringList();m_options.customGroups=canonical.value("groups").toList();
     auto snapshot=serializedNetworkConfiguration();
-    if(!snapshot.isEmpty() && !original.isEmpty())snapshot.insert("importedConfiguration",QJsonObject{{"format",sourceFormat},{"sourceId",sourceId},{"configuration",original}});
+    if(!snapshot.isEmpty() && !original.isEmpty())snapshot.insert("importedConfiguration",QJsonObject{{"format",sourceFormat},{"sourceId",sourceId},{"configuration",original},{"metadata",importMetadata}});
+    if(!snapshot.isEmpty()&&m_imports.automaticImport())snapshot=recordSubscriptionOutcome(snapshot,sourceId,sourceFormat,"full",profileMetadataNotice(importMetadata),importMetadata);
     if(snapshot.isEmpty() || !m_store.commitImport(plan,snapshot)) {
         if(!snapshot.isEmpty())m_networkError=m_store.error();
         m_nativeDocumentRouting=previousNative;m_options.smartRouting=previousSmart;m_options.nativePrivateRouting=previousPrivate;

@@ -3,6 +3,7 @@
 #include "RustCoreLibrary.h"
 #include <QTimer>
 #include <QElapsedTimer>
+#include <QSet>
 
 // Qt control adapter only. All forwarding sockets, routing and protocol state
 // live in the Rust DLL. Called from ThreadedEngine's existing worker thread.
@@ -34,6 +35,7 @@ private:
  void cancelProbe();
  void failProbe(const QString &stage,const QString &code,int httpStatus=0);
  void updateProbe(const QJsonObject &);
+ void recordForwardingFailures(const QJsonObject &);
  RustCoreLibrary &m_library = RustCoreLibrary::instance();
  Command m_command=nullptr;
  quint64 m_handle=0;
@@ -44,4 +46,6 @@ private:
  qint64 m_probeRequestId=0;
  QString m_probeFailureStage;
  qint64 m_probeOutboundConnectMs=-1,m_probeOriginTlsMs=-1;
+ QSet<quint64> m_reportedForwardingFailures;
+ bool m_forwardingFailureLimitReported=false;
 };

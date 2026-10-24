@@ -116,7 +116,20 @@ private slots:
             QVERIFY2(controller.replaceNetworkConfiguration(policy),qPrintable(controller.networkConfigurationError()));const auto retained=controller.networkConfigurationSnapshot();
             auto *importer=controller.imports();QVERIFY(importer->saveSubscription({},"Isolated format source",source.url(),360,false,"auto","nodes-only"));const auto sourceId=importer->providers().first().toMap()["id"].toString();
             const auto count=source.requests;importer->refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!importer->busy(),8000);QVERIFY2(controller.nodeCatalog().size()==1,qPrintable(formats[i]+": "+importer->message()));QCOMPARE(source.requests,count+1);
-            QCOMPARE(controller.networkConfigurationSnapshot(),retained);
+            // Provider labels and the historical saved scope cannot override
+            // the downloaded document. Complete INI/QX fixtures carry an
+            // explicit terminal rule; node-only documents retain local policy.
+            const bool complete=QList<int>{4,5,6,7,12,13}.contains(i);
+            const auto applied=controller.networkConfigurationSnapshot();
+            const auto outcome=importer->providers().first().toMap();
+            QVERIFY2(!outcome.value("status").toString().contains(QStringLiteral("失败")),qPrintable(formats[i]+": "+importer->message()));
+            if(complete){
+                QCOMPARE(applied.value("rules").toStringList(),QStringList{"MATCH,DIRECT"});
+                QVERIFY(applied.value("groups").toList().isEmpty());QCOMPARE(applied.value("dns"),retained.value("dns"));
+                QCOMPARE(outcome.value("importMode").toString(),QString("full"));
+            }else{
+                QCOMPARE(applied,retained);QCOMPARE(outcome.value("importMode").toString(),QString("nodes"));
+            }
             NodeStore store(path);const auto n=store.nodes().first();QVERIFY(n.conversionIssues.isEmpty());QVERIFY(controller.chooseNode(n.id));
             NodeStore reloaded(path);QCOMPARE(reloaded.nodes().size(),1);QCOMPARE(reloaded.nodes().first().sourceId,sourceId);QCOMPARE(reloaded.selectedId(),n.id);QCOMPARE(reloaded.subscriptions().first().importScope,QString("nodes-only"));
             QCOMPARE(reloaded.nodes().first().password,QString("r1-format-fixture-password"));
@@ -128,7 +141,7 @@ private slots:
             QCOMPARE(outbound.value("password").toString(),QString("r1-format-fixture-password"));
             if(trojan)QCOMPARE(outbound.value("tls").toObject().value("server_name").toString(),QString("localhost"));
             else QCOMPARE(outbound.value("cipher").toString(),QString("aes-128-gcm"));
-            importer->refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!importer->busy(),8000);QCOMPARE(controller.selectedNodeId(),n.id);QCOMPARE(controller.networkConfigurationSnapshot(),retained);
+            importer->refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!importer->busy(),8000);QCOMPARE(controller.selectedNodeId(),n.id);QCOMPARE(controller.networkConfigurationSnapshot(),applied);
             NodeStore refreshed(path);QCOMPARE(refreshed.selectedId(),n.id);QCOMPARE(refreshed.nodes().first().id,n.id);QCOMPARE(refreshed.networkConfiguration(),reloaded.networkConfiguration());
             qInfo()<<"FORMAT_DOWNLOAD_STORE_RUST_MAPPING"<<formats[i]<<"downloaded, parsed, DPAPI persisted, reloaded and mapped; protocol execution is a separate independent-peer test";
             controller.shutdown();

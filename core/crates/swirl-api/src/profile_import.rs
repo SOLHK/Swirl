@@ -16,17 +16,22 @@ fn response(input: &[u8], capacity: usize) -> Result<(usize, Option<Vec<u8>>), i
         .and_then(|value| {
             serde_json::from_value::<Request>(value)
                 .map_err(|_| ("ProfileRequestSyntax", String::from("configuration")))
-        })
-        .and_then(|request| {
-            swirl_subscription::profile::project_format(&request.format, &request.configuration)
-                .map_err(|error| (error.code, error.field))
         });
     let result = match result {
-        Ok(configuration) => {
-            json!({"schema":1,"ok":true,"configuration":configuration,"network_verified":false})
-        }
+        Ok(request) => match swirl_subscription::profile::project_format(
+            &request.format,
+            &request.configuration,
+        ) {
+            Ok(configuration) => json!({"schema":1,"ok":true,"configuration":configuration,
+                "safe_node_fallback":swirl_subscription::profile::node_only_fallback_allowed(&request.format,&request.configuration),
+                "has_profile_semantics":swirl_subscription::profile::has_profile_semantics(&request.format,&request.configuration),
+                "network_verified":false}),
+            Err(error) => json!({"schema":1,"ok":false,"error":error.code,"field":error.field,
+                "safe_node_fallback":swirl_subscription::profile::node_only_fallback_allowed(&request.format,&request.configuration),
+                "network_verified":false}),
+        },
         Err((code, field)) => {
-            json!({"schema":1,"ok":false,"error":code,"field":field,"network_verified":false})
+            json!({"schema":1,"ok":false,"error":code,"field":field,"safe_node_fallback":false,"network_verified":false})
         }
     };
     encoded_response(&result, capacity)
@@ -135,5 +140,37 @@ mod tests {
             assert!(!result.to_string().contains("PRIVATE"));
             assert!(!result.to_string().contains("https://"));
         }
+    }
+
+    #[test]
+    fn fallback_is_granted_only_after_the_entire_document_safety_audit() {
+        let basic = "[Proxy]\nA=socks5,proxy.invalid,1080\n";
+        let node_only = call(
+            &serde_json::to_vec(&json!({"format":"ini","configuration":{"document":basic}}))
+                .unwrap(),
+        );
+        assert_eq!(node_only["ok"], true);
+        assert_eq!(node_only["has_profile_semantics"], false);
+        let incompatible = "[General]\nloglevel=notify\n[Proxy]\nA=socks5,proxy.invalid,1080\n[Proxy Group]\nroute=url-test,A,url=https://example.invalid/check\n[Rule]\nFINAL,route\n";
+        let recoverable = call(
+            &serde_json::to_vec(&json!({"format":"ini","configuration":{"document":incompatible}}))
+                .unwrap(),
+        );
+        assert_eq!(recoverable["ok"], false);
+        assert_eq!(recoverable["safe_node_fallback"], true);
+        for suffix in [
+            "[Script]\nrequest=https://private.invalid/PRIVATE_TOKEN\n",
+            "[MITM]\nenable=true\n",
+            "[General]\nexternal-controller-access=PRIVATE_TOKEN\n",
+        ] {
+            let dangerous = call(&serde_json::to_vec(&json!({"format":"ini","configuration":{"document":format!("{incompatible}{suffix}")}})).unwrap());
+            assert_eq!(dangerous["ok"], false);
+            assert_eq!(dangerous["safe_node_fallback"], false);
+            assert!(!dangerous.to_string().contains("PRIVATE_TOKEN"));
+            assert!(dangerous.get("configuration").is_none());
+        }
+        let malformed =
+            call(br#"{"format":"ini","configuration":{"document":"[Proxy]"},"format":"clash"}"#);
+        assert_eq!(malformed["safe_node_fallback"], false);
     }
 }

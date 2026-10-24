@@ -55,11 +55,11 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
         const auto click=[&](const QString &name){auto *target=item(name);check("input-"+name,target&&target->isVisible()&&target->isEnabled());if(target)QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,target->mapToScene(QPointF(target->width()/2,target->height()/2)).toPoint());wait(250);};
         navigate("subscriptions");click("addSubscription");
         auto *dialog=window->findChild<QObject *>("subscriptionDialog");
-        auto *scope=item("subscriptionImportScope"),*format=item("subscriptionFormat"),*form=item("subscriptionFormViewport"),*name=item("subscriptionName");
+        auto *automatic=item("subscriptionAutomaticImport"),*format=item("subscriptionFormat"),*form=item("subscriptionFormViewport"),*name=item("subscriptionName");
         auto *body=item("subscriptionFormBody"),*save=item("saveSubscription");
-        check("subscription-form-mounted",dialog&&scope&&format&&form&&name&&body&&save);
-        if(dialog&&scope&&format&&form&&name&&body&&save){
-            check("new-subscription-default-full-strict",scope->property("currentIndex").toInt()==0&&scope->property("currentText").toString()==QString::fromUtf8("完整配置（严格校验）"));
+        check("subscription-form-mounted",dialog&&automatic&&format&&form&&name&&body&&save);
+        if(dialog&&automatic&&format&&form&&name&&body&&save){
+            check("subscription-import-is-automatic",!item("subscriptionImportScope")&&automatic->property("text").toString().contains(QString::fromUtf8("自动识别")));
             check("format-has-seven-distinct-choices",format->property("count").toInt()==7&&format->property("currentText").toString()==QString::fromUtf8("自动"));
             const auto visibleIn=[&](QQuickItem *field,QQuickItem *viewport){const QRectF outer(viewport->mapToScene(QPointF()),viewport->size());return outer.adjusted(-1,-1,1,1).contains(QRectF(field->mapToScene(QPointF()),field->size()));};
             check("first-input-visible-on-open",visibleIn(name,form));

@@ -8,8 +8,24 @@ use std::{
 };
 #[path = "profile_ini.rs"]
 mod ini;
+#[path = "profile_scope.rs"]
+mod scope;
 #[path = "singbox_profile.rs"]
 mod singbox;
+
+/// Whether an external document contains active non-node network semantics.
+/// This is a scope classifier, not a safety verdict; callers must still use
+/// `node_only_fallback_allowed` before importing any automatically reduced scope.
+pub fn has_profile_semantics(format: &str, configuration: &Value) -> bool {
+    scope::has_semantics(format, configuration)
+}
+
+/// Audit the entire document before a recoverable complete-profile failure may
+/// become an explicit nodes-only result. The first projection error alone is
+/// insufficient: a later section may request a script or host operation.
+pub fn node_only_fallback_allowed(format: &str, configuration: &Value) -> bool {
+    scope::node_only_allowed(format, configuration)
+}
 
 pub fn project_format(format: &str, configuration: &Value) -> Result<Value, ProfileError> {
     match format {

@@ -207,6 +207,15 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
             result.nodes.clear();result.error=QStringLiteral("第 %1 个节点：sni 与 servername 冲突，不能以别名覆盖 TLS 名称。").arg(i+1);return result;
         }
         n.name=params.take("name").toString().trimmed();n.protocol=params.take("type").toString().toLower();
+        // Subscription authors cannot weaken Swirl's TLS policy. A correctly
+        // typed Trojan flag is safely projected to stricter verification, with
+        // an explicit persistent notice; originalConfiguration stays untouched.
+        // This is not an insecure runtime option: manual/runtime true, wrong
+        // types, nested flags and all unrelated options still fail validation.
+        if(n.protocol=="trojan" && params.value("skip-cert-verify")==QJsonValue(true)) {
+            params["skip-cert-verify"]=false;
+            n.certificateVerificationEnforced=true;
+        }
         if(!result.configuration.isEmpty() && names.contains(n.name)) {
             result.nodes.clear();result.error=QStringLiteral("完整配置含重复节点名称，策略引用不明确；未应用配置。");return result;
         }

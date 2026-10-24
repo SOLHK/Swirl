@@ -14,6 +14,7 @@
 #include <QJsonObject>
 #include <QCryptographicHash>
 #include <QSignalSpy>
+#include <QScopeGuard>
 #include <QNetworkProxy>
 #include <QNetworkReply>
 #ifdef Q_OS_WIN
@@ -662,8 +663,10 @@ private slots:
     void rejectedSecurityOptionsNameTheCauseWithoutEchoingPrivateValues() {
         const QJsonObject base{{"name","fixture"},{"type","trojan"},{"server","proxy.invalid"},{"port",443},{"password","DO-NOT-ECHO-SECRET"}};
         const QList<QPair<QJsonObject,QString>> cases{
-            {{{"skip-cert-verify",true}},QStringLiteral("skip-cert-verify=true")},
             {{{"skip-cert-verify","false"}},QStringLiteral("布尔值 false")},
+            {{{"skip-cert-verify","true"}},QStringLiteral("布尔值 false")},
+            {{{"skip-cert-verify",QJsonValue(QJsonValue::Null)}},QStringLiteral("布尔值 false")},
+            {{{"tls",QJsonObject{{"skip-cert-verify",true}}}},QStringLiteral("skip-cert-verify=true")},
             {{{"script","DO-NOT-ECHO-SECRET"}},QStringLiteral("script")},
             {{{"DO-NOT-ECHO-SECRET-file","private-path"}},QStringLiteral("本地文件路径字段")},
             {{{"listeners",QJsonArray{}}},QStringLiteral("listeners")}
@@ -677,6 +680,120 @@ private slots:
         auto safe=base;safe["skip-cert-verify"]=false;
         const auto accepted=NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{safe}}}).toJson());
         QVERIFY2(accepted,qPrintable(accepted.error));QCOMPARE(accepted.nodes.first().parameters.value("skip-cert-verify"),QJsonValue(false));
+    }
+    void trojanInsecureSubscriptionFlagsKeepVerificationAndOriginals() {
+        const QByteArray uri="trojan://fixture-password@proxy.invalid:443?sni=subscription.example.invalid&allowInsecure=1#fixture";
+        const QByteArray line="fixture = trojan,proxy.invalid,443,fixture-password,tls-name:subscription.example.invalid,skip-cert-verify:true";
+        const QByteArray qxLine="trojan=proxy.invalid:443,password=fixture-password,tls-host=subscription.example.invalid,tls-verification=false,tag=fixture";
+        const QJsonObject clash{{"name","fixture"},{"type","trojan"},{"server","proxy.invalid"},{"port",443},{"password","fixture-password"},{"sni","subscription.example.invalid"},{"skip-cert-verify",true}};
+        const QList<QPair<QByteArray,QJsonObject>> cases{
+            {uri,QJsonObject{{"uri",QString::fromUtf8(uri)}}},
+            {uri.toBase64(),QJsonObject{{"uri",QString::fromUtf8(uri)}}},
+            {"[Proxy]\n"+line,QJsonObject{{"line",QString::fromUtf8(line)}}},
+            {"[server_local]\n"+qxLine,QJsonObject{{"line",QString::fromUtf8(qxLine)}}},
+            {QJsonDocument(QJsonObject{{"proxies",QJsonArray{clash}}}).toJson(),clash}
+        };
+        for(const auto &[document,original]:cases){
+            const auto parsed=NodeImporter::parse(document);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+            const auto node=parsed.nodes.first();QVERIFY(node.certificateVerificationEnforced);QCOMPARE(node.originalConfiguration,original);
+            QCOMPARE(node.parameters.value("skip-cert-verify"),QJsonValue(false));QVERIFY(node.conversionIssues.isEmpty());
+            const auto notes=node.publicInfo().value("normalizationNotes").toString();QVERIFY(notes.contains(QStringLiteral("验证开启")));QVERIFY(!notes.contains("fixture-password"));
+            QJsonObject outbound;QVERIFY2(NativeNodeBridge::executableOutbound(node,&outbound).isEmpty(),"Securely projected Trojan must still pass the Rust converter");
+            QCOMPARE(outbound.value("type"),QJsonValue("trojan"));QCOMPARE(outbound.value("tls").toObject().value("server_name"),QJsonValue("subscription.example.invalid"));
+            const auto extraTrust=outbound.value("tls").toObject().value("ca_der_base64");QVERIFY(extraTrust.isNull()||extraTrust.isUndefined());
+            QTemporaryDir folder;NodeStore store(folder.filePath("nodes.dpapi"));QVERIFY(store.importNodes(parsed.nodes));
+            NodeStore restored(store.filePath());QCOMPARE(restored.nodes().size(),1);const auto saved=restored.nodes().first();
+            QCOMPARE(saved.originalConfiguration,original);QCOMPARE(saved.parameters,node.parameters);QVERIFY(saved.certificateVerificationEnforced);
+            QCOMPARE(saved.publicInfo().value("normalizationNotes").toString(),notes);
+            QFile encrypted(store.filePath());QVERIFY(encrypted.open(QIODevice::ReadOnly));QVERIFY(!encrypted.readAll().contains("fixture-password"));
+            auto forbidden=saved;forbidden.parameters["skip-cert-verify"]=true;QVERIFY(!ProxyNode::validate(forbidden).isEmpty());
+            QJsonObject denied;QVERIFY(!NativeNodeBridge::executableOutbound(forbidden,&denied).isEmpty());QVERIFY(denied.isEmpty());
+        }
+        QTemporaryDir folder;NodeStore store(folder.filePath("nodes.dpapi"));NodeImportService imports(&store);
+        imports.importText(QString::fromUtf8(uri));QTRY_VERIFY_WITH_TIMEOUT(!imports.busy(),4000);QCOMPARE(store.nodes().size(),1);
+        QVERIFY(imports.message().contains(QStringLiteral("验证开启")));QVERIFY(!imports.message().contains("fixture-password"));
+        auto insecure=clash;insecure["type"]="socks5";insecure.remove("password");QVERIFY(!NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{insecure}}}).toJson()));
+    }
+    void securelyProjectedTrojanStillChecksCertificatesAndCarriesBytes() {
+        QFile caFile(QStringLiteral(SWIRL_FIXTURE_DIR "/localhost-cert.pem")),certFile(QStringLiteral(SWIRL_FIXTURE_DIR "/xray-proxy-server-cert.pem")),keyFile(QStringLiteral(SWIRL_FIXTURE_DIR "/xray-download-server-key.pem"));
+        QVERIFY(caFile.open(QIODevice::ReadOnly));QVERIFY(certFile.open(QIODevice::ReadOnly));QVERIFY(keyFile.open(QIODevice::ReadOnly));
+        const QSslCertificate ca(caFile.readAll()),certificate(certFile.readAll());const QSslKey key(keyFile.readAll(),QSsl::Rsa);
+        QVERIFY(!ca.isNull()&&!certificate.isNull()&&!key.isNull());QVERIFY(QSslSocket::supportsSsl());
+        QSslServer peer;auto tls=QSslConfiguration::defaultConfiguration();tls.setLocalCertificate(certificate);tls.setPrivateKey(key);
+        tls.setPeerVerifyMode(QSslSocket::VerifyNone); // Server does not require client certificates; the Rust client still verifies this server.
+        peer.setSslConfiguration(tls);QVERIFY(peer.listen(QHostAddress::LocalHost,0));
+        const QByteArray host="origin.fixture.invalid";
+        const auto authentication=QCryptographicHash::hash("fixture-password",QCryptographicHash::Sha224).toHex()+"\r\n"+QByteArray::fromHex("0103")+QByteArray(1,char(host.size()))+host+QByteArray::fromHex("01bb")+"\r\n";
+        int authenticated=0;bool unexpectedWire=false;
+        connect(&peer,&QTcpServer::pendingConnectionAvailable,&peer,[&]{while(peer.hasPendingConnections()){
+            auto *socket=peer.nextPendingConnection();auto buffer=std::make_shared<QByteArray>();
+            connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+            connect(socket,&QTcpSocket::readyRead,socket,[&,socket,buffer]{
+                buffer->append(socket->readAll());
+                if(!socket->property("authenticated").toBool()){
+                    if(buffer->size()<authentication.size())return;
+                    if(buffer->left(authentication.size())!=authentication){unexpectedWire=true;socket->abort();return;}
+                    buffer->remove(0,authentication.size());socket->setProperty("authenticated",true);++authenticated;
+                }
+                if(!buffer->isEmpty()){socket->write(*buffer);buffer->clear();}
+            });
+        }});
+        auto &library=RustCoreLibrary::instance();QVERIFY(library.load());const auto command=library.command();QVERIFY(command);
+        const auto call=[&](const QJsonObject &request){
+            auto bytes=QJsonDocument(request).toJson(QJsonDocument::Compact);QByteArray output(1024*1024,Qt::Uninitialized);
+            const auto count=command(reinterpret_cast<const unsigned char *>(bytes.constData()),size_t(bytes.size()),reinterpret_cast<unsigned char *>(output.data()),size_t(output.size()));bytes.fill('\0');
+            if(count<=0||count>output.size())return QJsonObject{};output.resize(count);return QJsonDocument::fromJson(output).object();
+        };
+        for(const auto &mode:QStringList{"verified","unknown-issuer","wrong-name"}){
+            const auto name=mode=="wrong-name"?QString("wrong.fixture.invalid"):QString("subscription.example.invalid");
+            const auto port=QByteArray::number(peer.serverPort());const auto encodedName=name.toUtf8();
+            const QByteArray uri="trojan://fixture-password@127.0.0.1:"+port+"?sni="+encodedName+"&allowInsecure=1#fixture";
+            const QList<QByteArray> sources{uri,uri.toBase64(),
+                "[Proxy]\nfixture = trojan,127.0.0.1,"+port+",fixture-password,tls-name:"+encodedName+",skip-cert-verify:true",
+                "[server_local]\ntrojan=127.0.0.1:"+port+",password=fixture-password,tls-host="+encodedName+",tls-verification=false,tag=fixture",
+                "proxies: [{name: fixture, type: trojan, server: 127.0.0.1, port: "+port+", password: fixture-password, sni: "+encodedName+", skip-cert-verify: true}]"};
+            for(const auto &source:sources){
+                const auto parsed=NodeImporter::parse(source);QVERIFY2(parsed,qPrintable(parsed.error));QVERIFY(parsed.nodes.first().certificateVerificationEnforced);
+                QJsonObject outbound;QVERIFY(NativeNodeBridge::executableOutbound(parsed.nodes.first(),&outbound).isEmpty());
+                auto parameters=outbound.value("tls").toObject();QCOMPARE(parameters.value("server_name"),QJsonValue(name));
+                // This public fixture CA is trusted for this isolated connection
+                // only. It is never imported into Windows or product settings.
+                if(mode!="unknown-issuer")parameters["ca_der_base64"]=QString::fromLatin1(ca.toDer().toBase64());outbound["tls"]=parameters;
+                const auto started=call({{"op","start"},{"config",QJsonObject{{"schema",1},{"listen","127.0.0.1:0"},{"selected","fixture"},{"nodes",QJsonArray{QJsonObject{{"id","fixture"},{"outbound",outbound}}}}}}});
+                QVERIFY(started.value("ok").toBool());const auto handle=started.value("handle").toInteger();
+                const auto stop=qScopeGuard([&]{call({{"op","stop"},{"handle",handle}});});
+                const auto listener=started.value("status").toObject().value("address").toString().section(':',-1).toUShort();QVERIFY(listener>0);
+                QTcpSocket client;client.setProxy(QNetworkProxy::NoProxy);client.connectToHost(QHostAddress::LocalHost,listener);
+                QVERIFY(QTest::qWaitFor([&]{return client.state()==QAbstractSocket::ConnectedState;},4000));
+                client.write("CONNECT origin.fixture.invalid:443 HTTP/1.1\r\nHost: origin.fixture.invalid:443\r\n\r\n");QByteArray reply;
+                QVERIFY(QTest::qWaitFor([&]{reply+=client.readAll();return reply.contains("\r\n\r\n")||client.state()==QAbstractSocket::UnconnectedState;},5000));
+                if(mode=="verified"){
+                    QVERIFY(reply.startsWith("HTTP/1.1 200 "));const QByteArray payload(65537,'T');QCOMPARE(client.write(payload),payload.size());QByteArray echo;
+                    QVERIFY(QTest::qWaitFor([&]{echo+=client.readAll();return echo.size()>=payload.size()||client.state()==QAbstractSocket::UnconnectedState;},5000));QCOMPARE(echo,payload);
+                }else QVERIFY(reply.startsWith("HTTP/1.1 502 "));
+                client.abort();QVERIFY(!unexpectedWire);
+            }
+        }
+        QCOMPARE(authenticated,5);QVERIFY(!unexpectedWire);
+    }
+    void mixedExecutableAndUnsupportedNodesRemainSeparatelyVisible() {
+        const QByteArray source="proxies: ["
+            "{name: working, type: trojan, server: proxy.invalid, port: 443, password: fixture-password, sni: subscription.example.invalid, skip-cert-verify: true},"
+            "{name: unsupported-protocol, type: snell, server: proxy.invalid, port: 443, psk: fixture-password},"
+            "{name: unsupported-option, type: trojan, server: proxy.invalid, port: 443, password: fixture-password, future-option: fixture-only}]";
+        const auto parsed=NodeImporter::parse(source);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),3);
+        QTemporaryDir folder;NodeStore store(folder.filePath("nodes.dpapi"));QVERIFY(store.importNodes(parsed.nodes));
+        NodeStore restored(store.filePath());QCOMPARE(restored.nodes().size(),3);
+        for(const auto &node:restored.nodes()){
+            QJsonObject outbound;const auto error=NativeNodeBridge::executableOutbound(node,&outbound);
+            QCOMPARE(error.isEmpty(),node.name=="working");QCOMPARE(node.publicInfo().value("nativeExecutable").toBool(),node.name=="working");
+            QVERIFY(!node.originalConfiguration.isEmpty());
+            if(node.name!="working"){QVERIFY(outbound.isEmpty());QVERIFY(!node.publicInfo().value("unsupportedReason").toString().isEmpty());}
+        }
+        auto unsafe=source;unsafe.replace("future-option: fixture-only","ca-file: fixture.pem");QVERIFY(!NodeImporter::parse(unsafe));
+        QFile stored(restored.filePath());QVERIFY(stored.open(QIODevice::ReadOnly));const auto before=stored.readAll();stored.close();
+        NodeImportService imports(&restored);imports.importText(QString::fromUtf8(unsafe));QTRY_VERIFY_WITH_TIMEOUT(!imports.busy(),4000);
+        QCOMPARE(restored.nodes().size(),3);QVERIFY(stored.open(QIODevice::ReadOnly));QCOMPARE(stored.readAll(),before);
     }
     void completeConfigurationWithoutOwnerDoesNotDiscardGlobals() {
         QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService imports(&store);
@@ -798,16 +915,20 @@ external-controller: 0.0.0.0:9090
         const QJsonObject configuration{{"schema",1},{"nativeDocumentRouting",true},
             {"groups",QJsonArray{QJsonObject{{"name","route"},{"type","select"},{"proxies",QJsonArray{owned,other}},{"default-selected",owned}}}},
             {"rules",QJsonArray{"DOMAIN,example.org,"+owned,"MATCH,route"}},
-            {"importedConfiguration",QJsonObject{{"sourceId",first}}}};
+            {"importedConfiguration",QJsonObject{{"sourceId",first}}},
+            {"subscriptionImportResults",QJsonObject{{first,QJsonObject{{"mode","complete"},{"notice","first-result"}}},{second,QJsonObject{{"mode","nodes"},{"notice","second-result"}}}}}};
         QVERIFY(store.saveNetworkConfiguration(configuration));QVERIFY(store.removeSubscription(first));
         QCOMPARE(store.nodes().size(),2);QVERIFY(store.selectedId().isEmpty());QCOMPARE(store.subscriptions().size(),1);
         const auto snapshot=store.networkConfiguration();const auto group=snapshot["groups"].toArray().first().toObject();
         QCOMPARE(group["proxies"].toArray(),QJsonArray({"REJECT",other}));QCOMPARE(group["default-selected"].toString(),QString("REJECT"));
         QCOMPARE(snapshot["rules"].toArray().first().toString(),QString("DOMAIN,example.org,REJECT"));QVERIFY(!snapshot.contains("importedConfiguration"));
+        QCOMPARE(snapshot["subscriptionImportResults"].toObject(),QJsonObject({{second,QJsonObject{{"mode","nodes"},{"notice","second-result"}}}}));
         NodeStore reloaded(path);QCOMPARE(reloaded.nodes().size(),2);QSet<QString> remaining;for(const auto &node:reloaded.nodes())remaining.insert(node.id);
         QVERIFY(remaining.contains(other));QVERIFY(remaining.contains(manual));QVERIFY(!remaining.contains(owned));
         QCOMPARE(reloaded.publicRows().last().toMap().value("sourceKind").toString(),QString("manual"));
+        QCOMPARE(reloaded.networkConfiguration()["subscriptionImportResults"],snapshot["subscriptionImportResults"]);
         QVERIFY(reloaded.removeSubscription(second));QCOMPARE(reloaded.nodes().size(),1);QCOMPARE(reloaded.nodes().first().id,manual);
+        QVERIFY(!reloaded.networkConfiguration().contains("subscriptionImportResults"));
     }
     void legacyDetachedNodesRequireExplicitCleanup_data() {
         QTest::addColumn<QString>("origin");

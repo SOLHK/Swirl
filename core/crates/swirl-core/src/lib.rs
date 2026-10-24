@@ -657,7 +657,24 @@ async fn session(
     }
     swirl_transport::relay(&mut inbound, &mut upstream, counters, state.totals.clone())
         .await
-        .map_err(|_| "StreamIo")
+        .map_err(|error| stream_failure_code(&error))
+}
+
+fn stream_failure_code(error: &std::io::Error) -> &'static str {
+    // Never copy OS/protocol error text (which can contain private targets) into
+    // snapshots. Keep the observed I/O failure without claiming who caused it.
+    use std::io::ErrorKind;
+    match error.kind() {
+        ErrorKind::ConnectionReset => "StreamConnectionReset",
+        ErrorKind::ConnectionAborted => "StreamConnectionAborted",
+        ErrorKind::UnexpectedEof => "StreamUnexpectedEof",
+        ErrorKind::TimedOut => "StreamTimedOut",
+        ErrorKind::BrokenPipe => "StreamBrokenPipe",
+        ErrorKind::InvalidData => "StreamInvalidData",
+        ErrorKind::WriteZero => "StreamWriteZero",
+        ErrorKind::PermissionDenied => "StreamPermissionDenied",
+        _ => "StreamIo",
+    }
 }
 
 async fn route<'a>(

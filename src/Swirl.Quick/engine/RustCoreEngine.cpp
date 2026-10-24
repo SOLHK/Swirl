@@ -10,6 +10,7 @@
 #include <QSet>
 #include <QHostAddress>
 #include <QRegularExpression>
+#include <QCryptographicHash>
 #include <algorithm>
 #include <functional>
 #include <limits>
@@ -355,6 +356,7 @@ void RustCoreEngine::start(const EngineStartOptions &options){
  }
  const auto response=call({{"op","start"},{"config",config}});
  if(!response["ok"].toBool()){fail(Error::ConfigurationFailed,response["error"].toString("RustStartFailed"));return;}
+ m_reportedForwardingFailures.clear();m_forwardingFailureLimitReported=false;
  m_handle=quint64(response["handle"].toInteger());m_status.sessionId=QUuid::createUuid().toString(QUuid::WithoutBraces);
  m_status.processId=QCoreApplication::applicationPid();m_status.version="Swirl Core Rust "+m_library.diagnostics().value("package_version").toString();m_status.controlEndpoint="in-process://SwirlRust/v1";
  m_status.mode=options.routingMode;m_status.directSession=options.directSession||options.routingMode=="direct";
@@ -363,7 +365,11 @@ void RustCoreEngine::start(const EngineStartOptions &options){
 }
 void RustCoreEngine::stop(){
  m_poll.stop();cancelProbe();
- if(m_handle){call({{"op","stop"},{"handle",qint64(m_handle)}});m_handle=0;}
+ if(m_handle){
+  const auto finalSnapshot=call({{"op","snapshot"},{"handle",qint64(m_handle)}});
+  if(finalSnapshot.value("ok").toBool())recordForwardingFailures(finalSnapshot.value("status").toObject());
+  call({{"op","stop"},{"handle",qint64(m_handle)}});m_handle=0;
+ }
  m_status.state=State::Stopped;m_status.processAlive=false;m_status.apiHealthy=false;m_status.nodeBusy=false;m_status.proxyPort=0;m_status.connections.clear();emit statusChanged();
 }
 void RustCoreEngine::refresh(){
@@ -371,6 +377,7 @@ void RustCoreEngine::refresh(){
  const auto response=call({{"op","snapshot"},{"handle",qint64(m_handle)}});
  if(!response["ok"].toBool()){fail(Error::ApiUnavailable,"Rust 状态读取失败。");return;}
  const auto state=response["status"].toObject();const auto elapsed=m_rateClock.restart();
+ recordForwardingFailures(state);
  const auto up=state["upload"].toInteger(),down=state["download"].toInteger();
  m_status.uploadRate=elapsed>0?double(up-m_status.uploadTotal)*1000/elapsed:0;m_status.downloadRate=elapsed>0?double(down-m_status.downloadTotal)*1000/elapsed:0;
  m_status.uploadTotal=up;m_status.downloadTotal=down;
@@ -398,6 +405,34 @@ void RustCoreEngine::refresh(){
   else updateProbe(result.value("probe").toObject());
  }
  emit statusChanged();
+}
+void RustCoreEngine::recordForwardingFailures(const QJsonObject &state){
+ // Fixed vocabularies only: arbitrary FFI strings, targets, names, credentials
+ // and OS messages must never become persistent diagnostic text.
+ static const QSet<QString> codes{
+  "HandshakeTimeout","InboundClosed","InboundAuthentication","InboundReply",
+  "UpstreamDnsTimeout","DnsLookupFailed","RouteDnsTimeout","UpstreamTcpTimeout","UpstreamConnectFailed","UpstreamAddressLimit",
+  "UpstreamConnectionRefused","UpstreamConnectionReset","UpstreamConnectionAborted","UpstreamNetworkUnreachable","UpstreamPermissionDenied",
+  "UpstreamTlsTimeout","TlsCertificateExpired","TlsCertificateNotValidYet","TlsCertificateNameMismatch","TlsCertificateUnknownIssuer",
+  "TlsCertificateRevoked","TlsCertificateInvalid","TlsCertificateMissing","TlsVerificationOrHandshake","TlsHandshakeEof","TlsConnectionReset","TlsConnectionAborted","TlsConnectionRefused","TlsHandshakeIoTimeout","TlsHandshakeBrokenPipe",
+  "UpstreamProtocolTimeout","UpstreamAuthentication","UpstreamRejected","UpstreamHeaderTooLarge","VmessHandshakeWrite","VlessHandshakeWrite","TrojanHandshakeWrite",
+  "StreamIo","StreamConnectionReset","StreamConnectionAborted","StreamUnexpectedEof","StreamTimedOut","StreamBrokenPipe","StreamInvalidData","StreamWriteZero","StreamPermissionDenied",
+  "InitialWriteTimeout","InitialWrite","WebSocketUpgradeTimeout","WebSocketUpgradeRead","WebSocketUpgradeRejected","RouteRejected"
+ };
+ static const QSet<QString> stages{"dns","tcp_connect","tls_handshake","quic_handshake","quic_tls_handshake","http_obfs","protocol_handshake","stream_io","inbound","protocol_authentication","http3_handshake","udp_relay","reality_handshake","websocket_upgrade","initial_write","routing","unknown"};
+ for(const auto &value:state.value("connections").toArray()){
+  const auto row=value.toObject();const auto error=row.value("error").toString();const auto id=row.value("id").toInteger();
+  if(error.isEmpty()||id<=0||m_reportedForwardingFailures.contains(quint64(id)))continue;
+  if(m_reportedForwardingFailures.size()>=256){
+   if(!m_forwardingFailureLimitReported){m_forwardingFailureLimitReported=true;emit diagnostic("SwirlRust","ForwardingFailureLimit","本次连接会话已记录 256 个转发失败；后续事件未逐条记录，请重新连接后复现一次并导出报告。");}
+   return;
+  }
+  m_reportedForwardingFailures.insert(quint64(id));
+  const auto code=codes.contains(error)?error:QStringLiteral("UnclassifiedForwardingError");
+  const auto rawStage=row.value("failure_stage").toString();const auto stage=stages.contains(rawStage)?rawStage:QStringLiteral("unknown");
+  const auto node=row.value("node").toString();const auto reference=node.isEmpty()?QStringLiteral("none"):QString::fromLatin1(QCryptographicHash::hash(node.toUtf8(),QCryptographicHash::Sha256).toHex().left(12));
+  emit diagnostic("SwirlRust","ForwardingFailed",QStringLiteral("连接 #%1 · 节点 #%2 · %3 · %4；仅记录观察到的失败，不能据此判定是节点、目标服务还是本机代理造成。").arg(id).arg(reference,stage,code));
+ }
 }
 void RustCoreEngine::selectNode(const QString &id){
  if(!m_handle)return;cancelProbe();auto options=m_options;options.selectedNodeId=id;options.directSession=false;
