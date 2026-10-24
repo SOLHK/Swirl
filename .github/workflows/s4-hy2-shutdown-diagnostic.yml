@@ -21,7 +21,6 @@ jobs:
       SWIRL_SOURCE_SHA: ${{ github.sha }}
       PYTHONUTF8: '1'
       HY2_CLIENT: ${{ github.workspace }}/core/target/debug/examples/hysteria2-client
-      SWIRL_HY2_OUTPUT: ${{ runner.temp }}/s4-hy2-shutdown
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -54,7 +53,7 @@ jobs:
                     'original_test_assertions_reduced': False, 'private_inputs': False}
           (output / 'identity.json').write_text(json.dumps(report, indent=2) + '\n')
       - name: Repeat unchanged HTTPS assertions and verify independent TLS close receipts
-        run: python tools/Run-Hysteria2ShutdownProbe.py --output "$SWIRL_HY2_OUTPUT"
+        run: python tools/Run-Hysteria2ShutdownProbe.py --output "$RUNNER_TEMP/s4-hy2-shutdown"
       - name: Require unchanged tracked source after the probe
         if: ${{ !cancelled() }}
         run: git diff --exit-code
