@@ -6,7 +6,10 @@
 #include <QQuickItem>
 #include <QQmlContext>
 #include <QQmlExpression>
+#include <QQmlComponent>
+#include <QQmlEngine>
 #include <QTest>
+#include <QSignalSpy>
 #include <QClipboard>
 #include <QGuiApplication>
 #include <QDir>
@@ -16,6 +19,7 @@
 #include <QJsonObject>
 #include <cstdio>
 #include <functional>
+#include <memory>
 
 int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     if(!window||!controller)return 1;
@@ -75,6 +79,78 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     if(check(waitEngineReady(),"UI starts actual Rust Core")) {
         check(!controller->requestSucceeded(),"running engine does not imply successful request");fill("nodeTestUrl",net.url().toString());
         probeSelected(net.a,net.b,"UI real request passes only through selected node A");
+        // Exercise the real Main toolbar after this test's node-page history,
+        // without invoking the real Windows adapter on the developer's host.
+        {
+            const auto hostProxyBefore=SystemProxySession::snapshot();
+#ifdef Q_OS_WIN
+            check(!hostProxyBefore.isEmpty(),"read-only Main proxy snapshot is available");
+#endif
+            const auto pidBefore=controller->processId();
+            eval("AppState.navigate('activity')");
+            const bool legacyReady=QTest::qWaitFor([&]{return eval("AppState.currentPage==='activity' && !pageLoader.pendingGrab && !pageLoader.moving").toBool();},3500);
+            auto *capsule=item("proxyCapsule");
+            if(check(capsule&&capsule->isVisible(),"read-only Main proxy capsule is visible")) {
+                QQmlComponent component(qmlEngine(window));
+                component.setData(R"(
+                    import QtQuick
+                    QtObject {
+                        property bool busy: false
+                        property bool systemProxyBusy: false
+                        property string routingError: ""
+                        property string error: ""
+                        property int calls: 0
+                        property QtObject systemProxy: QtObject {
+                            property bool systemEnabled: false
+                            property string stateReadError: ""
+                            property string error: ""
+                        }
+                        function toggleSystemProxy() {
+                            calls++
+                            systemProxy.systemEnabled=!systemProxy.systemEnabled
+                        }
+                    }
+                )",QUrl());
+                std::unique_ptr<QObject> fake(component.create());
+                if(check(fake!=nullptr,"read-only Main proxy controller is created")) {
+                    const auto originalController=capsule->property("controller");
+                    {
+                        struct RestoreController {
+                            QQuickItem *capsule;QVariant original;
+                            ~RestoreController(){capsule->setProperty("controller",original);}
+                        } restore{capsule,originalController};
+                        if(check(capsule->setProperty("controller",QVariant::fromValue(fake.get())),"read-only Main proxy controller is bound")) {
+                            QSignalSpy clicked(capsule,SIGNAL(clicked()));
+                            check(clicked.isValid(),"read-only Main proxy clicked signal is observed");
+                            const auto *legacyActive=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;
+                            const auto legacyRoute=legacyActive?legacyActive->property("routeId").toString():QString();
+                            const auto legacyPoint=capsule->mapToScene(QPointF(capsule->width()/2,capsule->height()/2));
+                            const QSizeF legacySize(capsule->width(),capsule->height());
+                            click("proxyCapsule");
+                            qInfo()<<"Main proxy legacy readiness evidence"<<legacyReady<<legacyRoute<<legacyPoint<<legacySize<<clicked.count()<<fake->property("calls").toInt();
+                            check(clicked.count()==1&&fake->property("calls").toInt()==1,"visible Main proxy accepts an immediate click while the previous page retires");
+                            check(capsule->property("label").toString()==QStringLiteral("关闭系统代理")&&eval("AppState.currentPage==='activity'").toBool(),"immediate Main proxy action updates its label without navigation");
+                            check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;return active&&active->property("routeId").toString()=="activity"&&!host->property("pendingGrab").toBool()&&!host->property("moving").toBool()&&capsule->isVisible()&&capsule->width()>0&&capsule->height()>0;},3500),"read-only Main proxy input test settles on Activity");
+                            fake->setProperty("calls",0);
+                            fake->property("systemProxy").value<QObject *>()->setProperty("systemEnabled",false);
+                            clicked.clear();
+                            click("proxyCapsule");
+                            check(clicked.count()==1&&fake->property("calls").toInt()==1,"real Main proxy pointer dispatches enable exactly once");
+                            check(capsule->property("label").toString()==QStringLiteral("关闭系统代理"),"real Main proxy input updates observed action label");
+                            click("proxyCapsule");
+                            check(clicked.count()==2&&fake->property("calls").toInt()==2,"real Main proxy pointer dispatches disable exactly once");
+                            check(capsule->property("label").toString()==QStringLiteral("开启系统代理"),"real Main proxy second input restores enable label");
+                            check(eval("AppState.currentPage==='activity'").toBool(),"real Main proxy pointer input does not navigate");
+                        }
+                    }
+                    check(capsule->property("controller")==originalController,"read-only Main proxy controller is restored");
+                }
+            }
+            check(SystemProxySession::snapshot()==hostProxyBefore,"Main proxy pointer regression leaves host settings unchanged");
+            check(controller->processId()==pidBefore&&controller->apiHealthy(),"Main proxy pointer regression leaves live Rust runtime unchanged");
+            eval("AppState.navigate('proxies')");
+            check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;return active&&active->property("routeId").toString()=="proxies"&&!host->property("moving").toBool()&&!host->property("pendingGrab").toBool();},3500),"read-only Main proxy input test returns to nodes");
+        }
         if(qEnvironmentVariable("SWIRL_SYSTEM_PROXY_TEST")==QStringLiteral("1")) {
             const auto original=SystemProxySession::snapshot();
             if(!check(!original.isEmpty(),"disposable proxy UI test snapshots original settings"))return 2;
@@ -86,10 +162,21 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
             controller->setSystemProxy(false);
             if(!check(controller->systemProxy()->turnOffSystemProxy(),"disposable proxy UI test starts from observed off state"))return 2;
             eval("AppState.navigate('activity')");
-            check(QTest::qWaitFor([&]{return eval("AppState.currentPage==='activity' && !pageLoader.pendingGrab && !pageLoader.moving").toBool();},3500),"proxy action page settles before real input");
+            check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;auto *capsule=item("proxyCapsule");return active&&active->property("routeId").toString()=="activity"&&!host->property("pendingGrab").toBool()&&!host->property("moving").toBool()&&capsule&&capsule->isVisible()&&capsule->width()>0&&capsule->height()>0;},3500),"proxy action page settles before real input");
             const auto pidBefore=controller->processId();
+            auto *actualCapsule=item("proxyCapsule");
+            QSignalSpy actualClicked(actualCapsule,SIGNAL(clicked()));
+            check(actualClicked.isValid(),"actual proxy action clicked signal is observed");
             click("proxyCapsule");
-            if(check(QTest::qWaitFor([&]{return controller->systemProxy()->owned()&&controller->systemProxy()->enabled()&&controller->systemProxy()->systemEnabled();},5000),"actual activity button enables Windows proxy through the live Rust listener")) {
+            const bool firstEnabled=QTest::qWaitFor([&]{return controller->systemProxy()->owned()&&controller->systemProxy()->enabled()&&controller->systemProxy()->systemEnabled();},5000);
+            const int firstEnableClicks=int(actualClicked.count());
+            const QJsonObject firstEnableState{{"owned",controller->systemProxy()->owned()},{"enabled",controller->systemProxy()->enabled()},{"systemEnabled",controller->systemProxy()->systemEnabled()},
+                {"busy",controller->busy()},{"systemProxyBusy",controller->systemProxyBusy()},{"apiHealthy",controller->apiHealthy()},
+                {"processId",double(controller->processId().toLongLong())},{"activeProxyPort",controller->activeProxyPort()},{"errorCode",controller->errorCode()},
+                {"proxyError",controller->systemProxy()->error()},{"routingError",controller->routingError()},{"stateReadError",controller->systemProxy()->stateReadError()}};
+            qInfo()<<"Proxy UI first enable evidence"<<firstEnableClicks<<QJsonDocument(firstEnableState).toJson(QJsonDocument::Compact);
+            check(firstEnableClicks==1,"actual proxy enable pointer reaches its clicked handler exactly once");
+            if(check(firstEnabled,"actual activity button enables Windows proxy through the live Rust listener")) {
                 check(controller->processId()==pidBefore&&controller->apiHealthy(),"proxy enable reuses the existing healthy Rust runtime");
                 check(eval("AppState.currentPage==='activity'").toBool(),"actual proxy enable does not navigate");
                 click("proxyCapsule");
@@ -114,7 +201,8 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
             const auto reportPath=qEnvironmentVariable("SWIRL_SYSTEM_PROXY_UI_REPORT");
             QFile report(reportPath);
             if(check(!reportPath.isEmpty()&&report.open(QIODevice::WriteOnly),"disposable proxy UI evidence file opens"))
-                report.write(QJsonDocument(QJsonObject{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"executed",true},{"restored",restored},{"success",failures==failuresBefore}}).toJson());
+                report.write(QJsonDocument(QJsonObject{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"executed",true},{"restored",restored},{"success",failures==failuresBefore},
+                    {"first_enable_click_count",firstEnableClicks},{"first_enable_state",firstEnableState}}).toJson());
             eval("AppState.navigate('proxies')");QTest::qWait(350);
         }
         const auto pid=controller->processId();

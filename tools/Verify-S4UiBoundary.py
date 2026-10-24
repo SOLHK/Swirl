@@ -22,6 +22,7 @@ MAIN_PROXY_ACTION = (
     'SwirlStatusCapsule {id:proxyCapsule;objectName:"proxyCapsule";Layout.preferredWidth:implicitWidth;Layout.preferredHeight:Theme.dp(28);label:window.proxyStatusLabel;tone:engineController.systemProxy.error.length||engineController.routingError.length?"warning":engineController.systemProxy.systemEnabled?"success":"neutral";detail:"打开节点管理";onClicked:AppState.navigate("proxies")}',
     'SwirlSystemProxyCapsule {id:proxyCapsule;objectName:"proxyCapsule";Layout.preferredWidth:implicitWidth;Layout.preferredHeight:Theme.dp(28);controller:engineController}',
 )
+MAIN_TOOLBAR_INPUT = ('id:toolbar; visible:', 'id:toolbar; z:1; visible:')
 
 
 def inspect(root):
@@ -35,6 +36,10 @@ def inspect(root):
         content = path.read_bytes().replace(b"\r\n", b"\n") if path.is_file() else b""
         if entry["path"] == "src/Swirl.Quick/qml/Main.qml":
             before, after = (value.encode() for value in MAIN_PROXY_ACTION)
+            if content.count(after) != 1 or before in content:
+                changed.append(entry["path"])
+            content = content.replace(after, before)
+            before, after = (value.encode() for value in MAIN_TOOLBAR_INPUT)
             if content.count(after) != 1 or before in content:
                 changed.append(entry["path"])
             content = content.replace(after, before)
