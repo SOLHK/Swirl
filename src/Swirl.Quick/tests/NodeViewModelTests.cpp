@@ -12,6 +12,16 @@
 class NodeViewModelTests : public QObject {
     Q_OBJECT
 private slots:
+    void sourceKindsKeepManualSubscriptionAndLegacySeparate(){
+        NodeViewModel model;model.updateRows({
+            QVariantMap{{"id","manual"},{"name","Manual"},{"sourceId",""},{"sourceKind","manual"}},
+            QVariantMap{{"id","old"},{"name","Old"},{"sourceId",""},{"sourceKind","legacy"}},
+            QVariantMap{{"id","remote"},{"name","Remote"},{"sourceId","provider-a"},{"sourceKind","subscription"}}});
+        model.setFilters({{"sourceKind","manual"}});QCOMPARE(model.rowCount(),1);QCOMPARE(model.get(0).value("id").toString(),QString("manual"));
+        model.setFilters({{"sourceKind","legacy"}});QCOMPARE(model.rowCount(),1);QCOMPARE(model.get(0).value("id").toString(),QString("old"));
+        model.setFilters({{"sourceKind","subscription"},{"sourceId","provider-a"}});QCOMPARE(model.rowCount(),1);QCOMPARE(model.get(0).value("id").toString(),QString("remote"));
+        model.setFilters({});QCOMPARE(model.rowCount(),3);
+    }
     void unrelatedStatusDoesNotScheduleCatalogWork(){
         QTemporaryDir temp;QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,temp.path());
         EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,temp.filePath("nodes.dpapi"));

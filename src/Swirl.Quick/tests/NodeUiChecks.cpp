@@ -318,8 +318,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         click("deleteSubscription-"+id);QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(250);
         check(controller->imports()->providers().size()==1,"Escape cancels destructive subscription confirmation");
         click("deleteSubscription-"+id);click("confirmSubscriptionDelete");
-        check(controller->imports()->providers().isEmpty()&&controller->nodes().size()==1,"confirmed deletion retains nodes as documented");
-        controller->deleteNode(controller->nodes().first().toMap().value("id").toString());
+        check(controller->imports()->providers().isEmpty()&&controller->nodes().isEmpty(),"confirmed deletion removes the source's owned nodes");
     }
     // Large-list layout/transfer fixture uses reserved local endpoints only.
     QString batch="proxies:\n";

@@ -18,11 +18,18 @@ pub use reality::Reality;
 pub use stream_transport::StreamTransport;
 pub use websocket::WebSocket;
 pub mod inspect;
+pub mod profile;
 pub mod xray;
 pub use dns_tls::DnsTlsServer;
 use std::{collections::HashSet, net::SocketAddr};
 
 pub const MAX_DOCUMENT: usize = 1024 * 1024;
+
+/// Bounded JSON parsing shared by offline import boundaries. Duplicate keys
+/// fail at every depth before a client-specific projection can discard them.
+pub fn parse_json_value(bytes: &[u8]) -> Result<serde_json::Value, xray::Diagnostic> {
+    xray::parse_json_value(bytes)
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

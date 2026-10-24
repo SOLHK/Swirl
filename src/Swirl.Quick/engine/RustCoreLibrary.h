@@ -31,6 +31,7 @@ public:
     Command command() const { QMutexLocker lock(&m_mutex); return m_command; }
     Command importXray() const { QMutexLocker lock(&m_mutex); return m_importXray; }
     Command importNode() const { QMutexLocker lock(&m_mutex); return m_importNode; }
+    Command importProfile() const { QMutexLocker lock(&m_mutex); return m_importProfile; }
     bool isReady() const { QMutexLocker lock(&m_mutex); return m_command != nullptr; }
     QJsonObject diagnostics() const { QMutexLocker lock(&m_mutex); return m_diagnostics; }
     QString errorString() const;
@@ -49,6 +50,7 @@ private:
     Command m_command = nullptr;
     Command m_importXray = nullptr;
     Command m_importNode = nullptr;
+    Command m_importProfile = nullptr;
     QJsonObject m_diagnostics;
     QString m_message;
 };

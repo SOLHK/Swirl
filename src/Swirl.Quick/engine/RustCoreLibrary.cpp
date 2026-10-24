@@ -155,6 +155,7 @@ bool RustCoreLibrary::fail(const char *stage, const char *code, const QString &m
     m_command = nullptr;
     m_importXray = nullptr;
     m_importNode = nullptr;
+    m_importProfile = nullptr;
     m_message = message;
     m_diagnostics["stage"] = QString::fromLatin1(stage);
     m_diagnostics["code"] = QString::fromLatin1(code);
@@ -340,8 +341,10 @@ bool RustCoreLibrary::load(const QString &absolutePath)
     // checks as runtime commands. A consumer fails closed if its export is absent.
     m_importXray = reinterpret_cast<Command>(m_library.resolve("swirl_import_xray_v1"));
     m_importNode = reinterpret_cast<Command>(m_library.resolve("swirl_import_node_v1"));
+    m_importProfile = reinterpret_cast<Command>(m_library.resolve("swirl_import_profile_v1"));
     m_diagnostics["import_xray_available"] = m_importXray != nullptr;
     m_diagnostics["import_node_available"] = m_importNode != nullptr;
+    m_diagnostics["import_profile_available"] = m_importProfile != nullptr;
     m_command = command;
     m_diagnostics["stage"] = QStringLiteral("ready");
     m_diagnostics["code"] = QStringLiteral("Ok");

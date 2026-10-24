@@ -1,7 +1,7 @@
 name: S4 mobile Rust compilation boundaries
 on:
   push:
-    branches: [work/swirl-s4-final-completion-20261023]
+    branches: [work/swirl-s4-final-completion-20261023, work/swirl-017-subscription-network-20261024]
     paths: ['core/**', 'tools/tests/test_portable_core_boundary.py', '.github/workflows/s4-portability.yml']
   workflow_dispatch:
 permissions:

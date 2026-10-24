@@ -46,7 +46,7 @@ static QJsonObject serialize(const ProxyNode &n) {
         // per-account options and raw outbounds must not duplicate a large
         // multi-user outbound for every expanded node (quadratic disk use).
         return {{"id",n.id},{"name",n.name},{"protocol",n.protocol},{"host",n.host},{"port",n.port},
-            {"sourceId",n.sourceId},{"sourceFormat",n.sourceFormat},{"importSource",n.importSource},
+            {"sourceId",n.sourceId},{"sourceFormat",n.sourceFormat},{"importSource",n.importSource},{"providerAlias",n.providerAlias},
             {"transportType",n.transportType},{"securityType",n.securityType},
             {"conversionIssues",QJsonArray::fromStringList(n.conversionIssues)}};
     }
@@ -54,7 +54,7 @@ static QJsonObject serialize(const ProxyNode &n) {
     // executable capability caches or other derived flags to become authority.
     return {{"id",n.id},{"name",n.name},{"protocol",n.protocol},{"host",n.host},{"port",n.port},
         {"username",n.username},{"password",n.password},{"cipher",n.cipher},{"serverName",n.serverName},
-        {"sourceId",n.sourceId},{"sourceFormat",n.sourceFormat},{"importSource",n.importSource},
+        {"sourceId",n.sourceId},{"sourceFormat",n.sourceFormat},{"importSource",n.importSource},{"providerAlias",n.providerAlias},
         {"options",n.parameters},{"originalConfiguration",n.originalConfiguration},
         {"conversionIssues",QJsonArray::fromStringList(n.conversionIssues)}};
 }
@@ -68,6 +68,7 @@ static ProxyNode deserialize(const QVariantMap &m) {
     n.originalConfiguration=QJsonObject::fromVariantMap(m.value("originalConfiguration").toMap());
     n.sourceFormat=m.value("sourceFormat").toString();n.conversionIssues=m.value("conversionIssues").toStringList();
     n.importSource=m.value("importSource").toString();
+    n.providerAlias=m.value("providerAlias").toString();
     n.transportType=m.value("transportType").toString();n.securityType=m.value("securityType").toString();
     // A previous importer may have accepted a URI while losing an unsupported
     // source field from its normalized options. Recheck the preserved source
@@ -109,8 +110,26 @@ bool NodeStore::allowMutation() {
     m_error=QStringLiteral("节点库正在安全保存，请等待完成后重试。");return false;
 }
 QVariantList NodeStore::publicRows() const {
-    if(m_publicRows.isEmpty())for(const auto &n:m_nodes)m_publicRows.append(n.publicInfo());
+    if(m_publicRows.isEmpty()) {
+        QHash<QString,QString> sources;
+        for(const auto &source:m_subscriptions)sources.insert(source.id,source.name);
+        for(const auto &n:m_nodes) {
+            auto row=n.publicInfo();
+            const bool legacy=legacyNode(n),subscription=!legacy&&!n.sourceId.isEmpty();
+            row.insert("sourceKind",legacy?QStringLiteral("legacy"):subscription?QStringLiteral("subscription"):QStringLiteral("manual"));
+            row.insert("sourceName",legacy?QStringLiteral("历史节点 · 归属待确认"):subscription?sources.value(n.sourceId):QStringLiteral("手动添加"));
+            m_publicRows.append(row);
+        }
+    }
     return m_publicRows;
+}
+bool NodeStore::legacyNode(const ProxyNode &node) const {
+    if(!node.sourceId.isEmpty())
+        return std::none_of(m_subscriptions.cbegin(),m_subscriptions.cend(),[&](const auto &source){return source.id==node.sourceId;});
+    return node.importSource=="subscription" || (node.importSource.isEmpty()&&!node.sourceFormat.isEmpty());
+}
+int NodeStore::legacyNodeCount() const {
+    return int(std::count_if(m_nodes.cbegin(),m_nodes.cend(),[this](const auto &node){return legacyNode(node);}));
 }
 void NodeStore::load() {
     QFile file(m_path);
@@ -164,6 +183,7 @@ void NodeStore::load() {
     for (const auto &entry : array) {
         if(!entry.isObject()) {m_error=QStringLiteral("保存的节点结构无效。");return;}
         const auto object=entry.toObject();
+        if(object.contains("providerAlias")&&!object.value("providerAlias").isString()){m_error=QStringLiteral("保存的订阅节点别名类型无效；原文件保持不变。");return;}
         auto n=deserialize(object.toVariantMap());
         if(object.contains("sourceDocumentRef")) {
             const auto reference=object.value("sourceDocumentRef");
@@ -187,7 +207,7 @@ void NodeStore::load() {
                 // Raw source is authoritative for secrets/options. Preserve
                 // user identity, the editable display name and provenance.
                 const auto saved=n;n=found.value();
-                n.id=saved.id;n.name=saved.name;n.sourceId=saved.sourceId;n.importSource=saved.importSource;
+                n.id=saved.id;n.name=saved.name;n.sourceId=saved.sourceId;n.importSource=saved.importSource;n.providerAlias=saved.providerAlias;
                 n.sourceDocument=saved.sourceDocument;n.sourceNodeIndex=saved.sourceNodeIndex;
             } else {
                 // A missing/new DLL or failed revalidation must disable the
@@ -214,7 +234,10 @@ void NodeStore::load() {
         if(QUuid(s.id).isNull() || sourceIds.contains(s.id) || !allowedSubscriptionUrl(s.url) || !subscriptionFormats().contains(s.formatHint) || !subscriptionScopes().contains(s.importScope) || s.name.isEmpty() || s.name.size()>128 || s.intervalMinutes<15 || s.intervalMinutes>10080 || subscriptions.size()>=32){m_error=QStringLiteral("保存的订阅参数无效；未覆盖原文件。");return;}
         sourceIds.insert(s.id);subscriptions.append(s);
     }
-    for(const auto &n:nodes)if(!n.sourceId.isEmpty() && !sourceIds.contains(n.sourceId)){m_error=QStringLiteral("节点订阅归属无效；未覆盖原文件。");return;}
+    // An older version may have removed the subscription record while leaving
+    // its nodes behind. Preserve orphaned data and present it for explicit
+    // cleanup; an uncertain owner must not make the entire catalog unreadable.
+    for(const auto &n:nodes)if(!n.sourceId.isEmpty() && QUuid(n.sourceId).isNull()){m_error=QStringLiteral("节点订阅标识无效；未覆盖原文件。");return;}
     const auto network=document.object().value("networkConfiguration");
     if(!network.isUndefined() && (!network.isObject() || network.toObject().value("schema").toInt()!=1)) {
         m_error=QStringLiteral("保存的网络配置无效；原文件保持不变。");return;
@@ -353,7 +376,8 @@ bool NodeStore::saveNode(const QVariantMap &input) {
         if(!input.contains("options"))n.parameters=nodes[index].parameters;
         else {auto merged=nodes[index].parameters;for(auto it=n.parameters.begin();it!=n.parameters.end();++it)merged.insert(it.key(),it.value());n.parameters=merged;}
     }
-    if(index>=0){n.sourceId=nodes[index].sourceId;n.sourceFormat=nodes[index].sourceFormat;n.originalConfiguration=nodes[index].originalConfiguration;n.conversionIssues=nodes[index].conversionIssues;}
+    if(index>=0){n.sourceId=nodes[index].sourceId;n.sourceFormat=nodes[index].sourceFormat;n.originalConfiguration=nodes[index].originalConfiguration;n.conversionIssues=nodes[index].conversionIssues;n.importSource=nodes[index].importSource;n.providerAlias=nodes[index].providerAlias;}
+    else {n.sourceId.clear();n.sourceFormat.clear();n.importSource="manual";n.providerAlias.clear();n.originalConfiguration={};n.conversionIssues.clear();}
     if(index>=0 && n.protocol==nodes[index].protocol && n.protocol!="ss" && n.cipher.isEmpty())n.cipher=nodes[index].cipher;
     m_error=ProxyNode::validate(n); if (!m_error.isEmpty()) return false;
     if (index<0) { if (nodes.size()>=2000) { m_error=QStringLiteral("最多保存 2000 个节点。"); return false; } nodes.append(n); }
@@ -406,19 +430,57 @@ bool NodeStore::saveSubscription(const QString &id,const QString &name,const QUr
     s.name=name.trimmed();if(!url.isEmpty())s.url=url;s.intervalMinutes=interval;s.enabled=enabled;
     if(!formatHint.isEmpty())s.formatHint=formatHint;
     if(!importScope.isEmpty())s.importScope=importScope;
-    if(!subscriptionFormats().contains(s.formatHint)){m_error=QStringLiteral("订阅格式偏好无效。");return false;}
+    if(!subscriptionFormats().contains(s.formatHint)){m_error=QStringLiteral("订阅格式无效。");return false;}
     if(!subscriptionScopes().contains(s.importScope)){m_error=QStringLiteral("订阅导入范围无效。");return false;}
     if(s.name.isEmpty() || s.name.size()>128 || s.name.contains(QRegularExpression("[\\x00-\\x1f]")) || !allowedSubscriptionUrl(s.url) || interval<15 || interval>10080){m_error=QStringLiteral("需要有效名称、HTTPS 订阅地址及 15–10080 分钟更新间隔（仅本机测试允许 HTTP）。");return false;}
+    for(const auto &existing:sources)if(existing.id!=s.id&&existing.url==s.url){m_error=QStringLiteral("此订阅地址已存在；请更新已有订阅，避免重复节点来源。");return false;}
     if(index<0){if(sources.size()>=32){m_error=QStringLiteral("最多保存 32 个订阅。");return false;}sources.append(s);}else sources[index]=s;
     return write(m_nodes,m_selected,sources,m_networkConfiguration);
+}
+namespace {
+QJsonObject withoutRemovedNodes(QJsonObject configuration,const QSet<QString> &removed,const QString &sourceId={}) {
+    // Preserve the policy graph and fail closed at exactly the removed node.
+    // Deleting a rule or an empty group could silently change its traffic to
+    // the fallback/DIRECT route. REJECT remains a valid explicit destination.
+    auto groups=configuration.value("groups").toArray();
+    for(int i=0;i<groups.size();++i) {
+        auto group=groups[i].toObject();auto members=group.value("proxies").toArray();
+        bool changed=false;
+        for(int j=0;j<members.size();++j)if(removed.contains(members[j].toString())){members[j]="REJECT";changed=true;}
+        if(changed) {
+            QJsonArray unique;for(const auto &member:members)if(!unique.contains(member))unique.append(member);
+            group.insert("proxies",unique);
+            if(removed.contains(group.value("default-selected").toString()))group.insert("default-selected","REJECT");
+            groups[i]=group;
+        }
+    }
+    if(configuration.contains("groups"))configuration.insert("groups",groups);
+    auto rules=configuration.value("rules").toArray();
+    for(int i=0;i<rules.size();++i) {
+        auto fields=rules[i].toString().split(',');for(auto &field:fields)field=field.trimmed();
+        const auto target=fields.value(0)=="MATCH"?1:2;
+        if(fields.size()>target&&removed.contains(fields[target])){fields[target]="REJECT";rules[i]=fields.join(',');}
+    }
+    if(configuration.contains("rules"))configuration.insert("rules",rules);
+    if(!sourceId.isEmpty()&&configuration.value("importedConfiguration").toObject().value("sourceId").toString()==sourceId)
+        configuration.remove("importedConfiguration");
+    return configuration;
+}
 }
 bool NodeStore::removeSubscription(const QString &id) {
     if(!allowMutation())return false;
     auto sources=m_subscriptions;const auto old=sources.size();sources.removeIf([&](const auto &s){return s.id==id;});
     if(old==sources.size()){m_error=QStringLiteral("订阅不存在。");return false;}
-    // Removing a source keeps its already imported nodes as manual nodes.
-    auto nodes=m_nodes;for(auto &n:nodes)if(n.sourceId==id)n.sourceId.clear();
-    return write(nodes,m_selected,sources,m_networkConfiguration);
+    QSet<QString> removed;auto nodes=m_nodes;
+    nodes.removeIf([&](const auto &node){if(node.sourceId!=id)return false;removed.insert(node.id);return true;});
+    return write(nodes,removed.contains(m_selected)?QString():m_selected,sources,withoutRemovedNodes(m_networkConfiguration,removed,id));
+}
+bool NodeStore::cleanLegacyNodes() {
+    if(!allowMutation())return false;
+    QSet<QString> removed;auto nodes=m_nodes;
+    nodes.removeIf([&](const auto &node){if(!legacyNode(node))return false;removed.insert(node.id);return true;});
+    if(removed.isEmpty()){m_error=QStringLiteral("没有需要清理的历史归属节点。");return false;}
+    return write(nodes,removed.contains(m_selected)?QString():m_selected,m_subscriptions,withoutRemovedNodes(m_networkConfiguration,removed));
 }
 namespace {
 struct IdentityCache {
@@ -496,7 +558,13 @@ QByteArray sourceAnchor(const ProxyNode &node) {
     // Only an explicit original-source alias is a provider update key. A Qt
     // display name alone never authorizes replacing another remote endpoint.
     const auto original=node.originalConfiguration;
-    const auto tag=node.isXray()?original.value("outbound").toObject().value("tag"):original.value("name");
+    QJsonValue tag=node.isXray()?original.value("outbound").toObject().value("tag"):QJsonValue(node.providerAlias);
+    if(!node.isXray()&&tag.toString().isEmpty()) {
+        tag=original.value("name");
+        if(tag.toString().isEmpty())tag=original.value("tag");
+        if(tag.toString().isEmpty())tag=original.value("vmess").toObject().value("ps");
+        if(tag.toString().isEmpty()&&original.value("uri").isString())tag=QUrl(original.value("uri").toString()).fragment(QUrl::FullyDecoded);
+    }
     if(!tag.isString() || tag.toString().isEmpty())return {};
     const auto source=original.value("source").toObject();
     const QJsonArray anchor{node.protocol,tag,source.value("server_index"),source.value("user_index")};
@@ -528,10 +596,11 @@ bool NodeStore::prepareImport(const QList<ProxyNode> &incoming,const QString &so
     QList<QByteArray> identities,incomingAnchors,incomingOrigins;
     QSet<QByteArray> requested;
     QHash<QByteArray,QSet<QByteArray>> anchorIdentities;
-    for(const auto &node:incoming) {
+    for(auto node:incoming) {
         m_error=ProxyNode::validate(node);if(!m_error.isEmpty())return false;
         if(parsedIds.contains(node.id)) {m_error=QStringLiteral("导入节点标识重复；原配置保持不变。");return false;}
         parsedIds.insert(node.id);
+        if(!sourceId.isEmpty()&&node.providerAlias.isEmpty())node.providerAlias=node.name;
         const auto origin=sourceLocator(node,identityCache);
         const auto identity=semanticIdentity(node,origin,identityCache),anchor=sourceAnchor(node);
         incomingOrigins.append(origin);
@@ -548,6 +617,7 @@ bool NodeStore::prepareImport(const QList<ProxyNode> &incoming,const QString &so
     };
     for(int i=0;i<incoming.size();++i) {
         auto node=incoming[i];const auto parsedId=node.id;const auto identity=identities[i];
+        if(!sourceId.isEmpty()&&node.providerAlias.isEmpty())node.providerAlias=node.name;
         if(imported.contains(identity)) {
             const auto id=imported.value(identity);
             if(allIds.contains(parsedId) && parsedId!=id) {m_error=QStringLiteral("导入节点标识与其他节点或订阅冲突；原配置保持不变。");return false;}
@@ -564,13 +634,19 @@ bool NodeStore::prepareImport(const QList<ProxyNode> &incoming,const QString &so
         }
         if(matched.isEmpty() && !sourceId.isEmpty() && !incomingAnchors[i].isEmpty()) {
             const auto candidates=anchors.value(incomingAnchors[i]);
+            if(candidates.size()>1 || (!candidates.isEmpty()&&anchorIdentities.value(incomingAnchors[i]).size()>1)) {
+                m_error=QStringLiteral("订阅节点别名存在多个更新目标，无法安全同步；原配置保持不变。");return false;
+            }
             if(candidates.size()==1 && anchorIdentities.value(incomingAnchors[i]).size()==1 &&
                !requested.contains(oldIdentities.value(candidates.first())))matched=candidates.first();
         }
         if(allIds.contains(parsedId) && parsedId!=matched) {m_error=QStringLiteral("导入节点标识与其他节点或订阅冲突；原配置保持不变。");return false;}
         if(!matched.isEmpty())node.id=matched;
         if(assigned.contains(node.id)) {m_error=QStringLiteral("订阅来源身份不唯一；原配置保持不变。");return false;}
-        node.sourceId=sourceId;assigned.insert(node.id);imported.insert(identity,node.id);
+        node.sourceId=sourceId;
+        if(!sourceId.isEmpty())node.importSource="subscription";
+        else if(node.importSource.isEmpty())node.importSource="manual-import";
+        assigned.insert(node.id);imported.insert(identity,node.id);
         plan.m_ids.insert(parsedId,node.id);mapName(node.name,node.id);
         plan.m_nodes.removeIf([&](const auto &old){return old.id==node.id;});plan.m_nodes.append(std::move(node));
     }

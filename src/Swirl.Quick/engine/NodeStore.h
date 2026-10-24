@@ -39,9 +39,11 @@ public:
     QList<NodeSubscription> subscriptions() const { return m_subscriptions; }
     QVariantList publicSubscriptions() const;
     bool saveSubscription(const QString &id, const QString &name, const QUrl &url, int intervalMinutes, bool enabled,const QString &formatHint={},const QString &importScope={});
-    static QStringList subscriptionFormats(){return {"auto","loon","shadowrocket","surge","quantumult-x","sing-box","xray-v2ray-json"};}
+    static QStringList subscriptionFormats(){return {"auto","clash","loon","shadowrocket","surge","quantumult-x","sing-box","xray-v2ray-json"};}
     static QStringList subscriptionScopes(){return {"full-profile","nodes-only"};}
     bool removeSubscription(const QString &id);
+    int legacyNodeCount() const;
+    bool cleanLegacyNodes();
     // A prepared import is immutable outside this store. Names/parse IDs map to
     // the final stable UUIDs before any policy configuration is compiled.
     class ImportPlan {
@@ -74,6 +76,7 @@ signals:
 private:
     bool write(const QList<ProxyNode> &nodes, const QString &selected, const QList<NodeSubscription> &subscriptions, const QJsonObject &networkConfiguration);
     bool allowMutation();
+    bool legacyNode(const ProxyNode &node) const;
     void adoptSnapshot(const QList<ProxyNode> &nodes, const QString &selected, const QList<NodeSubscription> &subscriptions, const QJsonObject &networkConfiguration,const QByteArray &snapshotDigest);
     void load();
     QString m_path, m_selected, m_error;

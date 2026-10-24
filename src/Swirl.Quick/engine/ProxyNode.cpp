@@ -36,6 +36,8 @@ static bool validHost(const QString &host) {
     return true;
 }
 QString ProxyNode::validate(const ProxyNode &n) {
+    if(n.providerAlias.size()>128||n.providerAlias.contains(QRegularExpression("[\\x00-\\x1f]")))
+        return QStringLiteral("订阅节点别名超过 128 字符或含控制字符。");
     if (n.isXray()) {
         // Invalid/unsupported imported nodes are safe data and remain visible.
         // Execution always replays the original document through Rust; these

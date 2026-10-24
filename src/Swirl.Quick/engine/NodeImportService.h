@@ -17,6 +17,7 @@ class NodeImportService final : public QObject {
     Q_PROPERTY(QVariantList providers READ providers NOTIFY changed)
     Q_PROPERTY(bool busy READ busy NOTIFY changed)
     Q_PROPERTY(QString message READ message NOTIFY changed)
+    Q_PROPERTY(int legacyNodeCount READ legacyNodeCount NOTIFY changed)
     Q_PROPERTY(bool hasPreview READ hasPreview NOTIFY changed)
     Q_PROPERTY(QVariantList preview READ preview NOTIFY changed)
     Q_PROPERTY(QStringList previewDiagnostics READ previewDiagnostics NOTIFY changed)
@@ -27,6 +28,7 @@ public:
     QVariantList providers() const;
     bool busy() const { return m_busy; }
     QString message() const { return m_message; }
+    int legacyNodeCount() const { return m_store->legacyNodeCount(); }
     bool hasPreview() const { return m_pending.has_value(); }
     QVariantList preview() const;
     QStringList previewDiagnostics() const { return m_pending ? m_pending->diagnostics : QStringList{}; }
@@ -42,6 +44,7 @@ public:
     Q_INVOKABLE void importNodesOnlyUrl(const QUrl &url);
     Q_INVOKABLE bool saveSubscription(const QString &id,const QString &name,const QUrl &url,int intervalMinutes,bool enabled,const QString &formatHint={},const QString &importScope={});
     Q_INVOKABLE bool removeSubscription(const QString &id);
+    Q_INVOKABLE bool cleanLegacyNodes();
     Q_INVOKABLE void refreshSubscription(const QString &id);
     Q_INVOKABLE bool cancelRefresh(const QString &id);
     Q_INVOKABLE void refreshAll();

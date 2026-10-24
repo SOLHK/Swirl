@@ -11,6 +11,7 @@
 #include <QGuiApplication>
 #include <QClipboard>
 #include <QCoreApplication>
+#include <QMetaEnum>
 #include <QThreadPool>
 
 namespace {
@@ -137,8 +138,15 @@ bool NodeImportService::saveSubscription(const QString &id,const QString &name,c
 bool NodeImportService::removeSubscription(const QString &id) {
     if(m_busy || hasPreview())return false;
     const bool ok=m_store->removeSubscription(id);
-    m_message=ok?QStringLiteral("订阅已删除，已导入节点保留为手动节点。"):m_store->error();
-    if(ok)m_cancelled.remove(id);m_errors.remove(id);emit changed();return ok;
+    m_message=ok?QStringLiteral("订阅及其所属节点已原子删除；手动节点与待确认归属的历史节点保持不变。"):m_store->error();
+    if(ok){m_cancelled.remove(id);m_errors.remove(id);m_queue.removeAll(id);m_attempts.remove(id);}
+    emit changed();return ok;
+}
+bool NodeImportService::cleanLegacyNodes() {
+    if(m_busy || hasPreview())return false;
+    const bool ok=m_store->cleanLegacyNodes();
+    m_message=ok?QStringLiteral("已按确认清理历史归属节点；手动节点与有效订阅节点保持不变。"):m_store->error();
+    emit changed();return ok;
 }
 void NodeImportService::refreshSubscription(const QString &id) {
     if(id.isEmpty() || m_shuttingDown)return;
@@ -246,9 +254,9 @@ void NodeImportService::startDownload(const QUrl &url,int redirects,const QList<
     QNetworkRequest request(url);
     SwirlNetwork::applyHttp1OnlyPolicy(request);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
-    const QHash<QString,QByteArray> agents{{"auto","Clash.Meta/1.19.32 Swirl/1.0"},{"loon","Loon/1.0"},{"shadowrocket","Shadowrocket/2.2.67"},{"surge","Surge/5.0"},{"quantumult-x","Quantumult X/1.0"},{"sing-box","sing-box/1.12"}};
+    const QHash<QString,QByteArray> agents{{"auto","Swirl/"+QCoreApplication::applicationVersion().toUtf8()},{"clash","Clash.Meta/1.19.32 Swirl"},{"loon","Loon/1.0"},{"shadowrocket","Shadowrocket/2.2.67"},{"surge","Surge/5.0"},{"quantumult-x","Quantumult X/1.0"},{"sing-box","sing-box/1.12"}};
     request.setRawHeader("User-Agent",agents.value(m_formatHint,agents.value("auto")));
-    request.setRawHeader("Accept","application/json, application/yaml, text/plain");
+    request.setRawHeader("Accept","application/json, application/yaml, text/yaml, text/plain, */*;q=0.5");
     request.setTransferTimeout(15000);
     m_network.setProxyFactory(new DownloadProxyFactory(proxies));
     auto *reply=m_network.get(request);m_reply=reply;reply->setReadBufferSize(64*1024);
@@ -276,7 +284,8 @@ void NodeImportService::startDownload(const QUrl &url,int redirects,const QList<
         const auto error=reply->error();reply->deleteLater();
         if(*tooLarge || bytes->size()>NodeImporter::MaximumBytes){finish(QStringLiteral("订阅内容超过 4 MiB；旧节点保持不变。"));return;}
         if(m_downloadTimedOut){finish(QStringLiteral("订阅下载超过 30 秒；旧节点保持不变。"));return;}
-        if((code==301||code==302||code==303||code==307||code==308) && !redirect.isEmpty()) {
+        if(code==301||code==302||code==303||code==307||code==308) {
+            if(redirect.isEmpty()){finish(QStringLiteral("订阅重定向失败：HTTP %1 未提供有效 Location；旧节点保持不变。").arg(code));return;}
             const auto nextUrl=url.resolved(redirect);
             if(url.scheme()=="https" && nextUrl.scheme()!="https"){finish(QStringLiteral("已拒绝从 HTTPS 降级的重定向。"));return;}
             // Signed URLs and cookies must not cross an untrusted origin.
@@ -289,8 +298,22 @@ void NodeImportService::startDownload(const QUrl &url,int redirects,const QList<
             }
             download(nextUrl,redirects+1);return;
         }
-        if(error!=QNetworkReply::NoError){finish(QStringLiteral("订阅下载失败（HTTP %1，网络错误 %2）；请检查认证、TLS 或网络出口。旧节点保持不变。").arg(code).arg(int(error)));return;}
-        if(code!=200){finish(QStringLiteral("订阅服务器返回 HTTP %1；旧节点保持不变。").arg(code));return;}
+        const auto errorName=QString::fromLatin1(QMetaEnum::fromType<QNetworkReply::NetworkError>().valueToKey(int(error)));
+        // A Qt enum such as ProtocolInvalidOperationError (302) is not
+        // HTTP 302. Preserve the two namespaces without exposing errorString(),
+        // which may contain the full credential-bearing request URL.
+        if(code>=400){
+            const auto reason=code==400?QStringLiteral("请求被服务器拒绝；请检查认证参数与订阅格式协商"):
+                code==401||code==403?QStringLiteral("服务器拒绝认证或访问权限"):QStringLiteral("服务器返回错误响应");
+            finish(QStringLiteral("订阅下载失败：HTTP %1，%2（Qt %3，代码 %4；非 HTTP 状态码）。旧节点保持不变。").arg(code).arg(reason,errorName).arg(int(error)));return;
+        }
+        if(error!=QNetworkReply::NoError){
+            const auto stage=error==QNetworkReply::SslHandshakeFailedError?QStringLiteral("TLS 校验或握手失败"):
+                error==QNetworkReply::TimeoutError?QStringLiteral("网络请求超时"):
+                error==QNetworkReply::TooManyRedirectsError||error==QNetworkReply::InsecureRedirectError?QStringLiteral("重定向失败"):QStringLiteral("网络连接失败");
+            finish(QStringLiteral("订阅下载失败：%1（Qt %2，代码 %3；HTTP %4）。旧节点保持不变。").arg(stage,errorName).arg(int(error)).arg(code));return;
+        }
+        if(code!=200){finish(QStringLiteral("订阅下载失败：服务器返回 HTTP %1；旧节点保持不变。").arg(code));return;}
         m_deadline.stop();parse(*bytes);
     });
 }
@@ -310,7 +333,7 @@ QVariantList NodeImportService::preview() const {
     return rows;
 }
 void NodeImportService::parsed(NodeImporter::Result result) {
-    if(!result){finish(result.error);return;}
+    if(!result){finish((result.errorKind=="unsupported-format"?QStringLiteral("订阅格式不支持：%1"):QStringLiteral("订阅内容解析失败：%1")).arg(result.error));return;}
     for(auto &node:result.nodes)node.importSource=m_importSource;
     if(m_previewRequested && result.format=="xray-v2ray-json") {
         const auto count=result.nodes.size();const auto unsupported=result.incompleteNodes;
@@ -368,7 +391,8 @@ void NodeImportService::apply(NodeImporter::Result result) {
     if(m_apply || m_nodesOnly || !result.configuration.isEmpty()) {
         QString error;
         if(!m_apply || !m_apply(result,m_source,m_nodesOnly,&error)) {
-            finish(error.isEmpty()?QStringLiteral("导入包含全局配置，但当前入口不能验证其语义；旧配置保持不变。"):error);return;
+            if(error.isEmpty())error=QStringLiteral("当前入口不能验证完整配置语义；旧配置保持不变。");
+            finish(m_nodesOnly?error:QStringLiteral("完整配置校验失败：%1").arg(error));return;
         }
     } else if(!m_store->importNodes(std::move(result.nodes),m_source)){finish(m_store->error());return;}
     applied(result.format,count,result.incompleteNodes);

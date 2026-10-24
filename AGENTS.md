@@ -1,3 +1,11 @@
+# v0.1.7 subscription and networking repair (2026-10-24)
+
+- Work on independent `work/swirl-017-subscription-network-20261024`, based on remote S4 `ca7015679aef49702a40302de55d83e367ed9e95`. Do not update S4, S3, main, test or parallel branches.
+- The current user authorizes subscription/node content and dialog layout repairs; preserve sidebar width, sidebar/frame radii and overall window geometry. Keep all existing motion and interactions.
+- Retain persistent subscription ownership, transactional updates and manual nodes. Unknown legacy ownership requires explicit cleanup/reassignment; never infer that unowned nodes are safe to delete.
+- Run portable dependency/target checks, Rust/C++/QML regression and Windows packaging. Distinguish controlled peers, public traffic and private-provider/Codex account acceptance.
+- Preserve existing local Clash/system proxy/TUN/routes/DNS and private data. Network setting mutation tests run only on disposable CI runners. Do not upload private logs, URLs or node credentials.
+
 # Current S4 integration contract (2026-10-24)
 
 - Active work is `work/swirl-s4-final-completion-20261023`, based on frozen S3 `9f8af5754d2a932f7b967eea0e64cbc75717e6be`. The S3 instructions below are historical; do not modify S3, main, test or parallel branches.

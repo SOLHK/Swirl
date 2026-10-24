@@ -16,16 +16,21 @@
 #include <QSignalSpy>
 #include <QNetworkProxy>
 #include <QNetworkReply>
+#ifdef Q_OS_WIN
+#include <windows.h>
+#include <wincrypt.h>
+#endif
 
 class SubscriptionServer:public QTcpServer {
 public:
-    QByteArray content,location;int count=0,code=200;bool hanging=false;
+    QByteArray content,location,lastRequest,successPath;int count=0,code=200;bool hanging=false;
     SubscriptionServer(){connect(this,&QTcpServer::newConnection,this,[this]{while(hasPendingConnections()){
         auto *socket=nextPendingConnection();auto data=std::make_shared<QByteArray>();
         connect(socket,&QTcpSocket::readyRead,socket,[this,socket,data]{data->append(socket->readAll());if(!data->contains("\r\n\r\n"))return;
-            if(socket->property("done").toBool())return;socket->setProperty("done",true);++count;
+            if(socket->property("done").toBool())return;socket->setProperty("done",true);++count;lastRequest=*data;
             if(hanging)return;
-            socket->write("HTTP/1.1 "+QByteArray::number(code)+" Result\r\n"+(location.isEmpty()?QByteArray():"Location: "+location+"\r\n")+"Content-Length: "+QByteArray::number(content.size())+"\r\nConnection: close\r\n\r\n"+content);socket->disconnectFromHost();});
+            const auto status=!successPath.isEmpty()&&data->startsWith("GET "+successPath)?200:code;
+            socket->write("HTTP/1.1 "+QByteArray::number(status)+" Result\r\n"+(location.isEmpty()||status==200?QByteArray():"Location: "+location+"\r\n")+"Content-Length: "+QByteArray::number(content.size())+"\r\nConnection: close\r\n\r\n"+content);socket->disconnectFromHost();});
         connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
     }});}
     QUrl url() const{return QUrl(QString("http://127.0.0.1:%1/sub?token=PRIVATE-TOKEN").arg(serverPort()));}
@@ -692,6 +697,122 @@ external-controller: 0.0.0.0:9090
         QVERIFY(store.nodes().isEmpty());QVERIFY(!QFile::exists(store.filePath()));
         QVERIFY(service.message().contains(QStringLiteral("无法校验当前网络配置")));
     }
+    void subscriptionHttpStatusAndQtErrorsAreDifferentNamespaces() {
+        SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));server.content=socks(1080);
+        QTemporaryDir directory;NodeStore store(directory.filePath("nodes"));NodeImportService service(&store);
+        QVERIFY(service.saveSubscription({},"Header fixture",server.url(),360,false,"auto"));
+        const auto source=store.subscriptions().first().id;service.refreshSubscription(source);
+        QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);
+        QVERIFY(server.lastRequest.contains("User-Agent: Swirl/"));QVERIFY(!server.lastRequest.contains("Clash"));
+        QVERIFY(!service.saveSubscription({},"Duplicate endpoint",server.url(),360,false));QCOMPARE(store.subscriptions().size(),1);
+        QFile file(store.filePath());QVERIFY(file.open(QIODevice::ReadOnly));const auto saved=file.readAll();file.close();
+        server.code=400;service.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);
+        QVERIFY(service.message().contains("HTTP 400"));QVERIFY(service.message().contains("ProtocolInvalidOperationError"));
+        QVERIFY(service.message().contains("302"));QVERIFY(service.message().contains(QStringLiteral("非 HTTP 状态码")));
+        QVERIFY(!service.message().contains(QStringLiteral("重定向失败")));QVERIFY(!service.message().contains("PRIVATE-TOKEN"));
+        QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),saved);file.close();
+        QCOMPARE(store.nodes().size(),1);QCOMPARE(store.subscriptions().first().lastSuccess,NodeStore(store.filePath()).subscriptions().first().lastSuccess);
+        server.code=200;QVERIFY(service.saveSubscription(source,"Header fixture",{},360,false,"clash"));
+        service.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QVERIFY(server.lastRequest.contains("User-Agent: Clash.Meta/"));
+        // A successful HTTP response containing a login page is never import success.
+        server.content="<html><body>login required</body></html>";service.refreshSubscription(source);
+        QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);
+        QVERIFY(service.providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+    }
+    void sameOriginRedirectAndMissingLocation() {
+        SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));server.content=socks(1080);
+        server.code=302;server.location="/final?token=PRIVATE-TOKEN";server.successPath="/final";
+        QTemporaryDir directory;NodeStore store(directory.filePath("nodes"));NodeImportService service(&store);
+        service.importUrl(server.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);
+        QCOMPARE(server.count,2);QCOMPARE(store.nodes().size(),1);QVERIFY(server.lastRequest.startsWith("GET /final?token=PRIVATE-TOKEN "));
+        server.location.clear();server.successPath.clear();service.importUrl(server.url());
+        QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);
+        QVERIFY(service.message().contains(QStringLiteral("重定向失败")));QVERIFY(service.message().contains("Location"));
+        QVERIFY(!service.message().contains("PRIVATE-TOKEN"));
+    }
+    void deletionRevokesOnlyOwnedNodesAndKeepsRoutingFailClosed() {
+        QTemporaryDir directory;const auto path=directory.filePath("nodes");NodeStore store(path);
+        const auto url=QUrl("https://fixture.invalid/source-a?token=PRIVATE-TOKEN");
+        QVERIFY(store.saveSubscription({},"First",url,360,false));const auto first=store.subscriptions().first().id;
+        QVERIFY(store.saveSubscription({},"Second",QUrl("https://fixture.invalid/source-b"),360,false));const auto second=store.subscriptions().last().id;
+        QVERIFY(store.importNodes(NodeImporter::parse(socks(1080)).nodes,first));const auto owned=store.nodes().first().id;
+        QVERIFY(store.importNodes(NodeImporter::parse(socks(1081)).nodes,second));const auto other=store.nodes().last().id;
+        QVERIFY(store.saveNode({{"name","Manual"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",1082},{"sourceId",first}}));
+        const auto manual=store.nodes().last().id;QVERIFY(store.nodes().last().sourceId.isEmpty());QVERIFY(store.select(owned));
+        const QJsonObject configuration{{"schema",1},{"nativeDocumentRouting",true},
+            {"groups",QJsonArray{QJsonObject{{"name","route"},{"type","select"},{"proxies",QJsonArray{owned,other}},{"default-selected",owned}}}},
+            {"rules",QJsonArray{"DOMAIN,example.org,"+owned,"MATCH,route"}},
+            {"importedConfiguration",QJsonObject{{"sourceId",first}}}};
+        QVERIFY(store.saveNetworkConfiguration(configuration));QVERIFY(store.removeSubscription(first));
+        QCOMPARE(store.nodes().size(),2);QVERIFY(store.selectedId().isEmpty());QCOMPARE(store.subscriptions().size(),1);
+        const auto snapshot=store.networkConfiguration();const auto group=snapshot["groups"].toArray().first().toObject();
+        QCOMPARE(group["proxies"].toArray(),QJsonArray({"REJECT",other}));QCOMPARE(group["default-selected"].toString(),QString("REJECT"));
+        QCOMPARE(snapshot["rules"].toArray().first().toString(),QString("DOMAIN,example.org,REJECT"));QVERIFY(!snapshot.contains("importedConfiguration"));
+        NodeStore reloaded(path);QCOMPARE(reloaded.nodes().size(),2);QSet<QString> remaining;for(const auto &node:reloaded.nodes())remaining.insert(node.id);
+        QVERIFY(remaining.contains(other));QVERIFY(remaining.contains(manual));QVERIFY(!remaining.contains(owned));
+        QCOMPARE(reloaded.publicRows().last().toMap().value("sourceKind").toString(),QString("manual"));
+        QVERIFY(reloaded.removeSubscription(second));QCOMPARE(reloaded.nodes().size(),1);QCOMPARE(reloaded.nodes().first().id,manual);
+    }
+    void legacyDetachedNodesRequireExplicitCleanup() {
+#ifdef Q_OS_WIN
+        QTemporaryDir directory;const auto path=directory.filePath("nodes");
+        {NodeStore store(path);auto parsed=NodeImporter::parse(socks(1080));QVERIFY(parsed);QVERIFY(store.importNodes(parsed.nodes));
+            QVERIFY(store.saveNode({{"name","Manual"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",1081}}));}
+        const auto crypt=[](const QByteArray &input,bool decrypt) {
+            DATA_BLOB source{DWORD(input.size()),reinterpret_cast<BYTE *>(const_cast<char *>(input.constData()))},result{};
+            const QByteArray context("Swirl.NodeStore.v1");DATA_BLOB entropy{DWORD(context.size()),reinterpret_cast<BYTE *>(const_cast<char *>(context.constData()))};
+            const bool ok=decrypt?CryptUnprotectData(&source,nullptr,&entropy,nullptr,nullptr,CRYPTPROTECT_UI_FORBIDDEN,&result):
+                CryptProtectData(&source,L"Swirl test legacy",&entropy,nullptr,nullptr,CRYPTPROTECT_UI_FORBIDDEN,&result);
+            if(!ok)return QByteArray{};const QByteArray value(reinterpret_cast<char *>(result.pbData),result.cbData);SecureZeroMemory(result.pbData,result.cbData);LocalFree(result.pbData);return value;
+        };
+        QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto ciphertext=file.readAll();file.close();
+        auto document=QJsonDocument::fromJson(crypt(ciphertext.mid(11),true)).object();auto nodes=document["nodes"].toArray();
+        auto legacy=nodes[0].toObject();legacy["importSource"]="subscription";legacy["sourceId"]="";nodes[0]=legacy;document["nodes"]=nodes;
+        const auto upgraded=QByteArray("SWIRLNODE1\n")+crypt(QJsonDocument(document).toJson(QJsonDocument::Compact),false);
+        QVERIFY(file.open(QIODevice::WriteOnly));QCOMPARE(file.write(upgraded),upgraded.size());file.close();
+        NodeStore reloaded(path);QCOMPARE(reloaded.nodes().size(),2);QCOMPARE(reloaded.legacyNodeCount(),1);
+        QCOMPARE(reloaded.publicRows().first().toMap().value("sourceKind").toString(),QString("legacy"));
+        QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),upgraded);file.close(); // Detection never rewrites data.
+        NodeImportService service(&reloaded);QVERIFY(service.cleanLegacyNodes());QCOMPARE(reloaded.legacyNodeCount(),0);
+        QCOMPARE(reloaded.nodes().size(),1);QCOMPARE(reloaded.nodes().first().name,QString("Manual"));
+        NodeStore saved(path);QCOMPARE(saved.nodes().size(),1);QCOMPARE(saved.nodes().first().name,QString("Manual"));
+#endif
+    }
+    void providerAliasSurvivesDisplayRenameAndCredentialRotation() {
+        for(const bool singBox:{false,true}) {
+            SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));
+            const auto document=[&](int port,const QString &user,const QString &password) {
+                if(!singBox)return QString("http://%1:%2@127.0.0.1:%3#ProviderAlias").arg(user,password).arg(port).toUtf8();
+                return QJsonDocument(QJsonObject{{"outbounds",QJsonArray{QJsonObject{{"type","http"},{"tag","ProviderAlias"},
+                    {"server","127.0.0.1"},{"server_port",port},{"username",user},{"password",password}}}}}).toJson();
+            };
+            server.content=document(1080,"first-user","first-password");
+            QTemporaryDir directory;const auto path=directory.filePath("nodes");EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);
+            auto *imports=controller.imports();QVERIFY(imports->saveSubscription({},"Rotating source",server.url(),360,false,"auto","nodes-only"));
+            const auto source=imports->providers().first().toMap().value("id").toString();imports->refreshSubscription(source);
+            QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);QCOMPARE(controller.nodeCatalog().size(),1);
+            const auto id=controller.nodeCatalog().first().toMap().value("id").toString();
+            QVERIFY(controller.chooseNode(id));QVERIFY(controller.saveNode({{"id",id},{"name","My local name"},{"protocol","http"},{"host","127.0.0.1"},{"port",1080}}));
+            {NodeStore saved(path);QCOMPARE(saved.nodes().first().name,QString("My local name"));QCOMPARE(saved.nodes().first().providerAlias,QString("ProviderAlias"));}
+            server.content=document(1081,"second-user","second-password");
+            for(int attempt=0;attempt<2;++attempt) {
+                imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);QCOMPARE(controller.nodeCatalog().size(),1);
+                NodeStore saved(path);const auto node=saved.nodes().first();QCOMPARE(node.id,id);QCOMPARE(saved.selectedId(),id);
+                QCOMPARE(node.sourceId,source);QCOMPARE(node.providerAlias,QString("ProviderAlias"));QCOMPARE(node.port,quint16(1081));
+                QCOMPARE(node.username,QString("second-user"));QCOMPARE(node.password,QString("second-password"));
+            }
+        }
+    }
+    void ambiguousProviderAliasRotationIsAtomicFailure() {
+        QTemporaryDir directory;const auto path=directory.filePath("nodes");NodeStore store(path);
+        QVERIFY(store.saveSubscription({},"Ambiguous",QUrl("https://fixture.invalid/ambiguous"),360,false));const auto source=store.subscriptions().first().id;
+        auto nodes=NodeImporter::parse("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: 1080}, {name: B, type: socks5, server: 127.0.0.1, port: 1081}]").nodes;
+        QCOMPARE(nodes.size(),2);for(auto &node:nodes)node.providerAlias="HistoricalAlias";
+        QVERIFY(store.importNodes(nodes,source));QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto before=file.readAll();file.close();
+        for(auto &node:nodes){node.id=QUuid::createUuid().toString(QUuid::WithoutBraces);node.username="rotated";node.password="synthetic-rotated-password";}
+        QVERIFY(!store.importNodes(nodes,source));QVERIFY(store.error().contains(QStringLiteral("多个更新目标")));
+        QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),before);QCOMPARE(store.nodes().size(),2);
+    }
     void subscriptionAtomicRefreshAndEncryptedUrl() {
         SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));server.content=socks(1080);
         QTemporaryDir temp;NodeStore store(temp.filePath("nodes"));qint64 now=QDateTime::currentSecsSinceEpoch();
@@ -711,7 +832,7 @@ external-controller: 0.0.0.0:9090
         QVERIFY(service.saveSubscription(source,"Paused",{},15,false,{},"nodes-only"));const int count=server.count;now+=10000;QTest::qWait(250);QCOMPARE(server.count,count);
         NodeStore reloaded(store.filePath());QCOMPARE(reloaded.subscriptions().first().url,server.url());QCOMPARE(reloaded.subscriptions().first().importScope,QString("nodes-only"));QCOMPARE(reloaded.nodes().first().port,quint16(1081));
         QVERIFY(service.saveSubscription(source,"Paused",{},15,false));QCOMPARE(store.subscriptions().first().importScope,QString("nodes-only"));
-        QVERIFY(service.removeSubscription(source));QVERIFY(store.subscriptions().isEmpty());QVERIFY(store.nodes().first().sourceId.isEmpty());
+        QVERIFY(service.removeSubscription(source));QVERIFY(store.subscriptions().isEmpty());QVERIFY(store.nodes().isEmpty());QVERIFY(store.selectedId().isEmpty());
     }
     void httpsRedirectAndDowngradeProtection() {
         const auto original=QSslConfiguration::defaultConfiguration();
@@ -770,6 +891,29 @@ external-controller: 0.0.0.0:9090
         reuse.close();imports->refreshSubscription(sid);controller.stop();
         QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);QTest::qWait(300);QVERIFY(!controller.processAlive());
         qInfo()<<"IMPORTED_REAL_CHAIN: selected A remains live through refresh; manual reconnect selects B; no remote environment claimed";
+    }
+    void deletedActiveSubscriptionCannotKeepAnEngineSnapshot() {
+        for(const bool removeSource:{true,false}) {
+            ControlledNetwork network;QVERIFY(network.start());SubscriptionServer source;QVERIFY(source.listen(QHostAddress::LocalHost,0));
+            QTemporaryDir directory;const auto path=directory.filePath("nodes");EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);
+            controller.setProxyPort(freePort());controller.setRoutingMode("global");auto *imports=controller.imports();
+            source.content=socks(network.a.serverPort());QVERIFY(imports->saveSubscription({},"Revoked source",source.url(),360,false,"auto","nodes-only"));
+            const auto sourceId=imports->providers().first().toMap().value("id").toString();imports->refreshSubscription(sourceId);
+            QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);QCOMPARE(controller.nodes().size(),1);
+            const auto id=controller.nodes().first().toMap().value("id").toString();controller.connectNode(id);
+            QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),18000);controller.testNode(network.url());QTRY_VERIFY_WITH_TIMEOUT(!controller.nodeBusy(),8000);
+            QVERIFY(controller.requestSucceeded());QVERIFY(network.a.forwarded>0);
+            if(removeSource)QVERIFY(imports->removeSubscription(sourceId));
+            else {
+                source.content=socks(network.b.serverPort());source.content.replace("Controlled","Replacement");
+                imports->refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
+            }
+            QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),5000);QVERIFY(controller.selectedNodeId().isEmpty());
+            for(const auto &entry:controller.nodeCatalog())QVERIFY(entry.toMap().value("id").toString()!=id);
+            QCOMPARE(controller.nodeCatalog().size(),removeSource?0:1);QCOMPARE(network.b.forwarded,0);
+            NodeStore reloaded(path);QVERIFY(reloaded.selectedId().isEmpty());QCOMPARE(reloaded.nodes().size(),removeSource?0:1);
+        }
+        qInfo()<<"OWNERSHIP_REVOCATION_REAL_CHAIN: owned selected node carries traffic before deletion/update removal, then Rust listener stops; no implicit switch";
     }
     void hysteria2UriParsesAuthPortSniObfsAndFingerprint() {
         for(const auto &scheme:QList<QByteArray>{"hysteria2","hy2"}){
