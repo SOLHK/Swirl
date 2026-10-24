@@ -47,6 +47,7 @@ Required local/final checks: portable boundary, Rust fmt/clippy/workspace tests;
 - OpenHarmony subscription/platform compilation does not establish full Rust Core linking with its native SDK or HarmonyOS NEXT VPN permissions/device networking. Android VpnService is never assumed to work there.
 - v2rayN private ProfileItemDto backups and conditional ETag/304 refresh remain gaps; standard sharing URIs and existing periodic refresh are separate supported paths.
 - Unknown legacy installed files are preserved when ownership cannot be proven. File-copy interruption does not yet have full executable rollback; no such recovery is claimed.
+- Legacy schema 1 proxy recovery lacks original registry ownership. A native-setting change is refused before writing; the journal remains for manual checking. Full schema 2 snapshots retain normal automatic restoration. Proxy-write failure handling is documented in [the system proxy action report](S4_SYSTEM_PROXY_BUTTON.md).
 
 ## User acceptance
 

@@ -163,19 +163,64 @@ bool SystemProxySession::apply(const QJsonObject &value, QString *error) {
     const auto original=snapshot(error);if(original.isEmpty())return false;
     const auto registry=value.contains("registry")?value.value("registry").toObject():original.value("registry").toObject();
     if(!validRegistry(registry)){if(error)*error=QStringLiteral("代理注册表恢复记录无效。");return false;}
-    if(!writeConnection(value)){if(error)*error=nativeError();return false;}
-    const auto status=writeRegistry(registry);
-    if(status!=ERROR_SUCCESS) {
-        // A partial update must not strand native clients on a different port.
-        const bool connectionRestored=writeConnection(original);
-        const bool registryRestored=writeRegistry(original.value("registry").toObject())==ERROR_SUCCESS;
-        notifyProxyChange();
-        if(error)*error=QStringLiteral("代理注册表写入失败（错误 %1）；恢复%2。").arg(status).arg(connectionRestored&&registryRestored?QStringLiteral("成功"):QStringLiteral("失败，请检查系统代理"));
+    if(!value.contains("registry")) {
+        auto nativeOriginal=original;nativeOriginal.remove("registry");
+        if(value==nativeOriginal)return true;
+        // Legacy records do not own registry values. WinINET refresh can derive
+        // native options from those values, so native-only changes cannot be
+        // promised without modifying an unowned representation.
+        if(error)*error=QStringLiteral("旧版代理记录未保存注册表所有权；无法保证仅恢复连接设置而不覆盖当前注册表，未修改代理。");
         return false;
     }
+    const auto originalRegistry=original.value("registry").toObject();
+    const auto knownWriteState=[&](const QJsonObject &observed) {
+        if(observed.keys()!=original.keys())return false;
+        for(const auto &key:original.keys()) {
+            if(key==QStringLiteral("registry"))continue;
+            const auto item=observed.value(key);
+            if(item!=original.value(key)&&item!=value.value(key))return false;
+        }
+        const auto actualRegistry=observed.value("registry").toObject();
+        if(actualRegistry.keys()!=originalRegistry.keys())return false;
+        for(const auto &key:originalRegistry.keys()) {
+            const auto item=actualRegistry.value(key);
+            if(item!=originalRegistry.value(key)&&item!=registry.value(key))return false;
+        }
+        return true;
+    };
+    const auto failAfterWrite=[&](const QString &reason,const QJsonObject &observed) {
+        QString recovery;
+        if(observed==original) {
+            recovery=QStringLiteral("原始配置未改变。");
+        } else if(!knownWriteState(observed)||snapshot()!=observed) {
+            // Do not overwrite unknown state or an edit observed after our
+            // writes. The caller retains any encrypted recovery journal.
+            recovery=QStringLiteral("当前配置来源未确认或已再次变化，未覆盖外部修改；恢复状态未确认，请检查系统代理。");
+        } else {
+            const bool connectionRestored=writeConnection(original);
+            const bool registryRestored=writeRegistry(originalRegistry)==ERROR_SUCCESS;
+            const bool notified=notifyProxyChange();
+            const bool restored=connectionRestored&&registryRestored&&notified&&snapshot()==original;
+            recovery=restored?QStringLiteral("已验证恢复原始配置。")
+                             :QStringLiteral("恢复原始配置未能确认，请检查系统代理；已有恢复记录须保留。");
+        }
+        if(error)*error=reason+QStringLiteral(" ")+recovery;
+        return false;
+    };
+    if(!writeConnection(value)) {
+        const auto reason=nativeError();
+        return failAfterWrite(reason,snapshot());
+    }
+    const auto status=writeRegistry(registry);
+    if(status!=ERROR_SUCCESS) {
+        return failAfterWrite(QStringLiteral("代理注册表写入失败（错误 %1）。").arg(status),snapshot());
+    }
     // Publish only after both representations agree.
-    if(!notifyProxyChange()){if(error)*error=QStringLiteral("代理设置已写入，但 Windows 刷新通知失败；恢复记录已保留。");return false;}
-    if(!matchesSettings(snapshot(),value)){if(error)*error=QStringLiteral("Windows 实际代理配置与写入值不一致。");return false;}return true;
+    const bool notified=notifyProxyChange();
+    const auto observed=snapshot();
+    if(!notified)return failAfterWrite(QStringLiteral("代理设置写入后，Windows 刷新通知失败。"),observed);
+    if(!matchesSettings(observed,value))return failAfterWrite(QStringLiteral("Windows 实际代理配置与写入值不一致。"),observed);
+    return true;
 #else
     Q_UNUSED(value);if(error)*error=QStringLiteral("系统代理仅支持 Windows。");return false;
 #endif

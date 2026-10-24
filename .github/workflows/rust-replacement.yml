@@ -98,8 +98,22 @@ jobs:
         run: python -m pip install cryptography==50.0.2
       - name: Configure isolated Qt integration tests
         run: cmake -S src/Swirl.Quick -B build/r1-tests -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=ON -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
+      - name: Build low-level system proxy recovery tests before the full UI
+        run: cmake --build build/r1-tests --config Release --target SwirlSystemProxyTests --parallel 4
+      - name: Deploy low-level system proxy test dependencies
+        shell: pwsh
+        run: |
+          windeployqt --release --compiler-runtime build/r1-tests/Release/SwirlSystemProxyTests.exe
+          if ($LASTEXITCODE -ne 0) { throw 'System proxy test deployment failed.' }
+      - name: Windows system proxy recovery before the full UI build
+        shell: pwsh
+        env:
+          SWIRL_SYSTEM_PROXY_TEST: '1'
+        run: |
+          build/r1-tests/Release/SwirlSystemProxyTests.exe -o build/r1-tests/system-proxy-write.xml,xml -o -,txt
+          if ($LASTEXITCODE -ne 0) { throw 'Actual Windows proxy state and recovery tests failed.' }
       - name: Build product, subscription, telemetry, stream, security and loader regressions
-        run: cmake --build build/r1-tests --config Release --target Swirl SwirlRustCoreTests SwirlRustCoreLibraryTests SwirlNodeTests SwirlNodeViewModelTests SwirlImportTests SwirlSubscriptionFormatTests SwirlTelemetryTests SwirlNetworkRegressionTests SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlSystemProxyTests SwirlQtNetworkPolicyTests --parallel 4
+        run: cmake --build build/r1-tests --config Release --target Swirl SwirlRustCoreTests SwirlRustCoreLibraryTests SwirlNodeTests SwirlNodeViewModelTests SwirlImportTests SwirlSubscriptionFormatTests SwirlTelemetryTests SwirlNetworkRegressionTests SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlQtNetworkPolicyTests --parallel 4
       - name: Deploy test dependencies and inspect PE imports
         shell: pwsh
         run: |
@@ -117,13 +131,11 @@ jobs:
         run: ctest --test-dir build/r1-tests -C Release -R "^swirl-(rust-library-loader|rust-qt-integration|node-real-chain|node-ui|engine-ui|stream-regression|import-subscription|import-boundaries|subscription-formats|telemetry-accounting|diagnostic-export|system-proxy-state|qt-network-policy|capture-network)$" --output-on-failure --no-tests=error
       - name: S4 content, model and motion correctness (offscreen software renderer)
         run: ctest --test-dir build/r1-tests -C Release -R "^swirl-(motion|all-pages|appearance-ui|node-view-model)$" --output-on-failure --no-tests=error
-      - name: Explicit Windows proxy off and recovery on the disposable runner
+      - name: Actual Windows system proxy button on the disposable runner
         shell: pwsh
         env:
           SWIRL_SYSTEM_PROXY_TEST: '1'
         run: |
-          build/r1-tests/Release/SwirlSystemProxyTests.exe -o build/r1-tests/system-proxy-write.xml,xml -o -,txt
-          if ($LASTEXITCODE -ne 0) { throw 'Actual Windows proxy state and recovery tests failed.' }
           $env:SWIRL_SYSTEM_PROXY_UI_REPORT=Join-Path $env:GITHUB_WORKSPACE 'build/r1-tests/system-proxy-ui.json'
           $p=Start-Process build/r1-tests/Release/Swirl.exe -ArgumentList '--node-self-test' -WindowStyle Hidden -PassThru
           if (-not $p.WaitForExit(150000)) { $p.Kill(); throw 'Real system proxy UI integration timed out.' }
