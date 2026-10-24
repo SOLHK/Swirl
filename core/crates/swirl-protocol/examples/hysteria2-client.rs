@@ -110,7 +110,17 @@ async fn run(input: Input) -> Result<Value, &'static str> {
         {
             return Err("HttpResponseMismatch");
         }
-        stream.shutdown().await.map_err(|_| "HttpShutdown")?;
+        stream.shutdown().await.map_err(|error| {
+            let detail = match error.to_string().as_str() {
+                "QuicShutdownPeerStopped" => "QuicShutdownPeerStopped",
+                "QuicShutdownPeerStoppedNoError" => "QuicShutdownPeerStoppedNoError",
+                "QuicShutdownConnectionLost" => "QuicShutdownConnectionLost",
+                "QuicShutdownAckTimeout" => "QuicShutdownAckTimeout",
+                _ => "Other",
+            };
+            eprintln!("HY2_HTTP_SHUTDOWN:{detail}");
+            "HttpShutdown"
+        })?;
         return Ok(
             json!({"ok":true,"mode":"http","imported":imported,"uploaded":request.len(),"downloaded":response.len(),"sha256":format!("{:x}",Sha256::digest(&response)),"dns_quic_auth_tcp_us":connection_us}),
         );

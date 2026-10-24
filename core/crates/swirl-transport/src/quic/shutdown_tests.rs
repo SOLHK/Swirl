@@ -120,3 +120,91 @@ async fn peer_stop_is_not_reported_as_a_clean_shutdown() {
         io::ErrorKind::BrokenPipe
     );
 }
+
+#[tokio::test]
+async fn shutdown_after_complete_response_and_zero_stop_remains_an_error() {
+    let (session, server, _endpoint) = peers().await;
+    let (mut send, mut recv) = session.connection.open_bi().await.unwrap();
+    let mut payload = (0..32 * 1024).map(|i| (i % 251) as u8).collect::<Vec<_>>();
+    payload.extend_from_slice(b"final-upload-sentinel");
+    send.write_all(&payload).await.unwrap();
+    let (mut response, mut request) = timeout(LIMIT, server.accept_bi()).await.unwrap().unwrap();
+    let mut actual = vec![0; payload.len()];
+    timeout(LIMIT, request.read_exact(&mut actual))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        actual, payload,
+        "the peer received every byte and the final sentinel"
+    );
+
+    const RESPONSE: &[u8] = b"complete-response-with-final-sentinel";
+    response.write_all(RESPONSE).await.unwrap();
+    response.finish().unwrap();
+    assert_eq!(
+        timeout(LIMIT, recv.read_to_end(64 * 1024))
+            .await
+            .unwrap()
+            .unwrap(),
+        RESPONSE,
+        "the client received the entire response and FIN before STOP_SENDING"
+    );
+
+    // The peer's application has consumed the upload, but STOP_SENDING(0)
+    // still does not acknowledge the client's as-yet unqueued FIN. Observe
+    // STOP before wrapping the stream so this ordering never depends on UDP timing.
+    request.stop(0u32.into()).unwrap();
+    assert_eq!(
+        timeout(LIMIT, send.stopped()).await.unwrap().unwrap(),
+        Some(0u32.into())
+    );
+    let mut stream = Stream::new(session, send, recv);
+    let error = timeout(LIMIT, stream.shutdown())
+        .await
+        .unwrap()
+        .unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
+    assert_eq!(error.to_string(), "QuicShutdownPeerStoppedNoError");
+    let repeated = stream.shutdown().await.unwrap_err();
+    assert_eq!(repeated.kind(), io::ErrorKind::BrokenPipe);
+    assert_eq!(repeated.to_string(), "QuicShutdownPeerStoppedNoError");
+}
+
+#[tokio::test]
+async fn shutdown_before_response_completion_and_zero_stop_remains_an_error() {
+    let (session, server, _endpoint) = peers().await;
+    let (mut send, mut recv) = session.connection.open_bi().await.unwrap();
+    send.write_all(b"request-with-final-sentinel")
+        .await
+        .unwrap();
+    let (mut response, mut request) = timeout(LIMIT, server.accept_bi()).await.unwrap().unwrap();
+    const PREFIX: &[u8] = b"incomplete-response-prefix";
+    response.write_all(PREFIX).await.unwrap();
+    let mut actual = vec![0; PREFIX.len()];
+    timeout(LIMIT, recv.read_exact(&mut actual))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(actual, PREFIX);
+    let mut tail = [0; 1];
+    let pending = poll_fn(|cx| {
+        let mut buffer = ReadBuf::new(&mut tail);
+        Poll::Ready(Pin::new(&mut recv).poll_read(cx, &mut buffer).is_pending())
+    })
+    .await;
+    assert!(pending, "the response has neither a tail byte nor FIN");
+
+    request.stop(0u32.into()).unwrap();
+    assert_eq!(
+        timeout(LIMIT, send.stopped()).await.unwrap().unwrap(),
+        Some(0u32.into())
+    );
+    let mut stream = Stream::new(session, send, recv);
+    let error = timeout(LIMIT, stream.shutdown())
+        .await
+        .unwrap()
+        .unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
+    assert_eq!(error.to_string(), "QuicShutdownPeerStoppedNoError");
+}

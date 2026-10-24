@@ -112,6 +112,8 @@ class DNS(socketserver.BaseRequestHandler):
 class HTTP(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     tls_close_errors = []
+    tls_close_receipts = []
+    tls_close_condition = threading.Condition()
 
     def setup(self):
         super().setup()
@@ -120,10 +122,17 @@ class HTTP(http.server.BaseHTTPRequestHandler):
     def finish(self):
         super().finish()
         if isinstance(self.connection, ssl.SSLSocket):
+            receipt = {"orderly_tls_close": False}
             try:
                 self.connection.unwrap()
+                receipt["orderly_tls_close"] = True
             except (OSError, ssl.SSLError) as error:
                 self.tls_close_errors.append(type(error).__name__)
+                receipt["error_type"] = type(error).__name__
+            finally:
+                with self.tls_close_condition:
+                    self.tls_close_receipts.append(receipt)
+                    self.tls_close_condition.notify_all()
 
     def do_GET(self):
         self.send_response(200)
@@ -323,6 +332,8 @@ class Hysteria2Official(unittest.TestCase):
         if target_tls is not None:
             request["target_tls"] = target_tls
         before = time.monotonic()
+        with HTTP.tls_close_condition:
+            close_count = len(HTTP.tls_close_receipts)
         result = subprocess.run(client_command(self.client), input=json.dumps(request),
             text=True, capture_output=True, timeout=15)
         measured_stack = stack_receipt(result.stderr)
@@ -333,6 +344,15 @@ class Hysteria2Official(unittest.TestCase):
         self.records.append({"case":case, "expected_success":success, "upstream_limitation_probe":limitation,
             "client_exit":result.returncode, "elapsed_ms":round((time.monotonic()-before)*1000,3),
             "main_stack_limit":measured_stack, "result":report})
+        shutdown_codes = {"HY2_HTTP_SHUTDOWN:" + code for code in (
+            "QuicShutdownPeerStopped", "QuicShutdownPeerStoppedNoError", "QuicShutdownConnectionLost", "QuicShutdownAckTimeout", "Other")}
+        diagnostics = [line for line in result.stderr.splitlines() if line in shutdown_codes]
+        if diagnostics:
+            self.records[-1]["shutdown_diagnostics"] = diagnostics
+        if target_tls is not None:
+            with HTTP.tls_close_condition:
+                HTTP.tls_close_condition.wait_for(lambda: len(HTTP.tls_close_receipts) > close_count, timeout=5)
+                self.records[-1]["independent_origin_tls_close"] = HTTP.tls_close_receipts[close_count:]
         self.assertEqual(report.get("ok"),success,case + ": " + str(report))
         self.assertEqual(result.returncode,0 if success else 1)
         if code is not None:

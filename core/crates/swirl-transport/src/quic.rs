@@ -438,6 +438,7 @@ async fn connect_inner(
 enum ShutdownFailure {
     TimedOut,
     PeerStopped,
+    PeerStoppedNoError,
     ConnectionLost,
 }
 impl ShutdownFailure {
@@ -445,6 +446,9 @@ impl ShutdownFailure {
         let (kind, code) = match self {
             Self::TimedOut => (io::ErrorKind::TimedOut, "QuicShutdownAckTimeout"),
             Self::PeerStopped => (io::ErrorKind::BrokenPipe, "QuicShutdownPeerStopped"),
+            Self::PeerStoppedNoError => {
+                (io::ErrorKind::BrokenPipe, "QuicShutdownPeerStoppedNoError")
+            }
             Self::ConnectionLost => (io::ErrorKind::BrokenPipe, "QuicShutdownConnectionLost"),
         };
         io::Error::new(kind, code)
@@ -509,6 +513,9 @@ impl AsyncWrite for Stream {
             self.shutdown = Some(Box::pin(async move {
                 match tokio::time::timeout(Duration::from_secs(5), completion).await {
                     Ok(Ok(None)) => Ok(()),
+                    Ok(Ok(Some(code))) if code == VarInt::from_u32(0) => {
+                        Err(ShutdownFailure::PeerStoppedNoError)
+                    }
                     Ok(Ok(Some(_))) => Err(ShutdownFailure::PeerStopped),
                     Ok(Err(_)) => Err(ShutdownFailure::ConnectionLost),
                     Err(_) => Err(ShutdownFailure::TimedOut),
