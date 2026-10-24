@@ -1,4 +1,14 @@
-# v0.2.3 REALITY wire compatibility follow-up (2026-10-24)
+# Current UI V2 staged work (2026-10-24)
+
+- Continue only in `D:/Codex/work/Swirl-ui-v2-20261024`, branch `work/swirl-ui-v2-20261024`, based on `4c8c9e076976e5cfb62f103daecdf2afc121eeb3` (0.2.3). Older branch instructions below are historical. Preserve main/test and all other windows; no force pushes.
+- Stage 1 audit is complete. Read `docs/UI_V2_HANDOFF.md` and `docs/UI_V2_STAGE1_AUDIT_20261024.md`; next is stage 2 architecture and confirmation, not a claim that the UI or route refactor has shipped. Keep each stage focused and report commits, evidence, next steps and the requested model-switch reminder. Never switch models autonomously.
+- The user explicitly resolved the radius discrepancy: set both window and sidebar corners to 14dp during implementation. Preserve window dimensions and sidebar structure. This supersedes the old frozen radius requirement, but does not authorize removing effects, animations or functionality. Run focused geometry checks for this change.
+- Subscription auto-refresh must manage source nodes without silently applying foreign DNS/rules/groups. Nodes are a resource library; row selection/details must not choose or connect a runtime exit. Policy selection belongs to the strategy page.
+- Stage 2 must address the audited custom-rules/smartRouting incompatibility and five-tier Rust routing, an immutable default-policy identity, stable group/rule IDs, explicit configuration approval, real applied-state acknowledgement and truthful TUN/process capability reporting. Reuse already implemented parser/model/probe/policy/motion foundations.
+- Mandatory skill paths: existing Hallmark at `C:/Users/sysfr/.agents/skills/hallmark/SKILL.md`, project `.agents/skills/ui-ux-pro-max/SKILL.md`, installed Motion at `D:/Codex/skills/motion-design/SKILL.md`, and Qt QML at `C:/Users/sysfr/.codex/skills/qt-qml/SKILL.md`. Read `docs/UI_V2_SKILLS.md`; do not duplicate installations or introduce web UI frameworks.
+- The 0.2.3 diagnostic package is historical baseline evidence, not V2 delivery. Actual private-node/Codex failures remain unresolved. Do not redownload private sources or mutate this machine's proxy/TUN/routes/DNS. Use isolated tests and exact-source package identity; do not reconfigure another worktree's CMake cache.
+
+# v0.2.3 REALITY wire compatibility follow-up (2026-10-24; historical)
 
 - Version 0.2.2 recovered actual cached subscription nodes but did not prove private-node networking. Version 0.2.3 fixes a separately reproduced production REALITY authenticated-client version error: use the inspected and independently tested protocol baseline 26.10.17 rather than Swirl's application version. Keep server version/time/key/SNI/UUID checks and certificate acceptance strict.
 - Reuse the existing hash-pinned official Xray test peer for focused production import/authentication tests, independently of Windows packaging. Never ship that peer as the product core. Reuse encrypted cached private responses for the next isolated two-node comparison; do not repeat consumed source downloads or change this machine's proxy/TUN/routes/DNS/Codex processes.
