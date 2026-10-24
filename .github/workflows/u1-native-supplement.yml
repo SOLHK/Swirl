@@ -91,7 +91,9 @@ jobs:
               ['cargo', 'build', '--manifest-path', 'core/Cargo.toml', '--release', '--locked',
                '-p', 'swirl-transport', '--example', 'reality-client', '--example', 'reality-hello'],
               ['cargo', 'build', '--manifest-path', 'core/Cargo.toml', '--release', '--locked',
-               '-p', 'swirl-protocol', '--example', 'vision-client', '--example', 'transport-client', '--example', 'transport-runtime'],
+               '-p', 'swirl-protocol', '--example', 'vision-client', '--example', 'transport-client'],
+              ['cargo', 'build', '--manifest-path', 'core/Cargo.toml', '--release', '--locked',
+               '-p', 'swirl-core', '--example', 'transport-runtime'],
           ]
           for index, command in enumerate(commands, 1):
               with (output / f'rust-build-{index}.log').open('w', encoding='utf-8') as log:
