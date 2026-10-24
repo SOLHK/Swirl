@@ -115,6 +115,7 @@ jobs:
       - name: Build product, subscription, telemetry, stream, security and loader regressions
         run: cmake --build build/r1-tests --config Release --target Swirl SwirlRustCoreTests SwirlRustCoreLibraryTests SwirlNodeTests SwirlNodeViewModelTests SwirlImportTests SwirlSubscriptionFormatTests SwirlTelemetryTests SwirlNetworkRegressionTests SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlQtNetworkPolicyTests --parallel 4
       - name: Deploy test dependencies and inspect PE imports
+        id: deploy_tests
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -128,10 +129,16 @@ jobs:
           dumpbin /DEPENDENTS build/r1-tests/Release/swirl_api.dll | Out-File build/r1-tests/rust-dependencies.txt
           if ($LASTEXITCODE -ne 0) { throw 'Rust dependency inspection failed.' }
       - name: Windows native product and subscription regression
+        id: product_regression
+        if: ${{ !cancelled() && steps.deploy_tests.outcome == 'success' }}
         run: ctest --test-dir build/r1-tests -C Release -R "^swirl-(rust-library-loader|rust-qt-integration|node-real-chain|node-ui|engine-ui|stream-regression|import-subscription|import-boundaries|subscription-formats|telemetry-accounting|diagnostic-export|system-proxy-state|qt-network-policy|capture-network)$" --output-on-failure --no-tests=error
       - name: S4 content, model and motion correctness (offscreen software renderer)
+        id: s4_correctness
+        if: ${{ !cancelled() && steps.deploy_tests.outcome == 'success' }}
         run: ctest --test-dir build/r1-tests -C Release -R "^swirl-(motion|all-pages|appearance-ui|node-view-model)$" --output-on-failure --no-tests=error
       - name: Actual Windows system proxy button on the disposable runner
+        id: system_proxy_ui
+        if: ${{ !cancelled() && steps.deploy_tests.outcome == 'success' }}
         shell: pwsh
         env:
           SWIRL_SYSTEM_PROXY_TEST: '1'
@@ -143,6 +150,8 @@ jobs:
           $result=Get-Content -LiteralPath $env:SWIRL_SYSTEM_PROXY_UI_REPORT -Raw | ConvertFrom-Json
           if (-not $result.executed -or -not $result.success -or -not $result.restored -or $result.source_sha -cne $env:GITHUB_SHA) { throw 'Real system proxy UI evidence is incomplete or has the wrong source.' }
       - name: S4 synthetic node scale and fixed geometry (not native GPU acceptance)
+        id: s4_stress
+        if: ${{ !cancelled() && steps.deploy_tests.outcome == 'success' }}
         shell: pwsh
         env:
           SWIRL_U2_CHECKS: S4
@@ -154,6 +163,8 @@ jobs:
           $result=Get-Content -LiteralPath $output -Raw | ConvertFrom-Json
           if ($result.failures -ne 0) { throw 'S4 node scale UI assertions failed.' }
       - name: Actual Windows Qt import, DPAPI restore, selection and routing
+        id: product_subscription
+        if: ${{ !cancelled() && steps.deploy_tests.outcome == 'success' }}
         env:
           SWIRL_RUST_QT_TESTS: ${{ github.workspace }}/build/r1-tests/Release/SwirlRustCoreTests.exe
           SWIRL_PRODUCT_EVIDENCE: ${{ github.workspace }}/build/r1-tests/product-chain
@@ -170,10 +181,20 @@ jobs:
                   or report['failures'] or report['errors'] or report['skipped'] or not report['success']):
               raise SystemExit('Windows Qt subscription chain did not pass on the exact source without skips')
       - name: Configure separate production Release without test entry points
+        id: production_configure
+        if: >-
+          ${{ !cancelled() && steps.deploy_tests.outcome == 'success'
+              && steps.product_regression.outcome == 'success'
+              && steps.s4_correctness.outcome == 'success'
+              && steps.system_proxy_ui.outcome == 'success'
+              && steps.s4_stress.outcome == 'success'
+              && steps.product_subscription.outcome == 'success' }}
         run: cmake -S src/Swirl.Quick -B build/r1-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=OFF -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
       - name: Build the real production executable and paired DLL
+        if: ${{ success() && steps.production_configure.outcome == 'success' }}
         run: cmake --build build/r1-product --config Release --target Swirl --parallel 4
       - name: Require the product DLL to equal the tested exact-source DLL
+        if: ${{ success() && steps.production_configure.outcome == 'success' }}
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -188,9 +209,11 @@ jobs:
           git diff --exit-code
           if ($LASTEXITCODE -ne 0) { throw 'Build modified tracked source.' }
       - name: Clean directory and actual Swirl.exe roundtrips
+        if: ${{ success() && steps.production_configure.outcome == 'success' }}
         shell: pwsh
         run: ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/r1-product -Destination dist/Swirl-Rust-x64
       - name: Negative packaged DLL gate
+        if: ${{ success() && steps.production_configure.outcome == 'success' }}
         shell: pwsh
         run: |
           $stage=(Resolve-Path dist/Swirl-Rust-x64).Path
@@ -207,6 +230,7 @@ jobs:
           } finally { Move-Item "$dll.absent" $dll }
       - name: Start actual Qt UI twice with one isolated cache
         id: production_ui_ready
+        if: ${{ success() && steps.production_configure.outcome == 'success' }}
         shell: pwsh
         run: |
           $env:QT_QPA_PLATFORM='offscreen'
@@ -226,6 +250,7 @@ jobs:
       # The mandatory public test below still fails the job on any failed assertion.
       - name: Build candidate installer and portable archive
         id: candidate_package
+        if: ${{ success() && steps.production_configure.outcome == 'success' }}
         shell: pwsh
         run: |
           $nsis='C:/Program Files (x86)/NSIS/makensis.exe'
@@ -264,6 +289,7 @@ jobs:
           path: |
             build/r1-tests/Testing/Temporary/LastTest.log
             build/r1-tests/Release/Swirl-diagnostics.txt
+            build/r1-tests/Release/Swirl-engine-ui-diagnostics.txt
             build/r1-tests/Release/Swirl-node-ui-diagnostics.txt
             build/r1-tests/*.xml
             build/r1-tests/system-proxy-ui.json

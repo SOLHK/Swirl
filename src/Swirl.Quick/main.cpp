@@ -289,6 +289,7 @@ int main(int argc, char *argv[])
         else if(motionTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-motion-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-motion-diagnostics.txt");}
         if(nodeTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-node-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-node-ui-diagnostics.txt");}
         else if(interaction){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-input-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-input-diagnostics.txt");}
+        if(engineTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-engine-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-engine-ui-diagnostics.txt");}
         if(xrayUiTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-xray-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-xray-ui-diagnostics.txt");}
         QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/Swirl-diagnostics.txt"));
         qInstallMessageHandler(recordQtDiagnostic);
