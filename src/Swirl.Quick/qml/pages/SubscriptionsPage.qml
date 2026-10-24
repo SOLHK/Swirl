@@ -113,7 +113,7 @@ Item {
         ownerItem:page
         id:legacyDialog;objectName:"legacyNodesDialog";title:qsTr("清理历史未归属节点？");guardChanges:false
         ColumnLayout {width:parent.width;spacing:Theme.dp(12)
-            SwirlText {text:qsTr("仅清理已标记为历史未归属的 %1 个节点。已确认的手动节点与现有订阅节点会保留。建议先在节点来源中查看；此操作不能撤销。").arg(engineController.imports.legacyNodeCount);Layout.fillWidth:true;wrapMode:Text.Wrap;color:Theme.text}
+            SwirlText {text:qsTr("将删除来源记录缺失或订阅已不存在的 %1 个节点，其中可能包含旧版手动节点。请先在「历史未归属」中检查，并备份需要保留的节点。已明确记录为手动添加、手动导入和现有订阅的节点会保留；此操作不能撤销。").arg(engineController.imports.legacyNodeCount);Layout.fillWidth:true;wrapMode:Text.Wrap;color:Theme.text}
             RowLayout {Layout.alignment:Qt.AlignRight
                 SwirlButton {text:qsTr("取消");onClicked:legacyDialog.close()}
                 SwirlButton {objectName:"confirmLegacyNodesDelete";text:qsTr("确认清理");danger:true;onClicked:{if(engineController.imports.cleanLegacyNodes())legacyDialog.close()}}

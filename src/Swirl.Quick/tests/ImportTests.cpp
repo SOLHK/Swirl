@@ -753,11 +753,32 @@ external-controller: 0.0.0.0:9090
         QCOMPARE(reloaded.publicRows().last().toMap().value("sourceKind").toString(),QString("manual"));
         QVERIFY(reloaded.removeSubscription(second));QCOMPARE(reloaded.nodes().size(),1);QCOMPARE(reloaded.nodes().first().id,manual);
     }
+    void legacyDetachedNodesRequireExplicitCleanup_data() {
+        QTest::addColumn<QString>("origin");
+        QTest::addColumn<bool>("missingFields");
+        QTest::addColumn<bool>("keepUserNodes");
+        QTest::newRow("empty-origin-and-format-180-to-zero")<<QString()<<false<<false;
+        QTest::newRow("absent-origin-and-format-180-to-zero")<<QString()<<true<<false;
+        QTest::newRow("empty-origin-preserves-explicit-user-nodes")<<QString()<<false<<true;
+        QTest::newRow("detached-subscription-preserves-user-nodes")<<QString("subscription")<<false<<true;
+        QTest::newRow("unknown-origin-remains-reviewable")<<QString("old-importer")<<false<<true;
+    }
     void legacyDetachedNodesRequireExplicitCleanup() {
 #ifdef Q_OS_WIN
+        QFETCH(QString,origin);QFETCH(bool,missingFields);QFETCH(bool,keepUserNodes);
         QTemporaryDir directory;const auto path=directory.filePath("nodes");
-        {NodeStore store(path);auto parsed=NodeImporter::parse(socks(1080));QVERIFY(parsed);QVERIFY(store.importNodes(parsed.nodes));
-            QVERIFY(store.saveNode({{"name","Manual"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",1081}}));}
+        QSet<QString> retained;
+        {NodeStore store(path);auto parsed=NodeImporter::parse(socks(1080));QVERIFY(parsed);
+            QList<ProxyNode> batch;
+            for(int i=0;i<180;++i){auto node=parsed.nodes.first();node.id=QUuid::createUuid().toString(QUuid::WithoutBraces);node.port=quint16(10000+i);batch.append(node);}
+            QVERIFY(store.importNodes(batch));QCOMPARE(store.nodes().size(),180);QVERIFY(store.select(store.nodes().first().id));
+            if(keepUserNodes){
+                for(const auto &entry:QStringList{"manual-import","text","clipboard","file","url"}){
+                    auto node=parsed.nodes.first();node.id=QUuid::createUuid().toString(QUuid::WithoutBraces);node.port=quint16(20000+retained.size());node.importSource=entry;
+                    QVERIFY(store.importNodes({node}));retained.insert(store.nodes().last().id);
+                }
+                QVERIFY(store.saveNode({{"name","Manual"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",21000}}));retained.insert(store.nodes().last().id);
+            }}
         const auto crypt=[](const QByteArray &input,bool decrypt) {
             DATA_BLOB source{DWORD(input.size()),reinterpret_cast<BYTE *>(const_cast<char *>(input.constData()))},result{};
             const QByteArray context("Swirl.NodeStore.v1");DATA_BLOB entropy{DWORD(context.size()),reinterpret_cast<BYTE *>(const_cast<char *>(context.constData()))};
@@ -767,15 +788,32 @@ external-controller: 0.0.0.0:9090
         };
         QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto ciphertext=file.readAll();file.close();
         auto document=QJsonDocument::fromJson(crypt(ciphertext.mid(11),true)).object();auto nodes=document["nodes"].toArray();
-        auto legacy=nodes[0].toObject();legacy["importSource"]="subscription";legacy["sourceId"]="";nodes[0]=legacy;document["nodes"]=nodes;
+        for(int i=0;i<180;++i){auto legacy=nodes[i].toObject();
+            for(const auto &field:{"sourceId","sourceFormat","importSource","providerAlias"}){
+                if(missingFields)legacy.remove(field);else legacy[field]="";
+            }
+            legacy.remove("originalConfiguration");
+            if(!missingFields)legacy["importSource"]=origin;
+            nodes[i]=legacy;
+        }
+        document["nodes"]=nodes;
+        // This fixture is a different encrypted snapshot; selection must be
+        // in that snapshot rather than in the original digest-bound sidecar.
+        document["selected"]=nodes.first().toObject().value("id");
         const auto upgraded=QByteArray("SWIRLNODE1\n")+crypt(QJsonDocument(document).toJson(QJsonDocument::Compact),false);
         QVERIFY(file.open(QIODevice::WriteOnly));QCOMPARE(file.write(upgraded),upgraded.size());file.close();
-        NodeStore reloaded(path);QCOMPARE(reloaded.nodes().size(),2);QCOMPARE(reloaded.legacyNodeCount(),1);
+        NodeStore reloaded(path);QVERIFY(reloaded.subscriptions().isEmpty());QCOMPARE(reloaded.nodes().size(),180+retained.size());QCOMPARE(reloaded.legacyNodeCount(),180);
+        QVERIFY(!reloaded.selectedId().isEmpty());
         QCOMPARE(reloaded.publicRows().first().toMap().value("sourceKind").toString(),QString("legacy"));
+        for(const auto &row:reloaded.publicRows())QCOMPARE(row.toMap().value("sourceKind").toString(),retained.contains(row.toMap().value("id").toString())?QString("manual"):QString("legacy"));
         QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),upgraded);file.close(); // Detection never rewrites data.
         NodeImportService service(&reloaded);QVERIFY(service.cleanLegacyNodes());QCOMPARE(reloaded.legacyNodeCount(),0);
-        QCOMPARE(reloaded.nodes().size(),1);QCOMPARE(reloaded.nodes().first().name,QString("Manual"));
-        NodeStore saved(path);QCOMPARE(saved.nodes().size(),1);QCOMPARE(saved.nodes().first().name,QString("Manual"));
+        QVERIFY(service.message().contains("180"));QVERIFY(reloaded.selectedId().isEmpty());
+        QCOMPARE(reloaded.nodes().size(),retained.size());for(const auto &node:reloaded.nodes())QVERIFY(retained.contains(node.id));
+        NodeStore saved(path);QCOMPARE(saved.nodes().size(),retained.size());QCOMPARE(saved.legacyNodeCount(),0);QVERIFY(saved.selectedId().isEmpty());
+        for(const auto &node:saved.nodes())QVERIFY(retained.contains(node.id));
+        QVERIFY(file.open(QIODevice::ReadOnly));const auto after=file.readAll();file.close();
+        QVERIFY(!service.cleanLegacyNodes());QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),after);
 #endif
     }
     void providerAliasSurvivesDisplayRenameAndCredentialRotation() {

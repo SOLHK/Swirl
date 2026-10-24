@@ -126,7 +126,12 @@ QVariantList NodeStore::publicRows() const {
 bool NodeStore::legacyNode(const ProxyNode &node) const {
     if(!node.sourceId.isEmpty())
         return std::none_of(m_subscriptions.cbegin(),m_subscriptions.cend(),[&](const auto &source){return source.id==node.sourceId;});
-    return node.importSource=="subscription" || (node.importSource.isEmpty()&&!node.sourceFormat.isEmpty());
+    // Old catalogs can have lost *all* provenance when detaching a subscription.
+    // Absence of sourceFormat is not evidence of a manually created node. Only
+    // explicit user-entry origins establish that; all other unowned records
+    // remain visible for review and are removed only by confirmed cleanup.
+    static const QStringList userOrigins{"manual","manual-import","text","clipboard","file","url"};
+    return !userOrigins.contains(node.importSource);
 }
 int NodeStore::legacyNodeCount() const {
     return int(std::count_if(m_nodes.cbegin(),m_nodes.cend(),[this](const auto &node){return legacyNode(node);}));

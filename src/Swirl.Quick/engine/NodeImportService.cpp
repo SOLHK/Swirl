@@ -144,8 +144,10 @@ bool NodeImportService::removeSubscription(const QString &id) {
 }
 bool NodeImportService::cleanLegacyNodes() {
     if(m_busy || hasPreview())return false;
+    const auto count=m_store->legacyNodeCount();
     const bool ok=m_store->cleanLegacyNodes();
-    m_message=ok?QStringLiteral("已按确认清理历史归属节点；手动节点与有效订阅节点保持不变。"):m_store->error();
+    m_message=ok?QStringLiteral("已清理 %1 个历史未归属节点，剩余 %2 个节点；已确认的手动节点与有效订阅节点保持不变。")
+        .arg(count).arg(m_store->nodes().size()):m_store->error();
     emit changed();return ok;
 }
 void NodeImportService::refreshSubscription(const QString &id) {

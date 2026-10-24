@@ -98,6 +98,17 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
             QTest::keyClick(window,Qt::Key_Escape);wait(200);click("discardChangesConfirm");
             check("explicit-discard-closes-form",!dialog->property("visible").toBool());
         }
+        auto *legacy=window->findChild<QObject *>("legacyNodesDialog");
+        check("legacy-cleanup-dialog-mounted",legacy!=nullptr);
+        if(legacy){
+            QMetaObject::invokeMethod(legacy,"open");wait(250);
+            auto *confirm=item("confirmLegacyNodesDelete");
+            check("legacy-cleanup-confirmation-visible",confirm&&confirm->isVisible()&&legacy->property("visible").toBool());
+            check("legacy-cleanup-footer-inside-window",confirm&&QRectF(0,0,window->width(),window->height()).contains(QRectF(confirm->mapToScene(QPointF()),confirm->size())));
+            window->grabWindow().save(QFileInfo(output).absolutePath()+"/legacy-cleanup-dialog.png");
+            QTest::keyClick(window,Qt::Key_Escape);wait(250);
+            check("escape-cancels-legacy-cleanup",!legacy->property("visible").toBool());
+        }
         navigate("proxies");
         auto *model=window->findChild<NodeViewModel *>("nodeViewModel");
         auto *table=item("realNodeTable"),*list=item("tableRowsViewport"),*search=item("nodeSearchField"),*source=item("nodeSourceFilter");
