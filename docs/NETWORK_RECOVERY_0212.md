@@ -26,10 +26,10 @@ source identities remain revoked and are not silently reattached to new imports.
   zero nodes, one subscription and a default node target listed as missing.
 - Existing encrypted caches were reused without subscription requests. One SS
   node and one VLESS REALITY node each returned HTTPS 204 through the installed
-  Rust DLL in isolated schema-1 and schema-2 sessions. No system proxy, TUN,
-  Both also completed HTTP CONNECT and certificate-verified HTTPS 204 through
-  the schema-2 loopback proxy listener.
-  routing, DNS, active catalog or credential store was changed. These are two
+  Rust DLL in isolated schema-1 and schema-2 sessions. Both also completed HTTP
+  CONNECT and certificate-verified HTTPS 204 through the schema-2 loopback proxy
+  listener. No system proxy, TUN, routing, DNS, active catalog or credential store
+  was changed. These are two
   sampled nodes, not acceptance of every source/node or the user's browser/Codex.
 - Older TLS certificate failures and individual handshake/timeouts in the archive
   cannot be assigned a single cause from that archive. No certificate validation
@@ -65,6 +65,25 @@ font-initialization and motion behavior are preserved.
 Final local checks: 7/7 CTest suites passed (policy configuration, catalog
 transactions, Rust/Qt integration, subscription download, Qt network policy,
 subscription import and import boundaries), plus 7/7 portable-core boundary
-checks. The same-source Windows/MSVC production installer remains a separate
-CI gate. Private sample reports and diagnostic input stay in ignored local work
+checks. The same-source Windows/MSVC production installer is verified separately
+below. Private sample reports and diagnostic input stay in ignored local work
 directories and are never part of the commit or CI inputs.
+
+## Verified installer
+
+- Product source: `8e3fc9841110edda764f7545970c83797df3550c`.
+- [CI run 40208634197](https://github.com/SOLHK/Swirl/actions/runs/40208634197):
+  Rust and Windows jobs succeeded. Rust test summaries total 782 passed, zero
+  failed/ignored. Windows CTest: 18/18 suites; Qt summaries: 688 passed, zero
+  failed, 11 skipped. Fixture/private-source skips remain unverified, not passes.
+- Candidate artifact `12604632859` and evidence artifact `12604278543` were
+  downloaded and independently checked against GitHub's archive sizes/digests.
+  CI confirms the staged payload's exact inventory and all file hashes, actual
+  proxy roundtrips, production startup, and disposable installer lifecycle.
+- Installer PE FileVersion/ProductVersion: `0.2.12.0`; 74,664,498 bytes;
+  SHA256 `d8913b3f57290241decf85080307b533eb481c869673a265b295014f8a469469`.
+- Delivered to the current chat's outputs directory as
+  `Swirl-0.2.12-Subscription-Recovery-Setup.exe`, with Chinese instructions,
+  checksum and verification JSON. It was not installed on the user's machine.
+  The private-node sample checks above used the already installed 0.2.11 Rust
+  DLL; they do not claim private-provider acceptance of every packaged node.
