@@ -1,4 +1,5 @@
 #pragma once
+#include "WindowShadowRenderer.h"
 #include <QObject>
 #include <QPointer>
 #include <QSize>
@@ -72,6 +73,7 @@ private:
     QSize m_shadowSize;
     qreal m_shadowRadius = 0, m_shadowDpr = 0;
     quint64 m_shadowBuildCount = 0;
+    WindowShadowRenderer m_shadowRenderer;
     QString m_status = QStringLiteral("Opaque: not initialized");
     void refresh();
     void updateCornerMask();

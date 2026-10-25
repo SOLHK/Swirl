@@ -60,50 +60,7 @@ HWND createShadowWindow() {
         L"SwirlExactContourShadow", L"", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
 }
 
-qreal roundedDistance(qreal x, qreal y, qreal width, qreal height, qreal radius) {
-    const qreal dx = std::abs(x - width / 2) - (width / 2 - radius);
-    const qreal dy = std::abs(y - height / 2) - (height / 2 - radius);
-    return std::pow(std::pow(qMax<qreal>(dx, 0), 2.5) + std::pow(qMax<qreal>(dy, 0), 2.5), 0.4)
-        + qMin(qMax(dx, dy), qreal(0)) - radius;
-}
 
-QImage shadowImage(QSize body, qreal radius, qreal dpr, bool active) {
-    const int padding = qCeil(20 * dpr);
-    const qreal sigma = 6.0 * dpr, offset = 2.5 * dpr;
-    const qreal strength = active ? 0.22 : 0.14;
-    QImage image(body + QSize(padding * 2, padding * 2), QImage::Format_ARGB32_Premultiplied);
-    image.fill(Qt::transparent);
-    // Only the perimeter is painted. The interior stays completely clear so
-    // the main window's Acrylic never blurs an artificial dark rectangle.
-    for (int y = 0; y < image.height(); ++y) {
-        auto *row = reinterpret_cast<QRgb *>(image.scanLine(y));
-        const qreal localY = y + 0.5 - padding;
-        int clearLeft = image.width(), clearRight = image.width();
-        if (localY >= 0 && localY < body.height()) {
-            const qreal dy = qMax<qreal>(0, qMax(radius - localY, localY - (body.height() - radius)));
-            const qreal inset = radius - std::pow(qMax<qreal>(0,
-                std::pow(radius, 2.5) - std::pow(dy, 2.5)), 0.4);
-              clearLeft = padding + qMax(0, qCeil(inset + 0.5));
-              clearRight = padding + body.width() - qMax(0, qCeil(inset + 0.5));
-        }
-        for (int x = 0; x < image.width(); ++x) {
-            if (x == clearLeft) { x = clearRight; if (x >= image.width()) break; }
-            const qreal localX = x + 0.5 - padding;
-            if (localX >= radius && localX < body.width() - radius
-                && localY >= 0 && localY < body.height()) continue;
-            if (localY >= radius && localY < body.height() - radius
-                && localX >= 0 && localX < body.width()) continue;
-            const qreal edge = roundedDistance(localX, localY, body.width(), body.height(), radius);
-            if (edge <= -0.5) continue;
-            const qreal t = qBound<qreal>(0, edge + 0.5, 1);
-            const qreal coverage = t * t * (3 - 2 * t);
-            const qreal distance = qMax<qreal>(0, roundedDistance(localX, localY - offset, body.width(), body.height(), radius));
-            const int alpha = qRound(255 * strength * coverage * std::exp(-distance * distance / (2 * sigma * sigma)));
-            row[x] = qRgba(0, 0, 0, alpha);
-        }
-    }
-    return image;
-}
 }
 #endif
 WindowsBackdrop::WindowsBackdrop(QObject *parent) : QObject(parent) {
@@ -341,7 +298,8 @@ void WindowsBackdrop::updateCompatibilityShadow() {
     const HWND shadow = reinterpret_cast<HWND>(m_shadowHandle);
     if (m_shadowSize != body || !qFuzzyCompare(m_shadowRadius + 1, radius + 1)
         || !qFuzzyCompare(m_shadowDpr, dpr) || m_shadowActive != active) {
-        const auto image = shadowImage(body, radius, dpr, active);
+        const auto image = m_shadowRenderer.render(body, radius, dpr, active);
+        if (image.isNull()) { ShowWindow(shadow, SW_HIDE); setVisible(false); return; }
         BITMAPINFO info{};
         info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
         info.bmiHeader.biWidth = image.width(); info.bmiHeader.biHeight = -image.height();

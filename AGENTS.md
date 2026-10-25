@@ -1,5 +1,7 @@
 # Current UI V2 staged work (2026-10-24)
 
+- The next continuation is 0.2.9: read `docs/UI_V2_STAGE6_CONTINUATION_029.md`. This stage isolates route/resize cadence and reuses pixel-exact native shadow kernels. Preserve all effects/cache and the failed hidden-desktop evidence; test-only VBlank/VSync diagnostics do not change product settings or establish physical 60FPS. Final same-source tests/CI/package identity are separate delivery evidence. Do not restart completed page architecture.
+
 - The next continuation is 0.2.8: read `docs/UI_V2_STAGE6_CONTINUATION_028.md`. Stages 3–5 and the 0.2.7 package already exist; do not restart architecture or discard working routing. Continue three-page control consistency, actual node row actions and measured lazy creation/performance work. Per-frame probe data has explicit attribution/overhead limits; final CI/package identity is separate.
 
 - The user rejected the 0.2.6 subscription page's dated controls. Read `docs/UI_V2_SUBSCRIPTIONS_027.md` for the 0.2.7 native subscription redesign: compact aligned rows, action menu, neutral controls and grouped form. Preserve receipt-gated mutations, one-use review and cancellation. Final package identity and test status remain in the independent delivery record.
