@@ -103,7 +103,7 @@ try {
     $pattern = '^swirl-(rust-library-loader|rust-qt-integration|node-real-chain|stream-regression|import-subscription|subscription-formats|diagnostic-export|system-proxy-state|qt-network-policy|codex-proxy-launcher|telemetry-accounting|node-view-model|node-section-model|policy-configuration|catalog-transaction'
     if ($DisposableSystemProxyTests) { $pattern += '|system-proxy-recovery' }
     $pattern += ')$'
-    Run-Step 'focused-core-security-network-tests' { Checked ctest @('--test-dir',$build,'-C','Release','-R',$pattern,'--output-on-failure','--no-tests=error','--output-junit',(Join-Path $evidence 'focused-tests.xml')) }
+    Run-Step 'focused-core-security-network-tests' { Checked ctest @('--test-dir',$build,'-C','Release','-R',$pattern,'--output-on-failure','--test-output-size-passed','1048576','--no-tests=error','--output-junit',(Join-Path $evidence 'focused-tests.xml')) }
     [xml]$testResults=Get-Content -LiteralPath (Join-Path $evidence 'focused-tests.xml') -Raw
     $report.focused_ctest_suites=[int]$testResults.testsuite.tests
     if([int]$testResults.testsuite.failures -ne 0 -or $report.focused_ctest_suites -ne $targets.Count) { throw 'Focused test report is incomplete or failed.' }

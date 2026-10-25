@@ -47,11 +47,11 @@ SwirlMotionButton {
         return qsTr("当前运行模式；实际出口请查看连接详情")
     }
     objectName: "activityOutboundMode"
-    implicitWidth: Math.ceil(modeCaption.implicitWidth)
-    implicitHeight: Theme.dp(23)
+    implicitWidth: Math.ceil(modeCaption.implicitWidth) + Theme.dp(24)
+    implicitHeight: Theme.dp(28)
     padding: 0
-    leftPadding: 0
-    rightPadding: 0
+    leftPadding: Theme.dp(12)
+    rightPadding: Theme.dp(12)
     topPadding: 0
     bottomPadding: 0
     hoverEnabled: true
@@ -59,8 +59,8 @@ SwirlMotionButton {
     Accessible.name: qsTr("出站模式：%1").arg(text)
     Accessible.description: statusText
     ToolTip.text: qsTr("点击更改出站模式。%1").arg(statusText)
-    ToolTip.visible: hovered || activeFocus
-    ToolTip.delay: 450
+    ToolTip.visible: (hovered || visualFocus) && !modeMenu.visible
+    ToolTip.delay: 650
 
     function modeLabel(mode) {
         const option = modes.find(item => item.key === mode)
@@ -114,21 +114,25 @@ SwirlMotionButton {
     onBusyChanged: if (!busy && !pending) settledMode = appliedMode
     Component.onCompleted: settledMode = appliedMode
     onClicked: modeMenu.open()
-    background: Rectangle {
-        radius: Theme.dp(4)
-        color: "transparent"
-        border.width: control.activeFocus ? 1 : 0
-        border.color: Theme.focusBorder
+    background: SwirlClearGlassSurface {
+        objectName: "activityOutboundModeSurface"
+        radius: height / 2
+        hovered: control.hovered
+        pressed: control.down
+        focused: false
+        border.width: Theme.increaseContrast ? 1 / Screen.devicePixelRatio : 0
+        border.color: Theme.text
     }
     contentItem: SwirlText {
         id: modeCaption
         objectName: "activityOutboundModeText"
         text: control.text
         textFormat: Text.PlainText
-        color: control.pending ? Theme.muted : control.hovered || control.down ? Theme.accent : Theme.text
-        font.pixelSize: Theme.fontSize(15)
-        font.weight: Font.DemiBold
-        font.underline: control.hovered || control.activeFocus
+        textRole: "smallLabel"
+        color: control.pending ? Theme.muted : Theme.text
+        font.pixelSize: Theme.fontSize(11)
+        font.weight: Theme.bodyFontWeight
+        font.underline: control.visualFocus
         elide: Text.ElideRight
     }
     HoverHandler { cursorShape: Qt.PointingHandCursor }

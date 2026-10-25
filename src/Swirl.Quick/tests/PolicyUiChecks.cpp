@@ -10,6 +10,7 @@
 #include <QJsonObject>
 #include <QQmlContext>
 #include <QQmlExpression>
+#include <QQmlProperty>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QSignalSpy>
@@ -188,7 +189,7 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     if(!check(QTest::qWaitFor([&]{return item("activityOutboundMode")&&!host->property("moving").toBool();},5000),QStringLiteral("Activity mode is reachable after policy edits")))return finish();
     auto *activityMode=item("activityOutboundMode");
     auto *modeText=item("activityOutboundModeText");
-    check(modeText&&qAbs(activityMode->width()-modeText->implicitWidth())<=2,QStringLiteral("The mode label itself is the compact click target without an adjacent button"));
+    check(modeText&&qAbs(activityMode->width()-modeText->implicitWidth()-eval("Theme.dp(24)").toReal())<=2,QStringLiteral("The mode value is one compact capsule without an adjacent button"));
     check(modeText&&modeText->width()+0.5>=modeText->implicitWidth()&&!modeText->property("truncated").toBool(),QStringLiteral("The complete mode name remains visible without style padding or elision"));
     const auto originalMode=controller->routingMode();
     check(activityMode->property("displayMode")==originalMode,QStringLiteral("Activity value starts from the controller's acknowledged mode"));
@@ -200,6 +201,10 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     }
     QTest::keyClick(window,Qt::Key_Escape);
     check(QTest::qWaitFor([&]{return !popup("activityOutboundModeMenu");},2000)&&activityMode->hasActiveFocus()&&controller->routingMode()==originalMode,QStringLiteral("Esc closes the mode menu, restores focus and changes no route"));
+    auto *modeSurface=item("activityOutboundModeSurface");
+    check(modeSurface&&QQmlProperty(modeSurface,"border.width").read().toReal()==0
+          &&qAbs(modeSurface->property("radius").toReal()-modeSurface->height()/2)<0.5,
+          QStringLiteral("Focused mode value keeps the event capsule shape without a blue frame"));
     bool busyObserved=false,pendingValueStable=true;
     const auto modeObservation=QObject::connect(controller,&EngineController::policyChanged,window,[&]{
         if(controller->policyBusy()){busyObserved=true;pendingValueStable=pendingValueStable&&activityMode->property("displayMode")==originalMode;}
@@ -214,6 +219,7 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     awaitSaved(QStringLiteral("Activity mode can switch back using the same native menu"));
     check(activityMode->property("displayMode")=="rule",QStringLiteral("Activity return choice follows the committed controller mode"));
     check(QTest::qWaitFor([&]{return !popup("activityOutboundModeMenu");},2000),QStringLiteral("Mode selection releases the menu before returning to the activity facts"));
+    QTest::qWait(200);
     if(!directory.isEmpty())window->grabWindow().save(directory+"/activity-mode.png");
     return finish();
 }

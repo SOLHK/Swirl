@@ -185,7 +185,7 @@ ApplicationWindow {
         if(AppState.historyIndex>0)AppState.goBack()
         else AppState.navigate("featurehub")
     }
-    readonly property bool swirlBackAvailable:AppState.canGoBack || (pageLoader.item!==null && pageLoader.item.detailOpen===true)
+    readonly property bool swirlBackAvailable:rewriteRulesLoader.wantOpen || AppState.canGoBack || (pageLoader.item!==null && pageLoader.item.detailOpen===true)
     function handleEscape() {
         if(rewriteRulesLoader.wantOpen){rewriteRulesLoader.wantOpen=false;return}
         if(pageLoader.item && pageLoader.item.dismissDetail && pageLoader.item.dismissDetail())return
