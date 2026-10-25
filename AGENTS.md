@@ -1,5 +1,7 @@
 # Current UI V2 staged work (2026-10-24)
 
+- The user rejected the 0.2.6 subscription page's dated controls. Read `docs/UI_V2_SUBSCRIPTIONS_027.md` for the 0.2.7 native subscription redesign: compact aligned rows, action menu, neutral controls and grouped form. Preserve receipt-gated mutations, one-use review and cancellation. Final package identity and test status remain in the independent delivery record.
+
 - Stage 5/6 source continuation is now the 0.2.6 diagnostic candidate: read `docs/UI_V2_STAGE5_HANDOFF.md`, `docs/UI_V2_STAGE6_HANDOFF.md` and `docs/UI_V2_STAGE6_MANUAL.md`. Final native, profiler, CI and installer evidence must be checked separately. Do not redo stage 1/2 or infer package success from a version file. The user also requested `caveman`; its installed path is `D:/Codex/skills/caveman/SKILL.md` (concise chat only, never compress code or reports).
 
 - Continue only in `D:/Codex/work/Swirl-ui-v2-20261024`, branch `work/swirl-ui-v2-20261024`, based on `4c8c9e076976e5cfb62f103daecdf2afc121eeb3` (0.2.3). Older branch instructions below are historical. Preserve main/test and all other windows; no force pushes.

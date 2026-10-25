@@ -48,8 +48,10 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
     const double sidebar=eval("window.actualSidebarWidth").toDouble();
     sample("cold");
     if(phase=="subscription"){
-        bool requestedScaleOk=false;const double requestedScale=qEnvironmentVariable("QT_SCALE_FACTOR").toDouble(&requestedScaleOk);
-        check("requested-dpi-scale-is-effective",requestedScaleOk&&qAbs(window->devicePixelRatio()-requestedScale)<0.02);
+        const auto expectedDprVariable=qEnvironmentVariableIsSet("SWIRL_EXPECTED_DPR")?"SWIRL_EXPECTED_DPR":"QT_SCALE_FACTOR";
+        bool expectedDprOk=false;const double expectedDpr=qEnvironmentVariable(expectedDprVariable).toDouble(&expectedDprOk);
+        check("requested-dpi-scale-is-effective",expectedDprOk&&expectedDpr>0&&qAbs(window->devicePixelRatio()-expectedDpr)<0.02);
+        double lastFormatOptionLabelContentHeight=-1,lastFormatOptionLabelHeight=-1,lastFormatOptionRowHeight=-1;
         std::function<QQuickItem *(QQuickItem *,const QString &)> find=[&](QQuickItem *parent,const QString &name)->QQuickItem *{if(parent->objectName()==name)return parent;for(auto *child:parent->childItems())if(auto *found=find(child,name))return found;return nullptr;};
         const auto item=[&](const QString &name){return find(window->contentItem(),name);};
         const auto click=[&](const QString &name){auto *target=item(name);check("input-"+name,target&&target->isVisible()&&target->isEnabled());if(target)QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,target->mapToScene(QPointF(target->width()/2,target->height()/2)).toPoint());wait(250);};
@@ -64,6 +66,8 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
             const auto visibleIn=[&](QQuickItem *field,QQuickItem *viewport){const QRectF outer(viewport->mapToScene(QPointF()),viewport->size());return outer.adjusted(-1,-1,1,1).contains(QRectF(field->mapToScene(QPointF()),field->size()));};
             check("first-input-visible-on-open",visibleIn(name,form));
             check("dialog-footer-inside-window",QRectF(0,0,window->width(),window->height()).contains(QRectF(save->mapToScene(QPointF()),save->size())));
+            click("subscriptionAdvanced");
+            check("advanced-format-is-visible",format->isVisible());
             format->forceActiveFocus();wait(150);
             check("focused-format-scrolls-fully-into-view",visibleIn(format,form));
             auto *popup=format->property("popup").value<QObject *>();
@@ -75,7 +79,11 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
                 if(list){QMetaObject::invokeMethod(list,"positionViewAtEnd");wait(120);}
                 auto *last=item("swirlComboOption-6");
                 check("last-format-option-visible-and-tall-enough",last&&list&&last->property("text").toString()=="sing-box"&&last->height()>=eval("Theme.controlHeight").toReal()&&visibleIn(last,list));
-                if(auto *label=last?last->property("contentItem").value<QQuickItem *>():nullptr)check("format-option-label-not-vertically-clipped",label->property("contentHeight").toReal()<=label->height()+1);
+                if(last)lastFormatOptionRowHeight=last->height();
+                if(auto *label=last?last->property("contentItem").value<QQuickItem *>():nullptr){
+                    lastFormatOptionLabelContentHeight=label->property("contentHeight").toReal();lastFormatOptionLabelHeight=label->height();
+                    check("format-option-label-not-vertically-clipped",lastFormatOptionLabelContentHeight<=lastFormatOptionLabelHeight+1);
+                }
                 window->grabWindow().save(QFileInfo(output).absolutePath()+"/subscription-form-popup.png");
                 QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,format->mapToScene(QPointF(format->width()/2,format->height()/2)).toPoint());wait(220);
                 check("format-click-toggles-popup-closed",!popup->property("visible").toBool());
@@ -138,7 +146,7 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
         check("subscription-fixes-preserve-shell-size",window->size()==initial);
         check("subscription-fixes-preserve-sidebar",eval("window.actualSidebarWidth").toDouble()==sidebar);
         QFile file(output);QDir().mkpath(QFileInfo(output).absolutePath());if(!file.open(QIODevice::WriteOnly))return 2;
-        file.write(QJsonDocument(QJsonObject{{"phase",phase},{"checks",checks},{"failures",failures},{"logicalWidth",initial.width()},{"logicalHeight",initial.height()},{"dpr",window->devicePixelRatio()},{"note","Mounted QML layout, popup, Escape and synthetic 600-row virtualization checks only; subscription/network acceptance runs separately."}}).toJson());return failures?1:0;
+        file.write(QJsonDocument(QJsonObject{{"phase",phase},{"checks",checks},{"failures",failures},{"logicalWidth",initial.width()},{"logicalHeight",initial.height()},{"dpr",window->devicePixelRatio()},{"expectedDpr",expectedDpr},{"expectedDprVariable",QString::fromLatin1(expectedDprVariable)},{"lastFormatOptionLabelContentHeight",lastFormatOptionLabelContentHeight},{"lastFormatOptionLabelHeight",lastFormatOptionLabelHeight},{"lastFormatOptionRowHeight",lastFormatOptionRowHeight},{"note","Mounted QML layout, popup, Escape and synthetic 600-row virtualization checks only; subscription/network acceptance runs separately. Missing format geometry is reported as -1."}}).toJson());return failures?1:0;
     }
     if(phase=="S4"){
         navigate("proxies");

@@ -1,6 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import SwirlQuick
 import "../components"
@@ -27,6 +27,7 @@ Item {
         return String(record.name).toLowerCase().indexOf(page.searchQuery) >= 0 && (page.filterIndex === 0 || (page.filterIndex === 1 ? record.status === "更新失败" : record.enabled))
     })
     readonly property int totalNodes: providers.reduce((total, record) => total + Number(record.nodes), 0)
+    readonly property string operationMessage: mutationMessage || engineController.imports.message
 
     function edit(record, source) {
         if (!editable) return
@@ -102,7 +103,7 @@ Item {
         trackMutation(engineController.imports.applyReviewedConfiguration(), v2)
     }
 
-    Shortcut { sequences: [StandardKey.Find]; enabled: AppState.currentPage === "subscriptions" && !addDialog.visible && !deleteDialog.visible && !reviewDialog.visible; onActivated: { search.forceActiveFocus(); search.selectAll() } }
+    Shortcut { sequences: [StandardKey.Find]; enabled: AppState.currentPage === "subscriptions" && !addDialog.visible && !deleteDialog.visible && !reviewDialog.visible && !operationDialog.visible && !legacyDialog.visible; onActivated: { search.forceActiveFocus(); search.selectAll() } }
     SwirlAnimatedModel { id: subscriptionModel; source: page.listed; keyRole: "id" }
     ColumnLayout {
         anchors.fill: parent; anchors.margins: Theme.pagePadding; spacing: Theme.dp(14)
@@ -111,31 +112,53 @@ Item {
             SwirlText { id: routeTitle; textRole: "pageTitle"; text: qsTr("订阅管理"); color: Theme.text; font.pixelSize: Theme.fontSize(26); font.weight: Font.DemiBold }
             SwirlText { text: String(page.providers.length); color: Theme.muted; font.pixelSize: Theme.fontSize(16); Accessible.name: qsTr("%1 个订阅来源").arg(page.providers.length) }
             Item { Layout.fillWidth: true }
-            SwirlButton { objectName: "refreshAllSubscriptions"; text: qsTr("更新全部"); quiet: true; iconName: "refresh"; enabled: page.editable && page.providers.length > 0; onClicked: engineController.imports.refreshAll() }
-            SwirlButton { id: add; objectName: "addSubscription"; text: qsTr("添加订阅"); primary: true; iconName: "plus"; enabled: page.editable; onClicked: page.edit(null, add) }
+            SubscriptionAction { objectName: "refreshAllSubscriptions"; text: qsTr("更新全部"); iconName: "refresh-source"; enabled: page.editable && page.providers.length > 0; onClicked: engineController.imports.refreshAll() }
+            SubscriptionAction { id: add; objectName: "addSubscription"; text: qsTr("添加订阅"); solid: true; iconName: "plus"; enabled: page.editable; onClicked: page.edit(null, add) }
         }
-        SwirlText { Layout.fillWidth: true; text: qsTr("%1 个节点来自 %2 个订阅，出口由策略页管理。").arg(page.totalNodes).arg(page.providers.length); color: Theme.muted; font.pixelSize: Theme.fontSize(12); wrapMode: Text.Wrap }
+        SwirlText { Layout.fillWidth: true; text: qsTr("%1 个来源，%2 个节点").arg(page.providers.length).arg(page.totalNodes); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
         RowLayout {
             Layout.fillWidth: true; spacing: Theme.dp(12)
-            SwirlSearchField { id: search; objectName: "subscriptionSearch"; Layout.fillWidth: true; Layout.minimumWidth: 0; placeholderText: qsTr("搜索订阅名称"); Accessible.name: placeholderText }
-            SwirlComboBox { objectName: "subscriptionFilter"; Layout.preferredWidth: Theme.dp(126); model: [qsTr("全部来源"), qsTr("更新失败"), qsTr("自动更新")]; currentIndex: page.filterIndex; onActivated: index => page.filterIndex = index; Accessible.name: qsTr("筛选订阅来源") }
+            TextField {
+                id: search; objectName: "subscriptionSearch"
+                Layout.fillWidth: true; Layout.maximumWidth: Theme.dp(300); Layout.minimumWidth: Theme.dp(140)
+                implicitHeight: Theme.dp(34); placeholderText: qsTr("搜索订阅"); Accessible.name: placeholderText
+                color: Theme.text; placeholderTextColor: Theme.muted; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize(12)
+                leftPadding: Theme.dp(32); rightPadding: Theme.dp(10); selectByMouse: true
+                background: Rectangle { radius: Theme.dp(9); color: Theme.buttonBase; border.width: search.activeFocus ? Theme.borderWidth : 0; border.color: Theme.muted }
+                SwirlIcon { anchors.left: parent.left; anchors.leftMargin: Theme.dp(10); anchors.verticalCenter: parent.verticalCenter; name: "search"; size: Theme.dp(14); color: Theme.muted }
+            }
+            Item { Layout.fillWidth: true; Layout.minimumWidth: 0 }
+            Item {
+                objectName: "subscriptionFilter"; Layout.preferredWidth: Theme.dp(234); Layout.preferredHeight: Theme.dp(34)
+                Rectangle { anchors.fill: parent; color: Theme.buttonBase; radius: Theme.dp(10) }
+                Row {
+                    anchors.fill: parent; anchors.margins: Theme.dp(2)
+                    Repeater {
+                        model: [qsTr("全部"), qsTr("更新失败"), qsTr("自动更新")]
+                        SubscriptionAction {
+                            required property int index
+                            required property string modelData
+                            text: modelData; width: Theme.dp(230) / 3; height: parent.height
+                            selected: page.filterIndex === index
+                            Accessible.role: Accessible.RadioButton; Accessible.checked: selected
+                            onClicked: page.filterIndex = index
+                        }
+                    }
+                }
+            }
         }
         RowLayout {
             Layout.fillWidth: true; visible: engineController.imports.legacyNodeCount > 0; spacing: Theme.dp(8)
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; text: qsTr("%1 个历史节点归属待确认，已保留。").arg(engineController.imports.legacyNodeCount); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
-            SwirlButton { objectName: "reviewLegacyNodes"; text: qsTr("查看"); quiet: true; onClicked: { AppState.navigate("proxies"); AppState.notice(qsTr("在节点来源中选择「历史未归属」查看。")) } }
-            SwirlButton { objectName: "cleanLegacyNodes"; text: qsTr("清理"); quiet: true; danger: true; enabled: page.editable; onClicked: { page.mutationMessage = ""; legacyDialog.open() } }
-        }
-        SwirlText {
-            objectName: "subscriptionOperationMessage"
-            Layout.fillWidth: true; visible: text.length > 0; wrapMode: Text.Wrap
-            text: page.mutationMessage || engineController.imports.message; textFormat: Text.PlainText; color: page.mutationMessage.length ? Theme.red : Theme.muted; font.pixelSize: Theme.fontSize(12)
+            SubscriptionAction { objectName: "reviewLegacyNodes"; text: qsTr("查看"); onClicked: { AppState.navigate("proxies"); AppState.notice(qsTr("在节点来源中选择「历史未归属」查看。")) } }
+            SubscriptionAction { objectName: "cleanLegacyNodes"; text: qsTr("清理"); danger: true; enabled: page.editable; onClicked: { page.mutationMessage = ""; legacyDialog.open() } }
         }
         RowLayout {
-            Layout.fillWidth: true
-            SwirlText { text: qsTr("订阅来源"); Layout.fillWidth: true; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
-            SwirlText { text: qsTr("节点与更新状态"); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
-            Item { Layout.preferredWidth: Theme.dp(100) }
+            Layout.fillWidth: true; spacing: Theme.dp(12)
+            SwirlText { text: qsTr("订阅来源"); leftPadding: Theme.dp(8); Layout.fillWidth: true; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
+            SwirlText { text: qsTr("节点"); Layout.preferredWidth: Theme.dp(48); horizontalAlignment: Text.AlignRight; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
+            SwirlText { text: qsTr("最近更新"); Layout.preferredWidth: Theme.dp(126); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
+            Item { Layout.preferredWidth: Theme.dp(88) }
         }
         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: Theme.borderWidth; color: Theme.border }
         Item {
@@ -168,8 +191,29 @@ Item {
                 objectName: "subscriptionsEmptyState"
                 visible: subscriptionList.count === 0; anchors.centerIn: parent; width: Math.min(parent.width, Theme.dp(370)); spacing: Theme.dp(12)
                 SwirlEmptyState { Layout.fillWidth: true; headline: page.providers.length ? qsTr("没有匹配的订阅") : qsTr("添加第一个订阅来源"); detail: page.providers.length ? qsTr("调整搜索或筛选条件，查看其他来源。") : qsTr("安全保存订阅地址，自动识别格式并管理来源节点。") }
-                SwirlButton { Layout.alignment: Qt.AlignHCenter; text: page.providers.length ? qsTr("清空筛选") : qsTr("添加订阅"); enabled: page.editable; onClicked: { if (page.providers.length) { search.clear(); page.filterIndex = 0 } else page.edit(null, this) } }
+                SubscriptionAction { Layout.alignment: Qt.AlignHCenter; solid: true; text: page.providers.length ? qsTr("清空筛选") : qsTr("添加订阅"); enabled: page.editable; onClicked: { if (page.providers.length) { search.clear(); page.filterIndex = 0 } else page.edit(null, this) } }
             }
+        }
+        RowLayout {
+            Layout.fillWidth: true; visible: page.operationMessage.length > 0; spacing: Theme.dp(8)
+            SwirlText { text: qsTr("最近操作"); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
+            SwirlText {
+                objectName: "subscriptionOperationMessage"; Layout.fillWidth: true
+                text: page.operationMessage; textFormat: Text.PlainText; elide: Text.ElideRight
+                color: page.mutationMessage.length ? Theme.red : Theme.muted; font.pixelSize: Theme.fontSize(12)
+            }
+            SubscriptionAction { text: qsTr("详情"); onClicked: operationDialog.open() }
+        }
+    }
+    SwirlDialog {
+        id: operationDialog; ownerItem: page; title: qsTr("最近操作详情"); guardChanges: false
+        contentItem: ColumnLayout {
+            spacing: Theme.dp(16)
+            ScrollView {
+                Layout.fillWidth: true; Layout.preferredHeight: Math.min(Theme.dp(280), operationText.implicitHeight)
+                TextArea { id: operationText; text: page.operationMessage; textFormat: TextEdit.PlainText; readOnly: true; wrapMode: TextEdit.Wrap; color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize(12); background: null; selectByMouse: true }
+            }
+            SubscriptionAction { Layout.alignment: Qt.AlignRight; text: qsTr("关闭"); solid: true; onClicked: operationDialog.close() }
         }
     }
     SubscriptionDialog { id: addDialog; ownerItem: page; canSave: !engineController.policyBusy && !engineController.imports.busy; recoveryRequired: engineController.policyApplyState === "reconciling"; onSaveRequested: page.saveSource(); onRecoveryRequested: engineController.recoverPolicyConfiguration() }
@@ -193,9 +237,9 @@ Item {
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; visible: text.length > 0; text: page.mutationMessage || (deleteDialog.pending ? engineController.policyError : ""); textFormat: Text.PlainText; color: Theme.red }
             RowLayout {
                 Layout.alignment: Qt.AlignRight
-                SwirlButton { objectName: "recoverSubscriptionDelete"; text: qsTr("恢复已保存的操作"); visible: deleteDialog.pending && engineController.policyApplyState === "reconciling"; onClicked: engineController.recoverPolicyConfiguration() }
-                SwirlButton { text: qsTr("取消"); enabled: !deleteDialog.pending; onClicked: deleteDialog.close() }
-                SwirlButton { objectName: "confirmSubscriptionDelete"; text: deleteDialog.pending ? qsTr("正在删除…") : qsTr("删除"); enabled: !deleteDialog.pending; danger: true; onClicked: page.removeSource() }
+                SubscriptionAction { objectName: "recoverSubscriptionDelete"; text: qsTr("恢复已保存的操作"); visible: deleteDialog.pending && engineController.policyApplyState === "reconciling"; onClicked: engineController.recoverPolicyConfiguration() }
+                SubscriptionAction { text: qsTr("取消"); enabled: !deleteDialog.pending; onClicked: deleteDialog.close() }
+                SubscriptionAction { objectName: "confirmSubscriptionDelete"; text: deleteDialog.pending ? qsTr("正在删除…") : qsTr("删除"); enabled: !deleteDialog.pending; danger: true; onClicked: page.removeSource() }
             }
         }
     }
@@ -209,9 +253,9 @@ Item {
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; visible: text.length > 0; text: page.mutationMessage || (legacyDialog.pending ? engineController.policyError : ""); textFormat: Text.PlainText; color: Theme.red }
             RowLayout {
                 Layout.alignment: Qt.AlignRight
-                SwirlButton { objectName: "recoverLegacyCleanup"; text: qsTr("恢复已保存的操作"); visible: legacyDialog.pending && engineController.policyApplyState === "reconciling"; onClicked: engineController.recoverPolicyConfiguration() }
-                SwirlButton { text: qsTr("取消"); enabled: !legacyDialog.pending; onClicked: legacyDialog.close() }
-                SwirlButton { objectName: "confirmLegacyNodesDelete"; text: legacyDialog.pending ? qsTr("正在清理…") : qsTr("确认清理"); enabled: !legacyDialog.pending; danger: true; onClicked: page.removeLegacy() }
+                SubscriptionAction { objectName: "recoverLegacyCleanup"; text: qsTr("恢复已保存的操作"); visible: legacyDialog.pending && engineController.policyApplyState === "reconciling"; onClicked: engineController.recoverPolicyConfiguration() }
+                SubscriptionAction { text: qsTr("取消"); enabled: !legacyDialog.pending; onClicked: legacyDialog.close() }
+                SubscriptionAction { objectName: "confirmLegacyNodesDelete"; text: legacyDialog.pending ? qsTr("正在清理…") : qsTr("确认清理"); enabled: !legacyDialog.pending; danger: true; onClicked: page.removeLegacy() }
             }
         }
     }

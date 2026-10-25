@@ -68,11 +68,11 @@ SwirlDialog {
         SwirlText { Layout.fillWidth: true; visible: !!dialog.review.canApply; wrapMode: Text.Wrap; text: qsTr("预览在 10 分钟内有效。来源或现有配置变化后，必须重新审阅。"); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
         RowLayout {
             Layout.fillWidth: true; spacing: Theme.dp(8)
-            SwirlButton { objectName: "recoverConfigurationReview"; text: qsTr("恢复已保存的操作"); visible: dialog.pending && dialog.recoveryRequired; onClicked: dialog.recoveryRequested() }
-            SwirlButton { objectName: "repeatConfigurationReview"; text: qsTr("重新审阅"); visible: !dialog.review.canApply && !dialog.pending; enabled: dialog.canSubmit; onClicked: dialog.reviewAgainRequested() }
+            SubscriptionAction { objectName: "recoverConfigurationReview"; text: qsTr("恢复已保存的操作"); visible: dialog.pending && dialog.recoveryRequired; onClicked: dialog.recoveryRequested() }
+            SubscriptionAction { objectName: "repeatConfigurationReview"; text: qsTr("重新审阅"); visible: !dialog.review.canApply && !dialog.pending; enabled: dialog.canSubmit; onClicked: dialog.reviewAgainRequested() }
             Item { Layout.fillWidth: true }
-            SwirlButton { text: qsTr("取消"); enabled: !dialog.pending; onClicked: dialog.close() }
-            SwirlButton { objectName: "applyReviewedConfiguration"; text: dialog.pending ? qsTr("正在应用…") : qsTr("本次应用"); primary: true; enabled: !!dialog.review.canApply && !dialog.pending && dialog.canSubmit; onClicked: dialog.applyRequested() }
+            SubscriptionAction { text: qsTr("取消"); enabled: !dialog.pending; onClicked: dialog.close() }
+            SubscriptionAction { objectName: "applyReviewedConfiguration"; text: dialog.pending ? qsTr("正在应用…") : qsTr("本次应用"); solid: true; enabled: !!dialog.review.canApply && !dialog.pending && dialog.canSubmit; onClicked: dialog.applyRequested() }
         }
     }
 }

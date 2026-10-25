@@ -382,23 +382,43 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     if(!controller->imports()->providers().isEmpty()) {
         const auto id=controller->imports()->providers().first().toMap().value("id").toString();
         QPointer<QQuickItem> card=item("subscriptionCard-"+id);
+        const auto qa=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");
+        if(!qa.isEmpty())QDir().mkpath(qa);
         const auto collapsedHeight=card?card->height():0;
         check(card&&collapsedHeight<=100*eval("Theme.uiScale").toReal(),"subscription source uses a compact list row instead of a dashboard card");
+        const auto originalSize=window->size();
+        window->resize(window->minimumWidth(),window->minimumHeight());QTest::qWait(250);
+        auto *title=item("subscriptionTitle-"+id),*refresh=item("refreshSubscription-"+id),*more=item("moreSubscription-"+id);
+        check(title&&title->width()>=60*eval("Theme.uiScale").toReal(),"subscription title keeps readable width at minimum window size");
+        check(refresh&&more&&refresh->isVisible()&&refresh->isEnabled()&&more->isVisible()&&more->isEnabled(),"subscription actions stay visible and enabled at minimum window size");
+        if(title&&refresh&&more){
+            const QRectF bounds(0,0,window->width(),window->height());
+            const QRectF titleRect(title->mapToScene(QPointF()),title->size()),refreshRect(refresh->mapToScene(QPointF()),refresh->size()),moreRect(more->mapToScene(QPointF()),more->size());
+            check(bounds.contains(titleRect)&&bounds.contains(refreshRect)&&bounds.contains(moreRect)&&!titleRect.intersects(refreshRect)&&!titleRect.intersects(moreRect)&&!refreshRect.intersects(moreRect),"subscription title and actions remain inside the minimum window without overlap");
+        }
+        if(!qa.isEmpty())window->grabWindow().save(qa+"/subscription-minimum.png");
+        window->resize(originalSize);QTest::qWait(250);
+        click("moreSubscription-"+id);QTest::qWait(250);
+        if(!qa.isEmpty())window->grabWindow().save(qa+"/subscription-menu.png");
+        QTest::keyClick(window,Qt::Key_Escape);
+        check(QTest::qWaitFor([&]{auto *action=item("editSubscription-"+id);return !action||!action->isVisible();},3000),"subscription action menu closes before continuing source interactions");
         click("expandSubscription-"+id);
         check(card&&card->height()>collapsedHeight,"subscription details animate open without replacing the card");
-        click("editSubscription-"+id);check(item("subscriptionUrl")&&item("subscriptionUrl")->property("text").toString().isEmpty(),"editing subscription keeps its protected URL hidden");
+        click("moreSubscription-"+id);click("editSubscription-"+id);QTest::qWait(250);
+        if(!qa.isEmpty())window->grabWindow().save(qa+"/subscription-edit.png");
+        check(item("subscriptionUrl")&&item("subscriptionUrl")->property("text").toString().isEmpty(),"editing subscription keeps its protected URL hidden");
         fill("subscriptionName","Edited subscription fixture");click("saveSubscription");
         check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->imports()->providers().first().toMap().value("name").toString()=="Edited subscription fixture"&&subscriptionRequests==2,"editing preserves encrypted URL and refreshes the real source");
         check(card&&item("subscriptionCard-"+id)==card,"subscription refresh keeps the same card delegate and expanded state");
         eval("AppState.navigate('proxies')");QTest::qWait(350);
         check(eval("pageLoader.item.countries.length===1 && pageLoader.item.countries[0].code==='JP' && pageLoader.item.countryCode==='' && pageLoader.item.resultCount===1").toBool(),"subscription refresh replaces country options and clears an obsolete country selection");
         eval("AppState.navigate('subscriptions')");QTest::qWait(350);
-        const auto qa=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");
         if(!qa.isEmpty()){QDir().mkpath(qa);window->grabWindow().save(qa+"/subscription-success.png");}
         const auto policyBeforeReview=controller->policyDocument();
         click("moreSubscription-"+id);QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(200);
+        check(QTest::qWaitFor([&]{auto *action=item("editSubscription-"+id);return !action||!action->isVisible();},3000),"Escape closes the source action menu");
         check(controller->imports()->providers().size()==1,"source more menu can be dismissed without changing its data");
-        click("reviewSubscription-"+id);
+        click("moreSubscription-"+id);click("reviewSubscription-"+id);
         check(QTest::qWaitFor([&]{return controller->imports()->hasConfigurationReview();},3000),"explicit source review opens the actual encrypted cached configuration preview");
         check(controller->policyDocument()==policyBeforeReview&&!controller->policyBusy()&&!controller->imports()->configurationReview().value("changes").toList().isEmpty(),"configuration review describes differences without applying foreign policy");
         if(!qa.isEmpty())window->grabWindow().save(qa+"/subscription-configuration-review.png");
@@ -411,9 +431,9 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         subscriptions.close();click("refreshSubscription-"+id);
         check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&!controller->imports()->providers().first().toMap().value("error").toString().isEmpty()&&controller->nodes().size()==1,"failed real refresh displays an error and retains imported nodes");
         if(!qa.isEmpty())window->grabWindow().save(qa+"/subscription-failure.png");
-        click("deleteSubscription-"+id);QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(250);
+        click("moreSubscription-"+id);click("deleteSubscription-"+id);QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(250);
         check(controller->imports()->providers().size()==1,"Escape cancels destructive subscription confirmation");
-        click("deleteSubscription-"+id);click("confirmSubscriptionDelete");
+        click("moreSubscription-"+id);click("deleteSubscription-"+id);click("confirmSubscriptionDelete");
         check(QTest::qWaitFor([&]{return !controller->imports()->busy()&&!controller->policyBusy()&&controller->imports()->providers().isEmpty()&&controller->nodes().isEmpty();},10000),"confirmed deletion removes the source's owned nodes after commit and revocation receipt");
     }
     // Large-list layout/transfer fixture uses reserved local endpoints only.
