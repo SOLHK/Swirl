@@ -94,6 +94,22 @@ class PolicyConfigurationTests final : public QObject {
         {"id","30000000-0000-4000-8000-000000000001"},{"name","Controlled service"},{"enabled",true},{"priority",10},
         {"domains",QJsonArray{QJsonObject{{"type","domain_suffix"},{"value","service.example.invalid"}}}},{"target",QJsonObject{{"kind","direct"}}}}});return result;}
     static QByteArray bytes(const QString &path){QFile file(path);if(!file.open(QIODevice::ReadOnly))return {};return file.readAll();}
+    static QString seedReviewSource(const QString &path,const QJsonObject &extra={},bool identity=true) {
+        NodeStore store(path);
+        if(!store.saveSubscription({},"Review source",QUrl("https://source.invalid/private-fixture-token"),360,false))return {};
+        const auto id=store.subscriptions().first().id;
+        QJsonObject profile{{"proxies",QJsonArray{QJsonObject{{"name","Review node"},{"type","socks5"},{"server","127.0.0.1"},{"port",9}}}},
+            {"proxy-groups",QJsonArray{QJsonObject{{"name","Review group"},{"type","select"},{"proxies",QJsonArray{"Review node"}}}}},
+            {"rules",QJsonArray{"DOMAIN-SUFFIX,review.invalid,Review group","MATCH,Review group"}}};
+        for(auto it=extra.begin();it!=extra.end();++it)profile.insert(it.key(),it.value());
+        const auto parsed=NodeImporter::parse(QJsonDocument(profile).toJson(QJsonDocument::Compact));
+        if(!parsed||!store.importNodes(parsed.nodes,id))return {};
+        const QJsonObject archive{{"mode","nodes-with-warning"},{"format",parsed.format},{"configurationFormat",parsed.configurationFormat},
+            {"sourceDigest",identity?parsed.sourceDigest:QString()},{"preservedConfiguration",parsed.configuration}};
+        if(!store.saveNetworkConfiguration({{"schema",1},{"groups",QJsonArray{}},{"rules",QJsonArray{}},
+            {"subscriptionImportResults",QJsonObject{{id,archive}}}}))return {};
+        return id;
+    }
     static QJsonObject envelope(const QString &path){
 #ifdef Q_OS_WIN
         const auto ciphertext=bytes(path);if(!ciphertext.startsWith("SWIRLNODE2\n"))return {};
@@ -263,6 +279,69 @@ private slots:
         const auto original=bytes(path);auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();EngineController controller(std::move(peer),nullptr,path);
         QVERIFY(controller.policyMigrationRequired());QVERIFY(!controller.policyError().isEmpty());QVERIFY(!controller.confirmPolicyMigration());
         QCOMPARE(bytes(path),original);QVERIFY(!controller.policyV2Active());QVERIFY(engine->operations.isEmpty());QVERIFY(!controller.processAlive());
+    }
+    void cachedConfigurationReviewIsReadOnlyAndOneUseAfterRealRustValidation(){
+        QTemporaryDir dir;const auto path=dir.filePath("review.dpapi"),source=seedReviewSource(path);QVERIFY(!source.isEmpty());
+        EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);QVERIFY(controller.confirmPolicyMigration());
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
+        const auto before=bytes(path);const auto refreshed=controller.m_store.subscriptions().first().lastSuccess;
+        QSignalSpy downloads(&controller.m_imports,&NodeImportService::downloadDiagnostic);
+        controller.m_imports.reviewConfiguration(source);const auto review=controller.m_imports.configurationReview();
+        QVERIFY2(review.value("canApply").toBool(),qPrintable(review.value("error").toString()));QVERIFY(controller.m_imports.hasConfigurationReview());
+        QCOMPARE(bytes(path),before);QCOMPARE(downloads.size(),0);QVERIFY(controller.m_subscriptionReview.has_value());
+        const auto publicBytes=QJsonDocument::fromVariant(review).toJson();QVERIFY(!publicBytes.contains("private-fixture-token"));QVERIFY(!publicBytes.contains("sourceDigest"));
+        QVERIFY(controller.m_imports.applyReviewedConfiguration());QVERIFY(!controller.m_imports.applyReviewedConfiguration());
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy()&&!controller.m_imports.busy(),5000);
+        QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));QVERIFY(controller.m_imports.configurationReview().value("applied").toBool());
+        QCOMPARE(controller.strategyGroups().size(),1);QCOMPARE(controller.servicePolicies().size(),0);
+        QCOMPARE(controller.m_store.subscriptions().first().lastSuccess,refreshed);QCOMPARE(downloads.size(),0);
+        QVERIFY(!controller.m_subscriptionReview.has_value());QVERIFY(!controller.m_imports.applyReviewedConfiguration());
+        QVERIFY(!bytes(path).contains("private-fixture-token"));controller.m_imports.cancelConfigurationReview();QVERIFY(!controller.m_imports.hasConfigurationReview());
+    }
+    void expiredAndChangedRevisionReviewsCannotBeReplayed(){
+        QTemporaryDir dir;const auto path=dir.filePath("expired.dpapi"),source=seedReviewSource(path);QVERIFY(!source.isEmpty());
+        EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);QVERIFY(controller.confirmPolicyMigration());QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        controller.m_imports.reviewConfiguration(source);QVERIFY(controller.m_imports.configurationReview().value("canApply").toBool());
+        const auto before=bytes(path);controller.m_subscriptionReview->expiry=QDeadlineTimer(0);
+        QVERIFY(!controller.m_imports.applyReviewedConfiguration());QCOMPARE(bytes(path),before);QVERIFY(!controller.m_imports.applyReviewedConfiguration());
+        controller.m_imports.reviewConfiguration(source);QVERIFY(controller.m_subscriptionReview.has_value());
+        // A separate configuration editor can commit while this review exists.
+        auto changed=controller.m_policyDocument;changed.insert("mode",changed.value("mode")==QJsonValue("direct")?"rule":"direct");
+        QVERIFY(controller.applyPolicyDocument(changed.toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        const auto changedBytes=bytes(path);
+        QVERIFY(!controller.m_imports.applyReviewedConfiguration());QCOMPARE(bytes(path),changedBytes);QVERIFY(!controller.m_subscriptionReview.has_value());
+    }
+    void synchronousReviewDismissalAtReceiptReleasesTheImportGate(){
+        QTemporaryDir dir;const auto path=dir.filePath("dismiss.dpapi"),source=seedReviewSource(path);QVERIFY(!source.isEmpty());
+        EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);QVERIFY(controller.confirmPolicyMigration());QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        controller.m_imports.reviewConfiguration(source);QVERIFY(controller.m_imports.configurationReview().value("canApply").toBool());
+        // Reduced motion can close the popup synchronously from this signal,
+        // before the coordinator invokes the importer's catalog completion.
+        connect(&controller,&EngineController::policyApplyFinished,&controller.m_imports,[&](const QString &,bool){controller.m_imports.cancelConfigurationReview();});
+        QVERIFY(controller.m_imports.applyReviewedConfiguration());QTRY_VERIFY_WITH_TIMEOUT(!controller.m_imports.busy(),5000);
+        QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));QVERIFY(!controller.m_imports.hasPreview());QVERIFY(!controller.m_imports.hasConfigurationReview());
+        const auto existing=controller.m_store.subscriptions().first();
+        QVERIFY(controller.m_imports.saveSubscription(existing.id,"Edited after review",{},360,false));QTRY_VERIFY_WITH_TIMEOUT(!controller.m_imports.busy(),5000);
+        QCOMPARE(controller.m_imports.providers().first().toMap().value("name").toString(),QString("Edited after review"));
+    }
+    void fullConfigurationReviewRejectsUnknownExecutionFieldsAndMissingSourceIdentity(){
+        QTemporaryDir dir;const auto path=dir.filePath("unsafe.dpapi"),source=seedReviewSource(path,{{"script",QJsonObject{{"code","never-execute"}}}});QVERIFY(!source.isEmpty());
+        EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);QVERIFY(controller.confirmPolicyMigration());QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        const auto before=bytes(path);controller.m_imports.reviewConfiguration(source);
+        QVERIFY(!controller.m_imports.configurationReview().value("canApply").toBool());QVERIFY(!controller.m_imports.configurationReview().value("error").toString().isEmpty());
+        QVERIFY(!controller.m_imports.applyReviewedConfiguration());QCOMPARE(bytes(path),before);QVERIFY(!controller.m_subscriptionReview.has_value());
+        controller.m_imports.cancelConfigurationReview();
+        const auto legacyPath=dir.filePath("unidentified.dpapi"),legacySource=seedReviewSource(legacyPath,{},false);QVERIFY(!legacySource.isEmpty());
+        EngineController legacy(std::make_unique<RustCoreEngine>(),nullptr,legacyPath);QVERIFY(legacy.confirmPolicyMigration());QTRY_VERIFY_WITH_TIMEOUT(!legacy.policyBusy(),5000);
+        const auto legacyBytes=bytes(legacyPath);legacy.m_imports.reviewConfiguration(legacySource);QVERIFY(!legacy.m_imports.configurationReview().value("canApply").toBool());
+        QVERIFY(legacy.m_imports.configurationReview().value("error").toString().contains(QStringLiteral("原始响应身份")));QCOMPARE(bytes(legacyPath),legacyBytes);
+    }
+    void importerHashBindsTheExactResponseInsteadOfOnlyItsDecodedMeaning(){
+        const QByteArray plain="socks5://127.0.0.1:9#Hash%20fixture";
+        const auto first=NodeImporter::parse(plain),second=NodeImporter::parse(plain.toBase64());QVERIFY(first);QVERIFY(second);
+        QCOMPARE(first.sourceDigest,QString::fromLatin1(QCryptographicHash::hash(plain,QCryptographicHash::Sha256).toHex()));
+        QCOMPARE(second.sourceDigest,QString::fromLatin1(QCryptographicHash::hash(plain.toBase64(),QCryptographicHash::Sha256).toHex()));
+        QVERIFY(first.sourceDigest!=second.sourceDigest);
     }
 };
 QTEST_GUILESS_MAIN(PolicyConfigurationTests)

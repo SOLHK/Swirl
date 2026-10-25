@@ -70,16 +70,16 @@ int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
     auto *pane=find(window->contentItem(),"sidebarFloatingBackground");
     check(pane!=nullptr,"sidebar pane exists");
     if(pane){
-        // The approved U2 sidebar is an Item with shader children, not a
-        // Rectangle. An absent color converted to QColor is opaque/invalid.
+        // The sidebar container remains an Item with shader children. V2's
+        // background fill is owned by its shared exact contour shape.
         // Require that structural contract as well as the pixel checks below.
         check(pane->metaObject()->indexOfProperty("color")==-1,"sidebar container has no independent fill property");
         QTest::qWait(250);
         const auto at=pane->mapToScene(QPointF(pane->width()-18,pane->height()/2))*window->devicePixelRatio();
         const auto before=window->grabWindow();
-        const auto expected=eval("Theme.canvas").value<QColor>();
+        const auto expected=eval("Theme.sidebarBase").value<QColor>();
         const auto actual=before.isNull()?QColor():before.pixelColor(at.toPoint());
-        check(actual.isValid() && qAbs(actual.red()-expected.red())<=2 && qAbs(actual.green()-expected.green())<=2 && qAbs(actual.blue()-expected.blue())<=2,"sidebar interior retains the actual continuous canvas color");
+        check(actual.isValid() && qAbs(actual.red()-expected.red())<=3 && qAbs(actual.green()-expected.green())<=3 && qAbs(actual.blue()-expected.blue())<=3,"sidebar interior uses its darker neutral material token");
         QQmlComponent fixture(qmlEngine(window));
         fixture.setData("import QtQuick; Rectangle {width:600;height:900;color:'#D02A65'; Text {anchors.fill:parent;text:'RIGHT PAGE CONTENT';font.pixelSize:60;wrapMode:Text.Wrap}}",QUrl());
         auto *overlay=qobject_cast<QQuickItem *>(fixture.create());

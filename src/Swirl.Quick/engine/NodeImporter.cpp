@@ -1,4 +1,5 @@
 #include "NodeImporter.h"
+#include <QCryptographicHash>
 #include "SubscriptionNormalizer.h"
 #include "XrayJsonBridge.h"
 #include "../third_party/fkYAML/node.hpp"
@@ -142,7 +143,8 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
     if(bytes.isEmpty() || bytes.size()>MaximumBytes) {
         result.error=QStringLiteral("导入内容为空、超过 4 MiB 或嵌套过深；原节点保持不变。"); return result;
     }
-    if (xrayJsonCandidate(bytes)) return XrayJsonBridge::parse(bytes);
+    result.sourceDigest=QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex());
+    if (xrayJsonCandidate(bytes)) {auto native=XrayJsonBridge::parse(bytes);native.sourceDigest=result.sourceDigest;return native;}
     if(!safeShape(bytes)){result.error=QStringLiteral("导入内容嵌套过深；原节点保持不变。");return result;}
     QJsonValue root;
     const auto normalized=SubscriptionNormalizer::normalize(bytes);
@@ -151,7 +153,7 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
     result.executionConfiguration=normalized.executionConfiguration;
     result.configurationFormat=normalized.configurationFormat;
     const auto effective=normalized.decodedDocument.isEmpty()?bytes:normalized.decodedDocument;
-    if (!normalized.decodedDocument.isEmpty() && xrayJsonCandidate(effective)) return XrayJsonBridge::parse(effective);
+    if (!normalized.decodedDocument.isEmpty() && xrayJsonCandidate(effective)) {auto native=XrayJsonBridge::parse(effective);native.sourceDigest=result.sourceDigest;return native;}
     if(!normalized.error.isEmpty()){result.error=normalized.error;return result;}
     if(!safeShape(effective)){result.error=QStringLiteral("订阅解码后嵌套过深。");return result;}
     if(normalized.handled){

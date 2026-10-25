@@ -11,6 +11,7 @@ class WindowsBackdrop final : public QObject, public QAbstractNativeEventFilter 
     Q_PROPERTY(bool active READ active NOTIFY changed)
     Q_PROPERTY(bool translucent READ translucent NOTIFY changed)
     Q_PROPERTY(bool blurActive READ blurActive NOTIFY changed)
+    Q_PROPERTY(bool micaActive READ micaActive NOTIFY changed)
     Q_PROPERTY(bool nativeCorners READ nativeCorners NOTIFY changed)
     Q_PROPERTY(bool exactCorners READ exactCorners NOTIFY changed)
     Q_PROPERTY(qreal cornerRadius READ cornerRadius NOTIFY changed)
@@ -22,6 +23,8 @@ public:
     bool active() const { return m_active; }
     bool translucent() const { return m_translucent; }
     bool blurActive() const { return m_blurActive; }
+    bool micaActive() const { return m_micaActive; }
+    quintptr materialWindowHandle() const { return m_blurHandle; }
     bool nativeCorners() const { return m_nativeCorners; }
     bool exactCorners() const { return m_exactCorners; }
     qreal cornerRadius() const { return m_cornerRadius; }
@@ -52,6 +55,8 @@ private:
     bool m_enabled = false, m_dark = false, m_active = false, m_nativeCorners = false;
     bool m_translucent = false;
     bool m_blurActive = false;
+    bool m_micaActive = false;
+    bool m_materialEligible = false, m_materialAttempted = false;
     quintptr m_blurHandle = 0;
     QSize m_blurRegionSize;
     qreal m_blurRegionRadius = -1;

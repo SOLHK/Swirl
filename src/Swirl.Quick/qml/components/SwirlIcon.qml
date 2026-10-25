@@ -9,7 +9,7 @@ Item {
     implicitWidth:size; implicitHeight:size; width:size; height:size
     Image {
         anchors.fill:parent
-        source:"image://swirl/"+(root.name.startsWith("nav-")||root.supported.indexOf(root.name)>=0||["add-square","add-circle","chevron-up-down","dismiss"].indexOf(root.name)>=0?root.name:"grid")+"/"+root.color.toString().slice(1)
+        source:"image://swirl/"+(root.name.startsWith("nav-")||root.supported.indexOf(root.name)>=0||["add-square","add-circle","chevron-up-down","checkmark","dismiss"].indexOf(root.name)>=0?root.name:"grid")+"/"+root.color.toString().slice(1)
         sourceSize:Qt.size(root.size*Screen.devicePixelRatio,root.size*Screen.devicePixelRatio)
     }
 }

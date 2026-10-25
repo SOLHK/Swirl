@@ -1,4 +1,5 @@
 #pragma once
+#include <QDeadlineTimer>
 #include <QNetworkInterface>
 #include <QPair>
 #include "ProxyEngine.h"
@@ -276,6 +277,17 @@ private:
     bool m_smartRoutingEligible=false;
     void updateRoutingFlags();
     void initializePolicyConfiguration();
+    QVariantMap reviewSubscriptionConfiguration(const QString &sourceId);
+    bool applyReviewedSubscriptionConfiguration(NodeImportService::ApplyCompletion,QString *error);
+    struct SubscriptionReviewTicket {
+        QString sourceId,sourceDefinitionDigest,sourceBytesDigest,archiveDigest,storeId,revision,planDigest,session;
+        QDeadlineTimer expiry;
+        NodeStore::ImportPlan catalog;
+        QJsonObject document,network;
+        EngineStartOptions options;
+    };
+    std::optional<SubscriptionReviewTicket> m_subscriptionReview;
+    QString m_reviewSession,m_policyReviewDigest;
     bool applyPolicyConfiguration(const QJsonObject &,const EngineStartOptions &);
     void policyCommandCompleted(const QString &,const QJsonObject &);
     void finishPolicyMutation(bool success,const QString &error={});

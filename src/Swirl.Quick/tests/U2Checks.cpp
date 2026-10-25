@@ -323,8 +323,8 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
     for(const auto &route:{"activity","featurehub","settings","proxies","overview","activity"}){navigate(route);check(QString("manual-geometry-")+route,window->size()==resized);}
     window->resize(initial);navigate("activity");
     if(phase!="baseline"&&phase!="A"){
-        check("window-reference-corner-extent-24",eval("Theme.windowRadius").toDouble()==24);
-        check("sidebar-radius-16",eval("sidebar.children[0].radius").toDouble()==16);
+        check("approved-window-corner-extent-14",eval("Theme.windowRadius").toDouble()==14);
+        check("approved-sidebar-radius-14",eval("sidebar.children[0].radius").toDouble()==14);
         window->grabWindow().save(QFileInfo(output).absolutePath()+"/corners-"+QString::number(window->devicePixelRatio())+".png");
     }
     sample("all-pages-warm");

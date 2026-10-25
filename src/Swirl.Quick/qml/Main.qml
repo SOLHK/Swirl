@@ -45,7 +45,7 @@ ApplicationWindow {
     readonly property real shellRadius:window.visibility===Window.Maximized || window.visibility===Window.FullScreen ? 0 : Theme.windowRadius
     Binding { target:window.captureProviderContext; property:"upstreamProxyPort"; value:window.engineControllerContext.processAlive?window.engineControllerContext.activeProxyPort:0 }
     Connections { target:window.captureProviderContext; function onStateChanged(){window.engineControllerContext.setCaptureProxyPort(window.captureProviderContext.running?window.captureProviderContext.port:0)} }
-    Connections { target:backdrop; function onChanged() { Theme.backdropActive=backdrop.active;Theme.backdropTranslucent=backdrop.translucent } }
+    Connections { target:backdrop; function onChanged() { Theme.backdropActive=backdrop.active||backdrop.micaActive||backdrop.blurActive;Theme.backdropTranslucent=backdrop.translucent } }
     Binding { target:Theme; property:"windowActive"; value:previewState==="inactive"?false:window.active }
     readonly property real sidebarGutter:0
     readonly property real actualSidebarWidth:Theme.sidebarWidth
@@ -93,7 +93,7 @@ ApplicationWindow {
         // DWM supplies the native material underneath the sharp QML content.
         width:window.width; height:window.height
         SwirlGlassMaterial {
-            anchors.fill:parent;targetWindow:window;color:Theme.canvas
+            anchors.fill:parent;targetWindow:window
         }
 
         MouseArea {
@@ -187,6 +187,7 @@ ApplicationWindow {
     }
     readonly property bool swirlBackAvailable:AppState.canGoBack || (pageLoader.item!==null && pageLoader.item.detailOpen===true)
     function handleEscape() {
+        if(rewriteRulesLoader.wantOpen){rewriteRulesLoader.wantOpen=false;return}
         if(pageLoader.item && pageLoader.item.dismissDetail && pageLoader.item.dismissDetail())return
         if(AppState.canGoBack)AppState.goBack()
     }
@@ -194,8 +195,32 @@ ApplicationWindow {
         const loader=pageLoader.pages["dns"]
         if(loader && loader.item && loader.item.persistExitDraft)loader.item.persistExitDraft()
     }
-    function openRewriteEditor(kind,title){rewriteRulesDialog.kind=kind;rewriteRulesDialog.title=title;rewriteRulesDialog.open()}
-    RewriteRulesDialog{id:rewriteRulesDialog}
+    function openRewriteEditor(kind,title){
+        rewriteRulesLoader.requestedKind=kind
+        rewriteRulesLoader.requestedTitle=title
+        rewriteRulesLoader.wantOpen=true
+        rewriteRulesLoader.active=true
+        showPendingRewriteEditor()
+    }
+    function showPendingRewriteEditor(){
+        if(!rewriteRulesLoader.wantOpen || rewriteRulesLoader.status!==Loader.Ready || !rewriteRulesLoader.item)return
+        rewriteRulesLoader.wantOpen=false
+        rewriteRulesLoader.item.kind=rewriteRulesLoader.requestedKind
+        rewriteRulesLoader.item.title=rewriteRulesLoader.requestedTitle
+        rewriteRulesLoader.item.open()
+    }
+    // Keep the first-created editor alive so reopening preserves its drafts.
+    Loader {
+        id:rewriteRulesLoader
+        property string requestedKind:"redirect"
+        property string requestedTitle:""
+        property bool wantOpen:false
+        objectName:"rewriteRulesLoader"
+        active:false
+        asynchronous:true
+        sourceComponent:Component {RewriteRulesDialog {}}
+        onLoaded:window.showPendingRewriteEditor()
+    }
     SwirlSecondaryWindow {
         composition:panelBackdrop
         id:dashboardWindow;objectName:"dashboardWindow";function openProxyControl(){hide();AppState.navigate("policies");window.show();window.raise();window.requestActivate()}
@@ -280,7 +305,11 @@ ApplicationWindow {
     }
     Timer { id:toastTimer; interval:3200; onTriggered:AppState.toast="" }
     WindowEdge {anchors.fill:parent;z:10000;radius:window.shellRadius}
-    Connections { target:AppState; function onToastChanged(){if(AppState.toast.length)toastTimer.restart()} }
+    Connections {
+        target:AppState
+        function onToastChanged(){if(AppState.toast.length)toastTimer.restart()}
+        function onCurrentPageChanged(){rewriteRulesLoader.wantOpen=false}
+    }
     Rectangle {
         visible:AppState.toast.length>0; z:999
         anchors.horizontalCenter:parent.horizontalCenter; anchors.bottom:parent.bottom; anchors.bottomMargin:Theme.dp(28)

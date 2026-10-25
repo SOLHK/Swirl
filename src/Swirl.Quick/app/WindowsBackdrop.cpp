@@ -178,32 +178,38 @@ void WindowsBackdrop::refresh() {
         SYSTEM_POWER_STATUS power{};
         const bool batterySaver=GetSystemPowerStatus(&power) && power.SystemStatusFlag==1;
         const bool remote=GetSystemMetrics(SM_REMOTESESSION)!=0;
-        // DWMSBT_TRANSIENTWINDOW paints a full HWND brush even outside a
+        // DWM system materials paint a full HWND brush even outside a
         // custom region on Windows 11. Keep exact corners free of pale square
         // tips by using the existing opaque palette for this capability case.
-        // The saved transparency preference is retained for preset windows.
+        // An inset material-only helper preserves the exact alpha contour.
         const bool transparencyAllowed = m_enabled && !software && !batterySaver && !remote && contrastKnown && !(contrast.dwFlags & HCF_HIGHCONTRASTON)
             && transparencyKnown && transparency && compositionEnabled;
         const bool allowed = transparencyAllowed && !exact;
-        // Preserve subtle live desktop transmission with exact AA corners.
-        // This is alpha composition, explicitly not system Acrylic blur.
+        // The helper owns a native material; raw desktop alpha is never a fallback.
         translucent = transparencyAllowed && exact;
-        // Windows 11 22H2+: Desktop Acrylic samples the LIVE compositor.
-        // Mica intentionally uses wallpaper; it cannot satisfy live blur-behind.
-        const int backdrop = allowed ? 3 : 1; // DWMSBT_TRANSIENTWINDOW / NONE
+        // Windows 11 22H2+: Mica samples the wallpaper rather than revealing
+        // desktop icons or the contents of other application windows.
+        const int backdrop = allowed ? 2 : 1; // DWMSBT_MAINWINDOW / NONE
         const HRESULT material = DwmSetWindowAttribute(hwnd,38,&backdrop,sizeof(backdrop));
         const MARGINS margins{-1,-1,-1,-1};
         const HRESULT frame = DwmExtendFrameIntoClientArea(hwnd, &margins);
         active = allowed && SUCCEEDED(material) && SUCCEEDED(frame);
-        status = active ? QStringLiteral("Windows Desktop Acrylic: DWM live backdrop, %1 contour").arg(exact ? QStringLiteral("exact HWND") : QStringLiteral("native preset"))
+        status = active ? QStringLiteral("Windows Mica: DWM wallpaper material, native preset contour")
             : !m_enabled ? QStringLiteral("Opaque: application transparency disabled")
-            : translucent ? QStringLiteral("Alpha translucency: exact logical contour; system Acrylic unavailable for custom contours")
+            : translucent ? QStringLiteral("Windows Mica requested: exact logical contour; opaque until native material is available")
             : exact ? QStringLiteral("Opaque: exact logical contour; system transparency policy or renderer requires fallback")
             : software ? QStringLiteral("Opaque: software renderer")
             : batterySaver ? QStringLiteral("Opaque: battery saver")
             : remote ? QStringLiteral("Opaque: remote desktop session")
             : QStringLiteral("Opaque: native backdrop unavailable (DWM 0x%1)").arg(quint32(material),8,16,QChar('0'));    } else status = QStringLiteral("Opaque: offscreen renderer");
 #endif
+    m_materialEligible = translucent;
+    m_materialAttempted = false;
+    translucent = m_materialEligible && (m_micaActive || m_blurActive);
+    if (m_micaActive && m_materialEligible)
+        status = QStringLiteral("Windows Mica: DWM wallpaper material, exact logical contour");
+    else if (m_blurActive && m_materialEligible)
+        status = QStringLiteral("Windows native blur: exact logical contour, neutral overlay");
     if (active != m_active || translucent != m_translucent || corners != m_nativeCorners || status != m_status) {
         m_active = active; m_translucent = translucent; m_nativeCorners = corners; m_status = status;
         qInfo().noquote() << "Window composition:" << status;
@@ -371,14 +377,21 @@ void WindowsBackdrop::destroyBackdropBlur() {
     if(m_blurHandle)DestroyWindow(reinterpret_cast<HWND>(m_blurHandle));
 #endif
     m_blurHandle=0;m_blurRegionSize={};m_blurRegionRadius=-1;
-    if(m_blurActive){m_blurActive=false;emit changed();}
+    if(m_blurActive || m_micaActive || m_translucent){m_blurActive=false;m_micaActive=false;m_translucent=false;emit changed();}
 }
 void WindowsBackdrop::updateBackdropBlur() {
 #ifdef Q_OS_WIN
     const auto width=m_window && m_window->property("swirlUnifiedBlur").toBool()?m_window->width():0;
-    const bool available=m_window && m_translucent && width>0;
+    const bool available=m_window && m_materialEligible && width>0;
     if(!available){destroyBackdropBlur();return;}
+    const auto opaqueFallback=[this] {
+        destroyBackdropBlur();
+        m_status=QStringLiteral("Opaque: native material unavailable for exact logical contour");
+        emit changed();
+    };
     if(!m_blurHandle){
+        if(m_materialAttempted)return;
+        m_materialAttempted=true;
         static const auto registered=[] {
             WNDCLASSEXW cls{};cls.cbSize=sizeof(cls);cls.hInstance=GetModuleHandleW(nullptr);
             cls.lpfnWndProc=[](HWND hwnd,UINT message,WPARAM wp,LPARAM lp)->LRESULT {
@@ -387,39 +400,42 @@ void WindowsBackdrop::updateBackdropBlur() {
             };
             cls.lpszClassName=L"SwirlUnifiedBackdrop";return RegisterClassExW(&cls);
         }();
-        if(!registered)return;
+        if(!registered){opaqueFallback();return;}
         const HWND blur=CreateWindowExW(WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE|WS_EX_TRANSPARENT,
             L"SwirlUnifiedBackdrop",L"",WS_POPUP,0,0,0,0,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
-        if(!blur)return;
+        if(!blur){opaqueFallback();return;}
         const int material=1,corner=1,nc=1;const DWORD border=0xFFFFFFFE;
         const BOOL dark=m_dark;const MARGINS margins{-1,-1,-1,-1};
         DwmSetWindowAttribute(blur,2,&nc,sizeof(nc));
         DwmSetWindowAttribute(blur,33,&corner,sizeof(corner));
         DwmSetWindowAttribute(blur,34,&border,sizeof(border));
         DwmSetWindowAttribute(blur,20,&dark,sizeof(dark));
-        if(FAILED(DwmSetWindowAttribute(blur,38,&material,sizeof(material))) || FAILED(DwmExtendFrameIntoClientArea(blur,&margins))){DestroyWindow(blur);return;}
-        // Desktop Acrylic becomes opaque for an inactive helper HWND. Use
-        // the compositor's blur policy for this non-activating visual only.
-        // Resolve the optional API dynamically and keep the alpha fallback
-        // when Windows does not expose it; never claim a blur from alpha.
+        if(FAILED(DwmSetWindowAttribute(blur,38,&material,sizeof(material))) || FAILED(DwmExtendFrameIntoClientArea(blur,&margins))){DestroyWindow(blur);opaqueFallback();return;}
+        // Mica's wallpaper state cannot be verified on a non-activating
+        // custom-contour helper. Retain the existing compositor blur path,
+        // whose desktop-color response is checked in the native fixture.
+        // Failure leaves QML opaque; never expose unblurred desktop alpha.
         struct AccentPolicy {int state;int flags;DWORD tint;int animation;};
         struct CompositionData {int attribute;void *data;SIZE_T size;};
         using SetComposition=BOOL(WINAPI *)(HWND,CompositionData *);
         const auto setComposition=reinterpret_cast<SetComposition>(GetProcAddress(GetModuleHandleW(L"user32.dll"),"SetWindowCompositionAttribute"));
         AccentPolicy accent{3,0,0,0};CompositionData data{19,&accent,sizeof(accent)};
-        if(!setComposition || !setComposition(blur,&data)){DestroyWindow(blur);return;}
+        if(!setComposition || !setComposition(blur,&data)){DestroyWindow(blur);opaqueFallback();return;}
         m_blurHandle=reinterpret_cast<quintptr>(blur);
-        m_blurActive=true;emit changed();
+        m_blurActive=true;
+        m_translucent=true;
+        m_status=QStringLiteral("Windows native blur: exact logical contour, neutral overlay");
+        emit changed();
     }
     const HWND blur=reinterpret_cast<HWND>(m_blurHandle);
     if(!m_window->isVisible() || m_window->visibility()==QWindow::Minimized){ShowWindow(blur,SW_HIDE);return;}
     const HWND shell=reinterpret_cast<HWND>(m_window->winId());RECT bounds{};
-    if(!GetWindowRect(shell,&bounds))return;
+    if(!GetWindowRect(shell,&bounds)){opaqueFallback();return;}
     const BOOL dark=m_dark;DwmSetWindowAttribute(blur,20,&dark,sizeof(dark));
     const auto dpr=m_window->devicePixelRatio();
     const bool rectangular=m_window->visibility()==QWindow::Maximized || m_window->visibility()==QWindow::FullScreen;
     const qreal requested=m_window->property("swirlWindowRadius").toReal();
-    // Accent blur can ignore HRGN in DWM. Its rectangular HWND must itself
+    // DWM material can ignore HRGN. Its rectangular HWND must itself
     // fit inside the visible curve: at the diagonal the superellipse cuts
     // r * (1 - 2^(-1/2.5)) from each axis. Keep one physical AA pixel clear.
     const int inset=rectangular?1:qMax(1,qCeil(requested*dpr*(1-std::pow(0.5,0.4))+1));
@@ -429,19 +445,19 @@ void WindowsBackdrop::updateBackdropBlur() {
         // Keep the compositor blur's hard edge inside fully covered shell
         // pixels. A system preset radius here leaks beyond the custom curve.
         const HRGN region=rectangular?nullptr:roundedWindowRegion(body.width(),body.height(),radius,0,2.5);
-        if(!rectangular&&!region){ShowWindow(blur,SW_HIDE);return;}
+        if(!rectangular&&!region){opaqueFallback();return;}
         if(!SetWindowRgn(blur,region,FALSE)){
             if(region)DeleteObject(region);
-            ShowWindow(blur,SW_HIDE);return;
+            opaqueFallback();return;
         }
         m_blurRegionSize=body;m_blurRegionRadius=radius;
     }
     // One compositor-only surface covers the entire shell. Sidebar and
-    // workspace sample the same live backdrop, with one uniform tint above.
+    // workspace share the same native backdrop, with one neutral tint above.
     // No desktop capture, CPU blur, foreground texture or timer is involved.
-    SetWindowPos(blur,shell,bounds.left+inset,bounds.top+inset,
+    if(!SetWindowPos(blur,shell,bounds.left+inset,bounds.top+inset,
         body.width(),body.height(),
-        SWP_NOACTIVATE|SWP_NOOWNERZORDER|SWP_SHOWWINDOW);
+        SWP_NOACTIVATE|SWP_NOOWNERZORDER|SWP_SHOWWINDOW))opaqueFallback();
 #endif
 }
 void WindowsBackdrop::scheduleCornerUpdate() {

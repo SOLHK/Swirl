@@ -21,6 +21,8 @@ class NodeImportService final : public QObject {
     Q_PROPERTY(bool hasPreview READ hasPreview NOTIFY changed)
     Q_PROPERTY(QVariantList preview READ preview NOTIFY changed)
     Q_PROPERTY(QStringList previewDiagnostics READ previewDiagnostics NOTIFY changed)
+    Q_PROPERTY(bool hasConfigurationReview READ hasConfigurationReview NOTIFY changed)
+    Q_PROPERTY(QVariantMap configurationReview READ configurationReview NOTIFY changed)
 public:
     using SystemProxyResolver=std::function<QList<QNetworkProxy>(const QNetworkProxyQuery &)>;
     explicit NodeImportService(NodeStore *store,QObject *parent=nullptr,
@@ -31,7 +33,13 @@ public:
     bool automaticImport() const { return m_automaticImport; }
     void setImportOutcome(const QString &mode,const QString &notice={}) { m_appliedMode=mode;m_applicationNotice=notice; }
     int legacyNodeCount() const { return m_store->legacyNodeCount(); }
-    bool hasPreview() const { return m_pending.has_value(); }
+    bool hasPreview() const { return m_pending.has_value() || hasConfigurationReview(); }
+    bool hasConfigurationReview() const { return !m_configurationReview.isEmpty(); }
+    QVariantMap configurationReview() const { return m_configurationReview; }
+    Q_INVOKABLE void reviewConfiguration(const QString &sourceId);
+    Q_INVOKABLE bool applyReviewedConfiguration();
+    Q_INVOKABLE void cancelConfigurationReview();
+    void invalidateConfigurationReview(const QString &message);
     QVariantList preview() const;
     QStringList previewDiagnostics() const { return m_pending ? m_pending->diagnostics : QStringList{}; }
     Q_INVOKABLE void confirmImport();
@@ -54,6 +62,11 @@ public:
     using ApplyConfiguration = std::function<bool(const NodeImporter::Result &,const QString &,bool,QString *)>;
     void setConfigurationApplier(ApplyConfiguration apply) { m_apply=std::move(apply); }
     using ApplyCompletion = std::function<void(bool,const QString &)>;
+    using ConfigurationReviewer=std::function<QVariantMap(const QString &)>;
+    using ReviewedConfigurationApplier=std::function<bool(ApplyCompletion,QString *)>;
+    void setConfigurationReviewHandlers(ConfigurationReviewer review,ReviewedConfigurationApplier apply,std::function<void()> cancel) {
+        m_reviewConfiguration=std::move(review);m_applyReviewedConfiguration=std::move(apply);m_cancelConfigurationReview=std::move(cancel);
+    }
     using ApplyConfigurationAsync = std::function<bool(const NodeImporter::Result &,const QString &,bool,ApplyCompletion,QString *)>;
     void setAsyncConfigurationApplier(ApplyConfigurationAsync apply) { m_applyAsync=std::move(apply); }
     using CatalogMutationApplier=std::function<bool(const QString &,const QVariantMap &,ApplyCompletion,QString *)>;
@@ -84,6 +97,11 @@ private:
     ApplyConfiguration m_apply;
     ApplyConfigurationAsync m_applyAsync;
     CatalogMutationApplier m_catalogApply;
+    ConfigurationReviewer m_reviewConfiguration;
+    ReviewedConfigurationApplier m_applyReviewedConfiguration;
+    std::function<void()> m_cancelConfigurationReview;
+    QVariantMap m_configurationReview;
+    bool m_configurationReviewDismissed=false;
     QNetworkAccessManager m_network;
     QPointer<QNetworkReply> m_reply;
     QTimer m_timer,m_deadline;

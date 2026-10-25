@@ -98,6 +98,16 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     auto *host=window->findChild<QObject *>("pageLoader");
     if(!check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;return active&&active->property("routeId")=="policies"&&!host->property("moving").toBool()&&!host->property("pendingGrab").toBool();},5000),QStringLiteral("Real policy page settles")))return finish();
     QTest::qWait(150);QSignalSpy applied(controller,&EngineController::policyApplyFinished);check(applied.isValid(),QStringLiteral("Configuration completion signal is observable"));
+    if(controller->policyMigrationRequired()){
+        const auto legacyDocument=controller->policyDocument();
+        eval("AppState.navigate('activity')");
+        check(QTest::qWaitFor([&]{return item("activityOutboundMode")&&!host->property("moving").toBool();},5000),QStringLiteral("Activity keeps its outbound mode control in the existing facts row"));
+        auto *legacyMode=item("activityOutboundMode");
+        check(legacyMode&&!legacyMode->property("editable").toBool(),QStringLiteral("Activity mode refuses changes before explicit legacy migration"));
+        if(legacyMode){QQmlExpression attempt(qmlContext(legacyMode),legacyMode,"requestMode('global')");check(!attempt.evaluate().toBool()&&!attempt.hasError()&&controller->policyDocument()==legacyDocument&&!controller->policyBusy(),QStringLiteral("Rejected legacy activity mode leaves saved configuration unchanged"));}
+        eval("AppState.navigate('policies')");
+        check(QTest::qWaitFor([&]{return item("reviewPolicyMigration")&&!host->property("moving").toBool();},5000),QStringLiteral("Migration remains an explicit policy-page action"));
+    }
     if(controller->policyMigrationRequired()){click("reviewPolicyMigration");click("confirmPolicyMigration");if(!awaitSaved(QStringLiteral("Legacy migration is explicitly reviewed before changes")))return finish();}
     check(!controller->processMatchingAvailable(),QStringLiteral("Application process matching is truthfully unavailable"));
     click("defaultPolicyTarget");check(item("policyDirectTarget")==nullptr,QStringLiteral("Default proxy target picker excludes DIRECT"));chooseTarget("node",nodeA);
@@ -174,5 +184,36 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     const auto unusedGroup=recordNamed(controller->strategyGroups(),"Automatic fixture 2").value("id").toString();click("policyGroupMore-"+unusedGroup);click("swirlContextOption-1");click("confirmDeletePolicy");awaitSaved(QStringLiteral("Unused strategy group deletion is committed"));check(controller->strategyGroups().size()==4,QStringLiteral("Deleting an unused group retains all unrelated references"));
     check(applied.count()>=14,QStringLiteral("Real policy completion signals accompany accepted transactions"));
     check(!controller->setTunEnabled(true)&&!controller->tunEnabled(),QStringLiteral("Unsupported TUN is rejected before any platform mutation"));
+    eval("AppState.navigate('activity')");
+    if(!check(QTest::qWaitFor([&]{return item("activityOutboundMode")&&!host->property("moving").toBool();},5000),QStringLiteral("Activity mode is reachable after policy edits")))return finish();
+    auto *activityMode=item("activityOutboundMode");
+    auto *modeText=item("activityOutboundModeText");
+    check(modeText&&qAbs(activityMode->width()-modeText->implicitWidth())<=2,QStringLiteral("The mode label itself is the compact click target without an adjacent button"));
+    check(modeText&&modeText->width()+0.5>=modeText->implicitWidth()&&!modeText->property("truncated").toBool(),QStringLiteral("The complete mode name remains visible without style padding or elision"));
+    const auto originalMode=controller->routingMode();
+    check(activityMode->property("displayMode")==originalMode,QStringLiteral("Activity value starts from the controller's acknowledged mode"));
+    click("activityOutboundMode");
+    check(popup("activityOutboundModeMenu")!=nullptr,QStringLiteral("Activity facts row opens the native three-mode menu"));
+    if(auto *menu=popup("activityOutboundModeMenu")) {
+        auto *content=menu->property("contentItem").value<QQuickItem *>();
+        check(content&&QRectF(QPointF(),window->size()).contains(QRectF(content->mapToScene(QPointF()),content->size())),QStringLiteral("Activity mode menu stays inside the minimum-width window"));
+    }
+    QTest::keyClick(window,Qt::Key_Escape);
+    check(QTest::qWaitFor([&]{return !popup("activityOutboundModeMenu");},2000)&&activityMode->hasActiveFocus()&&controller->routingMode()==originalMode,QStringLiteral("Esc closes the mode menu, restores focus and changes no route"));
+    bool busyObserved=false,pendingValueStable=true;
+    const auto modeObservation=QObject::connect(controller,&EngineController::policyChanged,window,[&]{
+        if(controller->policyBusy()){busyObserved=true;pendingValueStable=pendingValueStable&&activityMode->property("displayMode")==originalMode;}
+    });
+    click("activityOutboundMode");click("activityMode-global");
+    if(!awaitSaved(QStringLiteral("Activity global choice receives the real durable configuration receipt"))){QObject::disconnect(modeObservation);return finish();}
+    QObject::disconnect(modeObservation);
+    check(busyObserved&&pendingValueStable,QStringLiteral("Activity mode keeps its prior value while the real transaction is pending"));
+    check(!controller->processAlive()&&controller->policyReceipt().value("scope")=="saved-next-connect"&&controller->appliedRevision().isEmpty(),QStringLiteral("Offline activity mode save never claims live network application"));
+    check(activityMode->property("displayMode")=="global"&&!activityMode->property("pending").toBool()&&activityMode->property("savedForNextConnection").toBool(),QStringLiteral("Activity updates only after matching completion and labels next-connection scope"));
+    click("activityOutboundMode");click("activityMode-rule");
+    awaitSaved(QStringLiteral("Activity mode can switch back using the same native menu"));
+    check(activityMode->property("displayMode")=="rule",QStringLiteral("Activity return choice follows the committed controller mode"));
+    check(QTest::qWaitFor([&]{return !popup("activityOutboundModeMenu");},2000),QStringLiteral("Mode selection releases the menu before returning to the activity facts"));
+    if(!directory.isEmpty())window->grabWindow().save(directory+"/activity-mode.png");
     return finish();
 }

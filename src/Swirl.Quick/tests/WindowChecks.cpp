@@ -79,8 +79,9 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     const auto normalCorner=cornerCoverage();
     check(backdrop->nativeCorners() || normalCorner.second>=5,"system manages the final contour or fallback has antialiased corners");
     state("Theme.setScalePercent(125)");QTest::qWait(150);
-    check(qAbs(state("Theme.windowRadius").toReal()-10.0*96.0/72.0)<0.001,
-          "10pt window contour stays independent of manual content zoom");
+    check(qAbs(state("Theme.windowRadius").toReal()-14.0)<0.001
+          && qAbs(state("Theme.sidebarRadius").toReal()-14.0)<0.001,
+          "approved 14dp shell and sidebar contours stay independent of manual content zoom");
     state("Theme.resetScale()");QTest::qWait(150);
     // Increasing the minimum geometry for manual UI zoom can enlarge the
     // window. Restore the capture bounds so the bottom corners remain on the
@@ -171,25 +172,31 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     background.setColor(QColor("#2464D8"));QTest::qWait(800);
     auto blue=grab("backdrop-blue");
     const int sidebarChange=distance(sample(red,0.01,0.83),sample(blue,0.01,0.83));
-    const int contentChange=distance(sample(red,0.995,0.5),sample(blue,0.995,0.5));
+    const int contentChange=distance(red.pixelColor(red.width()-2,red.height()/2),blue.pixelColor(blue.width()-2,blue.height()/2));
+    const QPoint headerPoint(red.width()/2,qRound(8*window->devicePixelRatio()));
+    const int workspaceMaterialChange=distance(red.pixelColor(headerPoint),blue.pixelColor(headerPoint));
     qInfo()<<"Native pixel delta: sidebar="<<sidebarChange<<"content="<<contentChange<<"DPR="<<window->devicePixelRatio()<<backdrop->status();
-    const bool exactOpaque=backdrop->exactCorners()&&!backdrop->translucent();
-    check(exactOpaque ? !backdrop->active()&&backdrop->status().contains("exact 10pt")
-                      : (backdrop->active()&&backdrop->status().contains("Desktop Acrylic"))||(backdrop->translucent()&&backdrop->status().contains("Alpha translucency")),
-          "composition reports native Acrylic, exact alpha, or a policy-required opaque fallback");
-    check(exactOpaque ? sidebarChange<=3 : sidebarChange>=4&&sidebarChange<(backdrop->blurActive()?160:40),"sidebar follows the effective composition capability");
-    check(exactOpaque ? contentChange<=3 : contentChange>=4&&contentChange<(backdrop->blurActive()?160:40),"workspace follows the effective composition capability");
+    const bool exactOpaque=backdrop->exactCorners()&&!backdrop->micaActive()&&!backdrop->blurActive();
+    check(exactOpaque ? !backdrop->translucent()&&backdrop->status().startsWith("Opaque:")
+                      : (backdrop->micaActive()&&backdrop->status().contains("Windows Mica"))||(backdrop->blurActive()&&backdrop->status().contains("Windows native blur")),
+          "composition reports actual native material or an opaque fallback without raw desktop alpha");
+    check(sidebarChange<=12,"sidebar retains a restrained neutral material tint");
+    check(contentChange<=3,"opaque outer edge does not reveal desktop content");
+    check(state("window.opacity===1 && !scaledCanvas.layer.enabled").toBool(),"native material changes background only; foreground text and controls remain fully opaque");
     if(backdrop->blurActive()){
-        check(qAbs(sidebarChange-contentChange)<=12,"sidebar and workspace share one neutral shell material while responding to live desktop color");
+        check(sidebarChange<=workspaceMaterialChange&&workspaceMaterialChange<80,"darker sidebar subdues the shared native material while workspace tint remains restrained");
         const auto scale=window->devicePixelRatio();const auto divider=state("window.actualSidebarWidth").toReal();
         const auto lhs=red.pixelColor(qRound((divider-12)*scale),qRound(20*scale));
         const auto rhs=red.pixelColor(qRound((divider+12)*scale),qRound(20*scale));
         check(distance(lhs,rhs)<=20,"sidebar floats above the workspace without a hard material seam");
     }
-    // The shared light shell stays white while still allowing restrained live blur.
-    const auto materialAlpha=window->grabWindow().pixelColor(int(window->width()*0.995*window->devicePixelRatio()),int(window->height()*0.5*window->devicePixelRatio())).alpha();
-    const int expectedBlurAlpha=state("Theme.dark").toBool()?204:245;
-    check(exactOpaque ? materialAlpha==255 : backdrop->blurActive()?qAbs(materialAlpha-expectedBlurAlpha)<=2:backdrop->translucent()?materialAlpha>=240&&materialAlpha<=244:materialAlpha>=227&&materialAlpha<=231,"actual alpha matches the single material tint");
+    // The native material stays behind an opaque perimeter. The QML
+    // tint is translucent only where the native helper fully covers it.
+    const auto perimeter=window->grabWindow();
+    const auto materialAlpha=perimeter.pixelColor(perimeter.width()-2,perimeter.height()/2).alpha();
+    check(materialAlpha==255,"outer material perimeter is fully opaque");
+    const auto innerAlpha=window->grabWindow().pixelColor(int(window->width()*0.5*window->devicePixelRatio()),qRound(8*window->devicePixelRatio())).alpha();
+    check(exactOpaque ? innerAlpha==255 : qAbs(innerAlpha-qRound(state("Theme.nativeTintOpacity").toReal()*255))<=2,"inner alpha follows effective native-material capability");
     // Move Swirl relative to a split-color native QML window to verify position-
     // dependent composition. The scene is a test window, not a wallpaper image.
     QQuickItem split;
@@ -204,7 +211,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     window->setPosition(available.topLeft()+QPoint(available.width()/2,30));QTest::qWait(600);
     auto right=grab("backdrop-moved-right");
     const auto moveDelta=distance(sample(left,0.01,0.83),sample(right,0.01,0.83));
-    check(exactOpaque ? moveDelta<=3 : moveDelta>1,"moving follows opaque fallback or actual screen-position Acrylic composition");
+    check(moveDelta<=12,"moving across other windows retains the restrained neutral shell tint");
     const qreal sidebar=state("window.actualSidebarWidth * window.contentScale").toReal();
     window->setPosition(available.topLeft()+QPoint(int(available.width()/2-sidebar/2),30));QTest::qWait(600);
     auto edge=grab("backdrop-blurred-edge");
@@ -228,9 +235,8 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     check(distance(sample(opaqueBlue,0.01,0.83),sample(opaqueRed,0.01,0.83))<=3,"disabled transparency gives opaque sidebar fallback");
     check(distance(sample(opaqueBlue,0.995,0.5),sample(opaqueRed,0.995,0.5))<=3,"disabled transparency gives opaque page fallback");
     state("Theme.transparency=true;Theme.mode='Dark'");QTest::qWait(500);grab("overview-native-dark");
-    check(exactOpaque ? !backdrop->active()&&backdrop->status().contains("exact 10pt")
-                      : (backdrop->active()&&backdrop->status().contains("Desktop Acrylic"))||(backdrop->translucent()&&backdrop->status().contains("Alpha translucency")),
-          "dark theme retains its effective contour and composition capability");
+    check(backdrop->micaActive() ? backdrop->status().contains("Windows Mica") : backdrop->blurActive()?backdrop->status().contains("Windows native blur"):!backdrop->translucent()&&backdrop->status().startsWith("Opaque:"),
+          "dark theme retains actual native material or opaque capability fallback");
     state("Theme.mode='Light'");
     auto *title=find(window->contentItem(),"titleDragArea");
     check(title,"title drag region exists");

@@ -222,6 +222,27 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     const bool reduced=eval("SwirlMotion.reduced").toBool();
     check("animated-test-policy-is-active",!reduced);
     check("initial-page-present",item()!=nullptr);
+    auto *rewriteLoader=window->findChild<QObject *>("rewriteRulesLoader");
+    check("rewrite-editor-is-lazy-at-startup",rewriteLoader&&!rewriteLoader->property("active").toBool()&&!qvariant_cast<QObject *>(rewriteLoader->property("item")));
+    eval("window.openRewriteEditor('redirect','HTTP redirect rules')");
+    QTest::keyClick(window,Qt::Key_Escape);
+    const bool rewriteReady=rewriteLoader&&QTest::qWaitFor([&]{return rewriteLoader->property("status").toInt()==1;},5000);
+    auto *rewriteEditor=rewriteReady?qvariant_cast<QObject *>(rewriteLoader->property("item")):nullptr;
+    check("escape-cancels-pending-rewrite-opening",rewriteEditor&&QTest::qWaitFor([&]{return !rewriteEditor->property("visible").toBool();},2500)&&!rewriteLoader->property("wantOpen").toBool());
+    eval("window.openRewriteEditor('header','HTTP header rules');window.openRewriteEditor('redirect','HTTP redirect rules')");
+    check("rewrite-editor-opens-after-asynchronous-load",rewriteEditor&&QTest::qWaitFor([&]{return rewriteEditor->property("opened").toBool();},2500));
+    check("rewrite-editor-last-request-wins",rewriteEditor&&rewriteEditor->property("kind")=="redirect"&&rewriteEditor->property("title")=="HTTP redirect rules");
+    if(rewriteEditor){
+        const auto previousSelection=rewriteEditor->property("chosen");
+        rewriteEditor->setProperty("chosen","retained-selection-fixture");
+        QMetaObject::invokeMethod(rewriteEditor,"close");
+        check("rewrite-editor-releases-first-modal-grab",QTest::qWaitFor([&]{return !rewriteEditor->property("visible").toBool();},2500));
+        eval("window.openRewriteEditor('redirect','HTTP redirect rules')");
+        check("rewrite-editor-reuses-instance-and-local-state",qvariant_cast<QObject *>(rewriteLoader->property("item"))==rewriteEditor&&rewriteEditor->property("chosen")=="retained-selection-fixture"&&QTest::qWaitFor([&]{return rewriteEditor->property("opened").toBool();},2500));
+        rewriteEditor->setProperty("chosen",previousSelection);
+        QMetaObject::invokeMethod(rewriteEditor,"close");
+        check("rewrite-editor-releases-reopened-modal-grab",QTest::qWaitFor([&]{return !rewriteEditor->property("visible").toBool();},2500));
+    }
     route("featurehub");
     auto *hub=item();
     check("hub-loaded",hub!=nullptr);

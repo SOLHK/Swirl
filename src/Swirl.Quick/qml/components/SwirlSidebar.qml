@@ -19,6 +19,7 @@ Item {
   readonly property real radius:Theme.sidebarRadius
   SwirlShellOutline {
    anchors.fill:parent;radius:floatingBackground.radius
+   fillColor:Theme.sidebar
    strokeColor:Theme.increaseContrast?Theme.text:Theme.dark?Qt.rgba(1,1,1,0.12):Qt.rgba(0,0,0,0.04)
   }
   ShaderEffect {

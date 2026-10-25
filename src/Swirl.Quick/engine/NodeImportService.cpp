@@ -50,6 +50,7 @@ QVariantList NodeImportService::providers() const {
         const auto mode=outcome.value("mode").toString();
         r.insert("importMode",QStringList{"nodes","full","nodes-with-warning"}.contains(mode)?mode:QString());
         r.insert("warning",outcome.value("notice").toString().left(2048));
+        r.insert("hasConfiguration",!outcome.value("preservedConfiguration").toObject().isEmpty());
         const bool updating=m_busy&&id==m_source,queued=m_queue.contains(id);
         r.insert("status",updating?QStringLiteral("正在更新"):queued?QStringLiteral("等待更新"):m_cancelled.contains(id)?QStringLiteral("已取消"):m_errors.contains(id)?QStringLiteral("更新失败"):r.value("lastSuccess").toLongLong()>0?QStringLiteral("已保存真实节点"):QStringLiteral("等待更新"));
         r.insert("queued",queued);r.insert("canCancel",!m_shuttingDown&&(queued||(updating&&!m_committing)));
@@ -193,7 +194,7 @@ bool NodeImportService::cancelRefresh(const QString &id) {
 }
 void NodeImportService::shutdown() {
     m_shuttingDown=true;++m_generation;m_timer.stop();m_deadline.stop();m_queue.clear();
-    m_pending.reset();m_sourceDefinition.reset();
+    m_pending.reset();m_sourceDefinition.reset();m_configurationReview.clear();if(m_cancelConfigurationReview)m_cancelConfigurationReview();
     if(m_reply){m_reply->disconnect(this);m_reply->abort();m_reply->deleteLater();m_reply=nullptr;}
     m_busy=false;
 }
@@ -481,6 +482,7 @@ void NodeImportService::finish(const QString &error) {
     m_source.clear();m_sourceDefinition.reset();m_busy=false;m_committing=false;m_nodesOnly=false;m_automaticImport=false;
     m_downloadUrl=QUrl();m_compatibilityRequest=false;m_downloadAttempts=0;
     m_appliedMode.clear();m_applicationNotice.clear();
+    if(m_configurationReviewDismissed){m_configurationReview.clear();m_configurationReviewDismissed=false;if(m_cancelConfigurationReview)m_cancelConfigurationReview();}
     const QPointer<NodeImportService> guard(this);emit changed();if(guard)QTimer::singleShot(0,this,&NodeImportService::next);
 }
 bool NodeImportService::sourceDefinitionCurrent() const {
@@ -491,6 +493,39 @@ bool NodeImportService::sourceDefinitionCurrent() const {
             current.formatHint==captured.formatHint&&current.importScope==captured.importScope&&
             current.intervalMinutes==captured.intervalMinutes&&current.enabled==captured.enabled;
     return false;
+}
+void NodeImportService::reviewConfiguration(const QString &sourceId) {
+    if(m_shuttingDown||m_busy||m_pending)return;
+    if(m_cancelConfigurationReview)m_cancelConfigurationReview();
+    m_configurationReviewDismissed=false;m_configurationReview=m_reviewConfiguration?m_reviewConfiguration(sourceId):QVariantMap{{"canApply",false},{"error",QStringLiteral("完整配置审阅接口不可用；现有策略保持不变。")}};
+    emit changed();
+}
+bool NodeImportService::applyReviewedConfiguration() {
+    if(m_shuttingDown||m_busy||!m_configurationReview.value("canApply").toBool()||!m_applyReviewedConfiguration)return false;
+    m_busy=true;m_committing=true;m_configurationReview.insert("canApply",false);m_configurationReview.insert("pending",true);
+    m_message=QStringLiteral("正在应用本次审阅的配置，等待持久化与内核回执…");
+    const QPointer<NodeImportService> guard(this);const auto generation=m_generation;emit changed();
+    if(!guard||m_shuttingDown||m_generation!=generation)return false;
+    auto completion=[guard,generation](bool ok,const QString &error){
+        if(!guard||guard->m_shuttingDown||guard->m_generation!=generation)return;
+        guard->m_configurationReview.insert("pending",false);guard->m_configurationReview.insert("applied",ok);
+        guard->m_configurationReview.insert("error",ok?QString():error);
+        guard->m_message=ok?QStringLiteral("本次审阅的配置已提交；后续订阅更新仍仅更新节点。"):error;
+        guard->finish();
+    };
+    QString error;const bool accepted=m_applyReviewedConfiguration(std::move(completion),&error);
+    if(!accepted&&guard){m_configurationReview.insert("pending",false);m_configurationReview.insert("error",error);finish(error);}
+    return accepted;
+}
+void NodeImportService::cancelConfigurationReview() {
+    if(m_committing){if(hasConfigurationReview())m_configurationReviewDismissed=true;return;}
+    if(m_cancelConfigurationReview)m_cancelConfigurationReview();m_configurationReview.clear();
+    const QPointer<NodeImportService> guard(this);emit changed();
+    if(guard)QTimer::singleShot(0,this,&NodeImportService::next);
+}
+void NodeImportService::invalidateConfigurationReview(const QString &message) {
+    if(!hasConfigurationReview()||m_committing)return;
+    m_configurationReview.insert("canApply",false);m_configurationReview.insert("error",message);emit changed();
 }
 bool NodeImportService::mutateCatalog(const QString &operation,const QVariantMap &input,const QString &successMessage) {
     if(m_shuttingDown||m_busy||hasPreview()||!m_catalogApply){

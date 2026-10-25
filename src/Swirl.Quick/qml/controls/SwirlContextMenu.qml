@@ -1,6 +1,6 @@
 import QtQuick
 import QtQml.Models
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import SwirlQuick
 Menu {
     id: menu
@@ -17,21 +17,21 @@ Menu {
     onAboutToShow: {
         dismissals.push(menu,parent?parent.Window.window:null)
         if(SwirlMotion.reduced){scale=1;opacity=1}
-        else if(scale===1 && opacity===1){scale=0.96;opacity=0}
+        else if(scale===1 && opacity===1){scale=0.98;opacity=0}
     }
     onClosed:{dismissals.pop(menu);scale=1;opacity=1}
     enter:Transition {
         enabled:!SwirlMotion.reduced
         ParallelAnimation {
-            NumberAnimation {property:"opacity";to:1;duration:SwirlMotion.duration}
-            SwirlSpring {property:"scale";to:1}
+            NumberAnimation {property:"opacity";to:1;duration:SwirlMotion.menuEnterDuration;easing.type:Easing.OutCubic}
+            NumberAnimation {property:"scale";to:1;duration:SwirlMotion.menuEnterDuration;easing.type:Easing.OutCubic}
         }
     }
     exit:Transition {
         enabled:!SwirlMotion.reduced
         ParallelAnimation {
-            NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration}
-            NumberAnimation {property:"scale";to:0.97;duration:SwirlMotion.duration;easing.type:Easing.InCubic}
+            NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.menuExitDuration;easing.type:Easing.InCubic}
+            NumberAnimation {property:"scale";to:0.98;duration:SwirlMotion.menuExitDuration;easing.type:Easing.InCubic}
         }
     }
     background: Rectangle {

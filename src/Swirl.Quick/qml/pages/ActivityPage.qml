@@ -140,7 +140,11 @@ Item {
                 Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(45)
                 Fact { x: parent.width * 0.02; width: parent.width * 0.22; caption: "网络"; value: page.network.type || "未连接" }
                 Fact { x: parent.width * 0.255; width: parent.width * 0.23; caption: "配置"; value: extensionsProvider.profileName || "—" }
-                Fact { x: parent.width * 0.506; width: parent.width * 0.27; caption: "出站模式"; value: AppState.mode }
+                ColumnLayout {
+                    x: parent.width * 0.506; width: parent.width * 0.27; spacing: Theme.dp(2)
+                    SwirlText { text: qsTr("出站模式"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; elide: Text.ElideRight }
+                    OutboundModeControl { Layout.alignment: Qt.AlignLeft; engineController: page.engineController }
+                }
                 Fact { x: parent.width * 0.8; width: parent.width * 0.2; caption: "外部 IP"; value: page.telemetry.externalIp || "—" }
             }
             Item { Layout.preferredHeight: Theme.dp(10) }

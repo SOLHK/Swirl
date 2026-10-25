@@ -1,5 +1,7 @@
 #include "EngineController.h"
 #include <QCoreApplication>
+#include <QCryptographicHash>
+#include <QDateTime>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -79,6 +81,20 @@ QJsonObject recordSubscriptionOutcome(QJsonObject snapshot,const QString &source
     outcomes.insert(sourceId,outcome);
     snapshot.insert("subscriptionImportResults",outcomes);return snapshot;
 }
+QJsonObject recordSubscriptionArchive(QJsonObject snapshot,const QString &sourceId,const NodeImporter::Result &result) {
+    if(sourceId.isEmpty()||result.configuration.isEmpty())return snapshot;
+    auto outcomes=snapshot.value("subscriptionImportResults").toObject(),outcome=outcomes.value(sourceId).toObject();
+    outcome.insert("configurationFormat",result.configurationFormat);outcome.insert("sourceDigest",result.sourceDigest);
+    outcomes.insert(sourceId,outcome);snapshot.insert("subscriptionImportResults",outcomes);return snapshot;
+}
+QString privateDigest(const QJsonObject &object) {
+    auto bytes=QJsonDocument(object).toJson(QJsonDocument::Compact);
+    const auto digest=QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex());bytes.fill('\0');return digest;
+}
+QString subscriptionDefinitionDigest(const NodeSubscription &source) {
+    return privateDigest({{"id",source.id},{"name",source.name},{"url",source.url.toString(QUrl::FullyEncoded)},
+        {"format",source.formatHint},{"scope",source.importScope},{"interval",source.intervalMinutes},{"enabled",source.enabled}});
+}
 QStringList routingRuleFields(const QString &rule) {
     auto fields=rule.split(',');
     for(auto &field:fields)field=field.trimmed();
@@ -127,6 +143,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             const auto notice=!result.configuration.isEmpty()?QStringLiteral("订阅仅更新节点；原配置的 DNS、规则、策略组、脚本、重写、MITM、监听与 TUN 均未启用，继续使用现有 Swirl 网络配置。原文仅加密保留，不会执行。"):QString();
             if(m_imports.automaticImport()){
                 retained=recordSubscriptionOutcome(retained,sourceId,result.format,notice.isEmpty()?"nodes":"nodes-with-warning",notice,{},result.configuration);
+                retained=recordSubscriptionArchive(retained,sourceId,result);
                 m_imports.setImportOutcome(notice.isEmpty()?"nodes":"nodes-with-warning",notice);
             }
             return applyCatalogTransaction(plan,retained,std::move(completion),error);
@@ -163,7 +180,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             const auto nodes=plan.nodes();QVariantMap canonical;
             if(!validateNetworkConfiguration(networkConfigurationSnapshot(),&canonical,&nodes)){*error=m_networkError;return false;}
             auto retained=retainedNodeConfiguration(sourceId,nodesOnly||automatic);
-            if(automatic)retained=recordSubscriptionOutcome(retained,sourceId,result.format,mode,notice,metadata,result.configuration);
+            if(automatic){retained=recordSubscriptionOutcome(retained,sourceId,result.format,mode,notice,metadata,result.configuration);retained=recordSubscriptionArchive(retained,sourceId,result);}
             if(!m_store.commitImport(plan,retained)){*error=m_store.error();return false;}
             if(automatic)m_imports.setImportOutcome(mode,notice);
             return true;
@@ -196,6 +213,9 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         if(automatic)m_imports.setImportOutcome("full",profileMetadataNotice(metadata));
         return true;
     });
+    m_imports.setConfigurationReviewHandlers([this](const QString &id){return reviewSubscriptionConfiguration(id);},
+        [this](NodeImportService::ApplyCompletion completion,QString *error){return applyReviewedSubscriptionConfiguration(std::move(completion),error);},
+        [this]{m_subscriptionReview.reset();});
     connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this]{
         const QScopedValueRollback ingesting(m_ingestingEngineStatus,true);
         m_telemetry.ingest(m_engine->status());
@@ -1238,7 +1258,145 @@ void EngineController::initializePolicyConfiguration() {
     connect(&m_tests,&NodeTestService::changed,this,[this]{
         if(m_policyWaitingForProbes&&!m_tests.busy()){m_policyWaitingForProbes=false;finishPolicyMutation(true);}
     });
-    connect(&m_store,&NodeStore::changed,this,[this]{emit policyChanged();});
+    connect(&m_store,&NodeStore::changed,this,[this]{
+        if(m_subscriptionReview){m_subscriptionReview.reset();m_imports.invalidateConfigurationReview(QStringLiteral("保存版本或来源已经变化；旧审阅已失效，请重新审阅。"));}
+        emit policyChanged();
+    });
+}
+QVariantMap EngineController::reviewSubscriptionConfiguration(const QString &sourceId) {
+    m_subscriptionReview.reset();
+    QVariantMap summary{{"sourceId",sourceId},{"canApply",false},{"pending",false},{"applied",false}};
+    const auto reject=[&](const QString &error){summary.insert("error",error);return summary;};
+    if(m_shuttingDown||m_policyBusy||busy()||m_store.saving()||!m_store.configurationAvailable())
+        return reject(QStringLiteral("配置正在修改或需要恢复；请稍后重新审阅。"));
+    if(!m_store.configurationV2())return reject(QStringLiteral("请先在策略页确认 V2 配置迁移，再审阅完整来源配置。"));
+    std::optional<NodeSubscription> source;
+    for(const auto &entry:m_store.subscriptions())if(entry.id==sourceId){source=entry;break;}
+    if(!source)return reject(QStringLiteral("此订阅已不存在；未读取或下载旧来源。"));
+    summary.insert("sourceName",source->name);
+    const auto archive=m_store.networkConfiguration().value("subscriptionImportResults").toObject().value(sourceId).toObject();
+    const auto configuration=archive.value("preservedConfiguration").toObject();const auto format=archive.value("configurationFormat").toString();
+    summary.insert("format",QStringList{"clash","sing-box","ini"}.contains(format)?format:QString());
+    if(configuration.isEmpty())return reject(QStringLiteral("此来源尚无可审阅的完整配置；节点更新不会覆盖策略。"));
+    const auto sourceBytesDigest=archive.value("sourceDigest").toString();
+    if(!QRegularExpression("^[0-9a-f]{64}$").match(sourceBytesDigest).hasMatch())
+        return reject(QStringLiteral("旧缓存未记录原始响应身份，不能签发本次确认。请由你手动更新此订阅后重新审阅。"));
+    QVariantMap projected;QString error;
+    if(!projectSubscriptionProfile(configuration,format,&projected,&error))return reject(error);
+    projected.remove("importMetadata");
+    // Names resolve only inside this source. A display rename never grants a
+    // profile access to a different subscription's nodes or existing groups.
+    QHash<QString,QString> aliases,groupIds;QSet<QString> ambiguous;
+    for(const auto &node:m_store.nodes())if(node.sourceId==sourceId){
+        const auto alias=node.providerAlias.isEmpty()?node.name:node.providerAlias;
+        if(aliases.contains(alias)&&aliases.value(alias)!=node.id)ambiguous.insert(alias);else aliases.insert(alias,node.id);
+    }
+    if(aliases.isEmpty()||!ambiguous.isEmpty())return reject(QStringLiteral("来源节点为空或原始名称有歧义；未猜测完整配置引用。"));
+    for(const auto &reserved:QStringList{"DIRECT","REJECT","SWIRL","GLOBAL"})if(aliases.contains(reserved))
+        return reject(QStringLiteral("来源节点名与保留出口名称冲突；未应用配置。"));
+    const auto importedGroups=projected.value("groups").toList();
+    for(const auto &entry:importedGroups){const auto name=entry.toMap().value("name").toString();
+        if(name.isEmpty()||groupIds.contains(name)||aliases.contains(name)||QStringList{"DIRECT","REJECT","SWIRL","GLOBAL"}.contains(name))
+            return reject(QStringLiteral("来源策略组名称重复或与节点/保留名称冲突；未猜测引用。"));
+        groupIds.insert(name,newPolicyId());
+    }
+    bool valid=true;
+    const auto targetFor=[&](const QString &name)->QJsonObject{
+        if(name=="DIRECT")return {{"kind","direct"}};
+        if(name=="REJECT")return {{"kind","reject"}};
+        if(aliases.contains(name))return {{"kind","node"},{"id",aliases.value(name)}};
+        if(groupIds.contains(name))return {{"kind","group"},{"id",groupIds.value(name)}};
+        valid=false;return {};
+    };
+    QVariantList mappedGroups;
+    for(const auto &entry:importedGroups){auto group=entry.toMap();QStringList members;
+        for(const auto &member:group.value("proxies").toStringList()){targetFor(member);members.append(aliases.value(member,member));}
+        group.insert("proxies",members);
+        if(group.contains("default-selected")){const auto selected=group.value("default-selected").toString();targetFor(selected);group.insert("default-selected",aliases.value(selected,selected));}
+        mappedGroups.append(group);
+    }
+    QStringList mappedRules;
+    const auto importedRules=projected.value("rules").toStringList();
+    for(const auto &rule:importedRules){auto parts=routingRuleFields(rule);const auto index=routingRuleTargetIndex(parts);
+        const auto name=parts.value(index);targetFor(name);if(index>=parts.size()){valid=false;break;}
+        parts[index]=aliases.value(name,name);mappedRules.append(parts.join(','));
+    }
+    if(!valid)return reject(QStringLiteral("完整配置引用了来源之外的节点或组；未按显示名猜测出口。"));
+    const auto dns=projected.contains("dns")?projected.value("dns").toMap():m_options.dnsConfig;
+    const auto candidateNodes=m_store.nodes();
+    error=RustCoreEngine::validateNetworkConfiguration(candidateNodes,dns,mappedRules,mappedGroups);
+    if(!error.isEmpty())return reject(error);
+    QJsonObject document=emptyPolicyDocument(m_policyDocument.value("mode").toString(),{});QJsonArray groups,rules;
+    for(const auto &entry:importedGroups){const auto old=entry.toMap();const auto name=old.value("name").toString(),type=old.value("type").toString();
+        const auto strategy=type=="select"?"manual":type=="url-test"?"url_test":type=="fallback"?"fallback":type=="load-balance"?"load_balance":"";
+        if(QString::fromLatin1(strategy).isEmpty())return reject(QStringLiteral("此来源策略组类型尚未映射到 V2；未改变现有策略。"));
+        QJsonArray members;const auto names=old.value("proxies").toStringList();for(const auto &member:names)members.append(targetFor(member));
+        QJsonObject group{{"id",groupIds.value(name)},{"name",name},{"strategy",strategy},{"members",members}};
+        if(type=="select")group.insert("selected",targetFor(old.value("default-selected",names.value(0)).toString()));
+        else group.insert("probe",QJsonObject{{"url",old.value("url").toString()},{"interval_ms",old.value("interval",300).toInt()*1000},
+            {"timeout_ms",old.value("timeout",5000).toInt()},{"expected_status",old.value("expected-status",204).toInt()},
+            {"tolerance_ms",old.value("tolerance",0).toInt()},{"success_threshold",1},{"failure_threshold",2},{"switch_cooldown_ms",30000}});
+        groups.append(group);
+    }
+    QString defaultName;
+    for(int i=0;i<importedRules.size();++i){const auto fields=routingRuleFields(importedRules[i]);const auto type=fields.value(0);
+        const auto target=targetFor(fields.value(routingRuleTargetIndex(fields)));
+        if(type=="MATCH"){
+            if(target.value("kind")!=QJsonValue("node")&&target.value("kind")!=QJsonValue("group"))
+                return reject(QStringLiteral("此完整配置的最终出口为 DIRECT/REJECT，与 V2 默认代理约束不同；未静默改变其语义。可保留节点并在策略页配置直连或拒绝规则。"));
+            auto policy=document.value("default_policy").toObject();policy.insert("target",target);document.insert("default_policy",policy);defaultName=fields.value(1);continue;
+        }
+        const auto matcher=legacyMatcher(type,fields.value(1),!fields.contains("no-resolve"));
+        if(matcher.isEmpty())return reject(QStringLiteral("完整配置含尚未映射的规则类型；原策略保持不变。"));
+        rules.append(QJsonObject{{"id",newPolicyId()},{"name",QStringLiteral("来源规则 %1").arg(i+1)},{"enabled",true},{"priority",i+1},{"matcher",matcher},{"target",target}});
+    }
+    document.insert("groups",groups);document.insert("custom_rules",rules);
+    auto options=m_options;options.nodes=candidateNodes;options.dnsConfig=dns;
+    const auto validation=RustCoreEngine::validateConfigurationV2(options,document,newPolicyId());
+    if(!validation.value("ok").toBool())return reject(policyFailureText(validation));
+    const auto planDigest=validation.value("plan_digest").toString();
+    if(!QRegularExpression("^[0-9a-f]{64}$").match(planDigest).hasMatch())return reject(QStringLiteral("内核没有返回候选配置身份；无法确认本次应用。"));
+    NodeStore::ImportPlan catalog;
+    if(!m_store.prepareSaveSubscription(source->id,source->name,source->url,source->intervalMinutes,source->enabled,source->formatHint,QStringLiteral("nodes-only"),&catalog))return reject(m_store.error());
+    auto network=catalog.retainedNetworkConfiguration();network.insert("policyDocumentV2",document);network.insert("dns",QJsonObject::fromVariantMap(dns));
+    // This receipt is inert audit data. It is never read as future authority.
+    auto outcomes=network.value("subscriptionImportResults").toObject(),outcome=outcomes.value(sourceId).toObject();
+    outcome.insert("lastExplicitApplication",QJsonObject{{"schema",2},{"sourceDigest",sourceBytesDigest}});outcomes.insert(sourceId,outcome);network.insert("subscriptionImportResults",outcomes);
+    if(m_reviewSession.isEmpty())m_reviewSession=newPolicyId();
+    SubscriptionReviewTicket ticket;ticket.sourceId=sourceId;ticket.sourceDefinitionDigest=subscriptionDefinitionDigest(*source);
+    ticket.sourceBytesDigest=sourceBytesDigest;ticket.archiveDigest=privateDigest(archive);ticket.storeId=m_store.configurationStoreId();ticket.revision=m_store.configurationRevision();
+    ticket.planDigest=planDigest;ticket.session=m_reviewSession;ticket.expiry=QDeadlineTimer(600000);ticket.catalog=catalog;ticket.document=document;ticket.network=network;ticket.options=options;
+    m_subscriptionReview=std::move(ticket);
+    summary.insert("canApply",true);summary.insert("expiresAt",QDateTime::currentDateTime().addSecs(600).toString("HH:mm"));
+    summary.insert("changes",QVariantList{
+        QVariantMap{{"name",QStringLiteral("DNS")},{"before",QStringLiteral("当前 DNS 配置")},{"after",projected.contains("dns")?QStringLiteral("替换为来源 DNS（已严格校验）"):QStringLiteral("保留当前 DNS")}},
+        QVariantMap{{"name",QStringLiteral("默认出口")},{"before",QStringLiteral("当前默认策略")},{"after",defaultName.left(128)}},
+        QVariantMap{{"name",QStringLiteral("专属服务")},{"before",QString::number(m_policyDocument.value("service_policies").toArray().size())},{"after",QStringLiteral("0（替换现有专属服务）")}},
+        QVariantMap{{"name",QStringLiteral("策略组")},{"before",QString::number(m_policyDocument.value("groups").toArray().size())},{"after",QString::number(groups.size())}},
+        QVariantMap{{"name",QStringLiteral("显式直连规则")},{"before",QString::number(m_policyDocument.value("explicit_direct_rules").toArray().size())},{"after",QStringLiteral("0（替换现有显式规则）")}},
+        QVariantMap{{"name",QStringLiteral("其他自定义规则")},{"before",QString::number(m_policyDocument.value("custom_rules").toArray().size())},{"after",QString::number(rules.size())}}});
+    summary.insert("impact",QStringLiteral("本次替换现有服务分配、策略组和自定义规则；监听、系统代理及 TUN 不变。来源规则按原顺序放入「其他自定义」层，仍服从 Swirl 的本地直连、专属服务、中国规则、其他规则、默认策略顺序。普通已建立连接保留旧快照。确认仅对本次缓存有效，后续自动更新仍只更新节点。"));
+    return summary;
+}
+bool EngineController::applyReviewedSubscriptionConfiguration(NodeImportService::ApplyCompletion completion,QString *error) {
+    const auto reject=[&](const QString &message){if(error)*error=message;m_subscriptionReview.reset();return false;};
+    if(!m_subscriptionReview)return reject(QStringLiteral("本次确认已使用或已取消；请重新审阅。"));
+    auto ticket=std::move(*m_subscriptionReview);m_subscriptionReview.reset();
+    if(ticket.expiry.hasExpired()||ticket.session!=m_reviewSession||ticket.storeId!=m_store.configurationStoreId()||ticket.revision!=m_store.configurationRevision())
+        return reject(QStringLiteral("审阅已过期或保存版本发生变化；请重新审阅本次配置。"));
+    bool sourceCurrent=false;for(const auto &source:m_store.subscriptions())if(source.id==ticket.sourceId)sourceCurrent=subscriptionDefinitionDigest(source)==ticket.sourceDefinitionDigest;
+    const auto archive=m_store.networkConfiguration().value("subscriptionImportResults").toObject().value(ticket.sourceId).toObject();
+    if(!sourceCurrent||archive.value("sourceDigest").toString()!=ticket.sourceBytesDigest||privateDigest(archive)!=ticket.archiveDigest)
+        return reject(QStringLiteral("来源定义或缓存内容已经变化；旧确认未应用，请重新审阅。"));
+    if(m_policyBusy||busy()||m_store.saving()||!m_store.configurationAvailable()||m_moduleOverlayActive)
+        return reject(QStringLiteral("配置正在处理或需要恢复；本次确认已消耗，请重新审阅后再试。"));
+    const auto validation=RustCoreEngine::validateConfigurationV2(ticket.options,ticket.document,newPolicyId());
+    if(!validation.value("ok").toBool()||validation.value("plan_digest").toString()!=ticket.planDigest)
+        return reject(QStringLiteral("内核能力或规则资源已变化；本次候选未应用，请重新审阅。"));
+    m_policyCatalog=ticket.catalog;m_policyCandidateNetwork=ticket.network;m_policyCatalogCompletion=std::move(completion);m_policyReviewDigest=ticket.planDigest;
+    const bool accepted=applyPolicyConfiguration(ticket.document,ticket.options);
+    if(!accepted){if(error)*error=m_policyError;m_policyCatalog.reset();m_policyCatalogCompletion={};m_policyReviewDigest.clear();}
+    return accepted;
 }
 QVariantMap EngineController::validatePolicyDocument(const QVariantMap &input) {
     auto options=m_options;options.nodes=m_store.nodes();
@@ -1356,7 +1514,7 @@ void EngineController::finishPolicyMutation(bool success,const QString &error) {
         m_policyReceipt.insert("scope",m_policyOnline?"new-requests-applied":"saved-next-connect");
     }
     const bool recoveryFailed=m_policyRestartRecovery&&!success;
-    m_policyBusy=false;m_policyState=success?"idle":recoveryFailed?"reconciling":"failed";m_policyError=error;m_policyMigrationConfirmed=false;
+    m_policyBusy=false;m_policyState=success?"idle":recoveryFailed?"reconciling":"failed";m_policyError=error;m_policyMigrationConfirmed=false;m_policyReviewDigest.clear();
     m_policyWaitingForStop=false;m_policyWaitingForProbes=false;m_policyRestartRecovery=false;m_policyRecoveryAction.clear();
     m_store.releaseConfigurationLease();
     auto catalogCompletion=std::move(m_policyCatalogCompletion);m_policyCatalogCompletion={};m_policyCatalog.reset();m_policyIntentDurable=false;
@@ -1416,6 +1574,11 @@ void EngineController::policyCommandCompleted(const QString &requestId,const QJs
         }
         const auto digest=response.value("plan_digest").toString();
         if(!QRegularExpression("^[0-9a-f]{64}$").match(digest).hasMatch()) {finishPolicyMutation(false,QStringLiteral("内核未返回有效配置摘要，未保存配置。"));return;}
+        if(!m_policyReviewDigest.isEmpty()&&digest!=m_policyReviewDigest){
+            if(m_policyOnline){m_policyPrepared=response;failPolicyMutation(QStringLiteral("候选配置已不同于本次审阅，未应用；请重新审阅。"));}
+            else finishPolicyMutation(false,QStringLiteral("候选配置已不同于本次审阅，未保存；请重新审阅。"));
+            return;
+        }
         if(!m_policyOnline){
             if(m_policyRecoveryAction=="validate_committed"){
                 if(digest!=m_store.configurationReceipt().value("plan_digest").toString()){m_policyState="reconciling";m_policyError=QStringLiteral("当前规则资源与已提交配置摘要不一致，保持断开。");emit policyChanged();return;}

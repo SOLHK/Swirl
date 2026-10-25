@@ -6,6 +6,7 @@ Shape {
     property real radius: 0
     property real strokeWidth: 1 / Screen.devicePixelRatio
     property color strokeColor: "transparent"
+    property color fillColor: "transparent"
     preferredRendererType: Shape.CurveRenderer
     // The reference contour uses a 2.5-power corner. Sample only the outline;
     // no text or child content is rendered into a scaled texture.
@@ -29,7 +30,7 @@ Shape {
         return path + "Z"
     }
     ShapePath {
-        fillColor: "transparent"
+        fillColor: outline.fillColor
         strokeColor: outline.strokeColor
         strokeWidth: outline.strokeWidth
         joinStyle: ShapePath.RoundJoin

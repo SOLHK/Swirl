@@ -40,8 +40,9 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
         return result;
     };
     eval("Theme.mode='Light';Theme.reduceMotion=true;Theme.resetScale()");
-    check(qAbs(eval("Theme.windowRadius").toReal() - 16.0) < 0.0001,
-          "window token matches the 16 DIP sidebar contour");
+    check(qAbs(eval("Theme.windowRadius").toReal() - 14.0) < 0.0001
+          && qAbs(eval("Theme.sidebarRadius").toReal() - 14.0) < 0.0001,
+          "window and sidebar independently match the approved 14 DIP contour");
     check(eval("Theme.cardRadius===Theme.independentCardRadius && Theme.cardRadius===Theme.containerRadius").toBool(),
           "same-level card tokens share one radius");
     const HWND previousForeground = GetForegroundWindow();
@@ -69,7 +70,7 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
         RECT bounds{};
         GetWindowRect(hwnd, &bounds);
         const int width = bounds.right - bounds.left, height = bounds.bottom - bounds.top;
-        const qreal radius = 16.0 * window->devicePixelRatio();
+        const qreal radius = 14.0 * window->devicePixelRatio();
         const bool alpha=window->rendererInterface()->graphicsApi()!=QSGRendererInterface::Software;
         bool symmetric = alpha?kind==ERROR:kind==COMPLEXREGION, geometric = symmetric;
         for (int y = 0; !alpha && y <= qCeil(radius); ++y) {
@@ -79,12 +80,12 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
                     && present == bool(PtInRegion(region, x, height - 1 - y))
                     && present == bool(PtInRegion(region, width - 1 - x, height - 1 - y));
                 const qreal dx = qMax<qreal>(0, radius - x - 0.5), dy = qMax<qreal>(0, radius - y - 0.5);
-                geometric = geometric && present == (dx * dx + dy * dy <= radius * radius);
+                geometric = geometric && present == (std::pow(dx,2.5) + std::pow(dy,2.5) <= std::pow(radius,2.5));
             }
         }
         check(backdrop->exactCorners() && symmetric, phase + ": contour ownership matches renderer");
         check(geometric, phase + ": accelerated alpha has no binary clip; software keeps compatibility region");
-        check(qAbs(backdrop->cornerRadius() - 16.0) < 0.0001, phase + ": active logical radius is 16 DIP");
+        check(qAbs(backdrop->cornerRadius() - 14.0) < 0.0001, phase + ": active logical radius is 14 DIP");
         DeleteObject(region);
     };
     verifyRegion("normal");
@@ -147,13 +148,13 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
     int outsideCornerPixels = 0, outsideCornerBrightPixels = 0;
     if (!image.isNull()) {
         image.copy(padding, padding, width, height).save(directory + "/window.png");
-        const int extent = qCeil(16.0 * dpr) + 3;
+        const int extent = qCeil(14.0 * dpr) + 3;
         for (int i = 0; i < 4; ++i) image.copy(padding + (i % 2 ? width - extent : 0),
             padding + (i / 2 ? height - extent : 0), extent, extent).save(directory + QString("/corner-%1.png").arg(i));
-        const qreal cornerRadius = 16.0 * dpr;
+        const qreal cornerRadius = 14.0 * dpr;
         for (int y = 0; y < qCeil(cornerRadius); ++y) for (int x = 0; x < qCeil(cornerRadius); ++x) {
             const qreal dx = cornerRadius - x - 0.5, dy = cornerRadius - y - 0.5;
-            if (std::hypot(dx,dy) <= cornerRadius + 0.75) continue;
+            if (std::pow(std::pow(dx,2.5)+std::pow(dy,2.5),0.4) <= cornerRadius + 0.75) continue;
             for (int i = 0; i < 4; ++i) {
                 const auto pixel = image.pixelColor(padding + (i % 2 ? width - 1 - x : x),
                     padding + (i / 2 ? height - 1 - y : y));
@@ -170,7 +171,7 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
             }
     }
     check(outsideCornerPixels > 0 && outsideCornerBrightPixels == 0,
-          "actual pixels outside all four 16 DIP corners show only background or dark shadow, never a pale material square");
+          "actual pixels outside all four 14 DIP corners show only background or dark shadow, never a pale material square");
     check(shadowPixels > 10 && backdrop->compatibilityShadow(), "a visible compatibility shadow follows the exact contour");
     const HWND shadow = reinterpret_cast<HWND>(backdrop->compatibilityShadowHandle());
     const auto shadowStyle = shadow ? GetWindowLongPtrW(shadow, GWL_EXSTYLE) : 0;
@@ -179,6 +180,32 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
     check(shadow && SendMessageW(shadow, WM_NCHITTEST, 0, 0) == HTTRANSPARENT
           && SendMessageW(shadow, WM_MOUSEACTIVATE, 0, 0) == MA_NOACTIVATE,
           "shadow hit testing and mouse activation pass through");
+    int materialActivationDelta = -1;
+    int desktopColorDelta = -1;
+    if(backdrop->micaActive() || backdrop->blurActive()) {
+        const HWND material=reinterpret_cast<HWND>(backdrop->materialWindowHandle());
+        int kind=0;
+        check(material && SUCCEEDED(DwmGetWindowAttribute(material,38,&kind,sizeof(kind))) && kind==(backdrop->micaActive()?2:1),
+              "native material HWND uses its declared system backdrop path");
+        const auto materialStyle=material?GetWindowLongPtrW(material,GWL_EXSTYLE):0;
+        check((materialStyle&WS_EX_NOACTIVATE)&&(materialStyle&WS_EX_TRANSPARENT),
+              "material helper cannot activate or receive pointer input");
+        const auto headerPixel=[&] {
+            const HDC dc=GetDC(nullptr);
+            const auto sample=GetPixel(dc,rect.left+width/2,rect.top+qRound(8*dpr));
+            ReleaseDC(nullptr,dc);return QColor(GetRValue(sample),GetGValue(sample),GetBValue(sample));
+        };
+        const auto first=headerPixel();
+        background.setColor(QColor("#D72D31"));QTest::qWait(350);const auto second=headerPixel();
+        desktopColorDelta=qAbs(first.red()-second.red())+qAbs(first.green()-second.green())+qAbs(first.blue()-second.blue());
+        if(backdrop->blurActive())check(desktopColorDelta>2&&desktopColorDelta<80,
+              "native blur visibly responds to desktop color through a restrained neutral tint");
+        background.setColor(backgroundColor);QTest::qWait(200);
+        qInfo()<<"NATIVE_MATERIAL_DESKTOP_COLOR_DELTA"<<desktopColorDelta;
+        check(GetForegroundWindow()==hwnd,"material visual activation never changes the foreground input window");
+    } else {
+        check(!backdrop->translucent(),"unavailable native material keeps the shell opaque");
+    }
     const POINT centre{(rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2};
     check(WindowFromPoint(centre) == hwnd && GetForegroundWindow() == hwnd,
           "shadow never covers shell input or steals activation");
@@ -200,8 +227,10 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
     if (IsWindow(previousForeground)) SetForegroundWindow(previousForeground);
     QFile report(directory + "/window-radius.json");
     if (report.open(QIODevice::WriteOnly)) report.write(QJsonDocument(QJsonObject{
-        {"dpr", dpr}, {"logicalRadius", 16.0}, {"physicalRadius", 16.0 * dpr},
+        {"dpr", dpr}, {"logicalRadius", 14.0}, {"physicalRadius", 14.0 * dpr},
         {"shadowPixels", shadowPixels}, {"outsideCornerPixels", outsideCornerPixels}, {"outsideCornerBrightPixels", outsideCornerBrightPixels},
+        {"nativeMica",backdrop->micaActive()},{"nativeBlur",backdrop->blurActive()},
+        {"materialActivationPixelDelta",materialActivationDelta},{"desktopColorPixelDelta",desktopColorDelta},
         {"shadowKind", "cached input-transparent compatibility HWND"}, {"checks", checks}, {"failures", failures},
         {"scaleNote", "Qt scale-factor validation; no Windows global display setting is changed"}}).toJson());
     return failures ? 1 : 0;

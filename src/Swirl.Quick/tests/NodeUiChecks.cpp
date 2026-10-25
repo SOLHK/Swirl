@@ -383,6 +383,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         const auto id=controller->imports()->providers().first().toMap().value("id").toString();
         QPointer<QQuickItem> card=item("subscriptionCard-"+id);
         const auto collapsedHeight=card?card->height():0;
+        check(card&&collapsedHeight<=100*eval("Theme.uiScale").toReal(),"subscription source uses a compact list row instead of a dashboard card");
         click("expandSubscription-"+id);
         check(card&&card->height()>collapsedHeight,"subscription details animate open without replacing the card");
         click("editSubscription-"+id);check(item("subscriptionUrl")&&item("subscriptionUrl")->property("text").toString().isEmpty(),"editing subscription keeps its protected URL hidden");
@@ -394,6 +395,19 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         eval("AppState.navigate('subscriptions')");QTest::qWait(350);
         const auto qa=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");
         if(!qa.isEmpty()){QDir().mkpath(qa);window->grabWindow().save(qa+"/subscription-success.png");}
+        const auto policyBeforeReview=controller->policyDocument();
+        click("moreSubscription-"+id);QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(200);
+        check(controller->imports()->providers().size()==1,"source more menu can be dismissed without changing its data");
+        click("reviewSubscription-"+id);
+        check(QTest::qWaitFor([&]{return controller->imports()->hasConfigurationReview();},3000),"explicit source review opens the actual encrypted cached configuration preview");
+        check(controller->policyDocument()==policyBeforeReview&&!controller->policyBusy()&&!controller->imports()->configurationReview().value("changes").toList().isEmpty(),"configuration review describes differences without applying foreign policy");
+        if(!qa.isEmpty())window->grabWindow().save(qa+"/subscription-configuration-review.png");
+        QTest::keyClick(window,Qt::Key_Escape);
+        check(QTest::qWaitFor([&]{return !controller->imports()->hasConfigurationReview();},3000)&&controller->policyDocument()==policyBeforeReview,"Escape discards the one-use review without changing routing");
+        fill("subscriptionSearch","no matching source");QTest::qWait(200);
+        check(eval("pageLoader.item.listed.length===0").toBool(),"subscription search presents the genuine empty result state");
+        fill("subscriptionSearch","");QTest::qWait(200);
+        check(eval("pageLoader.item.listed.length===1").toBool(),"clearing source search restores the real subscription");
         subscriptions.close();click("refreshSubscription-"+id);
         check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&!controller->imports()->providers().first().toMap().value("error").toString().isEmpty()&&controller->nodes().size()==1,"failed real refresh displays an error and retains imported nodes");
         if(!qa.isEmpty())window->grabWindow().save(qa+"/subscription-failure.png");
