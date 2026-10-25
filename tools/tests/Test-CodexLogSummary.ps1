@@ -62,6 +62,10 @@ try {
     $unpacked=Join-Path $appData 'Codex/Logs/2026/10/24'
     $outsideWindow=Join-Path $appData 'Codex/Logs/2026/10/22'
     foreach ($folder in @($store,$unpacked,$outsideWindow)) { [IO.Directory]::CreateDirectory($folder) | Out-Null }
+    # Default Windows user profiles hide AppData. Preserve the ancestor check,
+    # but do not mistake an ordinary hidden directory for a missing path.
+    $hiddenRoot=Get-Item -LiteralPath $appData -Force
+    $hiddenRoot.Attributes=$hiddenRoot.Attributes -bor [IO.FileAttributes]::Hidden
     Set-Content -LiteralPath (Join-Path $store 'codex-desktop-store.log') -Value '2026-10-25T16:10:38.066Z warning [electron-message-handler] sa_server_request_failed errorMessage="Workspace routing is unavailable" routePattern=/settings/user status=432'
     Set-Content -LiteralPath (Join-Path $unpacked 'codex-desktop-unpacked.log') -Value ($prefix+'errorCode=cloudflare_challenge routePattern=/settings/user status=403')
     Set-Content -LiteralPath (Join-Path $outsideWindow 'codex-desktop-old.log') -Value ($prefix+'errorCode=ERR_PROXY_CONNECTION_FAILED status=500')

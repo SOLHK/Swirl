@@ -57,7 +57,9 @@ function Test-CodexLocalDirectory {
     # this offline collector into browser storage or a remote share.
     $current = [IO.Path]::GetFullPath($Path)
     while ($current) {
-        $item = Get-Item -LiteralPath $current -ErrorAction SilentlyContinue
+        # AppData is hidden on normal Windows profiles (including CI runners).
+        # Inspect its attributes explicitly; Hidden does not imply a redirect.
+        $item = Get-Item -LiteralPath $current -Force -ErrorAction SilentlyContinue
         if (!$item -or !$item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { return $false }
         $parent = [IO.Directory]::GetParent($current)
         $current = if ($parent) { $parent.FullName } else { $null }
