@@ -30,3 +30,36 @@ Two encrypted cached node samples were reused without refreshing their sources o
 - Physical 60/120 Hz motion acceptance, DPI visual acceptance and long-duration memory behavior.
 
 Account storage, TLS validation and Cloudflare checks were not bypassed or cleared. No operating-system network change was made on the user's machine. Native proxy mutation/lifecycle checks run only on the disposable Windows CI runner.
+
+## Newly authorized subscription validation
+
+The two newly authorized sources were fetched only in an isolated local harness.
+Source URLs, responses and node credentials are retained locally with current-user
+DPAPI protection; none are CI inputs or published artifacts.
+
+Source 1 returned HTTP 200 with verified TLS on a direct diagnostic path. The
+production Qt importer saved and reloaded 56 deduplicated nodes, of which 55 were
+executable and one lacked a valid REALITY server name. Its 59 raw URI records
+exposed a separate portable-parser inconsistency: exact empty TCP `host`, `path`
+and `serviceName` placeholders and neutral `quicSecurity` values were already
+handled by Qt but rejected by Rust inspection. The narrow URI normalization now
+matches, retaining rejection of nonempty, whitespace, duplicate and unknown
+fields. The Rust subscription suite passed 302 tests plus formatting and Clippy.
+
+An actual representative source-1 node returned HTTPS 204 through both versions
+for native probe, HTTP/1.1 CONNECT and independent curl with certificate checks.
+The installed 0.2.12 DLL returned 400 for HTTP/1.0 CONNECT; the candidate DLL
+returned CONNECT 200 followed by certificate-verified HTTPS 204.
+
+One actual ephemeral, read-only Codex CLI request through that isolated Swirl
+listener completed and returned `OK`. Owner-PID TCP observations and Swirl's
+connection/byte counters correlated the request to Swirl. Only that subprocess's
+proxy environment and `respect_system_proxy=false` override were used; no global
+Codex setting or desktop session changed. Six background streams still reported
+`StreamUnexpectedEof`; successful inference does not establish all-stream health
+or desktop workspace acceptance.
+
+Source 2 returned HTTP 403 both directly and through the verified isolated Swirl
+exit, after successful CONNECT and certificate verification. No explicit
+Cloudflare challenge header was observed. The provider's rejection trigger is
+unknown; no source-2 nodes or successful import are claimed.

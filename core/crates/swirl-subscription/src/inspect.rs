@@ -412,9 +412,30 @@ fn uri(line: &str) -> Result<Value, &'static str> {
         && n["security"] == "reality"
         && n.get("network")
             .is_none_or(|value| value.as_str() == Some("tcp"))
-        && n.get("headerType").and_then(Value::as_str) == Some("none")
     {
-        n.as_object_mut().expect("URI node").remove("headerType");
+        let node = n.as_object_mut().expect("URI node");
+        if node.get("headerType").and_then(Value::as_str) == Some("none") {
+            node.remove("headerType");
+        }
+        // Exporters include empty fields for inactive HTTP/gRPC transports.
+        // Match the Qt sharing-URI boundary: only literal empty values are
+        // absent-equivalent on TCP; never trim whitespace or drop nonempty or
+        // unknown options. Duplicate/alias validation already ran above, and
+        // raw-uri preserves every source byte. JSON/YAML cannot opt into this.
+        for key in ["host", "path", "serviceName"] {
+            if node.get(key).and_then(Value::as_str) == Some("") {
+                node.remove(key);
+            }
+        }
+        if node
+            .get("quicSecurity")
+            .and_then(Value::as_str)
+            .is_some_and(|value| matches!(value, "" | "none"))
+        {
+            // An inactive QUIC cipher selector declares no encryption on
+            // this already-validated TCP transport; active values stay fatal.
+            node.remove("quicSecurity");
+        }
     }
     Ok(n)
 }

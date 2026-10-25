@@ -230,6 +230,102 @@ fn reality_uri_explicit_no_header_preserves_profile_and_original() {
 }
 
 #[test]
+fn reality_uri_empty_tcp_placeholders_preserve_outbound_and_original() {
+    let key = URL_SAFE_NO_PAD.encode([9; 32]);
+    for network in ["", "&type=tcp"] {
+        let plain = format!(
+            "vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?security=reality&sni=camouflage.invalid&fp=chrome&pbk={key}&sid=a1B2{network}&flow=xtls-rprx-vision"
+        );
+        let expected = candidate(&plain);
+        for suffix in [
+            "&host=",
+            "&path=",
+            "&serviceName=",
+            "&host=&path=&serviceName=&headerType=none",
+        ] {
+            let uri = format!("{plain}{suffix}");
+            for input in [uri.clone(), STANDARD.encode(&uri)] {
+                assert_eq!(candidate(&input), expected);
+                let parsed = inspect(input.as_bytes());
+                assert_eq!(parsed.originals[0]["raw-uri"], uri);
+                assert_eq!(parsed.report.nodes[0].unrecognized_fields, 0);
+            }
+        }
+    }
+}
+
+#[test]
+fn reality_uri_tcp_neutral_quic_placeholder_preserves_outbound() {
+    let key = URL_SAFE_NO_PAD.encode([9; 32]);
+    let plain = format!(
+        "vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?security=reality&sni=camouflage.invalid&fp=chrome&pbk={key}&sid=a1B2&type=tcp"
+    );
+    let expected = candidate(&plain);
+    for suffix in [
+        "&quicSecurity=",
+        "&quicSecurity=none",
+        "&host=&path=&serviceName=&quicSecurity=none&headerType=none",
+    ] {
+        let uri = format!("{plain}{suffix}");
+        for input in [uri.clone(), STANDARD.encode(&uri)] {
+            assert_eq!(candidate(&input), expected);
+            let parsed = inspect(input.as_bytes());
+            assert_eq!(parsed.originals[0]["raw-uri"], uri);
+            assert_eq!(parsed.report.nodes[0].unrecognized_fields, 0);
+        }
+    }
+}
+
+#[test]
+fn reality_uri_empty_tcp_mapping_keeps_nonempty_unknown_and_conflicting_fields_rejected() {
+    let key = URL_SAFE_NO_PAD.encode([9; 32]);
+    let plain = format!(
+        "vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?security=reality&sni=camouflage.invalid&fp=chrome&pbk={key}&sid=a1B2&type=tcp"
+    );
+    for suffix in [
+        "&host=%20",
+        "&path=%20",
+        "&serviceName=%09",
+        "&path=%2F",
+        "&host=fixture-private.invalid",
+        "&path=&serviceName=fixture-private",
+        "&path=fixture-private&serviceName=",
+        "&host=&futureOption=",
+        "&host=&host=",
+        "&path=&path=",
+        "&serviceName=&serviceName=",
+        "&host=&path=&serviceName=&headerType=http",
+        "&host=&path=&serviceName=&network=ws",
+        "&quicSecurity=aes-128-gcm",
+        "&quicSecurity=None",
+        "&quicSecurity=%20",
+        "&quicSecurity=none&quicSecurity=none",
+    ] {
+        let uri = format!("{plain}{suffix}");
+        for input in [uri.clone(), STANDARD.encode(&uri)] {
+            let parsed = inspect(input.as_bytes());
+            assert_eq!(parsed.original, input.as_bytes());
+            assert!(
+                parsed.tcp_candidates.iter().all(Option::is_none),
+                "accepted {suffix}"
+            );
+            let report = serde_json::to_string(&parsed.report).unwrap();
+            assert!(!report.contains("fixture-private"));
+        }
+    }
+}
+
+#[test]
+fn reality_json_empty_transport_fields_cannot_spoof_uri_normalization() {
+    for key in ["host", "path", "serviceName", "quicSecurity"] {
+        let mut source = sing_box("chrome");
+        source[key] = json!("");
+        source["raw-uri"] = json!("vless://fixture-private.invalid?type=tcp&path=");
+        rejected(&source, "RealityUnmappedFields");
+    }
+}
+
+#[test]
 fn reality_uri_header_mapping_does_not_discard_transport_requirements() {
     let key = URL_SAFE_NO_PAD.encode([9; 32]);
     let plain = format!(
