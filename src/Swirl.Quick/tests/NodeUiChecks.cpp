@@ -275,8 +275,14 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         select(1);
         const auto nodeB=eval("pageLoader.item.selectedId").toString();
         check(controller->selectedNodeId()==selectedBeforeNavigation&&controller->activeNodeId()==selectedBeforeNavigation&&controller->processId()==pid,"browsing node B leaves the real running exit A unchanged");
-        eval("pageLoader.item.dismissDetail()");QTest::qWait(450);click("nodeFavoriteButton");
+        eval("pageLoader.item.dismissDetail()");QTest::qWait(450);click("nodeRowFavorite-"+nodeB);
         check(controller->selectedNodeId()==selectedBeforeNavigation&&controller->activeNodeId()==selectedBeforeNavigation,"favoriting another resource does not change the real exit");
+        check(eval(QString("pageLoader.item.resourceAt(1).favorite")).toBool(),"inline resource favorite reflects actual saved metadata");
+        click("nodeRowMore-"+nodeB);
+        check(item("nodeRowDetails-"+nodeB)&&item("nodeRowTest-"+nodeB)&&item("nodeRowCopy-"+nodeB),"node action menu exposes real details, request testing and safe-copy actions");
+        click("nodeRowDetails-"+nodeB);
+        check(QTest::qWaitFor([&]{auto *hero=item("nodeHero");return hero&&hero->property("opened").toBool()&&!hero->property("moving").toBool();},3500),"node row action opens its real details instead of a placeholder notice");
+        check(eval("pageLoader.item.selectedId").toString()==nodeB&&controller->activeNodeId()==selectedBeforeNavigation,"row details preserve resource identity and the live exit");
         select(1);
         check(!controller->tests()->result(nodeB).value("success").toBool(),"new inspected node has no inherited request result");
         probeSelected(net.b,net.a,"independent node B test uses B while the live exit remains A");

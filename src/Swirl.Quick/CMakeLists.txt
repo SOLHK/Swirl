@@ -159,7 +159,7 @@ set(SWIRL_QML_FILES
  qml/components/PolicyHelpers.js qml/components/PolicyTargetPicker.qml
  qml/components/ServicePolicyDialog.qml qml/components/PolicyProbeSettings.qml
  qml/components/PolicyGroupDialog.qml qml/components/ServiceAssignments.qml
- qml/components/SubscriptionRow.qml qml/components/SubscriptionDialog.qml qml/components/ConfigurationReviewDialog.qml qml/components/SubscriptionAction.qml
+ qml/components/SubscriptionRow.qml qml/components/SubscriptionDialog.qml qml/components/ConfigurationReviewDialog.qml qml/components/SubscriptionAction.qml qml/components/NodeRowActions.qml
  qml/components/OutboundModeControl.qml
  qml/components/PolicyGroupList.qml qml/components/PolicyFormScroll.qml
  qml/components/SwirlSecondaryWindow.qml

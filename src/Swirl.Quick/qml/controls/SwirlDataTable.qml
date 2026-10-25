@@ -11,6 +11,8 @@ Item {
     property bool sectioned:false
     property real sectionHeight:Theme.dp(32)
     property Component sectionDelegate:null
+    property Component rowActions:null
+    property real rowActionsWidth:0
     property bool activateOnSingleClick:true
     property bool followTail:false
     property string anchorKey:""
@@ -84,6 +86,7 @@ Item {
     property bool minimal:false
     property alias scrollPosition:list.contentY
     function scrollToBeginning(){anchorKey="";list.positionViewAtBeginning()}
+    function focusRowAt(index){const row=list.itemAtIndex(index);if(row){list.currentIndex=index;chooseRow(row,false)}}
     readonly property int renderedRows:list.contentItem.children.length
     SwirlAnimatedModel{id:stableRows;source:table.incrementalRows?table.rows:[];keyRole:"id"}
     property string selectedId:""
@@ -99,13 +102,15 @@ Item {
     property real stripeInset:0
     property real stripeRadius:0
     readonly property real totalWidth:columns.reduce(function(v,c){return v+c.w},0)
-    readonly property real minimumGridWidth:columns.reduce(function(v,c){return v+Theme.dp(c.min||12)},0)
+    readonly property real minimumColumnWidth:columns.reduce(function(v,c){return v+Theme.dp(c.min||12)},0)
+    readonly property real actionWidth:rowActions!==null?rowActionsWidth:0
+    readonly property real minimumGridWidth:minimumColumnWidth+actionWidth
     readonly property real gridWidth:Math.max(Math.floor(width),minimumGridWidth)
     // Rounded cumulative edges keep header/body columns aligned at all scales.
     function columnWidth(column) {
         let before=0
         for(const item of columns){if(item.key===column.key)break;before+=item.w}
-        const flexible=Math.max(0,gridWidth-minimumGridWidth)
+        const flexible=Math.max(0,gridWidth-actionWidth-minimumColumnWidth)
         return Theme.dp(column.min||12)+Math.round(flexible*(before+column.w)/totalWidth)-Math.round(flexible*before/totalWidth)
     }
     function chooseRow(row,activate) {
@@ -199,7 +204,7 @@ Item {
                     readonly property string presentationKey:table.displayKey(record,index)
                     property bool pooled:false
                     property real visualOffsetY:0
-                    function clearPresentation(){if(positionShift)positionShift.stop();visualOffsetY=0;scale=1;opacity=1;if(contextMenu)contextMenu.close()}
+                    function clearPresentation(){if(positionShift)positionShift.stop();visualOffsetY=0;scale=1;opacity=1;if(contextMenu)contextMenu.close();if(actionsLoader.item&&actionsLoader.item.closeMenu)actionsLoader.item.closeMenu()}
                     function presentFrom(offset){positionShift.stop();visualOffsetY=offset;if(Math.abs(offset)>0.25){positionShift.to=0;positionShift.start()}else visualOffsetY=0}
                     SmoothedAnimation {id:positionShift;target:recordRow;property:"visualOffsetY";to:0;duration:SwirlMotion.duration;velocity:-1}
                     onPresentationKeyChanged:{clearPresentation();if(table.selectedItem===recordRow)table.selectedItem=null}
@@ -217,9 +222,9 @@ Item {
                     transform:Translate {y:recordRow.visualOffsetY}
                     radius:table.minimal?Theme.dp(10):0
                     border.width:table.sectioned&&list.activeFocus&&list.currentIndex===index?Theme.dp(1):0
-                    border.color:Theme.focusBorder
-                    color:!recordRow.sectionRow&&table.selectedId===String(recordRow.record.id||recordRow.record.name) ? (table.minimal?Theme.withAlpha(Theme.accent,0.12):Theme.selected) :
-                          mouse.containsMouse ? (table.minimal?Theme.withAlpha(Theme.accent,0.055):Theme.hover) : table.minimal?"transparent":(index%2?Theme.field:Theme.surface)
+                    border.color:table.rowActions!==null?Theme.text:Theme.focusBorder
+                    color:!recordRow.sectionRow&&table.selectedId===String(recordRow.record.id||recordRow.record.name) ? (table.minimal?(table.rowActions!==null?Theme.navigationSelected:Theme.withAlpha(Theme.accent,0.12)):Theme.selected) :
+                          mouse.containsMouse ? (table.minimal?(table.rowActions!==null?Theme.hover:Theme.withAlpha(Theme.accent,0.055)):Theme.hover) : table.minimal?"transparent":(index%2?Theme.field:Theme.surface)
                     Behavior on color { ColorAnimation { duration:Theme.motion } }
                     Rectangle { anchors.bottom:parent.bottom; width:parent.width; height:Theme.dp(1); color:Theme.border; opacity:table.fillEmptyRows||table.minimal?0:0.6 }
                     Row {
@@ -277,7 +282,7 @@ Item {
                         onClicked:function(event){
                             list.forceActiveFocus();list.currentIndex=index
                             table.chooseRow(recordRow,event.button===Qt.LeftButton&&(recordRow.sectionRow||table.activateOnSingleClick))
-                            if(event.button===Qt.RightButton&&!recordRow.sectionRow) contextMenu.popup()
+                            if(event.button===Qt.RightButton&&!recordRow.sectionRow){if(actionsLoader.item&&actionsLoader.item.openMenu)actionsLoader.item.openMenu();else contextMenu.popup()}
                         }
                         onDoubleClicked:if(!recordRow.sectionRow){if(table.activateOnSingleClick)table.rowEdited(recordRow.record,recordRow);else table.chooseRow(recordRow,true)}
                         SwirlContextMenu {
@@ -287,6 +292,13 @@ Item {
                                 return c.label + ": " + String(recordRow.record[c.key] === undefined?"":recordRow.record[c.key])
                             }).join("\n")
                         }
+                    }
+                    Loader {
+                        id:actionsLoader
+                        z:2; anchors.right:parent.right; width:table.actionWidth; height:parent.height
+                        active:!recordRow.sectionRow&&!recordRow.pooled&&table.rowActions!==null
+                        sourceComponent:table.rowActions
+                        readonly property var record:recordRow.record
                     }
                     }
                 }

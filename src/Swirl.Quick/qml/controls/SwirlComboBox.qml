@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls.Basic
 import SwirlQuick
@@ -29,19 +30,21 @@ ComboBox {
         elide: Text.ElideRight
         leftPadding:0; rightPadding:0
     }
-    SwirlToolTip {parent:control;visible:(control.hovered||control.activeFocus)&&control.contentItem.truncated&&!popupLayer.visible;text:AppState.zh(control.displayText);delay:600}
-    indicator: Image {
-        x:Math.round(control.width-width-Theme.dp(6));y:Math.round((control.height-height)/2);width:Theme.dp(14);height:width
-        source:"image://swirl/chevron-up-down/"+Theme.text.toString().slice(1)
+    SwirlToolTip {
+        id: hint
+        parent:control;visible:(control.hovered||control.visualFocus)&&control.contentItem.truncated&&!popupLayer.visible;text:AppState.zh(control.displayText);delay:600
     }
-    background: SwirlClearGlassSurface {
-        hovered:control.hovered;pressed:control.pressed;focused:control.activeFocus
-        radius: height/2
-        antialiasing: true
+    indicator: SwirlIcon {
+        x:Math.round(control.width-width-Theme.dp(6));y:Math.round((control.height-height)/2)
+        name:"chevron-right";size:Theme.dp(14);rotation:90;color:Theme.muted
+    }
+    background: Rectangle {
+        radius: Math.min(Theme.dp(9),height/2)
         color: control.pressed ? Theme.pressed : control.hovered ? Theme.hover : Theme.buttonBase
-        border.width:control.activeFocus || Theme.increaseContrast?1/Screen.devicePixelRatio:0
-        border.color: control.activeFocus ? Theme.focusBorder : Theme.controlBorder
-        Behavior on color { ColorAnimation { duration: Math.min(100,SwirlMotion.duration) } }
+        border.width:control.visualFocus || Theme.increaseContrast?Theme.borderWidth:0
+        border.color: Theme.text
+        opacity:control.enabled?1:0.45
+        Behavior on color { enabled:!SwirlMotion.reduced; ColorAnimation { duration: Math.min(100,SwirlMotion.duration) } }
     }
     delegate: ItemDelegate {
         id:option
@@ -58,13 +61,13 @@ ComboBox {
         contentItem: SwirlText {renderType:Text.NativeRendering;
             textRole:"list"
             text: AppState.zh(option.text)
-            color: option.highlighted ? "white" : Theme.text; font.pixelSize:Theme.fontSize(13); font.family: Theme.fontFamily
+            color: Theme.text; font.pixelSize:Theme.fontSize(13); font.family: Theme.fontFamily
             verticalAlignment: Text.AlignVCenter; leftPadding:Theme.dp(24);rightPadding:Theme.dp(5);elide:Text.ElideRight
-            Image{visible:control.currentIndex===option.index;x:Theme.dp(3);anchors.verticalCenter:parent.verticalCenter;width:Theme.dp(14);height:width;sourceSize:Qt.size(width,height);source:"image://swirl/checkmark/"+(option.highlighted?"ffffff":Theme.text.toString().slice(1))}
+            SwirlIcon{visible:control.currentIndex===option.index;x:Theme.dp(3);anchors.verticalCenter:parent.verticalCenter;size:Theme.dp(14);name:"checkmark";color:Theme.text}
         }
         background: Rectangle {
-            radius: height/2; antialiasing:true; color: option.highlighted ? Theme.accent : "transparent"
-            Behavior on color { ColorAnimation { duration: Math.min(100,SwirlMotion.duration) } }
+            radius: Math.min(Theme.dp(8),height/2); color: option.highlighted ? Theme.selected : "transparent"
+            Behavior on color { enabled:!SwirlMotion.reduced; ColorAnimation { duration: Math.min(100,SwirlMotion.duration) } }
         }
     }
     popup: Popup {
@@ -103,7 +106,7 @@ ComboBox {
             }
         }
         exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} } }
-        background: SwirlClearGlassSurface { radius:Theme.popupRadius; color:Theme.material("floating") }
+        background: Rectangle { radius:Theme.dp(10); color:Theme.material("floating"); border.width:Theme.borderWidth; border.color:Theme.increaseContrast?Theme.text:Theme.border }
         contentItem: ListView { pixelAligned: true;
             id:popupList
             clip: true

@@ -38,7 +38,9 @@ Item {
     property string statusFilter:""
     property int maxLatency:-1
     property bool availableOnly:false
+    property bool recentOnly:false
     property int groupIndex:0
+    onGroupIndexChanged:if(groupIndex!==0)recentOnly=false
     readonly property var sources:engineController.imports.providers
     readonly property var sourceOptions:[{id:"",kind:"",name:qsTr("全部来源")},{id:"",kind:"manual",name:qsTr("手动添加")}].concat(page.sources.map(s=>({id:s.id,kind:"subscription",name:s.name}))).concat(engineController.imports.legacyNodeCount>0?[{id:"",kind:"legacy",name:qsTr("历史未归属")}]:[])
     readonly property int sourceIndex:Math.max(0,sourceOptions.findIndex(s=>s.id===page.sourceId&&s.kind===page.sourceKind))
@@ -47,7 +49,7 @@ Item {
     onCountriesChanged:if(countryCode&&!countries.some(c=>c.code===countryCode))countryCode=""
     readonly property int resultCount:nodes.count
     readonly property var protocols:engineController.supportedProtocols
-    readonly property var filterState:({protocol:protocol,regionCode:countryCode,sourceId:sourceId,sourceKind:sourceKind,status:statusFilter,maxLatency:maxLatency,available:availableOnly,group:["all","recent","favorites"][groupIndex],sort:["name","latency","regionName","protocol"][sortOrder.currentIndex]})
+    readonly property var filterState:({protocol:protocol,regionCode:countryCode,sourceId:sourceId,sourceKind:sourceKind,status:statusFilter,maxLatency:maxLatency,available:availableOnly||groupIndex===1,group:groupIndex===2?"favorites":recentOnly?"recent":"all",sort:["name","latency","regionName","protocol"][sortOrder.currentIndex]})
     onFilterStateChanged:nodes.filters=filterState
     onSourcesChanged:if(sourceId&&!sources.some(s=>s.id===sourceId)){sourceId="";sourceKind=""}
     onSourceOptionsChanged:if(sourceKind==="legacy"&&!sourceOptions.some(s=>s.kind==="legacy"))sourceKind=""
@@ -56,6 +58,7 @@ Item {
     function selectRow(row) {if(row&&row.id)focusedId=row.id}
     function inspectRow(row) {
         if(!row||!row.id||nodeDeletePending)return
+        nodeTable.focusRowAt(sections.indexOfNode(row.id))
         nodeDeleteRecovery=false;nodeMutationMessage=""
         focusedId=row.id;inspectedId=row.id;nodeHero.start(nodeTable.selectedItem)
     }
@@ -96,7 +99,9 @@ Item {
         anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.dp(16)
         RowLayout {
             Layout.fillWidth:true;spacing:Theme.dp(12)
-            SwirlText {textRole:"pageTitle";id:routeTitle;renderType:Text.NativeRendering;text:"节点";color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
+            SwirlText {textRole:"pageTitle";id:routeTitle;renderType:Text.NativeRendering;text:"节点";color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold}
+            SwirlText {text:String(nodes.total);color:Theme.muted;font.pixelSize:Theme.fontSize(16);Accessible.name:qsTr("%1 个节点").arg(nodes.total)}
+            Item {Layout.fillWidth:true}
             SwirlButton {id:allTestsButton;objectName:"allNodesTestButton";text:engineController.tests.busy?qsTr("取消测速"):qsTr("测速 ⌄");quiet:true;iconName:"activity";enabled:nodes.total>0||engineController.tests.busy;onClicked:{if(engineController.tests.busy)engineController.tests.cancel();else{SwirlMotion.noteTrigger(allTestsButton);batchTestMenu.open()}}}
             SwirlButton {objectName:"nodeImportButton";text:"导入";quiet:true;iconName:"download";enabled:!engineController.imports.busy;onClicked:importDialog.open()}
             SwirlButton {objectName:"nodeAddButton";text:"添加节点";iconName:"plus";primary:true;enabled:engineController.canStart;onClicked:page.edit(null)}
@@ -104,17 +109,15 @@ Item {
         RowLayout {
             Layout.fillWidth:true;spacing:Theme.dp(8)
             SwirlSearchField {id:search;objectName:"nodeSearchField";Layout.fillWidth:true;Layout.minimumWidth:0;placeholderText:"搜索节点名称、地区、服务器或协议";onTextChanged:searchDelay.restart();Accessible.name:placeholderText}
-            SwirlIconButton {iconName:"close";tooltip:"清空搜索";enabled:search.text.length>0;opacity:enabled?1:0;onClicked:search.clear()}
+            SwirlIconButton {iconName:"dismiss";tooltip:"清空搜索";enabled:search.text.length>0;opacity:enabled?1:0;onClicked:search.clear()}
             SwirlComboBox {objectName:"nodeSourceFilter";Layout.preferredWidth:Theme.dp(146);model:page.sourceOptions.map(s=>s.name);currentIndex:page.sourceIndex;onActivated:index=>page.selectSource(index);Accessible.name:qsTr("节点来源")}
             SwirlButton {objectName:"nodeFiltersButton";text:"筛选";quiet:true;onClicked:filtersDialog.open()}
             SwirlComboBox {id:sortOrder;objectName:"nodeSortOrder";Layout.preferredWidth:Theme.dp(110);model:[qsTr("名称排序"),qsTr("耗时排序"),qsTr("地区排序"),qsTr("协议排序")];Accessible.name:qsTr("来源内节点排序")}
         }
         RowLayout {
             Layout.fillWidth:true;spacing:Theme.dp(8)
-            SwirlSegmentedControl {Layout.preferredWidth:Theme.dp(200);options:["全部","最近使用","收藏"];currentIndex:page.groupIndex;onActivated:index=>page.groupIndex=index}
+            SwirlSegmentedControl {objectName:"nodeLibraryTabs";Layout.preferredWidth:Theme.dp(224);options:["全部","可用","收藏"];currentIndex:page.groupIndex;onActivated:index=>{page.recentOnly=false;page.groupIndex=index}}
             SwirlText {text:nodes.count+" / "+nodes.total+" 个节点";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;elide:Text.ElideRight}
-            SwirlButton {objectName:"nodeInspectButton";text:qsTr("详情");quiet:true;enabled:page.focused.id!==undefined;onClicked:page.inspectRow(page.focused)}
-            SwirlButton {objectName:"nodeFavoriteButton";text:page.focused.favorite?qsTr("取消收藏"):qsTr("收藏");quiet:true;enabled:page.focused.id!==undefined;onClicked:nodes.toggleFavorite(page.focusedId)}
         }
         SwirlText {objectName:"nodeBatchProgress";visible:engineController.tests.busy||engineController.tests.message.length>0;text:engineController.tests.busy?qsTr("正在测速 %1 / %2").arg(engineController.tests.completed).arg(engineController.tests.total):engineController.tests.message;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;elide:Text.ElideRight}
         RowLayout {
@@ -126,6 +129,19 @@ Item {
                     id:nodeTable;objectName:"realNodeTable";minimal:true;managedSelection:true;incrementalRows:false;animateRowChanges:true;animateLatency:true;itemHeight:Theme.dp(44);headerHeight:Theme.tableHeaderHeight;textPixelSize:13
                     sectioned:true;activateOnSingleClick:false
                     sectionDelegate:Component {NodeSourceHeader {record:parent.record}}
+                    rowActionsWidth:Theme.dp(88)
+                    rowActions:Component {
+                        NodeRowActions {
+                            record:parent.record
+                            editable:!record.sourceId&&engineController.canStart&&!page.nodeSavePending&&!page.nodeDeletePending
+                            testable:!engineController.tests.busy&&/^https?:\/\/\S+$/i.test(testUrl.text.trim())
+                            onFavoriteRequested:nodes.toggleFavorite(record.id)
+                            onDetailsRequested:page.inspectRow(record)
+                            onEditRequested:page.edit(record)
+                            onTestRequested:engineController.testSelectedNode(record.id,testUrl.text.trim())
+                            onCopyRequested:nodes.copySafeInfo(record.id)
+                        }
+                    }
                     anchors.fill:parent;anchors.margins:Theme.dp(16);externalModel:sections;selectedId:page.focusedId
                     cellPadding:Theme.dp(8)
                     columns:[{key:"name",label:"节点名称",w:235,min:76},{key:"protocol",label:"协议",w:62,min:44},{key:"regionName",label:"地区提示",w:70,min:54},{key:"latency",label:page.rustRequestMetric?"出站 ms":"延迟",w:76,min:52},{key:"status",label:"状态",w:92,min:58}]
@@ -200,7 +216,8 @@ Item {
             SwirlComboBox {Layout.fillWidth:true;model:page.sourceOptions.map(s=>s.name);currentIndex:page.sourceIndex;onActivated:index=>page.selectSource(index);Accessible.name:qsTr("节点来源")}
             SwirlComboBox {Layout.fillWidth:true;model:["全部状态","未测试","测试中","可用","超时","测试失败","正在连接","已连接","连接失败","会话就绪 · 未验证"];onActivated:page.statusFilter=currentIndex?currentText:"";Accessible.name:"状态"}
             SwirlComboBox {Layout.fillWidth:true;model:["不限延迟","低于 100 ms","低于 300 ms","低于 1000 ms"];onActivated:page.maxLatency=[-1,99,299,999][currentIndex];Accessible.name:"延迟"}
-            RowLayout {SwirlText {text:"只看实际测试可用";color:Theme.text;Layout.fillWidth:true} SwirlToggle {checked:page.availableOnly;onToggled:page.availableOnly=checked}}
+            RowLayout {SwirlText {text:"只看实际测试可用";color:Theme.text;Layout.fillWidth:true} SwirlToggle {checked:page.availableOnly||page.groupIndex===1;onToggled:{page.availableOnly=checked;if(!checked&&page.groupIndex===1)page.groupIndex=0}}}
+            RowLayout {SwirlText {text:"最近使用";color:Theme.text;Layout.fillWidth:true} SwirlToggle {checked:page.recentOnly;onToggled:{page.recentOnly=checked;if(checked)page.groupIndex=0}}}
             SwirlText {text:nodes.count+" 个匹配节点";color:Theme.muted}
             SwirlButton {text:"完成";onClicked:filtersDialog.close()}
         }

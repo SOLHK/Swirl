@@ -33,6 +33,12 @@ STAGE6_SHELL_EDITS = {
     "src/Swirl.Quick/app/WindowsBackdrop.h",
     # Replace the activity fact in place, keeping the existing four columns.
     "src/Swirl.Quick/qml/pages/ActivityPage.qml",
+    # Stage-6 continuation: shared neutral controls, preserving public APIs and sizes.
+    "src/Swirl.Quick/qml/controls/SwirlButton.qml",
+    "src/Swirl.Quick/qml/controls/SwirlIconButton.qml",
+    "src/Swirl.Quick/qml/controls/SwirlSearchField.qml",
+    "src/Swirl.Quick/qml/controls/SwirlSegmentedControl.qml",
+    "src/Swirl.Quick/qml/controls/SwirlToolTip.qml",
 }
 
 

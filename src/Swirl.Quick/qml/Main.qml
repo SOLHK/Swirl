@@ -174,7 +174,16 @@ ApplicationWindow {
     }
     readonly property string proxyStatusLabel:engineController.systemProxy.error.length||engineController.routingError.length?"系统代理 · 接管失败":engineController.systemProxy.owned&&engineController.systemProxy.enabled?"系统代理 · Swirl":engineController.systemProxy.systemEnabled?"系统代理 · 其他应用":"系统代理 · 未启用"
     function openDashboard(){dashboardWindow.show();dashboardWindow.raise();dashboardWindow.requestActivate()}
-    function openCaptureInspector(){captureInspectorDialog.open()}
+    function openCaptureInspector(){
+        captureInspectorLoader.wantOpen=true
+        captureInspectorLoader.active=true
+        showPendingCaptureInspector()
+    }
+    function showPendingCaptureInspector(){
+        if(!captureInspectorLoader.wantOpen || captureInspectorLoader.status!==Loader.Ready || !captureInspectorLoader.item)return
+        captureInspectorLoader.wantOpen=false
+        captureInspectorLoader.item.open()
+    }
     function openSettings(route,origin) {
         if(AppState.settingsRoutes.indexOf(route)<0)return
         if(origin)SwirlMotion.navigateFrom(origin,route,"settings")
@@ -185,9 +194,10 @@ ApplicationWindow {
         if(AppState.historyIndex>0)AppState.goBack()
         else AppState.navigate("featurehub")
     }
-    readonly property bool swirlBackAvailable:rewriteRulesLoader.wantOpen || AppState.canGoBack || (pageLoader.item!==null && pageLoader.item.detailOpen===true)
+    readonly property bool swirlBackAvailable:rewriteRulesLoader.wantOpen || captureInspectorLoader.wantOpen || AppState.canGoBack || (pageLoader.item!==null && pageLoader.item.detailOpen===true)
     function handleEscape() {
         if(rewriteRulesLoader.wantOpen){rewriteRulesLoader.wantOpen=false;return}
+        if(captureInspectorLoader.wantOpen){captureInspectorLoader.wantOpen=false;return}
         if(pageLoader.item && pageLoader.item.dismissDetail && pageLoader.item.dismissDetail())return
         if(AppState.canGoBack)AppState.goBack()
     }
@@ -229,9 +239,18 @@ ApplicationWindow {
         ExternalToolsPage{anchors.fill:parent;clip:true}
     }
 
-    SwirlDialog {
-        id:captureInspectorDialog;title:"HTTP 请求详情";width:Math.min(Theme.dp(1000),window.width-Theme.dp(20));height:Math.min(Theme.dp(650),window.height-Theme.dp(20));padding:Theme.dp(14)
-        CaptureInspectorPage{captureProvider:window.captureProviderContext;anchors.fill:parent}
+    Loader {
+        id:captureInspectorLoader;objectName:"captureInspectorLoader"
+        property bool wantOpen:false
+        active:false;asynchronous:true
+        onLoaded:window.showPendingCaptureInspector()
+        sourceComponent:Component {
+            SwirlDialog {
+                objectName:"captureInspectorDialog";ownerItem:window.contentItem;title:"HTTP 请求详情"
+                width:Math.min(Theme.dp(1000),window.width-Theme.dp(20));height:Math.min(Theme.dp(650),window.height-Theme.dp(20));padding:Theme.dp(14)
+                CaptureInspectorPage{captureProvider:window.captureProviderContext;anchors.fill:parent}
+            }
+        }
     }
     // Native move and eight-edge resize keep Windows snap/DPI behavior.
     Repeater {
@@ -308,7 +327,7 @@ ApplicationWindow {
     Connections {
         target:AppState
         function onToastChanged(){if(AppState.toast.length)toastTimer.restart()}
-        function onCurrentPageChanged(){rewriteRulesLoader.wantOpen=false}
+        function onCurrentPageChanged(){rewriteRulesLoader.wantOpen=false;captureInspectorLoader.wantOpen=false}
     }
     Rectangle {
         visible:AppState.toast.length>0; z:999

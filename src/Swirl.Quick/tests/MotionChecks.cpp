@@ -27,6 +27,8 @@
 #include <functional>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QPointer>
+#include <QThread>
 #include <QPainter>
 #include <QQmlEngine>
 #ifdef Q_OS_WIN
@@ -243,6 +245,57 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         QMetaObject::invokeMethod(rewriteEditor,"close");
         check("rewrite-editor-releases-reopened-modal-grab",QTest::qWaitFor([&]{return !rewriteEditor->property("visible").toBool();},2500));
     }
+    QPointer<QObject> captureLoader=window->findChild<QObject *>("captureInspectorLoader");
+    check("capture-inspector-is-lazy-at-startup",captureLoader&&!captureLoader->property("active").toBool()&&!qvariant_cast<QObject *>(captureLoader->property("item")));
+    if(captureLoader){
+        const QString captureRoute=eval("AppState.currentPage").toString();
+        const int captureHistory=eval("AppState.historyIndex").toInt();
+        const int dismissalsBeforeCapture=eval("dismissals.count").toInt();
+        eval("window.openCaptureInspector()");
+        check("capture-inspector-is-pending-before-escape",captureLoader&&captureLoader->property("status").toInt()==2&&captureLoader->property("wantOpen").toBool());
+        QTest::keyClick(window,Qt::Key_Escape);
+        check("capture-pending-escape-preserves-route",eval("AppState.currentPage").toString()==captureRoute&&eval("AppState.historyIndex").toInt()==captureHistory);
+        check("capture-pending-escape-clears-admission",captureLoader&&!captureLoader->property("wantOpen").toBool());
+        const bool captureReady=QTest::qWaitFor([&]{return captureLoader&&captureLoader->property("status").toInt()==1;},5000);
+        QPointer<QObject> inspectorDialog=captureReady?qvariant_cast<QObject *>(captureLoader->property("item")):nullptr;
+        check("capture-inspector-loads-asynchronously",captureReady&&inspectorDialog);
+        check("capture-cancelled-load-does-not-open",inspectorDialog&&!inspectorDialog->property("visible").toBool()&&eval("dismissals.count").toInt()==dismissalsBeforeCapture);
+        if(inspectorDialog){
+            eval("window.openCaptureInspector()");
+            check("capture-inspector-reopens-after-cancel",QTest::qWaitFor([&]{return inspectorDialog&&inspectorDialog->property("opened").toBool();},2500));
+            check("capture-inspector-has-owned-modal-layer",eval("captureInspectorLoader.item.ownerWindow===window").toBool()&&eval("dismissals.count").toInt()==dismissalsBeforeCapture+1);
+            auto *dialogContent=qvariant_cast<QQuickItem *>(inspectorDialog->property("contentItem"));
+            std::function<QQuickItem *(QQuickItem *)> findInspectorPage;
+            findInspectorPage=[&](QQuickItem *candidate)->QQuickItem *{
+                if(!candidate)return nullptr;
+                if(candidate->metaObject()->indexOfProperty("captureProvider")>=0
+                    &&candidate->metaObject()->indexOfProperty("selectedId")>=0
+                    &&candidate->metaObject()->indexOfProperty("query")>=0)return candidate;
+                for(auto *child:candidate->childItems())if(auto *found=findInspectorPage(child))return found;
+                return nullptr;
+            };
+            QPointer<QQuickItem> inspectorPage=findInspectorPage(dialogContent);
+            check("capture-inspector-real-state-properties-present",inspectorPage!=nullptr);
+            QVariant previousSelectedId,previousQuery;
+            if(inspectorPage){
+                previousSelectedId=inspectorPage->property("selectedId");previousQuery=inspectorPage->property("query");
+                check("capture-inspector-state-can-be-edited",inspectorPage->setProperty("selectedId",QStringLiteral("retained-capture-session-fixture"))
+                    &&inspectorPage->setProperty("query",QStringLiteral("retained capture filter")));
+            }
+            QMetaObject::invokeMethod(inspectorDialog,"close");
+            check("capture-inspector-close-releases-modal-layer",QTest::qWaitFor([&]{return inspectorDialog&&!inspectorDialog->property("visible").toBool()&&eval("dismissals.count").toInt()==dismissalsBeforeCapture;},2500));
+            eval("window.openCaptureInspector()");
+            const bool reopened=QTest::qWaitFor([&]{return inspectorDialog&&inspectorDialog->property("opened").toBool();},2500);
+            check("capture-inspector-retains-instance-and-state",reopened&&captureLoader&&inspectorPage
+                &&qvariant_cast<QObject *>(captureLoader->property("item"))==inspectorDialog
+                &&findInspectorPage(qvariant_cast<QQuickItem *>(inspectorDialog->property("contentItem")))==inspectorPage
+                &&inspectorPage->property("selectedId").toString()==QStringLiteral("retained-capture-session-fixture")
+                &&inspectorPage->property("query").toString()==QStringLiteral("retained capture filter"));
+            if(inspectorPage){inspectorPage->setProperty("selectedId",previousSelectedId);inspectorPage->setProperty("query",previousQuery);}
+            QTest::keyClick(window,Qt::Key_Escape);
+            check("capture-inspector-escape-releases-reopened-modal-layer",QTest::qWaitFor([&]{return inspectorDialog&&!inspectorDialog->property("visible").toBool()&&eval("dismissals.count").toInt()==dismissalsBeforeCapture;},2500));
+        }
+    }
     route("featurehub");
     auto *hub=item();
     check("hub-loaded",hub!=nullptr);
@@ -452,32 +505,126 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         }
         check("proxy-button-test-does-not-mutate-host-settings",SystemProxySession::snapshot()==hostProxyBefore);
     }
-    QList<double> intervals;QList<double> warmIntervals;bool warmPhase=false;bool measuring=true;QMutex frameMutex;
-    QElapsedTimer clock;clock.start();qint64 last=0;
-    auto connection=QObject::connect(window,&QQuickWindow::frameSwapped,window,[&] {
-        const qint64 now=clock.nsecsElapsed();
-        QMutexLocker lock(&frameMutex);
-        const double delta=double(now-last)/1000000.0;
-        if(!measuring)return;
-        if(last){intervals<<delta;if(warmPhase)warmIntervals<<delta;}
-        last=now;
-    },Qt::DirectConnection);
+    QList<double> intervals;QList<double> warmIntervals;
+    QJsonArray frameTimeline;
+    QJsonObject frameProbe;
     const QStringList stress={"overview","settings","proxies","featurehub","capture","connections","rules","logs"};
-    for(int i=0;i<40;++i) {
-        eval("AppState.navigate('"+stress[i%stress.size()]+"')");
-        wait(23);
-        if(i%7==0)window->resize(900+i*2,650+i);
-        check("rapid-switch-has-live-page-"+QString::number(i),item()!=nullptr);
-        check("rapid-switch-retains-visible-content-"+QString::number(i),eval("Object.keys(pageLoader.pages).reduce((sum,key)=>sum+(pageLoader.pages[key].visible?pageLoader.pages[key].opacity:0),0)>0.99").toBool());
+    {
+        struct FrameContext {
+            QString route,activeRoute,phase,point;
+            qint64 timestampNs=0;
+            quint64 revision=0;
+            bool moving=false,pending=false,valid=false;
+        };
+        struct FrameSample {
+            qint64 timestampNs=0;
+            double intervalMs=0;
+            bool hasInterval=false,warm=false;
+            FrameContext before,after;
+        };
+        constexpr qsizetype frameCapacity=20000;
+        struct FrameProbeState {
+            QMutex mutex;
+            QElapsedTimer clock;
+            QList<double> intervals,warmIntervals;
+            QList<FrameSample> samples;
+            FrameContext context,previousContext;
+            bool warmPhase=false,measuring=true;
+            qint64 last=0,callbackCount=0,droppedSamples=0,snapshotCount=0;
+            qint64 callbackTotalNs=0,callbackMaxNs=0,snapshotTotalNs=0,snapshotMaxNs=0,maxSnapshotAgeNs=0;
+        };
+        const auto state=std::make_shared<FrameProbeState>();
+        state->samples.reserve(frameCapacity);state->clock.start();
+        QString phase=QStringLiteral("rapid-switch");
+        // Context ownership keeps queued GUI callbacks from outliving the
+        // stack state. Only this GUI callback reads QML; the render callback
+        // consumes native state. An in-flight DirectConnection retains that
+        // state even if disconnect returns before the callback has finished.
+        auto captureContext=[state,host,window,&phase](const QString &point){
+            Q_ASSERT(QThread::currentThread()==window->thread());
+            const qint64 started=state->clock.nsecsElapsed();
+            {QMutexLocker lock(&state->mutex);if(!state->measuring)return;}
+            FrameContext next;
+            next.route=host->property("routeKey").toString();
+            if(auto *active=qvariant_cast<QObject *>(host->property("activeLoader")))next.activeRoute=active->property("routeId").toString();
+            next.moving=host->property("moving").toBool();next.pending=host->property("pendingGrab").toBool();
+            next.phase=phase;next.point=point;next.valid=true;next.timestampNs=state->clock.nsecsElapsed();
+            QMutexLocker lock(&state->mutex);
+            if(!state->measuring)return;
+            next.revision=++state->snapshotCount;state->context=next;
+            const qint64 cost=state->clock.nsecsElapsed()-started;
+            state->snapshotTotalNs+=cost;state->snapshotMaxNs=qMax(state->snapshotMaxNs,cost);
+        };
+        QObject probeContext;
+        captureContext(QStringLiteral("phase-start"));
+        const auto beforeFrame=QObject::connect(window,&QQuickWindow::afterAnimating,&probeContext,[&]{captureContext(QStringLiteral("afterAnimating"));});
+        const auto afterFrame=QObject::connect(window,&QQuickWindow::frameSwapped,&probeContext,[&]{captureContext(QStringLiteral("after-frame-queued"));},Qt::QueuedConnection);
+        const auto connection=QObject::connect(window,&QQuickWindow::frameSwapped,&probeContext,[state] {
+            const qint64 now=state->clock.nsecsElapsed();
+            QMutexLocker lock(&state->mutex);
+            if(!state->measuring)return;
+            const double delta=double(now-state->last)/1000000.0;
+            if(state->last){state->intervals<<delta;if(state->warmPhase)state->warmIntervals<<delta;}
+            if(state->samples.size()<frameCapacity)state->samples.append({now,delta,state->last!=0,state->warmPhase,state->previousContext,state->context});
+            else ++state->droppedSamples;
+            state->previousContext=state->context;state->last=now;++state->callbackCount;
+            if(state->context.valid)state->maxSnapshotAgeNs=qMax(state->maxSnapshotAgeNs,now-state->context.timestampNs);
+            const qint64 cost=state->clock.nsecsElapsed()-now;
+            state->callbackTotalNs+=cost;state->callbackMaxNs=qMax(state->callbackMaxNs,cost);
+        },Qt::DirectConnection);
+        for(int i=0;i<40;++i) {
+            eval("AppState.navigate('"+stress[i%stress.size()]+"')");
+            captureContext(QStringLiteral("route-request"));
+            wait(23);
+            if(i%7==0){window->resize(900+i*2,qMax(window->minimumHeight(),650+i));captureContext(QStringLiteral("resize-request"));}
+            check("rapid-switch-has-live-page-"+QString::number(i),item()!=nullptr);
+            check("rapid-switch-retains-visible-content-"+QString::number(i),eval("Object.keys(pageLoader.pages).reduce((sum,key)=>sum+(pageLoader.pages[key].visible?pageLoader.pages[key].opacity:0),0)>0.99").toBool());
+        }
+        check("rapid-switch-settles",settle(3500));
+        check("latest-route-wins",qvariant_cast<QObject *>(host->property("activeLoader"))->property("routeId").toString()==stress[39%stress.size()]);
+        // Preserve the original aggregate's warm reset and full interval set.
+        window->resize(1100,760);
+        phase=QStringLiteral("warm-route");
+        {QMutexLocker lock(&state->mutex);state->warmPhase=true;state->last=0;state->previousContext=FrameContext{};}
+        captureContext(QStringLiteral("phase-start"));
+        for(int i=0;i<8;++i)route(stress[i]);
+        QList<FrameSample> samples;
+        {
+            QMutexLocker lock(&state->mutex);
+            state->measuring=false;
+            intervals=state->intervals;warmIntervals=state->warmIntervals;samples=state->samples;
+            frameProbe=QJsonObject{{"schema",1},{"capacity",qint64(frameCapacity)},{"samples",qint64(samples.size())},
+                {"droppedSamples",state->droppedSamples},{"frameCallbacks",state->callbackCount},{"guiSnapshots",state->snapshotCount},
+                {"callbackMeasuredTotalMs",double(state->callbackTotalNs)/1e6},{"callbackMeasuredMaxMs",double(state->callbackMaxNs)/1e6},
+                {"guiSnapshotMeasuredTotalMs",double(state->snapshotTotalNs)/1e6},{"guiSnapshotMeasuredMaxMs",double(state->snapshotMaxNs)/1e6},
+                {"maxSnapshotAgeMs",double(state->maxSnapshotAgeNs)/1e6},{"renderCallbackReadsQml",false},
+                {"clockDomain","QElapsedTimer nanoseconds since stress probe start; not synchronized to QML trace clock"},
+                {"attributionIsExact",false},{"limits",QJsonArray{
+                    "Moving/pending are GUI snapshots around presentation, not complete activity histories between frames.",
+                    "Inactive endpoints can hide work between snapshots; active endpoints do not prove every millisecond was animated.",
+                    "Queued post-frame snapshots can lag; snapshot timestamps and revisions are retained.",
+                    "Probe costs include snapshot reads, copies, list appends and mutex waits, but exclude Qt dispatch and final unlock.",
+                    "The additional probe changes test overhead; compare matching instrumentation and workloads.",
+                    "All original aggregate intervals, including long or inactive gaps, remain in performance totals."}}};
+        }
+        QObject::disconnect(connection);QObject::disconnect(beforeFrame);QObject::disconnect(afterFrame);
+        const auto contextJson=[](const FrameContext &value){return QJsonObject{
+            {"valid",value.valid},{"snapshotNs",value.timestampNs},{"revision",qint64(value.revision)},
+            {"route",value.route},{"activeRoute",value.activeRoute},{"phase",value.phase},
+            {"snapshotPoint",value.point},{"moving",value.moving},{"pending",value.pending}};};
+        // JSON allocation and sorting occur after the timed probe is stopped.
+        for(const auto &sample:samples){
+            const bool beforeActive=sample.before.moving||sample.before.pending;
+            const bool afterActive=sample.after.moving||sample.after.pending;
+            const QString attribution=!sample.hasInterval||!sample.before.valid||!sample.after.valid?QStringLiteral("unclassified")
+                :beforeActive&&afterActive?QStringLiteral("active-at-both-snapshots")
+                :!beforeActive&&!afterActive?QStringLiteral("inactive-at-both-snapshots"):QStringLiteral("transition-boundary");
+            frameTimeline.append(QJsonObject{{"timestampNs",sample.timestampNs},
+                {"intervalMs",sample.hasInterval?QJsonValue(sample.intervalMs):QJsonValue(QJsonValue::Null)},
+                {"warm",sample.warm},{"attribution",attribution},
+                {"before",contextJson(sample.before)},{"after",contextJson(sample.after)}});
+        }
     }
-    check("rapid-switch-settles",settle(3500));
-    check("latest-route-wins",qvariant_cast<QObject *>(host->property("activeLoader"))->property("routeId").toString()==stress[39%stress.size()]);
-    // Warm transitions measure steady animation rather than initial QML creation.
-    window->resize(1100,760);
-    {QMutexLocker lock(&frameMutex);warmPhase=true;last=0;}
-    for(int i=0;i<8;++i)route(stress[i]);
-    {QMutexLocker lock(&frameMutex);measuring=false;}
-    QObject::disconnect(connection);
     // Warm the readback/driver pool at the same dimensions before checking
     // repeated growth. The earlier stress deliberately used varied sizes.
     for(int i=0;i<40;++i){eval("AppState.navigate('"+stress[i%stress.size()]+"')");wait(12);}
@@ -556,6 +703,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         {"cachedPages",host->property("cachedPageCount").toInt()},
         {"memoryBytes",memory()},{"revisitGrowthBytes",growth},{"idleFrames",idleFrames}};
     QJsonObject report{{"checks",checks},{"failures",failures},{"performance",performance},
+        {"frameTimeline",frameTimeline},{"frameProbe",frameProbe},
         {"diagnostics",QJsonDocument::fromJson(eval("JSON.stringify(systemProvider.logs())").toString().toUtf8()).array()}};
     if(!output.isEmpty()) {
         QDir().mkpath(QFileInfo(output).absolutePath());QFile file(output);

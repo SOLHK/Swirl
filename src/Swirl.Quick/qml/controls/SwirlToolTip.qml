@@ -1,10 +1,9 @@
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import SwirlQuick
 
-// Preserve the selected Qt Quick Controls style's popup, padding and transitions.
-// A local ToolTip owns its font; the shared attached ToolTip cannot carry the
-// correct size and window context independently for every originating item.
+// Own the complete surface here. Overriding a derived popup's deferred content
+// while a font binding reads that content can leave Qt creation unfinished.
 ToolTip {
     id: control
     font.family: Theme.fontFamily
@@ -13,8 +12,14 @@ ToolTip {
         target: control
         when: control.visible
         textRole: "auxiliary"
-        // Do not instantiate Qt's deferred tooltip content for every table cell.
-        fontWindow: control.visible && control.contentItem ? control.contentItem.Window.window : null
+        fontWindow: control.parent ? control.parent.Window.window : null
     }
-    Binding { target: control.visible ? control.contentItem : null; property: "renderType"; value: Text.NativeRendering; when: control.visible }
+    contentItem: Text {
+        text: control.text; font: control.font; color: Theme.text
+        wrapMode: Text.Wrap; renderType: Text.NativeRendering
+    }
+    background: Rectangle {
+        color: Theme.material("floating"); radius: Theme.dp(8)
+        border.width: Theme.borderWidth; border.color: Theme.border
+    }
 }

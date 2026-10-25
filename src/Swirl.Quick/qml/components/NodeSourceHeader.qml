@@ -17,7 +17,7 @@ Item {
             size:Theme.dp(12)
             rotation:header.record.expanded?90:0
             opacity:header.record.collapsible?1:0.45
-            Behavior on rotation {NumberAnimation {duration:SwirlMotion.statusDuration;easing.type:Easing.OutCubic}}
+            Behavior on rotation {enabled:!SwirlMotion.reduced;NumberAnimation {duration:SwirlMotion.statusDuration;easing.type:Easing.OutCubic}}
         }
         SwirlText {
             text:header.record.sectionName||""

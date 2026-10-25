@@ -38,13 +38,26 @@ SwirlDialog {
     height:Math.floor(Math.min(Theme.dp(580),parent?parent.height-Theme.dp(36):Theme.dp(580)))
     contentItem:ColumnLayout {
         spacing:Theme.dp(12)
-        SwirlSearchField {id:search;objectName:"policyTargetSearch";Layout.fillWidth:true;placeholderText:qsTr("搜索出口名称");enabled:!picker.pending;onTextChanged:picker.query=text;Accessible.name:qsTr("搜索出口")}
-        SwirlSegmentedControl {id:targetTabs;objectName:"policyTargetTabs";Layout.fillWidth:true;options:[qsTr("节点"),qsTr("策略组")];currentIndex:picker.targetKind;enabled:!picker.pending;onActivated:index=>picker.targetKind=index}
+        RowLayout {
+            Layout.fillWidth:true;spacing:Theme.dp(12)
+            TextField {
+                id:search;objectName:"policyTargetSearch"
+                Layout.fillWidth:true;Layout.minimumWidth:Theme.dp(100)
+                implicitHeight:Theme.dp(34);placeholderText:qsTr("搜索出口名称");enabled:!picker.pending
+                color:Theme.text;placeholderTextColor:Theme.muted;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(12)
+                leftPadding:Theme.dp(32);rightPadding:Theme.dp(10);selectByMouse:true
+                onTextChanged:picker.query=text;Accessible.name:qsTr("搜索出口")
+                background:Rectangle {radius:Theme.dp(9);color:Theme.buttonBase;border.width:search.activeFocus?Theme.borderWidth:0;border.color:Theme.text}
+                SwirlIcon {anchors.left:parent.left;anchors.leftMargin:Theme.dp(10);anchors.verticalCenter:parent.verticalCenter;name:"search";size:Theme.dp(14);color:Theme.muted;Accessible.ignored:true}
+            }
+            SwirlSegmentedControl {id:targetTabs;objectName:"policyTargetTabs";Layout.preferredWidth:Theme.dp(180);Layout.preferredHeight:Theme.dp(34);options:[qsTr("节点"),qsTr("策略组")];currentIndex:picker.targetKind;enabled:!picker.pending;onActivated:index=>picker.targetKind=index}
+        }
         ListView {
             id:targets;objectName:"policyTargetList";Layout.fillWidth:true;Layout.fillHeight:true;clip:true;reuseItems:true;pixelAligned:true
-            model:picker.visibleOptions;spacing:Theme.dp(3);keyNavigationEnabled:true;activeFocusOnTab:true
+            model:picker.visibleOptions;spacing:0;keyNavigationEnabled:true;activeFocusOnTab:true
             Keys.onReturnPressed:picker.selectOption(picker.visibleOptions[currentIndex],currentIndex)
             Keys.onEnterPressed:picker.selectOption(picker.visibleOptions[currentIndex],currentIndex)
+            Keys.onSpacePressed:picker.selectOption(picker.visibleOptions[currentIndex],currentIndex)
             ScrollBar.vertical:SwirlScrollBar {}
             delegate:SwirlMotionButton {
                 id:option;required property var modelData;required property int index
@@ -52,23 +65,44 @@ SwirlDialog {
                 width:Math.floor(ListView.view.width);height:Theme.dp(48);padding:Theme.dp(10);hoverEnabled:true
                 enabled:Boolean(modelData.available)&&!picker.pending
                 Accessible.name:String(modelData.name)+(modelData.available?"":qsTr("，当前不可用"))
-                background:Rectangle {radius:Theme.controlRadius;color:Policy.sameTarget(picker.selectedTarget,option.modelData)?Theme.selected:option.hovered?Theme.hover:Theme.field;border.width:option.activeFocus?Theme.dp(1):0;border.color:Theme.focusBorder}
+                background:Rectangle {
+                    radius:Theme.dp(9)
+                    color:Policy.sameTarget(picker.selectedTarget,option.modelData)?Theme.navigationSelected:option.down?Theme.pressed:option.hovered?Theme.hover:"transparent"
+                    border.width:option.visualFocus||(targets.activeFocus&&targets.currentIndex===option.index)?Theme.borderWidth:0
+                    border.color:Theme.text
+                    Behavior on color {enabled:!SwirlMotion.reduced;ColorAnimation {duration:SwirlMotion.hoverDuration}}
+                }
                 contentItem:RowLayout {
-                    SwirlIcon {name:"checkmark";visible:Policy.sameTarget(picker.selectedTarget,option.modelData);size:Theme.dp(16);color:Theme.accent;Accessible.ignored:true}
-                    SwirlText {Layout.fillWidth:true;text:String(option.modelData.name);color:option.enabled?Theme.text:Theme.muted;font.pixelSize:Theme.fontSize(13);elide:Text.ElideRight}
+                    spacing:Theme.dp(10)
+                    SwirlText {Layout.fillWidth:true;Layout.minimumWidth:0;text:String(option.modelData.name);textFormat:Text.PlainText;color:option.enabled?Theme.text:Theme.muted;font.pixelSize:Theme.fontSize(13);elide:Text.ElideRight}
                     SwirlText {visible:!option.modelData.available;text:qsTr("当前不可用");color:Theme.muted;font.pixelSize:Theme.fontSize(11)}
+                    SwirlIcon {name:"checkmark";opacity:Policy.sameTarget(picker.selectedTarget,option.modelData)?1:0;size:Theme.dp(16);color:Theme.text;Accessible.ignored:true}
                 }
                 onClicked:picker.selectOption(modelData,index)
             }
             SwirlEmptyState {anchors.centerIn:parent;width:parent.width;visible:targets.count===0;headline:qsTr("没有匹配的出口");detail:picker.targetKind===0?qsTr("先在节点页添加或导入节点。"):qsTr("先在策略组标签中创建策略组。")}
         }
-        SwirlButton {objectName:"policyDirectTarget";visible:picker.allowDirect;Layout.fillWidth:true;text:Policy.sameTarget(picker.selectedTarget,{kind:"direct"})?qsTr("DIRECT（已选）"):"DIRECT";outlined:Policy.sameTarget(picker.selectedTarget,{kind:"direct"});enabled:!picker.pending;onClicked:picker.selectedTarget={kind:"direct"};Accessible.name:qsTr("直连出口 DIRECT")}
+        SubscriptionAction {
+            id:directTarget;objectName:"policyDirectTarget"
+            visible:picker.allowDirect;Layout.fillWidth:true;implicitWidth:Theme.dp(180)
+            text:"DIRECT";selected:Policy.sameTarget(picker.selectedTarget,{kind:"direct"});enabled:!picker.pending
+            contentItem:RowLayout {
+                SwirlText {Layout.fillWidth:true;text:directTarget.text;color:directTarget.enabled?Theme.text:Theme.muted;font.pixelSize:Theme.fontSize(13)}
+                SwirlIcon {name:"checkmark";opacity:directTarget.selected?1:0;size:Theme.dp(16);color:Theme.text;Accessible.ignored:true}
+            }
+            onClicked:picker.selectedTarget={kind:"direct"};Accessible.name:qsTr("直连出口 DIRECT")
+        }
         SwirlText {Layout.fillWidth:true;visible:picker.selectedTarget.kind!=="unconfigured";text:qsTr("已选：%1").arg(Policy.targetName(picker.selectedTarget,picker.options));color:Theme.muted;font.pixelSize:Theme.fontSize(12);elide:Text.ElideRight}
         SwirlText {id:errorSummary;Layout.fillWidth:true;visible:picker.message.length>0;text:picker.message;textFormat:Text.PlainText;color:Theme.orange;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12);activeFocusOnTab:true;Accessible.name:text}
-        RowLayout {Layout.alignment:Qt.AlignRight
-            SwirlButton {text:qsTr("恢复已保存的操作");visible:picker.pending&&picker.recoveryAvailable;onClicked:picker.recoveryRequested()}
-            SwirlButton {objectName:"cancelPolicyTarget";text:qsTr("取消");enabled:!picker.pending;onClicked:picker.close()}
-            SwirlButton {objectName:"confirmPolicyTarget";text:picker.pending?qsTr("正在保存…"):qsTr("确认出口");primary:true;enabled:picker.selectionAvailable&&!picker.pending;onClicked:picker.targetChosen(Policy.copy(picker.selectedTarget))}
+        ColumnLayout {
+            Layout.fillWidth:true;spacing:Theme.dp(8)
+            SubscriptionAction {Layout.alignment:Qt.AlignRight;text:qsTr("恢复已保存的操作");visible:picker.pending&&picker.recoveryAvailable;onClicked:picker.recoveryRequested()}
+            RowLayout {
+                Layout.fillWidth:true;spacing:Theme.dp(8)
+                Item {Layout.fillWidth:true}
+                SubscriptionAction {objectName:"cancelPolicyTarget";text:qsTr("取消");enabled:!picker.pending;onClicked:picker.close()}
+                SubscriptionAction {objectName:"confirmPolicyTarget";text:picker.pending?qsTr("正在保存…"):qsTr("确认出口");solid:true;enabled:picker.selectionAvailable&&!picker.pending;onClicked:picker.targetChosen(Policy.copy(picker.selectedTarget))}
+            }
         }
     }
 }
