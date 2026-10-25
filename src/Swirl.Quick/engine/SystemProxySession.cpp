@@ -120,8 +120,8 @@ bool matchesSettings(QJsonObject current,const QJsonObject &expected) {
 }
 }
 QString SystemProxySession::journalPath() { return SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/system-proxy.dpapi"; }
-SystemProxySession::SystemProxySession(QObject *parent, QString journal):QObject(parent),m_journal(journal.isEmpty()?journalPath():journal) {
-    recover(m_journal,&m_error);refresh();m_poll.setInterval(500);
+SystemProxySession::SystemProxySession(QObject *parent, QString journal,std::unique_ptr<Backend> backend):QObject(parent),m_backend(std::move(backend)),m_journal(journal.isEmpty()?journalPath():journal) {
+    if(!m_backend)recover(m_journal,&m_error);refresh();m_poll.setInterval(500);
     connect(&m_poll,&QTimer::timeout,this,&SystemProxySession::refresh);m_poll.start();
     connect(QCoreApplication::instance(),&QCoreApplication::aboutToQuit,this,&SystemProxySession::disable);
 }
@@ -247,6 +247,7 @@ bool SystemProxySession::recover(const QString &journal, QString *error, bool re
 bool SystemProxySession::enable(int port, qint64 enginePid) {
     m_error.clear();
     if(port<1||port>65535||enginePid<=0){m_error=QStringLiteral("真实引擎与代理端口尚未就绪。");emit changed();return false;}
+    if(m_backend){adoptBackendState(m_backend->enable(port,enginePid));return m_owned&&m_enabled;}
     if(m_owned){refresh();return m_owned;}
     if(!recover(m_journal,&m_error)){emit changed();return false;}
     QLockFile lock(m_journal+".lock");
@@ -292,11 +293,13 @@ bool SystemProxySession::enable(int port, qint64 enginePid) {
 }
 bool SystemProxySession::disable() {
     if(!m_owned)return true;
+    if(m_backend){adoptBackendState(m_backend->disable());return !m_owned&&m_error.isEmpty();}
     m_error.clear();bool ok=recover(m_journal,&m_error,false,m_session);
     if(ok)m_owned=false;refresh();emit changed();return ok;
 }
 bool SystemProxySession::turnOffSystemProxy() {
     m_error.clear();
+    if(m_backend){m_error=QStringLiteral("当前代理后端不支持关闭其他应用的系统代理。");emit changed();return false;}
     // Release our recovery lease first. The subsequent explicit off action
     // must not be undone by the old guard restoring another application's proxy.
     if(m_owned&&!disable())return false;
@@ -317,6 +320,7 @@ bool SystemProxySession::turnOffSystemProxy() {
     refresh();emit changed();return ok;
 }
 void SystemProxySession::refresh() {
+    if(m_backend){adoptBackendState(m_backend->refresh());return;}
     const auto record=read(m_journal);QString readError;const auto current=snapshot(&readError);
     bool observationChanged=m_readError!=readError;m_readError=readError;
     if(!current.isEmpty()) {
@@ -342,7 +346,17 @@ void SystemProxySession::refresh() {
     if(enabled!=m_enabled){m_enabled=enabled;observationChanged=true;}
     if(observationChanged)emit changed();
 }
+void SystemProxySession::adoptBackendState(const Backend::State &state) {
+    const bool different=m_enabled!=state.enabled||m_owned!=state.owned||m_systemEnabled!=state.systemEnabled||
+        m_stateDiffers!=state.stateDiffers||m_readError!=state.readError||m_error!=state.error;
+    m_enabled=state.enabled;m_owned=state.owned;m_systemEnabled=state.systemEnabled;
+    m_stateDiffers=state.stateDiffers;m_readError=state.readError;m_error=state.error;
+    if(different)emit changed();
+}
 QVariantMap SystemProxySession::diagnosticState() const {
+    if(m_backend)return {{"known",m_readError.isEmpty()},{"enabled",m_systemEnabled},{"stateDiffers",m_stateDiffers},
+        {"swirlEnabled",m_enabled},{"owned",m_owned},{"readError",m_readError},{"recoveryError",m_error},
+        {"recoveryJournalPresent",false},{"guardAcknowledged",false}};
     QString readError;
     auto state=SystemProxyState::inspect(snapshot(&readError)).diagnostics();
     state.insert("swirlEnabled",m_enabled);state.insert("owned",m_owned);

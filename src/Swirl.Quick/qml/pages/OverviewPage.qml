@@ -8,12 +8,12 @@ import "../controls"
 Item {
  id:page;required property var engineController;required property var systemProvider
  component AccessCard:SwirlGlassPanel {
-  id:card;property string title;property string description;property string status;property bool active:false;property bool available:false;property bool configurable:false;signal toggled(bool on);signal configure()
+  id:card;property string title;property string description;property string status;property bool active:false;property bool available:false;property bool configurable:false;property bool toggleVisible:true;property string configureLabel:"配置";signal toggled(bool on);signal configure()
   Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredHeight:Math.max(Theme.dp(160),body.implicitHeight+2*Theme.cardPadding)
   ColumnLayout {id:body;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:Theme.dp(12)
-   RowLayout {Layout.fillWidth:true;SwirlText{text:card.title;color:Theme.text;font.pixelSize:Theme.fontSize(15);font.weight:Font.DemiBold;Layout.fillWidth:true}SwirlToggle{checked:card.active;enabled:card.available;onToggled:{card.toggled(checked);checked=Qt.binding(()=>card.active)}Accessible.name:card.title}}
+   RowLayout {Layout.fillWidth:true;SwirlText{text:card.title;color:Theme.text;font.pixelSize:Theme.fontSize(15);font.weight:Font.DemiBold;Layout.fillWidth:true}SwirlToggle{visible:card.toggleVisible;checked:card.active;enabled:card.available;onToggled:{card.toggled(checked);checked=Qt.binding(()=>card.active)}Accessible.name:card.title}}
    SwirlText {text:card.description;color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap;Layout.fillWidth:true}
-   RowLayout {Layout.fillWidth:true;SwirlText {text:card.status;color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap;Layout.fillWidth:true}SwirlButton {visible:card.configurable;quiet:true;text:"配置";onClicked:card.configure()}}
+   RowLayout {Layout.fillWidth:true;SwirlText {text:card.status;color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap;Layout.fillWidth:true}SwirlButton {visible:card.configurable;quiet:true;text:card.configureLabel;onClicked:card.configure()}}
   }
  }
  Flickable {id:scroll;anchors.fill:parent;contentWidth:width;contentHeight:body.implicitHeight+2*Theme.pagePadding;clip:true;boundsBehavior:Flickable.StopAtBounds;flickableDirection:Flickable.VerticalFlick;ScrollBar.vertical:SwirlScrollBar{}
@@ -22,7 +22,7 @@ Item {
    SwirlText {text:"配置与服务状态";color:Theme.muted;font.pixelSize:Theme.fontSize(13)}
    SwirlText {text:"网络接管";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold}
    GridLayout {Layout.fillWidth:true;columns:width>=Theme.dp(650)?2:1;columnSpacing:Theme.gap;rowSpacing:Theme.gap
-    AccessCard{title:"系统代理";description:"大多数应用的流量可以通过将 Swirl 设置为系统代理接管，具有最佳的兼容性和性能。";status:page.engineController.systemProxy.error||page.engineController.routingError||(page.engineController.busy?"正在切换":active?"由 Swirl 接管":page.engineController.systemProxy.systemEnabled?"由其他应用启用":"未启用");active:page.engineController.systemProxy.enabled;available:!page.engineController.busy;onToggled:on=>page.engineController.setSystemProxy(on)}
+    AccessCard{title:"系统代理";description:"在活动页统一开启或关闭 Swirl 代理，使用已保存的策略分配流量。";status:page.engineController.systemProxy.error||page.engineController.routingError||(page.engineController.busy?"正在切换":active?"由 Swirl 接管":page.engineController.systemProxy.systemEnabled?"由其他应用启用":"未启用");active:page.engineController.systemProxy.enabled;toggleVisible:false;configurable:true;configureLabel:"前往活动";onConfigure:AppState.navigate("activity")}
     AccessCard{title:"增强模式";description:"部分应用可能不遵循系统代理设置。使用增强模式可以让所有应用由 Swirl 处理。";status:active?"启用":page.engineController.elevated?"禁用":"需要管理员权限";active:page.engineController.tunEnabled;available:!page.engineController.busy;onToggled:on=>{if(!page.engineController.setTunEnabled(!page.engineController.tunRequested))AppState.notice(page.engineController.routingError||page.engineController.networkConfigurationError)}}
    }
    SwirlText {text:"局域网设备接管";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold}

@@ -226,7 +226,7 @@ Item {
                             GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 Layout.fillWidth:true;
                                 SwirlText {Layout.minimumWidth:0; text:engineController.systemProxy.owned?(engineController.systemProxy.enabled?"系统代理已接管":"接管状态未确认 · 快照已保留"):engineController.systemProxy.systemEnabled?"其他应用启用了系统代理":"未接管系统代理"; color:Theme.text; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(14) }
-                                SwirlButton { text:engineController.systemProxy.owned?"释放 / 恢复系统代理":"接管系统代理"; enabled:engineController.systemProxy.owned||engineController.connected; onClicked:engineController.setSystemProxy(!engineController.systemProxy.owned) }
+                                SwirlButton { text:"前往活动页管理代理"; onClicked:AppState.navigate("activity") }
                             }
                             SwirlText {Layout.minimumWidth:0; visible:engineController.systemProxy.error.length>0; text:engineController.systemProxy.error; color:Theme.orange; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
                             SwirlText {Layout.minimumWidth:0; text:"沿用 Swirl 的本地 DPAPI 恢复快照与独立守护进程。其他程序修改代理后让出控制权；控制 API 短时异常不会释放仍在运行的代理。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }

@@ -4,6 +4,7 @@
 #include <QTimer>
 #include <QProcess>
 #include <QVariantMap>
+#include <memory>
 
 // Current-user WinINET connection settings plus their legacy registry view.
 // The independent guard compares both stores before restoring their snapshots.
@@ -16,7 +17,20 @@ class SystemProxySession final : public QObject {
     Q_PROPERTY(QString stateReadError READ stateReadError NOTIFY changed)
     Q_PROPERTY(QString error READ error NOTIFY changed)
 public:
-    explicit SystemProxySession(QObject *parent=nullptr, QString journal={});
+    // C++ constructor injection keeps isolated controller tests away from the
+    // user's OS settings. A null backend always uses the native journal/guard.
+    class Backend {
+    public:
+        struct State {
+            bool enabled=false,owned=false,systemEnabled=false,stateDiffers=false;
+            QString readError,error;
+        };
+        virtual ~Backend()=default;
+        virtual State refresh()=0;
+        virtual State enable(int port,qint64 enginePid)=0;
+        virtual State disable()=0;
+    };
+    explicit SystemProxySession(QObject *parent=nullptr, QString journal={},std::unique_ptr<Backend> backend={});
     ~SystemProxySession() override;
     bool enabled() const { return m_enabled; }
     bool owned() const { return m_owned; }
@@ -25,6 +39,7 @@ public:
     QString stateReadError() const { return m_readError; }
     QVariantMap diagnosticState() const;
     QString error() const { return m_error; }
+    Backend *backend() const { return m_backend.get(); }
     bool enable(int port, qint64 enginePid);
     Q_INVOKABLE bool disable();
     bool turnOffSystemProxy(); // Explicit user action; unlike release, leaves Windows proxy off.
@@ -37,6 +52,8 @@ public:
 signals:
     void changed();
 private:
+    void adoptBackendState(const Backend::State &state);
+    std::unique_ptr<Backend> m_backend;
     QString m_journal, m_error, m_session, m_readError;
     bool m_enabled=false, m_owned=false;
     bool m_systemEnabled=false, m_stateDiffers=false;

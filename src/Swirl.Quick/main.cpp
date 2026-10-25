@@ -65,6 +65,7 @@
 #include "tests/EngineUiChecks.h"
 #include "tests/NodeUiChecks.h"
 #include "tests/PolicyUiChecks.h"
+#include "tests/PolicySystemProxyBackend.h"
 #include "tests/MotionChecks.h"
 #include "tests/MaterialChecks.h"
 #include "tests/HeroChecks.h"
@@ -246,7 +247,15 @@ int main(int argc, char *argv[])
                                         :QDir::tempPath()+QStringLiteral("/Swirl-XXXXXX"));
     if(isolatedRun&&!realAcceptance&&!isolatedNodes.isValid())return 2;
     auto runtimeEngine=std::make_unique<ThreadedEngine>();
+#ifdef SWIRL_UI_TESTS
+    // Native node/policy acceptance uses the actual controller and listener,
+    // with only host system-proxy I/O replaced by an owned in-memory adapter.
+    std::unique_ptr<SystemProxySession::Backend> policyProxyBackend;
+    if(policyTest||nodeTest)policyProxyBackend=std::make_unique<PolicySystemProxyBackend>();
+    EngineController engineController(std::move(runtimeEngine),nullptr,realAcceptance?runtimeStore:isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString(),realAcceptance,std::move(policyProxyBackend));
+#else
     EngineController engineController(std::move(runtimeEngine),nullptr,realAcceptance?runtimeStore:isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString(),realAcceptance);
+#endif
     ExtensionService extensions(&engineController,isolatedRun?isolatedNodes.filePath("extensions.dpapi"):QString());
     GatewayService gateway(&engineController,isolatedRun?isolatedNodes.filePath("gateway.json"):QString());
     DiagnosticService diagnostics(isolatedRun?isolatedNodes.filePath("diagnostics"):QString());

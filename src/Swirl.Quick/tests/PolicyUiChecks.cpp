@@ -1,10 +1,12 @@
 #include "PolicyUiChecks.h"
 #include "ControlledNetwork.h"
 #include "LoopbackPortLease.h"
+#include "PolicySystemProxyBackend.h"
 #include "SwirlBuildIdentity.h"
 #include "engine/EngineController.h"
 #include <QDir>
 #include <QFile>
+#include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -20,7 +22,7 @@
 
 int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QString &directory) {
     if(!window||!controller)return 1;
-    QJsonArray checks;int failures=0;
+    QJsonArray checks,captures;int failures=0;
     const auto check=[&](bool passed,const QString &name){checks.append(QJsonObject{{"name",name},{"passed",passed}});if(!passed)++failures;qInfo()<<(passed?"PASS":"FAIL")<<name;return passed;};
     std::function<QQuickItem *(QQuickItem *,const QString &)> find;
     find=[&](QQuickItem *parent,const QString &name)->QQuickItem *{if(parent->objectName()==name&&parent->isVisible())return parent;for(auto *child:parent->childItems())if(auto *found=find(child,name))return found;return nullptr;};
@@ -60,7 +62,17 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
         return true;
     };
     const auto fill=[&](const QString &name,const QString &text){auto *field=item(name);if(!check(field!=nullptr,QStringLiteral("Field exists: ")+name))return false;if(!check(std::all_of(text.cbegin(),text.cend(),[](QChar character){return character.unicode()<128;}),QStringLiteral("Keyboard fixture contains only ASCII input")))return false;field->forceActiveFocus();QTest::qWait(45);QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);for(const auto character:text)QTest::keyClick(window,character.toLatin1());return true;};
-    const auto finish=[&]{controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->policyBusy();},10000),QStringLiteral("Owned runtime and transaction finish before cleanup"));if(!directory.isEmpty()){QDir().mkpath(directory);QFile report(directory+"/policy-ui.json");if(!report.open(QIODevice::WriteOnly))return 3;report.write(QJsonDocument(QJsonObject{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"checks",checks},{"failures",failures},{"scope","Isolated real Qt input, committed policy receipts, Rust runtime and controlled loopback peers. No private-provider, host proxy, TUN or DNS mutations."}}).toJson());}return failures?2:0;};
+    auto *proxyBackend=dynamic_cast<PolicySystemProxyBackend *>(controller->systemProxy()->backend());
+    const auto finish=[&]{controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->policyBusy();},10000),QStringLiteral("Owned runtime and transaction finish before cleanup"));if(proxyBackend)check(!proxyBackend->current().owned&&proxyBackend->current().systemEnabled,QStringLiteral("Cleanup preserves the isolated external proxy after releasing only Swirl ownership"));if(!directory.isEmpty()){QDir().mkpath(directory);QFile report(directory+"/policy-ui.json");if(!report.open(QIODevice::WriteOnly))return 3;const QJsonObject proxyEvidence{{"backend",proxyBackend?"per-instance-memory":"missing"},{"takeovers",proxyBackend?proxyBackend->takeoverCalls:0},{"restores",proxyBackend?proxyBackend->restoreCalls:0},{"last_port",proxyBackend?proxyBackend->lastPort:0},{"last_pid",proxyBackend?double(proxyBackend->lastPid):0}};report.write(QJsonDocument(QJsonObject{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"checks",checks},{"captures",captures},{"system_proxy",proxyEvidence},{"failures",failures},{"scope","Isolated real Qt input, committed policy receipts, Rust runtime and controlled loopback peers. System-proxy ownership uses a per-instance in-memory adapter. No private-provider, host proxy, TUN or DNS mutations."}}).toJson());}return failures?2:0;};
+    if(!check(proxyBackend!=nullptr,QStringLiteral("Policy UI acceptance has a per-instance system-proxy adapter before any user action")))return finish();
+    check(proxyBackend->current().systemEnabled&&!proxyBackend->current().owned&&!controller->processAlive(),QStringLiteral("An external proxy starts enabled while Swirl remains stopped and unowned"));
+    const auto capture=[&](const QString &name){
+        if(directory.isEmpty())return;
+        QTest::qWait(250);QDir().mkpath(directory);const auto image=window->grabWindow();
+        const bool saved=!image.isNull()&&image.save(directory+"/"+name+".png");
+        captures.append(QJsonObject{{"name",name},{"saved",saved},{"width",image.width()},{"height",image.height()}});
+        check(saved,QStringLiteral("Actual owned Qt window capture is saved: ")+name);
+    };
     const auto document=[&]{return controller->policyDocument();};
     const auto recordNamed=[](const QVariantList &rows,const QString &name){for(const auto &value:rows){const auto row=value.toMap();if(row.value("name")==name)return row;}return QVariantMap{};};
     QString lastSavedRequest=controller->policyReceipt().value("request_id").toString();
@@ -81,6 +93,13 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
         return check(QTest::qWaitFor([&]{return !popup("policyTargetPicker");},12000),QStringLiteral("Target picker releases its modal grab after actual completion"));
     };
     const auto setTab=[&](int index){auto *tabs=item("policyTabs");if(!check(tabs!=nullptr,QStringLiteral("Policy tabs exist")))return;QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,tabs->mapToScene(QPointF(tabs->width()*(index?0.75:0.25),tabs->height()/2)).toPoint());QTest::qWait(100);check(eval("pageLoader.item.tabIndex").toInt()==index,QStringLiteral("Real segmented input selects requested policy tab"));};
+    const auto targetPresentation=[&](const QString &targetHook,const QString &sourceHook,const QString &nodeId,const QString &label){
+        QVariantMap node;for(const auto &row:controller->nodeCatalog()){const auto candidate=row.toMap();if(candidate.value("id")==nodeId){node=candidate;break;}}
+        const bool ready=QTest::qWaitFor([&]{return reachable(item(targetHook))&&reachable(item(sourceHook));},3500);
+        auto *target=item(targetHook),*source=item(sourceHook);
+        check(ready&&!node.isEmpty()&&!node.value("sourceName").toString().isEmpty()&&target->property("text").toString()==node.value("name").toString()
+              &&source->property("text").toString().contains(node.value("sourceName").toString())&&!target->property("truncated").toBool()&&!source->property("truncated").toBool(),label);
+    };
     const auto setCombo=[&](const QString &name,int index){
         if(!click(name))return;
         auto *control=item(name);auto *listPopup=control?qvariant_cast<QObject *>(control->property("popup")):nullptr;
@@ -98,6 +117,7 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     window->resize(1080,760);eval("AppState.navigate('policies')");
     auto *host=window->findChild<QObject *>("pageLoader");
     if(!check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;return active&&active->property("routeId")=="policies"&&!host->property("moving").toBool()&&!host->property("pendingGrab").toBool();},5000),QStringLiteral("Real policy page settles")))return finish();
+    const auto navigate=[&](const QString &route){eval("AppState.navigate('"+route+"')");return check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;return active&&active->property("routeId")==route&&!host->property("moving").toBool()&&!host->property("pendingGrab").toBool();},5000),QStringLiteral("Native page settles for user input: ")+route);};
     QTest::qWait(150);QSignalSpy applied(controller,&EngineController::policyApplyFinished);check(applied.isValid(),QStringLiteral("Configuration completion signal is observable"));
     if(controller->policyMigrationRequired()){
         const auto legacyDocument=controller->policyDocument();
@@ -110,14 +130,42 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
         check(QTest::qWaitFor([&]{return item("reviewPolicyMigration")&&!host->property("moving").toBool();},5000),QStringLiteral("Migration remains an explicit policy-page action"));
     }
     if(controller->policyMigrationRequired()){click("reviewPolicyMigration");click("confirmPolicyMigration");if(!awaitSaved(QStringLiteral("Legacy migration is explicitly reviewed before changes")))return finish();}
+    check(namedObjects("policyConnectButton").isEmpty(),QStringLiteral("Policy configuration has no separate connection control"));
+    check(controller->servicePolicies().isEmpty()&&controller->strategyGroups().isEmpty(),QStringLiteral("The controlled empty-state captures contain no fabricated policies or groups"));
+    capture("empty-service");setTab(1);capture("empty-groups");
+    const QStringList strategies{"manual","url_test","fallback","load_balance"};
+    for(int strategy=0;strategy<strategies.size();++strategy){
+        const auto emptyRevision=controller->savedRevision();
+        if(!click("createPolicyGroup-"+strategies[strategy]))return finish();
+        auto *editor=popup("policyGroupDialog");auto *type=item("policyGroupType");
+        check(editor&&type&&editor->property("strategy")==strategies[strategy]&&type->property("currentIndex").toInt()==strategy,QStringLiteral("Empty-state type entry opens its real strategy editor: ")+strategies[strategy]);
+        check(controller->strategyGroups().isEmpty()&&controller->savedRevision()==emptyRevision&&!controller->policyBusy(),QStringLiteral("Opening a strategy type does not invent or commit a group"));
+        const auto name="Preset fixture "+strategies[strategy];fill("policyGroupName",name);click("addPolicyGroupMember");chooseTarget("node",nodeA);
+        if(strategy==0)click("selectPolicyGroupMember-0");
+        click("savePolicyGroup");if(!awaitSaved(QStringLiteral("Empty-state type creation receives a real durable receipt: ")+strategies[strategy]))return finish();
+        const auto created=recordNamed(controller->strategyGroups(),name);const auto createdId=created.value("id").toString();
+        const auto members=created.value("members").toList();
+        check(!createdId.isEmpty()&&created.value("strategy")==strategies[strategy]&&members.size()==1&&members[0].toMap().value("id")==nodeA&&!controller->processAlive(),QStringLiteral("The selected type and actual candidate are stored without starting a runtime"));
+        if(createdId.isEmpty())return finish();
+        click("policyGroupMore-"+createdId);click("swirlContextOption-1");click("confirmDeletePolicy");
+        if(!awaitSaved(QStringLiteral("Unreferenced preset fixture is deleted through its actual menu")))return finish();
+        check(controller->strategyGroups().isEmpty(),QStringLiteral("Deleting the controlled group restores the real empty-state entry points"));
+    }
+    setTab(0);
     check(!controller->processMatchingAvailable(),QStringLiteral("Application process matching is truthfully unavailable"));
     click("defaultPolicyTarget");check(item("policyDirectTarget")==nullptr,QStringLiteral("Default proxy target picker excludes DIRECT"));chooseTarget("node",nodeA);
     if(!awaitSaved(QStringLiteral("Default node A is durably saved through real input")))return finish();
     check(controller->defaultPolicy().value("id")=="policy:default"&&controller->defaultPolicy().value("target").toMap().value("id")==nodeA,QStringLiteral("Permanent default policy holds stable identity and selected node"));
+    targetPresentation("defaultPolicyTargetText","defaultPolicySource",nodeA,QStringLiteral("Default routing shows the configured node and its real configuration source"));
     check(!controller->processAlive()&&controller->appliedRevision().isEmpty()&&!controller->policyReceipt().contains("applied_revision")&&controller->policyReceipt().value("scope")=="saved-next-connect",QStringLiteral("Offline save never claims an applied runtime revision"));
     setCombo("routingModePicker",1);if(!awaitSaved(QStringLiteral("Global mode is saved through the real mode control")))return finish();
-    LoopbackPortLease ports;if(!check(ports.reserve(),QStringLiteral("Dedicated mixed proxy and control ports are reserved")))return finish();controller->setProxyPort(ports.proxyPort());ports.release();click("policyConnectButton");
-    if(!check(QTest::qWaitFor([&]{return controller->apiHealthy()&&!controller->policyBusy();},15000),QStringLiteral("Configured default starts the actual Rust runtime")))return finish();
+    LoopbackPortLease ports;if(!check(ports.reserve(),QStringLiteral("Dedicated mixed proxy and control ports are reserved")))return finish();controller->setProxyPort(ports.proxyPort());ports.release();
+    if(!navigate("activity"))return finish();
+    check(item("proxyCapsule")&&item("proxyCapsule")->property("label").toString()==QStringLiteral("开启代理"),QStringLiteral("Activity offers to start Swirl even when another proxy is already enabled"));
+    if(!click("proxyCapsule"))return finish();
+    if(!check(QTest::qWaitFor([&]{return controller->apiHealthy()&&!controller->policyBusy()&&controller->systemProxy()->owned()&&controller->systemProxy()->enabled();},15000),QStringLiteral("Activity master switch starts the configured actual Rust runtime and takes isolated proxy ownership")))return finish();
+    check(proxyBackend->takeoverCalls==1&&proxyBackend->lastPid==controller->processId().toLongLong()&&proxyBackend->lastPort>0,QStringLiteral("Activity takeover follows the healthy live Rust listener rather than a host proxy flag"));
+    if(!navigate("policies"))return finish();
     const auto liveEpoch=controller->policyReceipt().value("engine_epoch").toString();
     check(!liveEpoch.isEmpty(),QStringLiteral("Live receipt reports the actual runtime epoch"));
     const auto request=[&](const QUrl &url,SocksPeer *expected,const QString &label){
@@ -136,6 +184,8 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     const auto addService=[&](const QString &name,const QString &domain,const QString &target){click("addServicePolicy");check(item("serviceMatchType")&&item("serviceMatchType")->property("count").toInt()==1,QStringLiteral("Unsupported application matching cannot be selected in the service form"));fill("servicePolicyName",name);fill("serviceDomainValue",domain);click("addServiceDomain");click("servicePolicyTarget");chooseTarget("node",target);click("saveServicePolicy");return awaitSaved(QStringLiteral("Service policy is committed from its real form"));};
     if(!addService("Dedicated fixture",serviceDomain,nodeA))return finish();
     const auto service=recordNamed(controller->servicePolicies(),"Dedicated fixture");const auto serviceId=service.value("id").toString();check(!serviceId.isEmpty(),QStringLiteral("New service receives a stable UUID"));
+    targetPresentation("servicePolicyTargetText-"+serviceId,"servicePolicySource-"+serviceId,nodeA,QStringLiteral("Saved service exposes its actual target and configuration source without opening an editor"));
+    capture("populated-service");
     setCombo("routingModePicker",0);if(!awaitSaved(QStringLiteral("Rule mode is acknowledged before service routing checks")))return finish();
     request(defaultUrl,&net.b,QStringLiteral("Unclassified rule traffic uses the default B"));request(serviceUrl,&net.a,QStringLiteral("Configured dedicated service uses A while ordinary traffic stays on B"));request(net.url(),nullptr,QStringLiteral("Necessary local traffic actually reaches the origin DIRECT"));
     click("addServicePolicy");fill("servicePolicyName","Overlapping fixture");fill("serviceDomainValue",childDomain);click("addServiceDomain");click("servicePolicyTarget");chooseTarget("node",nodeB);click("saveServicePolicy");
@@ -148,9 +198,9 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     click("servicePolicyEnabled-"+serviceId);awaitSaved(QStringLiteral("Re-enabling a service is committed"));
     setTab(1);
     const auto addManualGroup=[&](const QString &name,const QString &kind,const QString &memberId,bool includeB){
-        click("addPolicyGroup");fill("policyGroupName",name);click("addPolicyGroupMember");chooseTarget(kind,memberId);
+        click("addPolicyGroup");fill("policyGroupName",name);click("addPolicyGroupMember");if(includeB)capture("target-picker");chooseTarget(kind,memberId);
         if(includeB){click("addPolicyGroupMember");chooseTarget("node",nodeB);}
-        click("selectPolicyGroupMember-0");click("savePolicyGroup");return awaitSaved(QStringLiteral("Manual strategy group is committed through real form input"));
+        click("selectPolicyGroupMember-0");if(includeB)capture("group-editor");click("savePolicyGroup");return awaitSaved(QStringLiteral("Manual strategy group is committed through real form input"));
     };
     if(!addManualGroup("Manual fixture","node",nodeA,true))return finish();const auto groupA=recordNamed(controller->strategyGroups(),"Manual fixture").value("id").toString();
     if(!addManualGroup("Nested fixture","group",groupA,false))return finish();const auto groupB=recordNamed(controller->strategyGroups(),"Nested fixture").value("id").toString();
@@ -165,8 +215,12 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     click("swirlContextOption-1");click("confirmDeletePolicy");
     check(popup("deletePolicyDialog")&&controller->strategyGroups().size()==2,QStringLiteral("Deleting a group referenced by default is refused and retains both groups"));click("cancelDeletePolicy");
     check(QTest::qWaitFor([&]{return !popup("deletePolicyDialog");},4000),QStringLiteral("Cancelled deletion releases its modal grab before the connection control"));
-    if(!directory.isEmpty()){QDir().mkpath(directory);window->grabWindow().save(directory+"/strategy-groups.png");}
-    click("policyConnectButton");check(QTest::qWaitFor([&]{return !controller->processAlive();},10000),QStringLiteral("Policy connection control stops its owned runtime"));
+    capture("populated-groups");
+    if(!navigate("activity")||!click("proxyCapsule"))return finish();
+    check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->systemProxy()->owned()&&!controller->systemProxyBusy();},10000),QStringLiteral("Activity master switch stops its owned Rust runtime and releases its proxy ownership"));
+    check(proxyBackend->restoreCalls==1&&proxyBackend->current().systemEnabled&&!proxyBackend->current().owned,QStringLiteral("Stopping Swirl restores the pre-existing isolated external proxy instead of turning it off"));
+    QTest::qWait(200);check(!controller->processAlive()&&!controller->systemProxy()->owned()&&proxyBackend->takeoverCalls==1,QStringLiteral("Queued event processing leaves Swirl stopped without a second proxy takeover"));
+    if(!navigate("policies"))return finish();
     for(int strategy=1;strategy<=3;++strategy){
         click("addPolicyGroup");fill("policyGroupName",QString("Automatic fixture %1").arg(strategy));setCombo("policyGroupType",strategy);click("addPolicyGroupMember");chooseTarget("node",nodeA);click("policyGroupAdvanced");
         check(item("policyProbeFailureThreshold")&&item("policyProbeFailureThreshold")->property("text").toString()=="2",QStringLiteral("Advanced failure threshold exposes the core default"));

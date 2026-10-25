@@ -12,6 +12,7 @@
 #include <memory>
 #include <QJsonArray>
 #include <optional>
+class QTcpSocket;
 
 // QML sees only Swirl's generic business facade. Engine implementations are injected in C++.
 class EngineController final : public QObject {
@@ -51,6 +52,8 @@ class EngineController final : public QObject {
     Q_PROPERTY(QStringList supportedProtocols READ supportedProtocols CONSTANT)
     Q_PROPERTY(SystemProxySession* systemProxy READ systemProxy CONSTANT)
     Q_PROPERTY(bool systemProxyBusy READ systemProxyBusy NOTIFY statusChanged)
+    Q_PROPERTY(bool proxyRequested READ proxyRequested NOTIFY statusChanged)
+    Q_PROPERTY(bool systemProxyStopping READ systemProxyStopping NOTIFY statusChanged)
     Q_PROPERTY(QString routingMode READ routingMode NOTIFY statusChanged)
     Q_PROPERTY(QString routingError READ routingError NOTIFY statusChanged)
     Q_PROPERTY(bool routingBusy READ routingBusy NOTIFY statusChanged)
@@ -89,7 +92,7 @@ class EngineController final : public QObject {
     Q_PROPERTY(QString policyMigrationSummary READ policyMigrationSummary NOTIFY policyChanged)
     Q_PROPERTY(bool processMatchingAvailable READ processMatchingAvailable CONSTANT)
 public:
-    explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {},bool realAcceptance=false);
+    explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {},bool realAcceptance=false,std::unique_ptr<SystemProxySession::Backend> proxyBackend={});
     bool rustCoreBuild() const {
         return true;
     }
@@ -194,7 +197,9 @@ public:
     Q_INVOKABLE void setRoutingMode(const QString &mode);
     Q_INVOKABLE void setSystemProxy(bool enabled);
     Q_INVOKABLE void toggleSystemProxy();
-    bool systemProxyBusy() const { return m_proxyChecking||(m_proxyRequested&&busy()); }
+    bool proxyRequested() const { return m_proxyRequested; }
+    bool systemProxyStopping() const { return m_stopAfterPolicy||m_engine->status().state==ProxyEngine::State::Stopping; }
+    bool systemProxyBusy() const { return m_proxyChecking||(m_proxyRequested&&busy())||systemProxyStopping(); }
     QVariantMap policyDocument() const { return m_policyDocument.toVariantMap(); }
     bool policyV2Active() const { return m_store.configurationV2(); }
     QVariantMap defaultPolicy() const { return m_policyDocument.value("default_policy").toObject().toVariantMap(); }
@@ -259,11 +264,16 @@ private:
     bool commitRoutingConfiguration(const QStringList &rules,const QVariantList &groups);
     bool networkEditAllowed();
     void startConfiguredSession();
+    void cancelSystemProxyCheck();
+    void failSystemProxyRequest(const QString &error);
+    QString systemProxySessionError(const ProxyEngine::Status &status) const;
     QString m_networkError;
     QString m_routingError;
     int m_captureProxyPort=0;
     bool m_proxyRequested=false;
     bool m_proxyChecking=false;
+    quint64 m_proxyCheckGeneration=0;
+    QPointer<QTcpSocket> m_proxyCheckSocket;
     QString m_nodeError;
     QString m_pendingSelection,m_previousSelection;
     void rollbackPendingSelection(const QString &reason);

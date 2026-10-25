@@ -1,5 +1,6 @@
 #include "engine/EngineController.h"
 #include "engine/RustCoreEngine.h"
+#include "PolicySystemProxyBackend.h"
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
@@ -27,12 +28,13 @@ public:
     QJsonObject prepared,base;
     quint64 generation=1;
     bool rejectPrepare=false,rejectFinishOnce=false,rolledBack=false,gate=false;
-    int activations=0;
+    int activations=0,starts=0,stops=0;
     std::function<void()> beforeActivate,beforeRollback,beforeFinish;
     static QString digest(const QJsonObject &candidate) {
         return QString::fromLatin1(QCryptographicHash::hash(QJsonDocument(candidate).toJson(QJsonDocument::Compact),QCryptographicHash::Sha256).toHex());
     }
     void start(const EngineStartOptions &options) override {
+        ++starts;current.processId=QCoreApplication::applicationPid();
         current.state=State::Running;current.processAlive=true;current.apiHealthy=true;current.proxyPort=options.proxyPort;
         current.directSession=options.policyDocument.value("mode")==QJsonValue("direct");current.mode=options.policyDocument.value("mode").toString();
         current.configurationReceipt={{"engine_epoch","1"},{"generation",QString::number(generation)},
@@ -40,7 +42,7 @@ public:
             {"applied_mode",current.mode},{"store_id",options.configurationStoreId},{"request_id",options.configurationRequestId}};
         emit statusChanged();
     }
-    void stop() override {current.state=State::Stopped;current.processAlive=false;current.apiHealthy=false;current.configurationReceipt={};gate=false;emit statusChanged();}
+    void stop() override {++stops;current.state=State::Stopped;current.processAlive=false;current.apiHealthy=false;current.configurationReceipt={};gate=false;emit statusChanged();}
     void refresh() override {}
     void selectNode(const QString &) override {QFAIL("V2 coordinator used legacy selection");}
     void probeNode(const QUrl &) override {}
@@ -80,6 +82,26 @@ public:
         }else {QFAIL("Unexpected configuration command");}
         // Deliberately publish the reply before the telemetry notification.
         emit configurationCommandFinished(id,response);emit statusChanged();
+    }
+};
+
+class FailingPolicyProxyBackend final : public SystemProxySession::Backend {
+public:
+    PolicySystemProxyBackend memory;
+    State observed=memory.current();
+    bool rejectEnable=false,rejectRestore=false;
+    int enableAttempts=0,restoreAttempts=0;
+    State current() const {return observed;}
+    State refresh() override {return observed;}
+    State enable(int port,qint64 pid) override {
+        ++enableAttempts;
+        if(rejectEnable){observed.error=QStringLiteral("Controlled proxy acquisition failure");return observed;}
+        observed=memory.enable(port,pid);return observed;
+    }
+    State disable() override {
+        ++restoreAttempts;
+        if(rejectRestore){observed.error=QStringLiteral("Controlled proxy restoration failure");return observed;}
+        observed=memory.disable();return observed;
     }
 };
 
@@ -342,6 +364,62 @@ private slots:
         QCOMPARE(first.sourceDigest,QString::fromLatin1(QCryptographicHash::hash(plain,QCryptographicHash::Sha256).toHex()));
         QCOMPARE(second.sourceDigest,QString::fromLatin1(QCryptographicHash::hash(plain.toBase64(),QCryptographicHash::Sha256).toHex()));
         QVERIFY(first.sourceDigest!=second.sourceDigest);
+    }
+    void activityProxySwitchStartsSavedRustAndRestoresTheExternalProxy(){
+        QTemporaryDir dir;QTcpServer reserved;QVERIFY(reserved.listen(QHostAddress::LocalHost));const auto port=reserved.serverPort();
+        auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();
+        EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,dir.filePath("master.dpapi"),false,std::move(backend));
+        controller.setProxyPort(port);QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));const auto revision=controller.savedRevision();reserved.close();
+        QVERIFY(controller.systemProxy()->systemEnabled());QVERIFY(!controller.systemProxy()->owned());
+        controller.toggleSystemProxy();QVERIFY(controller.proxyRequested());
+        QTRY_VERIFY_WITH_TIMEOUT(controller.systemProxy()->owned()&&controller.systemProxy()->enabled(),7000);
+        QVERIFY(controller.processAlive());QCOMPARE(controller.appliedRevision(),revision);QCOMPARE(proxy->takeoverCalls,1);QCOMPARE(proxy->lastPort,int(port));QVERIFY(proxy->lastPid>0);
+        controller.toggleSystemProxy();QVERIFY(!controller.proxyRequested());
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive()&&!controller.busy(),5000);
+        QVERIFY(!controller.systemProxy()->owned());QVERIFY(controller.systemProxy()->systemEnabled());QCOMPARE(proxy->restoreCalls,1);QCOMPARE(controller.savedRevision(),revision);
+    }
+    void closingDuringTheListenerProbeCannotReacquireFromALateCallback(){
+        QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
+        auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("cancel.dpapi"),false,std::move(backend));
+        controller.setProxyPort(listener.serverPort());QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        controller.toggleSystemProxy();QVERIFY(controller.systemProxyBusy());controller.toggleSystemProxy();
+        QVERIFY(!controller.proxyRequested());QVERIFY(!controller.processAlive());QCOMPARE(proxy->enableCalls,0);
+        controller.toggleSystemProxy();QTRY_VERIFY_WITH_TIMEOUT(controller.systemProxy()->owned(),3000);
+        QTest::qWait(1600);QVERIFY(controller.proxyRequested());QVERIFY(controller.processAlive());QCOMPARE(proxy->enableCalls,1);QCOMPARE(engine->starts,2);
+        controller.toggleSystemProxy();QVERIFY(!controller.proxyRequested());QVERIFY(!controller.processAlive());QVERIFY(proxy->current().systemEnabled);QCOMPARE(proxy->restoreCalls,1);
+    }
+    void unavailableListenerRollsBackTheMasterIntentAndStopsTheCore(){
+        QTemporaryDir dir;QTcpServer reserved;QVERIFY(reserved.listen(QHostAddress::LocalHost));const auto port=reserved.serverPort();reserved.close();
+        auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("unavailable.dpapi"),false,std::move(backend));
+        controller.setProxyPort(port);QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        controller.toggleSystemProxy();QTRY_VERIFY_WITH_TIMEOUT(!controller.proxyRequested()&&!controller.processAlive(),3000);
+        QCOMPARE(engine->starts,1);QVERIFY(engine->stops>0);QCOMPARE(proxy->enableCalls,0);QVERIFY(proxy->current().systemEnabled);QVERIFY(!controller.routingError().isEmpty());
+    }
+    void acquisitionFailureStopsTheCoreAndRestorationFailureRetainsItsRetry(){
+        QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
+        auto backend=std::make_unique<FailingPolicyProxyBackend>();auto *proxy=backend.get();proxy->rejectEnable=true;
+        EngineController controller(std::make_unique<ConfigurationPeer>(),nullptr,dir.filePath("restore.dpapi"),false,std::move(backend));
+        controller.setProxyPort(listener.serverPort());QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        controller.toggleSystemProxy();QTRY_VERIFY_WITH_TIMEOUT(!controller.proxyRequested()&&!controller.processAlive(),3000);
+        QCOMPARE(proxy->enableAttempts,1);QVERIFY(proxy->current().systemEnabled);QVERIFY(controller.routingError().contains(QStringLiteral("acquisition failure")));
+        proxy->rejectEnable=false;controller.toggleSystemProxy();QTRY_VERIFY_WITH_TIMEOUT(controller.systemProxy()->owned(),3000);
+        proxy->rejectRestore=true;controller.toggleSystemProxy();QVERIFY(!controller.proxyRequested());QVERIFY(!controller.processAlive());
+        QVERIFY(controller.systemProxy()->owned());QVERIFY(controller.systemProxy()->error().contains(QStringLiteral("restoration failure")));
+        proxy->rejectRestore=false;controller.toggleSystemProxy();QVERIFY(!controller.systemProxy()->owned());QVERIFY(controller.systemProxy()->systemEnabled());QVERIFY(controller.systemProxy()->error().isEmpty());QCOMPARE(proxy->memory.restoreCalls,1);
+    }
+    void stoppingDuringADurablePolicyChangeClearsIntentBeforeDeferredShutdown(){
+        QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
+        auto backend=std::make_unique<PolicySystemProxyBackend>();auto *proxy=backend.get();auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("stop-policy.dpapi"),false,std::move(backend));
+        controller.setProxyPort(listener.serverPort());QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        controller.toggleSystemProxy();QTRY_VERIFY_WITH_TIMEOUT(controller.systemProxy()->owned(),3000);
+        bool deferred=false;engine->beforeActivate=[&]{controller.stop();deferred=controller.policyBusy()&&controller.processAlive()&&!controller.proxyRequested()&&!controller.systemProxy()->owned();};
+        QVERIFY(controller.applyPolicyDocument(changedDocument().toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy()&&!controller.processAlive(),5000);
+        QVERIFY(deferred);QVERIFY(!controller.proxyRequested());QVERIFY(!controller.systemProxy()->owned());QVERIFY(proxy->current().systemEnabled);QCOMPARE(proxy->takeoverCalls,1);QCOMPARE(proxy->restoreCalls,1);
+        QCOMPARE(controller.policyDocument(),changedDocument().toVariantMap());QVERIFY(controller.policyError().isEmpty());
     }
 };
 QTEST_GUILESS_MAIN(PolicyConfigurationTests)

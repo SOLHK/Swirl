@@ -2,6 +2,7 @@
 #include "SwirlBuildIdentity.h"
 #include "ControlledNetwork.h"
 #include "LoopbackPortLease.h"
+#include "PolicySystemProxyBackend.h"
 #include "engine/EngineController.h"
 #include <QQuickWindow>
 #include <QQuickItem>
@@ -27,6 +28,8 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     if(!window||!controller)return 1;
     int checks=0,failures=0;
     const auto check=[&](bool ok,const char *label){++checks;if(!ok)++failures;qInfo()<<(ok?"PASS":"FAIL")<<label;return ok;};
+    auto *proxyBackend=dynamic_cast<PolicySystemProxyBackend *>(controller->systemProxy()->backend());
+    if(!check(proxyBackend!=nullptr,"node acceptance uses a per-instance system-proxy sandbox before any input"))return 2;
     std::function<QQuickItem *(QQuickItem *,const QString &)> find;
     find=[&](QQuickItem *p,const QString &n)->QQuickItem *{if(p->objectName()==n)return p;for(auto *c:p->childItems())if(auto *f=find(c,n))return f;return nullptr;};
     const auto item=[&](const QString &n){return find(window->contentItem(),n);};
@@ -100,9 +103,13 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
             check(QTest::qWaitFor([&]{return !controller->policyBusy()&&controller->policyDocument().value("mode")=="global";},10000),"controlled node regression explicitly applies global routing through real input");
         }
         const bool wasRunning=controller->processAlive();
+        check(item("policyConnectButton")==nullptr,"policy configuration has no separate connection control");
         if(toggleConnection){
-            click("policyConnectButton");
-            check(QTest::qWaitFor([&]{return wasRunning?controller->canStart():controller->apiHealthy();},15000),"policy connection action reaches its real runtime state");
+            eval("AppState.navigate('activity')");
+            check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;auto *capsule=item("proxyCapsule");return active&&active->property("routeId").toString()=="activity"&&!host->property("moving").toBool()&&!host->property("pendingGrab").toBool()&&capsule&&capsule->isVisible();},3500),"activity master switch settles before real input");
+            click("proxyCapsule");
+            check(QTest::qWaitFor([&]{return wasRunning?controller->canStart()&&!controller->systemProxy()->owned():controller->apiHealthy()&&controller->systemProxy()->owned()&&controller->systemProxy()->enabled();},15000),"activity master switch reaches its real runtime and isolated proxy state");
+            check(proxyBackend->current().systemEnabled,"activity start and stop preserve the pre-existing external proxy in the sandbox");
         }else if(wasRunning){
             check(QTest::qWaitFor([&]{return !controller->nodeBusy()&&!controller->policyBusy()&&controller->activeNodeId()==id;},10000),"policy exit selection is applied before resource inspection");
         }
@@ -156,18 +163,31 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                     import QtQuick
                     QtObject {
                         property bool busy: false
+                        property bool policyBusy: false
+                        property bool processAlive: false
+                        property bool proxyRequested: false
+                        property bool systemProxyStopping: false
                         property bool systemProxyBusy: false
+                        property string errorCode: "None"
                         property string routingError: ""
+                        property string policyError: ""
                         property string error: ""
                         property int calls: 0
+                        property QtObject imports: QtObject { property bool busy: false }
                         property QtObject systemProxy: QtObject {
                             property bool systemEnabled: false
+                            property bool enabled: false
+                            property bool owned: false
                             property string stateReadError: ""
                             property string error: ""
                         }
                         function toggleSystemProxy() {
                             calls++
-                            systemProxy.systemEnabled=!systemProxy.systemEnabled
+                            proxyRequested=!proxyRequested
+                            processAlive=proxyRequested
+                            systemProxy.owned=proxyRequested
+                            systemProxy.enabled=proxyRequested
+                            systemProxy.systemEnabled=proxyRequested
                         }
                     }
                 )",QUrl());
@@ -189,17 +209,21 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                             click("proxyCapsule");
                             qInfo()<<"Main proxy legacy readiness evidence"<<legacyReady<<legacyRoute<<legacyPoint<<legacySize<<clicked.count()<<fake->property("calls").toInt();
                             check(clicked.count()==1&&fake->property("calls").toInt()==1,"visible Main proxy accepts an immediate click while the previous page retires");
-                            check(capsule->property("label").toString()==QStringLiteral("关闭系统代理")&&eval("AppState.currentPage==='activity'").toBool(),"immediate Main proxy action updates its label without navigation");
+                            check(capsule->property("label").toString()==QStringLiteral("关闭代理")&&eval("AppState.currentPage==='activity'").toBool(),"immediate Main proxy action updates its label without navigation");
                             check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;return active&&active->property("routeId").toString()=="activity"&&!host->property("pendingGrab").toBool()&&!host->property("moving").toBool()&&capsule->isVisible()&&capsule->width()>0&&capsule->height()>0;},3500),"read-only Main proxy input test settles on Activity");
                             fake->setProperty("calls",0);
+                            fake->setProperty("proxyRequested",false);
+                            fake->setProperty("processAlive",false);
+                            fake->property("systemProxy").value<QObject *>()->setProperty("owned",false);
+                            fake->property("systemProxy").value<QObject *>()->setProperty("enabled",false);
                             fake->property("systemProxy").value<QObject *>()->setProperty("systemEnabled",false);
                             clicked.clear();
                             click("proxyCapsule");
                             check(clicked.count()==1&&fake->property("calls").toInt()==1,"real Main proxy pointer dispatches enable exactly once");
-                            check(capsule->property("label").toString()==QStringLiteral("关闭系统代理"),"real Main proxy input updates observed action label");
+                            check(capsule->property("label").toString()==QStringLiteral("关闭代理"),"real Main proxy input updates observed action label");
                             click("proxyCapsule");
                             check(clicked.count()==2&&fake->property("calls").toInt()==2,"real Main proxy pointer dispatches disable exactly once");
-                            check(capsule->property("label").toString()==QStringLiteral("开启系统代理"),"real Main proxy second input restores enable label");
+                            check(capsule->property("label").toString()==QStringLiteral("开启代理"),"real Main proxy second input restores enable label");
                             check(eval("AppState.currentPage==='activity'").toBool(),"real Main proxy pointer input does not navigate");
                         }
                     }
@@ -212,23 +236,20 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
             check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;return active&&active->property("routeId").toString()=="proxies"&&!host->property("moving").toBool()&&!host->property("pendingGrab").toBool();},3500),"read-only Main proxy input test returns to nodes");
         }
         if(qEnvironmentVariable("SWIRL_SYSTEM_PROXY_TEST")==QStringLiteral("1")) {
-            const auto original=SystemProxySession::snapshot();
-            if(!check(!original.isEmpty(),"disposable proxy UI test snapshots original settings"))return 2;
             const int failuresBefore=failures;
-            struct RestoreProxy {
-                EngineController *controller;QJsonObject original;
-                ~RestoreProxy(){controller->setSystemProxy(false);SystemProxySession::apply(original);controller->systemProxy()->refresh();}
-            } restore{controller,original};
-            controller->setSystemProxy(false);
-            if(!check(controller->systemProxy()->turnOffSystemProxy(),"disposable proxy UI test starts from observed off state"))return 2;
             eval("AppState.navigate('activity')");
             check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;auto *capsule=item("proxyCapsule");return active&&active->property("routeId").toString()=="activity"&&!host->property("pendingGrab").toBool()&&!host->property("moving").toBool()&&capsule&&capsule->isVisible()&&capsule->width()>0&&capsule->height()>0;},3500),"proxy action page settles before real input");
-            const auto pidBefore=controller->processId();
             auto *actualCapsule=item("proxyCapsule");
             QSignalSpy actualClicked(actualCapsule,SIGNAL(clicked()));
             check(actualClicked.isValid(),"actual proxy action clicked signal is observed");
+            const auto savedSelection=controller->selectedNodeId();
             click("proxyCapsule");
-            const bool firstEnabled=QTest::qWaitFor([&]{return controller->systemProxy()->owned()&&controller->systemProxy()->enabled()&&controller->systemProxy()->systemEnabled();},5000);
+            if(!check(QTest::qWaitFor([&]{return controller->canStart()&&!controller->systemProxy()->owned()&&!controller->systemProxyBusy();},10000),"activity master switch stops the live runtime and restores only its isolated proxy ownership"))return 2;
+            check(proxyBackend->current().systemEnabled,"activity stop preserves the pre-existing external proxy instead of turning it off");
+            check(!savedSelection.isEmpty()&&controller->selectedNodeId()==savedSelection,"one-click enable retains the configured node while stopped");
+            actualClicked.clear();
+            click("proxyCapsule");
+            const bool firstEnabled=QTest::qWaitFor([&]{return controller->apiHealthy()&&controller->systemProxy()->owned()&&controller->systemProxy()->enabled()&&controller->systemProxy()->systemEnabled();},15000);
             const int firstEnableClicks=int(actualClicked.count());
             const QJsonObject firstEnableState{{"owned",controller->systemProxy()->owned()},{"enabled",controller->systemProxy()->enabled()},{"systemEnabled",controller->systemProxy()->systemEnabled()},
                 {"busy",controller->busy()},{"systemProxyBusy",controller->systemProxyBusy()},{"apiHealthy",controller->apiHealthy()},
@@ -236,32 +257,24 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                 {"proxyError",controller->systemProxy()->error()},{"routingError",controller->routingError()},{"stateReadError",controller->systemProxy()->stateReadError()}};
             qInfo()<<"Proxy UI first enable evidence"<<firstEnableClicks<<QJsonDocument(firstEnableState).toJson(QJsonDocument::Compact);
             check(firstEnableClicks==1,"actual proxy enable pointer reaches its clicked handler exactly once");
-            if(check(firstEnabled,"actual activity button enables Windows proxy through the live Rust listener")) {
-                check(controller->processId()==pidBefore&&controller->apiHealthy(),"proxy enable reuses the existing healthy Rust runtime");
+            if(check(firstEnabled,"activity master switch starts the saved Rust node and acquires isolated proxy ownership in one click")) {
+                check(controller->selectedNodeId()==savedSelection&&controller->apiHealthy(),"activity enable retains the configured exit and confirms its live Rust runtime");
                 check(eval("AppState.currentPage==='activity'").toBool(),"actual proxy enable does not navigate");
                 click("proxyCapsule");
-                check(QTest::qWaitFor([&]{return !controller->systemProxy()->systemEnabled()&&!controller->systemProxy()->owned();},3000),"actual activity button disables Windows proxy");
+                check(QTest::qWaitFor([&]{return controller->canStart()&&!controller->systemProxy()->owned()&&!controller->systemProxyBusy();},10000),"activity master switch stops Rust and releases its own proxy session");
                 check(eval("AppState.currentPage==='activity'").toBool(),"actual proxy disable does not navigate");
-                const auto savedSelection=controller->selectedNodeId();
-                controller->stop();
-                if(check(QTest::qWaitFor([&]{return controller->canStart();},4000),"one-click enable test stops the runtime while preserving its saved node")) {
+                const bool restored=proxyBackend->current().systemEnabled&&!proxyBackend->current().owned;
+                if(check(restored,"activity stop restores the original external proxy entirely inside the sandbox")) {
                     check(!savedSelection.isEmpty()&&controller->selectedNodeId()==savedSelection,"one-click enable retains the configured node while stopped");
                     click("proxyCapsule");
-                    check(QTest::qWaitFor([&]{return controller->apiHealthy()&&controller->systemProxy()->owned()&&controller->systemProxy()->enabled();},15000),"actual activity button starts the saved node and enables Windows proxy in one click");
+                    check(QTest::qWaitFor([&]{return controller->apiHealthy()&&controller->systemProxy()->owned()&&controller->systemProxy()->enabled();},15000),"activity master switch restarts the saved node and isolated proxy in one click");
                     check(eval("AppState.currentPage==='activity'").toBool(),"cold proxy enable does not navigate to the node page");
-                    click("proxyCapsule");
-                    check(QTest::qWaitFor([&]{return !controller->systemProxy()->systemEnabled()&&!controller->systemProxy()->owned();},3000),"actual activity button disables proxy after one-click runtime startup");
                 }
             }
-            controller->setSystemProxy(false);
-            check(SystemProxySession::apply(original),"disposable proxy UI test restores original Windows settings");
-            controller->systemProxy()->refresh();
-            const bool restored=SystemProxySession::snapshot()==original;
-            check(restored,"disposable proxy UI test verifies original settings restored");
             const auto reportPath=qEnvironmentVariable("SWIRL_SYSTEM_PROXY_UI_REPORT");
             QFile report(reportPath);
-            if(check(!reportPath.isEmpty()&&report.open(QIODevice::WriteOnly),"disposable proxy UI evidence file opens"))
-                report.write(QJsonDocument(QJsonObject{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"executed",true},{"restored",restored},{"success",failures==failuresBefore},
+            if(check(!reportPath.isEmpty()&&report.open(QIODevice::WriteOnly),"isolated proxy UI evidence file opens"))
+                report.write(QJsonDocument(QJsonObject{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"executed",true},{"backend","per-instance-memory"},{"restoration_observed",proxyBackend->restoreCalls>0},{"host_proxy_mutations",false},{"success",failures==failuresBefore},
                     {"first_enable_click_count",firstEnableClicks},{"first_enable_state",firstEnableState}}).toJson());
             eval("AppState.navigate('proxies')");QTest::qWait(350);
         }
