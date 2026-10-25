@@ -1258,6 +1258,17 @@ external-controller: 0.0.0.0:9090
         NodeStore reloaded(store.filePath());QCOMPARE(reloaded.subscriptions().first().url,server.url());QCOMPARE(reloaded.subscriptions().first().importScope,QString("nodes-only"));QCOMPARE(reloaded.nodes().first().port,quint16(1081));
         QVERIFY(service.saveSubscription(source,"Paused",{},15,false));QCOMPARE(store.subscriptions().first().importScope,QString("nodes-only"));
         QVERIFY(service.removeSubscription(source));QVERIFY(store.subscriptions().isEmpty());QVERIFY(store.nodes().isEmpty());QVERIFY(store.selectedId().isEmpty());
+        // Re-adding the exact deleted URL must create a fresh source and nodes,
+        // without reviving the removed runtime selection or cached failures.
+        server.code=200;server.content=socks(1082);
+        QVERIFY(service.saveSubscription({},"Re-added",server.url(),15,false));
+        const auto replacement=store.subscriptions().first().id;QVERIFY(replacement!=source);
+        service.refreshSubscription(replacement);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),4000);
+        QCOMPARE(store.nodes().size(),1);QCOMPARE(store.nodes().first().port,quint16(1082));
+        QCOMPARE(store.nodes().first().sourceId,replacement);QVERIFY(store.selectedId().isEmpty());
+        QVERIFY(service.providers().first().toMap().value("error").toString().isEmpty());
+        NodeStore reopened(store.filePath());QCOMPARE(reopened.nodes().size(),1);
+        QCOMPARE(reopened.subscriptions().first().id,replacement);
     }
     void httpsRedirectAndDowngradeProtection() {
         const auto original=QSslConfiguration::defaultConfiguration();

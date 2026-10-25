@@ -71,6 +71,8 @@ public:
     void setAsyncConfigurationApplier(ApplyConfigurationAsync apply) { m_applyAsync=std::move(apply); }
     using CatalogMutationApplier=std::function<bool(const QString &,const QVariantMap &,ApplyCompletion,QString *)>;
     void setCatalogMutationApplier(CatalogMutationApplier apply) { m_catalogApply=std::move(apply); }
+    // Runtime notification only: exclude Swirl's listener from subscription
+    // recovery. It must never force downloads through the selected node.
     void setDownloadProxy(int port);
     void rememberOwnedProxyPort(int port);
 signals:
@@ -126,6 +128,5 @@ private:
     int m_downloadAttempts=0;
     QUrl m_downloadUrl;
     bool m_committing=false;
-    int m_proxyPort=0;
     QSet<quint16> m_ownedProxyPorts;
 };

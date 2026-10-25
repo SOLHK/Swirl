@@ -89,7 +89,7 @@ try {
         "-DSWIRL_RUST_TARGET=$rustTarget",'-DSWIRL_BUILD_CORE_TESTS=ON',
         '-DSWIRL_BUILD_UI_TESTS=OFF','-DSWIRL_XRAY_UI_TESTS=OFF')
     Run-Step 'configure-focused-tests' { Checked cmake $configure }
-    $targets = @('SwirlRustCoreTests','SwirlRustCoreLibraryTests','SwirlNodeTests','SwirlImportTests',
+    $targets = @('SwirlRustCoreTests','SwirlRustCoreLibraryTests','SwirlNodeTests','SwirlImportTests','SwirlXrayDownloadTests',
         'SwirlSubscriptionFormatTests','SwirlNetworkRegressionTests','SwirlDiagnosticTests',
         'SwirlSystemProxyStateTests','SwirlQtNetworkPolicyTests','SwirlCodexLauncherTests',
         'SwirlTelemetryTests','SwirlNodeViewModelTests','SwirlNodeSectionModelTests','SwirlPolicyConfigurationTests','SwirlCatalogTransactionTests','SwirlWindowShadowTests')
@@ -100,7 +100,7 @@ try {
     $report.compiler_cache_ready = $true
     if ($env:GITHUB_OUTPUT) { 'cache-ready=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append }
     Run-Step 'deploy-test-runtime' { Checked windeployqt @('--release','--compiler-runtime',(Join-Path $build 'SwirlRustCoreTests.exe')) }
-    $pattern = '^swirl-(rust-library-loader|rust-qt-integration|node-real-chain|stream-regression|import-subscription|subscription-formats|diagnostic-export|system-proxy-state|qt-network-policy|codex-proxy-launcher|telemetry-accounting|node-view-model|node-section-model|policy-configuration|catalog-transaction|window-shadow'
+    $pattern = '^swirl-(rust-library-loader|rust-qt-integration|node-real-chain|stream-regression|import-subscription|subscription-download|subscription-formats|diagnostic-export|system-proxy-state|qt-network-policy|codex-proxy-launcher|telemetry-accounting|node-view-model|node-section-model|policy-configuration|catalog-transaction|window-shadow'
     if ($DisposableSystemProxyTests) { $pattern += '|system-proxy-recovery' }
     $pattern += ')$'
     Run-Step 'focused-core-security-network-tests' { Checked ctest @('--test-dir',$build,'-C','Release','-R',$pattern,'--output-on-failure','--test-output-size-passed','1048576','--no-tests=error','--output-junit',(Join-Path $evidence 'focused-tests.xml')) }

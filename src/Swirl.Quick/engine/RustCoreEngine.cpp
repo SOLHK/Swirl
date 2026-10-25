@@ -395,6 +395,12 @@ void RustCoreEngine::failProbe(const QString &stage,const QString &code,int http
   ?NodeHealth::Unavailable:NodeHealth::Unknown;
  m_status.latencyMs=-1;m_status.responseCode=httpStatus;
  m_status.nodeMessage=QStringLiteral("Rust HEAD 探测失败（阶段 %1，代码 %2）").arg(stage.isEmpty()?QStringLiteral("unknown"):stage,code);
+ if(code=="MissingTarget" || code=="DefaultUnconfigured"){
+  m_status.nodeHealth=NodeHealth::Unknown;
+  m_status.nodeMessage+=code=="MissingTarget"
+   ?QStringLiteral("。当前策略引用的出口已删除或不存在；请到「策略」重新选择出口。")
+   :QStringLiteral("。默认策略尚未选择出口；请到「策略」设置默认出口。");
+ }
 }
 void RustCoreEngine::updateProbe(const QJsonObject &probe){
  const auto requestId=probe.value("request_id").toInteger(-1);

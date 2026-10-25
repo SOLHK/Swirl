@@ -427,7 +427,7 @@ private slots:
         QCOMPARE(proxy.connections,1);QCOMPARE(server.requests,1);import.service.cancelImport();verifyUnchanged(import);
     }
 #endif
-    void coreDownloadProxyHasPriorityAndStoppedCoreFallsBackToSystem() {
+    void subscriptionRecoveryUsesExternalSystemProxyWhileCoreRuns() {
         FixtureTrust trust(true,true);QVERIFY(trust.valid);HttpsFixture server(trust.server);
         server.respond=[](QSslSocket *socket,const auto &){HttpsFixture::reply(socket,configuration());};
         QVERIFY(server.listen(QHostAddress::LocalHost));ConnectProxyFixture core(server.serverPort()),system(server.serverPort());
@@ -435,23 +435,26 @@ private slots:
         const auto queries=std::make_shared<std::atomic_int>(0);
         ImportFixture import([choice=system.proxy(),queries](const auto &){++*queries;return QList<QNetworkProxy>{choice};});
         import.service.setDownloadProxy(core.serverPort());import.service.importUrl(ConnectProxyFixture::remoteUrl());
-        QTRY_VERIFY_WITH_TIMEOUT(import.service.hasPreview(),10000);QCOMPARE(core.connections,1);QCOMPARE(system.connections,0);QCOMPARE(queries->load(),0);
+        QTRY_VERIFY_WITH_TIMEOUT(import.service.hasPreview(),10000);QCOMPARE(core.connections,0);QCOMPARE(system.connections,1);QCOMPARE(queries->load(),1);
         import.service.cancelImport();import.service.setDownloadProxy(0);import.service.importUrl(ConnectProxyFixture::remoteUrl());
-        QTRY_VERIFY_WITH_TIMEOUT(import.service.hasPreview(),10000);QCOMPARE(core.connections,1);QCOMPARE(system.connections,1);QCOMPARE(queries->load(),1);
+        QTRY_VERIFY_WITH_TIMEOUT(import.service.hasPreview(),10000);QCOMPARE(core.connections,0);QCOMPARE(system.connections,2);QCOMPARE(queries->load(),2);
         QCOMPARE(server.requests,2);import.service.cancelImport();verifyUnchanged(import);
     }
-    void staleOwnSystemProxyIsRejectedBeforeConnecting_data() {
+    void ownSystemProxyIsExcludedFromSubscriptionBootstrap_data() {
         QTest::addColumn<bool>("captureRelay");QTest::newRow("core endpoint")<<false;QTest::newRow("owned capture relay")<<true;
     }
-    void staleOwnSystemProxyIsRejectedBeforeConnecting() {
+    void ownSystemProxyIsExcludedFromSubscriptionBootstrap() {
         QFETCH(bool,captureRelay);
         ConnectProxyFixture stale(0);QVERIFY(stale.listen(QHostAddress::LocalHost));
         ImportFixture import([choice=stale.proxy()](const auto &){return QList<QNetworkProxy>{choice};});
         if(captureRelay)import.service.rememberOwnedProxyPort(stale.serverPort());
         else {import.service.setDownloadProxy(stale.serverPort());import.service.setDownloadProxy(0);}
-        QElapsedTimer elapsed;elapsed.start();import.service.importUrl(ConnectProxyFixture::remoteUrl());
-        QTRY_VERIFY_WITH_TIMEOUT(!import.service.busy(),3000);QVERIFY(elapsed.elapsed()<3000);QCOMPARE(stale.connections,0);
-        QVERIFY(import.service.message().contains(QStringLiteral("已停止的 Swirl")));verifyUnchanged(import);
+        QSignalSpy diagnostics(&import.service,&NodeImportService::downloadDiagnostic);
+        import.service.importUrl(ConnectProxyFixture::remoteUrl());
+        QTRY_VERIFY_WITH_TIMEOUT(!diagnostics.isEmpty(),3000);
+        QVERIFY(diagnostics.first().first().toString().contains("route-policy=bootstrap-direct"));
+        QCOMPARE(stale.connections,0);
+        import.service.cancelImport();verifyUnchanged(import);
     }
     void staleOwnSystemProxyDoesNotDiscardOtherSystemAlternatives() {
         FixtureTrust trust(true,true);QVERIFY(trust.valid);HttpsFixture server(trust.server);
@@ -513,8 +516,8 @@ private slots:
         verifyUnchanged(import);QCOMPARE(proxy.connections,0);
         // The canceled platform query may still return. A new authorized
         // runtime request must not inherit or be overwritten by that result.
-        import.service.setDownloadProxy(proxy.serverPort());import.service.importUrl(ConnectProxyFixture::remoteUrl());
-        gate->release();QTRY_VERIFY_WITH_TIMEOUT(returned->load(),3000);QTRY_VERIFY2_WITH_TIMEOUT(import.service.hasPreview(),qPrintable(import.service.message()),10000);
+        import.service.importUrl(ConnectProxyFixture::remoteUrl());
+        gate->release(2);QTRY_VERIFY_WITH_TIMEOUT(returned->load(),3000);QTRY_VERIFY2_WITH_TIMEOUT(import.service.hasPreview(),qPrintable(import.service.message()),10000);
         QCOMPARE(proxy.connections,1);QCOMPARE(server.requests,1);import.service.cancelImport();verifyUnchanged(import);
     }
     void sameOriginRelativeRedirectPreservesAuthorizedRequest() {
@@ -812,6 +815,14 @@ private slots:
         const auto bytes=[&]{QFile file(store.filePath());if(!file.open(QIODevice::ReadOnly))return QByteArray{};return file.readAll();};
         const auto before=bytes();QVERIFY(!before.isEmpty());QVERIFY(!before.contains(Uuid.toUtf8()));QVERIFY(!before.contains(Token.toUtf8()));
         NodeImportService service(&store);QSignalSpy applied(&service,&NodeImportService::nodesApplied),changes(&service,&NodeImportService::changed);
+        service.setAsyncConfigurationApplier([&store](const NodeImporter::Result &result,const QString &source,bool nodesOnly,NodeImportService::ApplyCompletion completion,QString *error){
+            if(!nodesOnly || !result.configuration.isEmpty() || !store.networkConfiguration().isEmpty()){
+                *error=QStringLiteral("Download fixture cannot apply a network policy");return false;
+            }
+            NodeStore::ImportPlan plan;
+            if(!store.prepareImport(result.nodes,source,&plan)){*error=store.error();return false;}
+            return store.commitImportAsync(plan,{},std::move(completion));
+        });
         service.refreshSubscription(active);QTRY_COMPARE_WITH_TIMEOUT(server.requests,1,10000);
         QVERIFY(service.busy());QVERIFY(service.providers().at(0).toMap().value("canCancel").toBool());
         service.cancelImport();QVERIFY(service.busy()); // Closing a manual dialog cannot own this refresh.

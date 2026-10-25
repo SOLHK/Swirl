@@ -6,6 +6,7 @@
 #include <QNetworkRequest>
 #include <QHostAddress>
 #include <QDateTime>
+#include <QJsonArray>
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
@@ -234,8 +235,7 @@ void NodeImportService::next() {
     }
 }
 void NodeImportService::setDownloadProxy(int port) {
-    m_proxyPort=port>0&&port<=65535?port:0;
-    rememberOwnedProxyPort(m_proxyPort);
+    rememberOwnedProxyPort(port);
 }
 void NodeImportService::rememberOwnedProxyPort(int port) {
     // Only actual runtime ports are recorded. A third-party loopback proxy at
@@ -245,7 +245,8 @@ void NodeImportService::rememberOwnedProxyPort(int port) {
 void NodeImportService::download(const QUrl &url,int redirects) {
     if(!NodeStore::allowedSubscriptionUrl(url) || redirects>5){finish(QStringLiteral("订阅重定向不安全或次数过多；旧节点保持不变。"));return;}
     if(loopbackHost(url.host())){startDownload(url,redirects,{QNetworkProxy(QNetworkProxy::NoProxy)});return;}
-    if(m_proxyPort){startDownload(url,redirects,{QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",quint16(m_proxyPort))});return;}
+    // Subscription recovery must not depend on the nodes it is downloading.
+    // Use the platform's external proxy policy even while our core is running.
     // PAC discovery can block in platform APIs. Keep it off the UI thread and
     // within the same cancellation generation / total download deadline.
     const auto resolver=m_systemProxyResolver;const auto generation=m_generation;QPointer<NodeImportService> guard(this);
@@ -253,21 +254,27 @@ void NodeImportService::download(const QUrl &url,int redirects) {
         const auto proxies=resolver(QNetworkProxyQuery(url));
         QMetaObject::invokeMethod(QCoreApplication::instance(),[guard,generation,url,redirects,proxies]{
             if(!guard || guard->m_shuttingDown || !guard->m_busy || guard->m_generation!=generation)return;
-            if(guard->m_proxyPort){guard->startDownload(url,redirects,{QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",quint16(guard->m_proxyPort))});return;}
-            QList<QNetworkProxy> usable;bool stoppedCore=false;
+            QList<QNetworkProxy> usable;bool ownProxy=false;
             for(const auto &proxy:proxies){
                 if(proxy.type()==QNetworkProxy::NoProxy){usable.append(proxy);continue;}
-                if(loopbackHost(proxy.hostName()) && guard->m_ownedProxyPorts.contains(proxy.port())){stoppedCore=true;continue;}
+                if(loopbackHost(proxy.hostName()) && guard->m_ownedProxyPorts.contains(proxy.port())){ownProxy=true;continue;}
                 if(proxy.hostName().isEmpty() || !proxy.port())continue;
                 if(proxy.type()==QNetworkProxy::HttpProxy || proxy.type()==QNetworkProxy::Socks5Proxy ||
                    (url.scheme()=="http" && proxy.type()==QNetworkProxy::HttpCachingProxy))usable.append(proxy);
             }
+            if(usable.isEmpty() && ownProxy){
+                // Our own listener is a routing dependency, not an external
+                // network policy. Bootstrap only this downloader directly when
+                // it is the sole configured route, including after node deletion.
+                usable.append(QNetworkProxy(QNetworkProxy::NoProxy));
+                emit guard->downloadDiagnostic(QStringLiteral("route-policy=bootstrap-direct; reason=own-proxy-excluded"));
+                if(!guard || guard->m_shuttingDown || !guard->m_busy || guard->m_generation!=generation)return;
+            }
             if(usable.isEmpty()){
-                guard->finish(stoppedCore?QStringLiteral("系统代理仍指向已停止的 Swirl 端口；请恢复系统代理或重新连接后重试。旧节点保持不变。"):
-                    QStringLiteral("无法获得适用于订阅下载的系统代理；请检查系统代理设置后重试。旧节点保持不变。"));return;
+                guard->finish(QStringLiteral("无法获得适用于订阅下载的系统代理；请检查系统代理设置后重试。旧节点保持不变。"));return;
             }
             // Preserve the platform's ordered alternatives, including DIRECT
-            // only when the platform explicitly returned NoProxy.
+            // without retrying a failed external proxy over a direct connection.
             guard->startDownload(url,redirects,usable);
         },Qt::QueuedConnection);
     });
@@ -472,6 +479,17 @@ void NodeImportService::applied(const QString &format,qsizetype count,int incomp
         if(!m_applicationNotice.isEmpty())m_message+=QStringLiteral(" ")+m_applicationNotice;
     }
     if(m_compatibilityRequest)m_message+=QStringLiteral(" 已通过兼容客户端格式协商下载，内容仍按实际格式完成校验。");
+    if(m_store->configurationV2()){
+        const auto policy=m_store->networkConfiguration().value("policyDocumentV2").toObject();
+        const auto target=policy.value("default_policy").toObject().value("target").toObject();
+        bool missing=target.value("kind")==QJsonValue("unconfigured");
+        for(const auto &entry:policy.value("missing_targets").toArray()){
+            const auto removed=entry.toObject();
+            missing|=removed.value("kind")==target.value("kind") && removed.value("id")==target.value("id");
+        }
+        if(missing && policy.value("mode")!=QJsonValue("direct"))
+            m_message+=QStringLiteral(" 默认策略尚无有效出口；请到「策略 → 默认策略 → 更换出口」选择本次导入的节点。");
+    }
     if(certificatesEnforced)m_message+=QStringLiteral(" %1 条 Trojan 记录原请求跳过证书验证；Swirl 已保持验证开启，证书异常仍会拒绝连接。详情页可查看说明。").arg(certificatesEnforced);
     const QPointer<NodeImportService> guard(this);emit nodesApplied();if(guard)finish();
 }

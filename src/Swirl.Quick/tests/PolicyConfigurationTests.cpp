@@ -209,6 +209,24 @@ private slots:
         QCOMPARE(retained.id,secret.id);QCOMPARE(retained.name,secret.name);QVERIFY(retained.password.isEmpty());QVERIFY(retained.host.isEmpty());QVERIFY(retained.sourceDocument.isEmpty());QVERIFY(retained.originalConfiguration.isEmpty());QVERIFY(retained.nativeOutbound.isEmpty());
         QVERIFY(worker.m_options.dnsConfig.isEmpty());QVERIFY(worker.m_options.inboundPassword.isEmpty());QVERIFY(worker.m_options.lanPassword.isEmpty());
     }
+    void missingDefaultExitIsReportedAsConfigurationFailure_data(){
+        QTest::addColumn<bool>("deleted");
+        QTest::newRow("not-selected")<<false;QTest::newRow("deleted-source-node")<<true;
+    }
+    void missingDefaultExitIsReportedAsConfigurationFailure(){
+        QFETCH(bool,deleted);RustCoreEngine worker;
+        // A running session can lose its source through a catalog transaction.
+        // Feed that core response through the real UI status adapter; starting
+        // a new session with a missing default is correctly rejected earlier.
+        worker.m_probeRequestId=7;
+        worker.updateProbe({{"request_id",7},{"state","failed"},{"failure",QJsonObject{
+            {"stage","outbound_connect"},{"code",deleted?"MissingTarget":"DefaultUnconfigured"}}}});
+        QCOMPARE(worker.status().requestState,ProxyEngine::RequestState::Failed);
+        QCOMPARE(worker.status().probeFailureCode,deleted?QString("MissingTarget"):QString("DefaultUnconfigured"));
+        QCOMPARE(worker.status().nodeHealth,ProxyEngine::NodeHealth::Unknown);
+        QVERIFY(worker.status().nodeMessage.contains(QStringLiteral("策略")));
+        QVERIFY(worker.status().nodeMessage.contains(QStringLiteral("出口")));
+    }
     void repeatedRealCoreFinishKeepsTheAdoptedWorkerPolicy(){
         QTcpServer lease;QVERIFY(lease.listen(QHostAddress::LocalHost));const auto port=lease.serverPort();lease.close();
         RustCoreEngine worker;EngineStartOptions options;options.proxyPort=port;options.policyDocument=document();
