@@ -1,25 +1,26 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQml.Models
 import QtQuick.Controls.Basic
 import SwirlQuick
 Menu {
-    id: menu
+    id: contextMenu
     objectName:"swirlContextMenu"
     function requestDismiss(){close()}
     property var items: ["查看详情", "复制", "导出"]
     property string payload: ""
     property bool handleItemsInternally:true
     implicitWidth:Math.ceil(Math.max(Theme.dp(150),items.reduce((width,label)=>Math.max(width,itemMetrics.advanceWidth(AppState.zh(String(label)))+Theme.dp(24)+leftPadding+rightPadding),0)))
-    FontMetrics {id:itemMetrics;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(12);font.weight:Theme.bodyFontWeight}
+    FontMetrics {id:itemMetrics;font.family:Theme.fontFamily;font.pixelSize:Theme.buttonSize;font.weight:Theme.bodyFontWeight}
     signal itemTriggered(int index)
     padding:Theme.dp(6)
     transformOrigin:Item.TopLeft
     onAboutToShow: {
-        dismissals.push(menu,parent?parent.Window.window:null)
+        dismissals.push(contextMenu,parent?parent.Window.window:null)
         if(SwirlMotion.reduced){scale=1;opacity=1}
         else if(scale===1 && opacity===1){scale=0.98;opacity=0}
     }
-    onClosed:{dismissals.pop(menu);scale=1;opacity=1}
+    onClosed:{dismissals.pop(contextMenu);scale=1;opacity=1}
     enter:Transition {
         enabled:!SwirlMotion.reduced
         ParallelAnimation {
@@ -36,15 +37,16 @@ Menu {
     }
     background: Rectangle {
         color: Theme.material("floating")
-        radius:Theme.popupRadius; antialiasing:true
+        radius:Theme.menuRadius; antialiasing:true
         border.width:Theme.dp(1)
         border.color: Theme.glassRim
     }
     Instantiator {
-        model: menu.items
-        onObjectAdded:(index,object)=>menu.insertItem(index,object)
-        onObjectRemoved:(index,object)=>menu.removeItem(object)
+        model: contextMenu.items
+        onObjectAdded:(index,object)=>contextMenu.insertItem(index,object)
+        onObjectRemoved:(index,object)=>contextMenu.removeItem(object)
         delegate:MenuItem {
+            id: option
             required property int index
             required property var modelData
             objectName:"swirlContextOption-"+index
@@ -53,16 +55,21 @@ Menu {
             height:Theme.dp(36)
             contentItem: SwirlText {
                 textRole:"list"
-                text: parent.text; color: Theme.text
-                font.pixelSize:Theme.fontSize(12); font.family: Theme.fontFamily
+                text: option.text; color: Theme.text
+                font.pixelSize:Theme.buttonSize; font.family: Theme.fontFamily
                 leftPadding:Theme.dp(12); verticalAlignment: Text.AlignVCenter
             }
-            background: Rectangle { radius: Theme.roundedRadius(width,height); color: parent.highlighted ? Theme.selected : "transparent" }
+            background: SwirlControlSurface {
+                quiet: true
+                selected: option.highlighted
+                focused: option.visualFocus
+                controlEnabled: option.enabled
+            }
             onTriggered: {
-                menu.itemTriggered(index)
-                if(!menu.handleItemsInternally)return
+                contextMenu.itemTriggered(index)
+                if(!contextMenu.handleItemsInternally)return
                 if (text === "复制" || text === "Copy") {
-                    systemProvider.copyText(menu.payload)
+                    systemProvider.copyText(contextMenu.payload)
                     AppState.toast = "已复制表格内容"
                 } else {
                     AppState.notice(text)

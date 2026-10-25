@@ -19,6 +19,7 @@ ComboBox {
     leftPadding:Theme.controlPadding; rightPadding:Theme.dp(28)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     contentItem: SwirlText {renderType:Text.NativeRendering;
+        id: valueLabel
         textRole:"input"
         text: AppState.zh(control.displayText)
         color: control.enabled ? Theme.text : Theme.muted
@@ -32,19 +33,18 @@ ComboBox {
     }
     SwirlToolTip {
         id: hint
-        parent:control;visible:(control.hovered||control.visualFocus)&&control.contentItem.truncated&&!popupLayer.visible;text:AppState.zh(control.displayText);delay:600
+        parent:control;visible:(control.hovered||control.visualFocus)&&valueLabel.truncated&&!popupLayer.visible;text:AppState.zh(control.displayText);delay:600
     }
     indicator: SwirlIcon {
         x:Math.round(control.width-width-Theme.dp(6));y:Math.round((control.height-height)/2)
-        name:"chevron-right";size:Theme.dp(14);rotation:90;color:Theme.muted
+        name:"chevron-right";size:Theme.dp(14);rotation:control.popup.visible?270:90;color:Theme.muted
+        Behavior on rotation {enabled:!SwirlMotion.reduced;NumberAnimation{duration:SwirlMotion.switchDuration;easing.type:Easing.OutCubic}}
     }
-    background: Rectangle {
-        radius: Math.min(Theme.dp(9),height/2)
-        color: control.pressed ? Theme.pressed : control.hovered ? Theme.hover : Theme.buttonBase
-        border.width:control.visualFocus || Theme.increaseContrast?Theme.borderWidth:0
-        border.color: Theme.text
-        opacity:control.enabled?1:0.45
-        Behavior on color { enabled:!SwirlMotion.reduced; ColorAnimation { duration: Math.min(100,SwirlMotion.duration) } }
+    background: SwirlControlSurface {
+        hovered: control.hovered
+        pressed: control.pressed
+        focused: control.visualFocus
+        controlEnabled: control.enabled
     }
     delegate: ItemDelegate {
         id:option
@@ -83,13 +83,13 @@ ComboBox {
         focus:true
         popupType:Popup.Item
         closePolicy:Popup.CloseOnEscape | Popup.CloseOnPressOutside
-        transformOrigin:Item.TopLeft
+        transformOrigin:opensAbove?Item.BottomLeft:Item.TopLeft
     onAboutToShow: {
         anchorPoint=control.mapToItem(parent,0,0)
         dismissals.push(popupLayer,control.Window.window)
         Qt.callLater(function(){popupList.positionViewAtIndex(control.currentIndex,ListView.Contain)})
         if(SwirlMotion.reduced){scale=1;opacity=1}
-        else opacity=0
+        else if(scale===1 && opacity===1){scale=0.98;opacity=0}
     }
     onClosed:{dismissals.pop(popupLayer);scale=1;opacity=1}
 
@@ -102,11 +102,15 @@ ComboBox {
         enter: Transition {
         enabled:!SwirlMotion.reduced
             ParallelAnimation {
-                NumberAnimation { property:"opacity";to:1; duration: Math.min(100,SwirlMotion.duration) }
+                NumberAnimation { property:"opacity";to:1; duration:SwirlMotion.menuEnterDuration;easing.type:Easing.OutCubic }
+                NumberAnimation { property:"scale";to:1; duration:SwirlMotion.menuEnterDuration;easing.type:Easing.OutCubic }
             }
         }
-        exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} } }
-        background: Rectangle { radius:Theme.dp(10); color:Theme.material("floating"); border.width:Theme.borderWidth; border.color:Theme.increaseContrast?Theme.text:Theme.border }
+        exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation {
+            NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.menuExitDuration;easing.type:Easing.InCubic}
+            NumberAnimation {property:"scale";to:0.98;duration:SwirlMotion.menuExitDuration;easing.type:Easing.InCubic}
+        } }
+        background: Rectangle { radius:Theme.menuRadius; color:Theme.material("floating"); border.width:Theme.borderWidth; border.color:Theme.increaseContrast?Theme.text:Theme.border }
         contentItem: ListView { pixelAligned: true;
             id:popupList
             clip: true
@@ -115,7 +119,7 @@ ComboBox {
             currentIndex: control.highlightedIndex
             highlightMoveDuration:0
             boundsBehavior:Flickable.StopAtBounds
-            ScrollIndicator.vertical: ScrollIndicator {}
+            ScrollBar.vertical: SwirlScrollBar {}
         }
     }
 }

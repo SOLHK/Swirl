@@ -37,7 +37,7 @@ QtObject {
         property string savedMode: "System"
         property bool savedTransparency: true
         property bool savedReduceMotion: false
-        property bool savedFollowSystemMotion: false
+        property bool savedFollowSystemMotion: true
         property bool savedIncreaseContrast: false
         property int savedScalePercent: 100
         property bool followSystemScale: true
@@ -80,13 +80,26 @@ QtObject {
     readonly property color navigationPressed: dark ? "#636871" : "#B4BAC3"
     readonly property color selected: dark ? "#484848" : "#E3E4E7"
     readonly property color segmentSelected: dark ? "#64666A" : "#FFFFFF"
-    readonly property color hover: dark ? "#484848" : "#E3E3E5"
-    readonly property color pressed: dark ? "#555555" : "#D5D5D8"
+    readonly property color hover: dark ? "#424751" : "#E8E9EC"
+    readonly property color pressed: dark ? "#4D5460" : "#DDE0E4"
     readonly property color controlBorder: pillRim
     readonly property color focusBorder: dark ? "#9AC8FF" : "#005BBF"
     readonly property color tableToolbar: dark ? "#333333" : "#ECECED"
-    readonly property color buttonBase: navigationSelected
-    readonly property color field: dark ? "#30343A" : "#ECEEF0"
+    readonly property color buttonBase: dark ? "#373B42" : "#F0F1F3"
+    readonly property color primaryButton: dark ? "#ECEEF2" : "#2B2D31"
+    readonly property color primaryButtonHover: dark ? "#FFFFFF" : "#41444B"
+    readonly property color primaryButtonPressed: dark ? "#CDD2DA" : "#15171B"
+    readonly property color primaryButtonText: dark ? "#202329" : "#FFFFFF"
+    readonly property color fieldSelection: dark ? "#40516A" : "#DDE5EF"
+    readonly property color toggleTrack: dark ? "#626872" : "#DADDE2"
+    readonly property color controlThumb: "#FFFFFF"
+    readonly property color successSurface: dark ? "#30483C" : "#EAF5EE"
+    readonly property color successText: dark ? "#A6EDC6" : "#21613D"
+    readonly property color warningSurface: dark ? "#4B3B2B" : "#FFF3E2"
+    readonly property color warningText: dark ? "#FFE0AD" : "#805019"
+    readonly property color dangerSurface: dark ? "#4A3035" : "#FBECEF"
+    readonly property real disabledOpacity: 0.45
+    readonly property color field: dark ? "#30343A" : "#F5F5F7"
     readonly property color floatingSurface: dark ? "#2B2D31" : "#FCFCFD"
     readonly property color capsuleSurface: dark ? "#38383C" : "#ECEDEF"
     readonly property color green: dark ? "#75DD91" : "#30C759"
@@ -109,6 +122,7 @@ QtObject {
     readonly property real tableRadius: dp(10)
     readonly property real segmentedRadius: dp(10)
     readonly property real segmentedSelectedRadius: dp(8)
+    readonly property real menuRadius: dp(12)
     readonly property real popupRadius: dp(20)
     readonly property real secondaryRadius: popupRadius
     readonly property real controlRadius: dp(10)
@@ -141,7 +155,13 @@ QtObject {
     readonly property real borderWidth: dp(1)
     readonly property real shadowOpacity: 0.05
     readonly property string fontFamily: fontManager.currentFamily
+    readonly property string codeFontFamily: "Cascadia Code"
     readonly property int bodyFontWeight: Font.Normal
+    readonly property int pageTitleSize: fontSize(26)
+    readonly property int sectionTitleSize: fontSize(16)
+    readonly property int bodySize: fontSize(13)
+    readonly property int captionSize: fontSize(12)
+    readonly property int buttonSize: fontSize(13)
     readonly property int fontRevision: fontManager.configurationRevision
     function variableAxesFor(font, logicalDpi, dpr, role) {
         const revision = fontRevision // establish a binding dependency for same-family axis updates

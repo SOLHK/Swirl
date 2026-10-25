@@ -152,6 +152,8 @@ target_sources(Swirl PRIVATE network/GatewayService.h network/GatewayService.cpp
 target_link_libraries(Swirl PRIVATE SwirlEngine SwirlHttp2 SwirlExtensions)
 add_dependencies(Swirl SwirlScriptRunner)
 set(SWIRL_QML_FILES
+ qml/controls/SwirlControlSurface.qml qml/controls/SwirlSlider.qml qml/controls/SwirlRadioButton.qml
+ qml/components/SwirlPageHeader.qml qml/components/SwirlSectionTitle.qml
  qml/controls/SwirlText.qml qml/controls/SwirlFontBinding.qml
  qml/controls/SwirlTextArea.qml qml/controls/SwirlToolTip.qml
  qml/controls/SwirlLinkedDetail.qml

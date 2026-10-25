@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
@@ -38,7 +39,7 @@ Dialog {
         transformOrigin=SwirlMotion.popupOrigin(dialog)
         if(heroSource){scale=1;opacity=1;heroClock.progress=0;heroClock.moveTo(1)}
         else if(SwirlMotion.reduced){scale=1;opacity=1}
-        else opacity=0
+        else if(scale===1 && opacity===1){scale=0.975;opacity=0}
     }
     // The modal can be opened (and Escape pressed) before a Qt.callLater
     // callback executes. Snapshot the initialized fields synchronously when
@@ -73,32 +74,44 @@ Dialog {
         onAboutToShow:dismissals.push(discardPrompt,owner)
         onClosed:dismissals.pop(discardPrompt)
         background:SwirlClearGlassSurface{radius:Theme.popupRadius;color:Theme.material("floating")}
-        contentItem:ColumnLayout {
-            SwirlText {text:"关闭后将丢失尚未保存的内容。";color:Theme.text;wrapMode:Text.Wrap;Layout.fillWidth:true}
-            RowLayout {Layout.alignment:Qt.AlignRight
-                SwirlButton {text:"继续编辑";onClicked:discardPrompt.close()}
-                SwirlButton {objectName:"discardChangesConfirm";text:"放弃修改";danger:true;onClicked:{discardPrompt.close();dialog.close()}}
+        // Retain the prompt shell and header hook; its controls are only
+        // instantiated while a real unsaved-change confirmation is visible.
+        contentItem: Loader {
+            active: discardPrompt.visible
+            sourceComponent: ColumnLayout {
+                spacing: Theme.gap
+                SwirlText {text:qsTr("关闭后将丢失尚未保存的内容。");color:Theme.text;wrapMode:Text.Wrap;Layout.fillWidth:true}
+                RowLayout {Layout.alignment:Qt.AlignRight;spacing:Theme.compactGap
+                    SwirlButton {text:qsTr("继续编辑");onClicked:discardPrompt.close()}
+                    SwirlButton {objectName:"discardChangesConfirm";text:qsTr("放弃修改");danger:true;onClicked:{discardPrompt.close();dialog.close()}}
+                }
             }
         }
     }
     enter: Transition {
         enabled:!SwirlMotion.reduced && dialog.heroSource===null
         ParallelAnimation {
-            NumberAnimation { property:"opacity";to:1; duration: SwirlMotion.dialogDuration }
+            NumberAnimation { property:"opacity";to:1; duration:SwirlMotion.dialogDuration;easing.type:Easing.OutCubic }
+            NumberAnimation { property:"scale";to:1; duration:SwirlMotion.dialogDuration;easing.type:Easing.OutCubic }
         }
     }
-    exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:dialog.heroSource?SwirlMotion.dialogDuration:SwirlMotion.exitDuration}  } }
+    exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation {
+        NumberAnimation {property:"opacity";to:0;duration:dialog.heroSource?SwirlMotion.dialogDuration:SwirlMotion.exitDuration;easing.type:Easing.InCubic}
+        NumberAnimation {property:"scale";to:dialog.heroSource?1:0.985;duration:SwirlMotion.exitDuration;easing.type:Easing.InCubic}
+    } }
     font.family: Theme.fontFamily
     header: Item {
-        implicitHeight:Theme.dp(47)
+        implicitHeight:Math.max(Theme.dp(47),dialogTitle.implicitHeight+Theme.dp(20))
         opacity:dialog.heroSource?Math.max(0,Math.min(1,(dialog.heroProgress-0.18)/0.65)):1
         SwirlText {
+            id:dialogTitle
             textRole: "pageTitle"
+            fitWidth:false
             text: dialog.title
             color: Theme.text; font.pixelSize:Theme.fontSize(18); font.weight: Font.DemiBold
             anchors.left: parent.left; anchors.leftMargin:dialog.leftPadding
             anchors.right:parent.right; anchors.rightMargin:dialog.rightPadding
-            elide:Text.ElideRight; anchors.verticalCenter: parent.verticalCenter
+            wrapMode:Text.Wrap; anchors.verticalCenter: parent.verticalCenter
         }
     }
     background: Item {

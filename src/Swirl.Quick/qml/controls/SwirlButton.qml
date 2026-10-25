@@ -18,17 +18,18 @@ SwirlMotionButton {
     font.weight: control.primary ? Font.DemiBold : Font.Medium
     SwirlFontBinding { target: control; textRole: "button" }
     font.hintingPreference:Font.PreferFullHinting
-    font.pixelSize:Theme.fontSize(13)
+    font.pixelSize:Theme.buttonSize
     leftPadding:Theme.dp(12); rightPadding:Theme.dp(12)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     property bool outlined:false
-    background:Rectangle {
-        radius:Math.min(Theme.dp(9),height/2)
-        color:control.down?Theme.pressed:control.hovered?Theme.hover:control.quiet?"transparent":Theme.buttonBase
-        border.width:control.visualFocus || Theme.increaseContrast || control.outlined?Theme.borderWidth:0
-        border.color:control.visualFocus || Theme.increaseContrast?Theme.text:Theme.controlBorder
-        Behavior on color {enabled:!SwirlMotion.reduced;ColorAnimation{duration:SwirlMotion.hoverDuration}}
-        opacity:control.enabled?1:0.45
+    background: SwirlControlSurface {
+        hovered: control.hovered
+        pressed: control.down
+        focused: control.visualFocus
+        quiet: control.quiet
+        primary: control.primary
+        outlined: control.outlined
+        controlEnabled: control.enabled
     }
     contentItem: Item {
         implicitWidth: contents.implicitWidth
@@ -42,7 +43,7 @@ SwirlMotionButton {
         SwirlIcon {
             visible: control.iconName !== ""
             name: control.iconName; size:Theme.dp(16)
-            color: !control.enabled ? Theme.muted : control.danger ? Theme.red : control.primary ? Theme.text : Theme.muted
+            color: !control.enabled ? Theme.muted : control.primary ? Theme.primaryButtonText : control.danger ? Theme.red : Theme.muted
         }
         SwirlText {
             text: AppState.zh(control.text)+(control.development?" · 研发中":"")
@@ -51,7 +52,7 @@ SwirlMotionButton {
             font.weight: control.font.weight
             textRole: "button"
             Layout.fillWidth: true; elide: Text.ElideRight
-            color: !control.enabled ? Theme.muted : control.danger ? Theme.red : Theme.text
+            color: !control.enabled ? Theme.muted : control.primary ? Theme.primaryButtonText : control.danger ? Theme.red : Theme.text
             Layout.alignment: Qt.AlignVCenter
             horizontalAlignment:Text.AlignHCenter
             verticalAlignment:Text.AlignVCenter
