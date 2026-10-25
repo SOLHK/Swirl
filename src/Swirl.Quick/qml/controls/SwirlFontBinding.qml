@@ -19,13 +19,16 @@ QtObject {
     readonly property real devicePixelRatio: fontWindow ? fontWindow.FontDisplayContext.devicePixelRatio : 1
     property var resolvedAxes: ({})
     property bool refreshQueued: false
+    // Async incubation can assign inputs before this object's methods are ready.
+    // Activate publication and signal scheduling only after component completion.
+    property bool initialized: false
     // Preview inputs already coalesce in Qt.callLater below. Publish that final
     // snapshot immediately, so polish does not see the previous axis tuple while
     // a second queued Binding update waits. Preserve normal text/layout timing.
     property Binding axesBinding: Binding {
         target: binding.target
         property: "font.variableAxes"
-        when: binding.when && binding.target !== null
+        when: binding.initialized && binding.when && binding.target !== null
         delayed: !binding.preview
         value: binding.resolvedAxes
     }
@@ -35,7 +38,7 @@ QtObject {
     // Queue an input snapshot, then publish only a changed result. Qt.callLater
     // coalesces changes in the current event turn; it does not use a frame clock.
     function scheduleRefresh() {
-        if (!when || !target || refreshQueued)
+        if (!initialized || !when || !target || refreshQueued)
             return
         refreshQueued = true
         Qt.callLater(refreshAxes)
@@ -43,7 +46,7 @@ QtObject {
 
     function refreshAxes() {
         refreshQueued = false
-        if (!when || !target)
+        if (!initialized || !when || !target)
             return
         // Pass QFont itself. QML's pixelSize/pointSize getters both synthesize a
         // positive size; QFont retains the unit actually set by the component.
@@ -66,32 +69,37 @@ QtObject {
     }
 
     property Connections fontChanges: Connections {
-        target: binding.target
+        enabled: binding.initialized
+        target: binding.initialized ? binding.target : null
         function onFontChanged() { binding.scheduleRefresh() }
     }
     property Connections layoutChanges: Connections {
-        target: binding.fitWidth ? binding.target : null
+        enabled: binding.initialized
+        target: binding.initialized && binding.fitWidth ? binding.target : null
         function onWidthChanged() { binding.scheduleRefresh() }
         function onTextChanged() { binding.scheduleRefresh() }
     }
     property Connections configurationChanges: Connections {
-        target: fontManager
+        enabled: binding.initialized
+        target: binding.initialized ? fontManager : null
         function onConfigurationChanged() { binding.scheduleRefresh() }
     }
     property Connections previewChanges: Connections {
-        target: binding.preview ? fontManager : null
+        enabled: binding.initialized
+        target: binding.initialized && binding.preview ? fontManager : null
         function onPreviewFamilyChanged() { binding.scheduleRefresh() }
         function onPreviewValuesChanged() { binding.scheduleRefresh() }
         function onPreviewAxesChanged() { binding.scheduleRefresh() }
         function onPreviewAutomaticChanged() { binding.scheduleRefresh() }
     }
-    onTargetChanged: scheduleRefresh()
-    onWhenChanged: scheduleRefresh()
-    onTextRoleChanged: scheduleRefresh()
-    onPreviewChanged: scheduleRefresh()
-    onFitWidthChanged: scheduleRefresh()
-    onLogicalDpiChanged: scheduleRefresh()
-    onDevicePixelRatioChanged: scheduleRefresh()
-    onFontWindowChanged: scheduleRefresh()
-    Component.onCompleted: scheduleRefresh()
+    onTargetChanged: if (initialized) scheduleRefresh()
+    onWhenChanged: if (initialized) scheduleRefresh()
+    onTextRoleChanged: if (initialized) scheduleRefresh()
+    onPreviewChanged: if (initialized) scheduleRefresh()
+    onFitWidthChanged: if (initialized) scheduleRefresh()
+    onLogicalDpiChanged: if (initialized) scheduleRefresh()
+    onDevicePixelRatioChanged: if (initialized) scheduleRefresh()
+    onFontWindowChanged: if (initialized) scheduleRefresh()
+    Component.onCompleted: { initialized = true; scheduleRefresh() }
+    Component.onDestruction: initialized = false
 }

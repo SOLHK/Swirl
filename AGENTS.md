@@ -1,6 +1,7 @@
 # Current UI V2 staged work (2026-10-24)
 
 - Current screenshot feedback iteration is 0.2.11: read `docs/UI_V2_VISUAL_FEEDBACK_0211.md`. Use 14dp Activity/same-level cards with the existing 14 DIP window/sidebar contours; light near-white #FAFAFA canvas is shared beneath the sidebar without its old gray overlay. Preserve the sidebar contour/shadow and all navigation/motion. The default policy's real picker has a persistent “更换出口” affordance; do not restore the inert center chevron. Keep isolated native evidence separate from desktop/DPI/private-network acceptance.
+- Preserve the 0.2.11 font-binding initialization fence: async Connections targets, axes publication and refresh scheduling activate only after component completion. The production startup gate reproduced a Qt metadata crash during incubation; three subsequent 61-page rapid smoke runs and the live font integration test passed. Do not hide this by disabling async loading, motion, caches or font axes.
 
 - Current feedback iteration is 0.2.10: read `docs/UI_V2_POLICY_WORKSPACE_0210.md`. The user rejected the old policy layout and removed its connection button; Activity's proxy capsule is now the sole user master switch, including actual Core stop and owned-setting restoration. Overview/Settings direct to Activity. Preserve the real receipt/routing checks, per-instance test OS backend isolation, interruption fencing, neutral UI and native shadow cache. Do not restore a separate policy connect action. Final CI/package evidence remains separate.
 
