@@ -463,19 +463,33 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             QtObject {
                 property bool busy: false
                 property bool systemProxyBusy: false
+                property bool proxyRequested: false
+                property bool processAlive: false
+                property bool systemProxyStopping: false
+                property bool policyBusy: false
                 property string routingError: ""
+                property string policyError: ""
                 property string error: ""
+                property string errorCode: "None"
                 property int calls: 0
                 property bool reject: false
+                property bool originalSystemEnabled: false
+                property QtObject imports: QtObject { property bool busy: false }
                 property QtObject systemProxy: QtObject {
                     property bool systemEnabled: false
+                    property bool enabled: false
+                    property bool owned: false
                     property string stateReadError: ""
                     property string error: ""
                 }
                 function toggleSystemProxy() {
                     calls++
                     if(reject) { routingError="test-operation-failed"; return }
-                    systemProxy.systemEnabled=!systemProxy.systemEnabled
+                    const requested = !(proxyRequested || systemProxy.owned || processAlive || busy)
+                    if(requested) originalSystemEnabled=systemProxy.systemEnabled
+                    proxyRequested=requested;processAlive=requested;busy=false;systemProxyBusy=false
+                    systemProxy.owned=requested;systemProxy.enabled=requested
+                    systemProxy.systemEnabled=requested ? true : originalSystemEnabled
                 }
             }
         )",QUrl());
@@ -485,22 +499,28 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             const auto originalController=capsule->property("controller");
             check("proxy-toggle-test-controller-bound",capsule->setProperty("controller",QVariant::fromValue(fake.get())));
             const auto clickProxy=[&]{QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,capsule->mapToScene(QPointF(capsule->width()/2,capsule->height()/2)).toPoint());wait(30);};
-            check("proxy-off-offers-enable",capsule->property("label").toString()==QStringLiteral("开启系统代理"));
+            check("proxy-off-offers-enable",capsule->property("label").toString()==QStringLiteral("开启代理"));
             clickProxy();
             check("proxy-enable-click-dispatches-once",fake->property("calls").toInt()==1);
-            check("proxy-on-offers-disable",capsule->property("label").toString()==QStringLiteral("关闭系统代理"));
+            check("proxy-on-offers-disable",capsule->property("label").toString()==QStringLiteral("关闭代理"));
             check("proxy-enable-stays-on-activity",eval("AppState.currentPage==='activity'").toBool());
             clickProxy();
             check("proxy-disable-click-dispatches-once",fake->property("calls").toInt()==2);
-            check("proxy-disabled-state-updates-action",capsule->property("label").toString()==QStringLiteral("开启系统代理"));
-            fake->setProperty("systemProxyBusy",true);clickProxy();
-            check("proxy-pending-cannot-repeat-request",fake->property("calls").toInt()==2&&!capsule->isEnabled());
-            fake->setProperty("systemProxyBusy",false);
+            check("proxy-disabled-state-updates-action",capsule->property("label").toString()==QStringLiteral("开启代理"));
+            fake->setProperty("proxyRequested",true);fake->setProperty("busy",true);fake->setProperty("systemProxyBusy",true);clickProxy();
+            check("proxy-pending-request-can-be-cancelled",fake->property("calls").toInt()==3&&!fake->property("proxyRequested").toBool()&&!fake->property("busy").toBool());
+            fake->setProperty("systemProxyStopping",true);clickProxy();
+            check("proxy-stopping-cannot-repeat-request",fake->property("calls").toInt()==3&&!capsule->isEnabled());
+            fake->setProperty("systemProxyStopping",false);
             auto *fakeProxy=fake->property("systemProxy").value<QObject *>();
             check("proxy-toggle-test-state-present",fakeProxy!=nullptr);
+            if(fakeProxy)fakeProxy->setProperty("systemEnabled",true);
+            check("external-proxy-does-not-claim-swirl-is-running",capsule->property("label").toString()==QStringLiteral("开启代理")&&capsule->property("tone").toString()=="neutral");
+            clickProxy();clickProxy();
+            check("master-off-restores-external-proxy-state",fake->property("calls").toInt()==5&&fakeProxy&&fakeProxy->property("systemEnabled").toBool()&&!fakeProxy->property("owned").toBool()&&capsule->property("label").toString()==QStringLiteral("开启代理"));
             if(fakeProxy)fakeProxy->setProperty("error",QStringLiteral("stale-owner-error"));
             fake->setProperty("reject",true);clickProxy();
-            check("proxy-failure-keeps-observed-state",fake->property("calls").toInt()==3&&capsule->property("label").toString()==QStringLiteral("开启系统代理"));
+            check("proxy-failure-keeps-observed-state",fake->property("calls").toInt()==6&&capsule->property("label").toString()==QStringLiteral("开启代理"));
             check("proxy-failure-visible",capsule->property("tone").toString()=="warning"&&capsule->property("detail").toString()=="test-operation-failed");
             check("proxy-disable-and-error-stay-on-activity",eval("AppState.currentPage==='activity'").toBool());
             check("proxy-toggle-controller-restored",capsule->setProperty("controller",originalController));
