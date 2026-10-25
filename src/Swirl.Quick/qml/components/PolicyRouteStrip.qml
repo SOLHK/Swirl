@@ -25,7 +25,7 @@ Rectangle {
         RowLayout {
             Layout.fillWidth: true; spacing: Theme.dp(12)
             ColumnLayout {
-                Layout.preferredWidth: Theme.dp(148); spacing: Theme.dp(3)
+                Layout.preferredWidth: Theme.dp(148); Layout.fillWidth: false; spacing: Theme.dp(3)
                 SwirlText { text: qsTr("默认出口"); color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.DemiBold }
                 SwirlText { Layout.fillWidth: true; text: strip.mode === "global" ? qsTr("普通流量") : strip.mode === "direct" ? qsTr("已保存的代理出口") : qsTr("未单独分配的流量"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); elide: Text.ElideRight }
             }
