@@ -4,6 +4,7 @@
 #include "PolicySystemProxyBackend.h"
 #include "SwirlBuildIdentity.h"
 #include "engine/EngineController.h"
+#include <QColor>
 #include <QDir>
 #include <QFile>
 #include <QImage>
@@ -157,6 +158,40 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     if(!awaitSaved(QStringLiteral("Default node A is durably saved through real input")))return finish();
     check(controller->defaultPolicy().value("id")=="policy:default"&&controller->defaultPolicy().value("target").toMap().value("id")==nodeA,QStringLiteral("Permanent default policy holds stable identity and selected node"));
     targetPresentation("defaultPolicyTargetText","defaultPolicySource",nodeA,QStringLiteral("Default routing shows the configured node and its real configuration source"));
+    {
+        const auto priorSize=window->size();const auto priorPolicy=controller->defaultPolicy();const auto priorRevision=controller->savedRevision();
+        window->resize(window->minimumWidth(),window->minimumHeight());QTest::qWait(150);
+        auto *choose=item("defaultPolicyTarget");QQuickItem *hint=nullptr,*chevron=nullptr;
+        std::function<void(QQuickItem *)> inspect=[&](QQuickItem *parent){
+            for(auto *child:parent->childItems()){
+                if(child->property("text").toString()==QStringLiteral("更换出口"))hint=child;
+                if(child->property("name")=="chevron-right"&&qAbs(child->rotation()-90)<0.5)chevron=child;
+                inspect(child);
+            }
+        };
+        if(choose)inspect(choose);
+        const auto contained=[&](QQuickItem *child){return choose&&reachable(child)&&QRectF(QPointF(),choose->size()).adjusted(-0.5,-0.5,0.5,0.5).contains(child->mapRectToItem(choose,QRectF(QPointF(),child->size())));};
+        check(contained(hint)&&!hint->property("truncated").toBool()&&hint->width()+0.5>=hint->implicitWidth()
+              &&contained(chevron)&&chevron->width()>=eval("Theme.dp(16)").toReal(),QStringLiteral("Minimum-size default picker keeps its complete change-exit hint and clear downward arrow inside the clickable row"));
+        QTest::mouseMove(window,QPoint(window->width()-10,10));QTest::qWait(150);
+        auto *surface=choose?choose->property("background").value<QQuickItem *>():nullptr;
+        check(choose&&!choose->property("hovered").toBool()&&surface&&surface->property("color").value<QColor>().alphaF()>0.95,
+              QStringLiteral("Default picker retains a visible button surface before hover"));
+        if(choose){choose->forceActiveFocus();QTest::keyClick(window,Qt::Key_Space);}
+        const bool opened=check(QTest::qWaitFor([&]{
+            auto *picker=popup("policyTargetPicker");auto *content=picker?picker->property("contentItem").value<QQuickItem *>():nullptr;
+            return picker&&picker->property("opened").toBool()&&picker->property("heroProgress").toReal()>0.999
+                &&content&&content->opacity()>0.95&&reachable(item("policyTargetSearch"));
+        },3500),QStringLiteral("Keyboard activation opens and settles the real default exit picker at minimum window size"));
+        if(opened){
+            auto *search=item("policyTargetSearch");search->forceActiveFocus();
+            if(check(QTest::qWaitFor([&]{return search->hasActiveFocus();},1500),QStringLiteral("Keyboard cancellation targets the settled picker scene's focused editor")))
+                QTest::keyClick(search->window(),Qt::Key_Escape);
+        }
+        check(QTest::qWaitFor([&]{return !popup("policyTargetPicker");},2500)&&controller->defaultPolicy()==priorPolicy&&controller->savedRevision()==priorRevision&&!controller->policyBusy(),
+              QStringLiteral("Cancelling the keyboard-opened picker changes no policy or saved revision"));
+        capture("minimum-default-picker");window->resize(priorSize);QTest::qWait(100);
+    }
     check(!controller->processAlive()&&controller->appliedRevision().isEmpty()&&!controller->policyReceipt().contains("applied_revision")&&controller->policyReceipt().value("scope")=="saved-next-connect",QStringLiteral("Offline save never claims an applied runtime revision"));
     setCombo("routingModePicker",1);if(!awaitSaved(QStringLiteral("Global mode is saved through the real mode control")))return finish();
     LoopbackPortLease ports;if(!check(ports.reserve(),QStringLiteral("Dedicated mixed proxy and control ports are reserved")))return finish();controller->setProxyPort(ports.proxyPort());ports.release();
@@ -273,6 +308,14 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     awaitSaved(QStringLiteral("Activity mode can switch back using the same native menu"));
     check(activityMode->property("displayMode")=="rule",QStringLiteral("Activity return choice follows the committed controller mode"));
     check(QTest::qWaitFor([&]{return !popup("activityOutboundModeMenu");},2000),QStringLiteral("Mode selection releases the menu before returning to the activity facts"));
+    const auto cardRadius=eval("Theme.dp(14)").toReal();
+    for(const auto &name:QStringList{"internetDiagnosticCard","activityTrafficCard"}){
+        auto *card=item(name);
+        check(card&&qAbs(card->property("cornerRadius").toReal()-cardRadius)<0.5&&qAbs(card->property("radius").toReal()-cardRadius)<0.5,
+              QStringLiteral("Actual Activity card uses the shared 14dp contour: ")+name);
+    }
+    check(eval("Theme.dark || (Theme.canvas.toString() === '#fafafa' && Theme.sidebarBase === Theme.canvas && Theme.sidebarOpacity === 0)").toBool(),
+          QStringLiteral("Light mode uses the near-white neutral canvas without a separate sidebar tint"));
     QTest::qWait(200);
     if(!directory.isEmpty())window->grabWindow().save(directory+"/activity-mode.png");
     return finish();

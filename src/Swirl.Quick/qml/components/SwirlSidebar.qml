@@ -22,15 +22,7 @@ Item {
    fillColor:Theme.sidebar
    strokeColor:Theme.increaseContrast?Theme.text:Theme.dark?Qt.rgba(1,1,1,0.12):Qt.rgba(0,0,0,0.04)
   }
-  ShaderEffect {
-   objectName:"sidebarTransmission"
-   anchors.fill:parent
-   visible:Theme.effectsSupported && Theme.transparency && !Theme.increaseContrast && !Theme.dark
-   property vector2d surfaceSize:Qt.vector2d(width,height)
-   property real cornerRadius:floatingBackground.radius
-   property real inset:Theme.dp(6)
-   fragmentShader:"qrc:/swirl/shaders/sidebar-transmission.frag.qsb"
-  }
+  // The light sidebar uses the shared window canvas; no extra darkening pass.
   ShaderEffect {
    readonly property real padding:Theme.dp(24)
    x:-padding;y:-padding;width:floatingBackground.width+2*padding;height:floatingBackground.height+2*padding

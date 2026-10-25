@@ -161,7 +161,7 @@ Item {
                     Layout.row: 0; Layout.column: 0
                     Layout.preferredWidth: page.wide ? (content.width - cards.columnSpacing) * 0.474 : content.width
                     Layout.preferredHeight: Theme.dp(276)
-                    cornerRadius: Theme.dp(9); interactive: true
+                    cornerRadius: Theme.cardRadius; interactive: true
 
                     SwirlText { x: Theme.dp(18); y: Theme.dp(19); text: "INTERNET 延迟"; color: Theme.muted; font.pixelSize: Theme.fontSize(13) }
                     SwirlIconButton {

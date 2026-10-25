@@ -29,15 +29,22 @@ Rectangle {
                 SwirlText { text: qsTr("默认出口"); color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.DemiBold }
                 SwirlText { Layout.fillWidth: true; text: strip.mode === "global" ? qsTr("普通流量") : strip.mode === "direct" ? qsTr("已保存的代理出口") : qsTr("未单独分配的流量"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); elide: Text.ElideRight }
             }
-            SwirlIcon { name: "chevron-right"; size: Theme.dp(14); color: Theme.muted; Accessible.ignored: true }
             SubscriptionAction {
                 id: choose
                 objectName: "defaultPolicyTarget"
                 Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.preferredHeight: Theme.dp(48)
                 enabled: strip.editable
                 text: Policy.targetName(strip.target, strip.targetOptions)
-                tooltip: text
-                Accessible.name: qsTr("默认策略出口：%1").arg(text)
+                tooltip: qsTr("更换出口：%1").arg(text)
+                Accessible.name: qsTr("更换默认策略出口，当前：%1").arg(text)
+                background: Rectangle {
+                    radius: Theme.controlRadius
+                    color: choose.down ? Theme.pressed : choose.hovered ? Theme.hover : Theme.surface
+                    border.width: Theme.borderWidth
+                    border.color: choose.visualFocus || Theme.increaseContrast ? Theme.text : Theme.controlBorder
+                    opacity: choose.enabled ? 1 : 0.45
+                    Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.hoverDuration } }
+                }
                 contentItem: RowLayout {
                     spacing: Theme.dp(10)
                     SwirlIcon { name: strip.target.kind === "group" ? "layers" : "route"; size: Theme.dp(19); color: Theme.muted; Accessible.ignored: true }
@@ -46,7 +53,8 @@ Rectangle {
                         SwirlText { objectName: "defaultPolicyTargetText"; Layout.fillWidth: true; Layout.minimumWidth: 0; text: choose.text; textFormat: Text.PlainText; color: Theme.text; font.pixelSize: Theme.fontSize(16); font.weight: Font.DemiBold; elide: Text.ElideRight }
                         SwirlText { objectName: "defaultPolicySource"; Layout.fillWidth: true; Layout.minimumWidth: 0; text: strip.sourceLabel || qsTr("选择节点或策略组"); textFormat: Text.PlainText; color: Theme.muted; font.pixelSize: Theme.fontSize(12); elide: Text.ElideRight }
                     }
-                    SwirlIcon { name: "chevron-up-down"; size: Theme.dp(12); color: Theme.muted; Accessible.ignored: true }
+                    SwirlText { text: qsTr("更换出口"); color: Theme.text; font.pixelSize: Theme.fontSize(12); font.weight: Font.Medium; Accessible.ignored: true }
+                    SwirlIcon { name: "chevron-right"; rotation: 90; size: Theme.dp(18); color: Theme.text; Accessible.ignored: true }
                 }
                 onClicked: strip.targetRequested(choose)
             }

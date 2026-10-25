@@ -8,7 +8,7 @@ QtObject {
     property bool backdropTranslucent: false
     property bool windowActive:true
     // Windows supplies blur and luminosity. These are only the Swirl overlay.
-    readonly property color nativeTint: dark ? "#292C31" : "#F3F4F5"
+    readonly property color nativeTint: dark ? "#292C31" : canvas
     readonly property real nativeTintOpacity: dark ? 0.92 : 0.94
     // Exact contours use restrained live alpha when DWM Acrylic cannot be
     // clipped smoothly. Keep background text subdued without masking glyphs.
@@ -46,15 +46,16 @@ QtObject {
     readonly property real uiScale: followSystemScale ? 1.0 : appearanceSettings.savedScalePercent / 100.0
     readonly property bool dark: mode === "Dark" || (mode === "System" && Qt.styleHints.colorScheme === Qt.Dark)
     // The light canvas runs continuously beneath content and the floating sidebar.
-    readonly property color canvas: dark ? "#24272C" : "#F3F4F5"
-    readonly property color surface: dark ? "#292C31" : "#F8F8F9"
-    readonly property color independentCard: dark ? "#30343A" : "#F8F8F9"
-    readonly property color primaryContainer: withAlpha(dark ? "#30343A" : "#F8F8F9",transparency?0.90:1)
+    readonly property color canvas: dark ? "#24272C" : "#FAFAFA"
+    readonly property color surface: dark ? "#292C31" : "#FFFFFF"
+    readonly property color independentCard: dark ? "#30343A" : "#FFFFFF"
+    readonly property color primaryContainer: withAlpha(independentCard,transparency?0.90:1)
     readonly property color raised: dark ? "#292929" : "#F7F7F7"
     // Neutral QML tint above the native window backdrop. Fall back to opacity 1.
-    readonly property color sidebarBase: dark ? "#292C31" : "#ECEEF0"
+    readonly property color sidebarBase: dark ? "#292C31" : canvas
     // Content materials are composed inside the system-owned HWND outline.
-    readonly property real sidebarOpacity: transparency && backdropActive ? (dark ? 0.78 : 0.72) : 1.0
+    // Light navigation shares the continuous window material without a second tint.
+    readonly property real sidebarOpacity: dark ? (transparency && backdropActive ? 0.78 : 1.0) : 0.0
     readonly property real workspaceOpacity:transparency && (backdropActive || backdropTranslucent) ? (dark ? 0.88 : 0.84) : 1.0
     readonly property real settingsOpacity:dark?0.98:0.96
     readonly property real popupOpacity:transparency && backdropActive ? (dark?0.98:0.99) : 1.0
@@ -100,7 +101,7 @@ QtObject {
     readonly property real windowRadius: Theme.WindowCornerRadius
     readonly property real sidebarRadius: Theme.SidebarCornerRadius
     // Cards at the same hierarchy share a token, including the settings grid.
-    readonly property real cardRadius: dp(20)
+    readonly property real cardRadius: dp(14)
     readonly property real containerRadius: cardRadius
     readonly property real radius: containerRadius
     readonly property real independentCardRadius: cardRadius

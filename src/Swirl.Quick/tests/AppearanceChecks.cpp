@@ -93,48 +93,40 @@ int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
             check(!before.isNull() && !after.isNull() && before.copy(strip)==after.copy(strip),"right-page text and color never get copied underneath sidebar navigation");
         }
         delete overlay;
-        auto *transmission=find(window->contentItem(),"sidebarTransmission");
-        check(transmission!=nullptr,"sidebar interior material exists");
-        if(transmission){
-            check(!transmission->isVisible(),"dark sidebar remains unchanged");
-            eval("Theme.mode='Light';Theme.reduceMotion=true");QTest::qWait(350);
-            check(transmission->isVisible(),"light sidebar uses the interior material");
-            const auto material=window->grabWindow();
-            transmission->setOpacity(0);QTest::qWait(150);
-            const auto clear=window->grabWindow();
+        eval("Theme.mode='Light';Theme.reduceMotion=true");QTest::qWait(350);
+        // Sample blank interior pixels, away from the sidebar rim, exterior
+        // shadow, navigation rows and Activity's header controls. This checks
+        // the Qt surface; native desktop composition has separate acceptance.
+        const auto lightCanvasMatches=[&](){
+            const auto image=window->grabWindow();
+            if(image.isNull()||!mainArea)return false;
             const auto dpr=window->devicePixelRatio();
-            const auto topLeft=pane->mapToScene(QPointF(0,0))*dpr;
-            const QRectF bounds(topLeft,QSizeF(pane->width()*dpr,pane->height()*dpr));
-            const auto area=bounds.adjusted(-6*dpr,-6*dpr,24*dpr,6*dpr).toAlignedRect().intersected(material.rect());
-            const auto interior=bounds.adjusted(6*dpr,6*dpr,-6*dpr,-6*dpr);
-            int changed=0,outside=0,maxDelta=0;
-            if(!material.isNull() && material.size()==clear.size()){
-                for(int y=area.top();y<=area.bottom();++y)for(int x=area.left();x<=area.right();++x){
-                    const auto a=material.pixelColor(x,y),b=clear.pixelColor(x,y);
-                    if(a==b)continue;
-                    ++changed;
-                    if(!interior.contains(QPointF(x+0.5,y+0.5)))++outside;
-                    maxDelta=qMax(maxDelta,qMax(qAbs(a.red()-b.red()),qMax(qAbs(a.green()-b.green()),qAbs(a.blue()-b.blue()))));
-                }
-            }
-            check(changed>0 && maxDelta<=7,"interior adjustment is visible but limited to seven RGB levels");
-            check(outside==0,"contour and exterior shadow pixels remain identical");
-            transmission->setOpacity(1);
-            eval("Theme.increaseContrast=true");check(!transmission->isVisible(),"increased contrast bypasses interior material");
-            eval("Theme.increaseContrast=false;Theme.transparency=false");check(!transmission->isVisible(),"reduced transparency bypasses interior material");
-            eval("Theme.transparency=true");
-        }
+            const auto side=pane->mapToScene(QPointF(pane->width()-18,pane->height()/2))*dpr;
+            const auto content=mainArea->mapToScene(QPointF(mainArea->width()/2,48))*dpr;
+            if(!image.rect().contains(side.toPoint())||!image.rect().contains(content.toPoint()))return false;
+            const auto a=image.pixelColor(side.toPoint()),b=image.pixelColor(content.toPoint());
+            return qAbs(a.red()-b.red())<=2&&qAbs(a.green()-b.green())<=2
+                &&qAbs(a.blue()-b.blue())<=2&&qAbs(a.alpha()-b.alpha())<=2
+                &&qAbs(a.red()-a.green())<=1&&qAbs(a.green()-a.blue())<=1;
+        };
+        check(lightCanvasMatches(),"light sidebar and workspace share the same neutral canvas pixels");
+        eval("Theme.increaseContrast=true");QTest::qWait(150);
+        check(lightCanvasMatches(),"increased contrast keeps the shared light canvas");
+        eval("Theme.increaseContrast=false;Theme.transparency=false");QTest::qWait(150);
+        check(lightCanvasMatches(),"opaque fallback keeps the shared light canvas");
+        eval("Theme.transparency=true");
     }
     auto *proxy=find(window->contentItem(),"proxyCapsule");
     if(proxy){
         // Appearance checks observe the real host but never click its network
         // switch. Motion checks inject a controller into this same control;
         // native setting mutations are tested only on disposable CI runners.
-        const bool active=eval("engineController.systemProxy.systemEnabled").toBool();
+        const bool active=eval("engineController.proxyRequested || engineController.systemProxy.owned || engineController.processAlive").toBool();
         const bool pending=eval("engineController.systemProxyBusy").toBool();
-        check(proxy->property("proxyEnabled").toBool()==active,"proxy control reflects actual host observation");
-        const auto action=pending?QStringLiteral("正在设置系统代理…"):active?QStringLiteral("关闭系统代理"):QStringLiteral("开启系统代理");
-        check(proxy->property("label").toString()==action,"proxy control presents the matching direct action");
+        const bool stopping=eval("engineController.systemProxyStopping").toBool();
+        check(proxy->property("proxyEnabled").toBool()==active,"master proxy control reflects Swirl runtime and owned settings");
+        const auto action=stopping?QStringLiteral("正在关闭代理…"):pending?QStringLiteral("正在开启代理…"):active?QStringLiteral("关闭代理"):QStringLiteral("开启代理");
+        check(proxy->property("label").toString()==action,"master proxy control presents the matching direct action");
     } else check(false,"system proxy switch exists");
     qInfo()<<"APPEARANCE_CHECKS failures"<<failures;return failures?2:0;
 }
