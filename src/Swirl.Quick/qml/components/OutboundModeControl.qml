@@ -133,6 +133,7 @@ SwirlMotionButton {
         font.pixelSize: Theme.fontSize(11)
         font.weight: Theme.bodyFontWeight
         font.underline: control.visualFocus
+        verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
     }
     HoverHandler { cursorShape: Qt.PointingHandCursor }
