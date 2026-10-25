@@ -125,6 +125,7 @@ void NodeImportService::importNodesOnlyUrl(const QUrl &url) {
 }
 void NodeImportService::startUrl(const QUrl &url,bool nodesOnly) {
     if(m_busy || hasPreview() || m_shuttingDown)return;
+    if(!m_store->configurationAvailable()){m_message=QStringLiteral("配置库需要恢复或重新打开；未发起下载。");emit changed();return;}
     if(!NodeStore::allowedSubscriptionUrl(url)){m_message=QStringLiteral("请使用 HTTPS 地址；只有本机测试地址允许 HTTP。");emit changed();return;}
     m_previewRequested=true;m_importSource="url";m_downloadTimedOut=false;m_nodesOnly=nodesOnly;
     m_downloadUrl=url;m_compatibilityRequest=false;m_downloadAttempts=0;
@@ -135,6 +136,7 @@ void NodeImportService::startUrl(const QUrl &url,bool nodesOnly) {
 }
 bool NodeImportService::saveSubscription(const QString &id,const QString &name,const QUrl &url,int interval,bool enabled,const QString &formatHint,const QString &importScope) {
     if(m_busy || hasPreview())return false;
+    if(m_store->configurationV2())return mutateCatalog("save_subscription",{{"id",id},{"name",name},{"url",url},{"interval",interval},{"enabled",enabled},{"formatHint",formatHint},{"importScope",importScope}},QStringLiteral("订阅已加密保存；自动更新设置已生效。"));
     const bool ok=m_store->saveSubscription(id,name,url,interval,enabled,formatHint,importScope);
     m_message=ok?QStringLiteral("订阅已加密保存；自动更新设置已生效。"):m_store->error();
     if(ok && !id.isEmpty()){m_errors.remove(id);m_cancelled.remove(id);}
@@ -142,6 +144,7 @@ bool NodeImportService::saveSubscription(const QString &id,const QString &name,c
 }
 bool NodeImportService::removeSubscription(const QString &id) {
     if(m_busy || hasPreview())return false;
+    if(m_store->configurationV2())return mutateCatalog("remove_subscription",{{"id",id}},QStringLiteral("订阅及关联节点已删除；相关流量撤销已确认。"));
     const bool ok=m_store->removeSubscription(id);
     m_message=ok?QStringLiteral("订阅及其所属节点已原子删除；手动节点与待确认归属的历史节点保持不变。"):m_store->error();
     if(ok){m_cancelled.remove(id);m_errors.remove(id);m_queue.removeAll(id);m_attempts.remove(id);}
@@ -149,6 +152,7 @@ bool NodeImportService::removeSubscription(const QString &id) {
 }
 bool NodeImportService::cleanLegacyNodes() {
     if(m_busy || hasPreview())return false;
+    if(m_store->configurationV2())return mutateCatalog("clean_legacy",{},QStringLiteral("历史未归属节点已清理；相关流量撤销已确认。"));
     const auto count=m_store->legacyNodeCount();
     const bool ok=m_store->cleanLegacyNodes();
     m_message=ok?QStringLiteral("已清理 %1 个历史未归属节点，剩余 %2 个节点；已确认的手动节点与有效订阅节点保持不变。")
@@ -157,12 +161,14 @@ bool NodeImportService::cleanLegacyNodes() {
 }
 void NodeImportService::refreshSubscription(const QString &id) {
     if(id.isEmpty() || m_shuttingDown)return;
+    if(!m_store->configurationAvailable()){m_message=QStringLiteral("配置库需要恢复或重新打开；未使用旧来源发起更新。");emit changed();return;}
     const QPointer<NodeImportService> guard(this);
     if(!m_queue.contains(id) && !(m_busy&&m_source==id)){m_queue.enqueue(id);emit changed();}
     if(guard)next();
 }
 void NodeImportService::refreshAll() {
     if(m_shuttingDown)return;
+    if(!m_store->configurationAvailable()){m_message=QStringLiteral("配置库需要恢复或重新打开；未使用旧来源发起更新。");emit changed();return;}
     bool queued=false;
     for(const auto &s:m_store->subscriptions())if(!m_queue.contains(s.id) && !(m_busy&&m_source==s.id)){m_queue.enqueue(s.id);queued=true;}
     const QPointer<NodeImportService> guard(this);
@@ -187,12 +193,13 @@ bool NodeImportService::cancelRefresh(const QString &id) {
 }
 void NodeImportService::shutdown() {
     m_shuttingDown=true;++m_generation;m_timer.stop();m_deadline.stop();m_queue.clear();
-    m_pending.reset();
+    m_pending.reset();m_sourceDefinition.reset();
     if(m_reply){m_reply->disconnect(this);m_reply->abort();m_reply->deleteLater();m_reply=nullptr;}
     m_busy=false;
 }
 void NodeImportService::checkDue() {
     if(m_shuttingDown)return;
+    if(!m_store->configurationAvailable())return;
     if(m_busy || hasPreview() || !m_queue.isEmpty())return;
     const auto now=m_clock();
     for(const auto &s:m_store->subscriptions())if(s.enabled &&
@@ -202,6 +209,7 @@ void NodeImportService::checkDue() {
 }
 void NodeImportService::next() {
     if(m_shuttingDown)return;
+    if(!m_store->configurationAvailable()){m_queue.clear();return;}
     if(m_busy || hasPreview())return;
     while(!m_queue.isEmpty()) {
         const auto id=m_queue.dequeue();
@@ -213,11 +221,13 @@ void NodeImportService::next() {
             m_cancelled.remove(id);
             m_previewRequested=false;m_importSource="subscription";m_downloadTimedOut=false;
             m_downloadUrl=url;m_compatibilityRequest=false;m_downloadAttempts=0;
-            // importScope is read only for old snapshot compatibility. A
-            // subscription's downloaded content now determines its semantics.
-            m_source=id;m_formatHint=s.formatHint;m_nodesOnly=false;m_automaticImport=true;
+            // Legacy scope values never authorize a background policy change.
+            // Only an explicit, separately reviewed operation may apply one.
+            m_sourceDefinition=s;
+            m_source=id;m_formatHint=s.formatHint;m_nodesOnly=true;m_automaticImport=true;
             m_appliedMode.clear();m_applicationNotice.clear();m_busy=true;m_attempts.insert(id,m_clock());m_message=QStringLiteral("正在下载并自动识别订阅（地址已隐藏）…");emit changed();
             if(!guard || m_shuttingDown || !m_busy || m_source!=id || m_generation!=generation)return;
+            if(!sourceDefinitionCurrent()){finish(QStringLiteral("订阅定义已更改，已丢弃旧响应；请重新更新。"));return;}
             m_deadline.start();download(url);return;
         }
     }
@@ -262,6 +272,7 @@ void NodeImportService::download(const QUrl &url,int redirects) {
     });
 }
 void NodeImportService::startDownload(const QUrl &url,int redirects,const QList<QNetworkProxy> &proxies) {
+    if(!m_store->configurationAvailable()){finish(QStringLiteral("配置库需要恢复或重新打开；未使用旧来源发起下载。"));return;}
     QNetworkRequest request(url);
     SwirlNetwork::applyHttp1OnlyPolicy(request);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
@@ -391,12 +402,21 @@ void NodeImportService::cancelImport() {
     m_pending.reset();m_message=QStringLiteral("已取消导入，现有节点保持不变。");finish();
 }
 void NodeImportService::apply(NodeImporter::Result result) {
+    if(m_automaticImport){
+        m_nodesOnly=true;
+        if(!sourceDefinitionCurrent()){
+            finish(QStringLiteral("订阅已删除或定义已更改，已丢弃旧响应；现有配置保持不变。"));return;
+        }
+    }
     const auto count=result.nodes.size();
     int certificatesEnforced=0;for(const auto &node:result.nodes)if(node.certificateVerificationEnforced)++certificatesEnforced;
     if(m_nodesOnly && !m_apply && !m_applyAsync){
         finish(QStringLiteral("节点专用导入无法校验当前网络配置；旧节点保持不变。"));return;
     }
-    if(result.format=="xray-v2ray-json" && (m_applyAsync || !m_apply)) {
+    if(m_store->configurationV2()&&!m_applyAsync){
+        finish(QStringLiteral("V2 节点导入缺少配置事务入口；原配置保持不变。"));return;
+    }
+    if((result.format=="xray-v2ray-json" && (m_applyAsync || !m_apply)) || m_store->configurationV2()) {
         const QPointer<NodeImportService> guard(this);const auto generation=m_generation;
         m_committing=true;m_message=QStringLiteral("正在加密并原子保存节点…");emit changed();
         if(!guard || m_shuttingDown || !m_busy || m_generation!=generation)return;
@@ -445,10 +465,9 @@ void NodeImportService::applied(const QString &format,qsizetype count,int incomp
         m_message=QStringLiteral("%1 · 已处理 %2 条节点记录，相同节点已合并保存；实际联网需检测。").arg(format).arg(count);
         if(incomplete)m_message+=QStringLiteral(" %1 条记录含无效或尚未映射的参数，原始参数已加密保留。").arg(incomplete);
     }
-    if(m_nodesOnly)m_message+=QStringLiteral(" 本次仅更新节点；DNS、规则与策略组保持不变。");
+    if(m_nodesOnly&&!m_automaticImport)m_message+=QStringLiteral(" 本次仅更新节点；DNS、规则与策略组保持不变。");
     if(m_automaticImport) {
-        if(m_appliedMode=="full")m_message+=QStringLiteral(" 已自动应用兼容的 DNS、规则和策略组。");
-        else m_message+=QStringLiteral(" 已自动提取节点；使用现有 Swirl DNS、规则与策略组。");
+        m_message+=QStringLiteral(" 已自动提取节点；使用现有 Swirl DNS、规则与策略组。");
         if(!m_applicationNotice.isEmpty())m_message+=QStringLiteral(" ")+m_applicationNotice;
     }
     if(m_compatibilityRequest)m_message+=QStringLiteral(" 已通过兼容客户端格式协商下载，内容仍按实际格式完成校验。");
@@ -459,8 +478,40 @@ void NodeImportService::finish(const QString &error) {
     m_deadline.stop();
     if(!m_source.isEmpty()){if(error.isEmpty())m_errors.remove(m_source);else m_errors.insert(m_source,error);}
     if(!error.isEmpty())m_message=error;
-    m_source.clear();m_busy=false;m_committing=false;m_nodesOnly=false;m_automaticImport=false;
+    m_source.clear();m_sourceDefinition.reset();m_busy=false;m_committing=false;m_nodesOnly=false;m_automaticImport=false;
     m_downloadUrl=QUrl();m_compatibilityRequest=false;m_downloadAttempts=0;
     m_appliedMode.clear();m_applicationNotice.clear();
     const QPointer<NodeImportService> guard(this);emit changed();if(guard)QTimer::singleShot(0,this,&NodeImportService::next);
+}
+bool NodeImportService::sourceDefinitionCurrent() const {
+    if(!m_sourceDefinition||m_sourceDefinition->id!=m_source)return false;
+    const auto &captured=*m_sourceDefinition;
+    for(const auto &current:m_store->subscriptions())if(current.id==m_source)
+        return current.url==captured.url&&current.name==captured.name&&
+            current.formatHint==captured.formatHint&&current.importScope==captured.importScope&&
+            current.intervalMinutes==captured.intervalMinutes&&current.enabled==captured.enabled;
+    return false;
+}
+bool NodeImportService::mutateCatalog(const QString &operation,const QVariantMap &input,const QString &successMessage) {
+    if(m_shuttingDown||m_busy||hasPreview()||!m_catalogApply){
+        m_message=QStringLiteral("目录事务不可用或仍在进行；现有数据保持不变。");emit changed();return false;
+    }
+    m_busy=true;m_committing=true;m_source.clear();m_sourceDefinition.reset();
+    m_message=QStringLiteral("正在安全保存目录变更，等待配置与撤销回执…");
+    const QPointer<NodeImportService> guard(this);const auto generation=m_generation;emit changed();
+    if(!guard||m_shuttingDown||m_generation!=generation)return false;
+    auto completion=[guard,generation,operation,id=input.value("id").toString(),successMessage](bool ok,const QString &error){
+        if(!guard||guard->m_shuttingDown||guard->m_generation!=generation)return;
+        if(!ok){guard->finish(error.isEmpty()?QStringLiteral("目录变更未完成；请检查配置恢复状态。"):error);return;}
+        if(operation=="remove_subscription"){
+            guard->m_cancelled.remove(id);guard->m_errors.remove(id);guard->m_queue.removeAll(id);guard->m_attempts.remove(id);
+        }else if(operation=="save_subscription"&&!id.isEmpty()){
+            guard->m_cancelled.remove(id);guard->m_errors.remove(id);
+        }
+        guard->m_message=successMessage;emit guard->nodesApplied();if(guard)guard->finish();
+    };
+    QString error;
+    const bool queued=m_catalogApply(operation,input,std::move(completion),&error);
+    if(!queued&&guard)finish(error.isEmpty()?QStringLiteral("无法受理目录变更；原配置保持不变。"):error);
+    return queued;
 }

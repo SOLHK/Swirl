@@ -64,6 +64,7 @@
 #include "tests/HdrChecks.h"
 #include "tests/EngineUiChecks.h"
 #include "tests/NodeUiChecks.h"
+#include "tests/PolicyUiChecks.h"
 #include "tests/MotionChecks.h"
 #include "tests/MaterialChecks.h"
 #include "tests/HeroChecks.h"
@@ -170,6 +171,12 @@ int main(int argc, char *argv[])
     const bool hdrTest=app.arguments().contains("--hdr-self-test");
     const bool hdrDisplayTest=app.arguments().contains("--hdr-display-test");
     const bool nodeTest=app.arguments().contains("--node-self-test");
+#ifdef SWIRL_UI_TESTS
+    const bool policyTest=app.arguments().contains("--policy-self-test");
+#else
+    constexpr bool policyTest=false;
+    if(app.arguments().contains("--policy-self-test"))return 4;
+#endif
     const bool engineTest=app.arguments().contains("--engine-self-test");
     const bool xrayUiTest=app.arguments().contains("--xray-import-ui-test");
 #ifndef SWIRL_XRAY_UI_TESTS
@@ -190,7 +197,7 @@ int main(int argc, char *argv[])
 #ifdef SWIRL_UI_TESTS
     lifecycleTest=app.arguments().contains("--lifecycle-test");
 #endif
-    const bool isolatedRun=xrayUiTest||appearanceTest||lifecycleTest||realAcceptance||heroTest||navigationTest||radiusTest||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
+    const bool isolatedRun=xrayUiTest||appearanceTest||lifecycleTest||realAcceptance||heroTest||navigationTest||radiusTest||nodeTest||policyTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
     SingleInstance instance;
     if(lifecycleTest || (!isolatedRun && !appearanceTest)) {
         const auto ownership=instance.acquire(lifecycleTest?QStringLiteral("isolated-lifecycle-test"):QStringLiteral("production"));
@@ -237,7 +244,7 @@ int main(int argc, char *argv[])
     ModuleDraftStore drafts;
     QTemporaryDir isolatedNodes(xrayUiTest?SwirlPaths::testRoot()+QStringLiteral("/xray-ui-nodes-XXXXXX")
                                         :QDir::tempPath()+QStringLiteral("/Swirl-XXXXXX"));
-    if(xrayUiTest&&!isolatedNodes.isValid())return 2;
+    if(isolatedRun&&!realAcceptance&&!isolatedNodes.isValid())return 2;
     auto runtimeEngine=std::make_unique<ThreadedEngine>();
     EngineController engineController(std::move(runtimeEngine),nullptr,realAcceptance?runtimeStore:isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString(),realAcceptance);
     ExtensionService extensions(&engineController,isolatedRun?isolatedNodes.filePath("extensions.dpapi"):QString());
@@ -282,12 +289,13 @@ int main(int argc, char *argv[])
         qCritical()<<"Preview font unavailable:"<<previewFont;return 2;
     }
     const QString previewState = argumentValue(QStringLiteral("--preview-state="));
-    if (xrayUiTest || appearanceTest || heroTest || navigationTest || radiusTest || nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
+    if (xrayUiTest || appearanceTest || heroTest || navigationTest || radiusTest || nodeTest || policyTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
         if(uiQualityTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-ui-quality.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-ui-quality.txt");}
         if(appearanceTest){const QString file=app.arguments().contains("--appearance-restore-test")?"Swirl-appearance-restore.txt":"Swirl-appearance.txt";app.setProperty("qtDiagnosticFile",file);QFile::remove(QCoreApplication::applicationDirPath()+"/"+file);}
         if(heroTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-hero-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-hero-diagnostics.txt");}
         else if(motionTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-motion-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-motion-diagnostics.txt");}
         if(nodeTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-node-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-node-ui-diagnostics.txt");}
+        if(policyTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-policy-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-policy-ui-diagnostics.txt");}
         else if(interaction){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-input-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-input-diagnostics.txt");}
         if(engineTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-engine-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-engine-ui-diagnostics.txt");}
         if(xrayUiTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-xray-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-xray-ui-diagnostics.txt");}
@@ -397,6 +405,12 @@ int main(int argc, char *argv[])
         return 4;
 #endif
     }
+#ifdef SWIRL_UI_TESTS
+    if(policyTest){
+        const auto directory=argumentValue(QStringLiteral("--policy-output="));
+        QTimer::singleShot(400,&app,[&app,rootWindow,&engineController,directory]{app.exit(runPolicyUiChecks(rootWindow,&engineController,directory));});
+    }
+#endif
         motionPolicy.attach(rootWindow);
 #ifdef SWIRL_UI_TESTS
     const auto viewportDirectory=argumentValue(QStringLiteral("--viewport-test-output="));
@@ -663,7 +677,7 @@ int main(int argc, char *argv[])
     // This also keeps scripted page-navigation shutdown free of incubation warnings.
     if (auto *controller = engine.incubationController())
         controller->incubateFor(100);
-    const int finalResult=(xrayUiTest || heroTest || radiusTest || nodeTest || motionTest || previewMode || engineTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
+    const int finalResult=(xrayUiTest || heroTest || radiusTest || nodeTest || policyTest || motionTest || previewMode || engineTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
     if(xrayUiTest) {
         if(!xrayUiCompleted||xrayUiTimedOut)return finalResult==0?3:finalResult;
         if(finalResult==0)qInfo()<<"XRAY_UI_PASS";

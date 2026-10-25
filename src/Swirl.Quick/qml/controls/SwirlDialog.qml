@@ -18,11 +18,14 @@ Dialog {
     Binding {target:dialog.contentItem;property:"enabled";value:false;when:dialog.dismissing;restoreMode:Binding.RestoreBindingOrValue}
     property bool dismissing:false
     property string savedFingerprint:""
+    property string stateFingerprint:""
+    property bool dismissBlocked:false
     readonly property var ownerWindow:ownerItem?ownerItem.Window.window:parent ? parent.Window.window : null
-    function markSaved(){savedFingerprint=dismissals.fingerprint(contentItem)}
+    function currentFingerprint(){return dismissals.fingerprint(contentItem)+":"+stateFingerprint}
+    function markSaved(){savedFingerprint=currentFingerprint()}
     function requestDismiss(){
-        if(!visible || dismissing)return
-        if(guardChanges && savedFingerprint!==dismissals.fingerprint(contentItem))discardPrompt.open()
+        if(!visible || dismissing || dismissBlocked)return
+        if(guardChanges && savedFingerprint!==currentFingerprint())discardPrompt.open()
         else close()
     }
     modal: true

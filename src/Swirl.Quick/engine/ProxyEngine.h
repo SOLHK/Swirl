@@ -3,6 +3,7 @@
 #include <QString>
 #include <QUrl>
 #include <QVariantList>
+#include <QJsonObject>
 #include "ProxyNode.h"
 
 // Swirl-owned UI/control contract; forwarding belongs exclusively to Rust.
@@ -36,6 +37,8 @@ struct EngineStartOptions {
     QStringList customRules;
     QVariantList customGroups;
     QString inboundUsername,inboundPassword;
+    QJsonObject policyDocument;
+    QString configurationStoreId,configurationRevision,configurationDigest,configurationRequestId;
 };
 
 class ProxyEngine : public QObject {
@@ -90,6 +93,7 @@ public:
         bool gatewayForwarding=false;
         bool directSession=false;
         bool tunEnabled=false,allowLan=false;
+        QJsonObject configurationReceipt;
     };
     using QObject::QObject;
     virtual ~ProxyEngine() = default;
@@ -105,6 +109,9 @@ public:
         emit probeRequestRejected(tag,QStringLiteral("probe-unavailable"));
     }
     virtual void setRoutingMode(const QString &mode) { Q_UNUSED(mode); }
+    virtual void configurationCommand(const QJsonObject &command) {
+        emit configurationCommandFinished(command.value("request_id").toString(),QJsonObject{{"ok",false},{"code","UnsupportedCapability"},{"phase","prepare"}});
+    }
     virtual Status status() const = 0;
     virtual QString configurationSummary() const = 0;
     virtual QVariantList routingRules() const { return {}; }
@@ -115,4 +122,5 @@ signals:
     void statusChanged();
     void diagnostic(const QString &module,const QString &code,const QString &message);
     void probeRequestRejected(quint64 tag,const QString &code);
+    void configurationCommandFinished(const QString &requestId,const QJsonObject &response);
 };

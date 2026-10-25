@@ -8,6 +8,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QRegularExpression>
+#include <QSet>
 #include <QSysInfo>
 #include <QtEndian>
 #include <iterator>
@@ -337,6 +338,11 @@ bool RustCoreLibrary::load(const QString &absolutePath)
         return fail("build", "RustBuildMismatch", QStringLiteral("Rust DLL 与 Swirl.exe 的构建标识不一致；检测到旧文件或混合构建包。"));
     if (info.value("source_sha").toString() != expectedSourceSha())
         return fail("build", "RustSourceMismatch", QStringLiteral("Rust DLL 与 Swirl.exe 的源码提交不一致。"));
+    const auto required=info.value("capabilities").toObject().value("required").toArray();
+    QSet<QString> capabilities;for(const auto &value:required)if(value.isString())capabilities.insert(value.toString());
+    m_configurationV2=info.value("control_schemas").toArray().contains(2)&&info.value("config_schemas").toArray().contains(2)&&
+        required.size()==3&&capabilities.size()==3&&capabilities.contains("config_transactions_v1")&&
+        capabilities.contains("stable_policy_ids_v1")&&capabilities.contains("routing_tiers_v1");
 
     // Optional ABI additions are exposed only after the same ABI/source/build
     // checks as runtime commands. A consumer fails closed if its export is absent.

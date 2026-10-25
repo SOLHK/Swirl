@@ -16,6 +16,7 @@ public:
  void refresh() override;
  void selectNode(const QString &) override;
  void setRoutingMode(const QString &) override;
+ void configurationCommand(const QJsonObject &) override;
  void probeNode(const QUrl &) override;
  Status status() const override {return m_status;}
  QString probeFailureStage() const override {return m_probeFailureStage;}
@@ -25,11 +26,17 @@ public:
  QVariantList routingRules() const override;
  static QVariantList routingRulesForOptions(const EngineStartOptions &);
  static QString configuration(const EngineStartOptions &,QJsonObject *);
+ static QString configurationV2(const EngineStartOptions &,const QJsonObject &policy,QJsonObject *);
+ static QJsonObject validateConfigurationV2(const EngineStartOptions &,const QJsonObject &policy,const QString &requestId);
  static QString validateNetworkConfiguration(const QList<ProxyNode> &,const QVariantMap &,const QStringList &,const QVariantList &,bool nativePrivateRouting=false);
  static QString validatePolicyGroups(const QList<ProxyNode> &,const QVariantList &);
 private:
+ friend class PolicyConfigurationTests;
  using Command=qintptr(*)(const unsigned char *,size_t,unsigned char *,size_t);
  QJsonObject call(QJsonObject);
+ void startV2(const EngineStartOptions &);
+ void ingestConfigurationReceipt(const QJsonObject &);
+ void retainPublicNodeIdentities();
  void fail(Error,const QString &);
  void resetProbeState();
  void cancelProbe();
@@ -48,4 +55,8 @@ private:
  qint64 m_probeOutboundConnectMs=-1,m_probeOriginTlsMs=-1;
  QSet<quint64> m_reportedForwardingFailures;
  bool m_forwardingFailureLimitReported=false;
+ bool m_v2=false;
+ QString m_engineEpoch;
+ QJsonObject m_preparedPolicy,m_previousPolicy;
+ bool m_configurationRollback=false;
 };

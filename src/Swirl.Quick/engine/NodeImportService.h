@@ -56,6 +56,8 @@ public:
     using ApplyCompletion = std::function<void(bool,const QString &)>;
     using ApplyConfigurationAsync = std::function<bool(const NodeImporter::Result &,const QString &,bool,ApplyCompletion,QString *)>;
     void setAsyncConfigurationApplier(ApplyConfigurationAsync apply) { m_applyAsync=std::move(apply); }
+    using CatalogMutationApplier=std::function<bool(const QString &,const QVariantMap &,ApplyCompletion,QString *)>;
+    void setCatalogMutationApplier(CatalogMutationApplier apply) { m_catalogApply=std::move(apply); }
     void setDownloadProxy(int port);
     void rememberOwnedProxyPort(int port);
 signals:
@@ -75,10 +77,13 @@ private:
     void parsed(NodeImporter::Result result);
     void apply(NodeImporter::Result result);
     void applied(const QString &format,qsizetype count,int incomplete,int certificatesEnforced=0);
+    bool sourceDefinitionCurrent() const;
+    bool mutateCatalog(const QString &operation,const QVariantMap &input,const QString &successMessage);
     void finish(const QString &error={});
     NodeStore *m_store;
     ApplyConfiguration m_apply;
     ApplyConfigurationAsync m_applyAsync;
+    CatalogMutationApplier m_catalogApply;
     QNetworkAccessManager m_network;
     QPointer<QNetworkReply> m_reply;
     QTimer m_timer,m_deadline;
@@ -92,6 +97,7 @@ private:
     QString m_appliedMode,m_applicationNotice;
     QString m_importSource;
     std::optional<NodeImporter::Result> m_pending;
+    std::optional<NodeSubscription> m_sourceDefinition;
     bool m_previewRequested=false;
     bool m_nodesOnly=false;
     bool m_automaticImport=false;

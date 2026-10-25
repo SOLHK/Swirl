@@ -31,7 +31,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     find=[&](QQuickItem *p,const QString &n)->QQuickItem *{if(p->objectName()==n)return p;for(auto *c:p->childItems())if(auto *f=find(c,n))return f;return nullptr;};
     const auto item=[&](const QString &n){return find(window->contentItem(),n);};
     const auto eval=[&](const QString &s){if(s.contains("resultCount"))check(QTest::qWaitFor([&]{auto *model=window->findChild<QObject *>("nodeViewModel");return model&&model->property("total").toInt()==controller->nodes().size();},1000),"node catalog catches up before count assertion");QQmlExpression e(qmlContext(window),window,s);auto v=e.evaluate();check(!e.hasError(),"QML expression valid");return v;};
-    const auto click=[&](const QString &n){if(!check(QTest::qWaitFor([&]{auto *hero=item("nodeHero");auto *target=item(n);if((hero&&hero->property("moving").toBool())||!target||!target->isVisible())return false;qreal opacity=1;for(auto *parent=target;parent;parent=parent->parentItem())opacity*=parent->opacity();return opacity>0.95;},3500),"node input is visible after motion settles"))return;auto *t=item(n);if(check(t&&t->isEnabled(),"node input exists and is enabled"))QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,t->mapToScene(QPointF(t->width()/2,t->height()/2)).toPoint());QTest::qWait(300);};
+    const auto click=[&](const QString &n){if(!check(QTest::qWaitFor([&]{auto *hero=item("nodeHero");auto *target=item(n);if((hero&&hero->property("moving").toBool())||!target||!target->isVisible())return false;qreal opacity=1;for(auto *parent=target;parent;parent=parent->parentItem())opacity*=parent->opacity();return opacity>0.95;},3500),"node input is visible after motion settles"))return;auto *t=item(n);if(check(t&&t->isEnabled(),"node input exists and is enabled"))QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,t->mapToScene(QPointF(t->width()/2,t->height()/2)).toPoint());QTest::qWait(300);if(n=="nodeSaveButton"||n=="nodeDeleteButton")check(QTest::qWaitFor([&]{return !controller->policyBusy();},10000),"node mutation waits for its real configuration completion");};
     const auto fill=[&](const QString &n,const QString &v){auto *t=item(n);if(check(t!=nullptr,"node field exists"))t->setProperty("text",v);};
     std::function<QQuickItem *(QQuickItem *,const QString &)> findNodeRow;
     findNodeRow=[&](QQuickItem *parent,const QString &id)->QQuickItem *{
@@ -61,6 +61,9 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         check(controller->selectedNodeId()==selection&&controller->activeNodeId()==active,"opening node details preserves configured and running exits");
     };
     ControlledNetwork net;if(!check(net.start(),"controlled real TCP endpoints start"))return 2;
+    const auto foreignFixture=QStringLiteral("node-runtime.fixture.invalid");
+    net.a.aliases={foreignFixture};net.b.aliases={foreignFixture};
+    auto liveUrl=net.url();liveUrl.setHost(foreignFixture);
     const auto probeSelected=[&](SocksPeer &selected,SocksPeer &other,const char *label){
         const auto forwarded=selected.forwarded,otherForwarded=other.forwarded;
         const auto before=net.httpRequestsByExit;
@@ -83,13 +86,25 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         eval("pageLoader.item.dismissDetail()");QTest::qWait(450);
         eval("AppState.navigate('policies')");
         check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;return active&&active->property("routeId").toString()=="policies"&&!host->property("moving").toBool()&&!host->property("pendingGrab").toBool();},3500),"policy exit selector settles");
-        click("policyNode-"+id);
+        if(controller->policyMigrationRequired()){
+            click("reviewPolicyMigration");click("confirmPolicyMigration");
+            check(QTest::qWaitFor([&]{return !controller->policyBusy()&&!controller->policyMigrationRequired();},10000),"policy migration is explicitly reviewed and committed");
+        }
+        const auto target=controller->defaultPolicy().value("target").toMap();
+        if(target.value("kind")!="node"||target.value("id")!=id){
+            click("defaultPolicyTarget");click("policyNode-"+id);click("confirmPolicyTarget");
+            check(QTest::qWaitFor([&]{return !controller->policyBusy()&&controller->defaultPolicy().value("target").toMap().value("id")==id;},10000),"default exit picker waits for the real configuration commit");
+        }
+        if(controller->policyDocument().value("mode")!="global"){
+            click("routingModePicker");click("swirlComboOption-1");
+            check(QTest::qWaitFor([&]{return !controller->policyBusy()&&controller->policyDocument().value("mode")=="global";},10000),"controlled node regression explicitly applies global routing through real input");
+        }
         const bool wasRunning=controller->processAlive();
         if(toggleConnection){
             click("policyConnectButton");
             check(QTest::qWaitFor([&]{return wasRunning?controller->canStart():controller->apiHealthy();},15000),"policy connection action reaches its real runtime state");
         }else if(wasRunning){
-            check(QTest::qWaitFor([&]{return !controller->nodeBusy()&&controller->activeNodeId()==id;},5000),"policy exit selection is applied before resource inspection");
+            check(QTest::qWaitFor([&]{return !controller->nodeBusy()&&!controller->policyBusy()&&controller->activeNodeId()==id;},10000),"policy exit selection is applied before resource inspection");
         }
         check(controller->selectedNodeId()==id,"policy selection updates the configured exit through real input");
         eval("AppState.navigate('proxies')");
@@ -268,7 +283,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         check(controller->activeNodeId()==selectedBeforeNavigation,"isolated test does not switch the live exit");
         const auto liveBeforeA=net.a.forwarded,liveBeforeB=net.b.forwarded;
         const auto liveReceipts=net.httpRequestsByExit;
-        controller->testNode(net.url());
+        controller->testNode(liveUrl);
         check(QTest::qWaitFor([&]{return controller->requestSucceeded()&&!controller->nodeBusy();},8000)
             &&net.a.forwarded>liveBeforeA&&net.b.forwarded==liveBeforeB
             &&net.httpRequestsByExit.value(net.a.label)>liveReceipts.value(net.a.label)
@@ -306,7 +321,8 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         std::fprintf(stderr,"NODE_UI_IMPORT_MISSING: %s\n",reason.constData());
         return failures?failures:1;
     }
-    controller->deleteNode(importedNodes.first().toMap().value("id").toString());
+    const auto importedFixtureId=importedNodes.first().toMap().value("id").toString();
+    check(controller->deleteNode(importedFixtureId)&&QTest::qWaitFor([&]{return !controller->policyBusy()&&controller->nodes().isEmpty();},10000),"controlled import cleanup waits for committed removal");
     // Exercise the actual subscription form against an isolated HTTPS server.
     // Only synthetic fixture data enters this temporary DPAPI store.
     QSslServer subscriptions;subscriptions.setSslConfiguration(net.https.sslConfiguration());
@@ -347,6 +363,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     check(eval("pageLoader.item.resultCount===1").toBool(),"country filter combines with the real imported node list");
     const auto subscriptionSource=controller->imports()->providers().first().toMap().value("id").toString();
     check(controller->saveNode({{"name","JP manual HTTP"},{"protocol","http"},{"host","127.0.0.1"},{"port",9}}),"manual node adds a second region outside the subscription");
+    check(QTest::qWaitFor([&]{return !controller->policyBusy()&&controller->nodes().size()==2;},10000),"manual filter fixture waits for its actual saved catalog");
     const auto manualId=controller->nodes().last().toMap().value("id").toString();
     check(eval("pageLoader.item.countries.length===2").toBool(),"all sources exposes both actual regions");
     eval("pageLoader.item.countryCode='JP'");
@@ -359,6 +376,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     eval(QString("pageLoader.item.sourceId='%1'").arg(subscriptionSource));
     check(eval("pageLoader.item.countries.length===1 && pageLoader.item.countries[0].code==='HK' && pageLoader.item.countryCode==='' && pageLoader.item.resultCount===1").toBool(),"switching subscription scopes countries and clears a country absent from that source");
     check(controller->deleteNode(manualId),"remove manual filter fixture");
+    check(QTest::qWaitFor([&]{return !controller->policyBusy()&&controller->nodes().size()==1;},10000),"manual filter fixture removal is committed before source refresh");
     eval("pageLoader.item.countryCode='HK'");
     eval("AppState.navigate('subscriptions')");QTest::qWait(350);
     if(!controller->imports()->providers().isEmpty()) {
@@ -382,7 +400,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         click("deleteSubscription-"+id);QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(250);
         check(controller->imports()->providers().size()==1,"Escape cancels destructive subscription confirmation");
         click("deleteSubscription-"+id);click("confirmSubscriptionDelete");
-        check(controller->imports()->providers().isEmpty()&&controller->nodes().isEmpty(),"confirmed deletion removes the source's owned nodes");
+        check(QTest::qWaitFor([&]{return !controller->imports()->busy()&&!controller->policyBusy()&&controller->imports()->providers().isEmpty()&&controller->nodes().isEmpty();},10000),"confirmed deletion removes the source's owned nodes after commit and revocation receipt");
     }
     // Large-list layout/transfer fixture uses reserved local endpoints only.
     QString batch="proxies:\n";

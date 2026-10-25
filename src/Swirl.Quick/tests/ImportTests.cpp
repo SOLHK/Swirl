@@ -39,6 +39,17 @@ public:
 };
 static QByteArray socks(quint16 port){return "proxies:\n  - {name: Controlled, type: socks5, server: 127.0.0.1, port: "+QByteArray::number(port)+"}\n";}
 static quint16 freePort(){QTcpServer s;s.listen(QHostAddress::LocalHost,0);return s.serverPort();}
+// Transport-only component fixtures have no network policy graph. Production
+// installs EngineController's Rust validator; a bare downloader grants no apply.
+static void catalogOnlyFixtureApplier(NodeImportService &service,NodeStore &store){
+    service.setConfigurationApplier([&store](const NodeImporter::Result &result,const QString &source,bool nodesOnly,QString *error){
+        if(!nodesOnly||!result.configuration.isEmpty()||!store.networkConfiguration().isEmpty()){
+            *error=QStringLiteral("Catalog-only transport fixture cannot apply policy");return false;
+        }
+        if(!store.importNodes(result.nodes,source)){*error=store.error();return false;}
+        return true;
+    });
+}
 static QJsonObject xrayRealitySource(){
     const auto key=QString::fromLatin1(QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals));
     const QJsonObject user{{"id","00112233-4455-6677-8899-aabbccddeeff"},{"encryption","none"},{"flow","xtls-rprx-vision"}};
@@ -919,9 +930,72 @@ external-controller: 0.0.0.0:9090
         QVERIFY(store.nodes().isEmpty());QVERIFY(!QFile::exists(store.filePath()));
         QVERIFY(service.message().contains(QStringLiteral("无法校验当前网络配置")));
     }
+    void automaticRefreshRequiresAnOwningConfigurationValidator() {
+        SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));server.content=socks(1080);
+        QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService service(&store);
+        QVERIFY(service.saveSubscription({},"No owner",server.url(),360,false));
+        service.refreshSubscription(store.subscriptions().first().id);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);
+        QVERIFY(store.nodes().isEmpty());QCOMPARE(store.subscriptions().first().lastSuccess,qint64(0));
+        QVERIFY(service.message().contains(QStringLiteral("无法校验当前网络配置")));
+    }
+    void automaticRefreshPreservesExistingPolicyAcrossFormats_data() {
+        QTest::addColumn<QByteArray>("body");QTest::addColumn<QString>("legacyScope");
+        const QList<QPair<QByteArray,QByteArray>> documents{
+            {"clash",socks(1080)+"dns: {enable: true, nameserver: [192.0.2.54]}\nproxy-groups: [{name: Foreign, type: select, proxies: [Controlled]}]\nrules: ['MATCH,Foreign']\n"},
+            {"sing-box",R"({"outbounds":[{"type":"socks","tag":"Controlled","server":"127.0.0.1","server_port":1080,"version":"5"},{"type":"selector","tag":"Foreign","outbounds":["Controlled"]}],"route":{"final":"Foreign"},"dns":{"servers":["192.0.2.54"]}})"},
+            {"ini","[General]\ndns-server=192.0.2.54\n[Proxy]\nControlled=socks5,127.0.0.1,1080\n[Proxy Group]\nForeign=select,Controlled\n[Rule]\nFINAL,Foreign\n"}
+        };
+        for(const auto &[format,body]:documents)for(const auto &scope:QStringList{"full-profile","nodes-only"})
+            QTest::newRow((format+"-"+scope.toUtf8()).constData())<<body<<scope;
+    }
+    void automaticRefreshPreservesExistingPolicyAcrossFormats() {
+        QFETCH(QByteArray,body);QFETCH(QString,legacyScope);
+        const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QVERIFY(!parsed.configuration.isEmpty());
+        SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));server.content=body;
+        QTemporaryDir directory;EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("nodes.dpapi"));
+        const QVariantMap kept{{"dns",QVariantMap{{"mode",2},{"servers","192.0.2.53"}}},
+            {"groups",QVariantList{QVariantMap{{"name","Kept"},{"type","select"},{"proxies",QStringList{"DIRECT"}}}}},
+            {"rules",QStringList{"DOMAIN,retained.invalid,REJECT","MATCH,Kept"}}};
+        QVERIFY2(controller.replaceNetworkConfiguration(kept),qPrintable(controller.networkConfigurationError()));
+        const auto before=controller.networkConfigurationSnapshot();const auto selected=controller.selectedNodeId();
+        auto *imports=controller.imports();QVERIFY(imports->saveSubscription({},"Foreign profile",server.url(),360,false,"auto",legacyScope));
+        const auto source=imports->providers().first().toMap().value("id").toString();
+        for(int refresh=0;refresh<2;++refresh){
+            imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),6000);
+            QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.networkConfigurationSnapshot(),before);
+            QCOMPARE(controller.selectedNodeId(),selected);QVERIFY(!controller.processAlive());
+            QVERIFY(imports->message().contains(QStringLiteral("已自动提取节点")));
+            QVERIFY(!imports->message().contains(QStringLiteral("已自动应用")));
+            QVERIFY(imports->providers().first().toMap().value("importMode").toString()!="full");
+        }
+    }
+    void staleSubscriptionDefinitionCannotCommitDownloadedNodes_data() {
+        QTest::addColumn<bool>("remove");QTest::newRow("removed-source")<<true;QTest::newRow("edited-source")<<false;
+    }
+    void staleSubscriptionDefinitionCannotCommitDownloadedNodes() {
+        QFETCH(bool,remove);
+        SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));server.content=socks(1081);
+        QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService service(&store);
+        QVERIFY(service.saveSubscription({},"Original",server.url(),360,false));const auto source=store.subscriptions().first().id;
+        QVERIFY(store.importNodes(NodeImporter::parse(socks(1080)).nodes,source));
+        bool mutated=false;int applies=0;QVariantList expected;QByteArray encrypted;
+        service.setConfigurationApplier([&](const NodeImporter::Result &,const QString &,bool,QString *){++applies;return false;});
+        connect(&service,&NodeImportService::downloadDiagnostic,&service,[&](const QString &message){
+            if(mutated||!message.contains("http=200;"))return;
+            mutated=true;
+            if(remove)QVERIFY(store.removeSubscription(source));
+            else {auto url=server.url();url.setPath("/replacement");QVERIFY(store.saveSubscription(source,"Edited",url,360,false));}
+            expected=store.publicRows();QFile file(store.filePath());QVERIFY(file.open(QIODevice::ReadOnly));encrypted=file.readAll();
+        });
+        service.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);
+        QVERIFY(mutated);QCOMPARE(applies,0);QCOMPARE(store.publicRows(),expected);
+        QFile file(store.filePath());QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),encrypted);
+        QVERIFY(service.message().contains(QStringLiteral("已丢弃旧响应")));QVERIFY(!service.message().contains("PRIVATE-TOKEN"));
+    }
     void subscriptionHttpStatusAndQtErrorsAreDifferentNamespaces() {
         SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));server.content=socks(1080);
         QTemporaryDir directory;NodeStore store(directory.filePath("nodes"));NodeImportService service(&store);
+        catalogOnlyFixtureApplier(service,store);
         QVERIFY(service.saveSubscription({},"Header fixture",server.url(),360,false,"auto"));
         const auto source=store.subscriptions().first().id;service.refreshSubscription(source);
         QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);
@@ -953,6 +1027,7 @@ external-controller: 0.0.0.0:9090
         server.acceptedAgent="Clash.Meta/1.19.32 Swirl/1.0";
         const auto url=QUrl::fromEncoded("http://127.0.0.1:"+QByteArray::number(server.serverPort())+"/signed%2Fpath?token=PRIVATE%2B%2F%3D&sig=a%252Fb%26c&duplicate=one&duplicate=two&empty=");
         QTemporaryDir directory;NodeStore store(directory.filePath("nodes"));NodeImportService service(&store);
+        catalogOnlyFixtureApplier(service,store);
         QSignalSpy diagnostics(&service,&NodeImportService::downloadDiagnostic);
         QVERIFY(service.saveSubscription({},"Negotiation",url,360,false,"auto"));
         const auto source=store.subscriptions().first().id;service.refreshSubscription(source);
@@ -985,6 +1060,7 @@ external-controller: 0.0.0.0:9090
         QFETCH(int,status);QFETCH(QString,format);QFETCH(int,attempts);
         SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));server.content=socks(1080);
         QTemporaryDir directory;NodeStore store(directory.filePath("nodes"));NodeImportService service(&store);
+        catalogOnlyFixtureApplier(service,store);
         QVERIFY(service.saveSubscription({},"Retention",server.url(),360,false,format));const auto source=store.subscriptions().first().id;
         service.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);
         const auto selected=store.nodes().first().id;QVERIFY(store.select(selected));
@@ -1000,6 +1076,7 @@ external-controller: 0.0.0.0:9090
         SubscriptionServer server,other;QVERIFY(server.listen(QHostAddress::LocalHost,0));QVERIFY(other.listen(QHostAddress::LocalHost,0));
         server.content=socks(1080);server.code=400;server.acceptedAgent="Clash.Meta/1.19.32 Swirl/1.0";
         QTemporaryDir directory;NodeStore store(directory.filePath("nodes"));NodeImportService service(&store);
+        catalogOnlyFixtureApplier(service,store);
         QVERIFY(service.saveSubscription({},"Cancellation",server.url(),360,false,"auto"));const auto source=store.subscriptions().first().id;
         const auto connection=connect(&service,&NodeImportService::downloadDiagnostic,&service,[&](const QString &message){
             if(message.contains("attempt=1;"))QVERIFY(service.cancelRefresh(source));
@@ -1164,6 +1241,7 @@ external-controller: 0.0.0.0:9090
         SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));server.content=socks(1080);
         QTemporaryDir temp;NodeStore store(temp.filePath("nodes"));qint64 now=QDateTime::currentSecsSinceEpoch();
         NodeImportService service(&store,nullptr,[&]{return now;},100);
+        catalogOnlyFixtureApplier(service,store);
         QVERIFY(service.saveSubscription({},"Controlled subscription",server.url(),15,true));
         const auto source=store.subscriptions().first().id;service.refreshSubscription(source);
         QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),4000);QCOMPARE(store.nodes().size(),1);

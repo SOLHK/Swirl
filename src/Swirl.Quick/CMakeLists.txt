@@ -156,6 +156,10 @@ set(SWIRL_QML_FILES
  qml/controls/SwirlLinkedDetail.qml
  qml/controls/SwirlNodeTransfer.qml
  qml/components/SwirlFontSettings.qml qml/components/NodeSourceHeader.qml
+ qml/components/PolicyHelpers.js qml/components/PolicyTargetPicker.qml
+ qml/components/ServicePolicyDialog.qml qml/components/PolicyProbeSettings.qml
+ qml/components/PolicyGroupDialog.qml qml/components/ServiceAssignments.qml
+ qml/components/PolicyGroupList.qml qml/components/PolicyFormScroll.qml
  qml/components/SwirlSecondaryWindow.qml
  qml/components/SwirlWindowTitleBar.qml
  qml/controls/RewriteRulesDialog.qml
@@ -264,6 +268,20 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  target_include_directories(SwirlNodeSectionModelTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
  add_test(NAME swirl-node-section-model COMMAND SwirlNodeSectionModelTests)
  set_tests_properties(swirl-node-section-model PROPERTIES TIMEOUT 60)
+ qt_add_executable(SwirlPolicyConfigurationTests tests/PolicyConfigurationTests.cpp)
+ target_link_libraries(SwirlPolicyConfigurationTests PRIVATE SwirlEngine Qt6::Test)
+ target_include_directories(SwirlPolicyConfigurationTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+ add_test(NAME swirl-policy-configuration COMMAND SwirlPolicyConfigurationTests)
+ set_tests_properties(swirl-policy-configuration PROPERTIES TIMEOUT 60)
+ qt_add_executable(SwirlCatalogTransactionTests tests/CatalogTransactionTests.cpp)
+ target_link_libraries(SwirlCatalogTransactionTests PRIVATE SwirlEngine Qt6::Test)
+ target_include_directories(SwirlCatalogTransactionTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+ add_test(NAME swirl-catalog-transaction COMMAND SwirlCatalogTransactionTests)
+ set_tests_properties(swirl-catalog-transaction PROPERTIES TIMEOUT 60)
+ if(MSVC)
+  target_compile_options(SwirlPolicyConfigurationTests PRIVATE /utf-8)
+  target_compile_options(SwirlCatalogTransactionTests PRIVATE /utf-8)
+ endif()
  swirl_add_font_tests()
  if(SWIRL_BUILD_UI_TESTS)
  target_sources(Swirl PRIVATE tests/GatewayChecks.cpp tests/GatewayChecks.h tests/HdrChecks.cpp tests/HdrChecks.h tests/OverviewChecks.cpp tests/OverviewChecks.h tests/CaptureChecks.cpp tests/CaptureChecks.h tests/WindowChecks.cpp tests/WindowChecks.h)
@@ -403,7 +421,7 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  set_tests_properties(swirl-import-boundaries PROPERTIES TIMEOUT 30)
  set_tests_properties(swirl-node-real-chain PROPERTIES TIMEOUT 180)
  if(SWIRL_BUILD_UI_TESTS)
- target_sources(Swirl PRIVATE tests/EngineUiChecks.cpp tests/EngineUiChecks.h tests/NodeUiChecks.cpp tests/NodeUiChecks.h tests/MotionChecks.cpp tests/MotionChecks.h tests/LiquidGlassChecks.cpp tests/U2Checks.cpp)
+ target_sources(Swirl PRIVATE tests/EngineUiChecks.cpp tests/EngineUiChecks.h tests/NodeUiChecks.cpp tests/NodeUiChecks.h tests/PolicyUiChecks.cpp tests/PolicyUiChecks.h tests/MotionChecks.cpp tests/MotionChecks.h tests/LiquidGlassChecks.cpp tests/U2Checks.cpp)
  target_compile_definitions(Swirl PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
  add_test(NAME swirl-node-ui COMMAND Swirl --node-self-test)
  set_tests_properties(swirl-node-ui PROPERTIES TIMEOUT 180 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
@@ -458,7 +476,7 @@ endif()
 foreach(runtime_target IN ITEMS SwirlProxyGuard SwirlExtensionTests SwirlTelemetryTests
  SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlSystemProxyTests SwirlAcceptance SwirlNodeTests
  SwirlNetworkRegressionTests SwirlImportTests SwirlSubscriptionFormatTests
- SwirlPrivateSubscriptionInspect)
+ SwirlPrivateSubscriptionInspect SwirlPolicyConfigurationTests SwirlCatalogTransactionTests)
  if(TARGET ${runtime_target})
   swirl_stage_rust_core(${runtime_target})
  endif()

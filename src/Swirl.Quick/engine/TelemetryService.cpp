@@ -1,6 +1,7 @@
 #include "TelemetryService.h"
 #include "../network/HttpRequestPolicy.h"
 #include "../app/StoragePaths.h"
+#include "RouteObservation.h"
 #include <QDir>
 #include <QFile>
 #include <QSaveFile>
@@ -54,7 +55,7 @@ int TelemetryService::activeProcesses() const {QSet<QString> names;for(const aut
 void TelemetryService::ingest(const ProxyEngine::Status &status){
  const auto epoch=QString::number(status.processId)+"/"+status.sessionId;
  if(status.processAlive&&m_epoch!=epoch){m_epoch=epoch;m_seen.clear();m_lastConnections=0;m_lastTraffic=0;m_lastUp=0;m_lastDown=0;m_externalIp.clear();m_latencies.clear();}
- const auto route=epoch+"/"+status.selectedNodeId+"/"+status.mode+"/"+QString::number(status.proxyPort)+"/"+QString::number(status.processAlive)+"/"+QString::number(status.apiHealthy)+"/"+QString::number(status.directSession);
+ const auto route=epoch+"/"+status.selectedNodeId+"/"+status.mode+"/"+QString::number(status.proxyPort)+"/"+QString::number(status.processAlive)+"/"+QString::number(status.apiHealthy)+"/"+QString::number(status.directSession)+"/"+status.configurationReceipt.value("applied_revision").toString()+"/"+status.configurationReceipt.value("generation").toString();
  if(route!=m_routeEpoch){m_routeEpoch=route;++m_routeGeneration;
   // Switching away and back still invalidates the old native measurement.
   if(m_nativeProbePending){m_nativeProbePending=false;m_nativeProbeObservedRunning=false;m_nativeProbeDeadline.stop();--m_measurements;}
@@ -67,7 +68,7 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
    finishNativeProbe({{"code",ok?QString("success"):status.probeFailureStage.isEmpty()?QString("native-probe"):status.probeFailureStage},
     {"state",ok?QString::number(status.latencyMs)+" ms":status.nodeMessage},{"success",ok},{"http",status.responseCode},{"elapsedMs",status.latencyMs},
     {"outboundConnectMs",status.probeOutboundConnectMs},{"originTlsMs",status.probeOriginTlsMs},{"metricType","http_headers"},
-    {"routeVerified",ok},{"route",QStringLiteral("当前所选 Rust 出站")},{"detail",QStringLiteral("Rust Core 测量所选出站至最终响应首部；不含界面刷新等待时间。")}});
+    {"routeVerified",ok},{"route",status.configurationReceipt.isEmpty()?QStringLiteral("当前所选 Rust 出站"):QStringLiteral("当前 Rust 策略")},{"detail",status.configurationReceipt.isEmpty()?QStringLiteral("Rust Core 测量所选出站至最终响应首部；不含界面刷新等待时间。"):QStringLiteral("Rust Core 根据当前策略测量至响应首部；本次实际出口见连接详情。")}});
   }
  }
  if(!status.apiHealthy){for(auto it=m_seen.begin();it!=m_seen.end();++it)if(it->value("status")!="已结束")(*it)["status"]=status.processAlive?QStringLiteral("采样中断"):QStringLiteral("已结束");publish();return;}
@@ -86,6 +87,7 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
   QSet<QString> active;
   for(const auto &value:status.connections){
    auto row=value.toMap();const auto id=row.value("id").toString();if(id.isEmpty()||active.contains(id))continue;active.insert(id);
+   if(row.contains("route"))row.insert("route",SwirlRouteObservation::sanitized(QJsonObject::fromVariantMap(row.value("route").toMap())));
    const auto old=m_seen.value(id);const auto u=row.value("uploadBytes").toLongLong(),d=row.value("downloadBytes").toLongLong();
    const auto ou=old.value("uploadBytes").toLongLong(),od=old.value("downloadBytes").toLongLong();
    const auto du=qMax<qint64>(0,u>=ou?u-ou:u),dd=qMax<qint64>(0,d>=od?d-od:d);
@@ -222,10 +224,10 @@ void TelemetryService::measureHttp(const QString &key,const QUrl &url,bool throu
 }
 void TelemetryService::measureProxy(){
  if(m_nativeProbePending)return;
- if(!m_status.apiHealthy||!m_status.processAlive||m_status.directSession||m_status.selectedNodeId.isEmpty()){m_latencies["proxy"]=QStringLiteral("未连接");return;}
+ if(!m_status.apiHealthy||!m_status.processAlive||m_status.directSession||(m_status.selectedNodeId.isEmpty()&&m_status.configurationReceipt.isEmpty())){m_latencies["proxy"]=QStringLiteral("未连接");return;}
  if(m_status.nodeBusy){m_latencies["proxy"]=QStringLiteral("节点检测进行中");return;}
  ++m_measurements;m_nativeProbePending=true;m_nativeProbeObservedRunning=false;m_nativeProbeGeneration=m_routeGeneration;
- m_latencies["proxy"]=QStringLiteral("测量中");m_proxyDiagnostic={{"code","measuring"},{"metricType","http_headers"},{"route",QStringLiteral("当前所选 Rust 出站")}};
+ m_latencies["proxy"]=QStringLiteral("测量中");m_proxyDiagnostic={{"code","measuring"},{"metricType","http_headers"},{"route",m_status.configurationReceipt.isEmpty()?QStringLiteral("当前所选 Rust 出站"):QStringLiteral("当前 Rust 策略")}};
  if(++m_nativeProbeTag==0)++m_nativeProbeTag;
  m_nativeProbeDeadline.start();emit nativeProbeRequested(m_internetProbe,m_nativeProbeTag);
 }

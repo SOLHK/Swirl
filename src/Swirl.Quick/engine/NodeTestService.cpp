@@ -87,7 +87,10 @@ void NodeTestService::next(){
   // invalidates old probe state. Only the fresh network request is measured.
   if(reuse)runner->selectNode(id);else runner->start(opts);
  }
- if(m_queue.isEmpty()&&m_running.isEmpty())while(!m_idle.isEmpty())retire(m_idle.dequeue());
+ if(m_queue.isEmpty()&&m_running.isEmpty()){
+  m_options={};
+  while(!m_idle.isEmpty())retire(m_idle.dequeue());
+ }
  emit changed();
 }
 void NodeTestService::finish(const QString &id,ProxyEngine *runner,const QVariantMap &result){
@@ -115,7 +118,7 @@ void NodeTestService::retire(ProxyEngine *runner){
  connect(runner,&ProxyEngine::statusChanged,this,release);runner->stop();release();
 }
 void NodeTestService::cancel(){
- m_queue.clear();const auto runners=m_running;m_running.clear();
+ m_queue.clear();m_options={};const auto runners=m_running;m_running.clear();
  for(auto runner:runners)retire(runner);
  while(!m_idle.isEmpty())retire(m_idle.dequeue());
  if(!runners.isEmpty())m_message=QString("已取消 · 正在释放测试内核 · 完成 %1/%2").arg(m_completed).arg(m_total);

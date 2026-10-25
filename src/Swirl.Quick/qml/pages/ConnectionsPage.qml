@@ -6,7 +6,38 @@ import "../components"
 import "../controls"
 Item {
     id:page
-    property var selected:null
+    property string selectedId:""
+    readonly property var selected:engineController.connections.find(record=>String(record.id)===selectedId)||null
+    readonly property var observedRoute:selected&&selected.route?selected.route:({})
+    function observed(value) {return value===undefined||value===null||value===""?qsTr("未提供"):String(value)}
+    function nodeLabel(id) {
+        if(id==="SWIRL_V2_DIRECT")return "DIRECT"
+        if(id==="SWIRL_V2_REJECT")return "REJECT"
+        const node=engineController.nodeCatalog.find(item=>item.id===id)
+        return node?node.name+"\n"+id:observed(id)
+    }
+    function groupLabel(id) {const group=(engineController.policyDocument.groups||[]).find(item=>item.id===id);return group?group.name+" ("+id+")":String(id)}
+    function serviceLabel(id) {const service=(engineController.policyDocument.service_policies||[]).find(item=>item.id===id);return service?service.name+"\n"+id:observed(id)}
+    readonly property var routingDetailRows: {
+        if(!selected)return []
+        const route=observedRoute
+        if(!Object.keys(route).length)return [[qsTr("匹配策略"),observed(selected.policy)],[qsTr("匹配规则"),observed(selected.rule)],[qsTr("最终出站"),observed(selected.outbound)],[qsTr("代理节点"),observed(selected.proxyNode)]]
+        const modes={rule:qsTr("规则分流"),global:qsTr("全局代理"),direct:qsTr("直连模式")}
+        return [[qsTr("实际模式"),modes[route.mode]||observed(route.mode)],
+            [qsTr("命中规则 ID"),observed(route.rule_id)],[qsTr("规则层级"),observed(route.tier)],
+            [qsTr("服务策略"),serviceLabel(route.service_policy_id)],
+            [qsTr("策略组链"),route.group_chain===undefined?qsTr("未提供"):(route.group_chain.map(id=>page.groupLabel(id)).join(" → ")||qsTr("未使用策略组"))],
+            [qsTr("实际节点"),nodeLabel(route.leaf_node_id)],
+            [qsTr("节点来源"),observed(route.source_id)],[qsTr("实际目标 IP"),observed(route.chosen_ip)],
+            [qsTr("DNS 路径"),observed(route.dns_path)],[qsTr("DNS 配置"),observed(route.dns_profile)],
+            [qsTr("分类状态"),observed(route.classification_state)],[qsTr("拒绝原因"),observed(route.rejection_code)],
+            [qsTr("出口保持原因"),observed(route.affinity_reason)],[qsTr("配置版本"),observed(route.revision)],[qsTr("运行代次"),observed(route.generation)]]
+    }
+    readonly property var connectionDetailRows:!selected?[]:[
+        [qsTr("域名"),observed(selected.host)],[qsTr("目标"),observed(observedRoute.chosen_ip||selected.ip)],
+        [qsTr("应用程序"),observed(selected.process)],[qsTr("协议"),observed(selected.protocol)]].concat(routingDetailRows,[
+        [qsTr("传输状态"),observed(selected.transportState)],[qsTr("上传"),observed(selected.up)],
+        [qsTr("下载"),observed(selected.down)],[qsTr("耗时"),observed(selected.latency)],[qsTr("建立时间"),observed(selected.time)]])
     SwirlTransitionCoordinator {id:detailClock;duration:SwirlMotion.dialogDuration;Component.onCompleted:{destination=AppState.detailOpen?1:0;finish()}}
     Connections {target:AppState;function onDetailOpenChanged(){detailClock.moveTo(AppState.detailOpen?1:0)}}
     readonly property var heroTargets:({activeConnections:activeCount})
@@ -17,7 +48,7 @@ Item {
         var s=sort.currentText
         var state=status.currentText
         var rows=engineController.connections.filter(function(r){
-            return (r.host+" "+r.process+" "+r.ip+" "+r.policy).toLowerCase().indexOf(q)>=0 &&
+            return (r.host+" "+r.process+" "+r.ip+" "+r.policy+" "+(r.route?String(r.route.rule_id||"")+" "+String(r.route.service_policy_id||"")+" "+String(r.route.chosen_ip||""):"")).toLowerCase().indexOf(q)>=0 &&
                    (state==="全部状态"||r.status===state)
         })
         rows.sort(function(a,b){
@@ -39,7 +70,7 @@ Item {
             SwirlComboBox { id:status; model:["全部状态","活动","已结束"] }
             SwirlComboBox { id:sort; model:["域名","延迟","下载","进程"] }
             SwirlButton { development:true; enabled:false; text:AppState.zh("导出"); iconName:"folder"; onClicked:AppState.notice("导出连接记录") }
-            SwirlButton { development:true; enabled:false; text:AppState.zh("Clear"); onClicked:{selected=null;AppState.notice("清空连接记录")} }
+            SwirlButton { development:true; enabled:false; text:AppState.zh("Clear"); onClicked:{page.selectedId="";AppState.notice("清空连接记录")} }
         }
         RowLayout {
             Layout.fillWidth:true; spacing:Theme.dp(8)
@@ -63,7 +94,7 @@ Item {
                         {key:"down",label:AppState.zh("DOWNLOAD"),w:100},{key:"latency",label:AppState.zh("LATENCY"),w:95},
                         {key:"time",label:AppState.zh("SINCE"),w:88},{key:"status",label:AppState.zh("状态"),w:88}
                     ]
-                    onRowSelected:function(record){page.selected=record;AppState.detailOpen=true;connectionDetail.present(connectionTable.selectedItem)}
+                    onRowSelected:function(record){page.selectedId=String(record.id);AppState.detailOpen=true;connectionDetail.present(connectionTable.selectedItem)}
                 }
                 SwirlEmptyState {
                     visible:page.visibleRows.length===0
@@ -87,25 +118,13 @@ Item {
                     SwirlText { text:AppState.zh("Connection details"); color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
                     SwirlStatusBadge { label:page.selected?page.selected.status.toUpperCase():"尚未选择"; tone:page.selected&&page.selected.status==="活动"?"success":"neutral" }
                     Repeater {
-                        model:[
-                            ["Host",page.selected?page.selected.host:"—"],
-                            ["Destination",page.selected?page.selected.ip:"—"],
-                            ["Application",page.selected?page.selected.process:"—"],
-                            ["Protocol",page.selected?page.selected.protocol:"—"],
-                            ["匹配策略",page.selected?page.selected.policy:"—"],
-                            ["匹配规则",page.selected?page.selected.rule:"—"],
-                            ["最终出站",page.selected?page.selected.outbound:"—"],
-                            ["代理节点",page.selected&&page.selected.proxyNode?page.selected.proxyNode:"—"],
-                            ["传输状态",page.selected&&page.selected.transportState?page.selected.transportState:"—"],
-                            ["Upload",page.selected?page.selected.up:"—"],
-                            ["Download",page.selected?page.selected.down:"—"],
-                            ["Latency",page.selected?page.selected.latency:"—"],
-                            ["Established",page.selected?page.selected.time:"—"]
-                        ]
+                        model:page.connectionDetailRows
                         ColumnLayout {
+                            id:detailField
+                            required property var modelData
                             Layout.fillWidth:true; spacing:Theme.dp(3)
-                            SwirlText { text:AppState.zh(modelData[0]); color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
-                            SwirlText { text:AppState.zh(modelData[1]); color:Theme.text; font.pixelSize:Theme.fontSize(13); elide:Text.ElideRight; Layout.fillWidth:true }
+                            SwirlText { text:AppState.zh(detailField.modelData[0]); color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
+                            SwirlText { text:String(detailField.modelData[1]);textFormat:Text.PlainText;color:Theme.text;font.pixelSize:Theme.fontSize(13);wrapMode:Text.WrapAnywhere;Layout.fillWidth:true }
                         }
                     }
 

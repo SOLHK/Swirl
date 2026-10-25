@@ -33,6 +33,7 @@ public:
     Command importNode() const { QMutexLocker lock(&m_mutex); return m_importNode; }
     Command importProfile() const { QMutexLocker lock(&m_mutex); return m_importProfile; }
     bool isReady() const { QMutexLocker lock(&m_mutex); return m_command != nullptr; }
+    bool supportsConfigurationV2() const { QMutexLocker lock(&m_mutex); return m_configurationV2; }
     QJsonObject diagnostics() const { QMutexLocker lock(&m_mutex); return m_diagnostics; }
     QString errorString() const;
 
@@ -52,5 +53,6 @@ private:
     Command m_importNode = nullptr;
     Command m_importProfile = nullptr;
     QJsonObject m_diagnostics;
+    bool m_configurationV2=false;
     QString m_message;
 };

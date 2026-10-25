@@ -12,6 +12,7 @@ mod policy;
 mod reality;
 mod singbox_quic;
 pub mod stream_transport;
+pub mod v2;
 mod websocket;
 pub use policy::{HealthProbe, PolicyStrategy, ProbeTarget};
 pub use reality::Reality;
@@ -151,7 +152,7 @@ pub struct Node {
     pub outbound: Outbound,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Matcher {
     Domain {

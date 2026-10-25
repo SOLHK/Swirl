@@ -9,6 +9,7 @@ use std::{
 use swirl_core::Core;
 use swirl_subscription::Config;
 
+mod control_v2;
 mod import_ffi;
 mod node_import;
 pub use node_import::swirl_import_node_v1;
@@ -61,9 +62,20 @@ enum Command {
 pub struct Controller {
     next: u64,
     cores: HashMap<u64, Core>,
+    cores_v2: HashMap<u64, swirl_core::v2::Core>,
 }
 impl Controller {
     pub fn dispatch(&mut self, input: &[u8]) -> Value {
+        if input.is_empty() || input.len() > MAX_COMMAND {
+            return json!({"ok":false,"error":"CommandSize"});
+        }
+        let parsed = match swirl_subscription::parse_json_value(input) {
+            Ok(value) => value,
+            Err(_) => return json!({"ok":false,"error":"CommandInvalidOrUnsupported"}),
+        };
+        if parsed.get("control_schema").is_some() {
+            return control_v2::dispatch(self, input);
+        }
         match self.execute(input) {
             Ok(v) => v,
             Err(code) => json!({"ok":false,"error":code}),
@@ -77,7 +89,7 @@ impl Controller {
             serde_json::from_slice(input).map_err(|_| "CommandInvalidOrUnsupported")?;
         match command {
             Command::Start { config } => {
-                if self.cores.len() >= 4 {
+                if self.cores.len() + self.cores_v2.len() >= 4 {
                     return Err("CoreLimit");
                 }
                 let core = Core::start(config)?;
@@ -88,6 +100,9 @@ impl Controller {
                 Ok(json!({"ok":true,"handle":handle,"status":status}))
             }
             Command::Configure { handle, config } => {
+                if self.cores_v2.contains_key(&handle) {
+                    return Err("V2MutationRequiresTransaction");
+                }
                 self.cores
                     .get(&handle)
                     .ok_or("UnknownHandle")?
@@ -95,34 +110,62 @@ impl Controller {
                 Ok(json!({"ok":true}))
             }
             Command::Select { handle, id } => {
+                if self.cores_v2.contains_key(&handle) {
+                    return Err("V2MutationRequiresTransaction");
+                }
                 self.cores
                     .get(&handle)
                     .ok_or("UnknownHandle")?
                     .select_node(&id)?;
                 Ok(json!({"ok":true}))
             }
-            Command::Snapshot { handle } => Ok(
-                json!({"ok":true,"status":self.cores.get(&handle).ok_or("UnknownHandle")?.snapshot()?}),
-            ),
+            Command::Snapshot { handle } => {
+                if let Some(core) = self.cores_v2.get(&handle) {
+                    return Ok(json!({"ok":true,"status":core.snapshot()?}));
+                }
+                Ok(
+                    json!({"ok":true,"status":self.cores.get(&handle).ok_or("UnknownHandle")?.snapshot()?}),
+                )
+            }
             Command::ProbeStart {
                 handle,
                 url,
                 timeout_ms,
                 expected_status,
-            } => Ok(json!({
-                "ok": true,
-                "probe": self.cores.get(&handle).ok_or("UnknownHandle")?
-                    .probe_start(url, timeout_ms, expected_status)?
-            })),
-            Command::ProbeStatus { handle } => Ok(json!({
-                "ok": true,
-                "probe": self.cores.get(&handle).ok_or("UnknownHandle")?.probe_status()?
-            })),
-            Command::ProbeCancel { handle } => Ok(json!({
-                "ok": true,
-                "probe": self.cores.get(&handle).ok_or("UnknownHandle")?.probe_cancel()?
-            })),
+            } => {
+                if let Some(core) = self.cores_v2.get(&handle) {
+                    return Ok(
+                        json!({"ok":true,"probe":core.probe_start(url,timeout_ms,expected_status)?}),
+                    );
+                }
+                Ok(json!({
+                    "ok": true,
+                    "probe": self.cores.get(&handle).ok_or("UnknownHandle")?
+                        .probe_start(url, timeout_ms, expected_status)?
+                }))
+            }
+            Command::ProbeStatus { handle } => {
+                if let Some(core) = self.cores_v2.get(&handle) {
+                    return Ok(json!({"ok":true,"probe":core.probe_status()?}));
+                }
+                Ok(json!({
+                    "ok": true,
+                    "probe": self.cores.get(&handle).ok_or("UnknownHandle")?.probe_status()?
+                }))
+            }
+            Command::ProbeCancel { handle } => {
+                if let Some(core) = self.cores_v2.get(&handle) {
+                    return Ok(json!({"ok":true,"probe":core.probe_cancel()?}));
+                }
+                Ok(json!({
+                    "ok": true,
+                    "probe": self.cores.get(&handle).ok_or("UnknownHandle")?.probe_cancel()?
+                }))
+            }
             Command::SelectGroup { handle, id, member } => {
+                if self.cores_v2.contains_key(&handle) {
+                    return Err("V2MutationRequiresTransaction");
+                }
                 self.cores
                     .get(&handle)
                     .ok_or("UnknownHandle")?
@@ -130,6 +173,10 @@ impl Controller {
                 Ok(json!({"ok":true}))
             }
             Command::Stop { handle } => {
+                if let Some(mut core) = self.cores_v2.remove(&handle) {
+                    core.stop();
+                    return Ok(json!({"ok":true}));
+                }
                 let mut core = self.cores.remove(&handle).ok_or("UnknownHandle")?;
                 core.stop();
                 Ok(json!({"ok":true}))
@@ -162,6 +209,10 @@ pub unsafe extern "C" fn swirl_core_build_info(output: *mut u8, output_capacity:
             "source_sha": env!("SWIRL_SOURCE_SHA"),
             "package_version": env!("CARGO_PKG_VERSION"),
             "target": env!("SWIRL_BUILD_TARGET"),
+            "control_schemas": [1,2],
+            "config_schemas": [1,2],
+            "capabilities": control_v2::capabilities(),
+            "limits": {"command_bytes":MAX_COMMAND,"response_bytes":OUTPUT_CAPACITY,"runtime_nodes":512,"policy_groups":128,"policy_edges":4096,"admission_waiters":64,"admission_timeout_ms":2000},
         });
         let bytes = metadata.to_string().into_bytes();
         if bytes.len() > output_capacity {
@@ -251,7 +302,9 @@ mod tests {
         assert_eq!(metadata["source_sha"], env!("SWIRL_SOURCE_SHA"));
         assert_eq!(metadata["package_version"], env!("CARGO_PKG_VERSION"));
         assert_eq!(metadata["target"], env!("SWIRL_BUILD_TARGET"));
-        assert_eq!(metadata.as_object().unwrap().len(), 5);
+        assert_eq!(metadata.as_object().unwrap().len(), 9);
+        assert_eq!(metadata["control_schemas"], json!([1, 2]));
+        assert_eq!(metadata["capabilities"]["optional"]["tun"], false);
 
         let mut short = [0xa5; 1];
         // SAFETY: short is a writable local array of the declared size.

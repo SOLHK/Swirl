@@ -7,11 +7,39 @@ use std::{
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
+use std::{future::Future, pin::Pin};
 use swirl_subscription::{DnsQueryFamily, DnsTlsServer};
+use swirl_transport::BoxStream;
 use tokio::{net::lookup_host, sync::Semaphore, time::timeout};
+
+/// The caller selects an already approved outbound for a fixed bootstrap IP.
+/// DNS owns TLS verification and wire parsing; it does not depend on protocols.
+pub trait QueryTransport: Send + Sync {
+    fn connect(
+        &self,
+        address: SocketAddr,
+    ) -> Pin<Box<dyn Future<Output = Result<BoxStream, &'static str>> + Send + '_>>;
+}
+struct DirectQueryTransport;
+impl QueryTransport for DirectQueryTransport {
+    fn connect(
+        &self,
+        address: SocketAddr,
+    ) -> Pin<Box<dyn Future<Output = Result<BoxStream, &'static str>> + Send + '_>> {
+        Box::pin(async move {
+            let stream = tokio::net::TcpStream::connect(address)
+                .await
+                .map_err(|_| "DnsTlsConnect")?;
+            Ok(Box::new(stream) as BoxStream)
+        })
+    }
+}
 
 type Cache = HashMap<String, (Instant, wire::Outcome)>;
 type Lookup = Result<Vec<SocketAddr>, &'static str>;
+#[cfg(test)]
+#[path = "query_transport_tests.rs"]
+mod query_transport_tests;
 const FAILURE_TTL: Duration = Duration::from_secs(1);
 pub struct Resolver {
     query_family: DnsQueryFamily,
@@ -36,6 +64,55 @@ impl Default for Resolver {
     }
 }
 impl Resolver {
+    /// Encrypted classification lookup over the explicitly selected policy.
+    /// No system/UDP fallback or endpoint-name bootstrap is possible here.
+    pub async fn resolve_with_transport(
+        &self,
+        host: &str,
+        port: u16,
+        transport: &dyn QueryTransport,
+    ) -> Lookup {
+        if port == 0 || !swirl_subscription::valid_host(host) {
+            return Err("DnsInvalidTarget");
+        }
+        if self.tls_servers.is_empty() {
+            return Err("DnsEncryptedServerRequired");
+        }
+        if let Ok(ip) = host.parse() {
+            return Ok(vec![SocketAddr::new(ip, port)]);
+        }
+        if let Some(ip) = self.mapped_host(host) {
+            return Ok(vec![SocketAddr::new(ip, port)]);
+        }
+        let key = host.to_ascii_lowercase();
+        if let Some(answer) = self.cached(&key, port)? {
+            return answer;
+        }
+        let _permit = timeout(Duration::from_secs(3), self.permits.clone().acquire_owned())
+            .await
+            .map_err(|_| "DnsBusy")?
+            .map_err(|_| "DnsStopped")?;
+        if let Some(answer) = self.cached(&key, port)? {
+            return answer;
+        }
+        let started = Instant::now();
+        let resolution = timeout(
+            Duration::from_secs(3),
+            dot::resolve_with_transport(&self.tls_servers, host, self.query_family, transport),
+        )
+        .await
+        .unwrap_or(Err("DnsTimeout"))
+        .map_err(|error| self.remember_failure(key.clone(), error))?;
+        let expires = started + Duration::from_secs(u64::from(resolution.ttl));
+        if expires > Instant::now() {
+            let mut cache = self.cache.lock().map_err(|_| "DnsState")?;
+            if cache.len() >= 256 {
+                cache.clear();
+            }
+            cache.insert(key, (expires, resolution.outcome.clone()));
+        }
+        resolution.outcome.for_port(port)
+    }
     fn cached(&self, key: &str, port: u16) -> Result<Option<Lookup>, &'static str> {
         let mut cache = self.cache.lock().map_err(|_| "DnsState")?;
         cache.retain(|_, (expires, _)| *expires > Instant::now());

@@ -2,6 +2,7 @@
 #include "RustDnsConfiguration.h"
 #include "XrayJsonBridge.h"
 #include "NativeNodeBridge.h"
+#include "RouteObservation.h"
 #include <QCoreApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -204,6 +205,51 @@ QString RustCoreEngine::validatePolicyGroups(const QList<ProxyNode> &nodes,const
 }
 QVariantList RustCoreEngine::routingRules()const{return routingRulesForOptions(m_options);}
 QVariantList RustCoreEngine::routingRulesForOptions(const EngineStartOptions &options){
+ if(!options.policyDocument.isEmpty()){
+  const auto document=options.policyDocument;const auto mode=document.value("mode").toString();QVariantList result;int order=0;
+  const auto label=[&](const QJsonObject &target){
+   const auto kind=target.value("kind").toString(),id=target.value("id").toString();
+   if(kind=="direct")return QString("DIRECT");if(kind=="reject")return QString("REJECT");
+   for(const auto &entry:document.value("missing_targets").toArray())if(entry.toObject().value("kind")==QJsonValue(kind)&&entry.toObject().value("id")==QJsonValue(id))return QStringLiteral("出口已删除");
+   if(kind=="node")for(const auto &node:options.nodes)if(node.id==id)return node.name;
+   if(kind=="group")for(const auto &entry:document.value("groups").toArray())if(entry.toObject().value("id")==QJsonValue(id))return entry.toObject().value("name").toString();
+   return kind=="unconfigured"?QStringLiteral("未配置"):QStringLiteral("出口已删除");
+  };
+  const auto encoded=[](const QJsonObject &target){const auto kind=target.value("kind").toString();return kind=="direct"?QString("DIRECT"):kind=="reject"?QString("REJECT"):kind+':'+target.value("id").toString();};
+  const auto append=[&](const QString &id,const QString &type,const QString &pattern,const QJsonObject &target,int customIndex=-1){
+   QVariantMap row{{"id",id},{"order",order++},{"type",type},{"pattern",pattern},{"policy",label(target)},{"policyTarget",encoded(target)},{"hits","—"}};
+   if(customIndex>=0)row.insert("customIndex",customIndex);result.append(row);
+  };
+  if(mode!="direct"){
+   for(const auto &subnet:privateSubnets())append("local:"+subnet,subnet.contains(':')?"IP-CIDR6":"IP-CIDR",subnet,{{"kind","direct"}});
+   append("local:localhost","DOMAIN","localhost",{{"kind","direct"}});append("local:local","DOMAIN-SUFFIX","local",{{"kind","direct"}});
+  }
+  const auto appendRules=[&](const QJsonArray &rules,bool editable){
+   QList<QPair<int,QJsonObject>> sorted;for(int i=0;i<rules.size();++i)sorted.append({i,rules[i].toObject()});
+   std::stable_sort(sorted.begin(),sorted.end(),[](const auto &a,const auto &b){return a.second.value("priority").toDouble()<b.second.value("priority").toDouble();});
+   for(const auto &entry:sorted){
+    const auto rule=entry.second;if(!rule.value("enabled").toBool(true))continue;const auto matcher=rule.value("matcher").toObject();
+    const auto kind=matcher.value("type").toString();const auto value=matcher.value("value");
+    const auto type=kind=="match"?"MATCH":kind=="domain"?"DOMAIN":kind=="domain_suffix"?"DOMAIN-SUFFIX":kind=="domain_keyword"?"DOMAIN-KEYWORD":kind=="source_cidr"?"SRC-IP-CIDR":kind=="destination_port"?"DST-PORT":value.toString().contains(':')?"IP-CIDR6":"IP-CIDR";
+    append(rule.value("id").toString(),type,kind=="match"?QString():value.isString()?value.toString():QString::number(value.toInt()),rule.value("target").toObject(),editable?entry.first:-1);
+   }
+  };
+  if(mode=="rule"){
+   appendRules(document.value("explicit_direct_rules").toArray(),false);
+   QList<QJsonObject> services;for(const auto &entry:document.value("service_policies").toArray())services.append(entry.toObject());
+   std::stable_sort(services.begin(),services.end(),[](const auto &a,const auto &b){return a.value("priority").toDouble()<b.value("priority").toDouble();});
+   for(const auto &service:services)if(service.value("enabled").toBool()){
+    int index=0;for(const auto &entry:service.value("domains").toArray()){
+     const auto domain=entry.toObject();append(service.value("id").toString()+':'+QString::number(index++),domain.value("type")==QJsonValue("domain")?"DOMAIN":"DOMAIN-SUFFIX",domain.value("value").toString(),service.value("target").toObject());
+    }
+   }
+   append("china:domains","RULE-SET",QStringLiteral("中国域名规则库"),{{"kind","direct"}});
+   append("china:ips","RULE-SET",QStringLiteral("中国 IPv4 / IPv6 规则库"),{{"kind","direct"}});
+   appendRules(document.value("custom_rules").toArray(),true);
+  }
+  append("policy:default","FINAL","",mode=="direct"?QJsonObject{{"kind","direct"}}:document.value("default_policy").toObject().value("target").toObject());
+  return result;
+ }
  QVariantList rows;int order=0;const bool direct=options.directSession||options.routingMode=="direct";
  QVariantMap terminal;
  if(!direct&&options.routingMode=="rule")for(int index=0;index<options.customRules.size();++index){
@@ -220,6 +266,7 @@ QVariantList RustCoreEngine::routingRulesForOptions(const EngineStartOptions &op
  return rows;
 }
 QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *output){
+ if(!o.policyDocument.isEmpty())return configurationV2(o,o.policyDocument,output);
  if(o.proxyPort==0&&!o.internalProbeListener)return "本机代理端口无效，请设置 1 至 65535 之间的端口。";
  if(o.internalProbeListener&&o.proxyPort!=0)return "内部节点检测监听必须由 Rust 自动分配端口。";
  if(o.tunEnabled||o.gatewayForwarding)return "当前会话要求增强模式或网关转发，但 Rust 版尚未支持。请在“概览”关闭增强模式后重试。";
@@ -276,9 +323,56 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
  if(!o.inboundUsername.isEmpty()||!o.inboundPassword.isEmpty())config["inbound_auth"]=QJsonObject{{"username",o.inboundUsername},{"password",o.inboundPassword}};
  *output=config;return {};
 }
+QString RustCoreEngine::configurationV2(const EngineStartOptions &options,const QJsonObject &policy,QJsonObject *output){
+ if(QJsonDocument(policy).toJson(QJsonDocument::Compact).size()>1024*1024)return QStringLiteral("策略文档超过控制协议上限，未截断配置。");
+ QSet<QString> referenced,missing;
+ const std::function<void(const QJsonValue &)> visit=[&](const QJsonValue &value){
+  if(value.isArray()){for(const auto &entry:value.toArray())visit(entry);return;}
+  if(!value.isObject())return;const auto object=value.toObject();
+  if(object.value("kind")==QJsonValue("node")&&object.value("id").isString())referenced.insert(object.value("id").toString());
+  for(auto it=object.begin();it!=object.end();++it)if(it.key()!="missing_targets")visit(it.value());
+ };
+ visit(policy);
+ for(const auto &entry:policy.value("missing_targets").toArray())if(entry.toObject().value("kind")==QJsonValue("node"))missing.insert(entry.toObject().value("id").toString());
+ auto base=options;base.policyDocument={};base.routingMode="global";base.directSession=true;base.smartRouting=false;
+ base.customGroups.clear();base.customRules.clear();QJsonObject config;
+ const auto baseError=configuration(base,&config);if(!baseError.isEmpty())return baseError;
+ QJsonArray nodes;QJsonObject sources;
+ auto ordered=referenced.values();std::sort(ordered.begin(),ordered.end());
+ for(const auto &id:ordered){
+  const auto found=std::find_if(options.nodes.cbegin(),options.nodes.cend(),[&](const auto &node){return node.id==id;});
+  if(found==options.nodes.cend()){
+   if(missing.contains(id))continue;
+   return QStringLiteral("策略引用了不存在的节点；请重新选择出口。");
+  }
+  auto leaf=base;leaf.directSession=false;leaf.selectedNodeId=id;QJsonObject mapped;
+  const auto error=configuration(leaf,&mapped);if(!error.isEmpty())return error;
+  const auto row=mapped.value("nodes").toArray();if(row.size()!=1)return QStringLiteral("节点转换结果无效；未应用配置。");
+  nodes.append(row.first());if(nodes.size()>512)return QStringLiteral("当前运行策略引用超过 512 个有效节点；未截断配置。");
+  if(!found->sourceId.isEmpty())sources.insert(id,found->sourceId);
+ }
+ for(const auto &key:QStringList{"selected","rules","selectors","smart_routing"})config.remove(key);
+ config.insert("schema",2);config.insert("nodes",nodes);config.insert("policy",policy);config.insert("node_sources",sources);
+ if(!options.rulesDirectory.isEmpty())config.insert("china_rules_directory",options.rulesDirectory);
+ *output=config;return {};
+}
+QJsonObject RustCoreEngine::validateConfigurationV2(const EngineStartOptions &options,const QJsonObject &policy,const QString &requestId){
+ QJsonObject candidate;const auto error=configurationV2(options,policy,&candidate);
+ if(!error.isEmpty())return {{"ok",false},{"code","InvalidCandidate"},{"error",error},{"phase","prepare"},{"request_id",requestId}};
+ auto &library=RustCoreLibrary::instance();if(!library.load())return {{"ok",false},{"code","RustLibraryUnavailable"},{"error",library.errorString()},{"phase","prepare"},{"request_id",requestId}};
+ if(!library.supportsConfigurationV2())return {{"ok",false},{"code","UnsupportedCapability"},{"phase","prepare"},{"request_id",requestId}};
+ const auto command=library.command();auto input=QJsonDocument(QJsonObject{{"control_schema",2},{"op","validate_configuration_v2"},{"request_id",requestId},{"candidate",candidate}}).toJson(QJsonDocument::Compact);
+ if(input.size()>1024*1024){input.fill('\0');return {{"ok",false},{"code","RequestTooLarge"},{"phase","prepare"},{"request_id",requestId}};}
+ QByteArray bytes(1024*1024,Qt::Uninitialized);const auto count=command(reinterpret_cast<const unsigned char *>(input.constData()),size_t(input.size()),reinterpret_cast<unsigned char *>(bytes.data()),size_t(bytes.size()));input.fill('\0');
+ if(count<=0||count>bytes.size())return {{"ok",false},{"code","RustAbiFailure"},{"phase","prepare"},{"request_id",requestId}};
+ bytes.resize(count);QJsonParseError parse;const auto document=QJsonDocument::fromJson(bytes,&parse);bytes.fill('\0');
+ if(parse.error!=QJsonParseError::NoError||!document.isObject())return {{"ok",false},{"code","InvalidResponse"},{"phase","prepare"},{"request_id",requestId}};
+ return document.object();
+}
 QJsonObject RustCoreEngine::call(QJsonObject command){
  if(!m_command)return {{"ok",false},{"error","RustLibraryUnavailable"}};
  auto input=QJsonDocument(command).toJson(QJsonDocument::Compact);QByteArray output(1024*1024,Qt::Uninitialized);
+ if(input.size()>1024*1024){input.fill('\0');return {{"ok",false},{"error","RequestTooLarge"},{"code","RequestTooLarge"}};}
  const auto count=m_command(reinterpret_cast<const unsigned char *>(input.constData()),size_t(input.size()),reinterpret_cast<unsigned char *>(output.data()),size_t(output.size()));input.fill('\0');
  if(count<=0||count>output.size())return {{"ok",false},{"error","RustAbiFailure"}};
  output.resize(count);return QJsonDocument::fromJson(output).object();
@@ -332,6 +426,7 @@ void RustCoreEngine::updateProbe(const QJsonObject &probe){
 }
 void RustCoreEngine::fail(Error error,const QString &reason){cancelProbe();m_status.state=State::Failed;m_status.error=error;m_status.message=reason;m_status.apiHealthy=false;emit diagnostic("SwirlRust","CoreFailure",reason);emit statusChanged();}
 void RustCoreEngine::start(const EngineStartOptions &options){
+ if(!options.policyDocument.isEmpty()){startV2(options);return;}
  QJsonObject config;const auto reason=configuration(options,&config);
  if(m_handle){
   // A duplicate/queued start must not destroy the valid runtime before the
@@ -374,13 +469,109 @@ void RustCoreEngine::start(const EngineStartOptions &options){
  m_status.selectedNodeId=options.selectedNodeId;m_status.proxyPort=int(boundPort);
  m_uptime.start();m_rateClock.start();m_poll.start();refresh();
 }
+void RustCoreEngine::ingestConfigurationReceipt(const QJsonObject &response){
+ auto receipt=response.value("receipt").toObject();if(receipt.isEmpty())receipt=response;
+ if(!receipt.value("engine_epoch").isString()||!receipt.value("generation").isString()||
+    !receipt.value("applied_revision").isString()||!receipt.value("plan_digest").isString()||!receipt.value("applied_mode").isString())return;
+ // A polling snapshot has no command request_id. Keep identity only from a
+ // verified receipt for exactly the same runtime version; never invent an ACK
+ // or let a later telemetry refresh erase the completed operation identity.
+ if(receipt.value("request_id").toString().isEmpty()){
+  const auto matches=[&](const QJsonObject &known){
+   if(known.value("request_id").toString().isEmpty())return false;
+   for(const auto &key:QStringList{"engine_epoch","generation","store_id","applied_revision","plan_digest"})if(known.value(key)!=receipt.value(key))return false;
+   return true;
+  };
+  const auto completed=receipt.value("last_receipt").toObject();
+  if(matches(completed))receipt.insert("request_id",completed.value("request_id"));
+  else if(matches(m_status.configurationReceipt))receipt.insert("request_id",m_status.configurationReceipt.value("request_id"));
+ }
+ receipt.remove("last_receipt");
+ m_engineEpoch=receipt.value("engine_epoch").toString();m_status.configurationReceipt=receipt;
+ if(receipt.value("transaction_state").toString("idle")=="idle"){
+  m_status.mode=receipt.value("applied_mode").toString();m_status.directSession=m_status.mode=="direct";
+ }
+}
+void RustCoreEngine::startV2(const EngineStartOptions &options){
+ if(m_handle){emit diagnostic("SwirlRust","CoreStartRejected",QStringLiteral("运行中的 V2 策略必须通过配置事务更新。"));return;}
+ QJsonObject candidate;const auto reason=configurationV2(options,options.policyDocument,&candidate);
+ if(!reason.isEmpty()){fail(Error::InvalidOptions,reason);return;}
+ if(!m_command){if(!m_library.load()){fail(Error::MissingExecutable,m_library.errorString());return;}m_command=m_library.command();}
+ if(!m_library.supportsConfigurationV2()){fail(Error::ConfigurationFailed,QStringLiteral("内核不支持 V2 配置事务，未降级为旧路由语义。"));return;}
+ auto request=QJsonObject{{"control_schema",2},{"op","start_v2"},{"request_id",options.configurationRequestId},
+  {"store_id",options.configurationStoreId},{"saved_revision",options.configurationRevision},{"candidate",candidate}};
+ if(!options.configurationDigest.isEmpty())request.insert("plan_digest",options.configurationDigest);
+ const auto response=call(request);
+ if(!response.value("ok").toBool()){fail(Error::ConfigurationFailed,response.value("error").toString(response.value("code").toString("ConfigurationRejected")));return;}
+ bool handleOk=false;const auto handle=response.value("handle").toString().toULongLong(&handleOk);
+ const auto address=response.value("status").toObject().value("address").toString();
+ const auto bound=QRegularExpression("\\A127\\.0\\.0\\.1:([1-9][0-9]{0,4})\\z").match(address);
+ const auto port=bound.hasMatch()?bound.captured(1).toUInt():0u;
+ if(!handleOk||handle==0||port==0||port>65535||port!=options.proxyPort){
+  if(handleOk&&handle)call({{"op","stop"},{"handle",qint64(handle)}});
+  fail(Error::InvalidResponse,QStringLiteral("Rust 未返回有效 V2 运行身份和监听地址。"));return;
+ }
+ m_options=options;retainPublicNodeIdentities();m_handle=handle;m_v2=true;m_status={};m_status.engineName="Swirl Core Rust";m_status.engineKind="rust";
+ ingestConfigurationReceipt(response);
+ if(m_status.configurationReceipt.isEmpty()||m_status.configurationReceipt.value("applied_revision").toString()!=options.configurationRevision||
+    (!options.configurationDigest.isEmpty()&&m_status.configurationReceipt.value("plan_digest").toString()!=options.configurationDigest)){
+  stop();fail(Error::InvalidResponse,QStringLiteral("Rust 启动回执与已保存配置不一致；保持断开。"));return;
+ }
+ const auto target=options.policyDocument.value("default_policy").toObject().value("target").toObject();
+ m_status.selectedNodeId=target.value("kind")==QJsonValue("node")?target.value("id").toString():QString();
+ m_status.proxyPort=int(port);m_status.sessionId=QUuid::createUuid().toString(QUuid::WithoutBraces);
+ m_status.processId=QCoreApplication::applicationPid();m_status.version="Swirl Core Rust "+m_library.diagnostics().value("package_version").toString();
+ m_status.controlEndpoint="in-process://SwirlRust/v2";m_uptime.start();m_rateClock.start();m_poll.start();refresh();
+}
+void RustCoreEngine::retainPublicNodeIdentities(){
+ // V2 forwarding owns the immutable compiled secrets in Rust. The Qt worker
+ // needs only labels; retaining its startup catalog would keep deleted source
+ // documents and credentials alive after the durable revoke barrier.
+ QList<ProxyNode> identities;identities.reserve(m_options.nodes.size());
+ for(const auto &node:m_options.nodes){ProxyNode identity;identity.id=node.id;identity.name=node.name;identities.append(std::move(identity));}
+ m_options.nodes=std::move(identities);m_options.dnsConfig.clear();m_options.customRules.clear();m_options.customGroups.clear();
+ m_options.inboundUsername.clear();m_options.inboundPassword.clear();m_options.lanUsername.clear();m_options.lanPassword.clear();
+}
+void RustCoreEngine::configurationCommand(const QJsonObject &input){
+ auto request=input;const auto requestId=request.value("request_id").toString(),op=request.value("op").toString();
+ if(!m_command){if(m_library.load())m_command=m_library.command();}
+ if(!m_library.supportsConfigurationV2()){
+  emit configurationCommandFinished(requestId,{{"ok",false},{"request_id",requestId},{"code","UnsupportedCapability"},{"phase","prepare"}});return;
+ }
+ if(op!="validate_configuration_v2"){
+  if(!m_handle||!m_v2){emit configurationCommandFinished(requestId,{{"ok",false},{"request_id",requestId},{"code","CoreUnavailable"},{"phase","prepare"}});return;}
+  request.insert("handle",QString::number(m_handle));request.insert("engine_epoch",m_engineEpoch);
+ }
+ const auto result=call(request);
+ if(result.value("ok").toBool()){
+  if(op=="prepare_configuration_v2"){
+   m_previousPolicy=m_options.policyDocument;m_preparedPolicy=request.value("candidate").toObject().value("policy").toObject();m_configurationRollback=false;
+  }else if(op=="rollback_configuration_v2")m_configurationRollback=true;
+  else if(op=="finish_configuration_v2"){
+   // Core finish is idempotent. Its duplicate receipt must not replace the
+   // already adopted policy with the cleared transaction working copy.
+   if(!m_preparedPolicy.isEmpty())m_options.policyDocument=m_configurationRollback?m_previousPolicy:m_preparedPolicy;
+   const auto target=m_options.policyDocument.value("default_policy").toObject().value("target").toObject();
+   m_status.selectedNodeId=target.value("kind")==QJsonValue("node")?target.value("id").toString():QString();
+   m_preparedPolicy={};m_previousPolicy={};m_configurationRollback=false;
+  }
+  ingestConfigurationReceipt(result);
+ }
+ emit configurationCommandFinished(requestId,result);emit statusChanged();
+}
 void RustCoreEngine::stop(){
  m_poll.stop();cancelProbe();
  if(m_handle){
   const auto finalSnapshot=call({{"op","snapshot"},{"handle",qint64(m_handle)}});
   if(finalSnapshot.value("ok").toBool())recordForwardingFailures(finalSnapshot.value("status").toObject());
-  call({{"op","stop"},{"handle",qint64(m_handle)}});m_handle=0;
+  const auto stopped=call({{"op","stop"},{"handle",qint64(m_handle)}});
+  if(!stopped.value("ok").toBool()&&stopped.value("error").toString()!="UnknownHandle"){
+   m_status.state=State::Degraded;m_status.apiHealthy=false;m_status.message=QStringLiteral("内核停止回执未确认，未声明资源已释放。");
+   emit diagnostic("SwirlRust","StopUnconfirmed",m_status.message);emit statusChanged();return;
+  }
+  m_handle=0;
  }
+ m_v2=false;m_engineEpoch.clear();m_status.configurationReceipt={};m_preparedPolicy={};m_previousPolicy={};m_configurationRollback=false;
  m_status.state=State::Stopped;m_status.processAlive=false;m_status.apiHealthy=false;m_status.nodeBusy=false;m_status.proxyPort=0;m_status.connections.clear();emit statusChanged();
 }
 void RustCoreEngine::refresh(){
@@ -388,6 +579,7 @@ void RustCoreEngine::refresh(){
  const auto response=call({{"op","snapshot"},{"handle",qint64(m_handle)}});
  if(!response["ok"].toBool()){fail(Error::ApiUnavailable,"Rust 状态读取失败。");return;}
  const auto state=response["status"].toObject();const auto elapsed=m_rateClock.restart();
+ if(m_v2)ingestConfigurationReceipt(state.value("configuration").toObject());
  recordForwardingFailures(state);
  const auto up=state["upload"].toInteger(),down=state["download"].toInteger();
  m_status.uploadRate=elapsed>0?double(up-m_status.uploadTotal)*1000/elapsed:0;m_status.downloadRate=elapsed>0?double(down-m_status.downloadTotal)*1000/elapsed:0;
@@ -404,8 +596,10 @@ void RustCoreEngine::refresh(){
    const auto named=std::find_if(m_options.nodes.cbegin(),m_options.nodes.cend(),[&](const auto &item){return item.id==node;});
    proxyNode=named==m_options.nodes.cend()?node:named->name;
   }
+  const auto route=SwirlRouteObservation::sanitized(row.value("route").toObject());
+  auto chain=route.value("group_chain").toStringList();if(!node.isEmpty())chain.append(node);
   m_status.connections.append(QVariantMap{{"id",QString::number(row["id"].toInteger())},{"host",row["host"].toString()},{"port",row["port"].toInt()},
-   {"sourceIp",row["source_ip"].toString()},{"sourcePort",row["source_port"].toInt()},{"policy",node},{"nodeChain",QStringList{node}},{"category",category},
+   {"sourceIp",row["source_ip"].toString()},{"sourcePort",row["source_port"].toInt()},{"policy",node},{"nodeChain",chain},{"category",category},{"route",route},
    {"rule",row["matched_rule"].toString()},{"outbound",category.toUpper()},{"proxyNode",proxyNode},{"transportState",row["transport_state"].toString()},
    {"closed",row["ended"].toBool()},{"uploadBytes",row["upload"].toInteger()},{"downloadBytes",row["download"].toInteger()},
    {"time",QDateTime::fromMSecsSinceEpoch(m_status.connectionsAt-row["elapsed_ms"].toInteger()).toString(Qt::ISODateWithMs)},{"process","未知进程"}});
@@ -446,6 +640,7 @@ void RustCoreEngine::recordForwardingFailures(const QJsonObject &state){
  }
 }
 void RustCoreEngine::selectNode(const QString &id){
+ if(m_v2){emit diagnostic("SwirlRust","SelectionUnsupported",QStringLiteral("V2 出口必须通过配置事务修改。"));return;}
  if(!m_handle)return;cancelProbe();auto options=m_options;options.selectedNodeId=id;options.directSession=false;
  if(options.routingMode=="direct"){
   // Validate the selected node independently of the current DIRECT route.
@@ -461,6 +656,7 @@ void RustCoreEngine::selectNode(const QString &id){
  m_status.latencyMs=-1;m_status.responseCode=0;m_status.nodeMessage.clear();refresh();
 }
 void RustCoreEngine::setRoutingMode(const QString &mode){
+ if(m_v2){emit diagnostic("SwirlRust","RoutingUnsupported",QStringLiteral("V2 模式必须通过配置事务修改。"));return;}
  if(!m_handle)return;cancelProbe();auto options=m_options;options.routingMode=mode;options.directSession=mode=="direct";QJsonObject config;const auto reason=configuration(options,&config);
  if(!reason.isEmpty()){emit diagnostic("SwirlRust","RoutingUnsupported",reason);emit statusChanged();return;}
  const auto result=call({{"op","configure"},{"handle",qint64(m_handle)},{"config",config}});

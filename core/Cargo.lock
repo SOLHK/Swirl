@@ -1290,14 +1290,18 @@ dependencies = [
 name = "swirl-core"
 version = "0.1.0"
 dependencies = [
+ "base64",
+ "ring",
  "serde",
  "serde_json",
+ "sha2",
  "swirl-dns",
  "swirl-protocol",
  "swirl-routing",
  "swirl-subscription",
  "swirl-transport",
  "tokio",
+ "tokio-rustls",
 ]
 
 [[package]]
@@ -1346,6 +1350,7 @@ dependencies = [
 name = "swirl-routing"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "sha2",
  "swirl-subscription",
  "zstd",

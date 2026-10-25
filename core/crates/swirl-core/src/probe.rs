@@ -191,6 +191,35 @@ impl ProbeRuntime {
     pub fn invalidate(&self) -> Result<()> {
         self.transition(ProbePhase::Idle).map(|_| ())
     }
+    /// V2 commit/revocation waits for owned probe inputs to be dropped before
+    /// acknowledging a new durable generation. Never hold Slot across await.
+    pub async fn invalidate_and_wait(&self) -> Result<()> {
+        let task = {
+            let mut slot = self.slot.lock().map_err(|_| "ProbeState")?;
+            slot.generation = slot
+                .generation
+                .checked_add(1)
+                .ok_or("ProbeGenerationLimit")?;
+            let task = slot.task.take();
+            slot.status = ProbeStatus {
+                request_id: slot.generation,
+                state: ProbePhase::Idle,
+                metrics: None,
+                failure: None,
+            };
+            task
+        };
+        if let Some(mut task) = task {
+            task.abort();
+            if tokio::time::timeout(std::time::Duration::from_secs(2), &mut task)
+                .await
+                .is_err()
+            {
+                return Err("ProbeCancellationTimeout");
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

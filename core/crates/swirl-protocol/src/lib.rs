@@ -2,6 +2,7 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
 mod diagnostics;
 mod dial;
+pub mod http_single;
 pub mod hysteria2;
 mod probe;
 mod shadowsocks;

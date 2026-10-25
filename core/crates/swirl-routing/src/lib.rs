@@ -2,6 +2,7 @@
 use std::net::{IpAddr, SocketAddr};
 use swirl_subscription::{Config, Matcher, Node, PolicyStrategy};
 mod mrs;
+pub mod v2;
 pub use mrs::{
     Behavior as MrsBehavior, ChinaRules, load_rules_from_directory, shared_bundled_rules,
 };

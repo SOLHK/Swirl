@@ -14,6 +14,7 @@
 #include "engine/ThreadedEngine.h"
 #include <QUuid>
 #include <QJsonDocument>
+#include <QFile>
 class PulseEngine final:public ProxyEngine {
 public:
  Status current;
@@ -29,6 +30,39 @@ class TelemetryTests:public QObject {
  Q_OBJECT
  ProxyEngine::Status sample(qint64 time,int up,int down){ProxyEngine::Status s;s.processAlive=true;s.processId=1;s.apiHealthy=true;s.connectionsAt=time;s.trafficAt=time;s.uploadTotal=up;s.downloadTotal=down;s.uploadRate=up;s.downloadRate=down;s.connections={QVariantMap{{"id","connection-a"},{"host","fixture.test"},{"process","fixture.exe"},{"policy","DIRECT"},{"category","direct"},{"uploadBytes",up},{"downloadBytes",down},{"time",QDateTime::fromMSecsSinceEpoch(time).toString(Qt::ISODateWithMs)}}};return s;}
 private slots:
+ void actualRouteObservationKeepsStableIdentityAndDropsPrivateFields(){
+  QTemporaryDir directory;TelemetryService model(directory.filePath("route.json"),false);auto status=sample(QDateTime::currentMSecsSinceEpoch(),0,0);
+  const QVariantMap expected{{"revision","9007199254740993"},{"generation","4"},{"mode","rule"},{"tier",2},
+   {"rule_id","service:rule"},{"service_policy_id","30000000-0000-4000-8000-000000000001"},
+   {"group_chain",QStringList{"20000000-0000-4000-8000-000000000001"}},
+   {"leaf_node_id","10000000-0000-4000-8000-000000000001"},{"source_id","40000000-0000-4000-8000-000000000001"},
+   {"chosen_ip","2001:db8::1"},{"dns_profile","classification"},{"dns_path","direct_encrypted"},{"classification_state","classified"},{"affinity_reason","service"}};
+  auto supplied=expected;supplied.insert("plan_digest",QString(64,'a'));supplied.insert("raw_configuration",QVariantMap{{"password","never-export-this"}});
+  auto row=status.connections.first().toMap();row.insert("route",supplied);status.connections={row};model.ingest(status);
+  QCOMPARE(model.connections().first().toMap().value("route").toMap(),expected);model.flush();
+  QFile saved(directory.filePath("route.json"));QVERIFY(saved.open(QIODevice::ReadOnly));const auto output=saved.readAll();QVERIFY(!output.contains("never-export-this"));QVERIFY(!output.contains("plan_digest"));
+ }
+ void groupConfigurationReceiptInvalidatesOldMeasurementsWithoutInventingALeaf(){
+  QTemporaryDir directory;TelemetryService model(directory.filePath("group.json"),false);auto status=sample(QDateTime::currentMSecsSinceEpoch(),0,0);
+  status.selectedNodeId.clear();status.mode="rule";status.proxyPort=7898;status.configurationReceipt={{"applied_revision","12"},{"generation","3"}};model.ingest(status);
+  model.m_externalIp="203.0.113.7";const auto previousGeneration=model.m_routeGeneration;QSignalSpy requested(&model,&TelemetryService::nativeProbeRequested);
+  model.measureProxy();QCOMPARE(requested.size(),1);QVERIFY(model.m_nativeProbePending);
+  status.configurationReceipt={{"applied_revision","13"},{"generation","4"}};++status.connectionsAt;model.ingest(status);
+  QVERIFY(model.m_routeGeneration>previousGeneration);QVERIFY(!model.m_nativeProbePending);QCOMPARE(model.m_measurements,0);QVERIFY(model.externalIp().isEmpty());QVERIFY(status.selectedNodeId.isEmpty());
+ }
+ void malformedRouteMetadataCannotBecomeAValidIdentity(){
+  QTemporaryDir directory;TelemetryService model(directory.filePath("malformed-route.json"),false);auto status=sample(QDateTime::currentMSecsSinceEpoch(),0,0);
+  auto row=status.connections.first().toMap();row.insert("route",QVariantMap{{"revision","01"},{"generation","18446744073709551616"},{"mode","unknown"},
+   {"tier",9},{"rule_id",QString("bad\nrule")},{"chosen_ip","password@example.invalid"},{"group_chain",QStringList{QString("bad\nmember")}},{"plan_digest","secret"}});
+  status.connections={row};model.ingest(status);QVERIFY(model.connections().first().toMap().value("route").toMap().isEmpty());
+ }
+ void directModePreservesItsActualBypassTierWithoutAcceptingRuleTierZero(){
+  QTemporaryDir directory;TelemetryService model(directory.filePath("direct-tier.json"),false);auto status=sample(QDateTime::currentMSecsSinceEpoch(),0,0);
+  auto row=status.connections.first().toMap();row.insert("route",QVariantMap{{"mode","direct"},{"tier",0}});status.connections={row};model.ingest(status);
+  QCOMPARE(model.connections().first().toMap().value("route").toMap().value("tier").toInt(),0);
+  row.insert("route",QVariantMap{{"mode","rule"},{"tier",0}});status.connections={row};++status.connectionsAt;model.ingest(status);
+  QVERIFY(!model.connections().first().toMap().value("route").toMap().contains("tier"));
+ }
   void controllerPublishesOneStatusChangePerEnginePulse(){
    QTemporaryDir temp;auto engine=std::make_unique<PulseEngine>();auto *pulse=engine.get();
    EngineController controller(std::move(engine),nullptr,temp.filePath("nodes.dpapi"));

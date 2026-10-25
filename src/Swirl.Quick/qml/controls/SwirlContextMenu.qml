@@ -1,12 +1,16 @@
 import QtQuick
+import QtQml.Models
 import QtQuick.Controls
 import SwirlQuick
 Menu {
     id: menu
+    objectName:"swirlContextMenu"
     function requestDismiss(){close()}
     property var items: ["查看详情", "复制", "导出"]
     property string payload: ""
     property bool handleItemsInternally:true
+    implicitWidth:Math.ceil(Math.max(Theme.dp(150),items.reduce((width,label)=>Math.max(width,itemMetrics.advanceWidth(AppState.zh(String(label)))+Theme.dp(24)+leftPadding+rightPadding),0)))
+    FontMetrics {id:itemMetrics;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(12);font.weight:Theme.bodyFontWeight}
     signal itemTriggered(int index)
     padding:Theme.dp(6)
     transformOrigin:Item.TopLeft
@@ -36,9 +40,14 @@ Menu {
         border.width:Theme.dp(1)
         border.color: Theme.glassRim
     }
-    Repeater {
+    Instantiator {
         model: menu.items
-        MenuItem {
+        onObjectAdded:(index,object)=>menu.insertItem(index,object)
+        onObjectRemoved:(index,object)=>menu.removeItem(object)
+        delegate:MenuItem {
+            required property int index
+            required property var modelData
+            objectName:"swirlContextOption-"+index
             SwirlPressMotion{}
             text: AppState.zh(String(modelData))
             height:Theme.dp(36)

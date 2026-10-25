@@ -12,12 +12,22 @@ Item {
 
     property string inspectedId:""
     property string focusedId:""
+    property string nodeSaveRequestId:""
+    property string nodeDeleteRequestId:""
+    property string nodeDeletedId:""
+    property bool nodeSaveSubmitting:false
+    property bool nodeDeleteSubmitting:false
+    property bool nodeDeleteRecovery:false
+    property string nodeMutationMessage:""
+    property var lastNodeCompletion:({requestId:"",success:false})
+    readonly property bool nodeSavePending:nodeSaveSubmitting||nodeSaveRequestId.length>0
+    readonly property bool nodeDeletePending:nodeDeleteSubmitting||nodeDeleteRequestId.length>0
     readonly property string selectedId:inspectedId
     NodeViewModel { id:nodes;objectName:"nodeViewModel";controller:engineController }
     NodeSectionModel { id:sections;objectName:"nodeSectionModel";source:nodes;providers:page.sources }
     readonly property var selected:{nodes.revision;return nodes.find(page.selectedId)}
     readonly property var focused:{nodes.revision;return nodes.find(page.focusedId)}
-    onSelectedChanged:if(selected.id===undefined){inspectedId="";if(nodeHero.opened)nodeHero.returnTo(null)}
+    onSelectedChanged:if(selected.id===undefined&&!nodeDeletePending&&!nodeDeleteRecovery){inspectedId="";if(nodeHero.opened)nodeHero.returnTo(null)}
     onFocusedChanged:if(focused.id===undefined)focusedId=""
     readonly property bool selectedActive:selected.id!==undefined&&engineController.processAlive&&engineController.activeNodeId===selectedId
     property string sourceId:""
@@ -42,10 +52,11 @@ Item {
     onSourcesChanged:if(sourceId&&!sources.some(s=>s.id===sourceId)){sourceId="";sourceKind=""}
     onSourceOptionsChanged:if(sourceKind==="legacy"&&!sourceOptions.some(s=>s.kind==="legacy"))sourceKind=""
     Timer {id:searchDelay;interval:100;onTriggered:{nodes.query=search.text;nodeTable.scrollToBeginning()}}
-    function dismissDetail(){if(!nodeHero.opened)return false;nodeHero.returnTo(nodeTable.selectedItem);return true}
+    function dismissDetail(){if(!nodeHero.opened)return false;if(nodeDeletePending)return true;nodeHero.returnTo(nodeTable.selectedItem);if(nodeDeleteRecovery){nodeDeleteRecovery=false;inspectedId=""}return true}
     function selectRow(row) {if(row&&row.id)focusedId=row.id}
     function inspectRow(row) {
-        if(!row||!row.id)return
+        if(!row||!row.id||nodeDeletePending)return
+        nodeDeleteRecovery=false;nodeMutationMessage=""
         focusedId=row.id;inspectedId=row.id;nodeHero.start(nodeTable.selectedItem)
     }
     function sectionIndexForNode(id){return sections.indexOfNode(id)}
@@ -57,7 +68,24 @@ Item {
     property bool importPending:false
     property bool editingJson:false
     readonly property var tested:engineController.tests.results[selectedId]||({})
+    function completeNodeMutation(requestId,success) {
+        if(!requestId.length)return
+        if(success&&String((engineController.policyReceipt||{}).request_id)!==requestId)success=false
+        if(requestId===nodeSaveRequestId){nodeSaveRequestId="";nodeSaveSubmitting=false;if(success){addDialog.markSaved();addDialog.close()}else nodeMutationMessage=engineController.policyError||engineController.nodeError||qsTr("节点未能保存，请修改后重试。")}
+        if(requestId===nodeDeleteRequestId){nodeDeleteRequestId="";nodeDeleteSubmitting=false;if(success){nodeDeleteRecovery=false;dismissDetail();inspectedId="";if(focusedId===nodeDeletedId)focusedId=""}else{nodeDeleteRecovery=selected.id===undefined;nodeMutationMessage=engineController.policyError||engineController.nodeError||qsTr("删除尚未确认，请检查恢复状态。")}}
+    }
+    function trackNodeMutation(kind,accepted,v2) {
+        if(!accepted){nodeSaveSubmitting=false;nodeDeleteSubmitting=false;nodeMutationMessage=engineController.policyError||engineController.nodeError;return}
+        if(!v2){nodeSaveSubmitting=false;nodeDeleteSubmitting=false;if(kind==="save"){addDialog.markSaved();addDialog.close()}else{dismissDetail();inspectedId="";if(focusedId===nodeDeletedId)focusedId=""}return}
+        const requestId=String(engineController.policyRequestId)
+        if(kind==="save"){nodeSaveRequestId=requestId;nodeSaveSubmitting=false}else{nodeDeleteRequestId=requestId;nodeDeleteSubmitting=false}
+        if(lastNodeCompletion.requestId===requestId)completeNodeMutation(requestId,lastNodeCompletion.success)
+        else if(!engineController.policyBusy&&String((engineController.policyReceipt||{}).request_id)===requestId)completeNodeMutation(requestId,true)
+    }
+    function saveResource(input) {nodeMutationMessage="";const v2=engineController.policyV2Active;nodeSaveSubmitting=true;trackNodeMutation("save",engineController.saveNode(input),v2)}
+    function deleteResource(id) {nodeMutationMessage="";nodeDeleteRecovery=false;nodeDeletedId=id;const v2=engineController.policyV2Active;nodeDeleteSubmitting=true;trackNodeMutation("delete",engineController.deleteNode(id),v2)}
     function edit(node) {
+        nodeMutationMessage=""
         editingJson=Boolean(node&&node.jsonParsed);editingId=node?node.id:"";nodeName.text=node?node.name:"";nodeHost.text=node?node.host:"";nodePort.text=node?String(node.port):""
         nodeProtocol.currentIndex=node?page.protocols.indexOf(node.protocol):0
         nodeCipher.currentIndex=node?Math.max(0,nodeCipher.model.indexOf(node.cipher)):0
@@ -125,7 +153,7 @@ Item {
         RowLayout {
             x:Theme.dp(16);y:Theme.dp(10);width:parent.width-Theme.dp(32);height:Theme.dp(36)
             SwirlText {text:"节点详情";textRole:"pageTitle";font.pixelSize:Theme.fontSize(18);color:Theme.text;Layout.fillWidth:true}
-            SwirlButton {objectName:"nodeReturnButton";text:"返回节点列表";iconName:"chevron-left";quiet:true;onClicked:page.dismissDetail()}
+            SwirlButton {objectName:"nodeReturnButton";text:"返回节点列表";iconName:"chevron-left";quiet:true;enabled:!page.nodeDeletePending;onClicked:page.dismissDetail()}
         }
         ScrollView {
                 id:detailScroll;objectName:"nodeDetailScroll";x:Theme.dp(12);y:Theme.dp(56);width:parent.width-Theme.dp(24);height:parent.height-y-Theme.dp(12);clip:true
@@ -193,11 +221,13 @@ Item {
             id:summaryBody;objectName:"nodeDetailBody";x:Theme.cardPadding;y:Theme.cardPadding;width:summarySlot.width-2*Theme.cardPadding;spacing:Theme.dp(12)
             SwirlText {
                 id:nodeDetailTitle;objectName:"nodeDetailTitle";renderType:Text.NativeRendering
-                text:page.selected.id!==undefined?page.selected.name:"未选择节点";textFormat:Text.PlainText;color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(18);font.weight:Font.Medium
+                text:page.selected.id!==undefined?page.selected.name:page.nodeDeletePending||page.nodeDeleteRecovery?qsTr("节点已从配置移除"):qsTr("未选择节点");textFormat:Text.PlainText;color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(18);font.weight:Font.Medium
                 Layout.fillWidth:true;wrapMode:Text.Wrap;activeFocusOnTab:true
                 HoverHandler {id:nodeNameHover}
                 SwirlToolTip {parent:nodeDetailTitle;visible:page.selected.id!==undefined&&(nodeNameHover.hovered||nodeDetailTitle.activeFocus);text:nodeDetailTitle.text;delay:600}
             }
+            SwirlText {objectName:"nodeMutationMessage";Layout.fillWidth:true;visible:page.nodeMutationMessage.length>0||page.nodeDeletePending;text:page.nodeMutationMessage||(page.selected.id===undefined?qsTr("正在确认连接撤销，尚未报告删除成功。"):qsTr("正在保存删除并确认连接撤销…"));textFormat:Text.PlainText;color:page.nodeMutationMessage.length?Theme.orange:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap;Accessible.name:text}
+            SwirlButton {objectName:"recoverNodeDelete";text:qsTr("恢复已保存的操作");visible:(page.nodeDeletePending||page.nodeDeleteRecovery)&&engineController.policyApplyState==="reconciling";onClicked:engineController.recoverPolicyConfiguration()}
             ColumnLayout {
                 Layout.fillWidth:true;spacing:Theme.dp(10)
                 RowLayout {
@@ -221,7 +251,7 @@ Item {
                     SwirlButton {text:page.selected.favorite?"取消收藏":"收藏";Layout.fillWidth:true;enabled:page.selected.id!==undefined;onClicked:nodes.toggleFavorite(page.selectedId)}
                     SwirlButton {text:"复制安全信息";Layout.fillWidth:true;enabled:page.selected.id!==undefined;onClicked:nodes.copySafeInfo(page.selectedId)}
                     SwirlButton {objectName:"nodeEditButton";text:"编辑节点";Layout.fillWidth:true;Layout.preferredWidth:1;enabled:page.selected.id!==undefined&&!page.selected.sourceId&&engineController.canStart;onClicked:page.edit(page.selected)}
-                    SwirlButton {objectName:"nodeDeleteButton";text:"删除节点";danger:true;Layout.fillWidth:true;Layout.preferredWidth:1;enabled:page.selected.id!==undefined&&!page.selected.sourceId&&engineController.canStart;onClicked:{const id=page.selectedId;if(engineController.deleteNode(id)){page.dismissDetail();page.inspectedId="";if(page.focusedId===id)page.focusedId=""}}}
+                    SwirlButton {objectName:"nodeDeleteButton";text:"删除节点";danger:true;Layout.fillWidth:true;Layout.preferredWidth:1;enabled:page.selected.id!==undefined&&!page.selected.sourceId&&engineController.canStart&&!page.nodeDeletePending;onClicked:page.deleteResource(page.selectedId)}
                 }
             }
         }
@@ -229,12 +259,13 @@ Item {
     SwirlDialog {
         ownerItem:page
         id:addDialog;objectName:"proxyAddDialog";title:page.editingId.length?"编辑代理节点":"添加代理节点"
+        dismissBlocked:page.nodeSavePending
         width:Math.min(Theme.dp(890),parent?parent.width-Theme.dp(30):Theme.dp(890));height:Math.min(Theme.dp(713),parent?parent.height-Theme.dp(30):Theme.dp(713))
         onClosed:{nodePassword.text="";nodeUsername.text="";nodeUuid.text="";nodeOptions.text=""}
         ColumnLayout {
             width:parent.width;spacing:Theme.dp(12)
             ScrollView {
-                id:form;Layout.fillWidth:true;Layout.preferredHeight:Math.floor(Math.min(Theme.dp(380),page.height*0.6));clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
+                id:form;Layout.fillWidth:true;Layout.preferredHeight:Math.floor(Math.min(Theme.dp(380),page.height*0.6));enabled:!page.nodeSavePending;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
                 ColumnLayout {
                     width:form.availableWidth;spacing:Theme.dp(10)
                     SwirlText {renderType:Text.NativeRendering;text:"名称";color:Theme.muted}
@@ -256,13 +287,14 @@ Item {
                     SwirlText {renderType:Text.NativeRendering;text:"协议扩展选项（JSON，留空保留已保存选项）";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                     SwirlTextField {id:nodeOptions;enabled:!page.editingJson;objectName:"nodeOptionsField";Layout.fillWidth:true;echoMode:TextInput.Password;placeholderText:'{"network":"ws","ws-opts":{"path":"/"}}';Accessible.name:"协议扩展选项"}
                     SwirlText {renderType:Text.NativeRendering;text:page.editingJson?"JSON 节点可修改显示名称。连接参数与凭据从原配置完整保留；需要更新时请重新导入配置。":"支持 Xray / V2Ray JSON、Clash、Surge、Loon、Quantumult X、sing-box 与 URI。凭据由 Windows DPAPI 保护；未映射参数会保留并阻止执行。";color:Theme.muted;font.pixelSize:Theme.fontSize(11);wrapMode:Text.Wrap;Layout.fillWidth:true}
-                    SwirlText {renderType:Text.NativeRendering;text:engineController.nodeError;color:Theme.orange;font.pixelSize:Theme.fontSize(11);wrapMode:Text.Wrap;Layout.fillWidth:true}
+                    SwirlText {renderType:Text.NativeRendering;text:page.nodeMutationMessage||engineController.nodeError;color:Theme.orange;font.pixelSize:Theme.fontSize(11);wrapMode:Text.Wrap;Layout.fillWidth:true}
                 }
             }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton {text:"取消";onClicked:addDialog.requestDismiss()}
-                SwirlButton {objectName:"nodeSaveButton";text:"保存";primary:true;enabled:nodeName.text.trim().length>0&&(page.editingJson||nodePort.acceptableInput||["wireguard","tailscale","zerotier","easytier","openvpn"].indexOf(nodeProtocol.currentText)>=0);onClicked:{var input=page.editingJson?{id:page.editingId,name:nodeName.text}:{id:page.editingId,name:nodeName.text,protocol:nodeProtocol.currentText,host:nodeHost.text,port:Number(nodePort.text),username:nodeUsername.text,password:nodePassword.text,replaceCredentials:replaceCredentials.checked,cipher:nodeProtocol.currentText==="ss"?(nodeCipher.editText||nodeCipher.currentText):"",serverName:nodeSni.text};try{if(nodeOptions.text.trim().length)input.options=JSON.parse(nodeOptions.text);if(nodeUuid.text.trim().length){if(!input.options)input.options={};input.options.uuid=nodeUuid.text.trim()}}catch(e){AppState.notice("扩展选项须为合法 JSON 对象");return}if(engineController.saveNode(input)){addDialog.close()}}}
+                SwirlButton {objectName:"recoverNodeSave";text:qsTr("恢复已保存的操作");visible:page.nodeSavePending&&engineController.policyApplyState==="reconciling";onClicked:engineController.recoverPolicyConfiguration()}
+                SwirlButton {text:"取消";enabled:!page.nodeSavePending;onClicked:addDialog.requestDismiss()}
+                SwirlButton {objectName:"nodeSaveButton";text:page.nodeSavePending?qsTr("正在保存…"):qsTr("保存");primary:true;enabled:!page.nodeSavePending&&nodeName.text.trim().length>0&&(page.editingJson||nodePort.acceptableInput||["wireguard","tailscale","zerotier","easytier","openvpn"].indexOf(nodeProtocol.currentText)>=0);onClicked:{var input=page.editingJson?{id:page.editingId,name:nodeName.text}:{id:page.editingId,name:nodeName.text,protocol:nodeProtocol.currentText,host:nodeHost.text,port:Number(nodePort.text),username:nodeUsername.text,password:nodePassword.text,replaceCredentials:replaceCredentials.checked,cipher:nodeProtocol.currentText==="ss"?(nodeCipher.editText||nodeCipher.currentText):"",serverName:nodeSni.text};try{if(nodeOptions.text.trim().length)input.options=JSON.parse(nodeOptions.text);if(nodeUuid.text.trim().length){if(!input.options)input.options={};input.options.uuid=nodeUuid.text.trim()}}catch(e){AppState.notice("扩展选项须为合法 JSON 对象");return}page.saveResource(input)}}
             }
         }
     }
@@ -322,6 +354,10 @@ Item {
     }
     onDetailOpenChanged:if(!detailOpen)clearHiddenFocus()
     Connections {target:sections;function onChanged(){page.clearHiddenFocus()}}
+    Connections {
+        target:engineController
+        function onPolicyApplyFinished(requestId,success) {page.lastNodeCompletion={requestId:String(requestId),success:success};page.completeNodeMutation(String(requestId),success)}
+    }
     Connections {
         target:engineController.imports
         function onNodesApplied() {

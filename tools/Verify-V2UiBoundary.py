@@ -1,4 +1,4 @@
-"""Extend the historical boundary only for approved stage 3 content edits."""
+"""Extend the historical boundary only for approved V2 content edits."""
 import importlib.util
 import json
 from pathlib import Path
@@ -11,6 +11,14 @@ STAGE3_CONTENT_EDITS = {
     "src/Swirl.Quick/qml/controls/SwirlFontBinding.qml",
     "src/Swirl.Quick/qml/pages/PolicyGroupsPage.qml",
 }
+STAGE4_CONTENT_EDITS = {
+    # Additive transaction dismissal guards; existing callers retain defaults.
+    "src/Swirl.Quick/qml/controls/SwirlDialog.qml",
+    # Actual, sanitized Rust route observations in the existing detail view.
+    "src/Swirl.Quick/qml/pages/ConnectionsPage.qml",
+    # Typed V2 targets and matching durable-transaction receipts.
+    "src/Swirl.Quick/qml/pages/RulesPage.qml",
+}
 
 
 def inspect(root):
@@ -20,10 +28,10 @@ def inspect(root):
     spec.loader.exec_module(module)
     historical = module.inspect(root)
     return {
-        "stage": 3,
+        "stage": 4,
         "historical": historical,
-        "authorized_v2_content_edits": sorted(STAGE3_CONTENT_EDITS),
-        "unexpected_changes": sorted(set(historical["changed"]) - STAGE3_CONTENT_EDITS),
+        "authorized_v2_content_edits": sorted(STAGE3_CONTENT_EDITS | STAGE4_CONTENT_EDITS),
+        "unexpected_changes": sorted(set(historical["changed"]) - STAGE3_CONTENT_EDITS - STAGE4_CONTENT_EDITS),
         "scope": "source boundary only; native geometry and interaction checks remain required",
     }
 

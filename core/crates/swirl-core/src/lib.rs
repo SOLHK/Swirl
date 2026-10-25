@@ -1,7 +1,9 @@
 //! Rust-owned runtime, sockets, scheduling, statistics and immutable session plans.
 mod policy;
+mod policy_v2;
 mod probe;
 mod socks5_udp;
+pub mod v2;
 pub use policy::{MemberHealth, PolicyReport};
 use policy::{PolicyRuntime, PolicyView};
 use probe::ProbeRuntime;
