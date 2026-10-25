@@ -1,6 +1,8 @@
 //! Swirl-owned HTTP/SOCKS state machines. Underlying Tokio is generic socket I/O.
 use base64::{Engine, engine::general_purpose::STANDARD};
 mod diagnostics;
+#[cfg(test)]
+mod inbound_http_tests;
 mod dial;
 pub mod http_single;
 pub mod hysteria2;
@@ -282,10 +284,16 @@ async fn accept_http(
     let (header, tail) = http_header(stream, vec![first]).await?;
     let mut fields = [httparse::EMPTY_HEADER; 64];
     let mut req = httparse::Request::new(&mut fields);
-    if !req.parse(&header).map_err(|_| "HttpSyntax")?.is_complete() || req.version != Some(1) {
+    if !req.parse(&header).map_err(|_| "HttpSyntax")?.is_complete() {
         return Err("HttpVersion");
     }
     let method = req.method.ok_or("HttpMethod")?;
+    // Legacy desktop clients can negotiate a CONNECT tunnel using HTTP/1.0.
+    // The tunnel becomes an opaque stream after the response; this does not
+    // enable HTTP/1.0 forwarding or relax any authority/framing/auth checks.
+    if req.version != Some(1) && !(req.version == Some(0) && method == "CONNECT") {
+        return Err("HttpVersion");
+    }
     let path = req.path.ok_or("HttpTarget")?;
     let mut seen = std::collections::HashSet::new();
     let mut authorization = None;

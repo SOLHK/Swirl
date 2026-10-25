@@ -269,6 +269,22 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         if(state!=m_previousProxyState){m_previousProxyState=state;m_diagnostics.noteEvent(QStringLiteral("Windows 系统代理"),state);}
         emit statusChanged();
     });
+    connect(&m_systemProxy,&SystemProxySession::enableFinished,this,[this](quint64 request,bool success) {
+        if(request!=m_proxyEnableRequest)return;
+        m_proxyEnableRequest=0;m_proxyChecking=false;
+        if(m_shuttingDown)return;
+        if(!success){failSystemProxyRequest(m_systemProxy.error().isEmpty()?QStringLiteral("系统代理接管失败，已停止本次开启。"):m_systemProxy.error());return;}
+        emit statusChanged();
+    });
+    connect(&m_systemProxy,&SystemProxySession::releaseFinished,this,[this](bool success) {
+        if(!success)return;
+        // A new listener may have become ready while a guard held the restore
+        // lock. Resume the still-current intent without requiring another core
+        // telemetry event, and re-check cancellation at queued dispatch time.
+        QTimer::singleShot(0,this,[this]{
+            if(!m_shuttingDown&&m_proxyRequested&&!m_systemProxy.owned()&&!m_systemProxy.busy()&&!m_proxyChecking)setSystemProxy(true);
+        });
+    });
     QSettings settings;
     // Retired engine preferences remain on disk for data preservation, but
     // never influence this Rust-only runtime or prevent its startup.
@@ -649,7 +665,7 @@ void EngineController::startConfiguredSession() {
     m_connectionRequested=true;
     m_options.nodes=m_store.nodes();m_options.selectedNodeId=m_store.selectedId();
     m_options.directSession=m_options.routingMode=="direct";
-    if(processAlive()){m_systemProxy.disable();m_restartPending=true;m_engine->stop();}
+    if(processAlive()){cancelSystemProxyCheck();m_systemProxy.disable();m_restartPending=true;m_engine->stop();}
     else m_engine->start(m_options);
     emit statusChanged();
 }
@@ -682,7 +698,7 @@ void EngineController::setRoutingMode(const QString &mode) {
     emit statusChanged();
 }
 void EngineController::cancelSystemProxyCheck() {
-    ++m_proxyCheckGeneration;m_proxyChecking=false;
+    ++m_proxyCheckGeneration;m_proxyChecking=false;m_proxyEnableRequest=0;m_systemProxy.cancelEnable();
     if(m_proxyCheckSocket){auto *socket=m_proxyCheckSocket.data();m_proxyCheckSocket=nullptr;socket->disconnect(this);socket->abort();socket->deleteLater();}
 }
 QString EngineController::systemProxySessionError(const ProxyEngine::Status &status) const {
@@ -706,7 +722,7 @@ void EngineController::setSystemProxy(bool enabled) {
     if(!enabled){
         m_routingError.clear();m_diagnostics.noteEvent(QStringLiteral("Swirl 操作"),QStringLiteral("用户请求关闭 Swirl 代理，恢复已接管的系统设置并停止内核。"));stop();return;
     }
-    if(m_systemProxy.owned()||m_proxyChecking)return;
+    if(m_systemProxy.owned()||m_systemProxy.busy()||m_proxyChecking)return;
     if(m_policyBusy||busy()||m_imports.busy()||m_store.saving()){
         if(!m_proxyRequested){m_routingError=QStringLiteral("请等待当前配置或内核操作完成，再开启代理。");emit statusChanged();}
         return;
@@ -736,9 +752,9 @@ void EngineController::setSystemProxy(bool enabled) {
     auto *timer=new QTimer(socket);timer->setSingleShot(true);timer->start(1500);
     connect(socket,&QTcpSocket::connected,this,[this,socket,timer,s,generation] {
         if(generation!=m_proxyCheckGeneration){socket->deleteLater();return;}
-        timer->stop();m_proxyChecking=false;m_proxyCheckSocket=nullptr;socket->deleteLater();
+        timer->stop();m_proxyCheckSocket=nullptr;socket->deleteLater();
         const auto now=m_engine->status();
-        if(!m_proxyRequested)return;
+        if(!m_proxyRequested){m_proxyChecking=false;return;}
         const auto error=systemProxySessionError(now);
         if(!error.isEmpty()||now.processId!=s.processId||now.proxyPort!=s.proxyPort){
             failSystemProxyRequest(error.isEmpty()?QStringLiteral("内核会话已变化，未使用旧端口检查结果接管系统代理。"):error);return;
@@ -747,13 +763,19 @@ void EngineController::setSystemProxy(bool enabled) {
         // The capture relay is also a Swirl-owned loopback endpoint. Do
         // not rediscover it as an external proxy after the core stops.
         m_imports.rememberOwnedProxyPort(port);
-        if(!m_systemProxy.enable(port,s.processId)){
+        m_proxyEnableRequest=m_systemProxy.requestEnable(port,s.processId,[this,s,generation,port] {
+            const auto current=m_engine->status();
+            return !m_shuttingDown&&m_proxyRequested&&generation==m_proxyCheckGeneration&&
+                current.processId==s.processId&&current.proxyPort==s.proxyPort&&
+                port==(m_captureProxyPort>0?m_captureProxyPort:current.proxyPort)&&systemProxySessionError(current).isEmpty();
+        });
+        if(!m_proxyEnableRequest){
             failSystemProxyRequest(m_systemProxy.error().isEmpty()?QStringLiteral("系统代理接管失败，已停止本次开启。"):m_systemProxy.error());return;
         }
         emit statusChanged();
     });
     const auto failed=[this,socket,timer,generation] {
-        if(generation!=m_proxyCheckGeneration||!m_proxyChecking)return;
+        if(generation!=m_proxyCheckGeneration||!m_proxyChecking||m_proxyCheckSocket!=socket)return;
         timer->stop();socket->deleteLater();m_proxyCheckSocket=nullptr;
         failSystemProxyRequest(QStringLiteral("本机代理端口未监听，未修改 Windows 系统代理。"));
     };
@@ -1099,7 +1121,9 @@ bool EngineController::setTunEnabled(bool enabled) {
 void EngineController::setCaptureProxyPort(int port) {
     if(port<0||port>65535||port==m_captureProxyPort)return;
     m_captureProxyPort=port;
-    if(m_systemProxy.owned()){m_systemProxy.disable();if(m_proxyRequested)setSystemProxy(true);}
+    if(m_systemProxy.owned()||m_proxyChecking||m_systemProxy.busy()){
+        cancelSystemProxyCheck();m_systemProxy.disable();if(m_proxyRequested)setSystemProxy(true);
+    }
 }
 
 QStringList EngineController::lanAddresses() const {
@@ -1146,7 +1170,7 @@ bool EngineController::setGatewayForwarding(bool enabled) {
     if(enabled){if(m_options.gatewayForwarding)return true;m_tunBeforeGateway=m_options.tunEnabled;m_options.gatewayForwarding=true;
         if(setTunEnabled(true))return true;m_options.gatewayForwarding=false;return false;}
     if(!m_options.gatewayForwarding)return true;m_options.gatewayForwarding=false;m_options.tunEnabled=m_tunBeforeGateway;saveNetworkConfiguration();
-    if(m_connectionRequested&&!m_store.selectedId().isEmpty()&&(processAlive()||busy())){m_systemProxy.disable();m_restartPending=true;m_engine->stop();}
+    if(m_connectionRequested&&!m_store.selectedId().isEmpty()&&(processAlive()||busy())){cancelSystemProxyCheck();m_systemProxy.disable();m_restartPending=true;m_engine->stop();}
     emit statusChanged();return true;
 }
 

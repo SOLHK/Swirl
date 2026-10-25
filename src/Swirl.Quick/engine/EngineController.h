@@ -199,7 +199,7 @@ public:
     Q_INVOKABLE void toggleSystemProxy();
     bool proxyRequested() const { return m_proxyRequested; }
     bool systemProxyStopping() const { return m_stopAfterPolicy||m_engine->status().state==ProxyEngine::State::Stopping; }
-    bool systemProxyBusy() const { return m_proxyChecking||(m_proxyRequested&&busy())||systemProxyStopping(); }
+    bool systemProxyBusy() const { return m_proxyChecking||m_systemProxy.busy()||(m_proxyRequested&&busy())||systemProxyStopping(); }
     QVariantMap policyDocument() const { return m_policyDocument.toVariantMap(); }
     bool policyV2Active() const { return m_store.configurationV2(); }
     QVariantMap defaultPolicy() const { return m_policyDocument.value("default_policy").toObject().toVariantMap(); }
@@ -273,6 +273,7 @@ private:
     bool m_proxyRequested=false;
     bool m_proxyChecking=false;
     quint64 m_proxyCheckGeneration=0;
+    quint64 m_proxyEnableRequest=0;
     QPointer<QTcpSocket> m_proxyCheckSocket;
     QString m_nodeError;
     QString m_pendingSelection,m_previousSelection;

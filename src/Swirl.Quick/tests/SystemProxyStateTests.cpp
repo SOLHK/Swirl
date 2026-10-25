@@ -7,6 +7,9 @@
 #include <QTest>
 #include <QtEndian>
 #include <QUuid>
+#include <QElapsedTimer>
+#include <QSignalSpy>
+#include "PolicySystemProxyBackend.h"
 
 namespace {
 QJsonObject registryFlag(quint32 flag) {
@@ -19,11 +22,71 @@ QJsonObject fixture(int flags, const QJsonObject &registry) {
             {"bypass", "private-bypass.example"}, {"pac", "https://private-pac.example/token"},
             {"registry", QJsonObject{{"ProxyEnable", registry}, {"ProxyServer", "fixture-secret"}}}};
 }
+class DeferredProxyBackend final : public SystemProxySession::Backend {
+public:
+    PolicySystemProxyBackend memory;
+    bool ready=false,externalChanged=false;
+    int preparations=0,cancellations=0;
+    State refresh() override {return memory.refresh();}
+    State enable(int port,qint64 pid) override {return memory.enable(port,pid);}
+    State disable() override {return memory.disable();}
+    Preparation prepareEnable(int,qint64,QString *error) override {
+        ++preparations;
+        if(externalChanged){*error=QStringLiteral("External proxy changed during guard preparation");return Preparation::Failed;}
+        return ready?Preparation::Ready:Preparation::Pending;
+    }
+    void cancelEnable() override {++cancellations;}
+};
 }
 
 class SystemProxyStateTests : public QObject {
     Q_OBJECT
 private slots:
+    void guardReadinessWaitKeepsTheEventLoopResponsive() {
+        auto backend=std::make_unique<DeferredProxyBackend>();auto *adapter=backend.get();
+        SystemProxySession proxy(nullptr,{},std::move(backend));QSignalSpy completed(&proxy,&SystemProxySession::enableFinished);
+        QElapsedTimer clock;clock.start();qint64 previous=0,maxGap=0;int beats=0;QTimer heartbeat;
+        heartbeat.setInterval(10);connect(&heartbeat,&QTimer::timeout,this,[&]{const auto now=clock.elapsed();maxGap=qMax(maxGap,now-previous);previous=now;++beats;});heartbeat.start();
+        const auto request=proxy.requestEnable(12345,1);QVERIFY(request);QVERIFY(proxy.busy());QVERIFY(!proxy.owned());
+        QTimer::singleShot(350,&proxy,[adapter]{adapter->ready=true;});
+        QTRY_COMPARE_WITH_TIMEOUT(completed.count(),1,3000);
+        QVERIFY(completed.first().at(1).toBool());QVERIFY(proxy.owned());QVERIFY(!proxy.busy());
+        QVERIFY2(beats>=10,"Readiness waiting must return to the Qt event loop");
+        QVERIFY2(maxGap<500,qPrintable(QStringLiteral("GUI heartbeat stalled for %1 ms").arg(maxGap)));
+        qInfo("Proxy readiness heartbeat: samples=%d maximum_gap_ms=%lld elapsed_ms=%lld",beats,static_cast<long long>(maxGap),static_cast<long long>(clock.elapsed()));
+        QCOMPARE(adapter->memory.enableCalls,1);QVERIFY(proxy.disable());QVERIFY(adapter->memory.current().systemEnabled);
+    }
+    void guardTimeoutPreservesExternalProxyAndContinuesDispatching() {
+        auto backend=std::make_unique<DeferredProxyBackend>();auto *adapter=backend.get();
+        SystemProxySession proxy(nullptr,{},std::move(backend));QSignalSpy completed(&proxy,&SystemProxySession::enableFinished);
+        QElapsedTimer clock;clock.start();int beats=0;QTimer heartbeat;heartbeat.setInterval(10);connect(&heartbeat,&QTimer::timeout,this,[&]{++beats;});heartbeat.start();
+        QVERIFY(proxy.requestEnable(12345,1));QTRY_COMPARE_WITH_TIMEOUT(completed.count(),1,4000);
+        QVERIFY(!completed.first().at(1).toBool());QVERIFY(!proxy.busy());QVERIFY(!proxy.owned());QVERIFY(proxy.systemEnabled());
+        QCOMPARE(adapter->memory.enableCalls,0);QVERIFY(adapter->cancellations>0);QVERIFY(!proxy.error().isEmpty());
+        QVERIFY(clock.elapsed()>=1800);QVERIFY(beats>=50);
+        qInfo("Proxy timeout heartbeat: samples=%d elapsed_ms=%lld",beats,static_cast<long long>(clock.elapsed()));
+    }
+    void cancellationAndLateReadinessCannotAcquireAnOldRequest() {
+        auto backend=std::make_unique<DeferredProxyBackend>();auto *adapter=backend.get();
+        SystemProxySession proxy(nullptr,{},std::move(backend));QSignalSpy completed(&proxy,&SystemProxySession::enableFinished);
+        const auto oldRequest=proxy.requestEnable(12345,1);QTRY_VERIFY(adapter->preparations>0);
+        QVERIFY(proxy.disable());QVERIFY(!proxy.busy());adapter->ready=true;QTest::qWait(60);
+        QCOMPARE(adapter->memory.enableCalls,0);QVERIFY(!proxy.owned());QCOMPARE(completed.count(),1);
+        QCOMPARE(completed.first().at(0).toULongLong(),oldRequest);QVERIFY(!completed.first().at(1).toBool());
+        const auto next=proxy.requestEnable(12346,2);QVERIFY(next!=oldRequest);QTRY_VERIFY(proxy.owned());
+        QCOMPARE(adapter->memory.enableCalls,1);QCOMPARE(adapter->memory.lastPort,12346);QCOMPARE(adapter->memory.lastPid,qint64(2));
+    }
+    void staleEngineGenerationAndExternalChangesNeverReachTheWrite() {
+        for(const bool external:{false,true}) {
+            auto backend=std::make_unique<DeferredProxyBackend>();auto *adapter=backend.get();
+            SystemProxySession proxy(nullptr,{},std::move(backend));QSignalSpy completed(&proxy,&SystemProxySession::enableFinished);bool valid=true;
+            QVERIFY(proxy.requestEnable(12345,1,[&]{return valid;}));QTRY_VERIFY(adapter->preparations>0);
+            if(external)adapter->externalChanged=true;else valid=false;
+            adapter->ready=true;QTRY_COMPARE(completed.count(),1);
+            QVERIFY(!completed.first().at(1).toBool());QCOMPARE(adapter->memory.enableCalls,0);
+            QVERIFY(!proxy.owned());QVERIFY(proxy.systemEnabled());QVERIFY(!proxy.error().isEmpty());
+        }
+    }
     void configuredProxyModes_data() {
         QTest::addColumn<int>("flags");QTest::addColumn<bool>("enabled");
         QTest::newRow("direct")<<1<<false;

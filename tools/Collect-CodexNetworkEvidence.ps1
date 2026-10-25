@@ -36,8 +36,8 @@ $dns=@(Get-DnsClientCache -ErrorAction SilentlyContinue | Where-Object Entry -ma
 $codexLogSummary=$null
 if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'CodexLogSummary.psm1')) {
     Import-Module (Join-Path $PSScriptRoot 'CodexLogSummary.psm1') -Force
-    if (!$CodexLogDirectory) { $CodexLogDirectory=Join-Path $env:LOCALAPPDATA ('Codex/Logs/'+(Get-Date).ToString('yyyy/MM/dd')) }
-    $codexLogSummary=Get-CodexLogSummary -LogDirectory $CodexLogDirectory
+    $logDirectories=if ($CodexLogDirectory) { @($CodexLogDirectory) } else { @(Get-CodexLogDirectories) }
+    $codexLogSummary=Get-CodexLogSummary -LogDirectory $logDirectories
 }
 $report=@{timestamp=(Get-Date).ToString('o');processes=$inventory;tcp=$tcp;windowsProxy=$proxy;winHttp=(netsh winhttp show proxy | Out-String).Trim();environment=$environment;certificateEnvironment=$certificates;tunCandidates=$interfaces;dnsCache=$dns;codexExistingLogSummary=$codexLogSummary;
     limitations=@('Process environment is the collector environment, not an inspection of already-running Codex processes.','TCP endpoints do not reveal encrypted WebSocket or SSE contents.','A TUN adapter name is a candidate, not proof of effective routing.','A loopback proxy connection and a TUN interface can coexist without proving a loop.')}

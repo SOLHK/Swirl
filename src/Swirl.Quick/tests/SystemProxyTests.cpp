@@ -8,6 +8,9 @@
 #include <QJsonDocument>
 #include <QSettings>
 #include <QtEndian>
+#include <QLockFile>
+#include <QSignalSpy>
+#include <QDir>
 #ifdef Q_OS_WIN
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -34,6 +37,49 @@ QJsonObject configuredProxy(QJsonObject value,int flags,const QString &server,co
 class ProxyTests : public QObject {
     Q_OBJECT
 private slots:
+    void lateAcknowledgementFromReleasedGuardCannotReplaceTheNextSession() {
+        const auto original=SystemProxySession::snapshot();QVERIFY(!original.isEmpty());
+        struct Restore {QJsonObject value;~Restore(){SystemProxySession::apply(value);}} restore{original};
+        QTemporaryDir temp;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
+        const auto journal=temp.filePath("late-guard.dpapi");SystemProxySession proxy(nullptr,journal);
+        QVERIFY(proxy.requestEnable(listener.serverPort(),QCoreApplication::applicationPid()));
+        QTRY_VERIFY_WITH_TIMEOUT(!proxy.busy()&&proxy.owned(),5000);
+        const auto firstFiles=QDir(temp.path()).entryList({"*.ready"},QDir::Files);QCOMPARE(firstFiles.size(),1);
+        const auto oldPath=temp.filePath(firstFiles.first());QFile first(oldPath);QVERIFY(first.open(QIODevice::ReadOnly));
+        const auto oldAcknowledgement=first.readAll();first.close();QVERIFY(!oldAcknowledgement.isEmpty());
+        proxy.disable();QTRY_VERIFY_WITH_TIMEOUT(!proxy.busy()&&!proxy.owned(),5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!QFile::exists(oldPath),5000);
+        QVERIFY(proxy.requestEnable(listener.serverPort(),QCoreApplication::applicationPid()));
+        QTRY_VERIFY_WITH_TIMEOUT(!proxy.busy()&&proxy.owned(),5000);
+        const auto nextFiles=QDir(temp.path()).entryList({"*.ready"},QDir::Files);QCOMPARE(nextFiles.size(),1);
+        QVERIFY(temp.filePath(nextFiles.first())!=oldPath);
+        // Reproduce the write of an old guard resuming after the new guard has
+        // acknowledged. The current session must retain its own readiness.
+        QFile late(oldPath);QVERIFY(late.open(QIODevice::WriteOnly));QCOMPARE(late.write(oldAcknowledgement),oldAcknowledgement.size());late.close();
+        QVERIFY(proxy.diagnosticState().value("guardAcknowledged").toBool());
+        proxy.disable();QTRY_VERIFY_WITH_TIMEOUT(!proxy.busy()&&!proxy.owned(),5000);
+        QCOMPARE(SystemProxySession::snapshot(),original);
+    }
+    void asynchronousTakeoverYieldsDuringJournalContentionAndCancelsSafely() {
+        const auto original=SystemProxySession::snapshot();QVERIFY(!original.isEmpty());
+        struct Restore {QJsonObject value;~Restore(){SystemProxySession::apply(value);}} restore{original};
+        QTemporaryDir temp;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
+        const auto journal=temp.filePath("async-proxy.dpapi");SystemProxySession proxy(nullptr,journal);
+        QLockFile otherProcess(journal+".lock");QVERIFY(otherProcess.tryLock(0));
+        QSignalSpy completed(&proxy,&SystemProxySession::enableFinished);
+        QVERIFY(proxy.requestEnable(listener.serverPort(),QCoreApplication::applicationPid()));
+        bool cancelledByEvent=false;QTimer::singleShot(75,&proxy,[&]{cancelledByEvent=true;proxy.disable();});
+        QTRY_COMPARE_WITH_TIMEOUT(completed.count(),1,1500);
+        QVERIFY(cancelledByEvent);QVERIFY(!completed.first().at(1).toBool());QVERIFY(!proxy.busy());
+        QCOMPARE(SystemProxySession::snapshot(),original);QVERIFY(!QFile::exists(journal));
+        otherProcess.unlock();completed.clear();
+        QVERIFY(proxy.requestEnable(listener.serverPort(),QCoreApplication::applicationPid()));
+        QTRY_COMPARE_WITH_TIMEOUT(completed.count(),1,5000);
+        QVERIFY2(completed.first().at(1).toBool(),qPrintable(proxy.error()));QVERIFY(proxy.owned());
+        QVERIFY(proxy.diagnosticState().value("guardAcknowledged").toBool());
+        proxy.disable();QTRY_VERIFY_WITH_TIMEOUT(!proxy.busy()&&!proxy.owned(),5000);
+        QCOMPARE(SystemProxySession::snapshot(),original);
+    }
     void explicitOffDisablesExternalAndOwnedProxy() {
         const auto original=SystemProxySession::snapshot();QVERIFY(!original.isEmpty());
         struct Restore {QJsonObject value;~Restore(){SystemProxySession::apply(value);}} restore{original};

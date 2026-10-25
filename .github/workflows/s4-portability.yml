@@ -1,7 +1,7 @@
 name: S4 mobile Rust compilation boundaries
 on:
   push:
-    branches: [work/swirl-s4-final-completion-20261023, work/swirl-017-subscription-network-20261024]
+    branches: [work/swirl-s4-final-completion-20261023, work/swirl-017-subscription-network-20261024, work/swirl-3-20261026]
     paths: ['core/**', 'tools/tests/test_portable_core_boundary.py', '.github/workflows/s4-portability.yml']
   workflow_dispatch:
 permissions:
@@ -15,6 +15,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+            scope: full-library-check
           - os: macos-14
             target: aarch64-apple-ios
             scope: full-library-check
@@ -51,6 +54,15 @@ jobs:
           test -x "$cc"
           test -x "$ar"
           printf 'CC_aarch64_linux_android=%s\nAR_aarch64_linux_android=%s\n' "$cc" "$ar" >> "$GITHUB_ENV"
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+          key: swirl-portable-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('core/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            swirl-portable-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('core/Cargo.lock') }}-
       - name: Compile and preserve exact scope and failure status
         shell: python
         run: |
@@ -70,7 +82,7 @@ jobs:
           (output / 'result.json').write_text(json.dumps(report, indent=2) + '\n')
           print((output / 'compile.log').read_text())
           raise SystemExit(result.returncode)
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: S4-compile-${{ matrix.target }}-${{ github.sha }}

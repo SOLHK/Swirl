@@ -104,6 +104,17 @@ public:
         observed=memory.disable();return observed;
     }
 };
+class WaitingPolicyProxyBackend final : public SystemProxySession::Backend {
+public:
+    PolicySystemProxyBackend memory;
+    bool ready=false,releaseReady=true;
+    int preparations=0;
+    State refresh() override {return memory.refresh();}
+    State enable(int port,qint64 pid) override {return memory.enable(port,pid);}
+    State disable() override {return memory.disable();}
+    Preparation prepareEnable(int,qint64,QString *) override {++preparations;return ready?Preparation::Ready:Preparation::Pending;}
+    Preparation prepareDisable(QString *) override {return releaseReady?Preparation::Ready:Preparation::Pending;}
+};
 
 class PolicyConfigurationTests final : public QObject {
     Q_OBJECT
@@ -407,6 +418,51 @@ private slots:
         controller.toggleSystemProxy();QTRY_VERIFY_WITH_TIMEOUT(controller.systemProxy()->owned(),3000);
         QTest::qWait(1600);QVERIFY(controller.proxyRequested());QVERIFY(controller.processAlive());QCOMPARE(proxy->enableCalls,1);QCOMPARE(engine->starts,2);
         controller.toggleSystemProxy();QVERIFY(!controller.proxyRequested());QVERIFY(!controller.processAlive());QVERIFY(proxy->current().systemEnabled);QCOMPARE(proxy->restoreCalls,1);
+    }
+    void stoppingAndClosingDuringGuardReadinessNeverTakeOwnership(){
+        for(const bool closing:{false,true}) {
+            QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
+            auto backend=std::make_unique<WaitingPolicyProxyBackend>();auto *proxy=backend.get();
+            EngineController controller(std::make_unique<ConfigurationPeer>(),nullptr,dir.filePath("guard-cancel.dpapi"),false,std::move(backend));
+            controller.setProxyPort(listener.serverPort());QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
+            controller.toggleSystemProxy();QTRY_VERIFY(proxy->preparations>0);QVERIFY(controller.systemProxyBusy());
+            if(closing)controller.shutdown();else controller.toggleSystemProxy();
+            proxy->ready=true;QTest::qWait(80);
+            QVERIFY(!controller.proxyRequested());QVERIFY(!controller.processAlive());QVERIFY(!controller.systemProxyBusy());
+            QCOMPARE(proxy->memory.enableCalls,0);QVERIFY(proxy->memory.current().systemEnabled);
+            if(!closing){controller.toggleSystemProxy();QTRY_VERIFY(controller.systemProxy()->owned());QCOMPARE(proxy->memory.enableCalls,1);controller.stop();}
+        }
+    }
+    void changedCoreReceiptDuringGuardReadinessRejectsTheOldTakeover(){
+        QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
+        auto backend=std::make_unique<WaitingPolicyProxyBackend>();auto *proxy=backend.get();auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("guard-generation.dpapi"),false,std::move(backend));
+        controller.setProxyPort(listener.serverPort());QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
+        controller.toggleSystemProxy();QTRY_VERIFY(proxy->preparations>0);
+        engine->current.configurationReceipt.insert("applied_revision","unexpected-new-revision");proxy->ready=true;
+        QTRY_VERIFY(!controller.proxyRequested()&&!controller.processAlive());
+        QCOMPARE(proxy->memory.enableCalls,0);QVERIFY(!controller.routingError().isEmpty());QVERIFY(proxy->memory.current().systemEnabled);
+    }
+    void releaseCompletionResumesOnlyTheCurrentProxyIntent(){
+        for(const bool cancel:{false,true}) {
+            QTemporaryDir dir;QTcpServer listener,capture;QVERIFY(listener.listen(QHostAddress::LocalHost));QVERIFY(capture.listen(QHostAddress::LocalHost));
+            auto backend=std::make_unique<WaitingPolicyProxyBackend>();auto *proxy=backend.get();proxy->ready=true;
+            EngineController controller(std::make_unique<ConfigurationPeer>(),nullptr,dir.filePath("restore-contention.dpapi"),false,std::move(backend));
+            controller.setProxyPort(listener.serverPort());QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
+            controller.toggleSystemProxy();QTRY_VERIFY(controller.systemProxy()->owned());QCOMPARE(proxy->memory.enableCalls,1);
+            proxy->releaseReady=false;controller.setCaptureProxyPort(capture.serverPort());QVERIFY(controller.systemProxyBusy());
+            if(cancel)controller.toggleSystemProxy();
+            proxy->releaseReady=true;
+            if(cancel) {
+                QTRY_VERIFY(!controller.systemProxyBusy());QTest::qWait(60);
+                QVERIFY(!controller.proxyRequested());QVERIFY(!controller.systemProxy()->owned());QCOMPARE(proxy->memory.enableCalls,1);
+            }else {
+                QTRY_COMPARE(proxy->memory.enableCalls,2);QTRY_VERIFY(!controller.systemProxyBusy());
+                QVERIFY(controller.proxyRequested());QVERIFY(controller.systemProxy()->owned());QCOMPARE(proxy->memory.lastPort,int(capture.serverPort()));
+                controller.stop();
+            }
+            QCOMPARE(proxy->memory.restoreCalls,cancel?1:2);QVERIFY(proxy->memory.current().systemEnabled);
+        }
     }
     void unavailableListenerRollsBackTheMasterIntentAndStopsTheCore(){
         QTemporaryDir dir;QTcpServer reserved;QVERIFY(reserved.listen(QHostAddress::LocalHost));const auto port=reserved.serverPort();reserved.close();
