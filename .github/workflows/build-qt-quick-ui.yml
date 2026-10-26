@@ -46,8 +46,9 @@ jobs:
           cache-dependency-path: |
             tools/requirements-qt-sdk.txt
             tools/requirements-network-fixtures.txt
+            tools/requirements-font-tests.txt
       - name: Install SDK downloader and independent certificate fixtures
-        run: python -m pip install -r tools/requirements-qt-sdk.txt -r tools/requirements-network-fixtures.txt
+        run: python -m pip install -r tools/requirements-qt-sdk.txt -r tools/requirements-network-fixtures.txt -r tools/requirements-font-tests.txt
       - name: Verify canonical brand assets and all six variants
         run: python tools/Generate-BrandAssets.py --check
       - name: Check SDK archive and metadata filesystem boundaries
@@ -76,7 +77,13 @@ jobs:
           "QT_ROOT_DIR=$qtRoot" >> $env:GITHUB_ENV
           "CMAKE_PREFIX_PATH=$qtRoot" >> $env:GITHUB_ENV
           (Join-Path $qtRoot 'bin') >> $env:GITHUB_PATH
-          "SWIRL_TEST_ROOT=$(Join-Path $env:RUNNER_TEMP 'swirl-apec-ui-isolated')" >> $env:GITHUB_ENV
+          $isolatedRoot = Join-Path $env:RUNNER_TEMP 'swirl-apec-ui-isolated'
+          New-Item -ItemType Directory -Force -Path $isolatedRoot | Out-Null
+          "SWIRL_TEST_ROOT=$isolatedRoot" >> $env:GITHUB_ENV
+          $fontFixtures = Join-Path $env:RUNNER_TEMP 'swirl-apec-font-metadata'
+          python src/Swirl.Quick/tests/generate_font_metadata_fixtures.py $fontFixtures
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $fontFixtures 'automation.ttf'))) { throw 'Synthetic font fixture generation failed.' }
+          "SWIRL_FONT_METADATA_FIXTURES=$fontFixtures" >> $env:GITHUB_ENV
           New-Item -ItemType Directory -Force -Path build-evidence | Out-Null
           Copy-Item -LiteralPath (Join-Path $sdkOutput 'sdk-install-result.json') -Destination build-evidence/qt-sdk.json
       - name: Record compiler cache identity
@@ -124,8 +131,17 @@ jobs:
           Copy-Item build/swirl-quick/Release/SwirlScriptRunner.exe dist/
           Copy-Item build/swirl-quick/Release/SwirlCodexLauncher.exe dist/
           Copy-Item tools/SwirlCodexManage.py,tools/SubscriptionCapture.py dist/
-          Copy-Item src/Swirl.Quick/packaging/rules dist/rules -Recurse
-          Copy-Item src/Swirl.Quick/packaging/rules build/swirl-quick/Release/rules -Recurse
+          # Copy files into the existing cache directory, never the directory
+          # itself into another directory of the same name on a warm build.
+          $ruleFiles = Get-ChildItem -LiteralPath 'src/Swirl.Quick/packaging/rules' -File
+          foreach ($ruleTarget in @('dist/rules', 'build/swirl-quick/Release/rules')) {
+            New-Item -ItemType Directory -Force -Path $ruleTarget | Out-Null
+            foreach ($ruleFile in $ruleFiles) {
+              $targetFile = Join-Path $ruleTarget $ruleFile.Name
+              Copy-Item -LiteralPath $ruleFile.FullName -Destination $targetFile -Force
+              if ((Get-FileHash -LiteralPath $targetFile -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $ruleFile.FullName -Algorithm SHA256).Hash) { throw 'Staged rule file differs from the source.' }
+            }
+          }
           # Qt 6.12 deploys only the Windows QPA plugin by default. The isolated
           # screenshot/input drivers also need offscreen; production staging
           # remains separate and uses the native Windows plugin.
@@ -150,8 +166,9 @@ jobs:
           if ((Get-Item $notoFile).Length -lt 10000000) { throw "Noto Sans SC fixture download is incomplete." }
           Write-Host "Qt offscreen font fixtures ready; they will NOT be included in the artifact."
           # CTest launches Swirl from the build directory, separate from dist.
-          New-Item -ItemType Directory -Force "build/swirl-quick/Release/lib" | Out-Null
-          Copy-Item -LiteralPath $fontDir -Destination "build/swirl-quick/Release/lib/fonts" -Recurse -Force
+          $testFontDir = 'build/swirl-quick/Release/lib/fonts'
+          New-Item -ItemType Directory -Force -Path $testFontDir | Out-Null
+          Get-ChildItem -LiteralPath $fontDir -File | Copy-Item -Destination $testFontDir -Force
       - name: Engine, stream and QML regression checks
         shell: pwsh
         run: |
@@ -369,6 +386,7 @@ jobs:
           name: Swirl-Qt612-Package-Evidence
           path: |
             build-evidence/
+            build/swirl-quick/font-*.xml
             out/package-evidence/
             out/delivery.json
             installer-bin/package-manifest.json
