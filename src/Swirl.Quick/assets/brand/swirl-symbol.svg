@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Swirl — flowing knot</title>
+  <desc>Swirl's original interwoven cloud-knot, redrawn with cubic curves and five individually directed colour passages. Independent brand artwork, not an APEC emblem.</desc>
+  <defs>
+    <linearGradient id="warm" gradientUnits="userSpaceOnUse" x1="135" y1="575" x2="510" y2="405">
+      <stop offset="0" stop-color="#F5A04D"/>
+      <stop offset="0.38" stop-color="#F47C51"/>
+      <stop offset="0.78" stop-color="#EC5260"/>
+      <stop offset="1" stop-color="#D93962"/>
+    </linearGradient>
+    <linearGradient id="crown" gradientUnits="userSpaceOnUse" x1="365" y1="315" x2="594" y2="559">
+      <stop offset="0" stop-color="#20B7D0"/>
+      <stop offset="0.42" stop-color="#188FD2"/>
+      <stop offset="1" stop-color="#285DD3"/>
+    </linearGradient>
+    <linearGradient id="forward" gradientUnits="userSpaceOnUse" x1="444" y1="562" x2="827" y2="538">
+      <stop offset="0" stop-color="#285DD3"/>
+      <stop offset="0.43" stop-color="#168DCB"/>
+      <stop offset="0.78" stop-color="#099DC2"/>
+      <stop offset="1" stop-color="#20AE9B"/>
+    </linearGradient>
+    <linearGradient id="return" gradientUnits="userSpaceOnUse" x1="342" y1="636" x2="546" y2="775">
+      <stop offset="0" stop-color="#098CAF"/>
+      <stop offset="0.51" stop-color="#12A39C"/>
+      <stop offset="1" stop-color="#3CAA79"/>
+    </linearGradient>
+    <linearGradient id="heart" gradientUnits="userSpaceOnUse" x1="442" y1="706" x2="531" y2="644">
+      <stop offset="0" stop-color="#1BAA9E"/>
+      <stop offset="0.58" stop-color="#099DC2"/>
+      <stop offset="1" stop-color="#287CCB"/>
+    </linearGradient>
+  </defs>
+  <g id="symbol" transform="translate(136 225.43) scale(1.016216216) translate(-117 -263)">
+    <path id="warm-current" fill="url(#warm)" d="M530 401 C516 380 493 369 473 371 C445 371 420 392 419 416 C416 433 430 449 446 447 C461 446 470 433 465 422 L460 415 C477 405 499 429 496 447 C492 477 459 501 430 499 C400 499 377 480 350 464 C300 432 267 433 243 437 C173 440 118 493 117 558 C113 615 160 660 217 658 C268 659 307 623 307 580 C310 551 291 532 267 532 C246 532 235 547 239 563 C242 575 252 580 261 575 C263 586 250 603 229 606 C202 611 173 589 173 557 C173 521 207 490 242 487 C281 481 302 493 334 512 L369 535 C424 571 491 533 521 497 C550 458 544 426 530 401 Z"/>
+    <path id="return-current" fill="url(#return)" d="M389 576 C340 607 307 643 312 694 C308 763 375 825 451 825 C523 827 581 786 595 720 C598 703 599 685 588 678 L563 664 C558 663 555 667 555 675 C559 729 511 778 455 777 C405 777 364 744 364 693 C362 650 393 622 431 606 L459 596 C442 584 426 575 414 567 C406 565 400 571 389 576 Z"/>
+    <path id="crown-current" fill="url(#crown)" d="M402 284 C352 313 324 352 324 402 C322 422 328 439 337 446 L370 465 C376 467 377 459 373 451 C361 425 364 392 380 367 C404 332 437 315 477 315 C542 312 599 361 599 431 C604 481 575 524 530 555 C529 560 552 572 569 585 C621 549 653 498 650 435 C657 355 606 294 548 276 C499 252 446 260 402 284 Z"/>
+    <path id="forward-current" fill="url(#forward)" d="M856 573 C866 503 808 450 749 454 C694 450 649 484 651 536 C650 566 674 596 701 593 C722 593 733 566 722 555 C715 546 706 546 700 550 C689 534 705 512 726 505 C756 491 786 512 798 539 C816 580 787 619 753 635 C711 660 664 647 618 627 L522 563 C508 554 494 545 480 539 C462 548 443 552 421 557 C417 558 420 562 429 566 L471 591 C521 625 570 662 611 679 C659 704 718 702 756 688 C816 667 851 621 856 573 Z"/>
+    <path id="heart-current" fill="url(#heart)" d="M549 653 L514 630 C502 649 484 668 467 676 C478 663 468 649 454 650 C434 648 422 669 425 685 C429 712 450 721 471 718 C505 716 536 683 549 653 Z"/>
+  </g>
+</svg>

@@ -46,8 +46,8 @@ function(swirl_add_font_tests)
 endfunction()
 
 if(SWIRL_FONT_TESTS_ONLY)
- find_package(Qt6 6.9 REQUIRED COMPONENTS Quick QuickControls2 GuiPrivate Test)
- qt_standard_project_setup(REQUIRES 6.8)
+ find_package(Qt6 6.12 REQUIRED COMPONENTS Quick QuickControls2 GuiPrivate Test)
+ qt_standard_project_setup(REQUIRES 6.12)
  enable_testing()
  swirl_add_font_tests()
  return()
@@ -60,8 +60,8 @@ if(DEFINED SWIRL_USE_RUST_CORE AND NOT SWIRL_USE_RUST_CORE)
 endif()
 set(SWIRL_USE_RUST_CORE ON CACHE BOOL "Deprecated: the product always uses Rust Core" FORCE)
 
-find_package(Qt6 6.9 REQUIRED COMPONENTS Quick Qml QuickControls2 Network Svg GuiPrivate ShaderTools)
-qt_standard_project_setup(REQUIRES 6.8)
+find_package(Qt6 6.12 REQUIRED COMPONENTS Quick Qml QuickControls2 Network Svg GuiPrivate ShaderTools)
+qt_standard_project_setup(REQUIRES 6.12)
 qt_policy(SET QTP0004 NEW)
 add_subdirectory(third_party)
 add_executable(SwirlScriptRunner tools/ScriptRunner.cpp)
@@ -230,6 +230,8 @@ qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_dark.svg"
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_light.svg"
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_dark.svg"
+    "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_mono_light.svg"
+    "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_mono_dark.svg"
 )
 qt_add_shaders(Swirl hdr_ui PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/hdr-ui.frag shaders/swirlclicklight.frag shaders/swirlclicklight.vert)
 qt_add_shaders(Swirl glass_ui PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/swirl-surface.frag shaders/swirl-blur.frag shaders/swirl-glass.frag shaders/sidebar-shadow.frag shaders/sidebar-transmission.frag)

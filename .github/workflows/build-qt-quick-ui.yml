@@ -2,10 +2,17 @@ name: Build Swirl Qt Quick UI (Preview)
 
 on:
   push:
-    branches: [main, test]
+    branches: [main, test, work/swirl-apec-v3-20261027]
   pull_request:
     branches: [test, main]
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: '1'
+  SWIRL_QT_VERSION: '6.12.0'
 
 concurrency:
   group: swirl-quick-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -19,32 +26,91 @@ jobs:
       contents: read
     steps:
       - name: Checkout original repository and UI branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - name: Validate scoped Codex proxy launcher
         shell: pwsh
         run: ./tools/tests/Test-CodexProxyLauncher.ps1
       - name: Install Rust MSVC tools
         run: rustup toolchain install stable --profile minimal --target x86_64-pc-windows-msvc
-      - name: Set up Qt desktop SDK
-        uses: jurplel/install-qt-action@v4
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
         with:
-          version: '6.10.3'
-          host: windows
-          target: desktop
-          arch: win64_msvc2022_64
-          modules: qtshadertools
-          cache: true
-      - uses: actions/setup-python@v5
+          arch: x64
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
-      - name: Install independent network test certificate support
-        run: python -m pip install cryptography==50.0.2
+          cache: pip
+          cache-dependency-path: |
+            tools/requirements-qt-sdk.txt
+            tools/requirements-network-fixtures.txt
+      - name: Install SDK downloader and independent certificate fixtures
+        run: python -m pip install -r tools/requirements-qt-sdk.txt -r tools/requirements-network-fixtures.txt
+      - name: Verify canonical brand assets and all six variants
+        run: python tools/Generate-BrandAssets.py --check
+      - name: Check SDK archive and metadata filesystem boundaries
+        shell: pwsh
+        run: python tools/tests/test_qt_sdk_installer.py --scratch-root "$env:RUNNER_TEMP/swirl-sdk-installer-tests"
+      - name: Restore isolated Qt 6.12 SDK archives
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/swirl-qt-6.12.0
+          key: qt-sdk-${{ runner.os }}-6.12.0-msvc2022-${{ hashFiles('tools/Install-QtSdk.py', 'tools/requirements-qt-sdk.txt') }}
+      - name: Install and verify the official Qt 6.12 MSVC SDK
+        shell: pwsh
+        run: |
+          # Qt 6.12 moved archives into architecture-specific metadata directories.
+          # The checked-in downloader verifies the official metadata/archive SHA256s.
+          $sdkOutput = Join-Path $env:RUNNER_TEMP 'swirl-qt-6.12.0'
+          python tools/Install-QtSdk.py --version $env:SWIRL_QT_VERSION --arch win64_msvc2022_64 --output $sdkOutput
+          if ($LASTEXITCODE -ne 0) { throw 'Official Qt SDK installation failed.' }
+          $sdk = Get-Content -LiteralPath (Join-Path $sdkOutput 'sdk-install-result.json') -Raw | ConvertFrom-Json
+          $qtRoot = (Resolve-Path -LiteralPath $sdk.kit_root).Path
+          $version = (& (Join-Path $qtRoot 'bin/qmake.exe') -query QT_VERSION).Trim()
+          if ($LASTEXITCODE -ne 0 -or $version -ne $env:SWIRL_QT_VERSION -or $sdk.arch -ne 'win64_msvc2022_64') { throw 'Unexpected Qt version or ABI.' }
+          foreach ($component in @('Qt6GuiPrivate', 'Qt6ShaderTools', 'Qt6QuickControls2', 'Qt6Svg', 'Qt6Network')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $qtRoot "lib/cmake/$component/${component}Config.cmake"))) { throw "Missing Qt component: $component" }
+          }
+          "QT_ROOT_DIR=$qtRoot" >> $env:GITHUB_ENV
+          "CMAKE_PREFIX_PATH=$qtRoot" >> $env:GITHUB_ENV
+          (Join-Path $qtRoot 'bin') >> $env:GITHUB_PATH
+          "SWIRL_TEST_ROOT=$(Join-Path $env:RUNNER_TEMP 'swirl-apec-ui-isolated')" >> $env:GITHUB_ENV
+          New-Item -ItemType Directory -Force -Path build-evidence | Out-Null
+          Copy-Item -LiteralPath (Join-Path $sdkOutput 'sdk-install-result.json') -Destination build-evidence/qt-sdk.json
+      - name: Record compiler cache identity
+        id: compiler
+        shell: pwsh
+        run: |
+          $tools = @('cl.exe','link.exe','cmake.exe') | ForEach-Object { (Get-FileHash -LiteralPath (Get-Command $_ -ErrorAction Stop).Source -Algorithm SHA256).Hash }
+          $identity = ([ordered]@{rust=(& rustc -vV | Out-String); tools=$tools; msvc=$env:VCToolsVersion; sdk=$env:WindowsSDKVersion; qt=$env:QT_ROOT_DIR; workspace=$env:GITHUB_WORKSPACE} | ConvertTo-Json -Compress)
+          $hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($identity))).ToLowerInvariant()
+          "hash=$hash" >> $env:GITHUB_OUTPUT
+          $identity | Set-Content -LiteralPath build-evidence/compiler.json -Encoding utf8
+      - name: Restore Qt 6.12 compiler outputs
+        id: build_cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+            build/swirl-quick
+            build/swirl-product
+          key: apec-qt612-msvc-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            apec-qt612-msvc-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-
+      - name: Restore content-verified input timestamps
+        shell: pwsh
+        run: |
+          . ./scripts/BuildInputTimes.ps1
+          Sync-SwirlBuildInputTimes -RepositoryRoot $env:GITHUB_WORKSPACE -BuildDirectory (Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick') -Restore
       - name: Configure Qt UI independently
         shell: pwsh
-        run: cmake -S src/Swirl.Quick -B build/swirl-quick -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON -DSWIRL_TEST_FONT_DIRECTORY="${{ github.workspace }}/build/swirl-quick/Release/lib/fonts"
+        run: cmake -S src/Swirl.Quick -B build/swirl-quick -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON -DSWIRL_RUST_TARGET="$env:GITHUB_WORKSPACE/core/target" -DSWIRL_TEST_FONT_DIRECTORY="$env:GITHUB_WORKSPACE/build/swirl-quick/Release/lib/fonts"
       - name: Build UI
+        id: ui_build
         shell: pwsh
-        run: cmake --build build/swirl-quick --config Release --parallel
+        run: cmake --build build/swirl-quick --config Release --parallel 4
       - name: Bundle UI runtime
         shell: pwsh
         run: |
@@ -93,7 +159,7 @@ jobs:
           }
       - name: Upload engine test evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Swirl-Engine-Test-Evidence
           path: |
@@ -162,6 +228,7 @@ jobs:
             @{ file = "Swirl-Overview-preview.png"; page = "overview"; theme = "light"; size = "1464x930"; scale = "1" },
             @{ file = "Swirl-Overview-125-preview.png"; page = "overview"; theme = "light"; size = "1464x930"; scale = "1.25" },
             @{ file = "Swirl-Overview-150-preview.png"; page = "overview"; theme = "light"; size = "1464x930"; scale = "1.5" },
+            @{ file = "Swirl-Overview-175-preview.png"; page = "overview"; theme = "light"; size = "1464x930"; scale = "1.75" },
             @{ file = "Swirl-Overview-200-preview.png"; page = "overview"; theme = "light"; size = "1464x930"; scale = "2" },
             @{ file = "Swirl-Minimum-preview.png"; page = "overview"; theme = "light"; size = "1000x650"; scale = "1" },
             @{ file = "Swirl-Minimum-bottom-preview.png"; page = "overview"; theme = "light"; size = "1000x650"; scale = "1.5"; bottom = $true },
@@ -207,7 +274,7 @@ jobs:
           Remove-Item Env:QT_SCALE_FACTOR
       - name: Upload Qt Quick preview diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Swirl-Quick-Preview-Diagnostics
           path: preview-diagnostics/
@@ -215,7 +282,7 @@ jobs:
           retention-days: 14
       - name: Upload rendered Qt Quick UI previews
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Swirl-Quick-UI-Previews
           path: dist/Swirl-*-preview.png
@@ -226,12 +293,19 @@ jobs:
         shell: pwsh
         run: |
           $fonts = "dist/lib/fonts"
-          if (Test-Path $fonts) { Remove-Item -LiteralPath $fonts -Recurse -Force }
+          if (Test-Path $fonts) {
+            $resolvedFonts = (Resolve-Path -LiteralPath $fonts).Path
+            $resolvedDist = (Resolve-Path -LiteralPath 'dist').Path.TrimEnd('\')
+            if (-not $resolvedFonts.StartsWith($resolvedDist + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Font cleanup escaped the preview payload.' }
+            Remove-Item -LiteralPath $resolvedFonts -Recurse -Force
+          }
           if (Test-Path $fonts) { throw "Test fonts must not be distributed in Swirl preview." }
       - name: Build and verify independent production files
         shell: pwsh
         run: |
-          cmake -S src/Swirl.Quick -B build/swirl-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=OFF
+          . ./scripts/Assert-BuildSource.ps1
+          Assert-SwirlBuildSource -RepositoryRoot $env:GITHUB_WORKSPACE -ExpectedSourceSha $env:GITHUB_SHA
+          cmake -S src/Swirl.Quick -B build/swirl-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=OFF -DSWIRL_RUST_TARGET="$env:GITHUB_WORKSPACE/core/target"
           if ($LASTEXITCODE -ne 0) { throw 'Production configure failed.' }
           cmake --build build/swirl-product --config Release --target Swirl --parallel 4
           if ($LASTEXITCODE -ne 0) { throw 'Production build failed.' }
@@ -259,15 +333,50 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "NSIS packaging failed ($LASTEXITCODE)" }
           if (!(Test-Path "out/Swirl-Setup.exe")) { throw "Installer missing" }
           if ((Get-Item "out/Swirl-Setup.exe").Length -lt 10000000) { throw "Installer suspiciously small" }
+          $exeVersion = (Get-Item -LiteralPath (Join-Path $appDist 'Swirl.exe')).VersionInfo.ProductVersionRaw.ToString()
+          $installerVersion = (Get-Item -LiteralPath 'out/Swirl-Setup.exe').VersionInfo.ProductVersionRaw.ToString()
+          if ($exeVersion -ne "$appVersion.0" -or $installerVersion -ne "$appVersion.0") { throw 'Source, application and installer versions disagree.' }
+          $manifest = Get-Content -LiteralPath (Join-Path $appDist 'package-manifest.json') -Raw | ConvertFrom-Json
+          if ($manifest.source_sha -ne $env:GITHUB_SHA) { throw 'Package source identity differs from this workflow commit.' }
+          [ordered]@{source_sha=$env:GITHUB_SHA;version=$appVersion;qt=$env:SWIRL_QT_VERSION;installer_sha256=(Get-FileHash -LiteralPath 'out/Swirl-Setup.exe' -Algorithm SHA256).Hash.ToLowerInvariant();ui_tests='passed';desktop_dpi_acceptance='manual';physical_refresh_rate_acceptance='unverified'} | ConvertTo-Json | Set-Content -LiteralPath out/delivery.json -Encoding utf8
+      - name: Save reusable compiler outputs
+        if: ${{ !cancelled() && steps.ui_build.outcome == 'success' && steps.build_cache.outputs.cache-hit != 'true' }}
+        shell: pwsh
+        run: |
+          . ./scripts/BuildInputTimes.ps1
+          Sync-SwirlBuildInputTimes -RepositoryRoot $env:GITHUB_WORKSPACE -BuildDirectory (Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick')
+      - name: Cache compiled Qt and Rust outputs
+        if: ${{ !cancelled() && steps.ui_build.outcome == 'success' && steps.build_cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+            build/swirl-quick
+            build/swirl-product
+          key: ${{ steps.build_cache.outputs.cache-primary-key }}
+      - name: Preserve SDK and exact-package identity evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Qt612-Package-Evidence
+          path: |
+            build-evidence/
+            out/package-evidence/
+            out/delivery.json
+            installer-bin/package-manifest.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Upload Swirl Windows installer EXE
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Swirl-Windows-Installer-EXE
           path: out/Swirl-Setup.exe
           if-no-files-found: error
           retention-days: 14
       - name: Upload separate Qt UI preview
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Swirl-Quick-UI-win-x64
           path: installer-bin/
@@ -283,7 +392,7 @@ jobs:
       contents: write
     steps:
       - name: Download verified EXE (not a ZIP download for users)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: Swirl-Windows-Installer-EXE
           path: release
