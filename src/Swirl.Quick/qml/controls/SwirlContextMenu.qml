@@ -7,6 +7,9 @@ Menu {
     id: contextMenu
     popupType:Popup.Item
     objectName:"swirlContextMenu"
+    property bool presentationReady:false
+    Component.onCompleted:presentationReady=true
+    Component.onDestruction:presentationReady=false
     function requestDismiss(){close()}
     function showAt(anchor,x,y){
         if(motionPolicy.reversePopupExit(contextMenu))return
@@ -25,7 +28,7 @@ Menu {
     readonly property alias popupMotion:reveal
     // Popup owns x/y placement (including screen clamping); translate its
     // visual content and background without changing pointer/keyboard grabs.
-    Binding {target:contextMenu.contentItem;property:"transform";value:[contentTravel]}
+    Binding {target:contextMenu.presentationReady?contextMenu.contentItem:null;property:"transform";value:[contentTravel];when:contextMenu.presentationReady;restoreMode:Binding.RestoreBindingOrValue}
     Translate {id:contentTravel;x:reveal.xOffset;y:reveal.yOffset}
     opacity:reveal.alpha
     onAboutToShow: {

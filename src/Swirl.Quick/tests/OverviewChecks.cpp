@@ -105,7 +105,7 @@ int runOverviewChecks(QQuickWindow *window) {
         check(page&&page->window()==window&&window->winId()==nativeHandle&&item("windowCloseButton")&&item("windowMinimizeButton")&&item("windowMaximizeButton"),"every settings route uses the original main shell and its controls");
         if(QString::fromLatin1(route)=="settings"){
             state("pageLoader.item.section='关于 Swirl'");QTest::qWait(80);
-            const auto *brand=item("brandVector");check(brand&&brand->isVisible()&&brand->width()>=104,"About retains the enlarged brand mark inside the settings page");
+            const auto *brand=page?find(page,"brandVector"):nullptr;check(brand&&brand->isVisible()&&brand->width()>=104,"About retains the enlarged brand mark inside the settings page");
         }
         const auto qaDirectory=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");
         if(!qaDirectory.isEmpty()){QDir().mkpath(qaDirectory);check(window->grabWindow().save(qaDirectory+"/"+route+".png"),"embedded page render saved for visual review");}
