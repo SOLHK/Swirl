@@ -137,6 +137,11 @@ Item {
         check("production-sidebar-arc-active",sidebarArc && sidebarArc->property("moving").toBool());
         eval("AppState.navigate('policies')");wait(35);eval("AppState.navigate('activity')");wait(500);
         check("production-navigation-settles",sidebarArc && !sidebarArc->property("moving").toBool() && eval("pageLoader.item!==null && !pageLoader.moving && !pageLoader.pendingGrab").toBool());
+        QTest::keyClick(window,Qt::Key_K,Qt::ControlModifier);wait(250);
+        auto *search=window->findChild<QObject *>("navigationSearchPopup");
+        check("global-search-keyboard-open",search && search->property("opened").toBool());
+        QTest::keyClick(keyboardWindow(),Qt::Key_Escape);wait(200);
+        check("global-search-escape-keeps-route",search && !search->property("visible").toBool() && eval("AppState.currentPage==='activity' && dismissals.count===0").toBool());
         check("all-transition-tokens-retired",eval("SwirlTransitionRegistry.activeCount===0").toBool());
         qmlEngine(window)->rootContext()->setContextProperty("apecFixture",static_cast<QObject *>(nullptr));
     }

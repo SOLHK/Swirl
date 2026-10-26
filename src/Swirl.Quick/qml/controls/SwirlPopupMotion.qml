@@ -3,6 +3,7 @@ import SwirlQuick
 
 QtObject {
     id: motion
+    property bool initialized:false
     property bool motionEnabled:true
     property var popup:null
     property real progress:1
@@ -21,12 +22,14 @@ QtObject {
     // Omitting from is intentional: reopening during exit reverses from the
     // currently displayed point, with no jump to a synthetic start state.
     property Transition enterTransition:Transition {
-        enabled:motion.motionEnabled && !SwirlMotion.reduced
-        NumberAnimation {id:enterTravel;target:motion;property:"progress";to:1;duration:motion.enterDuration;easing.type:Easing.OutCubic}
+        enabled:motion.initialized && motion.motionEnabled && !SwirlMotion.reduced
+        NumberAnimation {id:enterTravel;target:motion.initialized?motion:null;property:"progress";to:1;duration:motion.enterDuration;easing.type:Easing.OutCubic}
     }
     property Transition exitTransition:Transition {
-        enabled:motion.motionEnabled && !SwirlMotion.reduced
-        NumberAnimation {id:leaveTravel;target:motion;property:"progress";to:0;duration:motion.leaveDuration;easing.type:Easing.InOutCubic}
+        enabled:motion.initialized && motion.motionEnabled && !SwirlMotion.reduced
+        NumberAnimation {id:leaveTravel;target:motion.initialized?motion:null;property:"progress";to:0;duration:motion.leaveDuration;easing.type:Easing.InOutCubic}
     }
-    property Connections policyConnection:Connections {target:SwirlMotion;function onReducedChanged(){if(SwirlMotion.reduced){motion.progress=1;motionPolicy.finishPopup(motion.popup)}}}
+    property Connections policyConnection:Connections {target:motion.initialized?SwirlMotion:null;function onReducedChanged(){if(SwirlMotion.reduced){motion.progress=1;motionPolicy.finishPopup(motion.popup)}}}
+    Component.onCompleted:initialized=true
+    Component.onDestruction:initialized=false
 }

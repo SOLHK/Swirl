@@ -9,13 +9,16 @@ Dialog {
     property Item returnFocus:null
     property bool guardChanges:true
     property Item heroSource:null
+    property bool presentationReady:false
+    Component.onCompleted:presentationReady=true
+    Component.onDestruction:presentationReady=false
     // Pages that move between native scenes provide their declaration owner.
     // Overlay.overlay on the Popup itself otherwise retains the first scene.
     property Item ownerItem:null
     readonly property real heroProgress:heroClock.progress
     SwirlTransitionCoordinator { id:heroClock;parent:dialog.background;duration:SwirlMotion.dialogDuration }
     SwirlPopupMotion {id:reveal;popup:dialog;motionEnabled:dialog.heroSource===null}
-    Binding {target:dialog.background?dialog.background.parent:null;property:"transform";value:[contentTravel];when:dialog.background!==null;restoreMode:Binding.RestoreBindingOrValue}
+    Binding {target:dialog.presentationReady && dialog.background?dialog.background.parent:null;property:"transform";value:[contentTravel];when:dialog.presentationReady && dialog.background!==null;restoreMode:Binding.RestoreBindingOrValue}
     Translate {id:contentTravel;x:reveal.xOffset;y:reveal.yOffset}
     Binding {target:dialog.contentItem;property:"opacity";value:Math.max(0,Math.min(1,(dialog.heroProgress-0.18)/0.65));when:dialog.heroSource!==null;restoreMode:Binding.RestoreBindingOrValue}
     Binding {target:dialog.heroSource;property:"opacity";value:0;when:dialog.visible && dialog.heroSource!==null;restoreMode:Binding.RestoreBindingOrValue}
