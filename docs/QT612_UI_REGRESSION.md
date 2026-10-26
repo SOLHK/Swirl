@@ -53,3 +53,20 @@ unit/native CI results must be read independently when available.
 Installer notice versions are updated from the installed SDK's SBOM: Qt
 6.12.0 and bundled FreeType 2.14.3. The old Effect Maker version remains only
 as historical development-tool attribution, not the shipped Qt runtime.
+
+## Additional Qt test-runtime checks
+
+Qt 6.12 `windeployqt` deploys the native Windows QPA plugin by default. The
+isolated offscreen test executable initially failed to initialize its platform;
+plugin-loader diagnostics identified the absent `qoffscreen.dll`. CI's test
+runtime now explicitly includes that plugin and verifies its presence. The
+separate production deployment remains native Windows.
+
+The source-based font integration fixture also combined its TextArea skin's
+bound pixel size with a point size, which Qt reports as conflicting units. It
+now explicitly replaces the complete default font with a point-sized font;
+the existing point/pixel, optical-axis, live-binding and native-rendering
+assertions are unchanged. With the complete platform runtime, the font
+selection and axis-policy CTest suites pass. The selection XML records 34 test
+functions, zero failures and nine native/private-fixture skips in the offscreen
+run; these skipped cases are not accepted by that result.

@@ -126,7 +126,11 @@ jobs:
           Copy-Item tools/SwirlCodexManage.py,tools/SubscriptionCapture.py dist/
           Copy-Item src/Swirl.Quick/packaging/rules dist/rules -Recurse
           Copy-Item src/Swirl.Quick/packaging/rules build/swirl-quick/Release/rules -Recurse
-          windeployqt --release --qmldir src/Swirl.Quick/qml dist/Swirl.exe
+          # Qt 6.12 deploys only the Windows QPA plugin by default. The isolated
+          # screenshot/input drivers also need offscreen; production staging
+          # remains separate and uses the native Windows plugin.
+          windeployqt --release --include-plugins qoffscreen --qmldir src/Swirl.Quick/qml dist/Swirl.exe
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath 'dist/platforms/qoffscreen.dll')) { throw 'The isolated offscreen test runtime is incomplete.' }
       # Qt's offscreen QPA font database reads appdir/lib/fonts and does not
       # automatically discover the fonts installed on a Windows CI runner.
       # These fixtures are used for synthetic screenshot tests ONLY.

@@ -137,9 +137,11 @@ ApplicationWindow {
         RowLayout { objectName: "widthHost"; width: 96
             Controls.SwirlText { objectName: "widthText"; text: "AAAAAAAA"; textRole: "button"; font.pixelSize: 20; Layout.fillWidth: true; elide: Text.ElideRight }
         }
-        // The editor accepts point sizes. SwirlText deliberately keeps its
-        // existing pixel-size default; Qt forbids setting both units at once.
-        Controls.SwirlTextArea { objectName: "pointText"; text: "A"; font.pointSize: 18
+        // Replace the skin's complete default font when selecting point units;
+        // adding pointSize beside its bound pixelSize sets conflicting units.
+        Controls.SwirlTextArea { objectName: "pointText"; text: "A"
+            font: Qt.font({family: Theme.fontFamily, pointSize: 18,
+                weight: Theme.bodyFontWeight, hintingPreference: Font.PreferFullHinting})
             readonly property var monitorAxes: Theme.variableAxesFor(font, 144, 1.5, "body")
         }
         Controls.SwirlText { objectName: "staticText"; text: "A"; font.family: fixtureStaticFamily; font.pixelSize: 16 }
