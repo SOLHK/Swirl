@@ -88,3 +88,11 @@ certificate errors. `SWIRL_CAPTURE_TEST_TLS_BACKEND` selects a backend only
 for `--capture-self-test`, before TLS initialization. Production builds and
 certificate/hostname verification are unchanged. No system trust or proxy
 configuration was modified.
+
+The subsequent test-only trust isolation uses exactly the fixture CA and
+explicit peer verification. Both backends pass 80 checks locally, including
+new rejection controls for an unrelated root and a mismatched hostname.
+The Windows Server CI result is still pending; the suspected interaction
+between Schannel's CA-store construction and the runner root collection is
+not a confirmed cause. See Qt's
+[Schannel implementation](https://raw.githubusercontent.com/qt/qtbase/v6.12.0/src/plugins/tls/schannel/qtls_schannel.cpp).

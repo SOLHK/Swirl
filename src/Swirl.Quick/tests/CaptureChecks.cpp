@@ -16,6 +16,7 @@
 #include <QSslServer>
 #include <QSslConfiguration>
 #include <QSslSocket>
+#include <QCryptographicHash>
 #include <functional>
 
 int runCaptureChecks(CaptureService *capture)
@@ -151,6 +152,7 @@ int runCaptureChecks(CaptureService *capture)
     tls->setHostnames({"*.example.test","-private.example.test"});check(tls->matchesHost("public.example.test")&&!tls->matchesHost("private.example.test"),"explicit MitM exclusions take priority over wildcard inclusion");
     check(!tls->addHostname("bad host")&&!tls->hostnames().contains("bad host"),"invalid MitM hostname does not enter the active list");
     const auto identity=tls->identityFor("localhost");
+    const auto unrelatedRoot=tls->certificate();
     check(!identity.certificate.isNull()&&!identity.key.isNull(),"host certificate and usable RSA key are signed by the local CA");
     const QUrl fixture=QUrl::fromLocalFile(QStringLiteral(SWIRL_FIXTURE_DIR)+"/test-ca.p12");
     const auto originalFingerprint=tls->fingerprint();
@@ -163,7 +165,12 @@ int runCaptureChecks(CaptureService *capture)
     {TlsCertificateService restored(certificatePath);restored.setEnabled(true);check(restored.ready()&&restored.shouldIntercept("api.fixture.test")&&!restored.identityFor("api.fixture.test").key.isNull(),"DPAPI reload preserves CA private key and hostname scope");}
     // Use the currently selected CA after the import tests.
     const auto handshakeIdentity=tls->identityFor("localhost");
-    const auto originalSsl=QSslConfiguration::defaultConfiguration();auto trustedSsl=originalSsl;trustedSsl.addCaCertificate(tls->certificate());QSslConfiguration::setDefaultConfiguration(trustedSsl);
+    const auto originalSsl=QSslConfiguration::defaultConfiguration();
+    auto trustedSsl=originalSsl;
+    // This loopback test has one trust anchor, independent of the host root store.
+    trustedSsl.setCaCertificates({tls->certificate()});
+    trustedSsl.setPeerVerifyMode(QSslSocket::VerifyPeer);
+    QSslConfiguration::setDefaultConfiguration(trustedSsl);
     QList<QByteArray> upstreamProtocols,upstreamRequestLines;
     QSslServer secureOrigin;auto serverSsl=trustedSsl;serverSsl.setLocalCertificateChain({handshakeIdentity.certificate,tls->certificate()});serverSsl.setPrivateKey(handshakeIdentity.key);serverSsl.setPeerVerifyMode(QSslSocket::VerifyNone);serverSsl.setAllowedNextProtocols({QByteArray("h2"),QByteArray("http/1.1")});secureOrigin.setSslConfiguration(serverSsl);
     check(secureOrigin.listen(QHostAddress::LocalHost,0),"isolated TLS origin starts without installing a certificate into Windows");
@@ -185,11 +192,35 @@ int runCaptureChecks(CaptureService *capture)
             QObject::connect(socket,&QTcpSocket::readyRead,socket,respond);if(socket->bytesAvailable())respond();
         }
     });
+    const auto rejectedControl=[&](const QSslCertificate &root, const QString &peerName, bool hostnameMismatch) {
+        QSslSocket client;client.setProxy(QNetworkProxy::NoProxy);
+        auto configuration=trustedSsl;configuration.setCaCertificates({root});
+        configuration.setAllowedNextProtocols({QByteArray("h2")});
+        client.setSslConfiguration(configuration);client.setPeerVerifyName(peerName);
+        QList<QSslError> certificateErrors;
+        QObject::connect(&client,&QSslSocket::sslErrors,&client,[&](const QList<QSslError> &errors){certificateErrors=errors;});
+        QSignalSpy encrypted(&client,&QSslSocket::encrypted);
+        client.connectToHostEncrypted("localhost",secureOrigin.serverPort());
+        const bool rejected=until([&]{return !certificateErrors.isEmpty()||!encrypted.isEmpty();})
+            && !certificateErrors.isEmpty()&&encrypted.isEmpty()&&!client.isEncrypted();
+        bool hasHostnameMismatch=false;
+        for(const auto &error:certificateErrors)hasHostnameMismatch=hasHostnameMismatch||error.error()==QSslError::HostNameMismatch;
+        client.abort();QTest::qWait(20);upstreamProtocols.clear();upstreamRequestLines.clear();
+        return rejected&&(!hostnameMismatch||hasHostnameMismatch);
+    };
+    check(rejectedControl(unrelatedRoot,QStringLiteral("localhost"),false),"TLS positive-control origin rejects an unrelated trust root");
+    check(rejectedControl(tls->certificate(),QStringLiteral("wrong.fixture.test"),true),"TLS positive-control origin rejects a mismatched hostname");
     QSslSocket alpnControl;alpnControl.setProxy(QNetworkProxy::NoProxy);
     QObject::connect(&alpnControl, &QSslSocket::sslErrors, &alpnControl,
-                     [](const QList<QSslError> &errors) {
+                     [&](const QList<QSslError> &errors) {
         for (const auto &error : errors)
-            qInfo() << "CAPTURE_TLS_CONTROL_ERROR" << error.error() << error.errorString();
+            qInfo() << "CAPTURE_TLS_CONTROL_ERROR" << error.error() << error.errorString()
+                    << error.certificate().digest(QCryptographicHash::Sha256).toHex();
+        qInfo() << "CAPTURE_TLS_TRUST" << alpnControl.sslConfiguration().caCertificates().size()
+                << alpnControl.sslConfiguration().caCertificates().contains(tls->certificate())
+                << tls->certificate().digest(QCryptographicHash::Sha256).toHex();
+        for (const auto &certificate : alpnControl.peerCertificateChain())
+            qInfo() << "CAPTURE_TLS_PEER" << certificate.digest(QCryptographicHash::Sha256).toHex();
     });
     auto controlSsl=trustedSsl;controlSsl.setAllowedNextProtocols({QByteArray("h2"),QByteArray("http/1.1")});alpnControl.setSslConfiguration(controlSsl);
     QSignalSpy controlEncrypted(&alpnControl,&QSslSocket::encrypted);alpnControl.connectToHostEncrypted("localhost",secureOrigin.serverPort());
