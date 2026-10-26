@@ -30,12 +30,25 @@ int runOverviewChecks(QQuickWindow *window) {
         const auto control=QString("nav-")+route;click(control.toUtf8().constData());
         check(wait([&]{return state(QString("AppState.currentPage === '%1' && pageLoader.item !== null").arg(route)).toBool();}),"sidebar mouse input loads its real page");
     }
-    click("nav-rules");click("addRoutingRule");type("rulePattern","example.test");click("saveRoutingRule");
-    check(state("engineController.routingRules.some(r=>r.pattern==='example.test' && r.policy==='DIRECT')").toBool(),"rule editor mouse and keyboard input persists a real rule");
+    click("nav-rules");click("addRoutingRule");
+    auto *ruleEditor=window->findChild<QObject *>("ruleEditor");
+    check(wait([&]{return ruleEditor&&ruleEditor->property("opened").toBool();}),"rule editor completes its opening transition before input");
+    auto *rulePolicy=item("rulePolicy");
+    auto *saveRule=item("saveRoutingRule");
+    check(rulePolicy&&rulePolicy->property("currentIndex").toInt()==-1&&saveRule&&!saveRule->isEnabled(),"new rule requires an explicit policy selection before saving");
+    type("rulePattern","example.test");click("rulePolicy");
+    auto *policyPopup=rulePolicy?qvariant_cast<QObject *>(rulePolicy->property("popup")):nullptr;
+    check(wait([&]{return policyPopup&&policyPopup->property("opened").toBool();}),"rule policy menu opens through native mouse input");
+    click("swirlComboOption-0");
+    check(wait([&]{return rulePolicy&&rulePolicy->property("currentText").toString()=="DIRECT"&&policyPopup&&!policyPopup->property("visible").toBool();}),"DIRECT selection closes its menu before rule submission");
+    check(saveRule&&saveRule->isEnabled(),"explicit policy and pattern enable rule submission");
+    click("saveRoutingRule");
+    check(wait([&]{return state("engineController.routingRules.some(r=>r.pattern==='example.test' && r.policy==='DIRECT') && !pageLoader.item.ruleSubmitting").toBool();}),"rule editor mouse and keyboard input persists a real rule");
+    check(wait([&]{return ruleEditor&&!ruleEditor->property("visible").toBool()&&state("dismissals.count===0").toBool();}),"saved rule closes its editor after configuration completion");
     type("rulesSearch","example.test");check(state("pageLoader.item.displayRules.length===1").toBool(),"rules search filters saved rules");
     check(wait([&]{return state("dismissals.count===0").toBool();}),"rule dialog releases its modal shield before table input");
     if(auto *table=item("rulesTable")){QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,table->mapToScene(QPointF(60,39)).toPoint());QTest::qWait(50);}else check(false,"rules table exists");
-    click("removeRoutingRule");check(state("!engineController.routingRules.some(r=>r.pattern==='example.test')").toBool(),"selected custom rule can be removed by its editor action");
+    click("removeRoutingRule");check(wait([&]{return state("!engineController.routingRules.some(r=>r.pattern==='example.test')").toBool();}),"selected custom rule can be removed by its editor action");
     click("nav-capture");
     // The user's capture service may already own the normal UI port. This
     // isolated fixture exercises the same toggle on its own ephemeral port.

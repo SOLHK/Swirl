@@ -71,10 +71,10 @@ Item {
   Item {Layout.fillHeight:true}
  }
 
- SwirlDialog{id:ruleEditor;title:page.editingIndex>=0?"编辑规则":"新增规则";dismissBlocked:page.ruleSubmitting;ColumnLayout{width:parent.width;spacing:Theme.dp(14)
+ SwirlDialog{id:ruleEditor;objectName:"ruleEditor";title:page.editingIndex>=0?"编辑规则":"新增规则";dismissBlocked:page.ruleSubmitting;ColumnLayout{width:parent.width;spacing:Theme.dp(14)
   RowLayout{Layout.fillWidth:true;SwirlText {renderType:Text.NativeRendering;text:"类型：";color:Theme.text}SwirlComboBox{id:ruleType;Layout.fillWidth:true;model:page.ruleTypes;enabled:!page.ruleSubmitting}}
   RowLayout{Layout.fillWidth:true;SwirlText {renderType:Text.NativeRendering;text:"值：";color:Theme.text}SwirlTextField{id:rulePattern;objectName:"rulePattern";Layout.fillWidth:true;enabled:ruleType.currentText!=="MATCH"&&!page.ruleSubmitting;placeholderText:"example.com"}}
-  RowLayout{Layout.fillWidth:true;SwirlText {renderType:Text.NativeRendering;text:"策略：";color:Theme.text}SwirlComboBox{id:rulePolicy;Layout.fillWidth:true;model:page.ruleTargets.map(target=>target.label);enabled:!page.ruleSubmitting}}
+  RowLayout{Layout.fillWidth:true;SwirlText {renderType:Text.NativeRendering;text:"策略：";color:Theme.text}SwirlComboBox{id:rulePolicy;objectName:"rulePolicy";Layout.fillWidth:true;model:page.ruleTargets.map(target=>target.label);enabled:!page.ruleSubmitting}}
   SwirlText {text:qsTr("当前系统代理无法可靠识别应用进程，应用规则不可用。");color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.WordWrap;font.pixelSize:Theme.fontSize(11)}
   SwirlText {renderType:Text.NativeRendering;text:page.engineController.policyError||page.engineController.networkConfigurationError;color:Theme.orange;Layout.fillWidth:true;wrapMode:Text.WordWrap;font.pixelSize:Theme.fontSize(12)}
   RowLayout{Layout.alignment:Qt.AlignRight;SwirlButton{text:"取消";enabled:!page.ruleSubmitting;onClicked:ruleEditor.requestDismiss()}SwirlButton{objectName:"saveRoutingRule";text:page.ruleSubmitting?qsTr("正在保存…"):page.editingIndex>=0?"保存":"添加";primary:true;enabled:page.canEditPolicy&&!page.ruleSubmitting&&ruleType.currentIndex>=0&&rulePolicy.currentIndex>=0;onClicked:page.saveRule()}}

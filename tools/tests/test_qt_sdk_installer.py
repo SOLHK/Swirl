@@ -27,6 +27,8 @@ SCRATCH = None
 
 class QtSdkInstallerBoundaries(unittest.TestCase):
     def setUp(self):
+        if SCRATCH is None:
+            raise RuntimeError("Run this test script with an explicit --scratch-root")
         self.temporary = tempfile.TemporaryDirectory(prefix="case-", dir=SCRATCH)
         self.root = Path(self.temporary.name).resolve()
         if not self.root.is_relative_to(SCRATCH):

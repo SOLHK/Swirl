@@ -19,7 +19,7 @@ The installation completed and an independent repeated installer invocation repo
 
 ## Matching local compiler
 
-The SDK metadata still mentions MinGW 13.1 and ships an archive with that runtime name. Its actual `config_qtbase.summary` reports **GCC 15.1.0**, consistent with the [Qt 6.12 supported-platform documentation](https://doc.qt.io/qt-6.12/supported-platforms.html). The compiler was therefore selected from Qt's own [6.12 Windows provisioning script](https://code.qt.io/cgit/qt/qt5.git/tree/coin/provisioning/qtci-windows-11_24H2-x86_64/09-install-mingw1510_64.ps1?h=6.12), rather than inferred from the stale package dependency.
+The SDK metadata still mentions MinGW 13.1 and ships an archive with that runtime name. Its actual `config_qtbase.summary` reports **GCC 15.1.0**, consistent with the [Qt 6.12 supported-platform documentation](https://doc.qt.io/qt-6.12/supported-platforms.html). The compiler was therefore selected from Qt's own [6.12 Windows provisioning script](https://github.com/qt/qt5/blob/6.12/coin/provisioning/qtci-windows-11_24H2-x86_64/09-install-mingw1510_64.ps1), rather than inferred from the stale package dependency.
 
 The matching toolchain is installed at `D:/Codex/toolchains/Qt-6.12.0/Tools/mingw64`; its actual `g++ -dumpfullversion` result is **15.1.0**. The archive source and Qt-provided integrity value are recorded by the installation research. The compiler archive uses Qt's published checksum; SDK metadata and SDK archives use the stricter SHA256 verification described above.
 
@@ -51,4 +51,4 @@ The workflow also checks all six generated brand SVG variants, runs the installe
 
 Workflow validation actually completed: `actionlint` passed and all 15 multiline PowerShell blocks in the Windows build job parsed successfully. The local build scripts also parsed successfully. These are syntax and boundary checks, not a successful GitHub Actions run.
 
-At the time of this document, full Swirl compilation, broad application regression, Windows EXE packaging and new-commit CI remain pending. Physical 60/120Hz rendering, GPU measurements and desktop/DPI visual acceptance remain separate manual or hardware tests. The candidate must not be reported as a finished Swirl 3.0 release from this toolchain evidence alone.
+The new local Qt 6.12/GCC 15.1 CMake configure and `swirl-generate-icon` compilation subsequently passed. The integrated brand checks inspected 36 native ICO frames across four variants, checking dimensions and alpha and producing a visual contact sheet. Full Swirl compilation is still in progress at the time of this document; broad application regression, Windows EXE packaging and new-commit CI remain pending. Physical 60/120Hz rendering, GPU measurements and desktop/DPI visual acceptance remain separate manual or hardware tests. The candidate must not be reported as a finished Swirl 3.0 release from this toolchain evidence alone.

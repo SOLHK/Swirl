@@ -49,7 +49,8 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
  }
  auto *policy=qobject_cast<MotionPolicy *>(qmlContext(window)->contextProperty("motionPolicy").value<QObject *>());
  const auto nativeMotionPolicy=QJsonDocument::fromJson(eval("JSON.stringify({systemReduced:motionPolicy.systemReducedMotion,followSystem:Theme.followSystemMotion,applicationReduced:Theme.reduceMotion,effectiveReduced:SwirlMotion.reduced,expandDuration:SwirlMotion.expandDuration})").toString().toUtf8()).object();
- check(policy&&!nativeMotionPolicy.value("followSystem").toBool()&&!nativeMotionPolicy.value("applicationReduced").toBool()&&!nativeMotionPolicy.value("effectiveReduced").toBool()&&nativeMotionPolicy.value("expandDuration").toInt()>0,"fresh application defaults keep full animation under the actual system policy without an override");
+ check(policy&&nativeMotionPolicy.value("followSystem").toBool()&&!nativeMotionPolicy.value("applicationReduced").toBool()&&nativeMotionPolicy.value("effectiveReduced")==nativeMotionPolicy.value("systemReduced"),"fresh application follows the actual operating-system motion preference");
+ if(policy)policy->setSystemReducedMotionOverrideForTest(0);
  const auto handle=window->winId();const auto geometry=window->geometry();
  const auto pid=controller->processId();const auto selected=controller->selectedNodeId();const auto nodeCount=controller->nodes().size();
  eval("Theme.reduceMotion=false;SwirlMotion.speed=1");check(route("featurehub"),"card hub settles before input");
@@ -94,8 +95,8 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
    check(page&&page->property("section").toString()=="常规","general settings retain their section");
    // U2 moved fonts inside General. Keep actual font-control coverage without
    // inventing a removed eighth hub card or changing the approved QML layout.
-   if(page){page->setProperty("section",QStringLiteral("字体"));wait(100);}
-   check(item("fontSearch")&&item("fontFamilyList")&&noNewWindows(),"font controls are reachable inside the cached general settings page");
+   if(page)page->setProperty("section",QStringLiteral("字体"));
+   check(await([&]{return item("fontSearch")&&item("fontFamilyList");},4000)&&noNewWindows(),"font controls become reachable after asynchronous first loading inside the cached settings page");
    if(page){page->setProperty("section",QStringLiteral("常规"));wait(100);}
   }
   if(round==0&&id=="dns")if(auto *field=item("dnsServerAddress"))field->setProperty("text","1.1.1.1, 8.8.8.8");
@@ -103,7 +104,8 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
   if(id=="proxies"){
    auto *search=item("nodeSearchField"),*table=item("realNodeTable");
    if(round==0&&search){
-    search->setProperty("text","Fixture node 1");wait(30);
+    search->setProperty("text","Fixture node 1");
+    check(await([&]{auto *model=window->findChild<QObject *>("nodeViewModel");return model&&model->property("query").toString()=="Fixture node 1"&&model->property("count").toInt()==80;},3500),"node search applies its debounced query before recording scroll position");
     if(table)table->setProperty("scrollPosition",88);
    }
    else if(round==1){

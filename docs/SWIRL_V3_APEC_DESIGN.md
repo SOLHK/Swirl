@@ -100,7 +100,9 @@ must be checked per installed module, not inferred from one repository file.
 
 ## Motion contract for the Astra Ultra stage
 
-Motion is designed with each component, not added after page layout. Preserve
+The user's subsequent clarification makes the order explicit: implement and
+verify each component's interaction and motion first, then rebuild that
+component's visual UI. Preserve
 the existing retargetable page host, caches, return context and transition
 generation fencing. Reuse `SwirlMotion` and the registry instead of starting a
 parallel animation framework.
@@ -153,10 +155,13 @@ and persistent error context while redesigning their presentation.
 1. Astra Max: official visual study and source baseline; then editable Logo and
    native icon integration. Qt 6.12 upgrade is a supporting requirement from
    the user's follow-up, not evidence that the whole UI is rebuilt.
-2. Notify the user to switch to Astra Ultra before the floating glass and
-   global Design System implementation. Do not switch the parent chat silently.
+2. Notify the user before Astra Ultra takes the global interaction/motion
+   foundations, followed by the floating glass and global Design System
+   implementation. Do not switch the parent chat silently.
 3. Notify the user to switch to GPT-6.1 Sol Ultra for all QML page migration.
-   Each page uses motion primitives designed from step 2.
+   For every page, implement and verify its interaction/motion using the step 2
+   primitives before rebuilding its layout and visual UI. All pages, dynamic
+   routes, secondary panes, dialogs and controls remain in scope.
 4. Notify the user to switch to Astra Ultra for global motion integration,
    shader refinement and measured performance work.
 5. Notify the user to switch to Astra Max for final integration/review.

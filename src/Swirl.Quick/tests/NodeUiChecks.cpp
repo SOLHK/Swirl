@@ -6,6 +6,7 @@
 #include "engine/EngineController.h"
 #include <QQuickWindow>
 #include <QQuickItem>
+#include <QPointer>
 #include <QQmlContext>
 #include <QQmlExpression>
 #include <QQmlComponent>
@@ -34,7 +35,44 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     find=[&](QQuickItem *p,const QString &n)->QQuickItem *{if(p->objectName()==n)return p;for(auto *c:p->childItems())if(auto *f=find(c,n))return f;return nullptr;};
     const auto item=[&](const QString &n){return find(window->contentItem(),n);};
     const auto eval=[&](const QString &s){if(s.contains("resultCount"))check(QTest::qWaitFor([&]{auto *model=window->findChild<QObject *>("nodeViewModel");return model&&model->property("total").toInt()==controller->nodes().size();},1000),"node catalog catches up before count assertion");QQmlExpression e(qmlContext(window),window,s);auto v=e.evaluate();check(!e.hasError(),"QML expression valid");return v;};
-    const auto click=[&](const QString &n){if(!check(QTest::qWaitFor([&]{auto *hero=item("nodeHero");auto *target=item(n);if((hero&&hero->property("moving").toBool())||!target||!target->isVisible())return false;qreal opacity=1;for(auto *parent=target;parent;parent=parent->parentItem())opacity*=parent->opacity();return opacity>0.95;},3500),"node input is visible after motion settles"))return;auto *t=item(n);if(check(t&&t->isEnabled(),"node input exists and is enabled"))QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,t->mapToScene(QPointF(t->width()/2,t->height()/2)).toPoint());QTest::qWait(300);if(n=="nodeSaveButton"||n=="nodeDeleteButton")check(QTest::qWaitFor([&]{return !controller->policyBusy();},10000),"node mutation waits for its real configuration completion");};
+    const auto effectiveOpacity=[](QQuickItem *target){qreal opacity=1;for(auto *parent=target;parent;parent=parent->parentItem())opacity*=parent->opacity();return opacity;};
+    // Cached pages can retain popup delegates with identical object names.
+    // Input must resolve a visible target; state assertions still use item().
+    std::function<QQuickItem *(QQuickItem *,const QString &)> findInput;
+    findInput=[&](QQuickItem *parent,const QString &name)->QQuickItem *{
+        if(parent->objectName()==name&&parent->isVisible()&&effectiveOpacity(parent)>0.95)return parent;
+        for(auto *child:parent->childItems())if(auto *target=findInput(child,name))return target;
+        return nullptr;
+    };
+    const auto click=[&](const QString &n){
+        QPointer<QQuickItem> target;
+        const bool ready=QTest::qWaitFor([&]{
+            auto *hero=item("nodeHero");
+            target=findInput(window->contentItem(),n);
+            return !(hero&&hero->property("moving").toBool())&&target;
+        },3500);
+        if(!ready){
+            int matches=0;
+            std::function<void(QQuickItem *)> diagnose;
+            diagnose=[&](QQuickItem *candidate){
+                if(candidate->objectName()==n){
+                    ++matches;
+                    qInfo()<<"Node input readiness evidence"<<n
+                           <<"visible"<<candidate->isVisible()<<"enabled"<<candidate->isEnabled()
+                           <<"effectiveOpacity"<<effectiveOpacity(candidate)
+                           <<"size"<<candidate->size();
+                }
+                for(auto *child:candidate->childItems())diagnose(child);
+            };
+            diagnose(window->contentItem());
+            qInfo()<<"Node input readiness matches"<<n<<matches;
+        }
+        if(!check(ready,"node input is visible after motion settles"))return;
+        if(check(target&&target->isEnabled(),"node input exists and is enabled"))
+            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,target->mapToScene(QPointF(target->width()/2,target->height()/2)).toPoint());
+        QTest::qWait(300);
+        if(n=="nodeSaveButton"||n=="nodeDeleteButton")check(QTest::qWaitFor([&]{return !controller->policyBusy();},10000),"node mutation waits for its real configuration completion");
+    };
     const auto fill=[&](const QString &n,const QString &v){auto *t=item(n);if(check(t!=nullptr,"node field exists"))t->setProperty("text",v);};
     std::function<QQuickItem *(QQuickItem *,const QString &)> findNodeRow;
     findNodeRow=[&](QQuickItem *parent,const QString &id)->QQuickItem *{
@@ -97,6 +135,13 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         if(target.value("kind")!="node"||target.value("id")!=id){
             click("defaultPolicyTarget");click("policyNode-"+id);click("confirmPolicyTarget");
             check(QTest::qWaitFor([&]{return !controller->policyBusy()&&controller->defaultPolicy().value("target").toMap().value("id")==id;},10000),"default exit picker waits for the real configuration commit");
+            // A persisted receipt precedes the dialog's exit animation. The
+            // underlying controls remain visible while its modal overlay still
+            // owns input; wait for the actual popup lifecycle, not a delay.
+            check(QTest::qWaitFor([&]{
+                auto *picker=window->findChild<QObject *>("policyTargetPicker");
+                return picker&&!picker->property("visible").toBool();
+            },3500),"default exit picker releases its modal overlay before routing input");
         }
         if(controller->policyDocument().value("mode")!="global"){
             click("routingModePicker");click("swirlComboOption-1");
