@@ -66,7 +66,7 @@ Item {
   releaseSurfaces()
   hero.cancel()
   sourceSurface=null;targetSurface=null;heroData=null
-  for(const key of Object.keys(pages)){const loader=pages[key];loader.visible=loader===activeLoader;loader.enabled=loader===activeLoader;loader.startOpacity=loader===activeLoader?1:0;loader.endOpacity=loader.startOpacity;loader.startShift=Qt.point(0,0);loader.endShift=Qt.point(0,0)}
+  for(const key of Object.keys(pages)){const loader=pages[key];loader.visible=loader===activeLoader;loader.enabled=loader===activeLoader;loader.startOpacity=loader===activeLoader?1:0;loader.endOpacity=loader.startOpacity;loader.startShift=Qt.point(0,0);loader.endShift=Qt.point(0,0);loader.arcBend=0}
   leavingLoader=null
   if(activeLoader){activeLoader.visible=true;activeLoader.enabled=true}
   SwirlTransitionRegistry.setActive(transitionToken,false);trimCache()
@@ -76,7 +76,7 @@ Item {
   // Snapshot all live layers before retargeting. A third click must not drop
   // the still-visible first page or reset the incoming page to transparent.
   const values=Object.keys(pages).map(key=>({loader:pages[key],alpha:pages[key].visible?pages[key].opacity:0,shift:pages[key].contentShift}))
-  for(const value of values){value.loader.startOpacity=value.alpha;value.loader.endOpacity=value.loader===next?1:0;value.loader.startShift=value.shift;value.loader.endShift=Qt.point(0,0);value.loader.visible=value.alpha>0||value.loader===next;value.loader.enabled=value.loader===next}
+  for(const value of values){value.loader.startOpacity=value.alpha;value.loader.endOpacity=value.loader===next?1:0;value.loader.startShift=value.shift;value.loader.endShift=Qt.point(0,0);value.loader.arcBend=0;value.loader.visible=value.alpha>0||value.loader===next;value.loader.enabled=value.loader===next}
  }
  function carryReturningContent(){
   if(heroData && heroData.key==="settings" && heroData.returning && leavingLoader)
@@ -148,7 +148,16 @@ Item {
    animate()
   })
  }
- function animate(){preparing=false;commit.stop();SwirlTransitionRegistry.setActive(transitionToken,true);travel.from=progress;travel.to=1;travel.easing.type=heroData&&heroData.key==="settings"?Easing.Linear:Easing.OutCubic;travel.duration=Math.max(1,(heroData?SwirlMotion.expandDuration*(heroData.key==="settings"?1.15:1):SwirlMotion.pageDuration)*(1-progress));travel.start()}
+ function animate(){
+  preparing=false;commit.stop()
+  if(!heroData && !SwirlMotion.reduced){
+   const direction=AppState.navigationDirection
+   if(activeLoader && activeLoader.startOpacity===0)activeLoader.startShift=Qt.point(SwirlMotion.pageDistance*direction,0)
+   if(activeLoader)activeLoader.arcBend=-SwirlMotion.pageArc*direction
+   if(leavingLoader){leavingLoader.endShift=Qt.point(-SwirlMotion.pageDistance*0.5*direction,0);leavingLoader.arcBend=SwirlMotion.pageArc*0.5*direction}
+  }
+  SwirlTransitionRegistry.setActive(transitionToken,true);travel.from=progress;travel.to=1;travel.easing.type=heroData&&heroData.key==="settings"?Easing.Linear:Easing.OutCubic;travel.duration=Math.max(1,(heroData?SwirlMotion.expandDuration*(heroData.key==="settings"?1.15:1):SwirlMotion.pageDuration)*(1-progress));travel.start()
+ }
  function retargetGeometry(){
   if(!moving || !heroData || !valid(targetSurface))return
   const current=Qt.rect(morph.x,morph.y,morph.width,morph.height)
@@ -175,7 +184,8 @@ Item {
   property real endOpacity:0
   property point startShift:Qt.point(0,0)
   property point endShift:Qt.point(0,0)
-  readonly property point contentShift:Qt.point(host.interpolate(startShift.x,endShift.x,host.surfacePosition),host.interpolate(startShift.y,endShift.y,host.surfacePosition))
+  property real arcBend:0
+  readonly property point contentShift:Qt.point(host.interpolate(startShift.x,endShift.x,host.surfacePosition),host.interpolate(startShift.y,endShift.y,host.surfacePosition)+arcBend*SwirlMotion.arch(host.surfacePosition))
   opacity:startOpacity+(endOpacity-startOpacity)*host.pageReveal
   x:0;y:host.insetFor(routeId);width:host.width;height:host.height-y;visible:false
   z:host.heroData && host.heroData.key==="settings" && host.heroData.returning?

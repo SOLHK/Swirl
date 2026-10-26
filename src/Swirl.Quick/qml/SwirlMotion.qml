@@ -11,20 +11,40 @@ QtObject {
     readonly property int standardEasing: Easing.OutCubic
     function ms(value){return reduced ? 0 : Math.round(value/Math.max(0.25,speed))}
     readonly property int duration:ms(180)
-    readonly property int pressDuration:ms(80)
+    readonly property int pressDuration:ms(70)
     readonly property int releaseDuration:ms(140)
-    readonly property int selectionDuration:ms(220)
-    readonly property int hoverDuration:ms(150)
+    readonly property int selectionDuration:ms(240)
+    readonly property int hoverDuration:ms(110)
+    readonly property int focusDuration:ms(150)
     readonly property int switchDuration:ms(210)
-    readonly property int pageDuration:ms(190)
-    readonly property int dialogDuration:ms(220)
-    readonly property int exitDuration:ms(160)
+    readonly property int pageDuration:ms(300)
+    readonly property int returnDuration:ms(240)
+    readonly property int dialogDuration:ms(280)
+    readonly property int exitDuration:ms(180)
     readonly property int menuEnterDuration:ms(170)
     readonly property int menuExitDuration:ms(110)
     readonly property int listDuration:ms(180)
     readonly property int expandDuration:ms(360)
     readonly property int statusDuration:ms(160)
     readonly property int activityCycleDuration:ms(900)
+    readonly property int successDuration:ms(520)
+    readonly property int rowStagger:ms(24)
+    readonly property real navigationArc:Theme.dp(9)
+    readonly property real pageDistance:Theme.dp(18)
+    readonly property real pageArc:Theme.dp(7)
+    readonly property real popupDistance:Theme.dp(18)
+    readonly property real flowSpeed:0.85
+    readonly property real interactionSpring:4.2
+    readonly property real interactionDamping:0.38
+    // A bounded perpendicular excursion; zero slope at either endpoint.
+    function arch(t){const u=Math.max(0,Math.min(1,t));return 16*u*u*(1-u)*(1-u)}
+    function popupVector(popup) {
+        if(!popup.parent || triggerRect.width===0)return Qt.point(0,popupDistance)
+        const p=popup.parent.mapToItem(null,popup.x+popup.width/2,popup.y+popup.height/2)
+        const dx=triggerRect.x+triggerRect.width/2-p.x,dy=triggerRect.y+triggerRect.height/2-p.y
+        const length=Math.max(1,Math.hypot(dx,dy))
+        return Qt.point(dx/length*popupDistance,dy/length*popupDistance)
+    }
     readonly property real pressScale: reduced ? 1 : 0.98
     property bool transitioning: false
     readonly property bool busy: transitioning || SwirlTransitionRegistry.activeCount>0

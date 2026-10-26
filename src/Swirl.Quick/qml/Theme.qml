@@ -128,6 +128,7 @@ QtObject {
     readonly property real controlRadius: dp(10)
     readonly property real buttonRadius: controlRadius
     readonly property real sidebarWidth: dp(168)
+    readonly property real sidebarCollapsedWidth:dp(76)
     readonly property real pageInset: dp(6)
     readonly property real space: dp(4)
     readonly property real pagePadding: dp(24)

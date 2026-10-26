@@ -80,18 +80,21 @@ ComboBox {
         readonly property real above:Math.max(0,anchorPoint.y-Theme.dp(4)-edgeMargin)
         readonly property real desiredHeight:Math.min(Theme.dp(290),contentItem.implicitHeight+topPadding+bottomPadding)
         readonly property bool opensAbove:below<desiredHeight && above>below
-        focus:true
+        // ComboBox owns arrow/Enter handling while its item popup is open.
+        // Giving the bare Popup focus steals those keys from the control.
+        focus:false
         popupType:Popup.Item
         closePolicy:Popup.CloseOnEscape | Popup.CloseOnPressOutside
         transformOrigin:opensAbove?Item.BottomLeft:Item.TopLeft
+        SwirlPopupMotion {id:reveal;popup:popupLayer;enterDuration:SwirlMotion.menuEnterDuration;leaveDuration:SwirlMotion.menuExitDuration}
+        opacity:reveal.alpha
     onAboutToShow: {
         anchorPoint=control.mapToItem(parent,0,0)
         dismissals.push(popupLayer,control.Window.window)
         Qt.callLater(function(){popupList.positionViewAtIndex(control.currentIndex,ListView.Contain)})
-        if(SwirlMotion.reduced){scale=1;opacity=1}
-        else if(scale===1 && opacity===1){scale=0.98;opacity=0}
+        reveal.prepare(Qt.point(0,(opensAbove?1:-1)*SwirlMotion.popupDistance*0.5))
     }
-    onClosed:{dismissals.pop(popupLayer);scale=1;opacity=1}
+    onClosed:{dismissals.pop(popupLayer);reveal.reset()}
 
         y:opensAbove?anchorPoint.y-height-Theme.dp(4):anchorPoint.y+control.height+Theme.dp(4)
         x:parent?Math.max(edgeMargin,Math.min(anchorPoint.x,parent.width-width-edgeMargin)):0
@@ -99,20 +102,13 @@ ComboBox {
         height:Math.min(desiredHeight,Math.max(above,below))
         padding:Theme.dp(5)
         margins:edgeMargin
-        enter: Transition {
-        enabled:!SwirlMotion.reduced
-            ParallelAnimation {
-                NumberAnimation { property:"opacity";to:1; duration:SwirlMotion.menuEnterDuration;easing.type:Easing.OutCubic }
-                NumberAnimation { property:"scale";to:1; duration:SwirlMotion.menuEnterDuration;easing.type:Easing.OutCubic }
-            }
-        }
-        exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation {
-            NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.menuExitDuration;easing.type:Easing.InCubic}
-            NumberAnimation {property:"scale";to:0.98;duration:SwirlMotion.menuExitDuration;easing.type:Easing.InCubic}
-        } }
-        background: Rectangle { radius:Theme.menuRadius; color:Theme.material("floating"); border.width:Theme.borderWidth; border.color:Theme.increaseContrast?Theme.text:Theme.border }
+        enter:reveal.enterTransition
+        exit:reveal.exitTransition
+        background: Rectangle { transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
+            radius:Theme.menuRadius; color:Theme.material("floating"); border.width:Theme.borderWidth; border.color:Theme.increaseContrast?Theme.text:Theme.border }
         contentItem: ListView { pixelAligned: true;
             id:popupList
+            transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
             clip: true
             implicitHeight: contentHeight
             model: control.popup.visible ? control.delegateModel : null

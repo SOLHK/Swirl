@@ -13,6 +13,7 @@ DismissalController::DismissalController(QObject *parent):QObject(parent) { qApp
 void DismissalController::push(QObject *popup, QObject *owner) {
     auto *window=qobject_cast<QQuickWindow *>(owner);
     if(!popup || !window)return;
+    ++m_focusGeneration;
     for(const auto &layer:m_layers)if(layer.popup==popup)return;
     m_layers.append({popup,window,window->activeFocusItem()});
     connect(popup,&QObject::destroyed,this,[this,popup]{pop(popup);});
@@ -20,12 +21,22 @@ void DismissalController::push(QObject *popup, QObject *owner) {
 }
 void DismissalController::pop(QObject *popup) {
     QPointer<QQuickItem> focus;
+    QPointer<QQuickWindow> owner;
+    bool removed=false;
     for(int i=m_layers.size()-1;i>=0;--i)if(!m_layers[i].popup || m_layers[i].popup==popup) {
-        if(m_layers[i].popup==popup && i==m_layers.size()-1)focus=m_layers[i].focus;
+        if(m_layers[i].popup==popup && i==m_layers.size()-1){focus=m_layers[i].focus;owner=m_layers[i].window;}
         m_layers.removeAt(i);
+        removed=true;
     }
+    if(!removed)return;
+    const auto generation=++m_focusGeneration;
     emit changed();
-    QTimer::singleShot(0,this,[focus]{if(focus && focus->isVisible() && focus->isEnabled())focus->forceActiveFocus(Qt::PopupFocusReason);});
+    QTimer::singleShot(0,this,[this,focus,owner,generation]{
+        // A new or reopened popup owns focus now. A stale deferred return
+        // must not steal it and trigger that popup's focus-loss close path.
+        if(generation!=m_focusGeneration || (owner && hasPopup(owner)))return;
+        if(focus && focus->isVisible() && focus->isEnabled())focus->forceActiveFocus(Qt::PopupFocusReason);
+    });
 }
 bool DismissalController::hasPopup(QObject *window) const {
     for(const auto &layer:m_layers)if(layer.popup && layer.window==window)return true;

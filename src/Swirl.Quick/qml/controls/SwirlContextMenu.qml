@@ -5,8 +5,14 @@ import QtQuick.Controls.Basic
 import SwirlQuick
 Menu {
     id: contextMenu
+    popupType:Popup.Item
     objectName:"swirlContextMenu"
     function requestDismiss(){close()}
+    function showAt(anchor,x,y){
+        if(motionPolicy.reversePopupExit(contextMenu))return
+        if(anchor)popup(anchor,x||0,y||0)
+        else popup()
+    }
     property var items: ["查看详情", "复制", "导出"]
     property string payload: ""
     property bool handleItemsInternally:true
@@ -15,27 +21,22 @@ Menu {
     signal itemTriggered(int index)
     padding:Theme.dp(6)
     transformOrigin:Item.TopLeft
+    SwirlPopupMotion {id:reveal;popup:contextMenu;enterDuration:SwirlMotion.menuEnterDuration;leaveDuration:SwirlMotion.menuExitDuration}
+    readonly property alias popupMotion:reveal
+    // Popup owns x/y placement (including screen clamping); translate its
+    // visual content and background without changing pointer/keyboard grabs.
+    Binding {target:contextMenu.contentItem;property:"transform";value:[contentTravel]}
+    Translate {id:contentTravel;x:reveal.xOffset;y:reveal.yOffset}
+    opacity:reveal.alpha
     onAboutToShow: {
         dismissals.push(contextMenu,parent?parent.Window.window:null)
-        if(SwirlMotion.reduced){scale=1;opacity=1}
-        else if(scale===1 && opacity===1){scale=0.98;opacity=0}
+        reveal.prepare(Qt.point(-SwirlMotion.popupDistance*0.25,-SwirlMotion.popupDistance*0.5))
     }
-    onClosed:{dismissals.pop(contextMenu);scale=1;opacity=1}
-    enter:Transition {
-        enabled:!SwirlMotion.reduced
-        ParallelAnimation {
-            NumberAnimation {property:"opacity";to:1;duration:SwirlMotion.menuEnterDuration;easing.type:Easing.OutCubic}
-            NumberAnimation {property:"scale";to:1;duration:SwirlMotion.menuEnterDuration;easing.type:Easing.OutCubic}
-        }
-    }
-    exit:Transition {
-        enabled:!SwirlMotion.reduced
-        ParallelAnimation {
-            NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.menuExitDuration;easing.type:Easing.InCubic}
-            NumberAnimation {property:"scale";to:0.98;duration:SwirlMotion.menuExitDuration;easing.type:Easing.InCubic}
-        }
-    }
+    onClosed:{dismissals.pop(contextMenu);reveal.reset()}
+    enter:reveal.enterTransition
+    exit:reveal.exitTransition
     background: Rectangle {
+        transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
         color: Theme.material("floating")
         radius:Theme.menuRadius; antialiasing:true
         border.width:Theme.dp(1)

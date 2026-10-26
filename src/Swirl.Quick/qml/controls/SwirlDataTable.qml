@@ -282,7 +282,7 @@ Item {
                         onClicked:function(event){
                             list.forceActiveFocus();list.currentIndex=index
                             table.chooseRow(recordRow,event.button===Qt.LeftButton&&(recordRow.sectionRow||table.activateOnSingleClick))
-                            if(event.button===Qt.RightButton&&!recordRow.sectionRow){if(actionsLoader.item&&actionsLoader.item.openMenu)actionsLoader.item.openMenu();else contextMenu.popup()}
+                            if(event.button===Qt.RightButton&&!recordRow.sectionRow){if(actionsLoader.item&&actionsLoader.item.openMenu)actionsLoader.item.openMenu();else contextMenu.showAt()}
                         }
                         onDoubleClicked:if(!recordRow.sectionRow){if(table.activateOnSingleClick)table.rowEdited(recordRow.record,recordRow);else table.chooseRow(recordRow,true)}
                         SwirlContextMenu {

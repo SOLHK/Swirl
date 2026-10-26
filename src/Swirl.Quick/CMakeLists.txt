@@ -60,7 +60,7 @@ if(DEFINED SWIRL_USE_RUST_CORE AND NOT SWIRL_USE_RUST_CORE)
 endif()
 set(SWIRL_USE_RUST_CORE ON CACHE BOOL "Deprecated: the product always uses Rust Core" FORCE)
 
-find_package(Qt6 6.12 REQUIRED COMPONENTS Quick Qml QuickControls2 Network Svg GuiPrivate ShaderTools)
+find_package(Qt6 6.12 REQUIRED COMPONENTS Quick QuickPrivate Qml QuickControls2 QuickTemplates2Private Network Svg GuiPrivate ShaderTools)
 qt_standard_project_setup(REQUIRES 6.12)
 qt_policy(SET QTP0004 NEW)
 add_subdirectory(third_party)
@@ -152,6 +152,7 @@ target_sources(Swirl PRIVATE network/GatewayService.h network/GatewayService.cpp
 target_link_libraries(Swirl PRIVATE SwirlEngine SwirlHttp2 SwirlExtensions)
 add_dependencies(Swirl SwirlScriptRunner)
 set(SWIRL_QML_FILES
+ qml/controls/SwirlArcMotion.qml qml/controls/SwirlInteractionMotion.qml qml/controls/SwirlFlow.qml qml/controls/SwirlPopupMotion.qml
  qml/controls/SwirlControlSurface.qml qml/controls/SwirlSlider.qml qml/controls/SwirlRadioButton.qml
  qml/components/SwirlPageHeader.qml qml/components/SwirlSectionTitle.qml
  qml/controls/SwirlText.qml qml/controls/SwirlFontBinding.qml
@@ -234,13 +235,15 @@ qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_mono_dark.svg"
 )
 qt_add_shaders(Swirl hdr_ui PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/hdr-ui.frag shaders/swirlclicklight.frag shaders/swirlclicklight.vert)
-qt_add_shaders(Swirl glass_ui PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/swirl-surface.frag shaders/swirl-blur.frag shaders/swirl-glass.frag shaders/sidebar-shadow.frag shaders/sidebar-transmission.frag)
+qt_add_shaders(Swirl glass_ui PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/swirl-surface.frag shaders/swirl-blur.frag shaders/swirl-glass.frag shaders/sidebar-shadow.frag shaders/sidebar-transmission.frag shaders/swirl-flow.frag)
 qt_add_shaders(Swirl window_edge BATCHABLE PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/window-edge.vert shaders/window-edge.frag)
 if(WIN32)
  target_link_libraries(Swirl PRIVATE ole32 uuid)
 endif()
-target_sources(Swirl PRIVATE app/HdrOutput.h app/HdrOutput.cpp app/MotionPolicy.h app/MotionPolicy.cpp)
-target_link_libraries(Swirl PRIVATE Qt6::GuiPrivate)
+target_sources(Swirl PRIVATE app/HdrOutput.h app/HdrOutput.cpp app/MotionPolicy.h app/MotionPolicy.cpp app/PopupMotionBridge.cpp)
+target_link_libraries(Swirl PRIVATE Qt6::GuiPrivate Qt6::QuickTemplates2Private)
+# The SDK-specific popup adapter alone sees the Qt Quick transition internals.
+set_property(SOURCE app/PopupMotionBridge.cpp APPEND PROPERTY INCLUDE_DIRECTORIES "$<TARGET_PROPERTY:Qt6::QuickPrivate,INTERFACE_INCLUDE_DIRECTORIES>")
 
 target_include_directories(Swirl PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/app")
 target_sources(Swirl PRIVATE app/SvgIconProvider.h app/SvgIconProvider.cpp)
@@ -445,7 +448,7 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  set_tests_properties(swirl-import-boundaries PROPERTIES TIMEOUT 30)
  set_tests_properties(swirl-node-real-chain PROPERTIES TIMEOUT 180)
  if(SWIRL_BUILD_UI_TESTS)
- target_sources(Swirl PRIVATE tests/EngineUiChecks.cpp tests/EngineUiChecks.h tests/NodeUiChecks.cpp tests/NodeUiChecks.h tests/PolicyUiChecks.cpp tests/PolicyUiChecks.h tests/MotionChecks.cpp tests/MotionChecks.h tests/RouteBench.cpp tests/RouteBench.h tests/LiquidGlassChecks.cpp tests/U2Checks.cpp)
+ target_sources(Swirl PRIVATE tests/EngineUiChecks.cpp tests/EngineUiChecks.h tests/NodeUiChecks.cpp tests/NodeUiChecks.h tests/PolicyUiChecks.cpp tests/PolicyUiChecks.h tests/MotionChecks.cpp tests/MotionChecks.h tests/ApecMotionChecks.cpp tests/RouteBench.cpp tests/RouteBench.h tests/LiquidGlassChecks.cpp tests/U2Checks.cpp)
  target_compile_definitions(Swirl PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
  add_test(NAME swirl-node-ui COMMAND Swirl --node-self-test)
  set_tests_properties(swirl-node-ui PROPERTIES TIMEOUT 180 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
@@ -455,6 +458,9 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  add_test(NAME swirl-overview-input COMMAND Swirl --interaction-test)
  add_test(NAME swirl-all-pages COMMAND Swirl --smoke-test)
  add_test(NAME swirl-motion COMMAND Swirl --motion-test --motion-output=motion-report.json)
+ add_test(NAME swirl-apec-motion COMMAND Swirl --motion-test --motion-output=apec-motion-report.json)
+ set_tests_properties(swirl-apec-motion PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE
+  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;SWIRL_APEC_MOTION_CHECKS=1;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
  if(WIN32)
   add_test(NAME swirl-hero COMMAND Swirl --hero-test --hero-output=hero-evidence)
   add_test(NAME swirl-navigation-ui COMMAND Swirl --navigation-test --navigation-output=navigation-evidence --hero-no-recording)
@@ -467,6 +473,7 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
   # Popup.Window has native grabs and activation; the offscreen plugin cannot
   # exercise its opening/closing behavior. Keep this check on Windows QPA.
   set_tests_properties(swirl-motion PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=windows;QT_QUICK_BACKEND=software")
+  set_tests_properties(swirl-apec-motion PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=windows;QT_QUICK_BACKEND=software;SWIRL_APEC_MOTION_CHECKS=1")
  endif()
  add_test(NAME swirl-gateway-network COMMAND Swirl --gateway-self-test)
  set_tests_properties(swirl-gateway-network PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}" TIMEOUT 60)
