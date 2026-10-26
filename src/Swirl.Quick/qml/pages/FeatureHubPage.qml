@@ -1,6 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import SwirlQuick
 import "../components"
@@ -33,17 +33,17 @@ Item {
                     Layout.columnSpan:index===6?grid.columns-(index%grid.columns):1
                     padding:Theme.cardPadding; hoverEnabled:true
                     readonly property Item motionSurface:background
-                    motionScale:enabled && down?SwirlMotion.pressScale:1
+                    motionScale:1-(1-SwirlMotion.pressScale)*entryFeedback.contact
+                    SwirlInteractionMotion { id:entryFeedback; hovered:entry.hovered; pressed:entry.down; focused:entry.visualFocus; controlEnabled:entry.enabled }
                     // The cached hub stays mounted during in-window navigation.
                     opacity:1
                     background:Rectangle {
                         id:entrySurface
                         property bool surfaceHidden:false
                         color:Theme.material("content"); radius:Theme.cardRadius
+                        Rectangle { anchors.fill:parent; radius:parent.radius; color:Theme.withAlpha(Theme.accent,entryFeedback.light*0.055) }
                         opacity:surfaceHidden?0:1
-                        border.width:surfaceHidden?0:Theme.borderWidth; border.color:entry.activeFocus||entry.hovered?Theme.focusBorder:Theme.border
-                        Behavior on color { enabled:!entrySurface.surfaceHidden; ColorAnimation { duration:SwirlMotion.hoverDuration } }
-                        Behavior on border.color { enabled:!entrySurface.surfaceHidden; ColorAnimation { duration:SwirlMotion.hoverDuration } }
+                        border.width:surfaceHidden?0:Theme.borderWidth; border.color:entryFeedback.focusAmount>0?Theme.focusBorder:Theme.withAlpha(Theme.accent,0.12+entryFeedback.light*0.24)
                     }
                     contentItem:Column {
                         spacing:Theme.dp(12)

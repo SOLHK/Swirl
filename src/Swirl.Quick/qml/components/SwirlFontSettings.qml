@@ -1,5 +1,5 @@
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import QtQuick.Dialogs
 import SwirlQuick
@@ -17,6 +17,13 @@ ColumnLayout {
         Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(240)
         ListView { pixelAligned: true;
             id:fontList; objectName:"fontFamilyList"; anchors.fill:parent; anchors.margins:Theme.dp(6); clip:true
+            currentIndex:model.indexOf(fontManager.previewFamily)
+            keyNavigationEnabled:false
+            function moveSelection(step){if(!count)return;const next=Math.max(0,Math.min(count-1,currentIndex+step));fontManager.choosePreviewFamily(model[next]);positionViewAtIndex(next,ListView.Contain)}
+            Keys.onUpPressed:moveSelection(-1)
+            Keys.onDownPressed:moveSelection(1)
+            SwirlArcMotion { id:fontSelection; parent:fontList.contentItem; targetX:0; targetY:fontList.currentItem?fontList.currentItem.y:0; bend:Theme.dp(5); motionEnabled:root.visible }
+            Rectangle { parent:fontList.contentItem; z:1; x:fontSelection.position.x; y:fontSelection.position.y; width:Theme.dp(3); height:Theme.dp(38); radius:Theme.dp(1.5); color:Theme.accent; visible:fontList.currentIndex>=0 }
             model:fontManager.families.filter(function(family){return family.toLowerCase().indexOf(search.text.toLowerCase())>=0})
             ScrollBar.vertical:SwirlScrollBar {}
             delegate:SwirlButton {
@@ -30,7 +37,8 @@ ColumnLayout {
                     SwirlText {width:parent.width;text:fontRow.text;font.pixelSize:Theme.fontSize(12);color:Theme.text;elide:Text.ElideRight}
                     SwirlText {width:parent.width;text:"连接让世界更近  Swirl 0123456789";font.family:fontRow.modelData;font.pixelSize:Theme.fontSize(16);color:Theme.text;elide:Text.ElideRight}
                 }
-                background:SwirlContinuousSurface { radius:Theme.dp(7); color:parent.down?Theme.pressed:fontManager.previewFamily===parent.modelData?Theme.selected:parent.hovered?Theme.hover:"transparent" }
+                SwirlInteractionMotion { id:fontFeedback; hovered:fontRow.hovered; pressed:fontRow.down; focused:fontRow.visualFocus; controlEnabled:fontRow.enabled }
+                background:SwirlContinuousSurface { radius:Theme.dp(7); color:fontManager.previewFamily===fontRow.modelData?Theme.selected:Theme.withAlpha(Theme.accent,fontFeedback.light*0.07); border.width:fontRow.visualFocus?Theme.borderWidth:0; border.color:Theme.focusBorder }
                 Accessible.name:modelData
             }
             SwirlText { anchors.centerIn:parent; visible:fontList.count===0; text:"没有匹配的字体，可导入本地字体文件"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }

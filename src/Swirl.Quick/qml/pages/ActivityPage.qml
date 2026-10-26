@@ -163,7 +163,8 @@ Item {
                     Layout.preferredHeight: Theme.dp(276)
                     cornerRadius: Theme.cardRadius; interactive: true
 
-                    SwirlText { x: Theme.dp(18); y: Theme.dp(19); text: "INTERNET 延迟"; color: Theme.muted; font.pixelSize: Theme.fontSize(13) }
+                    SwirlText { x: Theme.dp(18); y: Theme.dp(19); text: qsTr("INTERNET 耗时"); color: Theme.muted; font.pixelSize: Theme.fontSize(13) }
+                    SwirlFlow {x:Theme.dp(18);y:Theme.dp(127);width:Theme.dp(64);height:Theme.dp(15);phase:page.telemetry.measurementState==="正在测量"?"pending":page.internetMeasured?"succeeded":page.telemetry.measurementState==="测量完成"?"failed":"idle"}
                     SwirlIconButton {
                         objectName: "networkDiagnosticButton"
                         x: Theme.dp(122); y: Theme.dp(12); implicitWidth: Theme.dp(28); implicitHeight: Theme.dp(28)
@@ -185,7 +186,7 @@ Item {
                         SwirlText { anchors.bottom: parent.bottom; anchors.bottomMargin: Theme.dp(6); text: page.internetMeasured ? "ms" : ""; color: Theme.dark ? Theme.text : "#08132C"; font.pixelSize: Theme.fontSize(18); font.weight: Font.DemiBold }
                     }
                     SwirlText {
-                        x: Theme.dp(19); y: Theme.dp(123); width: parent.width - Theme.dp(38)
+                        x: Theme.dp(90); y: Theme.dp(123); width: parent.width - Theme.dp(109)
                         text: page.internetMeasured ? "" : (page.telemetry.measurementState || "尚未检测")
                         color: Theme.muted; font.pixelSize: Theme.fontSize(11); elide: Text.ElideRight
                     }

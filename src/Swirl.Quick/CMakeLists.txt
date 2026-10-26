@@ -191,6 +191,7 @@ set(SWIRL_QML_FILES
  qml/pages/OverviewPage.qml qml/pages/CapturePage.qml qml/pages/ExternalToolsPage.qml qml/pages/ConnectionsPage.qml
  qml/pages/ProxiesPage.qml qml/pages/InspectorPage.qml
  qml/pages/ScriptsPage.qml qml/pages/SettingsPage.qml
+ qml/pages/SettingsAppearancePane.qml qml/pages/SettingsProxyPane.qml qml/pages/SettingsAboutPane.qml qml/pages/SettingsCapabilityPane.qml
  qml/pages/WorkbenchPage.qml qml/pages/ToolboxPage.qml
  qml/pages/ActivityPage.qml qml/pages/DNSPage.qml
  qml/pages/RulesPage.qml qml/pages/LogsPage.qml

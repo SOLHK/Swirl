@@ -15,8 +15,9 @@ Item {
     property string pendingRequestId:""
     property var lastCompletion:({requestId:"",success:false})
     property string localMessage:""
-    property Translate serviceTabTranslation:Translate {x:-Theme.dp(8)*tabMotion.progress}
-    property Translate groupTabTranslation:Translate {x:Theme.dp(8)*(1-tabMotion.progress)}
+    property Translate serviceTabTranslation:Translate {x:-Theme.dp(18)*tabMotion.progress;y:-Theme.dp(5)*SwirlMotion.arch(tabMotion.progress)}
+    property Translate groupTabTranslation:Translate {x:Theme.dp(18)*(1-tabMotion.progress);y:Theme.dp(5)*SwirlMotion.arch(tabMotion.progress)}
+    readonly property string operationPhase:engineController.policyBusy?"pending":(engineController.policyError||localMessage).length?"failed":String((engineController.policyReceipt||{}).request_id||"").length?"succeeded":"idle"
     property var targetContext:({kind:"default"})
     readonly property var document:engineController.policyDocument||({})
     readonly property var targets:engineController.policyTargetOptions||[]
@@ -119,10 +120,7 @@ Item {
         }
         RowLayout {
             Layout.fillWidth:true;spacing:Theme.dp(6)
-            SwirlIcon {
-                visible:page.engineController.policyBusy;name:"refresh-source";size:Theme.dp(13);color:Theme.muted;Accessible.ignored:true
-                RotationAnimator on rotation {running:page.engineController.policyBusy&&page.visible&&!SwirlMotion.reduced;from:0;to:360;duration:1000;loops:Animation.Infinite}
-            }
+            SwirlFlow {objectName:"policyOperationFlow";Layout.preferredWidth:Theme.dp(42);Layout.preferredHeight:Theme.dp(18);phase:page.operationPhase}
             SwirlText {Layout.fillWidth:true;text:page.statusText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap}
         }
         SwirlText {id:pageMessage;objectName:"policyApplyMessage";Layout.fillWidth:true;visible:text.length>0;text:page.localMessage||page.engineController.policyError||page.engineController.nodeError||page.engineController.routingError;textFormat:Text.PlainText;color:Theme.orange;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap;activeFocusOnTab:true;Accessible.name:text}

@@ -17,6 +17,7 @@ Item {
   ColumnLayout {width:Math.floor(scroll.availableWidth);spacing:Theme.dp(14)
    RowLayout {Layout.fillWidth:true;Layout.leftMargin:Theme.dp(24);Layout.rightMargin:Theme.dp(24);Layout.topMargin:Theme.dp(24)
     SwirlText {textRole:"pageTitle";renderType:Text.NativeRendering;text:"捕获 HTTP 内容";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold;Layout.fillWidth:true}
+    SwirlFlow {Layout.preferredWidth:Theme.dp(42);Layout.preferredHeight:Theme.dp(18);phase:page.captureProvider.error.length?"failed":page.captureProvider.running?"succeeded":"idle"}
     SwirlToggle {objectName:"captureToggle";large:true;checked:page.captureProvider.running;onToggled:{if(checked){page.applyLimits();page.captureProvider.start(page.listenerPort)}else page.captureProvider.stop()}Accessible.name:"捕获 HTTP 内容"}
    }
    Note {Layout.leftMargin:Theme.dp(24);Layout.rightMargin:Theme.dp(24);text:page.captureProvider.error||"捕获 HTTP 请求与内容。开启后会增加内存和存储开销，请仅在需要时使用；HTTPS 内容需要配合 MITM。"}

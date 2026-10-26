@@ -46,7 +46,7 @@ Item {
   SwirlToggle{objectName:"gatewayToggle";x:Theme.dp(68);y:Theme.dp(15);enabled:!gatewayProvider.busy&&gatewayProvider.running;checked:gatewayProvider.running;onToggled:{const wanted=checked;if(wanted){AppState.notice("Rust Core 暂不支持 TUN 网关转发")}else gatewayProvider.stop();checked=Qt.binding(()=>gatewayProvider.running)}Accessible.name:"网关模式"}
   SwirlIconButton{id:gearButton;objectName:"gatewaySettings";quiet:true;anchors.right:parent.right;y:Theme.dp(10);width:Theme.dp(26);height:width;iconName:"settings";onClicked:page.openGatewayMenu()}
   SwirlText {y:Theme.dp(41);width:parent.width;text:gatewayProvider.error||"Rust Core 暂不支持 TUN 网关转发；已保存配置保持不变。";color:Theme.muted;font.pixelSize:Theme.fontSize(10);lineHeightMode:Text.FixedHeight;lineHeight:Theme.dp(13);wrapMode:Text.WordWrap;maximumLineCount:2;elide:Text.ElideRight}
-  Menu{id:gatewayMenu;objectName:"gatewayMenu";popupType:Popup.Window;padding:Theme.dp(5);implicitWidth:Theme.dp(175);background:Rectangle{radius:Theme.popupRadius;color:Theme.dark?Theme.field:"#EAF2F8";border.color:Theme.border}
+  SwirlContextMenu{id:gatewayMenu;objectName:"gatewayMenu";items:[];popupType:Popup.Item;padding:Theme.dp(5);implicitWidth:Theme.dp(215)
    GatewayMenuItem{text:"DHCP 服务器："+(gatewayProvider.running?"已启用":"未启用");enabled:false}
    GatewayMenuItem{text:"Swirl 网关："+(gatewayProvider.running?"已启用":"未启用");enabled:false}
    MenuSeparator{implicitHeight:Theme.dp(10);contentItem:Rectangle{implicitWidth:Theme.dp(165);implicitHeight:Theme.dp(1);color:Theme.border}}

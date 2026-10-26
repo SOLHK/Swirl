@@ -41,12 +41,12 @@ Item {
             SwirlGlassPanel {
                 Layout.fillWidth:true; Layout.fillHeight:true; clip:true
                 SwirlDataTable {
-                    anchors.fill:parent; anchors.margins:Theme.dp(1)
+                    id:logTable;anchors.fill:parent; anchors.margins:Theme.dp(1)
                     rows:page.displayLogs;incrementalRows:true;followTail:page.followTail;animateRowChanges:false
                     selectedId:page.selected?page.selected.id:""
                     columns:[{key:"time",label:"时间",w:108},{key:"level",label:"级别",w:84},
                              {key:"source",label:"来源",w:104},{key:"message",label:"信息",w:570}]
-                    onRowSelected:function(r){page.selected=r}
+                    onRowSelected:function(r){page.selected=r;logDetail.present(logTable.selectedItem)}
                 }
                 SwirlEmptyState {
                     visible:page.displayLogs.length===0; anchors.centerIn:parent
@@ -54,9 +54,9 @@ Item {
                     detail:"暂无真实引擎事件"
                 }
             }
-            SwirlGlassPanel {
+            SwirlLinkedDetail {
+                id:logDetail;animationLayer:page;sourceViewport:logTable;detailOpen:page.selected!==null
                 Layout.preferredWidth:Theme.dp(289); Layout.fillHeight:true
-                transform:Translate{x:SwirlMotion.reduced?0:Theme.dp(16)*(1-detailClock.progress)}
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:Theme.dp(18); spacing:Theme.dp(12)
                     ScrollView {

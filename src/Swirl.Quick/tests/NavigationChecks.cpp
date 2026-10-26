@@ -98,6 +98,37 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
    if(page)page->setProperty("section",QStringLiteral("字体"));
    check(await([&]{return item("fontSearch")&&item("fontFamilyList");},4000)&&noNewWindows(),"font controls become reachable after asynchronous first loading inside the cached settings page");
    if(page){page->setProperty("section",QStringLiteral("常规"));wait(100);}
+   if(round==0&&page){
+    const auto sections=QJsonDocument::fromJson(eval("JSON.stringify(pageLoader.item.sections)").toString().toUtf8()).array();
+    check(sections.size()==13,"settings exposes all thirteen secondary sections");
+    for(const auto &section:sections){
+     page->setProperty("section",section.toString());
+     check(await([&]{return eval("pageLoader.item.currentSectionReady() && SwirlTransitionRegistry.activeCount===0").toBool();},4000)&&noNewWindows(),"settings section loads and motion settles in its cached page: "+section.toString());
+    }
+    page->setProperty("section",QStringLiteral("代理"));
+    check(await([&]{return item("diagnosticUrlField")!=nullptr;},2000),"proxy diagnostic draft input is available");
+    auto *diagnosticDraft=item("diagnosticUrlField");
+    if(diagnosticDraft)diagnosticDraft->setProperty("text",QStringLiteral("https://example.invalid/settings-draft"));
+    page->setProperty("section",QStringLiteral("常规"));wait(350);page->setProperty("section",QStringLiteral("代理"));
+    check(await([&]{auto *field=item("diagnosticUrlField");return field&&field==diagnosticDraft&&field->property("text").toString()==QStringLiteral("https://example.invalid/settings-draft");},2000),"switching settings sections preserves the same unsent diagnostic draft without running it");
+    if(diagnosticDraft)diagnosticDraft->setProperty("text",QString());
+    page->setProperty("section",QStringLiteral("字体"));
+    check(await([&]{return item("fontSearch")!=nullptr;},2000),"font draft search is available");
+    auto *fontDraft=item("fontSearch");if(fontDraft)fontDraft->setProperty("text",QStringLiteral("Harmony"));
+    page->setProperty("section",QStringLiteral("常规"));wait(350);page->setProperty("section",QStringLiteral("字体"));
+    check(await([&]{return item("fontSearch")==fontDraft&&fontDraft&&fontDraft->property("text").toString()==QStringLiteral("Harmony");},2000),"switching settings sections preserves the cached font preview controls and search draft");
+    if(fontDraft)fontDraft->setProperty("text",QString());
+    page->setProperty("section",QStringLiteral("常规"));wait(350);
+    auto *directory=item("settingsSectionList");
+    if(directory)directory->forceActiveFocus(Qt::TabFocusReason);
+    QTest::keyClick(window,Qt::Key_Down);
+    check(await([&]{return page->property("section").toString()==QStringLiteral("字体")&&item("fontSearch");},2000),"settings directory accepts real keyboard navigation into fonts");
+    QTest::keyClick(window,Qt::Key_Left,Qt::AltModifier);
+    check(await([&]{return eval("AppState.currentPage==='settings' && pageLoader.item.section==='常规'").toBool();},2000),"Alt-Left returns inside settings before leaving the cached page");
+    QTest::keyClick(window,Qt::Key_Down);wait(350);
+    QTest::keyClick(window,Qt::Key_Escape);
+    check(await([&]{return eval("AppState.currentPage==='settings' && pageLoader.item.section==='常规'").toBool();},2000),"real Window Escape traverses dismissal handling and returns inside settings before leaving the cached page");
+   }
   }
   if(round==0&&id=="dns")if(auto *field=item("dnsServerAddress"))field->setProperty("text","1.1.1.1, 8.8.8.8");
   if(round==1&&id=="dns")check(item("dnsServerAddress")&&item("dnsServerAddress")->property("text").toString()=="1.1.1.1, 8.8.8.8","unsubmitted DNS draft survives back and re-entry");

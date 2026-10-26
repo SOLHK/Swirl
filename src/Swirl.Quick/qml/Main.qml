@@ -200,6 +200,7 @@ ApplicationWindow {
         if(rewriteRulesLoader.wantOpen){rewriteRulesLoader.wantOpen=false;return}
         if(captureInspectorLoader.wantOpen){captureInspectorLoader.wantOpen=false;return}
         if(pageLoader.item && pageLoader.item.dismissDetail && pageLoader.item.dismissDetail())return
+        if(pageLoader.item && pageLoader.item.handleSectionEscape && pageLoader.item.handleSectionEscape())return
         if(AppState.canGoBack)AppState.goBack()
     }
     function persistExitDrafts(){
