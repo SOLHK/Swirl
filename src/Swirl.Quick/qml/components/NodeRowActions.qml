@@ -15,7 +15,7 @@ Item {
     signal editRequested()
     signal testRequested()
     signal copyRequested()
-    function openMenu() { menu.open() }
+    function openMenu() { menu.showAt() }
     function closeMenu() { menu.close() }
     RowLayout {
         anchors.fill: parent; spacing: 0

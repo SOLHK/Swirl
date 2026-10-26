@@ -113,7 +113,7 @@ SwirlMotionButton {
     onAppliedModeChanged: if (!busy && !pending) settledMode = appliedMode
     onBusyChanged: if (!busy && !pending) settledMode = appliedMode
     Component.onCompleted: settledMode = appliedMode
-    onClicked: modeMenu.open()
+    onClicked: modeMenu.showAt()
     background: SwirlClearGlassSurface {
         objectName: "activityOutboundModeSurface"
         radius: height / 2
@@ -137,8 +137,9 @@ SwirlMotionButton {
         elide: Text.ElideRight
     }
     HoverHandler { cursorShape: Qt.PointingHandCursor }
-    Menu {
+    SwirlContextMenu {
         id: modeMenu
+        items: []
         objectName: "activityOutboundModeMenu"
         x: 0
         y: control.height + Theme.dp(5)
@@ -147,32 +148,6 @@ SwirlMotionButton {
         padding: Theme.dp(6)
         popupType: Popup.Item
         transformOrigin: Item.TopLeft
-        property bool restoreFocusOnClose: true
-        function requestDismiss() { close() }
-        onAboutToShow: {
-            restoreFocusOnClose = true
-            dismissals.push(modeMenu, control.Window.window)
-            if (SwirlMotion.reduced) { scale = 1; opacity = 1 }
-            else if (scale === 1 && opacity === 1) { scale = 0.98; opacity = 0 }
-        }
-        onClosed: {
-            dismissals.pop(modeMenu); scale = 1; opacity = 1
-            if (restoreFocusOnClose && control.visible) control.forceActiveFocus()
-        }
-        enter: Transition {
-            enabled: !SwirlMotion.reduced
-            ParallelAnimation {
-                NumberAnimation { property: "opacity"; to: 1; duration: SwirlMotion.menuEnterDuration; easing.type: Easing.OutCubic }
-                NumberAnimation { property: "scale"; to: 1; duration: SwirlMotion.menuEnterDuration; easing.type: Easing.OutCubic }
-            }
-        }
-        exit: Transition {
-            enabled: !SwirlMotion.reduced
-            ParallelAnimation {
-                NumberAnimation { property: "opacity"; to: 0; duration: SwirlMotion.menuExitDuration; easing.type: Easing.InCubic }
-                NumberAnimation { property: "scale"; to: 0.98; duration: SwirlMotion.menuExitDuration; easing.type: Easing.InCubic }
-            }
-        }
         background: Rectangle {
             radius: Theme.popupRadius
             color: Theme.material("floating")
@@ -236,7 +211,7 @@ SwirlMotionButton {
             height: Theme.dp(34)
             contentItem: SwirlText { text: strategyLink.text; color: Theme.text; font.pixelSize: Theme.fontSize(12); verticalAlignment: Text.AlignVCenter }
             background: Rectangle { radius: Theme.dp(5); color: strategyLink.highlighted ? Theme.selected : "transparent" }
-            onTriggered: { modeMenu.restoreFocusOnClose = false; AppState.navigate("policies") }
+            onTriggered: AppState.navigate("policies")
         }
     }
     Connections {

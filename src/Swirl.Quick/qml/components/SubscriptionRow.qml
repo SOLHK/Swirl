@@ -72,10 +72,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter; width: parent.width; spacing: Theme.dp(5)
                 RowLayout {
                     Layout.fillWidth: true; spacing: Theme.dp(5)
-                    SwirlIcon {
-                        visible: row.updating; name: "refresh-source"; size: Theme.dp(13); color: Theme.muted; Accessible.ignored: true
-                        RotationAnimator on rotation { running: row.updating && row.visible && !SwirlMotion.reduced; from: 0; to: 360; duration: 1000; loops: Animation.Infinite }
-                    }
+                    SwirlFlow {Layout.preferredWidth:Theme.dp(30);Layout.preferredHeight:Theme.dp(14);phase:row.updating?"pending":row.failed?"failed":row.record.status==="已保存真实节点"?"succeeded":"idle"}
                     SwirlText { text: row.stateLabel; color: row.failed ? Theme.red : Theme.text; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; elide: Text.ElideRight }
                 }
                 SwirlText { text: row.record.lastSuccess > 0 ? row.record.update : qsTr("尚无成功更新"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; elide: Text.ElideRight }
@@ -100,12 +97,12 @@ Item {
                 Layout.preferredWidth: Theme.dp(44); Layout.preferredHeight: Theme.dp(44)
                 Accessible.name: qsTr("%1 的更多操作").arg(row.record.name)
                 tooltip: Accessible.name; tooltipEnabled: !moreMenu.visible
-                onClicked: moreMenu.open()
+                onClicked: moreMenu.showAt()
             }
         }
     }
     Item {
-        x: Theme.dp(46); y: Theme.dp(76) - Theme.dp(4) * (1 - row.reveal); width: parent.width - x - Theme.dp(12)
+        x: Theme.dp(46) + Theme.dp(7) * SwirlMotion.arch(row.reveal); y: Theme.dp(76) - Theme.dp(8) * (1 - row.reveal); width: parent.width - x - Theme.dp(12)
         height: Math.round(details.implicitHeight * row.reveal); clip: true; enabled: row.expanded
         opacity: row.reveal
         ColumnLayout {

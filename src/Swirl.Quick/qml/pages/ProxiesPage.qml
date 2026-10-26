@@ -102,7 +102,7 @@ Item {
             SwirlText {textRole:"pageTitle";id:routeTitle;renderType:Text.NativeRendering;text:"节点";color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold}
             SwirlText {text:String(nodes.total);color:Theme.muted;font.pixelSize:Theme.fontSize(16);Accessible.name:qsTr("%1 个节点").arg(nodes.total)}
             Item {Layout.fillWidth:true}
-            SwirlButton {id:allTestsButton;objectName:"allNodesTestButton";text:engineController.tests.busy?qsTr("取消测速"):qsTr("测速 ⌄");quiet:true;iconName:"activity";enabled:nodes.total>0||engineController.tests.busy;onClicked:{if(engineController.tests.busy)engineController.tests.cancel();else{SwirlMotion.noteTrigger(allTestsButton);batchTestMenu.open()}}}
+            SwirlButton {id:allTestsButton;objectName:"allNodesTestButton";text:engineController.tests.busy?qsTr("取消测速"):qsTr("测速 ⌄");quiet:true;iconName:"activity";enabled:nodes.total>0||engineController.tests.busy;onClicked:{if(engineController.tests.busy)engineController.tests.cancel();else{SwirlMotion.noteTrigger(allTestsButton);batchTestMenu.showAt()}}}
             SwirlButton {objectName:"nodeImportButton";text:"导入";quiet:true;iconName:"download";enabled:!engineController.imports.busy;onClicked:importDialog.open()}
             SwirlButton {objectName:"nodeAddButton";text:"添加节点";iconName:"plus";primary:true;enabled:engineController.canStart;onClicked:page.edit(null)}
         }
@@ -119,7 +119,11 @@ Item {
             SwirlSegmentedControl {objectName:"nodeLibraryTabs";Layout.preferredWidth:Theme.dp(224);options:["全部","可用","收藏"];currentIndex:page.groupIndex;onActivated:index=>{page.recentOnly=false;page.groupIndex=index}}
             SwirlText {text:nodes.count+" / "+nodes.total+" 个节点";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;elide:Text.ElideRight}
         }
-        SwirlText {objectName:"nodeBatchProgress";visible:engineController.tests.busy||engineController.tests.message.length>0;text:engineController.tests.busy?qsTr("正在测速 %1 / %2").arg(engineController.tests.completed).arg(engineController.tests.total):engineController.tests.message;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;elide:Text.ElideRight}
+        RowLayout {
+            Layout.fillWidth:true;visible:engineController.tests.busy||engineController.tests.message.length>0;spacing:Theme.dp(8)
+            SwirlFlow {objectName:"nodeTestFlow";Layout.preferredWidth:Theme.dp(42);Layout.preferredHeight:Theme.dp(18);phase:engineController.tests.busy?"pending":"idle"}
+            SwirlText {objectName:"nodeBatchProgress";text:engineController.tests.busy?qsTr("正在测速 %1 / %2").arg(engineController.tests.completed).arg(engineController.tests.total):engineController.tests.message;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;elide:Text.ElideRight}
+        }
         RowLayout {
             Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:0;spacing:Theme.dp(16)
             SwirlGlassPanel {

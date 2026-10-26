@@ -15,6 +15,7 @@ Item {
         SwirlText {textRole:"pageTitle"; text:"网络诊断";font.weight:Font.DemiBold; font.pixelSize:Theme.fontSize(28);color:Theme.text }
         RowLayout {
             Layout.fillWidth:true
+            SwirlFlow {Layout.preferredWidth:Theme.dp(48);Layout.preferredHeight:Theme.dp(20);phase:engineController.telemetry.measurementState==="正在测量"?"pending":/^\d+ ms$/.test(engineController.telemetry.latencies.internet||"")?"succeeded":engineController.telemetry.measurementState==="测量完成"?"failed":"idle"}
             SwirlText {text:engineController.telemetry.measurementState||"尚未测量";color:Theme.muted;Layout.fillWidth:true}
             SwirlButton {text:"开始检测";enabled:engineController.telemetry.measurementState!=="正在测量";onClicked:{engineController.telemetry.measureNetwork();if(engineController.selectedNodeId.length&&!engineController.tests.busy)engineController.testSelectedNode(engineController.selectedNodeId,"https://www.gstatic.com/generate_204")}}
         }
@@ -51,7 +52,7 @@ Item {
                                 SwirlIcon { name:"tool"; size:Theme.dp(17); color:Theme.muted }
                                 SwirlText { text:modelData; color:Theme.text; font.pixelSize:Theme.fontSize(12); elide:Text.ElideRight; Layout.fillWidth:true }
                             }
-                            MouseArea { id:area; anchors.fill:parent; hoverEnabled:true; onClicked:AppState.notice("研发中") }
+                            MouseArea { id:area; anchors.fill:parent; hoverEnabled:true; onClicked:page.tool=modelData }
                         }
                     }
                 }
