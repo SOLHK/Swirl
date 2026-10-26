@@ -22,10 +22,12 @@ Rectangle {
     border.width: outlined || field || Theme.increaseContrast ? Theme.borderWidth : 0
     border.color: invalid ? Theme.red : Theme.increaseContrast ? Theme.text : Theme.controlBorder
     Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.hoverDuration } }
+    SwirlInteractionMotion {id:feedback;hovered:surface.hovered;pressed:surface.pressed;focused:surface.focused;controlEnabled:surface.controlEnabled}
     Rectangle {
         anchors.fill: parent
         anchors.margins: -Theme.dp(2)
-        visible: surface.focused && surface.controlEnabled
+        visible:opacity>0
+        opacity:feedback.focusAmount
         color: "transparent"
         radius: surface.radius + Theme.dp(2)
         border.width: Theme.dp(2)

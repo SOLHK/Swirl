@@ -48,7 +48,7 @@ ApplicationWindow {
     Connections { target:backdrop; function onChanged() { Theme.backdropActive=backdrop.active||backdrop.micaActive||backdrop.blurActive;Theme.backdropTranslucent=backdrop.translucent } }
     Binding { target:Theme; property:"windowActive"; value:previewState==="inactive"?false:window.active }
     readonly property real sidebarGutter:0
-    readonly property real actualSidebarWidth:Theme.sidebarWidth
+    readonly property real actualSidebarWidth:sidebar.animatedWidth
     readonly property bool swirlUnifiedBlur:true
     Settings { id:windowSettings; category:"Window"; property int normalWidth:0; property int normalHeight:0 }
     onWidthChanged:if(geometryReady && visibility===Window.Windowed)windowSettings.normalWidth=Math.round(width)

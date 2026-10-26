@@ -24,4 +24,5 @@ protected:
 private:
     struct Layer { QPointer<QObject> popup; QPointer<QQuickWindow> window; QPointer<QQuickItem> focus; };
     QList<Layer> m_layers;
+    quint64 m_focusGeneration=0;
 };

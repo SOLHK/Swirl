@@ -14,6 +14,9 @@ Dialog {
     property Item ownerItem:null
     readonly property real heroProgress:heroClock.progress
     SwirlTransitionCoordinator { id:heroClock;parent:dialog.background;duration:SwirlMotion.dialogDuration }
+    SwirlPopupMotion {id:reveal;popup:dialog;motionEnabled:dialog.heroSource===null}
+    Binding {target:dialog.background?dialog.background.parent:null;property:"transform";value:[contentTravel];when:dialog.background!==null;restoreMode:Binding.RestoreBindingOrValue}
+    Translate {id:contentTravel;x:reveal.xOffset;y:reveal.yOffset}
     Binding {target:dialog.contentItem;property:"opacity";value:Math.max(0,Math.min(1,(dialog.heroProgress-0.18)/0.65));when:dialog.heroSource!==null;restoreMode:Binding.RestoreBindingOrValue}
     Binding {target:dialog.heroSource;property:"opacity";value:0;when:dialog.visible && dialog.heroSource!==null;restoreMode:Binding.RestoreBindingOrValue}
     Binding {target:dialog.contentItem;property:"enabled";value:false;when:dialog.dismissing;restoreMode:Binding.RestoreBindingOrValue}
@@ -37,16 +40,17 @@ Dialog {
         dismissing=false;modal=true
         dismissals.push(dialog,ownerWindow)
         transformOrigin=SwirlMotion.popupOrigin(dialog)
+        reveal.prepare(SwirlMotion.popupVector(dialog))
         if(heroSource){scale=1;opacity=1;heroClock.progress=0;heroClock.moveTo(1)}
         else if(SwirlMotion.reduced){scale=1;opacity=1}
-        else if(scale===1 && opacity===1){scale=0.975;opacity=0}
+        else if(scale===1 && opacity===1){opacity=0}
     }
     // The modal can be opened (and Escape pressed) before a Qt.callLater
     // callback executes. Snapshot the initialized fields synchronously when
     // the popup reports opened, so an untouched form never prompts to discard.
     onOpened:markSaved()
     onAboutToHide:{dismissing=true;if(heroSource)heroClock.moveTo(0)}
-    onClosed:{dismissals.pop(dialog);scale=1;opacity=1;if(returnFocus && returnFocus.visible)returnFocus.forceActiveFocus()}
+    onClosed:{dismissals.pop(dialog);reveal.reset();scale=1;opacity=1;if(returnFocus && returnFocus.visible)returnFocus.forceActiveFocus()}
     parent:ownerItem?ownerItem.Overlay.overlay:Overlay.overlay
     width: Math.floor(Math.min(Theme.dp(470), parent ? parent.width-Theme.dp(40) : Theme.dp(470)))
     x:parent ? Math.round((parent.width-width)/2) : 0
@@ -91,14 +95,17 @@ Dialog {
     enter: Transition {
         enabled:!SwirlMotion.reduced && dialog.heroSource===null
         ParallelAnimation {
+            id:dialogEnter
             NumberAnimation { property:"opacity";to:1; duration:SwirlMotion.dialogDuration;easing.type:Easing.OutCubic }
-            NumberAnimation { property:"scale";to:1; duration:SwirlMotion.dialogDuration;easing.type:Easing.OutCubic }
+            NumberAnimation {target:reveal;property:"progress";to:1;duration:SwirlMotion.dialogDuration;easing.type:Easing.OutCubic}
         }
     }
     exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation {
+        id:dialogExit
         NumberAnimation {property:"opacity";to:0;duration:dialog.heroSource?SwirlMotion.dialogDuration:SwirlMotion.exitDuration;easing.type:Easing.InCubic}
-        NumberAnimation {property:"scale";to:dialog.heroSource?1:0.985;duration:SwirlMotion.exitDuration;easing.type:Easing.InCubic}
+        NumberAnimation {target:reveal;property:"progress";to:0;duration:SwirlMotion.exitDuration;easing.type:Easing.InOutCubic}
     } }
+    Connections {target:SwirlMotion;function onReducedChanged(){if(SwirlMotion.reduced){reveal.progress=1;dialog.opacity=1;motionPolicy.finishPopup(dialog)}}}
     font.family: Theme.fontFamily
     header: Item {
         implicitHeight:Math.max(Theme.dp(47),dialogTitle.implicitHeight+Theme.dp(20))

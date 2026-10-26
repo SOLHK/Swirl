@@ -148,6 +148,10 @@ int runMotionVisualChecks(QQuickWindow *window, const QString &directory) {
 #include "ScrollBench.h"
 #include "SixAChecks.h"
 int runMotionChecks(QQuickWindow *window, const QString &output) {
+    if(qEnvironmentVariableIsSet("SWIRL_APEC_MOTION_CHECKS")) {
+        extern int runApecMotionChecks(QQuickWindow *,const QString &);
+        return runApecMotionChecks(window,output);
+    }
     if(qEnvironmentVariableIsSet("SWIRL_ROUTE_BENCH"))return runRouteBench(window,output);
     if(qEnvironmentVariableIsSet("SWIRL_U2_CHECKS")) {
         extern int runU2Checks(QQuickWindow *, const QString &);
