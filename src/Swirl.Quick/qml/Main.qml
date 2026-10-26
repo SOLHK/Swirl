@@ -92,7 +92,8 @@ ApplicationWindow {
         id:scaledCanvas
         // DWM supplies the native material underneath the sharp QML content.
         width:window.width; height:window.height
-        SwirlGlassMaterial {
+        SwirlWorkspaceBackdrop {
+            id:appSceneBackdrop
             anchors.fill:parent;targetWindow:window
         }
 
@@ -106,7 +107,7 @@ ApplicationWindow {
             onPositionChanged:mouse=>{ if(pressed&&(pressedButtons&Qt.LeftButton)&&!nativeMoveStarted&&Math.hypot(mouse.x-pressPosition.x,mouse.y-pressPosition.y)>Qt.styleHints.startDragDistance){nativeMoveStarted=true;window.startSystemMove()} }
             onDoubleClicked:window.visibility===Window.Maximized ? window.showNormal() : window.showMaximized()
         }
-        SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false }
+        SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false;backdropSource:appSceneBackdrop }
         SwirlWindowControls {
             id:windowControls;objectName:"windowControls";z:70
             anchors.right:parent.right;anchors.rightMargin:Theme.dp(5);y:Theme.dp(5)

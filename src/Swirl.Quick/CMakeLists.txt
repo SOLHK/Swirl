@@ -152,6 +152,7 @@ target_sources(Swirl PRIVATE network/GatewayService.h network/GatewayService.cpp
 target_link_libraries(Swirl PRIVATE SwirlEngine SwirlHttp2 SwirlExtensions)
 add_dependencies(Swirl SwirlScriptRunner)
 set(SWIRL_QML_FILES
+ qml/components/SwirlLiquidGlass.qml qml/components/SwirlWorkspaceBackdrop.qml
  qml/controls/SwirlArcMotion.qml qml/controls/SwirlInteractionMotion.qml qml/controls/SwirlFlow.qml qml/controls/SwirlPopupMotion.qml
  qml/controls/SwirlControlSurface.qml qml/controls/SwirlSlider.qml qml/controls/SwirlRadioButton.qml
  qml/components/SwirlPageHeader.qml qml/components/SwirlSectionTitle.qml
@@ -237,6 +238,7 @@ qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES
 )
 qt_add_shaders(Swirl hdr_ui PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/hdr-ui.frag shaders/swirlclicklight.frag shaders/swirlclicklight.vert)
 qt_add_shaders(Swirl glass_ui PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/swirl-surface.frag shaders/swirl-blur.frag shaders/swirl-glass.frag shaders/sidebar-shadow.frag shaders/sidebar-transmission.frag shaders/swirl-flow.frag)
+qt_add_shaders(Swirl liquid_navigation PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/sidebar-liquid.frag)
 qt_add_shaders(Swirl window_edge BATCHABLE PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/window-edge.vert shaders/window-edge.frag)
 if(WIN32)
  target_link_libraries(Swirl PRIVATE ole32 uuid)
@@ -449,7 +451,7 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  set_tests_properties(swirl-import-boundaries PROPERTIES TIMEOUT 30)
  set_tests_properties(swirl-node-real-chain PROPERTIES TIMEOUT 180)
  if(SWIRL_BUILD_UI_TESTS)
- target_sources(Swirl PRIVATE tests/EngineUiChecks.cpp tests/EngineUiChecks.h tests/NodeUiChecks.cpp tests/NodeUiChecks.h tests/PolicyUiChecks.cpp tests/PolicyUiChecks.h tests/MotionChecks.cpp tests/MotionChecks.h tests/ApecMotionChecks.cpp tests/RouteBench.cpp tests/RouteBench.h tests/LiquidGlassChecks.cpp tests/U2Checks.cpp)
+ target_sources(Swirl PRIVATE tests/EngineUiChecks.cpp tests/EngineUiChecks.h tests/NodeUiChecks.cpp tests/NodeUiChecks.h tests/PolicyUiChecks.cpp tests/PolicyUiChecks.h tests/MotionChecks.cpp tests/MotionChecks.h tests/ApecMotionChecks.cpp tests/ApecGlassChecks.cpp tests/RouteBench.cpp tests/RouteBench.h tests/LiquidGlassChecks.cpp tests/U2Checks.cpp)
  target_compile_definitions(Swirl PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
  add_test(NAME swirl-node-ui COMMAND Swirl --node-self-test)
  set_tests_properties(swirl-node-ui PROPERTIES TIMEOUT 180 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
@@ -463,6 +465,10 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  set_tests_properties(swirl-apec-motion PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE
   ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;SWIRL_APEC_MOTION_CHECKS=1;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
  if(WIN32)
+  add_test(NAME swirl-apec-glass COMMAND Swirl --motion-test --motion-output=apec-glass-report.json)
+  set_tests_properties(swirl-apec-glass PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE
+   ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;SWIRL_APEC_GLASS_CHECKS=1"
+   ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
   add_test(NAME swirl-hero COMMAND Swirl --hero-test --hero-output=hero-evidence)
   add_test(NAME swirl-navigation-ui COMMAND Swirl --navigation-test --navigation-output=navigation-evidence --hero-no-recording)
   set_tests_properties(swirl-navigation-ui PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")

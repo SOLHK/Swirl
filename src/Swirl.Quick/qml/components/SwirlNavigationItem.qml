@@ -21,13 +21,14 @@ SwirlMotionButton {
     leftPadding:Theme.dp(8); rightPadding:Theme.dp(10)
     topPadding:0; bottomPadding:0
     hoverEnabled: true
+    SwirlInteractionMotion {id:navigationFeedback;hovered:entry.hovered;pressed:entry.down;focused:entry.visualFocus;controlEnabled:entry.enabled}
     background: Rectangle {
         radius:Theme.sidebarRowRadius
         color:!entry.chosen && entry.down?Theme.withAlpha(Theme.text,0.05):!entry.chosen && entry.hovered?Theme.withAlpha(Theme.text,0.025):"transparent"
         Behavior on color {ColorAnimation{duration:SwirlMotion.hoverDuration}}
         antialiasing:true
-        border.width:Theme.dp(entry.visualFocus?2:0)
-        border.color:Theme.focusBorder
+        border.width:Theme.dp(2)
+        border.color:Theme.withAlpha(Theme.focusBorder,navigationFeedback.focusAmount)
     }
     contentItem: RowLayout {
         spacing:Theme.dp(10)
