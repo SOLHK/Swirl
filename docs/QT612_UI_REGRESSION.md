@@ -70,3 +70,21 @@ assertions are unchanged. With the complete platform runtime, the font
 selection and axis-policy CTest suites pass. The selection XML records 34 test
 functions, zero failures and nine native/private-fixture skips in the offscreen
 run; these skipped cases are not accepted by that result.
+
+## Capture backend diagnostic checkpoint
+
+The MSVC CI run `40388157088` passed its 30 CTests and Overview input checks,
+then failed the separate deployed application's TLS capture positive control
+with an issuer-certificate error. Installer steps were consequently skipped.
+This is an unresolved deployment/runtime regression, not a delivered package.
+
+The integrated Qt 6.12.0 local MinGW executable passed all 78 capture checks
+with both explicit Schannel (Windows 10.0.29695) and OpenSSL (runtime 3.6.4)
+backends. These are controlled loopback results on the local Windows host;
+they do not establish the Windows Server CI result or private-network support.
+
+Test builds now report the active TLS backend and the positive control's
+certificate errors. `SWIRL_CAPTURE_TEST_TLS_BACKEND` selects a backend only
+for `--capture-self-test`, before TLS initialization. Production builds and
+certificate/hostname verification are unchanged. No system trust or proxy
+configuration was modified.

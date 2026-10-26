@@ -20,6 +20,8 @@
 
 int runCaptureChecks(CaptureService *capture)
 {
+    qInfo() << "CAPTURE_TLS_RUNTIME" << QSslSocket::activeBackend()
+            << QSslSocket::sslLibraryVersionString() << QSslSocket::sslLibraryBuildVersionString();
     int failures=0,checks=0;
     const auto check=[&](bool ok,const char *name){++checks;if(ok)qInfo()<<"PASS"<<name;else{++failures;qCritical()<<"FAIL"<<name;}};
     const auto until=[](const std::function<bool()> &predicate){QElapsedTimer t;t.start();while(!predicate() && t.elapsed()<4500)QTest::qWait(10);return predicate();};
@@ -184,6 +186,11 @@ int runCaptureChecks(CaptureService *capture)
         }
     });
     QSslSocket alpnControl;alpnControl.setProxy(QNetworkProxy::NoProxy);
+    QObject::connect(&alpnControl, &QSslSocket::sslErrors, &alpnControl,
+                     [](const QList<QSslError> &errors) {
+        for (const auto &error : errors)
+            qInfo() << "CAPTURE_TLS_CONTROL_ERROR" << error.error() << error.errorString();
+    });
     auto controlSsl=trustedSsl;controlSsl.setAllowedNextProtocols({QByteArray("h2"),QByteArray("http/1.1")});alpnControl.setSslConfiguration(controlSsl);
     QSignalSpy controlEncrypted(&alpnControl,&QSslSocket::encrypted);alpnControl.connectToHostEncrypted("localhost",secureOrigin.serverPort());
     check(until([&]{return !controlEncrypted.isEmpty()&&!upstreamProtocols.isEmpty();})&&upstreamProtocols.first()=="h2",

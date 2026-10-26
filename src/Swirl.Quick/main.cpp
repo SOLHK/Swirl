@@ -71,6 +71,7 @@
 #include "tests/HeroChecks.h"
 #include "tests/NavigationChecks.h"
 #include "tests/AppearanceChecks.h"
+#include <QSslSocket>
 #endif
 #include "app/SystemDataProvider.h"
 #include "app/WindowsBackdrop.h"
@@ -121,6 +122,13 @@ int main(int argc, char *argv[])
     app.setOrganizationDomain(QStringLiteral("solhk.dev"));
     app.setApplicationVersion(QStringLiteral(SWIRL_APP_VERSION));
 #ifdef SWIRL_UI_TESTS
+    if (app.arguments().contains(QStringLiteral("--capture-self-test"))) {
+        const auto backend = qEnvironmentVariable("SWIRL_CAPTURE_TEST_TLS_BACKEND");
+        if (!backend.isEmpty() && !QSslSocket::setActiveBackend(backend)) {
+            std::fprintf(stderr, "The requested capture-test TLS backend is unavailable.\n");
+            return 2;
+        }
+    }
 #ifdef Q_OS_WIN
     // Read-only native QA capture, limited to the actual Windows taskbar.
     for(const auto &argument:app.arguments())if(argument.startsWith("--capture-taskbar=")) {
