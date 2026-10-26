@@ -18,12 +18,27 @@ Row {
             hoverEnabled: true
             objectName: index === 0 ? "windowMinimizeButton" : index === 1 ? "windowMaximizeButton" : "windowCloseButton"
             Accessible.name: index === 0 ? qsTr("最小化") : index === 1 ? (controls.maximized ? qsTr("还原") : qsTr("最大化")) : qsTr("关闭")
+            property bool motionInitialized:false
+            property color shownColor:targetColor
+            readonly property color targetColor:index===2 && (hovered || down)?(down?"#C42B1C":"#E81123")
+                :down?Theme.interactionPressed:hovered?Theme.interactionHover:"transparent"
+            readonly property bool animate:visible && controls.targetWindow.visible && controls.targetWindow.visibility!==Window.Minimized && !SwirlMotion.reduced
+            readonly property bool moving:backgroundTravel.running
+            function finishMotion(){if(motionInitialized){backgroundTravel.stop();shownColor=targetColor}}
+            function retargetMotion(){
+                if(!motionInitialized)return
+                if(!animate){finishMotion();return}
+                backgroundTravel.stop();backgroundTravel.from=shownColor;backgroundTravel.to=targetColor
+                if(shownColor!==targetColor)backgroundTravel.start()
+            }
+            onTargetColorChanged:retargetMotion()
+            onAnimateChanged:if(!animate)finishMotion()
+            Component.onCompleted:{motionInitialized=true;finishMotion()}
+            ColorAnimation {id:backgroundTravel;target:button;property:"shownColor";duration:SwirlMotion.hoverDuration}
             background: Rectangle {
-                color: button.index === 2 && (button.hovered || button.down) ? (button.down ? "#C42B1C" : "#E81123")
-                    : button.down ? Theme.interactionPressed : button.hovered ? Theme.interactionHover : "transparent"
+                color: button.shownColor
                 border.width: button.visualFocus ? 1 / Screen.devicePixelRatio : 0
                 border.color: Theme.focusBorder
-                Behavior on color { ColorAnimation { duration: SwirlMotion.hoverDuration } }
             }
             contentItem: Item {
                 readonly property color ink: button.index === 2 && button.hovered ? "white" : controls.targetWindow.active ? Theme.text : Theme.muted

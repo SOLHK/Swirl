@@ -48,13 +48,17 @@ Item {
  property alias menu:menu
  property alias dialog:dialog
  property alias combo:combo
+ property alias checkBox:checkBox
+ property alias guarded:guarded
  SwirlArcMotion {id:arc;targetX:0;targetY:0;duration:300;bend:12}
  SwirlFlow {id:flow;x:280;y:40;width:80;height:35}
  SwirlInteractionMotion {id:feedback}
+ ReferenceCheckBox {id:checkBox;objectName:"apecCheckBox";x:280;y:110;width:180;text:"Check fixture"}
  SwirlButton {id:openButton;objectName:"apecOpenDialog";text:"Motion fixture";onClicked:dialog.open()}
  SwirlComboBox {id:combo;y:70;width:190;model:["First","Second","Third"]}
  SwirlContextMenu {id:menu;items:["One","Two"];handleItemsInternally:false}
  SwirlDialog {id:dialog;ownerItem:fixture;guardChanges:false;title:"Motion fixture";contentItem:Item{implicitHeight:80} footer:SwirlButton{text:"Save"}}
+ SwirlDialog {id:guarded;ownerItem:fixture;title:"Guarded fixture";contentItem:SwirlTextField {objectName:"apecGuardedField";text:"Original";implicitHeight:40}}
 })QML",QUrl("qrc:/qt/qml/SwirlQuick/ApecMotionFixture.qml"));
     std::unique_ptr<QObject> object(component.create(qmlContext(window)));
     if(!object){qWarning()<<component.errors();check("fixture-load",false);}
@@ -98,6 +102,28 @@ Item {
         check("contact-release-settles",eval("Math.abs(apecFixture.feedback.contact)<.01").toBool());
         eval("apecFixture.feedback.pressed=true");wait(40);eval("apecFixture.feedback.pressed=false");wait(20);eval("Theme.reduceMotion=true");wait(20);
         check("midflight-reduced-contact-settles",eval("apecFixture.feedback.contact===0").toBool());eval("Theme.reduceMotion=false");
+        auto *checkBox=fixture->findChild<QQuickItem *>("apecCheckBox");
+        if(checkBox){
+            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,checkBox->mapToScene(QPointF(8,checkBox->height()/2)).toPoint());wait(25);
+            check("checkbox-input-starts-presentation",eval("apecFixture.checkBox.checked && apecFixture.checkBox.moving && apecFixture.checkBox.markOpacity<1").toBool());
+            eval("Theme.reduceMotion=true");
+            check("checkbox-midflight-reduced-settles",eval("!apecFixture.checkBox.moving && apecFixture.checkBox.markOpacity===1 && apecFixture.checkBox.markScale===1 && apecFixture.checkBox.shownColor===apecFixture.checkBox.targetColor").toBool());
+            eval("Theme.reduceMotion=false;apecFixture.checkBox.checked=false");wait(25);eval("apecFixture.checkBox.visible=false");
+            check("checkbox-hidden-settles",eval("!apecFixture.checkBox.moving && apecFixture.checkBox.markOpacity===0 && apecFixture.checkBox.markScale===0.65").toBool());
+            eval("apecFixture.checkBox.visible=true");
+        }else check("checkbox-fixture-present",false);
+        auto *caption=window->findChild<QQuickItem *>("windowMaximizeButton");
+        if(caption){
+            qmlEngine(window)->rootContext()->setContextProperty("apecCaption",caption);
+            QTest::mouseMove(window,QPoint(400,400));wait(160);
+            QTest::mouseMove(window,caption->mapToScene(QPointF(caption->width()/2,caption->height()/2)).toPoint());wait(20);
+            check("caption-hover-animates",caption->property("moving").toBool());
+            eval("Theme.reduceMotion=true");
+            check("caption-midflight-reduced-settles",eval("!apecCaption.moving && apecCaption.shownColor===apecCaption.targetColor").toBool());
+            eval("Theme.reduceMotion=false");QTest::mouseMove(window,QPoint(400,400));wait(20);caption->setVisible(false);
+            check("caption-hidden-settles",eval("!apecCaption.moving && apecCaption.shownColor===apecCaption.targetColor").toBool());
+            caption->setVisible(true);qmlEngine(window)->rootContext()->setContextProperty("apecCaption",static_cast<QObject *>(nullptr));
+        }else check("caption-fixture-present",false);
         eval("apecFixture.menu.showAt(apecFixture,50,150)");wait(40);
         check("menu-first-open-visible",eval("apecFixture.menu.visible && apecFixture.menu.count===2").toBool());
         qInfo()<<"APEC_MENU_INITIAL"<<eval("JSON.stringify({visible:apecFixture.menu.visible,count:apecFixture.menu.count,opacity:apecFixture.menu.opacity})");
@@ -117,11 +143,38 @@ Item {
         check("midflight-reduced-dialog-enter-completes",eval("apecFixture.dialog.opened && apecFixture.dialog.opacity===1").toBool());
         eval("Theme.reduceMotion=false;apecFixture.dialog.close()");wait(30);eval("Theme.reduceMotion=true");wait(20);
         check("midflight-reduced-dialog-exit-retires",eval("!apecFixture.dialog.visible && dismissals.count===0").toBool());eval("Theme.reduceMotion=false");
+        eval("apecFixture.guarded.open()");wait(340);
+        auto *guarded=qvariant_cast<QObject *>(fixture->property("guarded"));
+        auto *discard=guarded?guarded->findChild<QObject *>("discardChangesPrompt"):nullptr;
+        qmlEngine(window)->rootContext()->setContextProperty("apecDiscard",discard);
+        eval("apecFixture.guarded.contentItem.forceActiveFocus();apecFixture.guarded.contentItem.text='Edited';apecFixture.guarded.requestDismiss()");wait(45);
+        check("discard-opens-second-owned-layer",discard && discard->property("visible").toBool() && eval("dismissals.count===2").toBool());
+        const auto discardOffset=eval("apecDiscard.header.mapToItem(apecDiscard.background,0,0)").toPointF();wait(50);
+        check("discard-header-shares-surface-trajectory",QLineF(discardOffset,eval("apecDiscard.header.mapToItem(apecDiscard.background,0,0)").toPointF()).length()<.01);
+        eval("Theme.reduceMotion=true");wait(15);
+        check("discard-reduced-enter-finishes",eval("apecDiscard.opened && apecDiscard.opacity===1").toBool());
+        eval("Theme.reduceMotion=false");QTest::keyClick(keyboardWindow(),Qt::Key_Escape);wait(25);eval("Theme.reduceMotion=true");wait(20);
+        check("discard-reduced-exit-retains-editor",eval("!apecDiscard.visible && apecFixture.guarded.opened && dismissals.count===1 && apecFixture.guarded.contentItem.text==='Edited'").toBool());
+        check("discard-cancel-restores-editor-focus",eval("apecFixture.guarded.contentItem.activeFocus").toBool());
+        eval("Theme.reduceMotion=false;apecFixture.guarded.requestDismiss()");wait(320);
+        auto *confirm=discard?discard->findChild<QQuickItem *>("discardChangesConfirm"):nullptr;
+        check("discard-confirm-control-present",confirm!=nullptr);
+        if(confirm){QTest::mouseClick(keyboardWindow(),Qt::LeftButton,Qt::NoModifier,confirm->mapToScene(QPointF(confirm->width()/2,confirm->height()/2)).toPoint());wait(260);}
+        check("discard-confirm-releases-both-layers",eval("!apecDiscard.visible && !apecFixture.guarded.visible && dismissals.count===0").toBool());
+        eval("apecFixture.dialog.open()");wait(330);eval("apecFixture.dialog.close()");wait(25);eval("apecFixture.guarded.open()");wait(330);
+        check("old-dialog-close-keeps-new-popup-focus",eval("!apecFixture.dialog.visible && apecFixture.guarded.opened && apecFixture.guarded.activeFocus && dismissals.count===1").toBool());
+        eval("apecFixture.guarded.close()");wait(250);
+        check("guarded-final-close-releases-layer",eval("dismissals.count===0").toBool());
+        qmlEngine(window)->rootContext()->setContextProperty("apecDiscard",static_cast<QObject *>(nullptr));
         eval("apecFixture.combo.forceActiveFocus()");QTest::keyClick(window,Qt::Key_Space);wait(250);
         check("combo-keyboard-open",eval("apecFixture.combo.popup.opened").toBool());QTest::keyClick(keyboardWindow(),Qt::Key_Down);QTest::keyClick(keyboardWindow(),Qt::Key_Return);wait(250);
         qInfo()<<"APEC_COMBO"<<eval("JSON.stringify({index:apecFixture.combo.currentIndex,highlight:apecFixture.combo.highlightedIndex,visible:apecFixture.combo.popup.visible})");
         check("combo-keyboard-commit",eval("apecFixture.combo.currentIndex===1 && !apecFixture.combo.popup.visible").toBool());
         eval("apecFixture.combo.popup.close()");wait(200);
+        eval("apecFixture.arc.targetY=260;apecFixture.arc.retarget();apecFixture.feedback.pressed=true");wait(25);
+        window->showMinimized();wait(100);
+        check("minimized-window-settles-presentation",eval("!apecFixture.arc.moving && apecFixture.arc.position.y===260 && !apecFixture.feedback.moving && apecFixture.feedback.contact===1").toBool());
+        window->showNormal();window->requestActivate();wait(160);eval("apecFixture.feedback.pressed=false");
         fixture->setVisible(false);wait(50);
         auto *collapse=window->findChild<QQuickItem *>("sidebarCollapseButton");
         if(collapse){

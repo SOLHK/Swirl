@@ -21,6 +21,7 @@ Item {
     property int token:0
     property int generation:0
     readonly property bool moving:travel.running
+    readonly property bool windowVisible:!Window.window || (Window.window.visible && Window.window.visibility!==Window.Minimized)
     readonly property real u:Math.max(0,Math.min(1,progress))
     readonly property real h:3*u*u-2*u*u*u
     readonly property real v:u*u*u-2*u*u+u
@@ -36,7 +37,7 @@ Item {
         if(Math.hypot(dx,dy)<0.01){if(!moving)settle();return}
         ++generation
         travel.stop()
-        if(!motionEnabled || !visible || SwirlMotion.reduced){settle();return}
+        if(!motionEnabled || !visible || !windowVisible || SwirlMotion.reduced){settle();return}
         start=current;destination=target
         const length=Math.max(1,Math.hypot(dx,dy)),time=Math.max(1,duration)
         // Limit carried velocity only for a near-coincident destination, where
@@ -48,8 +49,9 @@ Item {
     }
     onTargetXChanged:Qt.callLater(retarget)
     onTargetYChanged:Qt.callLater(retarget)
-    onMotionEnabledChanged:if(!motionEnabled)settle()
-    onVisibleChanged:if(!visible)settle()
+    onMotionEnabledChanged:if(initialized && !motionEnabled)settle()
+    onVisibleChanged:if(initialized && !visible)settle()
+    onWindowVisibleChanged:if(initialized && !windowVisible)settle()
     onMovingChanged:SwirlTransitionRegistry.setActive(token,moving)
     Component.onCompleted:{token=SwirlTransitionRegistry.allocate();settle();initialized=true}
     Component.onDestruction:SwirlTransitionRegistry.setActive(token,false)

@@ -53,7 +53,7 @@ Dialog {
     // the popup reports opened, so an untouched form never prompts to discard.
     onOpened:markSaved()
     onAboutToHide:{dismissing=true;if(heroSource)heroClock.moveTo(0)}
-    onClosed:{dismissals.pop(dialog);reveal.reset();scale=1;opacity=1;if(returnFocus && returnFocus.visible)returnFocus.forceActiveFocus()}
+    onClosed:{dismissals.pop(dialog);reveal.reset();scale=1;opacity=1}
     parent:ownerItem?ownerItem.Overlay.overlay:Overlay.overlay
     width: Math.floor(Math.min(Theme.dp(470), parent ? parent.width-Theme.dp(40) : Theme.dp(470)))
     x:parent ? Math.round((parent.width-width)/2) : 0
@@ -64,7 +64,7 @@ Dialog {
         id:discardPrompt;objectName:"discardChangesPrompt"
         property var owner:dialog.ownerWindow
         function requestDismiss(){close()}
-        modal:true;focus:true;title:"放弃未保存的修改？"
+        modal:true;focus:true;title:qsTr("放弃未保存的修改？")
         font.family:Theme.fontFamily
         // The style owns this header (including its bold weight and padding).
         // Resolve its actual font after inheritance, without replacing it.
@@ -76,10 +76,14 @@ Dialog {
         x:parent ? Math.round((parent.width-width)/2) : 0
         y:parent ? Math.round((parent.height-height)/2) : 0
         closePolicy:Popup.NoAutoClose
-        enter:Transition{enabled:!SwirlMotion.reduced;ParallelAnimation{NumberAnimation{property:"opacity";from:0;to:1;duration:SwirlMotion.dialogDuration}}}
-        exit:Transition{enabled:!SwirlMotion.reduced;ParallelAnimation{NumberAnimation{property:"opacity";to:0;duration:SwirlMotion.exitDuration}}}
-        onAboutToShow:dismissals.push(discardPrompt,owner)
-        onClosed:dismissals.pop(discardPrompt)
+        SwirlPopupMotion {id:discardReveal;popup:discardPrompt}
+        Binding {target:dialog.presentationReady && discardPrompt.background?discardPrompt.background.parent:null;property:"transform";value:[discardTravel];when:dialog.presentationReady && discardPrompt.background!==null;restoreMode:Binding.RestoreBindingOrValue}
+        Translate {id:discardTravel;x:discardReveal.xOffset;y:discardReveal.yOffset}
+        opacity:discardReveal.alpha
+        enter:discardReveal.enterTransition
+        exit:discardReveal.exitTransition
+        onAboutToShow:{dismissals.push(discardPrompt,owner);discardReveal.prepare(SwirlMotion.popupVector(discardPrompt))}
+        onClosed:{dismissals.pop(discardPrompt);discardReveal.reset()}
         background:SwirlClearGlassSurface{radius:Theme.popupRadius;color:Theme.material("floating")}
         // Retain the prompt shell and header hook; its controls are only
         // instantiated while a real unsaved-change confirmation is visible.

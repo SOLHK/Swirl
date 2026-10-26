@@ -13,6 +13,7 @@ Item {
     readonly property real light:Math.max(hover*0.55,focusAmount*0.8,contact)
     readonly property bool moving:hoverTravel.running || contactTravel.running || focusTravel.running
     property bool initialized:false
+    readonly property bool windowVisible:!Window.window || (Window.window.visible && Window.window.visibility!==Window.Minimized)
     function finish(){
         if(!initialized)return
         hoverTravel.stop();contactTravel.stop();focusTravel.stop()
@@ -22,7 +23,7 @@ Item {
     }
     function retarget(){
         if(!initialized)return
-        if(!visible || SwirlMotion.reduced){finish();return}
+        if(!visible || !windowVisible || SwirlMotion.reduced){finish();return}
         hoverTravel.stop();hoverTravel.from=hover;hoverTravel.to=controlEnabled && hovered?1:0
         if(hoverTravel.from!==hoverTravel.to)hoverTravel.start()
         focusTravel.stop();focusTravel.from=focusAmount;focusTravel.to=controlEnabled && focused?1:0
@@ -36,6 +37,7 @@ Item {
     onFocusedChanged:retarget()
     onControlEnabledChanged:retarget()
     onVisibleChanged:if(!visible)finish()
+    onWindowVisibleChanged:if(!windowVisible)finish()
     Component.onCompleted:{initialized=true;finish()}
     NumberAnimation{id:hoverTravel;target:feedback;property:"hover";duration:SwirlMotion.hoverDuration;easing.type:Easing.OutCubic}
     SpringAnimation{id:contactTravel;target:feedback;property:"contact";spring:SwirlMotion.interactionSpring;damping:SwirlMotion.interactionDamping;epsilon:0.002}
