@@ -12,6 +12,7 @@ Item {
  property string query:""
  property string selectedGroup:""
  property string feedback:""
+ SwirlArcMotion {id:tabMotion;targetX:page.tabIndex*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
  onTabIndexChanged:{selectedGroup="";feedback=""}
  onFilterIndexChanged:selectedGroup=""
  readonly property var sourceRows:{
@@ -26,11 +27,12 @@ Item {
  readonly property var groupNames:Array.from(new Set(sourceRows.map(r=>groupKey(r)))).sort()
  readonly property var records:sourceRows.filter(r=>(!selectedGroup||groupKey(r)===selectedGroup)&&JSON.stringify(r).toLowerCase().indexOf(query.toLowerCase())>=0)
  readonly property var columns:tabIndex===0?[{key:"id",label:"ID",w:60},{key:"time",label:"时间",w:110},{key:"method",label:"方法",w:70},{key:"policy",label:"策略",w:130},{key:"up",label:"上传",w:80},{key:"down",label:"下载",w:80},{key:"address",label:"地址",w:300}]:tabIndex===1?[{key:"host",label:"主机名",w:220},{key:"process",label:"进程",w:170},{key:"policy",label:"策略",w:150},{key:"up",label:"上传",w:100},{key:"down",label:"下载",w:100}]:tabIndex===2?[{key:"type",label:"来源",w:140},{key:"name",label:"域名",w:240},{key:"value",label:"映射地址",w:260}]:tabIndex===3?[{key:"ip",label:"IP 地址",w:170},{key:"name",label:"设备名",w:200},{key:"up",label:"上传",w:110},{key:"down",label:"下载",w:110}]:tabIndex===4?[{key:"name",label:"进程",w:250},{key:"upload",label:"上传",w:150},{key:"download",label:"下载",w:150},{key:"value",label:"今日总计",w:160}]:[{key:"time",label:"时间",w:180},{key:"source",label:"分类",w:120},{key:"code",label:"标题",w:160},{key:"message",label:"详情",w:520}]
- RowLayout{
-  anchors.fill:parent;anchors.margins:Theme.dp(16);spacing:Theme.dp(16)
+ ColumnLayout{
+  anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap
+  SwirlPageHeader{Layout.fillWidth:true;title:qsTr("网络面板");description:qsTr("按客户端或主机查看请求、连接与流量。");metadata:engineController.connected?qsTr("引擎已连接"):qsTr("引擎未连接")}
+  RowLayout{Layout.fillWidth:true;Layout.fillHeight:true;spacing:Theme.sectionGap
   ColumnLayout{
    Layout.preferredWidth:Theme.dp(190);Layout.fillHeight:true;spacing:Theme.dp(12)
-   SwirlText {text:"网络控制与调试";color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(15);font.weight:Font.Medium}
    SwirlSegmentedControl{Layout.fillWidth:true;options:["按客户端","按主机名"];currentIndex:page.filterIndex;onActivated:index=>page.filterIndex=index}
    SwirlButton{Layout.fillWidth:true;text:"全部 · "+page.sourceRows.length;quiet:page.selectedGroup!=="";onClicked:page.selectedGroup=""}
    ListView { pixelAligned: true;
@@ -42,16 +44,17 @@ Item {
   }
   ColumnLayout{
    Layout.fillWidth:true;Layout.fillHeight:true;spacing:Theme.dp(10)
-   SwirlSegmentedControl{objectName:"dashboardTabs";Layout.fillWidth:true;implicitHeight:Theme.dp(32);rounded:true;options:["最近请求","活动连接","DNS","设备","流量统计","日志"];currentIndex:page.tabIndex;textPixelSize:12;onActivated:index=>page.tabIndex=index}
+   SwirlSegmentedControl{objectName:"dashboardTabs";Layout.fillWidth:true;implicitHeight:Theme.dp(36);rounded:false;options:["最近请求","活动连接","DNS","设备","流量统计","日志"];currentIndex:page.tabIndex;textPixelSize:12;onActivated:index=>page.tabIndex=index}
    RowLayout{
     Layout.fillWidth:true
     SwirlSearchField{objectName:"dashboardSearch";Layout.fillWidth:true;placeholderText:"搜索当前记录";onTextChanged:page.query=text}
-    SwirlText {text:page.records.length+" 项";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+    SwirlText {transform:Translate{x:tabMotion.position.x-tabMotion.targetX;y:tabMotion.position.y}
+    text:page.records.length+" 项";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
    }
    SwirlText {Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12);text:page.tabIndex===2?"当前显示已保存的 Hosts 配置 · DNS 查询历史研发中":page.feedback||captureProvider.error||engineController.error;visible:text.length>0;color:page.tabIndex===2?Theme.muted:Theme.orange}
    SwirlGlassPanel{
     Layout.fillWidth:true;Layout.fillHeight:true;cornerRadius:Theme.independentCardRadius;clip:true
-    SwirlDataTable{objectName:"dashboardTable";anchors.fill:parent;anchors.margins:Theme.dp(16);stripeInset:Theme.dp(6);stripeRadius:Theme.tileRadius;cellPadding:Theme.controlPadding;fillEmptyRows:false;headerHeight:Theme.tableHeaderHeight;itemHeight:Theme.tableRowHeight;rows:page.records;columns:page.columns;onRowSelected:r=>{if(page.tabIndex===0)page.Window.window.openCaptureInspector();else page.feedback="已选择："+String(r.host||r.name||r.code||r.ip||"记录")}}
+    SwirlDataTable{objectName:"dashboardTable";anchors.fill:parent;anchors.margins:Theme.dp(8);stripeInset:Theme.dp(6);stripeRadius:Theme.tileRadius;cellPadding:Theme.controlPadding;fillEmptyRows:false;headerHeight:Theme.tableHeaderHeight;itemHeight:Theme.tableRowHeight;rows:page.records;columns:page.columns;onRowSelected:r=>{if(page.tabIndex===0)page.Window.window.openCaptureInspector();else page.feedback="已选择："+String(r.host||r.name||r.code||r.ip||"记录")}}
     SwirlEmptyState{anchors.centerIn:parent;visible:page.records.length===0;headline:page.query.length?"没有匹配的记录":"暂无记录";detail:page.tabIndex===0?"开启捕获并通过捕获端口发起真实请求。":page.tabIndex===2?"Hosts 可在 DNS 设置中配置；查询历史研发中。":"连接和流量仅在取得真实数据后显示。"}
    }
    Flow{
@@ -64,5 +67,6 @@ Item {
     SwirlButton{visible:page.tabIndex===2;text:"DNS 查询历史";development:true;enabled:false}
    }
   }
+ }
  }
 }

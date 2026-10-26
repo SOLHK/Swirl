@@ -26,6 +26,10 @@ FocusScope {
         const pane = panes.itemAt(selectedIndex)
         if (pane) pane.scrollToBottom()
     }
+    function scrollToTop() {
+        const pane = panes.itemAt(selectedIndex)
+        if (pane) pane.scrollToTop()
+    }
     function selectSection(name, control) {
         if (sections.indexOf(name) < 0 || section === name) return
         if (control) SwirlMotion.noteTrigger(control)
@@ -36,7 +40,7 @@ FocusScope {
         selectSection(sections[next], categories)
         categories.positionViewAtIndex(next, ListView.Contain)
         const control = categories.itemAtIndex(next)
-        if (control) control.forceActiveFocus(Qt.TabFocusReason)
+        if (control) (control.button || control).forceActiveFocus(Qt.TabFocusReason)
     }
     function goBack() {
         if (!history.length) return false
@@ -99,7 +103,7 @@ FocusScope {
                     id: selectionPath
                     parent: categories.contentItem
                     targetX: 0
-                    targetY: categories.currentItem ? categories.currentItem.y : 0
+                    targetY: categories.currentItem ? categories.currentItem.y + categories.currentItem.headerHeight : 0
                     bend: Theme.dp(5)
                     motionEnabled: page.visible
                 }
@@ -110,34 +114,52 @@ FocusScope {
                     width: categories.width
                     height: Theme.dp(38)
                     radius: Theme.controlRadius
-                    color: Theme.selected
+                    color: Theme.withAlpha(Theme.accent, 0.09)
                     Rectangle { width: Theme.dp(3); height: Theme.dp(18); anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; radius: Theme.dp(1.5); color: Theme.accent }
                 }
-                delegate: ItemDelegate {
-                    id: category
+                delegate: Item {
+                    id: categoryRow
                     required property string modelData
+                    required property int index
+                    readonly property real headerHeight: index === 0 ? Theme.dp(26) : index === 2 || index === 6 || index === 12 ? Theme.dp(34) : 0
+                    readonly property Item button: category
                     width: ListView.view.width
-                    height: Theme.dp(38)
-                    text: modelData
-                    highlighted: page.section === modelData
-                    focusPolicy: Qt.StrongFocus
-                    onClicked: page.selectSection(modelData, category)
-                    background: Rectangle {
-                        color: Theme.withAlpha(Theme.accent, feedback.light * 0.09)
-                        radius: Theme.controlRadius
-                        border.width: category.visualFocus ? Theme.borderWidth : 0
-                        border.color: Theme.focusBorder
+                    height: headerHeight + Theme.dp(38)
+                    SwirlText {
+                        x: Theme.dp(12)
+                        y: categoryRow.index === 0 ? 0 : Theme.dp(8)
+                        visible: categoryRow.headerHeight > 0
+                        text: categoryRow.index === 0 ? qsTr("个性化") : categoryRow.index === 2 ? qsTr("连接") : categoryRow.index === 6 ? qsTr("本机") : qsTr("产品")
+                        color: Theme.muted
+                        font.pixelSize: Theme.fontSize(11)
                     }
-                    contentItem: SwirlText {
-                        text: category.text
-                        color: category.highlighted ? Theme.accent : Theme.text
-                        font.pixelSize: Theme.fontSize(13)
-                        font.weight: category.highlighted ? Font.DemiBold : Font.Normal
-                        verticalAlignment: Text.AlignVCenter
-                        elide: Text.ElideRight
+                    ItemDelegate {
+                        id: category
+                        objectName: "settingsSection-" + categoryRow.index
+                        y: categoryRow.headerHeight
+                        width: parent.width
+                        height: Theme.dp(38)
+                        text: categoryRow.modelData
+                        highlighted: page.section === categoryRow.modelData
+                        focusPolicy: Qt.StrongFocus
+                        onClicked: page.selectSection(categoryRow.modelData, category)
+                        background: Rectangle {
+                            color: Theme.withAlpha(Theme.accent, feedback.light * 0.09)
+                            radius: Theme.controlRadius
+                            border.width: category.visualFocus ? Theme.borderWidth : 0
+                            border.color: Theme.focusBorder
+                        }
+                        contentItem: SwirlText {
+                            text: category.text
+                            color: category.highlighted ? Theme.accent : Theme.text
+                            font.pixelSize: Theme.fontSize(13)
+                            font.weight: category.highlighted ? Font.DemiBold : Font.Normal
+                            verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
+                        }
+                        SwirlInteractionMotion { id: feedback; hovered: category.hovered; pressed: category.down; focused: category.visualFocus; controlEnabled: category.enabled }
+                        Accessible.name: text
                     }
-                    SwirlInteractionMotion { id: feedback; hovered: category.hovered; pressed: category.down; focused: category.visualFocus; controlEnabled: category.enabled }
-                    Accessible.name: text
                 }
             }
             Rectangle { Layout.preferredWidth: Theme.borderWidth; Layout.fillHeight: true; color: Theme.separator }
@@ -160,6 +182,7 @@ FocusScope {
                         enabled: selected
                         z: selected ? 1 : 0
                         function scrollToBottom() { options.contentItem.contentY = Math.max(0, options.contentHeight - options.availableHeight) }
+                        function scrollToTop() { options.contentItem.contentY = 0 }
                         function retarget() {
                             if (!initialized) return
                             if (selected && ready) {

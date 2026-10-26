@@ -30,7 +30,7 @@ changed, and no subscription was read.
 
 ## Visual phase
 
-Prepared after the interaction phase: Theme owns canvas `#FBFCFD`, surface
+Applied after the verified interaction commit `f608b4c`: Theme owns canvas `#FBFCFD`, surface
 `#FFFFFF`, navy `#14283F`, secondary `#53667A`, cyan `#007EAA` and separator
 `#DDE6ED`. Page code consumes the existing semantic tokens instead of copying
 those values. Existing fontManager choice and variable-font behavior remain
@@ -51,6 +51,15 @@ hub motion-only changes precede their visual drafts. Escape requires the narrow
 `handleSectionEscape()` callback from Main's Escape handler because the existing
 window event filter consumes Escape before page Keys handlers. Modal dismissal
 remains first; the header's route-return contract does not call this callback.
+
+The visual sources pass a static audit of original settings/font object names,
+all font/engine/diagnostic action calls, numeric-edit precision/family guards,
+the seven hub routes and shared transition properties. `git diff --check`
+passes. The sole additional registration in this phase is
+`pages/SettingsRowPane.qml`; the integration owner handles CMake registration.
+Final visual-source compilation, native repetition and screenshots are the
+integration owner's next checks. The 104dp About SVG, initialization-fenced
+page visibility Connections and the dedicated Escape callback are retained.
 
 Primary implementation references are the existing Qt 6.12 motion foundation
 sources in `APEC_MOTION_FOUNDATION.md`, especially Qt Popup/Menu lifecycle and

@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -10,101 +11,36 @@ Item {
     readonly property bool implemented:false
     property string tab:"API 管理"
     property var routes:[]
+    readonly property var tabs:["API 管理","命令行指令","Permissions","访问日志"]
+    SwirlArcMotion{id:tabMotion;targetX:page.tabs.indexOf(page.tab)*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
     ColumnLayout {
-        anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
-        SwirlGlassPanel {
-            Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(112)
-            RowLayout {
-                anchors.fill:parent; anchors.margins:Theme.dp(20); spacing:Theme.dp(16)
-                SwirlIcon { name:"terminal"; size:Theme.dp(31); color:Theme.accent }
-                ColumnLayout {
-                    Layout.fillWidth:true; spacing:Theme.dp(6)
-                    SwirlText {textRole:"pageTitle"; text:"本地控制 API"; font.pixelSize:Theme.fontSize(20); color:Theme.text; font.weight:Font.DemiBold }
-                    SwirlText { text:"API 未启动 · 命令行仅提供参考"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
-                }
-                SwirlStatusBadge { label:"研发中"; tone:"warning" }
-            }
+        anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap
+        SwirlPageHeader{Layout.fillWidth:true;title:qsTr("本地控制 API");description:qsTr("准备请求草稿，查看接口接入状态。");metadata:qsTr("API 服务尚未启动")
+            SwirlStatusBadge{label:qsTr("研发中");tone:"warning"}
         }
+        RowLayout{Layout.fillWidth:true;spacing:Theme.compactGap;Repeater{model:page.tabs;delegate:SwirlButton{required property string modelData;objectName:"apiSection-"+modelData;text:AppState.zh(modelData);quiet:page.tab!==modelData;onClicked:page.tab=modelData}}Item{Layout.fillWidth:true}}
         RowLayout {
-            Layout.fillWidth:true
-            Repeater {
-                model:["API 管理","命令行指令","Permissions","访问日志"]
-                SwirlButton { development:true; enabled:false; text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
+            Layout.fillWidth:true;Layout.fillHeight:true;spacing:Theme.sectionGap
+            ColumnLayout {
+                Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumWidth:0;spacing:Theme.gap
+                                SwirlDataTable{visible:page.tab==="API 管理"&&page.routes.length>0;Layout.fillWidth:true;Layout.fillHeight:true;rows:page.routes;fillEmptyRows:false;columns:[{key:"method",label:"方法",w:80},{key:"path",label:"端点",w:240},{key:"permission",label:"权限",w:150}];onRowSelected:function(row){pathInput.text=row.path;methodInput.currentIndex=Math.max(0,methodInput.model.indexOf(row.method))}}
+                SwirlEmptyState{transform:Translate{x:tabMotion.position.x-tabMotion.targetX;y:tabMotion.position.y}
+Layout.fillWidth:true;Layout.fillHeight:true;visible:page.tab!=="API 管理"||page.routes.length===0;headline:page.tab==="访问日志"?qsTr("没有访问日志"):page.tab==="Permissions"?qsTr("尚未授予访问权限"):page.tab==="命令行指令"?qsTr("命令行接口待接入"):qsTr("接口目录待接入");detail:page.tab==="访问日志"?qsTr("API 服务启动后才会生成真实访问记录。"):page.tab==="Permissions"?qsTr("当前没有可用的外部访问授权。"):page.tab==="命令行指令"?qsTr("当前没有可执行的命令行指令。"):qsTr("请求编辑仅保存在当前页面，不会建立监听或发送请求。")}
             }
-            Item { Layout.fillWidth:true }
-            SwirlButton { development:true; enabled:false; text:"服务设置"; onClicked:settingsDialog.open() }
-        }
-        RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(14)
-            SwirlGlassPanel {
-                Layout.fillWidth:true; Layout.fillHeight:true
-                SwirlDataTable {
-                    visible:page.tab==="API 管理"
-                    anchors.fill:parent; anchors.margins:Theme.dp(1)
-                    rows:page.routes
-                    columns:[{key:"method",label:"方法",w:100},{key:"path",label:"端点",w:260},
-                             {key:"permission",label:"权限范围",w:160},{key:"status",label:"状态",w:112}]
-                    onRowSelected:function(r){pathInput.text=r.path;methodInput.currentIndex=methodInput.model.indexOf(r.method)}
-                }
-                ColumnLayout {
-                    visible:page.tab!=="API 管理"
-                    anchors.fill:parent; anchors.margins:Theme.dp(18); spacing:Theme.dp(15)
-                    SwirlText { text:AppState.zh(page.tab); color:Theme.text; font.pixelSize:Theme.fontSize(17); font.weight:Font.DemiBold }
-                    Repeater {
-                        model:[]
-                        RowLayout {
-                            Layout.fillWidth:true
-                            SwirlText { text:modelData; color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-                            SwirlButton { development:true; enabled:false; text:"预览"; onClicked:AppState.notice("命令行 / API ") }
-                        }
-                    }
-                    Item { Layout.fillHeight:true }
-                }
+            Rectangle{Layout.fillHeight:true;Layout.preferredWidth:Theme.dp(1);color:Theme.border}
+            ColumnLayout {
+                Layout.preferredWidth:Theme.dp(280);Layout.fillHeight:true;spacing:Theme.gap
+                SwirlText{text:qsTr("请求草稿");font.pixelSize:Theme.sectionTitleSize;font.weight:Font.DemiBold;color:Theme.text}
+                SwirlText{text:qsTr("请求方法");color:Theme.muted;font.pixelSize:Theme.captionSize}
+                SwirlComboBox{id:methodInput;Layout.fillWidth:true;model:["GET","POST","PUT","DELETE"]}
+                SwirlText{text:qsTr("接口路径");color:Theme.muted;font.pixelSize:Theme.captionSize}
+                SwirlTextField{id:pathInput;Layout.fillWidth:true;text:"/v1/status";placeholderText:"/v1/status"}
+                Rectangle{Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(1);color:Theme.border}
+                SwirlText{text:qsTr("响应");color:Theme.text;font.pixelSize:Theme.bodySize;font.weight:Font.Medium}
+                SwirlText{Layout.fillWidth:true;wrapMode:Text.Wrap;text:qsTr("尚未发送请求。服务接入后才会显示真实响应。");color:Theme.muted;font.pixelSize:Theme.captionSize}
+                Item{Layout.fillHeight:true}
+                SwirlButton{text:qsTr("发送请求");primary:true;development:true;enabled:false;Layout.fillWidth:true}
             }
-            SwirlGlassPanel {
-                Layout.preferredWidth:Theme.dp(313); Layout.fillHeight:true
-                ScrollView {
-                    id:detailScroll0; anchors.fill:parent; anchors.margins:Theme.dp(17); clip:true
-                    ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
-                    ColumnLayout {
-                    width:detailScroll0.availableWidth; height:Math.max(implicitHeight,detailScroll0.availableHeight); spacing:Theme.dp(12)
-                    SwirlText { text:"请求"; color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
-                    SwirlComboBox { id:methodInput; Layout.fillWidth:true; model:["GET","POST","PUT","DELETE"] }
-                    SwirlTextField { id:pathInput; Layout.fillWidth:true; text:"/v1/status" }
-                    SwirlText { text:"JSON 响应预览"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
-                    Rectangle {
-                        Layout.fillWidth:true; Layout.fillHeight:true
-                        radius:Theme.roundedRadius(width,height); color:Theme.field; border.color:Theme.border
-                        ScrollView {
-                            anchors.fill:parent; anchors.margins:Theme.dp(9)
-                            SwirlTextArea {
-                                readOnly:true
-                                text:"研发中；未发起 API 请求。"
-                                color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(11)
-                                wrapMode:Text.WrapAnywhere; background:Rectangle { color:"transparent" }
-                            }
-                        }
-                    }
-                    SwirlButton { development:true; enabled:false; text:"本地测试"; primary:true; onClicked:AppState.notice("未发送 API 请求") }
-                }
-                }
-            }
-        }
-    }
-    SwirlDialog {
-        id:settingsDialog; title:"本地 API 设置"
-        ColumnLayout {
-            width:parent.width; spacing:Theme.dp(12)
-            SwirlText { text:"监听地址"; color:Theme.text }
-            SwirlTextField { Layout.fillWidth:true; text:"127.0.0.1"; readOnly:true }
-            SwirlText { text:"端口"; color:Theme.text }
-            SwirlTextField { Layout.fillWidth:true; text:"6170"; validator:IntValidator { bottom:1024; top:65535 } }
-            RowLayout {
-                Layout.fillWidth:true
-                SwirlText { text:"允许 API 请求（仅界面开关）"; Layout.fillWidth:true; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
-                SwirlToggle { enabled:false;checked:false; onToggled:AppState.notice("API 监听服务") }
-            }
-
         }
     }
 }

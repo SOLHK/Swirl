@@ -234,6 +234,37 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
  check(await([&]{return item("nodeCountryFilter")&&item("nodeSourceFilter");},1000),"node region and source controls open in the approved filter dialog");
  QTest::keyClick(window,Qt::Key_Escape);wait(100);
  window->setGeometry(geometry);wait(150);
+ if(qApp->arguments().contains("--navigation-tool-pages")){
+  window->resize(qRound(eval("Theme.dp(1100)").toDouble()),qRound(eval("Theme.dp(760)").toDouble()));wait(150);
+  const auto typeTool=[&](const QString &name,const QString &value){auto *control=item(name);check(control&&control->isEnabled(),"tool draft input is reachable: "+name);if(!control)return;control->forceActiveFocus();QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);for(const auto character:value)QTest::keyClick(window,character.toLatin1());wait(50);};
+  const auto selectModuleTab=[&](int index){auto *tabs=item("moduleSections");check(tabs&&tabs->isEnabled(),"dynamic module tab input is reachable");if(tabs)QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,tabs->mapToScene(QPointF(tabs->width()*(index+0.5)/3,tabs->height()/2)).toPoint());};
+  const auto featureId=eval("FeatureCatalog.entries.filter(entry=>entry.id.indexOf('feature-')===0)[0].id").toString();
+  check(!featureId.isEmpty()&&route(featureId),"dynamic feature module loads through its actual catalogue route");
+  selectModuleTab(1);wait(40);selectModuleTab(2);wait(40);selectModuleTab(1);
+  check(await([&]{auto *motion=item("moduleSectionMotion");return eval("pageLoader.item.tab===1").toBool()&&motion&&!motion->property("moving").toBool();},2000),"rapid real module tab input retargets and settles on the last requested section");
+  const auto initialRecords=eval("pageLoader.item.records.length").toInt();
+  for(const auto &name:QStringList{"local-draft-a","local-draft-b"}){
+   click("moduleAddButton");
+   check(await([&]{return item("moduleEntryName")&&eval("dismissals.count>0 && SwirlTransitionRegistry.activeCount===0").toBool();},2500),"dynamic module draft editor opens through the real popup lifecycle");
+   typeTool("moduleEntryName",name);typeTool("moduleEntryValue","local-only");click("moduleEntryConfirm");
+   check(await([&]{return eval("dismissals.count===0").toBool();},2500),"dynamic module draft editor closes without leaving its modal shield");
+  }
+  check(eval(QString("pageLoader.item.records.length===%1 && pageLoader.item.dirty").arg(initialRecords+2)).toBool(),"real module form input adds only local draft records");
+  eval(QString("pageLoader.item.reorder(%1,-1)").arg(initialRecords+1));
+  check(eval(QString("pageLoader.item.records[%1].name==='local-draft-b'").arg(initialRecords)).toBool(),"local module reorder preserves record values and changes their priority");
+  eval("pageLoader.item.restore()");
+  check(eval(QString("pageLoader.item.records.length===%1 && !pageLoader.item.dirty").arg(initialRecords)).toBool(),"restoring the unsaved module fixture leaves durable drafts unchanged");
+  check(route("api"),"API reference page loads");click("apiSection-访问日志");
+  check(eval("pageLoader.item.tab==='访问日志' && !pageLoader.item.implemented").toBool(),"actual API reference tab input does not start an unimplemented API service");
+  check(route("automation"),"automation reference page loads");click("automationSection-Conditions");
+  check(eval("pageLoader.item.tab==='Conditions' && !pageLoader.item.implemented").toBool(),"actual automation reference tab input does not execute a task");
+  check(route("map"),"mapping draft page loads");click("mapSection-远程映射");typeTool("mapDraftMatch","local-only");click("mapSection-本地映射");click("mapSection-远程映射");
+  check(await([&]{auto *field=item("mapDraftMatch");return field&&field->property("text").toString()=="local-only"&&eval("(pageLoader.item.editorBuffers['远程映射']||{}).match==='local-only' && !pageLoader.item.implemented").toBool();},2000),"mapping tabs retain independent local drafts without reading files or redirecting traffic");
+  check(route("replay"),"replay draft page loads");click("replaySection-Body");typeTool("replayDraftEditor","local-payload");click("replaySection-Headers");click("replaySection-Body");
+  check(await([&]{auto *editor=item("replayDraftEditor");return editor&&editor->property("text").toString()=="local-payload"&&eval("pageLoader.item.editorBuffers.Body==='local-payload' && !pageLoader.item.implemented && pageLoader.item.history.length===0").toBool();},2000),"replay tabs retain local text without sending requests or inventing execution history");
+  check(await([&]{return eval("SwirlTransitionRegistry.activeCount===0").toBool();},2500),"tool page motion settles without an idle animation loop");
+  window->setGeometry(geometry);wait(150);
+ }
  check(controller->processId()==pid&&controller->selectedNodeId()==selected&&controller->nodes().size()==nodeCount,"navigation preserves proxy process, selected node and stored records");
  check(eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").toBool(),"navigation releases all transient resources");
  route("featurehub");

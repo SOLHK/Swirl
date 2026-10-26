@@ -2,6 +2,7 @@
 #include "RouteBench.h"
 #include "app/MotionPolicy.h"
 #include <QQuickWindow>
+#include <QGuiApplication>
 #include <QQuickItem>
 #include <QQuickItemGrabResult>
 #include <QQmlExpression>
@@ -90,59 +91,75 @@ int runMotionDemo(QQuickWindow *window,const QString &directory) {
 }
 
 int runMotionVisualChecks(QQuickWindow *window, const QString &directory) {
-    QDir().mkpath(directory);
-    auto eval=[&](const QString &code) {
-        QQmlExpression e(qmlContext(window),window,code);
-        auto result=e.evaluate();
-        if(e.hasError())qWarning()<<e.error();
-        return result;
+    QDir().mkpath(directory);QJsonArray captures;int errors=0;
+    const auto eval=[&](const QString &code){QQmlExpression e(qmlContext(window),window,code);const auto result=e.evaluate();if(e.hasError()){qWarning()<<e.error();++errors;}return result;};
+    std::function<QQuickItem *(QQuickItem *,const QString &)> find;
+    find=[&](QQuickItem *root,const QString &name)->QQuickItem *{if(root->objectName()==name&&root->isVisible())return root;for(auto *child:root->childItems())if(auto *value=find(child,name))return value;return nullptr;};
+    std::function<void(QQuickItem *)> repaint;
+    repaint=[&](QQuickItem *item){if(item->metaObject()->indexOfMethod("requestPaint()")>=0)QMetaObject::invokeMethod(item,"requestPaint");for(auto *child:item->childItems())repaint(child);};
+    const auto capture=[&](const QString &fileKey,const QString &route,const QString &theme,const QSize &size,const QString &state=QString(),QQuickWindow *target=nullptr){
+        auto *owner=target?target:window;QTest::mouseMove(owner,QPoint(-20,-20));repaint(owner->contentItem());owner->update();QTest::qWait(60);
+        QImage shot=owner->grabWindow();
+        if(shot.isNull()){auto grab=owner->contentItem()->grabToImage();if(grab){QSignalSpy ready(grab.data(),&QQuickItemGrabResult::ready);owner->update();ready.wait(2000);shot=grab->image();}}
+        const auto name=theme.toLower()+"-"+QString::number(size.width())+"-"+fileKey+".png";
+        const bool saved=!shot.isNull()&&shot.save(directory+"/"+name);if(!saved)++errors;
+        captures.append(QJsonObject{{"file",name},{"route",route},{"state",state},{"theme",theme},{"saved",saved},{"logicalWidth",owner->width()},{"logicalHeight",owner->height()},{"pixelWidth",shot.width()},{"pixelHeight",shot.height()},{"dpr",owner->devicePixelRatio()},{"window",owner->objectName()},{"renderer",int(owner->rendererInterface()->graphicsApi())}});
     };
-    eval("Theme.reduceMotion=true; Theme.transparency=false; AppState.toast='' ");
-    const auto pages=eval("AppState.allPageIds").toStringList();
-    QStringList routes=pages;
-    if(routes.isEmpty()) {
-        const auto array=eval("JSON.stringify(AppState.allPageIds)").toString();
-        for(const auto &v:QJsonDocument::fromJson(array.toUtf8()).array())routes<<v.toString();
-    }
-    routes.removeDuplicates();
-    QJsonArray captures;
-    int errors=0;
-    for(const auto &size:{QSize(1100,760),QSize(800,600)}) {
-      window->resize(size);
-      for(const auto &theme:{QString("Light"),QString("Dark")}) {
-        eval("Theme.mode='"+theme+"'");
-        for(const auto &route:routes) {
-            // Compare fresh route defaults. The original single Loader reused
-            // FeatureModule/Workbench instances when consecutive routes shared
-            // a Component, making old test snapshots depend on route ordering.
-            eval("AppState.currentPage='external'");QTest::qWait(20);
-            QTest::mouseMove(window,QPoint(-20,-20));
-            eval("AppState.currentPage='"+route+"'; AppState.toast=''; AppState.recentEvents=[{time:'12:01',title:'已断开连接',tone:'neutral'},{time:'12:00',title:'连接到 新加坡 · 01 (Trojan)',tone:'accent'},{time:'12:00',title:'开始建立连接',tone:'success'},{time:'12:00',title:'订阅更新完成',tone:'success'},{time:'11:59',title:'切换到 自动选择',tone:'success'}]");
-            QTest::qWait(140);
-            std::function<void(QQuickItem *)> repaint=[](QQuickItem *){};
-            repaint=[&](QQuickItem *item) {
-                if(item->metaObject()->indexOfMethod("requestPaint()")>=0)QMetaObject::invokeMethod(item,"requestPaint");
-                for(auto *child:item->childItems())repaint(child);
-            };
-            repaint(window->contentItem());
-            window->update(); QTest::qWait(30);
-            QImage image=window->grabWindow();
-            if(image.isNull()) {
-                auto grab=window->contentItem()->grabToImage();
-                if(grab) {
-                    QSignalSpy ready(grab.data(),&QQuickItemGrabResult::ready);
-                    window->update(); ready.wait(2000); image=grab->image();
+    const auto popup=[&](const QString &name)->QObject *{for(auto *object:window->findChildren<QObject *>())if(object->property("opened").isValid()&&object->property("opened").toBool()&&(name.isEmpty()||object->objectName()==name))return object;return nullptr;};
+    const auto click=[&](const QString &name){auto *control=find(window->contentItem(),name);if(!control||!control->isEnabled())return false;QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint());return true;};
+    // These are own-window Qt renders of the real isolated, stopped state.
+    // No fake traffic, successful operations, nodes or recent events are seeded.
+    eval("Theme.reduceMotion=true;Theme.transparency=true;AppState.toast='';AppState.recentEvents=[]");
+    QStringList routes=eval("AppState.allPageIds").toStringList();
+    if(routes.isEmpty())for(const auto &value:QJsonDocument::fromJson(eval("JSON.stringify(AppState.allPageIds)").toString().toUtf8()).array())routes.append(value.toString());
+    routes<<"activity"<<"fonts";routes.removeDuplicates();
+    for(const auto &size:{QSize(1100,760),QSize(800,600)}){
+        window->resize(size);
+        for(const auto &theme:{QString("Light"),QString("Dark")}){
+            eval("Theme.mode='"+theme+"'");
+            for(const auto &route:routes){
+                eval("AppState.currentPage='"+route+"';AppState.toast=''");
+                if(!QTest::qWaitFor([&]{return eval("pageLoader.item && pageLoader.activeLoader.routeId===AppState.currentPage && !pageLoader.pendingGrab && !pageLoader.moving").toBool();},5000)){qWarning()<<"Capture route not ready"<<route;++errors;continue;}
+                if(route=="settings"||route=="fonts"){
+                    eval(route=="fonts"?"pageLoader.item.section='字体'":"pageLoader.item.section='常规'");
+                    if(!QTest::qWaitFor([&]{return eval("pageLoader.item.currentSectionReady()").toBool();},5000)){++errors;continue;}
+                    eval("pageLoader.item.scrollToTop()");
+                }
+                if(route=="policies")eval("pageLoader.item.tabIndex=0");
+                QTest::qWait(100);capture(route,route,theme,size);
+                if(route=="settings"){
+                    const auto sections=QJsonDocument::fromJson(eval("JSON.stringify(pageLoader.item.sections)").toString().toUtf8()).array();
+                    for(int index=0;index<sections.size();++index){
+                        const auto section=sections[index].toString();
+                        const auto quoted=QString::fromUtf8(QJsonDocument(QJsonArray{section}).toJson(QJsonDocument::Compact));
+                        eval("pageLoader.item.section=("+quoted+")[0]");
+                        if(!QTest::qWaitFor([&]{return eval("pageLoader.item.currentSectionReady()").toBool();},5000)){++errors;continue;}
+                        eval("pageLoader.item.scrollToTop()");QTest::qWait(60);
+                        const auto key=QString("settings-%1").arg(index,2,10,QChar('0'));
+                        capture(key,"settings",theme,size,section);
+                        if(section=="常规"||section=="字体"||section=="代理"){eval("pageLoader.item.scrollToBottom()");QTest::qWait(60);capture(key+"-bottom","settings",theme,size,section+" / bottom");}
+                    }
+                    eval("pageLoader.item.section='常规';pageLoader.item.scrollToTop()");
+                }
+                if(route=="policies"){eval("pageLoader.item.tabIndex=1");QTest::qWait(60);capture("policies-groups",route,theme,size,"策略组");eval("pageLoader.item.tabIndex=0");}
+                const auto button=route=="proxies"?QString("nodeAddButton"):route=="subscriptions"?QString("addSubscription"):route=="rules"?QString("addRoutingRule"):route=="tls"?QString("addMitmHostname"):route=="rewrite"?QString("rewriteEditor-redirect"):QString();
+                if(!button.isEmpty()&&click(button)){
+                    if(QTest::qWaitFor([&]{return popup(QString())!=nullptr;},4000)){capture(route+"-editor",route,theme,size,"empty editor");if(auto *dialog=popup(QString())){QMetaObject::invokeMethod(dialog,"close");QTest::qWaitFor([&]{return !dialog->property("visible").toBool();},2500);}}
+                    else{qWarning()<<"Capture editor did not open"<<route;++errors;}
+                }
+                if(route=="external"){
+                    QMetaObject::invokeMethod(window,"openDashboard");QTest::qWait(120);
+                    if(auto *panel=window->findChild<QQuickWindow *>("dashboardWindow")){panel->resize(size);capture("external-window",route,theme,size,"independent request window",panel);panel->hide();}
+                    else ++errors;
+                    QMetaObject::invokeMethod(window,"openCaptureInspector");
+                    if(QTest::qWaitFor([&]{return popup("captureInspectorDialog")!=nullptr;},5000)){capture("capture-inspector-dialog","requestlogs",theme,size,"main overlay request inspector");if(auto *dialog=popup("captureInspectorDialog")){QMetaObject::invokeMethod(dialog,"close");QTest::qWaitFor([&]{return !dialog->property("visible").toBool();},2500);}}
+                    else ++errors;
                 }
             }
-            const auto name=theme.toLower()+"-"+QString::number(size.width())+"-"+route+".png";
-            const bool saved=!image.isNull()&&image.save(directory+"/"+name);
-            if(!saved)++errors;
-            captures<<QJsonObject{{"file",name},{"saved",saved},{"width",image.width()},{"height",image.height()}};
         }
-      }
     }
     QFile file(directory+"/manifest.json");if(!file.open(QIODevice::WriteOnly))return 1;file.write(QJsonDocument(captures).toJson());
-    qInfo()<<"MOTION_VISUAL_CAPTURES"<<captures.size()<<"errors"<<errors;
+    qInfo()<<"MOTION_VISUAL_CAPTURES"<<captures.size()<<"uniqueRoutes"<<routes.size()<<"errors"<<errors;
     return errors?1:0;
 }
 #include "ScrollBench.h"
@@ -381,7 +398,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     auto *diagnostic=findVisual(activity,"internetDiagnosticCard"),*trafficCard=findVisual(activity,"activityTrafficCard");
     auto *trafficFilter=findVisual(activity,"activityTrafficFilter"),*sourceFilter=findVisual(activity,"activitySourceFilter");
     auto *periodFilter=findVisual(activity,"activityPeriodFilter"),*trafficChart=findVisual(activity,"activityTrafficChart");
-    check("activity-v7-two-cards-three-sections-present",activity&&activityScroll&&diagnostic&&trafficCard&&upload&&connections&&total);
+    check("activity-apec-status-transfer-diagnostics-and-detail-origins-present",activity&&activityScroll&&diagnostic&&trafficCard&&upload&&connections&&total);
     if(activity&&activityScroll&&diagnostic&&trafficCard&&upload&&connections&&total){
         const auto originalSize=window->size();
         const QSize normalSize(qRound(eval("Theme.dp(914)").toDouble()),qRound(eval("Theme.dp(672)").toDouble()));
@@ -393,33 +410,38 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             for(auto *child:root->childItems())count+=panelCount(child);
             return count;
         };
-        check("activity-v7-only-two-top-cards",panelCount(activity)==2&&diagnostic->isVisible()&&trafficCard->isVisible()
+        check("activity-apec-transfer-surface-and-open-diagnostic-rail",panelCount(activity)==1&&diagnostic->isVisible()&&trafficCard->isVisible()
             &&diagnostic->parentItem()==trafficCard->parentItem()&&qAbs(diagnosticAt.y()-trafficAt.y())<2
-            &&qAbs(diagnostic->height()-trafficCard->height())<2&&trafficAt.x()>=diagnosticAt.x()+diagnostic->width()
-            &&diagnostic->width()/trafficCard->width()>0.8&&diagnostic->width()/trafficCard->width()<1.0);
+            &&diagnosticAt.x()>=trafficAt.x()+trafficCard->width()&&trafficCard->width()>diagnostic->width());
         const auto unboxed=[](QQuickItem *section){return !section->property("color").isValid()&&!section->property("background").isValid();};
-        check("activity-v7-three-unboxed-sections",upload->parentItem()==connections->parentItem()&&connections->parentItem()==total->parentItem()
+        check("activity-apec-semantic-detail-origins-stay-in-their-reading-groups",upload->parentItem()==total->parentItem()
             &&unboxed(upload)&&unboxed(connections)&&unboxed(total)
-            &&uploadAt.y()>diagnosticAt.y()+diagnostic->height()&&qAbs(uploadAt.y()-connectionsAt.y())<2&&qAbs(uploadAt.y()-totalAt.y())<2
-            &&uploadAt.x()+upload->width()<connectionsAt.x()&&connectionsAt.x()+connections->width()<totalAt.x());
+            &&uploadAt.y()>trafficAt.y()&&totalAt.y()>uploadAt.y()&&connectionsAt.y()>=trafficAt.y()+trafficCard->height());
         const double contentHeight=activityScroll->property("contentHeight").toDouble();
-        const double sectionBottom=total->mapToItem(activityScroll,0,total->height()).y();
-        qInfo()<<"ACTIVITY_V7_NORMAL_GEOMETRY"<<window->size()<<activityScroll->size()<<contentHeight
+        qInfo()<<"ACTIVITY_APEC_NORMAL_GEOMETRY"<<window->size()<<activityScroll->size()<<contentHeight
                <<diagnostic->size()<<trafficCard->size()<<upload->size()<<connections->size()<<total->size();
-        check("activity-v7-normal-914x672-no-scroll",window->size()==normalSize&&eval("pageLoader.item.wide").toBool()
-            &&contentHeight<=activityScroll->height()+1&&qAbs(activityScroll->property("contentY").toDouble())<1
-            &&sectionBottom<=activityScroll->height()+1);
+        check("activity-apec-normal-viewport-retains-bounded-vertical-reading",window->size()==normalSize&&eval("pageLoader.item.wide").toBool()
+            &&contentHeight>0&&activityScroll->property("contentWidth").toDouble()<=activityScroll->width()+1
+            &&trafficAt.x()>=0&&diagnosticAt.x()+diagnostic->width()<=activity->width()+1);
+        const auto revealControl=[&](QQuickItem *control){
+            if(!control)return false;
+            const auto top=control->mapToItem(activityScroll,0,0).y(),bottom=top+control->height();
+            auto position=activityScroll->property("contentY").toDouble();
+            if(top<0)position+=top-8;else if(bottom>activityScroll->height())position+=bottom-activityScroll->height()+8;
+            activityScroll->setProperty("contentY",qBound(0.0,position,qMax(0.0,contentHeight-activityScroll->height())));wait(40);
+            return control->isVisible()&&control->isEnabled()&&control->width()>0&&control->height()>0;
+        };
         const auto visibleControl=[&](QQuickItem *control){
             return control&&control->isVisible()&&control->isEnabled()&&control->width()>0&&control->height()>0
                 &&control->mapToItem(activityScroll,0,0).y()>=-1
                 &&control->mapToItem(activityScroll,0,control->height()).y()<=activityScroll->height()+1;
         };
-        check("activity-v7-filters-visible",visibleControl(trafficFilter)&&visibleControl(sourceFilter)&&visibleControl(periodFilter)&&trafficChart&&trafficChart->isVisible());
+        check("activity-apec-filters-remain-reachable",revealControl(trafficFilter)&&visibleControl(trafficFilter)&&revealControl(sourceFilter)&&visibleControl(sourceFilter)&&revealControl(periodFilter)&&visibleControl(periodFilter)&&trafficChart&&trafficChart->isVisible());
         const auto clickSegment=[&](QQuickItem *control,int index,int count){
             const auto point=control->mapToScene(QPointF(control->width()*(index+0.5)/count,control->height()/2)).toPoint();
             QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point);wait(100);
         };
-        if(visibleControl(trafficFilter)&&trafficChart){
+        if(revealControl(trafficFilter)&&visibleControl(trafficFilter)&&trafficChart){
             clickSegment(trafficFilter,1,2);
             check("activity-v7-proxy-filter-switches-chart",eval("pageLoader.item.trafficKind===1").toBool()
                 &&trafficFilter->property("currentIndex").toInt()==1&&trafficChart->property("proxyOnly").toBool());
@@ -427,7 +449,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             check("activity-v7-all-filter-restores-chart",eval("pageLoader.item.trafficKind===0").toBool()
                 &&trafficFilter->property("currentIndex").toInt()==0&&!trafficChart->property("proxyOnly").toBool());
         }
-        if(visibleControl(sourceFilter)){
+        if(revealControl(sourceFilter)&&visibleControl(sourceFilter)){
             clickSegment(sourceFilter,1,3);
             check("activity-v7-domain-filter-switches-source",eval("pageLoader.item.rankingKind===1").toBool()&&sourceFilter->property("currentIndex").toInt()==1);
             clickSegment(sourceFilter,2,3);
@@ -435,7 +457,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             clickSegment(sourceFilter,0,3);
             check("activity-v7-source-filter-restores-processes",eval("pageLoader.item.rankingKind===0").toBool()&&sourceFilter->property("currentIndex").toInt()==0);
         }
-        if(visibleControl(periodFilter)){
+        if(revealControl(periodFilter)&&visibleControl(periodFilter)){
             clickSegment(periodFilter,1,2);
             check("activity-v7-month-filter-switches-period",eval("pageLoader.item.period===1").toBool()&&periodFilter->property("currentIndex").toInt()==1);
             clickSegment(periodFilter,0,2);

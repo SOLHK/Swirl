@@ -8,7 +8,7 @@ import "../controls"
 
 Item {
     id: page
-    readonly property Item motionTitle: routeTitle
+    readonly property Item motionTitle: subscriptionHeading.titleItem
     property string expandedId: ""
     property int filterIndex: 0
     property bool mutationSubmitting: false
@@ -107,45 +107,17 @@ Item {
     SwirlAnimatedModel { id: subscriptionModel; source: page.listed; keyRole: "id" }
     ColumnLayout {
         anchors.fill: parent; anchors.margins: Theme.pagePadding; spacing: Theme.dp(14)
-        RowLayout {
-            Layout.fillWidth: true; spacing: Theme.dp(12)
-            SwirlText { id: routeTitle; textRole: "pageTitle"; text: qsTr("订阅管理"); color: Theme.text; font.pixelSize: Theme.fontSize(26); font.weight: Font.DemiBold }
-            SwirlText { text: String(page.providers.length); color: Theme.muted; font.pixelSize: Theme.fontSize(16); Accessible.name: qsTr("%1 个订阅来源").arg(page.providers.length) }
-            Item { Layout.fillWidth: true }
-            SubscriptionAction { objectName: "refreshAllSubscriptions"; text: qsTr("更新全部"); iconName: "refresh-source"; enabled: page.editable && page.providers.length > 0; onClicked: engineController.imports.refreshAll() }
-            SubscriptionAction { id: add; objectName: "addSubscription"; text: qsTr("添加订阅"); solid: true; iconName: "plus"; enabled: page.editable; onClicked: page.edit(null, add) }
+        SwirlPageHeader {
+            id:subscriptionHeading;Layout.fillWidth:true;title:qsTr("订阅来源")
+            description:qsTr("管理更新节奏与来源节点，保留每次操作的结果。")
+            metadata:qsTr("%1 个来源，%2 个节点").arg(page.providers.length).arg(page.totalNodes)
+            SubscriptionAction {objectName:"refreshAllSubscriptions";text:qsTr("更新全部");iconName:"refresh-source";enabled:page.editable&&page.providers.length>0;onClicked:engineController.imports.refreshAll()}
+            SubscriptionAction {id:add;objectName:"addSubscription";text:qsTr("添加订阅");solid:true;iconName:"plus";enabled:page.editable;onClicked:page.edit(null,add)}
         }
-        SwirlText { Layout.fillWidth: true; text: qsTr("%1 个来源，%2 个节点").arg(page.providers.length).arg(page.totalNodes); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
         RowLayout {
             Layout.fillWidth: true; spacing: Theme.dp(12)
-            TextField {
-                id: search; objectName: "subscriptionSearch"
-                Layout.fillWidth: true; Layout.maximumWidth: Theme.dp(300); Layout.minimumWidth: Theme.dp(140)
-                implicitHeight: Theme.dp(34); placeholderText: qsTr("搜索订阅"); Accessible.name: placeholderText
-                color: Theme.text; placeholderTextColor: Theme.muted; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize(12)
-                leftPadding: Theme.dp(32); rightPadding: Theme.dp(10); selectByMouse: true
-                background: Rectangle { radius: Theme.dp(9); color: Theme.buttonBase; border.width: search.activeFocus ? Theme.borderWidth : 0; border.color: Theme.muted }
-                SwirlIcon { anchors.left: parent.left; anchors.leftMargin: Theme.dp(10); anchors.verticalCenter: parent.verticalCenter; name: "search"; size: Theme.dp(14); color: Theme.muted }
-            }
-            Item { Layout.fillWidth: true; Layout.minimumWidth: 0 }
-            Item {
-                objectName: "subscriptionFilter"; Layout.preferredWidth: Theme.dp(234); Layout.preferredHeight: Theme.dp(34)
-                Rectangle { anchors.fill: parent; color: Theme.buttonBase; radius: Theme.dp(10) }
-                Row {
-                    anchors.fill: parent; anchors.margins: Theme.dp(2)
-                    Repeater {
-                        model: [qsTr("全部"), qsTr("更新失败"), qsTr("自动更新")]
-                        SubscriptionAction {
-                            required property int index
-                            required property string modelData
-                            text: modelData; width: Theme.dp(230) / 3; height: parent.height
-                            selected: page.filterIndex === index
-                            Accessible.role: Accessible.RadioButton; Accessible.checked: selected
-                            onClicked: page.filterIndex = index
-                        }
-                    }
-                }
-            }
+            SwirlSearchField {id:search;objectName:"subscriptionSearch";Layout.fillWidth:true;Layout.minimumWidth:Theme.dp(140);placeholderText:qsTr("搜索来源名称");Accessible.name:placeholderText}
+            SwirlSegmentedControl {objectName:"subscriptionFilter";Layout.preferredWidth:Theme.dp(234);Layout.preferredHeight:Theme.dp(34);options:[qsTr("全部"),qsTr("更新失败"),qsTr("自动更新")];currentIndex:page.filterIndex;onActivated:index=>page.filterIndex=index}
         }
         RowLayout {
             Layout.fillWidth: true; visible: engineController.imports.legacyNodeCount > 0; spacing: Theme.dp(8)
@@ -195,14 +167,14 @@ Item {
             }
         }
         RowLayout {
-            Layout.fillWidth: true; visible: page.operationMessage.length > 0; spacing: Theme.dp(8)
+            Layout.fillWidth: true; Layout.minimumHeight:Theme.dp(30); spacing: Theme.dp(8)
             SwirlText { text: qsTr("最近操作"); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
             SwirlText {
                 objectName: "subscriptionOperationMessage"; Layout.fillWidth: true
-                text: page.operationMessage; textFormat: Text.PlainText; elide: Text.ElideRight
+                text: page.operationMessage || qsTr("自动更新只维护当前来源的节点；完整配置需要单独审阅。"); textFormat: Text.PlainText; elide: Text.ElideRight
                 color: page.mutationMessage.length ? Theme.red : Theme.muted; font.pixelSize: Theme.fontSize(12)
             }
-            SubscriptionAction { text: qsTr("详情"); onClicked: operationDialog.open() }
+            SubscriptionAction { visible:page.operationMessage.length>0; text: qsTr("详情"); onClicked: operationDialog.open() }
         }
     }
     SwirlDialog {
@@ -211,7 +183,7 @@ Item {
             spacing: Theme.dp(16)
             ScrollView {
                 Layout.fillWidth: true; Layout.preferredHeight: Math.min(Theme.dp(280), operationText.implicitHeight)
-                TextArea { id: operationText; text: page.operationMessage; textFormat: TextEdit.PlainText; readOnly: true; wrapMode: TextEdit.Wrap; color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize(12); background: null; selectByMouse: true }
+                TextArea { id: operationText; text: page.operationMessage || qsTr("自动更新只维护当前来源的节点；完整配置需要单独审阅。"); textFormat: TextEdit.PlainText; readOnly: true; wrapMode: TextEdit.Wrap; color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize(12); background: null; selectByMouse: true }
             }
             SubscriptionAction { Layout.alignment: Qt.AlignRight; text: qsTr("关闭"); solid: true; onClicked: operationDialog.close() }
         }

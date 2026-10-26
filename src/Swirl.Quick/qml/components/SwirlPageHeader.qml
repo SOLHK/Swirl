@@ -24,7 +24,7 @@ Item {
         ColumnLayout {
             Layout.fillWidth: true
             Layout.minimumWidth: 0
-            spacing: Theme.dp(5)
+            spacing: Theme.dp(7)
             SwirlText {
                 id: titleLabel
                 text: header.title
@@ -45,7 +45,8 @@ Item {
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
                 color: Theme.muted
-                font.pixelSize: Theme.bodySize
+                font.pixelSize: Theme.captionSize
+                lineHeight: 1.35
                 textFormat: Text.PlainText
                 wrapMode: Text.Wrap
             }

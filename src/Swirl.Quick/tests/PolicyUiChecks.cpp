@@ -308,14 +308,13 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     awaitSaved(QStringLiteral("Activity mode can switch back using the same native menu"));
     check(activityMode->property("displayMode")=="rule",QStringLiteral("Activity return choice follows the committed controller mode"));
     check(QTest::qWaitFor([&]{return !popup("activityOutboundModeMenu");},2000),QStringLiteral("Mode selection releases the menu before returning to the activity facts"));
-    const auto cardRadius=eval("Theme.dp(14)").toReal();
-    for(const auto &name:QStringList{"internetDiagnosticCard","activityTrafficCard"}){
-        auto *card=item(name);
-        check(card&&qAbs(card->property("cornerRadius").toReal()-cardRadius)<0.5&&qAbs(card->property("radius").toReal()-cardRadius)<0.5,
-              QStringLiteral("Actual Activity card uses the shared 14dp contour: ")+name);
-    }
-    check(eval("Theme.dark || (Theme.canvas.toString() === '#fafafa' && Theme.sidebarBase === Theme.canvas && Theme.sidebarOpacity === 0)").toBool(),
-          QStringLiteral("Light mode uses the near-white neutral canvas without a separate sidebar tint"));
+    const auto cardRadius=eval("Theme.dp(16)").toReal();
+    auto *transfer=item("activityTrafficCard"),*diagnostics=item("internetDiagnosticCard");
+    check(transfer&&qAbs(transfer->property("cornerRadius").toReal()-cardRadius)<0.5&&qAbs(transfer->property("radius").toReal()-cardRadius)<0.5,
+          QStringLiteral("Activity transfer uses its independently sized content surface"));
+    check(diagnostics&&!diagnostics->property("independentCard").isValid(),QStringLiteral("Activity diagnostics remain an open reading rail"));
+    check(eval("Theme.dark || Theme.increaseContrast || (Theme.canvas.toString()==='#fbfcfd' && Theme.text.toString()==='#14283f' && Theme.accent.toString()==='#007eaa')").toBool(),
+          QStringLiteral("Light mode uses the selected white, navy and cyan semantic palette"));
     QTest::qWait(200);
     if(!directory.isEmpty())window->grabWindow().save(directory+"/activity-mode.png");
     return finish();

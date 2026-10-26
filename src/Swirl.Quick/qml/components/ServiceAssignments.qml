@@ -86,16 +86,7 @@ ColumnLayout {
         SwirlText { text: qsTr("专属服务"); color: Theme.text; font.pixelSize: Theme.fontSize(15); font.weight: Font.DemiBold }
         SwirlText { text: String(assignments.records.length); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Accessible.name: qsTr("%1 项专属服务策略").arg(assignments.records.length) }
         Item { Layout.fillWidth: true }
-        TextField {
-            id: search; objectName: "servicePolicySearch"
-            Layout.preferredWidth: Theme.dp(226); Layout.minimumWidth: Theme.dp(140)
-            implicitHeight: Theme.dp(32); placeholderText: qsTr("搜索服务或域名")
-            color: Theme.text; placeholderTextColor: Theme.muted; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize(12)
-            leftPadding: Theme.dp(32); rightPadding: Theme.dp(10); selectByMouse: true
-            onTextChanged: assignments.query = text; Accessible.name: qsTr("搜索服务策略")
-            background: Rectangle { radius: Theme.dp(9); color: Theme.buttonBase; border.width: search.activeFocus ? Theme.borderWidth : 0; border.color: Theme.text }
-            SwirlIcon { anchors.left: parent.left; anchors.leftMargin: Theme.dp(10); anchors.verticalCenter: parent.verticalCenter; name: "search"; size: Theme.dp(14); color: Theme.muted; Accessible.ignored: true }
-        }
+        SwirlSearchField {id:search;objectName:"servicePolicySearch";Layout.preferredWidth:Theme.dp(226);Layout.minimumWidth:Theme.dp(140);placeholderText:qsTr("搜索服务或域名");Accessible.name:placeholderText;onTextChanged:assignments.query=text}
     }
     SwirlText {
         Layout.fillWidth: true; wrapMode: Text.Wrap; visible: assignments.records.length > 0
