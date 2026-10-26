@@ -221,6 +221,10 @@ jobs:
           $env:QT_QUICK_BACKEND = "software"
           $exe = (Resolve-Path "dist/Swirl.exe").Path
           $process = Start-Process -FilePath $exe -ArgumentList "--capture-self-test" -Wait -PassThru -NoNewWindow
+          if (Test-Path -LiteralPath 'dist/Swirl-diagnostics.txt') {
+            Copy-Item -LiteralPath 'dist/Swirl-diagnostics.txt' -Destination 'build-evidence/capture-self-test.log'
+            Select-String -LiteralPath 'build-evidence/capture-self-test.log' -Pattern 'CAPTURE_TLS_RUNTIME|CAPTURE_TLS_CONTROL_ERROR|Capture integration checks' | ForEach-Object Line
+          }
           if ($process.ExitCode -ne 0) {
             Get-Content "dist/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
             throw "HTTP capture checks failed: $($process.ExitCode)"
@@ -248,6 +252,15 @@ jobs:
           New-Item -ItemType Directory -Force -Path preview-diagnostics | Out-Null
           Add-Type -AssemblyName System.Drawing
           $previews = @(
+            @{ file = "Swirl-Activity-preview.png"; page = "activity"; theme = "light"; size = "1464x930"; scale = "1" },
+            @{ file = "Swirl-Activity-125-preview.png"; page = "activity"; theme = "light"; size = "1464x930"; scale = "1.25" },
+            @{ file = "Swirl-Activity-150-preview.png"; page = "activity"; theme = "light"; size = "1464x930"; scale = "1.5" },
+            @{ file = "Swirl-Activity-175-preview.png"; page = "activity"; theme = "light"; size = "1464x930"; scale = "1.75" },
+            @{ file = "Swirl-Activity-200-preview.png"; page = "activity"; theme = "light"; size = "1464x930"; scale = "2" },
+            @{ file = "Swirl-Nodes-preview.png"; page = "proxies"; theme = "light"; size = "1464x930"; scale = "1" },
+            @{ file = "Swirl-Policy-preview.png"; page = "policies"; theme = "light"; size = "1464x930"; scale = "1" },
+            @{ file = "Swirl-Subscriptions-preview.png"; page = "subscriptions"; theme = "light"; size = "1464x930"; scale = "1" },
+            @{ file = "Swirl-Settings-preview.png"; page = "settings"; theme = "light"; size = "1464x930"; scale = "1" },
             @{ file = "Swirl-Overview-preview.png"; page = "overview"; theme = "light"; size = "1464x930"; scale = "1" },
             @{ file = "Swirl-Overview-125-preview.png"; page = "overview"; theme = "light"; size = "1464x930"; scale = "1.25" },
             @{ file = "Swirl-Overview-150-preview.png"; page = "overview"; theme = "light"; size = "1464x930"; scale = "1.5" },
