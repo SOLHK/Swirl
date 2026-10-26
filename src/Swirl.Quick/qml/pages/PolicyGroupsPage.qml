@@ -9,6 +9,7 @@ import "../components/PolicyHelpers.js" as Policy
 
 Item {
     id:page
+    readonly property Item motionTitle:policyHeading.titleItem
     required property var engineController
     property int tabIndex:0
     property var pendingOwner:null
@@ -106,9 +107,11 @@ Item {
 
     ColumnLayout {
         anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.dp(12)
-        RowLayout {Layout.fillWidth:true
-            SwirlText {textRole:"pageTitle";text:qsTr("策略");color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
-            SubscriptionAction {id:addButton;objectName:page.tabIndex===0?"addServicePolicy":"addPolicyGroup";text:page.tabIndex===0?qsTr("添加策略"):qsTr("添加策略组");solid:true;iconName:"plus";enabled:page.editable;onClicked:{if(page.tabIndex===0)page.editService(null,addButton);else page.editGroup(null,addButton)}}
+        SwirlPageHeader {
+            id:policyHeading;Layout.fillWidth:true;title:qsTr("策略与出口")
+            description:qsTr("先选择默认出口，再为需要单独处理的服务分配策略。")
+            metadata:qsTr("%1 项服务，%2 个策略组").arg(page.services.length).arg(page.groups.length)
+            SubscriptionAction {id:addButton;objectName:page.tabIndex===0?"addServicePolicy":"addPolicyGroup";text:page.tabIndex===0?qsTr("添加服务"):qsTr("添加策略组");solid:true;iconName:"plus";enabled:page.editable;onClicked:{if(page.tabIndex===0)page.editService(null,addButton);else page.editGroup(null,addButton)}}
             SubscriptionAction {id:advancedButton;objectName:"policyAdvancedButton";iconName:"sliders";Accessible.name:qsTr("策略高级设置");tooltip:Accessible.name;onClicked:{advancedDialog.heroSource=advancedButton;advancedDialog.open()}}
         }
         RowLayout {

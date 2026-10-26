@@ -6,6 +6,8 @@ import "../components"
 import "../controls"
 Item {
  id:page
+ readonly property Item motionTitle:heading.titleItem
+ readonly property var rankingRows:visible?(telemetry.revision,telemetry.ranking(kind,period,100)):[]
  readonly property var telemetry:engineController.telemetry
  property int period:AppState.trafficPeriod
  readonly property var motionSurfaces:({totalTraffic:totalSurface,uploadRate:uploadSurface,downloadRate:downloadSurface})
@@ -13,44 +15,46 @@ Item {
  Connections {target:AppState;function onTrafficPeriodChanged(){page.period=AppState.trafficPeriod}}
  property string kind:"domains"
  readonly property var totals:visible?(telemetry.revision,telemetry.summary(period)):({})
- ScrollView { id:scroll;anchors.fill:parent;anchors.margins:Theme.pagePadding;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
-  ColumnLayout { width:Math.floor(scroll.availableWidth);spacing:Theme.gap
-   RowLayout { Layout.fillWidth:true
-    SwirlText {textRole:"largeTitle"; text:"流量分析";font.pixelSize:Theme.fontSize(30);font.weight:Font.DemiBold;color:Theme.text;Layout.fillWidth:true }
-    SwirlButton {text:"返回";visible:SwirlMotion.returnShared && SwirlMotion.returnShared.route===AppState.currentPage;onClicked:SwirlMotion.returnToHub(totalTraffic)}
-    SwirlComboBox { model:["今日","昨日","本周","本月"];currentIndex:page.period;onActivated:page.period=currentIndex }
+ ScrollView {id:scroll;anchors.fill:parent;anchors.margins:Theme.pagePadding;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
+  ColumnLayout {width:scroll.availableWidth;spacing:Theme.sectionGap
+   SwirlPageHeader {id:heading;Layout.fillWidth:true;title:qsTr("流量分析");description:qsTr("仅统计经过 Swirl 的流量。排行来自已采集连接，短连接可能无法归属。");metadata:qsTr("历史保留 32 天；期间累计与实时速率分别显示。")
+    SwirlButton {text:qsTr("返回");visible:SwirlMotion.returnShared&&SwirlMotion.returnShared.route===AppState.currentPage;onClicked:SwirlMotion.returnToHub(totalTraffic)}
+    SwirlComboBox {model:["今日","昨日","本周","本月"];currentIndex:page.period;onActivated:page.period=currentIndex;Accessible.name:qsTr("统计期间")}
    }
-   SwirlText { text:"仅统计经过 Swirl 的流量；排行基于已采集连接，短于采样间隔的连接可能无法归属。历史保留 32 天。";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.Wrap }
-   SwirlGlassPanel {id:totalSurface;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(72)
-    RowLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;SwirlText{text:"累计流量";color:Theme.muted}SwirlText{textRole:"data";id:totalTraffic;text:page.totals.sampled?page.telemetry.formatBytes(page.totals.total):"—";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}}
-   }
-   RowLayout {Layout.fillWidth:true;spacing:Theme.gap
-    SwirlGlassPanel {id:uploadSurface;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(90)
-     ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;SwirlText{text:"实时上传 / 秒";color:Theme.muted}SwirlText{textRole:"data";id:uploadRate;text:page.telemetry.sampled?page.telemetry.formatBytes(page.telemetry.uploadRate):"—";color:Theme.text;font.pixelSize:Theme.fontSize(23);Layout.fillWidth:true}}
+   GridLayout {Layout.fillWidth:true;columns:width<Theme.dp(650)?1:3;columnSpacing:Theme.dp(28);rowSpacing:Theme.dp(16)
+    Item {id:totalSurface;property color color:Theme.material("content");Layout.fillWidth:true;implicitHeight:totalColumn.implicitHeight+Theme.dp(12)
+     ColumnLayout {id:totalColumn;anchors.left:parent.left;anchors.right:parent.right;spacing:Theme.dp(8);SwirlText {text:qsTr("期间累计流量");color:Theme.muted;font.pixelSize:Theme.fontSize(12)}SwirlText {id:totalTraffic;textRole:"data";text:page.totals.sampled?page.telemetry.formatBytes(page.totals.total):"—";color:Theme.text;font.pixelSize:Theme.fontSize(32);font.weight:Font.DemiBold;Layout.fillWidth:true}}
     }
-    SwirlGlassPanel {id:downloadSurface;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(90)
-     ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;SwirlText{text:"实时下载 / 秒";color:Theme.muted}SwirlText{textRole:"data";id:downloadRate;text:page.telemetry.sampled?page.telemetry.formatBytes(page.telemetry.downloadRate):"—";color:Theme.text;font.pixelSize:Theme.fontSize(23);Layout.fillWidth:true}}
+    Item {id:uploadSurface;property color color:Theme.material("content");Layout.fillWidth:true;implicitHeight:uploadColumn.implicitHeight+Theme.dp(12)
+     ColumnLayout {id:uploadColumn;anchors.left:parent.left;anchors.right:parent.right;spacing:Theme.dp(8);SwirlText {text:qsTr("实时上传 / 秒");color:Theme.muted;font.pixelSize:Theme.fontSize(12)}SwirlText {id:uploadRate;textRole:"data";text:page.telemetry.sampled?page.telemetry.formatBytes(page.telemetry.uploadRate):"—";color:Theme.text;font.pixelSize:Theme.fontSize(27);font.weight:Font.DemiBold;Layout.fillWidth:true}}
+    }
+    Item {id:downloadSurface;property color color:Theme.material("content");Layout.fillWidth:true;implicitHeight:downloadColumn.implicitHeight+Theme.dp(12)
+     ColumnLayout {id:downloadColumn;anchors.left:parent.left;anchors.right:parent.right;spacing:Theme.dp(8);SwirlText {text:qsTr("实时下载 / 秒");color:Theme.muted;font.pixelSize:Theme.fontSize(12)}SwirlText {id:downloadRate;textRole:"data";text:page.telemetry.sampled?page.telemetry.formatBytes(page.telemetry.downloadRate):"—";color:Theme.text;font.pixelSize:Theme.fontSize(27);font.weight:Font.DemiBold;Layout.fillWidth:true}}
     }
    }
-   GridLayout { Layout.fillWidth:true;columns:page.width>Theme.dp(800)?4:2;columnSpacing:Theme.gap;rowSpacing:Theme.gap
-    SwirlMetricCard { Layout.fillWidth:true;label:"下载";value:totals.sampled?telemetry.formatBytes(totals.down):"未采集";iconName:"download" }
-    SwirlMetricCard { Layout.fillWidth:true;label:"上传";value:totals.sampled?telemetry.formatBytes(totals.up):"未采集";iconName:"upload" }
-    SwirlMetricCard { Layout.fillWidth:true;label:"域名";value:totals.sampled?String(totals.domains):"未采集";iconName:"globe" }
-    SwirlMetricCard { Layout.fillWidth:true;label:"来源";value:totals.sampled?String(totals.apps):"未采集";iconName:"sliders" }
-   }
-   SwirlGlassPanel { Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(245)
-    ColumnLayout { anchors.fill:parent;anchors.margins:Theme.cardPadding
-     SwirlText { text:"实时传输速率 · 最近 1 小时";color:Theme.text;font.pixelSize:Theme.fontSize(18);font.weight:Font.DemiBold }
-     SwirlTrafficChart { Layout.fillWidth:true;Layout.fillHeight:true;rangeIndex:3 }
+   Rectangle {Layout.fillWidth:true;Layout.preferredHeight:Theme.borderWidth;color:Theme.separator}
+   GridLayout {Layout.fillWidth:true;columns:width<Theme.dp(520)?2:4;columnSpacing:Theme.dp(20);rowSpacing:Theme.dp(16)
+    Repeater {model:[{label:qsTr("期间下载"),value:page.totals.sampled?page.telemetry.formatBytes(page.totals.down):"—"},{label:qsTr("期间上传"),value:page.totals.sampled?page.telemetry.formatBytes(page.totals.up):"—"},{label:qsTr("域名"),value:page.totals.sampled?String(page.totals.domains):"—"},{label:qsTr("应用来源"),value:page.totals.sampled?String(page.totals.apps):"—"}]
+     ColumnLayout {required property var modelData;Layout.fillWidth:true;spacing:Theme.dp(6);SwirlText {text:modelData.label;color:Theme.muted;font.pixelSize:Theme.fontSize(12)}SwirlText {text:modelData.value;color:Theme.text;font.pixelSize:Theme.fontSize(17);font.weight:Font.Medium}}
     }
    }
-   RowLayout { Layout.fillWidth:true
-    Repeater { model:[{name:"域名",key:"domains"},{name:"应用",key:"apps"},{name:"出口",key:"nodes"}];SwirlButton { required property var modelData;text:modelData.name;primary:page.kind===modelData.key;onClicked:page.kind=modelData.key } }
+   SwirlSectionTitle {Layout.fillWidth:true;Layout.topMargin:Theme.dp(8);title:qsTr("实时传输速率");description:qsTr("最近 1 小时，来自实际采样。")}
+   SwirlTrafficChart {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(220);rangeIndex:3}
+   SwirlSectionTitle {Layout.fillWidth:true;Layout.topMargin:Theme.dp(8);title:qsTr("流量排行");description:qsTr("所选期间内已归属的连接，最多显示前 100 项。")}
+Item { id:rankingTabs; Layout.fillWidth:true; Layout.preferredHeight:Theme.controlHeight
+    readonly property int selectedIndex:["domains","apps","nodes"].indexOf(page.kind)
+    SwirlArcMotion {id:rankingSelection;targetX:rankingTabs.selectedIndex*Theme.dp(100);targetY:0;bend:Theme.dp(4);motionEnabled:page.visible}
+    Rectangle {x:rankingSelection.position.x;y:rankingSelection.position.y;width:Theme.dp(96);height:rankingTabs.height;radius:Theme.controlRadius;color:Theme.withAlpha(Theme.accent,0.1)}
+    Row {spacing:Theme.dp(4)
+     Repeater {model:[{name:"域名",key:"domains"},{name:"应用",key:"apps"},{name:"出口",key:"nodes"}];SwirlButton {required property var modelData;width:Theme.dp(96);text:modelData.name;quiet:true;onClicked:page.kind=modelData.key}}
+    }
    }
-   SwirlGlassPanel { Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(350)
-    SwirlDataTable { anchors.fill:parent;rows:(telemetry.revision,telemetry.ranking(page.kind,page.period,100));columns:[{key:"name",label:"名称",w:300},{key:"connections",label:"连接次数",w:120},{key:"upload",label:"上传",w:130},{key:"download",label:"下载",w:130},{key:"value",label:"总流量",w:130}] }
+   Item {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(340)
+    SwirlDataTable {objectName:"trafficRankingTable";anchors.fill:parent;rows:page.rankingRows;incrementalRows:true;animateRowChanges:false;minimal:true;columns:[{key:"name",label:qsTr("名称"),w:300},{key:"connections",label:qsTr("连接次数"),w:120},{key:"upload",label:qsTr("上传"),w:130},{key:"download",label:qsTr("下载"),w:130},{key:"value",label:qsTr("总流量"),w:130}]}
+    SwirlEmptyState {visible:page.rankingRows.length===0;anchors.centerIn:parent;width:Math.max(0,parent.width-Theme.dp(24));headline:qsTr("尚无可归属流量");detail:qsTr("此期间采集到的域名、应用或出口流量会显示在这里。")}
    }
-   SwirlText { text:telemetry.storageError;visible:text.length>0;color:Theme.orange;Layout.fillWidth:true;wrapMode:Text.Wrap }
+   SwirlText {text:page.telemetry.storageError;visible:text.length>0;color:Theme.red;Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12)}
+   Item {Layout.preferredHeight:Theme.dp(16)}
   }
  }
 }

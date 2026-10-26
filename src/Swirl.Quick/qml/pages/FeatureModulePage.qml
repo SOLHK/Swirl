@@ -10,7 +10,7 @@ Item {
     SwirlAnimatedModel {id:animatedRecords;source:page.records}
     property string moduleId:""
     readonly property Item motionSurface:detailPanel
-    readonly property var heroTargets:({title:moduleTitle})
+    readonly property var heroTargets:({title:pageHeader.titleItem})
     readonly property var feature:FeatureCatalog.find(moduleId)
     property var settings:({})
     property var records:[]
@@ -18,7 +18,9 @@ Item {
     property bool dirty:false
     property string savedAt:""
     property int editing:-1
+    property bool componentReady:false
     property int revision:0
+    SwirlArcMotion {id:tabMotion;objectName:"moduleSectionMotion";targetX:page.tab*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
     function exportCacheState() { return {settings:settings,records:records,tab:tab,dirty:dirty,savedAt:savedAt,editing:editing,revision:revision} }
     function restoreCacheState(value) { settings=value.settings;records=value.records;tab=value.tab;dirty=value.dirty;savedAt=value.savedAt;editing=value.editing;revision=value.revision }
     function restore() {
@@ -29,43 +31,43 @@ Item {
     function draft() {return {settings:settings,records:records,savedAt:Qt.formatDateTime(new Date(),"yyyy-MM-dd HH:mm:ss")}}
     function save() {var data=draft();if(moduleDrafts.save(moduleId,data)){savedAt=data.savedAt;dirty=false;AppState.toast="模块草稿已保存，未启用网络服务。"}else AppState.toast=moduleDrafts.lastError}
     function reorder(index,step) {var next=records.slice();var other=index+step;if(other<0 || other>=next.length)return;var row=next[index];next[index]=next[other];next[other]=row;records=next;dirty=true}
-    onModuleIdChanged:if(moduleId.length)restore()
+    onModuleIdChanged:if(componentReady&&moduleId.length)restore()
+    Component.onCompleted:{componentReady=true;if(moduleId.length)restore()}
     ColumnLayout {
         anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap
-        RowLayout {
-            Layout.fillWidth:true;Layout.topMargin:12;spacing:Theme.dp(15)
-            SwirlIconButton {iconName:"chevron-left";tooltip:"功能模块中心";onClicked:SwirlMotion.returnToHub(detailPanel)}
-            ColumnLayout {
-                Layout.fillWidth:true;spacing:Theme.dp(5)
-                SwirlText {id:moduleTitle;text:page.feature ? page.feature.title : "功能模块";font.pixelSize:Theme.fontSize(25);font.weight:Font.DemiBold;color:Theme.text}
-                SwirlText {text:page.feature ? page.feature.sub : "";font.pixelSize:Theme.fontSize(14);color:Theme.muted;Layout.fillWidth:true;elide:Text.ElideRight}
-            }
-            SwirlButton {text:"导入草稿";font.pixelSize:Theme.fontSize(14);onClicked:importDialog.open()}
-            SwirlButton {text:"导出草稿";font.pixelSize:Theme.fontSize(14);onClicked:exportDialog.open()}
-            SwirlButton {objectName:"moduleSaveButton";text:"保存草稿";font.pixelSize:Theme.fontSize(14);primary:true;onClicked:page.save()}
+        SwirlPageHeader {
+            id:pageHeader;Layout.fillWidth:true
+            title:page.feature?page.feature.title:qsTr("功能模块")
+            description:page.feature?page.feature.sub:""
+            metadata:qsTr("本地界面草稿，服务尚未接入")
+            SwirlIconButton{iconName:"chevron-left";tooltip:qsTr("功能模块中心");onClicked:SwirlMotion.returnToHub(detailPanel)}
+            SwirlButton{text:qsTr("导入");onClicked:importDialog.open()}
+            SwirlButton{text:qsTr("导出");onClicked:exportDialog.open()}
+            SwirlButton{objectName:"moduleSaveButton";text:qsTr("保存草稿");primary:true;onClicked:page.save()}
         }
         RowLayout {
             Layout.fillWidth:true
-            SwirlSegmentedControl {implicitWidth:Theme.dp(285);options:["配置","条目","说明"];currentIndex:page.tab;onActivated:function(index){page.tab=index}}
+            SwirlSegmentedControl {objectName:"moduleSections";implicitWidth:Theme.dp(260);options:["配置","条目","说明"];currentIndex:page.tab;onActivated:function(index){page.tab=index}}
             Item {Layout.fillWidth:true}
-            SwirlStatusBadge{label:"研发中 · 服务未接入";tone:"warning"}
+            SwirlStatusBadge{label:qsTr("服务未接入");tone:"warning"}
             SwirlText {text:page.dirty ? "尚未保存" : page.savedAt.length ? "已保存 · "+page.savedAt : "未接入 · 本地界面草稿";color:Theme.muted;font.pixelSize:Theme.fontSize(13)}
         }
-        SwirlGlassPanel {
+        Item {
             id:detailPanel;objectName:"motion-detail"
             Layout.fillWidth:true;Layout.fillHeight:true
             ScrollView {
-                id:formScroll;anchors.fill:parent;anchors.margins:Theme.dp(22);clip:true;visible:page.tab===0
+                id:formScroll;anchors.fill:parent;anchors.topMargin:Theme.gap;clip:true;visible:page.tab===0
                 ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
                 ColumnLayout {
                     width:formScroll.availableWidth;spacing:Theme.dp(16)
-                    SwirlText {text:"配置只保存到本机界面草稿。当前不会设置代理、安装证书、创建网卡或启动此模块的服务。";color:Theme.muted;font.pixelSize:Theme.fontSize(14);Layout.fillWidth:true;wrapMode:Text.WordWrap}
+                    SwirlText {transform:Translate{x:tabMotion.position.x-tabMotion.targetX;y:tabMotion.position.y}
+                    text:"配置只保存到本机界面草稿。当前不会设置代理、安装证书、创建网卡或启动此模块的服务。";color:Theme.muted;font.pixelSize:Theme.fontSize(14);Layout.fillWidth:true;wrapMode:Text.WordWrap}
                     Repeater {
                         model:page.feature ? page.feature.fields : []
                         RowLayout {
                             required property var modelData
                             Layout.fillWidth:true;spacing:Theme.dp(24)
-                            SwirlText {text:modelData.label;color:Theme.text;font.pixelSize:Theme.fontSize(16);Layout.preferredWidth:Theme.dp(175);wrapMode:Text.WordWrap}
+                            SwirlText {text:modelData.label;color:Theme.text;font.pixelSize:Theme.bodySize;Layout.preferredWidth:Theme.dp(175);wrapMode:Text.WordWrap}
                             Loader {
                                 Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(44)
                                 property var field:modelData
@@ -78,10 +80,11 @@ Item {
                 }
             }
             ColumnLayout {
-                anchors.fill:parent;anchors.margins:Theme.dp(22);spacing:Theme.dp(14);visible:page.tab===1
+                anchors.fill:parent;anchors.topMargin:Theme.gap;spacing:Theme.dp(14);visible:page.tab===1
                 RowLayout {
                     Layout.fillWidth:true
-                    SwirlText {text:"条目与优先级 · "+page.records.length+" 项";color:Theme.text;font.pixelSize:Theme.fontSize(18);Layout.fillWidth:true}
+                    SwirlText {transform:Translate{x:tabMotion.position.x-tabMotion.targetX;y:tabMotion.position.y}
+                    text:"条目与优先级 · "+page.records.length+" 项";color:Theme.text;font.pixelSize:Theme.fontSize(18);Layout.fillWidth:true}
                     SwirlButton {objectName:"moduleAddButton";text:"添加条目";primary:true;font.pixelSize:Theme.fontSize(15);onClicked:{page.editing=-1;nameField.text="";valueField.text="";rowDialog.open()}}
                 }
                 ListView { pixelAligned: true;
@@ -95,7 +98,7 @@ Item {
                         required property int index
                         required property var entry
                         readonly property var modelData:entry
-                        width:Math.floor(ListView.view.width);height:Theme.dp(72);radius:Theme.controlRadius;color:Theme.material("field")
+                        width:Math.floor(ListView.view.width);height:Theme.dp(72);radius:Theme.controlRadius;color:index%2?Theme.withAlpha(Theme.field,0.55):"transparent"
                         RowLayout {
                             anchors.fill:parent;anchors.margins:Theme.dp(12);spacing:Theme.dp(12)
                             SwirlToggle {checked:modelData.enabled!==false;onToggled:{var rows=page.records.slice();rows[index]=Object.assign({},modelData,{enabled:checked});page.records=rows;page.dirty=true}}
@@ -110,9 +113,10 @@ Item {
                 }
             }
             ColumnLayout {
-                anchors.fill:parent;anchors.margins:Theme.dp(26);spacing:Theme.dp(17);visible:page.tab===2
+                anchors.fill:parent;anchors.topMargin:Theme.gap;spacing:Theme.dp(17);visible:page.tab===2
                 SwirlIcon {name:page.feature ? page.feature.icon : "grid";size:Theme.dp(38);color:Theme.accent}
-                SwirlText {textRole:"pageTitle";text:"模块界面已具备，实际功能待接入";font.pixelSize:Theme.fontSize(22);font.weight:Font.DemiBold;color:Theme.text}
+                SwirlText {transform:Translate{x:tabMotion.position.x-tabMotion.targetX;y:tabMotion.position.y}
+                    textRole:"pageTitle";text:"模块界面已具备，实际功能待接入";font.pixelSize:Theme.fontSize(22);font.weight:Font.DemiBold;color:Theme.text}
                 SwirlText {text:page.feature ? page.feature.sub : "";color:Theme.muted;font.pixelSize:Theme.fontSize(16);Layout.fillWidth:true;wrapMode:Text.WordWrap}
                 SwirlText {text:"可以编辑参数、增删条目、调整优先级、切换草稿启停、保存以及导入导出 JSON。这里的启用选项仅表示草稿意图，不代表操作系统或网络服务已经开启。";color:Theme.muted;font.pixelSize:Theme.fontSize(15);Layout.fillWidth:true;wrapMode:Text.WordWrap}
                 SwirlText {text:"Apple / 移动平台专有能力保留参考模块，Windows 的实际实现方式需后续确定。";color:Theme.muted;font.pixelSize:Theme.fontSize(15);Layout.fillWidth:true;wrapMode:Text.WordWrap}

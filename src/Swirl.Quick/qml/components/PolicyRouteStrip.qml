@@ -15,18 +15,18 @@ Rectangle {
     readonly property var target: defaultPolicy.target || {kind: "unconfigured"}
     readonly property bool configured: ["node", "group"].indexOf(target.kind) >= 0
     signal targetRequested(Item source)
-    color: Theme.buttonBase
-    radius: Theme.dp(12)
-    implicitHeight: body.implicitHeight + Theme.dp(24)
+    color: Theme.surface
+    radius: Theme.dp(16)
+    implicitHeight: body.implicitHeight + Theme.dp(32)
 
     ColumnLayout {
         id: body
-        anchors.fill: parent; anchors.margins: Theme.dp(12); spacing: Theme.dp(10)
+        anchors.fill: parent; anchors.margins: Theme.dp(16); spacing: Theme.dp(10)
         RowLayout {
             Layout.fillWidth: true; spacing: Theme.dp(12)
             ColumnLayout {
                 Layout.preferredWidth: Theme.dp(148); Layout.fillWidth: false; spacing: Theme.dp(3)
-                SwirlText { text: qsTr("默认出口"); color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.DemiBold }
+                SwirlText { text: qsTr("默认策略"); color: Theme.text; font.pixelSize: Theme.fontSize(18); font.weight: Font.DemiBold }
                 SwirlText { Layout.fillWidth: true; text: strip.mode === "global" ? qsTr("普通流量") : strip.mode === "direct" ? qsTr("已保存的代理出口") : qsTr("未单独分配的流量"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); elide: Text.ElideRight }
             }
             SubscriptionAction {
@@ -39,8 +39,8 @@ Rectangle {
                 Accessible.name: qsTr("更换默认策略出口，当前：%1").arg(text)
                 background: Rectangle {
                     radius: Theme.controlRadius
-                    color: choose.down ? Theme.pressed : choose.hovered ? Theme.hover : Theme.surface
-                    border.width: Theme.borderWidth
+                    color: choose.down ? Theme.pressed : choose.hovered ? Theme.hover : Theme.buttonBase
+                    border.width: choose.visualFocus || Theme.increaseContrast ? Theme.borderWidth : 0
                     border.color: choose.visualFocus || Theme.increaseContrast ? Theme.text : Theme.controlBorder
                     opacity: choose.enabled ? 1 : 0.45
                     Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.hoverDuration } }

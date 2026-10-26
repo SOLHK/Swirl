@@ -5,36 +5,92 @@ import QtQuick.Layouts
 import SwirlQuick
 import "../components"
 import "../controls"
+
 Item {
- id:page;required property var engineController;required property var systemProvider
- component AccessCard:SwirlGlassPanel {
-  id:card;property string title;property string description;property string status;property bool active:false;property bool available:false;property bool configurable:false;property bool toggleVisible:true;property string configureLabel:"配置";signal toggled(bool on);signal configure()
-  Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredHeight:Math.max(Theme.dp(160),body.implicitHeight+2*Theme.cardPadding)
-  ColumnLayout {id:body;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:Theme.dp(12)
-   RowLayout {Layout.fillWidth:true;SwirlText{text:card.title;color:Theme.text;font.pixelSize:Theme.fontSize(15);font.weight:Font.DemiBold;Layout.fillWidth:true}SwirlToggle{visible:card.toggleVisible;checked:card.active;enabled:card.available;onToggled:{card.toggled(checked);checked=Qt.binding(()=>card.active)}Accessible.name:card.title}}
-   SwirlText {text:card.description;color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap;Layout.fillWidth:true}
-   RowLayout {Layout.fillWidth:true;SwirlText {text:card.status;color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap;Layout.fillWidth:true}SwirlButton {visible:card.configurable;quiet:true;text:card.configureLabel;onClicked:card.configure()}}
-  }
- }
- Flickable {id:scroll;anchors.fill:parent;contentWidth:width;contentHeight:body.implicitHeight+2*Theme.pagePadding;clip:true;boundsBehavior:Flickable.StopAtBounds;flickableDirection:Flickable.VerticalFlick;ScrollBar.vertical:SwirlScrollBar{}
-  ColumnLayout {id:body;x:Theme.pagePadding;width:scroll.width-2*Theme.pagePadding;spacing:Theme.sectionGap
-   SwirlText {textRole:"pageTitle";text:"概览";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold}
-   SwirlText {text:"配置与服务状态";color:Theme.muted;font.pixelSize:Theme.fontSize(13)}
-   SwirlText {text:"网络接管";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold}
-   GridLayout {Layout.fillWidth:true;columns:width>=Theme.dp(650)?2:1;columnSpacing:Theme.gap;rowSpacing:Theme.gap
-    AccessCard{title:"系统代理";description:"在活动页统一开启或关闭 Swirl 代理，使用已保存的策略分配流量。";status:page.engineController.systemProxy.error||page.engineController.routingError||(page.engineController.busy?"正在切换":active?"由 Swirl 接管":page.engineController.systemProxy.systemEnabled?"由其他应用启用":"未启用");active:page.engineController.systemProxy.enabled;toggleVisible:false;configurable:true;configureLabel:"前往活动";onConfigure:AppState.navigate("activity")}
-    AccessCard{title:"增强模式";description:"部分应用可能不遵循系统代理设置。使用增强模式可以让所有应用由 Swirl 处理。";status:active?"启用":page.engineController.elevated?"禁用":"需要管理员权限";active:page.engineController.tunEnabled;available:!page.engineController.busy;onToggled:on=>{if(!page.engineController.setTunEnabled(!page.engineController.tunRequested))AppState.notice(page.engineController.routingError||page.engineController.networkConfigurationError)}}
-   }
-   SwirlText {text:"局域网设备接管";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold}
-   GridLayout {Layout.fillWidth:true;columns:width>=Theme.dp(650)?2:1;columnSpacing:Theme.gap;rowSpacing:Theme.gap
-    AccessCard{title:"HTTP & SOCKS5 代理";description:"Swirl 可以被其他设备用作标准的 HTTP 和 SOCKS5 代理服务器。";status:active?"启用 · "+page.engineController.activeProxyPort:"禁用";active:page.engineController.lanEnabled;available:!page.engineController.busy;configurable:true;onConfigure:lanDialog.open();onToggled:on=>{if(on&&!page.engineController.lanConfigured)lanDialog.open();else if(!page.engineController.setLanEnabled(on))AppState.notice(page.engineController.networkConfigurationError)}}
-    AccessCard{title:"网关模式";description:"将 Swirl 用作局域网的 DHCP 服务器，并使用 Swirl 网关模式接管其他设备的网络。";status:gatewayProvider.busy?"正在配置":gatewayProvider.running?"启用":gatewayProvider.configured?"禁用":"未配置";active:gatewayProvider.running;available:!gatewayProvider.busy;configurable:true;onConfigure:AppState.navigate("gateway");onToggled:on=>{if(on&&!gatewayProvider.start())AppState.notice(gatewayProvider.error);else if(!on)gatewayProvider.stop()}}
-   }
-   SwirlText {text:"远程连接";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold}
-   AccessCard{title:"Swirl 远程连接";description:"通过 WireGuard、EasyTier 等协议连接设备之间的私有网络。";status:"WireGuard / EasyTier";configurable:true;onConfigure:AppState.navigate("proxies")}
-  }
- }
- SwirlDialog{id:lanDialog;title:"HTTP & SOCKS5 局域网代理";ColumnLayout{width:parent.width;spacing:Theme.dp(12)
+    id: page
+    required property var engineController
+    required property var systemProvider
+    readonly property Item motionTitle: heading.titleItem
+    component AccessRow: Item {
+        id: row
+        property string title: ""
+        property string description: ""
+        property string status: ""
+        property bool active: false
+        property bool available: false
+        property bool configurable: false
+        property bool toggleVisible: true
+        property string configureLabel: qsTr("配置")
+        signal toggled(bool on)
+        signal configure()
+        Layout.fillWidth: true
+        implicitHeight: content.implicitHeight + Theme.dp(32)
+        GridLayout {
+            id: content
+            anchors.left: parent.left; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+            columns: row.width < Theme.dp(620) ? 1 : 2
+            columnSpacing: Theme.dp(28); rowSpacing: Theme.dp(12)
+            ColumnLayout {
+                Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: Theme.dp(6)
+                SwirlText { text: row.title; color: Theme.text; font.pixelSize: Theme.fontSize(16); font.weight: Font.DemiBold; Layout.fillWidth: true; wrapMode: Text.Wrap }
+                SwirlText { text: row.description; color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; wrapMode: Text.Wrap }
+                SwirlText { text: row.status; textFormat:Text.PlainText; color: row.active ? Theme.accent : Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; wrapMode: Text.Wrap }
+            }
+            RowLayout {
+                Layout.alignment: Qt.AlignRight | Qt.AlignVCenter; spacing: Theme.dp(14)
+                SwirlButton { visible: row.configurable; quiet: true; text: row.configureLabel; onClicked: row.configure() }
+                SwirlToggle { visible: row.toggleVisible; checked: row.active; enabled: row.available; onToggled: { row.toggled(checked); checked=Qt.binding(()=>row.active) } Accessible.name: row.title }
+            }
+        }
+        Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: Theme.borderWidth; color: Theme.separator }
+    }
+    ScrollView {
+        id: scroll
+        anchors.fill: parent; anchors.margins: Theme.pagePadding; clip: true
+        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+        ScrollBar.vertical: SwirlScrollBar {}
+        ColumnLayout {
+            width: scroll.availableWidth; spacing: Theme.dp(16)
+            SwirlPageHeader { id: heading; Layout.fillWidth: true; title: qsTr("概览"); description: qsTr("查看网络接管与服务能力。可用操作以当前内核的真实状态为准。") }
+            SwirlSectionTitle { Layout.fillWidth: true; Layout.topMargin: Theme.dp(8); title: qsTr("本机连接") }
+            AccessRow {
+                title: qsTr("系统代理")
+                description: qsTr("在活动页统一开启或关闭代理，按已保存策略分配流量。")
+                status: page.engineController.systemProxy.error || page.engineController.routingError || (page.engineController.systemProxyBusy ? qsTr("正在切换") : active ? qsTr("由 Swirl 接管") : page.engineController.systemProxy.systemEnabled ? qsTr("由其他应用启用") : qsTr("未启用"))
+                active: page.engineController.systemProxy.owned && page.engineController.systemProxy.enabled
+                toggleVisible: false; configurable: true; configureLabel: qsTr("前往活动")
+                onConfigure: AppState.navigate("activity")
+            }
+            AccessRow {
+                title: qsTr("增强模式")
+                description: qsTr("当前 Rust Core 尚未实现 TUN 数据通路，无法接管不遵循系统代理的应用。")
+                status: active ? qsTr("已启用") : qsTr("尚未支持")
+                active: page.engineController.tunEnabled; available: active && !page.engineController.busy
+                onToggled: on => { if (!page.engineController.setTunEnabled(!page.engineController.tunRequested)) AppState.notice(page.engineController.routingError || page.engineController.networkConfigurationError) }
+            }
+            SwirlSectionTitle { Layout.fillWidth: true; Layout.topMargin: Theme.dp(16); title: qsTr("局域网与设备"); description: qsTr("地址、认证与客户端配置可以保留；当前未支持的接管能力无法开启。") }
+            AccessRow {
+                title: qsTr("HTTP 与 SOCKS5 局域网代理")
+                description: qsTr("当前 Rust Core 尚不支持局域网代理。可保留地址与认证配置。")
+                status: active ? qsTr("启用，端口 %1").arg(page.engineController.activeProxyPort) : qsTr("尚未支持")
+                active: page.engineController.lanEnabled; available: active && !page.engineController.busy; configurable: true
+                onConfigure: lanDialog.open()
+                onToggled: on => { if (on && !page.engineController.lanConfigured) lanDialog.open(); else if (!page.engineController.setLanEnabled(on)) AppState.notice(page.engineController.networkConfigurationError) }
+            }
+            AccessRow {
+                title: qsTr("网关模式")
+                description: qsTr("管理网关配置、客户端记录与 CSV。当前 Rust Core 不支持 TUN 网关转发。")
+                status: gatewayProvider.busy ? qsTr("正在配置") : gatewayProvider.running ? qsTr("启用") : gatewayProvider.configured ? qsTr("配置已保留，转发尚未支持") : qsTr("尚未配置，转发尚未支持")
+                active: gatewayProvider.running; available: active && !gatewayProvider.busy; configurable: true; configureLabel: qsTr("管理设备")
+                onConfigure: AppState.navigate("gateway")
+                onToggled: on => { if (on && !gatewayProvider.start()) AppState.notice(gatewayProvider.error); else if (!on) gatewayProvider.stop() }
+            }
+            SwirlSectionTitle { Layout.fillWidth: true; Layout.topMargin: Theme.dp(16); title: qsTr("远程连接") }
+            AccessRow { title: qsTr("私有组网"); description: qsTr("当前尚未接入 WireGuard / EasyTier 私有组网能力。"); status: qsTr("尚未支持"); toggleVisible: false; configurable: true; configureLabel: qsTr("查看现有节点"); onConfigure: AppState.navigate("proxies") }
+            Item { Layout.preferredHeight: Theme.dp(16) }
+        }
+    }
+ SwirlDialog{id:lanDialog;ownerItem:page;title:"HTTP & SOCKS5 局域网代理";ColumnLayout{width:parent.width;spacing:Theme.dp(12)
   SwirlText {text:"其他设备使用本机 IP 和代理端口连接，并使用下面的账户认证。";Layout.fillWidth:true;wrapMode:Text.WordWrap;color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
   SwirlText {text:page.engineController.lanAddresses.join(" · ")+":"+page.engineController.proxyPort;color:Theme.text;font.pixelSize:Theme.fontSize(13)}
   SwirlTextField{id:lanUsername;Layout.fillWidth:true;text:page.engineController.lanUsername||"swirl";placeholderText:"用户名"}

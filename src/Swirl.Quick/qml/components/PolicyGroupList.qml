@@ -70,16 +70,7 @@ ColumnLayout {
         SwirlText { text: qsTr("可复用出口"); color: Theme.text; font.pixelSize: Theme.fontSize(15); font.weight: Font.DemiBold }
         SwirlText { text: String(groups.records.length); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
         Item { Layout.fillWidth: true }
-        TextField {
-            id: search; objectName: "policyGroupSearch"
-            Layout.preferredWidth: Theme.dp(226); Layout.minimumWidth: Theme.dp(140)
-            implicitHeight: Theme.dp(32); placeholderText: qsTr("搜索策略组")
-            color: Theme.text; placeholderTextColor: Theme.muted; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize(12)
-            leftPadding: Theme.dp(32); rightPadding: Theme.dp(10); selectByMouse: true
-            onTextChanged: groups.query = text; Accessible.name: qsTr("搜索策略组")
-            background: Rectangle { radius: Theme.dp(9); color: Theme.buttonBase; border.width: search.activeFocus ? Theme.borderWidth : 0; border.color: Theme.text }
-            SwirlIcon { anchors.left: parent.left; anchors.leftMargin: Theme.dp(10); anchors.verticalCenter: parent.verticalCenter; name: "search"; size: Theme.dp(14); color: Theme.muted; Accessible.ignored: true }
-        }
+        SwirlSearchField {id:search;objectName:"policyGroupSearch";Layout.preferredWidth:Theme.dp(226);Layout.minimumWidth:Theme.dp(140);placeholderText:qsTr("搜索策略组");Accessible.name:placeholderText;onTextChanged:groups.query=text}
     }
     SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; text: qsTr("把策略组分配给服务，统一管理出口。"); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
     RowLayout {

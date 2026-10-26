@@ -7,6 +7,7 @@ import "../components"
 import "../controls"
 Item {
  id:page;required property var engineController;property string query:"";property var selectedRule:null
+ readonly property Item motionTitle:ruleHeading.titleItem
  property Item selectedRowItem:null
  property int editingIndex:-1
  readonly property bool v2:engineController.policyV2Active
@@ -46,21 +47,23 @@ Item {
  readonly property var displayRules:engineController.routingRules.filter(r=>(r.type+" "+r.pattern+" "+r.policy).toLowerCase().indexOf(query.toLowerCase())>=0)
  ColumnLayout {
   anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.gap
-  RowLayout {Layout.fillWidth:true
-   SwirlText {textRole:"pageTitle";renderType:Text.NativeRendering;text:"规则";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold;Layout.fillWidth:true}
+  SwirlPageHeader {
+   id:ruleHeading;Layout.fillWidth:true;title:qsTr("路由规则")
+   description:page.v2?qsTr("按本地直连、专属服务、中国规则库、自定义规则、默认策略依次匹配。双击自定义规则可编辑。"):qsTr("当前保留旧版顺序规则；在策略页审阅迁移后启用新的分流层级。")
+   SwirlFlow {objectName:"rulesOperationFlow";Layout.preferredWidth:Theme.dp(42);Layout.preferredHeight:Theme.dp(18);phase:page.ruleSubmitting||page.deleteRequestId.length?"pending":page.engineController.policyError.length?"failed":"idle"}
+   SwirlButton {text:qsTr("查看策略");iconName:"route";quiet:true;onClicked:AppState.navigate("policies")}
   }
-  SwirlText {renderType:Text.NativeRendering;text:page.v2?qsTr("按本地直连、专属服务、中国规则库、自定义规则、默认策略依次匹配；双击自定义规则可编辑。"):qsTr("当前保留旧版顺序规则；在策略页审阅迁移后启用新的分流层级。");color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
-  SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:Math.min(ruleArea.implicitHeight+2*Theme.cardPadding,Math.max(Theme.dp(240),page.height-Theme.dp(150)));Layout.maximumHeight:Math.max(Theme.dp(200),page.height-Theme.dp(150))
+  SwirlGlassPanel {Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:Theme.dp(200);cornerRadius:Theme.dp(16);color:Theme.surface;border.width:0
    ColumnLayout {id:ruleArea;anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(12)
     RowLayout {Layout.fillWidth:true
-     SwirlText {renderType:Text.NativeRendering;text:"路由规则";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
+     SwirlText {renderType:Text.NativeRendering;text:qsTr("规则列表");color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
      SwirlText {renderType:Text.NativeRendering;text:page.displayRules.length+" 条规则";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
      SwirlSearchField {objectName:"rulesSearch";Layout.preferredWidth:Math.floor(Math.min(Theme.dp(240),page.width*0.36));placeholderText:"搜索类型、值或策略";onTextChanged:page.query=text}
     }
-    SwirlDataTable {id:ruleTable;objectName:"rulesTable";textPixelSize:13;headerPixelSize:12;Layout.fillWidth:true;Layout.fillHeight:true;Layout.preferredHeight:Theme.tableHeaderHeight+Math.max(1,page.displayRules.length)*Theme.tableRowHeight;visible:page.displayRules.length>0;incrementalRows:true;animateRowChanges:page.query.length===0;rows:page.displayRules;selectedId:page.selectedRule?page.selectedRule.id:"";fillEmptyRows:false;columns:[{key:"order",label:"ID",w:40},{key:"type",label:"类型",w:125},{key:"pattern",label:"值",w:230},{key:"policy",label:"策略",w:100},{key:"hits",label:"使用",w:50}];onRowSelected:r=>page.selectedRule=r;onRowEdited:(r,source)=>page.editRule(r,source)}
+    SwirlDataTable {id:ruleTable;objectName:"rulesTable";textPixelSize:13;headerPixelSize:12;Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:Theme.dp(150);visible:page.displayRules.length>0;incrementalRows:true;animateRowChanges:page.query.length===0;rows:page.displayRules;selectedId:page.selectedRule?page.selectedRule.id:"";fillEmptyRows:false;columns:[{key:"order",label:"ID",w:40},{key:"type",label:"类型",w:125},{key:"pattern",label:"值",w:230},{key:"policy",label:"策略",w:100},{key:"hits",label:"使用",w:50}];onRowSelected:r=>page.selectedRule=r;onRowEdited:(r,source)=>page.editRule(r,source)}
     SwirlEmptyState {visible:page.displayRules.length===0;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(130);headline:page.query.length?"没有匹配的规则":"尚无路由规则";detail:page.query.length?"尝试其他关键词，或清空搜索。":"添加自定义规则以控制流量的处理方式。"}
     RowLayout {Layout.fillWidth:true;spacing:Theme.dp(8)
-     SwirlButton {objectName:"addRoutingRule";text:"添加";iconName:"plus";enabled:page.canEditPolicy&&(page.v2||!page.engineController.processAlive);onClicked:{page.editingIndex=-1;ruleEditor.heroSource=null;ruleType.currentIndex=0;rulePattern.text="";rulePolicy.currentIndex=-1;ruleEditor.open()}}
+     SwirlButton {objectName:"addRoutingRule";text:qsTr("添加规则");iconName:"plus";primary:true;enabled:page.canEditPolicy&&(page.v2||!page.engineController.processAlive);onClicked:{page.editingIndex=-1;ruleEditor.heroSource=null;ruleType.currentIndex=0;rulePattern.text="";rulePolicy.currentIndex=-1;ruleEditor.open()}}
      SwirlButton {objectName:"editRoutingRule";text:"编辑";enabled:page.selectedRule!==null&&page.selectedRule.customIndex!==undefined&&page.canEditPolicy&&(page.v2||!page.engineController.processAlive);onClicked:page.editRule(page.selectedRule,ruleTable.selectedItem)}
      SwirlButton {objectName:"removeRoutingRule";text:"删除";enabled:page.selectedRule!==null&&page.selectedRule.customIndex!==undefined&&page.canEditPolicy&&(page.v2||!page.engineController.processAlive);onClicked:page.deleteRule()}
      Item {Layout.fillWidth:true}
@@ -68,7 +71,6 @@ Item {
     }
    }
   }
-  Item {Layout.fillHeight:true}
  }
 
  SwirlDialog{id:ruleEditor;objectName:"ruleEditor";title:page.editingIndex>=0?"编辑规则":"新增规则";dismissBlocked:page.ruleSubmitting;ColumnLayout{width:parent.width;spacing:Theme.dp(14)

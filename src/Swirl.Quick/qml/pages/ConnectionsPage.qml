@@ -6,6 +6,8 @@ import "../components"
 import "../controls"
 Item {
     id:page
+    readonly property Item motionTitle:heading.titleItem
+    readonly property bool compact:width<Theme.dp(620)
     property string selectedId:""
     readonly property var selected:engineController.connections.find(record=>String(record.id)===selectedId)||null
     readonly property var observedRoute:selected&&selected.route?selected.route:({})
@@ -58,56 +60,35 @@ Item {
         return rows
     }
     ColumnLayout {
-        anchors.fill:parent
-        anchors.leftMargin:Theme.dp(23); anchors.rightMargin:Theme.dp(23); anchors.bottomMargin:Theme.dp(14)
-        spacing:Theme.dp(14)
-        SwirlGlassPanel {id:connectionSummary;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(72)
-         RowLayout {anchors.fill:parent;anchors.margins:Theme.dp(16);SwirlText {textRole:"pageTitle";text:"活动连接";color:Theme.text;font.pixelSize:Theme.fontSize(22);Layout.fillWidth:true}SwirlText {textRole:"data";id:activeCount;text:engineController.telemetry.connectionsSampled?String(engineController.telemetry.activeConnections):"—";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold}SwirlButton {text:"返回";visible:SwirlMotion.returnShared && SwirlMotion.returnShared.route===AppState.currentPage;onClicked:SwirlMotion.returnToHub(activeCount)}}
+        anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.dp(16)
+        Item {id:connectionSummary;property color color:Theme.material("content");Layout.fillWidth:true;implicitHeight:heading.implicitHeight
+            SwirlPageHeader {id:heading;anchors.left:parent.left;anchors.right:parent.right;title:qsTr("活动连接");description:qsTr("查看连接与它实际命中的策略、节点和配置版本。")
+                SwirlText {id:activeCount;textRole:"data";text:engineController.telemetry.connectionsSampled?String(engineController.telemetry.activeConnections):"—";color:Theme.text;font.pixelSize:Theme.fontSize(30);font.weight:Font.DemiBold}
+                SwirlButton {text:qsTr("返回");visible:SwirlMotion.returnShared&&SwirlMotion.returnShared.route===AppState.currentPage;onClicked:SwirlMotion.returnToHub(activeCount)}
+            }
         }
-        RowLayout {
-            Layout.fillWidth:true; spacing:Theme.dp(10)
-            SwirlSearchField { id:search; Layout.fillWidth:true; text:AppState.connectionSearchQuery; placeholderText:AppState.zh("搜索域名、IP、进程或策略"); onTextEdited:AppState.connectionSearchQuery=text }
-            SwirlComboBox { id:status; model:["全部状态","活动","已结束"] }
-            SwirlComboBox { id:sort; model:["域名","延迟","下载","进程"] }
-            SwirlButton { development:true; enabled:false; text:AppState.zh("导出"); iconName:"folder"; onClicked:AppState.notice("导出连接记录") }
-            SwirlButton { development:true; enabled:false; text:AppState.zh("Clear"); onClicked:{page.selectedId="";AppState.notice("清空连接记录")} }
+        GridLayout {Layout.fillWidth:true;columns:width<Theme.dp(700)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap
+            SwirlSearchField {id:search;Layout.fillWidth:true;text:AppState.connectionSearchQuery;placeholderText:qsTr("搜索域名、IP、进程或策略");onTextEdited:AppState.connectionSearchQuery=text}
+            RowLayout {spacing:Theme.compactGap
+                SwirlComboBox {id:status;model:["全部状态","活动","已结束"];Accessible.name:qsTr("连接状态筛选")}
+                SwirlComboBox {id:sort;model:["域名","延迟","下载","进程"];Accessible.name:qsTr("连接排序")}
+                SwirlButton {development:true;enabled:false;text:qsTr("导出");iconName:"folder";onClicked:AppState.notice("导出连接记录")}
+                SwirlButton {development:true;enabled:false;text:qsTr("清空");onClicked:{page.selectedId="";AppState.notice("清空连接记录")}}
+            }
         }
-        RowLayout {
-            Layout.fillWidth:true; spacing:Theme.dp(8)
-            SwirlStatusBadge { label:visibleRows.length+" 条记录"; tone:"accent" }
-            SwirlText { text:AppState.zh("Click a row to examine a connection"); color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { text:AppState.detailOpen?"隐藏详情":"显示详情"; quiet:false; onClicked:AppState.detailOpen=!AppState.detailOpen }
+        RowLayout {Layout.fillWidth:true
+            SwirlText {text:qsTr("%1 条记录").arg(page.visibleRows.length);color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true}
+            SwirlButton {text:AppState.detailOpen?qsTr("隐藏详情"):qsTr("显示详情");quiet:true;onClicked:AppState.detailOpen=!AppState.detailOpen}
         }
-        RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(14)
-            SwirlGlassPanel {
-                Layout.fillWidth:true; Layout.fillHeight:true
-                clip:true
-                SwirlDataTable {
-                    id:connectionTable;anchors.fill:parent; anchors.margins:Theme.dp(1)
-                    incrementalRows:true;animateRowChanges:false;rows:page.visibleRows
-                    selectedId:page.selected?page.selected.id:""
-                    columns:[
-                        {key:"host",label:AppState.zh("HOST"),w:220},{key:"ip",label:AppState.zh("IP ADDRESS"),w:125},
-                        {key:"process",label:AppState.zh("PROCESS"),w:115},{key:"protocol",label:AppState.zh("PROTO"),w:80},
-                        {key:"policy",label:AppState.zh("POLICY"),w:119},{key:"up",label:AppState.zh("UPLOAD"),w:89},
-                        {key:"down",label:AppState.zh("DOWNLOAD"),w:100},{key:"latency",label:AppState.zh("LATENCY"),w:95},
-                        {key:"time",label:AppState.zh("SINCE"),w:88},{key:"status",label:AppState.zh("状态"),w:88}
-                    ]
+        GridLayout {Layout.fillWidth:true;Layout.fillHeight:true;columns:page.compact?1:2;columnSpacing:Theme.sectionGap;rowSpacing:Theme.sectionGap
+            Item {Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:Theme.dp(100)
+                SwirlDataTable {id:connectionTable;objectName:"connectionTable";anchors.fill:parent;incrementalRows:true;animateRowChanges:false;rows:page.visibleRows;selectedId:page.selected?page.selected.id:"";minimal:true
+                    columns:[{key:"host",label:qsTr("域名"),w:220},{key:"ip",label:qsTr("IP 地址"),w:125},{key:"process",label:qsTr("进程"),w:115},{key:"protocol",label:qsTr("协议"),w:80},{key:"policy",label:qsTr("策略"),w:119},{key:"up",label:qsTr("上传"),w:89},{key:"down",label:qsTr("下载"),w:100},{key:"latency",label:qsTr("耗时"),w:95},{key:"time",label:qsTr("建立时间"),w:108},{key:"status",label:qsTr("状态"),w:88}]
                     onRowSelected:function(record){page.selectedId=String(record.id);AppState.detailOpen=true;connectionDetail.present(connectionTable.selectedItem)}
                 }
-                SwirlEmptyState {
-                    visible:page.visibleRows.length===0
-                    anchors.centerIn:parent
-                    headline:AppState.zh("没有匹配的连接")
-                    detail:AppState.zh("Adjust the search or status filter")
-                }
+                SwirlEmptyState {visible:page.visibleRows.length===0;anchors.centerIn:parent;width:Math.max(0,parent.width-Theme.dp(24));headline:qsTr("没有匹配的连接");detail:qsTr("连接经过 Swirl 后会显示在这里，也可调整搜索或状态筛选。")}
             }
-            SwirlLinkedDetail {
-                id:connectionDetail;animationLayer:page;sourceViewport:connectionTable;detailOpen:AppState.detailOpen
-                visible:AppState.detailOpen||moving
-                enabled:AppState.detailOpen
-                Layout.preferredWidth:Theme.dp(290); Layout.fillHeight:true
+            SwirlLinkedDetail {id:connectionDetail;animationLayer:page;sourceViewport:connectionTable;detailOpen:AppState.detailOpen;visible:AppState.detailOpen||moving;enabled:AppState.detailOpen;Layout.preferredWidth:page.compact?1:Theme.dp(300);Layout.fillWidth:page.compact;Layout.fillHeight:!page.compact;Layout.preferredHeight:page.compact?Theme.dp(180):-1
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:Theme.dp(20); spacing:Theme.dp(12)
                     ScrollView {

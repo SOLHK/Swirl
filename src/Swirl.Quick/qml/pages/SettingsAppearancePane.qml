@@ -1,122 +1,52 @@
 import QtQuick
-import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import SwirlQuick
 import "../components"
 import "../controls"
 
 ColumnLayout {
+    id: pane
     required property var settingsPage
-                             spacing:Theme.dp(21); Layout.fillWidth:true
-                            SwirlText {text:"外观与主题";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
-                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
-                                Layout.fillWidth:true
-                                ColumnLayout {
-                                    Layout.fillWidth:true
-                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh("Color theme"); color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
-                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh("Choose light, dark or follow Windows"); color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
-                                }
-                                SwirlComboBox {
-                                    objectName:"themeModePicker"
-                                    model:["跟随系统","浅色","深色"]
-                                    currentIndex:["System","Light","Dark"].indexOf(Theme.mode)
-                                    onActivated:function(index){Theme.mode=["System","Light","Dark"][index]}
-                                }
-                            }
-                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
-                                Layout.fillWidth:true
-                                ColumnLayout {
-                                    Layout.fillWidth:true
-                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"磨砂背景"; color:Theme.text; font.pixelSize:Theme.fontSize(14) }
-                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"使用 Windows 原生窗口背景材质"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
-                                }
-                                SwirlToggle { checked:Theme.transparency; onToggled:Theme.transparency=checked }
-                            }
-                            RowLayout {
-                                Layout.fillWidth:true
-                                SwirlText {text:qsTr("增强对比度");color:Theme.text;font.pixelSize:Theme.fontSize(14);Layout.fillWidth:true}
-                                SwirlToggle {objectName:"increaseContrastToggle";checked:Theme.increaseContrast;onToggled:Theme.increaseContrast=checked;Accessible.name:qsTr("增强对比度")}
-                            }
-                            SwirlText {text:"动画与交互";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
-                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
-                                Layout.fillWidth:true
-                                ColumnLayout {
-                                    Layout.fillWidth:true
-                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh("Reduce motion"); color:Theme.text; font.pixelSize:Theme.fontSize(14) }
-                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh("Disable most transition animations"); color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
-                                }
-                                SwirlToggle { checked:Theme.reduceMotion; onToggled:Theme.reduceMotion=checked }
-                            }
-                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
-                                Layout.fillWidth:true
-                                ColumnLayout {
-                                    Layout.fillWidth:true
-                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap;text:"跟随系统动态效果";color:Theme.text;font.pixelSize:Theme.fontSize(14)}
-                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap;text:"开启后，遵循系统的动画效果设置。";color:Theme.muted;font.pixelSize:Theme.fontSize(11)}
-                                }
-                                SwirlToggle {objectName:"followSystemMotionToggle";checked:Theme.followSystemMotion;onToggled:Theme.followSystemMotion=checked}
-                            }
-                            SwirlText {text:"字体与文字大小";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
-                            RowLayout {Layout.fillWidth:true
-                                SwirlText {text:"界面缩放会同步调整文字与控件。字体家族和可变轴可单独设置。";color:Theme.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true;font.pixelSize:Theme.fontSize(11)}
-                                SwirlButton {text:"选择字体";quiet:true;onClicked:settingsPage.section="字体"}
-                            }
-                            ColumnLayout {
-                                Layout.fillWidth:true; spacing:Theme.dp(10)
-                                GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
-                                    Layout.fillWidth:true
-                                    ColumnLayout {
-                                        Layout.fillWidth:true
-                                        SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"界面缩放"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
-                                        SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:Theme.followSystemScale?"自动跟随 Windows 显示缩放 · Qt 原生 DPI":"手动缩放 · "+Math.round(Theme.uiScale*100)+"%"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
-                                    }
-                                    SwirlComboBox {
-                                        objectName:"scaleModeCombo"
-                                        implicitWidth:Theme.dp(176)
-                                        model:["自动跟随系统","手动自定义"]
-                                        currentIndex:Theme.followSystemScale?0:1
-                                        onActivated:currentIndex===0?Theme.followSystem():Theme.setScalePercent(Theme.uiScale*100)
-                                        Accessible.name:"界面缩放模式"
-                                    }
-                                }
-                                GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
-                                    Layout.fillWidth:true;
-                                    Slider {
-                                        id: scaleSlider
-                                        Layout.fillWidth:true; Layout.minimumWidth:Theme.dp(120)
-                                        objectName:"scaleSlider"
-                                        from:0.75; to:1.5; stepSize:0.01
-                                        enabled:!Theme.followSystemScale
-                                        onMoved:Theme.setScalePercent(Math.round(value*100))
-                                        Binding { target:scaleSlider; property:"value"; value:Theme.uiScale; when:!scaleSlider.pressed }
-                                    background: Rectangle {
-                                        x: scaleSlider.leftPadding
-                                        y: Math.round(scaleSlider.topPadding + scaleSlider.availableHeight / 2 - height / 2)
-                                        width: Math.round(scaleSlider.availableWidth)
-                                        height:Theme.dp(7)
-                                        radius:Theme.roundedRadius(width,height)
-                                        color: Theme.material("field")
-                                        border.width:Theme.dp(1)
-                                        border.color: Theme.glassRim
-                                        Rectangle {
-                                            height: parent.height
-                                            radius:Theme.roundedRadius(width,height)
-                                            width: Math.round(scaleSlider.visualPosition * parent.width)
-                                            color: Theme.accent
-                                        }
-                                    }
-                                    handle: Rectangle {
-                                        x: Math.round(scaleSlider.leftPadding + scaleSlider.visualPosition * (scaleSlider.availableWidth - width))
-                                        y: Math.round(scaleSlider.topPadding + scaleSlider.availableHeight / 2 - height / 2)
-                                        implicitWidth:Theme.dp(20); implicitHeight:Theme.dp(20)
-                                        radius:Theme.roundedRadius(width,height)
-                                        color: "#FBFDFF"
-                                        border.width:Theme.dp(1)
-                                        border.color: Theme.glassRim
-                                    }
-                                    }
-                                    SwirlButton { text:"恢复默认"; enabled:!Theme.followSystemScale || Theme.uiScale!==1.0; onClicked:Theme.resetScale() }
-                                }
-                            }
-                            SwirlStatusBadge { label:"已实现的设置自动保存"; tone:"accent" }
-                        }
+    spacing: Theme.dp(4)
+    SwirlSectionTitle { Layout.fillWidth: true; title: qsTr("外观"); description: qsTr("选择适合当前光线与阅读习惯的界面。") }
+    SettingsRowPane {
+        Layout.fillWidth: true
+        title: qsTr("颜色主题")
+        description: qsTr("浅色、深色，或跟随 Windows。")
+        SwirlComboBox { objectName: "themeModePicker"; model: [qsTr("跟随系统"), qsTr("浅色"), qsTr("深色")]; currentIndex: ["System", "Light", "Dark"].indexOf(Theme.mode); onActivated: function(index) { Theme.mode = ["System", "Light", "Dark"][index] }; Accessible.name: qsTr("颜色主题") }
+    }
+    SettingsRowPane { Layout.fillWidth: true; title: qsTr("透明材质"); description: qsTr("使用可用的窗口背景与玻璃效果。关闭后使用清晰的实色表面。"); SwirlToggle { checked: Theme.transparency; onToggled: Theme.transparency = checked; Accessible.name: qsTr("透明材质") } }
+    SettingsRowPane { Layout.fillWidth: true; separator: false; title: qsTr("增强对比度"); description: qsTr("强化文字、边界与焦点的辨识度。"); SwirlToggle { objectName: "increaseContrastToggle"; checked: Theme.increaseContrast; onToggled: Theme.increaseContrast = checked; Accessible.name: qsTr("增强对比度") } }
+    Item { Layout.preferredHeight: Theme.dp(20) }
+    SwirlSectionTitle { Layout.fillWidth: true; title: qsTr("动画与交互"); description: qsTr("动态效果随操作展开，减少动态效果时保留状态与焦点反馈。") }
+    SettingsRowPane { Layout.fillWidth: true; title: qsTr("减少动态效果"); description: qsTr("收束页面、曲线与浮层运动。"); SwirlToggle { checked: Theme.reduceMotion; onToggled: Theme.reduceMotion = checked; Accessible.name: qsTr("减少动态效果") } }
+    SettingsRowPane { Layout.fillWidth: true; separator: false; title: qsTr("跟随系统动态效果"); description: qsTr("遵循 Windows 的辅助功能设置。"); SwirlToggle { objectName: "followSystemMotionToggle"; checked: Theme.followSystemMotion; onToggled: Theme.followSystemMotion = checked; Accessible.name: qsTr("跟随系统动态效果") } }
+    Item { Layout.preferredHeight: Theme.dp(20) }
+    SwirlSectionTitle { Layout.fillWidth: true; title: qsTr("字体与显示"); description: qsTr("字体预览、可变轴与文字层级集中在字体分区。") }
+    SettingsRowPane {
+        Layout.fillWidth: true
+        title: qsTr("界面字体")
+        description: fontManager.currentFamily
+        SwirlButton { id: fontButton; text: qsTr("选择字体"); quiet: true; onClicked: pane.settingsPage.selectSection("字体", fontButton) }
+    }
+    SettingsRowPane {
+        Layout.fillWidth: true
+        title: qsTr("界面缩放")
+        description: Theme.followSystemScale ? qsTr("自动跟随 Windows 显示缩放，使用 Qt 原生 DPI。") : qsTr("手动缩放 %1%").arg(Math.round(Theme.uiScale * 100))
+        SwirlComboBox { objectName: "scaleModeCombo"; model: [qsTr("自动跟随系统"), qsTr("手动自定义")]; currentIndex: Theme.followSystemScale ? 0 : 1; onActivated: currentIndex === 0 ? Theme.followSystem() : Theme.setScalePercent(Theme.uiScale * 100); Accessible.name: qsTr("界面缩放模式") }
+    }
+    RowLayout {
+        Layout.fillWidth: true
+        Layout.topMargin: Theme.dp(12)
+        SwirlSlider { id: scaleSlider; objectName: "scaleSlider"; Layout.fillWidth: true; from: 0.75; to: 1.5; stepSize: 0.01; enabled: !Theme.followSystemScale; onMoved: Theme.setScalePercent(Math.round(value * 100)); Binding { target: scaleSlider; property: "value"; value: Theme.uiScale; when: !scaleSlider.pressed } Accessible.name: qsTr("界面缩放百分比") }
+        SwirlText { text: qsTr("%1%").arg(Math.round(Theme.uiScale * 100)); color: Theme.text; font.pixelSize: Theme.fontSize(13) }
+        SwirlButton { text: qsTr("恢复默认"); quiet: true; enabled: !Theme.followSystemScale || Theme.uiScale !== 1.0; onClicked: Theme.resetScale() }
+    }
+    SwirlText { Layout.fillWidth: true; Layout.topMargin: Theme.dp(10); text: qsTr("以上设置会自动保存。字体预览需要单独确认应用。"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); wrapMode: Text.Wrap }
+    Item { Layout.preferredHeight: Theme.dp(20) }
+    SwirlSectionTitle { Layout.fillWidth: true; title: qsTr("窗口偏好"); description: qsTr("下列选项尚未接入，当前不可更改。") }
+    Repeater {
+        model: [qsTr("关闭窗口时保留后台"), qsTr("记住窗口尺寸"), qsTr("显示工具提示")]
+        SettingsRowPane { required property string modelData; Layout.fillWidth: true; title: modelData; description: qsTr("研发中"); SwirlToggle { enabled: false; Accessible.name: modelData } }
+    }
+}

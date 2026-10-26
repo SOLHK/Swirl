@@ -56,10 +56,12 @@ int runOverviewChecks(QQuickWindow *window) {
     check(reserved,"capture fixture obtains its own loopback port");
     state(QString("pageLoader.item.listenerPort=%1").arg(capturePort));click("captureToggle");
     check(state(QString("captureProvider.running && captureProvider.port===%1").arg(capturePort)).toBool(),"capture toggle starts the actual loopback listener");
+    check(item("captureStateFlow")&&item("captureStateFlow")->property("phase")=="succeeded","capture flow follows the actual listener state after native toggle input");
     click("captureToggle");check(state("!captureProvider.running").toBool(),"capture toggle closes the listener");
     click("nav-tls");click("certificateAction-0");check(wait([&]{return state("captureProvider.tls.ready").toBool();}),"certificate action generates an actual protected local CA");
     check(state("!captureProvider.tls.enabled && !captureProvider.tls.trusted").toBool(),"CA generation keeps interception and system trust opt-in");
-    click("tlsToggle");check(state("captureProvider.tls.enabled").toBool(),"TLS control enables interception after certificate creation");click("tlsToggle");
+    click("tlsToggle");check(state("captureProvider.tls.enabled").toBool(),"TLS control enables interception after certificate creation");
+    check(item("tlsStateFlow")&&item("tlsStateFlow")->property("phase")=="succeeded","TLS flow follows actual interception state after native toggle input");click("tlsToggle");
     click("nav-featurehub");click("settings-dns");
     const auto nativeHandle=window->winId();
     check(state("AppState.currentPage==='dns' && pageLoader.item!==null").toBool(),"DNS opens inside the main navigation host");
