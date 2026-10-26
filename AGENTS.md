@@ -1,4 +1,13 @@
-# Current UI V2 staged work (2026-10-24)
+# Current Swirl 3.0 APEC redesign (2026-10-27)
+
+- Current isolated branch: `work/swirl-apec-v3-20261027`, based on remote `80955a98ef225fb799acb190967e8da4f41e719d`. Read `docs/SWIRL_V3_APEC_BASELINE.md`, `docs/APEC_2026_VISUAL_RESEARCH.md` and `docs/SWIRL_V3_APEC_DESIGN.md`.
+- The current user authorizes full UI/layout/brand/motion redesign and explicitly removes old fixed 14dp/sidebar/Activity layout restrictions and the requirement to use a fixed set of four skills. Preserve actual functionality, font initialization fencing, transaction receipts, page continuity and runtime isolation. Do not modify main/test/other windows or force-push.
+- The user requires the latest stable Qt; this stage targets official Qt 6.12.0 with a >=6.12 project minimum. Recheck the official stable release before a later upgrade, pin the tested SDK and use independent build caches. Do not silently use 6.10.3. Verify SDK/compiler compatibility from actual binaries, not only repository labels.
+- Model checkpoints are user-directed: Astra Max for research and Logo; notify before Astra Ultra for glass/Design System, GPT-6.1 Sol Ultra for all QML pages, Astra Ultra for motion, and Astra Max for final review. Do not silently change the parent chat model.
+- Prior uncommitted UI work is preserved locally under `work/inherited-ui-20261027` with SHA256 manifest. It is not merged or accepted yet. Review it in the page migration stage, including the three new settings panes; leave its original worktree untouched.
+- Stage packages are incremental candidates, not completion of Swirl 3.0. Keep source SHA, application/installer version and tests consistent. Native GPU/high-refresh/DPI/private-network acceptance requires separate evidence; software scenegraph screenshots do not accept glass shaders.
+
+# Historical UI V2 staged work (2026-10-24)
 
 - Current screenshot feedback iteration is 0.2.11: read `docs/UI_V2_VISUAL_FEEDBACK_0211.md`. Use 14dp Activity/same-level cards with the existing 14 DIP window/sidebar contours; light near-white #FAFAFA canvas is shared beneath the sidebar without its old gray overlay. Preserve the sidebar contour/shadow and all navigation/motion. The default policy's real picker has a persistent “更换出口” affordance; do not restore the inert center chevron. Keep isolated native evidence separate from desktop/DPI/private-network acceptance.
 - Preserve the 0.2.11 font-binding initialization fence: async Connections targets, axes publication and refresh scheduling activate only after component completion. The production startup gate reproduced a Qt metadata crash during incubation; three subsequent 61-page rapid smoke runs and the live font integration test passed. Do not hide this by disabling async loading, motion, caches or font axes.
