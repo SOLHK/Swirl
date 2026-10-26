@@ -16,7 +16,9 @@ env:
 
 concurrency:
   group: swirl-quick-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Finish the current verified stage so first-time Qt compilation can save its
+  # cache and installer evidence before the next stage starts.
+  cancel-in-progress: false
 
 jobs:
   build-qt-ui:
