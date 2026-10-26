@@ -4,6 +4,7 @@
 #include <QQmlProperty>
 #include <QQuickImageProvider>
 #include <QQuickStyle>
+#include <QLibraryInfo>
 #include <QSignalSpy>
 #include <QMetaProperty>
 #include <QEvent>
@@ -65,11 +66,13 @@ void FontTests::qmlLiveAutomaticFonts()
     // Context services must outlive the engine's Theme singleton.
     QScopedPointer<QObject> serviceObject;
     QQmlEngine engine;
-    // The full application build creates a SwirlQuick/qmldir beside this test
-    // executable which prefers resources linked only into Swirl.exe. Keep this
-    // source-based fixture independent of that unrelated application module.
-    auto importPaths=engine.importPathList();
-    importPaths.removeAll(QCoreApplication::applicationDirPath());
+    // MergeQtConf can add the parent build root ahead of the actual Qt SDK.
+    // Its SwirlQuick/qmldir prefers resources linked only into Swirl.exe.
+    // This fixture registers Swirl types from source. Keep every SDK import
+    // root (path() alone returns only the first), excluding the app module.
+    auto importPaths=QLibraryInfo::paths(QLibraryInfo::QmlImportsPath);
+    importPaths.removeIf([](const QString &path){return QFile::exists(path+"/SwirlQuick/qmldir");});
+    importPaths.append({QStringLiteral("qrc:/qt/qml"),QStringLiteral("qrc:/qt-project.org/imports")});
     engine.setImportPathList(importPaths);
     QObject::connect(&engine, &QQmlEngine::warnings, &engine, [&](const QList<QQmlError> &errors) {
         for (const auto &error : errors) warnings.append(error.toString());
