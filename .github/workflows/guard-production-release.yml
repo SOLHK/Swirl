@@ -19,16 +19,16 @@ jobs:
         if: github.event_name == 'pull_request'
         shell: bash
         env:
-          GITHUB_TOKEN: \${{ github.token }}
-          SOURCE_BRANCH: \${{ github.head_ref }}
-          SOURCE_REPO: \${{ github.event.pull_request.head.repo.full_name }}
-          TARGET_REPO: \${{ github.repository }}
-          TARGET_BRANCH: \${{ github.base_ref }}
-          LABEL_PRESENT: \${{ contains(github.event.pull_request.labels.*.name, 'release-approved') }}
-          IS_DRAFT: \${{ github.event.pull_request.draft }}
-          CANDIDATE_SHA: \${{ github.event.pull_request.head.sha }}
-          PR_NUMBER: \${{ github.event.pull_request.number }}
-          RELEASE_OWNER: \${{ github.repository_owner }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_BRANCH: ${{ github.head_ref }}
+          SOURCE_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          TARGET_REPO: ${{ github.repository }}
+          TARGET_BRANCH: ${{ github.base_ref }}
+          LABEL_PRESENT: ${{ contains(github.event.pull_request.labels.*.name, 'release-approved') }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RELEASE_OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
           if [[ "$SOURCE_BRANCH" != "test" || "$SOURCE_REPO" != "$TARGET_REPO" || "$TARGET_BRANCH" != "main" ]]; then
