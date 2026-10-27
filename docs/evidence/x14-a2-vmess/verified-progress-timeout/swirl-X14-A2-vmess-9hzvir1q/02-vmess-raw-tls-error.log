@@ -1,0 +1,6 @@
+2026/10/22 22:07:33.322145 [Debug] app/log: Logger started
+2026/10/22 22:07:33.322279 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:52197
+2026/10/22 22:07:33.324309 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:52197
+2026/10/22 22:07:33.325543 [Warning] core: Xray 26.10.21 started
+2026/10/22 22:07:33.330708 [Info] [1070566831] app/proxyman/inbound: connection ends > proxy/vmess/encoding: failed to read request header > EOF
+2026/10/22 22:07:33.336451 [Info] [4144087337] app/proxyman/inbound: connection ends > proxy/vmess/inbound: invalid request from 127.0.0.1:60862 > proxy/vmess/encoding: invalid user > user do not exist

@@ -1,0 +1,353 @@
+4: Font rendering "offscreen" "HarmonyOS Sans SC" NativeRendering / FullHinting
+4: Window composition: Opaque: offscreen renderer
+4: MOTION_POLICY {"systemReduced":false,"followSystem":false,"applicationReduced":false,"effectiveReduced":false,"expandDuration":360}
+4: HDR_OUTPUT SDR fallback emissive= false SDR white scale= 1 peak= 1
+4: PASS controlled real TCP endpoints start
+4: PASS QML expression valid
+4: PASS node navigation animation settles before input
+4: PASS node page starts empty without starting engine
+4: PASS node input exists and is enabled
+4: PASS node field exists
+4: PASS node field exists
+4: PASS node field exists
+4: PASS node input exists and is enabled
+4: PASS invalid host rejected through UI without fake save
+4: PASS node field exists
+4: PASS node input exists and is enabled
+4: PASS UI saves first real node
+4: PASS node input exists and is enabled
+4: PASS node field exists
+4: PASS node field exists
+4: PASS node field exists
+4: PASS node field exists
+4: PASS node field exists
+4: PASS credential field is masked
+4: PASS node input exists and is enabled
+4: PASS UI saves authenticated SOCKS5 node
+4: PASS distinct UI TCP/UDP and control ports are reserved together
+4: PASS QML expression valid
+4: PASS real node table exists
+4: PASS node card settles before next coordinate-based input
+4: PASS node input exists and is enabled
+4: PASS UI starts actual configured engine
+4: PASS running engine does not imply successful request
+4: PASS node field exists
+4: PASS node input exists and is enabled
+4: PASS UI real request passes only through selected node A
+4: PASS QML expression valid
+4: PASS live navigation settles inside the main host
+4: PASS all settings routes preserve the real running proxy and selected node
+4: PASS QML expression valid
+4: PASS live navigation settles inside the main host
+4: PASS all settings routes preserve the real running proxy and selected node
+4: PASS QML expression valid
+4: PASS live navigation settles inside the main host
+4: PASS all settings routes preserve the real running proxy and selected node
+4: PASS QML expression valid
+4: PASS live navigation settles inside the main host
+4: PASS all settings routes preserve the real running proxy and selected node
+4: PASS QML expression valid
+4: PASS live navigation settles inside the main host
+4: PASS all settings routes preserve the real running proxy and selected node
+4: PASS QML expression valid
+4: PASS live navigation settles inside the main host
+4: PASS all settings routes preserve the real running proxy and selected node
+4: PASS QML expression valid
+4: PASS live navigation settles inside the main host
+4: PASS all settings routes preserve the real running proxy and selected node
+4: PASS QML expression valid
+4: PASS live navigation settles inside the main host
+4: PASS all settings routes preserve the real running proxy and selected node
+4: PASS QML expression valid
+4: PASS live navigation settles inside the main host
+4: PASS all settings routes preserve the real running proxy and selected node
+4: PASS QML expression valid
+4: PASS real node table exists
+4: PASS node card settles before next coordinate-based input
+4: PASS row selection switches real engine node without restarting
+4: PASS new selected node has no inherited request result
+4: PASS node input exists and is enabled
+4: PASS UI new requests use authenticated selected node B
+4: PASS visible request state follows actual result
+4: PASS node input exists and is enabled
+4: PASS UI disconnect reaps engine
+4: PASS disconnect clears stale request success text
+4: PASS QML expression valid
+4: PASS real node table exists
+4: PASS node card settles before next coordinate-based input
+4: PASS node input exists and is enabled
+4: PASS editing never reveals stored credentials
+4: PASS node field exists
+4: PASS node input exists and is enabled
+4: PASS UI edits saved metadata
+4: PASS node input exists and is enabled
+4: PASS UI deletes selected node
+4: PASS QML expression valid
+4: PASS real node table exists
+4: PASS node card settles before next coordinate-based input
+4: PASS node input exists and is enabled
+4: PASS UI removes all saved test nodes
+4: PASS test cleanup reaps engine
+4: PASS disconnected proxy port is reusable
+4: PASS node input exists and is enabled
+4: PASS node field exists
+4: PASS node input exists and is enabled
+4: PASS UI import rejects invalid YAML without modifying stored nodes
+4: PASS node field exists
+4: PASS node input exists and is enabled
+4: PASS UI one-click import saves an actual controlled proxy configuration
+4: PASS import clears credential-bearing input after submission
+4: PASS QML expression valid
+4: PASS real node table exists
+4: PASS node card settles before next coordinate-based input
+4: PASS node input exists and is enabled
+4: PASS UI imported node starts configured Rust engine
+4: PASS node field exists
+4: PASS node input exists and is enabled
+4: PASS UI imported node forwards a real HTTP request
+4: PASS UI imported node cleanup reaps owned engine
+4: PASS subscription HTTPS fixture listens
+4: PASS QML expression valid
+4: PASS node input exists and is enabled
+4: PASS node field exists
+4: PASS node field exists
+4: PASS node input exists and is enabled
+4: PASS subscription UI saves HTTPS source and imports an actual node
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS country filter contains only the imported subscription's actual Hong Kong label
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS country filter combines with the real imported node list
+4: PASS manual node adds a second region outside the subscription
+4: PASS QML expression valid
+4: PASS all sources exposes both actual regions
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS Japan selection shows only the manual Japan node
+4: PASS node field exists
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS search, protocol and country filters compose
+4: PASS node field exists
+4: PASS QML expression valid
+4: PASS combined filters never leak unmatched nodes
+4: PASS node field exists
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS switching subscription scopes countries and clears a country absent from that source
+4: PASS remove manual filter fixture
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS node input exists and is enabled
+4: PASS subscription details animate open without replacing the card
+4: PASS node input exists and is enabled
+4: PASS editing subscription keeps its protected URL hidden
+4: PASS node field exists
+4: PASS node input exists and is enabled
+4: PASS editing preserves encrypted URL and refreshes the real source
+4: PASS subscription refresh keeps the same card delegate and expanded state
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS subscription refresh replaces country options and clears an obsolete country selection
+4: PASS QML expression valid
+4: PASS node input exists and is enabled
+4: PASS failed real refresh displays an error and retains imported nodes
+4: PASS node input exists and is enabled
+4: PASS Escape cancels destructive subscription confirmation
+4: PASS node input exists and is enabled
+4: PASS node input exists and is enabled
+4: PASS confirmed deletion retains nodes as documented
+4: PASS 180-node fixture imported
+4: PASS QML expression valid
+4: PASS all four columns fit minimum-width node viewport
+4: PASS node flight intersects horizontal and vertical clipping ancestors
+4: PASS invisible row uses explicit fallback origin
+4: PASS node reversal preserves content opacity at the handler handoff
+4: PASS node reopen preserves partially revealed content at the handler handoff
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS QML expression valid
+4: PASS 180 rapid node selections settle
+4: PASS QML expression valid
+4: PASS last of 180 rapid detail retargets retains its selected node
+4: PASS settled node details return to scroll ownership
+4: Node UI checks: 348 checks, 0 failures

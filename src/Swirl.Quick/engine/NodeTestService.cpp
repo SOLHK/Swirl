@@ -1,38 +1,20 @@
 #include "NodeTestService.h"
-#ifdef SWIRL_USE_RUST_CORE
 #include "RustCoreEngine.h"
-#else
-#include "MihomoAdapter.h"
-#include "SwirlProxyEngine.h"
-#include "SwirlProtocolRegistry.h"
-#endif
-#include <QTcpServer>
+#include "ThreadedEngine.h"
 #include <QSet>
 #include <QDateTime>
 #include <QPointer>
-#include <QUdpSocket>
-namespace {
-quint16 freePort(quint16 excludedPort=0){
- QTcpServer tcp;QUdpSocket udp;
- for(int attempt=0;attempt<16;++attempt){
-  if(!tcp.listen(QHostAddress::LocalHost,0))return 0;
-  if(tcp.serverPort()!=excludedPort && udp.bind(QHostAddress::LocalHost,tcp.serverPort(),QUdpSocket::DontShareAddress))return tcp.serverPort();
-  tcp.close();
- }
- return 0;
-}
-}
+#include <QCryptographicHash>
 NodeTestService::~NodeTestService(){cancel();}
+QString NodeTestService::nodeReference(const QString &id){
+ return QString::fromLatin1(QCryptographicHash::hash(id.toUtf8(),QCryptographicHash::Sha256).toHex().left(12));
+}
 EngineStartOptions NodeTestService::isolatedOptions(const EngineStartOptions &source){
- // Build a probe session from an allowlist. Copying the live session could
- // spawn three competing TUN/DNS/route owners during a latency test.
+ // Keep only node data. A test must not inherit saved TUN, LAN, routing,
+ // authentication, external executable paths or the live resolver owner.
  EngineStartOptions result;
- result.executablePath=source.executablePath;result.expectedSha256=source.expectedSha256;result.expectedVersion=source.expectedVersion;
- result.nodes=source.nodes;result.rulesDirectory=source.rulesDirectory;
- result.preferCompatibility=source.preferCompatibility;
- // Keep live DNS settings out of isolated probes: they may point back to a
- // session-owned resolver. The probe uses Rust's default DNS configuration;
- // target lookup still follows the selected outbound's protocol semantics.
+ result.nodes=source.nodes;
+ result.proxyPort=0;result.internalProbeListener=true;
  result.routingMode="global";result.smartRouting=false;
  result.healthIntervalMs=2000;result.requestTimeoutMs=3000;result.startupTimeoutMs=20000;
  return result;
@@ -40,61 +22,93 @@ EngineStartOptions NodeTestService::isolatedOptions(const EngineStartOptions &so
 void NodeTestService::start(const EngineStartOptions &options,const QStringList &ids,const QUrl &url){
  if(busy())return;
  if(!url.isValid()||(url.scheme()!="https"&&url.scheme()!="http")||url.host().isEmpty()||!url.userInfo().isEmpty()||url.hasFragment()||url.toString().size()>2048){m_message="测试地址必须为有效且不含凭据的 HTTP/HTTPS URL";emit changed();return;}
- m_options=options;m_url=url;m_completed=0;m_succeeded=0;m_failed=0;m_queue.clear();
- for(const auto &id:ids)if(!m_queue.contains(id)){bool found=false;for(const auto &n:options.nodes)if(n.id==id)found=true;if(found)m_queue.enqueue(id);}
- for(const auto &id:m_queue)m_results.remove(id);
+ m_options=isolatedOptions(options);m_url=url;m_completed=0;m_succeeded=0;m_failed=0;m_queue.clear();
+ QSet<QString> available;for(const auto &node:options.nodes)available.insert(node.id);
+ QSet<QString> queued;for(const auto &id:ids)if(available.contains(id)&&!queued.contains(id)){queued.insert(id);m_queue.enqueue(id);m_results.remove(id);}
  m_total=m_queue.size();m_message=m_total?"正在独立测试节点":"没有可测试的节点";emit changed();next();
 }
+ProxyEngine *NodeTestService::createWorker(){
+ auto *runner=new ThreadedEngine(this);
+ auto *deadline=new QTimer(runner);deadline->setObjectName("probeDeadline");deadline->setSingleShot(true);deadline->setInterval(40000);
+ connect(deadline,&QTimer::timeout,this,[this,runner]{
+  const auto id=runner->property("probeNodeId").toString();
+  if(!id.isEmpty())finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"phase","timeout"},{"failureCode","ProbeDeadlineExceeded"},{"error","节点测试超时"}});
+ });
+ connect(runner,&ProxyEngine::diagnostic,this,[this,runner](const QString &,const QString &code,const QString &message){
+  // A rejected configure keeps the old runtime alive. It must still finish the
+  // newly assigned node as a failure, without testing the previous node.
+  if(code!="SelectionUnsupported"&&code!="SelectionFailed")return;
+  const auto id=runner->property("probeNodeId").toString();
+  if(!id.isEmpty())finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"phase","configuration"},{"failureCode",code},{"error",message}});
+ });
+ connect(runner,&ProxyEngine::statusChanged,this,[this,runner]{
+  const auto id=runner->property("probeNodeId").toString();
+  if(id.isEmpty()||m_running.value(id)!=runner)return;
+  const auto status=runner->status();
+  if(status.state==ProxyEngine::State::Failed){finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"phase","startup"},{"failureCode","CoreStartupFailed"},{"engineError",int(status.error)},{"error",status.message}});return;}
+  // Worker snapshots can already be queued while the next node is assigned.
+  // Never let an old node's success satisfy a new node's test.
+  if(status.selectedNodeId!=id)return;
+  if(status.apiHealthy&&!runner->property("probeStarted").toBool()){
+   runner->setProperty("probeStarted",true);
+   // Give a catalogue mutation/cancellation observed with this snapshot a
+   // chance to revoke the request before it is posted to the network thread.
+   // The runner context also cancels this callback when it is destroyed.
+   QTimer::singleShot(0,runner,[this,runner,id,url=m_url]{
+    if(m_running.value(id)!=runner||runner->property("probeNodeId").toString()!=id)return;
+    runner->probeNode(url);
+   });return;
+  }
+  if(!runner->property("probeStarted").toBool()||status.nodeBusy)return;
+  if(status.requestState!=ProxyEngine::RequestState::Succeeded&&status.requestState!=ProxyEngine::RequestState::Failed&&status.nodeHealth!=ProxyEngine::NodeHealth::Unavailable)return;
+  const auto phase=!status.probeFailureStage.isEmpty()?status.probeFailureStage:status.nodeHealth==ProxyEngine::NodeHealth::Unavailable?QString("availability"):QString("request");
+  finish(id,runner,{{"success",status.requestState==ProxyEngine::RequestState::Succeeded},{"latency",status.latencyMs},{"http",status.responseCode},{"phase",phase},
+   {"failureCode",status.probeFailureCode},
+   {"error",status.requestState==ProxyEngine::RequestState::Succeeded?QString():status.nodeMessage},
+   {"outboundConnectMs",status.probeOutboundConnectMs},{"originTlsMs",status.probeOriginTlsMs}});
+ });
+ return runner;
+}
 void NodeTestService::next(){
- while(m_running.size()+m_retiring.size()<3&&!m_queue.isEmpty()){
-  const auto id=m_queue.dequeue();auto opts=isolatedOptions(m_options);opts.selectedNodeId=id;opts.controlPort=freePort();opts.proxyPort=freePort(opts.controlPort);opts.healthIntervalMs=2000;opts.requestTimeoutMs=3000;opts.startupTimeoutMs=20000;
-  // Include only the selected node and its explicit dialer dependencies.
-  QSet<QString> needed{id};bool added=true;while(added){added=false;for(const auto &node:m_options.nodes)if(needed.contains(node.id)){const auto dependency=node.parameters.value("dialer-proxy").toString();for(const auto &other:m_options.nodes)if(other.sourceId==node.sourceId&&(other.name==dependency||other.id==dependency)&&!needed.contains(other.id)){needed.insert(other.id);added=true;}}}
-  opts.nodes.clear();for(const auto &node:m_options.nodes)if(needed.contains(node.id))opts.nodes.append(node);
-  // Test a natively supported node through its actual native implementation.
-  // No automatic compatibility retry can turn a native failure into success.
-#ifdef SWIRL_USE_RUST_CORE
-  ProxyEngine *runner=new RustCoreEngine(this);
-  runner->setProperty("probeEngineKind","rust");
-#else
-  const bool native=SwirlProtocolRegistry::nativeSessionReason(opts).isEmpty();
-  ProxyEngine *runner=native?static_cast<ProxyEngine *>(new SwirlProxyEngine(this)):static_cast<ProxyEngine *>(new MihomoAdapter(this));
-  runner->setProperty("probeEngineKind",native?"native":"compatibility");
-#endif
-  m_running[id]=runner;auto deadline=new QTimer(runner);deadline->setSingleShot(true);deadline->setInterval(40000);
-  connect(deadline,&QTimer::timeout,this,[this,runner,id]{finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"error","节点测试超时"}});});deadline->start();
-  connect(runner,&ProxyEngine::statusChanged,this,[this,runner,id]{
-   if(m_running.value(id)!=runner)return;const auto status=runner->status();
-   if(status.state==ProxyEngine::State::Failed){finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"phase","startup"},{"engineError",int(status.error)},{"error",status.message}});return;}
-   if(status.apiHealthy&&!runner->property("probeStarted").toBool()){runner->setProperty("probeStarted",true);QPointer<ProxyEngine> guard(runner);QTimer::singleShot(0,runner,[this,guard]{if(guard)guard->probeNode(m_url);});}
-   if(runner->property("probeStarted").toBool()&&!status.nodeBusy&&(status.requestState==ProxyEngine::RequestState::Succeeded||status.requestState==ProxyEngine::RequestState::Failed||status.nodeHealth==ProxyEngine::NodeHealth::Unavailable)){
-    QString phase=status.nodeHealth==ProxyEngine::NodeHealth::Unavailable?"availability":"request";
-#ifdef SWIRL_USE_RUST_CORE
-    const auto probeStage=static_cast<RustCoreEngine *>(runner)->probeFailureStage();
-    if(!probeStage.isEmpty())phase=probeStage;
-#endif
-    QVariantMap result{{"success",status.requestState==ProxyEngine::RequestState::Succeeded},{"latency",status.latencyMs},{"http",status.responseCode},{"phase",phase},{"error",status.requestState==ProxyEngine::RequestState::Succeeded?QString():status.nodeMessage}};
-#ifdef SWIRL_USE_RUST_CORE
-    const auto *rust=static_cast<RustCoreEngine *>(runner);
-    result.insert("outboundConnectMs",rust->probeOutboundConnectMs());
-    result.insert("originTlsMs",rust->probeOriginTlsMs());
-#endif
-    finish(id,runner,result);
-   }
-  });runner->start(opts);
+ while(!m_queue.isEmpty()&&(!m_idle.isEmpty()||m_running.size()+m_retiring.size()<3)){
+  const auto id=m_queue.dequeue();auto opts=m_options;opts.selectedNodeId=id;
+  // Validate imported data before reserving a runtime. Unsupported nodes stay
+  // in the catalogue and receive an explicit per-node failure.
+  QJsonObject configuration;const auto reason=RustCoreEngine::configuration(opts,&configuration);
+  if(!reason.isEmpty()){record(id,{{"success",false},{"latency",-1},{"http",0},{"phase","configuration"},{"failureCode","NodeConfigurationRejected"},{"error",reason}});continue;}
+  const bool reuse=!m_idle.isEmpty();
+  // The Rust worker owns its TCP bind from allocation onward. A temporary Qt
+  // TCP/UDP reservation could reject a valid TCP-only probe or lose the port
+  // before Rust starts. No application proxy, UDP gate or port handoff is used.
+  auto *runner=reuse?m_idle.dequeue():createWorker();
+  m_running[id]=runner;runner->setProperty("probeNodeId",id);runner->setProperty("probeStarted",false);
+  runner->findChild<QTimer *>("probeDeadline")->start();
+  // Rust's configure operation reuses the existing Tokio runtime/listener and
+  // invalidates old probe state. Only the fresh network request is measured.
+  if(reuse)runner->selectNode(id);else runner->start(opts);
  }
+ if(m_queue.isEmpty()&&m_running.isEmpty()){
+  m_options={};
+  while(!m_idle.isEmpty())retire(m_idle.dequeue());
+ }
+ emit changed();
 }
 void NodeTestService::finish(const QString &id,ProxyEngine *runner,const QVariantMap &result){
- if(m_running.value(id)!=runner)return;m_running.remove(id);retire(runner);
- auto row=result;row["engineKind"]=runner->property("probeEngineKind");
- if(row.value("engineKind")==QStringLiteral("rust")){
-  row["metricType"]=QStringLiteral("http_headers");
-  row["resolverPolicy"]=QStringLiteral("isolated_default_dns");
- }
- row["time"]=QDateTime::currentDateTime().toString(Qt::ISODate);m_results[id]=row;++m_completed;if(row.value("success").toBool())++m_succeeded;else{++m_failed;emit diagnostic("NodeTestFailed",row.value("error").toString());}
- m_message=QString("%1/%2 · 成功 %3 · 失败 %4").arg(m_completed).arg(m_total).arg(m_succeeded).arg(m_failed);emit changed();QTimer::singleShot(0,this,&NodeTestService::next);
+ if(m_running.value(id)!=runner)return;
+ m_running.remove(id);runner->setProperty("probeNodeId",QString());runner->findChild<QTimer *>("probeDeadline")->stop();
+ const auto status=runner->status();
+ if(status.apiHealthy&&status.processAlive&&result.value("phase")!="timeout")m_idle.enqueue(runner);else retire(runner);
+ record(id,result);QTimer::singleShot(0,this,&NodeTestService::next);
+}
+void NodeTestService::record(const QString &id,QVariantMap row){
+ row["nodeReference"]=nodeReference(id);
+ row["engineKind"]=QStringLiteral("rust");row["metricType"]=QStringLiteral("http_headers");row["resolverPolicy"]=QStringLiteral("isolated_default_dns");
+ row["time"]=QDateTime::currentDateTime().toString(Qt::ISODate);m_results[id]=row;++m_completed;
+ if(row.value("success").toBool())++m_succeeded;else{++m_failed;emit diagnostic("NodeTestFailed",QStringLiteral("节点 #%1 · %2 · %3 · %4").arg(row.value("nodeReference").toString(),row.value("phase").toString(),row.value("failureCode").toString(),row.value("error").toString()));}
+ m_message=QString("%1/%2 · 成功 %3 · 失败 %4").arg(m_completed).arg(m_total).arg(m_succeeded).arg(m_failed);emit changed();
 }
 void NodeTestService::retire(ProxyEngine *runner){
+ runner->setProperty("probeNodeId",QString());runner->findChild<QTimer *>("probeDeadline")->stop();
  runner->disconnect(this);m_retiring.insert(runner);
  const auto release=[this,runner]{
   if(runner->status().processAlive || runner->status().state==ProxyEngine::State::Stopping)return;
@@ -104,8 +118,16 @@ void NodeTestService::retire(ProxyEngine *runner){
  connect(runner,&ProxyEngine::statusChanged,this,release);runner->stop();release();
 }
 void NodeTestService::cancel(){
- m_queue.clear();const auto runners=m_running;m_running.clear();
+ m_queue.clear();m_options={};const auto runners=m_running;m_running.clear();
  for(auto runner:runners)retire(runner);
+ while(!m_idle.isEmpty())retire(m_idle.dequeue());
  if(!runners.isEmpty())m_message=QString("已取消 · 正在释放测试内核 · 完成 %1/%2").arg(m_completed).arg(m_total);
+ emit changed();
+}
+void NodeTestService::invalidateResults(){
+ const bool hadWork=busy()||!m_results.isEmpty();
+ if(!hadWork)return;
+ cancel();m_results.clear();m_completed=0;m_total=0;m_succeeded=0;m_failed=0;
+ m_message=QStringLiteral("节点库已更新，旧测试结果已清除；请对当前参数重新发起请求。");
  emit changed();
 }

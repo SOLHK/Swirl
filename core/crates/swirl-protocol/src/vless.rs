@@ -15,17 +15,30 @@ pub fn request(uuid: &str, target: &Target) -> Result<Vec<u8>> {
     request_with_flow(uuid, target, None)
 }
 
+pub(crate) fn request_udp(uuid: &str, target: &Target) -> Result<Vec<u8>> {
+    request_command(uuid, target, None, 2)
+}
+
 pub(crate) fn request_with_flow(
     uuid: &str,
     target: &Target,
     flow: Option<&str>,
+) -> Result<Vec<u8>> {
+    request_command(uuid, target, flow, 1)
+}
+
+fn request_command(
+    uuid: &str,
+    target: &Target,
+    flow: Option<&str>,
+    command: u8,
 ) -> Result<Vec<u8>> {
     let addons = crate::vision::request_addons(flow).map_err(|_| "VlessFlow")?;
     let id = swirl_subscription::uuid_bytes(uuid).ok_or("VlessUuid")?;
     let mut bytes = vec![0];
     bytes.extend(id);
     bytes.extend(addons);
-    bytes.push(1);
+    bytes.push(command);
     bytes.extend(target.port.to_be_bytes());
     match target.host.parse::<IpAddr>() {
         Ok(IpAddr::V4(ip)) => {

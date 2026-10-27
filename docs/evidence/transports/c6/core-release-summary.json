@@ -1,0 +1,74 @@
+{
+  "tests_run": 4,
+  "failures": 0,
+  "errors": 0,
+  "skips": 0,
+  "elapsed_seconds": 3.171,
+  "exit_code": 0,
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "public_network_tested": false,
+  "xray_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)\nA unified platform for anti-censorship.",
+  "cases": [
+    {
+      "case": "test_grpc_and_xhttp_maps_route_sessions_and_both_probe_types",
+      "peer": "01-vless-grpc-tls",
+      "authenticated_requests": 2
+    },
+    {
+      "case": "test_grpc_and_xhttp_maps_route_sessions_and_both_probe_types",
+      "peer": "02-vless-xhttp-tls",
+      "authenticated_requests": 2
+    },
+    {
+      "case": "test_grpc_and_xhttp_maps_route_sessions_and_both_probe_types",
+      "peer": "01-vless-grpc-tls",
+      "authenticated_requests": 4
+    },
+    {
+      "case": "test_grpc_and_xhttp_maps_route_sessions_and_both_probe_types",
+      "peer": "02-vless-xhttp-tls",
+      "authenticated_requests": 4
+    },
+    {
+      "case": "test_grpc_and_xhttp_maps_route_sessions_and_both_probe_types",
+      "negative_probe_errors": {
+        "grpc-node": {
+          "automatic": "PolicyProbeRead",
+          "manual": "UrlTestRead"
+        },
+        "xhttp-node": {
+          "automatic": "PolicyProbeRead",
+          "manual": "UrlTestRead"
+        }
+      },
+      "origin_http_requests": 4,
+      "origin_health_requests": 4
+    },
+    {
+      "case": "test_probe_cancellation_timeout_and_wss_runtime_payload",
+      "peer": "01-vless-ws-plain",
+      "authenticated_requests": 2
+    },
+    {
+      "case": "test_probe_cancellation_timeout_and_wss_runtime_payload",
+      "peer": "02-vless-ws-tls",
+      "authenticated_requests": 1
+    },
+    {
+      "case": "test_session_selection_and_reconfiguration_preserve_native_transport",
+      "peer": "03-vless-ws-plain",
+      "authenticated_requests": 3
+    },
+    {
+      "case": "test_session_selection_and_reconfiguration_preserve_native_transport",
+      "peer": "04-vless-ws-plain",
+      "authenticated_requests": 2
+    },
+    {
+      "case": "test_user_and_automatic_health_probes_share_the_native_transport",
+      "peer": "05-vless-ws-plain",
+      "authenticated_requests": 3
+    }
+  ],
+  "runtime_sha256": "2e2d8b43876f0a714876518824d8fbc7cadf86038219f11901b79d3662f29fa9"
+}

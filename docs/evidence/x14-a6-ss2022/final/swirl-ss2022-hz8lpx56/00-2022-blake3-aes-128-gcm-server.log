@@ -1,0 +1,14 @@
+2026-10-22T22:07:22.280861364+09:00  INFO main ThreadId(01) shadowsocks_rust::service::server: shadowsocks server 1.25.0 build 2026-08-26T23:15:24.779049808+00:00
+2026-10-22T22:07:22.281584796+09:00  INFO main ThreadId(01) shadowsocks_service::server::tcprelay: shadowsocks tcp server listening on 127.0.0.1:46719, inbound address 127.0.0.1:46719
+2026-10-22T22:07:22.28160154+09:00  INFO main ThreadId(01) shadowsocks_service::server::udprelay: shadowsocks udp server listening on 127.0.0.1:46719, inbound address 127.0.0.1:46719
+2026-10-22T22:07:22.3002734+09:00 DEBUG main ThreadId(01) shadowsocks_service::server::tcprelay: tcp handshake failed, received EOF before a complete target Address, peer: 127.0.0.1:42410
+2026-10-22T22:07:22.303281816+09:00 DEBUG main ThreadId(01) shadowsocks_service::server::udprelay: created udp association for 127.0.0.1:49173 with session 343429702899846027
+2026-10-22T22:07:22.303315876+09:00 DEBUG main ThreadId(01) shadowsocks::net::sys: IpStackCapability support_ipv4=true
+2026-10-22T22:07:22.303330949+09:00 DEBUG main ThreadId(01) shadowsocks::net::sys: IpStackCapability support_ipv6=true
+2026-10-22T22:07:22.303341534+09:00 DEBUG main ThreadId(01) shadowsocks::net::sys: IpStackCapability support_ipv4_mapped_ipv6=true
+2026-10-22T22:07:22.313177292+09:00 DEBUG main ThreadId(01) shadowsocks_service::server::udprelay: created udp association for 127.0.0.1:48295 with session 2648866731441479748
+2026-10-22T22:07:22.31981291+09:00 DEBUG main ThreadId(01) shadowsocks_service::server::udprelay: created udp association for 127.0.0.1:44474 with session 11681256335578337752
+2026-10-22T22:07:22.376326452+09:00  INFO main ThreadId(01) shadowsocks_rust::monitor::imp: received SIGTERM, exiting
+2026-10-22T22:07:22.376473871+09:00 DEBUG main ThreadId(01) shadowsocks_service::server::udprelay: udp association for 127.0.0.1:49173 is closed
+2026-10-22T22:07:22.376503334+09:00 DEBUG main ThreadId(01) shadowsocks_service::server::udprelay: udp association for 127.0.0.1:48295 is closed
+2026-10-22T22:07:22.376515853+09:00 DEBUG main ThreadId(01) shadowsocks_service::server::udprelay: udp association for 127.0.0.1:44474 is closed

@@ -1,0 +1,65 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 0.377,
+    "log": "fmt.log"
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "--workspace",
+      "--locked"
+    ],
+    "exit_code": 0,
+    "seconds": 1.147,
+    "log": "check.log"
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 1.508,
+    "log": "clippy.log"
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--workspace",
+      "--locked"
+    ],
+    "exit_code": 0,
+    "seconds": 15.708,
+    "log": "test.log"
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--locked",
+      "-p",
+      "swirl-protocol",
+      "--example",
+      "transport-client"
+    ],
+    "exit_code": 0,
+    "seconds": 2.559,
+    "log": "build-client.log"
+  }
+]

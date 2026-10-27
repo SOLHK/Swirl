@@ -1,0 +1,13 @@
+{
+  "timestamp_utc": "2026-10-22T13:26:35.926672+00:00",
+  "scope": "Linux local workspace gates, not official or Qt acceptance",
+  "fmt": "passed",
+  "check": "passed",
+  "clippy": "passed",
+  "test": {
+    "passed": 631,
+    "failed": 0,
+    "ignored": 0,
+    "suites": 37
+  }
+}

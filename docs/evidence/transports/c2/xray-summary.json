@@ -1,0 +1,1190 @@
+{
+  "stage": "C2",
+  "independent_server": "Xray 26.10.21 / 1b1647c",
+  "test_command": [
+    "python3",
+    "tools/tests/test_transport_grpc_xray.py",
+    "-v"
+  ],
+  "test_exit_code": 0,
+  "test_methods": 11,
+  "failed": 0,
+  "skipped": 0,
+  "rust_tests_passed": 430,
+  "server_accepted_requests": 27,
+  "client_attempts": 37,
+  "successful_payloads": 24,
+  "expected_negative_attempts": 13,
+  "public_node_tested": false,
+  "fixtures": [
+    {
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "records": [
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 0,
+          "elapsed_ms": 15.542,
+          "result": {
+            "close": "clean",
+            "close_detail": null,
+            "connect_us": 3138,
+            "downloaded": 131328,
+            "driver_drain_us": 2508,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+            "transfer_us": 6067,
+            "uploaded": 69
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 0,
+          "elapsed_ms": 17.953,
+          "result": {
+            "close": "clean",
+            "close_detail": null,
+            "connect_us": 2892,
+            "downloaded": 131328,
+            "driver_drain_us": 3155,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+            "transfer_us": 8105,
+            "uploaded": 69
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 0,
+          "elapsed_ms": 17.361,
+          "result": {
+            "close": "clean",
+            "close_detail": null,
+            "connect_us": 3192,
+            "downloaded": 131328,
+            "driver_drain_us": 3159,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+            "transfer_us": 7042,
+            "uploaded": 69
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 0,
+          "elapsed_ms": 19.172,
+          "result": {
+            "close": "clean",
+            "close_detail": null,
+            "connect_us": 3026,
+            "downloaded": 131328,
+            "driver_drain_us": 3208,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+            "transfer_us": 8817,
+            "uploaded": 69
+          }
+        }
+      ],
+      "cleanup_errors": [],
+      "origins": [
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "records": [
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 1,
+          "elapsed_ms": 2.091,
+          "result": {
+            "error": "InputSyntax",
+            "ok": false
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 1,
+          "elapsed_ms": 2.366,
+          "result": {
+            "error": "InputSyntax",
+            "ok": false
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 1,
+          "elapsed_ms": 1.804,
+          "result": {
+            "error": "InputSyntax",
+            "ok": false
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 1,
+          "elapsed_ms": 2.607,
+          "result": {
+            "driver_drain_us": 7,
+            "error": "Http2ReservedHeader",
+            "ok": false,
+            "remaining_tasks": 0
+          }
+        }
+      ],
+      "cleanup_errors": [],
+      "origins": [
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 0,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "records": [
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "trojan",
+          "tls": true,
+          "reality": false,
+          "target_tls": true,
+          "mode": "http",
+          "exit_code": 0,
+          "elapsed_ms": 59.888,
+          "result": {
+            "close": "clean",
+            "close_detail": null,
+            "connect_us": 3368,
+            "downloaded": 131328,
+            "driver_drain_us": 3847,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+            "transfer_us": 44172,
+            "uploaded": 69
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "trojan",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 1,
+          "elapsed_ms": 10.404,
+          "result": {
+            "driver_drain_us": 3297,
+            "error": "HttpRead",
+            "ok": false,
+            "remaining_tasks": 0
+          }
+        }
+      ],
+      "cleanup_errors": [],
+      "origins": [
+        {
+          "mode": "http",
+          "tls": true,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 1,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 0,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "records": [
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "echo",
+          "exit_code": 0,
+          "elapsed_ms": 1546.025,
+          "result": {
+            "close": "clean",
+            "close_detail": null,
+            "connect_us": 2719,
+            "downloaded": 8388609,
+            "driver_drain_us": 3343,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "49229fb49c498aa71921dbc196f55a402dafc6664d84b5e0c8dab93929a62528",
+            "transfer_us": 530741,
+            "uploaded": 8388617
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "echo",
+          "exit_code": 0,
+          "elapsed_ms": 1602.211,
+          "result": {
+            "close": "clean",
+            "close_detail": null,
+            "connect_us": 4494,
+            "downloaded": 8388609,
+            "driver_drain_us": 3196,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "49229fb49c498aa71921dbc196f55a402dafc6664d84b5e0c8dab93929a62528",
+            "transfer_us": 588052,
+            "uploaded": 8388617
+          }
+        }
+      ],
+      "cleanup_errors": [],
+      "origins": [
+        {
+          "mode": "echo",
+          "tls": false,
+          "requests": 1,
+          "received": 8388609,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "echo",
+          "tls": false,
+          "requests": 1,
+          "received": 8388609,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "records": [
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "cancel",
+          "exit_code": 0,
+          "elapsed_ms": 45.86,
+          "result": {
+            "close": "cancelled",
+            "close_detail": null,
+            "connect_us": 3278,
+            "downloaded": 262147,
+            "driver_drain_us": 2819,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "8661a281b4be4aece91d1304ed4e7cd2cf8853ee19c143b4e6c4baf72138c652",
+            "transfer_us": 34883,
+            "uploaded": 262155
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "cancel",
+          "exit_code": 0,
+          "elapsed_ms": 47.349,
+          "result": {
+            "close": "cancelled",
+            "close_detail": null,
+            "connect_us": 3748,
+            "downloaded": 262147,
+            "driver_drain_us": 685,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "8661a281b4be4aece91d1304ed4e7cd2cf8853ee19c143b4e6c4baf72138c652",
+            "transfer_us": 37850,
+            "uploaded": 262155
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "cancel",
+          "exit_code": 0,
+          "elapsed_ms": 56.284,
+          "result": {
+            "close": "cancelled",
+            "close_detail": null,
+            "connect_us": 4845,
+            "downloaded": 262147,
+            "driver_drain_us": 3401,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "8661a281b4be4aece91d1304ed4e7cd2cf8853ee19c143b4e6c4baf72138c652",
+            "transfer_us": 44436,
+            "uploaded": 262155
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "cancel",
+          "exit_code": 0,
+          "elapsed_ms": 60.095,
+          "result": {
+            "close": "cancelled",
+            "close_detail": null,
+            "connect_us": 6462,
+            "downloaded": 262147,
+            "driver_drain_us": 3210,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "8661a281b4be4aece91d1304ed4e7cd2cf8853ee19c143b4e6c4baf72138c652",
+            "transfer_us": 43299,
+            "uploaded": 262155
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "cancel",
+          "exit_code": 0,
+          "elapsed_ms": 78.902,
+          "result": {
+            "close": "cancelled",
+            "close_detail": null,
+            "connect_us": 3197,
+            "downloaded": 262147,
+            "driver_drain_us": 4891,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "8661a281b4be4aece91d1304ed4e7cd2cf8853ee19c143b4e6c4baf72138c652",
+            "transfer_us": 67024,
+            "uploaded": 262155
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "cancel",
+          "exit_code": 0,
+          "elapsed_ms": 76.932,
+          "result": {
+            "close": "cancelled",
+            "close_detail": null,
+            "connect_us": 2787,
+            "downloaded": 262147,
+            "driver_drain_us": 3458,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "8661a281b4be4aece91d1304ed4e7cd2cf8853ee19c143b4e6c4baf72138c652",
+            "transfer_us": 66450,
+            "uploaded": 262155
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "cancel",
+          "exit_code": 0,
+          "elapsed_ms": 79.263,
+          "result": {
+            "close": "cancelled",
+            "close_detail": null,
+            "connect_us": 5414,
+            "downloaded": 262147,
+            "driver_drain_us": 3292,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "8661a281b4be4aece91d1304ed4e7cd2cf8853ee19c143b4e6c4baf72138c652",
+            "transfer_us": 64055,
+            "uploaded": 262155
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "cancel",
+          "exit_code": 0,
+          "elapsed_ms": 86.591,
+          "result": {
+            "close": "cancelled",
+            "close_detail": null,
+            "connect_us": 10272,
+            "downloaded": 262147,
+            "driver_drain_us": 3480,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "8661a281b4be4aece91d1304ed4e7cd2cf8853ee19c143b4e6c4baf72138c652",
+            "transfer_us": 65897,
+            "uploaded": 262155
+          }
+        }
+      ],
+      "cleanup_errors": [],
+      "origins": [
+        {
+          "mode": "echo",
+          "tls": false,
+          "requests": 8,
+          "received": 2097176,
+          "client_closes": 8,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "records": [
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 1,
+          "elapsed_ms": 14.975,
+          "result": {
+            "driver_drain_us": 3201,
+            "error": "HttpRead",
+            "ok": false,
+            "remaining_tasks": 0
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 0,
+          "elapsed_ms": 18.58,
+          "result": {
+            "close": "clean",
+            "close_detail": null,
+            "connect_us": 3756,
+            "downloaded": 131328,
+            "driver_drain_us": 3220,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+            "transfer_us": 7186,
+            "uploaded": 69
+          }
+        }
+      ],
+      "cleanup_errors": [],
+      "origins": [
+        {
+          "mode": "stall",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "records": [
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 1,
+          "elapsed_ms": 10.783,
+          "result": {
+            "driver_drain_us": 3208,
+            "error": "HttpRead",
+            "ok": false,
+            "remaining_tasks": 0
+          }
+        }
+      ],
+      "cleanup_errors": [],
+      "origins": [
+        {
+          "mode": "disconnect",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "records": [
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 1,
+          "elapsed_ms": 258.926,
+          "result": {
+            "driver_drain_us": 2462,
+            "error": "OperationTimeout",
+            "ok": false,
+            "remaining_tasks": 0
+          }
+        }
+      ],
+      "cleanup_errors": [],
+      "origins": [
+        {
+          "mode": "stall",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "records": [
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 1,
+          "elapsed_ms": 5.989,
+          "result": {
+            "driver_drain_us": 5,
+            "error": "TlsVerificationOrHandshake",
+            "ok": false,
+            "remaining_tasks": 0
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 1,
+          "elapsed_ms": 4.848,
+          "result": {
+            "driver_drain_us": 5,
+            "error": "TlsVerificationOrHandshake",
+            "ok": false,
+            "remaining_tasks": 0
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 1,
+          "elapsed_ms": 2.781,
+          "result": {
+            "driver_drain_us": 3,
+            "error": "TlsAlpnUnsupported",
+            "ok": false,
+            "remaining_tasks": 0
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 1,
+          "elapsed_ms": 10.106,
+          "result": {
+            "driver_drain_us": 3562,
+            "error": "HttpRead",
+            "ok": false,
+            "remaining_tasks": 0
+          }
+        }
+      ],
+      "cleanup_errors": [],
+      "origins": [
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 0,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "records": [
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": false,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 0,
+          "elapsed_ms": 19.516,
+          "result": {
+            "close": "clean",
+            "close_detail": null,
+            "connect_us": 893,
+            "downloaded": 131328,
+            "driver_drain_us": 3227,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+            "transfer_us": 11174,
+            "uploaded": 69
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": false,
+          "reality": false,
+          "target_tls": true,
+          "mode": "http",
+          "exit_code": 0,
+          "elapsed_ms": 22.982,
+          "result": {
+            "close": "clean",
+            "close_detail": null,
+            "connect_us": 1078,
+            "downloaded": 131328,
+            "driver_drain_us": 3585,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+            "transfer_us": 11209,
+            "uploaded": 69
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": false,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 0,
+          "elapsed_ms": 16.725,
+          "result": {
+            "close": "clean",
+            "close_detail": null,
+            "connect_us": 1065,
+            "downloaded": 131328,
+            "driver_drain_us": 3184,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+            "transfer_us": 7980,
+            "uploaded": 69
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": false,
+          "reality": false,
+          "target_tls": true,
+          "mode": "http",
+          "exit_code": 0,
+          "elapsed_ms": 17.884,
+          "result": {
+            "close": "clean",
+            "close_detail": null,
+            "connect_us": 1588,
+            "downloaded": 131328,
+            "driver_drain_us": 2617,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+            "transfer_us": 6660,
+            "uploaded": 69
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 0,
+          "elapsed_ms": 17.313,
+          "result": {
+            "close": "clean",
+            "close_detail": null,
+            "connect_us": 2973,
+            "downloaded": 131328,
+            "driver_drain_us": 3200,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+            "transfer_us": 7030,
+            "uploaded": 69
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": true,
+          "mode": "http",
+          "exit_code": 0,
+          "elapsed_ms": 18.343,
+          "result": {
+            "close": "clean",
+            "close_detail": null,
+            "connect_us": 3030,
+            "downloaded": 131328,
+            "driver_drain_us": 2713,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+            "transfer_us": 5619,
+            "uploaded": 69
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 0,
+          "elapsed_ms": 19.798,
+          "result": {
+            "close": "clean",
+            "close_detail": null,
+            "connect_us": 3185,
+            "downloaded": 131328,
+            "driver_drain_us": 3146,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+            "transfer_us": 8053,
+            "uploaded": 69
+          }
+        },
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": true,
+          "mode": "http",
+          "exit_code": 0,
+          "elapsed_ms": 25.596,
+          "result": {
+            "close": "clean",
+            "close_detail": null,
+            "connect_us": 4562,
+            "downloaded": 131328,
+            "driver_drain_us": 2785,
+            "ok": true,
+            "remaining_tasks": 0,
+            "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+            "transfer_us": 8924,
+            "uploaded": 69
+          }
+        }
+      ],
+      "cleanup_errors": [],
+      "origins": [
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": true,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 1,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": true,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 1,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": true,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 1,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 1,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        },
+        {
+          "mode": "http",
+          "tls": true,
+          "requests": 1,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 1,
+          "interruptions": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "records": [
+        {
+          "stage": "C2",
+          "platform": "Linux",
+          "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+          "transport": "grpc",
+          "protocol": "vless",
+          "tls": true,
+          "reality": false,
+          "target_tls": false,
+          "mode": "http",
+          "exit_code": 1,
+          "elapsed_ms": 9.886,
+          "result": {
+            "driver_drain_us": 3140,
+            "error": "HttpRead",
+            "ok": false,
+            "remaining_tasks": 0
+          }
+        }
+      ],
+      "cleanup_errors": [],
+      "origins": [
+        {
+          "mode": "http",
+          "tls": false,
+          "requests": 0,
+          "received": 0,
+          "client_closes": 0,
+          "tls_closes": 0,
+          "interruptions": 0,
+          "errors": []
+        }
+      ]
+    }
+  ]
+}

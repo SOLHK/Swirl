@@ -1,5 +1,5 @@
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import SwirlQuick
 ScrollBar {
     id:bar
@@ -15,7 +15,7 @@ ScrollBar {
         implicitWidth:Theme.dp(5); implicitHeight:Theme.dp(5)
         radius:width/2; color:Theme.muted
         opacity:bar.size>=1?0:bar.pressed?0.8:(bar.active||bar.hovered||bar.recent||motionPolicy.alwaysShowScrollbars)?0.45:0.22
-        Behavior on opacity { NumberAnimation { duration:SwirlMotion.reduced?0:180 } }
+        Behavior on opacity { NumberAnimation { duration:SwirlMotion.releaseDuration } }
     }
     background:Item {}
 }

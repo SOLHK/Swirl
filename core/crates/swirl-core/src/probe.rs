@@ -5,7 +5,7 @@ use std::{
     future::Future,
     sync::{Arc, Mutex},
 };
-use swirl_protocol::{UrlTestFailure, UrlTestMetrics, UrlTestStage};
+use swirl_protocol::{ConnectTimings, UrlTestFailure, UrlTestMetrics, UrlTestStage};
 use tokio::{runtime::Handle, task::JoinHandle};
 
 type Result<T> = std::result::Result<T, &'static str>;
@@ -26,6 +26,8 @@ pub struct ProbeMetrics {
     pub origin_tls_ms: Option<u64>,
     pub response_headers_ms: u64,
     pub http_status: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub outbound_timing: Option<ConnectTimings>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -34,6 +36,8 @@ pub struct ProbeFailure {
     pub code: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub http_status: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub outbound_timing: Option<ConnectTimings>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -134,6 +138,7 @@ impl ProbeRuntime {
                     origin_tls_ms: metrics.origin_tls_ms,
                     response_headers_ms: metrics.response_headers_ms,
                     http_status: metrics.http_status,
+                    outbound_timing: metrics.outbound_timing,
                 }),
                 failure: None,
             },
@@ -155,6 +160,7 @@ impl ProbeRuntime {
                     },
                     code: error.code,
                     http_status: error.http_status,
+                    outbound_timing: error.outbound_timing.map(|timing| *timing),
                 }),
             },
         };
@@ -184,6 +190,35 @@ impl ProbeRuntime {
 
     pub fn invalidate(&self) -> Result<()> {
         self.transition(ProbePhase::Idle).map(|_| ())
+    }
+    /// V2 commit/revocation waits for owned probe inputs to be dropped before
+    /// acknowledging a new durable generation. Never hold Slot across await.
+    pub async fn invalidate_and_wait(&self) -> Result<()> {
+        let task = {
+            let mut slot = self.slot.lock().map_err(|_| "ProbeState")?;
+            slot.generation = slot
+                .generation
+                .checked_add(1)
+                .ok_or("ProbeGenerationLimit")?;
+            let task = slot.task.take();
+            slot.status = ProbeStatus {
+                request_id: slot.generation,
+                state: ProbePhase::Idle,
+                metrics: None,
+                failure: None,
+            };
+            task
+        };
+        if let Some(mut task) = task {
+            task.abort();
+            if tokio::time::timeout(std::time::Duration::from_secs(2), &mut task)
+                .await
+                .is_err()
+            {
+                return Err("ProbeCancellationTimeout");
+            }
+        }
+        Ok(())
     }
 }
 

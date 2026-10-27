@@ -1,0 +1,37 @@
+Start testing: Oct 23 11:02 CST
+----------------------------------------------------------
+1/1 Testing: swirl-qt-network-policy
+1/1 Test: swirl-qt-network-policy
+Command: "/workspace/scratch/3a49b1a53628/Swirl-qt-http2/build/qt-network/SwirlQtNetworkPolicyTests" "-o" "/workspace/scratch/3a49b1a53628/Swirl-qt-http2/build/qt-network/qt-network-policy.xml,xml" "-o" "-,txt"
+Directory: /workspace/scratch/3a49b1a53628/Swirl-qt-http2/build/qt-network
+"swirl-qt-network-policy" start time: Oct 23 11:02 CST
+Output:
+----------------------------------------------------------
+********* Start testing of QtNetworkPolicyTests *********
+Config: Using QtTest library 6.10.3, Qt 6.10.3 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 11.4.1 20231218 (Red Hat 11.4.1-3)), ubuntu 24.04
+QINFO  : QtNetworkPolicyTests::initTestCase() Qt 6.10.3 TLS backend "openssl" "OpenSSL 3.0.13 30 Jan 2024"
+QINFO  : QtNetworkPolicyTests::initTestCase() Independent TLS fixture {"event": "prepared", "tls": "OpenSSL 3.5.8 25 Aug 2026", "leaf_days": 2}
+PASS   : QtNetworkPolicyTests::initTestCase()
+QWARN  : QtNetworkPolicyTests::unprotectedClientNegotiatesHttp2PositiveControl() qt.network.http2: stream 1 error: "Connection closed"
+QWARN  : QtNetworkPolicyTests::unprotectedClientNegotiatesHttp2PositiveControl() qt.network.http2: stream 1 finished with error: "HTTP/2 protocol error"
+PASS   : QtNetworkPolicyTests::unprotectedClientNegotiatesHttp2PositiveControl()
+PASS   : QtNetworkPolicyTests::policyOverridesExplicitHttp2AndDirectOptions()
+PASS   : QtNetworkPolicyTests::subscriptionHttpsDownloadsAndParsesOverHttp1()
+PASS   : QtNetworkPolicyTests::subscriptionHttpsRedirectsStayOnHttp1()
+PASS   : QtNetworkPolicyTests::cleartextSubscriptionIgnoresH2cEnvironment()
+QWARN  : QtNetworkPolicyTests::subscriptionStillRejectsUntrustedTls() Independent TLS fixture: "SSLEOFError: [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1010)"
+PASS   : QtNetworkPolicyTests::subscriptionStillRejectsUntrustedTls()
+PASS   : QtNetworkPolicyTests::subscriptionStillRejectsHttpsDowngrade()
+PASS   : QtNetworkPolicyTests::shutdownCancelsHangingHttp1Download()
+PASS   : QtNetworkPolicyTests::cleanupTestCase()
+Totals: 10 passed, 0 failed, 0 skipped, 0 blacklisted, 2174ms
+********* Finished testing of QtNetworkPolicyTests *********
+<end of output>
+Test time =   2.26 sec
+----------------------------------------------------------
+Test Passed.
+"swirl-qt-network-policy" end time: Oct 23 11:02 CST
+"swirl-qt-network-policy" time elapsed: 00:00:02
+----------------------------------------------------------
+
+End testing: Oct 23 11:02 CST

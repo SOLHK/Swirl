@@ -9,7 +9,6 @@ use swirl_subscription::{DnsQueryFamily, DnsTlsServer};
 use swirl_transport::{BoxStream, secure};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
     time::{Duration, timeout},
 };
 
@@ -66,10 +65,19 @@ async fn lookup(
     host: &str,
     query_family: DnsQueryFamily,
 ) -> Result<Resolution> {
+    lookup_with_transport(server, host, query_family, &crate::DirectQueryTransport).await
+}
+async fn lookup_with_transport(
+    server: &DnsTlsServer,
+    host: &str,
+    query_family: DnsQueryFamily,
+    transport: &dyn crate::QueryTransport,
+) -> Result<Resolution> {
     if server.https_path.is_some() {
-        return doh::lookup(server, host, query_family).await;
+        return doh::lookup_with_transport(server, host, query_family, transport).await;
     }
-    let tcp = TcpStream::connect(server.address)
+    let tcp = transport
+        .connect(server.address)
         .await
         .map_err(|_| "DnsTlsConnect")?;
     let mut stream = secure(tcp, &server.tls).await.map_err(|e| match e {
@@ -84,6 +92,28 @@ async fn lookup(
     };
     let _ = timeout(Duration::from_millis(100), stream.shutdown()).await;
     result
+}
+
+pub(super) async fn resolve_with_transport(
+    servers: &[DnsTlsServer],
+    host: &str,
+    query_family: DnsQueryFamily,
+    transport: &dyn crate::QueryTransport,
+) -> Result<Resolution> {
+    let mut error = "DnsNoServers";
+    for server in servers {
+        match timeout(
+            Duration::from_millis(1400),
+            lookup_with_transport(server, host, query_family, transport),
+        )
+        .await
+        .unwrap_or(Err("DnsTlsTimeout"))
+        {
+            Ok(answer) => return Ok(answer),
+            Err(code) => error = code,
+        }
+    }
+    Err(error)
 }
 
 pub(super) async fn resolve(

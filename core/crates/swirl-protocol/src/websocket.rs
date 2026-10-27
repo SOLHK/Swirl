@@ -386,19 +386,129 @@ impl AsyncWrite for Stream {
     }
 }
 pub(super) async fn connect(
-    mut wire: BoxStream,
+    wire: BoxStream,
     settings: &WebSocket,
 ) -> Result<BoxStream, &'static str> {
+    connect_with_headers(wire, settings, &[]).await
+}
+
+/// Validate application headers without allowing them to replace the opening
+/// handshake, request framing, or unsupported WebSocket extensions/early data.
+/// Host is supplied by `WebSocket::host`, not by this additional header list.
+pub fn validate_headers(headers: &[(String, String)]) -> Result<(), &'static str> {
+    if headers.len() > 32 {
+        return Err("WebSocketHeadersLimit");
+    }
+    let mut bytes = 0usize;
+    let mut names = std::collections::HashSet::new();
+    for (name, value) in headers {
+        bytes = bytes
+            .checked_add(name.len())
+            .and_then(|size| size.checked_add(value.len()))
+            .and_then(|size| size.checked_add(4))
+            .ok_or("WebSocketHeadersLimit")?;
+        if bytes > 8192 {
+            return Err("WebSocketHeadersLimit");
+        }
+        if name.is_empty()
+            || !name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&byte))
+            || !value
+                .bytes()
+                .all(|byte| byte == b'\t' || (32..=126).contains(&byte))
+        {
+            return Err("WebSocketHeadersSyntax");
+        }
+        let name = name.to_ascii_lowercase();
+        if name.starts_with("sec-websocket-")
+            || matches!(
+                name.as_str(),
+                "host"
+                    | "connection"
+                    | "upgrade"
+                    | "content-length"
+                    | "transfer-encoding"
+                    | "te"
+                    | "trailer"
+                    | "expect"
+                    | "proxy-connection"
+            )
+        {
+            return Err("WebSocketReservedHeader");
+        }
+        if !names.insert(name) {
+            return Err("WebSocketDuplicateHeader");
+        }
+    }
+    Ok(())
+}
+
+fn requests_early_data(path: &str) -> bool {
+    let Some((_, query)) = path.split_once('?') else {
+        return false;
+    };
+    query.split('&').any(|parameter| {
+        let key = parameter.split('=').next().unwrap_or_default();
+        // Xray reads this as a URL query, so percent-encoded "ed" is the same
+        // setting. Paths have already passed the strict ASCII/escape validator.
+        let mut decoded = Vec::with_capacity(key.len());
+        let mut at = 0;
+        while at < key.len() {
+            if key.as_bytes()[at] == b'%'
+                && let Some(encoded) = key.get(at + 1..at + 3)
+                && let Ok(byte) = u8::from_str_radix(encoded, 16)
+            {
+                decoded.push(byte);
+                at += 3;
+                continue;
+            }
+            decoded.push(key.as_bytes()[at]);
+            at += 1;
+        }
+        decoded == b"ed"
+    })
+}
+
+/// Shared preflight for Core activation, protocol dialing and direct callers.
+/// Unsupported early data must fail before DNS or opening the outer socket.
+pub(crate) fn validate_settings(
+    settings: &WebSocket,
+    headers: &[(String, String)],
+) -> Result<(), &'static str> {
     settings.validate()?;
+    validate_headers(headers)?;
+    if requests_early_data(&settings.path) {
+        return Err("WebSocketEarlyDataUnsupported");
+    }
+    Ok(())
+}
+
+/// Open the existing RFC 6455 binary stream with bounded custom HTTP headers.
+/// The caller supplies an already authenticated TLS stream for WSS and bounds
+/// this opening handshake with its shared connection deadline.
+pub async fn connect_with_headers(
+    mut wire: BoxStream,
+    settings: &WebSocket,
+    headers: &[(String, String)],
+) -> Result<BoxStream, &'static str> {
+    validate_settings(settings, headers)?;
     let mut nonce = [0; 16];
     SystemRandom::new()
         .fill(&mut nonce)
         .map_err(|_| "WebSocketRandom")?;
     let key = STANDARD.encode(nonce);
-    let request = format!(
-        "GET {} HTTP/1.1\r\nHost: {}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: {key}\r\n\r\n",
+    let mut request = format!(
+        "GET {} HTTP/1.1\r\nHost: {}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: {key}\r\n",
         settings.path, settings.host
     );
+    for (name, value) in headers {
+        request.push_str(name);
+        request.push_str(": ");
+        request.push_str(value);
+        request.push_str("\r\n");
+    }
+    request.push_str("\r\n");
     wire.write_all(request.as_bytes())
         .await
         .map_err(|_| "WebSocketUpgradeWrite")?;
@@ -804,6 +914,142 @@ mod tests {
             assert!(check_upgrade(format!("{valid}{extra}\r\n\r\n").as_bytes(), key).is_err());
         }
     }
+    #[test]
+    fn custom_headers_cannot_replace_handshake_or_inject_requests() {
+        for name in [
+            "Host",
+            "cOnNeCtIoN",
+            "Upgrade",
+            "Content-Length",
+            "Transfer-Encoding",
+            "TE",
+            "Trailer",
+            "Expect",
+            "Proxy-Connection",
+            "Sec-WebSocket-Key",
+            "Sec-WebSocket-Version",
+            "Sec-WebSocket-Protocol",
+            "Sec-WebSocket-Extensions",
+        ] {
+            assert_eq!(
+                validate_headers(&[(name.into(), "fixture".into())]),
+                Err("WebSocketReservedHeader")
+            );
+        }
+        for (name, value) in [
+            ("", "fixture"),
+            ("Bad Name", "fixture"),
+            ("Bad:Name", "fixture"),
+            ("X-Test", "value\r\nInjected: yes"),
+            ("X-Test", "nul\0byte"),
+            ("X-Test", "delete\x7f"),
+        ] {
+            assert_eq!(
+                validate_headers(&[(name.into(), value.into())]),
+                Err("WebSocketHeadersSyntax")
+            );
+        }
+        assert_eq!(
+            validate_headers(&[("X-Test".into(), "a".into()), ("x-test".into(), "b".into())]),
+            Err("WebSocketDuplicateHeader")
+        );
+        assert_eq!(
+            validate_headers(&[("X-Test".into(), "x".repeat(8192))]),
+            Err("WebSocketHeadersLimit")
+        );
+        assert_eq!(
+            validate_headers(
+                &(0..33)
+                    .map(|n| (format!("X-{n}"), String::new()))
+                    .collect::<Vec<_>>()
+            ),
+            Err("WebSocketHeadersLimit")
+        );
+        assert!(
+            validate_headers(&[
+                ("Origin".into(), "https://fixture.example".into()),
+                ("X-Test".into(), "visible\tvalue".into()),
+            ])
+            .is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn early_data_is_rejected_before_any_handshake_bytes() {
+        for path in ["/ws?ed=256", "/ws?token=fixture&%65%64=1", "/ws?ed"] {
+            let (wire, mut peer) = tokio::io::duplex(512);
+            let result = connect(
+                Box::new(wire),
+                &WebSocket {
+                    host: "fixture.example".into(),
+                    path: path.into(),
+                },
+            )
+            .await;
+            assert!(matches!(result, Err("WebSocketEarlyDataUnsupported")));
+            assert_eq!(peer.read(&mut [0; 1]).await.unwrap(), 0);
+        }
+        assert!(!requests_early_data("/ws?embedded=1"));
+    }
+
+    #[tokio::test]
+    async fn custom_path_ipv6_authority_headers_and_coalesced_binary_payload() {
+        let (wire, mut peer) = tokio::io::duplex(4096);
+        let server = tokio::spawn(async move {
+            let mut request = Vec::new();
+            while !request.ends_with(b"\r\n\r\n") {
+                request.push(peer.read_u8().await.unwrap());
+            }
+            let request = String::from_utf8(request).unwrap();
+            assert!(request.starts_with("GET /nested/ws%20path?fixture=yes HTTP/1.1\r\n"));
+            assert!(request.contains("\r\nHost: [::1]:8443\r\n"));
+            assert!(request.contains("\r\nOrigin: https://fixture.example\r\n"));
+            assert!(request.contains("\r\nX-Fixture: exact-value\r\n"));
+            let key = request
+                .lines()
+                .find_map(|line| line.strip_prefix("Sec-WebSocket-Key: "))
+                .unwrap();
+            assert_eq!(STANDARD.decode(key).unwrap().len(), 16);
+            let mut response = format!(
+                "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {}\r\n\r\n",
+                accept_key(key)
+            )
+            .into_bytes();
+            response.extend(server_frame(2, true, b"\0\xffserver-binary"));
+            peer.write_all(&response).await.unwrap();
+            let (opcode, bytes) = client_frame(&mut peer).await;
+            assert_eq!(opcode, 2);
+            assert_eq!(bytes, b"\xff\0client-binary");
+            peer.write_all(&server_frame(8, true, &1000u16.to_be_bytes()))
+                .await
+                .unwrap();
+            let (opcode, bytes) = client_frame(&mut peer).await;
+            assert_eq!(opcode, 8);
+            assert_eq!(bytes, 1000u16.to_be_bytes());
+        });
+        let mut stream = connect_with_headers(
+            Box::new(wire),
+            &WebSocket {
+                host: "[::1]:8443".into(),
+                path: "/nested/ws%20path?fixture=yes".into(),
+            },
+            &[
+                ("Origin".into(), "https://fixture.example".into()),
+                ("X-Fixture".into(), "exact-value".into()),
+            ],
+        )
+        .await
+        .unwrap();
+        stream.write_all(b"\xff\0client-binary").await.unwrap();
+        let mut data = Vec::new();
+        timeout(Duration::from_secs(2), stream.read_to_end(&mut data))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(data, b"\0\xffserver-binary");
+        server.await.unwrap();
+    }
+
     #[test]
     fn close_codes_and_utf8_are_validated() {
         assert!(close_valid(&[]));

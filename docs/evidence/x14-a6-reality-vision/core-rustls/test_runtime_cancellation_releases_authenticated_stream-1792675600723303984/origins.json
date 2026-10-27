@@ -1,0 +1,21 @@
+{
+  "http_paths": [],
+  "https_paths": [],
+  "https_sni": [],
+  "https_authenticated_closes": 0,
+  "echo_bytes": 35,
+  "echo_sessions": [
+    {
+      "expected_bytes": 36,
+      "received_bytes": 35,
+      "cancelled": true,
+      "tail_after_client_halfclose": false,
+      "target_closed": true
+    }
+  ],
+  "origin_errors": {
+    "http": [],
+    "https": [],
+    "echo": []
+  }
+}

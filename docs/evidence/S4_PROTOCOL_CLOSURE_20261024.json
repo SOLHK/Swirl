@@ -1,0 +1,546 @@
+{
+  "schema": 1,
+  "date_local": "2026-10-24",
+  "base_sha": "a4534010e1509972a8df49f7f706ae315f1ffee2",
+  "scope": "Windows GNU closure investigation; not final integrated source acceptance",
+  "production_protocol_changed": false,
+  "strict_acceptance_complete": false,
+  "build": {
+    "exit_code": 0,
+    "warnings": [
+      "GNU linker corrupt .drectve"
+    ]
+  },
+  "vmess_unit": {
+    "passed": 11,
+    "failed": 0,
+    "ignored": 0
+  },
+  "diagnostic_unit": {
+    "passed": 4,
+    "failed": 0
+  },
+  "vmess_ordinary": {
+    "evidence_level": "independent_official_xray_loopback",
+    "suite": "data_and_completed_response_close",
+    "target_half_close_accepted": false,
+    "public_network_tested": false,
+    "qt_product_tested": false,
+    "server_release": "v26.10.21",
+    "server_commit": "1b1647cd9ddf0abc34b981d4611fc03bcac1ca74",
+    "platform": "Windows-11-10.0.29648-SP0",
+    "tests_run": 13,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "elapsed_seconds": 16.297,
+    "client_sha256": "321507b91cc89657d8c435aac53de83212ff383b02bf5a0e03124779b5c9e980",
+    "exit_code": 0
+  },
+  "vmess_original_strict": {
+    "evidence_level": "independent_official_xray_loopback",
+    "suite": "strict_half_close",
+    "target_half_close_accepted": false,
+    "public_network_tested": false,
+    "qt_product_tested": false,
+    "server_release": "v26.10.21",
+    "server_commit": "1b1647cd9ddf0abc34b981d4611fc03bcac1ca74",
+    "platform": "Windows-11-10.0.29648-SP0",
+    "tests_run": 2,
+    "failures": 5,
+    "errors": 0,
+    "skipped": 0,
+    "elapsed_seconds": 10.234,
+    "client_sha256": "321507b91cc89657d8c435aac53de83212ff383b02bf5a0e03124779b5c9e980",
+    "exit_code": 1
+  },
+  "vmess_post_eof_control": {
+    "schema": 1,
+    "scope": "diagnostic-only-independent-loopback",
+    "timestamp_utc": "2026-10-23T16:07:32.271671+00:00",
+    "source_base_sha": "a4534010e1509972a8df49f7f706ae315f1ffee2",
+    "source_sha256": {
+      "core/crates/swirl-protocol/src/vmess.rs": "60d720bd285ab2263c619d8013a2689c6e87be8e1bec7f2849a0d3db8f895ca2",
+      "core/crates/swirl-core/src/lib.rs": "1433d8fffc6f5b333d70bd3e418543c8eb5e35eb1a1c2f73ca00a1c1b922d6aa",
+      "tools/tests/test_vmess_xray.py": "8b2cc2c0b6ee38b3fe1432bc026b5dc19310805942e9404123522462b875b9e2",
+      "tools/tests/diagnose_vmess_close.py": "1cfe6cd01166858754d3b8236421720bde2e4fc772b89cd067913b342281cb89"
+    },
+    "platform": "Windows-11-10.0.29648-SP0",
+    "size": 4194321,
+    "private_inputs": false,
+    "public_network": false,
+    "original_strict_tests_replaced": false,
+    "xray_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 windows/amd64)",
+    "xray_sha256": "c77a00eb84fb93ae044c2d771a1cabcc033b81e487253fbc35b12df6879c1e15",
+    "native_client_sha256": "321507b91cc89657d8c435aac53de83212ff383b02bf5a0e03124779b5c9e980",
+    "native_runtime_sha256": "5c0a9d69ec862ffa487b600cc0c14a868bc84488108952b1a59eb3f6bd630972",
+    "all_strict_cases_accepted": false,
+    "server_context_cancellations": 8,
+    "evidence_directory": "D:\\Codex\\outputs\\s4-protocol\\final-vmess-receipt\\swirl-S4-vmess-close-control-4oyz6b0l",
+    "results": [
+      {
+        "client": "direct-socket",
+        "network": "raw",
+        "tls": false,
+        "result": {
+          "uploaded": 4194329,
+          "downloaded": 4194321,
+          "close": "clean",
+          "failure": null,
+          "post_eof_receipt_verified": true,
+          "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+          "upload_shutdown_at": 53598.984,
+          "client_completed_at": 53598.984,
+          "target_receipts_before_client_cleanup": [
+            {
+              "received": 4194321,
+              "upload_eof": true,
+              "response_finished": false,
+              "failure": null,
+              "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+              "all_bytes_at": 53598.968,
+              "upload_eof_at": 53598.984
+            }
+          ],
+          "bytes_match": true,
+          "strict_target_half_close": true
+        }
+      },
+      {
+        "client": "swirl-native",
+        "network": "raw",
+        "tls": false,
+        "result": {
+          "uploaded": 4194329,
+          "downloaded": 4194321,
+          "close": "failed",
+          "failure": "EOFError",
+          "post_eof_receipt_verified": false,
+          "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+          "upload_shutdown_at": 53599.187,
+          "client_completed_at": 53600.187,
+          "target_receipts_before_client_cleanup": [
+            {
+              "received": 4194321,
+              "upload_eof": true,
+              "response_finished": true,
+              "failure": null,
+              "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+              "all_bytes_at": 53599.187,
+              "upload_eof_at": 53600.187,
+              "finished_at": 53600.187
+            }
+          ],
+          "bytes_match": true,
+          "strict_target_half_close": false
+        }
+      },
+      {
+        "client": "official-xray-control",
+        "network": "raw",
+        "tls": false,
+        "result": {
+          "uploaded": 4194329,
+          "downloaded": 4194321,
+          "close": "failed",
+          "failure": "EOFError",
+          "post_eof_receipt_verified": false,
+          "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+          "upload_shutdown_at": 53600.39,
+          "client_completed_at": 53601.39,
+          "target_receipts_before_client_cleanup": [
+            {
+              "received": 4194321,
+              "upload_eof": false,
+              "response_finished": false,
+              "failure": null,
+              "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+              "all_bytes_at": 53600.39
+            }
+          ],
+          "bytes_match": true,
+          "strict_target_half_close": false
+        }
+      },
+      {
+        "client": "swirl-native",
+        "network": "raw",
+        "tls": true,
+        "result": {
+          "uploaded": 4194329,
+          "downloaded": 4194321,
+          "close": "failed",
+          "failure": "EOFError",
+          "post_eof_receipt_verified": false,
+          "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+          "upload_shutdown_at": 53601.64,
+          "client_completed_at": 53602.64,
+          "target_receipts_before_client_cleanup": [
+            {
+              "received": 4194321,
+              "upload_eof": true,
+              "response_finished": true,
+              "failure": null,
+              "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+              "all_bytes_at": 53601.625,
+              "upload_eof_at": 53602.64,
+              "finished_at": 53602.64
+            }
+          ],
+          "bytes_match": true,
+          "strict_target_half_close": false
+        }
+      },
+      {
+        "client": "official-xray-control",
+        "network": "raw",
+        "tls": true,
+        "result": {
+          "uploaded": 4194329,
+          "downloaded": 4194321,
+          "close": "failed",
+          "failure": "EOFError",
+          "post_eof_receipt_verified": false,
+          "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+          "upload_shutdown_at": 53602.828,
+          "client_completed_at": 53603.828,
+          "target_receipts_before_client_cleanup": [
+            {
+              "received": 4194321,
+              "upload_eof": true,
+              "response_finished": false,
+              "failure": null,
+              "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+              "all_bytes_at": 53602.828,
+              "upload_eof_at": 53603.828
+            }
+          ],
+          "bytes_match": true,
+          "strict_target_half_close": false
+        }
+      },
+      {
+        "client": "swirl-native",
+        "network": "ws",
+        "tls": false,
+        "result": {
+          "uploaded": 4194329,
+          "downloaded": 4194321,
+          "close": "failed",
+          "failure": "EOFError",
+          "post_eof_receipt_verified": false,
+          "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+          "upload_shutdown_at": 53604.093,
+          "client_completed_at": 53605.109,
+          "target_receipts_before_client_cleanup": [
+            {
+              "received": 4194321,
+              "upload_eof": true,
+              "response_finished": true,
+              "failure": null,
+              "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+              "all_bytes_at": 53604.093,
+              "upload_eof_at": 53605.109,
+              "finished_at": 53605.109
+            }
+          ],
+          "bytes_match": true,
+          "strict_target_half_close": false
+        }
+      },
+      {
+        "client": "official-xray-control",
+        "network": "ws",
+        "tls": false,
+        "result": {
+          "uploaded": 4194329,
+          "downloaded": 4194321,
+          "close": "failed",
+          "failure": "EOFError",
+          "post_eof_receipt_verified": false,
+          "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+          "upload_shutdown_at": 53605.296,
+          "client_completed_at": 53606.296,
+          "target_receipts_before_client_cleanup": [
+            {
+              "received": 4194321,
+              "upload_eof": true,
+              "response_finished": false,
+              "failure": null,
+              "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+              "all_bytes_at": 53605.296,
+              "upload_eof_at": 53606.296
+            }
+          ],
+          "bytes_match": true,
+          "strict_target_half_close": false
+        }
+      },
+      {
+        "client": "swirl-native",
+        "network": "ws",
+        "tls": true,
+        "result": {
+          "uploaded": 4194329,
+          "downloaded": 4194321,
+          "close": "failed",
+          "failure": "EOFError",
+          "post_eof_receipt_verified": false,
+          "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+          "upload_shutdown_at": 53606.562,
+          "client_completed_at": 53607.562,
+          "target_receipts_before_client_cleanup": [
+            {
+              "received": 4194321,
+              "upload_eof": true,
+              "response_finished": true,
+              "failure": null,
+              "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+              "all_bytes_at": 53606.562,
+              "upload_eof_at": 53607.562,
+              "finished_at": 53607.562
+            }
+          ],
+          "bytes_match": true,
+          "strict_target_half_close": false
+        }
+      },
+      {
+        "client": "official-xray-control",
+        "network": "ws",
+        "tls": true,
+        "result": {
+          "uploaded": 4194329,
+          "downloaded": 4194321,
+          "close": "failed",
+          "failure": "EOFError",
+          "post_eof_receipt_verified": false,
+          "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+          "upload_shutdown_at": 53607.765,
+          "client_completed_at": 53608.765,
+          "target_receipts_before_client_cleanup": [
+            {
+              "received": 4194321,
+              "upload_eof": true,
+              "response_finished": true,
+              "failure": null,
+              "sha256": "1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44",
+              "all_bytes_at": 53607.765,
+              "upload_eof_at": 53608.765,
+              "finished_at": 53608.765
+            }
+          ],
+          "bytes_match": true,
+          "strict_target_half_close": false
+        }
+      }
+    ]
+  },
+  "public_tls_controls": {
+    "passed": 3,
+    "failed": 0
+  },
+  "public_shadowsocks": {
+    "schema": 1,
+    "success": false,
+    "platform": "Windows",
+    "scope": "controlled-independent-SS-nodes-to-public-origins",
+    "private_subscription_tested": false,
+    "environment_proxy_used": false,
+    "cipher": "aes-128-gcm",
+    "requests": [
+      {
+        "node": "A",
+        "inbound": "http",
+        "host": "example.com",
+        "port": 80,
+        "path": "/",
+        "expected_status": 200,
+        "success": true,
+        "certificate_verified": false,
+        "stage": "complete",
+        "connection_policy": "close",
+        "http_status": 200,
+        "body_bytes": 577,
+        "body_sha256": "25ddf2c883e0d1958ea971d279a7e4f0fd446724ee3db7db19dadabd4a62e484",
+        "orderly_close": true
+      },
+      {
+        "node": "A",
+        "inbound": "connect",
+        "host": "www.gstatic.com",
+        "port": 443,
+        "path": "/generate_204",
+        "expected_status": 204,
+        "success": false,
+        "certificate_verified": true,
+        "stage": "origin-close",
+        "tls_version": "TLSv1.3",
+        "peer_certificate_sha256": "2f8e8a520600f81073f18b6a06056c162f1e21f97f52e98425750fc031349c43",
+        "connection_policy": "keep-alive",
+        "http_status": 204
+      }
+    ],
+    "cleanup": {
+      "native_stopped": true,
+      "process_exited": true,
+      "listener_released": true
+    },
+    "harness_sha256": "bc73709ed5df0b1cec55609f4f56c84d13522085ae5cd82c2459761b44096021",
+    "source_sha": "9f8af5754d2a932f7b967eea0e64cbc75717e6be",
+    "tested_worktree_clean": false,
+    "fixture_sha256": {
+      "tools/tests/test_r1_public_proxy.py": "34ec6b4f8021684f610173f43dc73a429be2888703b1584897daa578fc496f6d",
+      "tools/tests/test_product_subscription_chain.py": "a2a4fdd499029917659b9c52a269c3aab8e7e70193c67fcbd43ba5b8bb45b293",
+      "tools/tests/test_shadowsocks.py": "fd7a08bd40856b7a6297f4e242cce2da939073fd676438e8f3538a2e8bccfaea",
+      "tools/tests/test_rust_core.py": "113153ffd17fa6b1ee2bb9da3827b1bc7d2383d9d95ed658b861c4937b4d69d7",
+      "tools/Verify-PublicRustCore.py": "31cce7a40ad6c5e96f9fc4d5c97657e544d1b6e141efd460ece046333f7c8106"
+    },
+    "dns": [
+      {
+        "host": "example.com",
+        "port": 80,
+        "resolved": true,
+        "connect_candidate_count": 2,
+        "resolution_owner": "independent-node"
+      },
+      {
+        "host": "www.gstatic.com",
+        "port": 443,
+        "resolved": true,
+        "connect_candidate_count": 1,
+        "resolution_owner": "independent-node"
+      }
+    ],
+    "engine": "swirl-rust",
+    "core": {
+      "accepted": 1,
+      "active": 0,
+      "failed": 0,
+      "upload": 56,
+      "download": 932,
+      "last_error": "",
+      "last_error_stage": "",
+      "recorded_connections": 1
+    },
+    "failure_phase": "A-connect",
+    "failure": {
+      "type": "SSLEOFError",
+      "errno": 8
+    },
+    "failure_core": {
+      "accepted": 2,
+      "active": 1,
+      "failed": 0,
+      "upload": 1796,
+      "download": 5644,
+      "last_error": "",
+      "last_error_stage": ""
+    },
+    "direct_origin_control": {
+      "scope": "direct-origin-diagnostic-only",
+      "proxy_result": false,
+      "host": "www.gstatic.com",
+      "port": 443,
+      "address": "120.232.233.162",
+      "path": "/generate_204",
+      "attempted": true,
+      "success": false,
+      "certificate_verified": true,
+      "environment_proxy_used": false,
+      "connection_policy": "keep-alive",
+      "tls_version": "TLSv1.3",
+      "peer_certificate_sha256": "2f8e8a520600f81073f18b6a06056c162f1e21f97f52e98425750fc031349c43",
+      "http_status": 204,
+      "failure_phase": "origin-close",
+      "failure": {
+        "type": "SSLEOFError",
+        "errno": 8
+      },
+      "matches_proxy_certificate": true
+    },
+    "peers": [
+      {
+        "identity": "A",
+        "authenticated_connections": [
+          {
+            "peer": "A",
+            "host": "example.com",
+            "port": 80,
+            "origin_address": "172.66.147.243",
+            "origin_family": 2,
+            "authenticated": true,
+            "upload": 56,
+            "download": 932,
+            "closed": true
+          },
+          {
+            "peer": "A",
+            "host": "www.gstatic.com",
+            "port": 443,
+            "origin_address": "120.232.233.162",
+            "origin_family": 2,
+            "authenticated": true,
+            "upload": 1740,
+            "download": 4712,
+            "closed": true
+          }
+        ],
+        "upload": 1796,
+        "download": 5644,
+        "errors": [],
+        "denied": []
+      },
+      {
+        "identity": "B",
+        "authenticated_connections": [],
+        "upload": 0,
+        "download": 0,
+        "errors": [],
+        "denied": []
+      }
+    ],
+    "elapsed_ms": 3813
+  },
+  "untested": [
+    "macOS execution",
+    "Linux execution",
+    "Android device networking",
+    "iOS device networking",
+    "HarmonyOS NEXT permissions/device networking",
+    "controlled public origin",
+    "private provider L5"
+  ],
+  "raw_root": "D:\\Codex\\outputs\\s4-protocol",
+  "raw_sha256": {
+    "build.log": "6ca238ec87254664d7da19922460de337969e8e2414b9cb526b4171fe3a9a6dd",
+    "current-vmess-unit.log": "39665bde7b867d3a982f5c014c77dc59c7a5b7c5125adc6ba4faa85e65e8552b",
+    "current-vmess-completed-response.log": "0d534c35298b3708ef3ca161ac5445ed98cf1ba8e094ce83cf29e6ddfaf8bd2e",
+    "current-vmess-strict.log": "f2a170cfc3a6ffd1114a180cba4bff879785a80d0a7794c1c0feb6ec78c46fa8",
+    "final-vmess-receipt.json": "1e0f4fb4b6a022811935ca83bd05afe870c672ea329f2bfbe59b89a6b8793e5c",
+    "diagnostic-unit.log": "205bc51241735bef8615e60af5b92efc577500aff2ebb34e8298b280d747a6d5",
+    "current-public-close.log": "497115631cbe97367a61452af90426d279941028c68dcb6c064408abf91493e8",
+    "current-public-close.json": "e54a371522297e545179c057d8787c4b4e59f1b56ca6e4e1b2d2d39f8b56f646",
+    "baseline-vmess-control.json": "2beed796a3709faf816a6985a51539957d20904d03342662b55fb8a2ad1f7209",
+    "baseline-vmess-receipt.json": "3f43324feb0343ce894aa9f097643515a14720de4be7143f16668b0b772196e5"
+  },
+  "peer_log_sha256": {
+    "final-vmess-receipt\\swirl-S4-vmess-close-control-4oyz6b0l\\01-vmess-raw-plain-access.log": "d1630424997c4353a3a35ac001904ea7ea93c4486543adf24d98f93a501d3c5c",
+    "final-vmess-receipt\\swirl-S4-vmess-close-control-4oyz6b0l\\01-vmess-raw-plain-error.log": "c71da7be0fc7ee0e83033b9e96c87201aa1cfe740423b84e22e4db90a7bda231",
+    "final-vmess-receipt\\swirl-S4-vmess-close-control-4oyz6b0l\\01-vmess-raw-plain-official-client.log": "02910d356f337bd18c988389910e3c82b1f47f90c26444d526f3b05e673872f6",
+    "final-vmess-receipt\\swirl-S4-vmess-close-control-4oyz6b0l\\01-vmess-raw-plain-process.log": "4e9341cbab14531cac2cd59fd08da13c4be362dd92922b11e3a8a6f0502098d0",
+    "final-vmess-receipt\\swirl-S4-vmess-close-control-4oyz6b0l\\02-vmess-raw-tls-access.log": "3bfc8c7303b28999355c1a2e882c50fca1e1cba82e1777edd613c5d3faba7406",
+    "final-vmess-receipt\\swirl-S4-vmess-close-control-4oyz6b0l\\02-vmess-raw-tls-error.log": "2a7e883a43ef72802c05ebcfeccdf744d51bbd87fb8e7f1c5ed51036d3227735",
+    "final-vmess-receipt\\swirl-S4-vmess-close-control-4oyz6b0l\\02-vmess-raw-tls-official-client.log": "73fa8446eae4dc8093f34ea885972e7b506b35c6e0338a23108862526e96e8a8",
+    "final-vmess-receipt\\swirl-S4-vmess-close-control-4oyz6b0l\\02-vmess-raw-tls-process.log": "74cc1898bf61b7b90c8bc2063b7686fdb47e36f6fae887671dda555d24c22865",
+    "final-vmess-receipt\\swirl-S4-vmess-close-control-4oyz6b0l\\03-vmess-ws-plain-access.log": "ee51afa6d7df5b170a3b5b0071f24e3ad3a0d5c66d2ebad0a7afe1a7a45c187d",
+    "final-vmess-receipt\\swirl-S4-vmess-close-control-4oyz6b0l\\03-vmess-ws-plain-error.log": "4775323d4b179107d04198caf6e3c9553a9683d4a06d533e96fb0e2e933cbb50",
+    "final-vmess-receipt\\swirl-S4-vmess-close-control-4oyz6b0l\\03-vmess-ws-plain-official-client.log": "0f9368782d3f6bd829754a0027c89b3c296c9cceef6ea987539d1ed78be59bef",
+    "final-vmess-receipt\\swirl-S4-vmess-close-control-4oyz6b0l\\03-vmess-ws-plain-process.log": "1660760f1904475eab812f46aba20be956099bb85983824490d861fe6aaaa4d4",
+    "final-vmess-receipt\\swirl-S4-vmess-close-control-4oyz6b0l\\04-vmess-ws-tls-access.log": "ee5ce5a037ff7de9367b54475c3eaf5593fb537078a560da5d409e38e1ee301c",
+    "final-vmess-receipt\\swirl-S4-vmess-close-control-4oyz6b0l\\04-vmess-ws-tls-error.log": "8833effc8c266afeefb69c43ac24bf4898a21672a28e572aa18351643a76f893",
+    "final-vmess-receipt\\swirl-S4-vmess-close-control-4oyz6b0l\\04-vmess-ws-tls-official-client.log": "1cb2e21e54836d6365223e8d1f4dc40fc5028c9f358d1c3470a8534d6d61ddee",
+    "final-vmess-receipt\\swirl-S4-vmess-close-control-4oyz6b0l\\04-vmess-ws-tls-process.log": "df7f1f3b3f3f8db835565fb961e76a92cf16667d675668ddc9307ef3b9c55923"
+  },
+  "original_vmess_test_unchanged": true
+}

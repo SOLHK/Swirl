@@ -1,23 +1,19 @@
-# UI/UX Guidance
+# Swirl active engineering contract — APEC V3 / Rust-only (2026-10-27)
 
-## User development requirements (2026-10-17)
+## Source of truth
+- Product UI: `src/Swirl.Quick/main.cpp` + `qml/`, Qt 6.12 Quick/QML, C++23. Work from the current APEC V3 branch/commit and [design baseline](docs/SWIRL_V3_APEC_BASELINE.md); older UI V2 notes are historical evidence, not constraints.
+- Product network runtime: `core/` native Rust only. `RustCoreLibrary` + `RustCoreEngine` are its Qt bridge; `ProxyEngine` and `ThreadedEngine` are Qt control/thread abstractions, **not** a second proxy core. Never ship or restore Mihomo, C++ forwarding fallbacks, downloaded external proxy executables, or their process managers.
+- Third-party config parsing is required: Clash YAML, sing-box and Xray/V2Ray JSON and supported URIs are *data formats*. Do not delete format parsers, imported subscriptions, node provenance or migration adapters just because their names mention third-party clients.
+- See [current architecture](docs/ARCHITECTURE.md), [core](core/README.md), [Windows build](src/Swirl.Quick/BUILDING.md), [APEC motion](docs/APEC_MOTION_FOUNDATION.md) and [performance](docs/APEC_PERFORMANCE_INTEGRATION.md).
 
-- Before implementation, look for mature open-source approaches on GitHub and
-  record the relevant primary references. Learn from their design and observable
-  behavior; independently implement Swirl changes without copying their code.
-- Check the task's premises, missing information and reasoning before acting.
-  Separate verified facts, hypotheses and judgments; explain disagreements and
-  material costs or risks with evidence. Ask when the actual goal is uncertain.
-- Use the smallest direct change that fulfills the request. Do not add unrelated
-  features, configuration options or extension frameworks.
-- On the user's Windows computer, keep generated/downloaded files, skills,
-  checkouts and build tools in `D:\Codex`. Do not write to `C:` unless a required
-  component cannot run elsewhere and the user has explicitly approved it. A
-  cloud Linux workspace cannot access that drive; disclose this limitation and
-  never claim a GitHub push also saved files to the user's D drive.
+## UI and behavior
+- Replace old appearance with APEC V3 across pages, dialogs, shared controls, motion and branding; preserve behavior and user data. Old frozen 14dp / UI V2 layout directions are superseded.
+- Keep node library (inspect/probe, no row-based connection), policy-controlled exit selection, source-owned subscriptions, automatic import, and the current transactional receipt/admission checks. Preserve window/page continuity and input, text/contrast, cold-start fonts and animation cancellation semantics.
+- A screenshot or software-renderer smoke check is not native GPU / 60+ FPS / DPI proof. Record the exact source SHA, test scope, skips and packaging identity; do not claim unrun checks have passed.
 
-## Current development handoff
-
-Read `docs/CONTINUE_DEVELOPMENT.md` and `docs/SWIRL_CORE_DEVELOPMENT_CONTRACT.md` before continuing the Rust migration. Preserve the existing UI; implement native forwarding in Rust without disguising an external core as native. The user's 2026-10-17 handoff supersedes the older `test` instruction: after each completed and validated stage, commit and push to `work/core-completion-20261017`. Never update `main` without explicit user authorization. Reuse the configured Swirl Core Automation App; do not reconfigure the App or change Secrets. Private subscription links, credentials and decrypted configurations must never enter source commits, public CI, logs or conversion services. The user has authorized testing the existing encrypted archive in the private Swirl-Private-Tests repository: decrypt only in memory in that private workflow, preserve only whitelisted reports, and do not refresh subscription URLs without a new open-window instruction. The historical Mihomo architecture below describes the retained compatibility build, not permission to use it as fallback in Rust mode.
-
-For UI/UX design, interaction, accessibility, or visual refinement, consult `.agents/skills/ui-ux-pro-max/SKILL.md` and its local resources when relevant. Treat the skill as guidance and follow existing project constraints first. Preserve Swirl’s refined, minimal macOS 27 visual direction and its C++23, Qt 6 Quick/QML, and Mihomo architecture; do not add unrelated frameworks such as React, Vue, or Tailwind.
+## Security and acceptance
+- Validate protocol support in native Rust. Unsupported options fail closed with a clear error; do not silently substitute DIRECT, other exits, or an external core.
+- Keep DPAPI/encrypted data, subscription ownership, existing settings, System Proxy/TUN restore, rules/DNS and offline migration. Do not delete user data as part of source cleanup.
+- Isolated CI/loopback acceptance must not change the developer machine's Clash, Windows proxy, TUN, DNS or routes. Private credentials, URLs, subscriptions and logs must not enter public commits.
+- Windows product packaging must pair source-identical Rust DLL/EXE; keep `scripts/RustProductPackagePolicy.ps1` and runtime source guards. Do not package test executables or unrelated peer binaries. Commit/PR only after necessary static checks and appropriate CI tests; never force-push protected `main`.
+- The historical `docs/` and older branch handoffs preserve their original evidence and may describe retired architecture. Do not treat them as active implementation instructions.

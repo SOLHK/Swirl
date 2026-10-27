@@ -1,0 +1,58 @@
+{
+  "suite": "C6 REALITY transports and raw/Vision regression",
+  "command": "python -m unittest -v test_transport_reality_xray",
+  "unittest_cases": 10,
+  "unittest_result": "OK",
+  "exit_code": 0,
+  "server_versions": [
+    "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)"
+  ],
+  "fixture_reports": 10,
+  "native_client_invocations": 41,
+  "successes": 21,
+  "expected_rejections": 20,
+  "close_results": {
+    "cancelled": 8,
+    "clean": 13
+  },
+  "rejection_codes": {
+    "RealityAuthenticationOrHandshake": 6,
+    "HttpRead": 2,
+    "RealityTransportUnsupported": 3,
+    "VisionTransportUnsupported": 2,
+    "InputSyntax": 2,
+    "RealityFingerprintUnsupported": 1,
+    "TlsVerificationOrHandshake": 2,
+    "RealityAlpnUnsupported": 2
+  },
+  "success_transport_counts": {
+    "grpc": 10,
+    "xhttp": 9,
+    "tcp": 2
+  },
+  "uploaded_bytes_success": 8389508,
+  "downloaded_bytes_success": 9964544,
+  "maximum_remaining_native_tasks": 0,
+  "origin_http_count": 12,
+  "origin_echo_received": 8388608,
+  "origin_plain_eof_count": 17,
+  "origin_tls_close_notify_count": 4,
+  "official_peer_reports": 16,
+  "official_reality_authenticated_sessions": 25,
+  "official_client_finished_verified_sessions": 25,
+  "official_vless_accepted_sessions": 23,
+  "camouflage_application_bytes": 0,
+  "camouflage_record_size_failures": 0,
+  "vision_padding_events": 2,
+  "vision_unpadding_events": 3,
+  "vision_direct_upload_commands": 1,
+  "vision_direct_download_commands": 1,
+  "cleanup_errors": [],
+  "processes_reaped": true,
+  "forced_kills": 0,
+  "active_camouflage_connections_at_cleanup": 0,
+  "evidence_directory": "/workspace/scratch/ece554ece7c1/c6-reality-evidence-alpn-corrected",
+  "initial_failed_evidence": "/workspace/scratch/ece554ece7c1/c6-reality-evidence-verified",
+  "alpn_wire_observation": "/workspace/scratch/ece554ece7c1/transport-evidence/c6-alpn-observation.json",
+  "scope": "Pinned independent loopback Xray; deliberately absent selected ALPN only for authenticated REALITY prior-known H2; ordinary TLS h2 requirement retained; no public-node test."
+}

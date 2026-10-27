@@ -13,6 +13,7 @@ DismissalController::DismissalController(QObject *parent):QObject(parent) { qApp
 void DismissalController::push(QObject *popup, QObject *owner) {
     auto *window=qobject_cast<QQuickWindow *>(owner);
     if(!popup || !window)return;
+    ++m_focusGeneration;
     for(const auto &layer:m_layers)if(layer.popup==popup)return;
     m_layers.append({popup,window,window->activeFocusItem()});
     connect(popup,&QObject::destroyed,this,[this,popup]{pop(popup);});
@@ -20,12 +21,40 @@ void DismissalController::push(QObject *popup, QObject *owner) {
 }
 void DismissalController::pop(QObject *popup) {
     QPointer<QQuickItem> focus;
+    QPointer<QQuickWindow> owner;
+    bool removed=false;
     for(int i=m_layers.size()-1;i>=0;--i)if(!m_layers[i].popup || m_layers[i].popup==popup) {
-        if(m_layers[i].popup==popup && i==m_layers.size()-1)focus=m_layers[i].focus;
+        if(m_layers[i].popup==popup){
+            owner=m_layers[i].window;
+            if(i==m_layers.size()-1)focus=m_layers[i].focus;
+        }
         m_layers.removeAt(i);
+        removed=true;
     }
+    if(!removed)return;
+    QPointer<QObject> remainingPopup;
+    for(int i=m_layers.size()-1;i>=0;--i)
+        if(m_layers[i].popup && m_layers[i].window==owner){remainingPopup=m_layers[i].popup;break;}
+    const QPointer<QQuickItem> activeFocus=owner?owner->activeFocusItem():nullptr;
+    const auto generation=++m_focusGeneration;
     emit changed();
-    QTimer::singleShot(0,this,[focus]{if(focus && focus->isVisible() && focus->isEnabled())focus->forceActiveFocus(Qt::PopupFocusReason);});
+    QTimer::singleShot(0,this,[this,focus,owner,remainingPopup,activeFocus,generation]{
+        if(generation!=m_focusGeneration)return;
+        // Qt finalizes its own focus restoration after closed(). If an older
+        // popup exits underneath a newer one, keep focus in the surviving layer.
+        if(remainingPopup && owner){
+            auto *content=qvariant_cast<QQuickItem *>(remainingPopup->property("contentItem"));
+            auto *root=content?content->parentItem():nullptr;
+            if(!root || !root->isVisible() || !root->isEnabled())return;
+            const auto belongs=[root](QQuickItem *item){return item && (item==root || root->isAncestorOf(item));};
+            if(belongs(owner->activeFocusItem()))return;
+            auto *target=belongs(focus)?focus.data():belongs(activeFocus)?activeFocus.data():root;
+            if(target->isVisible() && target->isEnabled())target->forceActiveFocus(Qt::PopupFocusReason);
+            return;
+        }
+        if(owner && hasPopup(owner))return;
+        if(focus && focus->isVisible() && focus->isEnabled())focus->forceActiveFocus(Qt::PopupFocusReason);
+    });
 }
 bool DismissalController::hasPopup(QObject *window) const {
     for(const auto &layer:m_layers)if(layer.popup && layer.window==window)return true;
@@ -42,12 +71,15 @@ bool DismissalController::eventFilter(QObject *receiver,QEvent *event) {
     auto *key=static_cast<QKeyEvent *>(event);
     auto *window=qobject_cast<QQuickWindow *>(receiver);
     if(!window || key->key()!=Qt::Key_Escape)return false;
+    // Let the focused editor cancel its IME composition before navigating.
+    if(window->activeFocusItem()&&window->activeFocusItem()->property("inputMethodComposing").toBool())return false;
     const bool popup=hasPopup(window);
     const bool dismissible=window->property("swirlDismissibleWindow").toBool();
-    if(!popup && !dismissible)return false;
+    const bool back=window->property("swirlBackAvailable").toBool();
+    if(!popup && !dismissible && !back)return false;
     event->accept();
     if(event->type()==QEvent::KeyPress && !key->isAutoRepeat()) {
-        if(popup)dismiss(window);else window->close();
+        if(popup)dismiss(window);else if(back)QMetaObject::invokeMethod(window,"handleEscape");else window->close();
     }
     return true;
 }

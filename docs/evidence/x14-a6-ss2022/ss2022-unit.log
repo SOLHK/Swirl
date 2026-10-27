@@ -1,0 +1,21 @@
+   Compiling swirl-subscription v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-subscription)
+   Compiling swirl-transport v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-transport)
+   Compiling swirl-dns v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-dns)
+   Compiling swirl-protocol v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-protocol)
+    Finished `test` profile [unoptimized] target(s) in 9.26s
+     Running unittests src/lib.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/swirl_protocol-fc50f44ebc76dfc6)
+
+running 10 tests
+test ss2022::tests::clocks_are_bounded_in_both_directions ... ok
+test ss2022::tests::replay_window_handles_out_of_order_wrap_boundaries_and_large_jumps ... ok
+test ss2022::tests::tcp_partial_initial_header_and_payload_truncation_are_sticky_errors ... ok
+test ss2022::tests::nonces_packet_ids_and_datagram_sizes_never_wrap_or_grow_unbounded ... ok
+test ss2022::tests::udp_authentication_errors_do_not_poison_valid_packet_ids ... ok
+test ss2022::tests::tcp_response_binding_type_timestamp_and_aead_are_required_before_delivery ... ok
+test ss2022::tests::udp_wrong_clock_binding_direction_address_and_reflection_are_rejected ... ok
+test ss2022::tests::udp_server_restarts_retain_two_sessions_without_unbounded_growth ... ok
+test ss2022::tests::tcp_partial_record_timeout_is_bounded_but_idle_read_is_preserved ... ok
+test ss2022::tests::tcp_accepts_full_65535_byte_payload_and_record_boundary_fin ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 92 filtered out; finished in 0.00s
+

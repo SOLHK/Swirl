@@ -1,5 +1,7 @@
 #include "NodeImporter.h"
+#include <QCryptographicHash>
 #include "SubscriptionNormalizer.h"
+#include "XrayJsonBridge.h"
 #include "../third_party/fkYAML/node.hpp"
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -10,6 +12,57 @@
 #include <stdexcept>
 
 namespace {
+QJsonValue singleDocument(const QByteArray &bytes);
+bool safeShape(const QByteArray &bytes);
+bool xrayJsonCandidate(const QByteArray &bytes) {
+    auto view = bytes.trimmed();
+    if (view.startsWith("\xef\xbb\xbf")) view = view.mid(3).trimmed();
+    if (!view.startsWith('{') && !view.startsWith('[')) return false;
+    // This is only dialect selection. Every Xray candidate, including invalid
+    // JSON, is passed unmodified to Rust before a single node is constructed.
+    const auto sniff = QJsonDocument::fromJson(view);
+    // A section header such as [Proxy] or [server_local] belongs to the INI
+    // normalizer. Do not let the JSON array prefix capture those subscriptions.
+    // Valid JSON arrays and every other malformed JSON candidate remain on the
+    // strict Rust path; the INI parser still validates headers and all content.
+    if (sniff.isNull() && view.startsWith('[') &&
+        QRegularExpression("^\\[\\s*[A-Za-z][A-Za-z0-9 _-]*(?:\\]|$)").match(QString::fromUtf8(view.split('\n').first())).hasMatch())
+        return false;
+    // A Clash flow sequence uses the same '[' prefix as a JSON array, but
+    // permits unquoted YAML keys. Only a complete, bounded, strict YAML
+    // sequence of typed Clash nodes can leave the JSON path. Malformed JSON,
+    // duplicate keys and mixed/Xray dialects still reach Rust unchanged.
+    if (sniff.isNull() && view.startsWith('[') && safeShape(view)) {
+        try {
+            const auto root = singleDocument(view);
+            const auto nodes = root.toArray();
+            if (!nodes.isEmpty() && std::all_of(nodes.cbegin(), nodes.cend(), [](const auto &node) {
+                return node.isObject() && node.toObject().value("type").isString()
+                    && !node.toObject().contains("protocol");
+            })) return false;
+        } catch (...) {
+            // Parser messages may contain credentials and are never exposed.
+        }
+    }
+    if (sniff.isObject()) {
+        const auto object = sniff.object();
+        for (const auto &key : {"protocol", "outbound", "outboundDetour", "inbound", "inboundDetour"})
+            if (object.contains(key)) return true;
+        if (object.contains("outbounds")) {
+            const auto outbounds = object.value("outbounds").toArray();
+            return outbounds.isEmpty() || std::any_of(outbounds.cbegin(), outbounds.cend(), [](const auto &node) {
+                return !node.isObject() || !node.toObject().contains("type") || node.toObject().contains("protocol");
+            });
+        }
+        if (object.contains("proxies") || object.contains("type")) return false;
+    } else if (sniff.isArray()) {
+        const auto nodes = sniff.array();
+        if (!nodes.isEmpty() && std::all_of(nodes.cbegin(), nodes.cend(), [](const auto &node) {
+            return node.isObject() && node.toObject().contains("type") && !node.toObject().contains("protocol");
+        })) return false;
+    }
+    return true;
+}
 QJsonValue convert(const fkyaml::node &value, int depth, int &budget) {
     if (depth > 32 || --budget < 0) throw std::runtime_error("limit");
     if (value.is_null()) return QJsonValue();
@@ -87,17 +140,21 @@ QJsonObject NodeImporter::strictJsonObject(const QByteArray &bytes){
 }
 NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
     Result result;
-    if(bytes.isEmpty() || bytes.size()>MaximumBytes || !safeShape(bytes)) {
+    if(bytes.isEmpty() || bytes.size()>MaximumBytes) {
         result.error=QStringLiteral("导入内容为空、超过 4 MiB 或嵌套过深；原节点保持不变。"); return result;
     }
+    result.sourceDigest=QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex());
+    if (xrayJsonCandidate(bytes)) {auto native=XrayJsonBridge::parse(bytes);native.sourceDigest=result.sourceDigest;return native;}
+    if(!safeShape(bytes)){result.error=QStringLiteral("导入内容嵌套过深；原节点保持不变。");return result;}
     QJsonValue root;
     const auto normalized=SubscriptionNormalizer::normalize(bytes);
     result.format=normalized.format;
     result.configuration=normalized.configuration;
     result.executionConfiguration=normalized.executionConfiguration;
     result.configurationFormat=normalized.configurationFormat;
-    if(!normalized.error.isEmpty()){result.error=normalized.error;return result;}
     const auto effective=normalized.decodedDocument.isEmpty()?bytes:normalized.decodedDocument;
+    if (!normalized.decodedDocument.isEmpty() && xrayJsonCandidate(effective)) {auto native=XrayJsonBridge::parse(effective);native.sourceDigest=result.sourceDigest;return native;}
+    if(!normalized.error.isEmpty()){result.error=normalized.error;return result;}
     if(!safeShape(effective)){result.error=QStringLiteral("订阅解码后嵌套过深。");return result;}
     if(normalized.handled){
         // QJsonDocument accepts duplicate keys. Validate the original JSON
@@ -126,6 +183,10 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
         }
         else if(obj.contains("type"))array.append(obj);
     }
+    if(!normalized.handled && !root.isArray() && (!root.isObject() || (!root.toObject().contains("proxies")&&!root.toObject().contains("type")))) {
+        result.errorKind="unsupported-format";result.format.clear();
+        result.error=QStringLiteral("实际内容未检测到受支持的节点列表；可能是登录页、错误正文或其它配置格式。原节点保持不变。");return result;
+    }
     if(array.isEmpty() || array.size()>2000) {
         result.error=QStringLiteral("需要包含 1–2000 个节点的 proxies 列表或单个节点；只导入节点，不执行订阅内的全局配置。");return result;
     }
@@ -148,6 +209,15 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
             result.nodes.clear();result.error=QStringLiteral("第 %1 个节点：sni 与 servername 冲突，不能以别名覆盖 TLS 名称。").arg(i+1);return result;
         }
         n.name=params.take("name").toString().trimmed();n.protocol=params.take("type").toString().toLower();
+        // Subscription authors cannot weaken Swirl's TLS policy. A correctly
+        // typed Trojan flag is safely projected to stricter verification, with
+        // an explicit persistent notice; originalConfiguration stays untouched.
+        // This is not an insecure runtime option: manual/runtime true, wrong
+        // types, nested flags and all unrelated options still fail validation.
+        if(n.protocol=="trojan" && params.value("skip-cert-verify")==QJsonValue(true)) {
+            params["skip-cert-verify"]=false;
+            n.certificateVerificationEnforced=true;
+        }
         if(!result.configuration.isEmpty() && names.contains(n.name)) {
             result.nodes.clear();result.error=QStringLiteral("完整配置含重复节点名称，策略引用不明确；未应用配置。");return result;
         }
@@ -165,9 +235,12 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
         n.username=params.take("username").toString();n.password=params.take("password").toString();
         n.cipher=params.take("cipher").toString();n.serverName=params.take("sni").toString();
         if(n.serverName.isEmpty())n.serverName=params.value("servername").toString();
+        if(n.serverName.isEmpty()&&params.value("_swirl-source-format")==QJsonValue("sing-box")&&
+            (n.protocol=="tuic"||n.protocol=="hysteria2"))
+            n.serverName=params.value("tls").toObject().value("server_name").toString();
         n.parameters=params;
         auto error=ProxyNode::validate(n);
-        if(!safeOptions(params))error=QStringLiteral("节点含本地文件、脚本或系统网络设置；请移除此类字段后导入。");
+        if(error.isEmpty()&&!safeOptions(params))error=QStringLiteral("节点含本地文件、脚本或系统网络设置；请移除此类字段后导入。");
         if(names.contains(n.name))error=QStringLiteral("节点名称重复，无法安全确定链式代理引用。");
         if(!error.isEmpty()) {
             result.nodes.clear();result.error=QStringLiteral("第 %1 个节点：%2").arg(i+1).arg(error);return result;

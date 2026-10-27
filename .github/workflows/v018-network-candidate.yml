@@ -1,0 +1,201 @@
+name: Swirl incremental Windows network candidate
+on:
+  push:
+    branches: [work/swirl-018-network-compat-20261024, work/swirl-019-subscription-regression-20261024, work/swirl-ui-v2-20261024, work/swirl-3-20261026]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: v018-network-candidate-${{ github.ref }}
+  # Complete each independently deliverable installer, then reuse its cache.
+  cancel-in-progress: false
+env:
+  CARGO_INCREMENTAL: '1'
+  SWIRL_SOURCE_SHA: ${{ github.sha }}
+jobs:
+  rust-safety:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install Rust tools
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - name: Record Rust compiler cache identity
+        id: compiler
+        shell: bash
+        run: echo "hash=$(rustc -vV | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: rust_cache
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+          key: v018-rust-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            v018-rust-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-
+      - name: Portable safety and Rust regression
+        id: checks
+        working-directory: core
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --workspace --all-targets --locked -- -D warnings
+          cargo test --workspace --locked
+          python ../tools/tests/test_portable_core_boundary.py
+      - name: Focused desktop-chain VMess regression with independent loopback peers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -r tools/requirements-network-fixtures.txt
+          cargo build --manifest-path core/Cargo.toml --locked -p swirl-core --example transport-runtime -p swirl-protocol --example transport-client
+          python tools/Fetch-TransportPeers.py --output build/v019-test-peers
+          mkdir -p dist/v019-codex-evidence
+          export SWIRL_TRANSPORT_RUNTIME="$PWD/core/target/debug/examples/transport-runtime"
+          export SWIRL_TRANSPORT_CLIENT="$PWD/core/target/debug/examples/transport-client"
+          export SWIRL_XRAY_BINARY="$PWD/build/v019-test-peers/current/xray"
+          export SWIRL_TRANSPORT_EVIDENCE="$PWD/dist/v019-codex-evidence/peers"
+          export PYTHONPATH="$PWD/tools/tests"
+          python -m unittest -v \
+            test_vmess_xray.VmessXrayTests.test_core_connect_preserves_verified_https_keepalive_large_headers_and_idle \
+            test_vmess_xray.VmessXrayTests.test_https_target_certificate_and_tls_close_over_vmess_tls \
+            test_vmess_xray.VmessXrayTests.test_core_node_switch_preserves_established_vmess_session \
+            2>&1 | tee dist/v019-codex-evidence/focused-vmess.log
+      - name: REALITY production wire-version regression with the same verified Xray peer
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --manifest-path core/Cargo.toml --locked -p swirl-api -p swirl-subscription --bin swirl-api --bin swirl-inspect
+          export SWIRL_RUST_HARNESS="$PWD/core/target/debug/swirl-api"
+          export SWIRL_RUST_INSPECTOR="$PWD/core/target/debug/swirl-inspect"
+          export SWIRL_XRAY_BINARY="$PWD/build/v019-test-peers/current/xray"
+          export SWIRL_XRAY_RELEASE_MANIFEST="$PWD/build/v019-test-peers/manifest.json"
+          for profile in rustls chrome chrome-vision; do
+            export SWIRL_REALITY_RUNTIME_EVIDENCE="$PWD/dist/v019-codex-evidence/reality-$profile"
+            args=(--wire-compatibility --fingerprint rustls)
+            if [[ "$profile" == chrome* ]]; then args=(--wire-compatibility --fingerprint chrome_133); fi
+            if [[ "$profile" == chrome-vision ]]; then args+=(--vision); fi
+            python tools/tests/test_reality_native_release.py "${args[@]}"
+          done
+      - name: Preserve controlled desktop-chain test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Swirl-controlled-Codex-chain-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist/v019-codex-evidence
+          if-no-files-found: warn
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        if: ${{ !cancelled() && steps.checks.outcome == 'success' && steps.rust_cache.outputs.cache-hit != 'true' }}
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+          key: ${{ steps.rust_cache.outputs.cache-primary-key }}
+  windows-candidate:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+      QT_FORCE_STDERR_LOGGING: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+      - name: Install Rust MSVC
+        run: rustup toolchain install stable --profile minimal --target x86_64-pc-windows-msvc
+      - uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4
+        with:
+          version: '6.11.3'
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b'
+          modules: qtshadertools
+          cache: true
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/requirements-network-fixtures.txt
+      - name: Install independent certificate fixtures and NSIS
+        shell: pwsh
+        run: |
+          python -m pip install -r tools/requirements-network-fixtures.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Fixture dependencies failed.' }
+          if (-not (Test-Path 'C:/Program Files (x86)/NSIS/makensis.exe')) {
+            choco install nsis --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'NSIS install failed.' }
+          }
+      - name: Offline Codex log classification and privacy regression
+        shell: pwsh
+        run: |
+          ./tools/tests/Test-CodexLogSummary.ps1
+          ./scripts/tests/Test-BuildInputTimes.ps1
+          ./scripts/tests/Test-BuildSourceGuard.ps1
+      - name: Record compiler and CMake cache identity
+        id: compiler
+        shell: pwsh
+        run: |
+          # Hosted image labels changed between consecutive runs even though
+          # the actual compiler/SDK versions matched. Key actual tools instead;
+          # Ninja and Cargo still check their dependencies and command lines.
+          $tools=@('cl.exe','link.exe','cmake.exe') | ForEach-Object { $command=Get-Command $_ -ErrorAction Stop; (Get-FileHash -LiteralPath $command.Source -Algorithm SHA256).Hash }
+          $identity=([ordered]@{rust=(& rustc -vV | Out-String);cmake=(& cmake --version | Out-String);tools=$tools;msvc=$env:VCToolsVersion;sdk=$env:WindowsSDKVersion;qt=$env:QT_ROOT_DIR;workspace=$env:GITHUB_WORKSPACE} | ConvertTo-Json -Compress)
+          $hash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($identity))).ToLowerInvariant()
+          "hash=$hash" >> $env:GITHUB_OUTPUT
+          $version=(Get-Content -LiteralPath 'src/Swirl.Quick/PRODUCT_VERSION.txt' -Raw).Trim()
+          if($version -notmatch '^\d+\.\d+\.\d+$'){throw 'Invalid product version'}
+          "SWIRL_PRODUCT_VERSION=$version" >> $env:GITHUB_ENV
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: build_cache
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+            build/v018-network
+          key: v018-msvc-ninja-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            v018-msvc-ninja-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-
+      - name: Build and validate the exact-source candidate incrementally
+        id: candidate
+        shell: pwsh
+        run: |
+          ./scripts/build-network-candidate.ps1 -QtDir $env:QT_ROOT_DIR -BuildDir build/v018-network -RustTargetDir core/target -OutDir dist/v018-network -Nsis 'C:/Program Files (x86)/NSIS/makensis.exe' -Parallel 4 -DisposableSystemProxyTests
+      - name: Save compiler outputs without treating downstream failures as passes
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        if: ${{ !cancelled() && steps.candidate.outputs.cache-ready == 'true' && steps.build_cache.outputs.cache-hit != 'true' }}
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+            build/v018-network
+          key: ${{ steps.build_cache.outputs.cache-primary-key }}
+      - name: Preserve timing, test and package identity evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Swirl-network-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist/v018-network/evidence
+          if-no-files-found: warn
+      - name: Preserve controlled-network diagnostic candidate
+        if: ${{ success() && steps.candidate.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Swirl-${{ env.SWIRL_PRODUCT_VERSION }}-network-candidate-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            dist/v018-network/Swirl-Setup.exe
+            dist/v018-network/evidence/build-timings.json
+            dist/v018-network/evidence/package/final-package-verification.json
+            tools/Collect-CodexNetworkEvidence.ps1
+            tools/CodexLogSummary.psm1
+          if-no-files-found: error

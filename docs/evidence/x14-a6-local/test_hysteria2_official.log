@@ -1,0 +1,22 @@
+test_01_tcp_and_clean_normal_close (test_hysteria2_official.Hysteria2Official.test_01_tcp_and_clean_normal_close) ... ok
+test_02_large_bidirectional_data (test_hysteria2_official.Hysteria2Official.test_02_large_bidirectional_data) ... ok
+test_03_udp_and_fragmented_datagrams (test_hysteria2_official.Hysteria2Official.test_03_udp_and_fragmented_datagrams) ... ok
+test_04_dns (test_hysteria2_official.Hysteria2Official.test_04_dns) ... ok
+test_05_wrong_password (test_hysteria2_official.Hysteria2Official.test_05_wrong_password) ... ok
+test_06_tls_trust_and_sni (test_hysteria2_official.Hysteria2Official.test_06_tls_trust_and_sni) ... ok
+test_07_certificate_pin (test_hysteria2_official.Hysteria2Official.test_07_certificate_pin) ... ok
+test_08_imported_clash_and_uri (test_hysteria2_official.Hysteria2Official.test_08_imported_clash_and_uri) ... ok
+test_09_node_switch_and_new_session_after_restart (test_hysteria2_official.Hysteria2Official.test_09_node_switch_and_new_session_after_restart) ... ok
+test_10_https_through_native_proxy (test_hysteria2_official.Hysteria2Official.test_10_https_through_native_proxy) ... ok
+test_11_invalid_options_fail_before_connection (test_hysteria2_official.Hysteria2Official.test_11_invalid_options_fail_before_connection) ... ok
+test_12_record_official_server_limitations_without_claiming_support (test_hysteria2_official.Hysteria2Official.test_12_record_official_server_limitations_without_claiming_support) ... ok
+test_13_salamander_tcp_udp_and_wrong_password (test_hysteria2_official.Hysteria2Official.test_13_salamander_tcp_udp_and_wrong_password) ... ok
+test_14_explicit_insecure_still_enforces_certificate_pin (test_hysteria2_official.Hysteria2Official.test_14_explicit_insecure_still_enforces_certificate_pin) ... ok
+test_15_negotiated_bandwidth_is_enforced_in_real_transfers (test_hysteria2_official.Hysteria2Official.test_15_negotiated_bandwidth_is_enforced_in_real_transfers) ... ok
+test_16_ipv6_quic_and_ipv6_tcp_udp_targets (test_hysteria2_official.Hysteria2Official.test_16_ipv6_quic_and_ipv6_tcp_udp_targets) ... ok
+test_17_concurrent_connections_and_multi_address_resolution (test_hysteria2_official.Hysteria2Official.test_17_concurrent_connections_and_multi_address_resolution) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 19.323s
+
+OK

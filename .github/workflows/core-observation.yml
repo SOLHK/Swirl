@@ -1,0 +1,45 @@
+name: Core observation identity regression
+on:
+  push:
+    branches: [work/subscription-unified-integration-20261023]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  identity:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            shell: powershell
+            label: Windows-PowerShell-5
+          - os: windows-2022
+            shell: pwsh
+            label: Windows-PowerShell-7
+          - os: ubuntu-latest
+            shell: pwsh
+            label: Linux-PowerShell-7
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Test current and legacy manifests without starting monitoring
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $report = Join-Path $env:RUNNER_TEMP 'core-identity-tests.txt'
+          "source_sha=$env:GITHUB_SHA" | Out-File -FilePath $report
+          "powershell=$($PSVersionTable.PSVersion)" | Out-File -Append -FilePath $report
+          & ./tools/tests/Test-SwirlCoreIdentity.ps1 | Tee-Object -FilePath $report -Append
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-identity-${{ matrix.label }}-${{ github.sha }}
+          path: ${{ runner.temp }}/core-identity-tests.txt
+          if-no-files-found: error

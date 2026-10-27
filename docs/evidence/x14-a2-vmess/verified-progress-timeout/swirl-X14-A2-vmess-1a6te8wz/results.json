@@ -1,0 +1,54 @@
+{
+  "command": [
+    "/workspace/scratch/63c2b083dcfa/build-rust/debug/examples/transport-client"
+  ],
+  "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+  "peers": [
+    {
+      "label": "01-vmess-raw-tls",
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "environment_overrides": {}
+    }
+  ],
+  "records": [
+    {
+      "stage": "X14-A2-vmess",
+      "platform": "Linux",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "server_environment_overrides": {},
+      "transport": "tcp",
+      "protocol": "vmess",
+      "tls": true,
+      "reality": false,
+      "target_tls": false,
+      "mode": "echo",
+      "exit_code": 0,
+      "elapsed_ms": 4105.216,
+      "result": {
+        "close": "clean",
+        "close_detail": null,
+        "connect_us": 4282,
+        "downloaded": 67108864,
+        "driver_drain_us": 9,
+        "ok": true,
+        "remaining_tasks": 0,
+        "sha256": "13de0ff39dd5c25d82a370d0e33f10223a39c4dfe9c42b57f10138109c79892f",
+        "transfer_us": 4097096,
+        "uploaded": 67108872
+      }
+    }
+  ],
+  "cleanup_errors": [],
+  "origins": [
+    {
+      "mode": "finite-echo",
+      "tls": false,
+      "requests": 1,
+      "received": 67108864,
+      "client_closes": 1,
+      "tls_closes": 0,
+      "interruptions": 0,
+      "errors": []
+    }
+  ]
+}

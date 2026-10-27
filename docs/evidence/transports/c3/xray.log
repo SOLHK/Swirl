@@ -1,0 +1,13 @@
+test_eight_concurrent_connections_and_client_drop_release_targets (__main__.Http2XrayTests.test_eight_concurrent_connections_and_client_drop_release_targets) ... ok
+test_eight_mib_bidirectional_flow_control_and_half_close (__main__.Http2XrayTests.test_eight_mib_bidirectional_flow_control_and_half_close) ... ok
+test_plain_legacy_h2_and_framing_override_fail_explicitly (__main__.Http2XrayTests.test_plain_legacy_h2_and_framing_override_fail_explicitly) ... ok
+test_timeout_cancel_and_server_interruption_are_bounded (__main__.Http2XrayTests.test_timeout_cancel_and_server_interruption_are_bounded) ... ok
+test_tls_certificate_sni_alpn_and_vless_auth_are_checked (__main__.Http2XrayTests.test_tls_certificate_sni_alpn_and_vless_auth_are_checked) ... ok
+test_truncated_response_fails_and_fresh_connection_recovers (__main__.Http2XrayTests.test_truncated_response_fails_and_fresh_connection_recovers) ... ok
+test_vless_and_trojan_tls_custom_host_path_http_and_https (__main__.Http2XrayTests.test_vless_and_trojan_tls_custom_host_path_http_and_https) ... ok
+test_wrong_host_path_and_server_status_are_errors (__main__.Http2XrayTests.test_wrong_host_path_and_server_status_are_errors) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 3.978s
+
+OK

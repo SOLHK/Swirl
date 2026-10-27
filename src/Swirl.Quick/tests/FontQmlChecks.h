@@ -4,6 +4,7 @@
 #include <QQmlProperty>
 #include <QQuickImageProvider>
 #include <QQuickStyle>
+#include <QLibraryInfo>
 #include <QSignalSpy>
 #include <QMetaProperty>
 #include <QEvent>
@@ -65,11 +66,13 @@ void FontTests::qmlLiveAutomaticFonts()
     // Context services must outlive the engine's Theme singleton.
     QScopedPointer<QObject> serviceObject;
     QQmlEngine engine;
-    // The full application build creates a SwirlQuick/qmldir beside this test
-    // executable which prefers resources linked only into Swirl.exe. Keep this
-    // source-based fixture independent of that unrelated application module.
-    auto importPaths=engine.importPathList();
-    importPaths.removeAll(QCoreApplication::applicationDirPath());
+    // MergeQtConf can add the parent build root ahead of the actual Qt SDK.
+    // Its SwirlQuick/qmldir prefers resources linked only into Swirl.exe.
+    // This fixture registers Swirl types from source. Keep every SDK import
+    // root (path() alone returns only the first), excluding the app module.
+    auto importPaths=QLibraryInfo::paths(QLibraryInfo::QmlImportsPath);
+    importPaths.removeIf([](const QString &path){return QFile::exists(path+"/SwirlQuick/qmldir");});
+    importPaths.append({QStringLiteral("qrc:/qt/qml"),QStringLiteral("qrc:/qt-project.org/imports")});
     engine.setImportPathList(importPaths);
     QObject::connect(&engine, &QQmlEngine::warnings, &engine, [&](const QList<QQmlError> &errors) {
         for (const auto &error : errors) warnings.append(error.toString());
@@ -137,9 +140,11 @@ ApplicationWindow {
         RowLayout { objectName: "widthHost"; width: 96
             Controls.SwirlText { objectName: "widthText"; text: "AAAAAAAA"; textRole: "button"; font.pixelSize: 20; Layout.fillWidth: true; elide: Text.ElideRight }
         }
-        // The editor accepts point sizes. SwirlText deliberately keeps its
-        // existing pixel-size default; Qt forbids setting both units at once.
-        Controls.SwirlTextArea { objectName: "pointText"; text: "A"; font.pointSize: 18
+        // Replace the skin's complete default font when selecting point units;
+        // adding pointSize beside its bound pixelSize sets conflicting units.
+        Controls.SwirlTextArea { objectName: "pointText"; text: "A"
+            font: Qt.font({family: Theme.fontFamily, pointSize: 18,
+                weight: Theme.bodyFontWeight, hintingPreference: Font.PreferFullHinting})
             readonly property var monitorAxes: Theme.variableAxesFor(font, 144, 1.5, "body")
         }
         Controls.SwirlText { objectName: "staticText"; text: "A"; font.family: fixtureStaticFamily; font.pixelSize: 16 }
@@ -235,10 +240,13 @@ ApplicationWindow {
     QVERIFY(!manager.previewAutomatic());
     QVERIFY(manager.automatic()); // preview mode does not mutate the active UI
     const auto axisBinding = [](QObject *target) -> QObject * {
-        for (auto *child : target->children())
+        for (auto *child : target->children()) {
+            auto *publisher = child->property("axesBinding").value<QObject *>();
             if (child->property("target").value<QObject *>() == target
-                && child->property("property").toString() == QStringLiteral("font.variableAxes")
+                && publisher && publisher->property("target").value<QObject *>() == target
+                && publisher->property("property").toString() == QStringLiteral("font.variableAxes")
                 && child->metaObject()->indexOfMethod("refreshAxes()") >= 0) return child;
+        }
         return nullptr;
     };
     auto *previewLine = qobject_cast<VariableFontPreview *>(item("fontPreviewLine_0"));

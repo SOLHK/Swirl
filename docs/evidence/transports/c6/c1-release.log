@@ -1,0 +1,11 @@
+test_additive_selector_raw_alias_and_custom_websocket_headers (__main__.C1XrayTests.test_additive_selector_raw_alias_and_custom_websocket_headers) ... ok
+test_http_and_verified_https_through_native_tcp_ws_wss (__main__.C1XrayTests.test_http_and_verified_https_through_native_tcp_ws_wss) ... ok
+test_ipv6_websocket_socket_and_authority (__main__.C1XrayTests.test_ipv6_websocket_socket_and_authority) ... ok
+test_server_interrupt_terminates_active_stream (__main__.C1XrayTests.test_server_interrupt_terminates_active_stream) ... ok
+test_websocket_large_binary_and_eight_concurrent_connections (__main__.C1XrayTests.test_websocket_large_binary_and_eight_concurrent_connections) ... ok
+test_wrong_host_path_certificate_and_uuid_are_rejected (__main__.C1XrayTests.test_wrong_host_path_certificate_and_uuid_are_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 4.369s
+
+OK

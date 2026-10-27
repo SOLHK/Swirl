@@ -1,0 +1,35 @@
+Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)
+A unified platform for anti-censorship.
+2026/10/22 22:25:22.223933 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-C6-reality-p9ota5o5/reality-02-xhttp-tun-chrome_133/xray-config.json Format:json}
+2026/10/22 22:25:22.224915 [Warning] infra/conf: REALITY: Listening on non-443 ports will increase the likelihood of your server's IP being blocked by the GFW
+2026/10/22 22:25:22.225750 [Debug] app/log: Logger started
+2026/10/22 22:25:22.225813 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:35495
+2026/10/22 22:25:22.228403 [Info] transport/internet/splithttp: listening tcp for XHTTP on 127.0.0.1:35495
+2026/10/22 22:25:22.228415 [Warning] core: Xray 26.10.21 started
+REALITY remoteAddr: 127.0.0.1:55368
+REALITY remoteAddr: 127.0.0.1:55368	hs.c.isHandshakeComplete.Load(): false
+REALITY remoteAddr: 127.0.0.1:55380
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:55380	hs.c.ClientVer: [0 1 0]
+REALITY remoteAddr: 127.0.0.1:55380	hs.c.ClientTime: 2026-10-22 22:25:22 +0900 KST
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:55380	hs.c.conn == conn: true
+REALITY remoteAddr: 127.0.0.1:55380	len(s2cSaved): 780	Server Hello: 127
+REALITY remoteAddr: 127.0.0.1:55380	len(s2cSaved): 653	Change Cipher Spec: 6
+REALITY remoteAddr: 127.0.0.1:55380	len(s2cSaved): 647	Encrypted Extensions: 41
+REALITY remoteAddr: 127.0.0.1:55380	len(s2cSaved): 606	Certificate: 432
+REALITY remoteAddr: 127.0.0.1:55380	len(s2cSaved): 174	Certificate Verify: 100
+REALITY remoteAddr: 127.0.0.1:55380	len(s2cSaved): 74	Finished: 74
+REALITY remoteAddr: 127.0.0.1:55380	is using X25519MLKEM768 for TLS' communication: false
+REALITY remoteAddr: 127.0.0.1:55380	is using ML-DSA-65 for cert's extra signature: false
+REALITY remoteAddr: 127.0.0.1:55380	hs.handshake() err: <nil>
+REALITY remoteAddr: 127.0.0.1:55380	hs.readClientFinished() err: <nil>
+REALITY remoteAddr: 127.0.0.1:55380	hs.c.isHandshakeComplete.Load(): true
+2026/10/22 22:25:22.243814 [Info] [2139450967] proxy/vless/inbound: firstLen = 95
+2026/10/22 22:25:22.243828 [Info] [2139450967] proxy/vless/inbound: received request for tcp:127.0.0.1:38237
+2026/10/22 22:25:22.243832 [Info] [2139450967] app/dispatcher: taking detour [origin-38237] for [tcp:127.0.0.1:38237]
+2026/10/22 22:25:22.243993 [Info] [2139450967] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:38237
+2026/10/22 22:25:22.243999 [Debug] [2139450967] transport/internet: dialing to tcp:127.0.0.1:38237
+2026/10/22 22:25:22.244171 [Info] [2139450967] proxy/freedom: connection opened to tcp:127.0.0.1:38237, local endpoint 127.0.0.1:48062, remote endpoint 127.0.0.1:38237
+2026/10/22 22:25:22.244179 [Debug] [2139450967] proxy: CopyRawConn (maybe) readv
+2026/10/22 22:25:22.257232 [Debug] app/log: Logger closing

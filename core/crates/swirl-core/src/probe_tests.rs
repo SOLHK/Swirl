@@ -9,6 +9,7 @@ fn metrics() -> UrlTestMetrics {
         origin_tls_ms: Some(7),
         response_headers_ms: 24,
         http_status: 200,
+        outbound_timing: None,
     }
 }
 

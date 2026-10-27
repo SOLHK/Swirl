@@ -94,9 +94,22 @@ impl TcpDiagnostic {
 pub fn failure_stage(code: &str) -> &'static str {
     match code {
         "" => "",
-        "UpstreamDnsTimeout" => "dns",
-        "UpstreamTcpTimeout" | "UpstreamConnectFailed" | "UpstreamAddressLimit" => "tcp_connect",
+        "UpstreamDnsTimeout" | "TuicDnsTimeout" | "Hysteria2DnsTimeout" => "dns",
+        "UpstreamTcpTimeout"
+        | "UpstreamConnectFailed"
+        | "UpstreamAddressLimit"
+        | "UpstreamConnectionRefused"
+        | "UpstreamConnectionReset"
+        | "UpstreamConnectionAborted"
+        | "UpstreamNetworkUnreachable"
+        | "UpstreamPermissionDenied" => "tcp_connect",
         "UpstreamTlsTimeout" => "tls_handshake",
+        "QuicHandshakeTimeout" | "QuicHandshake" | "QuicConnect" | "QuicHandshakeData" => {
+            "quic_handshake"
+        }
+        "QuicCertificatePin" | "QuicServerName" | "QuicTls13" | "QuicAlpnNegotiation" => {
+            "quic_tls_handshake"
+        }
         "ShadowsocksObfsWrite" | "ShadowsocksObfsWriteTimeout" => "http_obfs",
         "UpstreamProtocolTimeout"
         | "UpstreamAuthentication"
@@ -106,13 +119,43 @@ pub fn failure_stage(code: &str) -> &'static str {
         | "ShadowsocksHandshakeWrite"
         | "TrojanHandshakeWrite"
         | "VlessHandshakeWrite"
+        | "VmessHandshakeWrite"
+        | "VmessResponseTimeout"
         | "Socks4Rejected" => "protocol_handshake",
-        "StreamIo" => "stream_io",
+        "StreamIo"
+        | "StreamConnectionReset"
+        | "StreamConnectionAborted"
+        | "StreamUnexpectedEof"
+        | "StreamTimedOut"
+        | "StreamBrokenPipe"
+        | "StreamInvalidData"
+        | "StreamWriteZero"
+        | "StreamPermissionDenied" => "stream_io",
         "HandshakeTimeout" | "InboundClosed" | "InboundAuthentication" | "InboundReply" => {
             "inbound"
         }
         code if code.starts_with("Dns") || code.starts_with("RouteDns") => "dns",
         code if code.starts_with("Tls") => "tls_handshake",
+        code if code.starts_with("Hysteria2Authentication")
+            || code.starts_with("TuicAuthentication") =>
+        {
+            "protocol_authentication"
+        }
+        code if code.starts_with("Hysteria2Http3") => "http3_handshake",
+        code if code.starts_with("Hysteria2Request")
+            || code.starts_with("Hysteria2Response")
+            || code.starts_with("Hysteria2Target")
+            || code.starts_with("Hysteria2Stream")
+            || code.starts_with("TuicConnect") =>
+        {
+            "protocol_handshake"
+        }
+        code if code.starts_with("Hysteria2Udp")
+            || code.starts_with("TuicUdp")
+            || code.starts_with("TuicDissociate") =>
+        {
+            "udp_relay"
+        }
         code if code.starts_with("Reality") => "reality_handshake",
         code if code.starts_with("WebSocketUpgrade") => "websocket_upgrade",
         code if code.starts_with("SocksUpstream") || code.starts_with("HttpUpstream") => {
@@ -121,5 +164,28 @@ pub fn failure_stage(code: &str) -> &'static str {
         code if code.starts_with("InitialWrite") => "initial_write",
         code if code.starts_with("Route") || code.starts_with("Policy") => "routing",
         _ => "unknown",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::failure_stage;
+
+    #[test]
+    fn quic_authentication_is_distinct_from_dns_tcp_and_tls() {
+        for (code, stage) in [
+            ("TuicDnsTimeout", "dns"),
+            ("Hysteria2DnsTimeout", "dns"),
+            ("QuicHandshakeTimeout", "quic_handshake"),
+            ("QuicCertificatePin", "quic_tls_handshake"),
+            ("Hysteria2Http3Timeout", "http3_handshake"),
+            ("Hysteria2AuthenticationRejected", "protocol_authentication"),
+            ("TuicAuthenticationTimeout", "protocol_authentication"),
+            ("TuicUdpSendTimeout", "udp_relay"),
+            ("VmessHandshakeWrite", "protocol_handshake"),
+            ("a future unknown code", "unknown"),
+        ] {
+            assert_eq!(failure_stage(code), stage);
+        }
     }
 }

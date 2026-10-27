@@ -1,0 +1,8 @@
+********* Start testing of NodeViewModelTests *********
+Config: Using QtTest library 6.10.3, Qt 6.10.3 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 13.1.0), windows 11
+PASS   : NodeViewModelTests::initTestCase()
+QINFO  : NodeViewModelTests::stableSearchAndTelemetry() 5000-node search, 30 edits milliseconds 98
+PASS   : NodeViewModelTests::stableSearchAndTelemetry()
+PASS   : NodeViewModelTests::cleanupTestCase()
+Totals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 499ms
+********* Finished testing of NodeViewModelTests *********

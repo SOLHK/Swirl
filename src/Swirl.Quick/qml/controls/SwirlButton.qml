@@ -1,5 +1,5 @@
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import SwirlQuick
 import "../components"
@@ -15,20 +15,21 @@ SwirlMotionButton {
     implicitHeight:Theme.controlHeight
     hoverEnabled: true
     font.family: Theme.fontFamily
-    font.weight: Font.Medium
+    font.weight: control.primary ? Font.DemiBold : Font.Medium
     SwirlFontBinding { target: control; textRole: "button" }
     font.hintingPreference:Font.PreferFullHinting
-    font.pixelSize:Theme.fontSize(13)
+    font.pixelSize:Theme.buttonSize
     leftPadding:Theme.dp(12); rightPadding:Theme.dp(12)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     property bool outlined:false
-    background:SwirlContinuousSurface {
-        radius:Theme.controlRadius
-        color:control.primary?(control.down?Qt.darker(Theme.primaryControl,1.15):control.hovered?Qt.lighter(Theme.primaryControl,1.08):Theme.primaryControl):control.down?Theme.pressed:control.hovered?Theme.hover:control.quiet?"transparent":Theme.buttonBase
-        border.width:control.activeFocus?Theme.dp(2):control.primary||control.quiet?0:Theme.borderWidth
-        border.color:control.activeFocus?Theme.focusBorder:Theme.controlBorder
-        Behavior on color {ColorAnimation{duration:SwirlMotion.hoverDuration}}
-        opacity:control.enabled?1:0.45
+    background: SwirlControlSurface {
+        hovered: control.hovered
+        pressed: control.down
+        focused: control.visualFocus
+        quiet: control.quiet
+        primary: control.primary
+        outlined: control.outlined
+        controlEnabled: control.enabled
     }
     contentItem: Item {
         implicitWidth: contents.implicitWidth
@@ -42,7 +43,7 @@ SwirlMotionButton {
         SwirlIcon {
             visible: control.iconName !== ""
             name: control.iconName; size:Theme.dp(16)
-            color: !control.enabled ? Theme.muted : control.primary ? "white" : control.danger ? Theme.red : Theme.muted
+            color: !control.enabled ? Theme.muted : control.primary ? Theme.primaryButtonText : control.danger ? Theme.red : Theme.muted
         }
         SwirlText {
             text: AppState.zh(control.text)+(control.development?" · 研发中":"")
@@ -51,7 +52,7 @@ SwirlMotionButton {
             font.weight: control.font.weight
             textRole: "button"
             Layout.fillWidth: true; elide: Text.ElideRight
-            color: !control.enabled ? Theme.muted : control.primary ? "white" : control.danger ? Theme.red : Theme.text
+            color: !control.enabled ? Theme.muted : control.primary ? Theme.primaryButtonText : control.danger ? Theme.red : Theme.text
             Layout.alignment: Qt.AlignVCenter
             horizontalAlignment:Text.AlignHCenter
             verticalAlignment:Text.AlignVCenter

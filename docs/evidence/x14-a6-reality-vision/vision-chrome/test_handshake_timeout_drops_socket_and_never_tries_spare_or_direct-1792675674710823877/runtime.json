@@ -1,0 +1,42 @@
+{
+  "ok": true,
+  "status": {
+    "accepted": 1,
+    "active": 0,
+    "address": "127.0.0.1:42833",
+    "connections": [
+      {
+        "category": "proxy",
+        "download": 0,
+        "elapsed_ms": 253,
+        "ended": true,
+        "error": "RealityHandshakeTimeout",
+        "failure_stage": "reality_handshake",
+        "host": "localhost",
+        "id": 1,
+        "matched_rule": "DEFAULT",
+        "node": "stall",
+        "port": 43377,
+        "source_ip": "127.0.0.1",
+        "source_port": 56982,
+        "transport_state": "failed",
+        "udp_dropped": 0,
+        "upload": 0
+      }
+    ],
+    "download": 0,
+    "engine": "swirl-rust",
+    "failed": 1,
+    "generation": 1,
+    "last_error": "RealityHandshakeTimeout",
+    "last_error_stage": "reality_handshake",
+    "policies": {},
+    "rejected": 0,
+    "running": true,
+    "schema": 1,
+    "selected": "stall",
+    "selectors": {},
+    "udp_dropped": 0,
+    "upload": 0
+  }
+}

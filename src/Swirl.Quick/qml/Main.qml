@@ -18,7 +18,7 @@ ApplicationWindow {
     // path can operate per primitive. HDR capability/readback remains available
     // in the dedicated test renderer; no foreground postprocessing is applied.
     visible:true
-    width:Theme.dp(914); height:Theme.dp(672)
+    width:Theme.windowDefaultWidth; height:Theme.windowDefaultHeight
     // Qt Quick reports logical dimensions and handles each QScreen's device
     // pixel ratio. Manual sizing is applied to design metrics, not a scene transform.
     readonly property real contentScale:1.0
@@ -40,15 +40,15 @@ ApplicationWindow {
     function preparePreviewState(state){const item=pageLoader.item;if(item&&item.preparePreviewState)item.preparePreviewState(state)}
     function previewScrollBottom() { if(pageLoader.item && pageLoader.item.scrollToBottom)pageLoader.item.scrollToBottom() }
     property real swirlWindowRadius:Theme.windowRadius
-    // DWM's ROUND preference is a system preset, not an exact 10pt radius.
+    // DWM's ROUND preset cannot match the shared shell/sidebar radius exactly.
     property bool swirlExactWindowRadius:true
     readonly property real shellRadius:window.visibility===Window.Maximized || window.visibility===Window.FullScreen ? 0 : Theme.windowRadius
     Binding { target:window.captureProviderContext; property:"upstreamProxyPort"; value:window.engineControllerContext.processAlive?window.engineControllerContext.activeProxyPort:0 }
     Connections { target:window.captureProviderContext; function onStateChanged(){window.engineControllerContext.setCaptureProxyPort(window.captureProviderContext.running?window.captureProviderContext.port:0)} }
-    Connections { target:backdrop; function onChanged() { Theme.backdropActive=backdrop.active;Theme.backdropTranslucent=backdrop.translucent } }
+    Connections { target:backdrop; function onChanged() { Theme.backdropActive=backdrop.active||backdrop.micaActive||backdrop.blurActive;Theme.backdropTranslucent=backdrop.translucent } }
     Binding { target:Theme; property:"windowActive"; value:previewState==="inactive"?false:window.active }
     readonly property real sidebarGutter:0
-    readonly property real actualSidebarWidth:Theme.sidebarWidth
+    readonly property real actualSidebarWidth:sidebar.animatedWidth
     readonly property bool swirlUnifiedBlur:true
     Settings { id:windowSettings; category:"Window"; property int normalWidth:0; property int normalHeight:0 }
     onWidthChanged:if(geometryReady && visibility===Window.Windowed)windowSettings.normalWidth=Math.round(width)
@@ -65,8 +65,8 @@ ApplicationWindow {
             window.width=windowSettings.normalWidth
             window.height=windowSettings.normalHeight
         } else {
-            window.width=Math.max(Theme.dp(914),minimumWidth)
-            window.height=minimumHeight
+            window.width=Math.max(Theme.windowDefaultWidth,minimumWidth)
+            window.height=Math.max(Theme.windowDefaultHeight,minimumHeight)
         }
         geometryReady=true
         backdrop.apply(window,Theme.transparency,Theme.dark)
@@ -92,7 +92,8 @@ ApplicationWindow {
         id:scaledCanvas
         // DWM supplies the native material underneath the sharp QML content.
         width:window.width; height:window.height
-        SwirlGlassMaterial {
+        SwirlWorkspaceBackdrop {
+            id:appSceneBackdrop
             anchors.fill:parent;targetWindow:window
         }
 
@@ -106,17 +107,21 @@ ApplicationWindow {
             onPositionChanged:mouse=>{ if(pressed&&(pressedButtons&Qt.LeftButton)&&!nativeMoveStarted&&Math.hypot(mouse.x-pressPosition.x,mouse.y-pressPosition.y)>Qt.styleHints.startDragDistance){nativeMoveStarted=true;window.startSystemMove()} }
             onDoubleClicked:window.visibility===Window.Maximized ? window.showNormal() : window.showMaximized()
         }
-        SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false }
+        SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false;backdropSource:appSceneBackdrop }
+        SwirlWindowControls {
+            id:windowControls;objectName:"windowControls";z:70
+            anchors.right:parent.right;anchors.rightMargin:Theme.dp(5);y:Theme.dp(5)
+            targetWindow:window
+        }
         Item {
-            id:mainArea; x:window.actualSidebarWidth+window.sidebarGutter; width:parent.width-x-Theme.dp(12); height:parent.height
+            id:mainArea; x:window.actualSidebarWidth+window.sidebarGutter; width:parent.width-x-(AppState.currentPage==="activity"?0:Theme.dp(12)); height:parent.height
             RowLayout {
-                id:toolbar; visible:AppState.currentPage==="activity"; x:Theme.pagePadding; y:Theme.dp(16); width:parent.width-2*Theme.pagePadding; height:Theme.dp(32); spacing:Theme.dp(8)
-                SwirlText {textRole:"pageTitle";text:"活动";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
-                SwirlStatusCapsule { objectName:"eventsCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.statusHeight; label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"暂无事件";tone:systemProvider.eventCount>0?"info":"neutral";detail:"查看事件与活动记录"; onClicked:AppState.navigate("logs") }
-                SwirlStatusCapsule {id:proxyCapsule;objectName:"proxyCapsule";Layout.preferredWidth:implicitWidth;Layout.preferredHeight:Theme.statusHeight;label:window.proxyStatusLabel;tone:window.proxyTogglePending?"info":engineController.systemProxy.error.length||engineController.routingError.length?"warning":engineController.systemProxy.owned&&engineController.systemProxy.enabled?"success":"neutral";detail:"查看系统代理状态与操作";onClicked:proxyPanel.toggle()}
+                id:toolbar; z:1; visible:AppState.currentPage==="activity"; x:Theme.pagePadding+Theme.dp(7); y:Theme.dp(9); width:parent.width-x-windowControls.width-Theme.dp(16); height:Theme.dp(32); spacing:Theme.dp(8)
+                SwirlStatusCapsule { objectName:"eventsCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.dp(28); label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"暂无事件";tone:systemProvider.eventCount>0?"success":"neutral";detail:"查看事件与活动记录"; onClicked:AppState.navigate("logs") }
+                Item {Layout.fillWidth:true}
+                SwirlSystemProxyCapsule {id:proxyCapsule;objectName:"proxyCapsule";Layout.preferredWidth:implicitWidth;Layout.preferredHeight:Theme.dp(28);controller:engineController}
 
-                SwirlStatusCapsule { objectName:"tunCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.statusHeight; label:"增强模式";detail:engineController.routingError||(engineController.tunEnabled?"增强模式已开启，点击关闭":"点击开启增强模式接管网络"); tone:engineController.tunEnabled?"success":"neutral"; enabled:!engineController.busy; onClicked:{if(!engineController.setTunEnabled(!engineController.tunRequested))AppState.notice(engineController.routingError||engineController.networkConfigurationError)} }
-                SwirlButton { visible:captureProvider.running; text:"抓包中 · "+captureProvider.sessions.length; iconName:"capture"; font.pixelSize:Theme.fontSize(14); onClicked:AppState.navigate("capture") }
+                SwirlStatusCapsule { objectName:"tunCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.dp(28); label:"TUN 模式";detail:engineController.routingError||(engineController.tunEnabled?"TUN 模式已开启，点击关闭":"点击开启 TUN 模式接管网络"); tone:engineController.tunEnabled?"success":"neutral"; enabled:!engineController.busy; onClicked:{if(!engineController.setTunEnabled(!engineController.tunRequested))AppState.notice(engineController.routingError||engineController.networkConfigurationError)} }
 
             }
             SwirlButton {
@@ -134,7 +139,7 @@ ApplicationWindow {
             }
             SwirlPageHost {
                 routeKey:AppState.currentPage==="requestlogs" || AppState.currentPage==="dashboard" ? "activity" : AppState.currentPage
-                id:pageLoader; objectName:"pageLoader";insetRoutes:AppState.settingsRoutes;routeInset:settingsBack.height+Theme.compactGap; x:Theme.dp(0); y:Theme.dp(12); width:parent.width; height:parent.height-y-Theme.dp(12)
+                id:pageLoader; objectName:"pageLoader";insetRoutes:AppState.settingsRoutes;routeInset:0; x:Theme.dp(0); y:AppState.currentPage==="activity"?Theme.dp(12):Theme.dp(48); width:parent.width; height:parent.height-y-Theme.dp(12)
                 sourceComponent:AppState.currentPage==="overview" ? overview :
                                 AppState.currentPage==="activity" || AppState.currentPage==="requestlogs" || AppState.currentPage==="dashboard" ? activity :
                                 AppState.currentPage==="capture" ? capturePage :
@@ -168,81 +173,86 @@ ApplicationWindow {
             }
         }
     }
-    property bool proxyTogglePending:false
-    property bool proxyRequestedAction:false
-    readonly property string proxyStatusLabel:proxyTogglePending?"系统代理 · 正在切换":engineController.systemProxy.error.length||engineController.routingError.length?"系统代理 · 接管失败":engineController.systemProxy.owned&&engineController.systemProxy.enabled?"系统代理 · Swirl":engineController.systemProxy.systemEnabled?"系统代理 · 其他应用":"系统代理 · 未启用"
-    function showProxyError(){if(!proxyTogglePending)return;const message=engineController.systemProxy.error||engineController.routingError;if(message.length || (!engineController.busy && (proxyRequestedAction?engineController.systemProxy.owned:!engineController.systemProxy.enabled)))proxyTogglePending=false}
-    // A local reversible surface. The toolbar slot and business prerequisites remain intact.
-    MouseArea {anchors.fill:parent;z:99;visible:proxyPanel.visible;onClicked:proxyPanel.requestDismiss()}
-    Popup {
-        id:proxyPanel;objectName:"proxyStatusPanel";parent:Overlay.overlay
-        property bool desired:false
-        readonly property real reveal:proxyClock.progress
-        property point origin:Qt.point(0,0)
-        function updateOrigin(){if(parent)origin=proxyCapsule.mapToItem(parent,0,0)}
-        function toggle(){if(desired){requestDismiss();return}updateOrigin();desired=true;open();proxyClock.moveTo(1)}
-        function requestDismiss(){desired=false;proxyClock.moveTo(0)}
-        width:Math.min(Theme.dp(360),window.width-Theme.dp(32));height:proxyBody.implicitHeight+Theme.dp(40)
-        x:Math.max(Theme.dp(16),Math.min(window.width-width-Theme.dp(16),origin.x+proxyCapsule.width-width));y:origin.y
-        padding:Theme.dp(20);focus:true;modal:false;closePolicy:Popup.NoAutoClose
-        onAboutToShow:dismissals.push(proxyPanel,window)
-        onClosed:{dismissals.pop(proxyPanel);desired=false;proxyCapsule.forceActiveFocus()}
-        SwirlTransitionCoordinator {id:proxyClock;duration:SwirlMotion.dialogDuration;onMovingChanged:if(!moving&&!proxyPanel.desired&&progress===0)proxyPanel.close()}
-        Connections {target:AppState;function onCurrentPageChanged(){proxyPanel.requestDismiss()}}
-        Connections {target:window;function onWidthChanged(){if(proxyPanel.visible)Qt.callLater(proxyPanel.updateOrigin)}function onHeightChanged(){if(proxyPanel.visible)Qt.callLater(proxyPanel.updateOrigin)}}
-        Binding {target:proxyCapsule;property:"opacity";value:0;when:proxyPanel.visible;restoreMode:Binding.RestoreBindingOrValue}
-        background:SwirlGlassPanel {
-            color:Theme.surface
-            x:(proxyPanel.origin.x-proxyPanel.x)*(1-proxyPanel.reveal)
-            y:0;width:proxyCapsule.width+(proxyPanel.width-proxyCapsule.width)*proxyPanel.reveal
-            height:proxyCapsule.height+(proxyPanel.height-proxyCapsule.height)*proxyPanel.reveal
-            cornerRadius:proxyCapsule.height/2+(Theme.popupRadius-proxyCapsule.height/2)*proxyPanel.reveal
-        }
-        contentItem:ColumnLayout {
-            id:proxyBody;spacing:Theme.dp(14)
-            Keys.onEscapePressed:proxyPanel.requestDismiss()
-            SwirlText {text:window.proxyStatusLabel;color:Theme.text;font.pixelSize:Theme.fontSize(11+3*proxyPanel.reveal);font.weight:Font.DemiBold;Layout.fillWidth:true;wrapMode:Text.Wrap
-                transform:Translate{x:(proxyPanel.origin.x-proxyPanel.x+Theme.dp(21)-proxyPanel.leftPadding)*(1-proxyPanel.reveal);y:(proxyCapsule.height-height)/2*(1-proxyPanel.reveal)-proxyPanel.topPadding*(1-proxyPanel.reveal)}
-            }
-            SwirlText {opacity:proxyPanel.reveal;text:engineController.systemProxy.error||engineController.routingError||(engineController.systemProxy.owned&&engineController.systemProxy.enabled?"Swirl 已接管系统代理。":engineController.systemProxy.systemEnabled?"系统代理由其他应用启用。Swirl 尚未接管。":!engineController.processAlive?"引擎未运行，请先选择并连接节点。":!engineController.apiHealthy?"控制接口尚未就绪，请检查节点连接。":"可以启用系统代理，让支持系统代理的应用使用当前节点。");color:engineController.systemProxy.error.length||engineController.routingError.length?Theme.orange:Theme.muted;font.pixelSize:Theme.fontSize(13);Layout.fillWidth:true;wrapMode:Text.Wrap}
-            RowLayout {opacity:proxyPanel.reveal;Layout.fillWidth:true
-                SwirlButton {objectName:"proxyNodesButton";text:"节点与策略";onClicked:{proxyPanel.requestDismiss();AppState.navigate("proxies")}}
-                Item {Layout.fillWidth:true}
-                SwirlButton {objectName:"proxyPanelAction";text:window.proxyTogglePending?"正在切换…":engineController.systemProxy.enabled?"关闭代理":"接管代理";enabled:!engineController.busy&&!window.proxyTogglePending;onClicked:{window.proxyRequestedAction=!engineController.systemProxy.enabled;window.proxyTogglePending=true;engineController.setSystemProxy(window.proxyRequestedAction);window.showProxyError()}}
-            }
-            SwirlButton {text:"关闭";quiet:true;Layout.alignment:Qt.AlignRight;onClicked:proxyPanel.requestDismiss()}
-        }
-    }
-    Connections{target:engineController;function onStatusChanged(){window.showProxyError()}}
-    Connections{target:engineController.systemProxy;function onChanged(){window.showProxyError()}}
+    readonly property string proxyStatusLabel:engineController.systemProxy.error.length||engineController.routingError.length?"系统代理 · 接管失败":engineController.systemProxy.owned&&engineController.systemProxy.enabled?"系统代理 · Swirl":engineController.systemProxy.systemEnabled?"系统代理 · 其他应用":"系统代理 · 未启用"
     function openDashboard(){dashboardWindow.show();dashboardWindow.raise();dashboardWindow.requestActivate()}
-    function openCaptureInspector(){captureInspectorDialog.open()}
+    function openCaptureInspector(){
+        captureInspectorLoader.wantOpen=true
+        captureInspectorLoader.active=true
+        showPendingCaptureInspector()
+    }
+    function showPendingCaptureInspector(){
+        if(!captureInspectorLoader.wantOpen || captureInspectorLoader.status!==Loader.Ready || !captureInspectorLoader.item)return
+        captureInspectorLoader.wantOpen=false
+        captureInspectorLoader.item.open()
+    }
     function openSettings(route,origin) {
         if(AppState.settingsRoutes.indexOf(route)<0)return
         if(origin)SwirlMotion.navigateFrom(origin,route,"settings")
         else AppState.navigate(route)
     }
     function closeSettings() {
+        if(pageLoader.item && pageLoader.item.dismissDetail && pageLoader.item.dismissDetail())return
         if(AppState.historyIndex>0)AppState.goBack()
         else AppState.navigate("featurehub")
+    }
+    readonly property bool swirlBackAvailable:rewriteRulesLoader.wantOpen || captureInspectorLoader.wantOpen || AppState.canGoBack || (pageLoader.item!==null && pageLoader.item.detailOpen===true)
+    function handleEscape() {
+        if(rewriteRulesLoader.wantOpen){rewriteRulesLoader.wantOpen=false;return}
+        if(captureInspectorLoader.wantOpen){captureInspectorLoader.wantOpen=false;return}
+        if(pageLoader.item && pageLoader.item.dismissDetail && pageLoader.item.dismissDetail())return
+        if(pageLoader.item && pageLoader.item.handleSectionEscape && pageLoader.item.handleSectionEscape())return
+        if(AppState.canGoBack)AppState.goBack()
     }
     function persistExitDrafts(){
         const loader=pageLoader.pages["dns"]
         if(loader && loader.item && loader.item.persistExitDraft)loader.item.persistExitDraft()
     }
-    function openRewriteEditor(kind,title){rewriteRulesDialog.kind=kind;rewriteRulesDialog.title=title;rewriteRulesDialog.open()}
-    RewriteRulesDialog{id:rewriteRulesDialog}
+    function openRewriteEditor(kind,title){
+        rewriteRulesLoader.requestedKind=kind
+        rewriteRulesLoader.requestedTitle=title
+        rewriteRulesLoader.wantOpen=true
+        rewriteRulesLoader.active=true
+        showPendingRewriteEditor()
+    }
+    function showPendingRewriteEditor(){
+        if(!rewriteRulesLoader.wantOpen || rewriteRulesLoader.status!==Loader.Ready || !rewriteRulesLoader.item)return
+        rewriteRulesLoader.wantOpen=false
+        rewriteRulesLoader.item.kind=rewriteRulesLoader.requestedKind
+        rewriteRulesLoader.item.title=rewriteRulesLoader.requestedTitle
+        rewriteRulesLoader.item.open()
+    }
+    // Keep the first-created editor alive so reopening preserves its drafts.
+    Loader {
+        id:rewriteRulesLoader
+        property string requestedKind:"redirect"
+        property string requestedTitle:""
+        property bool wantOpen:false
+        objectName:"rewriteRulesLoader"
+        active:false
+        asynchronous:true
+        sourceComponent:Component {RewriteRulesDialog {}}
+        onLoaded:window.showPendingRewriteEditor()
+    }
     SwirlSecondaryWindow {
         composition:panelBackdrop
         id:dashboardWindow;objectName:"dashboardWindow";function openProxyControl(){hide();AppState.navigate("policies");window.show();window.raise();window.requestActivate()}
-        visible:false;width:Theme.dp(1300);height:Theme.dp(600);minimumWidth:Theme.dp(914);minimumHeight:Theme.dp(560);title:"Swirl 面板";flags:Qt.Window|Qt.FramelessWindowHint;color:"transparent"
+        visible:false;width:Theme.windowDefaultWidth;height:Theme.windowDefaultHeight;minimumWidth:Theme.windowMinimumWidth;minimumHeight:Theme.windowMinimumHeight;title:"Swirl 面板";flags:Qt.Window|Qt.FramelessWindowHint;color:"transparent"
         function openCaptureInspector(){window.openCaptureInspector()}
         ExternalToolsPage{anchors.fill:parent;clip:true}
     }
 
-    SwirlDialog {
-        id:captureInspectorDialog;title:"HTTP 请求详情";width:Math.min(Theme.dp(1000),window.width-Theme.dp(20));height:Math.min(Theme.dp(650),window.height-Theme.dp(20));padding:Theme.dp(14)
-        CaptureInspectorPage{captureProvider:window.captureProviderContext;anchors.fill:parent}
+    Loader {
+        id:captureInspectorLoader;objectName:"captureInspectorLoader"
+        property bool wantOpen:false
+        active:false;asynchronous:true
+        onLoaded:window.showPendingCaptureInspector()
+        sourceComponent:Component {
+            SwirlDialog {
+                objectName:"captureInspectorDialog";ownerItem:window.contentItem;title:"HTTP 请求详情"
+                width:Math.min(Theme.dp(1000),window.width-Theme.dp(20));height:Math.min(Theme.dp(650),window.height-Theme.dp(20));padding:Theme.dp(14)
+                CaptureInspectorPage{captureProvider:window.captureProviderContext;anchors.fill:parent}
+            }
+        }
     }
     // Native move and eight-edge resize keep Windows snap/DPI behavior.
     Repeater {
@@ -264,7 +274,6 @@ ApplicationWindow {
     }
     Shortcut { sequence:"Alt+Space"; context:Qt.ApplicationShortcut; onActivated:backdrop.showSystemMenu() }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+K"; context:Qt.ApplicationShortcut; onActivated:sidebar.openSearch() }
-    Shortcut { enabled:dismissals.count===0 && AppState.inSettings;sequence:"Esc";onActivated:window.closeSettings() }
     Shortcut { enabled:dismissals.count===0;sequence:"Alt+Left"; onActivated:AppState.goBack() }
     Shortcut { enabled:dismissals.count===0;sequence:"Alt+Right"; onActivated:AppState.goForward() }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+1"; onActivated:AppState.navigate("overview") }
@@ -308,16 +317,20 @@ ApplicationWindow {
     Timer { interval:1000; running:true; repeat:true; onTriggered:AppState.tickTraffic() }
     // Exact-region windows use this single matching rim; other native windows
     // retain their DWM rim. The native region clips all children at once.
-    SwirlContinuousSurface {
+    SwirlShellOutline {
         objectName:"windowOutline";visible:backdrop.exactCorners || !backdrop.nativeCorners
-        anchors.fill:parent;z:998;color:"transparent";antialiasing:true
+        anchors.fill:parent;z:998
         radius:window.shellRadius
-        border.width:window.visibility===Window.Maximized?0:1/Screen.devicePixelRatio
-        border.color:Theme.dark?Qt.rgba(1,1,1,window.active?0.30:0.20):Qt.rgba(0,0,0,window.active?0.12:0.08)
+        strokeWidth:window.visibility===Window.Maximized?0:1/Screen.devicePixelRatio
+        strokeColor:Theme.increaseContrast?Theme.text:Theme.dark?Qt.rgba(1,1,1,0.14):Qt.rgba(0,0,0,0.055)
     }
     Timer { id:toastTimer; interval:3200; onTriggered:AppState.toast="" }
     WindowEdge {anchors.fill:parent;z:10000;radius:window.shellRadius}
-    Connections { target:AppState; function onToastChanged(){if(AppState.toast.length)toastTimer.restart()} }
+    Connections {
+        target:AppState
+        function onToastChanged(){if(AppState.toast.length)toastTimer.restart()}
+        function onCurrentPageChanged(){rewriteRulesLoader.wantOpen=false;captureInspectorLoader.wantOpen=false}
+    }
     Rectangle {
         visible:AppState.toast.length>0; z:999
         anchors.horizontalCenter:parent.horizontalCenter; anchors.bottom:parent.bottom; anchors.bottomMargin:Theme.dp(28)

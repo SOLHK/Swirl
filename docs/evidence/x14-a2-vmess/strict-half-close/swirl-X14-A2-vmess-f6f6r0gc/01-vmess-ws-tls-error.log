@@ -1,0 +1,59 @@
+2026/10/22 21:45:21.702327 [Debug] app/log: Logger started
+2026/10/22 21:45:21.702565 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:38647
+2026/10/22 21:45:21.705228 [Info] transport/internet/websocket: listening tcp(for WS) on 127.0.0.1:38647
+2026/10/22 21:45:21.706208 [Warning] core: Xray 26.10.21 started
+2026/10/22 21:45:21.720038 [Info] [2503073485] proxy/vmess/inbound: received request for tcp:127.0.0.1:35809
+2026/10/22 21:45:21.720090 [Info] [2503073485] app/dispatcher: default route for tcp:127.0.0.1:35809
+2026/10/22 21:45:21.720094 [Info] [2503073485] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:35809
+2026/10/22 21:45:21.720097 [Debug] [2503073485] transport/internet: dialing to tcp:127.0.0.1:35809
+2026/10/22 21:45:21.720260 [Info] [1040057690] proxy/vmess/inbound: received request for tcp:127.0.0.1:35809
+2026/10/22 21:45:21.720274 [Info] [2503073485] proxy/freedom: connection opened to tcp:127.0.0.1:35809, local endpoint 127.0.0.1:34828, remote endpoint 127.0.0.1:35809
+2026/10/22 21:45:21.720279 [Debug] [2503073485] proxy: CopyRawConn (maybe) readv
+2026/10/22 21:45:21.720282 [Info] [1040057690] app/dispatcher: default route for tcp:127.0.0.1:35809
+2026/10/22 21:45:21.720386 [Info] [1040057690] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:35809
+2026/10/22 21:45:21.720399 [Debug] [1040057690] transport/internet: dialing to tcp:127.0.0.1:35809
+2026/10/22 21:45:21.720634 [Info] [1040057690] proxy/freedom: connection opened to tcp:127.0.0.1:35809, local endpoint 127.0.0.1:34830, remote endpoint 127.0.0.1:35809
+2026/10/22 21:45:21.720640 [Debug] [1040057690] proxy: CopyRawConn (maybe) readv
+2026/10/22 21:45:21.720920 [Info] [1137867582] proxy/vmess/inbound: received request for tcp:127.0.0.1:35809
+2026/10/22 21:45:21.721029 [Info] [1137867582] app/dispatcher: default route for tcp:127.0.0.1:35809
+2026/10/22 21:45:21.721033 [Info] [1137867582] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:35809
+2026/10/22 21:45:21.721036 [Debug] [1137867582] transport/internet: dialing to tcp:127.0.0.1:35809
+2026/10/22 21:45:21.721173 [Info] [4208486885] proxy/vmess/inbound: received request for tcp:127.0.0.1:35809
+2026/10/22 21:45:21.721233 [Info] [4208486885] app/dispatcher: default route for tcp:127.0.0.1:35809
+2026/10/22 21:45:21.721239 [Info] [4208486885] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:35809
+2026/10/22 21:45:21.721241 [Debug] [4208486885] transport/internet: dialing to tcp:127.0.0.1:35809
+2026/10/22 21:45:21.721348 [Info] [4208486885] proxy/freedom: connection opened to tcp:127.0.0.1:35809, local endpoint 127.0.0.1:34852, remote endpoint 127.0.0.1:35809
+2026/10/22 21:45:21.721355 [Info] [1137867582] proxy/freedom: connection opened to tcp:127.0.0.1:35809, local endpoint 127.0.0.1:34846, remote endpoint 127.0.0.1:35809
+2026/10/22 21:45:21.721358 [Debug] [1137867582] proxy: CopyRawConn (maybe) readv
+2026/10/22 21:45:21.721359 [Debug] [4208486885] proxy: CopyRawConn (maybe) readv
+2026/10/22 21:45:22.772745 [Info] [1137867582] app/proxyman/inbound: connection ends > proxy/vmess/inbound: connection ends > context canceled
+2026/10/22 21:45:22.773873 [Info] [4208486885] app/proxyman/inbound: connection ends > proxy/vmess/inbound: connection ends > context canceled
+2026/10/22 21:45:22.773924 [Info] [2503073485] app/proxyman/inbound: connection ends > proxy/vmess/inbound: connection ends > context canceled
+2026/10/22 21:45:22.777245 [Info] [1040057690] app/proxyman/inbound: connection ends > proxy/vmess/inbound: connection ends > context canceled
+2026/10/22 21:45:22.783992 [Info] [2849204218] proxy/vmess/inbound: received request for tcp:127.0.0.1:35809
+2026/10/22 21:45:22.783998 [Info] [2849204218] app/dispatcher: default route for tcp:127.0.0.1:35809
+2026/10/22 21:45:22.784001 [Info] [2849204218] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:35809
+2026/10/22 21:45:22.784003 [Debug] [2849204218] transport/internet: dialing to tcp:127.0.0.1:35809
+2026/10/22 21:45:22.784043 [Info] [2849204218] proxy/freedom: connection opened to tcp:127.0.0.1:35809, local endpoint 127.0.0.1:34860, remote endpoint 127.0.0.1:35809
+2026/10/22 21:45:22.784107 [Debug] [2849204218] proxy: CopyRawConn (maybe) readv
+2026/10/22 21:45:22.784781 [Info] [1183402892] proxy/vmess/inbound: received request for tcp:127.0.0.1:35809
+2026/10/22 21:45:22.785365 [Info] [1183402892] app/dispatcher: default route for tcp:127.0.0.1:35809
+2026/10/22 21:45:22.785369 [Info] [1183402892] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:35809
+2026/10/22 21:45:22.785371 [Debug] [1183402892] transport/internet: dialing to tcp:127.0.0.1:35809
+2026/10/22 21:45:22.785474 [Info] [1183402892] proxy/freedom: connection opened to tcp:127.0.0.1:35809, local endpoint 127.0.0.1:34866, remote endpoint 127.0.0.1:35809
+2026/10/22 21:45:22.785490 [Debug] [1183402892] proxy: CopyRawConn (maybe) readv
+2026/10/22 21:45:22.785640 [Info] [280417203] proxy/vmess/inbound: received request for tcp:127.0.0.1:35809
+2026/10/22 21:45:22.785758 [Info] [280417203] app/dispatcher: default route for tcp:127.0.0.1:35809
+2026/10/22 21:45:22.785762 [Info] [280417203] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:35809
+2026/10/22 21:45:22.785767 [Debug] [280417203] transport/internet: dialing to tcp:127.0.0.1:35809
+2026/10/22 21:45:22.785862 [Info] [280417203] proxy/freedom: connection opened to tcp:127.0.0.1:35809, local endpoint 127.0.0.1:34882, remote endpoint 127.0.0.1:35809
+2026/10/22 21:45:22.785868 [Debug] [280417203] proxy: CopyRawConn (maybe) readv
+2026/10/22 21:45:22.792810 [Info] [3862695570] proxy/vmess/inbound: received request for tcp:127.0.0.1:35809
+2026/10/22 21:45:22.792818 [Info] [3862695570] app/dispatcher: default route for tcp:127.0.0.1:35809
+2026/10/22 21:45:22.792821 [Info] [3862695570] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:35809
+2026/10/22 21:45:22.792824 [Debug] [3862695570] transport/internet: dialing to tcp:127.0.0.1:35809
+2026/10/22 21:45:22.792882 [Info] [3862695570] proxy/freedom: connection opened to tcp:127.0.0.1:35809, local endpoint 127.0.0.1:34888, remote endpoint 127.0.0.1:35809
+2026/10/22 21:45:22.792896 [Debug] [3862695570] proxy: CopyRawConn (maybe) readv
+2026/10/22 21:45:23.831532 [Info] [280417203] app/proxyman/inbound: connection ends > proxy/vmess/inbound: connection ends > context canceled
+2026/10/22 21:45:23.840110 [Info] [1183402892] app/proxyman/inbound: connection ends > proxy/vmess/inbound: connection ends > context canceled
+2026/10/22 21:45:23.849522 [Info] [3862695570] app/proxyman/inbound: connection ends > proxy/vmess/inbound: connection ends > context canceled

@@ -174,6 +174,10 @@ function New-CodexProxyStartInfo {
     $info.FileName = $ExecutablePath
     $info.WorkingDirectory = [IO.Path]::GetDirectoryName($ExecutablePath)
     $info.UseShellExecute = $false
+    # Chromium does not use the native app-server's proxy environment. Pin both
+    # stacks to the same validated loopback endpoint in this fresh process.
+    $info.ArgumentList.Add('--proxy-server=' + $ProxyEndpoint)
+    $info.ArgumentList.Add('--proxy-bypass-list=localhost;127.0.0.1;[::1]')
     foreach ($name in @('HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY')) { $info.Environment[$name] = $ProxyEndpoint }
     # Do not inherit a broad NO_PROXY list that could bypass the selected proxy.
     $info.Environment['NO_PROXY'] = 'localhost,127.0.0.1,::1'

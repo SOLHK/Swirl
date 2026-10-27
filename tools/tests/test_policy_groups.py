@@ -792,7 +792,8 @@ class PolicyIntegration(unittest.TestCase):
                 self.assertTrue(self.command(op='configure', handle=self.handle, config=changed)['ok'])
                 status = self.wait_for(lambda s: s['policies']['auto']['checks'] >= 2)
                 self.assertIsNone(status['policies']['auto']['selected'])
-                self.assertTrue(all(m['error'] == 'TlsVerificationOrHandshake'
+                expected = 'TlsCertificateNameMismatch' if wrong_name else 'TlsCertificateUnknownIssuer'
+                self.assertTrue(all(m['error'] == expected
                                     for m in status['policies']['auto']['members']), status)
         self.assertEqual(len(self.health.requests), baseline)
 

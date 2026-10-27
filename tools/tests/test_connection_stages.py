@@ -640,7 +640,7 @@ class ConnectionStageTests(unittest.TestCase):
             {'matcher': {'type': 'cidr', 'value': '127.0.0.1/32', 'resolve': True}, 'outbound': 'node'},
             {'matcher': {'type': 'match'}, 'outbound': 'deny'}], timeout_ms=3000)
         self.tunnel(port=port, success=False).close()
-        self.settled(failed=1, error='UpstreamConnectFailed', stage='tcp_connect')
+        self.settled(failed=1, error='UpstreamConnectionRefused', stage='tcp_connect')
         self.assertEqual(origin.tcp_connections, 0)
         self.assertEqual(len(peer.queries), 2)
         self.assert_refused('127.0.0.1', port)
@@ -659,7 +659,7 @@ class ConnectionStageTests(unittest.TestCase):
         self.start({'type': 'shadowsocks', 'host': '127.0.0.1', 'port': port,
                     'password': PASSWORD, 'cipher': 'aes-128-gcm'}, timeout_ms=3000)
         self.tunnel(success=False).close()
-        state = self.settled(failed=1, error='UpstreamConnectFailed', stage='tcp_connect')
+        state = self.settled(failed=1, error='UpstreamConnectionRefused', stage='tcp_connect')
         self.assertEqual((state['upload'], state['download']), (0, 0))
         self.assert_refused('127.0.0.1', port)
 
@@ -695,7 +695,9 @@ class ConnectionStageTests(unittest.TestCase):
                     'tls': {'server_name': 'localhost', 'ca_der_base64': self.ca}},
                    self.dns())
         self.tunnel(success=False).close()
-        self.settled(failed=1, error='TlsVerificationOrHandshake', stage='tls_handshake')
+        # Both synthetic CAs have the same issuer DN but different keys. This
+        # is a rejected certificate chain, not an absent matching issuer.
+        self.settled(failed=1, error='TlsCertificateInvalid', stage='tls_handshake')
         self.assertEqual(first.tcp_connections, 1)
         self.assertEqual(second.tcp_connections, 0)
         self.assertEqual(first.requests, [])

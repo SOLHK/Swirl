@@ -1,0 +1,208 @@
+{
+  "observed_utc": "2026-10-23 04:54:21 UTC",
+  "repository": "SOLHK/Swirl",
+  "branch_count": 47,
+  "previous_snapshot": "U1-source-recheck.json",
+  "sources_changed_since_previous": [
+    {
+      "branch": "work/activity-page-v7-20261023",
+      "previous_sha": "857f6b4e129ae138d3df674c1e6073d6b929b499",
+      "sha": "9d6b572828c1cd4f14251b6cd74dfd5c777491df",
+      "commits": [
+        "4e39d8d4b4c9aa029197cf4ea32a5a42cf2997d9",
+        "9d6b572828c1cd4f14251b6cd74dfd5c777491df"
+      ],
+      "disposition": "Both new commits and all four changed files inspected through GitHub compare. Only Theme, glass/sidebar material and native visual tests changed. Excluded under explicit UI-redesign boundary."
+    }
+  ],
+  "branches": [
+    {
+      "name": "backup/pre-qt-only-20261012",
+      "sha": "eed41b06d9e49d25fd0d7062fe5018a8fb669222"
+    },
+    {
+      "name": "codex/surge-activity",
+      "sha": "49559fa5fa6ad999086afc2444ac17ed35945657"
+    },
+    {
+      "name": "feat/mihomo-import-motion",
+      "sha": "b7f058f2f584602e6764fd28a808c3eb1c5ab088"
+    },
+    {
+      "name": "feat/phase2-real-node",
+      "sha": "0d8bd85e8af668eee80be609c6c89813a354cb9d"
+    },
+    {
+      "name": "feat/phase3-final-integration",
+      "sha": "564e213ce604d7b79bb2414cd3aefba5744d46eb"
+    },
+    {
+      "name": "feat/phase3-system-proxy-ui",
+      "sha": "0ae36d6f2ac3ef55921f7927e06b6cc9401b99e3"
+    },
+    {
+      "name": "feat/qt-quick-ui-demo",
+      "sha": "dcdfc072389d154fd53c542f33089e881e27c99b"
+    },
+    {
+      "name": "feature/core-engine",
+      "sha": "170188de532a2f3f802abe89bde07c32908ea85d"
+    },
+    {
+      "name": "feature/phase1-proxy-engine",
+      "sha": "7101cd25e19bbf292427714e58f5c48be9b6fb28"
+    },
+    {
+      "name": "feature/ui-animation",
+      "sha": "170188de532a2f3f802abe89bde07c32908ea85d"
+    },
+    {
+      "name": "fix/node-selection-layout",
+      "sha": "5c6e36adda7d327199ab399c16f54f71390679d5"
+    },
+    {
+      "name": "fix/windows-motion-network",
+      "sha": "c113903e18067fbfc55308bc28bad56e90ae1aca"
+    },
+    {
+      "name": "integration/all-open-prs-20261022",
+      "sha": "fa97b084769b39d8bddd5a6ffa40007345c5bc0f"
+    },
+    {
+      "name": "main",
+      "sha": "87409c0bf9c957ef113f84c176c5a1529c27b9df"
+    },
+    {
+      "name": "test",
+      "sha": "e19dc9f663ac326b6654953db212b97177a56966"
+    },
+    {
+      "name": "work/activity-page-v7-20261023",
+      "sha": "9d6b572828c1cd4f14251b6cd74dfd5c777491df"
+    },
+    {
+      "name": "work/core-buildkit-20261017",
+      "sha": "6f007c73fdf449bda8322a5cf3a83214144c7999"
+    },
+    {
+      "name": "work/core-completion-20261017",
+      "sha": "f87b6f98eb7018c4a5e86f281fe707764565ce58"
+    },
+    {
+      "name": "work/core-rule-routing-20261021",
+      "sha": "b6dce3a415619c2c3b107fe7b761f63727da11b2"
+    },
+    {
+      "name": "work/product-ui-fixes-20261021",
+      "sha": "bbb4ea33d3a3ae596027b840af630260ba6bdbcc"
+    },
+    {
+      "name": "work/qt-http2-security-20261023",
+      "sha": "9dd8a675eed6374ac1c35265074f594a39262479"
+    },
+    {
+      "name": "work/rust-core-full-replacement-20261022",
+      "sha": "5d96214ac80d63985cdccf4942c3c1d79035e793"
+    },
+    {
+      "name": "work/rust-core-network-fixes-20261021",
+      "sha": "b8aa4f6f40a091697e89ae4c8291789661edca60"
+    },
+    {
+      "name": "work/rust-dot-20261017",
+      "sha": "4dca7268bfd63db6b942f169811fa6d09e3388e0"
+    },
+    {
+      "name": "work/rust-native-protocols-x14a-20261022",
+      "sha": "2a41b360d0fed90bf2818d5e4c8e93b4f41f021b"
+    },
+    {
+      "name": "work/subscription-import-20261021",
+      "sha": "bf40f6dd639b0a9583a0dbea8e50851ac0c9ed29"
+    },
+    {
+      "name": "work/subscription-native-bridge-20261023",
+      "sha": "442138a3d40fc13a9a761b43f3a2ce829a2b47ec"
+    },
+    {
+      "name": "work/subscription-unified-integration-20261023",
+      "sha": "208e50dbd5f0b05b607afab0386fd4bb0dae8b79"
+    },
+    {
+      "name": "work/swirl-performance-20261021",
+      "sha": "294cdd29fceb966e9c11437ed57188e4917004ea"
+    },
+    {
+      "name": "work/swirl-ui-012-20261022",
+      "sha": "505216bc5007c9a8181c2d18490a50baa2b812c5"
+    },
+    {
+      "name": "work/vf-axis-a3",
+      "sha": "66594e9d32a33c1d216319e2dccd2f35c7e47a4a"
+    },
+    {
+      "name": "work/vf-b1-public-containment-20261020",
+      "sha": "ba8039a1028808140453adcbe150438e2bb20385"
+    },
+    {
+      "name": "work/vf-macos-native",
+      "sha": "e6b44f83cd92e4b8082d54a84d4a98bef1cd5b28"
+    },
+    {
+      "name": "work/vf-macos-windows-d1-20261021",
+      "sha": "54e579f1b46ee75187069d40b9ec626b3cc980d5"
+    },
+    {
+      "name": "work/vf-metrics-b1",
+      "sha": "7902cdb7b449a56939346263df54a692c22d8337"
+    },
+    {
+      "name": "work/vf-p8-gvar-pro",
+      "sha": "7ff8d17cb18c624b50895cda00216a2f3a86f844"
+    },
+    {
+      "name": "work/vf-rebuild-c1",
+      "sha": "c0fe6c47f1a4a0854fcbbde7c9f08b791b44123e"
+    },
+    {
+      "name": "work/vf-smart-width-w1",
+      "sha": "2be6c78cae93544af57e90cb4904a399959d6b7c"
+    },
+    {
+      "name": "work/vf-takeover-abc-20261021",
+      "sha": "0d47f057b91912e3be4048cbd7a5548e505763da"
+    },
+    {
+      "name": "work/vf-windows-d1",
+      "sha": "844544f92c8f2c0cc96dfb7af02e4fa8e6604b4f"
+    },
+    {
+      "name": "work/x12b-resume-20261022",
+      "sha": "44dda9d4fe27a6667aa977d879d8dfc2ca82688d"
+    },
+    {
+      "name": "work/x13-a-protocol-runtime-20261022",
+      "sha": "fca13d3c06f9a6a45cab0b8e28c3587fbbe2f870"
+    },
+    {
+      "name": "work/xray-v2ray-json-b-20261022",
+      "sha": "4e9f6ea0411c03bba418bb46884748ba7e0ba03b"
+    },
+    {
+      "name": "work/xray-v2ray-json-import-20261021",
+      "sha": "44dda9d4fe27a6667aa977d879d8dfc2ca82688d"
+    },
+    {
+      "name": "work/xray-v2ray-native-20261021",
+      "sha": "b88bb978d31fad1865e1b648cecd4f230bc3487c"
+    },
+    {
+      "name": "work/xray-v2ray-qt-import-20261022",
+      "sha": "506014d6386610411f48c939ab62cb93a3509431"
+    },
+    {
+      "name": "work/xray-v2ray-transport-20261022",
+      "sha": "fca13d3c06f9a6a45cab0b8e28c3587fbbe2f870"
+    }
+  ]
+}

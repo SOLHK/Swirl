@@ -1,3 +1,8 @@
+# Historical architecture (superseded by Rust-only R1)
+
+This document records removed code and is not a current build or runtime guide.
+See BUILDING.md and docs/R1_RUNTIME_CAPABILITIES.md.
+
 # 第一阶段：引擎通信与生命周期
 
 Swirl 的 C++ 业务层通过 `ProxyEngine` 使用代理引擎。`MihomoAdapter` 是目前的实现；

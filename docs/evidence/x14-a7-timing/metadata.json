@@ -1,0 +1,44 @@
+{
+  "source_base_commit": "42fd5782c1d30f32bb4cc2aef21857c52af50dc7",
+  "scope": "A7 explicit native HEAD connector timing plus actual exported C ABI observation; not Qt acceptance",
+  "collector_tests": {
+    "passed": 3,
+    "failed": 0,
+    "ignored": 0
+  },
+  "probe_filtered_tests": {
+    "passed": 16,
+    "failed": 0,
+    "ignored": 0,
+    "other_tests": "filtered, not claimed executed"
+  },
+  "official_runtime_head": {
+    "methods": 3,
+    "probes": 8,
+    "seconds": 0.748,
+    "all_expected_outcomes_verified": true
+  },
+  "official_dynamic_ffi_head": {
+    "methods": 3,
+    "probes": 8,
+    "seconds": 2.287,
+    "all_expected_outcomes_verified": true
+  },
+  "clippy": "passed after correcting an initially oversized Result error by boxing one fixed-size failure snapshot; no lint disabled",
+  "user_probe_cancel": "existing cancelled state clears metric/failure and aborts the probe; no partial report is promised for explicit cancellation",
+  "source_sha256": {
+    "core/crates/swirl-protocol/src/timing.rs": "cece29373f4a3e9be13bae0505e7842c2ae6bf2910ae41d74cbab9b3fe90ab28",
+    "core/crates/swirl-protocol/src/dial.rs": "deaed327bfaabe8f593de6f0cffb42ab88d997319d11688501d13b4b0679c18c",
+    "core/crates/swirl-protocol/src/lib.rs": "88273215e29533155398458d389ad6b0f8b8cea681003d78b422bb3223a4df1f",
+    "core/crates/swirl-protocol/src/socks4.rs": "f980a787eb67221ef8a196614b5469505cf556b1f73b3d96292781f7cf731e71",
+    "core/crates/swirl-protocol/src/hysteria2.rs": "471f4677d8933c16912922f7904e728a8ca8a23d3f76a0e7c56ff062db700542",
+    "core/crates/swirl-protocol/src/tuic.rs": "5a6243cf9f38afd954b4fd1a4b6e2c1c2fd6b81528f58c3123fd3a12ec197200",
+    "core/crates/swirl-protocol/src/probe.rs": "ed4367539025b05b435839d447c2ec363ffabc6d9472bbef126222ad3fd2e4a8",
+    "core/crates/swirl-protocol/src/transport.rs": "87d48390549fa666980f8d873c2286e33abed031532f02815a186c4d81097b83",
+    "core/crates/swirl-protocol/src/probe_tests.rs": "2b783ddcaf200071965ac9c132ca1929a39e1de848706e8ec565d56b4478b5b1",
+    "core/crates/swirl-core/src/probe.rs": "7021daae06acf97ef94d257888b80bf510b7c53f9e7e8275b724b3f0c3da147b",
+    "core/crates/swirl-core/src/probe_tests.rs": "9d0e402faf33423891c4a96ad606bfe10df133815b0dd6c4e41363c8b77c5f44",
+    "core/crates/swirl-api/src/probe_tests.rs": "20b5ef606a694344822cd3bce72bf9c6e169ca0d83d7b2956812be96270677b4",
+    "tools/tests/test_native_timing.py": "f501d12ec9b44ec14d5a1bcefab3c8418ee6df67e5225461e2387427dc585b3d"
+  }
+}

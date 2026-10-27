@@ -578,6 +578,89 @@ mod tests {
     }
 
     #[test]
+    fn rejects_oversized_compressed_container_even_with_matching_checksum() {
+        // Keep the public 16 MiB limit explicit, so changing the production
+        // constant cannot silently weaken this security regression.
+        let bytes = vec![0u8; 16 * 1024 * 1024 + 1];
+        let checksum = format!("{:x}", sha2::Sha256::digest(&bytes));
+        for behavior in [Behavior::Domain, Behavior::IpCidr] {
+            assert_eq!(
+                ChinaRules::parse(&bytes, behavior, &checksum).unwrap_err(),
+                "MrsCompressedSize"
+            );
+        }
+    }
+
+    #[test]
+    fn bounds_real_zstd_expansion_at_the_64_mib_boundary() {
+        use std::io::Write;
+
+        for decoded_size in [64 * 1024 * 1024, 64 * 1024 * 1024 + 1] {
+            let mut header = b"MRS\x01\x00".to_vec();
+            header.extend_from_slice(&1i64.to_be_bytes());
+            header.extend_from_slice(&0i64.to_be_bytes());
+            header.push(2); // A deliberate later-stage trie-version rejection.
+            let mut encoder = zstd::stream::Encoder::new(Vec::new(), 1).unwrap();
+            encoder.write_all(&header).unwrap();
+            let chunk = [0u8; 64 * 1024];
+            let mut remaining = decoded_size - header.len();
+            while remaining > 0 {
+                let count = remaining.min(chunk.len());
+                encoder.write_all(&chunk[..count]).unwrap();
+                remaining -= count;
+            }
+            let compressed = encoder.finish().unwrap();
+            assert!(compressed.len() < 16 * 1024 * 1024);
+            let checksum = format!("{:x}", sha2::Sha256::digest(&compressed));
+            // The exact limit reaches format validation; one additional
+            // decoded byte must be rejected by the size gate first.
+            let expected = if decoded_size == 64 * 1024 * 1024 {
+                "MrsDomainVersion"
+            } else {
+                "MrsDecompressedSize"
+            };
+            assert_eq!(
+                ChinaRules::parse(&compressed, Behavior::Domain, &checksum).unwrap_err(),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_out_of_bounds_rule_counts_and_extra_headers_before_payload() {
+        for (behavior, marker, version_error) in [
+            (Behavior::Domain, 0u8, "MrsDomainVersion"),
+            (Behavior::IpCidr, 1u8, "MrsIpVersion"),
+        ] {
+            for (count, extra_len, expected) in [
+                (-1i64, 0i64, "MrsHeaderBounds"),
+                (0, 0, "MrsHeaderBounds"),
+                (2_000_001, 0, "MrsHeaderBounds"),
+                (2_000_000, 0, version_error),
+                (1, -1, "MrsHeaderBounds"),
+                (1, 1024 * 1024 + 1, "MrsHeaderBounds"),
+                (1, 1024 * 1024, version_error),
+            ] {
+                let mut payload = b"MRS\x01".to_vec();
+                payload.push(marker);
+                payload.extend_from_slice(&count.to_be_bytes());
+                payload.extend_from_slice(&extra_len.to_be_bytes());
+                if expected == version_error {
+                    payload.resize(payload.len() + extra_len as usize, 0);
+                }
+                payload.push(2); // Valid-bound controls reach this payload byte.
+                let compressed = zstd::stream::encode_all(&payload[..], 1).unwrap();
+                let checksum = format!("{:x}", sha2::Sha256::digest(&compressed));
+                assert_eq!(
+                    ChinaRules::parse(&compressed, behavior, &checksum).unwrap_err(),
+                    expected,
+                    "behavior={behavior:?}, count={count}, extra_len={extra_len}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn rejects_mismatched_rule_behavior() {
         let payload = b"MRS\x01\x01";
         let compressed = zstd::stream::encode_all(&payload[..], 1).unwrap();

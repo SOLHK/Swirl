@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "source": "https://github.com/XTLS/Xray-core",
+  "license": "MPL-2.0",
+  "peers": {
+    "current": {
+      "release": "v26.10.21",
+      "commit": "1b1647cd9ddf0abc34b981d4611fc03bcac1ca74",
+      "sha256": {
+        "linux-64": "0eec3ed4163c273d8c8bf821f7d219e257921cf584aa3fb970715e458e631978",
+        "windows-64": "fc58c39ee2f2717b4c54d28d374362389e5319b20ae44aea76ea45a5243ec827",
+        "macos-64": "8e5169b429e76ce5f550c8294db465bc259f30c158ba900aa40802b76ad2f66e",
+        "macos-arm64-v8a": "926cc55fda2a8757dabe4f22dc98772f218ace025f101bd0b68aee232e59d5dc"
+      }
+    },
+    "legacy_h2": {
+      "release": "v1.8.24",
+      "commit": "6baad79f9881ee2cf75bdc825b3e2e92b289477a",
+      "sha256": {
+        "linux-64": "47a860787e823474a358d6bca536547df6dd08b69c6de482ea92a9e7e8f8969c",
+        "windows-64": "f932f83870bb539b9bd075540142c7a9e1a8ababb4fc1460fd2098fa491b89dc",
+        "macos-64": "d1b4ccfede6813cb9fe40e9eb7fd504352e4ea66f2a371341650d0be266e19ec",
+        "macos-arm64-v8a": "bb033a6e094a6cbb2f6e2c9a8b8c370678e3b9035e4e5bd42cbf44b06f0bc91a"
+      }
+    }
+  }
+}

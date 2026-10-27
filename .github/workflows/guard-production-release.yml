@@ -1,5 +1,4 @@
 name: Guard production release
-
 on:
   pull_request:
     branches: [main]
@@ -8,38 +7,91 @@ on:
 
 permissions:
   contents: read
+  issues: read
+  actions: read
 
 jobs:
   production-gate:
     name: production-gate
     runs-on: ubuntu-latest
     steps:
-      - name: Enforce staging to production promotion
+      - name: Verify owner-approved and tested test-to-main candidate
         if: github.event_name == 'pull_request'
         shell: bash
         env:
-          SOURCE_BRANCH: ${{ github.head_ref }}
-          SOURCE_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          TARGET_REPO: ${{ github.repository }}
-          TARGET_BRANCH: ${{ github.base_ref }}
-          RELEASE_APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'release-approved') }}
-          DRAFT_PR: ${{ github.event.pull_request.draft }}
+          GITHUB_TOKEN: \${{ github.token }}
+          SOURCE_BRANCH: \${{ github.head_ref }}
+          SOURCE_REPO: \${{ github.event.pull_request.head.repo.full_name }}
+          TARGET_REPO: \${{ github.repository }}
+          TARGET_BRANCH: \${{ github.base_ref }}
+          LABEL_PRESENT: \${{ contains(github.event.pull_request.labels.*.name, 'release-approved') }}
+          IS_DRAFT: \${{ github.event.pull_request.draft }}
+          CANDIDATE_SHA: \${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: \${{ github.event.pull_request.number }}
+          RELEASE_OWNER: \${{ github.repository_owner }}
         run: |
           set -euo pipefail
           if [[ "$SOURCE_BRANCH" != "test" || "$SOURCE_REPO" != "$TARGET_REPO" || "$TARGET_BRANCH" != "main" ]]; then
-            echo "::error::Only a same-repository test -> main pull request may ship a production release."
+            echo "::error::Only a same-repository test -> main PR can be promoted."
             exit 1
           fi
-          if [[ "$DRAFT_PR" == "true" ]]; then
-            echo "::error::Production pull request is still a draft."
+          if [[ "$IS_DRAFT" == "true" || "$LABEL_PRESENT" != "true" ]]; then
+            echo "::error::A non-draft PR with release-approved is required."
             exit 1
           fi
-          if [[ "$RELEASE_APPROVED" != "true" ]]; then
-            echo "::error::Release not approved. The repository owner must explicitly authorize release-approved."
-            exit 1
-          fi
-          echo "Production PR source and explicit approval label validated."
-      - name: Explain release policy
-        run: |
-          echo "Passing this job does not authorize auto-merge or auto-release."
-          echo "Owner approval and actual GitHub main branch protection remain mandatory."
+          python - <<'PY'
+          import json, os, urllib.parse, urllib.request
+          repo, sha = os.environ["GITHUB_REPOSITORY"], os.environ["CANDIDATE_SHA"]
+          owner, pr = os.environ["RELEASE_OWNER"], os.environ["PR_NUMBER"]
+          def api(path):
+              request = urllib.request.Request(
+                  "https://api.github.com/repos/" + repo + "/" + path,
+                  headers={"Authorization": "Bearer " + os.environ["GITHUB_TOKEN"],
+                           "Accept": "application/vnd.github+json",
+                           "X-GitHub-Api-Version": "2022-11-28"})
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.load(response)
+          def must(condition, message):
+              if not condition:
+                  raise SystemExit("::error::" + message)
+          current = api("branches/test")["commit"]["sha"]
+          must(current == sha, "Release candidate is not current test HEAD: " + sha + " != " + current)
+          events = []
+          for page in range(1, 11):
+              batch = api(f"issues/{pr}/events?per_page=100&page={page}")
+              events.extend(e for e in batch if e.get("event") in ("labeled", "unlabeled")
+                            and e.get("label", {}).get("name") == "release-approved")
+              if len(batch) < 100:
+                  break
+          else:
+              must(False, "Label audit exceeds 1000 events")
+          must(bool(events), "Missing owner label audit trail")
+          latest = events[-1]
+          must(latest["event"] == "labeled"
+               and latest.get("actor", {}).get("login", "").lower() == owner.lower(),
+               "Latest release-approved label must be applied by repository owner")
+          needed = {"Build Swirl Qt Quick UI (Preview)", "Swirl Rust Core",
+                    "Validate Qt-only source tree", "Qt HTTP client security"}
+          runs = []
+          for page in range(1, 6):
+              params = urllib.parse.urlencode({"branch": "test", "event": "push",
+                                               "head_sha": sha, "per_page": 100, "page": page})
+              batch = api("actions/runs?" + params)["workflow_runs"]
+              runs.extend(batch)
+              if len(batch) < 100:
+                  break
+          else:
+              must(False, "Candidate has over 500 runs; review manually")
+          runs = [r for r in runs if r.get("head_sha") == sha
+                  and r.get("head_branch") == "test" and r.get("event") == "push"]
+          for name in sorted(needed):
+              candidates = [r for r in runs if r.get("name") == name]
+              must(bool(candidates), "Missing exact-SHA staging workflow: " + name)
+              latest = max(candidates, key=lambda r: (r.get("created_at", ""), r.get("run_attempt", 0)))
+              must(latest.get("status") == "completed" and latest.get("conclusion") == "success",
+                   f"{name} not green: {latest.get('conclusion')} {latest.get('html_url')}")
+              print("Validated:", name, latest["html_url"])
+          print("Approved exact test candidate:", sha)
+          PY
+      - name: Require repository branch ruleset
+        run: echo "production-gate must be configured as a required status check on protected main."

@@ -1,0 +1,2 @@
+    Checking swirl-subscription v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-subscription)
+    Finished `dev` profile [unoptimized] target(s) in 0.23s

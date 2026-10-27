@@ -1,0 +1,8 @@
+2026/10/22 22:07:32.025686 [Debug] app/log: Logger started
+2026/10/22 22:07:32.025800 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:48315
+2026/10/22 22:07:32.028042 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:48315
+2026/10/22 22:07:32.029293 [Warning] core: Xray 26.10.21 started
+2026/10/22 22:07:32.043783 [Info] [1412571539] app/proxyman/inbound: connection ends > proxy/vmess/encoding: failed to read request header > EOF
+2026/10/22 22:07:32.049343 [Info] [2045579966] app/proxyman/inbound: connection ends > proxy/vmess/inbound: invalid request from 127.0.0.1:41414 > proxy/vmess/encoding: failed to read request header > remote error: tls: unknown certificate authority
+2026/10/22 22:07:32.056512 [Info] [66409792] app/proxyman/inbound: connection ends > proxy/vmess/inbound: invalid request from 127.0.0.1:41416 > proxy/vmess/encoding: failed to read request header > remote error: tls: bad certificate
+2026/10/22 22:07:32.057250 [Debug] app/log: Logger closing

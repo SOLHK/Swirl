@@ -27,6 +27,7 @@ QString reasonCode(const QString &reason) {
         {QStringLiteral("VLESS URI 含未映射的额外密码；原始参数已保留，不能忽略后连接。"), "VlessUriPasswordUnsupported"},
         {QStringLiteral("VLESS URI 含未映射的地址路径；原始参数已保留，不能忽略后连接。"), "VlessUriPathUnsupported"},
         {QStringLiteral("TCP URI 的 path、host 或 serviceName 尚未映射；原始参数已保留，不能忽略后连接。"), "TcpUriTransportOptionsUnsupported"},
+        {QStringLiteral("TCP 传输含未映射的 Host 或路径；原始参数已保留。"), "TcpTransportOptionsUnsupported"},
         {QStringLiteral("URI 显式传输类型为空；原始参数已保留，不能当作省略后连接。"), "ExplicitEmptyTransport"},
         {QStringLiteral("URI 的 headerType 仅支持 TCP 的 none；原始参数已保留，不能忽略后连接。"), "HeaderTypeUnsupported"},
         {QStringLiteral("此传输不支持 URI 的 headerType；原始参数已保留，不能忽略后连接。"), "HeaderTypeTransportConflict"},
@@ -49,6 +50,9 @@ QString reasonCode(const QString &reason) {
         {QStringLiteral("Rust 仅支持 REALITY 的 xtls-rprx-vision flow；未删除或更换原值。"), "VlessFlowUnsupported"},
         {QStringLiteral("Rust 尚未实现该 VLESS encryption 扩展。"), "VlessEncryptionUnsupported"},
         {QStringLiteral("REALITY 指纹尚未支持；当前支持显式 rustls、chrome 或 chrome_133，未替换源配置。"), "RealityFingerprintUnsupported"},
+        // NativeNodeBridge wraps the Rust inspector's fixed code. Match the
+        // complete known message; never expose an arbitrary source code/text.
+        {QStringLiteral("Rust 无法执行此节点：RealityFingerprintUnsupported；原始参数已保留。"), "RealityFingerprintUnsupported"},
         {QStringLiteral("REALITY 需要源配置明确声明受支持的指纹；未执行导入时推断的默认值。"), "RealityFingerprintRequired"},
         {QStringLiteral("REALITY 当前仅支持 TCP 传输。"), "RealityTransportUnsupported"},
         {QStringLiteral("REALITY 参数必须是对象。"), "RealityParameterType"},

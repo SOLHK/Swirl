@@ -1,0 +1,26 @@
+{
+  "stage": "X1.4-A1",
+  "parents": [
+    "fca13d3c06f9a6a45cab0b8e28c3587fbbe2f870",
+    "44dda9d4fe27a6667aa977d879d8dfc2ca82688d"
+  ],
+  "environment": "Linux x86_64 cloud; rustc 1.99.1; no debug symbols or incremental compilation",
+  "fmt": "passed",
+  "check_workspace_locked": "passed",
+  "test_workspace_locked": {
+    "passed": 564,
+    "failed": 0,
+    "ignored": 0
+  },
+  "initial_build": "failed: temporary disk exhausted; retained failure in local log",
+  "clippy_all_targets": "not accepted: concurrently created, uncommitted A3 example referenced unregistered modules; clean committed tree CI and final integrated gate required",
+  "official_interop_current_stage": "not run; historical transport evidence referenced separately",
+  "windows_qt_product": "not run",
+  "source_sha256": {
+    "core/Cargo.lock": "c60955db11ea6d608fb6d5dddd735f15ce3b67a23a3cefe9d0a4248db6cc4171",
+    "core/crates/swirl-protocol/src/lib.rs": "d9c17da73310c8ab3c5f944b67f211d8bff8fe05e373be038d5759d65fc7efbe",
+    "core/crates/swirl-core/src/lib.rs": "0986dff91bab7fd56f2fbf91dc179b69e0f1b828bba88693580991a593a74a4f",
+    "core/crates/swirl-subscription/src/lib.rs": "73e23f2401b827ebaa887dadf6cd206177098b3485b8421457242fc1e7c72488",
+    "core/crates/swirl-subscription/src/xray/convert/native.rs": "b0b13e2a0a86c605e1860add9b4e41a3a214c464c3c30573ff20d96e564e3470"
+  }
+}

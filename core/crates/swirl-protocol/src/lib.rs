@@ -2,17 +2,30 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
 mod diagnostics;
 mod dial;
+pub mod http_single;
+pub mod hysteria2;
+#[cfg(test)]
+mod inbound_http_tests;
 mod probe;
 mod shadowsocks;
 mod socks4;
 mod socks5;
+pub mod ss2022;
+pub mod stream_udp;
+mod timing;
+mod transport;
+pub mod tuic;
 pub mod vision;
 mod vless;
-mod websocket;
+mod vmess;
+pub mod websocket;
 pub use diagnostics::{TcpAttempt, TcpDiagnostic, TcpOutcome, failure_stage};
 pub use dial::{connect_direct_resolved, diagnose_tcp};
 use dial::{connect_tcp, within};
-pub use probe::{UrlTestFailure, UrlTestMetrics, UrlTestStage, health_probe, url_test_head};
+pub use probe::{
+    UrlTestFailure, UrlTestMetrics, UrlTestStage, health_probe, health_probe_with_transport,
+    url_test_head, url_test_head_with_transport,
+};
 pub use shadowsocks::{
     decrypt_datagram as ss_decrypt_datagram, encrypt_datagram as ss_encrypt_datagram,
 };
@@ -20,11 +33,24 @@ pub use socks5::UdpAssociation as Socks5UdpAssociation;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use swirl_dns::Resolver;
 use swirl_subscription::{Credentials, Outbound, valid_host};
+pub use timing::ConnectTimings;
+use timing::Phase;
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
     time::Instant,
 };
+pub use transport::Transport;
+
+// REALITY's encrypted session ID carries an implementation compatibility
+// version, which servers may gate with minClientVer/maxClientVer. It is not
+// Swirl's package version. This baseline is the independently tested Xray
+// v26.10.17 / REALITY 83f6217 source pinned in tools/tests/xray_peer/lock.json:
+// TLS 1.3, authenticated session ID, X25519MLKEM768 before optional X25519 and
+// the pinned Chrome 133 profile. Optional/unsupported features still fail
+// their own validation; this does not claim every Xray feature is supported.
+// Production-runtime peer tests exercise both accepted and rejected bounds.
+const REALITY_WIRE_COMPATIBILITY_VERSION: [u8; 3] = [26, 10, 17];
 
 pub type Result<T> = std::result::Result<T, &'static str>;
 #[derive(Clone, Debug)]
@@ -258,10 +284,16 @@ async fn accept_http(
     let (header, tail) = http_header(stream, vec![first]).await?;
     let mut fields = [httparse::EMPTY_HEADER; 64];
     let mut req = httparse::Request::new(&mut fields);
-    if !req.parse(&header).map_err(|_| "HttpSyntax")?.is_complete() || req.version != Some(1) {
+    if !req.parse(&header).map_err(|_| "HttpSyntax")?.is_complete() {
         return Err("HttpVersion");
     }
     let method = req.method.ok_or("HttpMethod")?;
+    // Legacy desktop clients can negotiate a CONNECT tunnel using HTTP/1.0.
+    // The tunnel becomes an opaque stream after the response; this does not
+    // enable HTTP/1.0 forwarding or relax any authority/framing/auth checks.
+    if req.version != Some(1) && !(req.version == Some(0) && method == "CONNECT") {
+        return Err("HttpVersion");
+    }
     let path = req.path.ok_or("HttpTarget")?;
     let mut seen = std::collections::HashSet::new();
     let mut authorization = None;
@@ -419,9 +451,128 @@ pub async fn connect(
     resolver: &Resolver,
     handshake_limit: std::time::Duration,
 ) -> Result<swirl_transport::BoxStream> {
+    connect_selected(outbound, target, resolver, handshake_limit, None, false).await
+}
+
+/// Connect an existing proxy protocol over an explicitly selected native
+/// transport. This additive API lets importers supply transport settings without
+/// changing the existing subscription IR or the legacy `connect` entry point.
+pub async fn connect_with_transport(
+    outbound: &Outbound,
+    target: &Target,
+    resolver: &Resolver,
+    handshake_limit: std::time::Duration,
+    transport: &Transport,
+) -> Result<swirl_transport::BoxStream> {
+    connect_selected(
+        outbound,
+        target,
+        resolver,
+        handshake_limit,
+        Some(transport),
+        false,
+    )
+    .await
+}
+
+pub(crate) async fn connect_udp_stream(
+    outbound: &Outbound,
+    target: &Target,
+    resolver: &Resolver,
+    handshake_limit: std::time::Duration,
+    transport: Option<&Transport>,
+) -> Result<swirl_transport::BoxStream> {
+    match outbound {
+        Outbound::Vless {
+            udp: true, flow, ..
+        } if flow.as_deref().is_none_or(str::is_empty) => (),
+        Outbound::Vless {
+            flow: Some(flow), ..
+        } if !flow.is_empty() => return Err("VisionUdpUnsupported"),
+        Outbound::Trojan { udp: true, .. } => (),
+        _ => return Err("StreamUdpUnsupported"),
+    }
+    connect_selected(outbound, target, resolver, handshake_limit, transport, true).await
+}
+
+async fn connect_selected(
+    outbound: &Outbound,
+    target: &Target,
+    resolver: &Resolver,
+    handshake_limit: std::time::Duration,
+    transport: Option<&Transport>,
+    udp: bool,
+) -> Result<swirl_transport::BoxStream> {
+    let configured = Transport::configured(outbound);
+    if configured.is_some() && transport.is_some() {
+        return Err("TransportConflict");
+    }
+    let transport = transport.or(configured.as_ref());
+    transport::validate(outbound, transport)?;
+    validate_tls(outbound, transport)?;
+    // A boxed future still executes its poll method on the caller's stack.
+    // Dispatch QUIC before constructing/polling the large TCP/TLS/REALITY
+    // state machine, so unrelated branches cannot exhaust a Windows stack.
+    // Each connection owns one box; dropping it still cancels the operation
+    // in place, without spawning a task or detaching any resource owners.
+    match outbound {
+        Outbound::Hysteria2(config) => {
+            Box::pin(hysteria2::connect(
+                config,
+                target,
+                resolver,
+                handshake_limit,
+            ))
+            .await
+        }
+        Outbound::Tuic(config) => {
+            Box::pin(tuic::connect(config, target, resolver, handshake_limit)).await
+        }
+        _ => {
+            Box::pin(connect_stream_selected(
+                outbound,
+                target,
+                resolver,
+                handshake_limit,
+                transport,
+                udp,
+            ))
+            .await
+        }
+    }
+}
+
+async fn connect_stream_selected(
+    outbound: &Outbound,
+    target: &Target,
+    resolver: &Resolver,
+    handshake_limit: std::time::Duration,
+    transport: Option<&Transport>,
+    udp: bool,
+) -> Result<swirl_transport::BoxStream> {
     // DNS, all address attempts, TLS and protocol negotiation share this one
     // budget. A successful TCP connection ends address fallback permanently.
     let deadline = Instant::now() + handshake_limit;
+    match outbound {
+        Outbound::Vmess {
+            uuid,
+            alter_id,
+            security,
+            ..
+        } => vmess::validate(uuid, *alter_id, security)?,
+        Outbound::Shadowsocks {
+            password,
+            cipher,
+            obfs_http,
+            ..
+        } if cipher.starts_with("2022-") => {
+            ss2022::validate(password, cipher)?;
+            if obfs_http.is_some() {
+                return Err("Shadowsocks2022ObfsUnsupported");
+            }
+        }
+        _ => {}
+    }
     if let Outbound::Vless {
         host,
         port,
@@ -448,7 +599,7 @@ pub async fn connect(
             &reality.server_name,
             key,
             &short_id,
-            [0, 1, 0],
+            REALITY_WIRE_COMPATIBILITY_VERSION,
         )?
         .with_fingerprint(&reality.fingerprint)?;
         let tcp = connect_tcp(
@@ -465,17 +616,33 @@ pub async fn connect(
             .ok()
             .and_then(|value| u32::try_from(value.as_secs()).ok())
             .ok_or("RealityClock")?;
-        let alpn: Vec<Vec<u8>> = reality
+        let required_alpn = transport.and_then(Transport::required_alpn);
+        let mut alpn: Vec<Vec<u8>> = reality
             .alpn
             .iter()
             .map(|value| value.as_bytes().to_vec())
             .collect();
-        let stream = within(deadline, "RealityHandshakeTimeout", async {
-            swirl_transport::reality::connect(tcp, &parameters, unix_time, &alpn)
-                .await
-                .map_err(|_| "RealityAuthenticationOrHandshake")
-        })
+        if alpn.is_empty()
+            && reality.fingerprint == "rustls"
+            && let Some(required) = required_alpn
+        {
+            alpn.push(required.to_vec());
+        }
+        // The Chrome profile owns its fixed h2/http1.1 offer. Do not rewrite
+        // its ClientHello. REALITY has its own authenticated ALPN policy below.
+        let stream = within(
+            deadline,
+            "RealityHandshakeTimeout",
+            timing::measure(Phase::Reality, async {
+                swirl_transport::reality::connect(tcp, &parameters, unix_time, &alpn)
+                    .await
+                    .map_err(|_| "RealityAuthenticationOrHandshake")
+            }),
+        )
         .await?;
+        if let Some(transport) = transport {
+            transport.validate_reality_alpn(stream.tls().alpn_protocol())?;
+        }
         if flow == "xtls-rprx-vision" {
             // Keep the concrete authenticated owner until the Vision adapter
             // installs its directional raw handoff. The wire request retains
@@ -483,22 +650,31 @@ pub async fn connect(
             let stream = within(
                 deadline,
                 "UpstreamProtocolTimeout",
-                vision::client_over_reality(stream, uuid, target, handshake_limit),
+                timing::measure(
+                    Phase::RequestEncodeWrite,
+                    vision::client_over_reality(stream, uuid, target, handshake_limit),
+                ),
             )
             .await?;
             return Ok(Box::new(stream));
         }
+        let mut stream: swirl_transport::BoxStream = Box::new(stream);
+        if let Some(transport) = transport {
+            stream = within(
+                deadline,
+                "TransportHandshakeTimeout",
+                transport.wrap(
+                    stream,
+                    true,
+                    deadline.saturating_duration_since(Instant::now()),
+                ),
+            )
+            .await?;
+        }
         return within(
             deadline,
             "UpstreamProtocolTimeout",
-            handshake(
-                outbound,
-                target,
-                Box::new(stream),
-                None,
-                *port,
-                handshake_limit,
-            ),
+            handshake(outbound, target, stream, None, *port, handshake_limit, udp),
         )
         .await;
     }
@@ -546,7 +722,11 @@ pub async fn connect(
         } => (host, *port, None, Some(tls)),
         Outbound::Vless {
             host, port, tls, ..
+        }
+        | Outbound::Vmess {
+            host, port, tls, ..
         } => (host, *port, None, tls.as_ref()),
+        Outbound::Hysteria2(_) | Outbound::Tuic(_) => return Err("QuicDispatchInvariant"),
     };
     let tcp = connect_tcp(
         resolver,
@@ -561,23 +741,41 @@ pub async fn connect(
         within(
             deadline,
             "UpstreamTlsTimeout",
-            swirl_transport::secure(tcp, tls),
+            timing::measure(
+                Phase::ProxyTls,
+                swirl_transport::secure_with_alpn(
+                    tcp,
+                    tls,
+                    transport.and_then(Transport::required_alpn),
+                ),
+            ),
         )
         .await?
     } else {
         Box::new(tcp)
     };
     let ws = match outbound {
-        Outbound::Vless { websocket, .. } | Outbound::Trojan { websocket, .. } => {
-            websocket.as_ref()
-        }
+        Outbound::Vless { websocket, .. }
+        | Outbound::Trojan { websocket, .. }
+        | Outbound::Vmess { websocket, .. } => websocket.as_ref(),
         _ => None,
     };
-    if let Some(ws) = ws {
+    if let Some(transport) = transport {
+        stream = within(
+            deadline,
+            "TransportHandshakeTimeout",
+            transport.wrap(
+                stream,
+                tls.is_some(),
+                deadline.saturating_duration_since(Instant::now()),
+            ),
+        )
+        .await?;
+    } else if let Some(ws) = ws {
         stream = within(
             deadline,
             "WebSocketUpgradeTimeout",
-            websocket::connect(stream, ws),
+            timing::measure(Phase::TransportSetup, websocket::connect(stream, ws)),
         )
         .await?;
     }
@@ -595,19 +793,77 @@ pub async fn connect(
     within(
         deadline,
         timeout_code,
-        handshake(outbound, target, stream, auth, port, handshake_limit),
+        handshake(outbound, target, stream, auth, port, handshake_limit, udp),
     )
     .await
 }
 
+/// Preflight TLS trust material independently from DNS, sockets and runtime
+/// activation. Protocol-specific QUIC authentication parameters are checked by
+/// the same preflight used by their direct TCP/UDP connectors.
+pub fn validate_tls(outbound: &Outbound, transport: Option<&Transport>) -> Result<()> {
+    match outbound {
+        Outbound::Hysteria2(config) => return hysteria2::validate(config),
+        Outbound::Tuic(config) => return tuic::validate(config),
+        _ => {}
+    }
+    let tls = match outbound {
+        Outbound::Trojan { tls, .. } => Some(tls),
+        Outbound::Vless { tls, .. }
+        | Outbound::Vmess { tls, .. }
+        | Outbound::Socks5 { tls, .. }
+        | Outbound::HttpConnect { tls, .. } => tls.as_ref(),
+        _ => None,
+    };
+    if let Some(tls) = tls {
+        swirl_transport::validate_tls(tls, transport.and_then(Transport::required_alpn))?;
+    }
+    Ok(())
+}
+
 async fn handshake(
+    outbound: &Outbound,
+    target: &Target,
+    stream: swirl_transport::BoxStream,
+    auth: Option<&Credentials>,
+    port: u16,
+    handshake_limit: std::time::Duration,
+    udp: bool,
+) -> Result<swirl_transport::BoxStream> {
+    let future = handshake_inner(outbound, target, stream, auth, port, handshake_limit, udp);
+    if matches!(
+        outbound,
+        Outbound::Vmess { .. }
+            | Outbound::Vless { .. }
+            | Outbound::Trojan { .. }
+            | Outbound::Shadowsocks { .. }
+    ) {
+        // These protocols may defer a response until application data, or
+        // have no acknowledgement. Measure encoding/writing, never auth OK.
+        timing::measure(Phase::RequestEncodeWrite, future).await
+    } else {
+        future.await
+    }
+}
+
+async fn handshake_inner(
     outbound: &Outbound,
     target: &Target,
     mut stream: swirl_transport::BoxStream,
     auth: Option<&Credentials>,
     port: u16,
     handshake_limit: std::time::Duration,
+    udp: bool,
 ) -> Result<swirl_transport::BoxStream> {
+    if let Outbound::Vmess {
+        uuid,
+        alter_id,
+        security,
+        ..
+    } = outbound
+    {
+        return vmess::connect(stream, uuid, *alter_id, security, target, handshake_limit).await;
+    }
     if let Outbound::Shadowsocks {
         password,
         cipher,
@@ -615,6 +871,9 @@ async fn handshake(
         ..
     } = outbound
     {
+        if cipher.starts_with("2022-") {
+            return ss2022::connect(stream, password, cipher, target, handshake_limit).await;
+        }
         let write_error = if obfs_http.is_some() {
             "ShadowsocksObfsWrite"
         } else {
@@ -640,7 +899,7 @@ async fn handshake(
     if let Outbound::Trojan { password, .. } = outbound {
         use sha2::{Digest, Sha224};
         let mut request = format!("{:x}\r\n", Sha224::digest(password.as_bytes())).into_bytes();
-        request.push(1);
+        request.push(if udp { 3 } else { 1 });
         target.encode(&mut request)?;
         request.extend(b"\r\n");
         stream
@@ -652,7 +911,11 @@ async fn handshake(
     }
     if let Outbound::Vless { uuid, .. } = outbound {
         stream
-            .write_all(&vless::request(uuid, target)?)
+            .write_all(&if udp {
+                vless::request_udp(uuid, target)?
+            } else {
+                vless::request(uuid, target)?
+            })
             .await
             .map_err(|_| "VlessHandshakeWrite")?;
         stream.flush().await.map_err(|_| "VlessHandshakeWrite")?;
@@ -661,44 +924,63 @@ async fn handshake(
         return Ok(Box::new(vless::Stream::new(stream, handshake_limit)));
     }
     if matches!(outbound, Outbound::Socks5 { .. }) {
-        socks5::authenticate(&mut stream, auth).await?;
-        socks5::request(&mut stream, 1, target, true).await?;
+        timing::measure(
+            if auth.is_some() {
+                Phase::AuthenticationExchange
+            } else {
+                Phase::ProxyNegotiation
+            },
+            socks5::authenticate(&mut stream, auth),
+        )
+        .await?;
+        if auth.is_some() {
+            timing::authentication_response_accepted();
+        }
+        timing::measure(
+            Phase::ProxyConnectExchange,
+            socks5::request(&mut stream, 1, target, true),
+        )
+        .await?;
     } else {
-        let mut request = format!(
-            "CONNECT {} HTTP/1.1\r\nHost: {}\r\n",
-            target.authority(),
-            target.authority()
-        );
-        if let Some(auth) = auth {
-            request += &format!(
-                "Proxy-Authorization: Basic {}\r\n",
-                STANDARD.encode(format!("{}:{}", auth.username, auth.password))
+        timing::measure(Phase::ProxyConnectExchange, async {
+            let mut request = format!(
+                "CONNECT {} HTTP/1.1\r\nHost: {}\r\n",
+                target.authority(),
+                target.authority()
             );
-        }
-        request += "\r\n";
-        stream
-            .write_all(request.as_bytes())
-            .await
-            .map_err(|_| "HttpUpstreamWrite")?;
-        stream.flush().await.map_err(|_| "HttpUpstreamWrite")?;
-        // Read exactly through the header: tunnel bytes must stay in the socket.
-        let mut header = Vec::new();
-        while !header.ends_with(b"\r\n\r\n") {
-            if header.len() >= 16384 {
-                return Err("UpstreamHeaderTooLarge");
+            if let Some(auth) = auth {
+                request += &format!(
+                    "Proxy-Authorization: Basic {}\r\n",
+                    STANDARD.encode(format!("{}:{}", auth.username, auth.password))
+                );
             }
-            header.push(stream.read_u8().await.map_err(|_| "HttpUpstreamRead")?);
-        }
-        let mut fields = [httparse::EMPTY_HEADER; 64];
-        let mut response = httparse::Response::new(&mut fields);
-        if !response
-            .parse(&header)
-            .map_err(|_| "HttpUpstreamSyntax")?
-            .is_complete()
-            || response.code != Some(200)
-        {
-            return Err("UpstreamRejected");
-        }
+            request += "\r\n";
+            stream
+                .write_all(request.as_bytes())
+                .await
+                .map_err(|_| "HttpUpstreamWrite")?;
+            stream.flush().await.map_err(|_| "HttpUpstreamWrite")?;
+            // Read exactly through the header: tunnel bytes must stay in the socket.
+            let mut header = Vec::new();
+            while !header.ends_with(b"\r\n\r\n") {
+                if header.len() >= 16384 {
+                    return Err("UpstreamHeaderTooLarge");
+                }
+                header.push(stream.read_u8().await.map_err(|_| "HttpUpstreamRead")?);
+            }
+            let mut fields = [httparse::EMPTY_HEADER; 64];
+            let mut response = httparse::Response::new(&mut fields);
+            if !response
+                .parse(&header)
+                .map_err(|_| "HttpUpstreamSyntax")?
+                .is_complete()
+                || response.code != Some(200)
+            {
+                return Err("UpstreamRejected");
+            }
+            Ok(())
+        })
+        .await?;
     }
     Ok(stream)
 }
@@ -707,6 +989,31 @@ async fn handshake(
 mod connect_tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn public_connect_futures_have_bounded_inline_storage() {
+        let outbound = Outbound::Reject {};
+        let target = Target {
+            host: "target.invalid".into(),
+            port: 443,
+        };
+        let resolver = Resolver::default();
+        let transport = Transport::Tcp {};
+        let limit = Duration::from_secs(1);
+        let ordinary = connect(&outbound, &target, &resolver, limit);
+        let explicit = connect_with_transport(&outbound, &target, &resolver, limit, &transport);
+        let udp = connect_udp_stream(&outbound, &target, &resolver, limit, None);
+        // This protects caller storage only. The official 1 MiB main-stack
+        // regression also exercises future construction and nested poll frames.
+        for (name, bytes) in [
+            ("connect", std::mem::size_of_val(&ordinary)),
+            ("connect_with_transport", std::mem::size_of_val(&explicit)),
+            ("connect_udp_stream", std::mem::size_of_val(&udp)),
+        ] {
+            println!("{name} future: {bytes} bytes");
+            assert!(bytes <= 1024, "{name} grew to {bytes} bytes");
+        }
+    }
 
     fn ss(obfs: bool) -> Outbound {
         Outbound::Shadowsocks {
@@ -740,6 +1047,7 @@ mod connect_tests {
                 None,
                 443,
                 Duration::from_secs(1),
+                false,
             )
             .await
             .err()
@@ -772,6 +1080,7 @@ mod connect_tests {
                 None,
                 443,
                 Duration::from_secs(1),
+                false,
             ),
         )
         .await

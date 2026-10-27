@@ -1,36 +1,45 @@
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import QtQuick.Dialogs
 import SwirlQuick
 import "../controls"
 ColumnLayout {
     id: root
-    spacing:Theme.dp(14)
-    SwirlText { text:"当前字体 · "+fontManager.currentFamily; color:Theme.text; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(15); Layout.fillWidth:true; wrapMode:Text.Wrap }
+    spacing:Theme.dp(16)
+    SwirlSectionTitle { Layout.fillWidth:true; title:qsTr("字体家族"); description:qsTr("当前应用：%1。先选择预览，再确认应用到整个界面。").arg(fontManager.currentFamily) }
     RowLayout {
         Layout.fillWidth:true
         SwirlSearchField { id:search; objectName:"fontSearch"; Layout.fillWidth:true; placeholderText:"搜索字体，如 HarmonyOS Sans SC" }
         SwirlButton { objectName:"fontReset"; text:"恢复自动选择"; onClicked:fontManager.reset() }
     }
-    SwirlGlassPanel {
-        Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(240)
+    Rectangle {
+        color:Theme.surface; radius:Theme.controlRadius
+        Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(252)
         ListView { pixelAligned: true;
             id:fontList; objectName:"fontFamilyList"; anchors.fill:parent; anchors.margins:Theme.dp(6); clip:true
+            currentIndex:model.indexOf(fontManager.previewFamily)
+            keyNavigationEnabled:false
+            function moveSelection(step){if(!count)return;const next=Math.max(0,Math.min(count-1,currentIndex+step));fontManager.choosePreviewFamily(model[next]);positionViewAtIndex(next,ListView.Contain)}
+            Keys.onUpPressed:moveSelection(-1)
+            Keys.onDownPressed:moveSelection(1)
+            SwirlArcMotion { id:fontSelection; parent:fontList.contentItem; targetX:0; targetY:fontList.currentItem?fontList.currentItem.y:0; bend:Theme.dp(5); motionEnabled:root.visible }
+            Rectangle { parent:fontList.contentItem; z:1; x:fontSelection.position.x; y:fontSelection.position.y; width:Theme.dp(3); height:Theme.dp(38); radius:Theme.dp(1.5); color:Theme.accent; visible:fontList.currentIndex>=0 }
             model:fontManager.families.filter(function(family){return family.toLowerCase().indexOf(search.text.toLowerCase())>=0})
             ScrollBar.vertical:SwirlScrollBar {}
             delegate:SwirlButton {
                 id:fontRow
                 required property string modelData
-                width:ListView.view.width-Theme.dp(12); height:Theme.dp(62)
-                text:(fontManager.previewFamily===modelData?"✓  ":"")+modelData+(modelData===fontManager.defaultFamily?" · 默认":"")
+                width:ListView.view.width-Theme.dp(12); height:Theme.dp(68)
+                text:modelData+(modelData===fontManager.defaultFamily?qsTr(" · 默认"):"")
                 font.family:modelData; onClicked:fontManager.choosePreviewFamily(modelData)
                 contentItem:Column {
                     spacing:Theme.dp(3)
                     SwirlText {width:parent.width;text:fontRow.text;font.pixelSize:Theme.fontSize(12);color:Theme.text;elide:Text.ElideRight}
                     SwirlText {width:parent.width;text:"连接让世界更近  Swirl 0123456789";font.family:fontRow.modelData;font.pixelSize:Theme.fontSize(16);color:Theme.text;elide:Text.ElideRight}
                 }
-                background:SwirlContinuousSurface { radius:Theme.dp(7); color:parent.down?Theme.pressed:fontManager.previewFamily===parent.modelData?Theme.selected:parent.hovered?Theme.hover:"transparent" }
+                SwirlInteractionMotion { id:fontFeedback; hovered:fontRow.hovered; pressed:fontRow.down; focused:fontRow.visualFocus; controlEnabled:fontRow.enabled }
+                background:Rectangle { radius:Theme.controlRadius; color:fontManager.previewFamily===fontRow.modelData?Theme.withAlpha(Theme.accent,0.09):Theme.withAlpha(Theme.accent,fontFeedback.light*0.07); border.width:fontRow.visualFocus?Theme.borderWidth:0; border.color:Theme.focusBorder }
                 Accessible.name:modelData
             }
             SwirlText { anchors.centerIn:parent; visible:fontList.count===0; text:"没有匹配的字体，可导入本地字体文件"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
@@ -48,6 +57,7 @@ ColumnLayout {
             Accessible.name:"已导入字体的家族"
         }
     }
+    SwirlSectionTitle { Layout.fillWidth:true; title:qsTr("可变轴"); description:qsTr("自动模式保留文字层级；手动模式可精确调整当前家族。") }
     SwirlText { text:fontManager.previewFamily; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true; wrapMode:Text.Wrap }
     RowLayout {
         visible:fontManager.previewAxes.length>0
@@ -83,7 +93,7 @@ ColumnLayout {
             }
             RowLayout {
                 Layout.fillWidth:true
-                Slider {
+                SwirlSlider {
                     objectName:"fontAxisSlider_"+axisRow.tag
                     Layout.fillWidth:true
                     from:axisRow.modelData.minimum; to:axisRow.modelData.maximum
@@ -119,14 +129,15 @@ ColumnLayout {
         }
     }
     SwirlText { visible:fontManager.previewAxes.length===0; text:"此家族没有可用的 OpenType 可变轴。"; color:Theme.muted; Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:Theme.fontSize(12) }
-    SwirlGlassPanel {
-        Layout.fillWidth:true; Layout.preferredHeight:previewColumn.implicitHeight+Theme.dp(32)
+    Rectangle {
+        color:Theme.withAlpha(Theme.accent,0.035); radius:Theme.controlRadius
+        Layout.fillWidth:true; Layout.preferredHeight:previewColumn.implicitHeight+Theme.dp(40)
         ColumnLayout {
             id:previewColumn
             anchors.left:parent.left; anchors.right:parent.right; anchors.top:parent.top
             anchors.margins:Theme.dp(16); spacing:Theme.dp(8)
             Repeater {
-                model:["苹方字体显示效果测试","The quick brown fox jumps over the lazy dog.","0123456789","@ # ¥ % &"]
+                model:["连接，让世界更近。","The quick brown fox jumps over the lazy dog.","0123456789","@ # ¥ % &"]
                 delegate:VariableFontPreview {
                     id:previewLine
                     required property string modelData
@@ -144,6 +155,7 @@ ColumnLayout {
             }
         }
     }
+    SwirlSectionTitle { Layout.fillWidth:true; title:qsTr("确认与应用") }
     Flow {
         Layout.fillWidth:true; spacing:Theme.dp(8)
         SwirlButton { objectName:"fontApply"; text:"应用到整个界面"; primary:true; onClicked:fontManager.applyPreview() }

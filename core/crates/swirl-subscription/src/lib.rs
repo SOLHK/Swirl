@@ -2,17 +2,35 @@
 //! No Mihomo configuration or proxy engine is an internal execution dependency.
 use serde::{Deserialize, Serialize};
 mod dns_tls;
+pub mod hysteria2;
+pub mod ss2022;
+pub mod tuic;
+pub mod vmess;
+pub use hysteria2::Hysteria2;
+pub use tuic::Tuic;
 mod policy;
 mod reality;
+mod singbox_quic;
+pub mod stream_transport;
+pub mod v2;
 mod websocket;
 pub use policy::{HealthProbe, PolicyStrategy, ProbeTarget};
 pub use reality::Reality;
+pub use stream_transport::StreamTransport;
 pub use websocket::WebSocket;
 pub mod inspect;
+pub mod profile;
+pub mod xray;
 pub use dns_tls::DnsTlsServer;
 use std::{collections::HashSet, net::SocketAddr};
 
 pub const MAX_DOCUMENT: usize = 1024 * 1024;
+
+/// Bounded JSON parsing shared by offline import boundaries. Duplicate keys
+/// fail at every depth before a client-specific projection can discard them.
+pub fn parse_json_value(bytes: &[u8]) -> Result<serde_json::Value, xray::Diagnostic> {
+    xray::parse_json_value(bytes)
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -43,6 +61,21 @@ pub struct ObfsHttp {
 pub enum Outbound {
     Direct {},
     Reject {},
+    Vmess {
+        host: String,
+        port: u16,
+        uuid: String,
+        #[serde(default)]
+        alter_id: u32,
+        #[serde(default = "vmess_default_security")]
+        security: String,
+        #[serde(default)]
+        tls: Option<Tls>,
+        #[serde(default)]
+        websocket: Option<WebSocket>,
+    },
+    Hysteria2(Hysteria2),
+    Tuic(Tuic),
     Vless {
         host: String,
         port: u16,
@@ -55,6 +88,10 @@ pub enum Outbound {
         reality: Option<Reality>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         flow: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        transport: Option<StreamTransport>,
+        #[serde(default)]
+        udp: bool,
     },
     Shadowsocks {
         host: String,
@@ -97,7 +134,15 @@ pub enum Outbound {
         tls: Tls,
         #[serde(default)]
         websocket: Option<WebSocket>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        transport: Option<StreamTransport>,
+        #[serde(default)]
+        udp: bool,
     },
+}
+
+fn vmess_default_security() -> String {
+    "auto".into()
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -107,7 +152,7 @@ pub struct Node {
     pub outbound: Outbound,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Matcher {
     Domain {
@@ -396,6 +441,21 @@ impl Config {
                 return Err("NodeId");
             }
             match &node.outbound {
+                Outbound::Vmess {
+                    host,
+                    port,
+                    uuid,
+                    alter_id,
+                    security,
+                    ..
+                } => {
+                    if !valid_host(host) || *port == 0 {
+                        return Err("VmessParameters");
+                    }
+                    vmess::validate(uuid, *alter_id, security)?;
+                }
+                Outbound::Hysteria2(config) => config.validate()?,
+                Outbound::Tuic(config) => config.validate()?,
                 Outbound::Socks4 {
                     host,
                     port,
@@ -425,11 +485,23 @@ impl Config {
                         || *port == 0
                         || password.is_empty()
                         || password.len() > 1024
-                        || !["aes-128-gcm", "aes-256-gcm", "chacha20-ietf-poly1305"]
-                            .contains(&cipher.as_str())
+                        || ![
+                            "aes-128-gcm",
+                            "aes-256-gcm",
+                            "chacha20-ietf-poly1305",
+                            "2022-blake3-aes-128-gcm",
+                            "2022-blake3-aes-256-gcm",
+                        ]
+                        .contains(&cipher.as_str())
                         || obfs_http.as_ref().is_some_and(|o| !valid_host(&o.host))
                     {
                         return Err("ShadowsocksParameters");
+                    }
+                    if cipher.starts_with("2022-") {
+                        ss2022::validate(password, cipher)?;
+                        if obfs_http.is_some() {
+                            return Err("Shadowsocks2022ObfsUnsupported");
+                        }
                     }
                 }
                 Outbound::Socks5 {
@@ -459,7 +531,19 @@ impl Config {
                 }
                 _ => {}
             }
+            if let Some(transport) = node.outbound.stream_transport() {
+                transport.validate_for(&node.outbound)?;
+            }
+            if matches!(&node.outbound, Outbound::Vless { udp: true, flow: Some(flow), .. } if !flow.is_empty())
+            {
+                return Err("VisionUdpUnsupported");
+            }
             match &node.outbound {
+                Outbound::Vmess {
+                    websocket: Some(ws),
+                    tls,
+                    ..
+                } => ws.validate_tls(tls.as_ref())?,
                 Outbound::Vless {
                     reality,
                     flow,
@@ -492,8 +576,11 @@ impl Config {
             let tls = match &node.outbound {
                 Outbound::Socks5 { tls, .. }
                 | Outbound::HttpConnect { tls, .. }
+                | Outbound::Vmess { tls, .. }
                 | Outbound::Vless { tls, .. } => tls.as_ref(),
                 Outbound::Trojan { tls, .. } => Some(tls),
+                Outbound::Hysteria2(config) => Some(&config.tls),
+                Outbound::Tuic(config) => Some(&config.tls),
                 _ => None,
             };
             if let Some(tls) = tls

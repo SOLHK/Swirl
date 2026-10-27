@@ -540,7 +540,8 @@ class RustCoreIntegration(unittest.TestCase):
         self.assertGreater(state['upload'], 0)
         self.assertGreater(state['download'], 0)
         self.assertEqual(state['failed'], 1)
-        self.assertEqual(state['last_error'], 'StreamIo')
+        self.assertEqual(state['last_error'], 'StreamConnectionReset')
+        self.assertEqual(state['last_error_stage'], 'stream_io')
         self.assertEqual(public_verifier.native_traffic_error(state), 'NativeRelayFailed')
 
     def test_public_https_close_and_active_snapshot_share_the_deadline(self):

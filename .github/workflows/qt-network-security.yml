@@ -1,0 +1,182 @@
+name: Qt HTTP client security
+
+on:
+  push:
+    branches: [test, work/qt-http2-security-20261023, work/subscription-unified-integration-20261023]
+  pull_request:
+    paths:
+      - '.github/workflows/qt-network-security.yml'
+      - 'src/Swirl.Quick/network/**'
+      - 'src/Swirl.Quick/engine/**'
+      - 'src/Swirl.Quick/tests/**'
+      - 'src/Swirl.Quick/CMakeLists.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qt-network-security-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/work/subscription-unified-integration-20261023' }}
+
+jobs:
+  downloader:
+    name: Qt ${{ matrix.qt-version }} downloader (${{ matrix.host }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, windows-2022]
+        qt-version: ['6.10.3', '6.11.3']
+        include:
+          - os: ubuntu-24.04
+            host: linux
+            arch: linux_gcc_64
+            generator: Ninja
+            configure_args: ''
+          - os: macos-14
+            host: mac
+            arch: clang_64
+            generator: Ninja
+            configure_args: ''
+          - os: windows-2022
+            host: windows
+            arch: win64_msvc2022_64
+            generator: Visual Studio 17 2022
+            configure_args: -A x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install Rust for the paired native subscription validator
+        run: rustup toolchain install stable --profile minimal
+      - name: Linux Qt dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgl1-mesa-dev libxkbcommon-dev
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt-version }}
+          host: ${{ matrix.host }}
+          target: desktop
+          arch: ${{ matrix.arch }}
+          # aqt 3.3.0 cannot resolve Qt >= 6.11 Windows repository directories.
+          aqtsource: ${{ runner.os == 'Windows' && matrix.qt-version == '6.11.3' && 'git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b' || '' }}
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install independent TLS fixture certificate support
+        run: python -m pip install cryptography==50.0.2
+      # Parsing uses the exact-source Rust ABI. These requests exercise the
+      # downloader and parser without starting a proxy listener/runtime.
+      - name: Configure real downloader and paired Rust validation tests
+        run: cmake -S src/Swirl.Quick/tests/qt-network -B build/qt-network -G "${{ matrix.generator }}" ${{ matrix.configure_args }} -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build/qt-network --config Release --parallel 2
+      - name: Deploy Windows Qt runtime
+        if: runner.os == 'Windows'
+        run: windeployqt --release build/qt-network/Release/SwirlQtNetworkPolicyTests.exe
+      - name: Verify real TLS negotiation, redirects, parsing and rejection paths
+        run: ctest --test-dir build/qt-network -C Release --output-on-failure --no-tests=error
+      - name: Require actual Qt version and all original security cases without skips
+        shell: python
+        env:
+          U1_EXPECTED_QT: ${{ matrix.qt-version }}
+        run: |
+          import os, xml.etree.ElementTree as ET
+          report = ET.parse('build/qt-network/qt-network-policy.xml').getroot()
+          assert report.findtext('Environment/QtVersion') == os.environ['U1_EXPECTED_QT']
+          functions = report.findall('TestFunction')
+          mandatory = {
+              'unprotectedClientNegotiatesHttp2PositiveControl',
+              'policyOverridesExplicitHttp2AndDirectOptions',
+              'subscriptionHttpsDownloadsAndParsesOverHttp1',
+              'subscriptionHttpsRedirectsStayOnHttp1',
+              'cleartextSubscriptionIgnoresH2cEnvironment',
+              'subscriptionStillRejectsUntrustedTls',
+              'subscriptionStillRejectsHttpsDowngrade',
+              'shutdownCancelsHangingHttp1Download',
+          }
+          assert mandatory.issubset({function.get('name') for function in functions})
+          for function in functions:
+              incidents = function.findall('Incident')
+              assert incidents and all(incident.get('type') == 'pass' for incident in incidents)
+              assert not function.findall('Skip')
+              assert not any(message.get('type') == 'skip' for message in function.findall('Message'))
+          print('Qt ' + os.environ['U1_EXPECTED_QT'] + ': all original HTTP/2/TLS/download cases passed')
+      - name: Preserve exact-source network evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qt-network-${{ matrix.host }}-${{ matrix.qt-version }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            build/qt-network/qt-network-policy.xml
+            build/qt-network/swirl-rust-build.json
+            build/qt-network/Testing/Temporary/LastTest.log
+          if-no-files-found: error
+
+  windows-product:
+    name: Windows Qt 6.12.0 product regression
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install Rust toolchain for the actual product
+        run: rustup toolchain install stable --profile minimal --target x86_64-pc-windows-msvc
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install verified official Qt SDK downloader
+        run: python -m pip install -r tools/requirements-qt-sdk.txt
+      - name: Install and verify Qt 6.12 product SDK
+        shell: pwsh
+        run: |
+          # Share the tested installer and digest checks used by the APEC UI CI.
+          $sdkOutput = Join-Path $env:RUNNER_TEMP 'swirl-qt-product-6.12.0'
+          python tools/Install-QtSdk.py --version 6.12.0 --arch win64_msvc2022_64 --output $sdkOutput
+          if ($LASTEXITCODE -ne 0) { throw 'Official Qt 6.12 SDK installation failed.' }
+          $sdk = Get-Content -LiteralPath (Join-Path $sdkOutput 'sdk-install-result.json') -Raw | ConvertFrom-Json
+          $qtRoot = (Resolve-Path -LiteralPath $sdk.kit_root).Path
+          $version = (& (Join-Path $qtRoot 'bin/qmake.exe') -query QT_VERSION).Trim()
+          if ($LASTEXITCODE -ne 0 -or $version -ne '6.12.0' -or $sdk.arch -ne 'win64_msvc2022_64') { throw 'Qt product SDK version or ABI mismatch.' }
+          foreach ($component in @('Qt6GuiPrivate', 'Qt6ShaderTools', 'Qt6QuickControls2', 'Qt6Svg', 'Qt6Network')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $qtRoot "lib/cmake/$component/${component}Config.cmake"))) { throw "Missing Qt SDK component: $component" }
+          }
+          "QT_ROOT_DIR=$qtRoot" >> $env:GITHUB_ENV
+          "CMAKE_PREFIX_PATH=$qtRoot" >> $env:GITHUB_ENV
+          (Join-Path $qtRoot 'bin') >> $env:GITHUB_PATH
+      - name: Install independent TLS fixture certificate support
+        run: python -m pip install cryptography==50.0.2
+      - name: Configure product with existing regression drivers
+        run: cmake -S src/Swirl.Quick -B build/qt-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON
+      - name: Build product and network regression targets
+        run: cmake --build build/qt-product --config Release --target Swirl SwirlImportTests SwirlTelemetryTests SwirlQtNetworkPolicyTests --parallel 2
+      - name: Deploy actual Qt product runtime
+        run: windeployqt --release --qmldir src/Swirl.Quick/qml build/qt-product/Release/Swirl.exe
+      - name: Verify Windows DPAPI subscription refresh and redirects
+        shell: pwsh
+        run: |
+          & build/qt-product/Release/SwirlImportTests.exe subscriptionAtomicRefreshAndEncryptedUrl httpsRedirectAndDowngradeProtection redirectsPreserveNodesAndBoundLoops -o build/qt-product/subscription-security.xml,xml -o -,txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify download policy, HTTPS measurements and preserved capture HTTP/2 input
+        run: ctest --test-dir build/qt-product -C Release -R "^swirl-(qt-network-policy|telemetry-accounting|capture-network)$" --output-on-failure --no-tests=error
+      - name: Preserve Windows product evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qt-network-product-windows-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            build/qt-product/subscription-security.xml
+            build/qt-product/qt-network-policy.xml
+            build/qt-product/Testing/Temporary/LastTest.log
+            build/qt-product/Release/Swirl-diagnostics.txt
+          if-no-files-found: error

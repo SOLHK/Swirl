@@ -17,6 +17,14 @@ int main(int argc, char **argv) {
         SwirlPaths::initializeTestStorage();
         return 0;
     }
+    if (arguments.contains("--qml-cache")) {
+        QStandardPaths::setTestModeEnabled(true);
+        SwirlPaths::initializeTestStorage();
+        SwirlPaths::initializeQmlCache(QStringLiteral("0123456789abcdef"), QStringLiteral("qa"));
+        return qEnvironmentVariable("QML_DISK_CACHE_PATH")
+            == SwirlPaths::testRoot() + QStringLiteral("/cache/qmlcache/0123456789abcdef-qt%1-qa")
+                                          .arg(QString::fromLatin1(qVersion())) ? 0 : 4;
+    }
     if (arguments.contains("--read-settings")) {
         QStandardPaths::setTestModeEnabled(true);
         SwirlPaths::initializeTestStorage();
@@ -53,6 +61,31 @@ int main(int argc, char **argv) {
     check(QDir::fromNativeSeparators(QDir::tempPath()) == root + "/tmp", "temporary files use the explicit root");
     check(qEnvironmentVariable("QML_DISK_CACHE_PATH") == root + "/cache/qml",
           "QML disk cache uses the explicit root");
+    SwirlPaths::initializeQmlCache(QStringLiteral("0123456789abcdef"), QStringLiteral("qa"));
+    const auto firstCache = qEnvironmentVariable("QML_DISK_CACHE_PATH");
+    check(firstCache == root + QStringLiteral("/cache/qmlcache/0123456789abcdef-qt%1-qa")
+                                  .arg(QString::fromLatin1(qVersion())),
+          "QML content and Qt version stay within the explicit test root");
+    QDir().mkpath(firstCache);
+    SwirlPaths::initializeQmlCache(QStringLiteral("0123456789abcdef"), QStringLiteral("release"));
+    check(qEnvironmentVariable("QML_DISK_CACHE_PATH") != firstCache && QFileInfo::exists(firstCache),
+          "production and QA caches are separate without deleting rollback caches");
+    const auto releaseCache = qEnvironmentVariable("QML_DISK_CACHE_PATH");
+    SwirlPaths::initializeQmlCache(QStringLiteral("fedcba9876543210"), QStringLiteral("release"));
+    check(qEnvironmentVariable("QML_DISK_CACHE_PATH") != releaseCache,
+          "a changed QML revision cannot reuse earlier bytecode");
+    QProcess cacheRestart;
+    cacheRestart.start(QCoreApplication::applicationFilePath(), {"--qml-cache"});
+    check(cacheRestart.waitForFinished(5000) && cacheRestart.exitStatus() == QProcess::NormalExit
+              && cacheRestart.exitCode() == 0,
+          "fresh process derives its own QML cache from the inherited isolated root");
+    QStandardPaths::setTestModeEnabled(false);
+    qputenv("QML_DISK_CACHE_PATH", (root + "/explicit-production-cache").toUtf8());
+    SwirlPaths::initializeQmlCache(QStringLiteral("0123456789abcdef"), QStringLiteral("release"));
+    check(qEnvironmentVariable("QML_DISK_CACHE_PATH") == root + "/explicit-production-cache",
+          "production respects an explicit QML disk cache override");
+    QStandardPaths::setTestModeEnabled(true);
+    SwirlPaths::initializeQmlCache(QStringLiteral("0123456789abcdef"), QStringLiteral("qa"));
     check(qEnvironmentVariable("QSG_RHI_PIPELINE_CACHE_SAVE") == root + "/cache/pipeline.bin",
           "pipeline cache uses the explicit root");
     QSettings::setDefaultFormat(QSettings::IniFormat);

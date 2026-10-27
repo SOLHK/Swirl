@@ -1,0 +1,536 @@
+{
+  "source_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+  "private_subscription_tested": false,
+  "strict_vmess": {
+    "actions_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447372",
+    "result": {
+      "assigned_to_windows_qt_workflow": {},
+      "elapsed_seconds": 6.557,
+      "expected": 2,
+      "expected_ids": [
+        "test_vmess_xray.VmessXrayHalfCloseTests.test_eight_concurrent_independent_sessions_with_target_half_close",
+        "test_vmess_xray.VmessXrayHalfCloseTests.test_four_transports_four_mib_duplex_and_logical_half_close"
+      ],
+      "log": "strict-vmess.log",
+      "log_sha256": "7cb9095b59a0575c113c8fe6eef68aba8e32e051be208a8661aea3c3aacf9afb",
+      "name": "strict-vmess",
+      "original_exit_code": 1,
+      "runs": [
+        {
+          "errors": 0,
+          "executed": 2,
+          "executed_ids": [
+            "test_vmess_xray.VmessXrayHalfCloseTests.test_eight_concurrent_independent_sessions_with_target_half_close",
+            "test_vmess_xray.VmessXrayHalfCloseTests.test_four_transports_four_mib_duplex_and_logical_half_close"
+          ],
+          "expected_failures": 0,
+          "failures": 5,
+          "planned_ids": [
+            "test_vmess_xray.VmessXrayHalfCloseTests.test_eight_concurrent_independent_sessions_with_target_half_close",
+            "test_vmess_xray.VmessXrayHalfCloseTests.test_four_transports_four_mib_duplex_and_logical_half_close"
+          ],
+          "skipped": 0,
+          "successful": false,
+          "unexpected_successes": 0
+        }
+      ],
+      "success": false
+    }
+  },
+  "public_shadowsocks": {
+    "actions_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447386",
+    "result": {
+      "schema": 1,
+      "success": false,
+      "platform": "Linux",
+      "scope": "controlled-independent-SS-nodes-to-public-origins",
+      "private_subscription_tested": false,
+      "environment_proxy_used": false,
+      "cipher": "aes-128-gcm",
+      "requests": [
+        {
+          "node": "A",
+          "inbound": "http",
+          "host": "example.com",
+          "port": 80,
+          "path": "/",
+          "expected_status": 200,
+          "success": true,
+          "certificate_verified": false,
+          "stage": "complete",
+          "connection_policy": "close",
+          "http_status": 200,
+          "body_bytes": 577,
+          "body_sha256": "25ddf2c883e0d1958ea971d279a7e4f0fd446724ee3db7db19dadabd4a62e484",
+          "orderly_close": true
+        },
+        {
+          "node": "A",
+          "inbound": "connect",
+          "host": "www.gstatic.com",
+          "port": 443,
+          "path": "/generate_204",
+          "expected_status": 204,
+          "success": false,
+          "certificate_verified": true,
+          "stage": "origin-close",
+          "tls_version": "TLSv1.3",
+          "connection_policy": "keep-alive",
+          "http_status": 204
+        }
+      ],
+      "cleanup": {
+        "native_stopped": true,
+        "process_exited": true,
+        "listener_released": true
+      },
+      "harness_sha256": "aa0e0072e291ce8b591a28416d60d6ef9325f230d92401751f7cd0cf9c108952",
+      "source_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+      "tested_worktree_clean": true,
+      "fixture_sha256": {
+        "tools/tests/test_r1_public_proxy.py": "0baf0163ab8055366ff8d4ce3127ee4bea5e13445176bddd84c98a5408596efa",
+        "tools/tests/test_product_subscription_chain.py": "a2a4fdd499029917659b9c52a269c3aab8e7e70193c67fcbd43ba5b8bb45b293",
+        "tools/tests/test_shadowsocks.py": "fd7a08bd40856b7a6297f4e242cce2da939073fd676438e8f3538a2e8bccfaea",
+        "tools/tests/test_rust_core.py": "113153ffd17fa6b1ee2bb9da3827b1bc7d2383d9d95ed658b861c4937b4d69d7",
+        "tools/Verify-PublicRustCore.py": "31cce7a40ad6c5e96f9fc4d5c97657e544d1b6e141efd460ece046333f7c8106"
+      },
+      "dns": [
+        {
+          "host": "example.com",
+          "port": 80,
+          "resolved": true,
+          "connect_candidate_count": 2,
+          "resolution_owner": "independent-node"
+        },
+        {
+          "host": "www.gstatic.com",
+          "port": 443,
+          "resolved": true,
+          "connect_candidate_count": 2,
+          "resolution_owner": "independent-node"
+        }
+      ],
+      "engine": "swirl-rust",
+      "core": {
+        "accepted": 1,
+        "active": 0,
+        "failed": 0,
+        "upload": 56,
+        "download": 928,
+        "last_error": "",
+        "last_error_stage": "",
+        "recorded_connections": 1
+      },
+      "failure_phase": "A-connect",
+      "failure": {
+        "type": "SSLEOFError",
+        "errno": 8
+      },
+      "failure_core": {
+        "accepted": 2,
+        "active": 0,
+        "failed": 0,
+        "upload": 776,
+        "download": 4551,
+        "last_error": "",
+        "last_error_stage": ""
+      },
+      "direct_origin_control": {
+        "scope": "direct-origin-diagnostic-only",
+        "proxy_result": false,
+        "host": "www.gstatic.com",
+        "port": 443,
+        "address": "172.253.122.94",
+        "path": "/generate_204",
+        "attempted": true,
+        "success": false,
+        "certificate_verified": true,
+        "environment_proxy_used": false,
+        "connection_policy": "keep-alive",
+        "tls_version": "TLSv1.3",
+        "http_status": 204,
+        "failure_phase": "origin-close",
+        "failure": {
+          "type": "SSLEOFError",
+          "errno": 8
+        }
+      },
+      "peers": [
+        {
+          "identity": "A",
+          "authenticated_connections": [
+            {
+              "peer": "A",
+              "host": "example.com",
+              "port": 80,
+              "origin_address": "172.66.147.243",
+              "origin_family": 2,
+              "authenticated": true,
+              "upload": 56,
+              "download": 928,
+              "closed": true
+            },
+            {
+              "peer": "A",
+              "host": "www.gstatic.com",
+              "port": 443,
+              "origin_address": "172.253.122.94",
+              "origin_family": 2,
+              "authenticated": true,
+              "upload": 720,
+              "download": 3623,
+              "closed": true
+            }
+          ],
+          "upload": 776,
+          "download": 4551,
+          "errors": [],
+          "denied": []
+        },
+        {
+          "identity": "B",
+          "authenticated_connections": [],
+          "upload": 0,
+          "download": 0,
+          "errors": [],
+          "denied": []
+        }
+      ],
+      "elapsed_ms": 320
+    }
+  },
+  "tls_controls": {
+    "source_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+    "source_clean": true,
+    "runner_os": "Linux",
+    "discovered": [
+      "test_r1_public_proxy.PublicTlsControlTests.test_control_records_missing_close_notify_as_failure_after_204",
+      "test_r1_public_proxy.PublicTlsControlTests.test_control_rejects_untrusted_tls_before_http",
+      "test_r1_public_proxy.PublicTlsControlTests.test_control_requires_verified_tls_response_and_orderly_close"
+    ],
+    "executed": [
+      "test_r1_public_proxy.PublicTlsControlTests.test_control_records_missing_close_notify_as_failure_after_204",
+      "test_r1_public_proxy.PublicTlsControlTests.test_control_rejects_untrusted_tls_before_http",
+      "test_r1_public_proxy.PublicTlsControlTests.test_control_requires_verified_tls_response_and_orderly_close"
+    ],
+    "tests_run": 3,
+    "failed": [],
+    "errors": [],
+    "skipped": [],
+    "expected_failures": [],
+    "unexpected_successes": [],
+    "scope": "Actual loopback TLS controls; not public-origin or proxy acceptance"
+  },
+  "deterministic_menus": {
+    "reality-peer.json": {
+      "expected": 16,
+      "success": true,
+      "runs": [
+        {
+          "errors": 0,
+          "executed": 16,
+          "executed_ids": [
+            "test_reality_peer.RealityPeerSelfChecks.test_all_three_record_suites_boundary_padding_integrity_and_replay",
+            "test_reality_peer.RealityPeerSelfChecks.test_authentication_binds_hello_random_sni_key_share_and_session_tag",
+            "test_reality_peer.RealityPeerSelfChecks.test_authentication_rejects_authenticated_invalid_parameters",
+            "test_reality_peer.RealityPeerSelfChecks.test_context_manager_does_not_hide_a_server_failure",
+            "test_reality_peer.RealityPeerSelfChecks.test_distinct_optional_x25519_and_duplicate_shares_are_refused",
+            "test_reality_peer.RealityPeerSelfChecks.test_fragmented_client_finished_is_verified_before_application",
+            "test_reality_peer.RealityPeerSelfChecks.test_live_hybrid_and_classical_exchanges_decapsulate_independently",
+            "test_reality_peer.RealityPeerSelfChecks.test_loopback_wrong_authentication_reports_explicit_rejection",
+            "test_reality_peer.RealityPeerSelfChecks.test_modern_authentication_matches_both_independent_fixtures",
+            "test_reality_peer.RealityPeerSelfChecks.test_parser_rejects_truncations_extra_data_and_legacy_profile",
+            "test_reality_peer.RealityPeerSelfChecks.test_plaintext_ccs_is_forbidden_after_client_finished",
+            "test_reality_peer.RealityPeerSelfChecks.test_record_header_length_is_rejected_before_reading_body",
+            "test_reality_peer.RealityPeerSelfChecks.test_rfc8448_client_finished_record_and_key_derivation",
+            "test_reality_peer.RealityPeerSelfChecks.test_server_mutations_change_the_exact_authenticated_fields",
+            "test_reality_peer.RealityPeerSelfChecks.test_two_complete_server_transcripts_match_fixed_checkpoints",
+            "test_reality_peer.RealityPeerSelfChecks.test_wrong_client_finished_and_early_application_are_rejected"
+          ],
+          "expected_failures": 0,
+          "failures": 0,
+          "planned_ids": [
+            "test_reality_peer.RealityPeerSelfChecks.test_all_three_record_suites_boundary_padding_integrity_and_replay",
+            "test_reality_peer.RealityPeerSelfChecks.test_authentication_binds_hello_random_sni_key_share_and_session_tag",
+            "test_reality_peer.RealityPeerSelfChecks.test_authentication_rejects_authenticated_invalid_parameters",
+            "test_reality_peer.RealityPeerSelfChecks.test_context_manager_does_not_hide_a_server_failure",
+            "test_reality_peer.RealityPeerSelfChecks.test_distinct_optional_x25519_and_duplicate_shares_are_refused",
+            "test_reality_peer.RealityPeerSelfChecks.test_fragmented_client_finished_is_verified_before_application",
+            "test_reality_peer.RealityPeerSelfChecks.test_live_hybrid_and_classical_exchanges_decapsulate_independently",
+            "test_reality_peer.RealityPeerSelfChecks.test_loopback_wrong_authentication_reports_explicit_rejection",
+            "test_reality_peer.RealityPeerSelfChecks.test_modern_authentication_matches_both_independent_fixtures",
+            "test_reality_peer.RealityPeerSelfChecks.test_parser_rejects_truncations_extra_data_and_legacy_profile",
+            "test_reality_peer.RealityPeerSelfChecks.test_plaintext_ccs_is_forbidden_after_client_finished",
+            "test_reality_peer.RealityPeerSelfChecks.test_record_header_length_is_rejected_before_reading_body",
+            "test_reality_peer.RealityPeerSelfChecks.test_rfc8448_client_finished_record_and_key_derivation",
+            "test_reality_peer.RealityPeerSelfChecks.test_server_mutations_change_the_exact_authenticated_fields",
+            "test_reality_peer.RealityPeerSelfChecks.test_two_complete_server_transcripts_match_fixed_checkpoints",
+            "test_reality_peer.RealityPeerSelfChecks.test_wrong_client_finished_and_early_application_are_rejected"
+          ],
+          "skipped": 0,
+          "successful": true,
+          "unexpected_successes": 0
+        }
+      ]
+    },
+    "reality-tls.json": {
+      "expected": 19,
+      "success": true,
+      "runs": [
+        {
+          "errors": 0,
+          "executed": 19,
+          "executed_ids": [
+            "test_reality_tls.RealityTlsInterop.test_aes128_hybrid_transcript_data_and_close",
+            "test_reality_tls.RealityTlsInterop.test_aes128_offered_classical_transcript_data_and_close",
+            "test_reality_tls.RealityTlsInterop.test_aes256_hybrid_transcript_data_and_close",
+            "test_reality_tls.RealityTlsInterop.test_aes256_offered_classical_transcript_data_and_close",
+            "test_reality_tls.RealityTlsInterop.test_alpn_selection_preserves_explicit_offer",
+            "test_reality_tls.RealityTlsInterop.test_authenticated_wrong_short_id_is_refused",
+            "test_reality_tls.RealityTlsInterop.test_bad_certificate_mac_is_refused",
+            "test_reality_tls.RealityTlsInterop.test_bad_certificate_verify_is_refused",
+            "test_reality_tls.RealityTlsInterop.test_bad_server_finished_is_refused",
+            "test_reality_tls.RealityTlsInterop.test_chacha_hybrid_transcript_data_and_close",
+            "test_reality_tls.RealityTlsInterop.test_chacha_offered_classical_transcript_data_and_close",
+            "test_reality_tls.RealityTlsInterop.test_empty_full_record_and_multiple_record_payloads",
+            "test_reality_tls.RealityTlsInterop.test_hello_retry_request_is_refused_without_second_client_hello",
+            "test_reality_tls.RealityTlsInterop.test_small_socket_writes_reads_and_fragmented_encrypted_handshake",
+            "test_reality_tls.RealityTlsInterop.test_tcp_eof_after_echo_is_not_authenticated_close",
+            "test_reality_tls.RealityTlsInterop.test_unoffered_alpn_is_refused",
+            "test_reality_tls.RealityTlsInterop.test_wrong_client_static_public_key_is_refused",
+            "test_reality_tls.RealityTlsInterop.test_wrong_server_authentication_key_never_reaches_finished",
+            "test_reality_tls.RealityTlsInterop.test_wrong_session_id_echo_is_refused"
+          ],
+          "expected_failures": 0,
+          "failures": 0,
+          "planned_ids": [
+            "test_reality_tls.RealityTlsInterop.test_aes128_hybrid_transcript_data_and_close",
+            "test_reality_tls.RealityTlsInterop.test_aes128_offered_classical_transcript_data_and_close",
+            "test_reality_tls.RealityTlsInterop.test_aes256_hybrid_transcript_data_and_close",
+            "test_reality_tls.RealityTlsInterop.test_aes256_offered_classical_transcript_data_and_close",
+            "test_reality_tls.RealityTlsInterop.test_alpn_selection_preserves_explicit_offer",
+            "test_reality_tls.RealityTlsInterop.test_authenticated_wrong_short_id_is_refused",
+            "test_reality_tls.RealityTlsInterop.test_bad_certificate_mac_is_refused",
+            "test_reality_tls.RealityTlsInterop.test_bad_certificate_verify_is_refused",
+            "test_reality_tls.RealityTlsInterop.test_bad_server_finished_is_refused",
+            "test_reality_tls.RealityTlsInterop.test_chacha_hybrid_transcript_data_and_close",
+            "test_reality_tls.RealityTlsInterop.test_chacha_offered_classical_transcript_data_and_close",
+            "test_reality_tls.RealityTlsInterop.test_empty_full_record_and_multiple_record_payloads",
+            "test_reality_tls.RealityTlsInterop.test_hello_retry_request_is_refused_without_second_client_hello",
+            "test_reality_tls.RealityTlsInterop.test_small_socket_writes_reads_and_fragmented_encrypted_handshake",
+            "test_reality_tls.RealityTlsInterop.test_tcp_eof_after_echo_is_not_authenticated_close",
+            "test_reality_tls.RealityTlsInterop.test_unoffered_alpn_is_refused",
+            "test_reality_tls.RealityTlsInterop.test_wrong_client_static_public_key_is_refused",
+            "test_reality_tls.RealityTlsInterop.test_wrong_server_authentication_key_never_reaches_finished",
+            "test_reality_tls.RealityTlsInterop.test_wrong_session_id_echo_is_refused"
+          ],
+          "skipped": 0,
+          "successful": true,
+          "unexpected_successes": 0
+        }
+      ]
+    },
+    "reality-xray.json": {
+      "expected": 14,
+      "success": true,
+      "runs": [
+        {
+          "errors": 0,
+          "executed": 14,
+          "executed_ids": [
+            "test_reality_xray.RealityXrayInterop.test_bare_tcp_fin_is_rejected_after_valid_echo",
+            "test_reality_xray.RealityXrayInterop.test_chrome_hybrid_authentication_finished_bidirectional_data_and_close",
+            "test_reality_xray.RealityXrayInterop.test_chrome_independent_x25519_authentication_finished_bidirectional_data_and_close",
+            "test_reality_xray.RealityXrayInterop.test_data_cancellation_drops_transport_and_reaps_peer",
+            "test_reality_xray.RealityXrayInterop.test_data_timeout_drops_transport_and_reaps_peer",
+            "test_reality_xray.RealityXrayInterop.test_empty_application_still_requires_both_finished_and_close_notify",
+            "test_reality_xray.RealityXrayInterop.test_handshake_cancellation_drops_transport_and_reaps_peer",
+            "test_reality_xray.RealityXrayInterop.test_handshake_timeout_drops_transport_and_reaps_peer",
+            "test_reality_xray.RealityXrayInterop.test_native_hybrid_authentication_finished_bidirectional_data_and_close",
+            "test_reality_xray.RealityXrayInterop.test_native_x25519_authentication_finished_bidirectional_data_and_close",
+            "test_reality_xray.RealityXrayInterop.test_one_mebibyte_binary_transfer_with_short_reads_and_writes",
+            "test_reality_xray.RealityXrayInterop.test_single_byte_socket_boundaries",
+            "test_reality_xray.RealityXrayInterop.test_wrong_reality_public_key_never_exposes_application_data",
+            "test_reality_xray.RealityXrayInterop.test_wrong_short_id_never_exposes_application_data"
+          ],
+          "expected_failures": 0,
+          "failures": 0,
+          "planned_ids": [
+            "test_reality_xray.RealityXrayInterop.test_bare_tcp_fin_is_rejected_after_valid_echo",
+            "test_reality_xray.RealityXrayInterop.test_chrome_hybrid_authentication_finished_bidirectional_data_and_close",
+            "test_reality_xray.RealityXrayInterop.test_chrome_independent_x25519_authentication_finished_bidirectional_data_and_close",
+            "test_reality_xray.RealityXrayInterop.test_data_cancellation_drops_transport_and_reaps_peer",
+            "test_reality_xray.RealityXrayInterop.test_data_timeout_drops_transport_and_reaps_peer",
+            "test_reality_xray.RealityXrayInterop.test_empty_application_still_requires_both_finished_and_close_notify",
+            "test_reality_xray.RealityXrayInterop.test_handshake_cancellation_drops_transport_and_reaps_peer",
+            "test_reality_xray.RealityXrayInterop.test_handshake_timeout_drops_transport_and_reaps_peer",
+            "test_reality_xray.RealityXrayInterop.test_native_hybrid_authentication_finished_bidirectional_data_and_close",
+            "test_reality_xray.RealityXrayInterop.test_native_x25519_authentication_finished_bidirectional_data_and_close",
+            "test_reality_xray.RealityXrayInterop.test_one_mebibyte_binary_transfer_with_short_reads_and_writes",
+            "test_reality_xray.RealityXrayInterop.test_single_byte_socket_boundaries",
+            "test_reality_xray.RealityXrayInterop.test_wrong_reality_public_key_never_exposes_application_data",
+            "test_reality_xray.RealityXrayInterop.test_wrong_short_id_never_exposes_application_data"
+          ],
+          "skipped": 0,
+          "successful": true,
+          "unexpected_successes": 0
+        }
+      ]
+    },
+    "reality-fingerprint.json": {
+      "expected": 4,
+      "success": true,
+      "runs": [
+        {
+          "errors": 0,
+          "executed": 4,
+          "executed_ids": [
+            "test_reality_fingerprint.RealityFingerprintInterop.test_chrome_and_versioned_alias_match_independent_utls_wire_profile",
+            "test_reality_fingerprint.RealityFingerprintInterop.test_default_rustls_is_a_negative_control",
+            "test_reality_fingerprint.RealityFingerprintInterop.test_each_connection_uses_fresh_randoms_keys_ech_and_extension_permutation",
+            "test_reality_fingerprint.RealityFingerprintInterop.test_real_wire_mutations_are_not_hidden_by_normalization"
+          ],
+          "expected_failures": 0,
+          "failures": 0,
+          "planned_ids": [
+            "test_reality_fingerprint.RealityFingerprintInterop.test_chrome_and_versioned_alias_match_independent_utls_wire_profile",
+            "test_reality_fingerprint.RealityFingerprintInterop.test_default_rustls_is_a_negative_control",
+            "test_reality_fingerprint.RealityFingerprintInterop.test_each_connection_uses_fresh_randoms_keys_ech_and_extension_permutation",
+            "test_reality_fingerprint.RealityFingerprintInterop.test_real_wire_mutations_are_not_hidden_by_normalization"
+          ],
+          "skipped": 0,
+          "successful": true,
+          "unexpected_successes": 0
+        }
+      ]
+    },
+    "vision-xray.json": {
+      "expected": 4,
+      "success": true,
+      "runs": [
+        {
+          "errors": 0,
+          "executed": 4,
+          "executed_ids": [
+            "test_vision_xray.VisionXrayInterop.test_tls12_authentication_framing_bidirectional_data_and_close",
+            "test_vision_xray.VisionXrayInterop.test_tls12_large_transfer_pause_resume_and_application_boundaries",
+            "test_vision_xray.VisionXrayInterop.test_tls12_single_byte_reads_and_small_writes",
+            "test_vision_xray.VisionXrayInterop.test_tls13_direct_request_is_rejected_without_application_data"
+          ],
+          "expected_failures": 0,
+          "failures": 0,
+          "planned_ids": [
+            "test_vision_xray.VisionXrayInterop.test_tls12_authentication_framing_bidirectional_data_and_close",
+            "test_vision_xray.VisionXrayInterop.test_tls12_large_transfer_pause_resume_and_application_boundaries",
+            "test_vision_xray.VisionXrayInterop.test_tls12_single_byte_reads_and_small_writes",
+            "test_vision_xray.VisionXrayInterop.test_tls13_direct_request_is_rejected_without_application_data"
+          ],
+          "skipped": 0,
+          "successful": true,
+          "unexpected_successes": 0
+        }
+      ]
+    },
+    "socks4.json": {
+      "expected": 9,
+      "success": true,
+      "runs": [
+        {
+          "errors": 0,
+          "executed": 9,
+          "executed_ids": [
+            "test_socks4.Socks4Integration.test_existing_socks4_session_survives_atomic_update",
+            "test_socks4.Socks4Integration.test_inbound_ipv4_and_4a_fragmented_with_coalesced_payload",
+            "test_socks4.Socks4Integration.test_invalid_command_userid_domain_and_zero_port_are_rejected",
+            "test_socks4.Socks4Integration.test_invalid_configuration_rejected_without_activation",
+            "test_socks4.Socks4Integration.test_ipv6_destination_rejected_before_proxy_connection",
+            "test_socks4.Socks4Integration.test_outbound_v4_local_dns_and_4a_remote_dns",
+            "test_socks4.Socks4Integration.test_password_protected_inbound_rejects_socks4",
+            "test_socks4.Socks4Integration.test_rejected_or_wrong_version_upstream_never_falls_back",
+            "test_socks4.Socks4Integration.test_subscription_candidates_forward_through_independent_peer"
+          ],
+          "expected_failures": 0,
+          "failures": 0,
+          "planned_ids": [
+            "test_socks4.Socks4Integration.test_existing_socks4_session_survives_atomic_update",
+            "test_socks4.Socks4Integration.test_inbound_ipv4_and_4a_fragmented_with_coalesced_payload",
+            "test_socks4.Socks4Integration.test_invalid_command_userid_domain_and_zero_port_are_rejected",
+            "test_socks4.Socks4Integration.test_invalid_configuration_rejected_without_activation",
+            "test_socks4.Socks4Integration.test_ipv6_destination_rejected_before_proxy_connection",
+            "test_socks4.Socks4Integration.test_outbound_v4_local_dns_and_4a_remote_dns",
+            "test_socks4.Socks4Integration.test_password_protected_inbound_rejects_socks4",
+            "test_socks4.Socks4Integration.test_rejected_or_wrong_version_upstream_never_falls_back",
+            "test_socks4.Socks4Integration.test_subscription_candidates_forward_through_independent_peer"
+          ],
+          "skipped": 0,
+          "successful": true,
+          "unexpected_successes": 0
+        }
+      ]
+    },
+    "websocket.json": {
+      "expected": 10,
+      "success": true,
+      "runs": [
+        {
+          "errors": 0,
+          "executed": 10,
+          "executed_ids": [
+            "test_websocket_transport.WebSocketPeerTests.test_control_only_and_empty_frames_return_to_the_forwarding_loop",
+            "test_websocket_transport.WebSocketTransportTests.test_bad_upgrades_fail_without_sending_credentials_or_origin_traffic",
+            "test_websocket_transport.WebSocketTransportTests.test_coalesced_ping_burst_preserves_the_connection_and_all_pongs",
+            "test_websocket_transport.WebSocketTransportTests.test_configuration_generation_preserves_existing_ws_stream",
+            "test_websocket_transport.WebSocketTransportTests.test_control_only_pong_does_not_block_the_origin_response_tail",
+            "test_websocket_transport.WebSocketTransportTests.test_fragmented_binary_messages_and_interleaved_ping_are_not_payload",
+            "test_websocket_transport.WebSocketTransportTests.test_malformed_frames_never_release_invalid_payload",
+            "test_websocket_transport.WebSocketTransportTests.test_stop_cancels_owned_ws_driver_and_releases_network",
+            "test_websocket_transport.WebSocketTransportTests.test_vless_ws_wss_trojan_wss_forward_actual_origin_and_mask_frames",
+            "test_websocket_transport.WebSocketTransportTests.test_wss_verifies_name_and_trust_before_http_upgrade"
+          ],
+          "expected_failures": 0,
+          "failures": 0,
+          "planned_ids": [
+            "test_websocket_transport.WebSocketPeerTests.test_control_only_and_empty_frames_return_to_the_forwarding_loop",
+            "test_websocket_transport.WebSocketTransportTests.test_bad_upgrades_fail_without_sending_credentials_or_origin_traffic",
+            "test_websocket_transport.WebSocketTransportTests.test_coalesced_ping_burst_preserves_the_connection_and_all_pongs",
+            "test_websocket_transport.WebSocketTransportTests.test_configuration_generation_preserves_existing_ws_stream",
+            "test_websocket_transport.WebSocketTransportTests.test_control_only_pong_does_not_block_the_origin_response_tail",
+            "test_websocket_transport.WebSocketTransportTests.test_fragmented_binary_messages_and_interleaved_ping_are_not_payload",
+            "test_websocket_transport.WebSocketTransportTests.test_malformed_frames_never_release_invalid_payload",
+            "test_websocket_transport.WebSocketTransportTests.test_stop_cancels_owned_ws_driver_and_releases_network",
+            "test_websocket_transport.WebSocketTransportTests.test_vless_ws_wss_trojan_wss_forward_actual_origin_and_mask_frames",
+            "test_websocket_transport.WebSocketTransportTests.test_wss_verifies_name_and_trust_before_http_upgrade"
+          ],
+          "skipped": 0,
+          "successful": true,
+          "unexpected_successes": 0
+        }
+      ]
+    }
+  },
+  "fixed_hysteria_failure": {
+    "source_sha": "61f9458628b0bb0a64d07bb3db1bfbc8a6c896e2",
+    "actions_url": "https://github.com/SOLHK/Swirl/actions/runs/39972868023",
+    "job_id": 120479828776,
+    "method": "Hysteria2Official.test_10_https_through_native_proxy",
+    "origin_tls_close_errors": [
+      "SSLEOFError"
+    ],
+    "fix_source_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+    "verification_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447341",
+    "before_regression": {
+      "passed": 0,
+      "failed": 2
+    },
+    "after_regression": {
+      "passed": 2,
+      "failed": 0
+    }
+  },
+  "raw_log_sha256": {
+    "quic-shutdown-before.log": "05609a11ad38e1ce1bd1b84001a463de706277ef5d215339e50980ee5903c19c",
+    "quic-shutdown-after.log": "05e2784e1578989153ef3798a42234228886877fe5ec3b09b72e234c62530d81",
+    "ci-native-macos-61f.log": "a8abc364885c9ff768deab943cd9b153c3559cc270a042ebbd42e87a6fd7aa8b",
+    "vmess-strict-3c1.log": "0e75d4a074f22f328256899908e6b5ed869121094a39485ce945425df99c2f75"
+  }
+}

@@ -1,0 +1,295 @@
+{
+  "schema": 1,
+  "evidence_type": "verified_github_actions_windows_run",
+  "commit": "4f3f0caba8f20e7fa776ea7a710864a685215d44",
+  "run_id": 39723505766,
+  "job_id": 119642111443,
+  "job_url": "https://github.com/SOLHK/Swirl/actions/runs/39723505766/job/119642111443",
+  "status": "completed",
+  "conclusion": "success",
+  "test_steps": [
+    {
+      "name": "Format",
+      "conclusion": "success"
+    },
+    {
+      "name": "Check",
+      "conclusion": "success"
+    },
+    {
+      "name": "Clippy",
+      "conclusion": "success"
+    },
+    {
+      "name": "Unit and local network tests",
+      "conclusion": "success"
+    },
+    {
+      "name": "Build native binaries and dynamic library",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run actions/setup-python@v5",
+      "conclusion": "success"
+    },
+    {
+      "name": "Install synthetic certificate dependency",
+      "conclusion": "success"
+    },
+    {
+      "name": "Fetch independent pinned test servers",
+      "conclusion": "success"
+    },
+    {
+      "name": "Independent TCP and WebSocket Xray interoperability",
+      "conclusion": "success"
+    },
+    {
+      "name": "Independent streaming gRPC Xray interoperability",
+      "conclusion": "success"
+    },
+    {
+      "name": "Independent legacy HTTP2 Xray interoperability",
+      "conclusion": "success"
+    },
+    {
+      "name": "Independent HTTPUpgrade Xray interoperability",
+      "conclusion": "success"
+    },
+    {
+      "name": "Independent XHTTP stream-one Xray interoperability",
+      "conclusion": "success"
+    },
+    {
+      "name": "Core transport selection and probes through independent Xray",
+      "conclusion": "success"
+    },
+    {
+      "name": "Required TLS ALPN policy with trusted local peers",
+      "conclusion": "success"
+    },
+    {
+      "name": "Independent REALITY transport and raw Vision regression",
+      "conclusion": "success"
+    }
+  ],
+  "python_suite_counts_in_execution_order": [
+    {
+      "suite": "C1",
+      "tests_run": 6,
+      "elapsed_seconds": 16.361
+    },
+    {
+      "suite": "gRPC",
+      "tests_run": 11,
+      "elapsed_seconds": 7.731
+    },
+    {
+      "suite": "HTTP2",
+      "tests_run": 8,
+      "elapsed_seconds": 4.504
+    },
+    {
+      "suite": "HTTPUpgrade",
+      "tests_run": 9,
+      "elapsed_seconds": 5.002
+    },
+    {
+      "suite": "XHTTP",
+      "tests_run": 10,
+      "elapsed_seconds": 4.147
+    },
+    {
+      "suite": "Core",
+      "tests_run": 4,
+      "elapsed_seconds": 7.063
+    },
+    {
+      "suite": "TLS policy",
+      "tests_run": 3,
+      "elapsed_seconds": 0.074
+    },
+    {
+      "suite": "REALITY",
+      "tests_run": 10,
+      "elapsed_seconds": 17.057
+    }
+  ],
+  "artifact": {
+    "id": 12401369731,
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/39723505766/artifacts/12401369731",
+    "sha256": "df6b31fe23506cf1e00a540f3c409419ad654f8b28991d3c3cd73644f76434b2",
+    "locally_verified": true,
+    "contents_included": false
+  },
+  "http2_original_log_lines": [
+    "2026-10-22T04:46:26.3950818Z ##[group]Run python tools/tests/test_transport_http2_xray.py -v",
+    "2026-10-22T04:46:27.1733827Z test_eight_concurrent_connections_and_client_drop_release_targets (__main__.Http2XrayTests.test_eight_concurrent_connections_and_client_drop_release_targets) ... ok",
+    "2026-10-22T04:46:28.5026715Z test_eight_mib_bidirectional_flow_control_and_half_close (__main__.Http2XrayTests.test_eight_mib_bidirectional_flow_control_and_half_close) ... ok",
+    "2026-10-22T04:46:28.9408283Z test_plain_legacy_h2_and_framing_override_fail_explicitly (__main__.Http2XrayTests.test_plain_legacy_h2_and_framing_override_fail_explicitly) ... ok",
+    "2026-10-22T04:46:29.5085258Z test_timeout_cancel_and_server_interruption_are_bounded (__main__.Http2XrayTests.test_timeout_cancel_and_server_interruption_are_bounded) ... ok",
+    "2026-10-22T04:46:29.7748266Z test_tls_certificate_sni_alpn_and_vless_auth_are_checked (__main__.Http2XrayTests.test_tls_certificate_sni_alpn_and_vless_auth_are_checked) ... ok",
+    "2026-10-22T04:46:30.0893704Z test_truncated_response_fails_and_fresh_connection_recovers (__main__.Http2XrayTests.test_truncated_response_fails_and_fresh_connection_recovers) ... ok",
+    "2026-10-22T04:46:31.0478796Z test_vless_and_trojan_tls_custom_host_path_http_and_https (__main__.Http2XrayTests.test_vless_and_trojan_tls_custom_host_path_http_and_https) ... ok",
+    "2026-10-22T04:46:31.3299221Z test_wrong_host_path_and_server_status_are_errors (__main__.Http2XrayTests.test_wrong_host_path_and_server_status_are_errors) ... ok",
+    "2026-10-22T04:46:31.3302356Z Ran 8 tests in 4.504s",
+    "2026-10-22T04:46:31.3302719Z OK"
+  ],
+  "windows_legacy_peer_environment_overrides": {
+    "xray.buf.readv": "disable"
+  },
+  "override_observed_in_peer_records": 12,
+  "override_observed_in_client_records": 28,
+  "legacy_peer_identity": {
+    "release": "v1.8.24",
+    "commit": "6baad79f9881ee2cf75bdc825b3e2e92b289477a",
+    "archive_sha256": "f932f83870bb539b9bd075540142c7a9e1a8ababb4fc1460fd2098fa491b89dc",
+    "binary_sha256": "1b560df0e636ad458164e70022f39e6f35607f09c11099982bedc8b22e5d121a",
+    "version": "Xray 1.8.24 (Xray, Penetrates Everything.) 6baad79 (go1.23.0 windows/amd64)\nA unified platform for anti-censorship."
+  },
+  "comparison_to_prior_failed_c3_run": {
+    "run_id": 39720581183,
+    "job_id": 119632853991,
+    "source_commit": "63613b3d94774199ea4dc289776240e7ad08fc96",
+    "legacy_binary_sha256": "1b560df0e636ad458164e70022f39e6f35607f09c11099982bedc8b22e5d121a",
+    "legacy_binary_identical": true,
+    "http2_test_file": "tools/tests/test_transport_http2_xray.py",
+    "http2_test_file_identical": true,
+    "http2_test_file_sha256": "ae92dc91fa2cc798e0b18d756ce2d3deb6a5db5e1fa3ca13e1b701d225dbf5c2"
+  },
+  "http2_concurrent_cancel": {
+    "artifact_member": "transport-evidence/c3/swirl-C3-z215vi6t/results.json",
+    "client_count": 8,
+    "copied_client_fields": [
+      {
+        "downloaded": 262144,
+        "uploaded": 262152,
+        "sha256": "743cdf7849dc6ffdc775371adb60313afb6ecb74e2a8ef22f63c8d419e0b36ec",
+        "close": "cancelled",
+        "remaining_tasks": 0,
+        "exit_code": 0
+      },
+      {
+        "downloaded": 262144,
+        "uploaded": 262152,
+        "sha256": "743cdf7849dc6ffdc775371adb60313afb6ecb74e2a8ef22f63c8d419e0b36ec",
+        "close": "cancelled",
+        "remaining_tasks": 0,
+        "exit_code": 0
+      },
+      {
+        "downloaded": 262144,
+        "uploaded": 262152,
+        "sha256": "743cdf7849dc6ffdc775371adb60313afb6ecb74e2a8ef22f63c8d419e0b36ec",
+        "close": "cancelled",
+        "remaining_tasks": 0,
+        "exit_code": 0
+      },
+      {
+        "downloaded": 262144,
+        "uploaded": 262152,
+        "sha256": "743cdf7849dc6ffdc775371adb60313afb6ecb74e2a8ef22f63c8d419e0b36ec",
+        "close": "cancelled",
+        "remaining_tasks": 0,
+        "exit_code": 0
+      },
+      {
+        "downloaded": 262144,
+        "uploaded": 262152,
+        "sha256": "743cdf7849dc6ffdc775371adb60313afb6ecb74e2a8ef22f63c8d419e0b36ec",
+        "close": "cancelled",
+        "remaining_tasks": 0,
+        "exit_code": 0
+      },
+      {
+        "downloaded": 262144,
+        "uploaded": 262152,
+        "sha256": "743cdf7849dc6ffdc775371adb60313afb6ecb74e2a8ef22f63c8d419e0b36ec",
+        "close": "cancelled",
+        "remaining_tasks": 0,
+        "exit_code": 0
+      },
+      {
+        "downloaded": 262144,
+        "uploaded": 262152,
+        "sha256": "743cdf7849dc6ffdc775371adb60313afb6ecb74e2a8ef22f63c8d419e0b36ec",
+        "close": "cancelled",
+        "remaining_tasks": 0,
+        "exit_code": 0
+      },
+      {
+        "downloaded": 262144,
+        "uploaded": 262152,
+        "sha256": "743cdf7849dc6ffdc775371adb60313afb6ecb74e2a8ef22f63c8d419e0b36ec",
+        "close": "cancelled",
+        "remaining_tasks": 0,
+        "exit_code": 0
+      }
+    ],
+    "original_origin_result": {
+      "mode": "echo",
+      "tls": false,
+      "requests": 8,
+      "received": 2097152,
+      "client_closes": 8,
+      "tls_closes": 0,
+      "interruptions": 0,
+      "errors": []
+    },
+    "cleanup_errors": [],
+    "unchanged_test_source": "    def test_eight_concurrent_connections_and_client_drop_release_targets(self):\n        peer = self.fixture.peer(\"h2\", tls=True, legacy=True)\n        origin = self.fixture.origin(echo=True)\n        size = 256 * 1024\n        requests = [self.fixture.request(peer, origin, mode=\"cancel\", size=size) for _ in range(8)]\n        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:\n            reports = list(pool.map(lambda request: self.success(request, size=size), requests))\n        self.assertEqual(len(reports), 8)\n        self.assertEqual(len(origin.requests), 8)\n        self.assertEqual(origin.received, size * 8)\n        self.fixture.assert_accepted(peer, origin)\n        self.wait_for(lambda: not origin.active)\n",
+    "unchanged_wait_source": "    def wait_for(self, predicate):\n        deadline = time.monotonic() + 2\n        while not predicate() and time.monotonic() < deadline:\n            time.sleep(0.01)\n        self.assertTrue(predicate())\n"
+  },
+  "readv_log_interpretation": {
+    "observed_copyrawconn_readv_log_lines": 17,
+    "explanation": "The old CopyRawConnIfExist constructs buf.NewReader and on Windows always calls a function named readV. That function unconditionally prints CopyRawConn readv, even when NewReader selected SingleReader. With xray.buf.readv=disable the init switch leaves useReadv false and the reader factory selects SingleReader. The log text is not a report of the selected reader implementation.",
+    "upstream_commit": "6baad79f9881ee2cf75bdc825b3e2e92b289477a",
+    "source_urls": [
+      "https://github.com/XTLS/Xray-core/blob/6baad79f9881ee2cf75bdc825b3e2e92b289477a/proxy/proxy.go#L473-L554",
+      "https://github.com/XTLS/Xray-core/blob/6baad79f9881ee2cf75bdc825b3e2e92b289477a/common/buf/io.go#L75-L95",
+      "https://github.com/XTLS/Xray-core/blob/6baad79f9881ee2cf75bdc825b3e2e92b289477a/common/buf/readv_reader.go#L147-L157",
+      "https://github.com/XTLS/Xray-core/blob/6baad79f9881ee2cf75bdc825b3e2e92b289477a/common/platform/platform.go"
+    ],
+    "conclusion": "The same official legacy binary passed the unchanged eight-connection/two-second-release test in this run under the documented official environment override. This comparison does not establish a unique cause for the earlier failure."
+  },
+  "limitations": [
+    "Synthetic loopback peers only; no public-node test.",
+    "One successful Windows attempt does not eliminate the separately observed intermittent WSS outer-close error on Linux.",
+    "Full artifacts, private fixture configurations, certificates and private keys are deliberately omitted."
+  ],
+  "rust_tests": {
+    "unit_or_binary": 446,
+    "doc": 1,
+    "failed": 0,
+    "ignored": 0
+  },
+  "rust_result_excerpts": [
+    "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s",
+    "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s",
+    "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.42s",
+    "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s",
+    "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+    "test result: ok. 70 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s",
+    "test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s",
+    "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s",
+    "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+    "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.74s",
+    "test result: ok. 89 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s",
+    "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s",
+    "test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s",
+    "test result: ok. 109 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.27s",
+    "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "tests_run": 10,
+  "elapsed_seconds": 5.52,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "successful": true,
+  "source": "transport-tests.txt unittest console output",
+  "evidence_level": "independent_official_release_native_connector_loopback",
+  "public_network_tested": false,
+  "qt_product_tested": false
+}

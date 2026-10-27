@@ -1,4 +1,5 @@
 #include "SystemDataProvider.h"
+#include "SwirlBuildIdentity.h"
 #include "DiagnosticService.h"
 #include "network/CaptureService.h"
 #include "engine/EngineController.h"
@@ -21,10 +22,11 @@ SystemDataProvider::SystemDataProvider(CaptureService *capture,EngineController 
         ++m_revision;emit dataChanged();
     });
     connect(engine,&EngineController::diagnostic,this,[this](const QString &module,const QString &code,const QString &message){m_diagnostics->record("ERROR",module,code,message);});
-    connect(engine->telemetry(),&TelemetryService::diagnostic,this,[this](const QString &module,const QString &code,const QString &message){m_diagnostics->record("ERROR",module,code,message);});
+    connect(engine->telemetry(),&TelemetryService::diagnostic,this,[this](const QString &module,const QString &code,const QString &message){m_diagnostics->record(module=="CodexNetwork"&&code=="PublicEndpointReachable"?"INFO":"ERROR",module,code,message);});
     connect(engine->tests(),&NodeTestService::diagnostic,this,[this](const QString &code,const QString &message){m_diagnostics->record("ERROR","NodeTest",code,message);});
+    connect(engine->imports(),&NodeImportService::downloadDiagnostic,this,[this](const QString &message){m_diagnostics->record("INFO","Subscription","DownloadAttempt",message);});
     connect(engine->imports(),&NodeImportService::changed,this,[this]{const auto message=m_engine->imports()->message();if(!message.isEmpty()&&property("lastSubscription").toString()!=message){setProperty("lastSubscription",message);const bool failed=message.contains(QStringLiteral("失败"))||message.contains(QStringLiteral("拒绝"))||message.contains(QStringLiteral("错误"));m_diagnostics->record(failed?"ERROR":"INFO","Subscription","Update",message);}});
-    connect(engine->systemProxy(),&SystemProxySession::changed,this,[this]{const auto proxy=m_engine->systemProxy();const auto state=QString::number(proxy->enabled())+" | "+proxy->error();if(property("lastProxy").toString()!=state){setProperty("lastProxy",state);m_diagnostics->record(proxy->error().isEmpty()?"INFO":"ERROR","SystemProxy","WindowsState",state);}});
+    connect(engine->systemProxy(),&SystemProxySession::changed,this,[this]{const auto proxy=m_engine->systemProxy();const auto state=QString("Windows=%1; Swirl=%2; owned=%3; differs=%4 | %5 | %6").arg(proxy->systemEnabled()).arg(proxy->enabled()).arg(proxy->owned()).arg(proxy->stateDiffers()).arg(proxy->error(),proxy->stateReadError());if(property("lastProxy").toString()!=state){setProperty("lastProxy",state);m_diagnostics->record(proxy->error().isEmpty()&&proxy->stateReadError().isEmpty()?"INFO":"ERROR","SystemProxy","WindowsState",state);}});
     connect(capture,&CaptureService::stateChanged,this,[this]{m_diagnostics->record(m_capture->error().isEmpty()?"INFO":"ERROR","Capture","Listener",m_capture->error().isEmpty()?(m_capture->running()?QStringLiteral("HTTP 抓包监听启动"):QStringLiteral("HTTP 抓包监听停止")):m_capture->error());});
 }
 int SystemDataProvider::eventCount() const { return m_diagnostics->eventCount(); }
@@ -44,6 +46,8 @@ QVariantMap SystemDataProvider::diagnosticSnapshot() const {
         {"actualEngineType",m_engine->processAlive()?m_engine->engineKind():QStringLiteral("not-running")},{"engineProcessId",m_engine->processAlive()?m_engine->processId():QString()},
         {"apiHealthy",m_engine->apiHealthy()},{"processAlive",m_engine->processAlive()},{"routingMode",m_engine->routingMode()},
         {"systemProxyEnabled",m_engine->systemProxy()->enabled()},{"systemProxyOwned",m_engine->systemProxy()->owned()},
+        {"systemProxy",m_engine->systemProxy()->diagnosticState()},
+        {"nodeTests",m_engine->nodeDiagnosticRows()},
         {"systemProxyError",m_engine->systemProxy()->error()},{"networkType",currentNetwork().value("type")},
         {"trafficSampled",t->sampled()},{"connectionsSampled",t->connectionsSampled()},{"activeConnections",t->activeConnections()},
         {"activeProcesses",t->activeProcesses()},{"uploadRate",t->uploadRate()},{"downloadRate",t->downloadRate()},{"today",t->summary()},

@@ -1,0 +1,93 @@
+{
+  "scope": "local_official_peer_to_public_target",
+  "timestamp_utc": "2026-10-22T04:14:13.127770+00:00",
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "automatic_ci": false,
+  "command": [
+    "tools/tests/test_transport_public.py",
+    "--transports",
+    "tcp",
+    "--attempt-native-on-preflight-failure",
+    "--output",
+    "/workspace/scratch/ece554ece7c1/transport-evidence/c6-public-native.json"
+  ],
+  "environment_proxy_used": false,
+  "remote_public_proxy_node_tested": false,
+  "requested_transports": [
+    "tcp"
+  ],
+  "protocol": "vless",
+  "direct_preflight": [
+    {
+      "target": "http://example.com/",
+      "ok": false,
+      "environment_proxy_used": false,
+      "certificate_verified": false,
+      "error_type": "gaierror",
+      "error": "[Errno -3] Temporary failure in name resolution",
+      "failure_phase": "dns_tcp",
+      "elapsed_ms": 8.886,
+      "exit_code": 1
+    },
+    {
+      "target": "https://example.com/",
+      "ok": false,
+      "environment_proxy_used": false,
+      "certificate_verified": false,
+      "error_type": "gaierror",
+      "error": "[Errno -3] Temporary failure in name resolution",
+      "failure_phase": "dns_tcp",
+      "elapsed_ms": 5009.21,
+      "exit_code": 1
+    }
+  ],
+  "native_probes": [
+    {
+      "scope": "local_official_peer_to_public_target",
+      "transport": "tcp",
+      "protocol": "vless",
+      "target": "http://example.com/",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "outer_tls": false,
+      "target_tls": false,
+      "remote_public_proxy_node_tested": false,
+      "ok": false,
+      "exit_code": 1,
+      "native": {
+        "driver_drain_us": 28,
+        "error": "OperationTimeout",
+        "ok": false,
+        "remaining_tasks": 0
+      },
+      "independent_peer_accepted_target": true,
+      "public_response_received": false,
+      "public_certificate_verified": false,
+      "matches_direct_reference": null
+    },
+    {
+      "scope": "local_official_peer_to_public_target",
+      "transport": "tcp",
+      "protocol": "vless",
+      "target": "https://example.com/",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "outer_tls": false,
+      "target_tls": true,
+      "remote_public_proxy_node_tested": false,
+      "ok": false,
+      "exit_code": 1,
+      "native": {
+        "driver_drain_us": 11,
+        "error": "OperationTimeout",
+        "ok": false,
+        "remaining_tasks": 0
+      },
+      "independent_peer_accepted_target": true,
+      "public_response_received": false,
+      "public_certificate_verified": false,
+      "matches_direct_reference": null
+    }
+  ],
+  "ok": false,
+  "fixture_evidence": "/workspace/scratch/ece554ece7c1/c6-public-native-evidence/swirl-C6-public-target-xj4ttgu3",
+  "public_target_response_verified": false
+}

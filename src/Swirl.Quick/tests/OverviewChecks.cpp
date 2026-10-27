@@ -30,12 +30,25 @@ int runOverviewChecks(QQuickWindow *window) {
         const auto control=QString("nav-")+route;click(control.toUtf8().constData());
         check(wait([&]{return state(QString("AppState.currentPage === '%1' && pageLoader.item !== null").arg(route)).toBool();}),"sidebar mouse input loads its real page");
     }
-    click("nav-rules");click("addRoutingRule");type("rulePattern","example.test");click("saveRoutingRule");
-    check(state("engineController.routingRules.some(r=>r.pattern==='example.test' && r.policy==='DIRECT')").toBool(),"rule editor mouse and keyboard input persists a real rule");
+    click("nav-rules");click("addRoutingRule");
+    auto *ruleEditor=window->findChild<QObject *>("ruleEditor");
+    check(wait([&]{return ruleEditor&&ruleEditor->property("opened").toBool();}),"rule editor completes its opening transition before input");
+    auto *rulePolicy=item("rulePolicy");
+    auto *saveRule=item("saveRoutingRule");
+    check(rulePolicy&&rulePolicy->property("currentIndex").toInt()==-1&&saveRule&&!saveRule->isEnabled(),"new rule requires an explicit policy selection before saving");
+    type("rulePattern","example.test");click("rulePolicy");
+    auto *policyPopup=rulePolicy?qvariant_cast<QObject *>(rulePolicy->property("popup")):nullptr;
+    check(wait([&]{return policyPopup&&policyPopup->property("opened").toBool();}),"rule policy menu opens through native mouse input");
+    click("swirlComboOption-0");
+    check(wait([&]{return rulePolicy&&rulePolicy->property("currentText").toString()=="DIRECT"&&policyPopup&&!policyPopup->property("visible").toBool();}),"DIRECT selection closes its menu before rule submission");
+    check(saveRule&&saveRule->isEnabled(),"explicit policy and pattern enable rule submission");
+    click("saveRoutingRule");
+    check(wait([&]{return state("engineController.routingRules.some(r=>r.pattern==='example.test' && r.policy==='DIRECT') && !pageLoader.item.ruleSubmitting").toBool();}),"rule editor mouse and keyboard input persists a real rule");
+    check(wait([&]{return ruleEditor&&!ruleEditor->property("visible").toBool()&&state("dismissals.count===0").toBool();}),"saved rule closes its editor after configuration completion");
     type("rulesSearch","example.test");check(state("pageLoader.item.displayRules.length===1").toBool(),"rules search filters saved rules");
     check(wait([&]{return state("dismissals.count===0").toBool();}),"rule dialog releases its modal shield before table input");
     if(auto *table=item("rulesTable")){QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,table->mapToScene(QPointF(60,39)).toPoint());QTest::qWait(50);}else check(false,"rules table exists");
-    click("removeRoutingRule");check(state("!engineController.routingRules.some(r=>r.pattern==='example.test')").toBool(),"selected custom rule can be removed by its editor action");
+    click("removeRoutingRule");check(wait([&]{return state("!engineController.routingRules.some(r=>r.pattern==='example.test')").toBool();}),"selected custom rule can be removed by its editor action");
     click("nav-capture");
     // The user's capture service may already own the normal UI port. This
     // isolated fixture exercises the same toggle on its own ephemeral port.
@@ -43,10 +56,12 @@ int runOverviewChecks(QQuickWindow *window) {
     check(reserved,"capture fixture obtains its own loopback port");
     state(QString("pageLoader.item.listenerPort=%1").arg(capturePort));click("captureToggle");
     check(state(QString("captureProvider.running && captureProvider.port===%1").arg(capturePort)).toBool(),"capture toggle starts the actual loopback listener");
+    check(item("captureStateFlow")&&item("captureStateFlow")->property("phase")=="succeeded","capture flow follows the actual listener state after native toggle input");
     click("captureToggle");check(state("!captureProvider.running").toBool(),"capture toggle closes the listener");
     click("nav-tls");click("certificateAction-0");check(wait([&]{return state("captureProvider.tls.ready").toBool();}),"certificate action generates an actual protected local CA");
     check(state("!captureProvider.tls.enabled && !captureProvider.tls.trusted").toBool(),"CA generation keeps interception and system trust opt-in");
-    click("tlsToggle");check(state("captureProvider.tls.enabled").toBool(),"TLS control enables interception after certificate creation");click("tlsToggle");
+    click("tlsToggle");check(state("captureProvider.tls.enabled").toBool(),"TLS control enables interception after certificate creation");
+    check(item("tlsStateFlow")&&item("tlsStateFlow")->property("phase")=="succeeded","TLS flow follows actual interception state after native toggle input");click("tlsToggle");
     click("nav-featurehub");click("settings-dns");
     const auto nativeHandle=window->winId();
     check(state("AppState.currentPage==='dns' && pageLoader.item!==null").toBool(),"DNS opens inside the main navigation host");
@@ -81,15 +96,18 @@ int runOverviewChecks(QQuickWindow *window) {
     check(state("AppState.currentPage==='featurehub'").toBool(),"cached form and its page dismiss independently after reopening");
     QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(100);check(window->isVisible(),"Escape on the hub never exits Swirl");
     window->requestActivate();click("nav-external");QQuickWindow *dashboard=nullptr;for(auto *candidate:QGuiApplication::allWindows())if(candidate->objectName()=="dashboardWindow")dashboard=qobject_cast<QQuickWindow *>(candidate);
-    check(dashboard&&dashboard->isVisible()&&dashboard->width()==1300,"Panel opens the independent native request window");
+    check(dashboard&&dashboard->isVisible()
+          &&dashboard->width()==qRound(state("Theme.windowDefaultWidth").toReal())
+          &&dashboard->height()==qRound(state("Theme.windowDefaultHeight").toReal()),
+          "Panel opens the independent native request window at the approved UI dimensions");
     if(dashboard){check(item("windowCloseButton",dashboard)&&item("windowMinimizeButton",dashboard)&&item("windowMaximizeButton",dashboard),"request panel has all three window controls");click("windowCloseButton",dashboard);check(!dashboard->isVisible()&&window->isVisible(),"panel red button closes only the panel");}
     for(const auto *route:{"settings","fonts","profiles","dns","modules","scripts","subscriptions","proxies"}){
         state(QString("window.openSettings('%1')").arg(route));QTest::qWait(80);settled();
         auto *page=qobject_cast<QQuickItem *>(state("pageLoader.item").value<QObject *>());
         check(page&&page->window()==window&&window->winId()==nativeHandle&&item("windowCloseButton")&&item("windowMinimizeButton")&&item("windowMaximizeButton"),"every settings route uses the original main shell and its controls");
         if(QString::fromLatin1(route)=="settings"){
-            state("pageLoader.item.section='关于 Swirl'");QTest::qWait(80);
-            const auto *brand=item("brandVector");check(brand&&brand->isVisible()&&brand->width()>=104,"About retains the enlarged brand mark inside the settings page");
+            state("pageLoader.item.section='关于 Swirl'");
+            check(wait([&]{const auto *brand=page?find(page,QStringLiteral("brandVector")):nullptr;return state("pageLoader.item.currentSectionReady()").toBool()&&brand&&brand->isVisible()&&brand->width()>=104;}),"About retains the enlarged brand mark inside the settings page");
         }
         const auto qaDirectory=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");
         if(!qaDirectory.isEmpty()){QDir().mkpath(qaDirectory);check(window->grabWindow().save(qaDirectory+"/"+route+".png"),"embedded page render saved for visual review");}

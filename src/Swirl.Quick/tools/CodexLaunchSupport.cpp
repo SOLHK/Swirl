@@ -163,8 +163,16 @@ std::vector<wchar_t> childEnvironment(const std::vector<std::wstring> &parent,co
     std::sort(values.begin(),values.end(),[](const auto &a,const auto &b){return _wcsicmp(a.c_str(),b.c_str())<0;});
     std::vector<wchar_t> block;for(const auto &value:values){block.insert(block.end(),value.begin(),value.end());block.push_back(0);}block.push_back(0);return block;
 }
-unsigned long startChild(const std::wstring &path,std::vector<wchar_t> &environment) {
-    auto command=L"\""+path+L"\"";std::vector<wchar_t> args(command.begin(),command.end());args.push_back(0);
+unsigned long startChild(const std::wstring &path,std::vector<wchar_t> &environment,const Proxy &proxy) {
+    // Electron's Chromium requests and the native app-server have independent
+    // proxy configuration. Environment variables cover the latter; the desktop
+    // needs an explicit startup switch as well. Only the already-validated
+    // loopback endpoint is allowed, with localhost OAuth callbacks bypassed.
+    const auto server=(proxy.host.find(L':')!=std::wstring::npos?L"["+proxy.host+L"]":proxy.host)+L":"+std::to_wstring(proxy.port);
+    if(parseProxy(server).endpoint!=proxy.endpoint)fail(L"Codex 启动代理端点无效。");
+    if(path.find(L'\"')!=std::wstring::npos)fail(L"Codex 路径包含无效引号。");
+    auto command=L"\""+path+L"\" --proxy-server="+proxy.endpoint+L" --proxy-bypass-list=localhost;127.0.0.1;[::1]";
+    std::vector<wchar_t> args(command.begin(),command.end());args.push_back(0);
     const auto directory=path.substr(0,path.find_last_of(L"\\/"));STARTUPINFOW startup{};startup.cb=sizeof(startup);PROCESS_INFORMATION process{};
     if(!CreateProcessW(path.c_str(),args.data(),nullptr,nullptr,FALSE,CREATE_UNICODE_ENVIRONMENT,environment.data(),directory.c_str(),&startup,&process))throw Error{L"Windows 无法创建 Codex 进程，错误 "+std::to_wstring(GetLastError())+L"。"};
     const auto pid=process.dwProcessId;CloseHandle(process.hThread);CloseHandle(process.hProcess);return pid;

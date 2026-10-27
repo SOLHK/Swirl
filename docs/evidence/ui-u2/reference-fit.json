@@ -1,0 +1,9 @@
+{
+  "referenceWindowHeightPixels": 1078,
+  "renderedWindowHeightPixels": 1008,
+  "referenceThresholdMinRGB": 210,
+  "sampleCount": 22,
+  "normalizedOuterBoundaryRmsPixels": 0.4255836043649086,
+  "normalizedOuterBoundaryMaxAbsPixels": 0.7854380673090215,
+  "note": "Approximate JPEG intensity boundary vs rendered alpha half-coverage; aligned to straight edges and normalized by window height. Not lossless pixel identity; excludes uncertain near-tangent rows and shadow."
+}

@@ -1,0 +1,461 @@
+name: Rust sole runtime and unified product
+on:
+  push:
+    branches: [work/rust-core-full-replacement-20261022, work/subscription-unified-integration-20261023, work/swirl-s3-max-ultra-20261023, work/swirl-s4-final-completion-20261023, work/swirl-017-subscription-network-20261024]
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  SWIRL_SOURCE_SHA: ${{ github.sha }}
+concurrency:
+  group: rust-replacement-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - name: Rust workspace gates
+        working-directory: core
+        run: |
+          cargo fmt --all -- --check
+          cargo check --workspace --locked
+          cargo clippy --workspace --all-targets --locked -- -D warnings
+          cargo test --workspace --locked
+          cargo build --release --workspace --locked --lib --bins
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Independent proxy and failure tests
+        env:
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect
+          SWIRL_RUST_DIAGNOSTIC: ${{ github.workspace }}/core/target/release/swirl-diagnose
+          SWIRL_PRODUCT_EVIDENCE: ${{ runner.temp }}/r1-native
+        run: |
+          python -m pip install cryptography==50.0.2
+          python tools/tests/test_rust_core.py -v
+          python tools/tests/test_shadowsocks.py -v
+          python tools/tests/test_socks5_udp.py -v
+          python tools/tests/test_native_probe.py -v
+          python tools/tests/test_connection_stages.py -v
+          python tools/tests/test_product_subscription_chain.py -v
+      - name: Public Internet through authenticated Rust Shadowsocks
+        env:
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api
+          SWIRL_R1_PUBLIC_NETWORK: '1'
+          SWIRL_R1_PUBLIC_REPORT: ${{ runner.temp }}/r1-native/public-proxy.json
+        run: python tools/tests/test_r1_public_proxy.py -v
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R1-native-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/r1-native
+          if-no-files-found: warn
+  windows-product:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+      QT_FORCE_STDERR_LOGGING: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Initialize isolated product test directory on the runner
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $u1TestRoot = Join-Path $env:RUNNER_TEMP 'u1-product-tests'
+          New-Item -ItemType Directory -Force -Path $u1TestRoot | Out-Null
+          "SWIRL_TEST_ROOT=$u1TestRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+      - name: Rust MSVC x64
+        run: rustup toolchain install stable --profile minimal --target x86_64-pc-windows-msvc
+      - uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4
+        with:
+          version: '6.11.3'
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          # Upstream aqt PR #1000 supports Qt 6.11's Windows per-architecture repositories.
+          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b'
+          modules: qtshadertools
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the independent TLS fixture dependency
+        run: python -m pip install cryptography==50.0.2
+      - name: Configure isolated Qt integration tests
+        run: cmake -S src/Swirl.Quick -B build/r1-tests -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=ON -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
+      - name: Build low-level system proxy recovery tests before the full UI
+        run: cmake --build build/r1-tests --config Release --target SwirlSystemProxyTests --parallel 4
+      - name: Deploy low-level system proxy test dependencies
+        shell: pwsh
+        run: |
+          windeployqt --release --compiler-runtime build/r1-tests/Release/SwirlSystemProxyTests.exe
+          if ($LASTEXITCODE -ne 0) { throw 'System proxy test deployment failed.' }
+      - name: Windows system proxy recovery before the full UI build
+        shell: pwsh
+        env:
+          SWIRL_SYSTEM_PROXY_TEST: '1'
+        run: |
+          build/r1-tests/Release/SwirlSystemProxyTests.exe -o build/r1-tests/system-proxy-write.xml,xml -o -,txt
+          if ($LASTEXITCODE -ne 0) { throw 'Actual Windows proxy state and recovery tests failed.' }
+      - name: Build product, subscription, telemetry, stream, security and loader regressions
+        run: cmake --build build/r1-tests --config Release --target Swirl SwirlRustCoreTests SwirlRustCoreLibraryTests SwirlNodeTests SwirlNodeViewModelTests SwirlImportTests SwirlSubscriptionFormatTests SwirlTelemetryTests SwirlNetworkRegressionTests SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlQtNetworkPolicyTests --parallel 4
+      - name: Deploy test dependencies and inspect PE imports
+        id: deploy_tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
+          windeployqt --release --compiler-runtime --qmldir src/Swirl.Quick/qml build/r1-tests/Release/Swirl.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Qt product test deployment failed.' }
+          windeployqt --release --compiler-runtime build/r1-tests/Release/SwirlRustCoreTests.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Qt test deployment failed.' }
+          dumpbin /HEADERS build/r1-tests/Release/swirl_api.dll | Out-File build/r1-tests/rust-pe-headers.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Rust PE inspection failed.' }
+          dumpbin /DEPENDENTS build/r1-tests/Release/swirl_api.dll | Out-File build/r1-tests/rust-dependencies.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Rust dependency inspection failed.' }
+      - name: Windows native product and subscription regression
+        id: product_regression
+        if: ${{ !cancelled() && steps.deploy_tests.outcome == 'success' }}
+        run: ctest --test-dir build/r1-tests -C Release -R "^swirl-(rust-library-loader|rust-qt-integration|node-real-chain|node-ui|engine-ui|stream-regression|import-subscription|import-boundaries|subscription-formats|telemetry-accounting|diagnostic-export|system-proxy-state|qt-network-policy|capture-network)$" --output-on-failure --no-tests=error
+      - name: S4 content, model and motion correctness (offscreen software renderer)
+        id: s4_correctness
+        if: ${{ !cancelled() && steps.deploy_tests.outcome == 'success' }}
+        run: ctest --test-dir build/r1-tests -C Release -R "^swirl-(motion|all-pages|appearance-ui|node-view-model)$" --output-on-failure --no-tests=error
+      - name: Actual Windows system proxy button on the disposable runner
+        id: system_proxy_ui
+        if: ${{ !cancelled() && steps.deploy_tests.outcome == 'success' }}
+        shell: pwsh
+        env:
+          SWIRL_SYSTEM_PROXY_TEST: '1'
+        run: |
+          $env:SWIRL_SYSTEM_PROXY_UI_REPORT=Join-Path $env:GITHUB_WORKSPACE 'build/r1-tests/system-proxy-ui.json'
+          $p=Start-Process build/r1-tests/Release/Swirl.exe -ArgumentList '--node-self-test' -WindowStyle Hidden -PassThru
+          if (-not $p.WaitForExit(150000)) { $p.Kill(); throw 'Real system proxy UI integration timed out.' }
+          if ($p.ExitCode -ne 0) { throw 'Real system proxy UI integration failed.' }
+          $result=Get-Content -LiteralPath $env:SWIRL_SYSTEM_PROXY_UI_REPORT -Raw | ConvertFrom-Json
+          if (-not $result.executed -or -not $result.success -or -not $result.restored -or $result.source_sha -cne $env:GITHUB_SHA) { throw 'Real system proxy UI evidence is incomplete or has the wrong source.' }
+      - name: Subscription dialogs and node viewport at five DPI scales
+        if: ${{ !cancelled() && steps.deploy_tests.outcome == 'success' }}
+        shell: pwsh
+        env:
+          SWIRL_U2_CHECKS: subscription
+          QT_SCREEN_SCALE_FACTORS: '1'
+          QT_ENABLE_HIGHDPI_SCALING: '0'
+        run: |
+          foreach ($scale in @('1','1.25','1.5','1.75','2')) {
+            $env:QT_SCALE_FACTOR=$scale
+            $output=Join-Path $env:GITHUB_WORKSPACE ('build/r1-tests/subscription-ui/'+$scale+'/result.json')
+            $p=Start-Process build/r1-tests/Release/Swirl.exe -ArgumentList @('--motion-test', ('--motion-output='+$output)) -WindowStyle Hidden -PassThru
+            if (-not $p.WaitForExit(120000)) { $p.Kill(); throw 'Subscription DPI check timed out.' }
+            if ($p.ExitCode -ne 0) { throw "Subscription DPI check failed at $scale." }
+            $result=Get-Content $output -Raw | ConvertFrom-Json
+            if ($result.failures -ne 0) { throw "Subscription UI assertions failed at $scale." }
+          }
+          Remove-Item Env:QT_SCALE_FACTOR
+      - name: S4 synthetic node scale and fixed geometry (not native GPU acceptance)
+        id: s4_stress
+        if: ${{ !cancelled() && steps.deploy_tests.outcome == 'success' }}
+        shell: pwsh
+        env:
+          SWIRL_U2_CHECKS: S4
+        run: |
+          $output=Join-Path $env:RUNNER_TEMP 's4-ui-stress.json'
+          $p=Start-Process build/r1-tests/Release/Swirl.exe -ArgumentList @('--motion-test', ('--motion-output='+$output)) -WindowStyle Hidden -PassThru
+          if (-not $p.WaitForExit(120000)) { $p.Kill(); throw 'S4 node scale UI check timed out.' }
+          if ($p.ExitCode -ne 0) { throw 'S4 node scale UI check failed.' }
+          $result=Get-Content -LiteralPath $output -Raw | ConvertFrom-Json
+          if ($result.failures -ne 0) { throw 'S4 node scale UI assertions failed.' }
+      - name: Actual Windows Qt import, DPAPI restore, selection and routing
+        id: product_subscription
+        if: ${{ !cancelled() && steps.deploy_tests.outcome == 'success' }}
+        env:
+          SWIRL_RUST_QT_TESTS: ${{ github.workspace }}/build/r1-tests/Release/SwirlRustCoreTests.exe
+          SWIRL_PRODUCT_EVIDENCE: ${{ github.workspace }}/build/r1-tests/product-chain
+        shell: python
+        run: |
+          import json, os, pathlib, subprocess, sys
+          binary = pathlib.Path(os.environ['SWIRL_RUST_QT_TESTS'])
+          if not binary.is_file():
+              raise SystemExit('Required Windows product Qt executable missing')
+          subprocess.run([sys.executable, 'tools/tests/test_product_subscription_chain.py',
+                          'ProductQtIntegration', '-v'], check=True)
+          report = json.loads((pathlib.Path(os.environ['SWIRL_PRODUCT_EVIDENCE']) / 'result.json').read_text(encoding='utf-8'))
+          if (report['source_sha'] != os.environ['SWIRL_SOURCE_SHA'] or report['tests'] != 1
+                  or report['failures'] or report['errors'] or report['skipped'] or not report['success']):
+              raise SystemExit('Windows Qt subscription chain did not pass on the exact source without skips')
+      - name: Configure separate production Release without test entry points
+        id: production_configure
+        if: >-
+          ${{ !cancelled() && steps.deploy_tests.outcome == 'success'
+              && steps.product_regression.outcome == 'success'
+              && steps.s4_correctness.outcome == 'success'
+              && steps.system_proxy_ui.outcome == 'success'
+              && steps.s4_stress.outcome == 'success'
+              && steps.product_subscription.outcome == 'success' }}
+        run: cmake -S src/Swirl.Quick -B build/r1-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=OFF -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
+      - name: Build the real production executable and paired DLL
+        if: ${{ success() && steps.production_configure.outcome == 'success' }}
+        run: cmake --build build/r1-product --config Release --target Swirl --parallel 4
+      - name: Require the product DLL to equal the tested exact-source DLL
+        if: ${{ success() && steps.production_configure.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tested = Get-Content build/r1-tests/Release/swirl-rust-build.json -Raw | ConvertFrom-Json
+          $product = Get-Content build/r1-product/Release/swirl-rust-build.json -Raw | ConvertFrom-Json
+          if ($tested.source_sha -ne $env:GITHUB_SHA -or $product.source_sha -ne $env:GITHUB_SHA -or $tested.build_id -ne $product.build_id) { throw 'Tested and product Rust identities differ.' }
+          [xml]$qtReport = Get-Content build/r1-tests/swirl-rust-qt-integration.xml -Raw
+          if ($qtReport.TestCase.Environment.QtVersion -ne '6.11.3') { throw 'Qt regression did not execute the required fixed Qt SDK.' }
+          $testedHash = (Get-FileHash build/r1-tests/Release/swirl_api.dll -Algorithm SHA256).Hash
+          $productHash = (Get-FileHash build/r1-product/Release/swirl_api.dll -Algorithm SHA256).Hash
+          if ($testedHash -ne $productHash) { throw 'The product DLL was not the DLL exercised by the Qt regressions.' }
+          git diff --exit-code
+          if ($LASTEXITCODE -ne 0) { throw 'Build modified tracked source.' }
+      - name: Clean directory and actual Swirl.exe roundtrips
+        if: ${{ success() && steps.production_configure.outcome == 'success' }}
+        shell: pwsh
+        run: ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/r1-product -Destination dist/Swirl-Rust-x64
+      - name: Negative packaged DLL gate
+        if: ${{ success() && steps.production_configure.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $stage=(Resolve-Path dist/Swirl-Rust-x64).Path
+          $dll=Join-Path $stage 'swirl_api.dll'
+          Move-Item $dll "$dll.absent"
+          try {
+            $report=Join-Path $env:RUNNER_TEMP 'r1-missing-dll.json'
+            $p=Start-Process (Join-Path $stage 'Swirl.exe') -ArgumentList @('--rust-core-self-test', ('"'+$report+'"')) -WorkingDirectory $env:RUNNER_TEMP -PassThru
+            if (-not $p.WaitForExit(15000)) { $p.Kill(); throw 'Missing DLL check hung.' }
+            if ($p.ExitCode -eq 0 -or -not (Test-Path $report)) { throw 'Missing DLL was not rejected.' }
+            $result=Get-Content $report -Raw | ConvertFrom-Json
+            if ($result.success -or $result.failure -ne 'RustLibraryLoadFailed') { throw 'Wrong missing DLL diagnostic.' }
+            Copy-Item $report build/r1-product/
+          } finally { Move-Item "$dll.absent" $dll }
+      - name: Start actual Qt UI twice with one isolated cache
+        id: production_ui_ready
+        if: ${{ success() && steps.production_configure.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM='offscreen'
+          $env:QT_QUICK_BACKEND='software'
+          $exe=(Resolve-Path dist/Swirl-Rust-x64/Swirl.exe).Path
+          $env:SWIRL_TEST_ROOT=Join-Path $env:RUNNER_TEMP ('u1-production-ui-'+[guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $env:SWIRL_TEST_ROOT | Out-Null
+          $launches=@()
+          foreach ($phase in @('fresh-directory','repeat-same-directory')) {
+            $p=Start-Process $exe -ArgumentList '--smoke-test' -WorkingDirectory $env:RUNNER_TEMP -PassThru
+            if (-not $p.WaitForExit(75000)) { $p.Kill(); throw "Swirl UI $phase timed out." }
+            if ($p.ExitCode -ne 0) { throw "Swirl UI $phase failed: $($p.ExitCode)" }
+            $launches+=@{phase=$phase;exitCode=$p.ExitCode}
+          }
+          @{source_sha=$env:GITHUB_SHA;launches=$launches;physical_windows_verified=$false} | ConvertTo-Json -Depth 4 | Set-Content build/r1-product/ui-repeated-start.json -Encoding utf8
+      # Retain a reviewable candidate after all production identity and UI gates.
+      # The mandatory public test below still fails the job on any failed assertion.
+      - name: Build candidate installer and portable archive
+        id: candidate_package
+        if: ${{ success() && steps.production_configure.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $nsis='C:/Program Files (x86)/NSIS/makensis.exe'
+          if (-not (Test-Path $nsis)) { choco install nsis --yes --no-progress; if ($LASTEXITCODE -ne 0) { throw 'NSIS install failed.' } }
+          $dist=(Resolve-Path dist).Path
+          $stage=(Resolve-Path dist/Swirl-Rust-x64).Path
+          $icon=(Resolve-Path build/r1-product/brand/Swirl.ico).Path
+          ./scripts/tests/Test-S4InstallerLifecycle.ps1 -Nsis $nsis -Icon $icon -EvidenceRoot (Join-Path $env:RUNNER_TEMP 's4-package-lifecycle')
+          if ($LASTEXITCODE -ne 0) { throw 'Installer lifecycle and retained-data regression failed.' }
+          $appVersion=(Get-Content -LiteralPath src/Swirl.Quick/PRODUCT_VERSION.txt -Raw).Trim()
+          if ($appVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid product version.' }
+          $uninstallList=Join-Path $dist 'Swirl-UninstallFiles.nsh'
+          ./scripts/Finalize-WindowsRustProduct.ps1 -ApplicationDirectory $stage -EvidenceDirectory build/r1-product/package-evidence -UninstallList $uninstallList
+          $repo=(Resolve-Path .).Path
+          & $nsis "/DAPP_VERSION=$appVersion" "/DAPP_DIST=$stage" "/DOUT_DIR=$dist" "/DAPP_ICON=$icon" "/DUNINSTALL_LIST=$uninstallList" "/DREPO_ROOT=$repo" src/Swirl.Quick/packaging/Swirl.nsi
+          if ($LASTEXITCODE -ne 0) { throw 'Installer build failed.' }
+          Compress-Archive -Path "$stage/*" -DestinationPath (Join-Path $dist 'Swirl-Rust-x64.zip')
+      - name: Windows native public Internet requests
+        if: ${{ !cancelled() && steps.production_ui_ready.outcome == 'success' }}
+        shell: pwsh
+        env:
+          SWIRL_R1_PUBLIC_NETWORK: '1'
+          SWIRL_R1_PUBLIC_REPORT: ${{ github.workspace }}/build/r1-product/public-proxy.json
+        run: |
+          python -m pip install cryptography==50.0.2
+          if ($LASTEXITCODE -ne 0) { throw 'Independent peer dependency install failed.' }
+          cargo build --manifest-path core/Cargo.toml --release --locked --target x86_64-pc-windows-msvc --bin swirl-api
+          if ($LASTEXITCODE -ne 0) { throw 'Windows native test host build failed.' }
+          $env:SWIRL_RUST_HARNESS=(Resolve-Path core/target/x86_64-pc-windows-msvc/release/swirl-api.exe).Path
+          python tools/tests/test_r1_public_proxy.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Rust public proxy response verification failed.' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R1-Windows-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            build/r1-tests/Testing/Temporary/LastTest.log
+            build/r1-tests/Release/Swirl-diagnostics.txt
+            build/r1-tests/Release/Swirl-engine-ui-diagnostics.txt
+            build/r1-tests/Release/Swirl-node-ui-diagnostics.txt
+            build/r1-tests/*.xml
+            build/r1-tests/system-proxy-ui.json
+            build/r1-tests/subscription-ui
+            build/r1-tests/node-chain.txt
+            build/r1-tests/import-subscription.txt
+            build/r1-tests/subscription-formats.txt
+            build/r1-tests/stream-regression.txt
+            build/r1-tests/swirl-rust-build.json
+            build/r1-tests/rust-*.txt
+            build/r1-tests/product-chain
+            build/r1-product/r1-missing-dll.json
+            build/r1-product/public-proxy.json
+            build/r1-product/ui-repeated-start.json
+            dist/Swirl-Rust-x64/rust-self-test.json
+            dist/Swirl-Rust-x64/package-manifest.json
+            build/r1-product/package-evidence
+            ${{ runner.temp }}/s4-package-lifecycle
+            ${{ runner.temp }}/s4-ui-stress.json
+            build/r1-tests/Release/motion-report.json
+          if-no-files-found: warn
+      - name: Preserve candidate package for review (not a release)
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.candidate_package.outcome == 'success' }}
+        with:
+          name: Swirl-Rust-Windows-x64-candidate-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            dist/Swirl-Rust-x64.zip
+            dist/Swirl-Setup.exe
+          if-no-files-found: error
+
+  portable-product:
+    name: Complete Qt product and native loader / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            qt-host: linux
+            qt-arch: linux_gcc_64
+            library: libswirl_api.so
+          - os: macos-14
+            qt-host: mac
+            qt-arch: clang_64
+            library: libswirl_api.dylib
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 75
+    defaults:
+      run:
+        shell: bash
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+      QT_FORCE_STDERR_LOGGING: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install native Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+      - name: Linux Qt build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ninja-build libgl1-mesa-dev libegl1-mesa-dev libxkbcommon-dev
+      - name: Install Qt 6.11.3 SDK
+        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4
+        with:
+          version: '6.11.3'
+          host: ${{ matrix.qt-host }}
+          target: desktop
+          arch: ${{ matrix.qt-arch }}
+          modules: qtshadertools
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Configure the complete production Qt application
+        run: >-
+          cmake -S src/Swirl.Quick -B build/r1-portable -G Ninja
+          -DCMAKE_BUILD_TYPE=Release -DSWIRL_BUILD_UI_TESTS=OFF -DSWIRL_USE_RUST_CORE=ON
+          -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
+      - name: Build C++ QML product and paired native library
+        run: cmake --build build/r1-portable --target Swirl --parallel 3
+      - name: Configure actual dynamic loader regression
+        run: >-
+          cmake -S src/Swirl.Quick/tests/rust-loader -B build/r1-loader -G Ninja
+          -DCMAKE_BUILD_TYPE=Release -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
+      - name: Build actual native loader and malformed-library fixtures
+        run: cmake --build build/r1-loader --parallel 3
+      - name: Execute native ABI and library identity tests
+        run: ctest --test-dir build/r1-loader --output-on-failure --no-tests=error
+      - name: Run the actual product HTTP SOCKS5 CONNECT and cleanup self-test
+        env:
+          U1_LIBRARY_NAME: ${{ matrix.library }}
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, pathlib, platform, subprocess
+          root = pathlib.Path.cwd()
+          build = root / 'build/r1-portable'
+          candidates = [build / 'Swirl', build / 'Swirl.app/Contents/MacOS/Swirl']
+          executables = [path for path in candidates if path.is_file()]
+          if len(executables) != 1:
+              raise SystemExit('Required unambiguous complete Qt application was not built')
+          executable = executables[0]
+          library = executable.parent / os.environ['U1_LIBRARY_NAME']
+          loader = root / 'build/r1-loader'
+          product_identity = json.loads((executable.parent / 'swirl-rust-build.json').read_text())
+          loader_identity = json.loads((loader / 'swirl-rust-build.json').read_text())
+          source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          if source != os.environ['GITHUB_SHA'] or product_identity['source_sha'] != source or loader_identity != product_identity:
+              raise SystemExit('Product and loader must be paired with the triggering source commit')
+          digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+          if digest(library) != digest(loader / os.environ['U1_LIBRARY_NAME']):
+              raise SystemExit('The product library differs from the tested loader library')
+          report = build / 'rust-self-test.json'
+          subprocess.run([str(executable), '--rust-core-self-test', str(report)],
+                         cwd=os.environ['RUNNER_TEMP'], check=True, timeout=45)
+          result = json.loads(report.read_text())
+          for field in ('success', 'http_response_verified', 'socks5_response_verified',
+                        'connect_response_verified', 'listener_released'):
+              if result.get(field) is not True:
+                  raise SystemExit('Complete Qt application self-test failed: ' + field)
+          evidence = {
+              'source_sha': source, 'runner_os': os.environ['RUNNER_OS'],
+              'platform': platform.platform(), 'rust': product_identity,
+              'qt_version': subprocess.check_output(['qmake', '-query', 'QT_VERSION'], text=True).strip(),
+              'rustc': subprocess.check_output(['rustc', '-vV'], text=True),
+              'application_sha256': digest(executable), 'library_sha256': digest(library),
+              'scope': 'complete-product-build-loader-and-loopback',
+              'private_subscription_tested': False,
+          }
+          if evidence['qt_version'] != '6.11.3':
+              raise SystemExit('Product did not build with the required fixed Qt SDK')
+          (build / 'u1-product-evidence.json').write_text(json.dumps(evidence, indent=2) + '\n')
+          subprocess.run(['git', 'diff', '--exit-code'], check=True)
+          PY
+      - name: Preserve complete product and loader evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: U1-Qt-Product-${{ matrix.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            build/r1-portable/u1-product-evidence.json
+            build/r1-portable/rust-self-test.json
+            build/r1-portable/swirl-rust-build.json
+            build/r1-loader/swirl-rust-build.json
+            build/r1-loader/swirl-rust-library-loader.xml
+            build/r1-loader/Testing/Temporary/LastTest.log
+          if-no-files-found: error

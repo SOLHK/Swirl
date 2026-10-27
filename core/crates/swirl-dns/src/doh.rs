@@ -5,10 +5,7 @@ use crate::wire::{self, Answer, MAX_PACKET, Resolution, Response};
 use std::collections::HashSet;
 use swirl_subscription::{DnsQueryFamily, DnsTlsServer};
 use swirl_transport::{BoxStream, secure};
-use tokio::{
-    io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 type Result<T> = std::result::Result<T, &'static str>;
 const MAX_HEADER: usize = 8192;
 
@@ -228,7 +225,12 @@ async fn response<R: AsyncRead + Unpin>(stream: &mut R) -> Result<(Vec<u8>, Meta
     }
     Ok((body, meta))
 }
-async fn exchange(server: &DnsTlsServer, host: &str, kind: u16) -> Result<Answer> {
+async fn exchange(
+    server: &DnsTlsServer,
+    host: &str,
+    kind: u16,
+    transport: &dyn crate::QueryTransport,
+) -> Result<Answer> {
     let mut request = wire::query(host, kind)?;
     // RFC 8484 recommends zero ID; HTTP associates the request and response.
     request[0] = 0;
@@ -245,7 +247,8 @@ async fn exchange(server: &DnsTlsServer, host: &str, kind: u16) -> Result<Answer
     } else {
         format!("{authority}:{}", server.address.port())
     };
-    let tcp = TcpStream::connect(server.address)
+    let tcp = transport
+        .connect(server.address)
         .await
         .map_err(|_| "DnsHttpsConnect")?;
     let mut stream: BoxStream = secure(tcp, &server.tls)
@@ -279,7 +282,12 @@ async fn exchange(server: &DnsTlsServer, host: &str, kind: u16) -> Result<Answer
     };
     Ok(answer)
 }
-async fn family(server: &DnsTlsServer, host: &str, kind: u16) -> Result<Answer> {
+async fn family(
+    server: &DnsTlsServer,
+    host: &str,
+    kind: u16,
+    transport: &dyn crate::QueryTransport,
+) -> Result<Answer> {
     let mut current = host.to_owned();
     let mut seen = HashSet::new();
     let mut ttl = 300;
@@ -287,7 +295,7 @@ async fn family(server: &DnsTlsServer, host: &str, kind: u16) -> Result<Answer> 
         if !seen.insert(current.clone()) {
             return Err("DnsAliasLoop");
         }
-        let mut answer = exchange(server, &current, kind).await?;
+        let mut answer = exchange(server, &current, kind, transport).await?;
         ttl = ttl.min(answer.ttl);
         if let Some(alias) = answer.alias {
             current = alias;
@@ -298,15 +306,16 @@ async fn family(server: &DnsTlsServer, host: &str, kind: u16) -> Result<Answer> 
     }
     Err("DnsAliasDepth")
 }
-pub(super) async fn lookup(
+pub(super) async fn lookup_with_transport(
     server: &DnsTlsServer,
     host: &str,
     query_family: DnsQueryFamily,
+    transport: &dyn crate::QueryTransport,
 ) -> Result<Resolution> {
-    let a = family(server, host, 1).await?;
+    let a = family(server, host, 1, transport).await?;
     match query_family {
         DnsQueryFamily::Ipv4Only => wire::single(a),
-        DnsQueryFamily::Dual => wire::combine(Ok(a), family(server, host, 28).await),
+        DnsQueryFamily::Dual => wire::combine(Ok(a), family(server, host, 28, transport).await),
     }
 }
 

@@ -5,10 +5,18 @@ use crate::{Config, Credentials, Limits, Node, ObfsHttp, Outbound, Tls};
 #[cfg(test)]
 #[path = "inspect_boundaries.rs"]
 mod inspect_boundaries;
+#[cfg(test)]
+#[path = "inspect_formats_tests.rs"]
+mod inspect_formats_tests;
 #[path = "inspect_reality.rs"]
 mod inspect_reality;
 #[path = "inspect_socks4.rs"]
 mod inspect_socks4;
+#[path = "inspect_stream.rs"]
+mod inspect_stream;
+#[cfg(test)]
+#[path = "inspect_tfo_tests.rs"]
+mod inspect_tfo_tests;
 #[path = "inspect_websocket.rs"]
 mod inspect_websocket;
 use base64::{
@@ -228,6 +236,9 @@ fn ss_percent(value: &str) -> Result<String, &'static str> {
     percent(value)
 }
 fn uri(line: &str) -> Result<Value, &'static str> {
+    if line.starts_with("hysteria2://") || line.starts_with("hy2://") {
+        return crate::hysteria2::parse_uri(line);
+    }
     if let Some(encoded) = line.strip_prefix("vmess://") {
         let raw: Value =
             serde_json::from_slice(&decode(encoded.as_bytes())?).map_err(|_| "VmessJson")?;
@@ -300,8 +311,14 @@ fn uri(line: &str) -> Result<Value, &'static str> {
             n["cipher"] = cipher.into();
             n["password"] = password.into();
         }
-        "trojan" | "hysteria2" | "anytls" => n["password"] = percent(u.username())?.into(),
-        "vless" | "tuic" => n["uuid"] = percent(u.username())?.into(),
+        "trojan" | "anytls" => n["password"] = percent(u.username())?.into(),
+        "vless" => n["uuid"] = percent(u.username())?.into(),
+        "tuic" => {
+            n["uuid"] = percent(u.username())?.into();
+            if let Some(password) = u.password() {
+                n["password"] = percent(password)?.into();
+            }
+        }
         _ => {
             n["username"] = percent(u.username())?.into();
             if let Some(pass) = u.password() {
@@ -395,13 +412,34 @@ fn uri(line: &str) -> Result<Value, &'static str> {
         && n["security"] == "reality"
         && n.get("network")
             .is_none_or(|value| value.as_str() == Some("tcp"))
-        && n.get("headerType").and_then(Value::as_str) == Some("none")
     {
-        n.as_object_mut().expect("URI node").remove("headerType");
+        let node = n.as_object_mut().expect("URI node");
+        if node.get("headerType").and_then(Value::as_str) == Some("none") {
+            node.remove("headerType");
+        }
+        // Exporters include empty fields for inactive HTTP/gRPC transports.
+        // Match the Qt sharing-URI boundary: only literal empty values are
+        // absent-equivalent on TCP; never trim whitespace or drop nonempty or
+        // unknown options. Duplicate/alias validation already ran above, and
+        // raw-uri preserves every source byte. JSON/YAML cannot opt into this.
+        for key in ["host", "path", "serviceName"] {
+            if node.get(key).and_then(Value::as_str) == Some("") {
+                node.remove(key);
+            }
+        }
+        if node
+            .get("quicSecurity")
+            .and_then(Value::as_str)
+            .is_some_and(|value| matches!(value, "" | "none"))
+        {
+            // An inactive QUIC cipher selector declares no encryption on
+            // this already-validated TCP transport; active values stay fatal.
+            node.remove("quicSecurity");
+        }
     }
     Ok(n)
 }
-fn clean_ini(text: &str) -> String {
+pub(crate) fn clean_ini(text: &str) -> String {
     let text = text.trim();
     if text.len() >= 2
         && ((text.starts_with('"') && text.ends_with('"'))
@@ -415,7 +453,7 @@ fn clean_ini(text: &str) -> String {
         text.to_string()
     }
 }
-fn csv(text: &str) -> Result<Vec<(String, bool)>, &'static str> {
+pub(crate) fn csv(text: &str) -> Result<Vec<(String, bool)>, &'static str> {
     let mut out = Vec::new();
     let mut field = String::new();
     let mut quote = None;
@@ -455,7 +493,7 @@ fn csv(text: &str) -> Result<Vec<(String, bool)>, &'static str> {
 // Only the section envelope is common across these client formats. Rule,
 // rewrite and script bodies have different grammars: retain them verbatim and
 // report unvalidated semantics instead of pretending to parse them as key=value.
-fn ini_section(line: &str) -> Result<Option<String>, &'static str> {
+pub(crate) fn ini_section(line: &str) -> Result<Option<String>, &'static str> {
     let Some(rest) = line.strip_prefix('[') else {
         return Ok(None);
     };
@@ -570,6 +608,7 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
             if let Some((key, value)) = parameter {
                 let key = key.trim();
                 let canonical = match key {
+                    "tag" if qx => "name",
                     "encrypt-method" | "method" => "cipher",
                     "tls-host" | "tls-name" => "sni",
                     "udp-relay" => "udp",
@@ -578,7 +617,9 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
                     "obfs-name" => "obfs",
                     _ => key,
                 };
-                if !seen.insert(canonical) || n.get(canonical).is_some() {
+                if !seen.insert(canonical)
+                    || (n.get(canonical).is_some() && !(qx && canonical == "name"))
+                {
                     return Err("DuplicateIniParameter");
                 }
                 let value = clean_ini(value);
@@ -630,12 +671,31 @@ fn parse(bytes: &[u8], depth: usize) -> Result<(&'static str, Value, Vec<Value>)
     if depth > 2 {
         return Err("EncodingDepth");
     }
-    let original_text = std::str::from_utf8(bytes)
-        .map_err(|_| "EncodingNotUtf8")?
-        .trim_start_matches('\u{feff}');
+    let decoded_text = std::str::from_utf8(bytes).map_err(|_| "EncodingNotUtf8")?;
+    let original_text = decoded_text
+        .strip_prefix('\u{feff}')
+        .unwrap_or(decoded_text);
     let text = original_text.trim();
     if text.is_empty() {
         return Err("EmptyDocument");
+    }
+    if text.starts_with('\u{feff}')
+        || text
+            .chars()
+            .any(|c| c.is_ascii_control() && !matches!(c, '\r' | '\n' | '\t'))
+    {
+        return Err("DocumentControlCharacter");
+    }
+    if text.starts_with('<') {
+        return Err("SubscriptionResponseIsHtml");
+    }
+    if text.starts_with("STATUS=") {
+        let (header, body) = text.split_once('\n').ok_or("ShadowrocketStatusHeader")?;
+        if header.len() > 4096 {
+            return Err("ShadowrocketStatusHeader");
+        }
+        let (_, document, nodes) = parse(body.as_bytes(), depth + 1)?;
+        return Ok(("shadowrocket", document, nodes));
     }
     if text
         .lines()
@@ -651,20 +711,23 @@ fn parse(bytes: &[u8], depth: usize) -> Result<(&'static str, Value, Vec<Value>)
     {
         return Ok(("ini", Value::String(text.to_string()), ini(original_text)?));
     }
-    if text.lines().filter(|l| !l.trim().is_empty()).all(|l| {
-        l.trim().split_once("://").is_some_and(|(scheme, _)| {
-            !scheme.is_empty()
-                && scheme.len() < 32
-                && scheme
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b"+.-".contains(&b))
+    let uri_lines = || {
+        text.lines().map(str::trim).filter(|line| {
+            !line.is_empty() && !line.starts_with(['#', ';']) && !line.starts_with("//")
         })
-    }) {
-        let nodes = text
-            .lines()
-            .filter(|l| !l.trim().is_empty())
-            .map(|l| uri(l.trim()))
-            .collect::<Result<Vec<_>, _>>()?;
+    };
+    if uri_lines().next().is_some()
+        && uri_lines().all(|l| {
+            l.trim().split_once("://").is_some_and(|(scheme, _)| {
+                !scheme.is_empty()
+                    && scheme.len() < 32
+                    && scheme
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b"+.-".contains(&b))
+            })
+        })
+    {
+        let nodes = uri_lines().map(uri).collect::<Result<Vec<_>, _>>()?;
         return Ok(("uri-list", Value::String(text.to_string()), nodes));
     }
     if text
@@ -765,7 +828,15 @@ fn ss_outbound(raw: &Value, family: &str) -> Result<Outbound, &'static str> {
     {
         return Err("ConflictingCipher");
     }
-    if !["aes-128-gcm", "aes-256-gcm", "chacha20-ietf-poly1305"].contains(&cipher) {
+    if ![
+        "aes-128-gcm",
+        "aes-256-gcm",
+        "chacha20-ietf-poly1305",
+        "2022-blake3-aes-128-gcm",
+        "2022-blake3-aes-256-gcm",
+    ]
+    .contains(&cipher)
+    {
         return Err("CipherNotImplemented");
     }
     let obfs_http = if let Some(plugin) = raw.get("plugin") {
@@ -855,6 +926,28 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
         .and_then(Value::as_str)
         .unwrap_or("");
     let kind = protocol(source_protocol);
+    // TFO is an optional TCP handshake optimization, not part of the proxy
+    // authentication or wire protocol (Surge Common Policy Parameters). Keep
+    // the source unchanged and use the existing ordinary TCP transport. Only
+    // booleans on known TCP protocols qualify; malformed values, QUIC and every
+    // other security/transport option still pass through their strict parser.
+    if family != "xray-v2ray-json"
+        && matches!(
+            kind,
+            "ss" | "vmess" | "vless" | "trojan" | "http" | "socks5" | "socks4" | "socks4a"
+        )
+        && let Some(enabled) = raw.get("tfo").and_then(Value::as_bool)
+    {
+        let mut ordinary_tcp = raw.clone();
+        if let Some(object) = ordinary_tcp.as_object_mut() {
+            object.remove("tfo");
+        }
+        let (mut capability, outbound) = capability(&ordinary_tcp, index, family);
+        if enabled && outbound.is_some() {
+            capability.diagnostic = "TcpFastOpenFallbackToTcp";
+        }
+        return (capability, outbound);
+    }
     let implicit_tls = kind == "trojan"
         || source_protocol.eq_ignore_ascii_case("socks5-tls")
         || source_protocol.eq_ignore_ascii_case("https");
@@ -882,6 +975,9 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
         ],
         "unknown",
     );
+    if matches!(kind, "vless" | "trojan") && inspect_stream::declared(raw) {
+        return inspect_stream::inspect(raw, index, family);
+    }
     if kind == "vless" && inspect_reality::declared(raw) {
         return inspect_reality::inspect(raw, index, family);
     }
@@ -994,6 +1090,26 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
     let udp = raw.get("udp").and_then(Value::as_bool) == Some(true);
     let mut diagnostic = "ProtocolNotImplemented";
     let mut candidate = None;
+    let native = match kind {
+        "vmess" => Some(crate::vmess::from_raw(raw)),
+        "hysteria2" | "tuic"
+            if family == "sing-box-json" || raw.get("_swirl-source-format").is_some() =>
+        {
+            Some(crate::singbox_quic::outbound(raw))
+        }
+        "hysteria2" => Some(crate::hysteria2::from_raw(raw).map(Outbound::Hysteria2)),
+        "tuic" => Some(crate::Tuic::from_raw(raw).map(Outbound::Tuic)),
+        _ => None,
+    };
+    if let Some(result) = native {
+        match result {
+            Ok(outbound) => {
+                candidate = Some(outbound);
+                diagnostic = "TcpCandidateNotYetVerified";
+            }
+            Err(code) => diagnostic = code,
+        }
+    }
     if kind == "ss" {
         match ss_outbound(raw, family) {
             Ok(outbound) => {
@@ -1137,6 +1253,10 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                     .or_else(|| raw.get("servername"))
                     .or_else(|| raw.pointer("/tls/server_name"))
                     .and_then(Value::as_str)
+                    // Clash's omitted/empty SNI both use the endpoint name;
+                    // aliases and source types were checked above. Retaining
+                    // an empty source string must not break saved Qt nodes.
+                    .filter(|name| !name.is_empty())
                     .unwrap_or(&host)
                     .to_string();
                 let alpn = raw
@@ -1184,6 +1304,8 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                     websocket: None,
                     reality: None,
                     flow: None,
+                    transport: None,
+                    udp,
                 }),
                 "trojan" => tls.map(|tls| Outbound::Trojan {
                     host,
@@ -1191,6 +1313,8 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                     password,
                     tls,
                     websocket: None,
+                    transport: None,
+                    udp,
                 }),
                 "http" => Some(Outbound::HttpConnect {
                     host,
@@ -1230,6 +1354,11 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             }
         }
     }
+    let (transport, udp, unrecognized) = match &candidate {
+        Some(Outbound::Hysteria2(config)) => ("quic", config.udp, 0),
+        Some(Outbound::Tuic(config)) => ("quic", config.udp, 0),
+        _ => (transport, udp, unrecognized),
+    };
     (
         NodeCapability {
             index,
@@ -1242,7 +1371,11 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             udp_declared: udp,
             unrecognized_fields: unrecognized,
             native_tcp_candidate: candidate.is_some(),
-            native_udp_supported: ["ss", "socks5"].contains(&kind) && udp && candidate.is_some(),
+            native_udp_supported: (["ss", "socks5", "vless", "trojan"].contains(&kind)
+                && udp
+                && candidate.is_some())
+                || matches!(&candidate, Some(Outbound::Hysteria2(config)) if config.udp)
+                || matches!(&candidate, Some(Outbound::Tuic(config)) if config.udp),
             real_network_verified: false,
             diagnostic,
         },
@@ -1317,8 +1450,21 @@ pub fn inspect(bytes: &[u8]) -> Inspection {
         };
     }
     let mut candidates = Vec::new();
+    // An encoding wrapper is not a client dialect. In particular, sing-box
+    // QUIC nodes have nested TLS fields which cannot use Clash's projection.
+    let family = if document
+        .get("outbounds")
+        .and_then(Value::as_array)
+        .is_some_and(|nodes| nodes.iter().any(|node| node.get("protocol").is_some()))
+    {
+        "xray-v2ray-json"
+    } else if document.get("outbounds").is_some() {
+        "sing-box-json"
+    } else {
+        format
+    };
     for (index, node) in nodes.iter().enumerate() {
-        let (capability, candidate) = capability(node, index + 1, format);
+        let (capability, candidate) = capability(node, index + 1, family);
         *report.protocols.entry(capability.protocol).or_default() += 1;
         report.nodes.push(capability);
         candidates.push(candidate);
@@ -1728,7 +1874,7 @@ mod tests {
             assert!(result.report.nodes[0].native_tcp_candidate);
             assert_eq!(result.originals[0]["udp"], declared);
             assert_eq!(result.report.nodes[0].udp_declared, declared);
-            assert!(!result.report.nodes[0].native_udp_supported);
+            assert_eq!(result.report.nodes[0].native_udp_supported, declared);
             assert_eq!(result.originals[0]["raw-uri"], input);
             assert_eq!(result.original, input.as_bytes());
             for query in [
@@ -2127,7 +2273,7 @@ mod tests {
             "future,obfs.example",
             "http,obfs.example,future=retained",
             "http,obfs.example,extra-positional",
-            "http,obfs.example,fast-open=true",
+            "http,obfs.example,fast-open=invalid",
             "obfs-name=http,obfs-host=obfs.example,obfs-uri=/custom",
         ] {
             let input = format!(
@@ -2175,8 +2321,9 @@ mod tests {
             r.report.nodes[0].diagnostic,
             "CertificateVerificationDisabledUnsupported"
         );
-        assert_eq!(r.report.nodes[1].diagnostic, "TcpFastOpenNotImplemented");
-        assert!(r.tcp_candidates.iter().all(Option::is_none));
+        assert_eq!(r.report.nodes[1].diagnostic, "TcpFastOpenFallbackToTcp");
+        assert!(r.tcp_candidates[0].is_none());
+        assert!(r.tcp_candidates[1].is_some());
         assert_eq!(r.original, input);
         assert_eq!(r.originals[0]["skip-cert-verify"], true);
     }

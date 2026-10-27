@@ -222,7 +222,7 @@ mod tests {
             ("udp", json!("false")),
             ("tls", json!(true)),
             ("tls", json!({"enabled":false})),
-            ("tfo", json!(true)),
+            ("tfo", json!("true")),
             ("sni", json!("name.fixture.invalid")),
             ("network", json!("udp")),
             ("network", json!("ws")),

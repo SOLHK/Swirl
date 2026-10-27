@@ -1,0 +1,17 @@
+test_aes128_aes256_tcp_http_https_four_mib_duplex_and_half_close (__main__.Ss2022OfficialTests.test_aes128_aes256_tcp_http_https_four_mib_duplex_and_half_close) ... ok
+test_captured_tcp_request_replay_and_response_binding (__main__.Ss2022OfficialTests.test_captured_tcp_request_replay_and_response_binding) ... ok
+test_clash_and_ss_uri_import_to_real_tcp_and_udp (__main__.Ss2022OfficialTests.test_clash_and_ss_uri_import_to_real_tcp_and_udp) ... ok
+test_core_socks5_udp_uses_native_ss2022_connector (__main__.Ss2022OfficialTests.test_core_socks5_udp_uses_native_ss2022_connector) ... ok
+test_existing_three_aead_ciphers_remain_official_tcp_udp_interoperable (__main__.Ss2022OfficialTests.test_existing_three_aead_ciphers_remain_official_tcp_udp_interoperable) ... ok
+test_ipv6_proxy_endpoint_and_domain_tcp_destination (__main__.Ss2022OfficialTests.test_ipv6_proxy_endpoint_and_domain_tcp_destination) ... ok
+test_six_concurrent_sessions_and_reconnect (__main__.Ss2022OfficialTests.test_six_concurrent_sessions_and_reconnect) ... ok
+test_udp_dns_ipv4_ipv6_and_multiple_datagrams (__main__.Ss2022OfficialTests.test_udp_dns_ipv4_ipv6_and_multiple_datagrams) ... ok
+test_udp_real_wire_tamper_and_replay_in_both_directions (__main__.Ss2022OfficialTests.test_udp_real_wire_tamper_and_replay_in_both_directions) ... ok
+test_udp_same_client_session_survives_official_server_restart (__main__.Ss2022OfficialTests.test_udp_same_client_session_survives_official_server_restart) ... ok
+test_udp_wrong_key_does_not_reach_destination (__main__.Ss2022OfficialTests.test_udp_wrong_key_does_not_reach_destination) ... ok
+test_wrong_valid_key_and_invalid_parameters_rejected (__main__.Ss2022OfficialTests.test_wrong_valid_key_and_invalid_parameters_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 5.324s
+
+OK

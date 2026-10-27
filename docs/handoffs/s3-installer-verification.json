@@ -1,0 +1,27 @@
+{
+  "source_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+  "generated": true,
+  "downloaded": true,
+  "installed": false,
+  "artifact_id": 12511774885,
+  "artifact_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447386/artifacts/12511774885",
+  "artifact_bytes": 168678481,
+  "artifact_sha256": "e6eb8a4f90b666d749a3e4d1c6eaacd1d185c40b983c93986f800f7225b3dad6",
+  "artifact_digest_verified": true,
+  "setup_entry": "Swirl-Setup.exe",
+  "setup_bytes": 73586877,
+  "portable_entry": "Swirl-Rust-x64.zip",
+  "manifest_source_verified": true,
+  "manifest_entries": 1509,
+  "unmanifested_files": [
+    "Swirl-diagnostics.txt"
+  ],
+  "missing_files": [],
+  "package_manifest_exact_match": false,
+  "all_payload_file_hashes_verified": false,
+  "setup_pe_inspected": false,
+  "final_acceptance_deferred": true,
+  "private_subscription_tested": false,
+  "issue": "UI smoke wrote Swirl-diagnostics.txt after staging created package-manifest.json; portable payload contains an unmanifested file. Per-file hash and PE verification did not run after this failure.",
+  "next_action": "In next development window, exclude test diagnostics or regenerate and strictly verify the final manifest after smoke; rebuild final installer after development completes. Preserve current remote artifacts."
+}

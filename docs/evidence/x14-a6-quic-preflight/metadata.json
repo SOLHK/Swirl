@@ -1,0 +1,47 @@
+{
+  "scope": "invalid local configuration rejected before networking; not protocol interoperability",
+  "bug": {
+    "config": "valid base64 wrapping non-certificate DER",
+    "protocols": [
+      "hysteria2",
+      "tuic"
+    ],
+    "before_observer": "real loopback UDP DNS socket; prior runtime accepted Core.start and each protocol sent a 44-byte lookup",
+    "before_runtime_sha256": "not recorded; source working tree based on A5 40be930b6328e3d292eb913bc14e45c27ea95f42 before QUIC preflight fix"
+  },
+  "regression": {
+    "source": "core/crates/swirl-protocol/tests/quic_preflight.rs",
+    "command": "cargo test --manifest-path core/Cargo.toml --locked -p swirl-protocol --test quic_preflight",
+    "tests": 1,
+    "passed": 1,
+    "failed": 0,
+    "ignored": 0,
+    "observation_ms": 50,
+    "paths": [
+      "Hysteria2 TCP",
+      "Hysteria2 UDP",
+      "TUIC TCP",
+      "TUIC UDP"
+    ],
+    "expected_error": "TlsTrustAnchor",
+    "dns_packets_observed": 0
+  },
+  "cache_policy": {
+    "maximum_entries": 32,
+    "keys": [
+      "CA DER base64",
+      "ALPN offers",
+      "explicit insecure policy",
+      "SHA256 leaf certificate pin"
+    ],
+    "socket_and_runtime_cached": false,
+    "session_resumption": false,
+    "early_data": false
+  },
+  "followup_build": {
+    "status": "environment failure",
+    "reason": "shared temporary build storage exhausted; linker Bus error and No space left on device",
+    "not_a_protocol_test": true
+  },
+  "full_A6_validation": "tracked separately by root; this focused receipt does not predeclare later gates"
+}

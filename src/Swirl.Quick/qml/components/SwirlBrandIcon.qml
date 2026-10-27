@@ -6,7 +6,9 @@ Item {
     Image {
         objectName:"brandVector"
         anchors.fill:parent
-        source: Theme.dark ? "qrc:/swirl/icons/swirl_knot_mark_dark.svg" : "qrc:/swirl/icons/swirl_knot_mark_light.svg"
+        source: Theme.increaseContrast
+            ? (Theme.dark ? "qrc:/swirl/icons/swirl_knot_mark_mono_dark.svg" : "qrc:/swirl/icons/swirl_knot_mark_mono_light.svg")
+            : (Theme.dark ? "qrc:/swirl/icons/swirl_knot_mark_dark.svg" : "qrc:/swirl/icons/swirl_knot_mark_light.svg")
         sourceSize: Qt.size(mark.width * Screen.devicePixelRatio, mark.height * Screen.devicePixelRatio)
         fillMode: Image.PreserveAspectFit
     }

@@ -1,0 +1,43 @@
+{
+  "scope": "Actual exported C ABI dynamic library, Linux official Hysteria2/TUIC loopback",
+  "qt_product_acceptance": false,
+  "public_network_tested": false,
+  "files": [
+    {
+      "file": "initial-results.json",
+      "source_file": "results.json",
+      "sha256": "cce70e6ea0486d38bdfdb16deee4f3d59ee1084e0db36d548010ad4d5dfc75da",
+      "unchanged_copy": true
+    },
+    {
+      "file": "initial-tests.log",
+      "source_file": "results.log",
+      "sha256": "ffaa02e639d694bf38f8493c46c5b5e19c837503a93d9f1ae728b9a4c6dc1bfd",
+      "unchanged_copy": true
+    },
+    {
+      "file": "final-results.json",
+      "source_file": "results.json",
+      "sha256": "d9e5e5b7f938c80ab538150031f88ebd648e6fb5e7e22df50b4334802e0989c1",
+      "unchanged_copy": true
+    },
+    {
+      "file": "final-tests.log",
+      "source_file": "results.log",
+      "sha256": "e723add252a9d01442f3da177aa01c2ba3ac3dd51d95ea3ef207ba7f29446ff1",
+      "unchanged_copy": true
+    },
+    {
+      "file": "library-build.log",
+      "source_file": "a7-ffi-library-build.log",
+      "sha256": "c5054b28fccb7f50ebbf6450790e8a990572d4e81c8e8ac02bc6b309a27be709",
+      "unchanged_copy": true
+    },
+    {
+      "file": "default-host-regression.log",
+      "source_file": "a7-ffi-default-host-regression.log",
+      "sha256": "105c9912dfaa51674af730a7d3063f0a1812767400c371ec92368748a2ad66fe",
+      "unchanged_copy": true
+    }
+  ]
+}

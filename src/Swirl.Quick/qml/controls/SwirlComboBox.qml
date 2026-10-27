@@ -1,6 +1,8 @@
+pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import SwirlQuick
+import "../components"
 ComboBox {
     id: control
     implicitWidth:Theme.dp(146)
@@ -17,6 +19,7 @@ ComboBox {
     leftPadding:Theme.controlPadding; rightPadding:Theme.dp(28)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     contentItem: SwirlText {renderType:Text.NativeRendering;
+        id: valueLabel
         textRole:"input"
         text: AppState.zh(control.displayText)
         color: control.enabled ? Theme.text : Theme.muted
@@ -28,75 +31,91 @@ ComboBox {
         elide: Text.ElideRight
         leftPadding:0; rightPadding:0
     }
-    indicator: Image {
-        x:Math.round(control.width-width-Theme.dp(6));y:Math.round((control.height-height)/2);width:Theme.dp(14);height:width
-        source:"image://swirl/chevron-up-down/"+Theme.text.toString().slice(1)
+    SwirlToolTip {
+        id: hint
+        parent:control;visible:(control.hovered||control.visualFocus)&&valueLabel.truncated&&!popupLayer.visible;text:AppState.zh(control.displayText);delay:600
     }
-    background: SwirlContinuousSurface {
-        radius: Theme.controlRadius
-        antialiasing: true
-        color: control.pressed ? Theme.pressed : control.hovered ? Theme.hover : Theme.buttonBase
-        border.width:control.activeFocus?Theme.dp(2):Theme.borderWidth
-        border.color: control.activeFocus ? Theme.focusBorder : Theme.controlBorder
-        Behavior on color { ColorAnimation { duration: Math.min(100,SwirlMotion.duration) } }
+    indicator: SwirlIcon {
+        x:Math.round(control.width-width-Theme.dp(6));y:Math.round((control.height-height)/2)
+        name:"chevron-right";size:Theme.dp(14);rotation:control.popup.visible?270:90;color:Theme.muted
+        Behavior on rotation {enabled:!SwirlMotion.reduced;NumberAnimation{duration:SwirlMotion.switchDuration;easing.type:Easing.OutCubic}}
+    }
+    background: SwirlControlSurface {
+        hovered: control.hovered
+        pressed: control.pressed
+        focused: control.visualFocus
+        controlEnabled: control.enabled
     }
     delegate: ItemDelegate {
+        id:option
+        required property int index
         objectName:"swirlComboOption-"+index
         SwirlPressMotion{}
-        width: control.popup.availableWidth
-        height:Theme.controlHeight
-        text: String(modelData)
+        width: ListView.view.width
+        implicitHeight:Math.max(Theme.controlHeight,contentItem.implicitHeight+topPadding+bottomPadding)
+        height:implicitHeight
+        leftPadding:Theme.dp(5);rightPadding:Theme.dp(5)
+        topPadding:Theme.dp(4);bottomPadding:Theme.dp(4)
+        text: control.textAt(index)
         highlighted: control.highlightedIndex === index
         contentItem: SwirlText {renderType:Text.NativeRendering;
             textRole:"list"
-            text: AppState.zh(parent.text)
-            color: parent.highlighted ? "white" : Theme.text; font.pixelSize:Theme.fontSize(13); font.family: Theme.fontFamily
-            verticalAlignment: Text.AlignVCenter; leftPadding:Theme.dp(24)
-            Image{visible:control.currentIndex===index;x:Theme.dp(3);anchors.verticalCenter:parent.verticalCenter;width:Theme.dp(14);height:width;source:"image://swirl/checkmark/"+(parent.parent.highlighted?"ffffff":Theme.text.toString().slice(1))}
+            text: AppState.zh(option.text)
+            color: Theme.text; font.pixelSize:Theme.fontSize(13); font.family: Theme.fontFamily
+            verticalAlignment: Text.AlignVCenter; leftPadding:Theme.dp(24);rightPadding:Theme.dp(5);elide:Text.ElideRight
+            SwirlIcon{visible:control.currentIndex===option.index;x:Theme.dp(3);anchors.verticalCenter:parent.verticalCenter;size:Theme.dp(14);name:"checkmark";color:Theme.text}
         }
         background: Rectangle {
-            radius: Theme.controlRadius; antialiasing:true; color: parent.highlighted ? Theme.accent : "transparent"
-            Behavior on color { ColorAnimation { duration: Math.min(100,SwirlMotion.duration) } }
+            radius: Math.min(Theme.dp(8),height/2); color: option.highlighted ? Theme.selected : "transparent"
+            Behavior on color { enabled:!SwirlMotion.reduced; ColorAnimation { duration: Math.min(100,SwirlMotion.duration) } }
         }
     }
     popup: Popup {
-        parent:control
-        focus:true
-        popupType:Popup.Window
-        transformOrigin:Item.TopLeft
+        id:popupLayer
+        function requestDismiss(){close()}
+        parent:control.Overlay.overlay
+        property point anchorPoint:Qt.point(0,0)
+        readonly property real edgeMargin:Theme.dp(8)
+        readonly property real below:parent?Math.max(0,parent.height-anchorPoint.y-control.height-Theme.dp(4)-edgeMargin):0
+        readonly property real above:Math.max(0,anchorPoint.y-Theme.dp(4)-edgeMargin)
+        readonly property real desiredHeight:Math.min(Theme.dp(290),contentItem.implicitHeight+topPadding+bottomPadding)
+        readonly property bool opensAbove:below<desiredHeight && above>below
+        // ComboBox owns arrow/Enter handling while its item popup is open.
+        // Giving the bare Popup focus steals those keys from the control.
+        focus:false
+        popupType:Popup.Item
+        closePolicy:Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        transformOrigin:opensAbove?Item.BottomLeft:Item.TopLeft
+        SwirlPopupMotion {id:reveal;popup:popupLayer;enterDuration:SwirlMotion.menuEnterDuration;leaveDuration:SwirlMotion.menuExitDuration}
+        opacity:reveal.alpha
     onAboutToShow: {
-        if(SwirlMotion.reduced){scale=1;opacity=1}
-        else opacity=0
+        anchorPoint=control.mapToItem(parent,0,0)
+        dismissals.push(popupLayer,control.Window.window)
+        Qt.callLater(function(){popupList.positionViewAtIndex(control.currentIndex,ListView.Contain)})
+        reveal.prepare(Qt.point(0,(opensAbove?1:-1)*SwirlMotion.popupDistance*0.5))
     }
-    onClosed:{scale=1;opacity=1}
+    onClosed:{dismissals.pop(popupLayer);reveal.reset()}
 
-        y: control.height+Theme.dp(4)
-        x:0
-        width: control.width
+        y:opensAbove?anchorPoint.y-height-Theme.dp(4):anchorPoint.y+control.height+Theme.dp(4)
+        x:parent?Math.max(edgeMargin,Math.min(anchorPoint.x,parent.width-width-edgeMargin)):0
+        width:parent?Math.min(control.width,parent.width-2*edgeMargin):control.width
+        height:Math.min(desiredHeight,Math.max(above,below))
         padding:Theme.dp(5)
-        implicitHeight: Math.min(Theme.dp(290), contentItem.implicitHeight+Theme.dp(12))
-        enter: Transition {
-        enabled:!SwirlMotion.reduced
-            ParallelAnimation {
-                NumberAnimation { property:"opacity";to:1; duration: Math.min(100,SwirlMotion.duration) }
-            }
-        }
-        exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} } }
-        background: Rectangle {
-            color:Theme.surface
-            radius: Theme.popupRadius; antialiasing:true
-            border.width:Theme.dp(1); border.color: Theme.pillRim
-        }
+        margins:edgeMargin
+        enter:reveal.enterTransition
+        exit:reveal.exitTransition
+        background: Rectangle { transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
+            radius:Theme.menuRadius; color:Theme.material("floating"); border.width:Theme.borderWidth; border.color:Theme.increaseContrast?Theme.text:Theme.border }
         contentItem: ListView { pixelAligned: true;
-                    add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:1;duration:SwirlMotion.duration} }
-                    remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
-                    move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
-                    displaced: Transition { enabled:!SwirlMotion.reduced; SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration} }
+            id:popupList
+            transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
             clip: true
             implicitHeight: contentHeight
             model: control.popup.visible ? control.delegateModel : null
             currentIndex: control.highlightedIndex
-            ScrollIndicator.vertical: ScrollIndicator {}
+            highlightMoveDuration:0
+            boundsBehavior:Flickable.StopAtBounds
+            ScrollBar.vertical: SwirlScrollBar {}
         }
     }
 }

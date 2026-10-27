@@ -1,0 +1,179 @@
+{
+  "schema": 1,
+  "source_base_sha": "658d90d566cb61ff5dc7f908e8b8a88f0e52dd30",
+  "fixture_root": "D:\\Codex\\tmp\\s4\\installer-lifecycle-d31784b84ea6469ea37bfed925d1afc6",
+  "install_target": "D:\\Codex\\tmp\\s4\\installer-lifecycle-d31784b84ea6469ea37bfed925d1afc6\\install",
+  "source_sha256": {
+    "scripts/RustProductPackagePolicy.ps1": "f5990f871ad5c8a6722080daafe70b14721306af75f13e5985e6ed33cbadeaa7",
+    "scripts/Finalize-WindowsRustProduct.ps1": "0434f0e5e11e15e549abaffff804afed0efd4cf05de010ec2c4eee9325a9fcfe",
+    "scripts/Maintain-WindowsRustProduct.ps1": "5f82fb1a8585d1bcd8887c91b192bc568a1ac5bf7e67bf1cfd593d36bf3c23ee",
+    "src/Swirl.Quick/packaging/Swirl.nsi": "8a12f9e97eb72beee7495554c7b48d9ce9c472416a36618a844c9c0b251994e9",
+    "scripts/tests/Test-S4InstallerLifecycle.ps1": "8106f051eb91c098c556e0301e8c48a0a39967da3bf926acac55b129acdf2f92"
+  },
+  "actual_nsis": "D:/Codex/toolchains/nsis-3.11/makensis.exe",
+  "actual_nsis_sha256": "f497e92deb9f179f7b8f7553fcb3bd04f511bb2949e5e4a2aee80a10f7b20431",
+  "actual_product_runtime_executed": false,
+  "private_inputs": false,
+  "existing_user_product_modified": false,
+  "artifacts_retained": true,
+  "success": true,
+  "cases": [
+    {
+      "name": "final-manifest-1",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "smoke-evidence-retained-outside-payload",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "nsis-build-1",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "installer-exit-1",
+      "passed": true,
+      "detail": "Exit 0"
+    },
+    {
+      "name": "installed-inventory-1",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "final-manifest-2",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "nsis-build-2",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "installer-exit-2",
+      "passed": true,
+      "detail": "Exit 0"
+    },
+    {
+      "name": "installed-inventory-2-removes-obsolete-vendor-files",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "upgrade-preserves-user-data",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "stale-v1-uninstaller-refuses-installed-v2",
+      "passed": true,
+      "detail": "Exit 2"
+    },
+    {
+      "name": "stale-v1-uninstaller-preserves-all-v2-user-and-marker-bytes",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "uninstaller-exit",
+      "passed": true,
+      "detail": "Exit 0"
+    },
+    {
+      "name": "uninstall-leaves-only-user-data",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "uninstall-preserves-user-data-bytes",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "isolated-install-refuses-unmarked-user-directory",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "uninstaller-refuses-missing-ownership-marker",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "isolated-install-refuses-wrong-expected-root",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "isolated-install-refuses-traversal-to-other-fixture-child",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "negative-install-attempts-preserve-user-data",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "upgrade-preserves-modified-obsolete-vendor-file",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "uninstall-preserves-modified-vendor-file",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "malformed-old-manifest-rejected-before-any-deletion",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "post-copy-vendor-hash-mismatch-rejected",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "payload-root-junction-rejected",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "evidence-junction-into-payload-rejected",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "isolated-installer-rejects-linked-destination",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "existing-user-registry-and-shortcuts-unchanged",
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "error": null,
+  "raw_sha256": {
+    "D:/Codex/outputs/s4/package-lifecycle/installer-lifecycle-d31784b84ea6469ea37bfed925d1afc6.json": "e2e25872e02bad0426d3a83fd8a210b1f15361c26d2d28f37b41c5ab95e2205a",
+    "D:/Codex/outputs/s4/package-lifecycle/installer-lifecycle-cdf6c9b191ee4dcb841c9e3895e9f252.json": "87328c09bc666e0ff2f3d6b9888064b5a854023267cd492fa67a2817b208eaf8",
+    "D:/Codex/outputs/s4/package-lifecycle-stale-before.log": "b9237e8a9d28aacfd18b89b48c5f69c9934c42c8dd894223d467aa86b4523c89",
+    "D:/Codex/outputs/s4/package-lifecycle-stale-after.log": "51b1db272cc556da60397461300b60dcad2b2767e53ba244eb9f8fe9407778c2",
+    "D:/Codex/outputs/s4/package-policy-final.log": "fbdb4e2e73e4184f9a801d71713add3c585ad2249383c2911b81a7d7ded7c9e9"
+  },
+  "package_policy_assertions": 31,
+  "release_cache_cases": 14,
+  "final_manifest_cases": 14,
+  "stale_uninstaller_regression": {
+    "after_exit_code": 2,
+    "before_failed": true,
+    "all_installed_bytes_preserved": true,
+    "subsequent_v2_uninstall_passed": true
+  }
+}

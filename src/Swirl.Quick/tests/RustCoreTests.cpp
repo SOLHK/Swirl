@@ -4,7 +4,6 @@
 #include <sys/socket.h>
 #endif
 #include "engine/RustCoreEngine.h"
-#include "engine/MihomoAdapter.h"
 #include "engine/ThreadedEngine.h"
 #include "engine/NodeTestService.h"
 #include "engine/NodeImporter.h"
@@ -30,7 +29,46 @@
 #include <QFileInfo>
 #include <QSaveFile>
 #include <QScopeGuard>
+#include <QRegularExpression>
+#include <algorithm>
 #include "app/StoragePaths.h"
+
+// Keep real Rust listeners and real A/B traffic while making one asynchronous
+// control failure deterministic. Invalid configurations are now rejected before
+// the worker, so they cannot stand in for a later selection failure.
+class RejectOneSelectionEngine final : public ProxyEngine {
+public:
+ RejectOneSelectionEngine(){
+  connect(&m_engine,&ProxyEngine::statusChanged,this,&ProxyEngine::statusChanged);
+  connect(&m_engine,&ProxyEngine::diagnostic,this,&ProxyEngine::diagnostic);
+  connect(&m_engine,&ProxyEngine::probeRequestRejected,this,&ProxyEngine::probeRequestRejected);
+ }
+ QString rejectNextSelection;
+ int selectionCalls=0,injectedRejections=0;
+ void start(const EngineStartOptions &options) override{m_engine.start(options);}
+ void stop() override{m_engine.stop();}
+ void refresh() override{m_engine.refresh();}
+ void selectNode(const QString &id) override{
+  ++selectionCalls;
+  if(!rejectNextSelection.isEmpty()&&id==rejectNextSelection){
+   rejectNextSelection.clear();
+   QMetaObject::invokeMethod(this,[this]{
+    ++injectedRejections;
+    emit diagnostic(QStringLiteral("SwirlRust"),QStringLiteral("SelectionFailed"),QStringLiteral("Synthetic queued control failure; current Rust session retained."));
+   },Qt::QueuedConnection);
+   return;
+  }
+  m_engine.selectNode(id);
+ }
+ void probeNode(const QUrl &url) override{m_engine.probeNode(url);}
+ void probeNodeTagged(const QUrl &url,quint64 tag) override{m_engine.probeNodeTagged(url,tag);}
+ void setRoutingMode(const QString &mode) override{m_engine.setRoutingMode(mode);}
+ Status status() const override{return m_engine.status();}
+ QString configurationSummary() const override{return m_engine.configurationSummary();}
+ QVariantList routingRules() const override{return m_engine.routingRules();}
+private:
+ ThreadedEngine m_engine;
+};
 
 class RustCoreTests:public QObject {
  Q_OBJECT
@@ -52,25 +90,104 @@ class RustCoreTests:public QObject {
  }
 private slots:
  void initTestCase(){QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));}
- void rustBuildRejectsCompatibilityEnableAndPreservesSavedPreference(){
+ void startRejectsInvalidReplacementWithoutStoppingLiveRuntime_data(){
+  QTest::addColumn<bool>("threaded");QTest::addColumn<int>("invalidKind");
+  for(const bool threaded:{false,true})for(int kind=0;kind<3;++kind)
+   QTest::newRow(qPrintable(QString("%1-%2").arg(threaded?"worker":"direct").arg(kind)))<<threaded<<kind;
+ }
+ void startRejectsInvalidReplacementWithoutStoppingLiveRuntime(){
+  QFETCH(bool,threaded);QFETCH(int,invalidKind);
+  ControlledNetwork net;QVERIFY(net.start());auto original=options(net);
+  std::unique_ptr<ProxyEngine> engine;
+  if(threaded)engine=std::make_unique<ThreadedEngine>();else engine=std::make_unique<RustCoreEngine>();
+  engine->start(original);QTRY_VERIFY_WITH_TIMEOUT(engine->status().apiHealthy,5000);
+  const auto previous=engine->status();auto invalid=original;
+  QTcpServer occupied;QVERIFY(occupied.listen(QHostAddress::LocalHost,0));
+  if(invalidKind==0)invalid.tunEnabled=true;
+  else if(invalidKind==1)invalid.selectedNodeId="missing-node";
+  else invalid.proxyPort=occupied.serverPort();
+  QSignalSpy diagnostics(engine.get(),&ProxyEngine::diagnostic);engine->start(invalid);
+  QTRY_VERIFY_WITH_TIMEOUT(!diagnostics.isEmpty(),5000);
+  // The worker queues the rejection diagnostic before its restored snapshot.
+  // Observe that snapshot before checking the retained session and real traffic.
+  QTRY_COMPARE_WITH_TIMEOUT(engine->status().state,ProxyEngine::State::Running,5000);
+  QVERIFY(engine->status().apiHealthy);QCOMPARE(engine->status().sessionId,previous.sessionId);
+  QCOMPARE(engine->status().proxyPort,previous.proxyPort);QCOMPARE(engine->status().selectedNodeId,previous.selectedNodeId);
+  QCOMPARE(diagnostics.last()[1].toString(),QString("CoreStartRejected"));
+  QNetworkAccessManager manager;manager.setProxy(QNetworkProxy(QNetworkProxy::Socks5Proxy,"127.0.0.1",previous.proxyPort));
+  auto *reply=manager.get(QNetworkRequest(net.url()));QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);
+  QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-A"));
+  reply->deleteLater();engine->stop();QTRY_VERIFY_WITH_TIMEOUT(!engine->status().processAlive,5000);
+  QTcpServer released;QVERIFY(released.listen(QHostAddress::LocalHost,previous.proxyPort));
+ }
+ void repeatedStartReconfiguresOneRuntimeAndPreservesEstablishedTunnel(){
+  ControlledNetwork net;QVERIFY(net.start());auto config=options(net);
+  auto second=config.nodes.first();second.id=QUuid::createUuid().toString(QUuid::WithoutBraces);second.name="second";
+  second.port=net.b.serverPort();second.username=QString::fromUtf8(net.b.username);second.password=QString::fromUtf8(net.b.password);
+  config.nodes.append(second);ThreadedEngine engine;engine.start(config);
+  QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,5000);const auto previous=engine.status();
+  QTcpSocket held;held.setProxy(QNetworkProxy::NoProxy);held.connectToHost(QHostAddress::LocalHost,previous.proxyPort);
+  QTRY_COMPARE_WITH_TIMEOUT(held.state(),QAbstractSocket::ConnectedState,5000);
+  const auto authority=QByteArray("127.0.0.1:")+QByteArray::number(net.url().port());
+  held.write("CONNECT "+authority+" HTTP/1.1\r\nHost: "+authority+"\r\n\r\n");
+  QByteArray response;QVERIFY(QTest::qWaitFor([&]{response+=held.readAll();return response.contains("\r\n\r\n");},5000));
+  QVERIFY(response.startsWith("HTTP/1.1 200"));QCOMPARE(net.a.forwarded,1);
+  config.selectedNodeId=second.id;engine.start(config);
+  QTRY_COMPARE_WITH_TIMEOUT(engine.status().selectedNodeId,second.id,5000);
+  QCOMPARE(engine.status().sessionId,previous.sessionId);QCOMPARE(engine.status().proxyPort,previous.proxyPort);
+  response.clear();held.write("GET / HTTP/1.1\r\nHost: "+authority+"\r\nConnection: close\r\n\r\n");
+  QVERIFY(QTest::qWaitFor([&]{response+=held.readAll();return response.endsWith("exit-A");},5000));
+  QNetworkAccessManager manager;manager.setProxy(QNetworkProxy(QNetworkProxy::Socks5Proxy,"127.0.0.1",previous.proxyPort));
+  auto *reply=manager.get(QNetworkRequest(net.url()));QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);
+  QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-B"));
+  QCOMPARE(net.a.forwarded,1);QCOMPARE(net.b.forwarded,1);reply->deleteLater();
+  engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,5000);
+ }
+ void invalidColdStartDoesNotOpenListenerAndCanRecover(){
+  ControlledNetwork net;QVERIFY(net.start());auto config=options(net);auto invalid=config;invalid.tunEnabled=true;
+  RustCoreEngine engine;engine.start(invalid);QCOMPARE(engine.status().state,ProxyEngine::State::Failed);
+  QVERIFY(!engine.status().processAlive);QTcpServer available;QVERIFY(available.listen(QHostAddress::LocalHost,config.proxyPort));available.close();
+  engine.start(config);QVERIFY(engine.status().apiHealthy);engine.stop();QVERIFY(!engine.status().processAlive);
+ }
+ void queuedExplicitStopThenStartReleasesPreviousListener(){
+  ControlledNetwork net;QVERIFY(net.start());auto first=options(net);ThreadedEngine engine;
+  engine.start(first);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,5000);const auto previous=engine.status();
+  auto next=first;QTcpServer port;QVERIFY(port.listen(QHostAddress::LocalHost,0));next.proxyPort=port.serverPort();port.close();
+  engine.stop();engine.start(next);
+  QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy&&engine.status().proxyPort==next.proxyPort,5000);
+  QVERIFY(engine.status().sessionId!=previous.sessionId);
+  QTcpServer released;QVERIFY(released.listen(QHostAddress::LocalHost,previous.proxyPort));
+  QNetworkAccessManager manager;manager.setProxy(QNetworkProxy(QNetworkProxy::Socks5Proxy,"127.0.0.1",next.proxyPort));
+  auto *reply=manager.get(QNetworkRequest(net.url()));QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);
+  QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-A"));reply->deleteLater();
+  engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,5000);
+ }
+ void retiredPreferenceCannotSelectAnEngineOrBlockRustStartup(){
   QTemporaryDir directory;QVERIFY(directory.isValid());
-  QSettings settings;const auto previous=settings.value("Proxy/preferCompatibility");
-  const auto restore=qScopeGuard([&]{if(previous.isValid())settings.setValue("Proxy/preferCompatibility",previous);else settings.remove("Proxy/preferCompatibility");settings.sync();});
-  settings.setValue("Proxy/preferCompatibility",false);settings.sync();
-  {
-   EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("disabled.dpapi"));
-   QVERIFY(controller.rustCoreBuild());QVERIFY(controller.property("rustCoreBuild").toBool());
-   controller.setPreferCompatibility(true);
-   QVERIFY(!controller.preferCompatibility());QVERIFY(controller.routingError().contains("Rust Core"));
-   QCOMPARE(QSettings().value("Proxy/preferCompatibility").toBool(),false);
-  }
-  settings.setValue("Proxy/preferCompatibility",true);settings.sync();
-  {
-   EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("saved.dpapi"));
-   QVERIFY(controller.preferCompatibility());QCOMPARE(QSettings().value("Proxy/preferCompatibility").toBool(),true);
-   controller.setPreferCompatibility(false);
-   QVERIFY(!controller.preferCompatibility());QCOMPARE(QSettings().value("Proxy/preferCompatibility").toBool(),false);
-  }
+  QSettings settings;const auto previous=settings.value("Proxy/preferCompatibility"),previousMode=settings.value("Proxy/routingMode");
+  const auto restore=qScopeGuard([&]{
+   if(previous.isValid())settings.setValue("Proxy/preferCompatibility",previous);else settings.remove("Proxy/preferCompatibility");
+   if(previousMode.isValid())settings.setValue("Proxy/routingMode",previousMode);else settings.remove("Proxy/routingMode");settings.sync();
+  });
+  settings.setValue("Proxy/preferCompatibility",true);settings.setValue("Proxy/routingMode","direct");settings.sync();
+  EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("saved.dpapi"));
+  QVERIFY(controller.rustCoreBuild());QVERIFY(controller.property("rustCoreBuild").toBool());
+  QCOMPARE(controller.metaObject()->indexOfProperty("preferCompatibility"),-1);
+  QTcpServer port;QVERIFY(port.listen(QHostAddress::LocalHost,0));const auto available=port.serverPort();port.close();
+  controller.setProxyPort(available);controller.start();
+  QVERIFY2(controller.apiHealthy(),qPrintable(controller.error()));QCOMPARE(controller.engineKind(),QString("rust"));
+  QCOMPARE(QSettings().value("Proxy/preferCompatibility").toBool(),true);
+  controller.stop();QVERIFY(!controller.processAlive());
+ }
+ void unsupportedCapabilitiesCannotBeEnabledOrRewriteConfiguration(){
+  QTemporaryDir directory;QVERIFY(directory.isValid());
+  EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("unsupported.dpapi"));
+  const auto before=controller.networkConfigurationSnapshot();
+  QVERIFY(!controller.setTunEnabled(true));QVERIFY(controller.routingError().contains("TUN"));
+  QVERIFY(!controller.setLanEnabled(true));QVERIFY(controller.networkConfigurationError().contains(QString::fromUtf8("局域网")));
+  QVERIFY(!controller.setGatewayForwarding(true));QVERIFY(controller.routingError().contains(QString::fromUtf8("网关")));
+  QVERIFY(!controller.setMeteredEnabled(true));QVERIFY(controller.routingError().contains(QString::fromUtf8("计费")));
+  QCOMPARE(controller.networkConfigurationSnapshot(),before);QVERIFY(!QFile::exists(directory.filePath("unsupported.dpapi")));
  }
  void smartRoutingUsesBundledRulesUnlessDirectoryIsExplicit(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="rule";o.smartRouting=true;
@@ -91,7 +208,7 @@ private slots:
   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(o.proxyPort);
   QCOMPARE(controller.routingMode(),QString("rule"));QVERIFY(controller.prepareRealAcceptance());
   QCOMPARE(controller.routingMode(),QString("global"));
-  QCOMPARE(controller.engineIdentityLabel(),QString::fromUtf8("Swirl Core · v9.8.7"));
+  QCOMPARE(controller.engineIdentityLabel(),QString::fromUtf8("Swirl · v9.8.7"));
   QCOMPARE(QSettings().value("Proxy/routingMode").toString(),QString("rule"));
   const QJsonObject node{{"name","synthetic"},{"type","socks5"},{"server","127.0.0.1"},{"port",net.a.serverPort()}};
   controller.imports()->importText(QString::fromUtf8(QJsonDocument(QJsonObject{{"proxies",QJsonArray{node}}}).toJson()));
@@ -101,7 +218,7 @@ private slots:
   QVERIFY(controller.chooseNode(id));controller.connectNode(id);
   QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),5000);
   QCOMPARE(controller.routingMode(),QString("global"));QCOMPARE(controller.engineKind(),QString("rust"));
-  QCOMPARE(controller.engineIdentityLabel(),QString::fromUtf8("Swirl Core · v9.8.7"));
+  QCOMPARE(controller.engineIdentityLabel(),QString::fromUtf8("Swirl · v9.8.7"));
   QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));
   QNetworkRequest request(net.url());request.setTransferTimeout(4000);
   auto *reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);
@@ -109,7 +226,7 @@ private slots:
   QCOMPARE(net.a.forwarded,1);
   QCOMPARE(QSettings().value("Proxy/routingMode").toString(),QString("rule"));
   controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),5000);
-  QCOMPARE(controller.engineIdentityLabel(),QString::fromUtf8("Swirl Core · v9.8.7"));
+  QCOMPARE(controller.engineIdentityLabel(),QString::fromUtf8("Swirl · v9.8.7"));
  }
  void savedRuleModeStartsWithBundledRulesWithoutChangingSavedRouting(){
   ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;QVERIFY(directory.isValid());
@@ -147,8 +264,6 @@ private slots:
   QVERIFY(RustCoreEngine::configuration(blocked,&configuration).isEmpty());
   QCOMPARE(configuration.value("smart_routing"),QJsonValue(true));
   QVERIFY(!configuration.contains("china_rules_directory"));
-  blocked=o;blocked.preferCompatibility=true;
-  QVERIFY(RustCoreEngine::configuration(blocked,&configuration).contains(QString::fromUtf8("兼容内核")));
   blocked=o;blocked.tunEnabled=true;
   QVERIFY(RustCoreEngine::configuration(blocked,&configuration).contains(QString::fromUtf8("增强模式")));
   blocked=o;blocked.allowLan=true;
@@ -193,7 +308,9 @@ private slots:
    if(!explicitAlpn){
     const QJsonObject user{{"id","00112233-4455-6677-8899-aabbccddeeff"},{"encryption","none"},{"flow","xtls-rprx-vision"}};
     const QJsonObject endpoint{{"address","proxy.invalid"},{"port",443},{"users",QJsonArray{user}}};
-    const QJsonObject reality{{"serverName","camouflage.invalid"},{"fingerprint",profile},{"publicKey",QString::fromLatin1(key)},{"shortId","a1B2"}};
+    // Xray source names are distinct from Swirl's native IR aliases.
+    const auto sourceProfile=profile=="chrome_133"?QStringLiteral("HelloChrome_133"):profile;
+    const QJsonObject reality{{"serverName","camouflage.invalid"},{"fingerprint",sourceProfile},{"publicKey",QString::fromLatin1(key)},{"shortId","a1B2"}};
     const QJsonObject stream{{"network","raw"},{"security","reality"},{"realitySettings",reality}};
     const QJsonObject legacy{{"protocol","vless"},{"tag","fixture"},{"settings",QJsonObject{{"vnext",QJsonArray{endpoint}}}},{"streamSettings",stream}};
     auto tcp=legacy;auto tcpStream=stream;tcpStream["network"]="tcp";tcpStream["tcpSettings"]=QJsonObject{{"header",QJsonObject{{"type","none"}}}};tcp["streamSettings"]=tcpStream;
@@ -205,21 +322,66 @@ private slots:
    QJsonObject expected;
    for(const auto &body:bodies){
     const auto imported=NodeImporter::parse(body);QVERIFY2(imported,qPrintable(imported.error));QCOMPARE(imported.nodes.size(),1);
-    const auto original=imported.nodes.first();QVERIFY(original.conversionIssues.isEmpty());QCOMPARE(original.parameters.value("client-fingerprint"),QJsonValue(profile));
+    const auto original=imported.nodes.first();
+    if(original.isXray()){
+     // The authoritative Rust import retains an informational semantic notice:
+     // native authentication fails closed instead of invoking Xray's crawler.
+     QCOMPARE(original.conversionIssues,QStringList{QStringLiteral("RealityNativeAuthenticationOnly · outbounds[0].streamSettings.realitySettings")});
+     QVERIFY(original.nativeExecutable);QVERIFY(original.runtimeIssues.isEmpty());
+     QCOMPARE(original.nativeOutbound.value("reality").toObject().value("fingerprint"),QJsonValue(profile));
+     const auto decoded=body.startsWith('{')?body:QByteArray::fromBase64(body);
+     // Direct JSON reaches Rust byte-for-byte. Base64 wrappers first pass
+     // through SubscriptionNormalizer, which removes only outer whitespace.
+     // Preserve the exact effective source on each path, including all JSON
+     // interior whitespace and values; neither path reparses/reprints it.
+     const auto effectiveSource=body.startsWith('{')?decoded:decoded.trimmed();
+     QCOMPARE(original.sourceDocument,effectiveSource);QCOMPARE(original.sourceNodeIndex,0);
+     QCOMPARE(original.originalConfiguration.value("outbound"),QJsonDocument::fromJson(decoded).object().value("outbounds").toArray().first());
+     QCOMPARE(imported.configurationFormat,QString("xray-v2ray-json"));QVERIFY(imported.configuration.isEmpty());QVERIFY(imported.executionConfiguration.isEmpty());
+    }else{QVERIFY(original.conversionIssues.isEmpty());QCOMPARE(original.parameters.value("client-fingerprint"),QJsonValue(profile));}
     if(body==json||body==json.toBase64())QCOMPARE(original.originalConfiguration,source);
-    if(original.sourceFormat.contains("Xray")){const auto decoded=body.startsWith('{')?body:QByteArray::fromBase64(body);QCOMPARE(original.originalConfiguration,QJsonDocument::fromJson(decoded).object().value("outbounds").toArray().first().toObject());QCOMPARE(imported.configurationFormat,QString("xray-v2ray-json"));QVERIFY(imported.configuration.isEmpty());QVERIFY(imported.executionConfiguration.isEmpty());}
     const auto path=directory.filePath(QString("browser-reality-%1.dat").arg(index++));QString id;
     {NodeStore saved(path);QVERIFY(saved.importNodes(imported.nodes));id=saved.nodes().first().id;QVERIFY(saved.select(id));}
     NodeStore restored(path);QCOMPARE(restored.nodes().size(),1);QCOMPARE(restored.selectedId(),id);
     const auto node=restored.nodes().first();QCOMPARE(node.parameters,original.parameters);QCOMPARE(node.originalConfiguration,original.originalConfiguration);
+    QCOMPARE(node.sourceDocument,original.sourceDocument);QCOMPARE(node.sourceFingerprint,original.sourceFingerprint);QCOMPARE(node.sourceNodeIndex,original.sourceNodeIndex);
     QVERIFY(SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());QCOMPARE(SwirlProtocolRegistry::describe(node).value("tested"),QVariant(false));
     EngineStartOptions options;options.nodes=restored.nodes();options.selectedNodeId=id;options.routingMode="global";options.proxyPort=12345;
     QJsonObject configuration;const auto reason=RustCoreEngine::configuration(options,&configuration);QVERIFY2(reason.isEmpty(),qPrintable(reason));
-    const auto outbound=configuration.value("nodes").toArray().first().toObject().value("outbound").toObject();
+    auto outbound=configuration.value("nodes").toArray().first().toObject().value("outbound").toObject();
+    // Serde emits absent Option values as null; generic-node conversion omits
+    // the same absent values. Neither representation may carry ordinary TLS/WS.
+    for(const auto &optional:{"tls","websocket"}){QVERIFY(outbound.value(optional).isNull()||outbound.value(optional).isUndefined());outbound.remove(optional);}
     if(expected.isEmpty())expected=outbound;else QCOMPARE(outbound,expected);
     QVERIFY(!outbound.contains("tls"));QVERIFY(!outbound.contains("websocket"));QCOMPARE(outbound.value("flow"),QJsonValue("xtls-rprx-vision"));
     const auto reality=outbound.value("reality").toObject();QCOMPARE(reality.value("fingerprint"),QJsonValue(profile));QCOMPARE(reality.value("public_key"),QJsonValue(QString::fromLatin1(key)));QCOMPARE(reality.value("short_id"),QJsonValue("a1B2"));QCOMPARE(reality.value("server_name"),QJsonValue("camouflage.invalid"));
     const QJsonArray expectedAlpn=explicitAlpn?QJsonArray{"h2","http/1.1"}:QJsonArray{};QCOMPARE(reality.value("alpn"),QJsonValue(expectedAlpn));
+   }
+  }
+ }
+ void browserRealityXraySourceNamesAndUnsupportedProfilesRemainExplicit(){
+  const auto key=QString::fromLatin1(QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals));
+  for(const auto &sourceProfile:QStringList{"chrome","HelloChrome_133","chrome_133","rustls","firefox"}){
+   const bool supported=sourceProfile=="chrome"||sourceProfile=="HelloChrome_133";
+   const QJsonObject reality{{"serverName","camouflage.invalid"},{"fingerprint",sourceProfile},{"publicKey",key},{"shortId","a1B2"}};
+   const QJsonObject user{{"id","00112233-4455-6677-8899-aabbccddeeff"},{"encryption","none"},{"flow","xtls-rprx-vision"}};
+   const QJsonObject endpoint{{"address","proxy.invalid"},{"port",443},{"users",QJsonArray{user}}};
+   const QJsonObject source{{"protocol","vless"},{"tag","fixture"},{"settings",QJsonObject{{"vnext",QJsonArray{endpoint}}}},{"streamSettings",QJsonObject{{"network","raw"},{"security","reality"},{"realitySettings",reality}}}};
+   const auto document=QJsonDocument(QJsonObject{{"outbounds",QJsonArray{source}}}).toJson();
+   const auto parsed=NodeImporter::parse(document);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+   const auto node=parsed.nodes.first();QVERIFY(node.isXray());QCOMPARE(node.sourceDocument,document);
+   QCOMPARE(node.originalConfiguration.value("outbound"),QJsonValue(source));QCOMPARE(node.nativeExecutable,supported);
+   QCOMPARE(SwirlProtocolRegistry::describe(node).value("tested"),QVariant(false));
+   EngineStartOptions options;options.nodes=parsed.nodes;options.selectedNodeId=node.id;options.routingMode="global";
+   QJsonObject config{{"sentinel",true}};const auto reason=RustCoreEngine::configuration(options,&config);
+   if(supported){
+    QVERIFY2(reason.isEmpty(),qPrintable(reason));QVERIFY(node.runtimeIssues.isEmpty());
+    const auto outbound=config.value("nodes").toArray().first().toObject().value("outbound").toObject();
+    QCOMPARE(outbound.value("reality").toObject().value("fingerprint"),QJsonValue(sourceProfile=="chrome"?"chrome":"chrome_133"));
+    QCOMPARE(outbound.value("flow"),QJsonValue("xtls-rprx-vision"));QVERIFY(outbound.value("tls").isNull());
+   }else{
+    QVERIFY(!reason.isEmpty());QCOMPARE(config,QJsonObject({{"sentinel",true}}));
+    QVERIFY(node.nativeOutbound.isEmpty());QVERIFY(node.runtimeIssues.contains(QStringLiteral("RealitySourceFingerprintUnsupported")));
    }
   }
  }
@@ -320,7 +482,7 @@ private slots:
   // HTTP imports can preserve passwords up to the product's storage bound;
   // this value exceeds the native runtime's narrower credential capability.
   auto nativeLimit=a;nativeLimit["name"]="native-limit";nativeLimit["type"]="http";nativeLimit["username"]="synthetic";nativeLimit["password"]=QString(256,'x');
-  auto engine=std::make_unique<ThreadedEngine>();const auto *runtime=engine.get();EngineController controller(std::move(engine),nullptr,path);auto o=options(net);controller.setProxyPort(o.proxyPort);controller.setRoutingMode("global");
+  auto engine=std::make_unique<RejectOneSelectionEngine>();auto *runtime=engine.get();EngineController controller(std::move(engine),nullptr,path);auto o=options(net);controller.setProxyPort(o.proxyPort);controller.setRoutingMode("global");
   controller.imports()->importText(QString::fromUtf8(QJsonDocument(QJsonObject{{"proxies",QJsonArray{a,b,unsupported,nativeLimit}}}).toJson()));
   QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),5000);QCOMPARE(controller.nodeCatalog().size(),4);
   const auto catalog=controller.nodeCatalog();const auto idA=catalog[0].toMap()["id"].toString(),idB=catalog[1].toMap()["id"].toString();
@@ -329,13 +491,20 @@ private slots:
   QVERIFY(!controller.chooseNode(catalog[2].toMap()["id"].toString()));QCOMPARE(controller.selectedNodeId(),idA);QCOMPARE(controller.activeNodeId(),idA);QCOMPARE(NodeStore(path).selectedId(),idA);
   QVERIFY(!controller.chooseNode("missing"));QVERIFY(!controller.chooseNode({}));QCOMPARE(NodeStore(path).selectedId(),idA);
   QSignalSpy diagnostics(&controller,&EngineController::diagnostic);
-  QVERIFY(controller.chooseNode(catalog[3].toMap()["id"].toString()));
+  QVERIFY(!controller.chooseNode(catalog[3].toMap()["id"].toString()));
+  QVERIFY(!controller.nodeBusy());QCOMPARE(runtime->selectionCalls,0);QCOMPARE(diagnostics.count(),0);
+  QCOMPARE(controller.selectedNodeId(),idA);QCOMPARE(controller.activeNodeId(),idA);QCOMPARE(NodeStore(path).selectedId(),idA);
+  QCOMPARE(runtime->status().sessionId,sessionA);QCOMPARE(request(),QByteArray("exit-A"));
+  // Preserve the asynchronous rollback contract independently of the earlier
+  // native capability check. B is valid, but one queued control result fails.
+  runtime->rejectNextSelection=idB;QVERIFY(controller.chooseNode(idB));QCOMPARE(runtime->selectionCalls,1);
+  QCOMPARE(NodeStore(path).selectedId(),idB);QCOMPARE(controller.activeNodeId(),idA);
   // The worker result is queued. An immediate reconnect request must obey the
   // same pending-selection gate and must not restart A with the unaccepted ID.
   QVERIFY(controller.nodeBusy());controller.connectNode({});QVERIFY(!controller.busy());QVERIFY(controller.apiHealthy());QCOMPARE(runtime->status().sessionId,sessionA);
   QTRY_VERIFY_WITH_TIMEOUT(!controller.nodeBusy(),5000);QCOMPARE(controller.selectedNodeId(),idA);QCOMPARE(controller.activeNodeId(),idA);QCOMPARE(NodeStore(path).selectedId(),idA);
   QCOMPARE(runtime->status().sessionId,sessionA);
-  bool rejectedByRuntime=false;for(const auto &event:diagnostics)if(event[0].toString()=="SwirlRust"&&event[1].toString()=="SelectionFailed")rejectedByRuntime=true;QVERIFY(rejectedByRuntime);
+  bool receivedQueuedFailure=false;for(const auto &event:diagnostics)if(event[0].toString()=="SwirlRust"&&event[1].toString()=="SelectionFailed")receivedQueuedFailure=true;QVERIFY(receivedQueuedFailure);QCOMPARE(runtime->injectedRejections,1);
   QCOMPARE(request(),QByteArray("exit-A"));QCOMPARE(net.b.forwarded,0);
   QVERIFY(controller.chooseNode(idB));QTRY_COMPARE_WITH_TIMEOUT(controller.activeNodeId(),idB,5000);QCOMPARE(NodeStore(path).selectedId(),idB);QCOMPARE(request(),QByteArray("exit-B"));
   controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),5000);
@@ -354,7 +523,7 @@ private slots:
   {
    NodeStore store(path);QVERIFY(store.saveSubscription({},"synthetic source",QUrl("https://fixture.invalid/subscription"),360,false));const auto source=store.subscriptions().first().id;
    const auto first=NodeImporter::parse(QString("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: %1}]").arg(net.a.serverPort()).toUtf8());QVERIFY(first);QVERIFY(store.importNodes(first.nodes,source));QVERIFY(store.select(store.nodes().first().id));
-   const auto replacement=NodeImporter::parse(QString("proxies: [{name: replacement, type: socks5, server: 127.0.0.1, port: %1}]").arg(net.a.serverPort()).toUtf8());QVERIFY(replacement);QVERIFY(store.importNodes(replacement.nodes,source));QVERIFY(store.selectedId().isEmpty());
+   const auto replacement=NodeImporter::parse(QString("proxies: [{name: replacement, type: socks5, server: 127.0.0.1, port: %1}]").arg(net.b.serverPort()).toUtf8());QVERIFY(replacement);QVERIFY(store.importNodes(replacement.nodes,source));QVERIFY(store.selectedId().isEmpty());
   }
   EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);auto o=options(net);controller.setProxyPort(o.proxyPort);controller.setRoutingMode("global");
   controller.connectNode({});QVERIFY(!controller.processAlive());QVERIFY(!controller.apiHealthy());QVERIFY(!controller.nodeError().isEmpty());QCOMPARE(net.a.forwarded,0);QCOMPARE(net.b.forwarded,0);QCOMPARE(net.httpRequests,0);
@@ -469,7 +638,7 @@ private slots:
    const auto response=request(host,port,target,encrypted);return response.error==QNetworkReply::NoError&&response.status==200&&response.body==expected+':'+target.toUtf8();
   };
   {
-   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);controller.setExecutablePath("must-not-start-an-external-core.exe");
+   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);QCOMPARE(controller.metaObject()->indexOfProperty("executablePath"),-1);
    QCOMPARE(controller.selectedNodeId(),idA);QCOMPARE(QJsonObject::fromVariantMap(controller.networkConfigurationSnapshot()),QJsonObject::fromVariantMap(network));
    NodeStore restored(path);QCOMPARE(restored.nodes().size(),savedNodes.size());QCOMPARE(restored.networkConfiguration()["importedConfiguration"].toObject(),original);
    for(qsizetype i=0;i<savedNodes.size();++i){QCOMPARE(restored.nodes()[i].parameters,savedNodes[i].parameters);QCOMPARE(restored.nodes()[i].password,savedNodes[i].password);QCOMPARE(restored.nodes()[i].originalConfiguration,savedNodes[i].originalConfiguration);}
@@ -646,7 +815,7 @@ private slots:
    check["stage"]="complete";check["success"]=true;return finish();
   };
   {
-   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);controller.setRoutingMode("global");controller.setExecutablePath("must-not-start-an-external-core.exe");
+   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);controller.setRoutingMode("global");QCOMPARE(controller.metaObject()->indexOfProperty("executablePath"),-1);
    QVERIFY(controller.selectedNodeId()==idA);QVERIFY(controller.networkConfigurationSnapshot()==savedNetwork);
    NodeStore restored(path);const auto restoredNodes=restored.nodes();QVERIFY(restored.error().isEmpty()&&restoredNodes.size()==savedNodes.size());report["encrypted_store_reloaded"]=true;
    for(qsizetype i=0;i<savedNodes.size();++i){const auto &node=restoredNodes[i],&before=savedNodes[i];QVERIFY(node.parameters==before.parameters&&node.password==before.password&&node.originalConfiguration==before.originalConfiguration);}
@@ -774,7 +943,7 @@ private slots:
   };
   for(const auto frontend:{QNetworkProxy::HttpProxy,QNetworkProxy::Socks5Proxy}){
    const auto frontendName=frontend==QNetworkProxy::HttpProxy?QString("http-connect"):QString("socks5");
-   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);controller.setRoutingMode(mode=="reject"?"direct":"global");controller.setExecutablePath("must-not-start-an-external-core.exe");
+   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);controller.setRoutingMode(mode=="reject"?"direct":"global");QCOMPARE(controller.metaObject()->indexOfProperty("executablePath"),-1);
    QVERIFY(controller.selectedNodeId()==idA);
    QVERIFY(QJsonObject::fromVariantMap(controller.networkConfigurationSnapshot())==savedNetwork);
    NodeStore restored(path);QVERIFY(restored.error().isEmpty()&&restored.nodes().size()==savedNodes.size());report["encrypted_store_reloaded"]=true;
@@ -844,14 +1013,159 @@ private slots:
   }
   controller.imports()->importText("proxies: [{name: inside, type: socks5, server: 127.0.0.1, port: 1081}]\nrules: ['MATCH,SWIRL']\n");QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),4000);QCOMPARE(controller.nodeCatalog().size(),1);
  }
- void nonClashGlobalConfigurationDoesNotAlterNativeState(){
+ void unsupportedClientGlobalConfigurationDoesNotAlterNativeState(){
   QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);
   controller.imports()->importText("proxies: [{name: retained, type: socks5, server: 127.0.0.1, port: 1080}]");QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),4000);QCOMPARE(controller.nodeCatalog().size(),1);
   QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto before=file.readAll();file.close();const auto nodes=controller.nodeCatalog();const auto network=controller.networkConfigurationSnapshot();
-  for(const auto &body:{QByteArray("[Proxy]\nA = socks5, 127.0.0.1, 1081\n[Rule]\nFINAL,A\n[Future]\nfixture-secret\n"),QByteArray(R"({"outbounds":[{"type":"socks","tag":"A","server":"127.0.0.1","server_port":1081},{"type":"selector","tag":"choice","outbounds":["A"]}],"route":{"final":"choice"}})")}){
+  for(const auto &body:{QByteArray("[Proxy]\nA = socks5, 127.0.0.1, 1081\n[Rule]\nFINAL,A\n[Future]\nfixture-secret\n"),QByteArray(R"({"outbounds":[{"type":"socks","tag":"A","server":"127.0.0.1","server_port":1081},{"type":"selector","tag":"choice","outbounds":["A"]}],"route":{"final":"choice"},"inbounds":[{"type":"mixed","listen":"0.0.0.0","listen_port":7890}]})")}){
    controller.imports()->importText(QString::fromUtf8(body));QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),4000);QCOMPARE(controller.nodeCatalog(),nodes);QCOMPARE(controller.networkConfigurationSnapshot(),network);
    QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),before);file.close();QVERIFY(!controller.imports()->message().contains("fixture-secret"));QVERIFY(!controller.processAlive());
   }
+ }
+ void automaticSubscriptionKeepsValidNodesAndRefusesForeignExecution(){
+  QTemporaryDir directory;const auto path=directory.filePath("automatic.dpapi");
+  ControlledNetwork net;QVERIFY(net.start());QTcpServer source;QVERIFY(source.listen(QHostAddress::LocalHost));
+  const auto node=QJsonObject{{"name","A"},{"type","socks5"},{"server","127.0.0.1"},{"port",net.a.serverPort()}};
+  QByteArray body=QJsonDocument(QJsonObject{{"proxies",QJsonArray{node}}}).toJson();
+  connect(&source,&QTcpServer::newConnection,this,[&]{while(source.hasPendingConnections()){
+   auto *socket=source.nextPendingConnection();connect(socket,&QTcpSocket::readyRead,socket,[&,socket]{
+    socket->readAll();if(socket->property("done").toBool())return;socket->setProperty("done",true);
+    socket->write("HTTP/1.1 200 OK\r\nContent-Length: "+QByteArray::number(body.size())+"\r\nConnection: close\r\n\r\n"+body);socket->disconnectFromHost();
+   });connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+  }});
+  EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path,true);
+  QVERIFY(controller.replaceNetworkConfiguration({{"rules",QStringList{"MATCH,REJECT"}},{"groups",QVariantList{}}}));
+  const auto original=controller.networkConfigurationSnapshot();auto *imports=controller.imports();
+  // Neither the provider's name, URL nor old persisted mode may override content.
+  QVERIFY(imports->saveSubscription({},"Surge named provider",QUrl(QString("http://127.0.0.1:%1/loon.conf").arg(source.serverPort())),360,false,"loon","full-profile"));
+  const auto sourceId=imports->providers().first().toMap().value("id").toString();
+  imports->refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
+  QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.networkConfigurationSnapshot(),original);
+  QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes"));
+  const auto id=controller.nodeCatalog().first().toMap().value("id").toString();
+  body=QJsonDocument(QJsonObject{{"proxies",QJsonArray{node}},
+   {"proxy-groups",QJsonArray{QJsonObject{{"name","route"},{"type","relay"},{"proxies",QJsonArray{"A"}}}}},
+   {"rules",QJsonArray{"MATCH,route"}}}).toJson();
+  imports->refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
+  QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.nodeCatalog().first().toMap().value("id").toString(),id);
+  QCOMPARE(controller.networkConfigurationSnapshot(),original);
+  const auto outcome=imports->providers().first().toMap();
+  QVERIFY2(!outcome.value("status").toString().contains(QStringLiteral("失败")),qPrintable(imports->message()));
+  QCOMPARE(outcome.value("importMode").toString(),QString("nodes-with-warning"));
+  QVERIFY2(outcome.value("warning").toString().contains(QStringLiteral("仅更新节点")),qPrintable(imports->message()));
+  EngineController reloaded(std::make_unique<RustCoreEngine>(),nullptr,path,true);
+  QCOMPARE(reloaded.imports()->providers().first().toMap().value("warning"),outcome.value("warning"));
+  // Portable structural projection can pass while native execution rejects a
+  // non-equivalent default strategy. This remains a recoverable pre-commit
+  // configuration problem only after the independent whole-document audit.
+  body=QJsonDocument(QJsonObject{{"proxies",QJsonArray{node}},
+   {"proxy-groups",QJsonArray{QJsonObject{{"name","route"},{"type","load-balance"},{"proxies",QJsonArray{"A"}}}}},
+   {"rules",QJsonArray{"MATCH,route"}}}).toJson();
+  imports->refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
+  const auto nativeOutcome=imports->providers().first().toMap();
+  QVERIFY2(!nativeOutcome.value("status").toString().contains(QStringLiteral("失败")),qPrintable(imports->message()));
+  QCOMPARE(nativeOutcome.value("importMode").toString(),QString("nodes-with-warning"));
+  QVERIFY(nativeOutcome.value("warning").toString().contains(QStringLiteral("仅更新节点")));
+  QCOMPARE(controller.networkConfigurationSnapshot(),original);
+  QCOMPARE(controller.nodeCatalog().first().toMap().value("id").toString(),id);
+  QFile saved(path);QVERIFY(saved.open(QIODevice::ReadOnly));const auto retained=saved.readAll();saved.close();
+  QVERIFY(!retained.contains("ProfileGroupUnsupported"));
+  // A later executable foreign section is refused full-profile execution;
+  // the existing manual nodes-only boundary can still recover its valid nodes.
+  body=QString("[General]\nloglevel=notify\n[Proxy]\nA=socks5,127.0.0.1,%1\n[Proxy Group]\nroute=url-test,A,url=https://example.invalid/check\n[Rule]\nFINAL,route\n[Script]\nrequest=https://private.invalid/SYNTHETIC-SCRIPT-SECRET\n").arg(net.a.serverPort()).toUtf8();
+  imports->refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
+  QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+  QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));
+  QVERIFY(imports->providers().first().toMap().value("warning").toString().contains(QStringLiteral("脚本、重写、MITM")));
+  QCOMPARE(controller.nodeCatalog().first().toMap().value("id").toString(),id);QCOMPARE(controller.networkConfigurationSnapshot(),original);
+  QVERIFY(saved.open(QIODevice::ReadOnly));const auto extracted=saved.readAll();saved.close();QVERIFY(!extracted.contains("SYNTHETIC-SCRIPT-SECRET"));
+  QVERIFY(!imports->message().contains("SYNTHETIC-SCRIPT-SECRET"));
+  imports->importText(QString::fromUtf8(body));QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
+  QVERIFY(imports->message().contains(QStringLiteral("失败")));QCOMPARE(controller.networkConfigurationSnapshot(),original);
+  QVERIFY(saved.open(QIODevice::ReadOnly));QCOMPARE(saved.readAll(),extracted);
+ }
+ void automaticForeignGlobalsAreInertData_data(){
+  QTest::addColumn<bool>("ini");QTest::newRow("surge-client-settings")<<true;QTest::newRow("clash-client-settings")<<false;
+ }
+ void automaticForeignGlobalsAreInertData(){
+  QFETCH(bool,ini);QTemporaryDir directory;const auto path=directory.filePath("inert.dpapi");
+  ControlledNetwork net;QVERIFY(net.start());net.a.username.clear();net.a.password.clear();
+  const QByteArray globals="[General]\nbypass-system=true\nskip-proxy=192.0.2.0/24\nbypass-tun=192.0.2.0/24\nhttp-listen=0.0.0.0:19870\nsocks5-listen=0.0.0.0:19871\nipv6-vif=always\ndns-server=192.0.2.53\nfuture-network-metadata=retained-fixture\n";
+  QByteArray body=ini?globals+QString("[Proxy]\nA=socks5,127.0.0.1,%1\n[Rule]\nRULE-SET,https://policy.invalid/rules,REJECT\nFINAL,REJECT\n").arg(net.a.serverPort()).toUtf8():
+   QString("mixed-port: 19870\nallow-lan: true\ntun: {enable: true}\nfuture-network-metadata: {opaque: retained-fixture}\nproxies: [{name: A, type: socks5, server: 127.0.0.1, port: %1}]\nrules: ['MATCH,REJECT']\n").arg(net.a.serverPort()).toUtf8();
+  const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+  QTcpServer source;QVERIFY(source.listen(QHostAddress::LocalHost));
+  connect(&source,&QTcpServer::newConnection,this,[&]{while(source.hasPendingConnections()){
+   auto *socket=source.nextPendingConnection();connect(socket,&QTcpSocket::readyRead,socket,[&,socket]{
+    socket->readAll();if(socket->property("done").toBool())return;socket->setProperty("done",true);
+    socket->write("HTTP/1.1 200 OK\r\nContent-Length: "+QByteArray::number(body.size())+"\r\nConnection: close\r\n\r\n"+body);socket->disconnectFromHost();
+   });connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+  }});
+  EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path,true);
+  QVERIFY(controller.replaceNetworkConfiguration({{"rules",QStringList{"MATCH,REJECT"}},{"groups",QVariantList{}}}));
+  const auto original=controller.networkConfigurationSnapshot();auto *imports=controller.imports();
+  QVERIFY(imports->saveSubscription({},"Foreign full profile",QUrl(QString("http://127.0.0.1:%1/source").arg(source.serverPort())),360,false,"auto"));
+  const auto sourceId=imports->providers().first().toMap().value("id").toString();imports->refreshSubscription(sourceId);
+  QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.networkConfigurationSnapshot(),original);
+  const auto outcome=imports->providers().first().toMap();QCOMPARE(outcome.value("importMode").toString(),QString("nodes-with-warning"));
+  QVERIFY(outcome.value("warning").toString().contains(QStringLiteral("监听与 TUN 均未启用")));
+  NodeStore reloaded(path);QCOMPARE(reloaded.nodes().size(),1);
+  const auto preserved=reloaded.networkConfiguration()["subscriptionImportResults"].toObject()[sourceId].toObject();
+  QCOMPARE(preserved["preservedConfiguration"],QJsonValue(parsed.configuration));
+  EngineController reopened(std::make_unique<RustCoreEngine>(),nullptr,path,true);QCOMPARE(reopened.networkConfigurationSnapshot(),original);
+  QCOMPARE(reopened.imports()->providers().first().toMap().value("warning"),outcome.value("warning"));
+  auto native=options(net);native.nodes=reloaded.nodes();native.selectedNodeId=native.nodes.first().id;native.routingMode="global";
+  RustCoreEngine engine;engine.start(native);QVERIFY2(engine.status().apiHealthy,qPrintable(engine.status().message));
+  QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",native.proxyPort));
+  QNetworkRequest request(net.url());request.setTransferTimeout(4000);auto *reply=client.get(request);
+  QVERIFY(QTest::qWaitFor([&]{return reply->isFinished();},5000));QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-A"));
+  QCOMPARE(net.a.forwarded,1);QCOMPARE(net.httpRequestsByExit.value("DIRECT-BYPASS"),0);engine.stop();
+  QFile encrypted(path);QVERIFY(encrypted.open(QIODevice::ReadOnly));const auto before=encrypted.readAll();encrypted.close();QVERIFY(!before.contains("retained-fixture"));
+  body+=ini?QByteArray("[Script]\nrequest=javascript:retained-fixture\n[MITM]\nhostname=fixture.invalid\n[URL Rewrite]\n^https://fixture.invalid https://ignored.invalid 302\n"):QByteArray("script: {code: retained-fixture}\n");
+  imports->refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
+  QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+  QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));
+  QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.networkConfigurationSnapshot(),original);
+  QVERIFY(encrypted.open(QIODevice::ReadOnly));const auto inert=encrypted.readAll();encrypted.close();QVERIFY(!inert.contains("retained-fixture"));
+  imports->importText(QString::fromUtf8(body));QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
+  QVERIFY(imports->message().contains(QStringLiteral("失败")));QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.networkConfigurationSnapshot(),original);
+  QVERIFY(encrypted.open(QIODevice::ReadOnly));QCOMPARE(encrypted.readAll(),inert);
+ }
+ void automaticManagedIniKeepsLocalRoutingAndSwirlUpdateSource_data(){
+  QTest::addColumn<bool>("quantumult");QTest::newRow("managed-ini")<<false;QTest::newRow("quantumult-x")<<true;
+ }
+ void automaticManagedIniKeepsLocalRoutingAndSwirlUpdateSource(){
+  QFETCH(bool,quantumult);
+  ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;const auto path=directory.filePath("managed.dpapi");
+  const QByteArray document=(quantumult?
+   QString("[general]\nserver_check_url=https://example.invalid/check\n[dns]\nno-ipv6\nno-system\nserver=192.0.2.53\n[policy]\nstatic=route,A\n[server_local]\nsocks5=127.0.0.1:%1,tag=A\n[filter_local]\nfinal,route\n"):
+   QString("#!MANAGED-CONFIG https://example.invalid/SYNTHETIC-MANAGED-TOKEN interval=86400 strict=false\n[General]\nloglevel=notify\ndns-server=192.0.2.53\nipv6=false\n[Proxy]\nA=socks5,127.0.0.1,%1\n[Proxy Group]\nroute=select,A\n[Rule]\nFINAL,route\n")).arg(net.a.serverPort()).toUtf8();
+  QTcpServer source;QVERIFY(source.listen(QHostAddress::LocalHost));
+  connect(&source,&QTcpServer::newConnection,this,[&]{while(source.hasPendingConnections()){
+   auto *socket=source.nextPendingConnection();connect(socket,&QTcpSocket::readyRead,socket,[&,socket]{
+    socket->readAll();if(socket->property("done").toBool())return;socket->setProperty("done",true);
+    socket->write("HTTP/1.1 200 OK\r\nContent-Length: "+QByteArray::number(document.size())+"\r\nConnection: close\r\n\r\n"+document);socket->disconnectFromHost();
+   });connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+  }});
+  EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path,true);
+  QTcpServer lease;QVERIFY(lease.listen(QHostAddress::LocalHost));const auto port=lease.serverPort();lease.close();controller.setProxyPort(port);controller.setRoutingMode("global");
+  const auto retainedNetwork=controller.networkConfigurationSnapshot();
+  const auto url=QUrl(QString("http://127.0.0.1:%1/clash.yaml").arg(source.serverPort()));auto *imports=controller.imports();
+  QVERIFY(imports->saveSubscription({},"Clash named provider",url,360,false,"auto","nodes-only"));
+  const auto sourceId=imports->providers().first().toMap().value("id").toString();
+  imports->refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
+  QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));
+  QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.networkConfigurationSnapshot(),retainedNetwork);
+  NodeStore stored(path);QCOMPARE(stored.subscriptions().first().url,url);QCOMPARE(stored.subscriptions().first().intervalMinutes,360);
+  const auto preserved=stored.networkConfiguration()["subscriptionImportResults"].toObject()[sourceId].toObject()["preservedConfiguration"];
+  QCOMPARE(preserved,QJsonValue(NodeImporter::parse(document).configuration));
+  QVERIFY(!stored.networkConfiguration().contains("importedConfiguration"));
+  QVERIFY(imports->providers().first().toMap().value("warning").toString().contains(QStringLiteral("Swirl")));
+  controller.connectNode(controller.nodeCatalog().first().toMap().value("id").toString());QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),5000);
+  QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",port));
+  QNetworkRequest request(net.url());request.setTransferTimeout(4000);auto *reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);
+  QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-A"));QCOMPARE(net.a.forwarded,1);reply->deleteLater();controller.stop();
+  QVERIFY(!imports->message().contains("SYNTHETIC-MANAGED-TOKEN"));
  }
  void manualNodesOnlyImportDoesNotInventPolicyMetadata(){
   QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");
@@ -877,15 +1191,28 @@ private slots:
    EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);const auto network=controller.networkConfigurationSnapshot();auto *imports=controller.imports();
    const auto source=imports->providers().first().toMap().value("id").toString();imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);
    QCOMPARE(downloads,1);QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.networkConfigurationSnapshot(),network);
-   QVERIFY(imports->message().contains(QStringLiteral("本次仅更新节点")));
+   QVERIFY(imports->message().contains(QStringLiteral("已自动提取节点")));
+   QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));
+   QVERIFY(imports->providers().first().toMap().value("warning").toString().contains(QStringLiteral("仅更新节点")));
    const auto id=controller.nodeCatalog().first().toMap().value("id").toString();
    const QVariantMap policy{{"groups",QVariantList{QVariantMap{{"name","route"},{"type","select"},{"proxies",QStringList{id}}}}},{"rules",QStringList{"MATCH,route"}}};
    QVERIFY2(controller.replaceNetworkConfiguration(policy),qPrintable(controller.networkConfigurationError()));const auto retained=controller.networkConfigurationSnapshot();
-   proxy["name"]="B";body=document();NodeStore before(path);const auto success=before.subscriptions().first().lastSuccess;
+   // U1 preserves identity across a display-name-only refresh. Verify that
+   // stronger contract before constructing a genuinely dangling policy.
+   proxy["name"]="B";body=document();
    imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(downloads,2);
+   QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.nodeCatalog().first().toMap().value("id").toString(),id);
+   QCOMPARE(controller.nodeCatalog().first().toMap().value("name").toString(),QString("B"));
+   QCOMPARE(controller.networkConfigurationSnapshot(),retained);QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+   NodeStore before(path);const auto success=before.subscriptions().first().lastSuccess;
+   QFile saved(path);QVERIFY(saved.open(QIODevice::ReadOnly));const auto ciphertext=saved.readAll();saved.close();
+   proxy["name"]="C";proxy["port"]=1082;body=document();
+   imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(downloads,3);
    QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.nodeCatalog().first().toMap().value("id").toString(),id);
    QCOMPARE(controller.networkConfigurationSnapshot(),retained);QVERIFY(imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
    NodeStore after(path);QCOMPARE(after.subscriptions().first().lastSuccess,success);QCOMPARE(after.nodes().first().id,id);
+   QCOMPARE(after.nodes().first().name,QString("B"));QCOMPARE(after.nodes().first().port,quint16(1080));
+   QVERIFY(saved.open(QIODevice::ReadOnly));QCOMPARE(saved.readAll(),ciphertext);
   }
  void fullClashSubscriptionReachesNativePolicyAndRejectsPartialUpdates(){
   ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");
@@ -899,32 +1226,119 @@ private slots:
   }});
   auto *imports=controller.imports();QVERIFY(imports->saveSubscription({},"fixture",QUrl(QString("http://127.0.0.1:%1/sub").arg(subscription.serverPort())),360,false));const auto source=imports->providers().first().toMap().value("id").toString();
   imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(downloads,1);QCOMPARE(controller.nodeCatalog().size(),2);
+  QVERIFY(controller.policyGroups().isEmpty());
+  // This legacy policy is an explicit local action, never authority granted
+  // by a subscription refresh. Subsequent downloads must preserve it.
+  const auto reviewedImport=NodeImporter::parse(body);QVERIFY(reviewedImport);
+  QVERIFY(controller.importNodesAndConfiguration(reviewedImport.nodes,source,
+    {{"groups",QVariantList{QVariantMap{{"name","route"},{"type","select"},{"proxies",QStringList{"B","A"}}}}},{"rules",QStringList{"MATCH,route"}}},
+    reviewedImport.configuration,reviewedImport.configurationFormat));
   const auto id=controller.nodeCatalog().first().toMap().value("id").toString();const auto group=controller.policyGroups();
   NodeStore disk(path);QCOMPARE(disk.networkConfiguration()["importedConfiguration"].toObject()["configuration"].toObject()["rules"],document["rules"]);
   controller.start();QVERIFY(!controller.processAlive());QVERIFY(!controller.apiHealthy());
   controller.connectNode(QString{});QVERIFY(!controller.processAlive());QVERIFY(!controller.apiHealthy());
   controller.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),4000);
   QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",proxyPort));QNetworkRequest request(net.url());request.setTransferTimeout(4000);auto *reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);QCOMPARE(reply->readAll(),QByteArray("exit-B"));QCOMPARE(net.a.forwarded,0);QCOMPARE(net.b.forwarded,1);reply->deleteLater();
-  // A complete document refresh cannot alter a running immutable session.
-  imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QVERIFY(controller.apiHealthy());QCOMPARE(controller.policyGroups(),group);QVERIFY(imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+  // A full document refresh only updates its nodes, including while running.
+  // The explicitly installed group and its real exit remain unchanged.
+  QFile saved(path);
+  imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QVERIFY(controller.apiHealthy());QCOMPARE(controller.policyGroups(),group);QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+  QVERIFY(saved.open(QIODevice::ReadOnly));const auto runningCiphertext=saved.readAll();saved.close();
   body=QJsonDocument(QJsonObject{{"proxies",QJsonArray{proxies.first()}}}).toJson();imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QVERIFY(controller.apiHealthy());QCOMPARE(controller.nodeCatalog().size(),2);QCOMPARE(controller.policyGroups(),group);
-  {NodeStore unchanged(path);QCOMPARE(unchanged.nodes().size(),2);}
+  {NodeStore unchanged(path);QCOMPARE(unchanged.nodes().size(),2);for(const auto &node:unchanged.nodes())QCOMPARE(node.sourceId,source);}
+  QVERIFY(imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+  QVERIFY(saved.open(QIODevice::ReadOnly));QCOMPARE(saved.readAll(),runningCiphertext);saved.close();
   controller.disconnectNode();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),4000);
-  for(const auto &mutation:QList<QJsonObject>{QJsonObject{{"future-global",true}},QJsonObject{{"dns",QJsonObject{{"respect-rules",true}}}},QJsonObject{{"rules",QJsonArray{false}}},QJsonObject{{"proxy-groups","not-an-array"}},QJsonObject{{"rules",QJsonArray{"PROCESS-NAME,fixture.exe,route","MATCH,route"}}},QJsonObject{{"rules",QJsonArray{"DOMAIN,example.invalid,route"}}}}) {
-   auto invalid=document;for(auto it=mutation.begin();it!=mutation.end();++it)invalid[it.key()]=it.value();body=QJsonDocument(invalid).toJson();imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(controller.policyGroups(),group);QCOMPARE(controller.nodeCatalog().size(),2);QVERIFY(imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+  const auto network=controller.networkConfigurationSnapshot();const auto nodes=controller.nodeCatalog();
+  for(const auto &mutation:QList<QJsonObject>{QJsonObject{{"future-global",true}},QJsonObject{{"script",QJsonObject{{"code","SYNTHETIC-PRIVATE"}}}},QJsonObject{{"mixed-port",7890}},QJsonObject{{"dns",QJsonObject{{"enable",true},{"nameserver",QJsonArray{"file:///SYNTHETIC-PRIVATE"}}}}}}) {
+   QVERIFY(saved.open(QIODevice::ReadOnly));const auto ciphertext=saved.readAll();saved.close();NodeStore before(path);const auto lastSuccess=before.subscriptions().first().lastSuccess;
+   auto invalid=document;for(auto it=mutation.begin();it!=mutation.end();++it)invalid[it.key()]=it.value();body=QJsonDocument(invalid).toJson();imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);
+   QCOMPARE(controller.networkConfigurationSnapshot(),network);QCOMPARE(controller.nodeCatalog(),nodes);QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+   QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));
+   QVERIFY(!imports->message().contains("SYNTHETIC-PRIVATE"));QVERIFY(saved.open(QIODevice::ReadOnly));const auto inert=saved.readAll();saved.close();QVERIFY(!inert.contains("SYNTHETIC-PRIVATE"));
+   imports->importText(QString::fromUtf8(body));QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QVERIFY(imports->message().contains(QStringLiteral("失败")));QCOMPARE(controller.networkConfigurationSnapshot(),network);QCOMPARE(controller.nodeCatalog(),nodes);
+   QVERIFY(saved.open(QIODevice::ReadOnly));QCOMPARE(saved.readAll(),inert);saved.close();
+  }
+  for(const auto &mutation:QList<QJsonObject>{QJsonObject{{"dns",QJsonObject{{"respect-rules",true}}}},QJsonObject{{"rules",QJsonArray{false}}},QJsonObject{{"proxy-groups","not-an-array"}},QJsonObject{{"rules",QJsonArray{"PROCESS-NAME,fixture.exe,route","MATCH,route"}}},QJsonObject{{"rules",QJsonArray{"DOMAIN,example.invalid,route"}}}}) {
+   auto unsupported=document;for(auto it=mutation.begin();it!=mutation.end();++it)unsupported[it.key()]=it.value();body=QJsonDocument(unsupported).toJson();imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);
+   QCOMPARE(controller.networkConfigurationSnapshot(),network);QCOMPARE(controller.nodeCatalog(),nodes);const auto outcome=imports->providers().first().toMap();
+   QVERIFY2(!outcome.value("status").toString().contains(QStringLiteral("失败")),qPrintable(imports->message()));QCOMPARE(outcome.value("importMode").toString(),QString("nodes-with-warning"));QVERIFY(!outcome.value("warning").toString().isEmpty());
+   NodeStore retained(path);for(const auto &node:retained.nodes())QCOMPARE(node.sourceId,source);
+   QCOMPARE(retained.networkConfiguration()["subscriptionImportResults"].toObject()[source].toObject()["notice"].toString(),outcome.value("warning").toString());
   }
   body=QJsonDocument(document).toJson();imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(controller.nodeCatalog().first().toMap().value("id").toString(),id);QCOMPARE(controller.policyGroups(),group);
   EngineController reopened(std::make_unique<RustCoreEngine>(),nullptr,path,true);reopened.setProxyPort(proxyPort);reopened.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(reopened.apiHealthy(),4000);
   reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);QCOMPARE(reply->readAll(),QByteArray("exit-B"));reply->deleteLater();reopened.stop();QTRY_VERIFY_WITH_TIMEOUT(!reopened.processAlive(),4000);
   NodeStore persisted(path);QCOMPARE(persisted.networkConfiguration()["nativeDocumentRouting"],QJsonValue(true));
   QVERIFY(imports->saveSubscription(source,"fixture",{},360,false,"auto","nodes-only"));
-  auto nodesOnly=document;nodesOnly["future-global"]=true;body=QJsonDocument(nodesOnly).toJson();
+  auto nodesOnly=document;nodesOnly["dns"]=QJsonObject{{"respect-rules",true}};body=QJsonDocument(nodesOnly).toJson();
   const auto retainedRules=controller.networkConfigurationSnapshot().value("rules");
   imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);
   QCOMPARE(controller.nodeCatalog().first().toMap().value("id").toString(),id);
   QCOMPARE(controller.policyGroups(),group);QCOMPARE(controller.networkConfigurationSnapshot().value("rules"),retainedRules);
   QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+  QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));
   NodeStore retained(path);QVERIFY(retained.networkConfiguration()["importedConfiguration"].toObject()["policyRetainedAfterNodesOnlyRefresh"].toBool());
+ }
+ void fullProfilesKeepDnsPolicyAndOriginsAtomic_data(){
+  QTest::addColumn<bool>("singbox");QTest::newRow("clash-dns-hosts")<<false;QTest::newRow("singbox-selector-route-dns")<<true;
+ }
+ void fullProfilesKeepDnsPolicyAndOriginsAtomic(){
+  QFETCH(bool,singbox);ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;QVERIFY(directory.isValid());const auto path=directory.filePath("profile.dpapi");
+  EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path,true);QTcpServer port;QVERIFY(port.listen(QHostAddress::LocalHost));const auto proxyPort=port.serverPort();port.close();controller.setProxyPort(proxyPort);controller.setRoutingMode("rule");
+  QJsonObject profile;
+  if(singbox){
+   const QJsonArray outbounds{QJsonObject{{"tag","A"},{"type","socks"},{"server","127.0.0.1"},{"server_port",net.a.serverPort()}},QJsonObject{{"tag","B"},{"type","socks"},{"server","127.0.0.1"},{"server_port",net.b.serverPort()},{"username",QString::fromUtf8(net.b.username)},{"password",QString::fromUtf8(net.b.password)}},QJsonObject{{"tag","deny"},{"type","block"}},QJsonObject{{"tag","route"},{"type","selector"},{"outbounds",QJsonArray{"B","A"}},{"default","B"}}};
+   profile={{"outbounds",outbounds},{"route",QJsonObject{{"rules",QJsonArray{QJsonObject{{"domain",QJsonArray{"profile-target.invalid"}},{"outbound","deny"}}}},{"final","route"}}},{"dns",QJsonObject{{"servers",QJsonArray{QJsonObject{{"type","udp"},{"tag","resolver"},{"server","192.0.2.53"}}}},{"final","resolver"},{"strategy","ipv4_only"}}}};
+  }else{
+   const QJsonArray proxies{QJsonObject{{"name","A"},{"type","socks5"},{"server","127.0.0.1"},{"port",net.a.serverPort()}},QJsonObject{{"name","B"},{"type","socks5"},{"server","127.0.0.1"},{"port",net.b.serverPort()},{"username",QString::fromUtf8(net.b.username)},{"password",QString::fromUtf8(net.b.password)}}};
+   profile={{"proxies",proxies},{"proxy-groups",QJsonArray{QJsonObject{{"name","route"},{"type","select"},{"proxies",QJsonArray{"B","A"}}}}},{"rules",QJsonArray{"DOMAIN,profile-target.invalid,DIRECT","MATCH,route"}},{"hosts",QJsonObject{{"profile-target.invalid","127.0.0.1"}}},{"dns",QJsonObject{{"enable",true},{"nameserver",QJsonArray{"192.0.2.53"}},{"ipv6",false},{"use-hosts",true}}}};
+  }
+  QByteArray body=QJsonDocument(profile).toJson();QTcpServer subscription;QVERIFY(subscription.listen(QHostAddress::LocalHost));
+  connect(&subscription,&QTcpServer::newConnection,this,[&]{while(subscription.hasPendingConnections()){
+   auto *socket=subscription.nextPendingConnection();connect(socket,&QTcpSocket::readyRead,socket,[&,socket]{socket->readAll();if(socket->property("done").toBool())return;socket->setProperty("done",true);socket->write("HTTP/1.1 200 OK\r\nContent-Length: "+QByteArray::number(body.size())+"\r\nConnection: close\r\n\r\n"+body);socket->disconnectFromHost();});connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+  }});
+  auto *imports=controller.imports();QVERIFY(imports->saveSubscription({},"Profile fixture",QUrl(QString("http://127.0.0.1:%1/sub").arg(subscription.serverPort())),360,false,"auto","full-profile"));const auto source=imports->providers().first().toMap().value("id").toString();
+  imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);QCOMPARE(controller.nodeCatalog().size(),2);QVERIFY2(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")),qPrintable(imports->message()));
+  QVERIFY(controller.policyGroups().isEmpty());
+  const auto reviewedImport=NodeImporter::parse(body);QVERIFY(reviewedImport);
+  QVariantMap reviewedDns{{"mode",2},{"servers","192.0.2.53"},{"queryFamily","ipv4_only"}};
+  if(!singbox){reviewedDns["useHosts"]=true;reviewedDns["hosts"]=QVariantList{QVariantMap{{"name","profile-target.invalid"},{"value","127.0.0.1"}}};}
+  QVERIFY(controller.importNodesAndConfiguration(reviewedImport.nodes,source,
+    {{"dns",reviewedDns},{"groups",QVariantList{QVariantMap{{"name","route"},{"type","select"},{"proxies",QStringList{"B","A"}},{"default-selected","B"}}}},
+     {"rules",QStringList{singbox?"DOMAIN,profile-target.invalid,REJECT":"DOMAIN,profile-target.invalid,DIRECT","MATCH,route"}}},
+    reviewedImport.configuration,reviewedImport.configurationFormat));
+  const auto snapshot=controller.networkConfigurationSnapshot();const auto dns=snapshot.value("dns").toMap();QCOMPARE(dns.value("servers").toString(),QString("192.0.2.53"));QCOMPARE(dns.value("queryFamily").toString(),QString("ipv4_only"));
+  QCOMPARE(controller.policyGroups().size(),1);NodeStore disk(path);QCOMPARE(disk.nodes().size(),2);for(const auto &node:disk.nodes())QCOMPARE(node.sourceId,source);
+  QCOMPARE(disk.networkConfiguration().value("dns").toObject().value("queryFamily").toString(),QString("ipv4_only"));QCOMPARE(disk.networkConfiguration().value("importedConfiguration").toObject().value("configuration").toObject(),NodeImporter::parse(QJsonDocument(profile).toJson()).configuration);
+  const auto id=controller.nodeCatalog().first().toMap().value("id").toString();controller.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),5000);
+  QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",proxyPort));QNetworkRequest request(net.url());request.setTransferTimeout(4000);auto *reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-B"));reply->deleteLater();QCOMPARE(net.a.forwarded,0);QCOMPARE(net.b.forwarded,1);
+  auto named=net.url();named.setHost("profile-target.invalid");QNetworkRequest namedRequest(named);namedRequest.setTransferTimeout(4000);reply=client.get(namedRequest);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);
+  if(singbox){QVERIFY(reply->error()!=QNetworkReply::NoError);QCOMPARE(net.httpRequests,1);}else{QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("DIRECT-BYPASS"));QCOMPARE(net.httpRequests,2);}reply->deleteLater();
+  controller.disconnectNode();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),5000);const auto nodes=controller.nodeCatalog();QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto ciphertext=file.readAll();file.close();
+  auto bad=profile;if(singbox){auto route=bad.value("route").toObject();route["rule_set"]=QJsonArray{};bad["route"]=route;}else{auto settings=bad.value("dns").toObject();settings["PRIVATE_TOKEN"]=QStringLiteral("PRIVATE_VALUE");bad["dns"]=settings;}
+  body=QJsonDocument(bad).toJson();imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);QCOMPARE(controller.nodeCatalog(),nodes);QCOMPARE(controller.networkConfigurationSnapshot(),snapshot);QVERIFY(!imports->message().contains("PRIVATE"));
+  if(singbox) {
+   const auto outcome=imports->providers().first().toMap();QVERIFY2(!outcome.value("status").toString().contains(QStringLiteral("失败")),qPrintable(imports->message()));
+   QCOMPARE(outcome.value("importMode").toString(),QString("nodes-with-warning"));QVERIFY(outcome.value("warning").toString().contains(QStringLiteral("仅更新节点")));
+   NodeStore retained(path);for(const auto &node:retained.nodes())QCOMPARE(node.sourceId,source);
+   QCOMPARE(retained.networkConfiguration()["subscriptionImportResults"].toObject()[source].toObject()["notice"].toString(),outcome.value("warning").toString());
+   QCOMPARE(retained.networkConfiguration()["importedConfiguration"].toObject()["configuration"].toObject(),disk.networkConfiguration()["importedConfiguration"].toObject()["configuration"].toObject());
+  } else {
+   QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+   QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));
+  }
+  // Refuse foreign execution while retaining the canonical nodes and current
+  // policy. Strict full application still rejects it without a disk write.
+  QVERIFY(file.open(QIODevice::ReadOnly));const auto beforeDanger=file.readAll();file.close();NodeStore beforeDangerStore(path);const auto lastSuccess=beforeDangerStore.subscriptions().first().lastSuccess;
+  auto dangerous=bad;dangerous["script"]=QJsonObject{{"code","SYNTHETIC-PRIVATE"}};body=QJsonDocument(dangerous).toJson();imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
+  QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));QVERIFY(!imports->message().contains("SYNTHETIC-PRIVATE"));QCOMPARE(controller.nodeCatalog(),nodes);QCOMPARE(controller.networkConfigurationSnapshot(),snapshot);
+  QVERIFY(file.open(QIODevice::ReadOnly));const auto inert=file.readAll();file.close();QVERIFY(inert!=beforeDanger);QVERIFY(!inert.contains("SYNTHETIC-PRIVATE"));
+  imports->importText(QString::fromUtf8(body));QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);QVERIFY(imports->message().contains(QStringLiteral("失败")));QCOMPARE(controller.nodeCatalog(),nodes);QCOMPARE(controller.networkConfigurationSnapshot(),snapshot);
+  QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),inert);file.close();
+  EngineController reopened(std::make_unique<RustCoreEngine>(),nullptr,path,true);QCOMPARE(QJsonObject::fromVariantMap(reopened.networkConfigurationSnapshot()),QJsonObject::fromVariantMap(snapshot));
+  NodeStore restored(path);const auto archivedNodes=disk.nodes();QCOMPARE(restored.selectedId(),id);QCOMPARE(restored.nodes().size(),archivedNodes.size());for(const auto &node:restored.nodes()){QCOMPARE(node.sourceId,source);QVERIFY(std::any_of(archivedNodes.cbegin(),archivedNodes.cend(),[&](const ProxyNode &before){return before.id==node.id&&before.name==node.name&&before.host==node.host&&before.port==node.port;}));}
+  reopened.setProxyPort(proxyPort);reopened.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(reopened.apiHealthy(),5000);reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-B"));QCOMPARE(net.a.forwarded,0);QCOMPARE(net.b.forwarded,2);reply->deleteLater();reopened.stop();QTRY_VERIFY_WITH_TIMEOUT(!reopened.processAlive(),5000);
  }
  void iniProfileImportConnectsAndUpdatesAtomically(){
   ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");
@@ -938,6 +1352,11 @@ private slots:
   }});
   auto *imports=controller.imports();QVERIFY(imports->saveSubscription({},"INI fixture",QUrl(QString("http://127.0.0.1:%1/sub").arg(subscription.serverPort())),360,false));const auto source=imports->providers().first().toMap().value("id").toString();
   imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(downloads,1);QCOMPARE(controller.nodeCatalog().size(),2);
+  QVERIFY(controller.policyGroups().isEmpty());
+  const auto reviewedImport=NodeImporter::parse(body);QVERIFY(reviewedImport);
+  QVERIFY(controller.importNodesAndConfiguration(reviewedImport.nodes,source,
+    {{"groups",QVariantList{QVariantMap{{"name","route"},{"type","select"},{"proxies",QStringList{"B","A"}}}}},
+     {"rules",QStringList{"DOMAIN,localhost,REJECT","MATCH,route"}}},reviewedImport.configuration,reviewedImport.configurationFormat));
   const auto id=controller.nodeCatalog().first().toMap().value("id").toString();auto beforeNetwork=controller.networkConfigurationSnapshot();const auto beforeNodes=controller.nodeCatalog();
   {NodeStore disk(path);const auto imported=disk.networkConfiguration()["importedConfiguration"].toObject();QCOMPARE(imported["format"],QJsonValue("ini"));QCOMPARE(imported["configuration"].toObject()["document"],QJsonValue(QString::fromUtf8(original).trimmed()));}
   controller.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),4000);
@@ -948,20 +1367,70 @@ private slots:
   imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(downloads,2);QVERIFY(controller.apiHealthy());QCOMPARE(controller.nodeCatalog(),beforeNodes);QCOMPARE(controller.networkConfigurationSnapshot(),beforeNetwork);
   controller.disconnectNode();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),4000);
   body=original;body.replace("select,B,A","select,A,B");imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);
-  QCOMPARE(controller.nodeCatalog(),beforeNodes);const auto retained=controller.networkConfigurationSnapshot().value("groups").toList().first().toMap();QCOMPARE(retained.value("default-selected").toString(),controller.nodeCatalog().last().toMap().value("id").toString());
+  QCOMPARE(controller.nodeCatalog(),beforeNodes);QCOMPARE(controller.networkConfigurationSnapshot().value("groups"),beforeNetwork.value("groups"));
   controller.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),4000);reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);QCOMPARE(reply->readAll(),QByteArray("exit-B"));reply->deleteLater();controller.disconnectNode();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),4000);
+  // Managed update headers and client-only log settings now have a safe,
+  // explicitly disclosed projection. They do not redirect the Swirl source.
+  for(const auto &compatible:QList<QByteArray>{original+"[General]\nloglevel=notify\n","#!MANAGED-CONFIG https://fixture.invalid/SYNTHETIC-MANAGED-TOKEN interval=86400 strict=false\n"+original}) {
+   const auto dns=controller.dnsConfiguration();body=compatible;imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);
+   QCOMPARE(controller.nodeCatalog(),beforeNodes);QCOMPARE(controller.dnsConfiguration(),dns);QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));
+   QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));QVERIFY(!imports->message().contains("SYNTHETIC-MANAGED-TOKEN"));
+   NodeStore retained(path);QCOMPARE(retained.subscriptions().first().url,QUrl(QString("http://127.0.0.1:%1/sub").arg(subscription.serverPort())));QCOMPARE(retained.subscriptions().first().intervalMinutes,360);
+   QCOMPARE(retained.networkConfiguration()["subscriptionImportResults"].toObject()[source].toObject()["preservedConfiguration"].toObject()["document"],QJsonValue(QString::fromUtf8(compatible).trimmed()));
+  }
   beforeNetwork=controller.networkConfigurationSnapshot();
-  QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto ciphertext=file.readAll();file.close();
-  QList<QByteArray> invalid{original+"[General]\ndns-server=192.0.2.53\n",original+"[Remote Rule]\nhttps://fixture.invalid/rules,policy=route\n",original+"DOMAIN,late.invalid,route\n"};
-  for(const auto &replacement:{"IP-CIDR,192.0.2.0/24,route","PROCESS-NAME,fixture.exe,route","DOMAIN,example.invalid,route,no-resolve","DOMAIN,example.invalid,SWIRL"}){auto bad=original;bad.replace("DOMAIN,localhost,REJECT",replacement);invalid.append(bad);}
-  {auto bad=original;bad.replace("select,B,A","url-test,B,A");invalid.append(bad);bad=original;bad.replace("select,B,A","select,missing");invalid.append(bad);bad=original;bad.replace("FINAL,route\n","");invalid.append(bad);}
-  invalid.append("[Proxy]\n"+a+"[Proxy Group]\nroute = select,A\n[Rule]\n"+QByteArray("DOMAIN,example.invalid,REJECT\n").repeated(1000)+"FINAL,route\n");
-  for(const auto &bad:invalid){body=bad;imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(controller.nodeCatalog(),beforeNodes);QCOMPARE(controller.networkConfigurationSnapshot(),beforeNetwork);QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),ciphertext);file.close();}
-  status=503;body=original;imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(controller.nodeCatalog(),beforeNodes);status=200;
+  QFile file(path);
+  QList<QByteArray> unsupported{original+"[General]\ndns-server=192.0.2.53\n",original+"DOMAIN,late.invalid,route\n"};
+  for(const auto &replacement:{"IP-CIDR,192.0.2.0/99,route","PROCESS-NAME,fixture.exe,route","DOMAIN,example.invalid,route,no-resolve","DOMAIN,example.invalid,SWIRL"}){auto bad=original;bad.replace("DOMAIN,localhost,REJECT",replacement);unsupported.append(bad);}
+  {auto bad=original;bad.replace("select,B,A","url-test,B,A");unsupported.append(bad);bad=original;bad.replace("select,B,A","select,missing");unsupported.append(bad);bad=original;bad.replace("FINAL,route\n","");unsupported.append(bad);}
+  for(const auto &bad:unsupported){body=bad;imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(controller.nodeCatalog(),beforeNodes);QCOMPARE(controller.networkConfigurationSnapshot(),beforeNetwork);
+   const auto outcome=imports->providers().first().toMap();QVERIFY2(!outcome.value("status").toString().contains(QStringLiteral("失败")),qPrintable(imports->message()));QCOMPARE(outcome.value("importMode").toString(),QString("nodes-with-warning"));QVERIFY(!outcome.value("warning").toString().isEmpty());
+   NodeStore retained(path);for(const auto &node:retained.nodes())QCOMPARE(node.sourceId,source);QCOMPARE(retained.networkConfiguration()["subscriptionImportResults"].toObject()[source].toObject()["notice"].toString(),outcome.value("warning").toString());
+  }
+  QList<QByteArray> opaqueGlobals{original+"[Remote Rule]\nhttps://fixture.invalid/rules,policy=route\n",original+"[Script]\nrequest=script-path=file:///SYNTHETIC-PRIVATE\n",original+"[MITM]\np12=SYNTHETIC-PRIVATE\n",original+"[General]\nhttp-listen=0.0.0.0:7890\n"};
+  {auto bad=original;bad.replace("select,B,A","select,B,A,policy-path=C:\\SYNTHETIC-PRIVATE");opaqueGlobals.append(bad);}
+  for(const auto &foreign:opaqueGlobals){
+   const auto beforeDownloads=downloads;body=foreign;imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);
+   QCOMPARE(downloads,beforeDownloads+1);QCOMPARE(controller.nodeCatalog(),beforeNodes);QCOMPARE(controller.networkConfigurationSnapshot(),beforeNetwork);
+   const auto outcome=imports->providers().first().toMap();QVERIFY(!outcome.value("status").toString().contains(QStringLiteral("失败")));QCOMPARE(outcome.value("importMode").toString(),QString("nodes-with-warning"));
+   QVERIFY(outcome.value("warning").toString().contains(QStringLiteral("不会执行")));QVERIFY(!imports->message().contains("SYNTHETIC-PRIVATE"));
+   QVERIFY(file.open(QIODevice::ReadOnly));const auto inert=file.readAll();file.close();QVERIFY(!inert.contains("SYNTHETIC-PRIVATE"));
+   imports->importText(QString::fromUtf8(foreign));QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QVERIFY(imports->message().contains(QStringLiteral("失败")));
+   QCOMPARE(controller.nodeCatalog(),beforeNodes);QCOMPARE(controller.networkConfigurationSnapshot(),beforeNetwork);QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),inert);file.close();
+  }
+  QList<QByteArray> dangerous;
+  // This safe but incomplete update removes a node still referenced by the
+  // retained policy. Nodes-only fallback must reject that dangling refresh.
+  dangerous.append("[Proxy]\n"+a+"[Proxy Group]\nroute = select,A\n[Rule]\n"+QByteArray("DOMAIN,example.invalid,REJECT\n").repeated(1000)+"FINAL,route\n");
+  for(const auto &bad:dangerous){
+   QVERIFY(file.open(QIODevice::ReadOnly));const auto ciphertext=file.readAll();file.close();NodeStore storedBefore(path);const auto lastSuccess=storedBefore.subscriptions().first().lastSuccess;
+   body=bad;imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(controller.nodeCatalog(),beforeNodes);QCOMPARE(controller.networkConfigurationSnapshot(),beforeNetwork);
+   QVERIFY(imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));QVERIFY(!imports->message().contains("SYNTHETIC-PRIVATE"));QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),ciphertext);file.close();QCOMPARE(NodeStore(path).subscriptions().first().lastSuccess,lastSuccess);
+  }
+  QVERIFY(file.open(QIODevice::ReadOnly));const auto beforeDownloadFailure=file.readAll();file.close();
+  status=503;body=original;imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(controller.nodeCatalog(),beforeNodes);QCOMPARE(controller.networkConfigurationSnapshot(),beforeNetwork);QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),beforeDownloadFailure);file.close();status=200;
+  // Release B explicitly in the local policy before the nodes-only refresh.
+  // A foreign group definition alone must never authorize that removal.
+  auto released=controller.networkConfigurationSnapshot();
+  released["groups"]=QVariantList{QVariantMap{{"name","route"},{"type","select"},{"proxies",QStringList{id}}}};
+  QVERIFY2(controller.replaceNetworkConfiguration(released),qPrintable(controller.networkConfigurationError()));
   body="[Proxy]\n"+a+"[Proxy Group]\nroute = select,A\n[Rule]\nFINAL,route\n";imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.nodeCatalog().first().toMap().value("id").toString(),id);
   controller.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),4000);reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-A"));reply->deleteLater();controller.disconnectNode();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),4000);
-  body.replace("A =","Renamed =");body.replace("select,A","select,Renamed");imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(controller.nodeCatalog().size(),1);const auto renamed=controller.nodeCatalog().first().toMap().value("id").toString();QVERIFY(renamed!=id);
-  EngineController reopened(std::make_unique<RustCoreEngine>(),nullptr,path,true);reopened.setProxyPort(proxyPort);reopened.connectNode(renamed);QTRY_VERIFY_WITH_TIMEOUT(reopened.apiHealthy(),4000);reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);QCOMPARE(reply->readAll(),QByteArray("exit-A"));reply->deleteLater();reopened.stop();QTRY_VERIFY_WITH_TIMEOUT(!reopened.processAlive(),4000);
+  body.replace("A =","Renamed =");body.replace("select,A","select,Renamed");imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(controller.nodeCatalog().size(),1);
+  const auto renamed=controller.nodeCatalog().first().toMap().value("id").toString();
+  // Display names are not semantic identities. The same source-owned endpoint
+  // retains its ID and selection while the policy resolves the new source name.
+  QCOMPARE(renamed,id);QCOMPARE(controller.nodeCatalog().first().toMap().value("name").toString(),QString("Renamed"));QCOMPARE(controller.selectedNodeId(),id);
+  QCOMPARE(controller.policyGroups().first().toMap().value("proxies").toStringList(),QStringList{id});
+  {NodeStore disk(path);QCOMPARE(disk.selectedId(),id);QCOMPARE(disk.nodes().first().sourceId,source);QCOMPARE(disk.nodes().first().name,QString("Renamed"));}
+  const auto renamedCatalog=controller.nodeCatalog();const auto renamedNetwork=controller.networkConfigurationSnapshot();
+  body.replace("select,Renamed","select,A");imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);
+  QCOMPARE(controller.nodeCatalog(),renamedCatalog);QCOMPARE(controller.networkConfigurationSnapshot(),renamedNetwork);
+  QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));QVERIFY(imports->providers().first().toMap().value("warning").toString().contains(QStringLiteral("仅更新节点")));
+  QVERIFY(file.open(QIODevice::ReadOnly));const auto renamedCiphertext=file.readAll();file.close();
+  body+="[Script]\nrequest=script-path=file:///SYNTHETIC-PRIVATE\n";imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);
+  QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));QCOMPARE(imports->providers().first().toMap().value("importMode").toString(),QString("nodes-with-warning"));QCOMPARE(controller.nodeCatalog(),renamedCatalog);QCOMPARE(controller.networkConfigurationSnapshot(),renamedNetwork);QVERIFY(file.open(QIODevice::ReadOnly));const auto extractedCiphertext=file.readAll();QVERIFY(extractedCiphertext!=renamedCiphertext);QVERIFY(!extractedCiphertext.contains("SYNTHETIC-PRIVATE"));file.close();
+  EngineController reopened(std::make_unique<RustCoreEngine>(),nullptr,path,true);QCOMPARE(reopened.selectedNodeId(),id);reopened.setProxyPort(proxyPort);reopened.connectNode(renamed);QTRY_VERIFY_WITH_TIMEOUT(reopened.apiHealthy(),4000);reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);QCOMPARE(reply->readAll(),QByteArray("exit-A"));reply->deleteLater();reopened.stop();QTRY_VERIFY_WITH_TIMEOUT(!reopened.processAlive(),4000);
  }
  void iniRealityCannotStartAsOrdinaryTls(){
   QTcpServer endpoint;QVERIFY(endpoint.listen(QHostAddress::LocalHost));int requests=0;connect(&endpoint,&QTcpServer::newConnection,this,[&]{++requests;});
@@ -1065,18 +1534,20 @@ private slots:
   QVERIFY(apply(second,{"A","B"}));QCOMPARE(current().value("default-selected").toString(),secondMembers.first());
  }
  void atomicNodeNetworkImportUsesPreparedIdsAndSurvivesReload(){
-  QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);
+  QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");QString source;
+  {NodeStore seed(path);QVERIFY(seed.saveSubscription({},"stable provider",QUrl("https://fixture.invalid/stable"),360,false));source=seed.subscriptions().first().id;}
+  EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);
   const QVariantMap dns{{"mode",0},{"servers",""},{"encrypted","https://1.1.1.1/dns-query"}};
   QVERIFY(controller.configureDns(dns));const auto preservedDns=controller.dnsConfiguration();
   const auto parsed=NodeImporter::parse("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: 1080}]");QVERIFY(parsed);
   const QVariantMap configuration{{"groups",QVariantList{QVariantMap{{"name","choice"},{"type","select"},{"proxies",QStringList{"A","DIRECT"}},{"default-selected","A"}}}},{"rules",QStringList{"MATCH,choice"}}};
-  QVERIFY2(controller.importNodesAndConfiguration(parsed.nodes,{},configuration),qPrintable(controller.networkConfigurationError()));
+  QVERIFY2(controller.importNodesAndConfiguration(parsed.nodes,source,configuration),qPrintable(controller.networkConfigurationError()));
   const auto id=controller.nodeCatalog().first().toMap().value("id").toString();QCOMPARE(controller.dnsConfiguration(),preservedDns);
   QCOMPARE(controller.policyGroups().first().toMap().value("proxies").toStringList(),QStringList({id,"DIRECT"}));
   auto refreshed=NodeImporter::parse("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: 1081}]");QVERIFY(refreshed);
-  QVERIFY(controller.importNodesAndConfiguration(refreshed.nodes,{},configuration));QCOMPARE(controller.nodeCatalog().first().toMap().value("id").toString(),id);
+  QVERIFY(controller.importNodesAndConfiguration(refreshed.nodes,source,configuration));QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.nodeCatalog().first().toMap().value("id").toString(),id);
   EngineController reopened(std::make_unique<RustCoreEngine>(),nullptr,path);QCOMPARE(QJsonObject::fromVariantMap(reopened.dnsConfiguration()),QJsonObject::fromVariantMap(preservedDns));QCOMPARE(QJsonArray::fromVariantList(reopened.policyGroups()),QJsonArray::fromVariantList(controller.policyGroups()));QCOMPARE(QJsonObject::fromVariantMap(reopened.networkConfigurationSnapshot()),QJsonObject::fromVariantMap(controller.networkConfigurationSnapshot()));
-  NodeStore disk(path);QCOMPARE(disk.nodes().first().port,quint16(1081));QCOMPARE(disk.networkConfiguration()["groups"].toArray(),QJsonArray::fromVariantList(controller.policyGroups()));
+  NodeStore disk(path);QCOMPARE(disk.nodes().size(),1);QCOMPARE(disk.nodes().first().id,id);QCOMPARE(disk.nodes().first().port,quint16(1081));QCOMPARE(disk.networkConfiguration()["groups"].toArray(),QJsonArray::fromVariantList(controller.policyGroups()));
   QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));QVERIFY(!file.readAll().contains("choice"));QVERIFY(!QFile::exists(path+".network.json"));
  }
  void atomicNodeNetworkImportRejectsInvalidGraphAndWriteFailure(){
@@ -1084,7 +1555,7 @@ private slots:
   auto parsed=NodeImporter::parse("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: 1080}]");QVERIFY(parsed);
   const QVariantMap configuration{{"groups",QVariantList{QVariantMap{{"name","choice"},{"type","select"},{"proxies",QStringList{"A"}}}}},{"rules",QStringList{"MATCH,choice"}}};
   QVERIFY(controller.importNodesAndConfiguration(parsed.nodes,{},configuration));const auto before=controller.networkConfigurationSnapshot();
-  parsed.nodes.first().port=1081;auto invalid=configuration;invalid["groups"]=QVariantList{QVariantMap{{"name","choice"},{"type","select"},{"proxies",QStringList{"missing"}}}};
+  parsed.nodes.first().port=1081;parsed.nodes.first().id=QUuid::createUuid().toString(QUuid::WithoutBraces);auto invalid=configuration;invalid["groups"]=QVariantList{QVariantMap{{"name","choice"},{"type","select"},{"proxies",QStringList{"missing"}}}};
   QVERIFY(!controller.importNodesAndConfiguration(parsed.nodes,{},invalid));QCOMPARE(controller.networkConfigurationSnapshot(),before);
   const auto backup=directory.filePath("old.dpapi");QVERIFY(QFile::rename(path,backup));QVERIFY(QDir().mkdir(path));
   QVERIFY(!controller.importNodesAndConfiguration(parsed.nodes,{},configuration,QJsonObject{{"rules",QJsonArray{"MATCH,choice"}}}));QCOMPARE(controller.networkConfigurationSnapshot(),before);
@@ -1146,8 +1617,11 @@ private slots:
   QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));
   auto parsed=NodeImporter::parse("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: 1080}]");QVERIFY(parsed);QVERIFY(store.importNodes(parsed.nodes));
   NodeStore::ImportPlan plan;auto duplicate=parsed.nodes;auto other=duplicate.first();other.id=QUuid::createUuid().toString(QUuid::WithoutBraces);duplicate.append(other);
-  QVERIFY(!store.prepareImport(duplicate,{},&plan));QCOMPARE(store.nodes().size(),1);
-  other.name="B";other.id=parsed.nodes.first().id;QVERIFY(!store.prepareImport({other},{},&plan));
+  QVERIFY(store.prepareImport(duplicate,{},&plan));QCOMPARE(plan.nodes().size(),1);QCOMPARE(store.nodes().size(),1);
+  QCOMPARE(plan.importedToStoredIds().value(other.id),parsed.nodes.first().id);
+  QVERIFY(!store.prepareImport({parsed.nodes.first(),parsed.nodes.first()},{},&plan));
+  other.name="B";other.id=parsed.nodes.first().id;QVERIFY(store.prepareImport({other},{},&plan));QCOMPARE(plan.nodes().first().id,other.id);
+  other.port=1081;QVERIFY(!store.prepareImport({other},{},&plan));
   QVERIFY(store.saveSubscription({},"fixture",QUrl("https://example.invalid/sub"),360,false));
   QVERIFY(!store.prepareImport(parsed.nodes,store.subscriptions().first().id,&plan));QVERIFY(store.nodes().first().sourceId.isEmpty());
   QVERIFY(store.prepareImport(parsed.nodes,{},&plan));QVERIFY(store.select(parsed.nodes.first().id));QVERIFY(!store.commitImport(plan));
@@ -1157,7 +1631,7 @@ private slots:
  void preparedImportWriteFailurePreservesMemoryAndDurableSnapshot(){
   QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));
   auto parsed=NodeImporter::parse("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: 1080}]");QVERIFY(parsed);QVERIFY(store.importNodes(parsed.nodes));
-  const auto id=store.nodes().first().id;parsed.nodes.first().port=1081;
+  const auto id=store.nodes().first().id;parsed.nodes.first().port=1081;parsed.nodes.first().id=QUuid::createUuid().toString(QUuid::WithoutBraces);
   NodeStore::ImportPlan plan;QVERIFY(store.prepareImport(parsed.nodes,{},&plan));
   // A directory at the destination forces a real QSaveFile failure without
   // permission assumptions or a production fault-injection switch.
@@ -1246,6 +1720,65 @@ private slots:
   o.nodes=valid.nodes;o.selectedNodeId=o.nodes.first().id;o.nodes.first().parameters["skip-cert-verify"]=true;
   QJsonObject config=sentinel;QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());QCOMPARE(config,sentinel);
  }
+ void singBoxQuicProductChainAgainstIndependentPeer(){
+  if(!qEnvironmentVariableIsSet("SWIRL_QT_QUIC_FIXTURE"))QSKIP("The independent QUIC harness supplies synthetic servers and targets.");
+#ifndef Q_OS_WIN
+  QSKIP("The product persistence gate requires Windows DPAPI.");
+#endif
+  const auto fixturePath=qEnvironmentVariable("SWIRL_QT_QUIC_FIXTURE"),reportPath=qEnvironmentVariable("SWIRL_QT_QUIC_REPORT");
+  QVERIFY(QFileInfo(reportPath).isAbsolute()&&fixturePath!=reportPath);QFile fixtureFile(fixturePath);QVERIFY(fixtureFile.open(QIODevice::ReadOnly));QVERIFY(fixtureFile.size()<=NodeImporter::MaximumBytes);
+  const auto fixture=NodeImporter::strictJsonObject(fixtureFile.readAll());QVERIFY(!fixture.isEmpty());
+  const auto subscription=fixture["subscription"].toString();QVERIFY(!subscription.isEmpty());
+  const auto tcpPort=fixture["tcp_port"].toInt(),udpPort=fixture["udp_port"].toInt();QVERIFY(tcpPort>0&&tcpPort<=65535&&udpPort>0&&udpPort<=65535);
+  const bool reject=fixture["reject"].toBool();
+  QJsonObject report{{"schema",1},{"imported",false},{"encrypted_store_reloaded",false},{"in_process_rust",false},{"tcp_verified",false},{"udp_verified",false},{"rejected",false},{"listener_released",false}};
+  const auto save=[&]{QSaveFile file(reportPath);const auto bytes=QJsonDocument(report).toJson();return file.open(QIODevice::WriteOnly)&&file.write(bytes)==bytes.size()&&file.commit();};
+  const auto reportGuard=qScopeGuard([&]{save();});QVERIFY(save());
+  QTemporaryDir directory;const auto path=directory.filePath("quic.dpapi");QString selected;QJsonObject original,parameters;
+  {
+   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);
+   controller.imports()->importText(subscription);QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),5000);
+   NodeStore stored(path);QVERIFY2(stored.nodes().size()==1,qPrintable(controller.imports()->message()));selected=stored.nodes().first().id;
+   original=stored.nodes().first().originalConfiguration;parameters=stored.nodes().first().parameters;
+   QVERIFY(!original.isEmpty()&&original["tls"].isObject());QVERIFY(controller.chooseNode(selected));
+   QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto encrypted=file.readAll();QVERIFY(encrypted.startsWith("SWIRLNODE1\n"));QVERIFY(!encrypted.contains(stored.nodes().first().password.toUtf8()));
+   report["imported"]=true;
+  }
+  QTcpServer reservation;QVERIFY(reservation.listen(QHostAddress::LocalHost));const auto proxyPort=reservation.serverPort();reservation.close();
+  EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);controller.setRoutingMode("global");
+  NodeStore restored(path);QCOMPARE(restored.nodes().size(),1);QCOMPARE(restored.nodes().first().originalConfiguration,original);QCOMPARE(restored.nodes().first().parameters,parameters);QCOMPARE(restored.selectedId(),selected);report["encrypted_store_reloaded"]=true;
+  controller.connectNode({});QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),5000);
+  QCOMPARE(controller.engineKind(),QString("rust"));QCOMPARE(controller.processId(),QString::number(QCoreApplication::applicationPid()));report["in_process_rust"]=true;
+  QTcpSocket tcp;tcp.setProxy(QNetworkProxy::NoProxy);tcp.connectToHost(QHostAddress::LocalHost,proxyPort);QTRY_COMPARE_WITH_TIMEOUT(tcp.state(),QAbstractSocket::ConnectedState,5000);
+  const auto authority="127.0.0.1:"+QByteArray::number(tcpPort);const auto connect="CONNECT "+authority+" HTTP/1.1\r\nHost: "+authority+"\r\n\r\n";QCOMPARE(tcp.write(connect),connect.size());
+  QByteArray response;QVERIFY(QTest::qWaitFor([&]{response+=tcp.readAll();return response.contains("\r\n\r\n")||tcp.state()==QAbstractSocket::UnconnectedState;},7000));
+  if(reject){
+   const auto failed=QByteArray("HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+   if(original["type"]=="tuic"&&response!=failed){
+    // TUIC v5 has no positive authentication response. A CONNECT reply only
+    // acknowledges the local tunnel; the peer must then reject before any
+    // target data arrives. The harness independently requires zero target
+    // connections, so an optimistic local reply cannot hide authentication loss.
+    QCOMPARE(response,QByteArray("HTTP/1.1 200 Connection Established\r\n\r\n"));const QByteArray payload="must-not-reach-origin";
+    if(tcp.state()==QAbstractSocket::ConnectedState){const auto written=tcp.write(payload);QVERIFY(written==-1||written==payload.size());}
+    response.clear();QVERIFY(QTest::qWaitFor([&]{response+=tcp.readAll();return tcp.state()==QAbstractSocket::UnconnectedState;},7000));response+=tcp.readAll();QVERIFY(response.isEmpty());
+   }else QCOMPARE(response,failed);
+   report["rejected"]=true;
+  }else{
+   QCOMPARE(response,QByteArray("HTTP/1.1 200 Connection Established\r\n\r\n"));const QByteArray payload(65553,'q');QCOMPARE(tcp.write(payload),payload.size());response.clear();
+   QVERIFY(QTest::qWaitFor([&]{response+=tcp.readAll();return response.size()>=payload.size()||tcp.state()==QAbstractSocket::UnconnectedState;},7000));QCOMPARE(response,payload);report["tcp_verified"]=true;
+   tcp.disconnectFromHost();QTRY_COMPARE_WITH_TIMEOUT(tcp.state(),QAbstractSocket::UnconnectedState,5000);
+   QUdpSocket udp;udp.setProxy(QNetworkProxy::NoProxy);QVERIFY(udp.bind(QHostAddress::LocalHost,0,QUdpSocket::DontShareAddress));
+   QTcpSocket control;control.setProxy(QNetworkProxy::NoProxy);control.connectToHost(QHostAddress::LocalHost,proxyPort);QTRY_COMPARE_WITH_TIMEOUT(control.state(),QAbstractSocket::ConnectedState,5000);
+   QCOMPARE(control.write(QByteArray::fromHex("050100")),qint64(3));QTRY_VERIFY_WITH_TIMEOUT(control.bytesAvailable()>=2,5000);QCOMPARE(control.read(2),QByteArray::fromHex("0500"));
+   auto associate=QByteArray::fromHex("050300017f000001");associate.append(char(udp.localPort()>>8));associate.append(char(udp.localPort()&255));QCOMPARE(control.write(associate),associate.size());QTRY_VERIFY_WITH_TIMEOUT(control.bytesAvailable()>=10,5000);
+   const auto bound=control.read(10);QCOMPARE(bound.left(8),QByteArray::fromHex("050000017f000001"));const auto relayPort=quint16((quint16(quint8(bound[8]))<<8)|quint8(bound[9]));QVERIFY(relayPort>0);
+   auto header=QByteArray::fromHex("000000017f000001");header.append(char(udpPort>>8));header.append(char(udpPort&255));const auto packet=header+QByteArray("s4-quic-udp-payload");
+   QCOMPARE(udp.writeDatagram(packet,QHostAddress::LocalHost,relayPort),packet.size());QTRY_VERIFY_WITH_TIMEOUT(udp.hasPendingDatagrams(),7000);const auto datagram=udp.receiveDatagram();QCOMPARE(datagram.senderPort(),int(relayPort));QCOMPARE(datagram.data(),packet);report["udp_verified"]=true;
+   control.disconnectFromHost();QTRY_COMPARE_WITH_TIMEOUT(control.state(),QAbstractSocket::UnconnectedState,5000);
+  }
+  tcp.abort();controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive()&&!controller.busy(),5000);QTcpServer reclaimed;QVERIFY(reclaimed.listen(QHostAddress::LocalHost,proxyPort));report["listener_released"]=true;QVERIFY(save());
+ }
  void socks5UdpThroughIndependentPeer(){
   const bool hasPeer=qEnvironmentVariableIsSet("SWIRL_SOCKS5_UDP_REFERENCE_PORT");
   const bool hasOrigin=qEnvironmentVariableIsSet("SWIRL_SOCKS5_UDP_ORIGIN_PORT");
@@ -1262,7 +1795,7 @@ private slots:
   for(qsizetype index=0;index<sources.size();++index){
    const auto parsed=NodeImporter::parse(sources[index]);QVERIFY2(bool(parsed),qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
    const auto &node=parsed.nodes.first();QVERIFY(node.conversionIssues.isEmpty());QCOMPARE(node.parameters.value("udp"),QJsonValue(true));
-   EngineStartOptions o;o.routingMode="global";o.nodes=parsed.nodes;o.selectedNodeId=node.id;o.executablePath="must-not-start-mihomo.exe";
+   EngineStartOptions o;o.routingMode="global";o.nodes=parsed.nodes;o.selectedNodeId=node.id;
    QTcpServer port;QVERIFY(port.listen(QHostAddress::LocalHost));o.proxyPort=port.serverPort();port.close();
    ThreadedEngine engine;engine.start(o);
    QVERIFY2(QTest::qWaitFor([&]{return engine.status().apiHealthy;},5000),qPrintable(engine.status().message));
@@ -1333,7 +1866,7 @@ private slots:
    {{"port","1080"}},{{"port",1080.5}},{{"port",0}},{{"port",65536}},
    {{"tls",true}},{{"tls","false"}},{{"udp",true}},{{"udp","false"}},
    {{"sni","tls.fixture.invalid"}},{{"sni",1}},{{"cipher","none"}},{{"cipher",1}},
-   {{"tfo",true}},{{"network","ws"}},{{"network","udp"}},{{"remote_dns",false}},
+   {{"tfo","true"}},{{"network","ws"}},{{"network","udp"}},{{"remote_dns",false}},
    {{"future-option","preserved"}},{{"server_port",1080}}
   };
   const QJsonObject sentinel{{"unchanged",true}};
@@ -1440,6 +1973,32 @@ private slots:
   engine.start(o);
   QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(engine.status().message));engine.stop();
  }
+ void webSocketUdpDeclarationSurvivesNativeMappingAndRuntimeStartup(){
+  ControlledNetwork net;QVERIFY(net.start());
+  for(const bool udp:{false,true}){
+   const QJsonObject raw{{"name","ws-udp-fixture"},{"type","vless"},{"server","127.0.0.1"},{"port",net.a.serverPort()},
+    {"uuid","00112233-4455-6677-8899-aabbccddeeff"},{"network","ws"},{"tls",true},{"sni","tls.fixture.invalid"},
+    {"alpn",QJsonArray{"http/1.1"}},{"udp",udp},
+    {"ws-opts",QJsonObject{{"path","/proxy"},{"headers",QJsonObject{{"Host","ws.fixture.invalid"}}}}}};
+   const auto parsed=NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{raw}}}).toJson());
+   QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.first().parameters.value("udp"),QJsonValue(udp));
+   QCOMPARE(parsed.nodes.first().originalConfiguration,raw);
+   auto start=options(net);start.nodes=parsed.nodes;start.selectedNodeId=parsed.nodes.first().id;
+   QJsonObject config;const auto error=RustCoreEngine::configuration(start,&config);QVERIFY2(error.isEmpty(),qPrintable(error));
+   const auto outbound=config.value("nodes").toArray().first().toObject().value("outbound").toObject();
+   QCOMPARE(outbound.value("udp"),QJsonValue(udp));
+   QCOMPARE(outbound.value("websocket").toObject(),QJsonObject({{"host","ws.fixture.invalid"},{"path","/proxy"}}));
+   QCOMPARE(outbound.value("tls").toObject().value("server_name"),QJsonValue("tls.fixture.invalid"));
+   RustCoreEngine engine;engine.start(start);
+   QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(engine.status().message));
+   QVERIFY(engine.status().apiHealthy);QCOMPARE(engine.status().engineKind,QString("rust"));
+   // This exercises actual native configuration/lifecycle (level 2). The
+   // inherited Rust UDP-over-stream peer suites verify protocol datagrams;
+   // listener startup is not labeled as external UDP interoperability.
+   engine.stop();QCOMPARE(engine.status().state,ProxyEngine::State::Stopped);
+   QTcpServer reclaimed;QVERIFY(reclaimed.listen(QHostAddress::LocalHost,start.proxyPort));
+  }
+ }
  void webSocketRejectsUnsupportedParametersWithoutPartialConfiguration(){
   ControlledNetwork net;QVERIFY(net.start());auto valid=options(net);
   auto &node=valid.nodes.first();node.protocol="vless";node.serverName="tls.fixture.invalid";
@@ -1457,7 +2016,11 @@ private slots:
    {"header injection",{{"ws-opts",QJsonObject{{"headers",QJsonObject{{"Host","ws.fixture.invalid\r\nX-Fixture: 1"}}}}}}},
    {"ambiguous request target",{{"ws-opts",QJsonObject{{"path","//other.fixture.invalid/proxy"}}}}},
    {"unsupported ALPN",{{"alpn",QJsonArray{"h2"}}}},
-   {"unsupported proxy UDP",{{"udp",true}}},
+   {"string UDP flag",{{"udp","true"}}},
+   {"numeric UDP flag",{{"udp",1}}},
+   {"null UDP flag",{{"udp",QJsonValue(QJsonValue::Null)}}},
+   {"object UDP flag",{{"udp",QJsonObject{}}}},
+   {"array UDP flag",{{"udp",QJsonArray{}}}},
    {"disabled certificate verification",{{"skip-cert-verify",true}}},
    {"unsupported VLESS flow",{{"flow","xtls-rprx-vision"}}}
   };
@@ -1939,7 +2502,7 @@ private slots:
   QCOMPARE(engine.status().engineKind,QString("rust"));QCOMPARE(engine.status().processId,QCoreApplication::applicationPid());
   engine.stop();
  }
- void disabledFastOpenIsAnExactNoOpAcrossNativeProtocols(){
+ void optionalFastOpenUsesOrdinaryTcpAcrossNativeProtocols(){
   ControlledNetwork net;QVERIFY(net.start());
   for(const auto &protocol:QStringList{"http","socks4","socks4a","socks5","ss","trojan","vless"}){
    auto o=options(net);auto &n=o.nodes.first();n.protocol=protocol;
@@ -1947,14 +2510,17 @@ private slots:
    if(protocol=="trojan")n.password="synthetic";
    if(protocol=="vless")n.parameters["uuid"]="11111111-1111-4111-8111-111111111111";
    QJsonObject baseline;QVERIFY2(RustCoreEngine::configuration(o,&baseline).isEmpty(),qPrintable(protocol));
-   n.parameters["tfo"]=false;QJsonObject disabled;QVERIFY2(RustCoreEngine::configuration(o,&disabled).isEmpty(),qPrintable(protocol));QCOMPARE(disabled,baseline);
-   for(const auto &invalid:QJsonArray{true,0,1,"false",QJsonValue(QJsonValue::Null),QJsonObject{},QJsonArray{}}){
+   for(const auto enabled:{false,true}){
+    n.parameters["tfo"]=enabled;QJsonObject fallback;QVERIFY2(RustCoreEngine::configuration(o,&fallback).isEmpty(),qPrintable(protocol));QCOMPARE(fallback,baseline);
+    QCOMPARE(n.publicInfo().value("normalizationNotes").toString().contains("普通 TCP"),enabled);
+   }
+   for(const auto &invalid:QJsonArray{0,1,"false",QJsonValue(QJsonValue::Null),QJsonObject{},QJsonArray{}}){
     n.parameters["tfo"]=invalid;QJsonObject unchanged{{"sentinel",true}};QVERIFY(!RustCoreEngine::configuration(o,&unchanged).isEmpty());QCOMPARE(unchanged,QJsonObject({{"sentinel",true}}));
    }
   }
  }
- void disabledFastOpenForwardsThroughNativeSocks5(){
-  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.nodes.first().parameters["tfo"]=false;
+ void optionalFastOpenForwardsThroughNativeSocks5(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.nodes.first().parameters["tfo"]=true;
   RustCoreEngine engine;engine.start(o);QCOMPARE(engine.status().state,ProxyEngine::State::Running);
   QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));
   auto reply=client.get(QNetworkRequest(net.url()));QVERIFY(QTest::qWaitFor([&]{return reply->isFinished();},5000));
@@ -1985,7 +2551,7 @@ private slots:
   bool valid=false;const int port=qEnvironmentVariableIntValue("SWIRL_SS_REFERENCE_PORT",&valid);
   if(!valid)QSKIP("Independent Python SS peer supplies the isolated port.");
   ControlledNetwork net;QVERIFY(net.start());
-  for(const auto &tail:QStringList{"http,obfs.example","obfs-name=http,obfs-host=obfs.example","obfs-name=http,obfs-host=obfs.example,fast-open=false"}){
+  for(const auto &tail:QStringList{"http,obfs.example","obfs-name=http,obfs-host=obfs.example","obfs-name=http,obfs-host=obfs.example,fast-open=false","obfs-name=http,obfs-host=obfs.example,fast-open=true"}){
    auto o=options(net);const auto source=QString("[Proxy]\nfixture = Shadowsocks,127.0.0.1,%1,aes-128-gcm,synthetic-ss-password,%2").arg(port).arg(tail).toUtf8();
    const auto parsed=NodeImporter::parse(source);QVERIFY2(bool(parsed),qPrintable(parsed.error));o.nodes=parsed.nodes;o.selectedNodeId=parsed.nodes.first().id;
    RustCoreEngine engine;engine.start(o);QCOMPARE(engine.status().state,ProxyEngine::State::Running);
@@ -1995,10 +2561,6 @@ private slots:
    QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("ss-native-ok"));
    QCOMPARE(engine.status().engineKind,QString("rust"));QCOMPARE(engine.status().processId,QCoreApplication::applicationPid());engine.stop();
   }
- }
- void referenceAdapterBlockedAtCompileTime(){
-  MihomoAdapter reference;EngineStartOptions o;o.executablePath="must-never-start.exe";reference.start(o);
-  QCOMPARE(reference.status().state,ProxyEngine::State::Failed);QCOMPARE(reference.status().error,ProxyEngine::Error::InvalidOptions);QVERIFY(!reference.status().processAlive);
  }
  void realForwardingThroughQtFacade(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);ThreadedEngine engine;engine.start(o);
@@ -2010,8 +2572,72 @@ private slots:
   engine.stop();QVERIFY(QTest::qWaitFor([&]{return !engine.status().processAlive;},5000));
   QTcpServer reuse;QVERIFY(reuse.listen(QHostAddress::LocalHost,o.proxyPort));
  }
- void nativeProbeAndUnsupportedDoNotStartCompatibility(){
-  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.executablePath="must-not-start-mihomo.exe";
+ void internalNodeTestListenersAreAtomicallyOwnedAndPreserveUserPortValidation(){
+  ControlledNetwork net;QVERIFY(net.start());auto user=options(net);user.proxyPort=0;
+  QJsonObject configuration;QVERIFY(!RustCoreEngine::configuration(user,&configuration).isEmpty());
+  RustCoreEngine invalid;invalid.start(user);QCOMPARE(invalid.status().error,ProxyEngine::Error::InvalidOptions);QVERIFY(!invalid.status().processAlive);
+  auto isolated=NodeTestService::isolatedOptions(user);isolated.selectedNodeId=user.selectedNodeId;
+  QCOMPARE(isolated.proxyPort,quint16(0));QVERIFY(isolated.internalProbeListener);
+  QVERIFY(RustCoreEngine::configuration(isolated,&configuration).isEmpty());QCOMPARE(configuration.value("listen").toString(),QString("127.0.0.1:0"));
+  auto other=isolated.nodes.first();other.id=QUuid::createUuid().toString(QUuid::WithoutBraces);isolated.nodes.append(other);
+  RustCoreEngine first,second;first.start(isolated);second.start(isolated);
+  QVERIFY2(first.status().apiHealthy,qPrintable(first.status().message));QVERIFY2(second.status().apiHealthy,qPrintable(second.status().message));
+  const auto firstPort=first.status().proxyPort,secondPort=second.status().proxyPort;
+  QVERIFY(firstPort>0);QVERIFY(secondPort>0);QVERIFY(firstPort!=secondPort);
+  for(const auto port:{firstPort,secondPort}){
+   QTcpServer conflict;conflict.setProxy(QNetworkProxy::NoProxy);QVERIFY(!conflict.listen(QHostAddress::LocalHost,quint16(port)));
+  }
+  const auto request=[&](int port){
+   QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",quint16(port)));
+   QNetworkRequest input(net.url());input.setTransferTimeout(4000);auto *reply=client.get(input);
+   if(!QTest::qWaitFor([&]{return reply->isFinished();},5000)||reply->error()!=QNetworkReply::NoError)return QByteArray("request-failed");
+   return reply->readAll();
+  };
+  QCOMPARE(request(firstPort),QByteArray("exit-A"));QCOMPARE(request(secondPort),QByteArray("exit-A"));
+  const auto session=first.status().sessionId;first.selectNode(other.id);
+  QCOMPARE(first.status().selectedNodeId,other.id);QCOMPARE(first.status().sessionId,session);QCOMPARE(first.status().proxyPort,firstPort);
+  QCOMPARE(request(firstPort),QByteArray("exit-A"));
+  first.probeNode(net.url());second.probeNode(net.url());
+  QTRY_COMPARE_WITH_TIMEOUT(first.status().requestState,ProxyEngine::RequestState::Succeeded,5000);
+  QTRY_COMPARE_WITH_TIMEOUT(second.status().requestState,ProxyEngine::RequestState::Succeeded,5000);
+  QCOMPARE(first.status().responseCode,200);QCOMPARE(second.status().responseCode,200);QCOMPARE(net.a.forwarded,5);QCOMPARE(net.httpRequests,5);
+  first.stop();second.stop();QVERIFY(!first.status().processAlive);QVERIFY(!second.status().processAlive);
+ }
+ void queuedProbesRecoverAfterPeerRejectionAndCancellation(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);
+  const int count=qBound(24,qEnvironmentVariableIntValue("SWIRL_U2_PROBE_COUNT"),5000);
+  const auto prototype=o.nodes.first();o.nodes.clear();QStringList ids;
+  for(int i=0;i<count;++i){auto node=prototype;node.id=QUuid::createUuid().toString(QUuid::WithoutBraces);node.name=QString("probe-%1").arg(i);o.nodes.append(node);ids.append(node.id);}
+  o.selectedNodeId=ids.first();NodeTestService probes;
+  int peakActive=0;QElapsedTimer heartbeat;heartbeat.start();qint64 maxGap=0;
+  QTimer ticker;ticker.setInterval(10);
+  connect(&ticker,&QTimer::timeout,&ticker,[&]{
+   maxGap=qMax(maxGap,heartbeat.restart());int active=0;
+   for(auto *runner:probes.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly)){
+    const auto s=runner->status();if(s.processAlive||s.state==ProxyEngine::State::Starting||s.state==ProxyEngine::State::Stopping)++active;
+   }
+   peakActive=qMax(peakActive,active);
+  });ticker.start();
+  net.a.reject=true;const auto before=net.httpRequests;
+  probes.start(o,ids.mid(0,6),net.url());
+  QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},15000));
+  QCOMPARE(probes.failed(),6);QCOMPARE(probes.succeeded(),0);QCOMPARE(net.httpRequests,before);
+  net.a.reject=false;QElapsedTimer elapsed;elapsed.start();
+  probes.start(o,ids,net.url());
+  QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},qMax(30000,count*1000)));
+  if(probes.failed())qInfo()<<"Loopback probe failure"<<probes.result(ids.first()).value("phase")<<probes.result(ids.first()).value("error");
+  QCOMPARE(probes.succeeded(),count);QCOMPARE(probes.failed(),0);QVERIFY(net.a.forwarded>=count);
+  for(const auto &id:ids){QVERIFY(probes.result(id).value("success").toBool());QCOMPARE(probes.result(id).value("engineKind").toString(),QString("rust"));}
+  qInfo()<<"U2 real loopback bulk probe count"<<count<<"elapsedMs"<<elapsed.elapsed()<<"maxEventLoopGapMs"<<maxGap<<"peakActive"<<peakActive;
+  QVERIFY(peakActive<=3);
+  probes.start(o,ids,net.url());probes.cancel();
+  QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},10000));QVERIFY(probes.completed()<count);
+  probes.start(o,ids.mid(0,3),net.url());
+  QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},10000));QCOMPARE(probes.succeeded(),3);
+  QVERIFY(QTest::qWaitFor([&]{return probes.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly).isEmpty();},3000));
+ }
+ void nativeProbeAndUnsupportedUseRustOnly(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);
   NodeTestService probes;probes.start(o,{o.selectedNodeId},net.url());QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},6000));
   QCOMPARE(probes.succeeded(),1);QCOMPARE(probes.result(o.selectedNodeId).value("engineKind").toString(),QString("rust"));
   QCOMPARE(probes.result(o.selectedNodeId).value("metricType").toString(),QString("http_headers"));
@@ -2020,6 +2646,25 @@ private slots:
   probes.start(o,{o.selectedNodeId},net.url());QVERIFY(!probes.result(o.selectedNodeId).value("success").toBool());
   QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},3000));QCOMPARE(probes.failed(),1);
   QCOMPARE(probes.result(o.selectedNodeId).value("engineKind").toString(),QString("rust"));
+ }
+ void filteredNodeBatchOnlyTestsRequestedIdentities(){
+  ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;
+  EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("nodes.dpapi"),true);
+  const auto body=QJsonDocument(QJsonObject{{"proxies",QJsonArray{
+   QJsonObject{{"name","A"},{"type","socks5"},{"server","127.0.0.1"},{"port",net.a.serverPort()}},
+   QJsonObject{{"name","B"},{"type","socks5"},{"server","127.0.0.1"},{"port",net.b.serverPort()},{"username",QString::fromUtf8(net.b.username)},{"password",QString::fromUtf8(net.b.password)}}}}}).toJson();
+  controller.imports()->importNodesOnlyText(QString::fromUtf8(body));
+  QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),4000);
+  const auto catalog=controller.nodeCatalog();QCOMPARE(catalog.size(),2);
+  const auto a=catalog.first().toMap().value("id").toString(),b=catalog.last().toMap().value("id").toString();
+  QVERIFY(controller.chooseNode(a));const auto saved=controller.selectedNodeId();
+  const auto beforeA=net.a.forwarded,beforeB=net.b.forwarded;
+  controller.testNodes({b,b,QStringLiteral("missing-resource")},net.url());
+  QTRY_VERIFY_WITH_TIMEOUT(!controller.tests()->busy(),6000);
+  QCOMPARE(controller.tests()->total(),1);QCOMPARE(controller.tests()->completed(),1);
+  QVERIFY(controller.tests()->result(b).value("success").toBool());
+  QVERIFY(controller.tests()->result(a).isEmpty());QCOMPARE(net.a.forwarded,beforeA);QVERIFY(net.b.forwarded>beforeB);
+  QCOMPARE(controller.selectedNodeId(),saved);QVERIFY(!controller.processAlive());
  }
  void nodeListShowsValidatedOutboundSetupTime(){
   ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;
@@ -2038,6 +2683,34 @@ private slots:
   QVERIFY(outbound>=0);
   QVERIFY(result.value("latency").toInt()>=outbound);
   QCOMPARE(controller.nodes().first().toMap().value("latency").toString(),QString::number(outbound));
+ }
+ void nodeBatchReusesBoundedRustWorkersAndReleasesListeners(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.nodes.clear();
+  QStringList ids;
+  for(int index=0;index<8;++index){
+   ProxyNode node;node.id=QUuid::createUuid().toString(QUuid::WithoutBraces);node.name=QString("batch-%1").arg(index);node.protocol="socks5";node.host="127.0.0.1";
+   node.port=index%2?net.b.serverPort():net.a.serverPort();
+   if(index%2){node.username=QString::fromUtf8(net.b.username);node.password=QString::fromUtf8(net.b.password);}
+   o.nodes.append(node);ids.append(node.id);
+  }
+  auto unsupported=o.nodes.first();unsupported.id=QUuid::createUuid().toString(QUuid::WithoutBraces);unsupported.protocol="tuic";unsupported.password="synthetic";o.nodes.append(unsupported);ids.insert(4,unsupported.id);
+  NodeTestService probes;QSet<QString> sessions;QSet<quint16> listeners;int maxWorkers=0,uiTicks=0;
+  QTimer heartbeat;heartbeat.setInterval(10);connect(&heartbeat,&QTimer::timeout,this,[&]{++uiTicks;});heartbeat.start();
+  connect(&probes,&NodeTestService::changed,this,[&]{
+   const auto workers=probes.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly);int active=0;
+   for(const auto *worker:workers){const auto status=worker->status();if(status.processAlive){++active;sessions.insert(status.sessionId);listeners.insert(quint16(status.proxyPort));}}
+   maxWorkers=qMax(maxWorkers,active);
+  });
+  probes.start(o,ids,net.url());QTRY_VERIFY_WITH_TIMEOUT(!probes.busy(),10000);
+  QCOMPARE(probes.total(),9);QCOMPARE(probes.completed(),9);QCOMPARE(probes.succeeded(),8);QCOMPARE(probes.failed(),1);
+  QCOMPARE(probes.result(unsupported.id).value("phase").toString(),QString("configuration"));
+  QCOMPARE(net.a.forwarded,4);QCOMPARE(net.b.forwarded,4);QCOMPARE(net.httpRequests,8);
+  QVERIFY(!sessions.contains(QString()));QCOMPARE(sessions.size(),3);QCOMPARE(maxWorkers,3);QVERIFY(uiTicks>5);
+  for(const auto &id:ids)if(id!=unsupported.id){const auto result=probes.result(id);QVERIFY(result.value("success").toBool());QCOMPARE(result.value("http").toInt(),200);QVERIFY(result.value("outboundConnectMs").toLongLong()>=0);}
+  for(const auto port:listeners){QTcpServer listener;QVERIFY2(listener.listen(QHostAddress::LocalHost,port),qPrintable(listener.errorString()));}
+  // Cancelling while start messages are queued must drain worker-owned handles.
+  probes.start(o,ids,net.url());probes.cancel();QTRY_VERIFY_WITH_TIMEOUT(!probes.busy(),5000);QCOMPARE(probes.completed(),0);
+  probes.start(o,{ids.first()},net.url());QTRY_VERIFY_WITH_TIMEOUT(!probes.busy(),5000);QCOMPARE(probes.succeeded(),1);
  }
  void nativeHeadProbeFinishesAtHeadersAndReportsHttpFailureStage(){
   ControlledNetwork net;QVERIFY(net.start());QTcpServer origin;QVERIFY(origin.listen(QHostAddress::LocalHost,0));
@@ -2104,6 +2777,27 @@ private slots:
   QCOMPARE(engine.status().nodeHealth,ProxyEngine::NodeHealth::Unknown);
   QCOMPARE(engine.status().latencyMs,-1);QCOMPARE(engine.status().responseCode,0);
   engine.stop();
+ }
+ void forwardingFailuresAreRetainedOnceWithoutPrivateTargets(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);
+  QTcpServer closed;QVERIFY(closed.listen(QHostAddress::LocalHost,0));o.nodes.first().port=closed.serverPort();closed.close();
+  o.nodes.first().name="PRIVATE-NODE-NAME";
+  RustCoreEngine engine;QSignalSpy diagnostics(&engine,&ProxyEngine::diagnostic);
+  const auto failures=[&]{QStringList result;for(const auto &event:diagnostics)if(event[1].toString()=="ForwardingFailed")result.append(event[2].toString());return result;};
+  const auto failRequest=[&]{
+   QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));
+   QNetworkRequest request(QUrl("http://PRIVATE-TARGET.invalid:8080/PRIVATE-PATH?token=PRIVATE-TOKEN"));request.setTransferTimeout(3000);
+   auto *reply=client.get(request);QVERIFY(QTest::qWaitFor([&]{return reply->isFinished();},4000));QVERIFY(reply->error()!=QNetworkReply::NoError);
+  };
+  engine.start(o);QVERIFY2(engine.status().apiHealthy,qPrintable(engine.status().message));
+  failRequest();
+  QTRY_COMPARE_WITH_TIMEOUT(failures().size(),1,3000);
+  const auto message=failures().first();QVERIFY(message.contains("tcp_connect"));QVERIFY(message.contains("UpstreamConnectionRefused"));
+  QVERIFY(!message.contains("PRIVATE",Qt::CaseInsensitive));QVERIFY(!message.contains(o.selectedNodeId));QVERIFY(message.contains(QRegularExpression("节点 #[0-9a-f]{12} ·")));
+  engine.refresh();engine.refresh();QCOMPARE(failures().size(),1);engine.stop();QCOMPARE(failures().size(),1);
+  // A new Rust runtime reuses connection ordinals; it must not inherit the old
+  // dedup state, and the final pre-stop snapshot must remain observable.
+  engine.start(o);QVERIFY(engine.status().apiHealthy);failRequest();engine.stop();QCOMPARE(failures().size(),2);
  }
  void unsupportedSessionRejectedAndOldStreamSurvivesBadSelection(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);RustCoreEngine engine;

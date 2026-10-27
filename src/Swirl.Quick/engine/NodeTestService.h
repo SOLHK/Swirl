@@ -4,8 +4,8 @@
 #include <QHash>
 #include <QSet>
 
-// Each tested node owns an isolated engine and loopback ports. Tests cannot
-// alter the main engine's selection, routing mode or Windows system proxy.
+// At most three isolated Rust workers are reused within a batch. FFI and
+// lifecycle work run off the UI thread; no probe changes the live session.
 class NodeTestService final : public QObject {
  Q_OBJECT
  Q_PROPERTY(bool busy READ busy NOTIFY changed)
@@ -19,9 +19,12 @@ public:
  using QObject::QObject;
  ~NodeTestService() override;
  static EngineStartOptions isolatedOptions(const EngineStartOptions &);
+ static QString nodeReference(const QString &id);
  void start(const EngineStartOptions &,const QStringList &ids,const QUrl &url);
  Q_INVOKABLE void cancel();
- bool busy() const { return !m_queue.isEmpty()||!m_running.isEmpty()||!m_retiring.isEmpty(); }
+ // A catalog change invalidates results for the old connection parameters.
+ void invalidateResults();
+ bool busy() const { return !m_queue.isEmpty()||!m_running.isEmpty()||!m_idle.isEmpty()||!m_retiring.isEmpty(); }
  int completed() const { return m_completed; }
  int total() const { return m_total; }
  int succeeded() const { return m_succeeded; }
@@ -29,17 +32,21 @@ public:
  QString message() const { return m_message; }
  QVariantMap results() const { return m_results; }
  QVariantMap result(const QString &id) const { return m_results.value(id).toMap(); }
+ bool testing(const QString &id) const { return m_running.contains(id)||m_queue.contains(id); }
 signals:
  void changed();
  void diagnostic(const QString &code,const QString &message);
 private:
  void next();
+ ProxyEngine *createWorker();
  void retire(ProxyEngine *runner);
  void finish(const QString &,ProxyEngine *,const QVariantMap &);
+ void record(const QString &,QVariantMap);
  EngineStartOptions m_options;
  QUrl m_url;
  QQueue<QString> m_queue;
  QHash<QString,ProxyEngine *> m_running;
+ QQueue<ProxyEngine *> m_idle;
  QSet<ProxyEngine *> m_retiring;
  QVariantMap m_results;
  int m_completed=0,m_total=0,m_succeeded=0,m_failed=0;

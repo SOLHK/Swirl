@@ -22,13 +22,15 @@ MAX_INPUT = 65536
 MAX_ADDRESSES = 16
 MAX_BUDGET_MS = 10000
 OUTCOMES = {"success", "refused", "timeout", "unreachable", "other", "cancelled"}
+TCP_ERRORS = {"UpstreamAddressLimit", "UpstreamTcpTimeout", "UpstreamConnectFailed",
+              "UpstreamConnectionRefused", "UpstreamConnectionReset", "UpstreamConnectionAborted",
+              "UpstreamNetworkUnreachable", "UpstreamPermissionDenied"}
 ERRORS = {None, "UpstreamDnsTimeout", "DnsLookupFailed", "DnsEmpty",
-          "UpstreamAddressLimit", "UpstreamTcpTimeout", "UpstreamConnectFailed",
           "SocketOptions", "InvalidDiagnosticInput", "DiagnosticProcessFailed",
           "DiagnosticProcessTimeout", "DiagnosticOutputInvalid", "DnsInvalidTarget",
           "DnsBusy", "DnsStopped", "DnsTimeout", "DnsTask", "DnsNameError",
           "DnsState", "DnsConfiguration", "DiagnosticInput", "DiagnosticBudget",
-          "DiagnosticDnsConfig", "DiagnosticRuntime", "DiagnosticInternal"}
+          "DiagnosticDnsConfig", "DiagnosticRuntime", "DiagnosticInternal"} | TCP_ERRORS
 INPUT_ERRORS = {"InvalidDiagnosticInput", "DiagnosticInput", "DiagnosticBudget",
                 "DiagnosticDnsConfig", "DiagnosticRuntime", "DiagnosticInternal",
                 "DiagnosticProcessFailed", "DiagnosticProcessTimeout", "DiagnosticOutputInvalid"}
@@ -305,8 +307,7 @@ def safe_report(raw, engine):
         raise ValueError("DiagnosticOutputInvalid")
     expected_stage = (None if code is None else "input" if code in INPUT_ERRORS
                       else "socket_options" if code == "SocketOptions"
-                      else "tcp_connect" if code in {"UpstreamAddressLimit", "UpstreamTcpTimeout",
-                                                      "UpstreamConnectFailed"} else "dns")
+                      else "tcp_connect" if code in TCP_ERRORS else "dns")
     if stage != expected_stage or raw["ok"] != (code is None):
         raise ValueError("DiagnosticOutputInvalid")
     result.update(error_code=code, failure_stage=stage)

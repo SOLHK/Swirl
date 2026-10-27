@@ -3,7 +3,7 @@
 //! candidate mapping, not a claim of complete configuration or real-node tests.
 use super::{NodeCapability, capability};
 use crate::{Outbound, WebSocket};
-use serde_json::{Value, json};
+use serde_json::Value;
 
 fn settings(raw: &Value) -> Result<(WebSocket, Value), &'static str> {
     let mut base = raw.clone();
@@ -73,9 +73,6 @@ fn settings(raw: &Value) -> Result<(WebSocket, Value), &'static str> {
             ws.host = host.as_str().ok_or("WebSocketHost")?.into();
         }
     }
-    if raw.get("udp").is_some_and(|v| v != &json!(false)) {
-        return Err("WebSocketUdpNotImplemented");
-    }
     ws.validate()?;
     Ok((ws, base))
 }
@@ -129,6 +126,10 @@ pub(super) fn inspect(
         return (report, None);
     }
     report.native_tcp_candidate = true;
+    report.native_udp_supported = matches!(
+        &candidate,
+        Outbound::Vless { udp: true, .. } | Outbound::Trojan { udp: true, .. }
+    );
     report.diagnostic = "TcpCandidateNotYetVerified";
     (report, Some(candidate))
 }
@@ -137,6 +138,36 @@ pub(super) fn inspect(
 mod tests {
     use crate::inspect::inspect;
     use serde_json::json;
+    #[test]
+    fn stream_udp_declaration_survives_websocket_import_without_verification_claim() {
+        for kind in ["vless", "trojan"] {
+            for udp in [false, true] {
+                let node = json!({"type":kind,"server":"proxy.invalid","port":443,
+                    "tls":true,"network":"ws","udp":udp,"ws-opts":{"path":"/udp"}});
+                let mut node = node;
+                node[if kind == "vless" { "uuid" } else { "password" }] =
+                    json!(if kind == "vless" {
+                        "12345678-1234-1234-1234-123456789abc"
+                    } else {
+                        "fixture"
+                    });
+                let data = json!({"proxies":[node.clone()]}).to_string();
+                let result = inspect(data.as_bytes());
+                let report = &result.report.nodes[0];
+                assert!(report.native_tcp_candidate, "{}", report.diagnostic);
+                assert_eq!(report.native_udp_supported, udp);
+                assert!(!report.real_network_verified);
+                assert_eq!(result.original, data.as_bytes());
+                let exported =
+                    serde_json::to_value(result.tcp_candidates[0].as_ref().unwrap()).unwrap();
+                assert_eq!(exported["udp"], udp);
+                node["udp"] = json!("true");
+                let invalid = inspect(json!({"proxies":[node]}).to_string().as_bytes());
+                assert!(!invalid.report.nodes[0].native_tcp_candidate);
+                assert!(!invalid.report.nodes[0].native_udp_supported);
+            }
+        }
+    }
     #[test]
     fn known_websocket_formats_map_but_extensions_remain_rejected() {
         let uuid = "12345678-1234-1234-1234-123456789abc";

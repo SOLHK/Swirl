@@ -1,0 +1,451 @@
+{
+  "source_branch": "work/ui-window-node-performance-20261023",
+  "source_sha": "7056dea1c920cee57208c1aae54b3550a850f758",
+  "adapted_pages": [
+    "src/Swirl.Quick/qml/pages/GatewayPage.qml",
+    "src/Swirl.Quick/qml/pages/ProxiesPage.qml",
+    "src/Swirl.Quick/qml/pages/SettingsPage.qml",
+    "src/Swirl.Quick/qml/pages/SubscriptionsPage.qml",
+    "src/Swirl.Quick/qml/pages/ToolboxPage.qml"
+  ],
+  "protected_files": [
+    {
+      "path": "src/Swirl.Quick/app/DismissalController.cpp",
+      "sha256": "9b00f0b320b4ecea1db085fb9c28ae3e227c1e8f6b6083e1f1b59e114015355d"
+    },
+    {
+      "path": "src/Swirl.Quick/app/DismissalController.h",
+      "sha256": "70b4a20db3f64bb1fbe308338e4b90f03e192e9208825186b82d6e0354dd7618"
+    },
+    {
+      "path": "src/Swirl.Quick/app/NodeViewModel.cpp",
+      "sha256": "b7770146ae1a39fe8bcaf8006caec54136a669d6fa73727c881756be1172ae24"
+    },
+    {
+      "path": "src/Swirl.Quick/app/NodeViewModel.h",
+      "sha256": "c3bc73a22c1d74fac704c743bf99585e7622631b4270caccd2304e48f0f11be1"
+    },
+    {
+      "path": "src/Swirl.Quick/app/WindowEdge.cpp",
+      "sha256": "57414babe12e1d032765c0d7055a5b3e5aed209f91198c4ef2bce0a8a13a3220"
+    },
+    {
+      "path": "src/Swirl.Quick/app/WindowEdge.h",
+      "sha256": "2668c1a23baefd57c675f4ff6fd22cb7a10cdfebc3bf60693db8635a14f82779"
+    },
+    {
+      "path": "src/Swirl.Quick/app/WindowsBackdrop.cpp",
+      "sha256": "02b0ecfd64bb6c7154700084b294f81e82f42ab49ba6ede872c0361cbe0bf723"
+    },
+    {
+      "path": "src/Swirl.Quick/app/WindowsBackdrop.h",
+      "sha256": "9ded9023e22a667787cac91e1c26cdf40592119e637bac84e30f44835612213c"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/AppState.qml",
+      "sha256": "edd54b4a737c1d500b10496535545d618db134a9fe0640b916e3b68f437b0107"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/FeatureCatalog.qml",
+      "sha256": "875a7e0367216d5112ee74c7175ab26e5fb10fd4269f902a5fcb8187b6b2d7a0"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/Main.qml",
+      "sha256": "1bad3a5d8482c6a05679fe9aeb79bb70677dbcebfa3d703fc62cf2dafc3ac2b1"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/SwirlMotion.qml",
+      "sha256": "f1fba13bcaf4565f072a9ad111af711f21275666e8f544a48cd34e2e51dc41bb"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/SwirlTransitionRegistry.qml",
+      "sha256": "ac67524ebae6b3de38e8e4218c55f7c5aa8bbcd52db3a425a1df6ea64e06d000"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/Theme.qml",
+      "sha256": "4be4def8221ad80435bc20f376e1dca8490a5ab39c59bcb79799ec1ea3fb7431"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/ReferenceCheckBox.qml",
+      "sha256": "ae70a63771a13f64da685f74c15862d5dc16c043fc52ccd444cf3f8bf0c03cf4"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/ReferenceOutline.qml",
+      "sha256": "9f895372d08ff11e720eda7c6184cb84d9de423a0405eb1983ec689d77d88d0d"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/ReferenceSection.qml",
+      "sha256": "720af743e694c488e4b353d96c600d1ffab5a4bc0538ff03af718c0d212d1f83"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlBlurLayer.qml",
+      "sha256": "831a176a99423daab4b440433da80d228c8372752402885cc2747ad3775794ac"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlBrandIcon.qml",
+      "sha256": "6b67343516bb8dc9cb0ed51012529b85883584ba72bd0dfec37bc8b3c07e8d56"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlClearGlassSurface.qml",
+      "sha256": "74bb5223c6ccee6011bacdc4c7b41d4a0689d39bfa67673c066d75ea446177e0"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlContinuousSurface.qml",
+      "sha256": "2454e6501ed26ba21f434a67df3d081b6bad00d746b7ba082fe42b4d254f3889"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlDailyTrafficChart.qml",
+      "sha256": "37fe306935cf443f2700fbd58e4d255b4eaa7973a992a91b0bc89a09ad11c405"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlEmptyState.qml",
+      "sha256": "734e266aa9f25734b27f1ca292bc032e8cf556001327d7808cc2b6708047ef66"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlFontSettings.qml",
+      "sha256": "bc32b9a79f797425ac50eb7b72c79fd54ca15c1a007c6e4d94becbb86116b398"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlGlassMaterial.qml",
+      "sha256": "5ab07bffc2aa8a03a0def4854b3027c8418c8df8c23672abafc32cf21dcf9fb8"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlGlassPanel.qml",
+      "sha256": "6134e8fb81e2145fabf2901f0f38bd3bb6e9aef15002b9b377735c251001e997"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlIcon.qml",
+      "sha256": "b51b7016d98190255bf7950e368ba389c65016fd8212a2cf85707f3b4b46fe3b"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlInspectorPanel.qml",
+      "sha256": "5dd76a72d5f405a5cf0fdc8917cef0832dd17b52a7d3691cb397fe78c1734b2e"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlListRow.qml",
+      "sha256": "9657bd295be41ded44ee0a1e7f4918c2cf02c3cd2107637908625a66296bef16"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlMetricCard.qml",
+      "sha256": "9765eaeac7e9f976ea134c868788c7b7c61ac1d28f3faf9d2d9467e066e4ac80"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlNavigationItem.qml",
+      "sha256": "4de02f54242f92e4283b982231f0b7a28cfc35159600eb9f2b0eac1ee9068768"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlRegionBadge.qml",
+      "sha256": "2a31b70958e72dedadafc5071520f88840d51a13f9061a48c98ecb14533888a2"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlSecondaryWindow.qml",
+      "sha256": "0d7e00c29ea978ddc6375beb0a2567c49271b5183ecb53f8fc561ed1a988fea1"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlShellOutline.qml",
+      "sha256": "850a6cb0814ce1dc53e713b8274e1c4868ec45e72e6d537fef1763793428bfa0"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlSidebar.qml",
+      "sha256": "22633f6c634edb83a1199d7e8f9f57595a451895d383891be90e4605ad04cda0"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlSparkline.qml",
+      "sha256": "d503e8ef444529863b4b556d0e34fe65bad5738f1d53ffd5264cb1dd0eb5476a"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlStatusBadge.qml",
+      "sha256": "a9fb05b0eaefa6d5303f23ae942532acea98eac6d9cad02e97aa439883c5cdf8"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlTrafficChart.qml",
+      "sha256": "b3433c1bf905d36c6199c1319123724e8fe5269d9c6abfafa638daa3f75852b4"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlWindowControls.qml",
+      "sha256": "98727373eea809db5ec0eb278b3328e075ff85401c7a8e855c33699b70171409"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/components/SwirlWindowTitleBar.qml",
+      "sha256": "0a81626b80626ce8fe0f50596ba8365857c7970595bc8a677041a3ca27c14f05"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/RewriteRulesDialog.qml",
+      "sha256": "f4c1c1a70ab24329c6c57dd7cdafb83460996639368d5d1a9a8df60acc99802b"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlActivityIndicator.qml",
+      "sha256": "8691f01fa8850a562893e9aa4cf202e70ba5a6ea0b90d7830178df200dcceb33"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlAnimatedModel.qml",
+      "sha256": "2904028f5741c5057a382cd1356e07d657c85b2ea093895f3fa2924e9cf8a4db"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlButton.qml",
+      "sha256": "ca706f982f9b2c8be713c6beb1f1a9532d1ad116202c8bb7fd20f9f25f6ab81e"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlClickLight.qml",
+      "sha256": "f3c48b1fa220c971d49cee2bda6b8054174e238c6b772d7f8cca431d44340f98"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlComboBox.qml",
+      "sha256": "5f7a696a20cb4f50f5f39bcf1af5fa18176219f4d111d7a526fe9f522e2a7557"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlContextMenu.qml",
+      "sha256": "4d8759259345677340596d27cee5cb5887ffb990f2db46fe200b0895902cd14a"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlDataTable.qml",
+      "sha256": "623210789e50149ce18eeaaf17ab380b9b8b7dde202a91194233aeba5c39b521"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlDialog.qml",
+      "sha256": "25b5b3673081f06d9169d412270c28ed91a8282e36794203ff24a93685e0fc52"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlExpander.qml",
+      "sha256": "1553548253d6838565229919dd1d85e1d4d4f38ad44f145d4481e482ad52654a"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlFontBinding.qml",
+      "sha256": "b3113136bf5049e359a46106a6de4ea8b51c22b9d89ac0bf3d02440b73f5cd84"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlHeroCard.qml",
+      "sha256": "88d065aa7e690c6a5360308ba4a91cf7a79d0d81dc5dded12068a6dcd97db716"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlHeroTitle.qml",
+      "sha256": "df096a298dc67a6833f3249e463f895a63043988f918231b7ed76ebef4e1dd95"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlIconButton.qml",
+      "sha256": "327f9b02a71efabfd0882510de96f86984f0aa8f0f20716a6f3dbdd19a9f0102"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlLinkedDetail.qml",
+      "sha256": "061b73a8d0d34a5a9dabfa956e77a130e9b34541247a0c2fc61cdbe226000878"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlMotionButton.qml",
+      "sha256": "a0740cdce5e531448752c5f9088fbaab031f2c32f62b3c96818d0fbe979a8131"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlNodeTransfer.qml",
+      "sha256": "d1589faa031ecaa34ae7d3b129035bee9e07927535485e355cff18fab89120ff"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlPageHost.qml",
+      "sha256": "59de667f80d5f9fd8e153aa79c0ffbc55be30166bda7a3dace034cad4d8d76b0"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlPillSurface.qml",
+      "sha256": "9d25f296a6b34f0fadda318ca83f33a0001b300d71b83b888968869a187ad902"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlPressMotion.qml",
+      "sha256": "484c2cb40dfec17396781b817370b7d1d2be2f27b4f323d3c1bf19ce2f96e45c"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlScrollBar.qml",
+      "sha256": "a4415074205f13ae8423cb776f471a156b35c449f422bf4fabd0142dc5378762"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlSearchField.qml",
+      "sha256": "1e5302891ffeaec422f7c239435bd34973b3ab4a295103b96f652c0bcd9b4f66"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlSegmentedControl.qml",
+      "sha256": "48fb778e94b258c83a8b959f235b877c590c45dae6b9b1b51713c3d25179e215"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlSpring.qml",
+      "sha256": "b281cc32473a2fbfe547ba927f967ed023a88e2d6468dd48a02b52b9e6898e18"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlStatusCapsule.qml",
+      "sha256": "fb9a6695cfa364bca915deaa85efa4d805ac6f479f7555c448f6c623a52ffa11"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlText.qml",
+      "sha256": "c52353cc7dd82d5396b4370d1974e38e8456de1df6810764984264c4a74943a3"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlTextArea.qml",
+      "sha256": "47365bf4537dd3fb7289b15b87ff5070004cdfdca150605cef04215eb71376a2"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlTextField.qml",
+      "sha256": "bb5da3743f578bbdeab48580c905c25f8f160ce9a700d0a7b3976461d9707d06"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlToggle.qml",
+      "sha256": "78a5cea63e8fc9fa0e7a7933d9036bfa27270bf91f846e8079ce655f24273fbc"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlToolTip.qml",
+      "sha256": "bb3b9fe209f7689905364ae231d17e30cb73c7db6b8bb1e04ad53fade59d3378"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/controls/SwirlTransitionCoordinator.qml",
+      "sha256": "dc06c17610a0210aa630f5f6d99f806b79861d046f6cb45fa643a725d38e56b3"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/ActivityPage.qml",
+      "sha256": "3d02dd56e171969dd5988135b6e1d055635534729b5b17cfd0874371dd47cbbe"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/ApiPage.qml",
+      "sha256": "e5cea717a02763b8809f932e5916c604623bbf8c24ac93e216d5503fc02e0f87"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/AutomationPage.qml",
+      "sha256": "48ebf8be970df1e3017c5fb6f653008ce90092771daa97110858600cb3138016"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/BreakpointPage.qml",
+      "sha256": "ee506cf57262290c89b7cc73419f40009d923d08182d48a799159f2643b184f9"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/CaptureInspectorPage.qml",
+      "sha256": "44d7778184928085228e8aef72899486b7af235de76a818c9aa373b616c9bd5d"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/CapturePage.qml",
+      "sha256": "66738f4067790b9db0d0eb5e54a3d938724b92504ba039eac5091229ca806513"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/ConnectionsPage.qml",
+      "sha256": "f42a280633f3b34e4ec3ad5a8b8549b8537b76f45c9021ca5f1e067ed5d6b2d6"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/DNSPage.qml",
+      "sha256": "0c3d30757f242329dab09574a73918972b83420d87bda8eaec77ad9293c84cb5",
+      "allowed_replacements": [
+        {
+          "before": "engineController.rustCoreBuild?\"DNS 配置已保存；连接时由 Swirl Rust Core 校验，支持的设置才会应用\":\"DNS 配置已保存，连接时应用到 Mihomo\"",
+          "after": "\"DNS 配置已保存；连接时由 Swirl Rust Core 校验，支持的设置才会应用\""
+        }
+      ]
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/ExternalToolsPage.qml",
+      "sha256": "ec0a4af5dd5270212ac5719c735d3c6c2fcbd1414ee2be5d7c9ca7de10536eb7"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/FeatureHubPage.qml",
+      "sha256": "158a2ef1a20a3627a2b6c2a54b8756a3e0e214472f532be13c1f9fe321aee0b0"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/FeatureModulePage.qml",
+      "sha256": "2931eca873dc238f86edab4308c13ffad0eda358a10df73528f9680092942018"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/InspectorPage.qml",
+      "sha256": "fd8f2d0ad5d6845e01ff820ad78081ccac5e5208a78c55ee6985647d23c841a1"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/LogsPage.qml",
+      "sha256": "e3fb9debcba918fc438d52a3ef6effa37fe45c92c632223082db254bc4a42ce6"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/MapPage.qml",
+      "sha256": "588b4f693c8d74c5f040e21861742896d5ff1585d91ec6dc96d6d0b9ad01915f"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/ModulesPage.qml",
+      "sha256": "2337e91f9630b8f548344ec57433fabb2805f5580f85a91fc3a07eb9861b69b0"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/OverviewPage.qml",
+      "sha256": "f2e8b390987c0e3cc6614365c6397813cf1f9e35f7679e83984a651cc616a127"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/PolicyGroupsPage.qml",
+      "sha256": "f3e438cbe6e504d2cbf2ece20e39f984313e08c430abf3428abc9eeb4bd13e07"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/ProcessesPage.qml",
+      "sha256": "b9350db094453e0b9bf9fb960ea59cebf4509f932faa592826386626af0c153b"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/ProfilesPage.qml",
+      "sha256": "b8fb543edfb1a58128f2ca722b8840ecaa9c8e4290575a029091ed41c8816d28"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/ReplayPage.qml",
+      "sha256": "39eeb39f2782f17164dcd3429261c326c52872d61498511ac207ed5295967bdd"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/RewritePage.qml",
+      "sha256": "c28b47e2e7a9c40dca9980c3fb1faf05f7c0e5cab3d84cc415bff3426fe64107"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/RulesPage.qml",
+      "sha256": "9e53b46513870db8d87e8336ddb2907ca08e54c00e068ac6744325947ad3e7ac"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/ScriptsPage.qml",
+      "sha256": "fc7dfc2849be76a6b5e48012afbbfa956a8a2b769fc5559fc0c46f2e18c029c3"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/TLSPage.qml",
+      "sha256": "4169293465b003b79e9aa3b438be0daa2d81c9b0a44a74dc665b116851ae8989"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/TrafficAnalyticsPage.qml",
+      "sha256": "d4a147680177a8a326a327bb9bc2a0ac69656273a1fa5f0a6633c1ce2e2fa45a"
+    },
+    {
+      "path": "src/Swirl.Quick/qml/pages/WorkbenchPage.qml",
+      "sha256": "69ef74f4ae0e317fb62a630478ef660168bb11b9e8646297b543badd13f26133"
+    },
+    {
+      "path": "src/Swirl.Quick/shaders/SwirlClickLight.qep",
+      "sha256": "e69757648495d1d5b65a04355555b1cfdf017432efb36a012f2436717557ff58"
+    },
+    {
+      "path": "src/Swirl.Quick/shaders/hdr-ui.frag",
+      "sha256": "172e3a4f46a85c4a06625e3f4c41b47ccddea77a99924a1a30453d65bbd97326"
+    },
+    {
+      "path": "src/Swirl.Quick/shaders/sidebar-shadow.frag",
+      "sha256": "6074a966f1e43582834accde855d81502041e15e077f8101471bc28f3bfcf6c2"
+    },
+    {
+      "path": "src/Swirl.Quick/shaders/sidebar-transmission.frag",
+      "sha256": "4d41533c5eeb3dd69baeeccd97e0f73322d8cb261b868b214c9d5656c20f4432"
+    },
+    {
+      "path": "src/Swirl.Quick/shaders/swirl-blur.frag",
+      "sha256": "292465f392a7a1dc5733a709dd55911ce036766cc31b3343f9acd35f6930e4ff"
+    },
+    {
+      "path": "src/Swirl.Quick/shaders/swirl-glass.frag",
+      "sha256": "f086c3b2c6e235a5b04b3061e8a2d8901dd62f46f571b45aeb05ef3d1ec266f5"
+    },
+    {
+      "path": "src/Swirl.Quick/shaders/swirl-surface.frag",
+      "sha256": "a999d108a20bcb3f29f3157948d3fe4b246510fd6413baa4b78e8c1b02c907d2"
+    },
+    {
+      "path": "src/Swirl.Quick/shaders/swirlclicklight.frag",
+      "sha256": "e82b632db05cc1f343614f3328308bfbd8f733c5a06c4889ccca95b9f594ec7c"
+    },
+    {
+      "path": "src/Swirl.Quick/shaders/swirlclicklight.vert",
+      "sha256": "0e80da1307955118a770de801f82f06520797f05c69fc9325a0526798842a582"
+    },
+    {
+      "path": "src/Swirl.Quick/shaders/window-edge.frag",
+      "sha256": "9dc6f0545d8c7e6d640f9d8e76b9607071379f86ebaa9a803adedad8ebc74fea"
+    },
+    {
+      "path": "src/Swirl.Quick/shaders/window-edge.vert",
+      "sha256": "29dfd9978b51359fac635d207b3f9864e563ab626cbd5cac83e7dd367dc44798"
+    }
+  ]
+}

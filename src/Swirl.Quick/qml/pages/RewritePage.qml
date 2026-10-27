@@ -5,25 +5,55 @@ import QtQuick.Layouts
 import SwirlQuick
 import "../components"
 import "../controls"
+
 Item {
- id:page
- function preparePreviewState(state){if(state==="rewrite-on")captureProvider.rewriteEnabled=true}
- component RewriteCard:SwirlGlassPanel {
-  id:card;property string title;property string description;property string moduleId;property string buttonText
-  width:Theme.dp(336);height:Theme.dp(134);cornerRadius:Theme.independentCardRadius
-  SwirlText {x:Theme.dp(16);y:Theme.dp(16);text:card.title;color:Theme.text;font.pixelSize:Theme.fontSize(13);font.weight:Font.DemiBold}
-  SwirlText {x:Theme.dp(16);y:Theme.dp(42);width:Theme.dp(304);text:card.description;color:Theme.muted;font.pixelSize:Theme.fontSize(11);wrapMode:Text.WordWrap}
-  SwirlText {x:Theme.dp(16);y:Theme.dp(101);text:captureProvider.rewriteRules.filter(r=>r.kind===card.moduleId).length+" 条规则"+(captureProvider.rewriteEnabled?"生效中":"已停用");color:Theme.text;font.pixelSize:Theme.fontSize(11)}
-  SwirlButton{anchors.right:parent.right;anchors.rightMargin:Theme.dp(16);y:Theme.dp(96);implicitHeight:Theme.dp(24);text:card.buttonText;onClicked:page.Window.window.openRewriteEditor(card.moduleId,card.title)}
- }
- Flickable{anchors.fill:parent;contentWidth:Theme.dp(698);contentHeight:Theme.dp(574);clip:true
-  SwirlText {textRole:"pageTitle";x:Theme.dp(4);y:Theme.dp(6);text:"重写 & 映射";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold}
-  SwirlToggle{x:Theme.dp(156);y:Theme.dp(10);large:true;checked:captureProvider.rewriteEnabled;onToggled:captureProvider.rewriteEnabled=checked;Accessible.name:"重写与映射"}
-  RewriteCard{x:Theme.dp(4);y:Theme.dp(80);title:"URL 重定向";description:"重定向 HTTP 请求。此功能也称为 Map Remote。Swirl 可以用 3 种不同的方法重写请求的 URL。有关更多信息，请查看手册。";buttonText:"编辑 URL 重定向规则…";moduleId:"redirect"}
-  RewriteCard{x:Theme.dp(356);y:Theme.dp(80);title:"Header 重写";description:"Swirl 可以修改发送到服务器的 HTTP Header，以及修改返回响应的 Header。";buttonText:"编辑 Header 重写规则…";moduleId:"header"}
-  RewriteCard{x:Theme.dp(4);y:Theme.dp(220);title:"Mock";description:"你可以模拟 API 服务器并返回静态响应。此功能也可称为 Map Local 或 API Mocking。如果你想动态返回响应，请使用脚本。";buttonText:"编辑 Mock 规则…";moduleId:"mock"}
-  RewriteCard{x:Theme.dp(356);y:Theme.dp(220);title:"Body 重写";description:"Swirl 可以重写 HTTP 请求或响应的 Body，用正则表达式替换原始内容。如果你需要进行更灵活的修改，请使用脚本。";buttonText:"编辑 Body 重写规则…";moduleId:"body"}
-  RewriteCard{x:Theme.dp(4);y:Theme.dp(360);title:"端口转发";description:"将传入的 TCP 连接从本地监听端口转发到指定的目标地址。";buttonText:"编辑端口转发规则…";moduleId:"forward"}
-  SwirlText {x:Theme.dp(18);y:Theme.dp(506);text:"以上计数包含了模块中的规则。";color:Theme.muted;font.pixelSize:Theme.fontSize(11)}
- }
+    id:page
+    readonly property Item motionTitle:heading.titleItem
+    function preparePreviewState(state) { if (state === "rewrite-on") captureProvider.rewriteEnabled=true }
+    ScrollView {
+        id:scroll; anchors.fill:parent; anchors.margins:Theme.pagePadding; clip:true
+        ScrollBar.horizontal.policy:ScrollBar.AlwaysOff; ScrollBar.vertical:SwirlScrollBar {}
+        ColumnLayout {
+            width:scroll.availableWidth; spacing:Theme.dp(22)
+            SwirlPageHeader {
+                id:heading; Layout.fillWidth:true; title:qsTr("重写与映射")
+                description:qsTr("管理请求处理规则与本机端口转发。")
+                metadata:qsTr("%1 条已保存规则").arg(captureProvider.rewriteRules.length)
+                SwirlFlow { objectName:"rewriteStateFlow"; Layout.preferredWidth:Theme.dp(42); Layout.preferredHeight:Theme.dp(18); phase:captureProvider.rewriteEnabled?"succeeded":"idle" }
+                SwirlToggle { objectName:"rewriteToggle"; large:true; checked:captureProvider.rewriteEnabled; onToggled:captureProvider.rewriteEnabled=checked; Accessible.name:qsTr("重写与映射规则开关") }
+            }
+            SwirlText { text:captureProvider.rewriteEnabled?qsTr("规则开关已开启。HTTP 重写在捕获端口处理请求，端口转发按已保存的监听配置工作。"):qsTr("规则已保留。开启后，HTTP 重写与已配置的本机转发开始处理对应请求。"); color:Theme.muted; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12); wrapMode:Text.Wrap }
+            ColumnLayout {
+                Layout.fillWidth:true; spacing:0
+                Repeater {
+                    model:[
+                        {title:qsTr("URL 重定向"),detail:qsTr("按 URL 正则匹配，修改请求目的地。"),kind:"redirect",icon:"route"},
+                        {title:qsTr("Header 重写"),detail:qsTr("修改请求或响应的 Header。"),kind:"header",icon:"document"},
+                        {title:qsTr("Mock 响应"),detail:qsTr("对匹配请求返回静态正文与状态码。"),kind:"mock",icon:"code"},
+                        {title:qsTr("Body 重写"),detail:qsTr("使用正则表达式替换请求或响应正文。"),kind:"body",icon:"edit"},
+                        {title:qsTr("端口转发"),detail:qsTr("从本机监听端口转发到指定主机与端口。"),kind:"forward",icon:"network"}
+                    ]
+                    SwirlMotionButton {
+                        id:editor; required property var modelData
+                        objectName:"rewriteEditor-"+modelData.kind
+                        Layout.fillWidth:true; implicitHeight:Theme.dp(94); leftPadding:Theme.dp(12); rightPadding:Theme.dp(12); hoverEnabled:true
+                        readonly property int ruleCount:captureProvider.rewriteRules.filter(rule=>rule.kind===modelData.kind).length
+                        background:Rectangle { radius:Theme.dp(10); color:editor.down?Theme.pressed:editor.hovered?Theme.hover:"transparent"; border.width:editor.visualFocus?Theme.borderWidth:0; border.color:Theme.accent; Rectangle { anchors.left:parent.left; anchors.right:parent.right; anchors.bottom:parent.bottom; height:Theme.borderWidth; color:Theme.separator } }
+                        contentItem:RowLayout {
+                            spacing:Theme.dp(18)
+                            SwirlIcon { name:editor.modelData.icon; size:Theme.dp(24); color:Theme.accent }
+                            ColumnLayout { Layout.fillWidth:true; Layout.minimumWidth:0; spacing:Theme.dp(6); SwirlText { text:editor.modelData.title; color:Theme.text; font.pixelSize:Theme.fontSize(17); font.weight:Font.DemiBold } SwirlText { text:editor.modelData.detail; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true; wrapMode:Text.Wrap } }
+                            SwirlText { text:qsTr("%1 条").arg(editor.ruleCount); color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+                            SwirlIcon { name:"chevron-right"; size:Theme.dp(16); color:Theme.muted }
+                        }
+                        Accessible.name:qsTr("编辑%1，%2 条规则").arg(modelData.title).arg(ruleCount)
+                        onClicked:page.Window.window.openRewriteEditor(modelData.kind,modelData.title)
+                    }
+                }
+            }
+            SwirlText { text:captureProvider.error; visible:text.length>0; textFormat:Text.PlainText; color:Theme.red; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12); wrapMode:Text.Wrap }
+            SwirlText { text:qsTr("计数包含模块中的同类规则。"); color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+            Item { Layout.preferredHeight:Theme.dp(6) }
+        }
+    }
 }

@@ -108,10 +108,19 @@ fn ffi_probe_starts_without_waiting_for_headers_and_returns_redacted_status() {
     assert!(request.starts_with(b"HEAD /check HTTP/1.1\r\n"));
     assert_eq!(completed["probe"]["state"], "succeeded");
     assert_eq!(completed["probe"]["metrics"]["http_status"], 200);
+    let timing = &completed["probe"]["metrics"]["outbound_timing"];
+    assert!(timing["resolution_us"].is_u64());
+    assert!(timing["tcp_dial_us"].is_u64());
+    assert!(timing["tcp_connected_attempt_us"].is_u64());
+    assert_eq!(timing["tcp_attempts"], 1);
+    assert!(timing["proxy_tls_handshake_us"].is_null());
+    assert!(timing["quic_handshake_including_tls_us"].is_null());
+    assert_eq!(timing["authentication_response_accepted"], false);
     assert_eq!(second["probe"]["state"], "running");
     assert_eq!(cancelled["probe"]["state"], "cancelled");
     assert_eq!(after_cancel["probe"], cancelled["probe"]);
-    assert!(completed["probe"].to_string().len() < 512);
+    // Additive, fixed-size timing fields remain bounded and endpoint-free.
+    assert!(completed["probe"].to_string().len() < 2048);
     assert!(!completed["probe"].to_string().contains("127.0.0.1"));
     assert_eq!(stopped["ok"], true);
 }

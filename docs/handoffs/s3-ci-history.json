@@ -1,0 +1,736 @@
+{
+  "branch": "work/swirl-s3-max-ultra-20261023",
+  "source_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+  "captured_utc": "2026-10-23T15:49:31.035294+00:00",
+  "records": [
+    {
+      "id": 39975447359,
+      "name": "U1 complete Windows Qt independent fixtures",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447359"
+    },
+    {
+      "id": 39975447372,
+      "name": "U1 retained native network regressions",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "head_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447372",
+      "jobs": [
+        {
+          "id": 120488712895,
+          "name": "retained-network-tests (macos-14)",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39975447372/job/120488712895",
+          "unsuccessful_steps": [
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "conclusion": "failure"
+            }
+          ]
+        },
+        {
+          "id": 120488713297,
+          "name": "retained-network-tests (ubuntu-24.04)",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39975447372/job/120488713297",
+          "unsuccessful_steps": [
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "conclusion": "failure"
+            }
+          ]
+        },
+        {
+          "id": 120488713437,
+          "name": "retained-network-tests (windows-2022)",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39975447372/job/120488713437",
+          "unsuccessful_steps": [
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "conclusion": "failure"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 39975447333,
+      "name": "R1 source and package guards",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447333"
+    },
+    {
+      "id": 39975447341,
+      "name": "Swirl Native Protocols X14",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447341"
+    },
+    {
+      "id": 39975447386,
+      "name": "Rust sole runtime and unified product",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "head_sha": "3c1fdf29cdb847c59680778efd74eb73a727a7fc",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39975447386",
+      "jobs": [
+        {
+          "id": 120489091635,
+          "name": "Complete Qt product and native loader / macos-14",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39975447386/job/120489091635",
+          "unsuccessful_steps": []
+        },
+        {
+          "id": 120489091941,
+          "name": "windows-product",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39975447386/job/120489091941",
+          "unsuccessful_steps": [
+            {
+              "name": "Windows native public Internet requests",
+              "conclusion": "failure"
+            }
+          ]
+        },
+        {
+          "id": 120489092131,
+          "name": "rust",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39975447386/job/120489092131",
+          "unsuccessful_steps": [
+            {
+              "name": "Public Internet through authenticated Rust Shadowsocks",
+              "conclusion": "failure"
+            }
+          ]
+        },
+        {
+          "id": 120489092259,
+          "name": "Complete Qt product and native loader / ubuntu-24.04",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39975447386/job/120489092259",
+          "unsuccessful_steps": []
+        }
+      ]
+    },
+    {
+      "id": 39972868002,
+      "name": "U1 retained native network regressions",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "head_sha": "61f9458628b0bb0a64d07bb3db1bfbc8a6c896e2",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39972868002",
+      "jobs": [
+        {
+          "id": 120479828462,
+          "name": "retained-network-tests (windows-2022)",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39972868002/job/120479828462",
+          "unsuccessful_steps": [
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "conclusion": "failure"
+            }
+          ]
+        },
+        {
+          "id": 120479828743,
+          "name": "retained-network-tests (ubuntu-24.04)",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39972868002/job/120479828743",
+          "unsuccessful_steps": [
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "conclusion": "failure"
+            }
+          ]
+        },
+        {
+          "id": 120479828765,
+          "name": "retained-network-tests (macos-14)",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39972868002/job/120479828765",
+          "unsuccessful_steps": [
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "conclusion": "failure"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 39972868007,
+      "name": "U1 complete Windows Qt independent fixtures",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "61f9458628b0bb0a64d07bb3db1bfbc8a6c896e2",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39972868007"
+    },
+    {
+      "id": 39972867959,
+      "name": "Rust sole runtime and unified product",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "head_sha": "61f9458628b0bb0a64d07bb3db1bfbc8a6c896e2",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39972867959",
+      "jobs": [
+        {
+          "id": 120480189314,
+          "name": "Complete Qt product and native loader / macos-14",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39972867959/job/120480189314",
+          "unsuccessful_steps": []
+        },
+        {
+          "id": 120480189324,
+          "name": "Complete Qt product and native loader / ubuntu-24.04",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39972867959/job/120480189324",
+          "unsuccessful_steps": []
+        },
+        {
+          "id": 120480189462,
+          "name": "rust",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39972867959/job/120480189462",
+          "unsuccessful_steps": [
+            {
+              "name": "Public Internet through authenticated Rust Shadowsocks",
+              "conclusion": "failure"
+            }
+          ]
+        },
+        {
+          "id": 120480189528,
+          "name": "windows-product",
+          "conclusion": "cancelled",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39972867959/job/120480189528",
+          "unsuccessful_steps": [
+            {
+              "name": "Build product, subscription, telemetry, stream, security and loader regressions",
+              "conclusion": "cancelled"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 39972868050,
+      "name": "R1 source and package guards",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "61f9458628b0bb0a64d07bb3db1bfbc8a6c896e2",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39972868050"
+    },
+    {
+      "id": 39972868023,
+      "name": "Swirl Native Protocols X14",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "head_sha": "61f9458628b0bb0a64d07bb3db1bfbc8a6c896e2",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39972868023",
+      "jobs": [
+        {
+          "id": 120479828776,
+          "name": "official-interop (macos-latest)",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39972868023/job/120479828776",
+          "unsuccessful_steps": [
+            {
+              "name": "Hysteria2 official server including retained limitation probes",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Require original Hysteria2 methods and lifecycle evidence on this runner",
+              "conclusion": "failure"
+            }
+          ]
+        },
+        {
+          "id": 120479828968,
+          "name": "native-protocols (ubuntu-latest)",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39972868023/job/120479828968",
+          "unsuccessful_steps": []
+        },
+        {
+          "id": 120479828995,
+          "name": "native-protocols (windows-latest)",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39972868023/job/120479828995",
+          "unsuccessful_steps": []
+        },
+        {
+          "id": 120479829024,
+          "name": "official-interop (ubuntu-latest)",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39972868023/job/120479829024",
+          "unsuccessful_steps": []
+        },
+        {
+          "id": 120479829133,
+          "name": "official-interop (windows-latest)",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39972868023/job/120479829133",
+          "unsuccessful_steps": []
+        },
+        {
+          "id": 120479829235,
+          "name": "native-protocols (macos-latest)",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39972868023/job/120479829235",
+          "unsuccessful_steps": []
+        }
+      ]
+    },
+    {
+      "id": 39969473239,
+      "name": "U1 complete Windows Qt independent fixtures",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "fb8be80bc7785da1302e06ca12aacb21a470dfa7",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39969473239"
+    },
+    {
+      "id": 39969473255,
+      "name": "Swirl Native Protocols X14",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "fb8be80bc7785da1302e06ca12aacb21a470dfa7",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39969473255"
+    },
+    {
+      "id": 39969473635,
+      "name": "U1 retained native network regressions",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "head_sha": "fb8be80bc7785da1302e06ca12aacb21a470dfa7",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39969473635",
+      "jobs": [
+        {
+          "id": 120467994338,
+          "name": "retained-network-tests (ubuntu-24.04)",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39969473635/job/120467994338",
+          "unsuccessful_steps": [
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "conclusion": "failure"
+            }
+          ]
+        },
+        {
+          "id": 120467994667,
+          "name": "retained-network-tests (macos-14)",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39969473635/job/120467994667",
+          "unsuccessful_steps": [
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "conclusion": "failure"
+            }
+          ]
+        },
+        {
+          "id": 120467994724,
+          "name": "retained-network-tests (windows-2022)",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39969473635/job/120467994724",
+          "unsuccessful_steps": [
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "conclusion": "failure"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 39969473084,
+      "name": "R1 source and package guards",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "fb8be80bc7785da1302e06ca12aacb21a470dfa7",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39969473084"
+    },
+    {
+      "id": 39969473309,
+      "name": "Rust sole runtime and unified product",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "head_sha": "fb8be80bc7785da1302e06ca12aacb21a470dfa7",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39969473309",
+      "jobs": [
+        {
+          "id": 120468284388,
+          "name": "Complete Qt product and native loader / ubuntu-24.04",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39969473309/job/120468284388",
+          "unsuccessful_steps": []
+        },
+        {
+          "id": 120468284684,
+          "name": "Complete Qt product and native loader / macos-14",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39969473309/job/120468284684",
+          "unsuccessful_steps": []
+        },
+        {
+          "id": 120468284768,
+          "name": "windows-product",
+          "conclusion": "cancelled",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39969473309/job/120468284768",
+          "unsuccessful_steps": [
+            {
+              "name": "Windows native product and subscription regression",
+              "conclusion": "cancelled"
+            }
+          ]
+        },
+        {
+          "id": 120468284836,
+          "name": "rust",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39969473309/job/120468284836",
+          "unsuccessful_steps": [
+            {
+              "name": "Public Internet through authenticated Rust Shadowsocks",
+              "conclusion": "failure"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 39966861505,
+      "name": "R1 source and package guards",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "5eca691384a9816874cdc0a51cc2cbba42773b53",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39966861505"
+    },
+    {
+      "id": 39966861513,
+      "name": "Swirl Native Protocols X14",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "5eca691384a9816874cdc0a51cc2cbba42773b53",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39966861513"
+    },
+    {
+      "id": 39966861559,
+      "name": "U1 retained native network regressions",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "head_sha": "5eca691384a9816874cdc0a51cc2cbba42773b53",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39966861559",
+      "jobs": [
+        {
+          "id": 120458864622,
+          "name": "retained-network-tests (ubuntu-24.04)",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39966861559/job/120458864622",
+          "unsuccessful_steps": [
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "conclusion": "failure"
+            }
+          ]
+        },
+        {
+          "id": 120458865094,
+          "name": "retained-network-tests (macos-14)",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39966861559/job/120458865094",
+          "unsuccessful_steps": [
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "conclusion": "failure"
+            }
+          ]
+        },
+        {
+          "id": 120458865095,
+          "name": "retained-network-tests (windows-2022)",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39966861559/job/120458865095",
+          "unsuccessful_steps": [
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "conclusion": "failure"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 39966861462,
+      "name": "U1 complete Windows Qt independent fixtures",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "5eca691384a9816874cdc0a51cc2cbba42773b53",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39966861462"
+    },
+    {
+      "id": 39966861463,
+      "name": "Rust sole runtime and unified product",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "head_sha": "5eca691384a9816874cdc0a51cc2cbba42773b53",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39966861463",
+      "jobs": [
+        {
+          "id": 120459543794,
+          "name": "Complete Qt product and native loader / macos-14",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39966861463/job/120459543794",
+          "unsuccessful_steps": []
+        },
+        {
+          "id": 120459544078,
+          "name": "Complete Qt product and native loader / ubuntu-24.04",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39966861463/job/120459544078",
+          "unsuccessful_steps": []
+        },
+        {
+          "id": 120459544080,
+          "name": "rust",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39966861463/job/120459544080",
+          "unsuccessful_steps": [
+            {
+              "name": "Public Internet through authenticated Rust Shadowsocks",
+              "conclusion": "failure"
+            }
+          ]
+        },
+        {
+          "id": 120459544290,
+          "name": "windows-product",
+          "conclusion": "cancelled",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39966861463/job/120459544290",
+          "unsuccessful_steps": [
+            {
+              "name": "Windows native product and subscription regression",
+              "conclusion": "cancelled"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 39964203522,
+      "name": "R1 source and package guards",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "e4c5ebdb7f662106e14079456d57fc565a4f17b8",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39964203522"
+    },
+    {
+      "id": 39964203419,
+      "name": "Swirl Native Protocols X14",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "e4c5ebdb7f662106e14079456d57fc565a4f17b8",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39964203419"
+    },
+    {
+      "id": 39964203370,
+      "name": "U1 retained native network regressions",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "head_sha": "e4c5ebdb7f662106e14079456d57fc565a4f17b8",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39964203370",
+      "jobs": [
+        {
+          "id": 120449678474,
+          "name": "retained-network-tests (macos-14)",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39964203370/job/120449678474",
+          "unsuccessful_steps": [
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "conclusion": "failure"
+            }
+          ]
+        },
+        {
+          "id": 120449679120,
+          "name": "retained-network-tests (ubuntu-24.04)",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39964203370/job/120449679120",
+          "unsuccessful_steps": [
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "conclusion": "failure"
+            }
+          ]
+        },
+        {
+          "id": 120449679161,
+          "name": "retained-network-tests (windows-2022)",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39964203370/job/120449679161",
+          "unsuccessful_steps": [
+            {
+              "name": "Execute both original strict VMess peer-closure methods",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Require complete actual results and matching source identity",
+              "conclusion": "failure"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 39964203552,
+      "name": "U1 complete Windows Qt independent fixtures",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "e4c5ebdb7f662106e14079456d57fc565a4f17b8",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39964203552"
+    },
+    {
+      "id": 39964203663,
+      "name": "Rust sole runtime and unified product",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "head_sha": "e4c5ebdb7f662106e14079456d57fc565a4f17b8",
+      "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39964203663",
+      "jobs": [
+        {
+          "id": 120449680055,
+          "name": "rust",
+          "conclusion": "failure",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39964203663/job/120449680055",
+          "unsuccessful_steps": [
+            {
+              "name": "Public Internet through authenticated Rust Shadowsocks",
+              "conclusion": "failure"
+            }
+          ]
+        },
+        {
+          "id": 120449680340,
+          "name": "Complete Qt product and native loader / ubuntu-24.04",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39964203663/job/120449680340",
+          "unsuccessful_steps": []
+        },
+        {
+          "id": 120449680545,
+          "name": "Complete Qt product and native loader / macos-14",
+          "conclusion": "success",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39964203663/job/120449680545",
+          "unsuccessful_steps": []
+        },
+        {
+          "id": 120449680750,
+          "name": "windows-product",
+          "conclusion": "cancelled",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39964203663/job/120449680750",
+          "unsuccessful_steps": [
+            {
+              "name": "Build product, subscription, telemetry, stream, security and loader regressions",
+              "conclusion": "cancelled"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scope": "All 25 branch workflow runs returned at freeze; cancelled is not a pass; no runs or artifacts deleted"
+}

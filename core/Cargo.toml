@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 exclude = ["vendor/rustls"]
-members = ["crates/swirl-subscription", "crates/swirl-dns", "crates/swirl-routing", "crates/swirl-protocol", "crates/swirl-transport", "crates/swirl-core", "crates/swirl-api"]
+members = ["crates/swirl-platform", "crates/swirl-subscription", "crates/swirl-dns", "crates/swirl-routing", "crates/swirl-protocol", "crates/swirl-transport", "crates/swirl-core", "crates/swirl-api"]
 
 [workspace.package]
 version = "0.1.0"
@@ -17,10 +17,19 @@ serde_json = "1"
 base64 = "0.22"
 ipnet = { version = "2", features = ["serde"] }
 httparse = "1"
+h2 = "=0.4.20"
+http = "=1.5.0"
+bytes = "=1.12.1"
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12", "brotli"] }
 webpki-roots = "1"
 sha2 = "0.10"
 ring = "0.17"
+aes = "=0.8.4"
+quinn = { version = "=0.11.12", default-features = false, features = ["runtime-tokio", "rustls-ring"] }
+h3 = "=0.0.8"
+h3-quinn = "=0.0.10"
+blake2 = "=0.10.6"
+blake3 = "=1.8.7"
 md-5 = "0.10"
 zeroize = "1"
 x25519-dalek = { version = "=3.0.0", features = ["static_secrets"] }
@@ -36,6 +45,7 @@ swirl-routing = { path = "crates/swirl-routing" }
 swirl-protocol = { path = "crates/swirl-protocol" }
 swirl-transport = { path = "crates/swirl-transport" }
 swirl-core = { path = "crates/swirl-core" }
+swirl-platform = { path = "crates/swirl-platform" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

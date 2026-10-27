@@ -1,0 +1,2 @@
+2026/10/22 22:07:32.049373 from 127.0.0.1:41414 rejected  proxy/vmess/encoding: failed to read request header > remote error: tls: unknown certificate authority
+2026/10/22 22:07:32.056531 from 127.0.0.1:41416 rejected  proxy/vmess/encoding: failed to read request header > remote error: tls: bad certificate

@@ -1,0 +1,65 @@
+{
+    "checks": [
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "primary-escape-keeps-window",
+            "passed": true
+        },
+        {
+            "name": "activity-escape-traffic",
+            "passed": true
+        },
+        {
+            "name": "activity-escape-connections",
+            "passed": true
+        },
+        {
+            "name": "activity-escape-toolbox",
+            "passed": true
+        },
+        {
+            "name": "activity-escape-processes",
+            "passed": true
+        },
+        {
+            "name": "activity-escape-gateway",
+            "passed": true
+        },
+        {
+            "name": "activity-escape-logs",
+            "passed": true
+        },
+        {
+            "name": "nested-first-escape",
+            "passed": true
+        },
+        {
+            "name": "nested-second-escape",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-proxies",
+            "passed": true
+        },
+        {
+            "name": "popup-first-escape",
+            "passed": true
+        },
+        {
+            "name": "focused-input-back",
+            "passed": true
+        },
+        {
+            "name": "escape-keeps-geometry",
+            "passed": true
+        }
+    ],
+    "failures": 0
+}

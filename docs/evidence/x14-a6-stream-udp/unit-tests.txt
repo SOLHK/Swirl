@@ -1,0 +1,38 @@
+   Compiling swirl-protocol v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-protocol)
+    Finished `test` profile [unoptimized] target(s) in 1.60s
+     Running unittests src/lib.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/swirl_protocol-04d4463d2a41c0b7)
+
+running 6 tests
+test stream_udp::tests::different_targets_cannot_reuse_a_vless_carrier ... ok
+test stream_udp::tests::malformed_address_and_separator_are_rejected ... ok
+test stream_udp::tests::complete_and_partial_frames_preserve_datagram_boundaries ... ok
+test stream_udp::tests::address_families_empty_and_bounded_payloads ... ok
+test stream_udp::tests::cancelling_a_partial_write_prevents_further_packets ... ok
+test stream_udp::tests::cancelling_a_partial_receive_preserves_its_framing ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 104 filtered out; finished in 0.01s
+
+     Running tests/vision.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/vision-45d7f52bf55f3cae)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 21 filtered out; finished in 0.00s
+
+     Running tests/vision_record.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/vision_record-0f6a939f0a463840)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/vision_stream.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/vision_stream-6a1ddfd3e091099a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.00s
+
+     Running tests/vision_tls.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/vision_tls-c4a0f4238e0b80ae)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+

@@ -1,0 +1,802 @@
+{
+  "scope": "exact A6 commit, separate from later uncommitted A7 work; official counts include negative cases and explicit upstream limitation probes",
+  "run_id": 39789898464,
+  "url": "https://github.com/SOLHK/Swirl/actions/runs/39789898464",
+  "head_sha": "42fd5782c1d30f32bb4cc2aef21857c52af50dc7",
+  "status": "completed",
+  "conclusion": "success",
+  "updated_at": "2026-10-22T13:52:13Z",
+  "qt_product_tested": false,
+  "public_network_tested": false,
+  "jobs": [
+    {
+      "id": 119862846616,
+      "name": "official-interop (windows-latest)",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39789898464/job/119862846616",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-22T13:46:57Z",
+      "completed_at": "2026-10-22T13:52:12Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install test certificate library",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Rust",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build native clients and Core harness",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned official Xray peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned Hysteria and TUIC server peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned official Shadowsocks server peer",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Measure and prepare disposable runner UDP prerequisites",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set native client and evidence paths",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "VMess official Xray data and completed-response closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Hysteria2 official server including retained limitation probes",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "TUIC historical official reference including retained limitation probe",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Core ingress TCP UDP DNS HTTPS and node switching",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Imported Xray V2Ray transport configs through ordinary Core start",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "VLESS and Trojan UDP through official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Shadowsocks 2022 official data and replay rejection",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "HTTP and SOCKS authentication TCP UDP and import through official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "REALITY Rustls through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "REALITY Chrome133 through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Vision Rustls TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Vision Chrome133 TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload actual interoperability receipts",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "rust_test_totals": null,
+      "official_suites": [
+        {
+          "methods": 13,
+          "seconds": 14.083
+        },
+        {
+          "methods": 17,
+          "seconds": 22.005
+        },
+        {
+          "methods": 9,
+          "seconds": 15.77
+        },
+        {
+          "methods": 6,
+          "seconds": 20.8
+        },
+        {
+          "methods": 5,
+          "seconds": 11.87
+        },
+        {
+          "methods": 8,
+          "seconds": 21.137
+        },
+        {
+          "methods": 12,
+          "seconds": 9.138
+        },
+        {
+          "methods": 8,
+          "seconds": 9.765
+        },
+        {
+          "methods": 8,
+          "seconds": 10.177
+        },
+        {
+          "methods": 8,
+          "seconds": 10.233
+        },
+        {
+          "methods": 10,
+          "seconds": 12.973
+        },
+        {
+          "methods": 10,
+          "seconds": 21.594
+        }
+      ],
+      "official_method_executions": 114,
+      "log_has_test_failure": false
+    },
+    {
+      "id": 119862846899,
+      "name": "native-protocols (windows-latest)",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39789898464/job/119862846899",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-22T13:46:57Z",
+      "completed_at": "2026-10-22T13:50:12Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Rust tools",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Format",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Clippy",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Unit and local network tests",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "rust_test_totals": {
+        "passed": 634,
+        "failed": 0,
+        "ignored": 0
+      },
+      "official_suites": [],
+      "official_method_executions": 0,
+      "log_has_test_failure": false
+    },
+    {
+      "id": 119862846924,
+      "name": "official-interop (macos-latest)",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39789898464/job/119862846924",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-22T13:46:59Z",
+      "completed_at": "2026-10-22T13:49:54Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install test certificate library",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Rust",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build native clients and Core harness",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned official Xray peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned Hysteria and TUIC server peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned official Shadowsocks server peer",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Measure and prepare disposable runner UDP prerequisites",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set native client and evidence paths",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "VMess official Xray data and completed-response closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Hysteria2 official server including retained limitation probes",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "TUIC historical official reference including retained limitation probe",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Core ingress TCP UDP DNS HTTPS and node switching",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Imported Xray V2Ray transport configs through ordinary Core start",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "VLESS and Trojan UDP through official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Shadowsocks 2022 official data and replay rejection",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "HTTP and SOCKS authentication TCP UDP and import through official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "REALITY Rustls through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "REALITY Chrome133 through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Vision Rustls TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Vision Chrome133 TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload actual interoperability receipts",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "rust_test_totals": null,
+      "official_suites": [
+        {
+          "methods": 13,
+          "seconds": 11.427
+        },
+        {
+          "methods": 17,
+          "seconds": 19.322
+        },
+        {
+          "methods": 9,
+          "seconds": 13.149
+        },
+        {
+          "methods": 6,
+          "seconds": 21.471
+        },
+        {
+          "methods": 5,
+          "seconds": 9.072
+        },
+        {
+          "methods": 8,
+          "seconds": 18.268
+        },
+        {
+          "methods": 12,
+          "seconds": 6.782
+        },
+        {
+          "methods": 8,
+          "seconds": 7.422
+        },
+        {
+          "methods": 8,
+          "seconds": 4.59
+        },
+        {
+          "methods": 8,
+          "seconds": 4.1
+        },
+        {
+          "methods": 10,
+          "seconds": 6.08
+        },
+        {
+          "methods": 10,
+          "seconds": 6.343
+        }
+      ],
+      "official_method_executions": 114,
+      "log_has_test_failure": false
+    },
+    {
+      "id": 119862846926,
+      "name": "native-protocols (ubuntu-latest)",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39789898464/job/119862846926",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-22T13:46:57Z",
+      "completed_at": "2026-10-22T13:48:19Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Rust tools",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Format",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Clippy",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Unit and local network tests",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "rust_test_totals": {
+        "passed": 633,
+        "failed": 0,
+        "ignored": 0
+      },
+      "official_suites": [],
+      "official_method_executions": 0,
+      "log_has_test_failure": false
+    },
+    {
+      "id": 119862847074,
+      "name": "native-protocols (macos-latest)",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39789898464/job/119862847074",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-22T13:46:57Z",
+      "completed_at": "2026-10-22T13:48:53Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Rust tools",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Format",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Clippy",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Unit and local network tests",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "rust_test_totals": {
+        "passed": 633,
+        "failed": 0,
+        "ignored": 0
+      },
+      "official_suites": [],
+      "official_method_executions": 0,
+      "log_has_test_failure": false
+    },
+    {
+      "id": 119862847205,
+      "name": "official-interop (ubuntu-latest)",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39789898464/job/119862847205",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-22T13:46:57Z",
+      "completed_at": "2026-10-22T13:50:29Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install test certificate library",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Rust",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build native clients and Core harness",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned official Xray peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned Hysteria and TUIC server peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned official Shadowsocks server peer",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Measure and prepare disposable runner UDP prerequisites",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set native client and evidence paths",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "VMess official Xray data and completed-response closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Hysteria2 official server including retained limitation probes",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "TUIC historical official reference including retained limitation probe",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Core ingress TCP UDP DNS HTTPS and node switching",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Imported Xray V2Ray transport configs through ordinary Core start",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "VLESS and Trojan UDP through official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Shadowsocks 2022 official data and replay rejection",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "HTTP and SOCKS authentication TCP UDP and import through official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "REALITY Rustls through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "REALITY Chrome133 through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Vision Rustls TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Vision Chrome133 TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload actual interoperability receipts",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "rust_test_totals": null,
+      "official_suites": [
+        {
+          "methods": 13,
+          "seconds": 9.974
+        },
+        {
+          "methods": 17,
+          "seconds": 18.67
+        },
+        {
+          "methods": 9,
+          "seconds": 11.618
+        },
+        {
+          "methods": 6,
+          "seconds": 20.029
+        },
+        {
+          "methods": 5,
+          "seconds": 29.539
+        },
+        {
+          "methods": 8,
+          "seconds": 14.423
+        },
+        {
+          "methods": 12,
+          "seconds": 4.943
+        },
+        {
+          "methods": 8,
+          "seconds": 10.812
+        },
+        {
+          "methods": 8,
+          "seconds": 8.97
+        },
+        {
+          "methods": 8,
+          "seconds": 3.713
+        },
+        {
+          "methods": 10,
+          "seconds": 6.593
+        },
+        {
+          "methods": 10,
+          "seconds": 6.685
+        }
+      ],
+      "official_method_executions": 114,
+      "log_has_test_failure": false
+    }
+  ]
+}

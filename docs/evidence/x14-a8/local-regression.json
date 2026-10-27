@@ -1,0 +1,519 @@
+{
+  "schema": 1,
+  "base_sha": "b6fba1827b0136c50123dab41fa4cb1c79a9ebce",
+  "original_sha": "de115093691ff00371b6e8313e4f1bb832c1fa3a",
+  "platform": "linux-x86_64",
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "profile": "dev/test opt-level=0 debug=0 incremental=false",
+  "qt_product_acceptance": false,
+  "public_network_tested": false,
+  "stack_experiments": [
+    {
+      "source_label": "de115093",
+      "client_sha256": "c9c7e1f654821cbecac9e370acab1f137ba17cf87b10f15ea0d81e27365386bf",
+      "official_server_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+      "records": [
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 1048576,
+          "mode": "tcp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(1048576, 1048576)\n\nthread 'main' (333119) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 1048576,
+          "mode": "udp",
+          "exit_code": 0,
+          "stdout": "{\"dns_quic_auth_us\":5755,\"downloaded\":3072,\"imported\":false,\"mode\":\"udp\",\"ok\":true,\"sha256\":\"2925f8a9109d508016c1edae2ab029a875e66f94e0787d13c23c0bda08a41e94\",\"uploaded\":3072}",
+          "stderr": "stack_limit=(1048576, 1048576)"
+        },
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 1048576,
+          "mode": "bad-password",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(1048576, 1048576)\n\nthread 'main' (333140) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 786432,
+          "mode": "tcp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(786432, 786432)\n\nthread 'main' (333149) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 786432,
+          "mode": "udp",
+          "exit_code": 0,
+          "stdout": "{\"dns_quic_auth_us\":6153,\"downloaded\":3072,\"imported\":false,\"mode\":\"udp\",\"ok\":true,\"sha256\":\"2925f8a9109d508016c1edae2ab029a875e66f94e0787d13c23c0bda08a41e94\",\"uploaded\":3072}",
+          "stderr": "stack_limit=(786432, 786432)"
+        },
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 786432,
+          "mode": "bad-password",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(786432, 786432)\n\nthread 'main' (333171) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 655360,
+          "mode": "tcp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(655360, 655360)\n\nthread 'main' (333181) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 655360,
+          "mode": "udp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(655360, 655360)\n\nthread 'main' (333190) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 655360,
+          "mode": "bad-password",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(655360, 655360)\n\nthread 'main' (333200) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 524288,
+          "mode": "tcp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(524288, 524288)\n\nthread 'main' (333209) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 524288,
+          "mode": "udp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(524288, 524288)\n\nthread 'main' (333219) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 524288,
+          "mode": "bad-password",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(524288, 524288)\n\nthread 'main' (333228) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 393216,
+          "mode": "tcp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(393216, 393216)\n\nthread 'main' (333237) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 393216,
+          "mode": "udp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(393216, 393216)\n\nthread 'main' (333247) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 393216,
+          "mode": "bad-password",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(393216, 393216)\n\nthread 'main' (333256) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 262144,
+          "mode": "tcp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(262144, 262144)\n\nthread 'main' (333266) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 262144,
+          "mode": "udp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(262144, 262144)\n\nthread 'main' (333275) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "de115093",
+          "stack_limit_bytes": 262144,
+          "mode": "bad-password",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(262144, 262144)\n\nthread 'main' (333285) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        }
+      ]
+    },
+    {
+      "source_label": "b6fba182",
+      "client_sha256": "b581d139a6074e14fe1e1e3373d9985b85389a0bfea02581dfe532b6b5f913e4",
+      "official_server_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+      "records": [
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 1048576,
+          "mode": "tcp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(1048576, 1048576)\n\nthread 'main' (333353) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 1048576,
+          "mode": "udp",
+          "exit_code": 0,
+          "stdout": "{\"dns_quic_auth_us\":6595,\"downloaded\":3072,\"imported\":false,\"mode\":\"udp\",\"ok\":true,\"sha256\":\"2925f8a9109d508016c1edae2ab029a875e66f94e0787d13c23c0bda08a41e94\",\"uploaded\":3072}",
+          "stderr": "stack_limit=(1048576, 1048576)"
+        },
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 1048576,
+          "mode": "bad-password",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(1048576, 1048576)\n\nthread 'main' (333380) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 786432,
+          "mode": "tcp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(786432, 786432)\n\nthread 'main' (333392) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 786432,
+          "mode": "udp",
+          "exit_code": 0,
+          "stdout": "{\"dns_quic_auth_us\":7305,\"downloaded\":3072,\"imported\":false,\"mode\":\"udp\",\"ok\":true,\"sha256\":\"2925f8a9109d508016c1edae2ab029a875e66f94e0787d13c23c0bda08a41e94\",\"uploaded\":3072}",
+          "stderr": "stack_limit=(786432, 786432)"
+        },
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 786432,
+          "mode": "bad-password",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(786432, 786432)\n\nthread 'main' (333418) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 655360,
+          "mode": "tcp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(655360, 655360)\n\nthread 'main' (333427) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 655360,
+          "mode": "udp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(655360, 655360)\n\nthread 'main' (333436) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 655360,
+          "mode": "bad-password",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(655360, 655360)\n\nthread 'main' (333445) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 524288,
+          "mode": "tcp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(524288, 524288)\n\nthread 'main' (333454) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 524288,
+          "mode": "udp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(524288, 524288)\n\nthread 'main' (333463) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 524288,
+          "mode": "bad-password",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(524288, 524288)\n\nthread 'main' (333472) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 393216,
+          "mode": "tcp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(393216, 393216)\n\nthread 'main' (333481) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 393216,
+          "mode": "udp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(393216, 393216)\n\nthread 'main' (333490) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 393216,
+          "mode": "bad-password",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(393216, 393216)\n\nthread 'main' (333499) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 262144,
+          "mode": "tcp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(262144, 262144)\n\nthread 'main' (333508) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 262144,
+          "mode": "udp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(262144, 262144)\n\nthread 'main' (333517) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "b6fba182",
+          "stack_limit_bytes": 262144,
+          "mode": "bad-password",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(262144, 262144)\n\nthread 'main' (333526) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        }
+      ]
+    },
+    {
+      "source_label": "a8-split",
+      "client_sha256": "769cda77115a04593ababcef6e7b1aaf0421fae2753e248d7f10f7263e3d57b4",
+      "official_server_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+      "records": [
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 1048576,
+          "mode": "tcp",
+          "exit_code": 0,
+          "stdout": "{\"close\":\"clean\",\"dns_quic_auth_tcp_us\":5910,\"downloaded\":65536,\"imported\":false,\"mode\":\"tcp\",\"ok\":true,\"sha256\":\"b03a3e1e12b699bd2c526e13a0d73f39b761de545f248b3d5faac391ad3b8d97\",\"total_us\":12916,\"uploaded\":65536}",
+          "stderr": "stack_limit=(1048576, 1048576)"
+        },
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 1048576,
+          "mode": "udp",
+          "exit_code": 0,
+          "stdout": "{\"dns_quic_auth_us\":5307,\"downloaded\":3072,\"imported\":false,\"mode\":\"udp\",\"ok\":true,\"sha256\":\"2925f8a9109d508016c1edae2ab029a875e66f94e0787d13c23c0bda08a41e94\",\"uploaded\":3072}",
+          "stderr": "stack_limit=(1048576, 1048576)"
+        },
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 1048576,
+          "mode": "bad-password",
+          "exit_code": 1,
+          "stdout": "{\"code\":\"Hysteria2AuthenticationRejected\",\"ok\":false}",
+          "stderr": "stack_limit=(1048576, 1048576)"
+        },
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 786432,
+          "mode": "tcp",
+          "exit_code": 0,
+          "stdout": "{\"close\":\"clean\",\"dns_quic_auth_tcp_us\":6436,\"downloaded\":65536,\"imported\":false,\"mode\":\"tcp\",\"ok\":true,\"sha256\":\"b03a3e1e12b699bd2c526e13a0d73f39b761de545f248b3d5faac391ad3b8d97\",\"total_us\":57617,\"uploaded\":65536}",
+          "stderr": "stack_limit=(786432, 786432)"
+        },
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 786432,
+          "mode": "udp",
+          "exit_code": 0,
+          "stdout": "{\"dns_quic_auth_us\":5461,\"downloaded\":3072,\"imported\":false,\"mode\":\"udp\",\"ok\":true,\"sha256\":\"2925f8a9109d508016c1edae2ab029a875e66f94e0787d13c23c0bda08a41e94\",\"uploaded\":3072}",
+          "stderr": "stack_limit=(786432, 786432)"
+        },
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 786432,
+          "mode": "bad-password",
+          "exit_code": 1,
+          "stdout": "{\"code\":\"Hysteria2AuthenticationRejected\",\"ok\":false}",
+          "stderr": "stack_limit=(786432, 786432)"
+        },
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 655360,
+          "mode": "tcp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(655360, 655360)\n\nthread 'main' (335274) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 655360,
+          "mode": "udp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(655360, 655360)\n\nthread 'main' (335283) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 655360,
+          "mode": "bad-password",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(655360, 655360)\n\nthread 'main' (335292) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 524288,
+          "mode": "tcp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(524288, 524288)\n\nthread 'main' (335301) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 524288,
+          "mode": "udp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(524288, 524288)\n\nthread 'main' (335310) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 524288,
+          "mode": "bad-password",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(524288, 524288)\n\nthread 'main' (335319) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 393216,
+          "mode": "tcp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(393216, 393216)\n\nthread 'main' (335328) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 393216,
+          "mode": "udp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(393216, 393216)\n\nthread 'main' (335337) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 393216,
+          "mode": "bad-password",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(393216, 393216)\n\nthread 'main' (335346) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 262144,
+          "mode": "tcp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(262144, 262144)\n\nthread 'main' (335355) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 262144,
+          "mode": "udp",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(262144, 262144)\n\nthread 'main' (335364) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        },
+        {
+          "label": "a8-split",
+          "stack_limit_bytes": 262144,
+          "mode": "bad-password",
+          "exit_code": -6,
+          "stdout": "",
+          "stderr": "stack_limit=(262144, 262144)\n\nthread 'main' (335373) has overflowed its stack\nfatal runtime error: stack overflow, aborting"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "cargo_fmt": "passed",
+    "cargo_check_workspace_locked": "passed",
+    "cargo_clippy_workspace_all_targets_locked_D_warnings": "passed",
+    "cargo_test_workspace_locked": {
+      "passed": 640,
+      "failed": 0,
+      "ignored": 0
+    },
+    "hysteria2_original_methods_measured_1MiB": {
+      "expected_methods": 17,
+      "executed_methods": 17,
+      "failures": [],
+      "errors": [],
+      "skips": [],
+      "all_original_methods_passed": true,
+      "constrained_stack": true
+    },
+    "public_future_bytes": {
+      "connect": 216,
+      "connect_with_transport": 224,
+      "connect_udp_stream": 224
+    }
+  },
+  "retained_windows_failures": [
+    {
+      "commit": "de115093691ff00371b6e8313e4f1bb832c1fa3a",
+      "run_id": 39793316607,
+      "job_id": 119874473015,
+      "hysteria2_methods": 17,
+      "failed_methods": 14,
+      "stack_overflow_code": "0xC00000FD"
+    },
+    {
+      "commit": "b6fba1827b0136c50123dab41fa4cb1c79a9ebce",
+      "run_id": 39801982069,
+      "job_id": 119904896248,
+      "hysteria2_methods": 17,
+      "failed_methods": 13,
+      "stack_overflow_code": "0xC00000FD",
+      "additional_failure": "HTTPUpgrade wrong UUID recv raised WinError 10053 ConnectionAbortedError"
+    }
+  ],
+  "source_sha256": {
+    "core/crates/swirl-protocol/src/lib.rs": "210ef10cc6abd228928c4e677aa6ff0bfec1afd0aeea465a9384fd4ea93dbe68",
+    "core/crates/swirl-protocol/examples/hysteria2-client.rs": "adfc152efe37ad74e87336c51b01eef499f192013284b1a17ffed6039b177966",
+    "core/crates/swirl-protocol/examples/hysteria2-lifecycle.rs": "e04a54e5baf112df253f68f5862c8e69ad9e656b8b282e0928cf73e16c6672d4",
+    "tools/tests/native_client_stack.py": "126254d04c746c881f8e35540cb03c2e4cddaa7f4e8ec8c370da3d0169a47380",
+    "tools/tests/run_hysteria2_official.py": "3dd75125403d9b7d55b6d8f825020e808a0651d453391f6ac9ddfbe96ce68b77",
+    "tools/tests/test_hysteria2_official.py": "a825b6597374a6c5b9ee857db01220437b52361d3630d7a4a54f3ffa06351ba7",
+    "tools/tests/test_hysteria2_lifecycle.py": "f659a0759386e7a1f067de45337b6db781580524dd82c9ebffe5c22dba54686a",
+    "tools/tests/test_imported_transports_xray.py": "a8fb12183e048c65e70efb5fc8d6c6f3aae8788048a13639576e257f203b5c47",
+    ".github/workflows/rust-native-protocols.yml": "35c2aa95abc0f4584375ff4f4a8d149e88955742f91fb370d0ba327bb3760619"
+  }
+}

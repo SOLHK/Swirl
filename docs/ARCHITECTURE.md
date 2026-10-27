@@ -1,38 +1,28 @@
-# Swirl Qt-only 架构与演进边界
+# Swirl 当前架构 — APEC V3 + 单一 Rust Core（2026-10-27）
 
-当前仓库的运行与打包链全部基于 **C++23、Qt 6 Quick/QML、CMake 和 Windows NSIS**；不再维护 C#、WPF、.NET 或旧 Inno Setup 项目。
-
-## 当前已经实现
-
-- `src/Swirl.Quick/qml/`：桌面 QML 界面、真实业务状态交互和功能模块草稿
-- `src/Swirl.Quick/app/`：Windows 桌面背景/图标提供者及草稿存储
-- `src/Swirl.Quick/network/CaptureService.*`：真实本地 HTTP/CONNECT 会话抓包；独立于代理核心
-- `src/Swirl.Quick/tests/`：输入、抓包、窗口回归
-- `src/Swirl.Quick/packaging/Swirl.nsi`：Qt 测试版本 Windows 安装包
-
-## 后续建议分层（未实现）
+## 产品运行路径
 
 ```text
-Qt Quick / QML 页面
-    ↓
-C++23 Application Services（配置、规则、订阅、诊断）
-    ↓
-ProxyEngine 抽象（启动/停止、选择节点、配置检验、状态、事件）
-    ↓
-MihomoAdapter（独立进程、控制 API、运行目录/凭据保护）
-    ↓
-Mihomo 代理引擎
+Qt 6.12 Quick/QML  (src/Swirl.Quick/qml)
+  -> C++23 UI / services / EngineController / NodeStore
+  -> ThreadedEngine  [QObject worker-thread facade, no independent network core]
+  -> RustCoreEngine + RustCoreLibrary  [checked C ABI and source/build ID]
+  -> swirl_api.dll
+  -> Rust crates: swirl-core / swirl-protocol / swirl-transport / swirl-dns / swirl-routing ...
 ```
 
-`ProxyEngine`、`MihomoAdapter` 已实现；HTTP 抓包服务仍是独立模块。
+仅 `core/` 负责代理监听、网络转发、协议实现与 DNS/路由运行时。Qt 层负责产品 UI、状态、订阅节点格式解析、持久化、诊断和 Windows 系统集成。部分本地 HTTP 捕获、网关/代理设置工具是产品辅助模块，**不是**第二套代理内核。
 
-建议分阶段实现接口、适配层、真实连接与代理切换，再实现规则、订阅、TUN、日志与调试扩展。每一阶段必须在 `test` 分支进行 Windows 构建与实际功能测试，验收后按保护流程晋级 `main`。
+旧 WPF/C#、C++ 转发引擎、MihomoAdapter 和 `stage-mihomo.ps1` 已从当前源码树退役；不要从历史分支重新引入。现有 `SWIRL_USE_RUST_CORE` CMake 缓存值强制为 ON，OFF 直接报错，只为与现有安装包源身份验证兼容；它不是引擎选择开关。
 
-## 旧源码退役
+## 输入格式 != 网络运行时
 
-2026-10-12 按仓库所有者要求从当前分支删除了 `AdShield/`、`AdShield.Tests/`、旧 `installer/`、对应的 C#/.NET 工作流和旧内核下载脚本。**删除文件不会改变过去的 Git 提交历史**，需要参考旧实现可查看 [备份分支](https://github.com/SOLHK/Swirl/tree/backup/pre-qt-only-20261012)。当前 Qt 安装程序不包含旧 C# 代理实现，未来网络核心能力需要重新对接或实现。
+可以继续解析 Clash YAML、sing-box、Surge/Shadowrocket/Loon/URI、Xray/V2Ray JSON 等允许的节点和配置数据。格式解析只将**已验证可支持**的语义映射到 Swirl 的 Rust 原生策略与节点。未知项、无法完整投影的规则、凭据、TUN、脚本、MITM、重写等不可静默执行或回退到外部引擎。保留订阅来源与加密数据；旧数据迁移逻辑仍属于当前产品兼容需求。
 
+## 构建与验证边界
 
-## 当前第二阶段实现
+- `src/Swirl.Quick/CMakeLists.txt` 只构建一个 `Swirl.exe` 产品；`cmake/SwirlRustCore.cmake` 配对唯一 Rust `swirl_api`。
+- `scripts/Stage-WindowsRustProduct.ps1` 验证 Release/源码/构建 ID、Rust 自检及安装文件清单；`scripts/RustProductPackagePolicy.ps1` 拒绝各类外部代理可执行文件和测试/私密文件。
+- APEC V3 的 Qt 6.12 Windows CI、Rust Core CI、网络安全测试和安装包验证需逐提交独立核对。未验证的字体许可弹窗、实际设备 DPI/GPU 帧率和私有节点不能因架构清理被标记通过。
 
-历史规划已由 C++ ProxyEngine、MihomoAdapter 和 EngineController 实现。节点 DTO 与 DPAPI NodeStore 属于 Swirl 业务层，QML 仅调用业务 facade，底层配置/API 封装于适配器。详见 [第二阶段说明](PHASE2_REAL_NODES.md)。
+`docs/` 中的旧版截图、Phase 2/MihomoAdapter 架构和早期 Core 迁移日志是可追溯的**历史记录**，不是当前实现或后续代码准则。旧源码备份：[pre-qt-only-20261012](https://github.com/SOLHK/Swirl/tree/backup/pre-qt-only-20261012)。

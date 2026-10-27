@@ -1,0 +1,43 @@
+Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)
+A unified platform for anti-censorship.
+2026/10/22 22:25:24.966204 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-C6-reality-f8_nu9yy/reality-01-raw-tun-chrome_133/xray-config.json Format:json}
+2026/10/22 22:25:24.967197 [Warning] infra/conf: REALITY: Listening on non-443 ports will increase the likelihood of your server's IP being blocked by the GFW
+2026/10/22 22:25:24.967846 [Debug] app/log: Logger started
+2026/10/22 22:25:24.968142 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:47911
+2026/10/22 22:25:24.970558 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:47911
+2026/10/22 22:25:24.970804 [Warning] core: Xray 26.10.21 started
+REALITY remoteAddr: 127.0.0.1:57356
+REALITY remoteAddr: 127.0.0.1:57356	hs.c.isHandshakeComplete.Load(): false
+2026/10/22 22:25:24.985576 [Info] transport/internet/tcp: REALITY: processed invalid connection from 127.0.0.1:57356: failed to read client hello
+REALITY remoteAddr: 127.0.0.1:57362
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:57362	hs.c.ClientVer: [0 1 0]
+REALITY remoteAddr: 127.0.0.1:57362	hs.c.ClientTime: 2026-10-22 22:25:24 +0900 KST
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:57362	hs.c.conn == conn: true
+REALITY remoteAddr: 127.0.0.1:57362	len(s2cSaved): 780	Server Hello: 127
+REALITY remoteAddr: 127.0.0.1:57362	len(s2cSaved): 653	Change Cipher Spec: 6
+REALITY remoteAddr: 127.0.0.1:57362	len(s2cSaved): 647	Encrypted Extensions: 41
+REALITY remoteAddr: 127.0.0.1:57362	len(s2cSaved): 606	Certificate: 431
+REALITY remoteAddr: 127.0.0.1:57362	len(s2cSaved): 175	Certificate Verify: 101
+REALITY remoteAddr: 127.0.0.1:57362	len(s2cSaved): 74	Finished: 74
+REALITY remoteAddr: 127.0.0.1:57362	is using X25519MLKEM768 for TLS' communication: false
+REALITY remoteAddr: 127.0.0.1:57362	is using ML-DSA-65 for cert's extra signature: false
+REALITY remoteAddr: 127.0.0.1:57362	hs.handshake() err: <nil>
+REALITY remoteAddr: 127.0.0.1:57362	hs.readClientFinished() err: <nil>
+REALITY remoteAddr: 127.0.0.1:57362	hs.c.isHandshakeComplete.Load(): true
+2026/10/22 22:25:24.998081 [Info] [3600453600] proxy/vless/inbound: firstLen = 44
+2026/10/22 22:25:24.998220 [Info] [3600453600] proxy/vless/inbound: received request for tcp:127.0.0.1:56803
+2026/10/22 22:25:24.998234 [Info] [3600453600] app/dispatcher: taking detour [origin-56803] for [tcp:127.0.0.1:56803]
+2026/10/22 22:25:24.998237 [Info] [3600453600] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:56803
+2026/10/22 22:25:24.998239 [Debug] [3600453600] transport/internet: dialing to tcp:127.0.0.1:56803
+2026/10/22 22:25:24.998365 [Info] [3600453600] proxy/freedom: connection opened to tcp:127.0.0.1:56803, local endpoint 127.0.0.1:48988, remote endpoint 127.0.0.1:56803
+2026/10/22 22:25:24.998461 [Debug] [3600453600] proxy: Xtls Unpadding new block, content 254 padding 1023 command 0
+2026/10/22 22:25:24.998466 [Debug] [3600453600] proxy: XtlsFilterTls found tls client hello! 254
+2026/10/22 22:25:24.999019 [Debug] [3600453600] proxy: XtlsFilterTls found tls 1.3! 826 TLS_AES_256_GCM_SHA384
+2026/10/22 22:25:24.999033 [Debug] [3600453600] proxy: XtlsPadding 826 148 0
+2026/10/22 22:25:25.000051 [Debug] [3600453600] proxy: Xtls Unpadding new block, content 6 padding 1109 command 0
+2026/10/22 22:25:25.000076 [Debug] [3600453600] proxy: Xtls Unpadding new block, content 74 padding 1242 command 2
+2026/10/22 22:25:25.000217 [Debug] [3600453600] proxy: XtlsPadding 271 929 2
+2026/10/22 22:25:25.000468 [Debug] [3600453600] proxy: CopyRawConn splice
+2026/10/22 22:25:25.008605 [Debug] app/log: Logger closing

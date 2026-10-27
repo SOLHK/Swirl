@@ -1,0 +1,15 @@
+2026-10-22T13:30:43.3975800Z test_clash_and_uri_import_reach_the_reference_server (test_tuic_reference.TuicReferenceTests.test_clash_and_uri_import_reach_the_reference_server) ... ok
+2026-10-22T13:30:43.5646610Z test_dns_request_through_both_udp_modes (test_tuic_reference.TuicReferenceTests.test_dns_request_through_both_udp_modes) ... ok
+2026-10-22T13:30:54.7367980Z test_historical_reference_empty_reply_limitation_is_recorded (test_tuic_reference.TuicReferenceTests.test_historical_reference_empty_reply_limitation_is_recorded) ... ok
+2026-10-22T13:30:54.9296920Z test_ipv6_endpoint_and_domain_destination (test_tuic_reference.TuicReferenceTests.test_ipv6_endpoint_and_domain_destination) ... ok
+2026-10-22T13:30:55.2291850Z test_reconnect_node_switch_and_parallel_connections (test_tuic_reference.TuicReferenceTests.test_reconnect_node_switch_and_parallel_connections) ... ok
+2026-10-22T13:30:55.7499100Z test_tcp_authentication_large_bidirectional_transfer_and_half_close (test_tuic_reference.TuicReferenceTests.test_tcp_authentication_large_bidirectional_transfer_and_half_close) ... ok
+2026-10-22T13:30:55.9138250Z test_tls_ca_sni_alpn_and_pin_fail_closed (test_tuic_reference.TuicReferenceTests.test_tls_ca_sni_alpn_and_pin_fail_closed) ... ok
+2026-10-22T13:30:56.1496530Z test_udp_native_and_quic_modes_small_and_fragmented (test_tuic_reference.TuicReferenceTests.test_udp_native_and_quic_modes_small_and_fragmented) ... ok
+2026-10-22T13:30:56.3018670Z test_wrong_password_and_uuid_never_reach_destination (test_tuic_reference.TuicReferenceTests.test_wrong_password_and_uuid_never_reach_destination) ... ok
+2026-10-22T13:30:56.3155550Z 
+2026-10-22T13:30:56.3156040Z ----------------------------------------------------------------------
+2026-10-22T13:30:56.3156410Z Ran 9 tests in 13.122s
+2026-10-22T13:30:56.3156540Z 
+2026-10-22T13:30:56.3156630Z OK
+2026-10-22T13:30:56.3316580Z ##[group]Run python -m unittest -v test_quic_core

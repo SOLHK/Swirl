@@ -1,0 +1,51 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 0.374,
+    "log": "fmt.log"
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "--workspace",
+      "--locked"
+    ],
+    "exit_code": 0,
+    "seconds": 4.326,
+    "log": "check.log"
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 3.558,
+    "log": "clippy.log"
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--workspace",
+      "--locked"
+    ],
+    "exit_code": 0,
+    "seconds": 18.131,
+    "log": "test.log"
+  }
+]

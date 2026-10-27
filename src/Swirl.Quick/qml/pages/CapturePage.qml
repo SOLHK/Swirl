@@ -5,76 +5,85 @@ import QtQuick.Layouts
 import SwirlQuick
 import "../components"
 import "../controls"
+
 Item {
- id:page;required property var captureProvider
- property int listenerPort:8899
- function scrollToBottom(){scroll.contentItem.contentY=Math.max(0,scroll.contentItem.contentHeight-scroll.availableHeight)}
- function applyLimits(){captureProvider.setLimits([3,5,10,0][timeLimit.currentIndex],[50,100,500,0][sizeLimit.currentIndex],[100,500,1000][countLimit.currentIndex])}
- component Note:SwirlText {renderType:Text.NativeRendering;color:Theme.muted;font.pixelSize:Theme.fontSize(12);lineHeight:1.5;wrapMode:Text.Wrap;Layout.fillWidth:true}
- component SectionTitle:SwirlText {renderType:Text.NativeRendering;color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
- ScrollView {
-  id:scroll;anchors.fill:parent;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
-  ColumnLayout {width:Math.floor(scroll.availableWidth);spacing:Theme.dp(14)
-   RowLayout {Layout.fillWidth:true;Layout.leftMargin:Theme.dp(24);Layout.rightMargin:Theme.dp(24);Layout.topMargin:Theme.dp(24)
-    SwirlText {textRole:"pageTitle";renderType:Text.NativeRendering;text:"捕获 HTTP 内容";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold;Layout.fillWidth:true}
-    SwirlToggle {objectName:"captureToggle";large:true;checked:page.captureProvider.running;onToggled:{if(checked){page.applyLimits();page.captureProvider.start(page.listenerPort)}else page.captureProvider.stop()}Accessible.name:"捕获 HTTP 内容"}
-   }
-   Note {Layout.leftMargin:Theme.dp(24);Layout.rightMargin:Theme.dp(24);text:page.captureProvider.error||"捕获 HTTP 请求与内容。开启后会增加内存和存储开销，请仅在需要时使用；HTTPS 内容需要配合 MITM。"}
-   RowLayout {Layout.fillWidth:true;Layout.leftMargin:Theme.dp(24);Layout.rightMargin:Theme.dp(24);spacing:Theme.gap;Layout.alignment:Qt.AlignTop
-    ColumnLayout {Layout.fillWidth:true;Layout.preferredWidth:1;Layout.minimumWidth:0;Layout.alignment:Qt.AlignTop;spacing:Theme.gap
-     SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:visibilityBody.implicitHeight+2*Theme.cardPadding
-      ColumnLayout {id:visibilityBody;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:Theme.dp(12)
-       SectionTitle {text:"可见性"}
-       Note {text:"内存记录保留最近请求的摘要，HTTP 捕获同时保存请求内容。"}
-       SwirlButton {text:"设置内存记录过滤器…";Layout.fillWidth:true;onClicked:filterDialog.open()}
-       SwirlButton {text:"设置 HTTP 捕获过滤器…";Layout.fillWidth:true;onClicked:filterDialog.open()}
-      }
-     }
-     SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:diskBody.implicitHeight+2*Theme.cardPadding
-      ColumnLayout {id:diskBody;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:Theme.dp(12)
-       SectionTitle {text:"磁盘 HTTP 捕获"}
-       Note {text:page.captureProvider.running?"本地地址：127.0.0.1:"+page.captureProvider.port:"尚未启动捕获"}
-       SwirlButton {text:"在面板中显示";Layout.fillWidth:true;onClicked:page.Window.window.openDashboard()}
-       Note {text:"从请求面板导出 HAR。仅解密 MITM 主机列表中的 HTTPS 请求。"}
-      }
-     }
-     SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:displayBody.implicitHeight+2*Theme.cardPadding
-      ColumnLayout {id:displayBody;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:Theme.dp(10)
-       SectionTitle {text:"显示"}
-       ReferenceCheckBox {text:"合并系统进程 · 研发中";checked:true;enabled:false}
-       Note {text:"将系统进程的统计合并到单一项目。"}
-       ReferenceCheckBox {text:"应用包合并 · 研发中";checked:true;enabled:false}
-       Note {text:"将应用及其子进程合并统计。"}
-      }
-     }
+    id: page
+    required property var captureProvider
+    property int listenerPort: 8899
+    readonly property Item motionTitle: heading.titleItem
+    function scrollToBottom() { scroll.contentItem.contentY=Math.max(0,scroll.contentHeight-scroll.availableHeight) }
+    function applyLimits() { captureProvider.setLimits([3,5,10,0][timeLimit.currentIndex],[50,100,500,0][sizeLimit.currentIndex],[100,500,1000][countLimit.currentIndex]) }
+    component Note: SwirlText { color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true; wrapMode:Text.Wrap; lineHeight:1.4 }
+    ColumnLayout {
+        anchors.fill:parent; anchors.margins:Theme.pagePadding; spacing:Theme.dp(20)
+        SwirlPageHeader {
+            id:heading; Layout.fillWidth:true; title:qsTr("HTTP 内容捕获")
+            description:qsTr("在本机监听端口记录真实请求。HTTPS 正文需要配置 CA 与解密主机名。")
+            SwirlFlow { objectName:"captureStateFlow"; Layout.preferredWidth:Theme.dp(42); Layout.preferredHeight:Theme.dp(18); phase:page.captureProvider.error.length?"failed":page.captureProvider.running?"succeeded":"idle" }
+            SwirlToggle { objectName:"captureToggle"; large:true; checked:page.captureProvider.running; enabled:page.captureProvider.running||listenerInput.acceptableInput; onToggled:{if(checked){page.applyLimits();page.captureProvider.start(page.listenerPort)}else page.captureProvider.stop()} Accessible.name:qsTr("捕获 HTTP 内容") }
+        }
+        ScrollView {
+            id:scroll; Layout.fillWidth:true; Layout.fillHeight:true; clip:true
+            ScrollBar.horizontal.policy:ScrollBar.AlwaysOff; ScrollBar.vertical:SwirlScrollBar {}
+            ColumnLayout {
+                width:scroll.availableWidth; spacing:Theme.dp(24)
+                Rectangle {
+                    Layout.fillWidth:true; Layout.preferredHeight:listenerBody.implicitHeight+Theme.dp(32); radius:Theme.dp(14); color:Theme.buttonBase
+                    ColumnLayout {
+                        id:listenerBody; anchors.fill:parent; anchors.margins:Theme.dp(16); spacing:Theme.dp(12)
+                        RowLayout {
+                            Layout.fillWidth:true
+                            ColumnLayout { Layout.fillWidth:true; spacing:Theme.dp(5); SwirlText { text:page.captureProvider.running?qsTr("正在监听 127.0.0.1:%1").arg(page.captureProvider.port):qsTr("捕获尚未开始"); color:Theme.text; font.pixelSize:Theme.fontSize(18); font.weight:Font.DemiBold } Note { text:qsTr("%1 条请求，%2 个活动连接").arg(page.captureProvider.sessions.length).arg(page.captureProvider.activeCount) } }
+                            SwirlButton { text:qsTr("打开请求面板"); iconName:"capture"; onClicked:page.Window.window.openDashboard() }
+                        }
+                        Note { text:page.captureProvider.error.length?page.captureProvider.error:qsTr("将客户端 HTTP / HTTPS 代理指向捕获端口。停止捕获后可继续检查已记录的请求。"); color:page.captureProvider.error.length?Theme.red:Theme.muted }
+                    }
+                }
+                GridLayout {
+                    Layout.fillWidth:true; columns:page.width>=Theme.dp(650)?2:1; columnSpacing:Theme.dp(32); rowSpacing:Theme.dp(24)
+                    ColumnLayout {
+                        Layout.fillWidth:true; Layout.minimumWidth:0; Layout.preferredWidth:1; Layout.alignment:Qt.AlignTop; spacing:Theme.dp(12)
+                        SwirlSectionTitle { title:qsTr("监听与范围"); Layout.fillWidth:true }
+                        RowLayout { Layout.fillWidth:true; SwirlText { text:qsTr("本机端口"); color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true } SwirlTextField { id:listenerInput; Layout.preferredWidth:Theme.dp(112); text:String(page.listenerPort); enabled:!page.captureProvider.running; validator:IntValidator { bottom:0; top:65535 } onEditingFinished:if(acceptableInput)page.listenerPort=Number(text); Accessible.name:qsTr("捕获监听端口") } }
+                        Note { text:qsTr("使用空闲端口。监听仅在开始捕获后生效。") }
+                        SwirlButton { text:qsTr("编辑记录筛选"); onClicked:filterDialog.open() }
+                        Note { text:page.captureProvider.filter.length?qsTr("当前 URL 筛选：%1").arg(page.captureProvider.filter):qsTr("当前记录通过此端口的全部请求。") }
+                        Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.borderWidth; color:Theme.separator }
+                        ReferenceCheckBox { text:qsTr("捕获时自动开启 MITM"); checked:page.captureProvider.autoMitmEnabled; onToggled:page.captureProvider.autoMitmEnabled=checked }
+                        Note { text:qsTr("仅对解密列表中的主机名生效；开始前需要配置 CA。") }
+                        SwirlButton { text:qsTr("配置 HTTPS 解密"); quiet:true; iconName:"shield"; onClicked:AppState.navigate("tls") }
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth:true; Layout.minimumWidth:0; Layout.preferredWidth:1; Layout.alignment:Qt.AlignTop; spacing:Theme.dp(12)
+                        SwirlSectionTitle { title:qsTr("自动停止"); description:qsTr("达到任一限制时结束本次捕获。"); Layout.fillWidth:true }
+                        GridLayout {
+                            Layout.fillWidth:true; columns:2; columnSpacing:Theme.dp(16); rowSpacing:Theme.dp(14)
+                            SwirlText { text:qsTr("时间"); color:Theme.text; font.pixelSize:Theme.fontSize(14) }
+                            SwirlComboBox { id:timeLimit; Layout.fillWidth:true; model:[qsTr("3 分钟"),qsTr("5 分钟"),qsTr("10 分钟"),qsTr("无限制")]; onActivated:page.applyLimits(); Accessible.name:qsTr("捕获时间限制") }
+                            SwirlText { text:qsTr("大小"); color:Theme.text; font.pixelSize:Theme.fontSize(14) }
+                            SwirlComboBox { id:sizeLimit; Layout.fillWidth:true; model:["50 MB","100 MB","500 MB",qsTr("无限制")]; onActivated:page.applyLimits(); Accessible.name:qsTr("捕获大小限制") }
+                            SwirlText { text:qsTr("请求数"); color:Theme.text; font.pixelSize:Theme.fontSize(14) }
+                            SwirlComboBox { id:countLimit; Layout.fillWidth:true; model:[qsTr("100 请求"),qsTr("500 请求"),qsTr("1000 请求")]; onActivated:page.applyLimits(); Accessible.name:qsTr("捕获请求数量限制") }
+                        }
+                        Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.borderWidth; color:Theme.separator; Layout.topMargin:Theme.dp(10) }
+                        SwirlText { text:qsTr("记录显示"); color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
+                        ReferenceCheckBox { text:qsTr("合并系统进程 · 研发中"); checked:false; enabled:false }
+                        ReferenceCheckBox { text:qsTr("合并应用及子进程 · 研发中"); checked:false; enabled:false }
+                        Note { text:qsTr("当前按实际采集的记录显示；进程合并尚未接入。") }
+                    }
+                }
+                Item { Layout.preferredHeight:Theme.dp(8) }
+            }
+        }
     }
-    ColumnLayout {Layout.fillWidth:true;Layout.preferredWidth:1;Layout.minimumWidth:0;Layout.alignment:Qt.AlignTop;spacing:Theme.gap
-     SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:limitsBody.implicitHeight+2*Theme.cardPadding
-      ColumnLayout {id:limitsBody;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:Theme.dp(12)
-       SectionTitle {text:"捕获限制器"}
-       GridLayout {Layout.fillWidth:true;columns:2;columnSpacing:Theme.dp(8);rowSpacing:Theme.dp(12)
-        SwirlText {renderType:Text.NativeRendering;text:"时间限制";color:Theme.text;font.pixelSize:Theme.fontSize(13)}
-        SwirlComboBox {id:timeLimit;Layout.fillWidth:true;Layout.minimumWidth:0;onActivated:page.applyLimits();model:["3 分钟","5 分钟","10 分钟","无限制"]}
-        SwirlText {renderType:Text.NativeRendering;text:"尺寸限制";color:Theme.text;font.pixelSize:Theme.fontSize(13)}
-        SwirlComboBox {id:sizeLimit;Layout.fillWidth:true;Layout.minimumWidth:0;onActivated:page.applyLimits();model:["50 MB","100 MB","500 MB","无限制"]}
-        SwirlText {renderType:Text.NativeRendering;text:"数量限制";color:Theme.text;font.pixelSize:Theme.fontSize(13)}
-        SwirlComboBox {id:countLimit;Layout.fillWidth:true;Layout.minimumWidth:0;onActivated:page.applyLimits();model:["100 请求","500 请求","1000 请求"]}
-       }
-       Note {text:"达到任一限制时，自动停止本次 HTTP 捕获。"}
-      }
-     }
-     SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:mitmBody.implicitHeight+2*Theme.cardPadding
-      ColumnLayout {id:mitmBody;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:Theme.dp(12)
-       SectionTitle {text:"捕获 MITM 覆写"}
-       ReferenceCheckBox {text:"自动开启 MITM";checked:page.captureProvider.autoMitmEnabled;onToggled:page.captureProvider.autoMitmEnabled=checked}
-       SwirlButton {text:"编辑 MITM 主机名…";Layout.fillWidth:true;onClicked:AppState.navigate("tls")}
-       Note {text:"仅对已配置的主机名生效，使用前需配置 CA。"}
-      }
-     }
+    SwirlDialog {
+        ownerItem:page; id:filterDialog; title:qsTr("捕获记录筛选")
+        ColumnLayout {
+            width:parent.width; spacing:Theme.dp(14)
+            SwirlTextField { id:captureFilter; Layout.fillWidth:true; text:page.captureProvider.filter; placeholderText:qsTr("URL 包含文本，留空记录全部"); Accessible.name:qsTr("捕获 URL 筛选") }
+            Note { text:qsTr("筛选实际捕获的 HTTP 请求与 CONNECT 隧道。") }
+            RowLayout { Layout.alignment:Qt.AlignRight; SwirlButton { text:qsTr("取消"); onClicked:filterDialog.requestDismiss() } SwirlButton { text:qsTr("应用筛选"); primary:true; onClicked:{page.captureProvider.filter=captureFilter.text;filterDialog.markSaved();filterDialog.close()} } }
+            SwirlButton { text:qsTr("打开请求面板"); quiet:true; onClicked:{filterDialog.close();page.Window.window.openDashboard()} }
+        }
     }
-   }
-   Item {Layout.preferredHeight:Theme.dp(24)}
-  }
- }
- SwirlDialog{id:filterDialog;title:"HTTP 捕获过滤器";ColumnLayout{width:parent.width;SwirlTextField{id:captureFilter;Layout.fillWidth:true;text:page.captureProvider.filter;placeholderText:"URL 包含文本 (留空捕获全部)"}SwirlButton{text:"应用过滤器";onClicked:{page.captureProvider.filter=captureFilter.text;filterDialog.close()}}SwirlText {renderType:Text.NativeRendering;text:"查看实际捕获的 HTTP 请求与 CONNECT 隧道。";color:Theme.text;font.pixelSize:Theme.fontSize(13);Layout.fillWidth:true;wrapMode:Text.WordWrap}SwirlButton{text:"打开请求面板";onClicked:{filterDialog.close();page.Window.window.openDashboard()}}}}
 }
