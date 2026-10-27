@@ -384,7 +384,7 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
   # Explicit opt-in: normal CI and CTest never modify the runner's proxy.
   if(DEFINED ENV{SWIRL_SYSTEM_PROXY_TEST})
    add_test(NAME swirl-system-proxy-recovery COMMAND SwirlSystemProxyTests)
-   set_tests_properties(swirl-system-proxy-recovery PROPERTIES RUN_SERIAL TRUE TIMEOUT 45)
+   set_tests_properties(swirl-system-proxy-recovery PROPERTIES RUN_SERIAL TRUE TIMEOUT 45 ENVIRONMENT "SWIRL_SYSTEM_PROXY_TEST=1")
   endif()
   add_executable(SwirlAcceptance tests/AcceptanceSession.cpp)
   target_link_libraries(SwirlAcceptance PRIVATE SwirlEngine)
