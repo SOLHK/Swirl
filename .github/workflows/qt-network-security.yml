@@ -119,9 +119,9 @@ jobs:
           if-no-files-found: error
 
   windows-product:
-    name: Windows Qt 6.11.3 product regression
+    name: Windows Qt 6.12.0 product regression
     runs-on: windows-2022
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -129,19 +129,31 @@ jobs:
           persist-credentials: false
       - name: Install Rust toolchain for the actual product
         run: rustup toolchain install stable --profile minimal --target x86_64-pc-windows-msvc
-      - uses: jurplel/install-qt-action@v4
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
         with:
-          version: '6.11.3'
-          host: windows
-          target: desktop
-          arch: win64_msvc2022_64
-          # Pinned upstream PR #1000; retain the officially fixed Qt SDK.
-          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b'
-          modules: qtshadertools
-          cache: true
+          arch: x64
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install verified official Qt SDK downloader
+        run: python -m pip install -r tools/requirements-qt-sdk.txt
+      - name: Install and verify Qt 6.12 product SDK
+        shell: pwsh
+        run: |
+          # Share the tested installer and digest checks used by the APEC UI CI.
+          $sdkOutput = Join-Path $env:RUNNER_TEMP 'swirl-qt-product-6.12.0'
+          python tools/Install-QtSdk.py --version 6.12.0 --arch win64_msvc2022_64 --output $sdkOutput
+          if ($LASTEXITCODE -ne 0) { throw 'Official Qt 6.12 SDK installation failed.' }
+          $sdk = Get-Content -LiteralPath (Join-Path $sdkOutput 'sdk-install-result.json') -Raw | ConvertFrom-Json
+          $qtRoot = (Resolve-Path -LiteralPath $sdk.kit_root).Path
+          $version = (& (Join-Path $qtRoot 'bin/qmake.exe') -query QT_VERSION).Trim()
+          if ($LASTEXITCODE -ne 0 -or $version -ne '6.12.0' -or $sdk.arch -ne 'win64_msvc2022_64') { throw 'Qt product SDK version or ABI mismatch.' }
+          foreach ($component in @('Qt6GuiPrivate', 'Qt6ShaderTools', 'Qt6QuickControls2', 'Qt6Svg', 'Qt6Network')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $qtRoot "lib/cmake/$component/${component}Config.cmake"))) { throw "Missing Qt SDK component: $component" }
+          }
+          "QT_ROOT_DIR=$qtRoot" >> $env:GITHUB_ENV
+          "CMAKE_PREFIX_PATH=$qtRoot" >> $env:GITHUB_ENV
+          (Join-Path $qtRoot 'bin') >> $env:GITHUB_PATH
       - name: Install independent TLS fixture certificate support
         run: python -m pip install cryptography==50.0.2
       - name: Configure product with existing regression drivers
