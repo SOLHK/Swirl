@@ -41,6 +41,8 @@ jobs:
           $base = $env:SWIRL_BASE_SHA
           if ($env:SWIRL_EVENT_NAME -eq 'workflow_dispatch' -or [string]::IsNullOrWhiteSpace($base) -or $base -match '^0+$') {
             "SWIRL_CI_UI_ONLY=false" >> $env:GITHUB_ENV
+            "SWIRL_CI_NETWORK_CHANGE=true" >> $env:GITHUB_ENV
+            "SWIRL_SYSTEM_PROXY_TEST=1" >> $env:GITHUB_ENV
             Write-Host 'Full regression scope: explicit/manual or initial run.'
             exit 0
           }
@@ -371,7 +373,9 @@ jobs:
           if ($exeVersion -ne "$appVersion.0" -or $installerVersion -ne "$appVersion.0") { throw 'Source, application and installer versions disagree.' }
           $manifest = Get-Content -LiteralPath (Join-Path $appDist 'package-manifest.json') -Raw | ConvertFrom-Json
           if ($manifest.source_sha -ne $env:GITHUB_SHA) { throw 'Package source identity differs from this workflow commit.' }
-          [ordered]@{source_sha=$env:GITHUB_SHA;version=$appVersion;qt=$env:SWIRL_QT_VERSION;installer_sha256=(Get-FileHash -LiteralPath 'out/Swirl-Setup.exe' -Algorithm SHA256).Hash.ToLowerInvariant();critical_ui_tests='passed';full_regression='pending';desktop_dpi_acceptance='manual';physical_refresh_rate_acceptance='unverified'} | ConvertTo-Json | Set-Content -LiteralPath out/delivery.json -Encoding utf8
+          $scope = if ($env:SWIRL_CI_UI_ONLY -eq 'true') { 'ui-only' } else { 'full' }
+          $networkRegression = if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') { 'passed' } else { 'not-run-ui-only' }
+          [ordered]@{source_sha=$env:GITHUB_SHA;version=$appVersion;qt=$env:SWIRL_QT_VERSION;installer_sha256=(Get-FileHash -LiteralPath 'out/Swirl-Setup.exe' -Algorithm SHA256).Hash.ToLowerInvariant();regression_scope=$scope;critical_ui_tests='passed';network_regression=$networkRegression;scoped_full_regression='pending';desktop_dpi_acceptance='manual';physical_refresh_rate_acceptance='unverified'} | ConvertTo-Json | Set-Content -LiteralPath out/delivery.json -Encoding utf8
       - name: Upload critical-test Windows installer
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -379,13 +383,13 @@ jobs:
           path: out/Swirl-Setup.exe
           if-no-files-found: error
           retention-days: 14
-      - name: Full regression suite after installer is available
+      - name: Remaining in-scope regression suite after installer is available
         shell: pwsh
         run: |
           $regression = 'failed'
           try {
-            # The critical UI tests have already passed before packaging. Exclude
-            # only those exact tests here to avoid paying for a second execution.
+            # Critical tests have already passed before packaging. Exclude only
+            # those exact tests here to avoid paying for a second execution.
             $excludedTests = 'appearance-ui|node-ui|engine-ui|overview-input|all-pages|motion|apec-motion|apec-glass|hero|navigation-ui|capture-network'
             if ($env:SWIRL_CI_UI_ONLY -eq 'true') {
               # UI-only changes still run all parser, policy, storage, and local
@@ -402,10 +406,10 @@ jobs:
             $regression = 'passed'
           } finally {
             $delivery = Get-Content -LiteralPath 'out/delivery.json' -Raw | ConvertFrom-Json
-            $delivery | Add-Member -NotePropertyName full_regression -NotePropertyValue $regression -Force
+            $delivery | Add-Member -NotePropertyName scoped_full_regression -NotePropertyValue $regression -Force
             $delivery | ConvertTo-Json | Set-Content -LiteralPath 'out/delivery.json' -Encoding utf8
           }
-      - name: Upload engine and full regression evidence
+      - name: Upload engine and scoped regression evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
