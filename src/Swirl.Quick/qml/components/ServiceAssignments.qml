@@ -150,20 +150,13 @@ ColumnLayout {
                         }
                         onClicked: assignments.targetRequested(row.record, target)
                     }
-                    CheckBox {
+                    ReferenceCheckBox {
                         id: enabledControl; objectName: "servicePolicyEnabled-" + row.record.id
                         Layout.preferredWidth: Theme.dp(30); Layout.preferredHeight: Theme.dp(44); padding: 0
                         checked: Boolean(row.record.enabled); enabled: assignments.editable
                         Accessible.name: qsTr("启用策略 %1").arg(row.record.name || "")
                         onToggled: { const requested = checked; checked = Qt.binding(function() { return Boolean(row.record.enabled) }); assignments.enabledRequested(row.record.id, requested) }
-                        background: Rectangle { anchors.centerIn: parent; width: Theme.dp(28); height: Theme.dp(30); radius: Theme.dp(8); color: "transparent"; border.width: enabledControl.visualFocus ? Theme.borderWidth : 0; border.color: Theme.text }
-                        indicator: Rectangle {
-                            anchors.centerIn: parent; width: Theme.dp(16); height: width; radius: Theme.dp(4)
-                            color: enabledControl.checked ? Theme.text : Theme.buttonBase; border.color: Theme.controlBorder; border.width: enabledControl.checked ? 0 : Theme.borderWidth; opacity: enabledControl.enabled ? 1 : 0.45
-                            Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.statusDuration } }
-                            SwirlIcon { anchors.centerIn: parent; name: "checkmark"; size: Theme.dp(12); color: Theme.surface; visible: enabledControl.checked; Accessible.ignored: true }
-                        }
-                        contentItem: Item {}
+                        indicator.x: (width - indicator.width) / 2
                     }
                     SubscriptionAction { id: more; objectName: "servicePolicyMore-" + row.record.id; iconName: "ellipsis"; Layout.preferredWidth: Theme.dp(36); Layout.preferredHeight: Theme.dp(44); enabled: assignments.editable; Accessible.name: qsTr("%1 的更多操作").arg(row.record.name || ""); tooltip: Accessible.name; tooltipEnabled: !moreMenu.visible; onClicked: moreMenu.showAt() }
                 }

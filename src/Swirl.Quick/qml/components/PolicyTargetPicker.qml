@@ -40,15 +40,11 @@ SwirlDialog {
         spacing:Theme.dp(12)
         RowLayout {
             Layout.fillWidth:true;spacing:Theme.dp(12)
-            TextField {
+            SwirlSearchField {
                 id:search;objectName:"policyTargetSearch"
                 Layout.fillWidth:true;Layout.minimumWidth:Theme.dp(100)
                 implicitHeight:Theme.dp(34);placeholderText:qsTr("搜索出口名称");enabled:!picker.pending
-                color:Theme.text;placeholderTextColor:Theme.muted;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(12)
-                leftPadding:Theme.dp(32);rightPadding:Theme.dp(10);selectByMouse:true
                 onTextChanged:picker.query=text;Accessible.name:qsTr("搜索出口")
-                background:Rectangle {radius:Theme.dp(9);color:Theme.buttonBase;border.width:search.activeFocus?Theme.borderWidth:0;border.color:Theme.text}
-                SwirlIcon {anchors.left:parent.left;anchors.leftMargin:Theme.dp(10);anchors.verticalCenter:parent.verticalCenter;name:"search";size:Theme.dp(14);color:Theme.muted;Accessible.ignored:true}
             }
             SwirlSegmentedControl {id:targetTabs;objectName:"policyTargetTabs";Layout.preferredWidth:Theme.dp(180);Layout.preferredHeight:Theme.dp(34);options:[qsTr("节点"),qsTr("策略组")];currentIndex:picker.targetKind;enabled:!picker.pending;onActivated:index=>picker.targetKind=index}
         }

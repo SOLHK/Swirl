@@ -34,7 +34,7 @@ Item {
         if(!initialized)return
         const current=Qt.point(position.x,position.y), speed=moving?Qt.point(velocity.x,velocity.y):Qt.point(0,0)
         const target=Qt.point(targetX,targetY),dx=target.x-current.x,dy=target.y-current.y
-        if(Math.hypot(dx,dy)<0.01){if(!moving)settle();return}
+        if(Math.hypot(dx,dy)<0.01){settle();return}
         ++generation
         travel.stop()
         if(!motionEnabled || !visible || !windowVisible || SwirlMotion.reduced){settle();return}

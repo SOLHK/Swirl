@@ -7,6 +7,7 @@ import "../controls"
 Item {
     id:page
     property var selected:null
+    readonly property bool compact:workspace.width<Theme.dp(680)
     property bool waterfallOpen:true
     property bool componentReady:false
     SwirlTransitionCoordinator{id:waterfallMotion;progress:1;destination:1}
@@ -23,33 +24,34 @@ Item {
     }
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.pagePadding; spacing:Theme.sectionGap
-        SwirlPageHeader{Layout.fillWidth:true;title:qsTr("请求检查器");description:qsTr("筛选本地请求记录，查看请求细节。");metadata:qsTr("真实 HTTP 会话请进入抓包面板")
+        SwirlPageHeader{Layout.fillWidth:true;title:qsTr("请求检查器");description:qsTr("查看本地调试记录；真实 HTTP 会话请进入抓包面板。")
             SwirlButton{text:qsTr("打开真实抓包");iconName:"capture";primary:true;onClicked:AppState.navigate("capture")}
         }
         RowLayout {
             Layout.fillWidth:true
-            SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Search URL, path, or request method") }
-            SwirlComboBox { id:methodFilter; model:["全部方法","GET","POST","PUT","DELETE"] }
-            SwirlButton { development:true;enabled:false;text:AppState.zh("Import HAR"); iconName:"folder"; onClicked:AppState.notice("HAR import") }
-            SwirlButton { development:true;enabled:false;text:AppState.zh("Export HAR"); onClicked:AppState.notice("HAR export") }
+            SwirlSearchField { id:search; Layout.fillWidth:true; Layout.minimumWidth:0; placeholderText:AppState.zh("Search URL, path, or request method") }
+            SwirlComboBox { id:methodFilter; Layout.preferredWidth:Theme.dp(140); model:["全部方法","GET","POST","PUT","DELETE"] }
         }
         RowLayout {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"研发中"; tone:"accent" }
             SwirlText { text:displayRows.length+" 条本地"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
             SwirlButton { development:true;enabled:false;text:AppState.zh("Record"); iconName:"play"; onClicked:AppState.notice("抓包记录") }
-            SwirlButton { text:qsTr("取消选择");enabled:page.selected!==null;onClicked:page.selected=null }
+            SwirlButton { objectName:"inspectorClearSelection";text:qsTr("取消选择");enabled:page.selected!==null;onClicked:page.selected=null }
         }
         SplitView {
+            id:workspace;objectName:"inspectorWorkspace"
             Layout.fillWidth:true; Layout.fillHeight:true
             orientation:Qt.Horizontal
             handle:Rectangle { implicitWidth:Theme.dp(7); color:Theme.canvas; Rectangle { width:Theme.dp(2); height:Theme.dp(45); radius:Theme.roundedRadius(width,height); color:Theme.border; anchors.centerIn:parent } }
             SwirlGlassPanel {
-                SplitView.fillWidth:true; SplitView.minimumWidth:Theme.dp(320)
+                objectName:"inspectorListSurface"
+                visible:!page.compact||page.selected===null
+                SplitView.fillWidth:true; SplitView.minimumWidth:page.compact?0:Theme.dp(320)
                 clip:true
                 SwirlDataTable {
                     anchors.fill:parent; anchors.margins:Theme.dp(1)
-                    rows:page.displayRows
+                    rows:page.displayRows;fillEmptyRows:false
                     selectedId:page.selected?page.selected.id:""
                     columns:[
                         {key:"method",label:AppState.zh("METHOD"),w:83},{key:"status",label:AppState.zh("STATUS"),w:78},
@@ -59,9 +61,13 @@ Item {
                     ]
                     onRowSelected:function(r){page.selected=r}
                 }
+                SwirlEmptyState { anchors.centerIn:parent; width:Math.max(0,parent.width-Theme.dp(28)); visible:page.displayRows.length===0; headline:qsTr("暂无本地请求"); detail:qsTr("通过抓包面板查看真实会话，或调整现有筛选。") }
             }
             SwirlInspectorPanel {
-                SplitView.preferredWidth:Theme.dp(440); SplitView.minimumWidth:Theme.dp(325)
+                objectName:"inspectorDetails"
+                visible:page.selected!==null
+                SplitView.fillWidth:page.compact
+                SplitView.preferredWidth:page.compact?workspace.width:Theme.dp(440); SplitView.minimumWidth:page.compact?0:Theme.dp(325)
                 record:page.selected
             }
         }
@@ -79,15 +85,16 @@ Item {
 
             }
         }
-        RowLayout {
-            Layout.fillWidth:true
+        Flow {
+            Layout.fillWidth:true;Layout.preferredHeight:implicitHeight;spacing:Theme.dp(8)
             SwirlButton {
                 text:page.waterfallOpen?"隐藏瀑布图":"显示瀑布图"
                 iconName:"chart"; quiet:false; onClicked:page.waterfallOpen=!page.waterfallOpen
             }
-            SwirlText { text:"研发中"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true }
             SwirlButton { text:AppState.zh("Replay"); onClicked:AppState.currentPage="replay" }
             SwirlButton { text:AppState.zh("Breakpoint"); onClicked:AppState.currentPage="breakpoint" }
+            SwirlButton { development:true;enabled:false;text:AppState.zh("Import HAR"); iconName:"folder"; onClicked:AppState.notice("HAR import") }
+            SwirlButton { development:true;enabled:false;text:AppState.zh("Export HAR"); onClicked:AppState.notice("HAR export") }
         }
     }
 }

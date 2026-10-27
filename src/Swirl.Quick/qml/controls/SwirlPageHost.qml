@@ -97,7 +97,7 @@ Item {
   pendingLoader=null
   if(!next.item){const copy=Object.assign({},pages);delete copy[routeKey];pages=copy;next.destroy();releaseShared();return}
   if(!next.stateRestored){if(savedPages[routeKey]&&next.item.restoreCacheState)next.item.restoreCacheState(savedPages[routeKey]);next.stateRestored=true}
-  if(next===activeLoader){releaseShared();return}
+  if(next===activeLoader){releaseShared();if(preparing)finish();return}
   const request=SwirlMotion.shared,back=SwirlMotion.returnShared
   releaseShared()
   // Reverse the same two live trees without visiting either endpoint.
@@ -124,6 +124,9 @@ Item {
   if(previous)motionPolicy.leavePage(previous.item)
   leavingLoader=previous;activeLoader=next
   preparing=true
+  // A synchronous preparation observer may request another route and return
+  // here. Its newer generation owns the presentation, including progress.
+  if(token!==generation)return
   accessOrder=accessOrder.filter(key=>key!==routeKey).concat([routeKey])
   progress=0
   if(!previous || SwirlMotion.reduced || !animateRoutes){finish();return}

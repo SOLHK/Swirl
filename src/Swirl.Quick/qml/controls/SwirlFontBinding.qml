@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import SwirlQuick
 
@@ -14,7 +15,7 @@ QtObject {
     property bool preview: false
     property bool fitWidth: false
     property real naturalWidth: 0
-    property var fontWindow: target ? target.Window.window : null
+    property var fontWindow: target && target.Window ? target.Window.window : null
     readonly property real logicalDpi: fontWindow ? fontWindow.FontDisplayContext.logicalDpi : 96
     readonly property real devicePixelRatio: fontWindow ? fontWindow.FontDisplayContext.devicePixelRatio : 1
     property var resolvedAxes: ({})
@@ -99,7 +100,7 @@ QtObject {
     onFitWidthChanged: if (initialized) scheduleRefresh()
     onLogicalDpiChanged: if (initialized) scheduleRefresh()
     onDevicePixelRatioChanged: if (initialized) scheduleRefresh()
-    onFontWindowChanged: if (initialized) scheduleRefresh()
+    onFontWindowChanged: if (initialized && fontWindow) binding.scheduleRefresh()
     Component.onCompleted: { initialized = true; scheduleRefresh() }
     Component.onDestruction: initialized = false
 }

@@ -91,3 +91,32 @@ building these assertions is not a pass.
 The default Activity-to-Settings font stress failure is tracked separately.
 A direct Settings-start pass must not be substituted for that cold route.
 Font axes, asynchronous loading and initialization fences remain intact.
+
+## Integration checkpoint, 2026-10-27
+
+The expanded 58-check motion suite now passes locally, including same-turn
+reversal, preparation interrupted by a cold route, nested discard confirmation,
+and focus retained by a newer popup while an older popup finishes closing.
+The fixes retain the existing caches, asynchronous incubation and animations.
+Native navigation and the updated floating-surface appearance checks pass.
+
+The recorded Hero run passed all 102 behavioral assertions and its nested
+navigation assertions, but exited unsuccessfully because a font binding emitted
+QML lifecycle warnings. The subsequent binding change retains its completion
+fence, binds its lexical component context and guards detached Window access;
+Hero needs rerunning against that change.
+
+The original synthetic-font cold Activity-to-Settings stress was rerun after
+the new settings and binding changes: zero FreeType creation warnings, and the
+unchanged memory-plateau and finite-coordinate memory checks passed. The overall
+font run still failed two license-popup lookup/inheritance checks; these remain
+under investigation. No private user font was used. This checkpoint is not final
+font, performance, CI or installer acceptance.
+
+CI `40396167707` built the full MSVC source and passed 30 of 32 CTests. The old
+appearance assertions required V2 identical canvas/sidebar pixels; the new
+checks verify Swirl 3's separate tokens and stopped fallback capture. The three
+Hero screenshot differences were exactly 877 pixels in the close-button tooltip
+area, outside page content. The pointer now parks in the blank outer gutter;
+the original pixel threshold remains unchanged. Resource checks await actual
+retirement rather than assuming a fixed 150 ms delay is sufficient.

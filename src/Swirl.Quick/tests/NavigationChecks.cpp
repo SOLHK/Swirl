@@ -175,7 +175,9 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
   click("settings-"+id);
   // Leave the destination's controls unhovered: this comparison concerns
   // surface retirement, not a new hover animation under the old card point.
-  QTest::mouseMove(window,QPoint(window->width()-24,20));
+  // Park in the blank outer gutter. The former top-right point hovered the
+  // close button, whose delayed tooltip polluted the retirement comparison.
+  QTest::mouseMove(window,QPoint(4,window->height()/2));
   QElapsedTimer endpointWait;endpointWait.start();bool reachedEndpoint=false;
   do{wait(2);reachedEndpoint=eval("pageLoader.moving && pageLoader.position===1").toBool();}while(!reachedEndpoint&&endpointWait.elapsed()<4000);
   check(reachedEndpoint,"endpoint fixture naturally reaches the final expansion segment: "+id);
@@ -263,10 +265,26 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
   check(route("replay"),"replay draft page loads");click("replaySection-Body");typeTool("replayDraftEditor","local-payload");click("replaySection-Headers");click("replaySection-Body");
   check(await([&]{auto *editor=item("replayDraftEditor");return editor&&editor->property("text").toString()=="local-payload"&&eval("pageLoader.item.editorBuffers.Body==='local-payload' && !pageLoader.item.implemented && pageLoader.item.history.length===0").toBool();},2000),"replay tabs retain local text without sending requests or inventing execution history");
   check(await([&]{return eval("SwirlTransitionRegistry.activeCount===0").toBool();},2500),"tool page motion settles without an idle animation loop");
+  for(const int width:{1100,914,760}){
+   window->resize(qRound(eval(QString("Theme.dp(%1)").arg(width)).toDouble()),qRound(eval("Theme.dp(672)").toDouble()));
+   check(route("inspector"),"inspector boundary fixture loads at width "+QString::number(width));
+   eval("pageLoader.item.selected=null");wait(100);
+   auto *inspectorPage=qobject_cast<QQuickItem *>(eval("pageLoader.item").value<QObject *>());
+   auto *listSurface=item("inspectorListSurface"),*split=item("inspectorWorkspace");
+   const auto inside=[&](QQuickItem *surface){if(!surface||!inspectorPage)return false;const auto point=surface->mapToItem(inspectorPage,QPointF());return point.x()>=-1&&point.y()>=-1&&point.x()+surface->width()<=inspectorPage->width()+1&&point.y()+surface->height()<=inspectorPage->height()+1;};
+   check(listSurface&&split&&inside(listSurface)&&inside(split)&&!item("inspectorDetails"),"inspector empty view fits without an idle detail pane at width "+QString::number(width));
+   // A geometry-only record exercises the selected layout; it is not inserted
+   // into the provider, captured as real traffic, or used for network claims.
+   eval("pageLoader.item.selected={method:'GET',host:'geometry.invalid',status:0,duration:'unmeasured',requestHeaders:'geometry fixture'}");wait(100);
+   auto *detail=item("inspectorDetails");
+   check(detail&&inside(detail)&&(!eval("pageLoader.item.compact").toBool()||!item("inspectorListSurface")),"inspector selected layout fits and can return to the list at width "+QString::number(width));
+   click("inspectorClearSelection");
+   check(await([&]{return eval("pageLoader.item.selected===null").toBool()&&item("inspectorListSurface")&&!item("inspectorDetails");},1000),"inspector clear selection returns to the list at width "+QString::number(width));
+  }
   window->setGeometry(geometry);wait(150);
  }
  check(controller->processId()==pid&&controller->selectedNodeId()==selected&&controller->nodes().size()==nodeCount,"navigation preserves proxy process, selected node and stored records");
- check(eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").toBool(),"navigation releases all transient resources");
+ check(await([&]{return eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").toBool();},2500),"navigation releases all transient resources");
  route("featurehub");
  if(qApp->arguments().contains("--navigation-performance")){
   // Passive delivery sampling: no screenshots, expression polling, layout

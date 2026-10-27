@@ -24,17 +24,35 @@ void DismissalController::pop(QObject *popup) {
     QPointer<QQuickWindow> owner;
     bool removed=false;
     for(int i=m_layers.size()-1;i>=0;--i)if(!m_layers[i].popup || m_layers[i].popup==popup) {
-        if(m_layers[i].popup==popup && i==m_layers.size()-1){focus=m_layers[i].focus;owner=m_layers[i].window;}
+        if(m_layers[i].popup==popup){
+            owner=m_layers[i].window;
+            if(i==m_layers.size()-1)focus=m_layers[i].focus;
+        }
         m_layers.removeAt(i);
         removed=true;
     }
     if(!removed)return;
+    QPointer<QObject> remainingPopup;
+    for(int i=m_layers.size()-1;i>=0;--i)
+        if(m_layers[i].popup && m_layers[i].window==owner){remainingPopup=m_layers[i].popup;break;}
+    const QPointer<QQuickItem> activeFocus=owner?owner->activeFocusItem():nullptr;
     const auto generation=++m_focusGeneration;
     emit changed();
-    QTimer::singleShot(0,this,[this,focus,owner,generation]{
-        // A new or reopened popup owns focus now. A stale deferred return
-        // must not steal it and trigger that popup's focus-loss close path.
-        if(generation!=m_focusGeneration || (owner && hasPopup(owner)))return;
+    QTimer::singleShot(0,this,[this,focus,owner,remainingPopup,activeFocus,generation]{
+        if(generation!=m_focusGeneration)return;
+        // Qt finalizes its own focus restoration after closed(). If an older
+        // popup exits underneath a newer one, keep focus in the surviving layer.
+        if(remainingPopup && owner){
+            auto *content=qvariant_cast<QQuickItem *>(remainingPopup->property("contentItem"));
+            auto *root=content?content->parentItem():nullptr;
+            if(!root || !root->isVisible() || !root->isEnabled())return;
+            const auto belongs=[root](QQuickItem *item){return item && (item==root || root->isAncestorOf(item));};
+            if(belongs(owner->activeFocusItem()))return;
+            auto *target=belongs(focus)?focus.data():belongs(activeFocus)?activeFocus.data():root;
+            if(target->isVisible() && target->isEnabled())target->forceActiveFocus(Qt::PopupFocusReason);
+            return;
+        }
+        if(owner && hasPopup(owner))return;
         if(focus && focus->isVisible() && focus->isEnabled())focus->forceActiveFocus(Qt::PopupFocusReason);
     });
 }
