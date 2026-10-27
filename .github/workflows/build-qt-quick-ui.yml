@@ -42,7 +42,6 @@ jobs:
           if ($env:SWIRL_EVENT_NAME -eq 'workflow_dispatch' -or [string]::IsNullOrWhiteSpace($base) -or $base -match '^0+$') {
             "SWIRL_CI_UI_ONLY=false" >> $env:GITHUB_ENV
             "SWIRL_CI_NETWORK_CHANGE=true" >> $env:GITHUB_ENV
-            "SWIRL_SYSTEM_PROXY_TEST=1" >> $env:GITHUB_ENV
             Write-Host 'Full regression scope: explicit/manual or initial run.'
             exit 0
           }
@@ -59,9 +58,6 @@ jobs:
           "SWIRL_CI_NETWORK_CHANGE=$((!$uiOnly).ToString().ToLowerInvariant())" >> $env:GITHUB_ENV
           if ($uiOnly) { Write-Host "UI-only change set ($($changed.Count) files); retain critical UI/package checks and defer unrelated network integration tests." }
           else {
-            # System-proxy mutation tests are opt-in at CMake configure time and
-            # run only on this disposable GitHub-hosted Windows runner.
-            "SWIRL_SYSTEM_PROXY_TEST=1" >> $env:GITHUB_ENV
             Write-Host "Core, network, security, build, or mixed change set ($($changed.Count) files); require focused network/security tests and full regression."
           }
       - name: Validate scoped Codex proxy launcher
@@ -148,7 +144,22 @@ jobs:
           Sync-SwirlBuildInputTimes -RepositoryRoot $env:GITHUB_WORKSPACE -BuildDirectory (Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick') -Restore
       - name: Configure Qt UI independently
         shell: pwsh
-        run: cmake -S src/Swirl.Quick -B build/swirl-quick -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON -DSWIRL_RUST_TARGET="$env:GITHUB_WORKSPACE/core/target" -DSWIRL_TEST_FONT_DIRECTORY="$env:GITHUB_WORKSPACE/build/swirl-quick/Release/lib/fonts"
+        run: |
+          $configureArgs = @(
+            '-S', 'src/Swirl.Quick', '-B', 'build/swirl-quick',
+            '-G', 'Visual Studio 17 2022', '-A', 'x64',
+            '-DSWIRL_BUILD_UI_TESTS=ON',
+            "-DSWIRL_RUST_TARGET=$env:GITHUB_WORKSPACE/core/target",
+            "-DSWIRL_TEST_FONT_DIRECTORY=$env:GITHUB_WORKSPACE/build/swirl-quick/Release/lib/fonts"
+          )
+          if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') {
+            # Enable CMake registration without leaking this opt-in into other
+            # application tests, which exercise the proxy UI in an isolated fake.
+            cmake -E env SWIRL_SYSTEM_PROXY_TEST=1 cmake @configureArgs
+          } else {
+            cmake @configureArgs
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Qt UI configuration failed.' }
       - name: Build UI
         id: ui_build
         shell: pwsh
