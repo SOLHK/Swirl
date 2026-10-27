@@ -53,7 +53,7 @@ jobs:
           }
           $changed = @(git diff --name-only $base $env:GITHUB_SHA)
           if ($LASTEXITCODE -ne 0 -or $changed.Count -eq 0) { throw 'Unable to determine changed files; refusing to narrow test scope.' }
-          $nonUi = @($changed | Where-Object { $_ -notmatch '^(src/Swirl\.Quick/qml/|src/Swirl\.Quick/tests/(ApecMotionChecks|ApecGlassChecks|AppearanceChecks|HeroChecks|NavigationChecks|UiQualityChecks|WindowChecks|OverviewChecks)\.(cpp|h)$|\.github/workflows/build-qt-quick-ui\.yml$|AGENTS\.md$)' })
+          $nonUi = @($changed | Where-Object { $_ -notmatch '^(src/Swirl\.Quick/qml/|src/Swirl\.Quick/tests/(ApecMotionChecks|ApecGlassChecks|AppearanceChecks|HeroChecks|NavigationChecks|UiQualityChecks|WindowChecks|OverviewChecks)\.(cpp|h)$|AGENTS\.md$)' })
           $uiOnly = $nonUi.Count -eq 0
           "SWIRL_CI_UI_ONLY=$($uiOnly.ToString().ToLowerInvariant())" >> $env:GITHUB_ENV
           "SWIRL_CI_NETWORK_CHANGE=$((!$uiOnly).ToString().ToLowerInvariant())" >> $env:GITHUB_ENV
