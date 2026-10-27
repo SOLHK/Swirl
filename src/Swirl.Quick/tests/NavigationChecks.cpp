@@ -175,7 +175,23 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
   click("settings-"+id);
   // Leave the destination's controls unhovered: this comparison concerns
   // surface retirement, not a new hover animation under the old card point.
-  QTest::mouseMove(window,QPoint(window->width()-24,20));
+  // The APEC shell places Close at the old top-right parking coordinate.
+  // Park in the actual empty title-bar span so a delayed tooltip cannot
+  // appear between the two full-window endpoint captures.
+  auto *dragArea=item("titleDragArea"),*windowControls=item("windowControls");
+  auto *sidebar=item("sidebar"),*backButton=item("settingsBackButton");
+  const auto sceneRect=[](QQuickItem *control){return control?control->mapRectToScene(QRectF(QPointF(),control->size())):QRectF();};
+  const auto dragRect=sceneRect(dragArea),controlsRect=sceneRect(windowControls);
+  const auto sidebarRect=sceneRect(sidebar),backRect=sceneRect(backButton);
+  const qreal parkingLeft=qMax(sidebarRect.right(),backRect.right());
+  const qreal parkingTop=qMax(dragRect.top(),controlsRect.top());
+  const QRectF parkingRect(parkingLeft,parkingTop,controlsRect.left()-parkingLeft,qMin(dragRect.bottom(),controlsRect.bottom())-parkingTop);
+  const QPoint parkingPoint=parkingRect.center().toPoint();
+  const bool parkingSafe=dragArea&&windowControls&&sidebar&&parkingRect.width()>2&&parkingRect.height()>2
+      &&dragRect.contains(parkingPoint)&&!controlsRect.contains(parkingPoint)
+      &&!sidebarRect.contains(parkingPoint)&&(!backButton||!backRect.contains(parkingPoint));
+  check(parkingSafe,"endpoint pointer has an empty title-bar position outside controls: "+id);
+  if(parkingSafe)QTest::mouseMove(window,parkingPoint);
   QElapsedTimer endpointWait;endpointWait.start();bool reachedEndpoint=false;
   do{wait(2);reachedEndpoint=eval("pageLoader.moving && pageLoader.position===1").toBool();}while(!reachedEndpoint&&endpointWait.elapsed()<4000);
   check(reachedEndpoint,"endpoint fixture naturally reaches the final expansion segment: "+id);
@@ -232,7 +248,8 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
  check(item("nodeSearchField")&&item("nodeFiltersButton")&&item("nodeImportButton")&&item("nodeAddButton")&&item("allNodesTestButton"),"embedded nodes retain search, filters, import, add and test controls");
  click("nodeFiltersButton");
  check(await([&]{return item("nodeCountryFilter")&&item("nodeSourceFilter");},1000),"node region and source controls open in the approved filter dialog");
- QTest::keyClick(window,Qt::Key_Escape);wait(100);
+ QTest::keyClick(window,Qt::Key_Escape);
+ check(await([&]{return eval("dismissals.count===0").toBool();},2000),"Escape closes the node filter dialog and releases its modal shield");
  window->setGeometry(geometry);wait(150);
  if(qApp->arguments().contains("--navigation-tool-pages")){
   window->resize(qRound(eval("Theme.dp(1100)").toDouble()),qRound(eval("Theme.dp(760)").toDouble()));wait(150);
@@ -266,7 +283,18 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
   window->setGeometry(geometry);wait(150);
  }
  check(controller->processId()==pid&&controller->selectedNodeId()==selected&&controller->nodes().size()==nodeCount,"navigation preserves proxy process, selected node and stored records");
- check(eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").toBool(),"navigation releases all transient resources");
+ // Restoring the window height retargets the bottom-anchored sidebar selection
+ // for selectionDuration (240 ms). Observe completion rather than assuming
+ // the preceding fixed geometry wait also finishes every transition.
+ const bool resourcesReleased=await([&]{return eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0 && dismissals.count===0").toBool();},2000);
+ if(!resourcesReleased){
+  auto *sidebarMotion=item("sidebarArcMotion");
+  qInfo()<<"NAVIGATION_RESOURCE_STATE"<<"activeGrabCount"<<eval("motionPolicy.activeGrabCount").toInt()
+      <<"activeTransitions"<<eval("SwirlTransitionRegistry.activeCount").toInt()
+      <<"dismissals"<<eval("dismissals.count").toInt()
+      <<"sidebarArcMoving"<<(sidebarMotion&&sidebarMotion->property("moving").toBool());
+ }
+ check(resourcesReleased,"navigation releases all transient resources");
  route("featurehub");
  if(qApp->arguments().contains("--navigation-performance")){
   // Passive delivery sampling: no screenshots, expression polling, layout
