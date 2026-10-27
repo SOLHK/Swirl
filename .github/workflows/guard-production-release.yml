@@ -3,7 +3,6 @@ on:
   pull_request:
     branches: [main]
     types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, labeled, unlabeled]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -84,13 +83,18 @@ jobs:
               must(False, "Candidate has over 500 runs; review manually")
           runs = [r for r in runs if r.get("head_sha") == sha
                   and r.get("head_branch") == "test" and r.get("event") == "push"]
+          completed_at = []
           for name in sorted(needed):
               candidates = [r for r in runs if r.get("name") == name]
               must(bool(candidates), "Missing exact-SHA staging workflow: " + name)
               latest = max(candidates, key=lambda r: (r.get("created_at", ""), r.get("run_attempt", 0)))
               must(latest.get("status") == "completed" and latest.get("conclusion") == "success",
                    f"{name} not green: {latest.get('conclusion')} {latest.get('html_url')}")
+              must(bool(latest.get("updated_at")), "Missing CI completion timestamp for " + name)
+              completed_at.append(latest["updated_at"])
               print("Validated:", name, latest["html_url"])
+          must(events[-1].get("created_at", "") >= max(completed_at),
+               "Owner release-approved must be applied after ALL exact-SHA test workflows succeed")
           print("Approved exact test candidate:", sha)
           PY
       - name: Require repository branch ruleset

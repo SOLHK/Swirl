@@ -43,3 +43,5 @@ jobs:
             exit 1
           fi
           echo "Qt-only tree verified. Build and runtime checks run in build-qt-ui."
+      - name: Validate production release gate source
+        run: python tools/tests/test_release_gate.py
