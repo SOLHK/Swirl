@@ -2,7 +2,7 @@ name: Qt HTTP client security
 
 on:
   push:
-    branches: [work/qt-http2-security-20261023, work/subscription-unified-integration-20261023]
+    branches: [test, work/qt-http2-security-20261023, work/subscription-unified-integration-20261023]
   pull_request:
     paths:
       - '.github/workflows/qt-network-security.yml'
