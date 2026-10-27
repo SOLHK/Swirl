@@ -31,6 +31,37 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+      - name: Classify changes for full regression scope
+        id: ci_scope
+        shell: pwsh
+        env:
+          SWIRL_EVENT_NAME: ${{ github.event_name }}
+          SWIRL_BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '' }}
+        run: |
+          $base = $env:SWIRL_BASE_SHA
+          if ($env:SWIRL_EVENT_NAME -eq 'workflow_dispatch' -or [string]::IsNullOrWhiteSpace($base) -or $base -match '^0+$') {
+            "SWIRL_CI_UI_ONLY=false" >> $env:GITHUB_ENV
+            Write-Host 'Full regression scope: explicit/manual or initial run.'
+            exit 0
+          }
+          git cat-file -e "$base^{commit}" 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            git fetch --no-tags --depth=1 origin $base
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch the event base commit; refusing to narrow test scope.' }
+          }
+          $changed = @(git diff --name-only $base $env:GITHUB_SHA)
+          if ($LASTEXITCODE -ne 0 -or $changed.Count -eq 0) { throw 'Unable to determine changed files; refusing to narrow test scope.' }
+          $nonUi = @($changed | Where-Object { $_ -notmatch '^(src/Swirl\.Quick/qml/|src/Swirl\.Quick/tests/(ApecMotionChecks|ApecGlassChecks|AppearanceChecks|HeroChecks|NavigationChecks|UiQualityChecks|WindowChecks|OverviewChecks)\.(cpp|h)$|\.github/workflows/build-qt-quick-ui\.yml$|AGENTS\.md$)' })
+          $uiOnly = $nonUi.Count -eq 0
+          "SWIRL_CI_UI_ONLY=$($uiOnly.ToString().ToLowerInvariant())" >> $env:GITHUB_ENV
+          "SWIRL_CI_NETWORK_CHANGE=$((!$uiOnly).ToString().ToLowerInvariant())" >> $env:GITHUB_ENV
+          if ($uiOnly) { Write-Host "UI-only change set ($($changed.Count) files); retain critical UI/package checks and defer unrelated network integration tests." }
+          else {
+            # System-proxy mutation tests are opt-in at CMake configure time and
+            # run only on this disposable GitHub-hosted Windows runner.
+            "SWIRL_SYSTEM_PROXY_TEST=1" >> $env:GITHUB_ENV
+            Write-Host "Core, network, security, build, or mixed change set ($($changed.Count) files); require focused network/security tests and full regression."
+          }
       - name: Validate scoped Codex proxy launcher
         shell: pwsh
         run: ./tools/tests/Test-CodexProxyLauncher.ps1
@@ -169,41 +200,22 @@ jobs:
           $testFontDir = 'build/swirl-quick/Release/lib/fonts'
           New-Item -ItemType Directory -Force -Path $testFontDir | Out-Null
           Get-ChildItem -LiteralPath $fontDir -File | Copy-Item -Destination $testFontDir -Force
-      - name: Engine, stream and QML regression checks
+      - name: Critical UI startup, rendering and interaction checks
         shell: pwsh
         run: |
-          # Include registered stream, shared-element and settings regressions.
-          # Later steps run the three excluded UI/capture drivers against dist.
-          # System proxy recovery needs a separately controlled test environment.
-          ctest --test-dir build/swirl-quick -C Release -E "^swirl-(system-proxy-recovery|overview-input|all-pages|capture-network)$" --output-on-failure
+          # Run affected UI checks before packaging. The remaining registered suite
+          # runs after the test installer is uploaded; these names are excluded there
+          # so a required check is never repeated just to change stage ordering.
+          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(appearance-ui|node-ui|engine-ui|motion|apec-motion|apec-glass|hero|navigation-ui)$" --output-on-failure --no-tests=error
           if ($LASTEXITCODE -ne 0) {
             Get-Content build/swirl-quick/engine-contract.txt, build/swirl-quick/engine-real.txt -ErrorAction SilentlyContinue
-            throw "Engine checks failed"
+            throw "Critical UI checks failed"
           }
-      - name: Upload engine test evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: Swirl-Engine-Test-Evidence
-          path: |
-            build/swirl-quick/Testing/Temporary/LastTest.log
-            build/swirl-quick/engine-contract.txt
-            build/swirl-quick/engine-real.txt
-            build/swirl-quick/node-chain.txt
-            build/swirl-quick/import-subscription.txt
-            build/swirl-quick/native-engine.txt
-            build/swirl-quick/stream-regression.txt
-            build/swirl-quick/subscription-formats.txt
-            build/swirl-quick/Release/Swirl-appearance.txt
-            build/swirl-quick/Release/Swirl-appearance-restore.txt
-            build/swirl-quick/motion-report.json
-            build/swirl-quick/hero-evidence/
-            build/swirl-quick/Release/Swirl-diagnostics.txt
-            build/swirl-quick/Release/Swirl-node-ui-diagnostics.txt
-            build/swirl-quick/Release/Swirl-motion-diagnostics.txt
-            build/swirl-quick/Release/Swirl-hero-diagnostics.txt
-          if-no-files-found: warn
-      - name: Overview mouse and keyboard input checks
+          if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') {
+            ctest --test-dir build/swirl-quick -C Release -R "^swirl-(system-proxy-state|system-proxy-recovery|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network)$" --output-on-failure --no-tests=error
+            if ($LASTEXITCODE -ne 0) { throw "Critical network/security checks failed ($LASTEXITCODE)." }
+          }
+      - name: Overview input checks against deployed Qt runtime
         shell: pwsh
         run: |
           $env:QT_QPA_PLATFORM = "offscreen"
@@ -214,7 +226,7 @@ jobs:
             Get-Content "dist/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
             throw "Overview input checks failed: $($process.ExitCode)"
           }
-      - name: Loopback HTTP capture integration checks
+      - name: Loopback HTTP capture checks against deployed Qt runtime
         shell: pwsh
         run: |
           $env:QT_QPA_PLATFORM = "offscreen"
@@ -229,7 +241,7 @@ jobs:
             Get-Content "dist/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
             throw "HTTP capture checks failed: $($process.ExitCode)"
           }
-      - name: Startup smoke test (offscreen, capture remains off)
+      - name: Startup and all-pages smoke against deployed Qt runtime
         shell: pwsh
         run: |
           $env:QT_QPA_PLATFORM = "offscreen"
@@ -251,29 +263,14 @@ jobs:
           $exe = (Resolve-Path "dist/Swirl.exe").Path
           New-Item -ItemType Directory -Force -Path preview-diagnostics | Out-Null
           Add-Type -AssemblyName System.Drawing
+          # These are render/DPR sanity samples, not visual acceptance. Full page
+          # continuity stays covered by swirl-all-pages; the user accepts DPI visuals.
           $previews = @(
             @{ file = "Swirl-Activity-preview.png"; page = "activity"; theme = "light"; size = "1464x930"; scale = "1" },
-            @{ file = "Swirl-Activity-125-preview.png"; page = "activity"; theme = "light"; size = "1464x930"; scale = "1.25" },
-            @{ file = "Swirl-Activity-150-preview.png"; page = "activity"; theme = "light"; size = "1464x930"; scale = "1.5" },
-            @{ file = "Swirl-Activity-175-preview.png"; page = "activity"; theme = "light"; size = "1464x930"; scale = "1.75" },
             @{ file = "Swirl-Activity-200-preview.png"; page = "activity"; theme = "light"; size = "1464x930"; scale = "2" },
-            @{ file = "Swirl-Nodes-preview.png"; page = "proxies"; theme = "light"; size = "1464x930"; scale = "1" },
-            @{ file = "Swirl-Policy-preview.png"; page = "policies"; theme = "light"; size = "1464x930"; scale = "1" },
-            @{ file = "Swirl-Subscriptions-preview.png"; page = "subscriptions"; theme = "light"; size = "1464x930"; scale = "1" },
             @{ file = "Swirl-Settings-preview.png"; page = "settings"; theme = "light"; size = "1464x930"; scale = "1" },
-            @{ file = "Swirl-Overview-preview.png"; page = "overview"; theme = "light"; size = "1464x930"; scale = "1" },
-            @{ file = "Swirl-Overview-125-preview.png"; page = "overview"; theme = "light"; size = "1464x930"; scale = "1.25" },
-            @{ file = "Swirl-Overview-150-preview.png"; page = "overview"; theme = "light"; size = "1464x930"; scale = "1.5" },
-            @{ file = "Swirl-Overview-175-preview.png"; page = "overview"; theme = "light"; size = "1464x930"; scale = "1.75" },
-            @{ file = "Swirl-Overview-200-preview.png"; page = "overview"; theme = "light"; size = "1464x930"; scale = "2" },
-            @{ file = "Swirl-Minimum-preview.png"; page = "overview"; theme = "light"; size = "1000x650"; scale = "1" },
-            @{ file = "Swirl-Minimum-bottom-preview.png"; page = "overview"; theme = "light"; size = "1000x650"; scale = "1.5"; bottom = $true },
-            @{ file = "Swirl-Compact-preview.png"; page = "overview"; theme = "light"; size = "800x560"; scale = "1" },
-            @{ file = "Swirl-Compact-200-preview.png"; page = "overview"; theme = "light"; size = "800x560"; scale = "2" },
-            @{ file = "Swirl-Large-preview.png"; page = "overview"; theme = "light"; size = "1920x1219"; scale = "1" },
             @{ file = "Swirl-Inspector-preview.png"; page = "inspector"; theme = "dark"; size = "1464x930"; scale = "1" },
-            @{ file = "Swirl-ModuleHub-preview.png"; page = "featurehub"; theme = "light"; size = "1464x930"; scale = "1" },
-            @{ file = "Swirl-DHCP-preview.png"; page = "feature-dhcp"; theme = "light"; size = "1464x930"; scale = "1" }
+            @{ file = "Swirl-Compact-preview.png"; page = "overview"; theme = "light"; size = "800x560"; scale = "1" }
           )
           foreach ($preview in $previews) {
             # Offscreen Windows QPA uses DPR 1; QT_SCALE_FACTOR gives effective scale.
@@ -374,7 +371,64 @@ jobs:
           if ($exeVersion -ne "$appVersion.0" -or $installerVersion -ne "$appVersion.0") { throw 'Source, application and installer versions disagree.' }
           $manifest = Get-Content -LiteralPath (Join-Path $appDist 'package-manifest.json') -Raw | ConvertFrom-Json
           if ($manifest.source_sha -ne $env:GITHUB_SHA) { throw 'Package source identity differs from this workflow commit.' }
-          [ordered]@{source_sha=$env:GITHUB_SHA;version=$appVersion;qt=$env:SWIRL_QT_VERSION;installer_sha256=(Get-FileHash -LiteralPath 'out/Swirl-Setup.exe' -Algorithm SHA256).Hash.ToLowerInvariant();ui_tests='passed';desktop_dpi_acceptance='manual';physical_refresh_rate_acceptance='unverified'} | ConvertTo-Json | Set-Content -LiteralPath out/delivery.json -Encoding utf8
+          [ordered]@{source_sha=$env:GITHUB_SHA;version=$appVersion;qt=$env:SWIRL_QT_VERSION;installer_sha256=(Get-FileHash -LiteralPath 'out/Swirl-Setup.exe' -Algorithm SHA256).Hash.ToLowerInvariant();critical_ui_tests='passed';full_regression='pending';desktop_dpi_acceptance='manual';physical_refresh_rate_acceptance='unverified'} | ConvertTo-Json | Set-Content -LiteralPath out/delivery.json -Encoding utf8
+      - name: Upload critical-test Windows installer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Windows-Installer-EXE
+          path: out/Swirl-Setup.exe
+          if-no-files-found: error
+          retention-days: 14
+      - name: Full regression suite after installer is available
+        shell: pwsh
+        run: |
+          $regression = 'failed'
+          try {
+            # The critical UI tests have already passed before packaging. Exclude
+            # only those exact tests here to avoid paying for a second execution.
+            $excludedTests = 'appearance-ui|node-ui|engine-ui|overview-input|all-pages|motion|apec-motion|apec-glass|hero|navigation-ui|capture-network'
+            if ($env:SWIRL_CI_UI_ONLY -eq 'true') {
+              # UI-only changes still run all parser, policy, storage, and local
+              # regressions; skip only suites whose purpose is network/TLS traffic.
+              $excludedTests += '|system-proxy-recovery|node-real-chain|stream-regression|subscription-download|qt-network-policy|gateway-network'
+              Write-Host 'Deferred for this UI-only diff: node-real-chain, stream-regression, subscription-download, qt-network-policy, gateway-network.'
+            } else {
+              # These network/security checks already passed before packaging.
+              $excludedTests += '|system-proxy-recovery|system-proxy-state|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network'
+            }
+            $exclude = "^swirl-($excludedTests)$"
+            ctest --test-dir build/swirl-quick -C Release -E $exclude --output-on-failure --no-tests=error --output-junit build-evidence/full-regression.xml
+            if ($LASTEXITCODE -ne 0) { throw "Full regression checks failed ($LASTEXITCODE)." }
+            $regression = 'passed'
+          } finally {
+            $delivery = Get-Content -LiteralPath 'out/delivery.json' -Raw | ConvertFrom-Json
+            $delivery | Add-Member -NotePropertyName full_regression -NotePropertyValue $regression -Force
+            $delivery | ConvertTo-Json | Set-Content -LiteralPath 'out/delivery.json' -Encoding utf8
+          }
+      - name: Upload engine and full regression evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Engine-Test-Evidence
+          path: |
+            build/swirl-quick/Testing/Temporary/LastTest.log
+            build-evidence/full-regression.xml
+            build/swirl-quick/engine-contract.txt
+            build/swirl-quick/engine-real.txt
+            build/swirl-quick/node-chain.txt
+            build/swirl-quick/import-subscription.txt
+            build/swirl-quick/native-engine.txt
+            build/swirl-quick/stream-regression.txt
+            build/swirl-quick/subscription-formats.txt
+            build/swirl-quick/Release/Swirl-appearance.txt
+            build/swirl-quick/Release/Swirl-appearance-restore.txt
+            build/swirl-quick/motion-report.json
+            build/swirl-quick/hero-evidence/
+            build/swirl-quick/Release/Swirl-diagnostics.txt
+            build/swirl-quick/Release/Swirl-node-ui-diagnostics.txt
+            build/swirl-quick/Release/Swirl-motion-diagnostics.txt
+            build/swirl-quick/Release/Swirl-hero-diagnostics.txt
+          if-no-files-found: warn
       - name: Save reusable compiler outputs
         if: ${{ !cancelled() && steps.ui_build.outcome == 'success' && steps.build_cache.outputs.cache-hit != 'true' }}
         shell: pwsh
@@ -404,13 +458,6 @@ jobs:
             out/delivery.json
             installer-bin/package-manifest.json
           if-no-files-found: warn
-          retention-days: 14
-      - name: Upload Swirl Windows installer EXE
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: Swirl-Windows-Installer-EXE
-          path: out/Swirl-Setup.exe
-          if-no-files-found: error
           retention-days: 14
       - name: Upload separate Qt UI preview
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
