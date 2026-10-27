@@ -120,3 +120,49 @@ Hero screenshot differences were exactly 877 pixels in the close-button tooltip
 area, outside page content. The pointer now parks in the blank outer gutter;
 the original pixel threshold remains unchanged. Resource checks await actual
 retirement rather than assuming a fixed 150 ms delay is sufficient.
+
+## Final integration evidence, 2026-10-28
+
+This section supersedes the pending results in the historical checkpoint above.
+The cold Activity-to-Settings run with the original synthetic automation font
+passed all 37 assertions with zero FreeType engine creation warnings. The two
+license assertions now locate the dialog through its cached font-pane owner,
+matching the actual QObject ownership. The native Hero run passed all 102
+assertions and its nested navigation checks, with no QML lifecycle warnings.
+The expanded 58 motion checks and native appearance/navigation checks pass.
+GitHub run `40510223760` passed the complete CI pipeline for integration commit
+`4a6987d008a69ffed4f45f8beb3a733c5ee94e59`; final 3.0.0 package validation belongs
+to the subsequent versioned commit and must be checked independently.
+
+Native D3D11 measurements used Qt 6.12.0, DPR 1.5, the reported 240 Hz display,
+live sampled glass and normal VSync settings. All three isolated scenarios
+exited successfully, retained cached page identities and reported no warnings.
+
+| Measurement | p95 (ms) | p99 (ms) | Maximum (ms) |
+| --- | ---: | ---: | ---: |
+| First-visits run, all intervals including setup and commit | 4.62 | 27.18 | 47.05 |
+| Route run, all intervals including instrumented prewarming | 21.98 | 32.04 | 39.86 |
+| Resize run, all intervals including setup | 22.71 | 32.15 | 145.77 |
+| First visits, intervals wholly within travel events | 4.41 | 4.66 | 8.03 |
+| Warm visits, intervals wholly within travel events | 4.47 | 4.78 | 5.58 |
+| Rapid retargeting, intervals wholly within travel events | 5.09 | 5.58 | 5.96 |
+| Settled route changes, intervals wholly within travel events | 4.39 | 4.76 | 5.58 |
+| Resize measurement phase, all intervals | 21.64 | 25.12 | 25.12 |
+
+The setup-only 145.77 ms gap and all original intervals remain in the evidence;
+the separated rows are not substitutes for whole-run results. These are Qt
+frame delivery observations, not physical presentation FPS or proof of universal
+60/120/240 Hz smoothness. Resize cadence remains a stated limitation. No effect,
+animation, asynchronous loader, font axis, or cache was removed for these results.
+
+The full screenshot pass saved 340 real app-window captures across light/dark,
+normal/compact windows, all page implementations, settings sections and editors.
+Its initial eight harness errors were navigation aliases `dashboard` and
+`requestlogs`, whose actual independent window and overlay were already captured.
+The harness now models those surfaces explicitly and respects the 672-DIP minimum
+height. Visual inspection also led to a narrow empty-state placement correction
+in the two request inspectors. The versioned 3.0.0 screenshot verification then
+completed with 340 saved captures, 61 main-route targets, both themes, 800/1100-DIP
+widths, and zero capture errors or QML warnings. The two corrected compact
+inspectors were visually checked again. Manual DPI and physical-display
+acceptance remain with the user.

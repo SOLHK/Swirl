@@ -138,7 +138,10 @@ inline int runFontUiChecks(QQuickWindow *window,FontManager *manager,const QStri
     auto *license=get("fontLicense");
     check(license&&QMetaObject::invokeMethod(license,"clicked"),"font license dialog opens");QTest::qWait(350);
     int popupText=0,popupWrong=0;QJsonArray popupCaptures;
-    auto *dialog=window->findChild<QObject *>("fontLicenseDialog");
+    // The visited font pane is owned by its cached Loader. Popup visual
+    // reparenting to the overlay does not make it a QObject child of Window.
+    auto *dialog=license&&license->parentItem()
+        ?license->parentItem()->findChild<QObject *>("fontLicenseDialog"):nullptr;
     check(dialog&&dialog->property("visible").toBool(),"license popup is visible in its owner overlay");
     if(dialog){
         std::function<void(QQuickItem *)> inspect=[&](QQuickItem *item){

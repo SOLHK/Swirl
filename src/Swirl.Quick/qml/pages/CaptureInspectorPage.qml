@@ -43,8 +43,10 @@ Item {
             ColumnLayout{Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumWidth:0;spacing:Theme.gap
                 SwirlSearchField{Layout.fillWidth:true;placeholderText:qsTr("筛选域名、方法或状态");onTextChanged:page.query=text}
                 Item{Layout.fillWidth:true;Layout.fillHeight:true
-                    SwirlDataTable{objectName:"captureTable";anchors.fill:parent;incrementalRows:true;animateRowChanges:false;rows:page.filteredRows;selectedId:page.selectedId;textPixelSize:12;headerPixelSize:11;columns:[{key:"method",label:"方法",w:80},{key:"host",label:"目标",w:190},{key:"status",label:"状态",w:65},{key:"protocol",label:"类型",w:110},{key:"duration",label:"耗时",w:90},{key:"size",label:"下载",w:90}];onRowSelected:function(row){page.selectedId=row.id}}
-                    SwirlEmptyState{anchors.centerIn:parent;width:parent.width;visible:page.filteredRows.length===0;headline:page.query.length?qsTr("没有匹配会话"):qsTr("等待请求");detail:page.captureProvider.running?qsTr("通过捕获端口发送真实请求后，会话会显示在此处。"):qsTr("开始抓包后，请求会显示在此处。")}
+                    SwirlDataTable{id:captureTable;objectName:"captureTable";anchors.fill:parent;incrementalRows:true;animateRowChanges:false;rows:page.filteredRows;selectedId:page.selectedId;textPixelSize:12;headerPixelSize:11;columns:[{key:"method",label:"方法",w:80},{key:"host",label:"目标",w:190},{key:"status",label:"状态",w:65},{key:"protocol",label:"类型",w:110},{key:"duration",label:"耗时",w:90},{key:"size",label:"下载",w:90}];onRowSelected:function(row){page.selectedId=row.id}}
+                    Item{anchors.fill:parent;anchors.topMargin:captureTable.headerHeight+Theme.dp(8);visible:page.filteredRows.length===0
+                        SwirlEmptyState{anchors.centerIn:parent;width:Math.max(0,parent.width-Theme.dp(20));iconName:parent.height<Theme.dp(120)?"":"search";headline:page.query.length?qsTr("没有匹配会话"):qsTr("等待请求");detail:page.captureProvider.running?qsTr("通过捕获端口发送真实请求后，会话会显示在此处。"):qsTr("开始抓包后，请求会显示在此处。")}
+                    }
                 }
                 Rectangle{Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(1);color:Theme.border}
                 RowLayout{Layout.fillWidth:true;SwirlText{transform:Translate{x:tabMotion.position.x-tabMotion.targetX;y:tabMotion.position.y}

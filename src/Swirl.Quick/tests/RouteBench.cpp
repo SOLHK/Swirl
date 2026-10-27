@@ -257,7 +257,8 @@ int runRouteBench(QQuickWindow *window,const QString &output) {
     const int glassShaderStatus=glass?glass->property("shaderStatus").toInt():-1;
     if(material=="glass"){
         check("native-glass-sampled-and-live",glassSampled&&glassCaptureLive);
-        check("native-glass-shader-compiled",glassShaderStatus==1);
+        // QQuickShaderEffect::Status: Compiled=0, Uncompiled=1, Error=2.
+        check("native-glass-shader-compiled",glassShaderStatus==0);
         check("native-glass-renderer",window->rendererInterface()->graphicsApi()!=QSGRendererInterface::Software);
     }
     auto cacheCheck=[&]{check("cache-count-stays-warm",host->property("cachedPageCount").toInt()==warmedCacheCount);for(const auto &name:warmed){auto *loader=cachedLoader(name);check("cache-identity-"+name,loaders.value(name)&&pages.value(name)&&loader==loaders.value(name).data()&&object(loader->property("item"))==pages.value(name).data());}};

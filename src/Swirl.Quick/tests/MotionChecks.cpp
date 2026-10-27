@@ -113,7 +113,10 @@ int runMotionVisualChecks(QQuickWindow *window, const QString &directory) {
     QStringList routes=eval("AppState.allPageIds").toStringList();
     if(routes.isEmpty())for(const auto &value:QJsonDocument::fromJson(eval("JSON.stringify(AppState.allPageIds)").toString().toUtf8()).array())routes.append(value.toString());
     routes<<"activity"<<"fonts";routes.removeDuplicates();
-    for(const auto &size:{QSize(1100,760),QSize(800,600)}){
+    // These navigation aliases open a separate window/overlay and reset the
+    // main route. Their real surfaces are captured in the external branch.
+    routes.removeAll("dashboard");routes.removeAll("requestlogs");
+    for(const auto &size:{QSize(1100,760),QSize(800,672)}){
         window->resize(size);
         for(const auto &theme:{QString("Light"),QString("Dark")}){
             eval("Theme.mode='"+theme+"'");

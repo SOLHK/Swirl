@@ -50,6 +50,7 @@ Item {
                 SplitView.fillWidth:true; SplitView.minimumWidth:page.compact?0:Theme.dp(320)
                 clip:true
                 SwirlDataTable {
+                    id:requestTable
                     anchors.fill:parent; anchors.margins:Theme.dp(1)
                     rows:page.displayRows;fillEmptyRows:false
                     selectedId:page.selected?page.selected.id:""
@@ -61,7 +62,11 @@ Item {
                     ]
                     onRowSelected:function(r){page.selected=r}
                 }
-                SwirlEmptyState { anchors.centerIn:parent; width:Math.max(0,parent.width-Theme.dp(28)); visible:page.displayRows.length===0; headline:qsTr("暂无本地请求"); detail:qsTr("通过抓包面板查看真实会话，或调整现有筛选。") }
+                Item {
+                    anchors.fill:parent;anchors.topMargin:requestTable.headerHeight+Theme.dp(8)
+                    visible:page.displayRows.length===0
+                    SwirlEmptyState { anchors.centerIn:parent; width:Math.max(0,parent.width-Theme.dp(28)); iconName:parent.height<Theme.dp(120)?"":"search"; headline:qsTr("暂无本地请求"); detail:qsTr("通过抓包面板查看真实会话，或调整现有筛选。") }
+                }
             }
             SwirlInspectorPanel {
                 objectName:"inspectorDetails"
