@@ -1,9 +1,11 @@
 #include "AppearanceChecks.h"
 #include <QQuickWindow>
 #include <QQuickItem>
+#include <QQuickItemGrabResult>
 #include <QQmlContext>
 #include <QQmlExpression>
 #include <QTest>
+#include <QSignalSpy>
 #include <QSettings>
 #include <QProcess>
 #include <QCoreApplication>
@@ -70,22 +72,42 @@ int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
     auto *pane=find(window->contentItem(),"sidebarFloatingBackground");
     check(pane!=nullptr,"sidebar pane exists");
     if(pane){
-        // The floating shell has one material owner and no second container fill.
+        // The APEC sidebar owns a sampled glass material, with Theme.surface
+        // as its opaque fallback. It no longer shares the canvas fill.
         check(pane->metaObject()->indexOfProperty("color")==-1,"sidebar container has no independent fill property");
-        auto *glass=find(window->contentItem(),"sidebarLiquidGlass");
-        check(glass!=nullptr,"floating sidebar exposes its sampled material owner");
         QTest::qWait(250);
-        // The outer five-DIP strip is inside the material but outside navigation
-        // hit targets and their animated selection/hover fills.
-        const auto at=pane->mapToScene(QPointF(pane->width()-5,pane->height()/2))*window->devicePixelRatio();
+        auto *glass=find(pane,"sidebarLiquidGlass");
+        auto *source=qvariant_cast<QQuickItem *>(eval("appSceneBackdrop"));
+        auto *shader=glass?glass->findChild<QObject *>("sidebarLiquidShader"):nullptr;
+        check(glass && source && qvariant_cast<QQuickItem *>(glass->property("backdropSource"))==source,"sidebar glass samples the independent application backdrop");
+        check(glass && glass->property("sampled").toBool() && glass->property("captureLive").toBool(),"transparent sidebar uses live sampled material");
+        check(shader && shader->property("status").toInt()==0 && shader->property("log").toString().isEmpty(),"production sidebar material shader is compiled without errors");
+        const auto capture=[&](QQuickItem *item){
+            if(!item)return QImage{};
+            auto result=item->grabToImage();if(!result)return QImage{};
+            QSignalSpy ready(result.data(),&QQuickItemGrabResult::ready);window->update();
+            if(result->image().isNull())ready.wait(2000);
+            return result->image();
+        };
+        const auto interiorMatches=[](const QImage &image,const QColor &expected=QColor()){
+            if(image.isNull())return false;
+            // Item-local readback excludes navigation labels and avoids any
+            // dependency on page layout or window/DPI sample coordinates.
+            const QPointF samples[]={{0.25,0.25},{0.75,0.25},{0.5,0.5},{0.25,0.75},{0.75,0.75}};
+            for(const auto &sample:samples){
+                const auto actual=image.pixelColor(qRound(sample.x()*(image.width()-1)),qRound(sample.y()*(image.height()-1)));
+                if(actual.alpha()!=255)return false;
+                if(expected.isValid() && (qAbs(actual.red()-expected.red())>2 || qAbs(actual.green()-expected.green())>2 || qAbs(actual.blue()-expected.blue())>2))return false;
+            }
+            return true;
+        };
+        const auto matchesToken=[&](QQuickItem *item,const QString &token){
+            const auto expected=eval(token).value<QColor>();
+            return expected.isValid() && interiorMatches(capture(item),expected);
+        };
+        const auto darkMaterial=capture(glass);
+        check(interiorMatches(darkMaterial),"sampled dark sidebar has opaque interior pixels");
         const auto before=window->grabWindow();
-        const auto expected=eval("Theme.surface").value<QColor>();
-        const auto actual=before.isNull()?QColor():before.pixelColor(at.toPoint());
-        const auto matches=[](const QColor &a,const QColor &b){return a.isValid() && qAbs(a.red()-b.red())<=3 && qAbs(a.green()-b.green())<=3 && qAbs(a.blue()-b.blue())<=3 && qAbs(a.alpha()-b.alpha())<=3;};
-        if(glass && !glass->property("sampled").toBool())
-            check(matches(actual,expected),"software sidebar fallback renders the surface token");
-        else
-            check(glass && glass->property("captureLive").toBool(),"GPU sidebar samples its application backdrop");
         QQmlComponent fixture(qmlEngine(window));
         fixture.setData("import QtQuick; Rectangle {width:600;height:900;color:'#D02A65'; Text {anchors.fill:parent;text:'RIGHT PAGE CONTENT';font.pixelSize:60;wrapMode:Text.Wrap}}",QUrl());
         auto *overlay=qobject_cast<QQuickItem *>(fixture.create());
@@ -94,33 +116,24 @@ int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
         if(overlay && mainArea){
             overlay->setParentItem(mainArea);overlay->setZ(999);window->update();QTest::qWait(250);
             const auto after=window->grabWindow();
-            const auto origin=pane->mapToScene(QPointF(pane->width()-5,120))*window->devicePixelRatio();
-            const QRect strip(origin.toPoint(),QSize(qMax(1,qRound(window->devicePixelRatio())),qRound((pane->height()-240)*window->devicePixelRatio())));
+            const auto origin=pane->mapToScene(QPointF(pane->width()-18,120))*window->devicePixelRatio();
+            const QRect strip(origin.toPoint(),QSize(4,qRound((pane->height()-240)*window->devicePixelRatio())));
             check(!before.isNull() && !after.isNull() && before.copy(strip)==after.copy(strip),"right-page text and color never get copied underneath sidebar navigation");
         }
         delete overlay;
         eval("Theme.mode='Light';Theme.reduceMotion=true");QTest::qWait(350);
-        // Swirl 3 has a white floating material over a cool near-white canvas.
-        // Both opaque accessibility paths must keep their distinct tokens.
-        const auto fallbackMatches=[&](){
-            const auto image=window->grabWindow();
-            if(image.isNull()||!mainArea||!glass)return false;
-            const auto dpr=window->devicePixelRatio();
-            const auto side=pane->mapToScene(QPointF(pane->width()-5,pane->height()/2))*dpr;
-            const auto content=mainArea->mapToScene(QPointF(8,3))*dpr;
-            if(!image.rect().contains(side.toPoint())||!image.rect().contains(content.toPoint()))return false;
-            const auto a=image.pixelColor(side.toPoint()),b=image.pixelColor(content.toPoint());
-            const auto surface=eval("Theme.surface").value<QColor>();
-            const auto canvas=eval("Theme.canvas").value<QColor>();
-            qInfo()<<"APPEARANCE_MATERIAL_PIXELS"<<a<<surface<<b<<canvas;
-            return !glass->property("sampled").toBool()&&!glass->property("captureLive").toBool()
-                &&matches(a,surface)&&matches(b,canvas);
-        };
+        const auto lightMaterial=capture(glass);
+        check(glass && glass->property("sampled").toBool() && glass->property("captureLive").toBool() && interiorMatches(lightMaterial),"light sidebar retains live sampled material and opaque interior pixels");
+        check(!darkMaterial.isNull() && !lightMaterial.isNull() && darkMaterial.size()==lightMaterial.size() && darkMaterial!=lightMaterial,"theme selection changes the rendered sidebar material");
         eval("Theme.increaseContrast=true");QTest::qWait(150);
-        check(fallbackMatches(),"increased contrast renders the floating surface and workspace canvas tokens");
+        check(glass && !glass->property("sampled").toBool() && !glass->property("captureLive").toBool(),"increased contrast stops sidebar sampling");
+        check(matchesToken(glass,"Theme.surface"),"increased contrast renders the opaque sidebar surface token");
         eval("Theme.increaseContrast=false;Theme.transparency=false");QTest::qWait(150);
-        check(fallbackMatches(),"opaque fallback renders both material tokens and stops capture");
-        eval("Theme.transparency=true");
+        check(glass && !glass->property("sampled").toBool() && !glass->property("captureLive").toBool(),"opaque fallback stops sidebar sampling");
+        check(matchesToken(glass,"Theme.surface"),"opaque fallback renders the sidebar surface token");
+        check(matchesToken(source,"Theme.canvas"),"opaque workspace renders its separate canvas token");
+        eval("Theme.transparency=true");QTest::qWait(150);
+        check(glass && glass->property("sampled").toBool() && glass->property("captureLive").toBool(),"restoring transparency resumes sidebar sampling");
     }
     auto *proxy=find(window->contentItem(),"proxyCapsule");
     if(proxy){
