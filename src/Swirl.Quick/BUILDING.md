@@ -3,7 +3,7 @@
 Run `scripts/build-quick-windows.ps1 -QtDir <Qt-MSVC-x64-directory>` in an x64
 MSVC developer shell. Output defaults to `D:\Codex`; use a fresh distribution
 and output directory. The product requires Cargo, Rust x86_64-pc-windows-msvc,
-Qt 6.9 or later, CMake, and Ninja. `-InputTests` uses a separate test build.
+the pinned Qt 6.12.0 MSVC x64 SDK (or a newer validated compatible SDK), CMake, and Ninja. `-InputTests` uses a separate test build.
 `-PortableOnly` omits NSIS. Never copy a DLL manually from an older build.
 
 Cargo is a mandatory dependency of Swirl. The DLL and EXE carry a shared

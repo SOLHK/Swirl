@@ -53,8 +53,9 @@ if(SWIRL_FONT_TESTS_ONLY)
  return()
 endif()
 
-# The old runtime selector is accepted only as ON for existing build scripts.
-# Font-only projects return above and never acquire a proxy runtime dependency.
+# Rust is the sole application proxy runtime. Retain an always-ON cache key only
+# for existing installer source-identity checks; OFF is an error, not a fallback.
+# The independent font-only test project returns above this gate.
 if(DEFINED SWIRL_USE_RUST_CORE AND NOT SWIRL_USE_RUST_CORE)
  message(FATAL_ERROR "SWIRL_USE_RUST_CORE=OFF is no longer supported; Rust is the only product runtime")
 endif()
@@ -255,9 +256,6 @@ if(MSVC)
  target_compile_options(Swirl PRIVATE /utf-8)
 endif()
 if(SWIRL_XRAY_UI_TESTS)
- if(NOT SWIRL_USE_RUST_CORE)
-  message(FATAL_ERROR "The JSON import UI acceptance profile requires the real Rust Core build")
- endif()
  find_package(Qt6 REQUIRED COMPONENTS Test QuickTest)
  target_sources(Swirl PRIVATE tests/XrayUiChecks.h tests/XrayUiChecks.cpp)
  target_compile_definitions(Swirl PRIVATE SWIRL_XRAY_UI_TESTS)
@@ -319,8 +317,8 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  target_compile_definitions(Swirl PRIVATE SWIRL_UI_TESTS)
  endif()
  enable_testing()
- if(SWIRL_USE_RUST_CORE)
-  add_executable(SwirlRustCoreTests tests/RustCoreTests.cpp)
+ # Rust is the sole runtime; these integration tests are never optional by engine selection.
+ add_executable(SwirlRustCoreTests tests/RustCoreTests.cpp)
   target_link_libraries(SwirlRustCoreTests PRIVATE SwirlEngine Qt6::Test)
   swirl_stage_rust_core(SwirlRustCoreTests)
   include(cmake/RustCoreLibraryTests.cmake)
@@ -334,7 +332,6 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
   add_test(NAME swirl-rust-qt-integration COMMAND SwirlRustCoreTests
    -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-rust-qt-integration.xml,xml" -o -,txt)
   set_tests_properties(swirl-rust-qt-integration PROPERTIES TIMEOUT 60)
- endif()
  if(WIN32)
   add_executable(SwirlCodexLauncherTests tests/CodexLauncherTests.cpp)
   target_link_libraries(SwirlCodexLauncherTests PRIVATE SwirlCodexLaunchSupport)

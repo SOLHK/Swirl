@@ -1,10 +1,18 @@
-# Swirl Core: native Rust runtime and staged product migration
+# Swirl Core — sole native Rust proxy runtime
 
-This workspace lives inside the existing Swirl product repository. The Qt/QML
-interface is unchanged. It replaces actual forwarding with Rust when configured
-using `SWIRL_USE_RUST_CORE=ON`; it does not wrap the C++ forwarder or Mihomo.
-The default build preserves historical capabilities until their Rust replacements
-are implemented and tested. This is **not the completed all-protocol product**.
+**Current architecture (2026-10-27):** The Windows product has one proxy runtime:
+`core/` builds the `swirl_api` Rust library, which is paired with the Qt Quick
+application at build time. No Mihomo, former C++ forwarder or alternate proxy
+runtime is available as a fallback. `SWIRL_USE_RUST_CORE=OFF` is rejected by
+CMake; the always-ON cache flag exists only for existing release checks.
+
+Importing Clash, sing-box or Xray/V2Ray configuration data is format parsing,
+not use of their executables. Unsupported protocol/configuration behavior must
+fail explicitly; it must never silently bypass the chosen node.
+
+The dated engineering logs below are retained as historical, commit-scoped test
+evidence. They do **not** describe the current default build or guarantee
+private-provider, Codex, TUN or physical-device acceptance.
 
 ## Current development scope (2026-10-19)
 
