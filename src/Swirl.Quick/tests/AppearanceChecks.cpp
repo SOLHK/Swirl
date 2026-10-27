@@ -70,16 +70,22 @@ int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
     auto *pane=find(window->contentItem(),"sidebarFloatingBackground");
     check(pane!=nullptr,"sidebar pane exists");
     if(pane){
-        // The sidebar container remains an Item with shader children. V2's
-        // background fill is owned by its shared exact contour shape.
-        // Require that structural contract as well as the pixel checks below.
+        // The floating shell has one material owner and no second container fill.
         check(pane->metaObject()->indexOfProperty("color")==-1,"sidebar container has no independent fill property");
+        auto *glass=find(window->contentItem(),"sidebarLiquidGlass");
+        check(glass!=nullptr,"floating sidebar exposes its sampled material owner");
         QTest::qWait(250);
-        const auto at=pane->mapToScene(QPointF(pane->width()-18,pane->height()/2))*window->devicePixelRatio();
+        // The outer five-DIP strip is inside the material but outside navigation
+        // hit targets and their animated selection/hover fills.
+        const auto at=pane->mapToScene(QPointF(pane->width()-5,pane->height()/2))*window->devicePixelRatio();
         const auto before=window->grabWindow();
-        const auto expected=eval("Theme.sidebarBase").value<QColor>();
+        const auto expected=eval("Theme.surface").value<QColor>();
         const auto actual=before.isNull()?QColor():before.pixelColor(at.toPoint());
-        check(actual.isValid() && qAbs(actual.red()-expected.red())<=3 && qAbs(actual.green()-expected.green())<=3 && qAbs(actual.blue()-expected.blue())<=3,"sidebar interior uses its darker neutral material token");
+        const auto matches=[](const QColor &a,const QColor &b){return a.isValid() && qAbs(a.red()-b.red())<=3 && qAbs(a.green()-b.green())<=3 && qAbs(a.blue()-b.blue())<=3 && qAbs(a.alpha()-b.alpha())<=3;};
+        if(glass && !glass->property("sampled").toBool())
+            check(matches(actual,expected),"software sidebar fallback renders the surface token");
+        else
+            check(glass && glass->property("captureLive").toBool(),"GPU sidebar samples its application backdrop");
         QQmlComponent fixture(qmlEngine(window));
         fixture.setData("import QtQuick; Rectangle {width:600;height:900;color:'#D02A65'; Text {anchors.fill:parent;text:'RIGHT PAGE CONTENT';font.pixelSize:60;wrapMode:Text.Wrap}}",QUrl());
         auto *overlay=qobject_cast<QQuickItem *>(fixture.create());
@@ -88,32 +94,32 @@ int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
         if(overlay && mainArea){
             overlay->setParentItem(mainArea);overlay->setZ(999);window->update();QTest::qWait(250);
             const auto after=window->grabWindow();
-            const auto origin=pane->mapToScene(QPointF(pane->width()-18,120))*window->devicePixelRatio();
-            const QRect strip(origin.toPoint(),QSize(4,qRound((pane->height()-240)*window->devicePixelRatio())));
+            const auto origin=pane->mapToScene(QPointF(pane->width()-5,120))*window->devicePixelRatio();
+            const QRect strip(origin.toPoint(),QSize(qMax(1,qRound(window->devicePixelRatio())),qRound((pane->height()-240)*window->devicePixelRatio())));
             check(!before.isNull() && !after.isNull() && before.copy(strip)==after.copy(strip),"right-page text and color never get copied underneath sidebar navigation");
         }
         delete overlay;
         eval("Theme.mode='Light';Theme.reduceMotion=true");QTest::qWait(350);
-        // Sample blank interior pixels, away from the sidebar rim, exterior
-        // shadow, navigation rows and Activity's header controls. This checks
-        // the Qt surface; native desktop composition has separate acceptance.
-        const auto lightCanvasMatches=[&](){
+        // Swirl 3 has a white floating material over a cool near-white canvas.
+        // Both opaque accessibility paths must keep their distinct tokens.
+        const auto fallbackMatches=[&](){
             const auto image=window->grabWindow();
-            if(image.isNull()||!mainArea)return false;
+            if(image.isNull()||!mainArea||!glass)return false;
             const auto dpr=window->devicePixelRatio();
-            const auto side=pane->mapToScene(QPointF(pane->width()-18,pane->height()/2))*dpr;
-            const auto content=mainArea->mapToScene(QPointF(mainArea->width()/2,48))*dpr;
+            const auto side=pane->mapToScene(QPointF(pane->width()-5,pane->height()/2))*dpr;
+            const auto content=mainArea->mapToScene(QPointF(8,3))*dpr;
             if(!image.rect().contains(side.toPoint())||!image.rect().contains(content.toPoint()))return false;
             const auto a=image.pixelColor(side.toPoint()),b=image.pixelColor(content.toPoint());
-            return qAbs(a.red()-b.red())<=2&&qAbs(a.green()-b.green())<=2
-                &&qAbs(a.blue()-b.blue())<=2&&qAbs(a.alpha()-b.alpha())<=2
-                &&qAbs(a.red()-a.green())<=1&&qAbs(a.green()-a.blue())<=1;
+            const auto surface=eval("Theme.surface").value<QColor>();
+            const auto canvas=eval("Theme.canvas").value<QColor>();
+            qInfo()<<"APPEARANCE_MATERIAL_PIXELS"<<a<<surface<<b<<canvas;
+            return !glass->property("sampled").toBool()&&!glass->property("captureLive").toBool()
+                &&matches(a,surface)&&matches(b,canvas);
         };
-        check(lightCanvasMatches(),"light sidebar and workspace share the same neutral canvas pixels");
         eval("Theme.increaseContrast=true");QTest::qWait(150);
-        check(lightCanvasMatches(),"increased contrast keeps the shared light canvas");
+        check(fallbackMatches(),"increased contrast renders the floating surface and workspace canvas tokens");
         eval("Theme.increaseContrast=false;Theme.transparency=false");QTest::qWait(150);
-        check(lightCanvasMatches(),"opaque fallback keeps the shared light canvas");
+        check(fallbackMatches(),"opaque fallback renders both material tokens and stops capture");
         eval("Theme.transparency=true");
     }
     auto *proxy=find(window->contentItem(),"proxyCapsule");
