@@ -1,6 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import SwirlQuick
 import "../components"
@@ -11,7 +11,8 @@ Item {
     required property var engineController
     required property var systemProvider
     readonly property var telemetry: engineController.telemetry
-    readonly property bool wide: scroll.width - 2 * Theme.pagePadding >= Theme.dp(620)
+    readonly property bool wide: scroll.width - 2 * Theme.pagePadding >= Theme.dp(480)
+    readonly property bool compact: scroll.width - 2 * Theme.pagePadding < Theme.dp(620)
     property int period: 0
     property int trafficKind: 0
     property int rankingKind: 0
@@ -21,6 +22,8 @@ Item {
     property var ranks: []
     property bool proxyRanksAvailable: false
     property bool snapshotDirty: true
+    property bool errorDetailsRequested: false
+    property string errorDetailsText: ""
     readonly property bool connected: engineController.processAlive && engineController.apiHealthy
     readonly property string internetLatency: telemetry.latencies.internet || ""
     readonly property bool internetMeasured: /^\d+ ms$/.test(internetLatency)
@@ -101,16 +104,48 @@ Item {
         id: fact
         property string caption: ""
         property string value: "—"
-        Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: Theme.dp(4)
+        Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.preferredWidth: 1; spacing: Theme.dp(4)
         SwirlText { text: fact.caption; color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; elide: Text.ElideRight }
         SwirlText { text: fact.value; color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.Medium; Layout.fillWidth: true; elide: Text.ElideRight }
+    }
+    component PolicyFact: SwirlMotionButton {
+        id: policy
+        readonly property Item motionTitle: policyCaption
+        readonly property Item motionSurface: policy
+        objectName: "activityPolicyShortcut"
+        Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.preferredWidth: 1
+        implicitWidth: 0; implicitHeight: policyContents.implicitHeight
+        padding: 0; hoverEnabled: true; focusPolicy: Qt.StrongFocus
+        Accessible.name: qsTr("策略：%1").arg(page.defaultTargetName)
+        Accessible.description: qsTr("打开策略页面")
+        onClicked: SwirlMotion.navigateFrom(policy, "policies", "")
+        background: SwirlControlSurface { quiet: true; hovered: policy.hovered; pressed: policy.down; focused: policy.visualFocus }
+        SwirlArcMotion {
+            id: policyCurve
+            objectName: "activityPolicyMotion"
+            targetX: policy.hovered || policy.visualFocus ? Theme.dp(4) : 0
+            bend: Theme.dp(3); duration: SwirlMotion.hoverDuration; motionEnabled: page.visible
+        }
+        contentItem: ColumnLayout {
+            id: policyContents
+            spacing: Theme.dp(4)
+            RowLayout {
+                Layout.fillWidth: true; spacing: Theme.dp(4)
+                SwirlText { id: policyCaption; text: qsTr("策略"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true }
+                SwirlIcon { name: "chevron-right"; size: Theme.dp(12); color: policy.hovered || policy.visualFocus ? Theme.accent : Theme.muted; transform: Translate { x: policyCurve.position.x; y: policyCurve.position.y } }
+            }
+            SwirlText { id: policyValue; text: page.defaultTargetName; color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.Medium; Layout.fillWidth: true; elide: Text.ElideRight }
+        }
+        HoverHandler { cursorShape: Qt.PointingHandCursor }
+        SwirlToolTip { parent: policy; visible: policy.hovered || policy.visualFocus; text: qsTr("%1 · 打开策略").arg(page.defaultTargetName) }
     }
     component StatRow: RowLayout {
         id: stat
         property string caption: ""
         property string value: "—"
         readonly property Item valueItem: valueText
-        width: parent ? parent.width : 0; height: Theme.dp(30); spacing: Theme.dp(8)
+        Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.preferredHeight: implicitHeight
+        implicitHeight: Theme.dp(26); spacing: Theme.dp(8)
         SwirlText { text: stat.caption; color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; elide: Text.ElideRight }
         SwirlText { id: valueText; text: stat.value; color: Theme.text; font.pixelSize: Theme.fontSize(13); font.weight: Font.Medium; elide: Text.ElideRight }
     }
@@ -132,46 +167,53 @@ Item {
     Flickable {
         id: scroll; objectName: "activityScroll"
         anchors.fill: parent; anchors.topMargin: Theme.dp(52)
-        contentWidth: width; contentHeight: content.implicitHeight + Theme.dp(20)
+        contentWidth: width; contentHeight: content.height + Theme.dp(16)
+        interactive: contentHeight > height + 1
         flickableDirection: Flickable.VerticalFlick; boundsBehavior: Flickable.StopAtBounds
         clip: true; ScrollBar.vertical: SwirlScrollBar {}
         ColumnLayout {
             id: content
-            x: Theme.pagePadding; width: scroll.width - 2 * Theme.pagePadding; spacing: Theme.dp(18)
-            RowLayout {
-                Layout.fillWidth: true; spacing: Theme.dp(12)
-                SwirlText { textRole: "pageTitle"; text: qsTr("活动"); font.pixelSize: Theme.fontSize(26); font.weight: Font.DemiBold; color: Theme.text; Layout.fillWidth: true }
-                SwirlButton { id: policyShortcut; text: qsTr("查看策略"); iconName: "route"; quiet: true; onClicked: SwirlMotion.navigateFrom(policyShortcut, "policies", "") }
-            }
+            x: Theme.pagePadding; width: scroll.width - 2 * Theme.pagePadding
+            height: Math.max(scroll.height - Theme.dp(16), Layout.minimumHeight); spacing: Theme.dp(16)
             Rectangle {
-                Layout.fillWidth: true; Layout.preferredHeight: statusBody.implicitHeight + Theme.dp(28)
+                Layout.fillWidth: true; Layout.minimumHeight: statusBody.implicitHeight + Theme.dp(24); Layout.preferredHeight: Layout.minimumHeight
                 radius: Theme.dp(14); color: Theme.buttonBase
                 ColumnLayout {
-                    id: statusBody; anchors.fill: parent; anchors.margins: Theme.dp(14); spacing: Theme.dp(14)
+                    id: statusBody; anchors.fill: parent; anchors.margins: Theme.dp(12); spacing: Theme.dp(12)
                     RowLayout {
                         Layout.fillWidth: true; spacing: Theme.dp(10)
                         SwirlFlow { Layout.preferredWidth: Theme.dp(54); Layout.preferredHeight: Theme.dp(20); phase: page.proxyPhase }
                         SwirlText { text: page.proxySummary; font.pixelSize: Theme.fontSize(15); font.weight: Font.DemiBold; color: Theme.text; Layout.fillWidth: true; elide: Text.ElideRight }
+                        SwirlIconButton {
+                            objectName: "activityProxyErrorDetails"
+                            visible: page.proxyError.length > 0
+                            Layout.preferredWidth: Theme.dp(28); Layout.preferredHeight: Theme.dp(28)
+                            iconName: "warning"; iconColor: Theme.red; quiet: true
+                            tooltip: qsTr("查看代理错误详情"); Accessible.description: page.proxyError
+                            onClicked: { page.errorDetailsText = page.proxyError; page.errorDetailsRequested = true }
+                        }
                         OutboundModeControl { engineController: page.engineController }
                     }
-                    SwirlText { visible: page.proxyError.length > 0; text: page.proxyError; textFormat: Text.PlainText; color: Theme.red; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; wrapMode: Text.Wrap }
                     RowLayout {
                         Layout.fillWidth: true; spacing: Theme.dp(14)
                         Fact { caption: qsTr("网络"); value: page.network.type || qsTr("未连接") }
                         Fact { caption: qsTr("配置"); value: extensionsProvider.profileName || "—" }
-                        Fact { caption: qsTr("默认策略"); value: page.defaultTargetName }
+                        PolicyFact {}
                         Fact { caption: qsTr("外部 IP"); value: page.telemetry.externalIp || "—" }
                     }
                 }
             }
             GridLayout {
-                Layout.fillWidth: true; columns: page.wide ? 2 : 1; columnSpacing: Theme.dp(20); rowSpacing: Theme.dp(18)
+                Layout.fillWidth: true; Layout.fillHeight: true
+                columns: page.wide ? 2 : 1; columnSpacing: Theme.dp(20); rowSpacing: Theme.dp(16)
                 SwirlGlassPanel {
                     id: trafficCard; objectName: "activityTrafficCard"
-                    Layout.fillWidth: true; Layout.preferredWidth: 3; Layout.minimumWidth: 0; Layout.preferredHeight: Theme.dp(268)
+                    Layout.fillWidth: true; Layout.fillHeight: true; Layout.preferredWidth: 3; Layout.minimumWidth: 0
+                    Layout.minimumHeight: trafficBody.Layout.minimumHeight + Theme.dp(28); Layout.preferredHeight: Theme.dp(268)
                     cornerRadius: Theme.dp(16); color: Theme.surface; border.width: 0
                     ColumnLayout {
-                        anchors.fill: parent; anchors.margins: Theme.dp(16); spacing: Theme.dp(10)
+                        id: trafficBody
+                        anchors.fill: parent; anchors.margins: Theme.dp(14); spacing: Theme.dp(8)
                         RowLayout {
                             Layout.fillWidth: true
                             SwirlText { text: qsTr("传输"); font.pixelSize: Theme.fontSize(18); font.weight: Font.DemiBold; color: Theme.text; Layout.fillWidth: true }
@@ -181,19 +223,19 @@ Item {
                             id: uploadSection; objectName: "activityUpload"
                             readonly property Item motionTitle: uploadRateText
                             readonly property Item motionSurface: uploadSection
-                            Layout.fillWidth: true; spacing: Theme.dp(24)
+                            Layout.fillWidth: true; spacing: Theme.dp(16)
                             ColumnLayout {
-                                Layout.fillWidth: true; spacing: Theme.dp(3)
+                                Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: Theme.dp(3)
                                 SectionTitle { caption: qsTr("上传"); onNavigate: page.goTraffic(uploadSection, "uploadRate") }
-                                SwirlText { id: uploadRateText; text: page.telemetry.sampled ? page.telemetry.formatBytes(page.telemetry.uploadRate) + "/s" : "—"; font.pixelSize: Theme.fontSize(25); font.weight: Font.DemiBold; color: Theme.text }
+                                SwirlText { id: uploadRateText; Layout.fillWidth: true; Layout.minimumWidth: 0; text: page.telemetry.sampled ? page.telemetry.formatBytes(page.telemetry.uploadRate) + "/s" : "—"; font.pixelSize: Theme.fontSize(25); font.weight: Font.DemiBold; color: Theme.text; wrapMode: Text.Wrap }
                             }
                             ColumnLayout {
                                 id: downloadSection
                                 readonly property Item motionTitle: downloadRateText
                                 readonly property Item motionSurface: downloadSection
-                                Layout.fillWidth: true; spacing: Theme.dp(3)
+                                Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: Theme.dp(3)
                                 SectionTitle { caption: qsTr("下载"); onNavigate: page.goTraffic(downloadSection, "downloadRate") }
-                                SwirlText { id: downloadRateText; text: page.telemetry.sampled ? page.telemetry.formatBytes(page.telemetry.downloadRate) + "/s" : "—"; font.pixelSize: Theme.fontSize(25); font.weight: Font.DemiBold; color: Theme.text }
+                                SwirlText { id: downloadRateText; Layout.fillWidth: true; Layout.minimumWidth: 0; text: page.telemetry.sampled ? page.telemetry.formatBytes(page.telemetry.downloadRate) + "/s" : "—"; font.pixelSize: Theme.fontSize(25); font.weight: Font.DemiBold; color: Theme.text; wrapMode: Text.Wrap }
                             }
                         }
                         SwirlDailyTrafficChart { id: trafficChart; objectName: "activityTrafficChart"; Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: Theme.dp(65); proxyOnly: page.trafficKind === 1 }
@@ -203,18 +245,20 @@ Item {
                             readonly property Item motionSurface: totalSection
                             Layout.fillWidth: true
                             SectionTitle { caption: qsTr("累计"); onNavigate: page.goTraffic(totalSection, "totalTraffic") }
-                            SwirlText { id: totalTrafficText; Layout.fillWidth: true; text: page.bytes(page.totals.total, page.totals.sampled); color: Theme.text; font.pixelSize: Theme.fontSize(16); font.weight: Font.DemiBold; elide: Text.ElideRight }
+                            SwirlText { id: totalTrafficText; Layout.fillWidth: true; Layout.minimumWidth: 0; text: page.bytes(page.totals.total, page.totals.sampled); color: Theme.text; font.pixelSize: Theme.fontSize(16); font.weight: Font.DemiBold; wrapMode: Text.Wrap }
                             SwirlSegmentedControl { objectName: "activityPeriodFilter"; Layout.preferredWidth: Theme.dp(112); Layout.preferredHeight: Theme.dp(28); options: [qsTr("今日"), qsTr("本月")]; currentIndex: page.period; onActivated: index => page.period = index }
                         }
                     }
                 }
                 ColumnLayout {
                     id: diagnosticCard; objectName: "internetDiagnosticCard"
-                    Layout.fillWidth: true; Layout.preferredWidth: 2; Layout.minimumWidth: 0; Layout.preferredHeight: Theme.dp(268); spacing: Theme.dp(10)
+                    Layout.fillWidth: true; Layout.fillHeight: true; Layout.preferredWidth: 2; Layout.minimumWidth: 0
+                    Layout.minimumHeight: implicitHeight; Layout.preferredHeight: Theme.dp(268); spacing: Theme.dp(6)
                     RowLayout {
                         Layout.fillWidth: true
-                        SwirlText { text: qsTr("网络诊断"); color: Theme.text; font.pixelSize: Theme.fontSize(18); font.weight: Font.DemiBold; Layout.fillWidth: true }
-                        SwirlIconButton { objectName: "networkDiagnosticButton"; iconName: "refresh"; quiet: true; enabled: page.telemetry.measurementState !== "正在测量"; Accessible.name: qsTr("刷新 INTERNET 耗时"); onClicked: page.telemetry.measureNetwork() }
+                        SectionTitle { id: diagnosticShortcut; objectName: "networkDiagnosticDetails"; caption: qsTr("网络诊断"); onNavigate: SwirlMotion.navigateFrom(diagnosticShortcut, "toolbox", "") }
+                        Item { Layout.fillWidth: true }
+                        SwirlIconButton { objectName: "networkDiagnosticButton"; Layout.preferredWidth: Theme.dp(30); Layout.preferredHeight: Theme.dp(30); iconName: "refresh"; quiet: true; enabled: page.telemetry.measurementState !== "正在测量"; Accessible.name: qsTr("刷新 INTERNET 耗时"); onClicked: page.telemetry.measureNetwork() }
                     }
                     RowLayout {
                         Layout.fillWidth: true; spacing: Theme.dp(6)
@@ -225,60 +269,100 @@ Item {
                     }
                     SwirlText { text: page.internetMeasured ? qsTr("INTERNET · HTTPS 完整请求") : page.telemetry.measurementState || qsTr("尚未检测"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; wrapMode: Text.Wrap }
                     Rectangle { Layout.fillWidth: true; Layout.preferredHeight: Theme.borderWidth; color: Theme.separator }
-                    Column {
-                        Layout.fillWidth: true
+                    ColumnLayout {
+                        Layout.fillWidth: true; spacing: 0
                         StatRow { caption: qsTr("默认网关"); value: page.latency("router") }
                         StatRow { caption: qsTr("DNS 查询"); value: page.latency("dns") }
                         StatRow { caption: qsTr("代理请求"); value: page.connected ? page.latency("proxy") : qsTr("未连接") }
                     }
                     Item { Layout.fillHeight: true }
-                    SwirlButton { id: diagnosticShortcut; objectName: "networkDiagnosticDetails"; text: qsTr("诊断详情"); quiet: true; onClicked: SwirlMotion.navigateFrom(diagnosticShortcut, "toolbox", "") }
                 }
-            }
-            GridLayout {
-                Layout.fillWidth: true; columns: page.wide ? 2 : 1; columnSpacing: Theme.dp(28); rowSpacing: Theme.dp(20)
                 ColumnLayout {
-                    Layout.fillWidth: true; Layout.preferredWidth: 3; Layout.minimumWidth: 0; spacing: Theme.dp(8)
-                    RowLayout {
-                        Layout.fillWidth: true
+                    id: sourcesSection; objectName: "activitySourceSection"
+                    Layout.fillWidth: true; Layout.fillHeight: false; Layout.preferredWidth: 3; Layout.minimumWidth: 0; Layout.minimumHeight: implicitHeight; spacing: Theme.dp(8)
+                    GridLayout {
+                        Layout.fillWidth: true; columns: page.compact ? 1 : 2; columnSpacing: Theme.dp(8); rowSpacing: Theme.dp(6)
                         SwirlText { text: qsTr("流量来源"); font.pixelSize: Theme.fontSize(16); font.weight: Font.DemiBold; color: Theme.text; Layout.fillWidth: true }
                         SwirlSegmentedControl { id: sourceFilter; objectName: "activitySourceFilter"; Layout.preferredWidth: Theme.dp(230); Layout.preferredHeight: Theme.dp(28); options: [qsTr("进程与设备"), qsTr("域名"), qsTr("策略")]; currentIndex: page.rankingKind; onActivated: index => page.rankingKind = index }
                     }
-                    Repeater {
-                        model: page.ranks
-                        SwirlMotionButton {
-                            id: rank; required property var modelData
-                            Layout.fillWidth: true; implicitHeight: Theme.dp(35); padding: Theme.dp(5); hoverEnabled: true
-                            background: Rectangle { color: rank.down ? Theme.pressed : rank.hovered ? Theme.hover : "transparent"; radius: Theme.dp(6); border.width: rank.visualFocus ? Theme.borderWidth : 0; border.color: Theme.accent }
-                            contentItem: RowLayout {
-                                spacing: Theme.dp(9)
-                                SwirlIcon { name: rank.modelData.kind === "apps" ? "terminal" : rank.modelData.kind === "devices" ? "router" : rank.modelData.kind === "domains" ? "globe" : "route"; size: Theme.dp(17); color: Theme.muted }
-                                SwirlText { text: rank.modelData.name; Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight; color: Theme.text; font.pixelSize: Theme.fontSize(12) }
-                                SwirlText { text: rank.modelData.value; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
-                                SwirlIcon { name: "chevron-right"; size: Theme.dp(12); color: Theme.muted }
+                    Flickable {
+                        id: rankViewport; objectName: "activitySourceList"
+                        visible: page.ranks.length > 0
+                        Layout.fillWidth: true; Layout.minimumWidth: 0
+                        Layout.preferredHeight: Math.min(rankRows.implicitHeight, Theme.dp(88))
+                        Layout.minimumHeight: Layout.preferredHeight
+                        contentWidth: width; contentHeight: rankRows.implicitHeight
+                        interactive: contentHeight > height + 1; clip: interactive
+                        boundsBehavior: Flickable.StopAtBounds; flickableDirection: Flickable.VerticalFlick
+                        ScrollBar.vertical: SwirlScrollBar {}
+                        ColumnLayout {
+                            id: rankRows
+                            width: rankViewport.width; spacing: Theme.dp(2)
+                            Repeater {
+                                model: page.ranks
+                                SwirlMotionButton {
+                                    id: rank; required property var modelData
+                                    Layout.fillWidth: true; Layout.minimumWidth: 0; implicitHeight: Theme.dp(28); padding: Theme.dp(4); hoverEnabled: true
+                                    background: Rectangle { color: rank.down ? Theme.pressed : rank.hovered ? Theme.hover : "transparent"; radius: Theme.dp(6); border.width: rank.visualFocus ? Theme.borderWidth : 0; border.color: Theme.accent }
+                                    contentItem: RowLayout {
+                                        spacing: Theme.dp(9)
+                                        SwirlIcon { name: rank.modelData.kind === "apps" ? "terminal" : rank.modelData.kind === "devices" ? "router" : rank.modelData.kind === "domains" ? "globe" : "route"; size: Theme.dp(17); color: Theme.muted }
+                                        SwirlText { text: rank.modelData.name; Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight; color: Theme.text; font.pixelSize: Theme.fontSize(12) }
+                                        SwirlText { text: rank.modelData.value; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
+                                        SwirlIcon { name: "chevron-right"; size: Theme.dp(12); color: Theme.muted }
+                                    }
+                                    Accessible.name: qsTr("%1详情").arg(modelData.name)
+                                    onClicked: { SwirlMotion.noteTrigger(rank); page.openRank(modelData) }
+                                }
                             }
-                            Accessible.name: qsTr("%1详情").arg(modelData.name)
-                            onClicked: { SwirlMotion.noteTrigger(rank); page.openRank(modelData) }
                         }
                     }
-                    SwirlText { visible: page.ranks.length === 0; text: page.emptyRanksText; color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(74); verticalAlignment: Text.AlignVCenter; wrapMode: Text.Wrap }
+                    SwirlText { visible: page.ranks.length === 0; text: page.emptyRanksText; color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(56); verticalAlignment: Text.AlignVCenter; wrapMode: Text.Wrap }
                     RowLayout {
                         Layout.fillWidth: true
                         SwirlText { text: qsTr("直连 %1").arg(page.distribution[1] && page.totals.sampled ? page.distribution[1].value : "—"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true }
                         SwirlText { text: qsTr("代理 %1").arg(page.distribution[0] && page.totals.sampled ? page.distribution[0].value : "—"); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
                     }
                 }
-                Column {
+                ColumnLayout {
                     id: connectionsSection; objectName: "activityConnections"
                     readonly property Item motionTitle: connectionCountRow.valueItem
                     readonly property Item motionSurface: connectionsSection
-                    Layout.fillWidth: true; Layout.preferredWidth: 2; Layout.minimumWidth: 0; spacing: Theme.dp(2)
+                    Layout.fillWidth: true; Layout.fillHeight: false; Layout.preferredWidth: 2; Layout.minimumWidth: 0; Layout.alignment: Qt.AlignTop; spacing: Theme.dp(2)
                     SectionTitle { caption: qsTr("活动连接"); onNavigate: SwirlMotion.navigateFrom(connectionsSection, "connections", "activeConnections") }
                     StatRow { id: connectionCountRow; caption: qsTr("连接数量"); value: page.telemetry.connectionsSampled ? String(page.telemetry.activeConnections) : "—" }
                     StatRow { caption: qsTr("进程"); value: page.telemetry.connectionsSampled ? String(page.telemetry.activeProcesses) : "—" }
                     StatRow { caption: qsTr("设备"); value: page.telemetry.connectionsSampled ? String(page.activeDeviceCount) : "—" }
                     StatRow { caption: qsTr("DHCP 设备"); value: gatewayProvider.running ? String(page.dhcpDeviceCount) : "—" }
                 }
+            }
+        }
+    }
+    Loader {
+        active: page.errorDetailsRequested
+        sourceComponent: SwirlDialog {
+            id: errorDialog
+            objectName: "activityProxyErrorDialog"
+            ownerItem: page; guardChanges: false
+            title: qsTr("代理错误详情")
+            height: Math.min(Theme.dp(360), parent ? parent.height - Theme.dp(48) : Theme.dp(360))
+            Component.onCompleted: open()
+            onClosed: page.errorDetailsRequested = false
+            contentItem: ColumnLayout {
+                spacing: Theme.dp(12)
+                ScrollView {
+                    id: errorScroll
+                    Layout.fillWidth: true; Layout.fillHeight: true
+                    clip: true
+                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                    ScrollBar.vertical: SwirlScrollBar {}
+                    SwirlText {
+                        width: errorScroll.availableWidth
+                        text: page.errorDetailsText; textFormat: Text.PlainText
+                        color: Theme.red; font.pixelSize: Theme.fontSize(13); wrapMode: Text.Wrap
+                    }
+                }
+                SwirlButton { Layout.alignment: Qt.AlignRight; text: qsTr("关闭"); onClicked: errorDialog.close() }
             }
         }
     }
