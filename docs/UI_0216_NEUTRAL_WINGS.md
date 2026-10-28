@@ -14,16 +14,16 @@ card borders, analytic shadows and interactive hover/press/focus feedback.
 The seven Settings entry cards use that same surface.
 
 `SwirlWingAnimation` renders each of the existing four small / five large
-closed vector feather paths independently. Each contour has a staggered root
-reveal and fold transform; no raster image or whole-wing opacity animation
+closed vector feather paths independently. Each pointed contour has a staggered
+extension and fan rotation around its own root; no raster image or whole-wing opacity animation
 stands in for feather growth. `SwirlProxyWingMotion` owns one reversible clock
 for Activity, Policy and the proxy capsule, bound to the actual
-`owned && enabled && processAlive` state. Nominal full travel is 1900 ms open
-and 1200 ms close. A Qt SmoothedAnimation behavior preserves the current frame
+`owned && enabled && processAlive` state. Nominal full travel is 1600 ms open
+and 1000 ms close. A Qt SmoothedAnimation behavior preserves the current frame
 and velocity on reversal. Zero progress hides the entire small wing.
 
 The workspace owns the large wing across all routes. Its first presented frame
-starts a 120 ms visible delay followed by a 2600 ms feather sequence. Navigation
+starts a 120 ms visible delay followed by a 2100 ms feather sequence. Navigation
 and theme changes retain its progress; minimizing pauses it. Once complete,
 there is no decorative animation clock. Reduced motion settles the relevant
 state, and increased contrast suppresses decorative artwork.

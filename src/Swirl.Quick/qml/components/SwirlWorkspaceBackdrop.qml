@@ -61,7 +61,7 @@ Item {
         property: "progress"
         from: 0
         to: 1
-        duration: SwirlMotion.ms(2600)
+        duration: SwirlMotion.ms(2100)
         paused: entrance.running && !canvas.presenting
     }
 

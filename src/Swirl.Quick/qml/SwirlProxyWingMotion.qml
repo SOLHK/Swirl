@@ -10,8 +10,8 @@ QtObject {
     property real progress: 0
     property bool initialized: false
     readonly property bool moving: unfold.running
-    readonly property int expandDuration: 1900
-    readonly property int collapseDuration: 1200
+    readonly property int expandDuration: 1600
+    readonly property int collapseDuration: 1000
     property alias animation: unfold
     Behavior on progress {
         enabled: motion.initialized && motion.windowVisible && !SwirlMotion.reduced

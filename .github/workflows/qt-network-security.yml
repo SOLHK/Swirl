@@ -119,7 +119,7 @@ jobs:
           if-no-files-found: error
 
   windows-product:
-    name: Windows Qt 6.11.3 product regression
+    name: Windows Qt 6.12.0 product regression
     runs-on: windows-2022
     timeout-minutes: 45
     steps:
@@ -131,7 +131,7 @@ jobs:
         run: rustup toolchain install stable --profile minimal --target x86_64-pc-windows-msvc
       - uses: jurplel/install-qt-action@v4
         with:
-          version: '6.11.3'
+          version: '6.12.0'
           host: windows
           target: desktop
           arch: win64_msvc2022_64

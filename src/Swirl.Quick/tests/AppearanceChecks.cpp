@@ -133,7 +133,10 @@ int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
         eval("Theme.increaseContrast=false;Theme.transparency=false");QTest::qWait(150);
         check(glass && !glass->property("sampled").toBool() && !glass->property("captureLive").toBool(),"opaque fallback stops sidebar sampling");
         check(matchesToken(glass,"Theme.canvas"),"opaque sidebar fallback uses the shared canvas token");
-        check(matchesToken(workspace,"Theme.canvas"),"opaque workspace uses the same canvas token as the sidebar");
+        QQuickItem *workspaceBase=nullptr;
+        if(workspace)for(auto *child:workspace->childItems())if(child->property("tintOpacity").isValid()){workspaceBase=child;break;}
+        check(matchesToken(workspaceBase,"Theme.canvas"),"opaque workspace base uses the same canvas token as the sidebar");
+        check(source && source->isVisible() && interiorMatches(capture(workspace)),"opaque workspace retains the global wing above its fully opaque base");
         eval("Theme.transparency=true");QTest::qWait(150);
         check(glass && glass->property("sampled").toBool() && glass->property("captureLive").toBool(),"restoring transparency resumes sidebar sampling");
     }

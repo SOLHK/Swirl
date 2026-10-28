@@ -250,7 +250,7 @@ Item {
         if(theme=="Dark")check("dark-canvas-is-near-black",canvasColor.lightness()<24);
         for(const QString route:{QStringLiteral("activity"),QStringLiteral("overview"),QStringLiteral("featurehub"),QStringLiteral("policies")}){
             eval(QStringLiteral("AppState.navigate('%1')").arg(route));
-            check("page-settles-before-visual-capture",QTest::qWaitFor([&]{return eval(QStringLiteral("AppState.currentPage==='%1' && pageLoader.item!==null && !pageLoader.moving && !pageLoader.pendingGrab && !SwirlMotion.busy").arg(route)).toBool();},4000));
+            check("page-settles-before-visual-capture",QTest::qWaitFor([&]{return eval(QStringLiteral("AppState.currentPage==='%1' && pageLoader.item!==null && pageLoader.activeLoader && pageLoader.activeLoader.routeId==='%1' && !pageLoader.moving && !pageLoader.pendingGrab && !SwirlMotion.busy").arg(route)).toBool();},4000));
             QTest::qWait(80);
             check("global-wing-stays-complete-across-pages-and-themes",eval("appSceneBackdrop.progress===1 && !appSceneBackdrop.entering && appSceneBackdrop.decorationSource.visible").toBool());
             const auto image=window->grabWindow();

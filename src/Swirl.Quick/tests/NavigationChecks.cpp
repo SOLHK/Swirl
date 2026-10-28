@@ -76,8 +76,10 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
    backFollowsPage&=eval("!pageLoader.heroData || pageLoader.heroData.key!=='settings' || pageLoader.position>=0.82 || settingsBack.opacity===0").toBool();
    if(auto *morph=item("sharedSurface")){
     unframed&=!morph->property("independentCard").toBool()&&morph->property("radius").toDouble()>0&&QQmlExpression(qmlContext(morph),morph,"border.width===0").evaluate().toBool();
-    unframed&=QQmlExpression(qmlContext(morph),morph,"!settingsTransition || color.a<0.01 || Math.abs(color.r-(host.heroData.returning?host.heroData.toColor.r:host.heroData.fromColor.r))<0.005").evaluate().toBool();
-    unframed&=QQmlExpression(qmlContext(morph),morph,"!settingsTransition || color.a<0.01 || (Math.abs(color.r-Theme.material('content').r)<0.005 && Math.abs(color.g-Theme.material('content').g)<0.005 && Math.abs(color.b-Theme.material('content').b)<0.005)").evaluate().toBool();
+    unframed&=QQmlExpression(qmlContext(morph),morph,"!settingsTransition || color.a<0.01 || ['r','g','b'].every(channel=>Math.abs(color[channel]-(host.heroData.returning?host.heroData.toColor[channel]:host.heroData.fromColor[channel]))<0.005)").evaluate().toBool();
+    // A pointer click can sample an intermediate hover/press color. Preserve
+    // that live neutral feedback rather than requiring the resting white.
+    unframed&=QQmlExpression(qmlContext(morph),morph,"!settingsTransition || color.a<0.01 || ['r','g','b'].every(channel=>color[channel]>=Math.min(Theme.cardPressed[channel],Theme.independentCard[channel])-0.005 && color[channel]<=Math.max(Theme.cardPressed[channel],Theme.independentCard[channel])+0.005)").evaluate().toBool();
    }
    if(round==0&&id=="subscriptions"&&qApp->arguments().contains("--navigation-record-motion")){
     const QString path=directory+"/settings-expansion";QDir().mkpath(path);

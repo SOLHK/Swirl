@@ -11,6 +11,8 @@ Item {
     readonly property real artWidth: largeWing ? 1600 : 96
     readonly property real artHeight: largeWing ? 1000 : 48
     readonly property real fit: Math.min(width / artWidth, height / artHeight)
+    readonly property var roots: largeWing ? [Qt.point(-70, 830), Qt.point(280, 925), Qt.point(408, 942), Qt.point(510, 954), Qt.point(600, 980)]
+                                                : [Qt.point(5, 39), Qt.point(10, 42), Qt.point(18, 44), Qt.point(30, 45)]
     readonly property var paths: largeWing ? [
         "M -70 830 C 35 957 205 955 415 868 C 798 709 1202 359 1570 20 C 1246 388 825 745 433 915 C 206 1000 10 1002 -70 830 Z",
         "M 280 925 C 653 771 1093 505 1460 205 C 1125 544 684 827 300 960 Z",
@@ -48,15 +50,22 @@ Item {
                 required property int index
                 objectName: "wingFeather" + index
                 readonly property real reveal: wing.featherProgress(index)
-                // Reveal each original contour from its root, then release its fold.
-                width: wing.artWidth * reveal
+                readonly property point rootPoint: wing.roots[index]
+                // Preserve the pointed contour while each feather extends and fans from its root.
+                width: wing.artWidth
                 height: wing.artHeight
-                clip: reveal < 1
                 visible: reveal > 0
-                opacity: Math.min(1, reveal * 5) * (wing.largeWing ? 1 : 1 - index * 0.18)
+                opacity: Math.min(1, reveal * 8) * (wing.largeWing ? 1 : 1 - index * 0.18)
                 transform: [
-                    Scale { origin.y: wing.artHeight; yScale: 0.6 + 0.4 * feather.reveal },
-                    Rotation { origin.y: wing.artHeight; angle: (1 - feather.reveal) * 5 }
+                    Scale {
+                        origin.x: feather.rootPoint.x; origin.y: feather.rootPoint.y
+                        xScale: 0.12 + 0.88 * feather.reveal
+                        yScale: 0.18 + 0.82 * feather.reveal
+                    },
+                    Rotation {
+                        origin.x: feather.rootPoint.x; origin.y: feather.rootPoint.y
+                        angle: (1 - feather.reveal) * (12 + feather.index * 2)
+                    }
                 ]
                 Shape {
                     objectName: wing.largeWing && feather.index === 0 ? "apecFlatWingPaths" : "wingFeatherPath" + feather.index
