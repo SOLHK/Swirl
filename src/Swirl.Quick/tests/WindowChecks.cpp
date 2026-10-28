@@ -1,5 +1,6 @@
 #include "WindowChecks.h"
 #include "../app/WindowsBackdrop.h"
+#include "../app/BrandRaster.h"
 #include <QQuickWindow>
 #include <QGuiApplication>
 #include <QScreen>
@@ -134,14 +135,36 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     const auto nativeIcon=reinterpret_cast<HICON>(SendMessageW(testHwnd,WM_GETICON,ICON_BIG,0));
     check(nativeIcon!=nullptr,"Windows taskbar receives an explicit large icon");
     if(nativeIcon){
-        BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=32;info.bmiHeader.biHeight=-32;info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
+        ICONINFO nativeInfo{};BITMAP nativeBitmap{};
+        const bool iconInfoKnown=GetIconInfo(nativeIcon,&nativeInfo);
+        const bool nativeSizeKnown=iconInfoKnown && nativeInfo.hbmColor && GetObjectW(nativeInfo.hbmColor,sizeof(nativeBitmap),&nativeBitmap);
+        if(nativeInfo.hbmColor)DeleteObject(nativeInfo.hbmColor);
+        if(nativeInfo.hbmMask)DeleteObject(nativeInfo.hbmMask);
+        check(nativeSizeKnown && nativeBitmap.bmWidth>0 && nativeBitmap.bmWidth==nativeBitmap.bmHeight,"native taskbar icon reports its actual square raster frame");
+        const int size=nativeSizeKnown?nativeBitmap.bmWidth:0;
+        if(size>0){
+        BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=size;info.bmiHeader.biHeight=-size;info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
         void *bits=nullptr;const auto dc=CreateCompatibleDC(nullptr);const auto bitmap=CreateDIBSection(dc,&info,DIB_RGB_COLORS,&bits,nullptr,0);
-        const auto previous=SelectObject(dc,bitmap);RECT box{0,0,32,32};FillRect(dc,&box,reinterpret_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
-        DrawIconEx(dc,0,0,nativeIcon,32,32,0,nullptr,DI_NORMAL);
-        QImage image(static_cast<uchar *>(bits),32,32,QImage::Format_RGB32);int dark=0,blue=0;
-        for(int y=0;y<32;++y)for(int x=0;x<32;++x){const auto c=image.pixelColor(x,y);if(c.red()<80&&c.green()<80&&c.blue()<80)++dark;if(c.blue()>c.red()+35)++blue;}
-        check(dark>40 && blue==0,"native taskbar icon is the monochrome knot, not the blue legacy logo");
+        const auto previous=SelectObject(dc,bitmap);RECT box{0,0,size,size};FillRect(dc,&box,reinterpret_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
+        DrawIconEx(dc,0,0,nativeIcon,size,size,0,nullptr,DI_NORMAL);
+        QImage image(static_cast<uchar *>(bits),size,size,QImage::Format_RGB32);
+        QSvgRenderer canonical(QStringLiteral(":/swirl/icons/swirl_knot_mark_light.svg"));
+        QImage reference(size,size,QImage::Format_RGB32);reference.fill(Qt::white);
+        {QPainter painter(&reference);painter.drawImage(QPoint(),swirlBrandRaster(canonical,size));}
+        int maximumError=0,warm=0,cool=0,green=0;qint64 totalError=0;
+        for(int y=0;y<size;++y)for(int x=0;x<size;++x){
+            const auto actual=image.pixelColor(x,y),expected=reference.pixelColor(x,y);
+            maximumError=qMax(maximumError,qMax(qAbs(actual.red()-expected.red()),qMax(qAbs(actual.green()-expected.green()),qAbs(actual.blue()-expected.blue()))));
+            totalError+=distance(actual,expected);
+            if(actual.red()>actual.green()+35 && actual.red()>actual.blue()+35)++warm;
+            if(actual.blue()>actual.red()+35)++cool;
+            if(actual.green()>actual.red()+25 && actual.green()>actual.blue()+10)++green;
+        }
+        qInfo()<<"NATIVE_ICON_CANONICAL"<<size<<"maxChannelError"<<maximumError<<"totalChannelError"<<totalError<<"warm/cool/green"<<warm<<cool<<green;
+        check(canonical.isValid() && warm>0 && cool>0 && green>0 && maximumError<=2 && totalError<=size*size,
+              "native taskbar frame matches the canonical colored knot and every color passage");
         image.save(directory+"/taskbar-native-icon.png");SelectObject(dc,previous);DeleteObject(bitmap);DeleteDC(dc);
+        }
     }
 #endif
     state("Theme.mode='Light'");QTest::qWait(300);
@@ -188,7 +211,27 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
         const auto scale=window->devicePixelRatio();const auto divider=state("window.actualSidebarWidth").toReal();
         const auto lhs=red.pixelColor(qRound((divider-12)*scale),qRound(20*scale));
         const auto rhs=red.pixelColor(qRound((divider+12)*scale),qRound(20*scale));
-        check(distance(lhs,rhs)<=20,"sidebar floats above the workspace without a hard material seam");
+        qInfo()<<"SIDEBAR_INTENTIONAL_RIM_SHADOW"<<QPointF(divider-12,20)<<lhs<<QPointF(divider+12,20)<<rhs<<"delta"<<distance(lhs,rhs);
+        auto *pane=find(window->contentItem(),QStringLiteral("sidebarFloatingBackground"));
+        auto *identity=find(window->contentItem(),QStringLiteral("engineIdentityLabel"));
+        auto *firstNavigation=find(window->contentItem(),QStringLiteral("nav-activity"));
+        auto *statusCard=find(window->contentItem(),QStringLiteral("activityStatusCard"));
+        QQuickItem *shadow=nullptr;
+        if(pane)for(auto *child:pane->childItems())if(child->property("shadowOffset").isValid() && child->property("softness").isValid())shadow=child;
+        const auto sceneRect=[](QQuickItem *item){return item?item->mapRectToScene(QRectF(QPointF(),item->size())):QRectF();};
+        const auto paneRect=sceneRect(pane),shadowRect=sceneRect(shadow),identityRect=sceneRect(identity),navigationRect=sceneRect(firstNavigation);
+        const qreal quietY=(identityRect.bottom()+navigationRect.top())/2;
+        const qreal paneRadius=pane?pane->property("radius").toReal():0;
+        const QPointF inside(paneRect.right()-2*paneRadius,quietY),outside(shadowRect.right()+2/scale,quietY);
+        const bool quietSamplesKnown=pane && shadow && identity && firstNavigation && statusCard
+            && quietY>identityRect.bottom() && quietY<navigationRect.top() && paneRect.contains(inside)
+            && inside.x()<paneRect.right()-paneRadius && !paneRect.contains(outside) && !shadowRect.contains(outside)
+            && !sceneRect(statusCard).contains(outside) && QRectF(QPointF(),window->size()).contains(outside);
+        check(quietSamplesKnown,"sidebar continuity samples avoid foreground content, rounded rim and the full shadow envelope");
+        const auto interior=quietSamplesKnown?red.pixelColor((inside*scale).toPoint()):QColor();
+        const auto exterior=quietSamplesKnown?red.pixelColor((outside*scale).toPoint()):QColor();
+        qInfo()<<"SIDEBAR_QUIET_CONTINUITY"<<inside<<interior<<outside<<exterior<<"delta"<<distance(interior,exterior);
+        check(quietSamplesKnown && distance(interior,exterior)<=20,"sidebar and workspace share the base material away from the intentional floating rim and shadow");
     }
     // The native material stays behind an opaque perimeter. The QML
     // tint is translucent only where the native helper fully covers it.
