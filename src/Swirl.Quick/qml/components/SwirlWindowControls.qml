@@ -21,7 +21,7 @@ Row {
             property bool motionInitialized:false
             property color shownColor:targetColor
             readonly property color targetColor:!enabled?"transparent":index===2 && (hovered || down)?(down?Theme.windowClosePressed:Theme.windowCloseHover)
-                :down?Theme.interactionPressed:hovered?Theme.interactionHover:"transparent"
+                :down?Theme.interactionPressed:hovered || visualFocus?Theme.interactionHover:"transparent"
             readonly property bool animate:visible && controls.targetWindow.visible && controls.targetWindow.visibility!==Window.Minimized && !SwirlMotion.reduced
             readonly property bool moving:backgroundTravel.running
             function finishMotion(){if(motionInitialized){backgroundTravel.stop();shownColor=targetColor}}
@@ -42,8 +42,7 @@ Row {
                 radius: Theme.pillRadius(height)
                 antialiasing: true
                 color: button.shownColor
-                border.width: button.visualFocus && button.enabled ? 1 / Screen.devicePixelRatio : 0
-                border.color: Theme.focusBorder
+                border.width:0
             }
             contentItem: Item {
                 readonly property color ink: !button.enabled ? Theme.disabledText : button.index === 2 && (button.hovered || button.down) ? "white" : controls.targetWindow.active ? Theme.text : Theme.muted

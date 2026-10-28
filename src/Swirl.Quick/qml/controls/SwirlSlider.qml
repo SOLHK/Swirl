@@ -31,16 +31,12 @@ Slider {
         implicitWidth: Theme.dp(20)
         implicitHeight: Theme.dp(20)
         radius: width / 2
-        color: Theme.controlThumb
+        color:control.enabled && control.visualFocus ? Theme.hover : Theme.controlThumb
+        Behavior on color {enabled:!SwirlMotion.reduced;ColorAnimation {duration:SwirlMotion.focusDuration}}
         border.width: Theme.borderWidth
-        border.color: control.pressed ? Theme.text : Theme.controlBorder
+        border.color:Theme.controlBorder
         opacity: control.enabled ? 1 : Theme.disabledOpacity
         scale: control.pressed ? 1.08 : 1
         Behavior on scale { enabled: !SwirlMotion.reduced; NumberAnimation { duration: control.pressed ? SwirlMotion.pressDuration : SwirlMotion.releaseDuration; easing.type: Easing.OutCubic } }
-        Rectangle {
-            anchors.fill: parent; anchors.margins: -Theme.dp(3)
-            visible: control.visualFocus; color: "transparent"
-            radius: width / 2; border.width: Theme.dp(2); border.color: Theme.focusBorder
-        }
     }
 }

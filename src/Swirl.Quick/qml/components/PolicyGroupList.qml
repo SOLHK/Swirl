@@ -63,7 +63,7 @@ ColumnLayout {
             SwirlIcon { name: action.glyph; size: Theme.dp(16); color: action.danger ? Theme.red : Theme.muted; Accessible.ignored: true }
             SwirlText { Layout.fillWidth: true; text: action.text; color: action.danger ? Theme.red : Theme.text; font.pixelSize: Theme.fontSize(12) }
         }
-        background: Rectangle { radius: Theme.dp(8); color: action.highlighted ? Theme.hover : "transparent"; border.width: action.visualFocus ? Theme.borderWidth : 0; border.color: Theme.text }
+        background: SwirlControlSurface {quiet:true;hovered:action.hovered;pressed:action.down;focused:action.visualFocus;selected:action.highlighted;controlEnabled:action.enabled}
     }
     RowLayout {
         Layout.fillWidth: true; spacing: Theme.dp(12)

@@ -211,12 +211,15 @@ Item {
                 && colorDistance(pixelAt(pressedImage,QPointF(1,1)),pixelAt(idleImage,QPointF(1,1)))<8);
             QTest::mouseMove(window,park);QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,park);wait(settle);
             maxCaption->forceActiveFocus(Qt::TabFocusReason);
-            QTest::keyClick(window,Qt::Key_Tab);wait(30);
+            QTest::keyClick(window,Qt::Key_Tab);wait(settle);
             const qreal focusBorderWidth=QQmlProperty(closeSurface,QStringLiteral("border.width")).read().toDouble();
             qInfo()<<"CAPTION_FOCUS"<<closeCaption->property("visualFocus")<<"activeFocus"<<closeCaption->hasActiveFocus()
                    <<"focusReason"<<closeCaption->property("focusReason")<<"borderWidth"<<focusBorderWidth;
-            check("caption-keyboard-focus-draws-rounded-outline",closeCaption->property("visualFocus").toBool()
-                && focusBorderWidth>0);
+            const auto focusImage=window->grabWindow();
+            check("caption-keyboard-focus-tints-fill-without-outline",closeCaption->property("visualFocus").toBool()
+                && focusBorderWidth==0 && !focusImage.isNull()
+                && colorDistance(pixelAt(focusImage,QPointF(closeSurface->width()/2,3)),pixelAt(idleImage,QPointF(closeSurface->width()/2,3)))>5
+                && colorDistance(pixelAt(focusImage,QPointF(1,1)),pixelAt(idleImage,QPointF(1,1)))<8);
             closeCaption->setEnabled(false);QTest::mouseMove(window,center);wait(settle);
             QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,center);
             check("caption-disabled-has-no-hover-press-or-close",window->isVisible() && !closeCaption->property("down").toBool()
@@ -225,7 +228,7 @@ Item {
             check("caption-states-preserve-click-region",rect(closeCaption)==initialRect);
             const auto imageDir=QFileInfo(output).absolutePath();QDir().mkpath(imageDir);
             check("caption-state-captures-saved",idleImage.save(imageDir+"/caption-default.png")
-                && hoverImage.save(imageDir+"/caption-hover.png") && pressedImage.save(imageDir+"/caption-pressed.png"));
+                && hoverImage.save(imageDir+"/caption-hover.png") && pressedImage.save(imageDir+"/caption-pressed.png") && focusImage.save(imageDir+"/caption-focus.png"));
             qmlEngine(window)->rootContext()->setContextProperty("apecCaption",static_cast<QObject *>(nullptr));
         }
         eval("apecFixture.menu.showAt(apecFixture,50,150)");wait(40);

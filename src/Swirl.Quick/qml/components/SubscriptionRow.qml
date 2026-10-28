@@ -48,7 +48,7 @@ Item {
             Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumWidth: 0
             hoverEnabled: true; padding: Theme.dp(8)
             Accessible.name: qsTr("%1，%2 个节点，%3。%4详情").arg(row.record.name).arg(row.record.nodes).arg(row.stateLabel).arg(row.expanded ? qsTr("收起") : qsTr("展开"))
-            background: Rectangle { color: "transparent"; radius: Theme.controlRadius; border.color: Theme.text; border.width: source.visualFocus ? Theme.borderWidth : 0 }
+            background: SwirlControlSurface {quiet:true;hovered:source.hovered;pressed:source.down;focused:source.visualFocus;controlEnabled:source.enabled;radius:Theme.controlRadius}
             contentItem: RowLayout {
                 spacing: Theme.dp(10)
                 SwirlIcon { name: "chevron-right"; size: Theme.dp(10); color: Theme.muted; rotation: row.reveal * 90; Accessible.ignored: true }
@@ -127,7 +127,7 @@ Item {
             SwirlIcon { name: menuAction.glyph; size: Theme.dp(16); color: menuAction.danger ? Theme.red : Theme.muted; Accessible.ignored: true }
             SwirlText { text: menuAction.text; color: menuAction.danger ? Theme.red : Theme.text; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true }
         }
-        background: Rectangle { radius: Theme.dp(8); color: menuAction.highlighted ? Theme.hover : "transparent"; border.width: menuAction.visualFocus ? Theme.borderWidth : 0; border.color: Theme.text }
+        background: SwirlControlSurface {quiet:true;hovered:menuAction.hovered;pressed:menuAction.down;focused:menuAction.visualFocus;selected:menuAction.highlighted;controlEnabled:menuAction.enabled}
     }
     SwirlContextMenu {
         id: moreMenu

@@ -43,7 +43,7 @@ Item {
         implicitHeight: Math.max(Theme.dp(36), contentItem.implicitHeight + Theme.dp(12))
         leftPadding: Theme.dp(12); rightPadding: Theme.dp(12)
         contentItem: SwirlText { text: option.text; color: option.enabled ? Theme.text : Theme.muted; font.pixelSize: Theme.fontSize(12); verticalAlignment: Text.AlignVCenter }
-        background: Rectangle { radius: Theme.dp(8); color: option.highlighted ? Theme.hover : "transparent"; border.width: option.visualFocus ? Theme.borderWidth : 0; border.color: Theme.text }
+        background: SwirlControlSurface {quiet:true;hovered:option.hovered;pressed:option.down;focused:option.visualFocus;selected:option.highlighted;controlEnabled:option.enabled}
     }
     SwirlContextMenu {
         id: menu

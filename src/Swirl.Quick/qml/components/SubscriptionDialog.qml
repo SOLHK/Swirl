@@ -205,10 +205,10 @@ SwirlDialog {
                                 color: autoEnabled.checked ? Theme.text : Theme.controlBorder
                                 opacity: autoEnabled.enabled ? autoEnabled.hovered ? 0.85 : 1 : 0.45
                                 Rectangle {
-                                    anchors.fill: parent; anchors.margins: -Theme.dp(3)
-                                    visible: dialog.keyboardFocused(autoEnabled)
-                                    radius: height / 2; color: "transparent"
-                                    border.color: Theme.text; border.width: Theme.borderWidth
+                                    anchors.fill:parent
+                                    visible:opacity>0;opacity:autoEnabled.enabled && dialog.keyboardFocused(autoEnabled)?1:0
+                                    radius:height/2;color:Theme.withAlpha(Theme.text,0.12)
+                                    Behavior on opacity {enabled:!SwirlMotion.reduced;NumberAnimation {duration:SwirlMotion.focusDuration}}
                                 }
                                 Rectangle {
                                     property real thumbPosition: autoEnabled.checked ? 1 : 0

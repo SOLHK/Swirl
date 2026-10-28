@@ -4,6 +4,7 @@
 #include <QQuickItemGrabResult>
 #include <QQmlContext>
 #include <QQmlExpression>
+#include <QQmlProperty>
 #include <QTest>
 #include <QSignalSpy>
 #include <QSettings>
@@ -82,8 +83,7 @@ Item {
                     qInfo()<<"CONTROL_HOVER"<<theme<<name<<control->property("hovered")<<normal<<paint->property("color")
                            <<"cursor"<<window->mapFromGlobal(QCursor::pos())<<"target"<<control->mapToScene(QPointF(control->width()/2,control->height()/2))<<"active"<<window->isActive();
                     check(QTest::qWaitFor([&]{return control->property("hovered").toBool()&&paint->property("color").value<QColor>()!=normal;},1000),"shared control hover visibly changes its surface");
-                    auto *rim=paint->findChild<QQuickItem *>("controlInteractionRim");
-                    check(rim&&rim->isVisible()&&rim->opacity()>0.9,"hover expands and reveals the shared edge light");
+                    check(!paint->findChild<QQuickItem *>("controlInteractionRim")&&QQmlProperty(paint,"border.width").read().toReal()==0,"hover feedback keeps ordinary controls free of outline strokes");
                     const auto hoveredPixels=window->grabWindow();
                     const qreal dpr=window->devicePixelRatio();
                     const auto rect=control->mapRectToScene(control->boundingRect());
@@ -92,6 +92,10 @@ Item {
                     if(name!="reviewCombo")check(control->property("motionLift").toReal()<-.5,"hover gently lifts the button without relaying out its shell");
                     control->forceActiveFocus(Qt::TabFocusReason);QTest::qWait(160);
                     check(control->property("visualFocus").toBool()&&paint->property("focused").toBool(),"keyboard focus reaches the shared surface");
+                    auto *focusFill=paint->findChild<QQuickItem *>("controlFocusFill");
+                    check(focusFill&&focusFill->isVisible()&&focusFill->opacity()>.99&&QQmlProperty(focusFill,"border.width").read().toReal()==0&&QQmlProperty(paint,"border.width").read().toReal()==0,"keyboard focus fills the surface without adding a border");
+                    const auto focusedPixels=window->grabWindow();
+                    check(!focusedPixels.isNull()&&focusedPixels.copy(pixelRect)!=hoveredPixels.copy(pixelRect),"keyboard focus visibly tints the actual rendered button pixels");
                     if(name!="reviewCombo"){
                         const auto at=control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint();
                         const auto hovered=paint->property("color").value<QColor>();
@@ -100,6 +104,7 @@ Item {
                         check(paint->scale()<.995&&content&&qAbs(content->scale()-paint->scale())<.001,"a short press contracts both the surface and its label within the first40ms");
                         QTest::qWait(100);
                         check(control->property("down").toBool()&&paint->property("color").value<QColor>()!=hovered,"shared button provides a distinct pressed surface");
+                        check(QQmlProperty(paint,"border.width").read().toReal()==0,"press feedback does not introduce an outline stroke");
                         QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,at);
                         QTest::qWait(30);
                         check(paint->scale()<.999,"release continues from the pressed frame through a spring return");

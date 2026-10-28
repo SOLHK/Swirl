@@ -61,12 +61,14 @@ SwirlDialog {
                 width:Math.floor(ListView.view.width);height:Theme.dp(48);padding:Theme.dp(10);hoverEnabled:true
                 enabled:Boolean(modelData.available)&&!picker.pending
                 Accessible.name:String(modelData.name)+(modelData.available?"":qsTr("，当前不可用"))
-                background:Rectangle {
+                background:SwirlControlSurface {
                     radius:Theme.pillRadius(height)
-                    color:Policy.sameTarget(picker.selectedTarget,option.modelData)?Theme.navigationSelected:option.down?Theme.pressed:option.hovered?Theme.hover:"transparent"
-                    border.width:option.visualFocus||(targets.activeFocus&&targets.currentIndex===option.index)?Theme.borderWidth:0
-                    border.color:Theme.text
-                    Behavior on color {enabled:!SwirlMotion.reduced;ColorAnimation {duration:SwirlMotion.hoverDuration}}
+                    quiet:true
+                    hovered:option.hovered
+                    pressed:option.down
+                    focused:option.visualFocus||(targets.activeFocus&&targets.currentIndex===option.index)
+                    controlEnabled:option.enabled
+                    color:Policy.sameTarget(picker.selectedTarget,option.modelData)?Theme.navigationSelected:option.enabled && option.down?Theme.pressed:option.enabled && option.hovered?Theme.hover:"transparent"
                 }
                 contentItem:RowLayout {
                     spacing:Theme.dp(10)

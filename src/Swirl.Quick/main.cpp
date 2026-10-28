@@ -103,7 +103,7 @@ static void configureTaskbarIdentity(QQuickWindow *window)
     const auto exe=QDir::toNativeSeparators(QCoreApplication::applicationFilePath());
     // A process AppID alone lets Explorer reuse an older registered shortcut's
     // group icon. Publish this window's own resources before its explicit ID.
-    const auto iconPath=QDir::toNativeSeparators(QCoreApplication::applicationDirPath()+QStringLiteral("/Swirl-brand-0216-cloudknot.ico"));
+    const auto iconPath=QDir::toNativeSeparators(QCoreApplication::applicationDirPath()+QStringLiteral("/Swirl-brand-0216-original-knot-v2.ico"));
     result=setString(PKEY_AppUserModel_RelaunchIconResource,iconPath+QStringLiteral(",0"));
     if(SUCCEEDED(result))result=setString(PKEY_AppUserModel_RelaunchCommand,QStringLiteral("\"%1\"").arg(exe));
     if(SUCCEEDED(result))result=setString(PKEY_AppUserModel_RelaunchDisplayNameResource,QStringLiteral("@%1,-100").arg(exe));

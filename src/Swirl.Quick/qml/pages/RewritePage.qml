@@ -38,7 +38,7 @@ Item {
                         objectName:"rewriteEditor-"+modelData.kind
                         Layout.fillWidth:true; implicitHeight:Theme.dp(94); leftPadding:Theme.dp(12); rightPadding:Theme.dp(12); hoverEnabled:true
                         readonly property int ruleCount:captureProvider.rewriteRules.filter(rule=>rule.kind===modelData.kind).length
-                        background:Rectangle { radius:Theme.dp(10); color:editor.down?Theme.pressed:editor.hovered?Theme.hover:"transparent"; border.width:editor.visualFocus?Theme.borderWidth:0; border.color:Theme.accent; Rectangle { anchors.left:parent.left; anchors.right:parent.right; anchors.bottom:parent.bottom; height:Theme.borderWidth; color:Theme.separator } }
+                        background:SwirlControlSurface { radius:Theme.controlRadius; quiet:true; hovered:editor.hovered; pressed:editor.down; focused:editor.visualFocus; controlEnabled:editor.enabled; Rectangle { anchors.left:parent.left; anchors.right:parent.right; anchors.bottom:parent.bottom; height:Theme.borderWidth; color:Theme.separator } }
                         contentItem:RowLayout {
                             spacing:Theme.dp(18)
                             SwirlIcon { name:editor.modelData.icon; size:Theme.dp(24); color:Theme.accent }

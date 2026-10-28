@@ -228,12 +228,13 @@ Item {
                     anchors.fill:parent
                     transform:[Translate {y:recordRow.visualOffsetY},Scale {origin.x:recordRow.width/2;origin.y:recordRow.height/2;xScale:1-0.008*rowFeedback.contact;yScale:1-(1-SwirlMotion.pressScale)*rowFeedback.contact}]
                     radius:table.minimal?Theme.dp(10):0
-                    border.width:table.sectioned?Theme.dp(1):0
-                    border.color:Theme.withAlpha(table.rowActions!==null?Theme.text:Theme.focusBorder,rowFeedback.focusAmount)
+                    border.width:Theme.increaseContrast && table.sectioned?Theme.dp(1):0
+                    border.color:Theme.text
                     color:!recordRow.sectionRow&&table.selectedId===String(recordRow.record.id||recordRow.record.name) ? (table.minimal?(table.rowActions!==null?Theme.navigationSelected:Theme.withAlpha(Theme.accent,0.12)):Theme.selected) :
                           mouse.containsMouse ? (table.minimal?(table.rowActions!==null?Theme.hover:Theme.withAlpha(Theme.accent,0.055)):Theme.hover) : table.minimal?"transparent":(index%2?Theme.field:Theme.surface)
                     Behavior on color { enabled:!SwirlMotion.reduced;ColorAnimation { duration:SwirlMotion.hoverDuration } }
                     Rectangle { anchors.bottom:parent.bottom; width:parent.width; height:Theme.dp(1); color:Theme.border; opacity:table.fillEmptyRows||table.minimal?0:0.6 }
+                    Rectangle {anchors.fill:parent;radius:parent.radius;color:Theme.withAlpha(Theme.text,0.05);opacity:rowFeedback.focusAmount;visible:opacity>0;Accessible.ignored:true}
                     Row {
                         anchors.fill:parent
                         visible:!recordRow.sectionRow

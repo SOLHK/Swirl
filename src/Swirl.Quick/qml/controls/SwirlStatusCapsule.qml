@@ -27,12 +27,11 @@ SwirlMotionButton {
   opacity: control.enabled ? 1 : Theme.disabledOpacity
   readonly property color base: control.tone === "success" ? Theme.successSurface : Theme.capsuleSurface
   gradient: Gradient {
-   GradientStop { position: 0; color: control.enabled && control.down ? Theme.pressed : control.enabled && control.hovered ? Theme.surface : Theme.withAlpha(Theme.surface, 0.95); Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.hoverDuration } } }
-   GradientStop { position: 1; color: control.enabled && control.down ? Theme.pressed : control.enabled && control.hovered ? Qt.lighter(capsuleSurface.base, 1.02) : capsuleSurface.base; Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.hoverDuration } } }
+   GradientStop { position: 0; color: control.enabled && control.down ? Theme.pressed : control.enabled && control.visualFocus ? Qt.tint(Theme.surface,Theme.withAlpha(Theme.text,0.08)) : control.enabled && control.hovered ? Theme.surface : Theme.withAlpha(Theme.surface, 0.95); Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.hoverDuration } } }
+   GradientStop { position: 1; color: control.enabled && control.down ? Theme.pressed : control.enabled && control.visualFocus ? Qt.tint(capsuleSurface.base,Theme.withAlpha(Theme.text,0.08)) : control.enabled && control.hovered ? Qt.lighter(capsuleSurface.base, 1.02) : capsuleSurface.base; Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.hoverDuration } } }
   }
-  border.width: 1 / Screen.devicePixelRatio
-  border.color: control.enabled && control.visualFocus ? Theme.focusBorder : control.tone === "success" ? Theme.withAlpha(Theme.successText, 0.26) : Theme.withAlpha(Theme.text, control.enabled && control.hovered ? 0.25 : 0.16)
-  Behavior on border.color { ColorAnimation { duration: SwirlMotion.hoverDuration } }
+  border.width:Theme.increaseContrast ? 1 / Screen.devicePixelRatio : 0
+  border.color:Theme.text
  }
  HoverHandler { enabled: control.enabled; cursorShape: Qt.PointingHandCursor }
  TextMetrics { id: proxyLabelMetrics; font: caption.font; text: qsTr("系统代理 · 外部") }

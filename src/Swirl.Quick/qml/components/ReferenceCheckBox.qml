@@ -63,9 +63,8 @@ CheckBox {
             visible: control.checkState === Qt.PartiallyChecked
         }
         Rectangle {
-            anchors.fill: parent; anchors.margins: -Theme.dp(3)
-            visible:opacity>0;opacity:contact.focusAmount;color: "transparent"; radius: Theme.dp(6)
-            border.width: Theme.dp(2); border.color: Theme.focusBorder
+            anchors.fill: parent
+            visible:opacity>0;opacity:contact.focusAmount;color:Theme.withAlpha(Theme.text,0.12);radius:Theme.dp(4)
         }
     }
     contentItem: SwirlText {

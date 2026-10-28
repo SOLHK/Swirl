@@ -18,9 +18,9 @@ Rectangle {
     readonly property bool floating: material === "floating"
     radius: cornerRadius
     antialiasing: true
-    color: surfaceHidden ? "transparent" : independentCard ? (pressed ? Theme.cardPressed : interactive && hovered ? Theme.cardHover : Theme.independentCard) : Theme.material(material)
-    border.width: surfaceHidden ? 0 : focused || Theme.increaseContrast ? Theme.dp(2) : independentCard || selected ? 1 / Screen.devicePixelRatio : 0
-    border.color: selected || focused ? Theme.focusBorder : interactive && (hovered || pressed) ? Theme.cardHoverBorder : Theme.border
+    color: surfaceHidden ? "transparent" : independentCard ? (pressed || interactive && focused ? Theme.cardPressed : interactive && hovered ? Theme.cardHover : selected ? Theme.selected : Theme.independentCard) : Theme.material(material)
+    border.width: surfaceHidden ? 0 : Theme.increaseContrast ? Theme.dp(2) : independentCard ? 1 / Screen.devicePixelRatio : 0
+    border.color:Theme.increaseContrast ? Theme.text : Theme.border
     // Analytic background-only shadow: no offscreen capture of child text.
     RectangularShadow {
         anchors.fill: parent; z: -1

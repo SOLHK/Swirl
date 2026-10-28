@@ -146,8 +146,6 @@ FocusScope {
                         background: Rectangle {
                             color: Theme.withAlpha(Theme.accent, feedback.light * 0.09)
                             radius: Theme.controlRadius
-                            border.width: category.visualFocus ? Theme.borderWidth : 0
-                            border.color: Theme.focusBorder
                         }
                         contentItem: SwirlText {
                             text: category.text

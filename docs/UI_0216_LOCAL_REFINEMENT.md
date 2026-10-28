@@ -14,16 +14,18 @@ verification checks the actual settled title opacity and semantic foreground,
 including the existing shared-title handoff repair.
 
 The existing interaction system supplies a 70 ms press ingress, spring release,
-110 ms hover, 150 ms focus and a one-DIP lift with an expanding neutral rim.
+110 ms hover, 150 ms focus and a one-DIP lift with soft surface tint.
 Labels and icons follow the surface scale. Navigation, combo/menu items,
 segmented choices, switches, radio/checkbox controls, subscription dialogs and
 table rows use these shared states. Disabled navigation cannot retain hover
 color, and pooled rows finish old interaction state before reuse.
 
-Windows uses `assets/icons/swirl_windows.svg`, an optical variant retaining the
-horizontally open cloud-knot silhouette. Fuller side curls, compact upper/lower
-loops and consistent ribbon weight increase the painted subject area without
-stretching the whole mark. The application-scene logo remains canonical SVG.
+Windows uses `assets/icons/swirl_windows.svg`, preserving every original path
+and the original horizontally open cloud-knot proportions. Consistent optical
+ribbon weight improves the painted subject area and small-size clarity. No
+whole-mark stretch or reshaped curl changes the reference artwork. The
+application-scene logo remains canonical SVG. Buttons use filled hover/focus
+feedback, with no added normal-state interaction or focus outlines.
 All 18 native sizes are rendered by the same rasterizer for runtime QIcon and
 EXE ICO resources. The RC object explicitly depends on its generated ICO;
 previous target ordering alone allowed an old resource object to survive a
@@ -31,11 +33,13 @@ regenerated icon. `tools/Verify-WindowsIconResources.py` rejects any frame or
 EXE resource mismatch before package staging writes its manifest.
 
 The window publishes its explicit AppID and relaunch resources before first
-show. `Swirl-brand-0216-cloudknot.ico` gives the shell a distinct resource path.
+show. `Swirl-brand-0216-original-knot-v2.ico` gives the shell a distinct resource path.
 The installer repairs only existing Swirl shortcuts targeting that installation
 and notifies the shell. During investigation, correct native HICONs coexisted
-with the old taskbar group image; the owned shortcut update plus application
-relaunch was required before Explorer displayed the new artwork. No taskbar
+with the old taskbar group image. Item-only notifications retained that bitmap;
+after a verified owned shortcut save, `SHCNE_ASSOCCHANGED` invalidates the shell
+icon cache. Its completed notification followed by application relaunch was
+verified against actual taskbar pixels. No taskbar
 height, network setting, global icon-cache deletion or Explorer restart is part
 of this repair.
 
@@ -59,7 +63,8 @@ verification report, not to this implementation description.
 Primary platform references:
 [Qt application icons](https://doc.qt.io/qt-6.12/appicon.html),
 [Microsoft AppUserModelID](https://learn.microsoft.com/en-us/windows/win32/properties/props-system-appusermodel-id),
-and [taskbar relaunch icons](https://learn.microsoft.com/en-us/windows/win32/properties/props-system-appusermodel-relaunchiconresource).
+and [taskbar relaunch icons](https://learn.microsoft.com/en-us/windows/win32/properties/props-system-appusermodel-relaunchiconresource),
+plus [shell icon-cache notifications](https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shchangenotify).
 
 # Previous Activity and glass refinement
 

@@ -14,11 +14,13 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QSGRendererInterface>
+#include <QElapsedTimer>
+#include <QTimer>
 #include <memory>
 #include <functional>
 
 int runApecGlassChecks(QQuickWindow *window,const QString &output) {
-    QJsonArray checks;int failures=0;
+    QJsonArray checks;QJsonObject openingFailureDiagnostics;int failures=0;
     const auto check=[&](const char *name,bool passed){checks.append(QJsonObject{{"name",name},{"passed",passed}});if(!passed)++failures;qInfo()<<"APEC_GLASS_CHECK"<<name<<passed;};
     const auto eval=[&](const QString &code){QQmlExpression expression(qmlContext(window),window,code);auto value=expression.evaluate();if(expression.hasError()){qWarning()<<expression.error();check("qml-expression",false);}return value;};
     std::function<QQuickItem *(QQuickItem *,const QString &)> findVisual;
@@ -204,18 +206,45 @@ Item {
         entry->setProperty("glassSurface",QVariant::fromValue(window->findChild<QQuickItem *>("sidebarFloatingBackground")));
         QTest::qWait(180);
         check("hidden-opening-waits-for-visible-frame",!entry->property("entranceConsumed").toBool() && entry->property("progress").toDouble()==0);
+        QElapsedTimer openingClock;openingClock.start();QJsonArray openingSamples;int presentedFrames=0;
+        QObject openingContext;
+        const auto frameConnection=QObject::connect(window,&QQuickWindow::frameSwapped,&openingContext,[&]{++presentedFrames;});
+        QObject *entranceClock=nullptr;
+        for(auto *candidate:entry->findChildren<QObject *>())if(candidate->property("duration").isValid()&&candidate->property("property").toString()=="progress"){entranceClock=candidate;break;}
+        const auto sampleOpening=[&](const QString &phase){openingSamples.append(QJsonObject{
+            {"phase",phase},{"elapsedMs",openingClock.elapsed()},{"presentedFrames",presentedFrames},
+            {"progress",entry->property("progress").toDouble()},{"entering",entry->property("entering").toBool()},
+            {"presenting",entry->property("presenting").toBool()},{"entranceConsumed",entry->property("entranceConsumed").toBool()},
+            {"firstFramePresented",entry->property("firstFramePresented").toBool()},
+            {"animationClockFound",entranceClock!=nullptr},{"animationPaused",entranceClock&&entranceClock->property("paused").toBool()},
+            {"animationDurationMs",entranceClock?entranceClock->property("duration").toInt():-1},
+            {"windowVisible",window->isVisible()},{"windowVisibility",int(window->visibility())},
+            {"windowExposed",window->isExposed()},{"windowActive",window->isActive()}});};
+        QTimer openingObserver;openingObserver.setInterval(40);
+        QObject::connect(&openingObserver,&QTimer::timeout,window,[&]{sampleOpening("observed");});openingObserver.start();sampleOpening("before-show");
         entry->setVisible(true);window->update();
         check("visible-frame-starts-opening",QTest::qWaitFor([&]{return entry->property("entering").toBool();},1500));
         QTest::qWait(120);
-        const auto early=grab(entry);QTest::qWait(800);const auto middle=grab(entry);
+        const auto early=grab(entry);sampleOpening("early-capture");QTest::qWait(800);const auto middle=grab(entry);sampleOpening("middle-capture");
         check("native-opening-frames-progress",!early.isNull() && !middle.isNull() && early!=middle && entry->property("entering").toBool());
-        check("native-opening-completes",QTest::qWaitFor([&]{return !entry->property("entering").toBool();},3000));
+        const bool openingCompletes=QTest::qWaitFor([&]{return !entry->property("entering").toBool();},3000);
+        sampleOpening("completion-deadline");check("native-opening-completes",openingCompletes);
         const auto settled=grab(entry);QTest::qWait(80);const auto resting=grab(entry);
-        check("native-wing-is-pixel-static-at-rest",!settled.isNull() && settled==resting);
+        const bool staticAtRest=!settled.isNull()&&settled==resting;
+        check("native-wing-is-pixel-static-at-rest",staticAtRest);
         early.save(directory+"/wing-entry-early.png");middle.save(directory+"/wing-entry-middle.png");settled.save(directory+"/wing-entry-settled.png");
         entry->setVisible(false);QTest::qWait(35);
         entry->setVisible(true);QTest::qWait(35);
-        check("native-return-does-not-replay-opening",!entry->property("entering").toBool() && grab(entry)==settled);
+        const bool returnDoesNotReplay=!entry->property("entering").toBool()&&grab(entry)==settled;
+        check("native-return-does-not-replay-opening",returnDoesNotReplay);
+        openingObserver.stop();sampleOpening("return-capture");QObject::disconnect(frameConnection);
+        if(!openingCompletes||!staticAtRest||!returnDoesNotReplay){
+            const auto capturePath=directory+"/wing-entry-failure-window.png";
+            const bool captureSaved=window->grabWindow().save(capturePath);
+            openingFailureDiagnostics={{"nominalDurationMs",eval("SwirlMotion.ms(2100)").toInt()},{"motionSpeed",eval("SwirlMotion.speed").toDouble()},
+                {"windowCaptureSaved",captureSaved},{"windowCapture",capturePath},{"samples",openingSamples}};
+            qInfo()<<"APEC_WING_OPENING_FAILURE"<<QJsonDocument(openingFailureDiagnostics).toJson(QJsonDocument::Compact);
+        }
     }
     owner.reset();entryOwner.reset();
     QQmlComponent featherComponent(qmlEngine(window));
@@ -285,6 +314,6 @@ Item {
         }
     }
     QFile file(output);if(!file.open(QIODevice::WriteOnly))return 2;
-    file.write(QJsonDocument(QJsonObject{{"checks",checks},{"failures",failures},{"qtVersion",qVersion()},{"devicePixelRatio",window->devicePixelRatio()},{"graphicsApi",int(window->rendererInterface()->graphicsApi())},{"scope","Native app-source pixel readback and controlled DPR; not desktop sampling, physical refresh, mixed-monitor DPI or private-network acceptance"}}).toJson());
+    file.write(QJsonDocument(QJsonObject{{"checks",checks},{"failures",failures},{"openingFailureDiagnostics",openingFailureDiagnostics},{"qtVersion",qVersion()},{"devicePixelRatio",window->devicePixelRatio()},{"graphicsApi",int(window->rendererInterface()->graphicsApi())},{"scope","Native app-source pixel readback and controlled DPR; not desktop sampling, physical refresh, mixed-monitor DPI or private-network acceptance"}}).toJson());
     return failures?1:0;
 }

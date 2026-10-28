@@ -39,7 +39,7 @@ ColumnLayout {
                     SwirlText {width:parent.width;text:"连接让世界更近  Swirl 0123456789";font.family:fontRow.modelData;font.pixelSize:Theme.fontSize(16);color:Theme.text;elide:Text.ElideRight}
                 }
                 SwirlInteractionMotion { id:fontFeedback; hovered:fontRow.hovered; pressed:fontRow.down; focused:fontRow.visualFocus; controlEnabled:fontRow.enabled }
-                background:Rectangle { radius:Theme.controlRadius; color:fontManager.previewFamily===fontRow.modelData?Theme.withAlpha(Theme.accent,0.09):Theme.withAlpha(Theme.accent,fontFeedback.light*0.07); border.width:fontRow.visualFocus?Theme.borderWidth:0; border.color:Theme.focusBorder }
+                background:Rectangle { radius:Theme.controlRadius; color:fontManager.previewFamily===fontRow.modelData?Theme.withAlpha(Theme.accent,0.09):Theme.withAlpha(Theme.accent,fontFeedback.light*0.07) }
                 Accessible.name:modelData
             }
             SwirlText { anchors.centerIn:parent; visible:fontList.count===0; text:"没有匹配的字体，可导入本地字体文件"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }

@@ -29,9 +29,8 @@ Switch {
             Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.switchDuration } }
         }
         Rectangle {
-            anchors.fill: parent; anchors.margins: -Theme.dp(3)
-            visible:opacity>0;opacity:feedback.focusAmount;color: "transparent"; radius: height / 2
-            border.width: Theme.dp(2); border.color: Theme.focusBorder
+            anchors.fill: parent
+            visible:opacity>0;opacity:feedback.focusAmount;color:Theme.withAlpha(Theme.text,0.12);radius:height/2
         }
     }
     contentItem: Item {}
