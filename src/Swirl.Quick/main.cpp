@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
     // when the optional SVG QIcon plugin is missing and avoids the old wind logo.
     QSvgRenderer brand(QStringLiteral(":/swirl/icons/swirl_knot_mark_light.svg"));
     QIcon icon;
-    for(int size:{16,20,24,32,40,48,64,128,256}) {
+    for(int size:swirlBrandIconSizes) {
         icon.addPixmap(QPixmap::fromImage(swirlBrandRaster(brand,size)));
     }
     app.setWindowIcon(icon);
