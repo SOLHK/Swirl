@@ -1,4 +1,12 @@
-# Current 0.2.16 neutral theme and feather interaction (2026-10-28)
+# Current 0.2.16 interaction and Windows icon repair (2026-10-28)
+
+- Continue `work/swirl-0216-interaction-icon-20261028` from `f895801`; keep main and other worktrees untouched. Keep version 0.2.16.
+- Preserve neutral surfaces, APEC feathers, floating glass sidebar and current page/card geometry. Scope includes shared button sizing, interruption-safe input feedback, Activity affordances and native Windows icon resources/shortcuts. Do not change the Rust Core or proxy/routing ownership behavior.
+- Use the dedicated Windows optical SVG for both runtime QIcon and generated EXE ICO; in-app brand artwork remains unchanged. Keep all 18 native frames and the versioned shortcut icon filename aligned with staging.
+- Verify actual native input and taskbar pixels. Distinguish controlled Qt DPR renders from Windows shell/physical-DPI acceptance. Do not change the host proxy, TUN, routes, DNS, taskbar height or system scale to improve apparent results.
+- Deliver a production installer without UI test entry points and record exact-source EXE/DLL identities, tests, failed attempts and remaining acceptance gaps.
+
+# Previous 0.2.16 neutral theme and feather interaction (2026-10-28)
 
 - Work on `work/swirl-0216-neutral-wings-20261028`, based on `39a1b91`; keep other worktrees and `main` untouched. This request supersedes the historical navy palette and Activity-only wing entrance below.
 - Preserve the current layout, floating sidebar contours, features and Rust Core. Restrict production changes to shared QML theme, cards, scene decoration and glass shaders; do not change routing, protocol or system-proxy ownership logic.

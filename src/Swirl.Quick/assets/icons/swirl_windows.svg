@@ -1,0 +1,41 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Swirl — Windows optical knot</title>
+  <desc>Windows optical master: the cloud-knot opens horizontally with fuller side curls and compact crown and return loops. All five passages gain optical weight together, balancing the horizontal curls, vertical loops and internal counters. No whole-mark stretching, backdrop tile or clipping.</desc>
+  <defs>
+    <linearGradient id="warm" gradientUnits="userSpaceOnUse" x1="135" y1="575" x2="510" y2="405">
+      <stop offset="0" stop-color="#F5A04D" />
+      <stop offset="0.38" stop-color="#F47C51" />
+      <stop offset="0.78" stop-color="#EC5260" />
+      <stop offset="1" stop-color="#D93962" />
+    </linearGradient>
+    <linearGradient id="crown" gradientUnits="userSpaceOnUse" x1="365" y1="315" x2="594" y2="559">
+      <stop offset="0" stop-color="#20B7D0" />
+      <stop offset="0.42" stop-color="#188FD2" />
+      <stop offset="1" stop-color="#285DD3" />
+    </linearGradient>
+    <linearGradient id="forward" gradientUnits="userSpaceOnUse" x1="444" y1="562" x2="827" y2="538">
+      <stop offset="0" stop-color="#285DD3" />
+      <stop offset="0.43" stop-color="#168DCB" />
+      <stop offset="0.78" stop-color="#099DC2" />
+      <stop offset="1" stop-color="#20AE9B" />
+    </linearGradient>
+    <linearGradient id="return" gradientUnits="userSpaceOnUse" x1="342" y1="636" x2="546" y2="775">
+      <stop offset="0" stop-color="#098CAF" />
+      <stop offset="0.51" stop-color="#12A39C" />
+      <stop offset="1" stop-color="#3CAA79" />
+    </linearGradient>
+    <linearGradient id="heart" gradientUnits="userSpaceOnUse" x1="442" y1="706" x2="531" y2="644">
+      <stop offset="0" stop-color="#1BAA9E" />
+      <stop offset="0.58" stop-color="#099DC2" />
+      <stop offset="1" stop-color="#287CCB" />
+    </linearGradient>
+  </defs>
+  <g id="symbol" transform="translate(136 225.43) scale(1.016216216) translate(-117 -263)">
+    <path id="warm-current" fill="url(#warm)" stroke="url(#warm)" stroke-width="18" stroke-linejoin="round" d="M 530 401 C 516 380 493 369 473 371 C 445 371 420 392 419 416 C 416 433 430 449 446 447 C 461 446 470 433 465 422 L 460 415 C 477 405 499 429 496 447 C 492 477 459 501 430 499 C 400 499 401.712 471.797 399.222 443.5 C 373.6 385.5 330.7 386.8 299.5 392 C 208.5 395.9 137 464.8 135.7 549.3 C 130.5 623.4 191.6 681.9 265.7 679.3 C 332 680.6 382.7 633.8 382.7 577.9 C 386.6 540.2 361.9 515.5 330.7 515.5 C 303.4 515.5 289.1 535 294.3 555.8 C 298.2 571.4 311.2 577.9 322.9 571.4 C 325.5 585.7 308.6 607.8 281.3 611.7 C 246.2 618.2 208.5 589.6 208.5 548 C 208.5 501.2 252.7 460.9 298.2 457 C 348.9 449.2 376.2 464.8 395.453 495.5 L 401.481 529.627 C 424 571 491 533 521 497 C 550 458 544 426 530 401 Z" />
+    <path id="return-current" fill="url(#return)" stroke="url(#return)" stroke-width="18" stroke-linejoin="round" d="M389 576 C340 607 307 648.7 312 708.1 C308 787.9 375 852.9 451 852.9 C523 854.9 581 807.6 595 729.9 C598 709.6 599 688 588 678 L563 664 C558 663 555 667 555 675 C559 746.4 511 801.7 455 801 C405 801 364 763.5 364 704.1 C362 655.4 393 622 431 606 L459 596 C442 584 426 575 414 567 C406 565 400 571 389 576 Z" />
+    <path id="crown-current" fill="url(#crown)" stroke="url(#crown)" stroke-width="18" stroke-linejoin="round" d="M402 261.5 C352 292 324 337.3 324 397.5 C322 420.5 328 439 337 446 L370 465 C376 467 377 459 373 451 C361 421.4 364 377.9 380 349 C404 310.4 437 291.9 477 291.9 C542 288.9 599 342.1 599 425.3 C604 481 575 524 530 555 C529 560 552 572 569 585 C621 549 653 498 650 429.3 C657 337.9 606 270.6 548 252 C499 228 446 236.6 402 261.5 Z" />
+    <path id="forward-current" fill="url(#forward)" stroke="url(#forward)" stroke-width="18" stroke-linejoin="round" d="M 844.45 597.95 C 857.95 503.45 779.65 431.9 700 437.3 C 625.75 431.9 597.55 480.202 597.896 543.65 C 597.719 580.062 604.394 626.525 635.2 624.95 C 663.55 624.95 678.4 588.5 663.55 573.65 C 654.1 561.5 641.95 561.5 633.85 566.9 C 619 545.3 640.6 515.6 668.95 506.15 C 709.45 487.25 749.95 515.6 766.15 552.05 C 790.45 607.4 751.3 660.05 705.4 681.65 C 648.7 715.4 601 687.68 596.659 636.866 L 522 563 C 508 554 494 545 480 539 C 462 548 443 552 421 557 C 417 558 420 562 429 566 L 471 591 C 521 625 570 662 597.621 687.532 C 599.631 756.215 658.15 772.1 709.45 753.2 C 790.45 724.85 837.7 662.75 844.45 597.95 Z" />
+    <path id="heart-current" fill="url(#heart)" stroke="url(#heart)" stroke-width="18" stroke-linejoin="round" d="M549 653 L514 630 C502 649 484 668 467 676 C478 663 468 649 454 650 C434 648 422 669 425 685 C429 712 450 721 471 718 C505 716 536 683 549 653 Z" />
+  </g>
+</svg>

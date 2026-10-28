@@ -1,4 +1,4 @@
-﻿!include "MUI2.nsh"
+!include "MUI2.nsh"
 !include "FileFunc.nsh"
 Unicode true
 SetCompressor /SOLID lzma
@@ -167,26 +167,26 @@ Section "安装 Swirl"
     Goto install_done
     regular:
     CreateDirectory "$SMPROGRAMS\\Swirl"
-    CreateShortCut "$SMPROGRAMS\\Swirl\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-phase3-v2.ico" 0
+    CreateShortCut "$SMPROGRAMS\\Swirl\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-0216-cloudknot.ico" 0
     !if /FileExists "${APP_DIST}\SwirlCodexLauncher.exe"
-    CreateShortCut "$SMPROGRAMS\\Swirl\\通过 Swirl 启动 Codex.lnk" "$INSTDIR\\SwirlCodexLauncher.exe" "" "$INSTDIR\\Swirl-brand-phase3-v2.ico" 0
+    CreateShortCut "$SMPROGRAMS\\Swirl\\通过 Swirl 启动 Codex.lnk" "$INSTDIR\\SwirlCodexLauncher.exe" "" "$INSTDIR\\Swirl-brand-0216-cloudknot.ico" 0
     !endif
-    CreateShortCut "$DESKTOP\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-phase3-v2.ico" 0
-    ExecWait '"$INSTDIR\SwirlProxyGuard.exe" --repair-shortcut "$DESKTOP\Swirl.lnk" "$INSTDIR\Swirl.exe" "$INSTDIR\Swirl-brand-phase3-v2.ico"' $0
+    CreateShortCut "$DESKTOP\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-0216-cloudknot.ico" 0
+    ExecWait '"$INSTDIR\SwirlProxyGuard.exe" --repair-shortcut "$DESKTOP\Swirl.lnk" "$INSTDIR\Swirl.exe" "$INSTDIR\Swirl-brand-0216-cloudknot.ico"' $0
     StrCmp $0 0 +2
     DetailPrint "Swirl 桌面快捷方式属性更新失败，错误 $0。"
-    ExecWait '"$INSTDIR\SwirlProxyGuard.exe" --repair-shortcut "$SMPROGRAMS\Swirl\Swirl.lnk" "$INSTDIR\Swirl.exe" "$INSTDIR\Swirl-brand-phase3-v2.ico"' $0
+    ExecWait '"$INSTDIR\SwirlProxyGuard.exe" --repair-shortcut "$SMPROGRAMS\Swirl\Swirl.lnk" "$INSTDIR\Swirl.exe" "$INSTDIR\Swirl-brand-0216-cloudknot.ico"' $0
     StrCmp $0 0 +2
     DetailPrint "Swirl 开始菜单快捷方式属性更新失败，错误 $0。"
     WriteRegStr HKCU "Software\\Swirl" "InstallDir" "$INSTDIR"
-    ExecWait '"$INSTDIR\SwirlProxyGuard.exe" --repair-owned-pins "$INSTDIR\Swirl.exe" "$INSTDIR\Swirl-brand-phase3-v2.ico"' $0
+    ExecWait '"$INSTDIR\SwirlProxyGuard.exe" --repair-owned-pins "$INSTDIR\Swirl.exe" "$INSTDIR\Swirl-brand-0216-cloudknot.ico"' $0
     StrCmp $0 0 +2
     DetailPrint "Swirl 任务栏图标刷新未完成，错误 $0。"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayName" "Swirl"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayVersion" "${APP_VERSION}.0"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "InstallLocation" "$INSTDIR"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "UninstallString" '"$INSTDIR\\卸载 Swirl.exe"'
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayIcon" "$INSTDIR\\Swirl-brand-phase3-v2.ico"
+    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayIcon" "$INSTDIR\\Swirl-brand-0216-cloudknot.ico"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "Publisher" "Swirl"
     WriteRegDWORD HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "NoModify" 1
     WriteRegDWORD HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "NoRepair" 1

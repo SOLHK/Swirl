@@ -21,6 +21,9 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <shobjidl.h>
+#include <propkey.h>
+#include <propvarutil.h>
+#include <QDir>
 #endif
 #include <QTimer>
 #include <QQuickWindow>
@@ -84,6 +87,32 @@
 #include "engine/ThreadedEngine.h"
 #include "engine/EngineController.h"
 
+#ifdef Q_OS_WIN
+static void configureTaskbarIdentity(QQuickWindow *window)
+{
+    IPropertyStore *store=nullptr;
+    HRESULT result=SHGetPropertyStoreForWindow(reinterpret_cast<HWND>(window->winId()),IID_PPV_ARGS(&store));
+    if(FAILED(result)){qWarning()<<"Taskbar property store unavailable"<<quint32(result);return;}
+    const auto setString=[&](const PROPERTYKEY &key,const QString &text){
+        PROPVARIANT value{};
+        HRESULT status=InitPropVariantFromString(reinterpret_cast<LPCWSTR>(text.utf16()),&value);
+        if(SUCCEEDED(status))status=store->SetValue(key,value);
+        PropVariantClear(&value);
+        return status;
+    };
+    const auto exe=QDir::toNativeSeparators(QCoreApplication::applicationFilePath());
+    // A process AppID alone lets Explorer reuse an older registered shortcut's
+    // group icon. Publish this window's own resources before its explicit ID.
+    const auto iconPath=QDir::toNativeSeparators(QCoreApplication::applicationDirPath()+QStringLiteral("/Swirl-brand-0216-cloudknot.ico"));
+    result=setString(PKEY_AppUserModel_RelaunchIconResource,iconPath+QStringLiteral(",0"));
+    if(SUCCEEDED(result))result=setString(PKEY_AppUserModel_RelaunchCommand,QStringLiteral("\"%1\"").arg(exe));
+    if(SUCCEEDED(result))result=setString(PKEY_AppUserModel_RelaunchDisplayNameResource,QStringLiteral("@%1,-100").arg(exe));
+    if(SUCCEEDED(result))result=setString(PKEY_AppUserModel_ID,QStringLiteral("SOLHK.Swirl.Desktop"));
+    store->Release();
+    if(FAILED(result))qWarning()<<"Taskbar identity publication failed"<<quint32(result);
+}
+#endif
+
 // Collect Qt/QML diagnostics in a file because the Windows GUI subsystem
 // does not attach stderr to GitHub Actions' PowerShell console.
 static void recordQtDiagnostic(QtMsgType type, const QMessageLogContext &, const QString &message)
@@ -144,9 +173,13 @@ int main(int argc, char *argv[])
     }
 #endif
 #endif
-    // Rasterize the canonical mark at every Windows icon size. This works even
+    // Rasterize the square optical master at every Windows icon size. This works even
     // when the optional SVG QIcon plugin is missing and avoids the old wind logo.
+#ifdef Q_OS_WIN
+    QSvgRenderer brand(QStringLiteral(":/swirl/icons/swirl_windows.svg"));
+#else
     QSvgRenderer brand(QStringLiteral(":/swirl/icons/swirl_knot_mark_light.svg"));
+#endif
     QIcon icon;
     for(int size:swirlBrandIconSizes) {
         icon.addPixmap(QPixmap::fromImage(swirlBrandRaster(brand,size)));
@@ -345,6 +378,10 @@ int main(int argc, char *argv[])
         return 1;
     auto *rootWindow = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
     if(rootWindow)rootWindow->setIcon(icon);
+#ifdef Q_OS_WIN
+    if(rootWindow)configureTaskbarIdentity(rootWindow);
+#endif
+    if(rootWindow)rootWindow->show();
     std::unique_ptr<ShutdownCoordinator> shutdown;
     if(rootWindow && (lifecycleTest || (!isolatedRun && !appearanceTest))) {
         app.setQuitOnLastWindowClosed(false);

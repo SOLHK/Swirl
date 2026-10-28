@@ -148,7 +148,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
         const auto previous=SelectObject(dc,bitmap);RECT box{0,0,size,size};FillRect(dc,&box,reinterpret_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
         DrawIconEx(dc,0,0,nativeIcon,size,size,0,nullptr,DI_NORMAL);
         QImage image(static_cast<uchar *>(bits),size,size,QImage::Format_RGB32);
-        QSvgRenderer canonical(QStringLiteral(":/swirl/icons/swirl_knot_mark_light.svg"));
+        QSvgRenderer canonical(QStringLiteral(":/swirl/icons/swirl_windows.svg"));
         QImage reference(size,size,QImage::Format_RGB32);reference.fill(Qt::white);
         {QPainter painter(&reference);painter.drawImage(QPoint(),swirlBrandRaster(canonical,size));}
         int maximumError=0,warm=0,cool=0,green=0;qint64 totalError=0;

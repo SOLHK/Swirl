@@ -17,7 +17,8 @@ ApplicationWindow {
     // without text entering another texture. Clarity takes priority until that
     // path can operate per primitive. HDR capability/readback remains available
     // in the dedicated test renderer; no foreground postprocessing is applied.
-    visible:true
+    // The native bootstrap publishes the taskbar resources before first show.
+    visible:false
     width:Theme.windowDefaultWidth; height:Theme.windowDefaultHeight
     // Qt Quick reports logical dimensions and handles each QScreen's device
     // pixel ratio. Manual sizing is applied to design metrics, not a scene transform.

@@ -233,6 +233,7 @@ qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_light.svg"
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_dark.svg"
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_light.svg"
+    "${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_dark.svg"
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_mono_light.svg"
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_mono_dark.svg"
@@ -472,7 +473,8 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
    ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
   add_test(NAME swirl-hero COMMAND Swirl --hero-test --hero-output=hero-evidence)
   add_test(NAME swirl-navigation-ui COMMAND Swirl --navigation-test --navigation-output=navigation-evidence --hero-no-recording)
-  set_tests_properties(swirl-navigation-ui PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  # Includes canceled native input, focus and pixel evidence for 17 page controls.
+  set_tests_properties(swirl-navigation-ui PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
   set_tests_properties(swirl-hero PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
  endif()
  set_tests_properties(swirl-motion PROPERTIES TIMEOUT 120
@@ -499,17 +501,24 @@ if(WIN32)
   OUTPUT "${SWIRL_GENERATED_ICON}"
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/brand"
   COMMAND $<TARGET_FILE:SwirlIconBuilder>
-          "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_light.svg"
+          "${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
           "${SWIRL_GENERATED_ICON}"
-  DEPENDS SwirlIconBuilder app/BrandRaster.h "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_light.svg"
+  DEPENDS SwirlIconBuilder app/BrandRaster.h "${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
   COMMENT "Generate Windows ICO from Swirl SVG"
   VERBATIM
  )
  add_custom_target(swirl-generate-icon DEPENDS "${SWIRL_GENERATED_ICON}")
  add_dependencies(Swirl swirl-generate-icon)
+ add_custom_command(TARGET Swirl POST_BUILD
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_GENERATED_ICON}"
+          "${CMAKE_CURRENT_BINARY_DIR}/Swirl-brand-0216-cloudknot.ico"
+  VERBATIM)
  configure_file(app/Swirl.rc.in "${CMAKE_CURRENT_BINARY_DIR}/Swirl.rc" @ONLY)
+ # RC includes the generated ICO by path; Ninja does not discover that input.
+ set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/Swirl.rc" PROPERTIES
+  OBJECT_DEPENDS "${SWIRL_GENERATED_ICON}")
  target_sources(Swirl PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/Swirl.rc")
- target_link_libraries(Swirl PRIVATE dwmapi advapi32 psapi shell32)
+ target_link_libraries(Swirl PRIVATE dwmapi advapi32 psapi shell32 propsys shlwapi)
 endif()
 
 foreach(runtime_target IN ITEMS SwirlProxyGuard SwirlExtensionTests SwirlTelemetryTests

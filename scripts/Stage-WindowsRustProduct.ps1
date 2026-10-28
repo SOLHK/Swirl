@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory=$true)][string]$BuildDirectory,
     [Parameter(Mandatory=$true)][string]$Destination,
-    [string]$Configuration = 'Release'
+    [string]$Configuration = 'Release',
+    [string]$Python = 'python'
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -51,7 +52,7 @@ foreach ($name in $files) { Copy-Item -LiteralPath (Join-Path $bin $name) -Desti
 Copy-Item -LiteralPath (Join-Path $repo 'src/Swirl.Quick/packaging/licenses') -Destination $stage -Recurse
 Copy-Item -LiteralPath (Join-Path $repo 'src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt') -Destination $stage
 Copy-Item -LiteralPath (Join-Path $repo 'src/Swirl.Quick/packaging/README-RustProductPreview.txt') -Destination (Join-Path $stage 'README.txt')
-foreach ($name in @('Swirl-brand-phase3.ico','Swirl-brand-phase3-v2.ico')) {
+foreach ($name in @('Swirl-brand-phase3.ico','Swirl-brand-0216-cloudknot.ico')) {
     Copy-Item -LiteralPath (Join-Path $build 'brand/Swirl.ico') -Destination (Join-Path $stage $name)
 }
 & windeployqt --release --compiler-runtime --qmldir (Join-Path $repo 'src/Swirl.Quick/qml') (Join-Path $stage 'Swirl.exe')
@@ -77,6 +78,11 @@ $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
 if (-not $report.success -or -not $report.http_response_verified -or
     -not $report.socks5_response_verified -or -not $report.connect_response_verified -or
     -not $report.listener_released) { throw 'Not all required native roundtrips passed.' }
+# Python is an existing build-host dependency; no interpreter is shipped.
+& $Python (Join-Path $repo 'tools/Verify-WindowsIconResources.py') `
+    --ico (Join-Path $build 'brand/Swirl.ico') --exe (Join-Path $stage 'Swirl.exe') `
+    --output (Join-Path $build 'icon-resource-verification.json')
+if ($LASTEXITCODE -ne 0) { throw 'Packaged EXE icon resources differ from the generated 18-frame ICO.' }
 $manifest = [ordered]@{ schema=1; source_sha=$sourceSha; rust=$expected; files=@() }
 foreach ($file in (Get-ChildItem -LiteralPath $stage -Recurse -File | Sort-Object FullName)) {
     # Windows PowerShell 5.1 lacks Path.GetRelativePath. All entries were
