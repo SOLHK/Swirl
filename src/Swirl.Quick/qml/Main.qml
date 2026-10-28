@@ -95,6 +95,7 @@ ApplicationWindow {
         SwirlWorkspaceBackdrop {
             id:appSceneBackdrop
             anchors.fill:parent;targetWindow:window
+            glassSurface:sidebar.glassSurface;glassSampled:sidebar.glassSampled
         }
 
         MouseArea {
@@ -107,7 +108,7 @@ ApplicationWindow {
             onPositionChanged:mouse=>{ if(pressed&&(pressedButtons&Qt.LeftButton)&&!nativeMoveStarted&&Math.hypot(mouse.x-pressPosition.x,mouse.y-pressPosition.y)>Qt.styleHints.startDragDistance){nativeMoveStarted=true;window.startSystemMove()} }
             onDoubleClicked:window.visibility===Window.Maximized ? window.showNormal() : window.showMaximized()
         }
-        SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false;backdropSource:appSceneBackdrop }
+        SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false;backdropSource:appSceneBackdrop.decorationSource }
         SwirlWindowControls {
             id:windowControls;objectName:"windowControls";z:70
             anchors.right:parent.right;anchors.rightMargin:Theme.dp(5);y:Theme.dp(5)

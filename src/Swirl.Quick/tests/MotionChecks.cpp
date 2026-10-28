@@ -426,6 +426,25 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         check("activity-apec-normal-viewport-retains-bounded-vertical-reading",window->size()==normalSize&&eval("pageLoader.item.wide").toBool()
             &&contentHeight>0&&activityScroll->property("contentWidth").toDouble()<=activityScroll->width()+1
             &&trafficAt.x()>=0&&diagnosticAt.x()+diagnostic->width()<=activity->width()+1);
+        const auto inside=[&](QQuickItem *region){
+            if(!region||!region->isVisible()||region->width()<=0||region->height()<=0)return false;
+            const auto bounds=region->mapRectToItem(activityScroll,QRectF(QPointF(),region->size()));
+            return bounds.left()>=-1 && bounds.top()>=-1 && bounds.right()<=activityScroll->width()+1 && bounds.bottom()<=activityScroll->height()+1;
+        };
+        auto *sourceSection=findVisual(activity,"activitySourceSection");
+        const auto actualRanks=activity->property("ranks");
+        // Geometry-only rows exercise the populated layout without publishing
+        // measured traffic or inserting records into the real telemetry store.
+        eval("pageLoader.item.ranks=[{name:'Layout row A',value:'1 KiB',kind:'apps'},{name:'Layout row B',value:'2 KiB',kind:'apps'},{name:'Layout row C',value:'3 KiB',kind:'devices'}]");
+        for(const auto size:{QSize(760,672),QSize(914,672),QSize(1100,760)}){
+            window->resize(qRound(eval(QString("Theme.dp(%1)").arg(size.width())).toDouble()),qRound(eval(QString("Theme.dp(%1)").arg(size.height())).toDouble()));wait(180);
+            check("activity-one-screen-"+QString::number(size.width()),activityScroll->property("contentHeight").toDouble()<=activityScroll->height()+1
+                &&inside(trafficCard)&&inside(diagnostic)&&inside(sourceSection)&&inside(connections));
+            qInfo()<<"ACTIVITY_FEEDBACK_VIEWPORT"<<window->size()<<activityScroll->size()<<activityScroll->property("contentHeight")
+                   <<trafficCard->size()<<diagnostic->size()<<(sourceSection?sourceSection->size():QSizeF())<<connections->size();
+        }
+        activity->setProperty("ranks",actualRanks);
+        window->resize(normalSize);wait(180);
         const auto revealControl=[&](QQuickItem *control){
             if(!control)return false;
             const auto top=control->mapToItem(activityScroll,0,0).y(),bottom=top+control->height();
@@ -465,6 +484,18 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             check("activity-v7-month-filter-switches-period",eval("pageLoader.item.period===1").toBool()&&periodFilter->property("currentIndex").toInt()==1);
             clickSegment(periodFilter,0,2);
             check("activity-v7-today-filter-restores-period",eval("pageLoader.item.period===0").toBool()&&periodFilter->property("currentIndex").toInt()==0);
+        }
+        auto *policyLink=findVisual(activity,"activityPolicyShortcut");
+        check("activity-policy-entry-is-visible",policyLink&&inside(policyLink)&&policyLink->isEnabled());
+        if(policyLink){
+            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,policyLink->mapToScene(QPointF(policyLink->width()/2,policyLink->height()/2)).toPoint());wait(85);
+            auto *title=window->findChild<QObject *>("pageHeroTitle");
+            check("activity-policy-title-follows-wing-trajectory",eval("AppState.currentPage==='policies'").toBool()&&title&&title->property("moving").toBool()&&title->property("arcOffset").toDouble()<-.01);
+            eval("AppState.goBack()");settle();
+            check("activity-policy-return-restores-page",item()==activity);
+            policyLink->forceActiveFocus();QTest::keyClick(window,Qt::Key_Space);settle();
+            check("activity-policy-entry-supports-keyboard",eval("AppState.currentPage==='policies'").toBool());
+            eval("AppState.goBack()");settle();
         }
         window->resize(originalSize);wait(250);
     }

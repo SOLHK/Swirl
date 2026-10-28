@@ -12,11 +12,10 @@ layout(std140,binding=0) uniform buf {
     float refraction;
     float interaction;
     vec2 lightPoint;
-    vec4 tintColor;
-    float tintAmount;
     float darkMode;
 };
 layout(binding=1) uniform sampler2D source;
+layout(binding=2) uniform sampler2D sharpSource;
 float distanceToSurface(vec2 p){
     float r=min(cornerRadius,min(surfaceSize.x,surfaceSize.y)*.5);
     vec2 q=abs(p-surfaceSize*.5)-surfaceSize*.5+r;
@@ -34,7 +33,8 @@ void main(){
     vec2 extent=surfaceSize+2.*padding;
     // A padded capture prevents the refracted rim from sampling outside the
     // real app scene crop. Refraction is at most a few logical pixels.
-    vec2 uv=(p+padding-normal*edge*edge*refraction*(1.+.3*interaction))/extent;
+    float lens=4.*edge*(1.-edge);
+    vec2 uv=(p+padding-normal*lens*refraction*(1.+.3*interaction))/extent;
     // Horizontal Gaussian is prepared in one panel-sized texture. This
     // vertical pass also performs refraction, tint and rim lighting. Closely
     // spaced weighted taps avoid hard bands at high-contrast source edges.
@@ -44,15 +44,18 @@ void main(){
     blur+=(sampleSafe(uv+2.*s)+sampleSafe(uv-2.*s))*.121622;
     blur+=(sampleSafe(uv+3.*s)+sampleSafe(uv-3.*s))*.054054;
     blur+=(sampleSafe(uv+4.*s)+sampleSafe(uv-4.*s))*.016216;
-    vec3 transmitted=blur.rgb/max(.001,blur.a);
-    vec3 color=mix(transmitted,tintColor.rgb,tintAmount);
+    // The shared window material is already below this texture. Preserve the
+    // decoration's premultiplied alpha instead of adding a second opaque base.
+    // At the boundary both displacement and blur reach zero: one continuous wing.
+    vec4 color=mix(texture(sharpSource,(p+padding)/extent),blur,smoothstep(0.,8.,-d));
     float facing=max(0.,dot(normal,normalize(vec2(-.65,-1.))));
     float rim=exp(-max(0.,-d)*1.25)*facing;
     float localLight=exp(-dot((qt_TexCoord0-lightPoint)*vec2(1.,2.),(qt_TexCoord0-lightPoint)*vec2(1.,2.))*8.);
     // Directional highlights and a restrained opposite reflection, not a
     // uniform white outline. They move only with real interaction state.
-    color+=vec3(.82,.94,1.)*rim*(.24+.24*interaction*localLight);
-    color-=vec3(.08,.12,.18)*edge*edge*(1.-facing)*mix(.09,.20,darkMode);
-    float alpha=mask*qt_Opacity;
-    fragColor=vec4(clamp(color,0.,1.)*alpha,alpha);
+    float highlight=rim*(.16+.18*interaction*localLight);
+    color=vec4(vec3(.88,.96,1.)*highlight,highlight)+color*(1.-highlight);
+    float reflection=edge*edge*(1.-facing)*mix(.015,.045,darkMode);
+    color=vec4(vec3(.08,.12,.18)*reflection,reflection)+color*(1.-reflection);
+    fragColor=color*(mask*qt_Opacity);
 }

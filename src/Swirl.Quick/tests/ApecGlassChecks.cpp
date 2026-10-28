@@ -28,6 +28,38 @@ int runApecGlassChecks(QQuickWindow *window,const QString &output) {
     // cache bypasses prepareShaderCode on later instances, leaving their
     // manager's status at Uncompiled despite successful native rendering.
     check("native-shader-compiled",productionShader && productionShader->property("status").toInt()==0 && productionShader->property("log").toString().isEmpty());
+    auto *scene=qvariant_cast<QQuickItem *>(eval("appSceneBackdrop"));
+    auto *decoration=scene?scene->findChild<QQuickItem *>("workspaceWingDecoration"):nullptr;
+    const auto grab=[&](QQuickItem *item){
+        if(!item)return QImage{};
+        auto result=item->grabToImage();if(!result)return QImage{};
+        QSignalSpy ready(result.data(),&QQuickItemGrabResult::ready);window->update();
+        if(result->image().isNull())ready.wait(2000);
+        return result->image();
+    };
+    auto *productionGlass=window->findChild<QQuickItem *>("sidebarLiquidGlass");
+    const auto clearGlass=grab(productionGlass);
+    check("sidebar-preserves-shared-window-base",!clearGlass.isNull() && clearGlass.pixelColor(clearGlass.width()/2,clearGlass.height()/4).alpha()<3);
+    check("wing-decoration-spans-workspace",decoration && decoration->width()==scene->width() && decoration->height()==scene->height());
+    if(decoration){
+        auto decorated=grab(scene);
+        decoration->setVisible(false);QTest::qWait(35);auto plain=grab(scene);
+        qint64 rightSideChanges=0;
+        if(!decorated.isNull() && decorated.size()==plain.size())
+            for(int y=0;y<plain.height();++y)for(int x=plain.width()/2;x<plain.width();++x)
+                if(decorated.pixelColor(x,y)!=plain.pixelColor(x,y))++rightSideChanges;
+        check("wing-decoration-reaches-uncovered-right-workspace",rightSideChanges>100);
+        QQmlComponent cardComponent(qmlEngine(window));
+        cardComponent.setData("import QtQuick; import SwirlQuick; SwirlGlassPanel {x:280;y:180;width:240;height:160}",QUrl("qrc:/qt/qml/SwirlQuick/WingCardFixture.qml"));
+        std::unique_ptr<QObject> cardOwner(cardComponent.create(qmlContext(window)));
+        auto *card=qobject_cast<QQuickItem *>(cardOwner.get());
+        if(card){
+            card->setParentItem(scene);const auto before=grab(card);
+            decoration->setVisible(true);QTest::qWait(35);const auto after=grab(card);
+            check("opaque-card-occludes-workspace-wings",!before.isNull() && before==after && after.pixelColor(after.width()/2,after.height()/2).alpha()==255);
+        }else check("opaque-card-fixture",false);
+        decoration->setVisible(true);
+    }
     QQmlComponent component(qmlEngine(window));
     component.setData(R"QML(
 import QtQuick
@@ -81,6 +113,9 @@ Item {
             check("edge-refraction-changes-sampled-pixels",!changed.isNull() && !unrefracted.isNull() && difference(changed,unrefracted)>100);
             eval("apecGlass.glass.interaction=1;apecGlass.glass.lightPoint=Qt.point(0,0)");QTest::qWait(60);auto lit=capture();
             check("interaction-drives-directional-rim",!lit.isNull() && difference(lit,unrefracted)>100);
+            eval("apecGlass.source.color='#40BD334F'");QTest::qWait(60);auto translucent=capture();
+            check("glass-preserves-transmitted-alpha",!translucent.isNull() && qAbs(sample(translucent,100,140).alpha()-64)<=2);
+            eval("apecGlass.source.color='#BD334F'");
         }
         const auto size=eval("apecGlass.glass.captureSize").toSizeF();
         check("capture-bounded-to-panel",size.width()<=440 && size.height()<=320 && size.width()>0 && size.height()>0);

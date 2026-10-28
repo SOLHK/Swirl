@@ -10,6 +10,8 @@ Item {
  property int geometryRevision:0
  property var entries:({})
  property Item backdropSource:null
+ readonly property Item glassSurface:floatingBackground
+ readonly property bool glassSampled:liquidGlass.sampled
  readonly property Item selectedEntry:entries[AppState.sidebarPage] || null
  function registerEntry(item){const next=Object.assign({},entries);next[item.pageId]=item;entries=next}
  function unregisterEntry(item){const next=Object.assign({},entries);delete next[item.pageId];entries=next}
@@ -21,6 +23,7 @@ Item {
   SwirlInteractionMotion {id:materialResponse;hovered:glassHover.hovered;pressed:sidebar.selectedEntry && sidebar.selectedEntry.down;focused:sidebar.selectedEntry && sidebar.selectedEntry.visualFocus}
   HoverHandler {id:glassHover}
   SwirlLiquidGlass {
+   id:liquidGlass
    objectName:"sidebarLiquidGlass";anchors.fill:parent;cornerRadius:floatingBackground.radius
    captureWidth:Theme.sidebarWidth-2*Theme.shellInset
    backdropSource:sidebar.backdropSource;interaction:materialResponse.light

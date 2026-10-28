@@ -17,7 +17,7 @@ Text {
     font.weight: Theme.bodyFontWeight
     font.pixelSize: Theme.fontSize(13)
     font.hintingPreference: Font.PreferFullHinting
-    SwirlFontBinding { id: fontBinding; target: control; textRole: control.textRole; fitWidth: control.widthFitting }
+    readonly property SwirlFontBinding ownedFontBinding: SwirlFontBinding { id:fontBinding; target: control; textRole: control.textRole; fitWidth: control.widthFitting }
     // Layouts always see the natural advance. Compressing the rendered label
     // therefore cannot shrink its parent's implicit size and feed back into fit.
     Layout.preferredWidth: control.widthFitting && fontBinding.naturalWidth > 0 ? fontBinding.naturalWidth : -1

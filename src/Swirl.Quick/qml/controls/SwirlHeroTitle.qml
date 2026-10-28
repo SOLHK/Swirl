@@ -20,6 +20,7 @@ Item {
         return t*t*(3-2*t)
     }
     readonly property Item labelItem:label
+    readonly property real arcOffset: -SwirlMotion.navigationArc * SwirlMotion.arch(progress)
     // The target is mapped again as the window/layout changes. Only two small
     // text items participate; no table snapshot or offscreen texture is made.
     readonly property rect targetRect: {
@@ -73,7 +74,7 @@ Item {
         opacity:1-hero.handoff
         x: hero.origin.x+(hero.targetRect.x-hero.origin.x)*hero.progress
         y: hero.origin.y+(hero.targetRect.y-hero.origin.y)*hero.progress+
-           hero.sourceBaseline*(1-hero.progress)+(hero.targetItem?hero.targetItem.baselineOffset:hero.sourceBaseline)*hero.progress-baselineOffset
+           hero.sourceBaseline*(1-hero.progress)+(hero.targetItem?hero.targetItem.baselineOffset:hero.sourceBaseline)*hero.progress-baselineOffset+hero.arcOffset
         width: hero.origin.width+(hero.targetRect.width-hero.origin.width)*hero.progress
         height: hero.origin.height+(hero.targetRect.height-hero.origin.height)*hero.progress
         text: hero.title; textFormat: Text.PlainText; color: Theme.text

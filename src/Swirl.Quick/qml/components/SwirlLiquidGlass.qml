@@ -9,8 +9,8 @@ Item {
     property real cornerRadius:Theme.sidebarRadius
     property real interaction:0
     property point lightPoint:Qt.point(0.18,0.15)
-    property real blurRadius:Theme.dp(7)
-    property real refraction:Theme.dp(2.4)
+    property real blurRadius:Theme.dp(4)
+    property real refraction:Theme.dp(3.2)
     // A width-changing shell can keep one texture allocation for its maximum
     // envelope while sourceRect and shader geometry follow the live width.
     property real captureWidth:width
@@ -57,6 +57,7 @@ Item {
         anchors.fill:parent
         visible:glass.sampled
         property var source:softened
+        property var sharpSource:capture
         property vector2d surfaceSize:Qt.vector2d(width,height)
         property vector2d textureExtent:Qt.vector2d(glass.captureSize.width,glass.captureSize.height)
         property real padding:glass.samplePadding
@@ -65,14 +66,12 @@ Item {
         property real refraction:glass.refraction
         property real interaction:glass.interaction
         property vector2d lightPoint:Qt.vector2d(glass.lightPoint.x,glass.lightPoint.y)
-        property color tintColor:Theme.dark?"#182A40":"#FFFFFF"
-        property real tintAmount:Theme.dark?0.28:0.38
         property real darkMode:Theme.dark?1:0
         fragmentShader:"qrc:/swirl/shaders/sidebar-liquid.frag.qsb"
     }
     SwirlShellOutline {
         anchors.fill:parent;visible:!glass.sampled;radius:glass.cornerRadius
-        fillColor:Theme.surface
+        fillColor:Theme.canvas
         strokeColor:Theme.increaseContrast?Theme.text:Theme.border
     }
     Accessible.ignored:true

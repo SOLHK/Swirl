@@ -9,7 +9,7 @@ QtObject {
     property bool windowActive:true
     // Windows supplies blur and luminosity. These are only the Swirl overlay.
     readonly property color nativeTint:canvas
-    readonly property real nativeTintOpacity: dark ? 0.92 : 0.94
+    readonly property real nativeTintOpacity: dark ? 0.88 : 0.90
     // Exact contours use restrained live alpha when DWM Acrylic cannot be
     // clipped smoothly. Keep background text subdued without masking glyphs.
     readonly property real alphaTintOpacity: dark ? 0.94 : 0.95

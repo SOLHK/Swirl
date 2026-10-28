@@ -10,6 +10,7 @@ import "../components/PolicyHelpers.js" as Policy
 Item {
     id:page
     readonly property Item motionTitle:policyHeading.titleItem
+    readonly property var heroTargets:({title:motionTitle})
     required property var engineController
     property int tabIndex:0
     property var pendingOwner:null

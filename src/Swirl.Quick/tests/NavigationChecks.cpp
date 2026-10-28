@@ -7,6 +7,7 @@
 #include <QScreen>
 #include <QQmlExpression>
 #include <QQmlContext>
+#include <QQmlEngine>
 #include <QTest>
 #include <QFile>
 #include <QJsonDocument>
@@ -63,9 +64,13 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
  for(int round=0;round<2;++round)for(const auto &id:routes){
   auto *source=item("settings-"+id);check(source!=nullptr,"hub card remains reachable: "+id);
   click("settings-"+id);
+  bool collected=false;
   bool coverage=true,sawMorph=false,unframed=true,backFollowsPage=true;int frame=0;QJsonArray frameTimes;QElapsedTimer timer;timer.start();
   do {
    wait(6);
+   // A cold page's helpers must remain owned through asynchronous creation
+   // and GC, including a dialog's deferred content and header creation.
+   if(round==0 && id=="subscriptions" && !collected){qmlEngine(window)->collectGarbage();collected=true;}
    coverage&=eval("Object.keys(pageLoader.pages).reduce((sum,key)=>sum+(pageLoader.pages[key].visible?pageLoader.pages[key].opacity:0),0)>0.98").toBool();
    sawMorph|=eval("pageLoader.moving && pageLoader.heroData && pageLoader.heroData.key==='settings'").toBool();
    backFollowsPage&=eval("!pageLoader.heroData || pageLoader.heroData.key!=='settings' || pageLoader.position>=0.82 || settingsBack.opacity===0").toBool();

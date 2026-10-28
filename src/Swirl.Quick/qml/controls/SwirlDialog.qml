@@ -17,7 +17,7 @@ Dialog {
     property Item ownerItem:null
     readonly property real heroProgress:heroClock.progress
     SwirlTransitionCoordinator { id:heroClock;parent:dialog.background;duration:SwirlMotion.dialogDuration }
-    SwirlPopupMotion {id:reveal;popup:dialog;motionEnabled:dialog.heroSource===null}
+    readonly property SwirlPopupMotion popupMotion:SwirlPopupMotion {id:reveal;popup:dialog;motionEnabled:dialog.heroSource===null}
     Binding {target:dialog.presentationReady && dialog.background?dialog.background.parent:null;property:"transform";value:[contentTravel];when:dialog.presentationReady && dialog.background!==null;restoreMode:Binding.RestoreBindingOrValue}
     Translate {id:contentTravel;x:reveal.xOffset;y:reveal.yOffset}
     Binding {target:dialog.contentItem;property:"opacity";value:Math.max(0,Math.min(1,(dialog.heroProgress-0.18)/0.65));when:dialog.heroSource!==null;restoreMode:Binding.RestoreBindingOrValue}
@@ -68,7 +68,7 @@ Dialog {
         font.family:Theme.fontFamily
         // The style owns this header (including its bold weight and padding).
         // Resolve its actual font after inheritance, without replacing it.
-        SwirlFontBinding {target:discardPrompt.header;textRole:"pageTitle"}
+        readonly property SwirlFontBinding headerFont:SwirlFontBinding {target:discardPrompt.header;textRole:"pageTitle"}
         Binding {target:discardPrompt.header;property:"font.hintingPreference";value:Font.PreferFullHinting}
         Binding {target:discardPrompt.header;property:"renderType";value:Text.NativeRendering}
         parent:dialog.parent
@@ -76,7 +76,7 @@ Dialog {
         x:parent ? Math.round((parent.width-width)/2) : 0
         y:parent ? Math.round((parent.height-height)/2) : 0
         closePolicy:Popup.NoAutoClose
-        SwirlPopupMotion {id:discardReveal;popup:discardPrompt}
+        readonly property SwirlPopupMotion popupMotion:SwirlPopupMotion {id:discardReveal;popup:discardPrompt}
         Binding {target:dialog.presentationReady && discardPrompt.background?discardPrompt.background.parent:null;property:"transform";value:[discardTravel];when:dialog.presentationReady && discardPrompt.background!==null;restoreMode:Binding.RestoreBindingOrValue}
         Translate {id:discardTravel;x:discardReveal.xOffset;y:discardReveal.yOffset}
         opacity:discardReveal.alpha
