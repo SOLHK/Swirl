@@ -1,15 +1,10 @@
 import QtQuick
 import SwirlQuick
+import "../controls"
 
-Rectangle {
+SwirlControlSurface {
     id: surface
-    property bool focused: false
-    property bool hovered: false
-    property bool pressed: false
     radius: Theme.pillRadius(height)
-    antialiasing: true
-    color: pressed ? Theme.pressed : hovered ? Theme.hover : Theme.buttonBase
     border.width: focused || Theme.increaseContrast ? 1 / Screen.devicePixelRatio : 0
     border.color: focused ? Theme.focusBorder : Theme.text
-    Behavior on color { ColorAnimation { duration: SwirlMotion.hoverDuration } }
 }

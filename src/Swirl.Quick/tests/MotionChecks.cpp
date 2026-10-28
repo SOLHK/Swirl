@@ -407,6 +407,28 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         const QSize normalSize(qRound(eval("Theme.dp(914)").toDouble()),qRound(eval("Theme.dp(672)").toDouble()));
         window->resize(normalSize);wait(250);
         auto *sourceCard=findVisual(activity,"activitySourcesCard");
+        auto *policyEntry=findVisual(activity,"activityPolicyShortcut");
+        auto *policyValue=findVisual(activity,"activityPolicyValue");
+        auto *diagnosticEntry=findVisual(activity,"networkDiagnosticDetails");
+        auto *connectionsEntry=findVisual(activity,"activityConnectionsDetails");
+        const auto controlHeight=eval("Theme.controlHeight").toDouble();
+        for(auto *entry:{diagnosticEntry,connectionsEntry}){
+            auto *contents=entry?entry->property("contentItem").value<QQuickItem *>():nullptr;
+            check("activity-detail-heading-has-padded-full-height-hit-area",entry&&contents&&entry->height()>=controlHeight
+                &&entry->property("leftPadding").toDouble()>=eval("Theme.dp(8)").toDouble()
+                &&entry->property("rightPadding").toDouble()>=eval("Theme.dp(12)").toDouble()
+                &&contents->width()+entry->property("leftPadding").toDouble()+entry->property("rightPadding").toDouble()<=entry->width()+1);
+        }
+        if(policyEntry&&policyValue){
+            const auto before=policyEntry->size();
+            const auto originalName=policyValue->property("text");
+            policyValue->setProperty("text",QString::fromUtf8("新加坡实验性 IEPL 专线 — a deliberately long regional node name that must elide without moving other facts"));wait(80);
+            check("activity-long-policy-name-elides-inside-padded-stable-selector",policyValue->property("truncated").toBool()
+                &&policyEntry->size()==before&&policyValue->width()>0
+                &&policyEntry->property("leftPadding").toDouble()>=eval("Theme.dp(14)").toDouble()
+                &&policyEntry->property("rightPadding").toDouble()>=eval("Theme.dp(14)").toDouble());
+            policyValue->setProperty("text",originalName);
+        }else check("activity-policy-value-is-present",false);
         const auto diagnosticAt=diagnostic->mapToItem(activity,0,0),trafficAt=trafficCard->mapToItem(activity,0,0);
         const auto sourceAt=sourceCard?sourceCard->mapToItem(activity,0,0):QPointF();
         const auto uploadAt=upload->mapToItem(activity,0,0),connectionsAt=connections->mapToItem(activity,0,0),totalAt=total->mapToItem(activity,0,0);

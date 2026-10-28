@@ -8,6 +8,7 @@ ComboBox {
     implicitWidth:Theme.dp(146)
     implicitHeight:Theme.controlHeight
     hoverEnabled: true
+    SwirlPressMotion {pressed:control.pressed}
     // Let ComboBox own pointer grabs, keyboard activation and popup focus.
     // Opening its popup through an overlay MouseArea bypasses that lifecycle.
     focusPolicy:Qt.StrongFocus
@@ -65,9 +66,14 @@ ComboBox {
             verticalAlignment: Text.AlignVCenter; leftPadding:Theme.dp(24);rightPadding:Theme.dp(5);elide:Text.ElideRight
             SwirlIcon{visible:control.currentIndex===option.index;x:Theme.dp(3);anchors.verticalCenter:parent.verticalCenter;size:Theme.dp(14);name:"checkmark";color:Theme.text}
         }
-        background: Rectangle {
-            radius: Math.min(Theme.dp(8),height/2); color: option.highlighted ? Theme.selected : "transparent"
-            Behavior on color { enabled:!SwirlMotion.reduced; ColorAnimation { duration: Math.min(100,SwirlMotion.duration) } }
+        background: SwirlControlSurface {
+            radius:Math.min(Theme.dp(8),height/2)
+            quiet:true
+            hovered:option.hovered
+            pressed:option.down
+            selected:option.highlighted
+            focused:option.visualFocus
+            controlEnabled:option.enabled
         }
     }
     popup: Popup {

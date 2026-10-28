@@ -11,15 +11,15 @@ SwirlMotionButton {
     property bool development: false
     Accessible.description:development?"研发中，此操作尚未实现。":""
     property string iconName: ""
-    implicitWidth: Math.round(Math.max(Theme.dp(76), contents.implicitWidth + Theme.dp(24)))
-    implicitHeight:Theme.controlHeight
+    implicitWidth: Math.ceil(Math.max(Theme.dp(76), contents.implicitWidth + leftPadding + rightPadding))
+    implicitHeight:Math.max(Theme.controlHeight,contents.implicitHeight+topPadding+bottomPadding)
     hoverEnabled: true
     font.family: Theme.fontFamily
     font.weight: control.primary ? Font.DemiBold : Font.Medium
     SwirlFontBinding { target: control; textRole: "button" }
     font.hintingPreference:Font.PreferFullHinting
     font.pixelSize:Theme.buttonSize
-    leftPadding:Theme.dp(12); rightPadding:Theme.dp(12)
+    leftPadding:Theme.dp(16); rightPadding:Theme.dp(16)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     property bool outlined:false
     background: SwirlControlSurface {
@@ -46,6 +46,7 @@ SwirlMotionButton {
             color: !control.enabled ? Theme.muted : control.primary ? Theme.primaryButtonText : control.danger ? Theme.red : Theme.muted
         }
         SwirlText {
+            id:label
             text: AppState.zh(control.text)+(control.development?" · 研发中":"")
             font.family: control.font.family
             font.pixelSize: control.font.pixelSize
@@ -60,4 +61,9 @@ SwirlMotionButton {
         }
     }
     Accessible.name: text
+    SwirlToolTip {
+        parent:control
+        visible:(control.hovered || control.visualFocus) && label.truncated && !previewCaptureMode
+        text:label.text
+    }
 }

@@ -65,6 +65,8 @@ Menu {
             }
             background: SwirlControlSurface {
                 quiet: true
+                hovered:option.hovered
+                pressed:option.down
                 selected: option.highlighted
                 focused: option.visualFocus
                 controlEnabled: option.enabled

@@ -47,11 +47,11 @@ SwirlMotionButton {
         return qsTr("当前运行模式；实际出口请查看连接详情")
     }
     objectName: "activityOutboundMode"
-    implicitWidth: Math.ceil(modeCaption.implicitWidth) + Theme.dp(24)
-    implicitHeight: Theme.dp(28)
+    implicitWidth: Math.ceil(modeCaption.implicitWidth) + leftPadding + rightPadding
+    implicitHeight:Theme.controlHeight
     padding: 0
-    leftPadding: Theme.dp(12)
-    rightPadding: Theme.dp(12)
+    leftPadding: Theme.dp(16)
+    rightPadding: Theme.dp(16)
     topPadding: 0
     bottomPadding: 0
     hoverEnabled: true
@@ -119,7 +119,8 @@ SwirlMotionButton {
         radius: Theme.pillRadius(height)
         hovered: control.hovered
         pressed: control.down
-        focused: false
+        focused:control.visualFocus
+        controlEnabled:control.enabled
         border.width: Theme.increaseContrast ? 1 / Screen.devicePixelRatio : 0
         border.color: Theme.text
     }
@@ -160,6 +161,7 @@ SwirlMotionButton {
             onObjectRemoved: (index, object) => modeMenu.removeItem(object)
             delegate: MenuItem {
                 id: option
+                SwirlPressMotion{}
                 required property var modelData
                 objectName: "activityMode-" + modelData.key
                 height: Theme.dp(59)
@@ -169,9 +171,13 @@ SwirlMotionButton {
                 Accessible.checkable: true
                 Accessible.checked: control.displayMode === modelData.key
                 Accessible.description: control.displayMode === modelData.key ? qsTr("当前模式") : ""
-                background: Rectangle {
-                    radius: Theme.dp(5)
-                    color: option.highlighted || option.activeFocus ? Theme.selected : "transparent"
+                background: SwirlControlSurface {
+                    quiet:true
+                    hovered:option.hovered
+                    pressed:option.down
+                    focused:option.visualFocus
+                    selected:option.highlighted
+                    controlEnabled:option.enabled
                 }
                 contentItem: RowLayout {
                     spacing: Theme.dp(9)
@@ -207,10 +213,11 @@ SwirlMotionButton {
         }
         MenuItem {
             id: strategyLink
+            SwirlPressMotion{}
             text: qsTr("前往策略")
             height: Theme.dp(34)
             contentItem: SwirlText { text: strategyLink.text; color: Theme.text; font.pixelSize: Theme.fontSize(12); verticalAlignment: Text.AlignVCenter }
-            background: Rectangle { radius: Theme.dp(5); color: strategyLink.highlighted ? Theme.selected : "transparent" }
+            background: SwirlControlSurface {quiet:true;hovered:strategyLink.hovered;pressed:strategyLink.down;focused:strategyLink.visualFocus;selected:strategyLink.highlighted;controlEnabled:strategyLink.enabled}
             onTriggered: AppState.navigate("policies")
         }
     }

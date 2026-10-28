@@ -39,11 +39,14 @@ Item {
                 required property var modelData
                 width: control.segmentWidth(segment.index); height: control.height-Theme.dp(4)
                 hoverEnabled:true
-                background: Rectangle {
+                background: SwirlControlSurface {
                     radius:control.rounded ? Theme.pillRadius(height) : Theme.segmentedSelectedRadius
-                    border.width:segment.visualFocus?Theme.borderWidth:0;border.color:control.currentIndex===segment.index&&control.accentSelection?Theme.primaryButtonText:Theme.text
-                    color:control.currentIndex!==segment.index && segment.hovered?Theme.withAlpha(Theme.hover,0.5):"transparent"
-                    Behavior on color{enabled:!SwirlMotion.reduced;ColorAnimation{duration:SwirlMotion.hoverDuration}}
+                    quiet:true
+                    hovered:segment.hovered
+                    pressed:segment.down
+                    focused:segment.visualFocus
+                    controlEnabled:segment.enabled
+                    color:control.currentIndex!==segment.index && segment.enabled && segment.hovered?Theme.withAlpha(Theme.hover,0.5):"transparent"
                 }
                 contentItem: SwirlText {
                     text: AppState.zh(String(segment.modelData))

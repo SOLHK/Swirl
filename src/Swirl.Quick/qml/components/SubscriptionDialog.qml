@@ -64,27 +64,18 @@ SwirlDialog {
         font.weight: Font.Medium
         font.hintingPreference: Font.PreferFullHinting
         Accessible.name: text
-        background: Item {
-            opacity: control.enabled ? 1 : 0.45
-            Rectangle {
-                anchors.fill: parent
-                radius: Theme.dp(8)
-                color: control.primary ? Theme.text : control.down ? Theme.pressed : control.hovered ? Theme.hover : control.quiet ? "transparent" : Theme.buttonBase
-                opacity: control.primary && control.down ? 0.78 : control.primary && control.hovered ? 0.88 : 1
-                Behavior on color { ColorAnimation { duration: SwirlMotion.hoverDuration } }
-                Behavior on opacity { NumberAnimation { duration: SwirlMotion.hoverDuration } }
-            }
-            Rectangle {
-                anchors.fill: parent; anchors.margins: -Theme.dp(3)
-                visible: control.keyboardFocus
-                radius: Theme.dp(10)
-                color: "transparent"; border.color: Theme.text; border.width: Theme.borderWidth
-            }
+        background: SwirlControlSurface {
+            hovered:control.hovered
+            pressed:control.down
+            focused:control.keyboardFocus
+            quiet:control.quiet
+            primary:control.primary
+            controlEnabled:control.enabled
         }
         contentItem: SwirlText {
             text: control.text; textRole: "button"
             font.family: control.font.family; font.pixelSize: control.font.pixelSize; font.weight: control.font.weight
-            color: control.primary ? Theme.surface : Theme.text
+            color: control.primary ? Theme.primaryButtonText : Theme.text
             opacity: control.enabled ? 1 : 0.45
             horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
@@ -114,16 +105,15 @@ SwirlDialog {
             x: Math.round(control.width - width - Theme.dp(10)); y: Math.round((control.height - height) / 2)
             color: Theme.muted
         }
-        background: Rectangle {
-            radius: Theme.dp(8)
-            color: control.pressed ? Theme.pressed : control.hovered ? Theme.hover : Theme.buttonBase
-            border.color: Theme.text
-            border.width: control.keyboardFocus || Theme.increaseContrast ? Theme.borderWidth : 0
-            opacity: control.enabled ? 1 : 0.45
-            Behavior on color { ColorAnimation { duration: SwirlMotion.hoverDuration } }
+        background: SwirlControlSurface {
+            hovered:control.hovered
+            pressed:control.pressed
+            focused:control.keyboardFocus
+            controlEnabled:control.enabled
         }
         delegate: ItemDelegate {
             id: option
+            SwirlPressMotion{}
             required property int index
             objectName: "swirlComboOption-" + index
             width: ListView.view.width
@@ -142,8 +132,13 @@ SwirlDialog {
                     x: Theme.dp(3); anchors.verticalCenter: parent.verticalCenter
                 }
             }
-            background: Rectangle {
-                radius: Theme.dp(6); color: option.highlighted ? Theme.selected : "transparent"
+            background: SwirlControlSurface {
+                quiet:true
+                hovered:option.hovered
+                pressed:option.down
+                focused:option.visualFocus
+                selected:option.highlighted
+                controlEnabled:option.enabled
             }
         }
     }

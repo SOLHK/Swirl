@@ -17,6 +17,7 @@
 #include <QFontMetricsF>
 #include <QFontDatabase>
 #include <QCursor>
+#include <QtMath>
 #include <functional>
 
 int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
@@ -40,7 +41,9 @@ Item {
     SwirlComboBox {objectName:"reviewCombo";x:270;y:10;model:["默认策略 SG 176 ms","自动测速"]}
     SwirlSegmentedControl {objectName:"reviewSegments";x:10;y:65;width:280;options:["全部 12","仅代理 8"]}
     SwirlText {objectName:"reviewFigures";x:310;y:75;tabularFigures:true;text:"176 ms · HTTPS 完整请求"}
-    PolicyGroupTypes {objectName:"reviewGroupTypes";x:0;y:115;width:590}
+    SubscriptionAction {objectName:"reviewAction";x:10;y:115;text:"更新全部";iconName:"refresh";solid:true}
+    SwirlNavigationItem {objectName:"reviewNavigation";x:210;y:115;width:180;pageId:"external";title:"面板";iconName:"gauge"}
+    PolicyGroupTypes {objectName:"reviewGroupTypes";x:0;y:170;width:590}
 })QML",QUrl("qrc:/qt/qml/SwirlQuick/ControlsReviewFixture.qml"));
         auto *fixture=qobject_cast<QQuickItem *>(component.create(qmlContext(window)));
         check(fixture!=nullptr,"shared control review fixture loads");
@@ -50,11 +53,11 @@ Item {
             struct RestoreCursor { QPoint position=QCursor::pos(); ~RestoreCursor(){QCursor::setPos(position);} } restoreCursor;
             window->requestActivate();QTest::qWait(100);
             const auto surface=[](QQuickItem *control){return control?control->property("background").value<QQuickItem *>():nullptr;};
-            const auto movePointer=[&](QPoint local){
+            const auto movePointer=[&](QPoint local,int settle=160){
                 QCursor::setPos(window->mapToGlobal(local));
                 QCoreApplication::processEvents();
                 QTest::mouseMove(window,window->mapFromGlobal(QCursor::pos()));
-                QTest::qWait(160);
+                QTest::qWait(settle);
             };
             std::function<QQuickItem *(QQuickItem *,const QString &)> visualItem;
             visualItem=[&](QQuickItem *parent,const QString &name)->QQuickItem *{
@@ -63,30 +66,49 @@ Item {
                 return nullptr;
             };
             for(const auto &theme:QStringList{"Light","Dark"}){
-                eval("Theme.mode='"+theme+"';Theme.reduceMotion=false;Theme.followSystemMotion=false");QTest::qWait(160);
-                for(const auto &name:QStringList{"reviewButton","reviewIcon","reviewCombo"}){
+                eval("Theme.mode='"+theme+"';Theme.reduceMotion=false;Theme.followSystemMotion=false;Theme.increaseContrast=false");QTest::qWait(160);
+                for(const auto &name:QStringList{"reviewButton","reviewIcon","reviewCombo","reviewAction","reviewNavigation"}){
                     auto *control=fixture->findChild<QQuickItem *>(name);auto *paint=surface(control);
-                    check(paint&&qAbs(paint->property("radius").toReal()-paint->height()/2)<0.01,"buttons and selector share a height-derived capsule curve");
+                    check(paint&&qAbs(paint->property("radius").toReal()-(name=="reviewNavigation"?eval("Theme.sidebarRowRadius").toReal():paint->height()/2))<0.01,"shared surfaces retain the requested capsule or navigation curve");
                     if(!control||!paint)continue;
                     const auto size=control->size();const auto position=control->position();
                     movePointer(QPoint(window->width()-20,90));
                     check(QTest::qWaitFor([&]{return !control->property("hovered").toBool();},1000),"native pointer leaves the shared control before its resting sample");
                     const auto normal=paint->property("color").value<QColor>();
-                    movePointer(control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint());
+                    const auto restingPixels=window->grabWindow();
+                    movePointer(control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint(),25);
+                    check(paint->property("moving").toBool()&&paint->property("hoverProgress").toReal()>0&&paint->property("hoverProgress").toReal()<1,"real pointer starts an intermediate hover frame instead of jumping to its endpoint");
+                    QTest::qWait(160);
                     qInfo()<<"CONTROL_HOVER"<<theme<<name<<control->property("hovered")<<normal<<paint->property("color")
                            <<"cursor"<<window->mapFromGlobal(QCursor::pos())<<"target"<<control->mapToScene(QPointF(control->width()/2,control->height()/2))<<"active"<<window->isActive();
                     check(QTest::qWaitFor([&]{return control->property("hovered").toBool()&&paint->property("color").value<QColor>()!=normal;},1000),"shared control hover visibly changes its surface");
+                    auto *rim=paint->findChild<QQuickItem *>("controlInteractionRim");
+                    check(rim&&rim->isVisible()&&rim->opacity()>0.9,"hover expands and reveals the shared edge light");
+                    const auto hoveredPixels=window->grabWindow();
+                    const qreal dpr=window->devicePixelRatio();
+                    const auto rect=control->mapRectToScene(control->boundingRect());
+                    const QRect pixelRect(qFloor(rect.x()*dpr),qFloor(rect.y()*dpr),qCeil(rect.width()*dpr),qCeil(rect.height()*dpr));
+                    check(!restingPixels.isNull()&&!hoveredPixels.isNull()&&restingPixels.copy(pixelRect)!=hoveredPixels.copy(pixelRect),"hover feedback changes the actual rendered button pixels");
+                    if(name!="reviewCombo")check(control->property("motionLift").toReal()<-.5,"hover gently lifts the button without relaying out its shell");
                     control->forceActiveFocus(Qt::TabFocusReason);QTest::qWait(160);
                     check(control->property("visualFocus").toBool()&&paint->property("focused").toBool(),"keyboard focus reaches the shared surface");
                     if(name!="reviewCombo"){
                         const auto at=control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint();
                         const auto hovered=paint->property("color").value<QColor>();
-                        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at);QTest::qWait(160);
+                        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at);QTest::qWait(40);
+                        auto *content=control->property("contentItem").value<QQuickItem *>();
+                        check(paint->scale()<.995&&content&&qAbs(content->scale()-paint->scale())<.001,"a short press contracts both the surface and its label within the first40ms");
+                        QTest::qWait(100);
                         check(control->property("down").toBool()&&paint->property("color").value<QColor>()!=hovered,"shared button provides a distinct pressed surface");
                         QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,at);
+                        QTest::qWait(30);
+                        check(paint->scale()<.999,"release continues from the pressed frame through a spring return");
+                        check(QTest::qWaitFor([&]{return qAbs(paint->scale()-1)<.001;},1400),"released button springs back to its resting scale");
                     }
                     control->setEnabled(false);QTest::qWait(180);
-                    check(!paint->property("controlEnabled").toBool()&&paint->opacity()<1&&paint->property("color").value<QColor>()==normal,"disabled surface retires hover and press feedback");
+                    const bool disabledSettled=!paint->property("controlEnabled").toBool()&&paint->opacity()<1&&paint->property("color").value<QColor>()==normal;
+                    if(!disabledSettled)qInfo()<<"CONTROL_DISABLED"<<theme<<name<<"hovered"<<control->property("hovered")<<"down"<<control->property("down")<<"enabled"<<paint->property("controlEnabled")<<"opacity"<<paint->opacity()<<"normal"<<normal<<"actual"<<paint->property("color");
+                    check(disabledSettled,"disabled surface retires hover and press feedback");
                     check(control->size()==size&&control->position()==position,"all button states retain shell geometry");
                     control->setEnabled(true);
                 }

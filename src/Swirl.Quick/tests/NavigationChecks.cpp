@@ -3,6 +3,10 @@
 #include "app/MotionPolicy.h"
 #include <QQuickWindow>
 #include <QQuickItem>
+#include <QColor>
+#include <QCursor>
+#include <QSignalSpy>
+#include <QtMath>
 #include <QGuiApplication>
 #include <QScreen>
 #include <QQmlExpression>
@@ -25,9 +29,12 @@
 #include <algorithm>
 #include <memory>
 #include <functional>
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
 
 int runNavigationChecks(QQuickWindow *window,EngineController *controller,const QString &directory) {
- int failures=0;QJsonArray checks,endpointSamples;QJsonObject performance;QDir().mkpath(directory);
+ int failures=0;QJsonArray checks,endpointSamples,buttonSamples;QJsonObject performance;QDir().mkpath(directory);
  auto wait=[](int ms){QEventLoop loop;QTimer::singleShot(ms,&loop,&QEventLoop::quit);loop.exec();};
  auto await=[](const std::function<bool()> &predicate,int timeout){
   if(predicate())return true;QEventLoop loop;QTimer poll,deadline;poll.setInterval(4);poll.setTimerType(Qt::PreciseTimer);deadline.setSingleShot(true);
@@ -137,7 +144,11 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
     check(await([&]{return eval("AppState.currentPage==='settings' && pageLoader.item.section==='常规'").toBool();},2000),"real Window Escape traverses dismissal handling and returns inside settings before leaving the cached page");
    }
   }
-  if(round==0&&id=="dns")if(auto *field=item("dnsServerAddress"))field->setProperty("text","1.1.1.1, 8.8.8.8");
+  if(id=="dns"){
+   auto *title=page?page->property("motionTitle").value<QQuickItem *>():nullptr;
+   check(title&&title->opacity()>0.999&&title->property("color").value<QColor>()==eval("Theme.text").value<QColor>(),"settled DNS title restores the opaque semantic foreground after expansion");
+   if(round==0)if(auto *field=item("dnsServerAddress"))field->setProperty("text","1.1.1.1, 8.8.8.8");
+  }
   if(round==1&&id=="dns")check(item("dnsServerAddress")&&item("dnsServerAddress")->property("text").toString()=="1.1.1.1, 8.8.8.8","unsubmitted DNS draft survives back and re-entry");
   if(id=="proxies"){
    auto *search=item("nodeSearchField"),*table=item("realNodeTable");
@@ -305,6 +316,134 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
   }
   window->setGeometry(geometry);wait(150);
  }
+ {
+  // Exercise the actual page controls with canceled pointer releases. No
+  // command handler, import, subscription refresh or system setting is invoked.
+  struct RestoreCursor {QPoint position=QCursor::pos();~RestoreCursor(){QCursor::setPos(position);}} restoreCursor;
+  eval("Theme.reduceMotion=false;Theme.followSystemMotion=false;SwirlMotion.speed=1");
+  window->requestActivate();window->resize(qRound(eval("Theme.dp(1100)").toDouble()),qRound(eval("Theme.dp(760)").toDouble()));wait(150);
+#ifdef Q_OS_WIN
+  // Keyboard focus and compositor evidence require the owned test HWND to be
+  // foreground. Qt's activation request alone can be refused by Windows when
+  // another application had focus before the test process started.
+  const bool wasTopmost=window->flags().testFlag(Qt::WindowStaysOnTopHint);
+  window->setFlag(Qt::WindowStaysOnTopHint,true);
+  const HWND auditHwnd=reinterpret_cast<HWND>(window->winId());
+  SetWindowPos(auditHwnd,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE);
+  const DWORD foregroundThread=GetWindowThreadProcessId(GetForegroundWindow(),nullptr),currentThread=GetCurrentThreadId();
+  const bool attached=foregroundThread&&foregroundThread!=currentThread&&AttachThreadInput(currentThread,foregroundThread,TRUE);
+  SetForegroundWindow(auditHwnd);
+  if(attached)AttachThreadInput(currentThread,foregroundThread,FALSE);
+  check(await([&]{return GetForegroundWindow()==auditHwnd&&window->isActive();},1500),"marked-button runtime evidence owns the actual foreground window and keyboard focus");
+#else
+  window->raise();window->requestActivate();check(await([&]{return window->isActive();},1500),"marked-button runtime evidence owns keyboard focus");
+#endif
+  const auto evidence=directory+"/marked-buttons";QDir().mkpath(evidence);
+  const auto movePointer=[&](const QPoint &point,int delay=0){QCursor::setPos(window->mapToGlobal(point));QCoreApplication::processEvents();QTest::mouseMove(window,window->mapFromGlobal(QCursor::pos()));if(delay)wait(delay);};
+  const auto park=[&]{return QPoint(window->width()-2,window->height()/2);};
+  std::function<QQuickItem *(QQuickItem *,const QString &)> byText;
+  byText=[&](QQuickItem *root,const QString &text)->QQuickItem *{
+   if(!root||!root->isVisible())return nullptr;
+   if(root->property("down").isValid()&&root->property("text").toString()==text)return root;
+   for(auto *child:root->childItems())if(auto *found=byText(child,text))return found;
+   return nullptr;
+  };
+  const auto reveal=[&](QQuickItem *control){
+   for(auto *ancestor=control?control->parentItem():nullptr;ancestor;ancestor=ancestor->parentItem())if(ancestor->property("contentY").isValid()){
+    const auto bounds=control->mapRectToItem(ancestor,control->boundingRect());
+    const auto y=ancestor->property("contentY").toDouble();
+    const auto maximum=qMax(0.0,ancestor->property("contentHeight").toDouble()-ancestor->height());
+    if(bounds.top()<0)ancestor->setProperty("contentY",qBound(0.0,y+bounds.top()-8,maximum));
+    else if(bounds.bottom()>ancestor->height())ancestor->setProperty("contentY",qBound(0.0,y+bounds.bottom()-ancestor->height()+8,maximum));
+   }
+   wait(60);
+  };
+  const auto audit=[&](QQuickItem *control,const QString &key){
+   check(control!=nullptr,"marked page button exists: "+key);if(!control)return;
+   reveal(control);movePointer(park(),170);
+   auto *surface=control->property("background").value<QQuickItem *>();
+   const auto size=control->size();const auto position=control->position();
+   const auto point=control->mapToScene(QPointF(size.width()/2,size.height()/2)).toPoint();
+   const bool inside=QRectF(QPointF(),window->size()).contains(point);
+   check(surface&&inside&&control->isVisible(),"marked page button is visible inside the native window: "+key);if(!surface||!inside)return;
+   const auto snapshot=[&](const QString &phase){
+    const auto image=window->grabWindow();const auto rect=control->mapRectToScene(control->boundingRect()).adjusted(-5,-5,5,5);const auto dpr=window->devicePixelRatio();
+    const QRect pixels(qFloor(rect.x()*dpr),qFloor(rect.y()*dpr),qCeil(rect.width()*dpr),qCeil(rect.height()*dpr));
+    const auto crop=image.copy(pixels.intersected(image.rect()));
+    check(!crop.isNull()&&crop.save(evidence+"/"+key+"-"+phase+".png"),"actual marked-button pixels saved: "+key+"/"+phase);return crop;
+   };
+   const auto sample=[&](const QString &phase){const auto cursor=window->mapFromGlobal(QCursor::pos());buttonSamples.append(QJsonObject{{"button",key},{"phase",phase},{"windowActive",window->isActive()},{"activeFocus",control->hasActiveFocus()},{"visualFocus",control->property("visualFocus").toBool()},{"focusReason",control->property("focusReason").toInt()},{"cursorX",cursor.x()},{"cursorY",cursor.y()},{"enabled",control->isEnabled()},{"hovered",control->property("hovered").toBool()},{"down",control->property("down").toBool()},{"scale",control->property("motionScale").toDouble()},{"lift",control->property("motionLift").toDouble()},{"surfaceColor",surface->property("color").value<QColor>().name(QColor::HexArgb)}});};
+   QSignalSpy clicked(control,SIGNAL(clicked()));
+   const bool enabled=control->isEnabled();
+   const auto fullLift=eval("Theme.dp(1)").toDouble();
+   QImage idle,hover;bool intermediate=false,stableHover=false;
+   for(int attempt=0;attempt<(enabled?3:1);++attempt){
+    // Observe actual animation progress instead of assuming one fixed sleep
+    // lands on a rendered frame. A real user pointer move can cancel hover
+    // during readback; retain that sample and repeat only interrupted input.
+    movePointer(park());await([&]{return !control->property("hovered").toBool()&&qAbs(control->property("motionLift").toDouble())<.01;},600);
+    idle=snapshot("idle");sample("idle");movePointer(point);
+    if(enabled){
+     intermediate|=await([&]{const auto lift=control->property("motionLift").toDouble();return control->property("hovered").toBool()&&lift<0&&lift>-fullLift;},350);
+     sample("hover-intermediate");
+     if(!await([&]{return control->property("hovered").toBool()&&control->property("motionLift").toDouble()<-fullLift*.95;},600)){sample("hover-interrupted");continue;}
+    }else wait(150);
+    hover=snapshot("hover");sample("hover");
+    stableHover=!enabled||(control->property("hovered").toBool()&&control->property("motionLift").toDouble()<-fullLift*.5);
+    if(stableHover)break;
+    sample("hover-interrupted");
+   }
+   if(enabled){
+    check(intermediate,"marked button hover travels through an intermediate lifted frame: "+key);
+    check(stableHover&&!hover.isNull()&&hover!=idle,"marked button hover visibly changes its real pixels: "+key);
+   }
+   QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,point);wait(70);snapshot("pressed");sample("pressed");
+   if(enabled)check(control->property("down").toBool()&&control->property("motionScale").toDouble()<0.995,"marked button contracts during a normal70ms press: "+key);
+   else check(!control->property("down").toBool()&&qAbs(control->property("motionScale").toDouble()-1)<.001&&qAbs(control->property("motionLift").toDouble())<.001,"disabled marked button has no misleading press or lift: "+key);
+   movePointer(park());QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,park());wait(30);sample("release-intermediate");
+   if(enabled)check(control->property("motionScale").toDouble()<.999,"marked button release continues naturally from its compressed frame: "+key);
+   check(await([&]{return !control->property("down").toBool()&&qAbs(control->property("motionScale").toDouble()-1)<.001&&qAbs(control->property("motionLift").toDouble())<.01;},1800),"marked button returns completely after canceled release: "+key);
+   snapshot("released");sample("released");
+   if(enabled){
+    // The preceding mouse press already focused this control. Qt retains that
+    // mouse reason when forceActiveFocus targets the same focused item, so
+    // first give the content root focus to generate a fresh keyboard FocusIn.
+    control->setFocus(false);window->contentItem()->forceActiveFocus(Qt::OtherFocusReason);QCoreApplication::processEvents();
+    control->forceActiveFocus(Qt::TabFocusReason);
+    check(await([&]{return window->isActive()&&control->hasActiveFocus()&&control->property("visualFocus").toBool()&&control->property("focusReason").toInt()==Qt::TabFocusReason;},600),"marked button exposes keyboard focus: "+key);
+    wait(170);snapshot("focus");sample("focus");
+   }
+   check(clicked.isValid()&&clicked.count()==0&&control->size()==size&&control->position()==position,"marked button feedback preserves layout and invokes no action: "+key);
+  };
+  check(route("processes"),"marked process-page audit settles");
+  auto *processPage=qobject_cast<QQuickItem *>(eval("pageLoader.item").value<QObject *>());
+  const auto processController=processPage?processPage->property("engineController"):QVariant();
+  // The actual production page receives a geometry-only row through its view
+  // property; it is never inserted into accounting or reported as real traffic.
+  eval("pageLoader.item.engineController={telemetry:{revision:0,ranking:function(){return [{id:'motion-geometry',name:'Motion geometry fixture',upload:'0 B',download:'0 B',connections:0,value:'0 B'}]}},routingError:'',networkConfigurationError:'',meteredEnabled:false,meteredAllowlist:[],busy:false,elevated:false};pageLoader.item.selectedId='motion-geometry'");wait(350);
+  audit(byText(processPage,QStringLiteral("查看连接")),"process-connections");
+  if(processPage)processPage->setProperty("engineController",processController);
+  for(const auto &spec:QList<QPair<QString,QString>>{{"rules","addRoutingRule"},{"scripts","scriptAddButton"},{"profiles","profileAddButton"},{"subscriptions","refreshAllSubscriptions"},{"subscriptions","addSubscription"},{"proxies","allNodesTestButton"},{"proxies","nodeImportButton"},{"proxies","nodeAddButton"}}){
+   check(route(spec.first),"marked-button page settles: "+spec.first);audit(item(spec.second),spec.second);
+  }
+  check(route("dns"),"marked DNS-page audit settles");audit(byText(qobject_cast<QQuickItem *>(eval("pageLoader.item").value<QObject *>()),QStringLiteral("添加映射")),"dns-add-mapping");
+  check(route("activity"),"marked Activity-page audit settles");
+  for(const auto &name:QStringList{"activityOutboundMode","activityPolicyShortcut","networkDiagnosticDetails","activityConnectionsDetails","proxyCapsule","tunCapsule","nav-external"})audit(item(name),name);
+  check(route("scripts"),"rapid hover audit returns to the actual script action");
+  auto *rapid=item("scriptAddButton");
+  if(rapid){
+   for(int i=0;i<16;++i){movePointer(i%2?park():rapid->mapToScene(QPointF(rapid->width()/2,rapid->height()/2)).toPoint(),8);}
+   movePointer(park());
+   check(await([&]{return !rapid->property("hovered").toBool()&&!rapid->property("down").toBool()&&qAbs(rapid->property("motionLift").toDouble())<.01&&qAbs(rapid->property("motionScale").toDouble()-1)<.001;},1800),"rapid actual-button enter/leave interruptions settle without a stale state");
+   movePointer(rapid->mapToScene(QPointF(rapid->width()/2,rapid->height()/2)).toPoint(),35);
+   check(route("profiles")&&route("scripts")&&!rapid->property("down").toBool(),"page switching during actual-button hover returns a synchronized live control");
+  }
+  window->setGeometry(geometry);movePointer(park(),170);
+#ifdef Q_OS_WIN
+  window->setFlag(Qt::WindowStaysOnTopHint,wasTopmost);
+  SetWindowPos(reinterpret_cast<HWND>(window->winId()),wasTopmost?HWND_TOPMOST:HWND_NOTOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
+#endif
+ }
  check(controller->processId()==pid&&controller->selectedNodeId()==selected&&controller->nodes().size()==nodeCount,"navigation preserves proxy process, selected node and stored records");
  // Restoring the window height retargets the bottom-anchored sidebar selection
  // for selectionDuration (240 ms). Observe completion rather than assuming
@@ -346,6 +485,6 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
   auto percentile=[&](double fraction){return intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*fraction))];};
   performance={{"cycles",18},{"samples",intervals.size()},{"reportedRefreshHz",refresh},{"p50Ms",percentile(0.50)},{"p95Ms",percentile(0.95)},{"p99Ms",percentile(0.99)},{"maxMs",intervals.isEmpty()?0:intervals.last()},{"over1_5Budgets",overBudget},{"over2_5Budgets",overDouble},{"allDeliverySamples",allIntervals.size()},{"allDeliveryP95Ms",allIntervals.isEmpty()?0:allIntervals[qMin(allIntervals.size()-1,qsizetype(allIntervals.size()*0.95))]},{"method","Passive Qt frameSwapped intervals during 36 warm forward/reverse transitions driven by a normal QEventLoop; no QTest sleep polling, screenshot readback or per-frame expression polling. Active samples cover 20 ms through duration minus 20 ms; all-delivery statistics additionally retain the stationary commit tail. Delivery intervals are not physical display presentation FPS."}};
  }
- QFile file(directory+"/navigation-report.json");if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"checks",checks},{"nativeMotionPolicy",nativeMotionPolicy},{"endpointSamples",endpointSamples},{"performance",performance},{"failures",failures},{"nativeHandleUnchanged",window->winId()==handle},{"dpr",window->devicePixelRatio()}}).toJson());
+ QFile file(directory+"/navigation-report.json");if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"checks",checks},{"nativeMotionPolicy",nativeMotionPolicy},{"endpointSamples",endpointSamples},{"buttonSamples",buttonSamples},{"buttonAuditScope","Actual production page controls; canceled pointer releases invoke no commands. Process detail uses one page-local geometry row, never accounting data. Empty-source refresh-all is verified disabled."},{"performance",performance},{"failures",failures},{"nativeHandleUnchanged",window->winId()==handle},{"dpr",window->devicePixelRatio()}}).toJson());
  return failures;
 }

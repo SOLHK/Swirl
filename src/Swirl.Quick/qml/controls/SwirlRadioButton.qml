@@ -12,11 +12,13 @@ RadioButton {
     font.pixelSize: Theme.bodySize
     font.weight: Theme.bodyFontWeight
     SwirlFontBinding { target: control; textRole: "button" }
+    SwirlInteractionMotion {id:feedback;hovered:control.hovered;pressed:control.down;focused:control.visualFocus;controlEnabled:control.enabled}
     indicator: Rectangle {
         x: control.leftPadding
         y: (control.height - height) / 2
         width: Theme.dp(18); height: width; radius: width / 2
-        color: control.checked ? Theme.primaryButton : control.hovered ? Theme.hover : Theme.field
+        color: control.checked ? Theme.primaryButton : control.enabled && control.hovered ? Theme.hover : Theme.field
+        scale:1-(1-SwirlMotion.pressScale)*feedback.contact
         border.width: control.checked ? 0 : Theme.borderWidth
         border.color: Theme.controlBorder
         opacity: control.enabled ? 1 : Theme.disabledOpacity
@@ -31,7 +33,7 @@ RadioButton {
         }
         Rectangle {
             anchors.fill: parent; anchors.margins: -Theme.dp(3)
-            visible: control.visualFocus; color: "transparent"; radius: width / 2
+            visible:opacity>0;opacity:feedback.focusAmount;color: "transparent"; radius: width / 2
             border.width: Theme.dp(2); border.color: Theme.focusBorder
         }
     }

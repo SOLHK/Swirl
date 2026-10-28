@@ -120,9 +120,9 @@ Item {
         readonly property Item motionTitle: policyCaption
         readonly property Item motionSurface: policy
         objectName: "activityPolicyShortcut"
-        Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.preferredWidth: 1
+        Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.preferredWidth: 1.6
         implicitWidth: 0; implicitHeight: policyContents.implicitHeight
-        padding: 0; leftPadding: Theme.dp(8); rightPadding: Theme.dp(8); hoverEnabled: true; focusPolicy: Qt.StrongFocus
+        padding: 0; leftPadding: Theme.dp(14); rightPadding: Theme.dp(14); hoverEnabled: true; focusPolicy: Qt.StrongFocus
         Accessible.name: qsTr("策略：%1").arg(page.defaultTargetName)
         Accessible.description: qsTr("打开策略页面")
         onClicked: SwirlMotion.navigateFrom(policy, "policies", "")
@@ -138,13 +138,13 @@ Item {
             spacing: Theme.dp(4)
             RowLayout {
                 Layout.fillWidth: true; spacing: Theme.dp(4)
-                SwirlText { id: policyCaption; text: qsTr("策略"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true }
+                SwirlText { id: policyCaption; text: qsTr("策略"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight }
                 SwirlIcon { name: "chevron-right"; size: Theme.dp(12); color: policy.hovered || policy.visualFocus ? Theme.accent : Theme.muted; transform: Translate { x: policyCurve.position.x; y: policyCurve.position.y } }
             }
-            SwirlText { id: policyValue; text: page.defaultTargetName; tabularFigures: true; color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.Medium; Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight }
+            SwirlText { id: policyValue; objectName: "activityPolicyValue"; text: page.defaultTargetName; textFormat: Text.PlainText; tabularFigures: true; color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.Medium; Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight }
         }
         HoverHandler { cursorShape: Qt.PointingHandCursor }
-        SwirlToolTip { parent: policy; visible: policy.hovered || policy.visualFocus; text: qsTr("%1 · 打开策略").arg(page.defaultTargetName) }
+        SwirlToolTip { parent: policy; width: Math.min(implicitWidth, Theme.dp(420), page.width - Theme.dp(32)); visible: policy.hovered || policy.visualFocus; text: qsTr("%1 · 打开策略").arg(page.defaultTargetName) }
     }
     component StatRow: RowLayout {
         id: stat
@@ -159,13 +159,16 @@ Item {
     component SectionTitle: SwirlMotionButton {
         id: titleControl
         property string caption: ""
+        readonly property Item motionTitle: titleCaption
         signal navigate()
-        implicitHeight: Theme.dp(30); hoverEnabled: true; padding: 0; rightPadding: Theme.dp(5)
+        implicitHeight: Theme.controlHeight; hoverEnabled: true
+        leftPadding: Theme.dp(8); rightPadding: Theme.dp(12); topPadding: Theme.dp(4); bottomPadding: Theme.dp(4)
+        Layout.leftMargin: -leftPadding
         baselineOffset: titleContents.y + titleCaption.y + titleCaption.baselineOffset
         background: SwirlControlSurface { quiet: true; hovered: titleControl.hovered; pressed: titleControl.down; focused: titleControl.visualFocus; controlEnabled: titleControl.enabled }
         contentItem: RowLayout {
             id: titleContents
-            spacing: Theme.dp(6)
+            spacing: Theme.dp(8)
             SwirlText { id: titleCaption; text: titleControl.caption; color: Theme.text; font.pixelSize: Theme.fontSize(16); font.weight: Font.DemiBold }
             SwirlIcon { name: "chevron-right"; size: Theme.dp(14); color: Theme.muted }
         }
@@ -347,7 +350,7 @@ Item {
                     readonly property Item motionTitle: connectionCountRow.valueItem
                     readonly property Item motionSurface: connectionsSection
                     Layout.fillWidth: true; Layout.fillHeight: false; Layout.preferredWidth: 2; Layout.minimumWidth: 0; Layout.alignment: Qt.AlignTop; spacing: Theme.dp(2)
-                    SectionTitle { caption: qsTr("活动连接"); onNavigate: SwirlMotion.navigateFrom(connectionsSection, "connections", "activeConnections") }
+                    SectionTitle { objectName: "activityConnectionsDetails"; caption: qsTr("活动连接"); onNavigate: SwirlMotion.navigateFrom(connectionsSection, "connections", "activeConnections") }
                     StatRow { id: connectionCountRow; caption: qsTr("连接数量"); value: page.telemetry.connectionsSampled ? String(page.telemetry.activeConnections) : "—" }
                     StatRow { caption: qsTr("进程"); value: page.telemetry.connectionsSampled ? String(page.telemetry.activeProcesses) : "—" }
                     StatRow { caption: qsTr("设备"); value: page.telemetry.connectionsSampled ? String(page.activeDeviceCount) : "—" }

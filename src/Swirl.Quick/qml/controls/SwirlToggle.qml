@@ -5,21 +5,20 @@ import SwirlQuick
 Switch {
     id: control
     property bool large: false
-    property real motionScale: down ? SwirlMotion.pressScale : 1
+    property real motionScale:1-(1-SwirlMotion.pressScale)*feedback.contact
+    SwirlInteractionMotion {id:feedback;hovered:control.hovered;pressed:control.down;focused:control.visualFocus;controlEnabled:control.enabled}
     implicitWidth: Theme.dp(large ? 52 : 36)
     implicitHeight: Theme.dp(large ? 24 : 17)
     padding: 0
     hoverEnabled: true
     onPressed: SwirlMotion.noteTrigger(control)
-    Behavior on motionScale { enabled: !SwirlMotion.reduced; NumberAnimation { duration: control.down ? SwirlMotion.pressDuration : SwirlMotion.releaseDuration; easing.type: Easing.OutCubic } }
     indicator: Rectangle {
         width: control.width; height: control.height
         scale: control.motionScale
         radius: height / 2
         color: control.checked ? Theme.primaryButton : Theme.toggleTrack
-        opacity: control.enabled ? (control.hovered ? 0.9 : 1) : Theme.disabledOpacity
+        opacity:control.enabled ? 1-0.1*feedback.hover : Theme.disabledOpacity
         Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.switchDuration } }
-        Behavior on opacity { enabled: !SwirlMotion.reduced; NumberAnimation { duration: SwirlMotion.hoverDuration } }
         Rectangle {
             property real thumbPosition: control.checked ? 1 : 0
             width: parent.height - Theme.dp(4); height: width
@@ -31,7 +30,7 @@ Switch {
         }
         Rectangle {
             anchors.fill: parent; anchors.margins: -Theme.dp(3)
-            visible: control.visualFocus; color: "transparent"; radius: height / 2
+            visible:opacity>0;opacity:feedback.focusAmount;color: "transparent"; radius: height / 2
             border.width: Theme.dp(2); border.color: Theme.focusBorder
         }
     }

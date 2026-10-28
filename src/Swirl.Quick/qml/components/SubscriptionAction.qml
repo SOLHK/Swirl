@@ -15,10 +15,11 @@ SwirlMotionButton {
     property string tooltip: ""
     property bool tooltipEnabled: true
     readonly property bool iconOnly: text.length === 0
-    implicitWidth: iconOnly ? Theme.dp(44) : contents.implicitWidth + Theme.dp(24)
-    implicitHeight: Theme.controlHeight
+    implicitWidth: iconOnly ? Theme.dp(44) : contents.implicitWidth + leftPadding + rightPadding
+    implicitHeight:Math.max(Theme.controlHeight,contents.implicitHeight+topPadding+bottomPadding)
     hoverEnabled: true
-    padding: Theme.dp(8)
+    leftPadding:Theme.dp(iconOnly?8:16);rightPadding:leftPadding
+    topPadding:Theme.dp(4);bottomPadding:Theme.dp(4)
     Accessible.name: text
     background: SwirlControlSurface {
         anchors.centerIn: parent
@@ -39,7 +40,8 @@ SwirlMotionButton {
         RowLayout {
             id: contents
             anchors.centerIn: parent
-            spacing: Theme.dp(7)
+            width:Math.min(implicitWidth,parent.width)
+            spacing: Theme.dp(8)
             SwirlIcon {
                 visible: control.iconName.length > 0
                 name: control.iconName; size: Theme.dp(16)
@@ -48,8 +50,11 @@ SwirlMotionButton {
                 RotationAnimator on rotation { running: control.spinning && control.visible && control.Window.window && control.Window.window.visible && control.Window.window.visibility !== Window.Minimized && !SwirlMotion.reduced; from: 0; to: 360; duration: 1000; loops: Animation.Infinite }
             }
             SwirlText {
+                id:caption
+                Layout.fillWidth:true
                 visible: !control.iconOnly
                 text: control.text; textRole: "button"
+                elide:Text.ElideRight
                 color: control.solid ? Theme.primaryButtonText : control.danger ? Theme.red : Theme.text
                 font.pixelSize: Theme.buttonSize
                 font.weight: control.solid || control.selected ? Font.DemiBold : Font.Medium
@@ -58,7 +63,7 @@ SwirlMotionButton {
     }
     SwirlToolTip {
         parent: control
-        visible: control.tooltipEnabled && control.enabled && (control.hovered || control.visualFocus) && control.tooltip.length > 0
-        text: control.tooltip
+        visible: control.tooltipEnabled && control.enabled && (control.hovered || control.visualFocus) && (control.tooltip.length > 0 || caption.truncated)
+        text:control.tooltip.length ? control.tooltip : control.text
     }
 }

@@ -13,7 +13,7 @@ CheckBox {
     property color shownColor:targetColor
     property real markOpacity:0
     property real markScale:0.65
-    readonly property color targetColor:checked?Theme.primaryButton:hovered?Theme.hover:Theme.buttonBase
+    readonly property color targetColor:checked?Theme.primaryButton:enabled && hovered?Theme.hover:Theme.buttonBase
     readonly property bool windowVisible:!Window.window || (Window.window.visible && Window.window.visibility!==Window.Minimized)
     readonly property bool animate:visible && windowVisible && !SwirlMotion.reduced
     readonly property bool moving:colorTravel.running || markFade.running || markTravel.running || contact.moving
@@ -39,7 +39,7 @@ CheckBox {
     ColorAnimation {id:colorTravel;target:control;property:"shownColor";duration:SwirlMotion.switchDuration}
     NumberAnimation {id:markFade;target:control;property:"markOpacity";duration:SwirlMotion.releaseDuration}
     NumberAnimation {id:markTravel;target:control;property:"markScale";duration:SwirlMotion.switchDuration;easing.type:Easing.OutCubic}
-    SwirlInteractionMotion {id:contact;pressed:control.down;controlEnabled:control.enabled}
+    SwirlInteractionMotion {id:contact;hovered:control.hovered;pressed:control.down;focused:control.visualFocus;controlEnabled:control.enabled}
     indicator: Rectangle {
         x: 0; y: (control.height - height) / 2
         width: Theme.dp(16); height: width; radius: Theme.dp(4)
@@ -64,7 +64,7 @@ CheckBox {
         }
         Rectangle {
             anchors.fill: parent; anchors.margins: -Theme.dp(3)
-            visible: control.visualFocus; color: "transparent"; radius: Theme.dp(6)
+            visible:opacity>0;opacity:contact.focusAmount;color: "transparent"; radius: Theme.dp(6)
             border.width: Theme.dp(2); border.color: Theme.focusBorder
         }
     }

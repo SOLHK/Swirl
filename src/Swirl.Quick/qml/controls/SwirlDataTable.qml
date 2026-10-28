@@ -203,8 +203,15 @@ Item {
                     readonly property bool sectionRow:table.sectioned&&record&&record.rowKind==="section"
                     readonly property string presentationKey:table.displayKey(record,index)
                     property bool pooled:false
+                    SwirlInteractionMotion {
+                        id:rowFeedback
+                        hovered:!recordRow.pooled && mouse.containsMouse
+                        pressed:!recordRow.pooled && mouse.pressed
+                        focused:!recordRow.pooled && list.activeFocus && list.currentIndex===index
+                        controlEnabled:recordRow.enabled && !recordRow.pooled
+                    }
                     property real visualOffsetY:0
-                    function clearPresentation(){if(positionShift)positionShift.stop();visualOffsetY=0;scale=1;opacity=1;if(contextMenu)contextMenu.close();if(actionsLoader.item&&actionsLoader.item.closeMenu)actionsLoader.item.closeMenu()}
+                    function clearPresentation(){if(positionShift)positionShift.stop();if(rowFeedback)rowFeedback.finish();visualOffsetY=0;scale=1;opacity=1;if(contextMenu)contextMenu.close();if(actionsLoader.item&&actionsLoader.item.closeMenu)actionsLoader.item.closeMenu()}
                     function presentFrom(offset){positionShift.stop();visualOffsetY=offset;if(Math.abs(offset)>0.25){positionShift.to=0;positionShift.start()}else visualOffsetY=0}
                     SmoothedAnimation {id:positionShift;target:recordRow;property:"visualOffsetY";to:0;duration:SwirlMotion.duration;velocity:-1}
                     onPresentationKeyChanged:{clearPresentation();if(table.selectedItem===recordRow)table.selectedItem=null}
@@ -219,13 +226,13 @@ Item {
                     Accessible.onPressAction:table.chooseRow(recordRow,true)
                     Rectangle {
                     anchors.fill:parent
-                    transform:Translate {y:recordRow.visualOffsetY}
+                    transform:[Translate {y:recordRow.visualOffsetY},Scale {origin.x:recordRow.width/2;origin.y:recordRow.height/2;xScale:1-0.008*rowFeedback.contact;yScale:1-(1-SwirlMotion.pressScale)*rowFeedback.contact}]
                     radius:table.minimal?Theme.dp(10):0
-                    border.width:table.sectioned&&list.activeFocus&&list.currentIndex===index?Theme.dp(1):0
-                    border.color:table.rowActions!==null?Theme.text:Theme.focusBorder
+                    border.width:table.sectioned?Theme.dp(1):0
+                    border.color:Theme.withAlpha(table.rowActions!==null?Theme.text:Theme.focusBorder,rowFeedback.focusAmount)
                     color:!recordRow.sectionRow&&table.selectedId===String(recordRow.record.id||recordRow.record.name) ? (table.minimal?(table.rowActions!==null?Theme.navigationSelected:Theme.withAlpha(Theme.accent,0.12)):Theme.selected) :
                           mouse.containsMouse ? (table.minimal?(table.rowActions!==null?Theme.hover:Theme.withAlpha(Theme.accent,0.055)):Theme.hover) : table.minimal?"transparent":(index%2?Theme.field:Theme.surface)
-                    Behavior on color { ColorAnimation { duration:Theme.motion } }
+                    Behavior on color { enabled:!SwirlMotion.reduced;ColorAnimation { duration:SwirlMotion.hoverDuration } }
                     Rectangle { anchors.bottom:parent.bottom; width:parent.width; height:Theme.dp(1); color:Theme.border; opacity:table.fillEmptyRows||table.minimal?0:0.6 }
                     Row {
                         anchors.fill:parent
