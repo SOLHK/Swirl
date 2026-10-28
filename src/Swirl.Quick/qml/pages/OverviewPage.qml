@@ -34,7 +34,7 @@ Item {
                 Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: Theme.dp(6)
                 SwirlText { text: row.title; color: Theme.text; font.pixelSize: Theme.fontSize(16); font.weight: Font.DemiBold; Layout.fillWidth: true; wrapMode: Text.Wrap }
                 SwirlText { text: row.description; color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; wrapMode: Text.Wrap }
-                SwirlText { text: row.status; textFormat:Text.PlainText; color: row.active ? Theme.accent : Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; wrapMode: Text.Wrap }
+                SwirlText { text: row.status; textFormat:Text.PlainText; color: row.active ? Theme.accent : row.available ? Theme.muted : Theme.disabledText; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; wrapMode: Text.Wrap }
             }
             RowLayout {
                 Layout.alignment: Qt.AlignRight | Qt.AlignVCenter; spacing: Theme.dp(14)

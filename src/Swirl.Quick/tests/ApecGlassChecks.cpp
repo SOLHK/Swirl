@@ -15,12 +15,23 @@
 #include <QDir>
 #include <QSGRendererInterface>
 #include <memory>
+#include <functional>
 
 int runApecGlassChecks(QQuickWindow *window,const QString &output) {
     QJsonArray checks;int failures=0;
     const auto check=[&](const char *name,bool passed){checks.append(QJsonObject{{"name",name},{"passed",passed}});if(!passed)++failures;qInfo()<<"APEC_GLASS_CHECK"<<name<<passed;};
     const auto eval=[&](const QString &code){QQmlExpression expression(qmlContext(window),window,code);auto value=expression.evaluate();if(expression.hasError()){qWarning()<<expression.error();check("qml-expression",false);}return value;};
+    std::function<QQuickItem *(QQuickItem *,const QString &)> findVisual;
+    findVisual=[&](QQuickItem *root,const QString &name)->QQuickItem *{
+        if(!root)return nullptr;
+        if(root->objectName()==name)return root;
+        for(auto *child:root->childItems())if(auto *found=findVisual(child,name))return found;
+        return nullptr;
+    };
     check("gpu-backend",window->rendererInterface()->graphicsApi()!=QSGRendererInterface::Software);
+    bool expectedDprSet=false;
+    const auto expectedDpr=qEnvironmentVariable("SWIRL_EXPECTED_DPR").toDouble(&expectedDprSet);
+    if(expectedDprSet)check("requested-device-pixel-ratio",qAbs(window->devicePixelRatio()-expectedDpr)<0.01);
     eval("Theme.mode='Light';Theme.transparency=true;Theme.increaseContrast=false;Theme.reduceMotion=true;AppState.navigate('activity')");
     window->resize(1100,760);window->requestActivate();QTest::qWait(200);
     auto *productionShader=window->findChild<QObject *>("sidebarLiquidShader");
@@ -43,7 +54,7 @@ int runApecGlassChecks(QQuickWindow *window,const QString &output) {
     check("wing-decoration-spans-workspace",decoration && decoration->width()==scene->width() && decoration->height()==scene->height());
     auto *footprint=scene?scene->findChild<QQuickItem *>("apecWingFootprint"):nullptr;
     auto *wingVisual=scene?scene->findChild<QQuickItem *>("apecWingVisual"):nullptr;
-    check("flat-wing-vector-loaded",footprint && wingVisual && scene->findChild<QQuickItem *>("apecFlatWingPaths"));
+    check("flat-wing-vector-loaded",footprint && wingVisual && findVisual(scene,"apecFlatWingPaths"));
     for(const QSize size:{QSize(760,672),QSize(914,672),QSize(1100,760)}) {
         window->resize(size);QTest::qWait(50);
         check("single-wing-spans-window-diagonally-with-fixed-aspect",footprint
@@ -63,7 +74,7 @@ int runApecGlassChecks(QQuickWindow *window,const QString &output) {
         check("production-wing-remains-visible-through-lower-glass",featherPixels>transmitted.width()*transmitted.height()/200);
     }
     check("sidebar-retains-floating-inset-and-14dp-contour",eval("sidebar.glassSurface.x===Theme.shellInset && sidebar.glassSurface.y===Theme.shellInset && sidebar.glassSurface.radius===14").toBool());
-    check("neutral-light-canvas-and-card-palette",eval("Theme.canvas.toString()==='#f3f3f5' && Theme.surface.toString()==='#f8f8fa' && Theme.border.toString()==='#e3e3e7'").toBool());
+    check("neutral-light-canvas-and-card-palette",eval("Theme.canvas.toString()==='#f7f7f8' && Theme.surface.toString()==='#ffffff' && Theme.border.toString()==='#e0e0e3'").toBool());
     if(decoration){
         auto decorated=grab(scene);
         decoration->setVisible(false);QTest::qWait(35);auto plain=grab(scene);
@@ -145,7 +156,9 @@ Item {
             initial.save(directory+"/glass-source-blue.png");
             check("rounded-clip-transparent-corner",initial.pixelColor(0,0).alpha()<8);
             const auto left=sample(initial,100,140),right=sample(initial,300,140),edge=sample(initial,200,140);
-            check("source-colours-transmitted-with-restrained-saturation",right.red()>left.red()+30 && left.blue()>left.red() && left.hsvSaturation()<170 && right.hsvSaturation()<170);
+            check("source-colours-transmitted-without-pigment-wash",right.red()>left.red()+100 && left.blue()>left.red()+60 && left.hsvSaturation()>170);
+            const auto stripe=sample(initial,2,140),besideStripe=sample(initial,20,140);
+            check("fine-source-stripe-remains-recognizable",stripe.lightness()>besideStripe.lightness()+40);
             check("blur-mixes-source-boundary",edge.red()>left.red()+8 && edge.red()<right.red()-8);
             eval("apecGlass.source.color='#BD334F'");QTest::qWait(100);auto changed=capture();changed.save(directory+"/glass-source-red.png");
             check("live-source-change-reaches-material",!changed.isNull() && sample(changed,100,140).red()>left.red()+35);
@@ -166,7 +179,8 @@ Item {
             eval("apecGlass.source.color='#BD334F'");
         }
         const auto size=eval("apecGlass.glass.captureSize").toSizeF();
-        check("capture-bounded-to-panel",size.width()<=440 && size.height()<=320 && size.width()>0 && size.height()>0);
+        const auto scale=qMin(2.0,window->devicePixelRatio());
+        check("capture-bounded-to-panel-at-native-dpr",size.width()<=qCeil(440*scale) && size.height()<=qCeil(320*scale) && size.width()>0 && size.height()>0);
         eval("apecGlass.glass.visible=false");QTest::qWait(30);check("hidden-capture-stopped",!eval("apecGlass.glass.captureLive").toBool());
         eval("apecGlass.glass.visible=true;Theme.transparency=false");QTest::qWait(60);
         check("opaque-fallback-releases-sample",eval("!apecGlass.glass.sampled && !apecGlass.glass.captureLive").toBool());
@@ -181,25 +195,96 @@ Item {
     }
     eval("Theme.mode='Light';Theme.transparency=true;Theme.reduceMotion=false;Theme.followSystemMotion=false");
     QQmlComponent entryComponent(qmlEngine(window));
-    entryComponent.setData("import QtQuick; import SwirlQuick; SwirlWorkspaceBackdrop {width:914;height:672;homeVisible:false;glassSampled:true}",QUrl("qrc:/qt/qml/SwirlQuick/NativeWingEntryFixture.qml"));
+    entryComponent.setData("import QtQuick; import SwirlQuick; SwirlWorkspaceBackdrop {width:914;height:672;visible:false;glassSampled:true}",QUrl("qrc:/qt/qml/SwirlQuick/NativeWingEntryFixture.qml"));
     std::unique_ptr<QObject> entryOwner(entryComponent.createWithInitialProperties({{"targetWindow",QVariant::fromValue(window)}},qmlContext(window)));
     auto *entry=qobject_cast<QQuickItem *>(entryOwner.get());
     check("native-opening-fixture-loaded",entry!=nullptr);
     if(entry){
         entry->setParentItem(window->contentItem());entry->setZ(120);
         entry->setProperty("glassSurface",QVariant::fromValue(window->findChild<QQuickItem *>("sidebarFloatingBackground")));
-        entry->setProperty("homeVisible",true);QTest::qWait(100);
-        const auto early=grab(entry);QTest::qWait(180);const auto middle=grab(entry);
+        QTest::qWait(180);
+        check("hidden-opening-waits-for-visible-frame",!entry->property("entranceConsumed").toBool() && entry->property("progress").toDouble()==0);
+        entry->setVisible(true);window->update();
+        check("visible-frame-starts-opening",QTest::qWaitFor([&]{return entry->property("entering").toBool();},1500));
+        QTest::qWait(120);
+        const auto early=grab(entry);QTest::qWait(800);const auto middle=grab(entry);
         check("native-opening-frames-progress",!early.isNull() && !middle.isNull() && early!=middle && entry->property("entering").toBool());
-        check("native-opening-completes",QTest::qWaitFor([&]{return !entry->property("entering").toBool();},1500));
+        check("native-opening-completes",QTest::qWaitFor([&]{return !entry->property("entering").toBool();},3000));
         const auto settled=grab(entry);QTest::qWait(80);const auto resting=grab(entry);
         check("native-wing-is-pixel-static-at-rest",!settled.isNull() && settled==resting);
         early.save(directory+"/wing-entry-early.png");middle.save(directory+"/wing-entry-middle.png");settled.save(directory+"/wing-entry-settled.png");
-        entry->setProperty("homeVisible",false);QTest::qWait(35);
-        entry->setProperty("homeVisible",true);QTest::qWait(35);
+        entry->setVisible(false);QTest::qWait(35);
+        entry->setVisible(true);QTest::qWait(35);
         check("native-return-does-not-replay-opening",!entry->property("entering").toBool() && grab(entry)==settled);
     }
+    owner.reset();entryOwner.reset();
+    QQmlComponent featherComponent(qmlEngine(window));
+    featherComponent.setData("import QtQuick; import SwirlQuick; SwirlWingAnimation {width:320;height:160}",QUrl("qrc:/qt/qml/SwirlQuick/FeatherSequenceFixture.qml"));
+    std::unique_ptr<QObject> featherOwner(featherComponent.create(qmlContext(window)));
+    auto *feathers=qobject_cast<QQuickItem *>(featherOwner.get());
+    check("independent-feather-fixture-loads",feathers!=nullptr);
+    if(feathers){
+        feathers->setParentItem(window->contentItem());feathers->setZ(120);
+        const auto reveal=[&](int index){auto *feather=findVisual(feathers,QStringLiteral("wingFeather%1").arg(index));return feather?feather->property("reveal").toDouble():-1.;};
+        feathers->setProperty("progress",0.12);QTest::qWait(40);const auto first=grab(feathers);
+        check("first-feather-grows-before-other-feathers",reveal(0)>0 && reveal(0)<1 && reveal(1)==0 && reveal(2)==0 && reveal(3)==0);
+        feathers->setProperty("progress",0.38);QTest::qWait(40);const auto second=grab(feathers);
+        check("second-feather-grows-before-third",reveal(0)>reveal(1) && reveal(1)>0 && reveal(2)==0 && reveal(3)==0);
+        check("independent-feather-frames-render-differently",!first.isNull() && !second.isNull() && first!=second);
+        feathers->setProperty("progress",1.0);QTest::qWait(40);const auto full=grab(feathers);
+        check("all-feathers-complete",reveal(0)==1 && reveal(1)==1 && reveal(2)==1 && reveal(3)==1);
+        feathers->setProperty("progress",0.55);QTest::qWait(40);
+        check("closing-retires-last-feather-first",reveal(0)==1 && reveal(1)>reveal(2) && reveal(2)>0 && reveal(3)==0);
+        feathers->setProperty("progress",0.12);QTest::qWait(40);
+        check("closing-leaves-only-first-feather",reveal(0)>0 && reveal(1)==0 && reveal(2)==0 && reveal(3)==0);
+        feathers->setProperty("progress",0.0);QTest::qWait(40);
+        check("closed-wing-fully-hidden",!feathers->isVisible() && reveal(0)==0 && reveal(1)==0 && reveal(2)==0 && reveal(3)==0);
+        first.save(directory+"/small-wing-first.png");second.save(directory+"/small-wing-second.png");full.save(directory+"/small-wing-full.png");
+    }
+    featherOwner.reset();
+    eval("Theme.reduceMotion=true;Theme.followSystemMotion=false");
+    for(const QString theme:{QStringLiteral("Light"),QStringLiteral("Dark")}){
+        eval(QStringLiteral("Theme.mode='%1'").arg(theme));
+        const auto canvasColor=eval("Theme.canvas").value<QColor>();
+        check("canvas-has-no-blue-cast",qMax(canvasColor.red(),qMax(canvasColor.green(),canvasColor.blue()))-qMin(canvasColor.red(),qMin(canvasColor.green(),canvasColor.blue()))<=2);
+        if(theme=="Dark")check("dark-canvas-is-near-black",canvasColor.lightness()<24);
+        for(const QString route:{QStringLiteral("activity"),QStringLiteral("overview"),QStringLiteral("featurehub"),QStringLiteral("policies")}){
+            eval(QStringLiteral("AppState.navigate('%1')").arg(route));
+            check("page-settles-before-visual-capture",QTest::qWaitFor([&]{return eval(QStringLiteral("AppState.currentPage==='%1' && pageLoader.item!==null && !pageLoader.moving && !pageLoader.pendingGrab && !SwirlMotion.busy").arg(route)).toBool();},4000));
+            QTest::qWait(80);
+            check("global-wing-stays-complete-across-pages-and-themes",eval("appSceneBackdrop.progress===1 && !appSceneBackdrop.entering && appSceneBackdrop.decorationSource.visible").toBool());
+            const auto image=window->grabWindow();
+            check("settled-native-page-capture-saved",!image.isNull() && image.save(directory+QStringLiteral("/final-%1-%2.png").arg(theme.toLower(),route)));
+            if(route=="activity"){
+                for(const char *name:{"activityProxyWing","diagnosticProxyWing"}){
+                    auto *smallWing=window->findChild<QQuickItem *>(name);
+                    check("stopped-production-proxy-wing-is-empty",smallWing && smallWing->property("progress").toDouble()==0);
+                }
+            }
+            if(route=="featurehub"){
+                auto *general=window->findChild<QQuickItem *>("settings-settings");
+                auto *dns=window->findChild<QQuickItem *>("settings-dns");
+                const auto surface=[](QQuickItem *entry){return entry?qobject_cast<QQuickItem *>(entry->property("background").value<QObject *>()):nullptr;};
+                auto *generalSurface=surface(general),*dnsSurface=surface(dns);
+                if(general && generalSurface){
+                    const auto top=general->mapToScene(QPointF(general->width()/2,0)).toPoint();
+                    const QPoint outside(top.x(),qMax(1,top.y()-12));
+                    QTest::mouseMove(window,outside);
+                    check("settings-card-hover-starts-from-rest",QTest::qWaitFor([&]{return !general->property("hovered").toBool() && generalSurface->property("color")==eval("Theme.independentCard");},1000));
+                    check("settings-general-and-dns-share-card-material",dnsSurface && generalSurface->property("color")==dnsSurface->property("color"));
+                    const auto resting=generalSurface->property("color");
+                    const auto center=general->mapToScene(QPointF(general->width()/2,general->height()/2)).toPoint();
+                    QTest::mouseMove(window,center);
+                    check("settings-card-hover-has-visible-feedback",QTest::qWaitFor([&]{return general->property("hovered").toBool() && generalSurface->property("color")!=resting && generalSurface->property("color")==eval("Theme.cardHover");},1000));
+                    QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,center);QTest::qWait(30);
+                    check("settings-card-press-uses-shared-feedback",generalSurface->property("color")==eval("Theme.cardPressed"));
+                    QTest::mouseMove(window,outside);
+                    QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,outside);QTest::qWait(30);
+                }else check("settings-general-and-dns-share-card-material",false);
+            }
+        }
+    }
     QFile file(output);if(!file.open(QIODevice::WriteOnly))return 2;
-    file.write(QJsonDocument(QJsonObject{{"checks",checks},{"failures",failures},{"qtVersion",qVersion()},{"graphicsApi",int(window->rendererInterface()->graphicsApi())},{"scope","Native app-source pixel readback; not desktop sampling, physical refresh, DPI or private-network acceptance"}}).toJson());
+    file.write(QJsonDocument(QJsonObject{{"checks",checks},{"failures",failures},{"qtVersion",qVersion()},{"devicePixelRatio",window->devicePixelRatio()},{"graphicsApi",int(window->rendererInterface()->graphicsApi())},{"scope","Native app-source pixel readback and controlled DPR; not desktop sampling, physical refresh, mixed-monitor DPI or private-network acceptance"}}).toJson());
     return failures?1:0;
 }

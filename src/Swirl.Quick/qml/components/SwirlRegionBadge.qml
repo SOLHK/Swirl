@@ -5,7 +5,7 @@ Rectangle {
     property string region:"SG"
     width:Theme.dp(68); height:Theme.dp(58); radius:Theme.secondaryRadius; color:Theme.raised
     Rectangle {
-        x:Theme.dp(5); y:Theme.dp(8); width:parent.width-Theme.dp(10); height:Theme.dp(28); radius:Theme.roundedRadius(width,height); color:badge.region==="SG" ? "#EF2742" : "#E5EFFB"
+        x:Theme.dp(5); y:Theme.dp(8); width:parent.width-Theme.dp(10); height:Theme.dp(28); radius:Theme.roundedRadius(width,height); color:badge.region==="SG" ? "#EF2742" : Theme.surface
         SwirlText { visible:badge.region!=="SG"; anchors.centerIn:parent; text:badge.region; color:Theme.muted; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
         Canvas {
         onVisibleChanged:if(visible)requestPaint();

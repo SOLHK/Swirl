@@ -152,7 +152,7 @@ target_sources(Swirl PRIVATE network/GatewayService.h network/GatewayService.cpp
 target_link_libraries(Swirl PRIVATE SwirlEngine SwirlHttp2 SwirlExtensions)
 add_dependencies(Swirl SwirlScriptRunner)
 set(SWIRL_QML_FILES
- qml/components/SwirlLiquidGlass.qml qml/components/SwirlWorkspaceBackdrop.qml
+ qml/components/SwirlLiquidGlass.qml qml/components/SwirlWorkspaceBackdrop.qml qml/controls/SwirlWingAnimation.qml qml/SwirlProxyWingMotion.qml
  qml/controls/SwirlArcMotion.qml qml/controls/SwirlInteractionMotion.qml qml/controls/SwirlFlow.qml qml/controls/SwirlPopupMotion.qml
  qml/controls/SwirlControlSurface.qml qml/controls/SwirlSlider.qml qml/controls/SwirlRadioButton.qml
  qml/components/SwirlPageHeader.qml qml/components/SwirlSectionTitle.qml
@@ -205,7 +205,7 @@ foreach(file IN LISTS SWIRL_QML_FILES)
     string(REGEX REPLACE "^qml/" "" qml_alias "${file}")
     set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "${qml_alias}")
 endforeach()
-set_source_files_properties(qml/SwirlMotion.qml qml/SwirlTransitionRegistry.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+set_source_files_properties(qml/SwirlMotion.qml qml/SwirlProxyWingMotion.qml qml/SwirlTransitionRegistry.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 # Resource URLs are shared across branches and test/production builds. Bind the
 # disk cache to QML contents even when resource timestamps have not changed.
 set(SWIRL_QML_CACHE_INPUT "")

@@ -96,8 +96,9 @@ ApplicationWindow {
             id:appSceneBackdrop
             anchors.fill:parent;targetWindow:window
             glassSurface:sidebar.glassSurface;glassSampled:sidebar.glassSampled
-            homeVisible:pageLoader.routeKey==="activity"
         }
+
+        Binding { target: SwirlProxyWingMotion; property: "windowVisible"; value: window.visible && window.visibility !== Window.Minimized }
 
         MouseArea {
             objectName:"titleDragArea"

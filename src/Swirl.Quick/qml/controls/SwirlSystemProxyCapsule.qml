@@ -2,6 +2,7 @@ import QtQuick
 import SwirlQuick
 
 SwirlStatusCapsule {
+    proxyWing: true
     id: control
     required property var controller
     readonly property bool proxyEnabled: controller.proxyRequested || controller.systemProxy.owned || controller.processAlive

@@ -13,6 +13,8 @@ layout(std140,binding=0) uniform buf {
     float interaction;
     vec2 lightPoint;
     float darkMode;
+    vec4 highlightColor;
+    vec4 reflectionColor;
 };
 layout(binding=1) uniform sampler2D source;
 layout(binding=2) uniform sampler2D sharpSource;
@@ -52,19 +54,14 @@ void main(){
     // The shared window material is already below this texture. Preserve the
     // decoration's premultiplied alpha instead of adding a second opaque base.
     // At the boundary both displacement and blur reach zero: one continuous wing.
-    vec4 color=mix(texture(sharpSource,(p+padding)/extent),blur,smoothstep(0.,8.,-d));
-    // Neutralize transmitted pigment while retaining alpha, live source detail,
-    // blur and edge displacement. No opaque paint covers the glass.
-    float luminance=dot(color.rgb,vec3(.2126,.7152,.0722));
-    color.rgb=mix(vec3(luminance),color.rgb,.66);
-    color.rgb=mix(color.rgb,vec3(.94)*color.a,mix(.10,.04,darkMode));
+    vec4 color=mix(texture(sharpSource,(p+padding)/extent),blur,.72*smoothstep(0.,8.,-d));
     float facing=max(0.,dot(normal,normalize(vec2(-.65,-1.))));
     float rim=exp(-max(0.,-d)*1.25);
     // Keep the resting light directional, but let the interaction glint reach
     // every edge without shifting the distant wing or lighting a whole outline.
-    float highlight=rim*(.16*facing+.12*localInteraction);
-    color=vec4(vec3(.88,.96,1.)*highlight,highlight)+color*(1.-highlight);
-    float reflection=edge*edge*(1.-facing)*mix(.015,.045,darkMode);
-    color=vec4(vec3(.08,.12,.18)*reflection,reflection)+color*(1.-reflection);
+    float highlight=rim*(.20*facing+.12*localInteraction)*highlightColor.a;
+    color=vec4(highlightColor.rgb*highlight,highlight)+color*(1.-highlight);
+    float reflection=edge*edge*(1.-facing)*mix(.02,.045,darkMode)*reflectionColor.a;
+    color=vec4(reflectionColor.rgb*reflection,reflection)+color*(1.-reflection);
     fragColor=color*(mask*qt_Opacity);
 }
