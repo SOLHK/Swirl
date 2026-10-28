@@ -169,7 +169,6 @@ private slots:
   QCOMPARE(model.latencies().value("internet").toString(),QString::number(result.value("elapsedMs").toLongLong())+" ms");
   QVERIFY(result.value("advice").toString().contains(QStringLiteral("连接、TLS 与目标响应")));
  }
-#ifdef SWIRL_USE_RUST_CORE
  void nativeNodeProbeKeepsOutboundAndHeaderDurationsSeparate(){
   ControlledNetwork net;QVERIFY(net.start());QTcpServer origin;QVERIFY(origin.listen(QHostAddress::LocalHost,0));
   net.a.targetPorts.append(origin.serverPort());QPointer<QTcpSocket> pending;QByteArray request;
@@ -198,7 +197,6 @@ private slots:
   QVERIFY(!failed.value("success").toBool());QCOMPARE(failed.value("latency").toLongLong(),qint64(-1));
   QCOMPARE(failed.value("outboundConnectMs").toLongLong(),qint64(-1));QCOMPARE(net.a.forwarded,2);
  }
-#endif
 
  void httpsMeasurementStaysHttp1WhenOriginOffersHttp2(){
   const auto original=QSslConfiguration::defaultConfiguration();

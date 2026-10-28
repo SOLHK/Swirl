@@ -78,9 +78,7 @@ private slots:
         const QByteArray prefix="vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?security=reality&sni=camouflage.invalid&fp=chrome&pbk="+key+"&sid=abcd&flow=xtls-rprx-vision";
         for(const auto &network:QList<QByteArray>{"","&type=tcp","&network=tcp"}){
             const auto baseline=NodeImporter::parse(prefix+network);QVERIFY2(baseline,qPrintable(baseline.error));QVERIFY(baseline.nodes.first().conversionIssues.isEmpty());
-#ifdef SWIRL_USE_RUST_CORE
             QVERIFY(SwirlProtocolRegistry::nativeNodeReason(baseline.nodes.first()).isEmpty());
-#endif
         }
         QList<QByteArray> uris{prefix+"&type=",prefix+"&network="};
         for(const auto &network:QList<QByteArray>{"","&type=tcp","&network=tcp"})
@@ -112,11 +110,9 @@ private slots:
             const auto baseline=NodeImporter::parse(prefix+flow+network);QVERIFY2(baseline,qPrintable(baseline.error));
             QCOMPARE(baseline.nodes.size(),1);QCOMPARE(baseline.incompleteNodes,0);
             const auto reference=baseline.nodes.first();QVERIFY(reference.conversionIssues.isEmpty());
-#ifdef SWIRL_USE_RUST_CORE
             QJsonObject expectedOutbound;
             const auto baselineError=NativeNodeBridge::executableOutbound(reference,&expectedOutbound);
             QVERIFY2(baselineError.isEmpty(),qPrintable(baselineError));QVERIFY(!expectedOutbound.isEmpty());
-#endif
             for(const auto &extra:QList<QByteArray>{"&path=","&host=","&serviceName=","&host=&path=&headerType=none&serviceName="}){
                 const auto uri=prefix+flow+network+extra;
                 for(const auto &body:{uri,uri.toBase64()}){
@@ -125,19 +121,15 @@ private slots:
                     const auto node=parsed.nodes.first();QVERIFY(node.conversionIssues.isEmpty());
                     QCOMPARE(node.parameters,reference.parameters);
                     QCOMPARE(node.originalConfiguration.value("uri"),QJsonValue(QString::fromUtf8(uri)));
-#ifdef SWIRL_USE_RUST_CORE
                     QJsonObject outbound;const auto error=NativeNodeBridge::executableOutbound(node,&outbound);
                     QVERIFY2(error.isEmpty(),qPrintable(error));QCOMPARE(outbound,expectedOutbound);
-#endif
                     QTemporaryDir directory;QVERIFY(directory.isValid());const auto path=directory.filePath("empty-transport.dpapi");
                     {NodeStore store(path);QVERIFY(store.importNodes(parsed.nodes));QVERIFY(store.select(node.id));}
                     NodeStore restored(path);QCOMPARE(restored.nodes().size(),1);QCOMPARE(restored.selectedId(),node.id);
                     const auto saved=restored.nodes().first();QCOMPARE(saved.parameters,reference.parameters);
                     QCOMPARE(saved.originalConfiguration,node.originalConfiguration);QVERIFY(saved.conversionIssues.isEmpty());
-#ifdef SWIRL_USE_RUST_CORE
                     QJsonObject savedOutbound;const auto savedError=NativeNodeBridge::executableOutbound(saved,&savedOutbound);
                     QVERIFY2(savedError.isEmpty(),qPrintable(savedError));QCOMPARE(savedOutbound,expectedOutbound);
-#endif
                 }
             }
         }
@@ -170,9 +162,7 @@ private slots:
             for(const auto &body:{uri,uri.toBase64()}){
                 const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);QCOMPARE(parsed.incompleteNodes,0);
                 QCOMPARE(parsed.nodes.first().originalConfiguration.value("uri"),QJsonValue(QString::fromUtf8(uri)));QVERIFY(parsed.nodes.first().conversionIssues.isEmpty());
-#ifdef SWIRL_USE_RUST_CORE
                 QVERIFY(SwirlProtocolRegistry::nativeNodeReason(parsed.nodes.first()).isEmpty());
-#endif
             }
         }
         for(const auto &extra:QList<QByteArray>{"&type=tcp","&network=ws"}){
@@ -192,9 +182,7 @@ private slots:
                 const auto parsed=NodeImporter::parse(body);QVERIFY(parsed);QCOMPARE(parsed.incompleteNodes,0);QCOMPARE(parsed.nodes.size(),1);
                 QCOMPARE(parsed.nodes.first().parameters,baseline.nodes.first().parameters);
                 QCOMPARE(parsed.nodes.first().originalConfiguration.value("uri"),QJsonValue(QString::fromUtf8(uri)));
-#ifdef SWIRL_USE_RUST_CORE
                 QVERIFY(SwirlProtocolRegistry::nativeNodeReason(parsed.nodes.first()).isEmpty());
-#endif
             }
         }
         for(const auto &uri:QList<QByteArray>{prefix+"&type=tcp&headerType=",prefix+"&type=tcp&headerType=None",prefix+"&type=tcp&headerType=http",QByteArray("vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?type=ws&headerType=none")})
@@ -230,9 +218,7 @@ private slots:
             if(!existing.isEmpty())QVERIFY(node.conversionIssues.contains(existing));
             if(!supported){QVERIFY(node.conversionIssues.size()>old.conversionIssues.size());QVERIFY(!node.conversionIssues.join(' ').contains("fixture-secret"));}
             if(!supported||!existing.isEmpty())QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());
-#ifdef SWIRL_USE_RUST_CORE
             else {QVERIFY(SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());QCOMPARE(SwirlProtocolRegistry::describe(node).value("tested"),QVariant(false));}
-#endif
             QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),encrypted);
         }
     }

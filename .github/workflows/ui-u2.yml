@@ -78,7 +78,7 @@ jobs:
           rustup toolchain install stable --profile minimal
           rustup default stable
       - name: Configure Rust product and UI checks
-        run: cmake -S src/Swirl.Quick -B build/u2 -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=ON
+        run: cmake -S src/Swirl.Quick -B build/u2 -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON
       - name: Build
         run: cmake --build build/u2 --config Release --parallel 4 --target Swirl SwirlNodeViewModelTests
       - name: Model regression

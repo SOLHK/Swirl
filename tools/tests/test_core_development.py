@@ -167,7 +167,7 @@ def previous_socks5_udp_stage(source):
     qt = "          python tools/tests/test_socks5_udp.py Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path\n"
     return source.replace(development.QT_TEST_ARTIFACT, "").replace(
         development.NATIVE_QT_REPORT, development.PREVIOUS_NATIVE_QT_REPORT).replace(
-        development.COMPATIBILITY_GATE, development.PREVIOUS_COMPATIBILITY_GATE).replace(
+        development.REMOVED_RUNTIME_GATE, development.HISTORICAL_COMPATIBILITY_GATE).replace(
         development.NATIVE_APPLICATION_BUILD, "").replace(
         qt + development.WINDOWS_STATUS_GUARD, "").replace(
         command + development.WINDOWS_STATUS_GUARD, "").replace(command, "")
@@ -821,36 +821,64 @@ class CoreDevelopmentTests(unittest.TestCase):
             with self.subTest(tail=broken[-180:]), self.assertRaises(ValueError):
                 development.updated_workflow(broken)
 
-    def test_compatibility_import_runs_alongside_the_existing_native_dns_guard(self):
+    def test_removed_runtime_rejection_preserves_rust_import_and_dns_gates(self):
         final = development.updated_workflow(FIXTURE)
-        self.assertEqual(final.count(development.COMPATIBILITY_GATE), 1)
-        self.assertNotIn(development.PREVIOUS_COMPATIBILITY_GATE, final)
-        gate = development.COMPATIBILITY_GATE
-        self.assertIn("-DSWIRL_USE_RUST_CORE=OFF -DSWIRL_BUILD_UI_TESTS=ON\n", gate)
-        self.assertIn("--target SwirlEngineTests SwirlImportTests --parallel\n" + development.WINDOWS_STATUS_GUARD, gate)
-        self.assertIn("'^swirl-(native-dns-compatibility-guard|import-boundaries)$' --output-on-failure -V\n"
-                      + "          $compatQtExit = $LASTEXITCODE\n", gate)
-        self.assertIn("          if ($compatQtExit -ne 0) { exit $compatQtExit }\n", gate)
-        self.assertIn("$env:SWIRL_TEST_ROOT=Join-Path $env:RUNNER_TEMP 'swirl-compat-dns-tests'", gate)
+        self.assertEqual(final.count(development.REMOVED_RUNTIME_GATE), 1)
+        self.assertNotIn(development.HISTORICAL_COMPATIBILITY_GATE, final)
+        self.assertNotIn("SwirlEngineTests", final)
+        self.assertNotIn("build/compat-dns", final)
+        gate = development.REMOVED_RUNTIME_GATE
+        self.assertIn("-DSWIRL_USE_RUST_CORE=OFF 2>&1 | Tee-Object", gate)
+        self.assertIn("$runtimeConfigureExit = $LASTEXITCODE", gate)
+        self.assertIn("if ($runtimeConfigureExit -eq 0)", gate)
+        self.assertIn("'SWIRL_USE_RUST_CORE=OFF is no longer supported' -SimpleMatch -Quiet", gate)
+        self.assertIn(development.NATIVE_QT_REPORT, final)
+        self.assertIn("rust-qt-integration|storage-paths|import-boundaries", final)
+        for name in ("test_dns_negative.py", "test_dns_tls.py", "test_dns_https.py"):
+            self.assertEqual(final.count(f"python ../tools/tests/{name}\n"), 2)
         self.assertEqual(development.updated_workflow(previous_socks5_udp_stage(final)), final)
 
-    def test_compatibility_import_partial_or_weakened_gates_are_rejected(self):
+    def test_removed_runtime_partial_or_weakened_gates_are_rejected(self):
         final = development.updated_workflow(FIXTURE)
-        gate = development.COMPATIBILITY_GATE
+        gate = development.REMOVED_RUNTIME_GATE
         for broken_gate in (
             "",
             gate + gate,
-            development.PREVIOUS_COMPATIBILITY_GATE,
+            development.HISTORICAL_COMPATIBILITY_GATE,
             gate.replace("-DSWIRL_USE_RUST_CORE=OFF", "-DSWIRL_USE_RUST_CORE=ON"),
-            gate.replace("SwirlEngineTests SwirlImportTests", "SwirlEngineTests"),
-            gate.replace("SwirlEngineTests SwirlImportTests", "SwirlImportTests"),
-            gate.replace("native-dns-compatibility-guard|import-boundaries", "native-dns-compatibility-guard"),
-            gate.replace("native-dns-compatibility-guard|import-boundaries", "import-boundaries"),
-            gate.replace(development.WINDOWS_STATUS_GUARD, "", 1),
-            gate.replace("          if ($compatQtExit -ne 0) { exit $compatQtExit }\n", ""),
+            gate.replace("$runtimeConfigureExit = $LASTEXITCODE", "$runtimeConfigureExit = 1"),
+            gate.replace("if ($runtimeConfigureExit -eq 0)", "if ($runtimeConfigureExit -ne 0)"),
+            gate.replace("-SimpleMatch -Quiet", "-Quiet"),
+            gate.replace("SWIRL_USE_RUST_CORE=OFF is no longer supported", "CMake Error"),
+            gate.replace("          exit 0\n", ""),
         ):
             with self.subTest(gate=broken_gate), self.assertRaises(ValueError):
                 development.updated_workflow(final.replace(gate, broken_gate, 1))
+
+    @unittest.skipUnless(os.name == "nt" and shutil.which("pwsh"), "Windows CI uses PowerShell")
+    def test_removed_runtime_gate_requires_the_actual_rejection_reason(self):
+        # Run the real PowerShell gate against a synthetic CMake command. An
+        # unrelated missing-Qt/compiler error must not masquerade as acceptance.
+        body = development.REMOVED_RUNTIME_GATE.split("        run: |\n", 1)[1]
+        body = "\n".join(line[10:] for line in body.splitlines()) + "\n"
+        reason = "SWIRL_USE_RUST_CORE=OFF is no longer supported; Rust is the only product runtime"
+        cases = ((1, reason, True), (0, reason, False),
+                 (1, "CMake Error: Qt package is missing", False), (1, "", False))
+        for exit_code, message, expected in cases:
+            with self.subTest(exit_code=exit_code, message=message), tempfile.TemporaryDirectory() as temporary:
+                work = Path(temporary)
+                shim = work / "bin"
+                shim.mkdir()
+                (shim / "cmake.cmd").write_text(
+                    f"@echo off\necho {message or 'unrelated failure'}\nexit /b {exit_code}\n", encoding="utf-8")
+                script = work / "reject-runtime.ps1"
+                script.write_text(body, encoding="utf-8")
+                environment = dict(os.environ, PATH=str(shim) + os.pathsep + os.environ.get("PATH", ""))
+                result = subprocess.run(["pwsh", "-NoProfile", "-File", str(script)], cwd=work,
+                                        env=environment, capture_output=True, text=True,
+                                        encoding="utf-8", timeout=15)
+                self.assertEqual(result.returncode == 0, expected, result.stderr)
+                self.assertIn(message, (work / "build/removed-runtime/rejection.log").read_text(encoding="utf-8"))
 
     def test_qt_reports_upgrade_diagnostic_stage_and_preserve_exact_artifact_paths(self):
         final = development.updated_workflow(FIXTURE)
@@ -865,8 +893,7 @@ class CoreDevelopmentTests(unittest.TestCase):
         self.assertEqual(paths, [
             "build/rust-qt/swirl-rust-qt-integration.xml",
             "build/rust-qt/swirl-import-boundaries.xml",
-            "build/compat-dns/swirl-native-dns-compatibility-guard.xml",
-            "build/compat-dns/swirl-import-boundaries.xml",
+            "build/removed-runtime/rejection.log",
         ])
         self.assertIn("        if: always()\n", artifact)
         self.assertIn("          retention-days: 7\n", artifact)
@@ -874,28 +901,26 @@ class CoreDevelopmentTests(unittest.TestCase):
 
     def test_qt_reports_reject_missing_paths_expanded_artifacts_and_weakened_exits(self):
         final = development.updated_workflow(FIXTURE)
-        native, compat, artifact = (development.NATIVE_QT_REPORT, development.COMPATIBILITY_GATE,
-                                    development.QT_TEST_ARTIFACT)
+        native, artifact = development.NATIVE_QT_REPORT, development.QT_TEST_ARTIFACT
         broken_blocks = [
             (artifact, ""),
             (artifact, artifact * 2),
             (artifact, artifact.replace("if: always()", "if: success()")),
             (artifact, artifact.replace("retention-days: 7", "retention-days: 30")),
             (artifact, artifact.replace("build/rust-qt/swirl-import-boundaries.xml", "build/**")),
-            (artifact, artifact.replace("            build/compat-dns/swirl-import-boundaries.xml\n", "")),
+            (artifact, artifact.replace("            build/removed-runtime/rejection.log\n", "")),
             (artifact, artifact.replace("          if-no-files-found:",
                                         "            ${{ env.SWIRL_TEST_ROOT }}\n          if-no-files-found:")),
         ]
-        for block, prefix in ((native, "native"), (compat, "compat")):
-            exit_guard = f"          if (${prefix}QtExit -ne 0) {{ exit ${prefix}QtExit }}\n"
-            capture = f"          ${prefix}QtExit = $LASTEXITCODE\n"
-            broken_blocks.extend((
-                (block, block.replace(capture, "")),
-                (block, block.replace(exit_guard, "")),
-                (block, block.replace(exit_guard, "          exit 0\n")),
-                (block, block.replace("swirl-import-boundaries.xml", "../private-state.xml")),
-                (block, block.replace("Get-Content -LiteralPath", "Write-Output")),
-            ))
+        exit_guard = "          if ($nativeQtExit -ne 0) { exit $nativeQtExit }\n"
+        capture = "          $nativeQtExit = $LASTEXITCODE\n"
+        broken_blocks.extend((
+            (native, native.replace(capture, "")),
+            (native, native.replace(exit_guard, "")),
+            (native, native.replace(exit_guard, "          exit 0\n")),
+            (native, native.replace("swirl-import-boundaries.xml", "../private-state.xml")),
+            (native, native.replace("Get-Content -LiteralPath", "Write-Output")),
+        ))
         for before, after in broken_blocks:
             with self.subTest(block=after), self.assertRaises(ValueError):
                 development.updated_workflow(final.replace(before, after, 1))

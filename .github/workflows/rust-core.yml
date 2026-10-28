@@ -607,27 +607,41 @@ jobs:
             tools/SwirlCodexManage.py
             tools/SubscriptionCapture.py
             docs/CODEX_PROXY_MANAGEMENT.md
-      - name: Install Qt for Rust control adapter
-        uses: jurplel/install-qt-action@v4
+      - name: Restore verified Qt 6.12 MSVC SDK archives
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          version: '6.10.3'
-          host: windows
-          target: desktop
-          arch: win64_msvc2022_64
-          modules: qtshadertools
-          cache: true
+          path: ${{ runner.temp }}/swirl-qt-6.12.0
+          key: qt-sdk-${{ runner.os }}-6.12.0-msvc2022-${{ hashFiles('tools/Install-QtSdk.py', 'tools/requirements-qt-sdk.txt') }}
+      - name: Install and verify Qt 6.12 MSVC for the Rust control adapter
+        working-directory: .
+        shell: pwsh
+        run: |
+          python -m pip install -r tools/requirements-qt-sdk.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Qt SDK dependencies failed to install.' }
+          $sdkOutput = Join-Path $env:RUNNER_TEMP 'swirl-qt-6.12.0'
+          python tools/Install-QtSdk.py --version 6.12.0 --arch win64_msvc2022_64 --output $sdkOutput
+          if ($LASTEXITCODE -ne 0) { throw 'Official Qt SDK installation failed.' }
+          $sdk = Get-Content -LiteralPath (Join-Path $sdkOutput 'sdk-install-result.json') -Raw | ConvertFrom-Json
+          $qtRoot = (Resolve-Path -LiteralPath $sdk.kit_root).Path
+          $version = (& (Join-Path $qtRoot 'bin/qmake.exe') -query QT_VERSION).Trim()
+          if ($LASTEXITCODE -ne 0 -or $version -ne '6.12.0' -or $sdk.arch -ne 'win64_msvc2022_64') { throw 'Unexpected Qt version or ABI.' }
+          "CMAKE_PREFIX_PATH=$qtRoot" >> $env:GITHUB_ENV
+          (Join-Path $qtRoot 'bin') >> $env:GITHUB_PATH
       - name: Build Qt to Rust integration test
         working-directory: .
         run: |
-          cmake -S src/Swirl.Quick -B build/rust-qt -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=ON
+          cmake -S src/Swirl.Quick -B build/rust-qt -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake --build build/rust-qt --config Release --target SwirlRustCoreTests SwirlStoragePathsTests SwirlImportTests SwirlPrivateSubscriptionInspect --parallel
       - name: Reject the removed runtime build option
         working-directory: .
         shell: pwsh
         run: |
-          cmake -S src/Swirl.Quick -B build/removed-runtime -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=OFF
-          if ($LASTEXITCODE -eq 0) { throw 'Removed runtime option was accepted.' }
+          New-Item -ItemType Directory -Force -Path build/removed-runtime | Out-Null
+          cmake -S src/Swirl.Quick -B build/removed-runtime -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=OFF 2>&1 | Tee-Object -FilePath build/removed-runtime/rejection.log
+          $runtimeConfigureExit = $LASTEXITCODE
+          if ($runtimeConfigureExit -eq 0) { throw 'Removed runtime option was accepted.' }
+          if (-not (Select-String -LiteralPath build/removed-runtime/rejection.log -Pattern 'SWIRL_USE_RUST_CORE=OFF is no longer supported' -SimpleMatch -Quiet)) { throw 'Configure failed before the Rust-only runtime guard.' }
           exit 0
       - name: Run Qt to Rust integration without Mihomo
         working-directory: .
@@ -805,7 +819,6 @@ jobs:
           path: |
             build/rust-qt/swirl-rust-qt-integration.xml
             build/rust-qt/swirl-import-boundaries.xml
-            build/compat-dns/swirl-native-dns-compatibility-guard.xml
-            build/compat-dns/swirl-import-boundaries.xml
+            build/removed-runtime/rejection.log
           if-no-files-found: warn
           retention-days: 7

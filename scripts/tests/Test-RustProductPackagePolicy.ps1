@@ -55,7 +55,7 @@ try {
         foreach ($case in $cacheCases) {
             $lines = @('SWIRL_BUILD_UI_TESTS:BOOL=OFF','SWIRL_BUILD_CORE_TESTS:BOOL=ON', $case.Line,
                 ('CMAKE_HOME_DIRECTORY:INTERNAL=' + (Join-Path $repo 'src/Swirl.Quick')),
-                'SWIRL_USE_RUST_CORE:BOOL=ON',
+                'SWIRL_RUNTIME:INTERNAL=rust',
                 ('SWIRL_RUST_LIBRARY:INTERNAL=' + (Join-Path $build 'unused.dll')),
                 'SWIRL_RUST_BUILD_ID:INTERNAL=cache-policy-fixture')
             [IO.File]::WriteAllText((Join-Path $build 'CMakeCache.txt'), (($lines -join $ending) + $ending))
@@ -72,6 +72,21 @@ try {
                 throw "Staging cache gate mismatch for $($case.Line), newline length $($ending.Length): $failure"
             }
             if (Test-Path -LiteralPath $destination) { throw 'Cache regression created a product stage.' }
+            $caseCount++
+        }
+        foreach ($runtime in @('', 'SWIRL_RUNTIME:INTERNAL=mihomo')) {
+            $runtimeLines = @('SWIRL_BUILD_UI_TESTS:BOOL=OFF','CMAKE_BUILD_TYPE:STRING=Release',
+                ('CMAKE_HOME_DIRECTORY:INTERNAL=' + (Join-Path $repo 'src/Swirl.Quick')),
+                ('SWIRL_RUST_LIBRARY:INTERNAL=' + (Join-Path $build 'unused.dll')),
+                'SWIRL_RUST_BUILD_ID:INTERNAL=cache-policy-fixture')
+            if ($runtime) { $runtimeLines += $runtime }
+            [IO.File]::WriteAllText((Join-Path $build 'CMakeCache.txt'), (($runtimeLines -join $ending) + $ending))
+            $failure = $null
+            try { & $staging -BuildDirectory $build -Destination $destination } catch { $failure=$_.Exception.Message }
+            if ($failure -cne 'Rust Core must be the only configured product runtime.') {
+                throw 'A missing or foreign runtime identity reached product staging.'
+            }
+            if (Test-Path -LiteralPath $destination) { throw 'Runtime identity regression created a product stage.' }
             $caseCount++
         }
         $uiLines = @('SWIRL_BUILD_UI_TESTS:BOOL=ON','SWIRL_BUILD_CORE_TESTS:BOOL=ON','CMAKE_BUILD_TYPE:STRING=Release')

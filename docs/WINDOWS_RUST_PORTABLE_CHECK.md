@@ -1,4 +1,6 @@
-# Windows Rust 便携联网测试包
+# 历史 Windows Rust 便携联网测试包
+
+本文只保留 2026-10-20 阶段的一键联网验收方案与范围。旧便携包、`Build-WindowsRustPortableAcceptance.ps1`、网络检查安装器及 `TEST-SWIRL-NETWORK.cmd` 已退休；下文的打包和运行步骤不得用于当前发行。当前产品构建与精确 SHA 打包见 [BUILDING.md](../src/Swirl.Quick/BUILDING.md)。保留的 `tools/Invoke-WindowsRustAcceptance.ps1` 是独立的原生路径诊断工具，其使用条件与限制见 [WINDOWS_RUST_ACCEPTANCE.md](WINDOWS_RUST_ACCEPTANCE.md)，不恢复这条旧发行链。
 
 此包是 `SWIRL_USE_RUST_CORE=ON`、`SWIRL_BUILD_UI_TESTS=ON` 的开发验收预览，供同一台 Windows 11 电脑断开 Codex 时双击运行。它不是普通用户正式发行版。包内有 `Swirl.exe`、进程内的 `swirl_api.dll`、Qt/QML 和 MinGW 运行库、辅助 EXE、许可证、固定哈希清单和一键脚本；不含 `mihomo.exe`、私有订阅、NodeStore 或原始运行时状态。
 
@@ -12,6 +14,6 @@
 
 一键脚本不会暂停、结束、恢复或启动 Mihomo，也不会修改 Windows 系统代理、WinHTTP、TUN、路由或 DNS。每项 curl 请求最多 20 秒，整轮测试子进程最多 270 秒。它只停止自己启动的测试版 Swirl，并清理该轮原始状态与临时加密副本；异常退出时保留脱敏进度并明确报告清理失败。先在 Mihomo 正常运行时执行一次；以后若用户自行停用 Mihomo，也可在 Codex 断线时直接从本地包重测并查看两行结果。
 
-打包方式：在最终干净源码 SHA 上配置/构建 Release Rust 测试版，运行 `scripts/Build-WindowsRustPortableAcceptance.ps1 -QtDir <Qt 6.10.3 mingw_64>`。脚本只在 D 盘新目录输出，调用 Qt 的 `windeployqt --release --qmldir`，验证运行库和包内文件，再压缩 ZIP。历史 `build-current-portable.ps1` 面向 Mihomo 兼容构建，不能用于此包。
+当时的打包方式是在干净源码 SHA 上构建 Release Rust 测试版，再调用现已退休的 `Build-WindowsRustPortableAcceptance.ps1` 和 Qt 6.10.3 MinGW kit。该脚本在新目录调用 `windeployqt`、验证包内文件并压缩 ZIP。这里记录的旧脚本职责不是当前同名构建入口的说明；当前 `build-current-portable.ps1` 已转入 Rust-only 产品链，具体参数以当前 [构建说明](../src/Swirl.Quick/BUILDING.md) 为准。
 
 参考的现有实现：[Swirl 自有 Windows Qt 部署工作流](https://github.com/SOLHK/Swirl/blob/93750941ef712d436ccdc642c59a92a68fd599f6/.github/workflows/build-qt-quick-ui.yml) 和 [Qt 6.10 Windows Deployment](https://doc.qt.io/qt-6.10/windows-deployment.html)。此包的脚本独立编写；没有复用兼容构建的 Mihomo 暂存步骤。

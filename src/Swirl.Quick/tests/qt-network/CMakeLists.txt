@@ -32,7 +32,6 @@ add_executable(SwirlQtNetworkPolicyTests
  "${SWIRL_QUICK_SOURCE}/engine/ProxyEngine.h")
 target_include_directories(SwirlQtNetworkPolicyTests PRIVATE "${SWIRL_QUICK_SOURCE}")
 target_compile_definitions(SwirlQtNetworkPolicyTests PRIVATE
- SWIRL_USE_RUST_CORE
  SWIRL_TEST_PYTHON="${SWIRL_TEST_PYTHON}"
  SWIRL_TLS_FIXTURE_SCRIPT="${CMAKE_CURRENT_LIST_DIR}/tls_origin.py")
 target_link_libraries(SwirlQtNetworkPolicyTests PRIVATE Qt6::Core Qt6::Gui Qt6::Network Qt6::Test)

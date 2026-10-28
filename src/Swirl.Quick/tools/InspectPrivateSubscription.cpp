@@ -140,8 +140,6 @@ int main(int argc,char **argv) {
     if(app.arguments().size()!=3)return error(output,"UsageInvalid",2);
 #if !defined(Q_OS_WIN)
     return error(output,"WindowsDpapiRequired",4);
-#elif !defined(SWIRL_USE_RUST_CORE)
-    return error(output,"NativeRustBuildRequired",7);
 #else
     const bool existing=app.arguments()[1]=="--node-store";
     const auto path=app.arguments()[2];

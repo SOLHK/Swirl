@@ -55,7 +55,7 @@ jobs:
       - name: Build current-source Rust command hosts
         run: cargo build --manifest-path core/Cargo.toml --workspace --release --locked --lib --bins
       - name: Configure the paired Qt fixture executable
-        run: cmake -S src/Swirl.Quick -B build/u1-qt-fixtures -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=ON -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
+        run: cmake -S src/Swirl.Quick -B build/u1-qt-fixtures -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
       - name: Build actual Qt product-chain and private-inspector tests
         run: cmake --build build/u1-qt-fixtures --config Release --target SwirlRustCoreTests SwirlPrivateSubscriptionInspect SwirlStoragePathsTests --parallel 4
       - name: Deploy Qt dependencies and initialize isolated fixture paths

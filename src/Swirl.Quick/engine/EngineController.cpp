@@ -153,10 +153,8 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         }
         NodeStore::ImportPlan plan;
         if(!m_store.prepareImport(result.nodes,sourceId,&plan)){*error=m_store.error();return false;}
-#ifdef SWIRL_USE_RUST_CORE
         const auto nodes=plan.nodes();QVariantMap canonical;
         if(!validateNetworkConfiguration(networkConfigurationSnapshot(),&canonical,&nodes)){*error=m_networkError;return false;}
-#endif
         auto retained=retainedNodeConfiguration(sourceId,nodesOnly||m_imports.automaticImport());
         if(m_imports.automaticImport())retained=recordSubscriptionOutcome(retained,sourceId,result.format,"nodes",{});
         if(!m_store.commitImportAsync(plan,retained,std::move(completion))){*error=m_store.error();return false;}
@@ -485,11 +483,7 @@ QVariantList EngineController::nodes() const {
         if(connection!=QStringLiteral("未连接"))nodeStatus=connection;
         row.insert("status",nodeStatus);
         row.insert("testAvailable",!m_tests.testing(id)&&measured.value("success").toBool());
-#ifdef SWIRL_USE_RUST_CORE
         row.insert("latency",QStringLiteral("—"));
-#else
-        row.insert("latency",active && status.latencyMs>=0?QString::number(status.latencyMs):QStringLiteral("—"));
-#endif
         if(!measured.isEmpty()){
             const auto timing=measured.value(measured.value("metricType")==QStringLiteral("http_headers")?"outboundConnectMs":"latency");
             bool valid=false;const auto elapsed=timing.toLongLong(&valid);

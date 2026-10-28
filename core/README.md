@@ -1,12 +1,19 @@
-# Swirl Core: native Rust runtime and staged product migration
+# Swirl Core: native Rust runtime
 
-This workspace lives inside the existing Swirl product repository. The Qt/QML
-interface is unchanged. It replaces actual forwarding with Rust when configured
-using `SWIRL_USE_RUST_CORE=ON`; it does not wrap the C++ forwarder or Mihomo.
-The default build preserves historical capabilities until their Rust replacements
-are implemented and tested. This is **not the completed all-protocol product**.
+This workspace supplies the only proxy runtime in the Swirl product repository.
+The Qt/QML application loads its paired `swirl_api` library through a checked C
+ABI; `ThreadedEngine` creates `RustCoreEngine`. The retired C++ forwarder and
+Mihomo process adapter are absent. There is no external-core selector, downloader
+or fallback. Clash/Mihomo subscription import remains a data-format feature,
+including the internal canonical node mapping used by other supported formats.
 
-## Current development scope (2026-10-19)
+Use the [current desktop build guide](../src/Swirl.Quick/BUILDING.md) and the
+build section below. Dated implementation notes and test counts in this file
+are historical evidence for their named sources, not current-source acceptance.
+Unsupported parameters still fail explicitly; Rust-only architecture does not
+establish all-protocol, private-provider, Codex Desktop or TUN acceptance.
+
+## Historical development scope (2026-10-19)
 
 The [REALITY R3 gate](../docs/REALITY_XRAY_INTEROP_20261019.md) exercises the
 native R2 TLS engine against pinned, unmodified official Xray/REALITY source.
@@ -113,9 +120,12 @@ The older dated sections below retain their original source and scope.
 
 ## Build and verification
 
-Use stable Rust and a native C toolchain (ring builds C/assembly cryptography).
-Previous Windows local validation: rustc 1.99.1, GNU x64, Qt 6.10.3, MinGW 13.1.0.
-Cargo.lock pins dependencies; CI additionally checks Windows MSVC.
+Use the stable Rust toolchain selected by `rust-toolchain.toml` and a native C
+toolchain (cryptographic dependencies build C/assembly). `Cargo.lock` pins the
+dependency graph. Current desktop builds require Qt 6.12.0 and its matching
+C++23 toolchain. The local Windows UI kit uses GCC 15.1.0 MinGW with Rust
+`x86_64-pc-windows-gnu`; an MSVC Qt kit requires `x86_64-pc-windows-msvc`.
+Never combine a Qt kit or Rust library from a different compiler/build tree.
 
 ```text
 cargo fmt --all -- --check
@@ -126,14 +136,13 @@ cargo build --release --locked --workspace --lib --bins
 cargo build --release --locked -p swirl-transport --example reality-client
 ```
 
-Configure the real desktop with CMake options `SWIRL_USE_RUST_CORE=ON` and
-`SWIRL_BUILD_UI_TESTS=ON`. Cargo must be on the build environment PATH. Build
-`Swirl` and `SwirlRustCoreTests`, then run CTest `swirl-rust-qt-integration`.
-No Mihomo executable is staged into this build. The retained MihomoAdapter has a
-compile-time start rejection in this mode, including legacy diagnostic callers.
-Production sessions use RustCoreEngine through the existing ThreadedEngine
-worker; isolated node tests instantiate RustCoreEngine directly. Forwarding and
-protocol tasks execute in Rust. The old build and tests remain separately usable.
+Run Cargo commands from `core/`. For desktop verification, configure a separate
+CMake directory with `SWIRL_BUILD_UI_TESTS=ON` or `SWIRL_BUILD_CORE_TESTS=ON`.
+Cargo must be on PATH. Build `Swirl` and `SwirlRustCoreTests`, then run CTest
+`swirl-rust-qt-integration` with the matched Qt runtime available. Production
+builds use a separate directory with both test options OFF. CMake builds and
+stages the exact-source Rust library; package checks verify its ABI, source SHA,
+content build ID and payload hashes. No external proxy executable is staged.
 
 Python `tools/tests/test_rust_core.py` uses an independent socket/TLS peer and
 ephemeral CA/leaf certificates (cryptography 50.0.2). Set SWIRL_RUST_HARNESS to
@@ -141,7 +150,7 @@ the built swirl-api executable. No global certificate trust changes occur.
 `tools/Benchmark-RustCore.py` records loopback latency/throughput/CPU/memory and
 optional public HTTPS checks; it does not claim private-node performance.
 
-## Second capture and bounded connectivity diagnostics (2026-10-18)
+## Historical second capture and bounded connectivity diagnostics (2026-10-18)
 
 The current stage continues from `13ea97af5c94198ecba4ed79b16cfc7b1b676f27` on
 `work/core-completion-20261017`. All 16 subscription bodies were independently
@@ -312,7 +321,7 @@ candidates. The later policy stage declared them in their crate roots, connected
 the runtime call paths and executed their tests; that evidence is recorded
 separately in the historical policy validation document.
 
-## Explicit DNS query family
+## Historical explicit DNS query family
 
 Native `dns.query_family` accepts strict strings `dual` (the unchanged default)
 and `ipv4_only`. The latter sends A queries only to explicit UDP/TCP/DoT/DoH
@@ -322,7 +331,7 @@ Qt maps `queryFamily` and preserves it across legacy settings edits; compatibili
 builds reject the native policy instead of dropping it. No UI control or complete
 Clash DNS import is enabled. See [scope and verification](../docs/RUST_DNS_QUERY_FAMILY_20261018.md).
 
-## Encrypted DNS: DoT and HTTP/1.1 DoH
+## Historical encrypted DNS: DoT and HTTP/1.1 DoH
 
 DNS-over-TLS is now implemented in Rust using explicit IP bootstrap endpoints
 and separately verified authentication names. The existing DNS wire parser and
@@ -350,7 +359,7 @@ and the [historical connection/policy validation](../docs/RUST_CONNECTION_POLICY
 The old DoT-only document's exclusions do not override the implemented DoH
 behavior described here.
 
-## TCP address fallback and connection diagnostics
+## Historical TCP address fallback and connection diagnostics
 
 `swirl-protocol::connect` creates one absolute outbound-establishment deadline.
 Locally resolving the target or proxy endpoint, every TCP address attempt, TLS,
@@ -411,7 +420,7 @@ the failure occurred without claiming that a password, server certificate or
 provider is the root cause. Current tests and private-node limitations are tracked
 in [connection/policy validation](../docs/RUST_CONNECTION_POLICY_VALIDATION_20261017.md).
 
-## Implemented boundary
+## Historical implementation boundary
 
 | Crate | Actual implementation | Not yet implemented |
 |---|---|---|
@@ -480,7 +489,7 @@ parameters fail explicitly instead of overwriting one another. Anonymous test
 cases distinguish parsed, blocked, not-tested, passed and failed evidence;
 unsupported certificate policies and TCP Fast Open have explicit diagnostics.
 
-## Shadowsocks AEAD implementation
+## Historical Shadowsocks AEAD implementation
 
 Swirl owns SIP004/SIP007 framing, address encoding, nonce sequencing, stream
 state and UDP association handling. Supported ciphers are aes-128-gcm,
@@ -527,7 +536,7 @@ HTTP obfs, IPv4/IPv6/domain targets, partial records, half-close, tampering,
 replay and the Qt facade. Run `tools/tests/test_shadowsocks.py` with
 SWIRL_RUST_HARNESS and optionally SWIRL_RUST_QT_TESTS pointing to built executables.
 
-## Bounds and ownership
+## Historical bounds and ownership
 
 VLESS supports the version-0 TCP request layout used by the reference Xray
 implementation, canonical UUID authentication, IPv4/IPv6/domain target encoding,
@@ -607,9 +616,10 @@ Public DIRECT success does not prove a provider's WS endpoint,
 private subscription or all product settings. The user's personal Windows
 visual/private-node testing remains deferred.
 
-The original C++ native engine, encrypted NodeStore, importers, proxy recovery,
-subscription capture utility and regression tests remain available. No Go/C#
-network core or Rust workspace was present in the audited `main` baseline
+At the earlier evidence baseline, the C++ native engine, encrypted NodeStore,
+importers, proxy recovery and capture utilities coexisted. The C++ forwarding
+engine has since been removed; storage, import and OS recovery functionality
+remain. No Go/C# network core or Rust workspace was present in the audited `main` baseline
 `87409c0bf9c957ef113f84c176c5a1529c27b9df`. The development branch already
 contained the Rust workspace when the earlier WS stage began at `8bd89f2`.
 The policy stage continued from `0bf2666`, the completed DNS stage followed it,

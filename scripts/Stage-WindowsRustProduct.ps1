@@ -21,7 +21,7 @@ if ($cache -notmatch '(?m)^CMAKE_HOME_DIRECTORY:INTERNAL=(.+)$' -or
     [IO.Path]::GetFullPath((Join-Path $repo 'src/Swirl.Quick')).TrimEnd('\','/')) {
     throw 'The build belongs to a different source tree.'
 }
-if ($cache -notmatch '(?m)^SWIRL_USE_RUST_CORE:BOOL=ON\s*$') { throw 'Rust Core must be the only configured product runtime.' }
+if ($cache -notmatch '(?m)^SWIRL_RUNTIME:INTERNAL=rust\s*$') { throw 'Rust Core must be the only configured product runtime.' }
 if ($cache -notmatch '(?m)^SWIRL_RUST_LIBRARY:INTERNAL=(.+)$') { throw 'Exact Cargo library path is missing.' }
 $rustLibrary = $Matches[1].Trim()
 if ($cache -notmatch '(?m)^SWIRL_RUST_BUILD_ID:INTERNAL=(.+)$') { throw 'Paired Rust build identity is missing.' }

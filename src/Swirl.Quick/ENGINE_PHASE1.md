@@ -1,7 +1,14 @@
-# Historical architecture (superseded by Rust-only R1)
+# Historical architecture — retired external-core stage
 
-This document records removed code and is not a current build or runtime guide.
-See BUILDING.md and docs/R1_RUNTIME_CAPABILITIES.md.
+This archive records the earlier external-core implementation. Every behavior,
+test name and command below refers to that historical stage. `MihomoAdapter`,
+the external-core downloader and its manifest have been removed; the commands
+below cannot build the current product and must not be executed as setup steps.
+
+Current Swirl uses only the in-process Rust Core. Subscription format
+compatibility remains supported without executing Mihomo. See
+[BUILDING.md](BUILDING.md), [Rust Core](../../core/README.md) and the
+[Rust runtime boundary](../../docs/R1_RUNTIME_CAPABILITIES.md) for current work.
 
 # 第一阶段：引擎通信与生命周期
 
@@ -39,7 +46,7 @@ DNS、TUN、自动路由及 Geo 更新关闭。不会修改 Windows 系统代理
 
 本地已有发布包时可重复构建，不必再次下载：
 
-```powershell
+```text
 ./scripts/stage-mihomo.ps1 -Destination build/swirl-quick -Archive C:/path/mihomo-windows-amd64-compatible-v1.19.32.zip
 ctest --test-dir build/swirl-quick --output-on-failure
 # 多配置 MSVC 使用 -C Release，并将已校验 core 目录置于 build/swirl-quick/Release。

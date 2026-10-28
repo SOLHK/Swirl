@@ -91,7 +91,7 @@ jobs:
         run: >-
           cmake -S src/Swirl.Quick -B build/xray-app
           -G "Visual Studio 17 2022" -A x64
-          -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=OFF -DSWIRL_XRAY_UI_TESTS=ON
+          -DSWIRL_BUILD_UI_TESTS=OFF -DSWIRL_XRAY_UI_TESTS=ON
           -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
       - name: Build complete Windows application
         if: runner.os == 'Windows'

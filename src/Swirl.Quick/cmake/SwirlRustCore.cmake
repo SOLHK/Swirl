@@ -125,7 +125,6 @@ add_custom_target(SwirlRustCore
 
 function(swirl_pair_rust_core target)
  add_dependencies(${target} SwirlRustCore)
- target_compile_definitions(${target} PUBLIC SWIRL_USE_RUST_CORE)
  target_include_directories(${target} PUBLIC "${SWIRL_BUILD_IDENTITY_DIRECTORY}")
 endfunction()
 
