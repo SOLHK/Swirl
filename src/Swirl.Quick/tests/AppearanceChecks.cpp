@@ -16,6 +16,7 @@
 #include <QQmlEngine>
 #include <QFontMetricsF>
 #include <QFontDatabase>
+#include <QCursor>
 #include <functional>
 
 int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
@@ -46,8 +47,15 @@ Item {
         if(!fixture)qWarning()<<component.errors();
         if(fixture){
             fixture->setParentItem(window->contentItem());
+            struct RestoreCursor { QPoint position=QCursor::pos(); ~RestoreCursor(){QCursor::setPos(position);} } restoreCursor;
             window->requestActivate();QTest::qWait(100);
             const auto surface=[](QQuickItem *control){return control?control->property("background").value<QQuickItem *>():nullptr;};
+            const auto movePointer=[&](QPoint local){
+                QCursor::setPos(window->mapToGlobal(local));
+                QCoreApplication::processEvents();
+                QTest::mouseMove(window,window->mapFromGlobal(QCursor::pos()));
+                QTest::qWait(160);
+            };
             std::function<QQuickItem *(QQuickItem *,const QString &)> visualItem;
             visualItem=[&](QQuickItem *parent,const QString &name)->QQuickItem *{
                 if(parent->objectName()==name)return parent;
@@ -61,10 +69,13 @@ Item {
                     check(paint&&qAbs(paint->property("radius").toReal()-paint->height()/2)<0.01,"buttons and selector share a height-derived capsule curve");
                     if(!control||!paint)continue;
                     const auto size=control->size();const auto position=control->position();
-                    QTest::mouseMove(window,QPoint(window->width()-20,90));QTest::qWait(160);
+                    movePointer(QPoint(window->width()-20,90));
+                    check(QTest::qWaitFor([&]{return !control->property("hovered").toBool();},1000),"native pointer leaves the shared control before its resting sample");
                     const auto normal=paint->property("color").value<QColor>();
-                    QTest::mouseMove(window,control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint());QTest::qWait(160);
-                    check(control->property("hovered").toBool()&&paint->property("color").value<QColor>()!=normal,"shared control hover visibly changes its surface");
+                    movePointer(control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint());
+                    qInfo()<<"CONTROL_HOVER"<<theme<<name<<control->property("hovered")<<normal<<paint->property("color")
+                           <<"cursor"<<window->mapFromGlobal(QCursor::pos())<<"target"<<control->mapToScene(QPointF(control->width()/2,control->height()/2))<<"active"<<window->isActive();
+                    check(QTest::qWaitFor([&]{return control->property("hovered").toBool()&&paint->property("color").value<QColor>()!=normal;},1000),"shared control hover visibly changes its surface");
                     control->forceActiveFocus(Qt::TabFocusReason);QTest::qWait(160);
                     check(control->property("visualFocus").toBool()&&paint->property("focused").toBool(),"keyboard focus reaches the shared surface");
                     if(name!="reviewCombo"){
@@ -84,11 +95,14 @@ Item {
                     check(control&&paint,"strategy creation action uses its real card surface");
                     if(!control||!paint)continue;
                     const auto size=control->size();
-                    QTest::mouseMove(window,QPoint(window->width()-15,90));QTest::qWait(160);
+                    movePointer(QPoint(window->width()-15,90));
+                    check(QTest::qWaitFor([&]{return !control->property("hovered").toBool();},1000),"native pointer leaves the strategy card before its resting sample");
                     const auto normal=paint->property("color").value<QColor>();
                     const auto at=control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint();
-                    QTest::mouseMove(window,at);QTest::qWait(160);
-                    check(paint->property("hovered").toBool()&&paint->property("color").value<QColor>()!=normal,"strategy creation card brightens on hover");
+                    movePointer(at);
+                    qInfo()<<"CARD_HOVER"<<theme<<strategy<<paint->property("hovered")<<normal<<paint->property("color")
+                           <<"cursor"<<window->mapFromGlobal(QCursor::pos())<<"target"<<at<<"active"<<window->isActive();
+                    check(QTest::qWaitFor([&]{return paint->property("hovered").toBool()&&paint->property("color").value<QColor>()!=normal;},1000),"strategy creation card brightens on hover");
                     control->forceActiveFocus(Qt::TabFocusReason);QTest::qWait(160);
                     check(paint->property("focused").toBool(),"strategy creation card has keyboard focus feedback");
                     QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at);QTest::qWait(160);
