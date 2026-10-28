@@ -18,7 +18,7 @@ Item {
     }
     Rectangle {
         anchors.fill:parent;radius:light.cornerRadius
-        color:Theme.dark?"#CDE4FF":"#FFFFFF";opacity:light.amount
+        color:Theme.glassHighlight;opacity:light.amount
         visible:!light.useShader
     }
 }

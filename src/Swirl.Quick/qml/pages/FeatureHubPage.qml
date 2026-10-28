@@ -25,18 +25,15 @@ Item {
         Layout.preferredHeight: Theme.dp(featured ? 100 : 82)
         padding: Theme.dp(featured ? 20 : 14)
         hoverEnabled: true
+        focusPolicy: Qt.StrongFocus
         motionScale: 1 - (1 - SwirlMotion.pressScale) * feedback.contact
         SwirlInteractionMotion { id: feedback; hovered: entry.hovered; pressed: entry.down; focused: entry.visualFocus; controlEnabled: entry.enabled }
-        background: Rectangle {
+        background: SwirlGlassPanel {
             id: surface
-            property bool surfaceHidden: false
-            color: Theme.material("content")
-            radius: entry.featured ? Theme.cardRadius : Theme.controlRadius
-            opacity: surfaceHidden ? 0 : 1
-            border.width: entry.visualFocus ? Theme.borderWidth : 0
-            border.color: Theme.focusBorder
-            Rectangle { anchors.fill: parent; radius: parent.radius; color: Theme.withAlpha(Theme.accent, (entry.featured ? 0.035 : 0) + feedback.light * 0.055) }
-            Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.leftMargin: Theme.dp(14); anchors.rightMargin: Theme.dp(14); height: Theme.borderWidth; color: Theme.separator; visible: !entry.featured }
+            interactive: true
+            hovered: entry.hovered
+            pressed: entry.down
+            focused: entry.visualFocus
         }
         contentItem: RowLayout {
             spacing: Theme.dp(entry.featured ? 18 : 14)

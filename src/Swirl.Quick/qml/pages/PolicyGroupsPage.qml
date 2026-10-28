@@ -124,7 +124,7 @@ Item {
         }
         RowLayout {
             Layout.fillWidth:true;spacing:Theme.dp(6)
-            SwirlFlow {objectName:"policyOperationFlow";Layout.preferredWidth:Theme.dp(42);Layout.preferredHeight:Theme.dp(18);phase:page.operationPhase}
+            SwirlFlow {objectName:"policyOperationFlow";Layout.preferredWidth:Theme.dp(42);Layout.preferredHeight:Theme.dp(18);phase:page.operationPhase;proxyWing:true}
             SwirlText {Layout.fillWidth:true;text:page.statusText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap}
         }
         SwirlText {id:pageMessage;objectName:"policyApplyMessage";Layout.fillWidth:true;visible:text.length>0;text:page.localMessage||page.engineController.policyError||page.engineController.nodeError||page.engineController.routingError;textFormat:Text.PlainText;color:Theme.orange;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap;activeFocusOnTab:true;Accessible.name:text}

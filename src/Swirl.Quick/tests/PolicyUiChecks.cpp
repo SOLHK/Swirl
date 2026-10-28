@@ -67,6 +67,8 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     const auto finish=[&]{controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->policyBusy();},10000),QStringLiteral("Owned runtime and transaction finish before cleanup"));if(proxyBackend)check(!proxyBackend->current().owned&&proxyBackend->current().systemEnabled,QStringLiteral("Cleanup preserves the isolated external proxy after releasing only Swirl ownership"));if(!directory.isEmpty()){QDir().mkpath(directory);QFile report(directory+"/policy-ui.json");if(!report.open(QIODevice::WriteOnly))return 3;const QJsonObject proxyEvidence{{"backend",proxyBackend?"per-instance-memory":"missing"},{"takeovers",proxyBackend?proxyBackend->takeoverCalls:0},{"restores",proxyBackend?proxyBackend->restoreCalls:0},{"last_port",proxyBackend?proxyBackend->lastPort:0},{"last_pid",proxyBackend?double(proxyBackend->lastPid):0}};report.write(QJsonDocument(QJsonObject{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"checks",checks},{"captures",captures},{"system_proxy",proxyEvidence},{"failures",failures},{"scope","Isolated real Qt input, committed policy receipts, Rust runtime and controlled loopback peers. System-proxy ownership uses a per-instance in-memory adapter. No private-provider, host proxy, TUN or DNS mutations."}}).toJson());}return failures?2:0;};
     if(!check(proxyBackend!=nullptr,QStringLiteral("Policy UI acceptance has a per-instance system-proxy adapter before any user action")))return finish();
     check(proxyBackend->current().systemEnabled&&!proxyBackend->current().owned&&!controller->processAlive(),QStringLiteral("An external proxy starts enabled while Swirl remains stopped and unowned"));
+    eval("Theme.reduceMotion=false;Theme.followSystemMotion=false");
+    check(eval("!SwirlProxyWingMotion.active && SwirlProxyWingMotion.progress===0").toBool(),QStringLiteral("An external host proxy never displays Swirl's small wing"));
     const auto capture=[&](const QString &name){
         if(directory.isEmpty())return;
         QTest::qWait(250);QDir().mkpath(directory);const auto image=window->grabWindow();
@@ -200,7 +202,10 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     if(!click("proxyCapsule"))return finish();
     if(!check(QTest::qWaitFor([&]{return controller->apiHealthy()&&!controller->policyBusy()&&controller->systemProxy()->owned()&&controller->systemProxy()->enabled();},15000),QStringLiteral("Activity master switch starts the configured actual Rust runtime and takes isolated proxy ownership")))return finish();
     check(proxyBackend->takeoverCalls==1&&proxyBackend->lastPid==controller->processId().toLongLong()&&proxyBackend->lastPort>0,QStringLiteral("Activity takeover follows the healthy live Rust listener rather than a host proxy flag"));
+    check(QTest::qWaitFor([&]{return eval("SwirlProxyWingMotion.active && SwirlProxyWingMotion.progress===1 && !SwirlProxyWingMotion.moving").toBool();},3000),QStringLiteral("Actual proxy ownership finishes the shared small-wing expansion"));
+    check(item("activityProxyWing")&&item("diagnosticProxyWing")&&item("activityProxyWing")->property("progress").toDouble()==1&&item("diagnosticProxyWing")->property("progress").toDouble()==1,QStringLiteral("Activity status and diagnostics show the same actual proxy wing"));
     if(!navigate("policies"))return finish();
+    check(item("policyOperationFlow")&&item("policyOperationFlow")->property("progress").toDouble()==1,QStringLiteral("Policy wing preserves the Activity proxy animation state"));
     const auto liveEpoch=controller->policyReceipt().value("engine_epoch").toString();
     check(!liveEpoch.isEmpty(),QStringLiteral("Live receipt reports the actual runtime epoch"));
     const auto request=[&](const QUrl &url,SocksPeer *expected,const QString &label){
@@ -255,6 +260,8 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->systemProxy()->owned()&&!controller->systemProxyBusy();},10000),QStringLiteral("Activity master switch stops its owned Rust runtime and releases its proxy ownership"));
     check(proxyBackend->restoreCalls==1&&proxyBackend->current().systemEnabled&&!proxyBackend->current().owned,QStringLiteral("Stopping Swirl restores the pre-existing isolated external proxy instead of turning it off"));
     QTest::qWait(200);check(!controller->processAlive()&&!controller->systemProxy()->owned()&&proxyBackend->takeoverCalls==1,QStringLiteral("Queued event processing leaves Swirl stopped without a second proxy takeover"));
+    check(QTest::qWaitFor([&]{return eval("!SwirlProxyWingMotion.active && SwirlProxyWingMotion.progress===0 && !SwirlProxyWingMotion.moving").toBool();},2000),QStringLiteral("Actual proxy shutdown fully retires the last small feather"));
+    capture("proxy-off-wing-hidden");
     if(!navigate("policies"))return finish();
     for(int strategy=1;strategy<=3;++strategy){
         click("addPolicyGroup");fill("policyGroupName",QString("Automatic fixture %1").arg(strategy));setCombo("policyGroupType",strategy);click("addPolicyGroupMember");chooseTarget("node",nodeA);click("policyGroupAdvanced");
@@ -313,9 +320,27 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     check(transfer&&qAbs(transfer->property("cornerRadius").toReal()-cardRadius)<0.5&&qAbs(transfer->property("radius").toReal()-cardRadius)<0.5,
           QStringLiteral("Activity transfer uses its independently sized content surface"));
     check(diagnostics&&!diagnostics->property("independentCard").isValid(),QStringLiteral("Activity diagnostics remain an open reading rail"));
-    check(eval("Theme.dark || Theme.increaseContrast || (Theme.canvas.toString()==='#f3f3f5' && Theme.text.toString()==='#202027' && Theme.accent.toString()==='#171d87')").toBool(),
-          QStringLiteral("Light mode uses the selected white, navy and cyan semantic palette"));
+    check(eval("Theme.dark || Theme.increaseContrast || (Theme.canvas.toString()==='#f7f7f8' && Theme.surface.toString()==='#ffffff' && Theme.text.toString()==='#202023')").toBool(),
+          QStringLiteral("Light mode uses the shared neutral white canvas and readable card palette"));
     QTest::qWait(200);
     if(!directory.isEmpty())window->grabWindow().save(directory+"/activity-mode.png");
+    controller->setSystemProxy(true);
+    if(check(QTest::qWaitFor([&]{return controller->systemProxy()->owned()&&controller->systemProxy()->enabled()&&controller->processAlive();},10000),QStringLiteral("Rapid-wing fixture uses an actual owned Rust session"))){
+        QTest::qWait(330);
+        const auto beforeReverse=eval("SwirlProxyWingMotion.progress").toDouble();
+        check(beforeReverse>0 && beforeReverse<1,QStringLiteral("Rapid stop interrupts a visibly partial feather expansion"));
+        controller->setSystemProxy(false);
+        const auto afterReverse=eval("SwirlProxyWingMotion.progress").toDouble();
+        check(qAbs(beforeReverse-afterReverse)<0.05,QStringLiteral("Actual proxy reversal preserves the current wing frame"));
+        check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->systemProxyBusy();},10000),QStringLiteral("Rapid stop finishes runtime cleanup"));
+        controller->setSystemProxy(true);
+        if(check(QTest::qWaitFor([&]{return controller->systemProxy()->owned()&&controller->systemProxy()->enabled()&&controller->processAlive();},10000),QStringLiteral("Reopening during contraction starts a new actual owned session"))){
+            QTest::qWait(120);
+            check(eval("SwirlProxyWingMotion.progress>0 && SwirlProxyWingMotion.progress<1").toBool(),QStringLiteral("Interrupted contraction resumes through partial feather frames"));
+        }
+        controller->setSystemProxy(false);
+        check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->systemProxyBusy()&&eval("SwirlProxyWingMotion.progress===0 && !SwirlProxyWingMotion.moving").toBool();},10000),QStringLiteral("Rapid repeated reversal settles closed without a stuck animation"));
+        capture("rapid-proxy-final-wing-hidden");
+    }
     return finish();
 }

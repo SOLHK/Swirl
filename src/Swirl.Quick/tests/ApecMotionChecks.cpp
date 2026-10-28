@@ -240,17 +240,19 @@ Item {
     auto *wing=window->findChild<QQuickItem *>("apecWingVisual");
     check("production-wing-entry-already-consumed",wing && eval("appSceneBackdrop.entranceConsumed").toBool());
     eval("AppState.navigate('overview')");wait(35);
-    check("wing-stops-off-home",wing && !eval("appSceneBackdrop.entering").toBool() && wing->opacity()==0);
+    check("wing-persists-off-home",wing && !eval("appSceneBackdrop.entering").toBool()
+        && eval("appSceneBackdrop.progress===1").toBool()
+        && qAbs(wing->opacity()-eval("Theme.wingOpacity").toDouble())<0.001);
     eval("AppState.navigate('activity')");wait(80);
     check("wing-does-not-replay-on-navigation",wing && !eval("appSceneBackdrop.entering").toBool()
         && qAbs(wing->opacity()-eval("Theme.wingOpacity").toDouble())<0.001);
     window->showMinimized();wait(40);
-    check("wing-minimize-stops-render-motion",!eval("appSceneBackdrop.entering").toBool() && wing && wing->opacity()==0);
+    check("wing-minimize-stops-render-motion",!eval("appSceneBackdrop.presenting").toBool() && !eval("appSceneBackdrop.entering").toBool());
     window->showNormal();wait(80);
     check("wing-does-not-replay-on-restore",!eval("appSceneBackdrop.entering").toBool() && wing && wing->scale()==1 && wing->rotation()==0);
 
     QQmlComponent entryComponent(qmlEngine(window));
-    entryComponent.setData("import QtQuick; import SwirlQuick; SwirlWorkspaceBackdrop {width:914;height:672;homeVisible:false}",QUrl("qrc:/qt/qml/SwirlQuick/WingEntryFixture.qml"));
+    entryComponent.setData("import QtQuick; import SwirlQuick; SwirlWorkspaceBackdrop {width:914;height:672;visible:false}",QUrl("qrc:/qt/qml/SwirlQuick/WingEntryFixture.qml"));
     std::unique_ptr<QObject> entryOwner(entryComponent.createWithInitialProperties({{"targetWindow",QVariant::fromValue(window)}},qmlContext(window)));
     auto *entry=qobject_cast<QQuickItem *>(entryOwner.get());
     check("fresh-wing-fixture-load",entry!=nullptr);
@@ -258,15 +260,17 @@ Item {
         entry->setParentItem(window->contentItem());
         qmlEngine(window)->rootContext()->setContextProperty("apecEntry",entry);
         check("fresh-wing-has-not-consumed-opening",!entry->property("entranceConsumed").toBool());
-        eval("apecEntry.homeVisible=true");wait(100);
+        wait(180);
+        check("hidden-window-does-not-consume-wing-opening",!entry->property("entranceConsumed").toBool() && entry->property("progress").toDouble()==0);
+        eval("apecEntry.visible=true");window->update();wait(260);
         check("first-opening-unfolds",entry->property("entering").toBool() && entry->property("entranceConsumed").toBool());
         auto *visual=entry->findChild<QQuickItem *>("apecWingVisual");
         eval("Theme.reduceMotion=true");wait(40);
         check("reduced-motion-settles-unfolding",visual && !entry->property("entering").toBool()
             && visual->scale()==1 && visual->rotation()==0 && visual->y()==0
             && qAbs(visual->opacity()-eval("Theme.wingOpacity").toDouble())<0.001);
-        eval("Theme.reduceMotion=false;apecEntry.homeVisible=false");wait(40);
-        eval("apecEntry.homeVisible=true");wait(100);
+        eval("Theme.reduceMotion=false;apecEntry.visible=false");wait(40);
+        eval("apecEntry.visible=true");wait(100);
         check("consumed-opening-stays-static-on-return",!entry->property("entering").toBool() && visual && visual->rotation()==0 && visual->scale()==1);
         qmlEngine(window)->rootContext()->setContextProperty("apecEntry",static_cast<QObject *>(nullptr));
     }

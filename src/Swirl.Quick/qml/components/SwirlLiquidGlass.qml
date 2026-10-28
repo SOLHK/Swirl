@@ -9,15 +9,15 @@ Item {
     property real cornerRadius:Theme.sidebarRadius
     property real interaction:0
     property point lightPoint:Qt.point(0.18,0.15)
-    property real blurRadius:Theme.dp(5)
-    property real refraction:Theme.dp(2.4)
+    property real blurRadius:Theme.glassBlurRadius
+    property real refraction:Theme.glassRefraction
     // A width-changing shell can keep one texture allocation for its maximum
     // envelope while sourceRect and shader geometry follow the live width.
     property real captureWidth:width
     readonly property real samplePadding:Theme.dp(16)
     readonly property bool windowVisible:!Window.window || (Window.window.visible && Window.window.visibility!==Window.Minimized)
     readonly property bool sampled:Theme.effectsSupported && Theme.transparency && !Theme.increaseContrast && backdropSource!==null
-    readonly property real captureScale:Math.min(1,Screen.devicePixelRatio*0.6)
+    readonly property real captureScale:Math.min(2,Screen.devicePixelRatio)
     readonly property size captureSize:Qt.size(Math.max(1,Math.ceil((captureWidth+2*samplePadding)*captureScale)),Math.max(1,Math.ceil((height+2*samplePadding)*captureScale)))
     readonly property point sampleOrigin:{glass.x;glass.y;glass.width;glass.height;return backdropSource?glass.mapToItem(backdropSource,-samplePadding,-samplePadding):Qt.point(0,0)}
     readonly property int shaderStatus:material.status
@@ -67,6 +67,8 @@ Item {
         property real interaction:glass.interaction
         property vector2d lightPoint:Qt.vector2d(glass.lightPoint.x,glass.lightPoint.y)
         property real darkMode:Theme.dark?1:0
+        property color highlightColor:Theme.glassHighlight
+        property color reflectionColor:Theme.glassReflection
         fragmentShader:"qrc:/swirl/shaders/sidebar-liquid.frag.qsb"
     }
     SwirlShellOutline {

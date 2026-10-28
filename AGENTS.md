@@ -1,4 +1,12 @@
-# Current Swirl 3.0 APEC redesign (2026-10-27)
+# Current 0.2.16 neutral theme and feather interaction (2026-10-28)
+
+- Work on `work/swirl-0216-neutral-wings-20261028`, based on `39a1b91`; keep other worktrees and `main` untouched. This request supersedes the historical navy palette and Activity-only wing entrance below.
+- Preserve the current layout, floating sidebar contours, features and Rust Core. Restrict production changes to shared QML theme, cards, scene decoration and glass shaders; do not change routing, protocol or system-proxy ownership logic.
+- Use neutral white/near-black tokens throughout. Shared feather paths must unfold individually, reverse continuously, disappear fully when the owned proxy is off, and retain one shared proxy animation state across pages. The global wing starts after a visible window frame, persists across navigation and settles without an idle animation.
+- Validate compilation, focused UI/motion/GPU-glass gates and controlled 100/125/150/175/200% DPR renders. Keep physical monitor/DPI and real private-network acceptance separate from controlled tests. Never mutate this machine's active proxy, TUN, routes or DNS for these checks.
+- Keep version 0.2.16 as explicitly requested. Package a production build without UI test entry points, with source/EXE/Rust DLL identity and verified payload hashes.
+
+# Previous Swirl 3.0 APEC redesign (2026-10-27)
 
 - Current isolated branch: `work/swirl-apec-v3-20261027`, based on remote `80955a98ef225fb799acb190967e8da4f41e719d`. Read `docs/SWIRL_V3_APEC_BASELINE.md`, `docs/APEC_2026_VISUAL_RESEARCH.md` and `docs/SWIRL_V3_APEC_DESIGN.md`.
 - The current user authorizes full UI/layout/brand/motion redesign and explicitly removes old fixed 14dp/sidebar/Activity layout restrictions and the requirement to use a fixed set of four skills. Preserve actual functionality, font initialization fencing, transaction receipts, page continuity and runtime isolation. Do not modify main/test/other windows or force-push.

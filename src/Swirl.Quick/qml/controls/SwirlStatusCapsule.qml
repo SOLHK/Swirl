@@ -9,6 +9,7 @@ SwirlMotionButton {
  property string tone:"neutral"
  property string detail:""
  property string activityPhase:""
+ property bool proxyWing:false
  implicitWidth:content.implicitWidth+Theme.dp(24)
  implicitHeight:Theme.statusHeight
  leftPadding:Theme.dp(8);rightPadding:Theme.dp(8)
@@ -30,7 +31,7 @@ SwirlMotionButton {
  HoverHandler { cursorShape: Qt.PointingHandCursor }
  contentItem:RowLayout { id:content;spacing:Theme.dp(7)
   Rectangle { visible:!control.activityPhase.length;Layout.preferredWidth:Theme.dp(6);Layout.preferredHeight:Theme.dp(6);radius:width/2;color:control.tone==="success"?Theme.successText:control.tone==="warning"?Theme.orange:control.tone==="info"?Theme.accent:Theme.muted;Behavior on color{ColorAnimation{duration:SwirlMotion.duration}} }
-  SwirlFlow {visible:control.activityPhase.length>0;Layout.preferredWidth:Theme.dp(25);Layout.preferredHeight:Theme.dp(14);phase:control.activityPhase}
+  SwirlFlow {visible:control.activityPhase.length>0;Layout.preferredWidth:Theme.dp(25);Layout.preferredHeight:Theme.dp(14);phase:control.activityPhase;proxyWing:control.proxyWing}
   SwirlText {textRole:"smallLabel";renderType:Text.NativeRendering; text:control.label;color:control.tone==="success"?Theme.successText:Theme.text;font.pixelSize:Theme.fontSize(11);verticalAlignment:Text.AlignVCenter }
  }
  Accessible.name:label+(detail.length?"，"+detail:"")

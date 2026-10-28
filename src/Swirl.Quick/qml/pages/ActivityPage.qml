@@ -190,7 +190,7 @@ Item {
                     id: statusBody; anchors.fill: parent; anchors.margins: Theme.dp(12); spacing: Theme.dp(12)
                     RowLayout {
                         Layout.fillWidth: true; spacing: Theme.dp(10)
-                        SwirlFlow { Layout.preferredWidth: Theme.dp(54); Layout.preferredHeight: Theme.dp(20); phase: page.proxyPhase }
+                        SwirlFlow { objectName: "activityProxyWing"; Layout.preferredWidth: Theme.dp(54); Layout.preferredHeight: Theme.dp(20); phase: page.proxyPhase; proxyWing: true }
                         SwirlText { text: page.proxySummary; font.pixelSize: Theme.fontSize(15); font.weight: Font.DemiBold; color: Theme.text; Layout.fillWidth: true; elide: Text.ElideRight }
                         SwirlIconButton {
                             objectName: "activityProxyErrorDetails"
@@ -284,7 +284,7 @@ Item {
                         SwirlText { text: page.internetMeasured ? String(parseInt(page.internetLatency)) : "—"; color: Theme.text; font.pixelSize: Theme.fontSize(42); font.weight: Font.DemiBold }
                         SwirlText { Layout.alignment: Qt.AlignBottom; Layout.bottomMargin: Theme.dp(6); text: page.internetMeasured ? "ms" : ""; color: Theme.muted; font.pixelSize: Theme.fontSize(16) }
                         Item { Layout.fillWidth: true }
-                        SwirlFlow { Layout.preferredWidth: Theme.dp(42); Layout.preferredHeight: Theme.dp(18); phase: page.telemetry.measurementState === "正在测量" ? "pending" : page.internetMeasured ? "succeeded" : page.telemetry.measurementState === "测量完成" ? "failed" : "idle" }
+                        SwirlFlow { objectName: "diagnosticProxyWing"; Layout.preferredWidth: Theme.dp(42); Layout.preferredHeight: Theme.dp(18); phase: page.proxyPhase; proxyWing: true }
                     }
                     SwirlText { text: page.internetMeasured ? qsTr("INTERNET · HTTPS 完整请求") : page.telemetry.measurementState || qsTr("尚未检测"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; wrapMode: Text.Wrap }
                     Rectangle { Layout.fillWidth: true; Layout.preferredHeight: Theme.borderWidth; color: Theme.separator }

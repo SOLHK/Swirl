@@ -12,6 +12,7 @@ Canvas {
     onValuesChanged:requestPaint()
     onWidthChanged:requestPaint()
     onHeightChanged:requestPaint()
+    Connections { target:Theme; function onDarkChanged(){plot.requestPaint()} }
     Connections { target:AppState; function onMeasurementTickChanged(){if(plot.active)plot.requestPaint()} }
     onPaint: {
         var c=getContext("2d");c.reset()
@@ -19,7 +20,7 @@ Canvas {
         if(n<2)return
         if(bars) {
             var arr=values
-            c.fillStyle=Theme.dark ? "#6584A4" : "#CFDDF0"
+            c.fillStyle=Theme.chartBar
             for(var j=0;j<arr.length;j++)c.fillRect(j*width/arr.length,base-arr[j]*(height-Theme.dp(4)),width/arr.length*0.65,arr[j]*(height-Theme.dp(4)))
             return
         }

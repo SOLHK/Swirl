@@ -162,7 +162,7 @@ Item {
         items:[qsTr("当前筛选结果（%1）").arg(nodes.count),qsTr("全部节点（%1）").arg(nodes.total)]
         onItemTriggered:function(index){if(index===0)engineController.testNodes(sections.nodeIds(),testUrl.text.trim());else engineController.testAllNodes(testUrl.text.trim())}
     }
-    Rectangle {objectName:"nodeDetailScrim";anchors.fill:parent;radius:Theme.cardRadius;antialiasing:true;z:10;visible:nodeHero.opened||nodeHero.moving;color:Theme.withAlpha("#000000",0.10*nodeHero.progress)
+    Rectangle {objectName:"nodeDetailScrim";anchors.fill:parent;radius:Theme.cardRadius;antialiasing:true;z:10;visible:nodeHero.opened||nodeHero.moving;color:Theme.withAlpha(Theme.shadowColor,0.10*nodeHero.progress)
         MouseArea {anchors.fill:parent;onClicked:page.dismissDetail()}
     }
     Item {

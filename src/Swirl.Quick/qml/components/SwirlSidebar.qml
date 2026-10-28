@@ -37,7 +37,7 @@ Item {
    property real cornerRadius:floatingBackground.radius
    property vector2d shadowOffset:Qt.vector2d(Theme.dp(3),Theme.dp(3))
    property real softness:Theme.dp(9)
-   property color shadowColor:Theme.withAlpha("#000000",Theme.sidebarShadowOpacity)
+   property color shadowColor:Theme.withAlpha(Theme.shadowColor,Theme.sidebarShadowOpacity)
    fragmentShader:"qrc:/swirl/shaders/sidebar-shadow.frag.qsb"
   }
  }
