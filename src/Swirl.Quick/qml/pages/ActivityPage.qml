@@ -146,7 +146,7 @@ Item {
         readonly property Item valueItem: valueText
         Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.preferredHeight: implicitHeight
         implicitHeight: Theme.dp(26); spacing: Theme.dp(8)
-        SwirlText { text: stat.caption; color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; elide: Text.ElideRight }
+        SwirlText { text: stat.caption; color: Theme.artworkText; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; elide: Text.ElideRight }
         SwirlText { id: valueText; text: stat.value; color: Theme.text; font.pixelSize: Theme.fontSize(13); font.weight: Font.Medium; elide: Text.ElideRight }
     }
     component SectionTitle: SwirlMotionButton {
@@ -306,10 +306,10 @@ Item {
                                     background: Rectangle { color: rank.down ? Theme.pressed : rank.hovered ? Theme.hover : "transparent"; radius: Theme.dp(6); border.width: rank.visualFocus ? Theme.borderWidth : 0; border.color: Theme.accent }
                                     contentItem: RowLayout {
                                         spacing: Theme.dp(9)
-                                        SwirlIcon { name: rank.modelData.kind === "apps" ? "terminal" : rank.modelData.kind === "devices" ? "router" : rank.modelData.kind === "domains" ? "globe" : "route"; size: Theme.dp(17); color: Theme.muted }
+                                        SwirlIcon { name: rank.modelData.kind === "apps" ? "terminal" : rank.modelData.kind === "devices" ? "router" : rank.modelData.kind === "domains" ? "globe" : "route"; size: Theme.dp(17); color: Theme.artworkText }
                                         SwirlText { text: rank.modelData.name; Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight; color: Theme.text; font.pixelSize: Theme.fontSize(12) }
-                                        SwirlText { text: rank.modelData.value; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
-                                        SwirlIcon { name: "chevron-right"; size: Theme.dp(12); color: Theme.muted }
+                                        SwirlText { text: rank.modelData.value; color: Theme.artworkText; font.pixelSize: Theme.fontSize(12) }
+                                        SwirlIcon { name: "chevron-right"; size: Theme.dp(12); color: Theme.artworkText }
                                     }
                                     Accessible.name: qsTr("%1详情").arg(modelData.name)
                                     onClicked: { SwirlMotion.noteTrigger(rank); page.openRank(modelData) }
@@ -317,11 +317,11 @@ Item {
                             }
                         }
                     }
-                    SwirlText { visible: page.ranks.length === 0; text: page.emptyRanksText; color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(56); verticalAlignment: Text.AlignVCenter; wrapMode: Text.Wrap }
+                    SwirlText { visible: page.ranks.length === 0; text: page.emptyRanksText; color: Theme.artworkText; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(56); verticalAlignment: Text.AlignVCenter; wrapMode: Text.Wrap }
                     RowLayout {
                         Layout.fillWidth: true
-                        SwirlText { text: qsTr("直连 %1").arg(page.distribution[1] && page.totals.sampled ? page.distribution[1].value : "—"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true }
-                        SwirlText { text: qsTr("代理 %1").arg(page.distribution[0] && page.totals.sampled ? page.distribution[0].value : "—"); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
+                        SwirlText { text: qsTr("直连 %1").arg(page.distribution[1] && page.totals.sampled ? page.distribution[1].value : "—"); color: Theme.artworkText; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true }
+                        SwirlText { text: qsTr("代理 %1").arg(page.distribution[0] && page.totals.sampled ? page.distribution[0].value : "—"); color: Theme.artworkText; font.pixelSize: Theme.fontSize(12) }
                     }
                 }
                 ColumnLayout {

@@ -21,7 +21,7 @@ int runApecGlassChecks(QQuickWindow *window,const QString &output) {
     const auto check=[&](const char *name,bool passed){checks.append(QJsonObject{{"name",name},{"passed",passed}});if(!passed)++failures;qInfo()<<"APEC_GLASS_CHECK"<<name<<passed;};
     const auto eval=[&](const QString &code){QQmlExpression expression(qmlContext(window),window,code);auto value=expression.evaluate();if(expression.hasError()){qWarning()<<expression.error();check("qml-expression",false);}return value;};
     check("gpu-backend",window->rendererInterface()->graphicsApi()!=QSGRendererInterface::Software);
-    eval("Theme.mode='Light';Theme.transparency=true;Theme.increaseContrast=false;Theme.reduceMotion=true");
+    eval("Theme.mode='Light';Theme.transparency=true;Theme.increaseContrast=false;Theme.reduceMotion=true;AppState.navigate('activity')");
     window->resize(1100,760);window->requestActivate();QTest::qWait(200);
     auto *productionShader=window->findChild<QObject *>("sidebarLiquidShader");
     // Check the first real application instance. Qt 6.12's global shader-info
@@ -41,6 +41,21 @@ int runApecGlassChecks(QQuickWindow *window,const QString &output) {
     const auto clearGlass=grab(productionGlass);
     check("sidebar-preserves-shared-window-base",!clearGlass.isNull() && clearGlass.pixelColor(clearGlass.width()/2,clearGlass.height()/4).alpha()<3);
     check("wing-decoration-spans-workspace",decoration && decoration->width()==scene->width() && decoration->height()==scene->height());
+    auto *footprint=scene?scene->findChild<QQuickItem *>("apecWingFootprint"):nullptr;
+    auto *wingVisual=scene?scene->findChild<QQuickItem *>("apecWingVisual"):nullptr;
+    check("flat-wing-vector-loaded",footprint && wingVisual && scene->findChild<QQuickItem *>("apecFlatWingPaths"));
+    for(const QSize size:{QSize(760,672),QSize(914,672),QSize(1100,760)}) {
+        window->resize(size);QTest::qWait(50);
+        const auto area=qvariant_cast<QQuickItem *>(eval("mainArea"));
+        check("bottom-wing-preserves-85-percent-width-and-aspect",footprint && area
+            && qAbs(footprint->width()/area->width()-0.85)<0.001
+            && qAbs(footprint->height()/footprint->width()-0.76)<0.001
+            && footprint->y()<scene->height()/2
+            && qAbs(footprint->x()+footprint->width()/2-area->x()-area->width()/2)<0.1
+            && qAbs(footprint->y()+footprint->height()-scene->height()+12)<0.1);
+    }
+    check("sidebar-retains-floating-inset-and-20dp-contour",eval("sidebar.glassSurface.x===Theme.shellInset && sidebar.glassSurface.y===Theme.shellInset && sidebar.glassSurface.radius===20").toBool());
+    check("neutral-light-canvas-and-card-palette",eval("Theme.canvas.toString()==='#f3f3f5' && Theme.surface.toString()==='#f8f8fa' && Theme.border.toString()==='#e3e3e7'").toBool());
     if(decoration){
         auto decorated=grab(scene);
         decoration->setVisible(false);QTest::qWait(35);auto plain=grab(scene);
@@ -50,11 +65,13 @@ int runApecGlassChecks(QQuickWindow *window,const QString &output) {
                 if(decorated.pixelColor(x,y)!=plain.pixelColor(x,y))++rightSideChanges;
         check("wing-decoration-reaches-uncovered-right-workspace",rightSideChanges>100);
         QQmlComponent cardComponent(qmlEngine(window));
-        cardComponent.setData("import QtQuick; import SwirlQuick; SwirlGlassPanel {x:280;y:180;width:240;height:160}",QUrl("qrc:/qt/qml/SwirlQuick/WingCardFixture.qml"));
+        cardComponent.setData("import QtQuick; import SwirlQuick; SwirlGlassPanel {width:240;height:160}",QUrl("qrc:/qt/qml/SwirlQuick/WingCardFixture.qml"));
         std::unique_ptr<QObject> cardOwner(cardComponent.create(qmlContext(window)));
         auto *card=qobject_cast<QQuickItem *>(cardOwner.get());
         if(card){
-            card->setParentItem(scene);const auto before=grab(card);
+            card->setParentItem(scene);
+            card->setPosition(QPointF(footprint->x()+footprint->width()/2-120,scene->height()-170));
+            const auto before=grab(card);
             decoration->setVisible(true);QTest::qWait(35);const auto after=grab(card);
             check("opaque-card-occludes-workspace-wings",!before.isNull() && before==after && after.pixelColor(after.width()/2,after.height()/2).alpha()==255);
         }else check("opaque-card-fixture",false);
@@ -131,7 +148,8 @@ Item {
         eval("apecGlass.glass.visible=true;Theme.transparency=false");QTest::qWait(60);
         check("opaque-fallback-releases-sample",eval("!apecGlass.glass.sampled && !apecGlass.glass.captureLive").toBool());
         const auto opaque=capture();
-        check("opaque-fallback-pixels",!opaque.isNull() && sample(opaque,100,140).red()>245 && sample(opaque,300,140).red()>245 && sample(opaque,100,140).alpha()==255);
+        const auto canvasColor=eval("Theme.canvas").value<QColor>();
+        check("opaque-fallback-pixels",!opaque.isNull() && sample(opaque,100,140)==canvasColor && sample(opaque,300,140)==canvasColor && canvasColor.alpha()==255);
         eval("Theme.transparency=true;Theme.increaseContrast=true");QTest::qWait(60);
         check("high-contrast-fallback",eval("!apecGlass.glass.sampled && !apecGlass.glass.captureLive").toBool());
         eval("Theme.increaseContrast=false;Theme.mode='Dark'");QTest::qWait(100);auto dark=capture();

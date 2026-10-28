@@ -236,6 +236,23 @@ Item {
         check("all-transition-tokens-retired",eval("SwirlTransitionRegistry.activeCount===0").toBool());
         qmlEngine(window)->rootContext()->setContextProperty("apecFixture",static_cast<QObject *>(nullptr));
     }
+    eval("Theme.reduceMotion=false;Theme.transparency=true;AppState.navigate('activity')");wait(80);
+    auto *wing=window->findChild<QQuickItem *>("apecWingVisual");
+    check("wing-entry-starts",wing && eval("appSceneBackdrop.entering").toBool());
+    eval("AppState.navigate('overview')");wait(35);
+    check("wing-entry-stops-off-home",wing && !eval("appSceneBackdrop.entering").toBool() && wing->opacity()==0);
+    eval("AppState.navigate('activity')");wait(80);
+    check("wing-entry-restarts-on-return",eval("appSceneBackdrop.entering").toBool());
+    eval("Theme.reduceMotion=true");wait(30);
+    check("wing-reduced-motion-settles-immediately",wing && !eval("appSceneBackdrop.entering").toBool()
+        && qAbs(wing->opacity()-eval("Theme.wingOpacity").toDouble())<0.001 && wing->scale()==1 && wing->y()==0);
+    eval("Theme.reduceMotion=false;AppState.navigate('overview')");wait(30);
+    eval("AppState.navigate('activity')");wait(850);
+    check("wing-rests-without-continuous-animation",wing && !eval("appSceneBackdrop.entering").toBool()
+        && wing->scale()==1 && wing->y()==0 && qAbs(wing->opacity()-eval("Theme.wingOpacity").toDouble())<0.001);
+    window->showMinimized();wait(40);
+    check("wing-minimize-stops-render-motion",!eval("appSceneBackdrop.entering").toBool() && wing && wing->opacity()==0);
+    window->showNormal();wait(40);eval("Theme.reduceMotion=true");
     const auto api=window->rendererInterface()->graphicsApi();
     QDir().mkpath(QFileInfo(output).absolutePath());QFile report(output);if(!report.open(QIODevice::WriteOnly))return 2;
     report.write(QJsonDocument(QJsonObject{{"checks",checks},{"failures",failures},{"qtVersion",qVersion()},{"graphicsApi",int(api)},{"scope","Actual application QML, controlled motion/input; not physical refresh or private-network acceptance"}}).toJson());

@@ -22,9 +22,9 @@ QtObject {
     property alias increaseContrast: appearanceStore.savedIncreaseContrast
     readonly property color interactionHover: withAlpha(dark ? "#FFFFFF" : "#000000", dark ? 0.10 : 0.045)
     readonly property color interactionPressed: withAlpha(dark ? "#FFFFFF" : "#000000", dark ? 0.16 : 0.09)
-    readonly property color glassFill: dark ? "#20364D" : "#EDF5F9"
-    readonly property color glassTop: dark ? "#2A4661" : "#F6FAFC"
-    readonly property color glassHoverTop: dark ? "#33536D" : "#FFFFFF"
+    readonly property color glassFill: dark ? "#20364D" : "#F0F0F2"
+    readonly property color glassTop: dark ? "#2A4661" : "#F8F8FA"
+    readonly property color glassHoverTop: dark ? "#33536D" : "#FAFAFC"
     readonly property real sidebarShadowOpacity: dark ? 0.22 : 0.075
     readonly property color separator: increaseContrast ? text : withAlpha(dark ? "#FFFFFF" : "#18202B", dark ? 0.12 : 0.10)
     property string pageBranch: "B"
@@ -46,11 +46,11 @@ QtObject {
     readonly property real uiScale: followSystemScale ? 1.0 : appearanceSettings.savedScalePercent / 100.0
     readonly property bool dark: mode === "Dark" || (mode === "System" && Qt.styleHints.colorScheme === Qt.Dark)
     // The light canvas runs continuously beneath content and the floating sidebar.
-    readonly property color canvas: dark ? "#101D2D" : "#FBFCFD"
-    readonly property color surface: dark ? "#182A40" : "#FFFFFF"
-    readonly property color independentCard: dark ? "#1D3149" : "#FFFFFF"
+    readonly property color canvas: dark ? "#101D2D" : "#F3F3F5"
+    readonly property color surface: dark ? "#182A40" : "#F8F8FA"
+    readonly property color independentCard: dark ? "#1D3149" : "#F8F8FA"
     readonly property color primaryContainer: withAlpha(independentCard,transparency?0.90:1)
-    readonly property color raised: dark ? "#20364D" : "#F3F7FA"
+    readonly property color raised: dark ? "#20364D" : "#F0F0F2"
     // Neutral QML tint above the native window backdrop. Fall back to opacity 1.
     readonly property color sidebarBase:surface
     // Content materials are composed inside the system-owned HWND outline.
@@ -60,14 +60,24 @@ QtObject {
     readonly property real settingsOpacity:dark?0.98:0.96
     readonly property real popupOpacity:transparency && backdropActive ? (dark?0.98:0.99) : 1.0
     readonly property color sidebar: withAlpha(sidebarBase, sidebarOpacity)
-    readonly property color border: increaseContrast ? text : dark ? "#344B63" : "#DDE6ED"
+    readonly property color border: increaseContrast ? text : dark ? "#344B63" : "#E3E3E7"
     readonly property color glassRim: border
     readonly property color glassGlint: dark ? "#456783" : "#FFFFFF"
     readonly property color glassShadow: dark ? "#50000000" : "#18000000"
     readonly property color pillRim:border
-    readonly property color pillTop: dark ? "#29435B" : "#EDF3F7"
+    readonly property color pillTop: dark ? "#29435B" : "#EEEEF1"
     readonly property color pillBottom: pillTop
-    readonly property color text: dark ? "#EDF5FC" : "#14283F"
+    readonly property color text: dark ? "#EDF5FC" : "#202027"
+    readonly property color artworkText: dark ? text : "#393941"
+    readonly property color apecBlue: "#171D87"
+    readonly property color wingGold: "#FFB264"
+    readonly property color wingOrange: "#FF954B"
+    readonly property color wingCoral: "#FF554D"
+    readonly property color wingRose: "#F40050"
+    readonly property color wingCyan: "#00BDE1"
+    readonly property color wingTeal: "#36CBB0"
+    readonly property color wingGreen: "#A3E65D"
+    readonly property real wingOpacity: dark ? 0.56 : 0.72
     readonly property color brandOrange:"#F5A04D"
     readonly property color brandRed:"#D93962"
     readonly property color brandBlue:"#285DD3"
@@ -75,28 +85,28 @@ QtObject {
     readonly property color brandGreen:"#3CAA79"
     readonly property color magenta:brandRed
     readonly property color cyan:brandCyan
-    readonly property color muted: dark ? "#B4C7D9" : "#53667A"
-    readonly property color accent: dark ? "#55C8E6" : "#007EAA"
+    readonly property color muted: dark ? "#B4C7D9" : "#71717A"
+    readonly property color accent: dark ? "#55C8E6" : apecBlue
     readonly property color accentIndigo:brandBlue
     readonly property color speedAccent:accent
     readonly property color primaryControl:accent
     readonly property color navigationAccent:accent
     readonly property color navigationSelected:withAlpha(accent,dark?0.18:0.10)
     readonly property color navigationPressed:withAlpha(accent,dark?0.28:0.18)
-    readonly property color selected: dark ? "#274861" : "#E2F0F6"
-    readonly property color segmentSelected: dark ? "#2F506C" : "#FFFFFF"
-    readonly property color hover: dark ? "#29445F" : "#E7F1F6"
-    readonly property color pressed: dark ? "#33536D" : "#D7EAF2"
+    readonly property color selected: dark ? "#274861" : "#E5E5EF"
+    readonly property color segmentSelected: dark ? "#2F506C" : "#FAFAFC"
+    readonly property color hover: dark ? "#29445F" : "#EAEAEF"
+    readonly property color pressed: dark ? "#33536D" : "#DFDFE7"
     readonly property color controlBorder: pillRim
     readonly property color focusBorder:accent
-    readonly property color tableToolbar: dark ? "#20364D" : "#F0F5F8"
-    readonly property color buttonBase: dark ? "#233B54" : "#EFF4F8"
+    readonly property color tableToolbar: dark ? "#20364D" : "#F0F0F2"
+    readonly property color buttonBase: dark ? "#233B54" : "#EEEEF1"
     readonly property color primaryButton:accent
-    readonly property color primaryButtonHover: dark ? "#7CD9EE" : "#006F98"
-    readonly property color primaryButtonPressed: dark ? "#38B3D2" : "#005C82"
+    readonly property color primaryButtonHover: dark ? "#7CD9EE" : "#252B97"
+    readonly property color primaryButtonPressed: dark ? "#38B3D2" : "#10156B"
     readonly property color primaryButtonText: dark ? "#101D2D" : "#FFFFFF"
-    readonly property color fieldSelection: dark ? "#315571" : "#D8EDF6"
-    readonly property color toggleTrack: dark ? "#425D73" : "#D4E1EA"
+    readonly property color fieldSelection: dark ? "#315571" : "#DDDDEB"
+    readonly property color toggleTrack: dark ? "#425D73" : "#D5D5DD"
     readonly property color controlThumb: "#FFFFFF"
     readonly property color successSurface: dark ? "#30483C" : "#EAF5EE"
     readonly property color successText: dark ? "#A6EDC6" : "#21613D"
@@ -104,9 +114,9 @@ QtObject {
     readonly property color warningText: dark ? "#FFE0AD" : "#805019"
     readonly property color dangerSurface: dark ? "#4A3035" : "#FBECEF"
     readonly property real disabledOpacity: 0.45
-    readonly property color field: dark ? "#1B3048" : "#F2F6F9"
+    readonly property color field: dark ? "#1B3048" : "#F0F0F2"
     readonly property color floatingSurface:surface
-    readonly property color capsuleSurface: dark ? "#233B54" : "#EAF2F6"
+    readonly property color capsuleSurface: dark ? "#233B54" : "#EEEEF1"
     readonly property color green: dark ? "#75DD91" : "#30C759"
     readonly property color statusGreen: dark ? "#75DD91" : "#00B832"
     readonly property color orange: dark ? "#F5C67D" : "#FF9229"

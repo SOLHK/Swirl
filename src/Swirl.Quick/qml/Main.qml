@@ -95,7 +95,8 @@ ApplicationWindow {
         SwirlWorkspaceBackdrop {
             id:appSceneBackdrop
             anchors.fill:parent;targetWindow:window
-            glassSurface:sidebar.glassSurface;glassSampled:sidebar.glassSampled
+            contentLeft:mainArea.x;contentWidth:mainArea.width
+            homeVisible:pageLoader.routeKey==="activity"
         }
 
         MouseArea {
