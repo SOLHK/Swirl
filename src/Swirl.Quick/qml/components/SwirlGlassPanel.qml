@@ -11,8 +11,8 @@ Rectangle {
     property bool pressed:false
     property bool focused:false
     HoverHandler{id:cardHover;enabled:panel.interactive}
-    Behavior on color{enabled:!SwirlMotion.reduced;ColorAnimation{duration:SwirlMotion.hoverDuration}}
-    Behavior on border.color{enabled:!SwirlMotion.reduced;ColorAnimation{duration:SwirlMotion.hoverDuration}}
+    Behavior on color{enabled:panel.interactive && !SwirlMotion.reduced;ColorAnimation{duration:SwirlMotion.hoverDuration}}
+    Behavior on border.color{enabled:panel.interactive && !SwirlMotion.reduced;ColorAnimation{duration:SwirlMotion.hoverDuration}}
     property real cornerRadius: floating ? Theme.popupRadius : Theme.cardRadius
     property bool independentCard: !floating
     readonly property bool floating: material === "floating"
