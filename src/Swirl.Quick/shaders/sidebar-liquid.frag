@@ -31,12 +31,17 @@ void main(){
     vec2 normal=normalize(vec2(distanceToSurface(p+vec2(.5,0))-distanceToSurface(p-vec2(.5,0)),distanceToSurface(p+vec2(0,.5))-distanceToSurface(p-vec2(0,.5)))+vec2(.00001));
     float edge=1.-smoothstep(0.,16.,max(0.,-d));
     vec2 extent=surfaceSize+2.*padding;
+    // Surface-space distance keeps the light round as the sidebar changes
+    // aspect ratio. Only the nearby rim responds to pointer or focus feedback.
+    vec2 lightDelta=(p-lightPoint*surfaceSize)/max(4.*cornerRadius,1.);
+    float localLight=exp(-dot(lightDelta,lightDelta)*2.);
+    float localInteraction=interaction*localLight;
     // A padded capture prevents the refracted rim from sampling outside the
     // real app scene crop. Refraction is at most a few logical pixels.
     float lens=4.*edge*(1.-edge);
-    vec2 uv=(p+padding-normal*lens*refraction*(1.+.3*interaction))/extent;
+    vec2 uv=(p+padding-normal*lens*refraction*(1.+.3*localInteraction))/extent;
     // Horizontal Gaussian is prepared in one panel-sized texture. This
-    // vertical pass also performs refraction, tint and rim lighting. Closely
+    // vertical pass also performs refraction and rim lighting. Closely
     // spaced weighted taps avoid hard bands at high-contrast source edges.
     vec2 s=vec2(0.,blurRadius/4.)/extent;
     vec4 blur=sampleSafe(uv)*.227027;
@@ -49,11 +54,10 @@ void main(){
     // At the boundary both displacement and blur reach zero: one continuous wing.
     vec4 color=mix(texture(sharpSource,(p+padding)/extent),blur,smoothstep(0.,8.,-d));
     float facing=max(0.,dot(normal,normalize(vec2(-.65,-1.))));
-    float rim=exp(-max(0.,-d)*1.25)*facing;
-    float localLight=exp(-dot((qt_TexCoord0-lightPoint)*vec2(1.,2.),(qt_TexCoord0-lightPoint)*vec2(1.,2.))*8.);
-    // Directional highlights and a restrained opposite reflection, not a
-    // uniform white outline. They move only with real interaction state.
-    float highlight=rim*(.16+.18*interaction*localLight);
+    float rim=exp(-max(0.,-d)*1.25);
+    // Keep the resting light directional, but let the interaction glint reach
+    // every edge without shifting the distant wing or lighting a whole outline.
+    float highlight=rim*(.16*facing+.12*localInteraction);
     color=vec4(vec3(.88,.96,1.)*highlight,highlight)+color*(1.-highlight);
     float reflection=edge*edge*(1.-facing)*mix(.015,.045,darkMode);
     color=vec4(vec3(.08,.12,.18)*reflection,reflection)+color*(1.-reflection);
