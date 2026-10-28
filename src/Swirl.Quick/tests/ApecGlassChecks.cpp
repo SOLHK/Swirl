@@ -46,13 +46,13 @@ int runApecGlassChecks(QQuickWindow *window,const QString &output) {
     check("flat-wing-vector-loaded",footprint && wingVisual && scene->findChild<QQuickItem *>("apecFlatWingPaths"));
     for(const QSize size:{QSize(760,672),QSize(914,672),QSize(1100,760)}) {
         window->resize(size);QTest::qWait(50);
-        const auto area=qvariant_cast<QQuickItem *>(eval("mainArea"));
-        check("bottom-wing-preserves-85-percent-width-and-aspect",footprint && area
-            && qAbs(footprint->width()/area->width()-0.85)<0.001
-            && qAbs(footprint->height()/footprint->width()-0.76)<0.001
-            && footprint->y()<scene->height()/2
-            && qAbs(footprint->x()+footprint->width()/2-area->x()-area->width()/2)<0.1
-            && qAbs(footprint->y()+footprint->height()-scene->height()+12)<0.1);
+        check("single-wing-spans-window-diagonally-with-fixed-aspect",footprint
+            && footprint->width()>scene->width()
+            && qAbs(footprint->height()/footprint->width()-0.625)<0.001
+            && footprint->y()<scene->height()/4
+            && footprint->x()<0
+            && qAbs(footprint->x()+footprint->width()-scene->width()+20)<0.1
+            && qAbs(footprint->y()+footprint->height()-scene->height()-40)<0.1);
     }
     check("sidebar-retains-floating-inset-and-20dp-contour",eval("sidebar.glassSurface.x===Theme.shellInset && sidebar.glassSurface.y===Theme.shellInset && sidebar.glassSurface.radius===20").toBool());
     check("neutral-light-canvas-and-card-palette",eval("Theme.canvas.toString()==='#f3f3f5' && Theme.surface.toString()==='#f8f8fa' && Theme.border.toString()==='#e3e3e7'").toBool());
@@ -64,6 +64,21 @@ int runApecGlassChecks(QQuickWindow *window,const QString &output) {
             for(int y=0;y<plain.height();++y)for(int x=plain.width()/2;x<plain.width();++x)
                 if(decorated.pixelColor(x,y)!=plain.pixelColor(x,y))++rightSideChanges;
         check("wing-decoration-reaches-uncovered-right-workspace",rightSideChanges>100);
+        const auto withoutWing=window->grabWindow();
+        decoration->setVisible(true);QTest::qWait(35);
+        const auto withWing=window->grabWindow();
+        for(const auto *name:{"activityStatusCard","activityTrafficCard"}) {
+            auto *card=window->findChild<QQuickItem *>(name);
+            check("production-opaque-card-found",card!=nullptr);
+            if(card){
+                const auto dpr=window->devicePixelRatio();
+                const auto origin=card->mapToScene(QPointF(16,16))*dpr;
+                const QRect interior(qRound(origin.x()),qRound(origin.y()),qRound((card->width()-32)*dpr),qRound((card->height()-32)*dpr));
+                check("production-card-pixels-independent-of-wing",!withoutWing.isNull() && !withWing.isNull()
+                    && withoutWing.copy(interior)==withWing.copy(interior));
+            }
+        }
+        decoration->setVisible(false);QTest::qWait(35);
         QQmlComponent cardComponent(qmlEngine(window));
         cardComponent.setData("import QtQuick; import SwirlQuick; SwirlGlassPanel {width:240;height:160}",QUrl("qrc:/qt/qml/SwirlQuick/WingCardFixture.qml"));
         std::unique_ptr<QObject> cardOwner(cardComponent.create(qmlContext(window)));
@@ -155,6 +170,26 @@ Item {
         eval("Theme.increaseContrast=false;Theme.mode='Dark'");QTest::qWait(100);auto dark=capture();
         check("dark-material-readback",!dark.isNull());if(!dark.isNull())dark.save(directory+"/glass-dark.png");
         qmlEngine(window)->rootContext()->setContextProperty("apecGlass",static_cast<QObject *>(nullptr));
+    }
+    eval("Theme.mode='Light';Theme.transparency=true;Theme.reduceMotion=false;Theme.followSystemMotion=false");
+    QQmlComponent entryComponent(qmlEngine(window));
+    entryComponent.setData("import QtQuick; import SwirlQuick; SwirlWorkspaceBackdrop {width:914;height:672;homeVisible:false;glassSampled:true}",QUrl("qrc:/qt/qml/SwirlQuick/NativeWingEntryFixture.qml"));
+    std::unique_ptr<QObject> entryOwner(entryComponent.createWithInitialProperties({{"targetWindow",QVariant::fromValue(window)}},qmlContext(window)));
+    auto *entry=qobject_cast<QQuickItem *>(entryOwner.get());
+    check("native-opening-fixture-loaded",entry!=nullptr);
+    if(entry){
+        entry->setParentItem(window->contentItem());entry->setZ(120);
+        entry->setProperty("glassSurface",QVariant::fromValue(window->findChild<QQuickItem *>("sidebarFloatingBackground")));
+        entry->setProperty("homeVisible",true);QTest::qWait(100);
+        const auto early=grab(entry);QTest::qWait(180);const auto middle=grab(entry);
+        check("native-opening-frames-progress",!early.isNull() && !middle.isNull() && early!=middle && entry->property("entering").toBool());
+        check("native-opening-completes",QTest::qWaitFor([&]{return !entry->property("entering").toBool();},1500));
+        const auto settled=grab(entry);QTest::qWait(80);const auto resting=grab(entry);
+        check("native-wing-is-pixel-static-at-rest",!settled.isNull() && settled==resting);
+        early.save(directory+"/wing-entry-early.png");middle.save(directory+"/wing-entry-middle.png");settled.save(directory+"/wing-entry-settled.png");
+        entry->setProperty("homeVisible",false);QTest::qWait(35);
+        entry->setProperty("homeVisible",true);QTest::qWait(35);
+        check("native-return-does-not-replay-opening",!entry->property("entering").toBool() && grab(entry)==settled);
     }
     QFile file(output);if(!file.open(QIODevice::WriteOnly))return 2;
     file.write(QJsonDocument(QJsonObject{{"checks",checks},{"failures",failures},{"qtVersion",qVersion()},{"graphicsApi",int(window->rendererInterface()->graphicsApi())},{"scope","Native app-source pixel readback; not desktop sampling, physical refresh, DPI or private-network acceptance"}}).toJson());

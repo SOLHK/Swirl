@@ -176,6 +176,7 @@ Item {
             x: Theme.pagePadding; width: scroll.width - 2 * Theme.pagePadding
             height: Math.max(scroll.height - Theme.dp(16), Layout.minimumHeight); spacing: Theme.dp(16)
             Rectangle {
+                objectName: "activityStatusCard"
                 Layout.fillWidth: true; Layout.minimumHeight: statusBody.implicitHeight + Theme.dp(24); Layout.preferredHeight: Layout.minimumHeight
                 radius: Theme.dp(14); color: Theme.buttonBase
                 ColumnLayout {
