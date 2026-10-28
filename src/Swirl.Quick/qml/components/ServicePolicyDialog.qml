@@ -64,8 +64,8 @@ SwirlDialog {
                     ScrollBar.vertical:SwirlScrollBar {}
                     delegate:RowLayout {
                         id:domainRow;required property var modelData;required property int index;width:Math.floor(ListView.view.width);height:Theme.dp(42);spacing:Theme.dp(8)
-                        SwirlText {Layout.fillWidth:true;text:(domainRow.modelData.type==="domain_suffix"?"*.":"")+domainRow.modelData.value;color:Theme.text;font.pixelSize:Theme.fontSize(12);elide:Text.ElideRight}
-                        SwirlText {text:domainRow.modelData.type==="domain_suffix"?qsTr("包含子域名"):qsTr("仅此域名");color:Theme.muted;font.pixelSize:Theme.fontSize(11)}
+                        SwirlText {Layout.fillWidth:true;Layout.alignment:Qt.AlignBaseline;text:(domainRow.modelData.type==="domain_suffix"?"*.":"")+domainRow.modelData.value;color:Theme.text;font.pixelSize:Theme.fontSize(12);elide:Text.ElideRight}
+                        SwirlText {Layout.alignment:Qt.AlignBaseline;text:domainRow.modelData.type==="domain_suffix"?qsTr("包含子域名"):qsTr("仅此域名");color:Theme.muted;font.pixelSize:Theme.fontSize(11)}
                         SwirlButton {text:qsTr("移除");quiet:true;enabled:!editor.pending;onClicked:editor.domains=editor.domains.filter((item,index)=>index!==domainRow.index);Accessible.name:qsTr("移除域名 %1").arg(domainRow.modelData.value)}
                     }
                     SwirlText {anchors.centerIn:parent;visible:domainList.count===0;text:qsTr("添加至少一个域名；任一条匹配即使用此策略。");color:Theme.muted;font.pixelSize:Theme.fontSize(11)}
@@ -73,9 +73,9 @@ SwirlDialog {
                 SwirlText {text:qsTr("出口");color:Theme.text;font.pixelSize:Theme.fontSize(12)}
                 SwirlButton {id:targetButton;objectName:"servicePolicyTarget";Layout.fillWidth:true;text:Policy.targetName(editor.selectedTarget,editor.targetOptions);outlined:true;enabled:!editor.pending;onClicked:targetPicker.begin(editor.selectedTarget,targetButton);Accessible.name:qsTr("策略出口：%1").arg(text)}
                 RowLayout {Layout.fillWidth:true;spacing:Theme.dp(12)
-                    SwirlText {text:qsTr("优先级");color:Theme.text;font.pixelSize:Theme.fontSize(12)}
-                    SwirlTextField {id:priorityField;objectName:"servicePolicyPriority";Layout.preferredWidth:Theme.dp(90);validator:IntValidator {bottom:0;top:1000000}enabled:!editor.pending;Accessible.name:qsTr("策略优先级，数值越小越优先");onTextEdited:editor.conflictReviewDigest=""}
-                    SwirlText {Layout.fillWidth:true;text:qsTr("数值越小越优先");color:Theme.muted;font.pixelSize:Theme.fontSize(11)}
+                    SwirlText {Layout.alignment:Qt.AlignBaseline;text:qsTr("优先级");color:Theme.text;font.pixelSize:Theme.fontSize(12)}
+                    SwirlTextField {id:priorityField;objectName:"servicePolicyPriority";Layout.preferredWidth:Theme.dp(90);Layout.alignment:Qt.AlignBaseline;font.features:({"tnum":1});validator:IntValidator {bottom:0;top:1000000}enabled:!editor.pending;Accessible.name:qsTr("策略优先级，数值越小越优先");onTextEdited:editor.conflictReviewDigest=""}
+                    SwirlText {Layout.fillWidth:true;Layout.alignment:Qt.AlignBaseline;text:qsTr("数值越小越优先");color:Theme.muted;font.pixelSize:Theme.fontSize(11)}
                     ReferenceCheckBox {id:enabledField;objectName:"servicePolicyEnabled";text:qsTr("启用");enabled:!editor.pending;onToggled:editor.conflictReviewDigest=""}
                 }
             }

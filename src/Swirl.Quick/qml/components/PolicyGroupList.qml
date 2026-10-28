@@ -67,8 +67,8 @@ ColumnLayout {
     }
     RowLayout {
         Layout.fillWidth: true; spacing: Theme.dp(12)
-        SwirlText { text: qsTr("可复用出口"); color: Theme.text; font.pixelSize: Theme.fontSize(15); font.weight: Font.DemiBold }
-        SwirlText { text: String(groups.records.length); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
+        SwirlText { objectName: "policyGroupCountTitle"; Layout.alignment: Qt.AlignBaseline; text: qsTr("可复用出口"); color: Theme.text; font.pixelSize: Theme.fontSize(15); font.weight: Font.DemiBold }
+        SwirlText { objectName: "policyGroupCount"; Layout.alignment: Qt.AlignBaseline; tabularFigures: true; text: String(groups.records.length); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
         Item { Layout.fillWidth: true }
         SwirlSearchField {id:search;objectName:"policyGroupSearch";Layout.preferredWidth:Theme.dp(226);Layout.minimumWidth:Theme.dp(140);placeholderText:qsTr("搜索策略组");Accessible.name:placeholderText;onTextChanged:groups.query=text}
     }
@@ -103,14 +103,14 @@ ColumnLayout {
                     SwirlMotionButton {
                         id: edit; objectName: "policyGroup-" + row.record.id
                         Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.fillHeight: true; padding: Theme.dp(8); hoverEnabled: true; enabled: groups.editable
-                        background: Rectangle { radius: Theme.controlRadius; color: edit.down ? Theme.pressed : edit.hovered ? Theme.navigationSelected : "transparent"; border.width: edit.visualFocus ? Theme.borderWidth : 0; border.color: Theme.text }
+                        background: SwirlControlSurface { hovered: edit.hovered; pressed: edit.down; focused: edit.visualFocus; quiet: true; controlEnabled: edit.enabled }
                         contentItem: RowLayout {
                             spacing: Theme.dp(12)
                             SwirlIcon { name: row.record.strategy === "manual" ? "pin" : row.record.strategy === "url_test" ? "gauge" : row.record.strategy === "fallback" ? "shield" : "layers"; size: Theme.dp(20); color: Theme.muted; Accessible.ignored: true }
                             ColumnLayout {
                                 Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: Theme.dp(5)
                                 SwirlText { Layout.fillWidth: true; Layout.minimumWidth: 0; text: row.record.name; textFormat: Text.PlainText; color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.DemiBold; elide: Text.ElideRight }
-                                SwirlText { Layout.fillWidth: true; Layout.minimumWidth: 0; text: qsTr("%1，%2 个候选").arg(Policy.strategyName(row.record.strategy)).arg((row.record.members || []).length); color: Theme.muted; font.pixelSize: Theme.fontSize(12); elide: Text.ElideRight }
+                                SwirlText { Layout.fillWidth: true; Layout.minimumWidth: 0; tabularFigures: true; text: qsTr("%1，%2 个候选").arg(Policy.strategyName(row.record.strategy)).arg((row.record.members || []).length); color: Theme.muted; font.pixelSize: Theme.fontSize(12); elide: Text.ElideRight }
                             }
                         }
                         Accessible.name: qsTr("编辑策略组 %1").arg(row.record.name)
@@ -138,7 +138,7 @@ ColumnLayout {
                             }
                             onClicked: groups.memberRequested(row.record, member)
                         }
-                        SwirlText { Layout.fillWidth: true; leftPadding: Theme.dp(8); visible: row.record.strategy !== "manual"; text: row.observation.connections ? qsTr("%1 个活动连接").arg(row.observation.connections) : qsTr("按策略自动选择"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); elide: Text.ElideRight }
+                        SwirlText { Layout.fillWidth: true; leftPadding: Theme.dp(8); tabularFigures: true; visible: row.record.strategy !== "manual"; text: row.observation.connections ? qsTr("%1 个活动连接").arg(row.observation.connections) : qsTr("按策略自动选择"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); elide: Text.ElideRight }
                     }
                     SubscriptionAction { id: more; objectName: "policyGroupMore-" + row.record.id; iconName: "ellipsis"; Layout.preferredWidth: Theme.dp(36); Layout.preferredHeight: Theme.dp(44); enabled: groups.editable; Accessible.name: qsTr("%1 的更多操作").arg(row.record.name); tooltip: Accessible.name; tooltipEnabled: !moreMenu.visible; onClicked: moreMenu.showAt() }
                 }

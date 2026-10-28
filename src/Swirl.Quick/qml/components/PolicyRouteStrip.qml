@@ -37,16 +37,20 @@ Rectangle {
                 text: Policy.targetName(strip.target, strip.targetOptions)
                 tooltip: qsTr("更换出口：%1").arg(text)
                 Accessible.name: qsTr("更换默认策略出口，当前：%1").arg(text)
-                background: Rectangle {
-                    radius: Theme.controlRadius
-                    color: choose.down ? Theme.pressed : choose.hovered ? Theme.hover : Theme.buttonBase
-                    border.width: choose.visualFocus || Theme.increaseContrast ? Theme.borderWidth : 0
-                    border.color: choose.visualFocus || Theme.increaseContrast ? Theme.text : Theme.controlBorder
-                    opacity: choose.enabled ? 1 : 0.45
-                    Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.hoverDuration } }
+                leftPadding: Theme.pillRadius(height)
+                rightPadding: Theme.pillRadius(height)
+                topPadding: Theme.dp(4)
+                bottomPadding: Theme.dp(4)
+                background: SwirlControlSurface {
+                    objectName: "defaultPolicyTargetSurface"
+                    hovered: choose.hovered
+                    pressed: choose.down
+                    focused: choose.visualFocus
+                    controlEnabled: choose.enabled
                 }
                 contentItem: RowLayout {
                     spacing: Theme.dp(10)
+                    opacity: choose.enabled ? 1 : Theme.disabledOpacity
                     SwirlIcon { name: strip.target.kind === "group" ? "layers" : "route"; size: Theme.dp(19); color: Theme.muted; Accessible.ignored: true }
                     ColumnLayout {
                         Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: Theme.dp(3)
@@ -65,13 +69,13 @@ Rectangle {
             SwirlIcon { name: strip.mode === "rule" ? "shield" : "route"; size: Theme.dp(14); color: Theme.muted; Accessible.ignored: true }
             SwirlText {
                 objectName: "policyRoutingExplanation"
-                Layout.fillWidth: true; wrapMode: Text.Wrap
+                Layout.fillWidth: true; Layout.alignment: Qt.AlignBaseline; wrapMode: Text.Wrap
                 text: strip.mode === "direct" ? qsTr("直连模式：受接管流量直接出站，以下分配暂不参与路由。")
                     : strip.mode === "global" ? qsTr("普通流量走默认出口，保留必要本地直连；专属分配暂不参与路由。")
                     : qsTr("国内规则命中使用 DIRECT；专属服务使用下方出口，其余流量走默认出口。")
                 color: Theme.muted; font.pixelSize: Theme.fontSize(12)
             }
-            SwirlText { visible: strip.mode === "rule"; text: "DIRECT"; color: Theme.text; font.pixelSize: Theme.fontSize(12); font.weight: Font.DemiBold; Accessible.name: qsTr("国内规则命中时直连") }
+            SwirlText { visible: strip.mode === "rule"; Layout.alignment: Qt.AlignBaseline; text: "DIRECT"; color: Theme.text; font.pixelSize: Theme.fontSize(12); font.weight: Font.DemiBold; Accessible.name: qsTr("国内规则命中时直连") }
         }
     }
 }

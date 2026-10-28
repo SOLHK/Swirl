@@ -6,6 +6,7 @@
 #include <QQmlContext>
 #include <QQmlComponent>
 #include <QQmlExpression>
+#include <QQmlProperty>
 #include <QTest>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -18,6 +19,8 @@
 #include <QEventLoop>
 #include <QTimer>
 #include <QSGRendererInterface>
+#include <QColor>
+#include <QtMath>
 #include <memory>
 #include <functional>
 
@@ -155,6 +158,76 @@ Item {
             check("caption-hidden-settles",eval("!apecCaption.moving && apecCaption.shownColor===apecCaption.targetColor").toBool());
             caption->setVisible(true);qmlEngine(window)->rootContext()->setContextProperty("apecCaption",static_cast<QObject *>(nullptr));
         }else check("caption-fixture-present",false);
+        auto *closeCaption=findVisual(window->contentItem(),"windowCloseButton");
+        auto *minCaption=findVisual(window->contentItem(),"windowMinimizeButton");
+        auto *maxCaption=findVisual(window->contentItem(),"windowMaximizeButton");
+        auto *closeSurface=findVisual(window->contentItem(),"captionSurface2");
+        check("caption-controls-and-paint-surface-present",closeCaption && minCaption && maxCaption && closeSurface);
+        if(closeCaption && minCaption && maxCaption && closeSurface){
+            qmlEngine(window)->rootContext()->setContextProperty("apecCaption",closeCaption);
+            const auto rect=[](QQuickItem *item){return QRectF(item->mapToScene(QPointF()),item->size());};
+            const auto initialRect=rect(closeCaption);
+            const auto minRect=rect(minCaption),maxRect=rect(maxCaption);
+            check("caption-hit-regions-equal-and-evenly-spaced",minRect.size()==maxRect.size() && maxRect.size()==initialRect.size()
+                && qAbs((maxRect.x()-minRect.x())-(initialRect.x()-maxRect.x()))<0.001);
+            check("caption-rounded-paint-is-inset-from-hit-region",closeSurface->x()>0 && closeSurface->y()>0
+                && closeSurface->width()<closeCaption->width() && closeSurface->height()<closeCaption->height()
+                && qAbs(closeSurface->property("radius").toDouble()-closeSurface->height()/2)<0.001);
+            const auto center=closeCaption->mapToScene(QPointF(closeCaption->width()/2,closeCaption->height()/2)).toPoint();
+            const auto park=QPoint(400,400);
+            const int settle=eval("SwirlMotion.hoverDuration").toInt()+80;
+            QTest::mouseMove(window,park);wait(settle);
+            const auto idleImage=window->grabWindow();
+            QTest::mouseMove(window,center);wait(settle);
+            const auto hoverImage=window->grabWindow();
+            const qreal dpr=window->devicePixelRatio();
+            const auto pixelAt=[&](const QImage &image,QPointF local){
+                const auto point=closeSurface->mapToScene(local)*dpr;
+                return image.isNull()?QColor():image.pixelColor(qRound(point.x()),qRound(point.y()));
+            };
+            const auto colorDistance=[](QColor a,QColor b){return qAbs(a.red()-b.red())+qAbs(a.green()-b.green())+qAbs(a.blue()-b.blue());};
+            const QColor hoverColor=eval("Theme.windowCloseHover").value<QColor>();
+            bool roundedCorners=!idleImage.isNull() && !hoverImage.isNull();
+            const QList<QPointF> cornerPoints{{1,1},{closeSurface->width()-2,1},{1,closeSurface->height()-2},{closeSurface->width()-2,closeSurface->height()-2}};
+            for(const auto &point:cornerPoints)roundedCorners=roundedCorners
+                && colorDistance(pixelAt(hoverImage,point),pixelAt(idleImage,point))<8
+                && colorDistance(pixelAt(hoverImage,point),hoverColor)>60;
+            check("caption-hover-render-has-four-clear-rounded-corners",roundedCorners);
+            check("caption-hover-render-has-muted-danger-fill",colorDistance(pixelAt(hoverImage,QPointF(closeSurface->width()/2,3)),hoverColor)<8);
+            QRect whiteBounds;
+            const auto surfaceCenter=closeSurface->mapToScene(QPointF(closeSurface->width()/2,closeSurface->height()/2))*dpr;
+            const int iconExtent=qCeil(8*dpr);
+            for(int y=qRound(surfaceCenter.y())-iconExtent;y<=qRound(surfaceCenter.y())+iconExtent;++y)
+                for(int x=qRound(surfaceCenter.x())-iconExtent;x<=qRound(surfaceCenter.x())+iconExtent;++x){
+                    const auto color=hoverImage.isNull()?QColor():hoverImage.pixelColor(x,y);
+                    if(color.red()>235 && color.green()>235 && color.blue()>235)whiteBounds=whiteBounds.united(QRect(x,y,1,1));
+                }
+            check("caption-close-glyph-centered-in-rounded-fill",!whiteBounds.isEmpty()
+                && QLineF(QPointF(whiteBounds.left()+whiteBounds.width()/2.0,whiteBounds.top()+whiteBounds.height()/2.0),surfaceCenter).length()<=1.5);
+            QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,center);wait(settle);
+            const auto pressedImage=window->grabWindow();
+            check("caption-pressed-render-retains-rounded-danger-feedback",closeCaption->property("down").toBool()
+                && colorDistance(pixelAt(pressedImage,QPointF(closeSurface->width()/2,3)),eval("Theme.windowClosePressed").value<QColor>())<8
+                && colorDistance(pixelAt(pressedImage,QPointF(1,1)),pixelAt(idleImage,QPointF(1,1)))<8);
+            QTest::mouseMove(window,park);QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,park);wait(settle);
+            maxCaption->forceActiveFocus(Qt::TabFocusReason);
+            QTest::keyClick(window,Qt::Key_Tab);wait(30);
+            const qreal focusBorderWidth=QQmlProperty(closeSurface,QStringLiteral("border.width")).read().toDouble();
+            qInfo()<<"CAPTION_FOCUS"<<closeCaption->property("visualFocus")<<"activeFocus"<<closeCaption->hasActiveFocus()
+                   <<"focusReason"<<closeCaption->property("focusReason")<<"borderWidth"<<focusBorderWidth;
+            check("caption-keyboard-focus-draws-rounded-outline",closeCaption->property("visualFocus").toBool()
+                && focusBorderWidth>0);
+            closeCaption->setEnabled(false);QTest::mouseMove(window,center);wait(settle);
+            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,center);
+            check("caption-disabled-has-no-hover-press-or-close",window->isVisible() && !closeCaption->property("down").toBool()
+                && closeCaption->property("shownColor").value<QColor>().alpha()==0);
+            closeCaption->setEnabled(true);QTest::mouseMove(window,park);wait(settle);
+            check("caption-states-preserve-click-region",rect(closeCaption)==initialRect);
+            const auto imageDir=QFileInfo(output).absolutePath();QDir().mkpath(imageDir);
+            check("caption-state-captures-saved",idleImage.save(imageDir+"/caption-default.png")
+                && hoverImage.save(imageDir+"/caption-hover.png") && pressedImage.save(imageDir+"/caption-pressed.png"));
+            qmlEngine(window)->rootContext()->setContextProperty("apecCaption",static_cast<QObject *>(nullptr));
+        }
         eval("apecFixture.menu.showAt(apecFixture,50,150)");wait(40);
         check("menu-first-open-visible",eval("apecFixture.menu.visible && apecFixture.menu.count===2").toBool());
         qInfo()<<"APEC_MENU_INITIAL"<<eval("JSON.stringify({visible:apecFixture.menu.visible,count:apecFixture.menu.count,opacity:apecFixture.menu.opacity})");

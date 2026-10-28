@@ -20,7 +20,7 @@ Row {
             Accessible.name: index === 0 ? qsTr("最小化") : index === 1 ? (controls.maximized ? qsTr("还原") : qsTr("最大化")) : qsTr("关闭")
             property bool motionInitialized:false
             property color shownColor:targetColor
-            readonly property color targetColor:index===2 && (hovered || down)?(down?"#C42B1C":"#E81123")
+            readonly property color targetColor:!enabled?"transparent":index===2 && (hovered || down)?(down?Theme.windowClosePressed:Theme.windowCloseHover)
                 :down?Theme.interactionPressed:hovered?Theme.interactionHover:"transparent"
             readonly property bool animate:visible && controls.targetWindow.visible && controls.targetWindow.visibility!==Window.Minimized && !SwirlMotion.reduced
             readonly property bool moving:backgroundTravel.running
@@ -36,12 +36,17 @@ Row {
             Component.onCompleted:{motionInitialized=true;finishMotion()}
             ColorAnimation {id:backgroundTravel;target:button;property:"shownColor";duration:SwirlMotion.hoverDuration}
             background: Rectangle {
+                objectName: "captionSurface" + button.index
+                x: Theme.dp(3); y: Theme.dp(2)
+                width: button.width - 2 * x; height: button.height - 2 * y
+                radius: Theme.pillRadius(height)
+                antialiasing: true
                 color: button.shownColor
-                border.width: button.visualFocus ? 1 / Screen.devicePixelRatio : 0
+                border.width: button.visualFocus && button.enabled ? 1 / Screen.devicePixelRatio : 0
                 border.color: Theme.focusBorder
             }
             contentItem: Item {
-                readonly property color ink: button.index === 2 && button.hovered ? "white" : controls.targetWindow.active ? Theme.text : Theme.muted
+                readonly property color ink: !button.enabled ? Theme.disabledText : button.index === 2 && (button.hovered || button.down) ? "white" : controls.targetWindow.active ? Theme.text : Theme.muted
                 readonly property real stroke: Math.max(1, Math.round(Screen.devicePixelRatio)) / Screen.devicePixelRatio
                 Item {
                     anchors.centerIn: parent

@@ -7,6 +7,7 @@ import SwirlQuick
 Text {
     id: control
     property string textRole: "body"
+    property bool tabularFigures: false
     // Only constrained, eliding single-line labels participate. Body copy,
     // editors, rich text and numeric data retain their natural typography.
     property bool fitWidth: textRole === "button" || textRole === "navigation" || textRole === "pageTitle"
@@ -17,6 +18,9 @@ Text {
     font.weight: Theme.bodyFontWeight
     font.pixelSize: Theme.fontSize(13)
     font.hintingPreference: Font.PreferFullHinting
+    font.contextFontMerging: true
+    font.preferTypoLineMetrics: true
+    font.features: tabularFigures ? {"tnum": 1} : ({})
     readonly property SwirlFontBinding ownedFontBinding: SwirlFontBinding { id:fontBinding; target: control; textRole: control.textRole; fitWidth: control.widthFitting }
     // Layouts always see the natural advance. Compressing the rendered label
     // therefore cannot shrink its parent's implicit size and feed back into fit.

@@ -6,7 +6,7 @@ Rectangle {
     property bool focused: false
     property bool hovered: false
     property bool pressed: false
-    radius: height / 2
+    radius: Theme.pillRadius(height)
     antialiasing: true
     color: pressed ? Theme.pressed : hovered ? Theme.hover : Theme.buttonBase
     border.width: focused || Theme.increaseContrast ? 1 / Screen.devicePixelRatio : 0

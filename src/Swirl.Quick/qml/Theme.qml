@@ -135,6 +135,8 @@ QtObject {
     readonly property color statusGreen: dark ? "#75DD91" : "#00B832"
     readonly property color orange: dark ? "#F5C67D" : "#FF9229"
     readonly property color red: dark ? "#FF9A93" : "#CF3029"
+    readonly property color windowCloseHover: dark ? "#C95058" : "#C8444C"
+    readonly property color windowClosePressed: dark ? "#AF3943" : "#AD3039"
     // Logical point-style design sizes, independent of content zoom.
     // Qt maps these logical pixels to each screen's device pixel ratio.
     // Apple image reference normalized to the existing 672-unit shell height.

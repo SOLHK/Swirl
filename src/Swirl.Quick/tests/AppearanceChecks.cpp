@@ -14,6 +14,8 @@
 #include <QColor>
 #include <QQmlComponent>
 #include <QQmlEngine>
+#include <QFontMetricsF>
+#include <QFontDatabase>
 #include <functional>
 
 int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
@@ -22,6 +24,93 @@ int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
     auto check=[&](bool ok,const char *name){qInfo()<<(ok?"PASS":"FAIL")<<name;if(!ok)++failures;};
     auto eval=[&](const QString &code){QQmlExpression e(qmlContext(window),window,code);auto value=e.evaluate();check(!e.hasError(),"appearance expression is valid");return value;};
     if(restoreOnly){check(eval("Theme.mode==='Dark' && Theme.dark && Theme.followSystemMotion").toBool(),"new process restores saved dark theme and explicit system-motion preference");return failures?2:0;}
+    if(qEnvironmentVariableIsSet("SWIRL_EXPECTED_DPR"))
+        check(qAbs(window->devicePixelRatio()-qEnvironmentVariable("SWIRL_EXPECTED_DPR").toDouble())<0.02,"native window uses the requested controlled DPR");
+    {
+        QQmlComponent component(qmlEngine(window));
+        component.setData(R"QML(
+import QtQuick
+import QtQuick.Layouts
+import SwirlQuick
+Item {
+    width:600;height:480;x:230;y:100;z:1000
+    SwirlButton {objectName:"reviewButton";x:10;y:10;text:"规则分流 HTTPS 176"}
+    SwirlIconButton {objectName:"reviewIcon";x:220;y:10;iconName:"plus";tooltip:"添加"}
+    SwirlComboBox {objectName:"reviewCombo";x:270;y:10;model:["默认策略 SG 176 ms","自动测速"]}
+    SwirlSegmentedControl {objectName:"reviewSegments";x:10;y:65;width:280;options:["全部 12","仅代理 8"]}
+    SwirlText {objectName:"reviewFigures";x:310;y:75;tabularFigures:true;text:"176 ms · HTTPS 完整请求"}
+    PolicyGroupTypes {objectName:"reviewGroupTypes";x:0;y:115;width:590}
+})QML",QUrl("qrc:/qt/qml/SwirlQuick/ControlsReviewFixture.qml"));
+        auto *fixture=qobject_cast<QQuickItem *>(component.create(qmlContext(window)));
+        check(fixture!=nullptr,"shared control review fixture loads");
+        if(!fixture)qWarning()<<component.errors();
+        if(fixture){
+            fixture->setParentItem(window->contentItem());
+            window->requestActivate();QTest::qWait(100);
+            const auto surface=[](QQuickItem *control){return control?control->property("background").value<QQuickItem *>():nullptr;};
+            std::function<QQuickItem *(QQuickItem *,const QString &)> visualItem;
+            visualItem=[&](QQuickItem *parent,const QString &name)->QQuickItem *{
+                if(parent->objectName()==name)return parent;
+                for(auto *child:parent->childItems())if(auto *match=visualItem(child,name))return match;
+                return nullptr;
+            };
+            for(const auto &theme:QStringList{"Light","Dark"}){
+                eval("Theme.mode='"+theme+"';Theme.reduceMotion=false;Theme.followSystemMotion=false");QTest::qWait(160);
+                for(const auto &name:QStringList{"reviewButton","reviewIcon","reviewCombo"}){
+                    auto *control=fixture->findChild<QQuickItem *>(name);auto *paint=surface(control);
+                    check(paint&&qAbs(paint->property("radius").toReal()-paint->height()/2)<0.01,"buttons and selector share a height-derived capsule curve");
+                    if(!control||!paint)continue;
+                    const auto size=control->size();const auto position=control->position();
+                    QTest::mouseMove(window,QPoint(window->width()-20,90));QTest::qWait(160);
+                    const auto normal=paint->property("color").value<QColor>();
+                    QTest::mouseMove(window,control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint());QTest::qWait(160);
+                    check(control->property("hovered").toBool()&&paint->property("color").value<QColor>()!=normal,"shared control hover visibly changes its surface");
+                    control->forceActiveFocus(Qt::TabFocusReason);QTest::qWait(160);
+                    check(control->property("visualFocus").toBool()&&paint->property("focused").toBool(),"keyboard focus reaches the shared surface");
+                    if(name!="reviewCombo"){
+                        const auto at=control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint();
+                        const auto hovered=paint->property("color").value<QColor>();
+                        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at);QTest::qWait(160);
+                        check(control->property("down").toBool()&&paint->property("color").value<QColor>()!=hovered,"shared button provides a distinct pressed surface");
+                        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,at);
+                    }
+                    control->setEnabled(false);QTest::qWait(180);
+                    check(!paint->property("controlEnabled").toBool()&&paint->opacity()<1&&paint->property("color").value<QColor>()==normal,"disabled surface retires hover and press feedback");
+                    check(control->size()==size&&control->position()==position,"all button states retain shell geometry");
+                    control->setEnabled(true);
+                }
+                for(const auto &strategy:QStringList{"manual","url_test","fallback","load_balance"}){
+                    auto *control=visualItem(fixture,"createPolicyGroup-"+strategy);auto *paint=surface(control);
+                    check(control&&paint,"strategy creation action uses its real card surface");
+                    if(!control||!paint)continue;
+                    const auto size=control->size();
+                    QTest::mouseMove(window,QPoint(window->width()-15,90));QTest::qWait(160);
+                    const auto normal=paint->property("color").value<QColor>();
+                    const auto at=control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint();
+                    QTest::mouseMove(window,at);QTest::qWait(160);
+                    check(paint->property("hovered").toBool()&&paint->property("color").value<QColor>()!=normal,"strategy creation card brightens on hover");
+                    control->forceActiveFocus(Qt::TabFocusReason);QTest::qWait(160);
+                    check(paint->property("focused").toBool(),"strategy creation card has keyboard focus feedback");
+                    QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at);QTest::qWait(160);
+                    check(control->property("down").toBool()&&paint->property("color").value<QColor>()!=normal&&paint->scale()<1,"strategy creation card has visible press and contact feedback");
+                    QTest::mouseMove(window,QPoint(window->width()-15,90));QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,QPoint(window->width()-15,90));
+                    control->setEnabled(false);QTest::qWait(180);
+                    check(paint->opacity()<1&&!paint->property("hovered").toBool()&&control->size()==size,"disabled strategy card dims and retains its click geometry");
+                    control->setEnabled(true);
+                }
+            }
+            auto *figures=fixture->findChild<QQuickItem *>("reviewFigures");
+            for(const auto &family:QStringList{eval("Theme.fontFamily").toString(),"Segoe UI","Microsoft YaHei UI"}){
+                if(!QFontDatabase::families().contains(family))continue;
+                QFont font=figures->property("font").value<QFont>();font.setFamily(family);figures->setProperty("font",font);QTest::qWait(40);
+                font=figures->property("font").value<QFont>();const QFontMetricsF metrics(font);
+                check((font.styleStrategy()&QFont::ContextFontMerging)&&(font.styleStrategy()&QFont::PreferTypoLineMetrics),"mixed-script text retains contextual fallback and typographic line metrics");
+                check(qAbs(metrics.horizontalAdvance("111111")-metrics.horizontalAdvance("888888"))<0.05,"numeric glyph updates retain equal advances in bundled and Windows fonts");
+                check(figures->baselineOffset()>0&&figures->baselineOffset()<=figures->height(),"mixed-script baseline remains inside measured text height");
+            }
+            delete fixture;
+        }
+    }
     eval("Theme.reduceMotion=false;AppState.navigate('settings')");
     check(QTest::qWaitFor([&]{return eval("pageLoader.item && !pageLoader.pendingGrab && !pageLoader.moving && pageLoader.activeLoader.routeId==='settings'").toBool();},3500),"general settings with appearance controls settles before input");
     std::function<QQuickItem *(QQuickItem *,const QString &)> find=[&](QQuickItem *item,const QString &name)->QQuickItem *{if(item->objectName()==name)return item;for(auto *child:item->childItems())if(auto *match=find(child,name))return match;return nullptr;};

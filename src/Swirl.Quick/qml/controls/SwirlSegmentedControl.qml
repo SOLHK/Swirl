@@ -16,13 +16,13 @@ Item {
     function segmentWidth(index) { return segmentStart(index+1)-segmentStart(index) }
     signal activated(int index, string value)
     implicitHeight:Theme.statusHeight; implicitWidth:Theme.dp(295)
-    Rectangle { anchors.fill:parent; radius:control.rounded ? Math.min(Theme.controlRadius,height/2) : Theme.segmentedRadius; color:Theme.buttonBase; border.width:Theme.increaseContrast?Theme.borderWidth:0; border.color:Theme.text }
+    Rectangle { anchors.fill:parent; radius:control.rounded ? Theme.pillRadius(height) : Theme.segmentedRadius; color:Theme.buttonBase; border.width:Theme.increaseContrast?Theme.borderWidth:0; border.color:Theme.text }
     Rectangle {
         property real selectionPosition:control.currentIndex
         x:Theme.dp(2)+control.segmentStart(selectionPosition);y:Theme.dp(2)
         width:control.segmentWidth(control.currentIndex)
         height:control.height-Theme.dp(4)
-        radius:control.rounded?Math.min(Theme.segmentedSelectedRadius,height/2):Theme.segmentedSelectedRadius
+        radius:control.rounded?Theme.pillRadius(height):Theme.segmentedSelectedRadius
         color:control.accentSelection?Theme.primaryButton:Theme.segmentSelected
         opacity:control.enabled?1:0.45
         border.width:0
@@ -40,7 +40,7 @@ Item {
                 width: control.segmentWidth(segment.index); height: control.height-Theme.dp(4)
                 hoverEnabled:true
                 background: Rectangle {
-                    radius:control.rounded ? Math.min(Theme.segmentedSelectedRadius,height/2) : Theme.segmentedSelectedRadius
+                    radius:control.rounded ? Theme.pillRadius(height) : Theme.segmentedSelectedRadius
                     border.width:segment.visualFocus?Theme.borderWidth:0;border.color:control.currentIndex===segment.index&&control.accentSelection?Theme.primaryButtonText:Theme.text
                     color:control.currentIndex!==segment.index && segment.hovered?Theme.withAlpha(Theme.hover,0.5):"transparent"
                     Behavior on color{enabled:!SwirlMotion.reduced;ColorAnimation{duration:SwirlMotion.hoverDuration}}

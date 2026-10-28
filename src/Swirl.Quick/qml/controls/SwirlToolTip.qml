@@ -10,6 +10,8 @@ ToolTip {
     delay: 600
     font.pixelSize: Theme.captionSize
     font.family: Theme.fontFamily
+    font.contextFontMerging: true
+    font.preferTypoLineMetrics: true
     font.hintingPreference: Font.PreferFullHinting
     SwirlFontBinding {
         target: control

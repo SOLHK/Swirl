@@ -14,6 +14,8 @@ TextArea {
     selectionColor: Theme.fieldSelection
     selectedTextColor: Theme.text
     font.family: Theme.fontFamily
+    font.contextFontMerging: true
+    font.preferTypoLineMetrics: true
     font.weight: Theme.bodyFontWeight
     font.pixelSize: Theme.bodySize
     font.hintingPreference: Font.PreferFullHinting

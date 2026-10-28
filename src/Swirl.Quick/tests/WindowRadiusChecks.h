@@ -40,10 +40,10 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
         return result;
     };
     eval("Theme.mode='Light';Theme.reduceMotion=true;Theme.resetScale()");
-    constexpr qreal expectedWindowRadius=22.0,expectedSidebarRadius=20.0;
+    constexpr qreal expectedWindowRadius=22.0,expectedSidebarRadius=14.0;
     check(qAbs(eval("Theme.windowRadius").toReal() - expectedWindowRadius) < 0.0001
           && qAbs(eval("Theme.sidebarRadius").toReal() - expectedSidebarRadius) < 0.0001,
-          "window and sidebar independently match the 22/20 DIP design contract");
+          "window and sidebar independently match the 22/14 DIP design contract");
     check(eval("Theme.cardRadius===Theme.independentCardRadius && Theme.cardRadius===Theme.containerRadius").toBool(),
           "same-level card tokens share one radius");
     const HWND previousForeground = GetForegroundWindow();

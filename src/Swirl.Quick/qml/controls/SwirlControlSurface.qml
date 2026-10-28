@@ -13,11 +13,11 @@ Rectangle {
     property bool outlined: false
     property bool field: false
     property bool invalid: false
-    radius: Theme.controlRadius
+    radius: field ? Theme.controlRadius : Theme.pillRadius(height)
     antialiasing: true
     opacity: controlEnabled ? 1 : Theme.disabledOpacity
-    color: primary ? (pressed ? Theme.primaryButtonPressed : hovered ? Theme.primaryButtonHover : Theme.primaryButton)
-         : field ? (hovered && !focused ? Theme.buttonBase : Theme.field) : pressed ? Theme.pressed : hovered ? Theme.hover
+    color: primary ? (controlEnabled && pressed ? Theme.primaryButtonPressed : controlEnabled && hovered ? Theme.primaryButtonHover : Theme.primaryButton)
+         : field ? (controlEnabled && hovered && !focused ? Theme.buttonBase : Theme.field) : controlEnabled && pressed ? Theme.pressed : controlEnabled && hovered ? Theme.hover
          : selected ? Theme.segmentSelected : quiet ? "transparent" : Theme.buttonBase
     border.width: outlined || field || Theme.increaseContrast ? Theme.borderWidth : 0
     border.color: invalid ? Theme.red : Theme.increaseContrast ? Theme.text : Theme.controlBorder

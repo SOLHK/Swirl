@@ -62,7 +62,7 @@ SwirlDialog {
                 enabled:Boolean(modelData.available)&&!picker.pending
                 Accessible.name:String(modelData.name)+(modelData.available?"":qsTr("，当前不可用"))
                 background:Rectangle {
-                    radius:Theme.dp(9)
+                    radius:Theme.pillRadius(height)
                     color:Policy.sameTarget(picker.selectedTarget,option.modelData)?Theme.navigationSelected:option.down?Theme.pressed:option.hovered?Theme.hover:"transparent"
                     border.width:option.visualFocus||(targets.activeFocus&&targets.currentIndex===option.index)?Theme.borderWidth:0
                     border.color:Theme.text
@@ -70,8 +70,8 @@ SwirlDialog {
                 }
                 contentItem:RowLayout {
                     spacing:Theme.dp(10)
-                    SwirlText {Layout.fillWidth:true;Layout.minimumWidth:0;text:String(option.modelData.name);textFormat:Text.PlainText;color:option.enabled?Theme.text:Theme.muted;font.pixelSize:Theme.fontSize(13);elide:Text.ElideRight}
-                    SwirlText {visible:!option.modelData.available;text:qsTr("当前不可用");color:Theme.muted;font.pixelSize:Theme.fontSize(11)}
+                    SwirlText {Layout.fillWidth:true;Layout.minimumWidth:0;Layout.alignment:Qt.AlignBaseline;text:String(option.modelData.name);textFormat:Text.PlainText;color:option.enabled?Theme.text:Theme.muted;font.pixelSize:Theme.fontSize(13);elide:Text.ElideRight}
+                    SwirlText {visible:!option.modelData.available;Layout.alignment:Qt.AlignBaseline;text:qsTr("当前不可用");color:Theme.muted;font.pixelSize:Theme.fontSize(11)}
                     SwirlIcon {name:"checkmark";opacity:Policy.sameTarget(picker.selectedTarget,option.modelData)?1:0;size:Theme.dp(16);color:Theme.text;Accessible.ignored:true}
                 }
                 onClicked:picker.selectOption(modelData,index)

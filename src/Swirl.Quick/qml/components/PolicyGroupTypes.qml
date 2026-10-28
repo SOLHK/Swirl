@@ -29,14 +29,30 @@ ColumnLayout {
                 enabled: types.editable; hoverEnabled: true; padding: Theme.dp(14)
                 Accessible.name: qsTr("创建%1策略组").arg(modelData.name)
                 Accessible.description: modelData.detail
-                background: Rectangle { radius: Theme.dp(12); color: choice.down ? Theme.pressed : choice.hovered ? Theme.hover : Theme.buttonBase; border.width: choice.visualFocus ? Theme.borderWidth : 0; border.color: Theme.text; Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.hoverDuration } } }
+                background: SwirlGlassPanel {
+                    objectName: "policyGroupCardSurface-" + choice.modelData.key
+                    interactive: true
+                    hovered: choice.enabled && choice.hovered
+                    pressed: choice.down
+                    focused: choice.visualFocus
+                    opacity: choice.enabled ? 1 : Theme.disabledOpacity
+                    color: choice.down ? Theme.cardPressed : Theme.withAlpha(Theme.surface, hovered ? 1 : 0.94)
+                }
                 contentItem: ColumnLayout {
                     spacing: Theme.dp(8)
+                    opacity: choice.enabled ? 1 : Theme.disabledOpacity
                     RowLayout {
                         Layout.fillWidth: true; spacing: Theme.dp(8)
-                        SwirlIcon { name: choice.modelData.icon; size: Theme.dp(18); color: Theme.text; Accessible.ignored: true }
-                        SwirlText { Layout.fillWidth: true; text: choice.modelData.name; color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.DemiBold }
-                        SwirlIcon { name: "plus"; size: Theme.dp(14); color: Theme.muted; Accessible.ignored: true }
+                        SwirlIcon { Layout.alignment: Qt.AlignVCenter; name: choice.modelData.icon; size: Theme.dp(18); color: Theme.text; Accessible.ignored: true }
+                        SwirlText { objectName: "policyGroupCardTitle-" + choice.modelData.key; Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.alignment: Qt.AlignVCenter; text: choice.modelData.name; color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.DemiBold; elide: Text.ElideRight }
+                        SwirlControlSurface {
+                            objectName: "policyGroupPlusSurface-" + choice.modelData.key
+                            Layout.preferredWidth: Theme.dp(26); Layout.preferredHeight: Theme.dp(26); Layout.alignment: Qt.AlignVCenter
+                            hovered: choice.hovered; pressed: choice.down; outlined: true
+                            controlEnabled: choice.enabled
+                            Accessible.ignored: true
+                            SwirlIcon { anchors.centerIn: parent; name: "plus"; size: Theme.dp(14); color: Theme.text; Accessible.ignored: true }
+                        }
                     }
                     SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; text: choice.modelData.detail; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
                 }

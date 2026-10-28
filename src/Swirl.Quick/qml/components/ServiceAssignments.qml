@@ -83,8 +83,8 @@ ColumnLayout {
     }
     RowLayout {
         Layout.fillWidth: true; spacing: Theme.dp(10)
-        SwirlText { text: qsTr("专属服务"); color: Theme.text; font.pixelSize: Theme.fontSize(15); font.weight: Font.DemiBold }
-        SwirlText { text: String(assignments.records.length); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Accessible.name: qsTr("%1 项专属服务策略").arg(assignments.records.length) }
+        SwirlText { objectName: "servicePolicyCountTitle"; Layout.alignment: Qt.AlignBaseline; text: qsTr("专属服务"); color: Theme.text; font.pixelSize: Theme.fontSize(15); font.weight: Font.DemiBold }
+        SwirlText { objectName: "servicePolicyCount"; Layout.alignment: Qt.AlignBaseline; tabularFigures: true; text: String(assignments.records.length); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Accessible.name: qsTr("%1 项专属服务策略").arg(assignments.records.length) }
         Item { Layout.fillWidth: true }
         SwirlSearchField {id:search;objectName:"servicePolicySearch";Layout.preferredWidth:Theme.dp(226);Layout.minimumWidth:Theme.dp(140);placeholderText:qsTr("搜索服务或域名");Accessible.name:placeholderText;onTextChanged:assignments.query=text}
     }
@@ -113,8 +113,8 @@ ColumnLayout {
                 ListView.onReused: visible = true
                 RowLayout {
                     visible: row.headerRow; anchors.fill: parent; spacing: Theme.dp(8)
-                    SwirlText { text: row.entry.name || ""; color: Theme.muted; font.pixelSize: Theme.fontSize(12); font.weight: Font.DemiBold }
-                    SwirlText { text: String(row.entry.count || ""); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
+                    SwirlText { Layout.alignment: Qt.AlignBaseline; text: row.entry.name || ""; color: Theme.muted; font.pixelSize: Theme.fontSize(12); font.weight: Font.DemiBold }
+                    SwirlText { Layout.alignment: Qt.AlignBaseline; tabularFigures: true; text: String(row.entry.count || ""); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
                     Rectangle { Layout.fillWidth: true; Layout.preferredHeight: Theme.borderWidth; color: Theme.border }
                 }
                 RowLayout {
@@ -123,13 +123,13 @@ ColumnLayout {
                         id: edit; objectName: "servicePolicy-" + row.record.id
                         Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.fillHeight: true
                         padding: Theme.dp(8); leftPadding: Theme.dp(34); enabled: assignments.editable; hoverEnabled: true
-                        background: Rectangle { radius: Theme.controlRadius; color: edit.down ? Theme.pressed : edit.hovered ? Theme.navigationSelected : "transparent"; border.width: edit.visualFocus ? Theme.borderWidth : 0; border.color: Theme.text }
+                        background: SwirlControlSurface { hovered: edit.hovered; pressed: edit.down; focused: edit.visualFocus; quiet: true; controlEnabled: edit.enabled }
                         contentItem: ColumnLayout {
                             spacing: Theme.dp(4)
                             RowLayout {
                                 Layout.fillWidth: true; spacing: Theme.dp(8)
-                                SwirlText { Layout.fillWidth: true; Layout.minimumWidth: 0; text: row.record.name || ""; textFormat: Text.PlainText; color: row.record.enabled ? Theme.text : Theme.muted; font.pixelSize: Theme.fontSize(14); font.weight: Font.DemiBold; elide: Text.ElideRight }
-                                SwirlText { text: qsTr("优先级 %1").arg(row.record.priority === undefined ? "" : row.record.priority); color: Theme.muted; font.pixelSize: Theme.fontSize(11) }
+                                SwirlText { Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.alignment: Qt.AlignBaseline; text: row.record.name || ""; textFormat: Text.PlainText; color: row.record.enabled ? Theme.text : Theme.muted; font.pixelSize: Theme.fontSize(14); font.weight: Font.DemiBold; elide: Text.ElideRight }
+                                SwirlText { Layout.alignment: Qt.AlignBaseline; tabularFigures: true; text: qsTr("优先级 %1").arg(row.record.priority === undefined ? "" : row.record.priority); color: Theme.muted; font.pixelSize: Theme.fontSize(11) }
                             }
                             SwirlText { Layout.fillWidth: true; Layout.minimumWidth: 0; text: Policy.domainSummary(row.record.domains); textFormat: Text.PlainText; color: Theme.muted; font.pixelSize: Theme.fontSize(12); elide: Text.ElideRight }
                         }

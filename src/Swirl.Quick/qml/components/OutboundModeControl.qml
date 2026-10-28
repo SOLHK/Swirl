@@ -116,7 +116,7 @@ SwirlMotionButton {
     onClicked: modeMenu.showAt()
     background: SwirlClearGlassSurface {
         objectName: "activityOutboundModeSurface"
-        radius: height / 2
+        radius: Theme.pillRadius(height)
         hovered: control.hovered
         pressed: control.down
         focused: false

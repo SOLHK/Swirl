@@ -68,12 +68,12 @@ Item {
         model: 3
         SwirlText {
             required property int index
-            x: 0; y: index * plot.height / 2 - Theme.dp(7)
-            width: Theme.dp(52); height: Theme.dp(15)
+            x: 0; y: plot.y + index * plot.height / 2 - height / 2
+            width: Theme.dp(52); height: implicitHeight
             horizontalAlignment: Text.AlignRight
             text: index === 2 ? "0 B/s" : graph.samples.length
                 ? engineController.telemetry.formatBytes(graph.axisMaximum * (1 - index / 2)) + "/s" : "—"
-            color: Theme.muted; font.pixelSize: Theme.fontSize(10)
+            color: Theme.muted; font.pixelSize: Theme.fontSize(10); tabularFigures: true
         }
     }
     Repeater {
@@ -83,8 +83,9 @@ Item {
             required property string modelData
             x: plot.x + index * plot.width / 4 - (index === 0 ? 0 : Theme.dp(16))
             y: plot.y + plot.height + Theme.dp(5)
-            width: Theme.dp(36); height: Theme.dp(16)
+            width: Theme.dp(36); height: implicitHeight
             text: modelData; color: Theme.muted; font.pixelSize: Theme.fontSize(10)
+            tabularFigures: true
             horizontalAlignment: index === 0 ? Text.AlignLeft : Text.AlignHCenter
         }
     }

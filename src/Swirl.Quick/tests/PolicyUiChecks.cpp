@@ -11,15 +11,20 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLineF>
+#include <QQmlComponent>
 #include <QQmlContext>
+#include <QQmlEngine>
 #include <QQmlExpression>
 #include <QQmlProperty>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QSignalSpy>
 #include <QTest>
+#include <QTimer>
 #include <algorithm>
 #include <functional>
+#include <memory>
 
 int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QString &directory) {
     if(!window||!controller)return 1;
@@ -43,6 +48,7 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
         return static_cast<QQuickItem *>(nullptr);
     };
     const auto popup=[&](const QString &name)->QObject *{for(auto *object:namedObjects(name))if(object->property("visible").toBool())return object;return nullptr;};
+    const auto sameBaseline=[](QQuickItem *first,QQuickItem *second){return first&&second&&qAbs(first->mapToScene(QPointF(0,first->baselineOffset())).y()-second->mapToScene(QPointF(0,second->baselineOffset())).y())<0.5;};
     const auto eval=[&](const QString &source){QQmlExpression expression(qmlContext(window),window,source);auto value=expression.evaluate();check(!expression.hasError(),QStringLiteral("QML expression is valid"));return value;};
     const auto reachable=[&](QQuickItem *target){
         if(!target||!target->isVisible()||!target->isEnabled()||target->width()<=0||target->height()<=0)return false;
@@ -135,7 +141,24 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     if(controller->policyMigrationRequired()){click("reviewPolicyMigration");click("confirmPolicyMigration");if(!awaitSaved(QStringLiteral("Legacy migration is explicitly reviewed before changes")))return finish();}
     check(namedObjects("policyConnectButton").isEmpty(),QStringLiteral("Policy configuration has no separate connection control"));
     check(controller->servicePolicies().isEmpty()&&controller->strategyGroups().isEmpty(),QStringLiteral("The controlled empty-state captures contain no fabricated policies or groups"));
-    capture("empty-service");setTab(1);capture("empty-groups");
+    capture("empty-service");
+    check(sameBaseline(item("servicePolicyCountTitle"),item("servicePolicyCount")),QStringLiteral("Service count and Chinese section title share their actual text baselines"));
+    setTab(1);capture("empty-groups");
+    check(sameBaseline(item("policyGroupCountTitle"),item("policyGroupCount")),QStringLiteral("Policy group count and Chinese section title share their actual text baselines"));
+    QList<QRectF> creationRects;
+    for(const auto &strategy:QStringList{"manual","url_test","fallback","load_balance"}){
+        auto *card=item("createPolicyGroup-"+strategy),*plus=item("policyGroupPlusSurface-"+strategy),*surface=item("policyGroupCardSurface-"+strategy);
+        const auto plusRect=card&&plus?plus->mapRectToItem(card,QRectF(QPointF(),plus->size())):QRectF();
+        check(card&&plus&&surface&&surface->property("color").value<QColor>().alphaF()>0.9
+            &&QRectF(QPointF(),card->size()).contains(plusRect)&&qAbs(plus->property("radius").toReal()-plus->height()/2)<0.5,
+            QStringLiteral("Creation card has a visible neutral surface and contained rounded plus action: ")+strategy);
+        if(card)creationRects.append(card->mapRectToScene(QRectF(QPointF(),card->size())));
+    }
+    check(creationRects.size()==4&&qAbs(creationRects[0].width()-creationRects[1].width())<0.5
+        &&qAbs(creationRects[0].height()-creationRects[3].height())<0.5
+        &&qAbs(creationRects[0].top()-creationRects[1].top())<0.5&&qAbs(creationRects[2].top()-creationRects[3].top())<0.5
+        &&creationRects[1].left()>creationRects[0].right()&&creationRects[2].top()>creationRects[0].bottom(),
+        QStringLiteral("All four strategy actions retain equal dimensions and a separated two-column grid"));
     const QStringList strategies{"manual","url_test","fallback","load_balance"};
     for(int strategy=0;strategy<strategies.size();++strategy){
         const auto emptyRevision=controller->savedRevision();
@@ -199,11 +222,69 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     LoopbackPortLease ports;if(!check(ports.reserve(),QStringLiteral("Dedicated mixed proxy and control ports are reserved")))return finish();controller->setProxyPort(ports.proxyPort());ports.release();
     if(!navigate("activity"))return finish();
     check(item("proxyCapsule")&&item("proxyCapsule")->property("label").toString()==QStringLiteral("系统代理 · 外部"),QStringLiteral("Activity offers to start Swirl even when another proxy is already enabled"));
+    {
+        auto *value=item("activityInternetValue"),*unit=item("activityInternetUnit"),*caption=item("activityInternetCaption");
+        const auto originalUnit=unit?unit->property("text").toString():QString();
+        QQmlContext fixtureContext(qmlContext(window));
+        fixtureContext.setContextProperty("fixtureValue",value);fixtureContext.setContextProperty("fixtureUnit",unit);fixtureContext.setContextProperty("fixtureCaption",caption);
+        QQmlComponent fixture(qmlEngine(window));
+        fixture.setData(R"(
+            import QtQml
+            QtObject {
+                id: metricFixture
+                property bool active: true
+                property Binding valueOverride: Binding { when: metricFixture.active; target: fixtureValue; property: "text"; value: "176"; restoreMode: Binding.RestoreBindingOrValue }
+                property Binding unitOverride: Binding { when: metricFixture.active; target: fixtureUnit; property: "text"; value: "ms"; restoreMode: Binding.RestoreBindingOrValue }
+                property Binding captionOverride: Binding { when: metricFixture.active; target: fixtureCaption; property: "text"; value: "INTERNET · HTTPS 完整请求"; restoreMode: Binding.RestoreBindingOrValue }
+            }
+        )",QUrl());
+        std::unique_ptr<QObject> overrides(fixture.create(&fixtureContext));
+        check(overrides&&value&&unit&&caption,QStringLiteral("Temporary geometry-only metric fixture binds to the actual Activity text items"));
+        const auto originalSize=window->size();window->resize(window->minimumWidth(),window->minimumHeight());QTest::qWait(180);
+        check(sameBaseline(value,unit),QStringLiteral("Geometry fixture 176 and ms share an actual text baseline at minimum window size"));
+        auto *diagnostic=item("internetDiagnosticCard");
+        const auto bounds=caption&&diagnostic?caption->mapRectToItem(diagnostic,QRectF(QPointF(),caption->size())):QRectF();
+        check(caption&&diagnostic&&QRectF(QPointF(),diagnostic->size()).adjusted(-0.5,-0.5,0.5,0.5).contains(bounds)
+            &&caption->property("contentWidth").toReal()<=caption->width()+0.5&&!caption->property("truncated").toBool(),
+            QStringLiteral("Geometry-only INTERNET and Chinese caption wraps within the actual minimum-width diagnostic rail"));
+        capture("minimum-metric-geometry-fixture");if(overrides)overrides->setProperty("active",false);QTest::qWait(30);
+        check(unit&&unit->property("text").toString()==originalUnit,QStringLiteral("Removing metric geometry fixtures restores the production text binding"));
+        overrides.reset();
+        window->resize(originalSize);QTest::qWait(100);
+    }
+    auto *proxyCapsule=item("proxyCapsule");
+    auto *proxyLabel=proxyCapsule?find(proxyCapsule,"statusCapsuleLabel"):nullptr;
+    auto *proxyGroup=proxyCapsule?find(proxyCapsule,"statusCapsuleContentGroup"):nullptr;
+    auto *proxyContent=proxyCapsule?proxyCapsule->property("contentItem").value<QQuickItem *>():nullptr;
+    const auto shellRect=[&]{return proxyCapsule?proxyCapsule->mapRectToScene(QRectF(QPointF(),proxyCapsule->size())):QRectF();};
+    const auto centered=[&](QQuickItem *child){return child&&proxyCapsule&&QLineF(child->mapToScene(QPointF(child->width()/2,child->height()/2)),shellRect().center()).length()<0.5;};
+    check(centered(proxyLabel)&&proxyContent&&proxyContent->property("accessoryExtent").toReal()==0,
+          QStringLiteral("External proxy label is centered horizontally and vertically without an empty wing slot"));
+    const auto stableProxyRect=shellRect();
+    const auto fullAccessory=proxyCapsule?proxyCapsule->property("accessoryWidth").toReal()+proxyCapsule->property("accessorySpacing").toReal():0;
+    bool shellStable=true,intermediateOpen=false,intermediateClose=false,smoothAccessory=true; qreal priorExtent=0;
+    QTimer capsuleSampler;
+    QObject::connect(&capsuleSampler,&QTimer::timeout,window,[&]{
+        const auto current=shellRect();
+        shellStable=shellStable&&QLineF(current.topLeft(),stableProxyRect.topLeft()).length()<0.5
+            &&qAbs(current.width()-stableProxyRect.width())<0.5&&qAbs(current.height()-stableProxyRect.height())<0.5;
+        const auto extent=proxyContent?proxyContent->property("accessoryExtent").toReal():0;
+        const bool intermediate=extent>0.01&&extent<fullAccessory-0.01;
+        intermediateOpen=intermediateOpen||(intermediate&&extent>priorExtent);
+        intermediateClose=intermediateClose||(intermediate&&extent<priorExtent);
+        smoothAccessory=smoothAccessory&&qAbs(extent-priorExtent)<fullAccessory-0.01;
+        priorExtent=extent;
+    });
+    capsuleSampler.start(5);
     if(!click("proxyCapsule"))return finish();
     if(!check(QTest::qWaitFor([&]{return controller->apiHealthy()&&!controller->policyBusy()&&controller->systemProxy()->owned()&&controller->systemProxy()->enabled();},15000),QStringLiteral("Activity master switch starts the configured actual Rust runtime and takes isolated proxy ownership")))return finish();
     check(proxyBackend->takeoverCalls==1&&proxyBackend->lastPid==controller->processId().toLongLong()&&proxyBackend->lastPort>0,QStringLiteral("Activity takeover follows the healthy live Rust listener rather than a host proxy flag"));
     check(QTest::qWaitFor([&]{return eval("SwirlProxyWingMotion.active && SwirlProxyWingMotion.progress===1 && !SwirlProxyWingMotion.moving").toBool();},3000),QStringLiteral("Actual proxy ownership finishes the shared small-wing expansion"));
     check(item("activityProxyWing")&&item("diagnosticProxyWing")&&item("activityProxyWing")->property("progress").toDouble()==1&&item("diagnosticProxyWing")->property("progress").toDouble()==1,QStringLiteral("Activity status and diagnostics show the same actual proxy wing"));
+    capsuleSampler.stop();
+    check(shellStable&&intermediateOpen&&smoothAccessory&&centered(proxyGroup)
+        &&proxyContent&&qAbs(proxyContent->property("accessoryExtent").toReal()-fullAccessory)<0.5,
+        QStringLiteral("Actual proxy startup keeps the capsule shell fixed and smoothly centers its wing and label as one group"));
     if(!navigate("policies"))return finish();
     check(item("policyOperationFlow")&&item("policyOperationFlow")->property("progress").toDouble()==1,QStringLiteral("Policy wing preserves the Activity proxy animation state"));
     const auto liveEpoch=controller->policyReceipt().value("engine_epoch").toString();
@@ -256,11 +337,16 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     check(popup("deletePolicyDialog")&&controller->strategyGroups().size()==2,QStringLiteral("Deleting a group referenced by default is refused and retains both groups"));click("cancelDeletePolicy");
     check(QTest::qWaitFor([&]{return !popup("deletePolicyDialog");},4000),QStringLiteral("Cancelled deletion releases its modal grab before the connection control"));
     capture("populated-groups");
-    if(!navigate("activity")||!click("proxyCapsule"))return finish();
+    if(!navigate("activity"))return finish();
+    priorExtent=proxyContent?proxyContent->property("accessoryExtent").toReal():0;capsuleSampler.start(5);
+    if(!click("proxyCapsule"))return finish();
     check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->systemProxy()->owned()&&!controller->systemProxyBusy();},10000),QStringLiteral("Activity master switch stops its owned Rust runtime and releases its proxy ownership"));
     check(proxyBackend->restoreCalls==1&&proxyBackend->current().systemEnabled&&!proxyBackend->current().owned,QStringLiteral("Stopping Swirl restores the pre-existing isolated external proxy instead of turning it off"));
     QTest::qWait(200);check(!controller->processAlive()&&!controller->systemProxy()->owned()&&proxyBackend->takeoverCalls==1,QStringLiteral("Queued event processing leaves Swirl stopped without a second proxy takeover"));
     check(QTest::qWaitFor([&]{return eval("!SwirlProxyWingMotion.active && SwirlProxyWingMotion.progress===0 && !SwirlProxyWingMotion.moving").toBool();},2000),QStringLiteral("Actual proxy shutdown fully retires the last small feather"));
+    QTest::qWait(150);capsuleSampler.stop();
+    check(shellStable&&intermediateClose&&smoothAccessory&&centered(proxyLabel)&&proxyContent&&proxyContent->property("accessoryExtent").toReal()==0,
+          QStringLiteral("Actual shutdown restores centered external-proxy text through partial positions without moving or resizing the capsule"));
     capture("proxy-off-wing-hidden");
     if(!navigate("policies"))return finish();
     for(int strategy=1;strategy<=3;++strategy){

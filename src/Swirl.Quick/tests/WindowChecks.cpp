@@ -79,9 +79,9 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     const auto normalCorner=cornerCoverage();
     check(backdrop->nativeCorners() || normalCorner.second>=5,"system manages the final contour or fallback has antialiased corners");
     state("Theme.setScalePercent(125)");QTest::qWait(150);
-    check(qAbs(state("Theme.windowRadius").toReal()-14.0)<0.001
+    check(qAbs(state("Theme.windowRadius").toReal()-22.0)<0.001
           && qAbs(state("Theme.sidebarRadius").toReal()-14.0)<0.001,
-          "approved 14dp shell and sidebar contours stay independent of manual content zoom");
+          "approved 22dp shell and 14dp sidebar contours stay independent of manual content zoom");
     state("Theme.resetScale()");QTest::qWait(150);
     // Increasing the minimum geometry for manual UI zoom can enlarge the
     // window. Restore the capture bounds so the bottom corners remain on the
