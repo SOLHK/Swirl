@@ -107,7 +107,7 @@ fence, binds its lexical component context and guards detached Window access;
 Hero needs rerunning against that change.
 
 The original synthetic-font cold Activity-to-Settings stress was rerun after
-the new settings and binding changes: zero FreeType creation warnings, and the
+the new settings and binding changes: the
 unchanged memory-plateau and finite-coordinate memory checks passed. The overall
 font run still failed two license-popup lookup/inheritance checks; these remain
 under investigation. No private user font was used. This checkpoint is not final
@@ -125,7 +125,9 @@ retirement rather than assuming a fixed 150 ms delay is sufficient.
 
 This section supersedes the pending results in the historical checkpoint above.
 The cold Activity-to-Settings run with the original synthetic automation font
-passed all 37 assertions with zero FreeType engine creation warnings. The two
+passed all 37 assertions. The earlier zero-FreeType-warning claim was incorrect:
+the retained `evidence-20261027-211744` log contains 7,761 engine creation warnings.
+The functional/memory assertions do not validate that diagnostic stream. The two
 license assertions now locate the dialog through its cached font-pane owner,
 matching the actual QObject ownership. The native Hero run passed all 102
 assertions and its nested navigation checks, with no QML lifecycle warnings.

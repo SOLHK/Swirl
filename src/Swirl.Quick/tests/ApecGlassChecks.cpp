@@ -113,6 +113,14 @@ Item {
             check("edge-refraction-changes-sampled-pixels",!changed.isNull() && !unrefracted.isNull() && difference(changed,unrefracted)>100);
             eval("apecGlass.glass.interaction=1;apecGlass.glass.lightPoint=Qt.point(0,0)");QTest::qWait(60);auto lit=capture();
             check("interaction-drives-directional-rim",!lit.isNull() && difference(lit,unrefracted)>100);
+            eval("apecGlass.glass.lightPoint=Qt.point(1,0.5)");QTest::qWait(60);auto rightLit=capture();
+            if(!rightLit.isNull() && rightLit.size()==unrefracted.size()){
+                const QRect rightRim(rightLit.width()-12,rightLit.height()/3,12,rightLit.height()/3);
+                const QRect leftRim(0,rightLit.height()/3,12,rightLit.height()/3);
+                const auto rightChange=difference(rightLit.copy(rightRim),unrefracted.copy(rightRim));
+                const auto leftChange=difference(rightLit.copy(leftRim),unrefracted.copy(leftRim));
+                check("right-edge-glint-stays-local",rightChange>100 && leftChange<rightChange/10);
+            }else check("right-edge-glint-readback",false);
             eval("apecGlass.source.color='#40BD334F'");QTest::qWait(60);auto translucent=capture();
             check("glass-preserves-transmitted-alpha",!translucent.isNull() && qAbs(sample(translucent,100,140).alpha()-64)<=2);
             eval("apecGlass.source.color='#BD334F'");

@@ -113,3 +113,33 @@ The preceding APEC motion check passed in 14.52 s. New alpha tests verify that
 the sidebar leaves the shared base visible and preserves a translucent source.
 Earlier failed runs remain in the local evidence archive; obsolete opaque-pane
 assertions were replaced with checks of the new shared-base contract.
+
+## Astra material refinement and outstanding font stress
+
+The next refinement gives each of the five vanes unequal thickness, transparent
+body gradients, denser curved folds and narrow reflection ridges. Glass feedback
+uses surface-space distance, keeping its light round through sidebar resizing;
+pointer/focus glints can reach every edge without brightening the entire rim.
+No new timer, texture or sample pass is introduced by this refinement.
+
+Commit `24fce41` passed full Windows CI `40636576944`; its verified 0.2.14 installer
+has SHA-256 `a4affdcbe5473efc6aac02f41158fad5a1200ac20a678bb501fc24137fa8eb29`.
+That package predates the subsequent material refinement.
+
+Additional synthetic-font stress must not be reported as clean: 37 assertions
+passed, but logs retained 7,746 FreeType creation warnings. An A/B run restoring
+the prior anonymous font-helper ownership still produced 7,503 warnings; the
+older 2026-10-27 log also contains 7,761. The historical zero-warning claim in
+APEC_PERFORMANCE_INTEGRATION.md has been corrected. Qt font debug identifies
+failed system fallback families (including Tahoma, SimSun and Arial), while the
+synthetic axis stress is running. The root cause remains unresolved. A debug run
+also failed an assertion and is retained separately; it is not clean acceptance.
+These observations do not invalidate the passing regular UI/GC lifecycle checks,
+and those checks do not establish warning-free extreme variable-font rendering.
+
+The Astra refinement passed native appearance (11.38 s), APEC motion (14.49 s)
+and glass checks (2.84 s, including right-edge glint locality). Four light/dark
+previews at 760, 914 and 1100 DIP were inspected. The debug font run's three
+failed assertions concerned dynamic control discovery, HGHT update and retained
+page identity; normal non-debug runs passed those assertions but retained FT
+warnings. This remains a diagnostic limitation, not a clean font-stress result.
