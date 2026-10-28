@@ -60,7 +60,7 @@ Item {
             width: Math.max(canvas.width * 1.08, canvas.height * 1.52)
             height: width * 0.625
             x: canvas.width - width - Theme.dp(20)
-            y: canvas.height - height + Theme.dp(40)
+            y: canvas.height - height + Theme.dp(8)
             Item {
                 id: visual
                 objectName: "apecWingVisual"

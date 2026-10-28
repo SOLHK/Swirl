@@ -77,7 +77,7 @@ QtObject {
     readonly property color wingCyan: "#00BDE1"
     readonly property color wingTeal: "#36CBB0"
     readonly property color wingGreen: "#A3E65D"
-    readonly property real wingOpacity: dark ? 0.56 : 0.72
+    readonly property real wingOpacity: dark ? 0.48 : 0.52
     readonly property color brandOrange:"#F5A04D"
     readonly property color brandRed:"#D93962"
     readonly property color brandBlue:"#285DD3"
@@ -125,7 +125,7 @@ QtObject {
     // Qt maps these logical pixels to each screen's device pixel ratio.
     // Apple image reference normalized to the existing 672-unit shell height.
     // These are corner extents for the shared 2.5-power contour, not circle radii.
-    enum ShellMetrics { WindowCornerRadius = 22, SidebarCornerRadius = 20 }
+    enum ShellMetrics { WindowCornerRadius = 22, SidebarCornerRadius = 14 }
     readonly property real windowRadius: Theme.WindowCornerRadius
     readonly property real sidebarRadius: Theme.SidebarCornerRadius
     // Cards at the same hierarchy share a token, including the settings grid.

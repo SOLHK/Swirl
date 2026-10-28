@@ -48,16 +48,23 @@ Item {
         let rows = []
         if (trafficKind === 0 || proxyRanksAvailable) {
             const proxyOnly = trafficKind === 1
-            if (rankingKind === 0) rows = telemetry.ranking("apps", range, 4, proxyOnly)
-                .concat(telemetry.ranking("devices", range, 4, proxyOnly))
-            else rows = telemetry.ranking(rankingKind === 1 ? "domains" : "nodes", range, 4, proxyOnly)
+            if (rankingKind === 0) rows = telemetry.ranking("apps", range, 8, proxyOnly)
+                .concat(telemetry.ranking("devices", range, 8, proxyOnly))
+            else rows = telemetry.ranking(rankingKind === 1 ? "domains" : "nodes", range, 8, proxyOnly)
             rows.sort((a, b) => b.total - a.total)
-            rows = rows.slice(0, 3)
+            rows = rows.slice(0, 8)
         }
         if (JSON.stringify(rows) !== JSON.stringify(ranks)) ranks = rows
         snapshotDirty = false
     }
     function bytes(value, known) { return known ? telemetry.formatBytes(value) : "—" }
+    function sourceName(row) {
+        if (row.kind !== "nodes") return row.name
+        if (row.name === "SWIRL_V2_DIRECT" || row.name === "DIRECT") return qsTr("直连")
+        if (row.name === "SWIRL_V2_REJECT" || row.name === "REJECT") return qsTr("阻止")
+        const target = engineController.policyTargetOptions.find(option => option.id === row.name)
+        return target ? target.name : row.name
+    }
     function latency(key) {
         const value = telemetry.latencies[key] || ""
         return /^\d+ ms$/.test(value) ? value : "—"
@@ -175,10 +182,10 @@ Item {
             id: content
             x: Theme.pagePadding; width: scroll.width - 2 * Theme.pagePadding
             height: Math.max(scroll.height - Theme.dp(16), Layout.minimumHeight); spacing: Theme.dp(16)
-            Rectangle {
+            SwirlGlassPanel {
                 objectName: "activityStatusCard"
                 Layout.fillWidth: true; Layout.minimumHeight: statusBody.implicitHeight + Theme.dp(24); Layout.preferredHeight: Layout.minimumHeight
-                radius: Theme.dp(14); color: Theme.buttonBase
+                cornerRadius: Theme.cardRadius; color: Theme.surface
                 ColumnLayout {
                     id: statusBody; anchors.fill: parent; anchors.margins: Theme.dp(12); spacing: Theme.dp(12)
                     RowLayout {
@@ -208,53 +215,64 @@ Item {
                 Layout.fillWidth: true; Layout.fillHeight: true
                 columns: page.wide ? 2 : 1; columnSpacing: Theme.dp(20); rowSpacing: Theme.dp(16)
                 SwirlGlassPanel {
-                    id: trafficCard; objectName: "activityTrafficCard"
+                    id: sourcesCard; objectName: "activitySourcesCard"
                     Layout.fillWidth: true; Layout.fillHeight: true; Layout.preferredWidth: 3; Layout.minimumWidth: 0
-                    Layout.minimumHeight: trafficBody.Layout.minimumHeight + Theme.dp(28); Layout.preferredHeight: Theme.dp(268)
-                    cornerRadius: Theme.dp(16); color: Theme.surface; border.width: 0
+                    Layout.minimumHeight: Theme.dp(202); Layout.preferredHeight: Theme.dp(258)
+                    cornerRadius: Theme.cardRadius
                     ColumnLayout {
-                        id: trafficBody
+                        id: sourcesSection; objectName: "activitySourceSection"
                         anchors.fill: parent; anchors.margins: Theme.dp(14); spacing: Theme.dp(8)
+                        GridLayout {
+                            Layout.fillWidth: true; columns: page.compact ? 1 : 2; columnSpacing: Theme.dp(8); rowSpacing: Theme.dp(6)
+                            SwirlText { text: qsTr("流量来源"); font.pixelSize: Theme.fontSize(18); font.weight: Font.DemiBold; color: Theme.text; Layout.fillWidth: true }
+                            SwirlSegmentedControl { id: sourceFilter; objectName: "activitySourceFilter"; Layout.preferredWidth: Theme.dp(230); Layout.preferredHeight: Theme.dp(28); options: [qsTr("进程与设备"), qsTr("域名"), qsTr("策略")]; currentIndex: page.rankingKind; onActivated: index => page.rankingKind = index }
+                        }
+                        Flickable {
+                            id: rankViewport; objectName: "activitySourceList"
+                            visible: page.ranks.length > 0
+                            Layout.fillWidth: true; Layout.minimumWidth: 0
+                            Layout.fillHeight: true; Layout.minimumHeight: Theme.dp(96)
+                            contentWidth: width; contentHeight: rankRows.implicitHeight
+                            interactive: contentHeight > height + 1; clip: interactive
+                            boundsBehavior: Flickable.StopAtBounds; flickableDirection: Flickable.VerticalFlick
+                            ScrollBar.vertical: SwirlScrollBar {}
+                            ColumnLayout {
+                                id: rankRows
+                                width: rankViewport.width - (rankViewport.interactive ? Theme.dp(8) : 0); spacing: Theme.dp(2)
+                                Repeater {
+                                    model: page.ranks
+                                    SwirlMotionButton {
+                                        id: rank; required property var modelData; required property int index
+                                        objectName: "activitySourceRow-" + index
+                                        readonly property string displayName: page.sourceName(modelData)
+                                        Layout.fillWidth: true; Layout.minimumWidth: 0; implicitHeight: Theme.dp(34); padding: Theme.dp(4); hoverEnabled: true
+                                        background: Rectangle { color: rank.down ? Theme.pressed : rank.hovered ? Theme.hover : "transparent"; radius: Theme.dp(6); border.width: rank.visualFocus ? Theme.borderWidth : 0; border.color: Theme.accent }
+                                        contentItem: RowLayout {
+                                            spacing: Theme.dp(9)
+                                            SwirlIcon { name: rank.modelData.kind === "apps" ? "terminal" : rank.modelData.kind === "devices" ? "router" : rank.modelData.kind === "domains" ? "globe" : "route"; size: Theme.dp(17); color: Theme.artworkText }
+                                            SwirlText { text: rank.displayName; Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight; color: Theme.text; font.pixelSize: Theme.fontSize(12) }
+                                            SwirlText { text: rank.modelData.value; color: Theme.artworkText; font.pixelSize: Theme.fontSize(12) }
+                                            SwirlIcon { name: "chevron-right"; size: Theme.dp(12); color: Theme.artworkText }
+                                        }
+                                        Accessible.name: qsTr("%1，%2，查看详情").arg(displayName).arg(modelData.value)
+                                        SwirlToolTip { parent: rank; width: Math.min(implicitWidth, Theme.dp(420)); visible: rank.hovered || rank.visualFocus; text: rank.displayName + " · " + rank.modelData.value + (rank.modelData.upload ? qsTr("\n上传 %1 · 下载 %2").arg(rank.modelData.upload).arg(rank.modelData.download) : "") }
+                                        onClicked: { SwirlMotion.noteTrigger(rank); page.openRank(modelData) }
+                                    }
+                                }
+                            }
+                        }
+                        SwirlText { visible: page.ranks.length === 0; text: page.emptyRanksText; color: Theme.artworkText; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: Theme.dp(96); verticalAlignment: Text.AlignVCenter; wrapMode: Text.Wrap }
                         RowLayout {
                             Layout.fillWidth: true
-                            SwirlText { text: qsTr("传输"); font.pixelSize: Theme.fontSize(18); font.weight: Font.DemiBold; color: Theme.text; Layout.fillWidth: true }
-                            SwirlSegmentedControl { id: trafficFilter; objectName: "activityTrafficFilter"; Layout.preferredWidth: Theme.dp(138); Layout.preferredHeight: Theme.dp(28); options: [qsTr("全部"), qsTr("仅代理")]; currentIndex: page.trafficKind; onActivated: index => page.trafficKind = index }
-                        }
-                        RowLayout {
-                            id: uploadSection; objectName: "activityUpload"
-                            readonly property Item motionTitle: uploadRateText
-                            readonly property Item motionSurface: uploadSection
-                            Layout.fillWidth: true; spacing: Theme.dp(16)
-                            ColumnLayout {
-                                Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: Theme.dp(3)
-                                SectionTitle { caption: qsTr("上传"); onNavigate: page.goTraffic(uploadSection, "uploadRate") }
-                                SwirlText { id: uploadRateText; Layout.fillWidth: true; Layout.minimumWidth: 0; text: page.telemetry.sampled ? page.telemetry.formatBytes(page.telemetry.uploadRate) + "/s" : "—"; font.pixelSize: Theme.fontSize(25); font.weight: Font.DemiBold; color: Theme.text; wrapMode: Text.Wrap }
-                            }
-                            ColumnLayout {
-                                id: downloadSection
-                                readonly property Item motionTitle: downloadRateText
-                                readonly property Item motionSurface: downloadSection
-                                Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: Theme.dp(3)
-                                SectionTitle { caption: qsTr("下载"); onNavigate: page.goTraffic(downloadSection, "downloadRate") }
-                                SwirlText { id: downloadRateText; Layout.fillWidth: true; Layout.minimumWidth: 0; text: page.telemetry.sampled ? page.telemetry.formatBytes(page.telemetry.downloadRate) + "/s" : "—"; font.pixelSize: Theme.fontSize(25); font.weight: Font.DemiBold; color: Theme.text; wrapMode: Text.Wrap }
-                            }
-                        }
-                        SwirlDailyTrafficChart { id: trafficChart; objectName: "activityTrafficChart"; Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: Theme.dp(65); proxyOnly: page.trafficKind === 1 }
-                        RowLayout {
-                            id: totalSection; objectName: "activityTotal"
-                            readonly property Item motionTitle: totalTrafficText
-                            readonly property Item motionSurface: totalSection
-                            Layout.fillWidth: true
-                            SectionTitle { caption: qsTr("累计"); onNavigate: page.goTraffic(totalSection, "totalTraffic") }
-                            SwirlText { id: totalTrafficText; Layout.fillWidth: true; Layout.minimumWidth: 0; text: page.bytes(page.totals.total, page.totals.sampled); color: Theme.text; font.pixelSize: Theme.fontSize(16); font.weight: Font.DemiBold; wrapMode: Text.Wrap }
-                            SwirlSegmentedControl { objectName: "activityPeriodFilter"; Layout.preferredWidth: Theme.dp(112); Layout.preferredHeight: Theme.dp(28); options: [qsTr("今日"), qsTr("本月")]; currentIndex: page.period; onActivated: index => page.period = index }
+                            SwirlText { text: qsTr("直连 %1").arg(page.distribution[1] && page.totals.sampled ? page.distribution[1].value : "—"); color: Theme.artworkText; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true }
+                            SwirlText { text: qsTr("代理 %1").arg(page.distribution[0] && page.totals.sampled ? page.distribution[0].value : "—"); color: Theme.artworkText; font.pixelSize: Theme.fontSize(12) }
                         }
                     }
                 }
                 ColumnLayout {
                     id: diagnosticCard; objectName: "internetDiagnosticCard"
                     Layout.fillWidth: true; Layout.fillHeight: true; Layout.preferredWidth: 2; Layout.minimumWidth: 0
-                    Layout.minimumHeight: implicitHeight; Layout.preferredHeight: Theme.dp(268); spacing: Theme.dp(6)
+                    Layout.minimumHeight: implicitHeight; Layout.preferredHeight: Theme.dp(258); spacing: Theme.dp(6)
                     RowLayout {
                         Layout.fillWidth: true
                         SectionTitle { id: diagnosticShortcut; objectName: "networkDiagnosticDetails"; caption: qsTr("网络诊断"); onNavigate: SwirlMotion.navigateFrom(diagnosticShortcut, "toolbox", "") }
@@ -278,51 +296,48 @@ Item {
                     }
                     Item { Layout.fillHeight: true }
                 }
-                ColumnLayout {
-                    id: sourcesSection; objectName: "activitySourceSection"
-                    Layout.fillWidth: true; Layout.fillHeight: false; Layout.preferredWidth: 3; Layout.minimumWidth: 0; Layout.minimumHeight: implicitHeight; spacing: Theme.dp(8)
-                    GridLayout {
-                        Layout.fillWidth: true; columns: page.compact ? 1 : 2; columnSpacing: Theme.dp(8); rowSpacing: Theme.dp(6)
-                        SwirlText { text: qsTr("流量来源"); font.pixelSize: Theme.fontSize(16); font.weight: Font.DemiBold; color: Theme.text; Layout.fillWidth: true }
-                        SwirlSegmentedControl { id: sourceFilter; objectName: "activitySourceFilter"; Layout.preferredWidth: Theme.dp(230); Layout.preferredHeight: Theme.dp(28); options: [qsTr("进程与设备"), qsTr("域名"), qsTr("策略")]; currentIndex: page.rankingKind; onActivated: index => page.rankingKind = index }
-                    }
-                    Flickable {
-                        id: rankViewport; objectName: "activitySourceList"
-                        visible: page.ranks.length > 0
-                        Layout.fillWidth: true; Layout.minimumWidth: 0
-                        Layout.preferredHeight: Math.min(rankRows.implicitHeight, Theme.dp(88))
-                        Layout.minimumHeight: Layout.preferredHeight
-                        contentWidth: width; contentHeight: rankRows.implicitHeight
-                        interactive: contentHeight > height + 1; clip: interactive
-                        boundsBehavior: Flickable.StopAtBounds; flickableDirection: Flickable.VerticalFlick
-                        ScrollBar.vertical: SwirlScrollBar {}
-                        ColumnLayout {
-                            id: rankRows
-                            width: rankViewport.width; spacing: Theme.dp(2)
-                            Repeater {
-                                model: page.ranks
-                                SwirlMotionButton {
-                                    id: rank; required property var modelData
-                                    Layout.fillWidth: true; Layout.minimumWidth: 0; implicitHeight: Theme.dp(28); padding: Theme.dp(4); hoverEnabled: true
-                                    background: Rectangle { color: rank.down ? Theme.pressed : rank.hovered ? Theme.hover : "transparent"; radius: Theme.dp(6); border.width: rank.visualFocus ? Theme.borderWidth : 0; border.color: Theme.accent }
-                                    contentItem: RowLayout {
-                                        spacing: Theme.dp(9)
-                                        SwirlIcon { name: rank.modelData.kind === "apps" ? "terminal" : rank.modelData.kind === "devices" ? "router" : rank.modelData.kind === "domains" ? "globe" : "route"; size: Theme.dp(17); color: Theme.artworkText }
-                                        SwirlText { text: rank.modelData.name; Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight; color: Theme.text; font.pixelSize: Theme.fontSize(12) }
-                                        SwirlText { text: rank.modelData.value; color: Theme.artworkText; font.pixelSize: Theme.fontSize(12) }
-                                        SwirlIcon { name: "chevron-right"; size: Theme.dp(12); color: Theme.artworkText }
-                                    }
-                                    Accessible.name: qsTr("%1详情").arg(modelData.name)
-                                    onClicked: { SwirlMotion.noteTrigger(rank); page.openRank(modelData) }
-                                }
+                SwirlGlassPanel {
+                    id: trafficCard; objectName: "activityTrafficCard"
+                    Layout.fillWidth: true; Layout.fillHeight: false; Layout.preferredWidth: 3; Layout.minimumWidth: 0
+                    Layout.minimumHeight: trafficBody.implicitHeight + Theme.dp(24); Layout.preferredHeight: Layout.minimumHeight
+                    cornerRadius: Theme.cardRadius; color: Theme.surface; border.width: 0
+                    ColumnLayout {
+                        id: trafficBody
+                        anchors.fill: parent; anchors.margins: Theme.dp(12); spacing: Theme.dp(4)
+                        RowLayout {
+                            Layout.fillWidth: true
+                            SwirlText { text: qsTr("传输"); font.pixelSize: Theme.fontSize(18); font.weight: Font.DemiBold; color: Theme.text; Layout.fillWidth: true }
+                            SwirlSegmentedControl { id: trafficFilter; objectName: "activityTrafficFilter"; Layout.preferredWidth: Theme.dp(138); Layout.preferredHeight: Theme.dp(28); options: [qsTr("全部"), qsTr("仅代理")]; currentIndex: page.trafficKind; onActivated: index => page.trafficKind = index }
+                        }
+                        RowLayout {
+                            id: uploadSection; objectName: "activityUpload"
+                            readonly property Item motionTitle: uploadRateText
+                            readonly property Item motionSurface: uploadSection
+                            Layout.fillWidth: true; spacing: Theme.dp(16)
+                            ColumnLayout {
+                                Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: Theme.dp(3)
+                                SectionTitle { caption: qsTr("上传"); onNavigate: page.goTraffic(uploadSection, "uploadRate") }
+                                SwirlText { id: uploadRateText; Layout.fillWidth: true; Layout.minimumWidth: 0; text: page.telemetry.sampled ? page.telemetry.formatBytes(page.telemetry.uploadRate) + "/s" : "—"; font.pixelSize: Theme.fontSize(21); font.weight: Font.DemiBold; color: Theme.text; wrapMode: Text.Wrap }
+                            }
+                            ColumnLayout {
+                                id: downloadSection
+                                readonly property Item motionTitle: downloadRateText
+                                readonly property Item motionSurface: downloadSection
+                                Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: Theme.dp(3)
+                                SectionTitle { caption: qsTr("下载"); onNavigate: page.goTraffic(downloadSection, "downloadRate") }
+                                SwirlText { id: downloadRateText; Layout.fillWidth: true; Layout.minimumWidth: 0; text: page.telemetry.sampled ? page.telemetry.formatBytes(page.telemetry.downloadRate) + "/s" : "—"; font.pixelSize: Theme.fontSize(21); font.weight: Font.DemiBold; color: Theme.text; wrapMode: Text.Wrap }
                             }
                         }
-                    }
-                    SwirlText { visible: page.ranks.length === 0; text: page.emptyRanksText; color: Theme.artworkText; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(56); verticalAlignment: Text.AlignVCenter; wrapMode: Text.Wrap }
-                    RowLayout {
-                        Layout.fillWidth: true
-                        SwirlText { text: qsTr("直连 %1").arg(page.distribution[1] && page.totals.sampled ? page.distribution[1].value : "—"); color: Theme.artworkText; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true }
-                        SwirlText { text: qsTr("代理 %1").arg(page.distribution[0] && page.totals.sampled ? page.distribution[0].value : "—"); color: Theme.artworkText; font.pixelSize: Theme.fontSize(12) }
+                        SwirlDailyTrafficChart { id: trafficChart; objectName: "activityTrafficChart"; Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(52); Layout.minimumHeight: Theme.dp(52); proxyOnly: page.trafficKind === 1 }
+                        RowLayout {
+                            id: totalSection; objectName: "activityTotal"
+                            readonly property Item motionTitle: totalTrafficText
+                            readonly property Item motionSurface: totalSection
+                            Layout.fillWidth: true
+                            SectionTitle { caption: qsTr("累计"); onNavigate: page.goTraffic(totalSection, "totalTraffic") }
+                            SwirlText { id: totalTrafficText; Layout.fillWidth: true; Layout.minimumWidth: 0; text: page.bytes(page.totals.total, page.totals.sampled); color: Theme.text; font.pixelSize: Theme.fontSize(16); font.weight: Font.DemiBold; wrapMode: Text.Wrap }
+                            SwirlSegmentedControl { objectName: "activityPeriodFilter"; Layout.preferredWidth: Theme.dp(112); Layout.preferredHeight: Theme.dp(28); options: [qsTr("今日"), qsTr("本月")]; currentIndex: page.period; onActivated: index => page.period = index }
+                        }
                     }
                 }
                 ColumnLayout {

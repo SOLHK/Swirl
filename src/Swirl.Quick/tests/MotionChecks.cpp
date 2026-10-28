@@ -406,20 +406,24 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         const auto originalSize=window->size();
         const QSize normalSize(qRound(eval("Theme.dp(914)").toDouble()),qRound(eval("Theme.dp(672)").toDouble()));
         window->resize(normalSize);wait(250);
+        auto *sourceCard=findVisual(activity,"activitySourcesCard");
         const auto diagnosticAt=diagnostic->mapToItem(activity,0,0),trafficAt=trafficCard->mapToItem(activity,0,0);
+        const auto sourceAt=sourceCard?sourceCard->mapToItem(activity,0,0):QPointF();
         const auto uploadAt=upload->mapToItem(activity,0,0),connectionsAt=connections->mapToItem(activity,0,0),totalAt=total->mapToItem(activity,0,0);
         std::function<int(QQuickItem *)> panelCount=[&](QQuickItem *root){
             int count=root->property("independentCard").isValid()?1:0;
             for(auto *child:root->childItems())count+=panelCount(child);
             return count;
         };
-        check("activity-apec-transfer-surface-and-open-diagnostic-rail",panelCount(activity)==1&&diagnostic->isVisible()&&trafficCard->isVisible()
-            &&diagnostic->parentItem()==trafficCard->parentItem()&&qAbs(diagnosticAt.y()-trafficAt.y())<2
+        check("activity-source-primary-surface-above-compact-transfer-and-open-diagnostic-rail",panelCount(activity)==3&&sourceCard&&diagnostic->isVisible()&&trafficCard->isVisible()
+            &&diagnostic->parentItem()==trafficCard->parentItem()&&qAbs(diagnosticAt.y()-sourceAt.y())<2
+            &&trafficAt.y()>=sourceAt.y()+sourceCard->height()
+            &&sourceCard->height()>trafficCard->height()
             &&diagnosticAt.x()>=trafficAt.x()+trafficCard->width()&&trafficCard->width()>diagnostic->width());
         const auto unboxed=[](QQuickItem *section){return !section->property("color").isValid()&&!section->property("background").isValid();};
         check("activity-apec-semantic-detail-origins-stay-in-their-reading-groups",upload->parentItem()==total->parentItem()
             &&unboxed(upload)&&unboxed(connections)&&unboxed(total)
-            &&uploadAt.y()>trafficAt.y()&&totalAt.y()>uploadAt.y()&&connectionsAt.y()>=trafficAt.y()+trafficCard->height());
+            &&uploadAt.y()>trafficAt.y()&&totalAt.y()>uploadAt.y()&&qAbs(connectionsAt.y()-trafficAt.y())<2);
         const double contentHeight=activityScroll->property("contentHeight").toDouble();
         qInfo()<<"ACTIVITY_APEC_NORMAL_GEOMETRY"<<window->size()<<activityScroll->size()<<contentHeight
                <<diagnostic->size()<<trafficCard->size()<<upload->size()<<connections->size()<<total->size();
@@ -435,7 +439,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         const auto actualRanks=activity->property("ranks");
         // Geometry-only rows exercise the populated layout without publishing
         // measured traffic or inserting records into the real telemetry store.
-        eval("pageLoader.item.ranks=[{name:'Layout row A',value:'1 KiB',kind:'apps'},{name:'Layout row B',value:'2 KiB',kind:'apps'},{name:'Layout row C',value:'3 KiB',kind:'devices'}]");
+        eval("pageLoader.item.ranks=Array.from({length:8},(_,i)=>({name:'Long source name for layout and full-name tooltip verification — regional service '+i,value:'123.4 GiB',upload:'23.4 GiB',download:'100 GiB',kind:'domains'}))");
         for(const auto size:{QSize(760,672),QSize(914,672),QSize(1100,760)}){
             window->resize(qRound(eval(QString("Theme.dp(%1)").arg(size.width())).toDouble()),qRound(eval(QString("Theme.dp(%1)").arg(size.height())).toDouble()));wait(180);
             check("activity-one-screen-"+QString::number(size.width()),activityScroll->property("contentHeight").toDouble()<=activityScroll->height()+1
@@ -443,6 +447,17 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             qInfo()<<"ACTIVITY_FEEDBACK_VIEWPORT"<<window->size()<<activityScroll->size()<<activityScroll->property("contentHeight")
                    <<trafficCard->size()<<diagnostic->size()<<(sourceSection?sourceSection->size():QSizeF())<<connections->size();
         }
+        auto *sourceList=findVisual(activity,"activitySourceList");
+        auto *sourceRow=findVisual(activity,"activitySourceRow-0");
+        check("long-source-list-scrolls-within-primary-card",sourceList&&sourceRow&&sourceList->property("interactive").toBool()
+            &&sourceList->property("contentHeight").toDouble()>sourceList->height()&&sourceRow->width()<=sourceList->width());
+        if(sourceRow){
+            sourceRow->forceActiveFocus();wait(80);
+            check("source-full-name-available-to-keyboard-users",sourceRow->hasActiveFocus()
+                &&sourceRow->property("displayName").toString().contains("tooltip verification"));
+        }
+        check("source-direct-id-has-readable-name",eval("pageLoader.item.sourceName({kind:'nodes',name:'SWIRL_V2_DIRECT'})==='直连'").toBool());
+        if(!output.isEmpty())window->grabWindow().save(QFileInfo(output).absolutePath()+"/activity-long-sources.png");
         activity->setProperty("ranks",actualRanks);
         window->resize(normalSize);wait(180);
         const auto revealControl=[&](QQuickItem *control){
@@ -563,14 +578,14 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             const auto originalController=capsule->property("controller");
             check("proxy-toggle-test-controller-bound",capsule->setProperty("controller",QVariant::fromValue(fake.get())));
             const auto clickProxy=[&]{QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,capsule->mapToScene(QPointF(capsule->width()/2,capsule->height()/2)).toPoint());wait(30);};
-            check("proxy-off-offers-enable",capsule->property("label").toString()==QStringLiteral("开启代理"));
+            check("proxy-off-offers-enable",capsule->property("label").toString()==QStringLiteral("系统代理 · 已关"));
             clickProxy();
             check("proxy-enable-click-dispatches-once",fake->property("calls").toInt()==1);
-            check("proxy-on-offers-disable",capsule->property("label").toString()==QStringLiteral("关闭代理"));
+            check("proxy-on-offers-disable",capsule->property("label").toString()==QStringLiteral("系统代理 · 已开"));
             check("proxy-enable-stays-on-activity",eval("AppState.currentPage==='activity'").toBool());
             clickProxy();
             check("proxy-disable-click-dispatches-once",fake->property("calls").toInt()==2);
-            check("proxy-disabled-state-updates-action",capsule->property("label").toString()==QStringLiteral("开启代理"));
+            check("proxy-disabled-state-updates-action",capsule->property("label").toString()==QStringLiteral("系统代理 · 已关"));
             fake->setProperty("proxyRequested",true);fake->setProperty("busy",true);fake->setProperty("systemProxyBusy",true);clickProxy();
             check("proxy-pending-request-can-be-cancelled",fake->property("calls").toInt()==3&&!fake->property("proxyRequested").toBool()&&!fake->property("busy").toBool());
             fake->setProperty("systemProxyStopping",true);clickProxy();
@@ -579,12 +594,15 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             auto *fakeProxy=fake->property("systemProxy").value<QObject *>();
             check("proxy-toggle-test-state-present",fakeProxy!=nullptr);
             if(fakeProxy)fakeProxy->setProperty("systemEnabled",true);
-            check("external-proxy-does-not-claim-swirl-is-running",capsule->property("label").toString()==QStringLiteral("开启代理")&&capsule->property("tone").toString()=="neutral");
+            check("external-proxy-does-not-claim-swirl-is-running",capsule->property("label").toString()==QStringLiteral("系统代理 · 外部")&&capsule->property("tone").toString()=="neutral");
             clickProxy();clickProxy();
-            check("master-off-restores-external-proxy-state",fake->property("calls").toInt()==5&&fakeProxy&&fakeProxy->property("systemEnabled").toBool()&&!fakeProxy->property("owned").toBool()&&capsule->property("label").toString()==QStringLiteral("开启代理"));
+            check("master-off-restores-external-proxy-state",fake->property("calls").toInt()==5&&fakeProxy&&fakeProxy->property("systemEnabled").toBool()&&!fakeProxy->property("owned").toBool()&&capsule->property("label").toString()==QStringLiteral("系统代理 · 外部"));
+            fake->setProperty("processAlive",true);
+            check("running-core-without-owned-proxy-stays-neutral",capsule->property("label").toString()==QStringLiteral("代理 · 仅内核")&&capsule->property("tone").toString()=="neutral");
+            fake->setProperty("processAlive",false);
             if(fakeProxy)fakeProxy->setProperty("error",QStringLiteral("stale-owner-error"));
             fake->setProperty("reject",true);clickProxy();
-            check("proxy-failure-keeps-observed-state",fake->property("calls").toInt()==6&&capsule->property("label").toString()==QStringLiteral("开启代理"));
+            check("proxy-failure-keeps-observed-state",fake->property("calls").toInt()==6&&capsule->property("label").toString()==QStringLiteral("系统代理 · 外部"));
             check("proxy-failure-visible",capsule->property("tone").toString()=="warning"&&capsule->property("detail").toString()=="test-operation-failed");
             check("proxy-disable-and-error-stay-on-activity",eval("AppState.currentPage==='activity'").toBool());
             check("proxy-toggle-controller-restored",capsule->setProperty("controller",originalController));

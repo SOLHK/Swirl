@@ -146,7 +146,7 @@ int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
         const bool pending=eval("engineController.systemProxyBusy").toBool();
         const bool stopping=eval("engineController.systemProxyStopping").toBool();
         check(proxy->property("proxyEnabled").toBool()==active,"master proxy control reflects Swirl runtime and owned settings");
-        const auto action=stopping?QStringLiteral("正在关闭代理…"):pending?QStringLiteral("正在开启代理…"):active?QStringLiteral("关闭代理"):QStringLiteral("开启代理");
+        const auto action=stopping?QStringLiteral("正在关闭代理…"):pending?QStringLiteral("正在开启代理…"):proxy->property("proxyOwned").toBool()?QStringLiteral("系统代理 · 已开"):active?QStringLiteral("代理 · 仅内核"):eval("engineController.systemProxy.systemEnabled").toBool()?QStringLiteral("系统代理 · 外部"):QStringLiteral("系统代理 · 已关");
         check(proxy->property("label").toString()==action,"master proxy control presents the matching direct action");
     } else check(false,"system proxy switch exists");
     qInfo()<<"APPEARANCE_CHECKS failures"<<failures;return failures?2:0;

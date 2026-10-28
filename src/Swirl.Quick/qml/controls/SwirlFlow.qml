@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Shapes
 import SwirlQuick
 
 // A state consumer, never a source of business success. Callers bind phase to
@@ -28,27 +27,12 @@ Item {
     Component.onCompleted:{initialized=true;updatePhase()}
     NumberAnimation {id:pendingClock;target:flow;property:"clock";from:0;to:1;duration:Math.max(1,SwirlMotion.activityCycleDuration/SwirlMotion.flowSpeed);loops:Animation.Infinite;running:flow.pending && flow.animate}
     NumberAnimation {id:successClock;target:flow;property:"sweep";from:0;to:1;duration:SwirlMotion.successDuration;easing.type:Easing.OutCubic}
-    ShaderEffect {
-        anchors.fill:parent
-        visible:Theme.effectsSupported && !Theme.increaseContrast
-        property vector2d surfaceSize:Qt.vector2d(width,height)
-        property real head:flow.head
-        property real pending:flow.pending?1:0
-        property real energy:flow.phase==="idle"?0:1
-        property color coldColor:flow.phase==="failed"?Theme.red:Theme.accent
-        fragmentShader:"qrc:/swirl/shaders/swirl-flow.frag.qsb"
-    }
-    // Software/high-contrast material fallback retains the same two curves;
-    // it intentionally does not claim to render the shader's travelling light.
-    Shape {
-        anchors.fill:parent;visible:!Theme.effectsSupported || Theme.increaseContrast
-        ShapePath {strokeColor:flow.phase==="failed"?Theme.red:Theme.accent;strokeWidth:Theme.dp(2);fillColor:"transparent";capStyle:ShapePath.RoundCap
-            startX:flow.width*0.06;startY:flow.height*0.8
-            PathCubic {control1X:flow.width*0.3;control1Y:flow.height*0.8;control2X:flow.width*0.56;control2Y:flow.height*0.1;x:flow.width*0.94;y:flow.height*0.2}
-        }
-        ShapePath {strokeColor:Theme.withAlpha(Theme.accent,0.45);strokeWidth:Theme.dp(1.5);fillColor:"transparent";capStyle:ShapePath.RoundCap
-            startX:flow.width*0.17;startY:flow.height*0.95
-            PathCubic {control1X:flow.width*0.43;control1Y:flow.height*0.95;control2X:flow.width*0.63;control2Y:flow.height*0.35;x:flow.width*0.87;y:flow.height*0.43}
-        }
+    Image {
+        anchors.fill: parent
+        source: "qrc:/swirl/icons/swirl-wing.svg"
+        sourceSize: Qt.size(Math.ceil(width * Screen.devicePixelRatio), Math.ceil(height * Screen.devicePixelRatio))
+        fillMode: Image.PreserveAspectFit
+        opacity: flow.phase === "idle" ? 0.62 : flow.pending ? 0.72 + 0.28 * Math.sin(flow.clock * Math.PI) : 1
+        scale: flow.phase === "succeeded" ? 0.94 + 0.06 * flow.sweep : 1
     }
 }

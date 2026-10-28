@@ -172,7 +172,7 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
         if(choose)inspect(choose);
         const auto contained=[&](QQuickItem *child){return choose&&reachable(child)&&QRectF(QPointF(),choose->size()).adjusted(-0.5,-0.5,0.5,0.5).contains(child->mapRectToItem(choose,QRectF(QPointF(),child->size())));};
         check(contained(hint)&&!hint->property("truncated").toBool()&&hint->width()+0.5>=hint->implicitWidth()
-              &&contained(chevron)&&chevron->width()>=eval("Theme.dp(16)").toReal(),QStringLiteral("Minimum-size default picker keeps its complete change-exit hint and clear downward arrow inside the clickable row"));
+              &&contained(chevron)&&chevron->width()>=eval("Theme.cardRadius").toReal(),QStringLiteral("Minimum-size default picker keeps its complete change-exit hint and clear downward arrow inside the clickable row"));
         QTest::mouseMove(window,QPoint(window->width()-10,10));QTest::qWait(150);
         auto *surface=choose?choose->property("background").value<QQuickItem *>():nullptr;
         check(choose&&!choose->property("hovered").toBool()&&surface&&surface->property("color").value<QColor>().alphaF()>0.95,
@@ -196,7 +196,7 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     setCombo("routingModePicker",1);if(!awaitSaved(QStringLiteral("Global mode is saved through the real mode control")))return finish();
     LoopbackPortLease ports;if(!check(ports.reserve(),QStringLiteral("Dedicated mixed proxy and control ports are reserved")))return finish();controller->setProxyPort(ports.proxyPort());ports.release();
     if(!navigate("activity"))return finish();
-    check(item("proxyCapsule")&&item("proxyCapsule")->property("label").toString()==QStringLiteral("开启代理"),QStringLiteral("Activity offers to start Swirl even when another proxy is already enabled"));
+    check(item("proxyCapsule")&&item("proxyCapsule")->property("label").toString()==QStringLiteral("系统代理 · 外部"),QStringLiteral("Activity offers to start Swirl even when another proxy is already enabled"));
     if(!click("proxyCapsule"))return finish();
     if(!check(QTest::qWaitFor([&]{return controller->apiHealthy()&&!controller->policyBusy()&&controller->systemProxy()->owned()&&controller->systemProxy()->enabled();},15000),QStringLiteral("Activity master switch starts the configured actual Rust runtime and takes isolated proxy ownership")))return finish();
     check(proxyBackend->takeoverCalls==1&&proxyBackend->lastPid==controller->processId().toLongLong()&&proxyBackend->lastPort>0,QStringLiteral("Activity takeover follows the healthy live Rust listener rather than a host proxy flag"));
@@ -308,12 +308,12 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     awaitSaved(QStringLiteral("Activity mode can switch back using the same native menu"));
     check(activityMode->property("displayMode")=="rule",QStringLiteral("Activity return choice follows the committed controller mode"));
     check(QTest::qWaitFor([&]{return !popup("activityOutboundModeMenu");},2000),QStringLiteral("Mode selection releases the menu before returning to the activity facts"));
-    const auto cardRadius=eval("Theme.dp(16)").toReal();
+    const auto cardRadius=eval("Theme.cardRadius").toReal();
     auto *transfer=item("activityTrafficCard"),*diagnostics=item("internetDiagnosticCard");
     check(transfer&&qAbs(transfer->property("cornerRadius").toReal()-cardRadius)<0.5&&qAbs(transfer->property("radius").toReal()-cardRadius)<0.5,
           QStringLiteral("Activity transfer uses its independently sized content surface"));
     check(diagnostics&&!diagnostics->property("independentCard").isValid(),QStringLiteral("Activity diagnostics remain an open reading rail"));
-    check(eval("Theme.dark || Theme.increaseContrast || (Theme.canvas.toString()==='#fbfcfd' && Theme.text.toString()==='#14283f' && Theme.accent.toString()==='#007eaa')").toBool(),
+    check(eval("Theme.dark || Theme.increaseContrast || (Theme.canvas.toString()==='#f3f3f5' && Theme.text.toString()==='#202027' && Theme.accent.toString()==='#171d87')").toBool(),
           QStringLiteral("Light mode uses the selected white, navy and cyan semantic palette"));
     QTest::qWait(200);
     if(!directory.isEmpty())window->grabWindow().save(directory+"/activity-mode.png");

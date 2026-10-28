@@ -123,7 +123,7 @@ ApplicationWindow {
                 Item {Layout.fillWidth:true}
                 SwirlSystemProxyCapsule {id:proxyCapsule;objectName:"proxyCapsule";Layout.preferredWidth:implicitWidth;Layout.preferredHeight:Theme.dp(28);controller:engineController}
 
-                SwirlStatusCapsule { objectName:"tunCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.dp(28); label:"TUN 模式";detail:engineController.routingError||(engineController.tunEnabled?"TUN 模式已开启，点击关闭":"点击开启 TUN 模式接管网络"); tone:engineController.tunEnabled?"success":"neutral"; enabled:!engineController.busy; onClicked:{if(!engineController.setTunEnabled(!engineController.tunRequested))AppState.notice(engineController.routingError||engineController.networkConfigurationError)} }
+                SwirlStatusCapsule { objectName:"tunCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.dp(28); label:engineController.tunEnabled?"TUN · 已开":"TUN · 未开启";detail:engineController.routingError||(engineController.tunEnabled?"TUN 模式已开启，点击关闭":"当前 Rust Core 暂不支持 TUN 模式"); tone:engineController.tunEnabled?"success":"neutral"; enabled:!engineController.busy; onClicked:{if(!engineController.setTunEnabled(!engineController.tunRequested))AppState.notice(engineController.routingError||engineController.networkConfigurationError)} }
 
             }
             SwirlButton {

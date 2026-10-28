@@ -4,11 +4,11 @@
 #include <QPainter>
 #include <array>
 
-// Include the taskbar's exact sizes at 100%, 125%, 150%, 200%, 250%, 300%
+// Include the taskbar's exact sizes at 100%, 125%, 150%, 175%, 200%, 250%, 300%
 // and 400%, alongside title-bar, Start and Explorer sizes. Runtime QIcon and
 // the packaged ICO must use the same frames.
-inline constexpr std::array<int, 15> swirlBrandIconSizes{
-    16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 128, 256
+inline constexpr std::array<int, 18> swirlBrandIconSizes{
+    16, 20, 24, 28, 30, 32, 36, 40, 42, 48, 56, 60, 64, 72, 80, 96, 128, 256
 };
 
 // Preserve the canonical paths and aspect ratio. Remove only the SVG's

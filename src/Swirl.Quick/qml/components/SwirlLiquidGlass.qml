@@ -9,8 +9,8 @@ Item {
     property real cornerRadius:Theme.sidebarRadius
     property real interaction:0
     property point lightPoint:Qt.point(0.18,0.15)
-    property real blurRadius:Theme.dp(4)
-    property real refraction:Theme.dp(3.2)
+    property real blurRadius:Theme.dp(5)
+    property real refraction:Theme.dp(2.4)
     // A width-changing shell can keep one texture allocation for its maximum
     // envelope while sourceRect and shader geometry follow the live width.
     property real captureWidth:width

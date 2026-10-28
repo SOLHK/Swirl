@@ -52,9 +52,17 @@ int runApecGlassChecks(QQuickWindow *window,const QString &output) {
             && footprint->y()<scene->height()/4
             && footprint->x()<0
             && qAbs(footprint->x()+footprint->width()-scene->width()+20)<0.1
-            && qAbs(footprint->y()+footprint->height()-scene->height()-40)<0.1);
+            && qAbs(footprint->y()+footprint->height()-scene->height()-8)<0.1);
+        const auto transmitted=grab(productionGlass);
+        qint64 featherPixels=0;
+        for(int y=transmitted.height()*3/4;y<transmitted.height()-8;++y)
+            for(int x=8;x<transmitted.width()-8;++x) {
+                const auto pixel=transmitted.pixelColor(x,y);
+                if(pixel.alpha()>30 && pixel.hsvSaturation()>25)++featherPixels;
+            }
+        check("production-wing-remains-visible-through-lower-glass",featherPixels>transmitted.width()*transmitted.height()/200);
     }
-    check("sidebar-retains-floating-inset-and-20dp-contour",eval("sidebar.glassSurface.x===Theme.shellInset && sidebar.glassSurface.y===Theme.shellInset && sidebar.glassSurface.radius===20").toBool());
+    check("sidebar-retains-floating-inset-and-14dp-contour",eval("sidebar.glassSurface.x===Theme.shellInset && sidebar.glassSurface.y===Theme.shellInset && sidebar.glassSurface.radius===14").toBool());
     check("neutral-light-canvas-and-card-palette",eval("Theme.canvas.toString()==='#f3f3f5' && Theme.surface.toString()==='#f8f8fa' && Theme.border.toString()==='#e3e3e7'").toBool());
     if(decoration){
         auto decorated=grab(scene);
@@ -67,7 +75,7 @@ int runApecGlassChecks(QQuickWindow *window,const QString &output) {
         const auto withoutWing=window->grabWindow();
         decoration->setVisible(true);QTest::qWait(35);
         const auto withWing=window->grabWindow();
-        for(const auto *name:{"activityStatusCard","activityTrafficCard"}) {
+        for(const auto *name:{"activityStatusCard","activityTrafficCard","activitySourcesCard"}) {
             auto *card=window->findChild<QQuickItem *>(name);
             check("production-opaque-card-found",card!=nullptr);
             if(card){
@@ -137,7 +145,7 @@ Item {
             initial.save(directory+"/glass-source-blue.png");
             check("rounded-clip-transparent-corner",initial.pixelColor(0,0).alpha()<8);
             const auto left=sample(initial,100,140),right=sample(initial,300,140),edge=sample(initial,200,140);
-            check("source-colours-transmitted",right.red()>left.red()+30 && left.blue()>left.red());
+            check("source-colours-transmitted-with-restrained-saturation",right.red()>left.red()+30 && left.blue()>left.red() && left.hsvSaturation()<170 && right.hsvSaturation()<170);
             check("blur-mixes-source-boundary",edge.red()>left.red()+8 && edge.red()<right.red()-8);
             eval("apecGlass.source.color='#BD334F'");QTest::qWait(100);auto changed=capture();changed.save(directory+"/glass-source-red.png");
             check("live-source-change-reaches-material",!changed.isNull() && sample(changed,100,140).red()>left.red()+35);

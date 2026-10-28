@@ -229,6 +229,7 @@ set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 file(GLOB SWIRL_UI_ICONS CONFIGURE_DEPENDS "${SWIRL_ASSET_PATH}/icons/ui/*.svg")
 qt_add_resources(Swirl ui_icons PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES ${SWIRL_UI_ICONS})
 qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES
+    "${SWIRL_ASSET_PATH}/icons/swirl-wing.svg"
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_light.svg"
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_dark.svg"
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_light.svg"

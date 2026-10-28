@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 48">
+  <title>Swirl feather wing</title>
+  <defs>
+    <linearGradient id="flight" x1="8" y1="42" x2="83" y2="5" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8580C5"/>
+      <stop offset=".48" stop-color="#555BC4"/>
+      <stop offset="1" stop-color="#79BDDC"/>
+    </linearGradient>
+  </defs>
+  <g fill="url(#flight)">
+    <path d="M5 39C21 37 26 22 42 14C57 6 76 5 92 4C83 12 72 17 58 20C39 24 26 39 5 39Z"/>
+    <path d="M10 42C30 39 40 27 57 24C67 22 77 20 85 16C79 25 67 30 55 31C36 33 25 43 10 42Z" opacity=".82"/>
+    <path d="M18 44C34 41 43 35 56 34C65 33 71 31 77 28C70 36 62 39 52 39C38 39 30 45 18 44Z" opacity=".64"/>
+    <path d="M30 45C40 42 47 42 54 42C59 42 63 41 67 39C62 44 56 46 50 45C42 44 37 46 30 45Z" opacity=".45"/>
+  </g>
+</svg>

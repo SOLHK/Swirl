@@ -53,6 +53,11 @@ void main(){
     // decoration's premultiplied alpha instead of adding a second opaque base.
     // At the boundary both displacement and blur reach zero: one continuous wing.
     vec4 color=mix(texture(sharpSource,(p+padding)/extent),blur,smoothstep(0.,8.,-d));
+    // Neutralize transmitted pigment while retaining alpha, live source detail,
+    // blur and edge displacement. No opaque paint covers the glass.
+    float luminance=dot(color.rgb,vec3(.2126,.7152,.0722));
+    color.rgb=mix(vec3(luminance),color.rgb,.66);
+    color.rgb=mix(color.rgb,vec3(.94)*color.a,mix(.10,.04,darkMode));
     float facing=max(0.,dot(normal,normalize(vec2(-.65,-1.))));
     float rim=exp(-max(0.,-d)*1.25);
     // Keep the resting light directional, but let the interaction glint reach
