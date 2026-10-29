@@ -23,6 +23,7 @@
 #include <QSet>
 #include <QPainter>
 #include <QCoreApplication>
+#include <QCursor>
 #include <QMutex>
 #include <QMutexLocker>
 #include <functional>
@@ -78,6 +79,80 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
 #endif
  eval("Theme.mode='Light';Theme.transparency=true;Theme.reduceMotion=false;SwirlMotion.speed=1");route("featurehub");
  check(!eval("SwirlMotion.reduced").toBool(),"animated fixture resolves independently of the Windows accessibility preference");
+ if(qApp->arguments().contains("--hero-material-only")){
+  QJsonArray samples;
+  QSet<QString> capturedPhases;
+  int darkFrames=0;
+  const QString stateScript=QStringLiteral(R"JS(JSON.stringify((function(){
+   function describe(item){if(!item)return null;const p=item.mapToItem(window.contentItem,0,0);const c=item.color;return {name:item.objectName,x:p.x,y:p.y,width:item.width,height:item.height,visible:item.visible,opacity:item.opacity,surfaceHidden:item.surfaceHidden===true,color:c?{r:c.r,g:c.g,b:c.b,a:c.a}:null}}
+   const h=pageLoader,hero=h.children.filter(item=>item.objectName==='pageHeroTitle')[0];return {route:AppState.currentPage,progress:h.position,moving:h.moving,preparing:h.preparing,surfaceKind:h.surfaceKind,heroData:h.heroData?{key:h.heroData.key,returning:h.heroData.returning,fromColor:h.heroData.fromColor,toColor:h.heroData.toColor}:null,source:describe(h.sourceSurface),target:describe(h.targetSurface),sourceTitle:describe(hero?hero.sourceItem:null),targetTitle:describe(hero?hero.targetItem:null),sharedTitle:describe(hero?hero.labelItem:null),morph:describe(h.children[0].children.filter(item=>item.objectName==='sharedSurface')[0]),layers:Object.keys(h.pages).map(key=>({route:key,visible:h.pages[key].visible,opacity:h.pages[key].opacity,z:h.pages[key].z})),registry:SwirlTransitionRegistry.activeCount,dismissals:dismissals.count}
+  })()))JS");
+  auto sampleMaterial=[&](const QString &phase){
+   auto state=QJsonDocument::fromJson(eval(stateScript).toString().toUtf8()).object();
+   auto *surface=item("sharedSurface");
+   if(!surface)return;
+   QElapsedTimer readback;readback.start();
+   const auto frame=window->grabWindow().convertToFormat(QImage::Format_ARGB32);
+   state["readbackMs"]=readback.nsecsElapsed()/1000000.0;
+   state["phase"]=phase;
+   state["frame"]=samples.size();
+   if(!frame.isNull()&&state.value("progress").toDouble()>=0.5&&!capturedPhases.contains(phase)){
+    const auto filename="material-"+phase+"-half.png";
+    frame.save(directory+"/"+filename);state["image"]=filename;capturedPhases.insert(phase);
+   }
+   if(!frame.isNull()&&surface->width()>32&&surface->height()>32){
+    QList<int> reds,greens,blues;
+    for(int y=1;y<=5;++y)for(int x=1;x<=5;++x){
+     const auto p=surface->mapToScene(QPointF(surface->width()*x/6,surface->height()*y/6))*window->devicePixelRatio();
+     if(frame.rect().contains(p.toPoint())){const auto c=frame.pixelColor(p.toPoint());reds.append(c.red());greens.append(c.green());blues.append(c.blue());}
+    }
+    if(!reds.isEmpty()){
+     std::sort(reds.begin(),reds.end());std::sort(greens.begin(),greens.end());std::sort(blues.begin(),blues.end());
+     const int middle=reds.size()/2;
+     state["backgroundMedianRgb"]=QJsonArray{reds[middle],greens[middle],blues[middle]};
+     const bool dark=qMin(reds[middle],qMin(greens[middle],blues[middle]))<210;
+     state["unexpectedDarkFrame"]=dark;
+     if(dark){++darkFrames;frame.save(directory+QString("/material-dark-%1.png").arg(samples.size(),3,10,QChar('0')));}
+    }
+   }
+   samples.append(state);
+  };
+  auto settled=[&]{return eval("pageLoader.item && !pageLoader.moving && !pageLoader.pendingGrab && pageLoader.activeLoader.routeId===AppState.currentPage").toBool();};
+  auto observe=[&](const QString &phase,double until=1.0){
+   QElapsedTimer timer;timer.start();bool started=false;
+   do{wait(16);started|=eval("pageLoader.moving").toBool();sampleMaterial(phase);
+    if(started&&(settled()||(until<1&&eval("pageLoader.position").toDouble()>=until)))return true;
+   }while(timer.elapsed()<4500);
+   return false;
+  };
+  auto pressCard=[&](const QString &name){
+   auto *card=item("settings-"+name);check(card!=nullptr,"material fixture card is reachable: "+name);if(!card)return;
+   const auto point=card->mapToScene(QPointF(card->width()/2,card->height()/2)).toPoint();
+   QCursor::setPos(window->mapToGlobal(point));QTest::mouseMove(window,point);wait(130);
+   QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,point);wait(70);QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,point);
+  };
+  eval("SwirlMotion.speed=0.5");
+  for(const auto &name:QStringList{"settings","dns","modules","profiles","scripts","subscriptions","proxies"}){
+   pressCard(name);check(observe(name+"-open")&&settled(),"material fixture expansion settles: "+name);
+   QTest::keyClick(window,Qt::Key_Escape);check(observe(name+"-close")&&settled(),"material fixture Escape return settles: "+name);
+  }
+  for(const double phase:{0.15,0.55,0.95}){
+   const auto key=QString::number(phase,'f',2);
+   pressCard("profiles");check(observe("reverse-open-"+key,phase),"material reversal reaches its actual opening phase: "+key);
+   QTest::keyClick(window,Qt::Key_Escape);check(observe("reverse-close-"+key,0.15),"material reversal reaches its actual closing phase: "+key);
+   pressCard("profiles");check(observe("reverse-reopen-"+key)&&settled(),"material fixture reopens the live card: "+key);
+   QTest::keyClick(window,Qt::Key_Escape);check(observe("reverse-settle-"+key)&&settled(),"material fixture final Escape settles: "+key);
+  }
+  pressCard("profiles");check(observe("third-route-open",0.55),"material third-route fixture reaches an intermediate frame");
+  eval("window.openSettings('scripts')");check(observe("third-route-change")&&settled(),"material third-route retarget settles");
+  QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(1000);
+  check(eval("Object.keys(pageLoader.pages).filter(key=>pageLoader.pages[key].visible).length===1 && SwirlTransitionRegistry.activeCount===0 && dismissals.count===0").toBool(),"material fixture releases all outgoing layers and transition tokens");
+  check(!samples.isEmpty()&&darkFrames==0,"opening, Escape, reversal and third-route frames retain the light card material");
+  eval("SwirlMotion.speed=1");
+  QFile output(directory+"/material-transition-report.json");if(!output.open(QIODevice::WriteOnly))return 3;
+  output.write(QJsonDocument(QJsonObject{{"samples",samples},{"darkFrames",darkFrames},{"checks",checks},{"failures",failures},{"scope","Native D3D11 rendered mid-transition RGB plus live shared-surface/color/layer state. Screenshot readbacks are diagnostic only, not presentation performance measurements."}}).toJson());
+  return failures?2:0;
+ }
  check(item("settings-proxies")&&item("settings-subscriptions")&&!item("settings-license"),"More has direct node/subscription entries and no paid license entry");
  QString yaml="proxies:\n";for(int i=0;i<180;++i)yaml+=QString("  - {name: 'Fixture node %1', type: socks5, server: 127.0.0.1, port: %2}\n").arg(i,3,10,QChar('0')).arg(10000+i);
  controller->imports()->importText(yaml);check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->nodes().size()==180,"180 synthetic node records imported by the real importer for rendering stress only");

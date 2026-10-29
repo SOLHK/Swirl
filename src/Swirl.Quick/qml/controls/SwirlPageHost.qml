@@ -45,7 +45,9 @@ Item {
  readonly property real pageReveal:heroData!==null && heroData.key==="settings"?ramp(position,heroData.returning?0:0.12,heroData.returning?0.80:0.92):position
  function valid(item){return item && item.width>0 && item.height>0}
  function sampledColor(item){
-  if(item && item.color!==undefined){const c=item.color;return Qt.rgba(c.r,c.g,c.b,c.a)}
+  // A hidden card still owns its material, not its zero-alpha presentation.
+  // Keep the live morph color for reversals, which snapshot the current frame.
+  if(item && item.color!==undefined){const c=item.surfaceHidden && item.surfaceColor!==undefined?item.surfaceColor:item.color;return Qt.rgba(c.r,c.g,c.b,c.a)}
   return Qt.rgba(Theme.independentCard.r,Theme.independentCard.g,Theme.independentCard.b,0)
  }
  function surfaceFor(page,key){return page.motionSurfaces && page.motionSurfaces[key] || page.motionSurface || null}

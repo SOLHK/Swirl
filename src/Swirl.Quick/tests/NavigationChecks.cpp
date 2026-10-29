@@ -427,7 +427,13 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
     // settle, so this catches the old caption-row arrow without flattening motion.
     const bool centered=await([&]{return arrow&&arc&&arrow->isVisible()&&arrow->height()>0&&!arc->property("moving").toBool()&&!surface->property("moving").toBool()&&qAbs(centerY(arrow)-centerY(surface))*window->devicePixelRatio()<=.5;},1000);
     check(centered,"Activity policy arrow is vertically centered in the full two-line moving button surface");
-    buttonSamples.append(QJsonObject{{"button",key},{"phase","policy-arrow-alignment"},{"arrowCenterSceneY",arrow?QJsonValue(centerY(arrow)):QJsonValue()},{"surfaceCenterSceneY",centerY(surface)},{"centerDeltaPhysicalPx",arrow?QJsonValue(qAbs(centerY(arrow)-centerY(surface))*window->devicePixelRatio()):QJsonValue()},{"arcMoving",arc?arc->property("moving").toBool():false},{"surfaceMoving",surface->property("moving").toBool()},{"centered",centered}});
+    const auto geometry=[](QQuickItem *target){
+     if(!target)return QJsonObject();
+     const auto origin=target->mapToScene(QPointF()),center=target->mapToScene(QPointF(target->width()/2,target->height()/2));
+     return QJsonObject{{"x",target->x()},{"y",target->y()},{"width",target->width()},{"height",target->height()},{"implicitWidth",target->implicitWidth()},{"implicitHeight",target->implicitHeight()},{"scale",target->scale()},{"sceneX",origin.x()},{"sceneY",origin.y()},{"sceneCenterX",center.x()},{"sceneCenterY",center.y()}};
+    };
+    QJsonObject controlSpacing;for(const auto *name:{"leftInset","rightInset","topInset","bottomInset","leftPadding","rightPadding","topPadding","bottomPadding","availableHeight"})controlSpacing[name]=control->property(name).toDouble();
+    buttonSamples.append(QJsonObject{{"button",key},{"phase","policy-arrow-alignment"},{"arrowCenterSceneY",arrow?QJsonValue(centerY(arrow)):QJsonValue()},{"surfaceCenterSceneY",centerY(surface)},{"centerDeltaPhysicalPx",arrow?QJsonValue(qAbs(centerY(arrow)-centerY(surface))*window->devicePixelRatio()):QJsonValue()},{"arcMoving",arc?arc->property("moving").toBool():false},{"surfaceMoving",surface->property("moving").toBool()},{"centered",centered},{"controlGeometry",geometry(control)},{"backgroundGeometry",geometry(surface)},{"contentGeometry",geometry(control->property("contentItem").value<QQuickItem *>())},{"rightCellGeometry",geometry(arrow?arrow->parentItem():nullptr)},{"arrowGeometry",geometry(arrow)},{"controlSpacing",controlSpacing}});
    }
    check(clicked.isValid()&&clicked.count()==0&&control->size()==size&&control->position()==position,"marked button feedback preserves layout and invokes no action: "+key);
   };

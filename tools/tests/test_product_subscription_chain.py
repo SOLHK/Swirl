@@ -62,11 +62,37 @@ class Server(socketserver.ThreadingTCPServer):
 class Origin:
     def __init__(self, context=None, echo=False, client_closes_tls=False):
         self.requests, self.errors, self.payloads, self.sni = [], [], [], []
+        self.sni_events = []
         self.context, self.echo = context, echo
         self.tls_closed = 0
         self.stopped = threading.Event()
         if context:
-            context.set_servername_callback(lambda stream, name, ctx: self.sni.append(name))
+            sni_lock = threading.Lock()
+            connection_serial = 0
+
+            def record_server_name(stream, name, ctx):
+                nonlocal connection_serial
+                with sni_lock:
+                    state = getattr(stream, '_swirl_origin_sni', None)
+                    if state is None:
+                        connection_serial += 1
+                        state = {'connection_id': connection_serial, 'name': name, 'hellos': 0}
+                        stream._swirl_origin_sni = state
+                        self.sni.append(name)
+                    state['hellos'] += 1
+                    self.sni_events.append({'connection_id': state['connection_id'],
+                                            'socket_identity': id(stream),
+                                            'client_hello_index': state['hellos'], 'server_name': name})
+                    # TLS 1.3 HelloRetryRequest invokes SNI again on the same
+                    # socket. Count connections, while retaining every hello
+                    # and refusing a changed name within one handshake.
+                    if state['name'] != name:
+                        self.errors.append({'category': 'IndependentFixtureAssertion',
+                                            'fixture': 'tls-origin',
+                                            'type': 'ServerNameChangedDuringHandshake'})
+                        return ssl.ALERT_DESCRIPTION_ILLEGAL_PARAMETER
+
+            context.set_servername_callback(record_server_name)
         owner = self
 
         class Handler(socketserver.BaseRequestHandler):
@@ -138,6 +164,35 @@ class Origin:
         self.server.server_close()
         self.thread.join(2)
         assert not self.errors, self.errors
+
+
+class OriginSniSelfChecks(unittest.TestCase):
+    def test_tls13_retry_keeps_one_sni_per_real_connection(self):
+        with tempfile.TemporaryDirectory(prefix='swirl-origin-sni-') as folder:
+            context, _, ca = certificates(folder)
+            context.minimum_version = context.maximum_version = ssl.TLSVersion.TLSv1_3
+            context.set_ecdh_curve('prime256v1')
+            origin = Origin(context, client_closes_tls=True)
+            try:
+                client = ssl.create_default_context(cadata=ca)
+                client.minimum_version = client.maximum_version = ssl.TLSVersion.TLSv1_3
+                for _ in range(2):
+                    with socket.create_connection(('127.0.0.1', origin.port), timeout=5) as raw:
+                        stream = client.wrap_socket(raw, server_hostname='localhost')
+                        stream.sendall(b'GET /sni HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n')
+                        self.assertIn(b'200 OK', header(stream))
+                        self.assertEqual(exact(stream, len(BODY) + 5), BODY + b':/sni')
+                        stream.unwrap().close()
+                self.assertEqual(origin.sni, ['localhost', 'localhost'])
+                self.assertEqual(len(origin.requests), 2)
+                self.assertEqual([(event['connection_id'], event['client_hello_index'])
+                                  for event in origin.sni_events], [(1, 1), (1, 2), (2, 1), (2, 2)])
+                for connection in (1, 2):
+                    events = [event for event in origin.sni_events if event['connection_id'] == connection]
+                    self.assertEqual(len({event['socket_identity'] for event in events}), 1)
+                    self.assertEqual({event['server_name'] for event in events}, {'localhost'})
+            finally:
+                origin.close()
 
 
 class SsStream:
@@ -907,7 +962,7 @@ class ProductQtIntegration(ChainBase):
                 log = case / 'qt.log'
                 env = {**os.environ, 'SWIRL_PRODUCT_FIXTURE': str(path)}
                 before = (len(self.http.requests), len(self.https.requests), len(self.https.sni),
-                          self.https.tls_closed)
+                          self.https.tls_closed, len(self.https.sni_events))
                 result = subprocess.run([os.environ['SWIRL_RUST_QT_TESTS'],
                                          'subscriptionProductChainAgainstIndependentPeer',
                                          '-o', str(log) + ',txt'], env=env, text=True,
@@ -947,6 +1002,7 @@ class ProductQtIntegration(ChainBase):
                 if evidence:
                     report = {'protocol': protocol, 'origin_http_paths': actual_paths,
                               'origin_https_sni': self.https.sni[before[2]:],
+                              'origin_https_client_hellos': self.https.sni_events[before[4]:],
                               'origin_https_tls_closed': self.https.tls_closed - before[3],
                               'origin_errors': {'http': self.http.errors, 'https': self.https.errors,
                                                 'echo': self.echo.errors},

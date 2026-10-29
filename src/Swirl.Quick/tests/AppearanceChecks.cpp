@@ -19,15 +19,25 @@
 #include <QFontDatabase>
 #include <QCursor>
 #include <QElapsedTimer>
+#include <QDateTime>
+#include <QFileInfo>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QEventLoop>
+#include <QTimer>
 #include <QtMath>
 #include <functional>
 
 int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
     if(!window)return 2;
+    QElapsedTimer totalClock,stageClock;totalClock.start();stageClock.start();
+    const auto stage=[&](const char *name){qInfo()<<"APPEARANCE_STAGE"<<name<<"stageMs"<<stageClock.restart()<<"totalMs"<<totalClock.elapsed();};
     int failures=0;
     auto check=[&](bool ok,const char *name){qInfo()<<(ok?"PASS":"FAIL")<<name;if(!ok)++failures;};
     auto eval=[&](const QString &code){QQmlExpression e(qmlContext(window),window,code);auto value=e.evaluate();check(!e.hasError(),"appearance expression is valid");return value;};
-    if(restoreOnly){check(eval("Theme.mode==='Dark' && Theme.dark && Theme.followSystemMotion").toBool(),"new process restores saved dark theme and explicit system-motion preference");return failures?2:0;}
+    if(restoreOnly){qInfo()<<"APPEARANCE_RESTORE_PROCESS"<<QCoreApplication::applicationPid();check(eval("Theme.mode==='Dark' && Theme.dark && Theme.followSystemMotion").toBool(),"new process restores saved dark theme and explicit system-motion preference");return failures?2:0;}
     if(qEnvironmentVariableIsSet("SWIRL_EXPECTED_DPR"))
         check(qAbs(window->devicePixelRatio()-qEnvironmentVariable("SWIRL_EXPECTED_DPR").toDouble())<0.02,"native window uses the requested controlled DPR");
     {
@@ -74,8 +84,28 @@ Item {
                     check(paint&&qAbs(paint->property("radius").toReal()-(name=="reviewNavigation"?eval("Theme.sidebarRowRadius").toReal():paint->height()/2))<0.01,"shared surfaces retain the requested capsule or navigation curve");
                     if(!control||!paint)continue;
                     const auto size=control->size();const auto position=control->position();
-                    movePointer(QPoint(window->width()-20,90));
-                    check(QTest::qWaitFor([&]{return !control->property("hovered").toBool();},1000),"native pointer leaves the shared control before its resting sample");
+                    auto *content=control->property("contentItem").value<QQuickItem *>();
+                    auto *focusFill=paint->findChild<QQuickItem *>("controlFocusFill");
+                    const auto sameRenderedColor=[](const QColor &left,const QColor &right){return left.rgba64().premultiplied()==right.rgba64().premultiplied();};
+                    const auto motionRetired=[&]{return !paint->property("moving").toBool()&&paint->property("hoverProgress").toReal()==0&&paint->property("contactProgress").toReal()==0&&focusFill&&focusFill->opacity()==0&&paint->scale()==1&&content&&content->scale()==1;};
+                    const auto diagnose=[&](const char *phase,const QColor &normal){
+                        qInfo()<<"CONTROL_STATE"<<theme<<name<<phase<<"hovered"<<control->property("hovered")<<"down"<<control->property("down")
+                               <<"visualFocus"<<control->property("visualFocus")<<"focused"<<paint->property("focused")<<"focusProgress"<<(focusFill?focusFill->opacity():-1)
+                               <<"enabled"<<paint->property("controlEnabled")<<"opacity"<<paint->opacity()<<"moving"<<paint->property("moving")
+                               <<"hoverProgress"<<paint->property("hoverProgress")<<"contactProgress"<<paint->property("contactProgress")
+                               <<"surfaceScale"<<paint->scale()<<"contentScale"<<(content?content->scale():-1)<<"motionLift"<<control->property("motionLift")
+                               <<"normal"<<normal<<"actual"<<paint->property("color");
+                    };
+                    // The interaction's moving flag excludes the independent color
+                    // Behavior. Wait for both its exact token and the motion endpoint
+                    // before using a normal frame as this control's baseline.
+                    const auto expectedNormal=paint->property("primary").toBool()?eval("Theme.primaryButton").value<QColor>():paint->property("quiet").toBool()?QColor(Qt::transparent):eval("Theme.buttonBase").value<QColor>();
+                    fixture->forceActiveFocus(Qt::OtherFocusReason);
+                    movePointer(QPoint(window->width()-20,90),0);
+                    const bool restingSettled=QTest::qWaitFor([&]{return !control->property("hovered").toBool()&&!control->property("visualFocus").toBool()&&motionRetired()&&sameRenderedColor(paint->property("color").value<QColor>(),expectedNormal);},1000);
+                    if(!restingSettled)diagnose("resting",expectedNormal);
+                    check(restingSettled,"native pointer leaves and all shared control motion settles before its resting sample");
+                    if(!restingSettled)continue;
                     const auto normal=paint->property("color").value<QColor>();
                     const auto restingPixels=window->grabWindow();
                     bool intermediateHoverFrame=false;
@@ -109,18 +139,50 @@ Item {
                     const QRect pixelRect(qFloor(rect.x()*dpr),qFloor(rect.y()*dpr),qCeil(rect.width()*dpr),qCeil(rect.height()*dpr));
                     check(!restingPixels.isNull()&&!hoveredPixels.isNull()&&restingPixels.copy(pixelRect)!=hoveredPixels.copy(pixelRect),"hover feedback changes the actual rendered button pixels");
                     if(name!="reviewCombo")check(control->property("motionLift").toReal()<-.5,"hover gently lifts the button without relaying out its shell");
-                    control->forceActiveFocus(Qt::TabFocusReason);QTest::qWait(160);
+                    control->forceActiveFocus(Qt::TabFocusReason);
+                    const bool focusSettled=QTest::qWaitFor([&]{return control->property("visualFocus").toBool()&&paint->property("focused").toBool()&&focusFill&&focusFill->isVisible()&&focusFill->opacity()>.99;},1000);
+                    if(!focusSettled)diagnose("focused",normal);
                     check(control->property("visualFocus").toBool()&&paint->property("focused").toBool(),"keyboard focus reaches the shared surface");
-                    auto *focusFill=paint->findChild<QQuickItem *>("controlFocusFill");
-                    check(focusFill&&focusFill->isVisible()&&focusFill->opacity()>.99&&QQmlProperty(focusFill,"border.width").read().toReal()==0&&QQmlProperty(paint,"border.width").read().toReal()==0,"keyboard focus fills the surface without adding a border");
+                    check(focusSettled&&QQmlProperty(focusFill,"border.width").read().toReal()==0&&QQmlProperty(paint,"border.width").read().toReal()==0,"keyboard focus fills the surface without adding a border");
                     const auto focusedPixels=window->grabWindow();
                     check(!focusedPixels.isNull()&&focusedPixels.copy(pixelRect)!=hoveredPixels.copy(pixelRect),"keyboard focus visibly tints the actual rendered button pixels");
                     if(name!="reviewCombo"){
+                        // A grab performs synchronous render-thread readback. Start the
+                        // input deadline only after its next normal frame is delivered.
+                        bool readbackRetired=false;
+                        QObject readbackContext;
+                        const auto readbackFrame=QObject::connect(window,&QQuickWindow::frameSwapped,&readbackContext,[&]{readbackRetired=true;},Qt::QueuedConnection);
+                        window->update();
+                        check(QTest::qWaitFor([&]{return readbackRetired;},1000),"a normal frame retires screenshot readback before timed input");
+                        QObject::disconnect(readbackFrame);
                         const auto at=control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint();
                         const auto hovered=paint->property("color").value<QColor>();
-                        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at);QTest::qWait(40);
-                        auto *content=control->property("contentItem").value<QQuickItem *>();
-                        check(paint->scale()<.995&&content&&qAbs(content->scale()-paint->scale())<.001,"a short press contracts both the surface and its label within the first40ms");
+                        QElapsedTimer pressClock;
+                        QJsonArray pressFrames;
+                        bool contractedWithin40ms=false;
+                        const auto samplePress=[&](const char *phase){
+                            if(!pressClock.isValid())return;
+                            const qreal elapsed=pressClock.nsecsElapsed()/1000000.0;
+                            const auto down=control->property("down").toBool();
+                            const auto scale=paint->scale();
+                            const auto labelScale=content?content->scale():0;
+                            pressFrames.append(QJsonObject{{"phase",QString::fromLatin1(phase)},{"elapsedMs",elapsed},{"down",down},{"contact",paint->property("contactProgress").toReal()},{"surfaceScale",scale},{"contentScale",labelScale}});
+                            if(qstrcmp(phase,"afterAnimating")==0&&elapsed<=40&&down&&scale<.995&&content&&qAbs(labelScale-scale)<.001)contractedWithin40ms=true;
+                        };
+                        QObject pressContext;
+                        const auto pressAnimation=QObject::connect(window,&QQuickWindow::afterAnimating,&pressContext,[&]{samplePress("afterAnimating");});
+                        const auto pressDelivery=QObject::connect(window,&QQuickWindow::frameSwapped,&pressContext,[&]{samplePress("frameSwappedQueued");},Qt::QueuedConnection);
+                        // QTest::qWait polls with sleeps of up to10ms, which can
+                        // starve a fast render loop during this strict deadline.
+                        QEventLoop pressObservation;
+                        QTimer pressDeadline;pressDeadline.setTimerType(Qt::PreciseTimer);pressDeadline.setSingleShot(true);
+                        QObject::connect(&pressDeadline,&QTimer::timeout,&pressObservation,&QEventLoop::quit);
+                        pressClock.start();pressDeadline.start(40);
+                        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at);samplePress("inputDelivered");pressObservation.exec();
+                        samplePress("deadlineObservation");
+                        qInfo().noquote()<<"CONTROL_PRESS_FRAMES"<<theme<<name<<QJsonDocument(pressFrames).toJson(QJsonDocument::Compact);
+                        check(contractedWithin40ms,"a short press contracts both the surface and its label within the first40ms");
+                        QObject::disconnect(pressAnimation);QObject::disconnect(pressDelivery);
                         QTest::qWait(100);
                         check(control->property("down").toBool()&&paint->property("color").value<QColor>()!=hovered,"shared button provides a distinct pressed surface");
                         check(QQmlProperty(paint,"border.width").read().toReal()==0,"press feedback does not introduce an outline stroke");
@@ -129,9 +191,11 @@ Item {
                         check(paint->scale()<.999,"release continues from the pressed frame through a spring return");
                         check(QTest::qWaitFor([&]{return qAbs(paint->scale()-1)<.001;},1400),"released button springs back to its resting scale");
                     }
-                    control->setEnabled(false);QTest::qWait(180);
-                    const bool disabledSettled=!paint->property("controlEnabled").toBool()&&paint->opacity()<1&&paint->property("color").value<QColor>()==normal;
-                    if(!disabledSettled)qInfo()<<"CONTROL_DISABLED"<<theme<<name<<"hovered"<<control->property("hovered")<<"down"<<control->property("down")<<"enabled"<<paint->property("controlEnabled")<<"opacity"<<paint->opacity()<<"normal"<<normal<<"actual"<<paint->property("color");
+                    control->setEnabled(false);
+                    // Compare exact premultiplied channels: RGB hidden by alpha=0
+                    // has no rendered effect; opaque channel differences still fail.
+                    const bool disabledSettled=QTest::qWaitFor([&]{return !paint->property("controlEnabled").toBool()&&!control->property("down").toBool()&&paint->opacity()<1&&motionRetired()&&sameRenderedColor(paint->property("color").value<QColor>(),normal);},1000);
+                    if(!disabledSettled)diagnose("disabled",normal);
                     check(disabledSettled,"disabled surface retires hover and press feedback");
                     check(control->size()==size&&control->position()==position,"all button states retain shell geometry");
                     control->setEnabled(true);
@@ -171,6 +235,7 @@ Item {
             delete fixture;
         }
     }
+    stage("shared-controls-and-fonts");
     eval("Theme.reduceMotion=false;AppState.navigate('settings')");
     check(QTest::qWaitFor([&]{return eval("pageLoader.item && !pageLoader.pendingGrab && !pageLoader.moving && pageLoader.activeLoader.routeId==='settings'").toBool();},3500),"general settings with appearance controls settles before input");
     std::function<QQuickItem *(QQuickItem *,const QString &)> find=[&](QQuickItem *item,const QString &name)->QQuickItem *{if(item->objectName()==name)return item;for(auto *child:item->childItems())if(auto *match=find(child,name))return match;return nullptr;};
@@ -210,11 +275,31 @@ Item {
         } else check(false,"contrast switch exists");
         select(2);
     }
+    stage("theme-input-and-popup-cycles");
     check(eval("!scaledCanvas.layer.enabled").toBool(),"text canvas is not a resampled window texture");
     eval("Theme.followSystemMotion=true;Theme.appearanceSettings.sync()");QTest::qWait(250);
     QSettings settings;check(QTest::qWaitFor([&]{settings.sync();return settings.value("Appearance/savedMode").toString()=="Dark"&&settings.value("Appearance/savedFollowSystemMotion").toBool();},3000),"chosen theme and motion preference are persisted");
-    QProcess child;child.start(QCoreApplication::applicationFilePath(),{"--appearance-restore-test","--preview-preserve-settings"});
-    check(child.waitForFinished(15000)&&child.exitStatus()==QProcess::NormalExit&&child.exitCode()==0,"fresh application process confirms theme restoration");
+    stage("settings-persistence");
+    const auto restorePath=QCoreApplication::applicationDirPath()+"/Swirl-appearance-restore.txt";
+    const bool oldRestoreRemoved=!QFileInfo::exists(restorePath)||QFile::remove(restorePath);
+    check(oldRestoreRemoved,"old restoration output is removed before starting the new process");
+    QProcess child;qint64 childPid=0;
+    QObject::connect(&child,&QProcess::started,&child,[&]{childPid=child.processId();});
+    const auto childStartedAt=QDateTime::currentDateTimeUtc();
+    child.start(QCoreApplication::applicationFilePath(),{"--appearance-restore-test","--preview-preserve-settings"});
+    // A second native GUI process may need messages from the parent HWND during
+    // initialization. Keep this event loop live instead of blocking it in waitForFinished.
+    const bool childFinished=QTest::qWaitFor([&]{return child.state()==QProcess::NotRunning;},15000);
+    check(childFinished&&child.exitStatus()==QProcess::NormalExit&&child.exitCode()==0,"fresh application process confirms theme restoration");
+    if(!childFinished){child.kill();child.waitForFinished(1000);}
+    QFile restoreOutput(restorePath);
+    const bool restoreReadable=oldRestoreRemoved&&restoreOutput.open(QIODevice::ReadOnly);
+    const auto restoreText=restoreReadable?restoreOutput.readAll():QByteArray();
+    const auto expectedProcess=QByteArray("APPEARANCE_RESTORE_PROCESS ")+QByteArray::number(childPid);
+    const bool freshRestore=restoreReadable&&childPid>0&&QFileInfo(restorePath).lastModified().toUTC()>=childStartedAt&&restoreText.contains(expectedProcess)&&restoreText.contains("PASS new process restores saved dark theme and explicit system-motion preference");
+    check(freshRestore,"restoration evidence belongs to this newly started process");
+    qInfo()<<"APPEARANCE_RESTORE_RESULT"<<"pid"<<childPid<<"startedUtc"<<childStartedAt<<"finished"<<childFinished<<"state"<<child.state()<<"error"<<child.error()<<"freshOutput"<<freshRestore;
+    stage("fresh-process-restoration");
     window->requestActivate();
     eval("Theme.transparency=true;Theme.increaseContrast=false;AppState.navigate('activity')");
     check(QTest::qWaitFor([&]{return eval("pageLoader.activeLoader.routeId==='activity' && !pageLoader.pendingGrab && !pageLoader.moving").toBool();},3500),"activity route settles");
@@ -301,5 +386,6 @@ Item {
         const auto action=stopping?QStringLiteral("正在关闭代理…"):pending?QStringLiteral("正在开启代理…"):proxy->property("proxyOwned").toBool()?QStringLiteral("系统代理 · 已开"):active?QStringLiteral("代理 · 仅内核"):eval("engineController.systemProxy.systemEnabled").toBool()?QStringLiteral("系统代理 · 外部"):QStringLiteral("系统代理 · 已关");
         check(proxy->property("label").toString()==action,"master proxy control presents the matching direct action");
     } else check(false,"system proxy switch exists");
-    qInfo()<<"APPEARANCE_CHECKS failures"<<failures;return failures?2:0;
+    stage("glass-and-runtime-state");
+    qInfo()<<"APPEARANCE_CHECKS failures"<<failures<<"totalMs"<<totalClock.elapsed();return failures?2:0;
 }

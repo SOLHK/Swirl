@@ -143,6 +143,8 @@ Item {
             }
             Item {
                 Layout.preferredWidth: Theme.dp(12); Layout.fillHeight: true
+                // Center anchors also use the target item's rounding policy.
+                anchors.alignWhenCentered: false
                 SwirlIcon { objectName: "activityPolicyArrow"; name: "chevron-right"; size: Theme.dp(12); anchors.centerIn: parent; anchors.alignWhenCentered: false; color: policy.hovered || policy.visualFocus ? Theme.accent : Theme.muted; transform: Translate { x: policyCurve.position.x; y: policyCurve.position.y } }
             }
         }

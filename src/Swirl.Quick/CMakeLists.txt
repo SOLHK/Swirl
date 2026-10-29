@@ -314,7 +314,9 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  target_sources(Swirl PRIVATE tests/HeroChecks.cpp tests/HeroChecks.h tests/NavigationChecks.cpp tests/NavigationChecks.h)
  target_sources(Swirl PRIVATE tests/AppearanceChecks.cpp tests/AppearanceChecks.h)
  add_test(NAME swirl-appearance-ui COMMAND Swirl --appearance-test)
- set_tests_properties(swirl-appearance-ui PROPERTIES TIMEOUT 45 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+ # Includes ten shared-control/theme samples, repeated native popups, a bounded
+ # 15s restoration process and glass readbacks. Per-input 40ms checks stay strict.
+ set_tests_properties(swirl-appearance-ui PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
  qt_add_resources(Swirl material_tests PREFIX "/tests" BASE "${CMAKE_CURRENT_SOURCE_DIR}/tests" FILES tests/MaterialBench.qml)
  target_link_libraries(Swirl PRIVATE Qt6::Test)
  target_compile_definitions(Swirl PRIVATE SWIRL_UI_TESTS)
@@ -470,6 +472,8 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
    ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;SWIRL_APEC_GLASS_CHECKS=1"
    ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
   add_test(NAME swirl-hero COMMAND Swirl --hero-test --hero-output=hero-evidence)
+  add_test(NAME swirl-settings-material COMMAND Swirl --hero-test --hero-material-only --hero-output=settings-material-evidence)
+  set_tests_properties(swirl-settings-material PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
   add_test(NAME swirl-navigation-ui COMMAND Swirl --navigation-test --navigation-output=navigation-evidence --hero-no-recording)
   # Includes canceled native input, focus and pixel evidence for 17 page controls.
   set_tests_properties(swirl-navigation-ui PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
