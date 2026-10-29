@@ -193,6 +193,130 @@ fn native_udp_real_loopback_dual_stack_keeps_empty_datagrams_and_rejects_truncat
     core.stop();
 }
 
+struct CounterWake {
+    local: Arc<Counters>,
+    total: Arc<Counters>,
+    upload: bool,
+    observed: std::sync::Mutex<Option<(u64, u64)>>,
+}
+impl std::task::Wake for CounterWake {
+    fn wake(self: Arc<Self>) {
+        self.wake_by_ref();
+    }
+    fn wake_by_ref(self: &Arc<Self>) {
+        let counts = if self.upload {
+            (
+                self.local.upload.load(Ordering::Relaxed),
+                self.total.upload.load(Ordering::Relaxed),
+            )
+        } else {
+            (
+                self.local.download.load(Ordering::Relaxed),
+                self.total.download.load(Ordering::Relaxed),
+            )
+        };
+        *self.observed.lock().unwrap() = Some(counts);
+    }
+}
+fn counter_wake(upload: bool) -> Arc<CounterWake> {
+    Arc::new(CounterWake {
+        local: Arc::new(Counters::default()),
+        total: Arc::new(Counters::default()),
+        upload,
+        observed: std::sync::Mutex::new(None),
+    })
+}
+
+#[tokio::test]
+async fn udp_send_counters_are_visible_at_completion_wake_including_failures() {
+    use std::future::Future;
+    for result in [Ok(()), Err("UdpSendTimeout"), Err("SessionRevoked")] {
+        let observer = counter_wake(true);
+        let waker = std::task::Waker::from(observer.clone());
+        let mut context = std::task::Context::from_waker(&waker);
+        let (complete, mut completed) = oneshot::channel();
+        assert!(
+            std::pin::Pin::new(&mut completed)
+                .poll(&mut context)
+                .is_pending()
+        );
+        let request = SendRequest {
+            payload: vec![0xa7; 1200],
+            complete,
+        };
+        assert_eq!(
+            request.finish(result, &observer.local, &observer.total),
+            result
+        );
+        let expected = if result.is_ok() { 1200 } else { 0 };
+        // The waker executes synchronously at publication, before the producer
+        // can run any later accounting. No sleep or counter polling is involved.
+        assert_eq!(
+            *observer.observed.lock().unwrap(),
+            Some((expected, expected))
+        );
+        assert_eq!(completed.await.unwrap(), result);
+    }
+}
+
+#[tokio::test]
+async fn udp_download_counters_are_visible_at_response_wake() {
+    use std::future::Future;
+    let observer = counter_wake(false);
+    let waker = std::task::Waker::from(observer.clone());
+    let mut context = std::task::Context::from_waker(&waker);
+    let (responses, mut received) = mpsc::channel(1);
+    let mut receive = Box::pin(received.recv());
+    assert!(receive.as_mut().poll(&mut context).is_pending());
+    assert!(queue_udp_response(
+        vec![0xa7; 1200],
+        &responses,
+        &observer.local,
+        &observer.total,
+    ));
+    assert_eq!(*observer.observed.lock().unwrap(), Some((1200, 1200)));
+    assert_eq!(receive.await.unwrap(), vec![0xa7; 1200]);
+}
+
+#[tokio::test]
+async fn udp_full_closed_and_oversized_responses_do_not_count_successful_bytes() {
+    let local = Counters::default();
+    let total = Counters::default();
+    let (responses, mut received) = mpsc::channel(1);
+    assert!(queue_udp_response(
+        vec![1; 1200],
+        &responses,
+        &local,
+        &total
+    ));
+    assert!(!queue_udp_response(
+        vec![2; 1200],
+        &responses,
+        &local,
+        &total
+    ));
+    assert_eq!(local.download.load(Ordering::Relaxed), 1200);
+    assert_eq!(total.download.load(Ordering::Relaxed), 1200);
+    assert_eq!(received.recv().await.unwrap(), vec![1; 1200]);
+    assert!(!queue_udp_response(
+        vec![3; UDP_MAX_PAYLOAD + 1],
+        &responses,
+        &local,
+        &total
+    ));
+    drop(received);
+    assert!(!queue_udp_response(
+        vec![4; 1200],
+        &responses,
+        &local,
+        &total
+    ));
+    assert_eq!(local.download.load(Ordering::Relaxed), 1200);
+    assert_eq!(total.download.load(Ordering::Relaxed), 1200);
+    assert_eq!(local.udp_dropped.load(Ordering::Relaxed), 3);
+    assert_eq!(total.udp_dropped.load(Ordering::Relaxed), 3);
+}
+
 #[test]
 fn native_and_system_proxy_share_one_connection_budget_and_drop_releases_it() {
     let mut config = config();

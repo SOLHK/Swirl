@@ -243,6 +243,44 @@ struct SendRequest {
     payload: Vec<u8>,
     complete: oneshot::Sender<Result<()>>,
 }
+impl SendRequest {
+    fn finish(self, result: Result<()>, counters: &Counters, total: &Counters) -> Result<()> {
+        if result.is_ok() {
+            let size = self.payload.len() as u64;
+            counters.upload.fetch_add(size, Ordering::Relaxed);
+            total.upload.fetch_add(size, Ordering::Relaxed);
+        }
+        // Completion is a publication boundary: an awakened caller must already
+        // observe the successful send in both session and aggregate counters.
+        let _ = self.complete.send(result);
+        result
+    }
+}
+
+fn queue_udp_response(
+    payload: Vec<u8>,
+    responses: &mpsc::Sender<Vec<u8>>,
+    counters: &Counters,
+    total: &Counters,
+) -> bool {
+    if payload.len() > UDP_MAX_PAYLOAD {
+        crate::udp_drop(counters, total);
+        return false;
+    }
+    let Ok(permit) = responses.try_reserve() else {
+        // Full and closed queues did not accept the response, so neither may
+        // contribute successful download bytes.
+        crate::udp_drop(counters, total);
+        return false;
+    };
+    let size = payload.len() as u64;
+    counters.download.fetch_add(size, Ordering::Relaxed);
+    total.download.fetch_add(size, Ordering::Relaxed);
+    // Reserve first, account second, publish last. Once recv observes payload,
+    // the channel's synchronization also makes these earlier counts visible.
+    permit.send(payload);
+    true
+}
 
 /// Exactly one terminal state survives data-channel closure, task cancellation
 /// and runtime shutdown. Data channels can close before run_udp returns; their
@@ -587,11 +625,10 @@ async fn run_udp(
                     _ = cancelled(&mut cancellation) => Err("SessionRevoked"),
                     result = timeout(routed.limit, association.send(&routed.target, &request.payload)) => result.map_err(|_| "UdpSendTimeout").and_then(|r| r),
                 };
-                let _ = request.complete.send(sent);
-                sent?;
-                last_activity = Instant::now();
-                counters.upload.fetch_add(request.payload.len() as u64, Ordering::Relaxed);
-                shared.totals.upload.fetch_add(request.payload.len() as u64, Ordering::Relaxed);
+                if sent.is_ok() {
+                    last_activity = Instant::now();
+                }
+                request.finish(sent, &counters, &shared.totals)?;
             }
             response = association.recv(&routed.target, &mut buffer) => {
                 let payload = match response {
@@ -602,14 +639,9 @@ async fn run_udp(
                     }
                     Err(error) => return Err(error),
                 };
-                let size = payload.len();
-                if size > UDP_MAX_PAYLOAD || responses.try_send(payload).is_err() {
-                    crate::udp_drop(&counters, &shared.totals);
-                    continue;
+                if queue_udp_response(payload, &responses, &counters, &shared.totals) {
+                    last_activity = Instant::now();
                 }
-                last_activity = Instant::now();
-                counters.download.fetch_add(size as u64, Ordering::Relaxed);
-                shared.totals.download.fetch_add(size as u64, Ordering::Relaxed);
             }
         }
     }
