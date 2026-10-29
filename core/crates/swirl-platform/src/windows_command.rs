@@ -502,8 +502,13 @@ $start=New-Object Diagnostics.ProcessStartInfo
 $start.FileName=Join-Path $PSHOME 'powershell.exe'
 $start.UseShellExecute=$false
 $start.CreateNoWindow=$true
+# .NET Framework only supplies STARTF_USESTDHANDLES when a stream is
+# redirected. Redirect stdin so the child receives the existing stdout pipe;
+# leave stdout itself inherited, without a forwarding pump in the parent.
+$start.RedirectStandardInput=$true
 $start.Arguments='-NoLogo -NoProfile -NonInteractive -Command "$root=$env:SWIRL_COMMAND_TEST_DIR; [Console]::Out.WriteLine(''descendant-ready''); [IO.File]::WriteAllText((Join-Path $root ''descendant''),[string]$PID); while (-not [IO.File]::Exists((Join-Path $root ''release''))) { Start-Sleep -Milliseconds 10 }; [IO.File]::WriteAllText((Join-Path $root ''late-write''),''executed'')"'
 $descendant=[Diagnostics.Process]::Start($start)
+$descendant.StandardInput.Close()
 while (-not [IO.File]::Exists((Join-Path $root 'parent-exit'))) { Start-Sleep -Milliseconds 10 }
 [Console]::Out.WriteLine('parent-exit')
 "#;
