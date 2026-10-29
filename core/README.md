@@ -6,11 +6,13 @@ ABI; `ThreadedEngine` creates `RustCoreEngine`. The retired C++ forwarder and
 Mihomo process adapter are absent. There is no external-core selector, downloader
 or fallback. Clash/Mihomo subscription import remains a data-format feature,
 including the internal canonical node mapping used by other supported formats.
+Clash YAML, sing-box and Xray/V2Ray JSON are input formats, not executable cores.
 
 Use the [current desktop build guide](../src/Swirl.Quick/BUILDING.md) and the
 build section below. Dated implementation notes and test counts in this file
 are historical evidence for their named sources, not current-source acceptance.
-Unsupported parameters still fail explicitly; Rust-only architecture does not
+Unsupported parameters fail explicitly and never silently bypass the chosen node.
+Rust-only architecture does not
 establish all-protocol, private-provider, Codex Desktop or TUN acceptance.
 
 ## Historical development scope (2026-10-19)

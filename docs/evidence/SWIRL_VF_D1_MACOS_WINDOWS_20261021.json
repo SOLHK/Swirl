@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "source_checkpoint": "d10354fa02495d63e141b301ffb14be3c1941ac1",
+  "scope": "D1 evidence only; not original font production acceptance",
+  "original": {
+    "sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+    "bytes": 61473880,
+    "faces": 32,
+    "gids_per_face": 47102,
+    "unicode_union_count": 35741,
+    "generated_ttc": false,
+    "completed_production_faces": 0
+  },
+  "local_macos_26_3": {
+    "build": "25D125",
+    "coretext_original_faces_verified": 0,
+    "original_process_registration_error_code": 103,
+    "installed_control_faces_verified": 32,
+    "original_hvf_library_version": [
+      1,
+      0,
+      2
+    ]
+  },
+  "default_design_geometry": {
+    "face_index": 0,
+    "normalized_design_location": [
+      0,
+      0,
+      0
+    ],
+    "native_extracted_gids": 47102,
+    "legacy_comparisons": 47102,
+    "legacy_passed": 47064,
+    "legacy_rejections_retained": 38,
+    "preserved_q_companion_calls": 38,
+    "preserved_q_companion_passed": 38,
+    "combined_passed": 47102,
+    "maximum_point_error_font_units": 9.890754881780595e-12,
+    "limit_font_units": 0.03125,
+    "source_unchanged": true,
+    "user_coordinate_mapping_accepted": false,
+    "metrics_tested": false,
+    "continuous_space_accepted": false
+  },
+  "fresh_design_geometry": {
+    "selected_gids": 64,
+    "locations": 3,
+    "actual_legacy_comparisons": 192,
+    "legacy_failed": 0,
+    "maximum_point_error_font_units": 4.547473508864641e-13,
+    "source_unchanged": true
+  },
+  "original_macos_27_ci": {
+    "run_id": 39476027356,
+    "job_id": 118812091949,
+    "job_conclusion": "success",
+    "os_version": "Version 27.0.1 (Build 26A434)",
+    "faces_verified": 32,
+    "axis_requests": 384,
+    "strict_axis_passes": 288,
+    "strict_axis_failures": 96,
+    "extractor_sha256": "8e5aaa0a921f24a656766c1e24a0d388397cdaddbdfebae1ab415c0d7c3f3bbf",
+    "harness_sha256": "7c8d6c01b30d19d5a106d4840c299d513f6c072ffe5117625c0614b3fc8367ad",
+    "scope": "identity and finite axis readback; not conversion"
+  },
+  "synthetic_native": {
+    "local_tests_discovered": 598,
+    "local_tests_passed": 591,
+    "local_tests_skipped": 7,
+    "audit_tests_passed": 6,
+    "reconstructed_ttc_bytes": 3424,
+    "candidate_sha256": "74168ffac87764d52b388d37b1868efb044bd119dd0757c0b6df4a0e21327485",
+    "native_remeasurement_records": 174,
+    "maximum_observed_native_outline_and_table_metric_difference": 0,
+    "harfbuzz_shaping_comparisons": 16,
+    "static_serialization_checks": 8,
+    "raw_coretext_metric_gate": "FAIL_849_VS_850_AT_0.03125"
+  },
+  "latest_ci": {
+    "run_id": 39476027356,
+    "overall_conclusion": "failure",
+    "windows_job_id": 118812092483,
+    "windows_job_conclusion": "success",
+    "windows_product": "Windows Server 2022",
+    "windows_build": 20348,
+    "directwrite_probe_passes": 2,
+    "macos_synthetic_job_id": 118812092557,
+    "macos_synthetic_job_conclusion": "failure",
+    "native_table_metric_reconstruction_step": "success",
+    "actual_logs_read": true,
+    "artifact_zip_bytes_downloaded": false
+  },
+  "windows11_acceptance": "NOT_RUN",
+  "actual_qt_swirl_acceptance": "NOT_RUN",
+  "original_outlines_published": false,
+  "original_font_generated": false
+}

@@ -320,6 +320,7 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  target_compile_definitions(Swirl PRIVATE SWIRL_UI_TESTS)
  endif()
  enable_testing()
+ # Rust integration tests are unconditional within the selected QA profile.
  add_executable(SwirlRustCoreTests tests/RustCoreTests.cpp)
  target_link_libraries(SwirlRustCoreTests PRIVATE SwirlEngine Qt6::Test)
  swirl_stage_rust_core(SwirlRustCoreTests)

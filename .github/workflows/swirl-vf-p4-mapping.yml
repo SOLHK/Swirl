@@ -1,0 +1,126 @@
+name: Swirl VF P4 font mapping evidence
+
+on:
+  push:
+    branches: [work/vf-takeover-abc-20261021]
+    paths:
+      - 'tools/swirl_vf/tools/*axis_mapping.py'
+      - 'tools/swirl_vf/tools/design_axis_basis.py'
+      - 'tools/swirl_vf/tools/rebase_design_font.py'
+      - 'tools/swirl_vf/tests/test_*axis_mapping.py'
+      - 'tools/swirl_vf/tests/test_design_axis_basis.py'
+      - 'tools/swirl_vf/tests/test_rebase_design_font.py'
+      - 'tools/swirl_vf/platform/probe_font_axis_mapping.py'
+      - 'tools/swirl_vf/platform/make_target_axis_controls.py'
+      - 'tools/swirl_vf/platform/make_font_level_controls.py'
+      - 'tools/swirl_vf/platform/target_axis_transport*'
+      - 'tools/swirl_vf/platform/target_axis_transport/**'
+      - '.github/workflows/swirl-vf-p4-mapping.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mapping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fonttools==4.61.1 numpy==2.2.6 uharfbuzz==0.56.3
+      - name: New source, font-level compiler and representation regressions
+        run: |
+          python -m unittest discover -s tools/swirl_vf/tests -p 'test_*axis_mapping.py' -v
+          python -m unittest discover -s tools/swirl_vf/tests -p test_design_axis_basis.py -v
+          python -m unittest discover -s tools/swirl_vf/tests -p test_rebase_design_font.py -v
+      - name: Independent authored HarfBuzz q representation control
+        run: python tools/swirl_vf/platform/make_target_axis_controls.py --output build/p4-private/authored-controls
+      - name: Actual font-only model reparameterization with unchanged user inputs
+        run: python tools/swirl_vf/platform/make_font_level_controls.py --output build/p4-private/font-level-controls
+
+  original-source-q:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fonttools==4.61.1 numpy==2.2.6
+      - name: Build existing unchanged Apple native tools
+        run: |
+          mkdir -p build/p4-private/bin
+          xcrun swiftc -O tools/swirl_vf/platform/coretext_extract.swift -o build/p4-private/bin/coretext_extract
+          xcrun clang -std=c11 -O2 -Wall -Wextra -Werror -mmacosx-version-min=15.4 tools/swirl_vf/platform/hvf_oracle.c -lhvf -o build/p4-private/bin/hvf_oracle
+      - name: Falsify frozen mapping on bounded original cohort
+        run: |
+          python tools/swirl_vf/platform/probe_font_axis_mapping.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --output build/p4-private/original-mapping \
+            --native build/p4-private/bin/coretext_extract --hvf build/p4-private/bin/hvf_oracle
+      - name: Export fixed aggregate only, never source data or private files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p4-original-aggregate-${{ github.sha }}
+          path: build/p4-private/original-mapping/summary.json
+          retention-days: 7
+
+  windows-representation-control:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fonttools==4.61.1 numpy==2.2.6 uharfbuzz==0.56.3
+      - name: Generate authored twin fonts without Apple data
+        run: |
+          python tools/swirl_vf/platform/make_target_axis_controls.py --output build/p4-private/authored-controls
+          if ($LASTEXITCODE -ne 0) { throw 'Authored control generation failed' }
+      - name: Compile actual DirectWrite transport probe
+        run: |
+          cmake -S tools/swirl_vf/platform/target_axis_transport -B build/p4-private/windows-probe -A x64
+          if ($LASTEXITCODE -ne 0) { throw 'DirectWrite configuration failed' }
+          cmake --build build/p4-private/windows-probe --config Release
+          if ($LASTEXITCODE -ne 0) { throw 'DirectWrite compilation failed' }
+      - name: Run actual FLOAT, instance readback and glyph comparisons
+        run: |
+          & build/p4-private/windows-probe/Release/target_axis_transport.exe build/p4-private/authored-controls/normalized.ttc build/p4-private/authored-controls/transported.ttc build/p4-private/authored-controls/requests.tsv build/p4-private/authored-controls/directwrite-summary.json
+          if ($LASTEXITCODE -ne 0) { throw 'DirectWrite representation control failed' }
+          Get-Content build/p4-private/authored-controls/directwrite-summary.json
+      - name: Generate actual authored font-level rebased models
+        run: |
+          python tools/swirl_vf/platform/make_font_level_controls.py --output build/p4-private/font-level-controls
+          if ($LASTEXITCODE -ne 0) { throw 'Font-level controls failed' }
+      - name: Test font-only nominal-input behavior in DirectWrite
+        run: |
+          & build/p4-private/windows-probe/Release/target_axis_transport.exe build/p4-private/font-level-controls/normalized.ttc build/p4-private/font-level-controls/font-level.ttc build/p4-private/font-level-controls/requests.tsv build/p4-private/font-level-controls/directwrite-summary.json --font-level
+          if ($LASTEXITCODE -ne 0) { throw 'Actual font-level reparameterization failed' }
+          Get-Content build/p4-private/font-level-controls/directwrite-summary.json
+      - name: Export authored aggregate only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p4-authored-target-aggregate-${{ github.sha }}
+          path: |
+            build/p4-private/authored-controls/summary.json
+            build/p4-private/authored-controls/directwrite-summary.json
+            build/p4-private/font-level-controls/summary.json
+            build/p4-private/font-level-controls/directwrite-summary.json
+          retention-days: 7

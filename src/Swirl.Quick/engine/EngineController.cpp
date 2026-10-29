@@ -483,6 +483,7 @@ QVariantList EngineController::nodes() const {
         if(connection!=QStringLiteral("未连接"))nodeStatus=connection;
         row.insert("status",nodeStatus);
         row.insert("testAvailable",!m_tests.testing(id)&&measured.value("success").toBool());
+        // Never substitute a connection-state RTT for an HTTP node-probe measurement.
         row.insert("latency",QStringLiteral("—"));
         if(!measured.isEmpty()){
             const auto timing=measured.value(measured.value("metricType")==QStringLiteral("http_headers")?"outboundConnectMs":"latency");

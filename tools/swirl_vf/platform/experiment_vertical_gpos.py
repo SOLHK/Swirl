@@ -266,7 +266,7 @@ def add_adjustment(original, symbols, route, *, diagnostic_rounding=False):
     font['GPOS'] = newTable('GPOS'); font['GPOS'].table = table
     candidate = serialize(font)
     reread = TTFont(io.BytesIO(candidate), recalcTimestamp=False)
-    require(reread['head'].unitsPerEm == UPM and reread.getGlyphOrder() == font.getGlyphOrder()
+    require(reread['head'].unitsPerEm == font['head'].unitsPerEm and reread.getGlyphOrder() == font.getGlyphOrder()
             and all(reread.getTableData(tag) == data for tag, data in protected.items()),
             'GPOS_experiment_changed_original_outlines_metrics_mapping_or_GSUB')
     return candidate, failures

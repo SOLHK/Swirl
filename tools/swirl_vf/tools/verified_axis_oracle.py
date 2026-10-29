@@ -80,14 +80,18 @@ def runtime_identity():
             'fonttools': fontTools.__version__}
 
 
-def launcher_binding(native_binary):
+def launcher_binding(native_binary, *, source_request_replay=False):
     directory = Path(__file__).resolve().parent
     files = [Path(__file__).resolve(), directory / 'incremental_pipe.py', Path(native_binary).resolve()]
-    return {'backend': BACKEND, 'files': {str(path): source_hash(path) for path in files},
+    backend = BACKEND
+    if source_request_replay:
+        from source_request_oracle import BACKEND as backend
+        files.append(directory / 'source_request_oracle.py')
+    return {'backend': backend, 'files': {str(path): source_hash(path) for path in files},
             'runtime': runtime_identity()}
 
 
-def make_launcher(path, native_binary):
+def make_launcher(path, native_binary, *, source_request_replay=False):
     """Create a new executable whose own hash binds native, adapter and runtime.
 
     NativeOracle invokes launchers as ``launcher SOURCE``. Changing a dependency
@@ -95,7 +99,9 @@ def make_launcher(path, native_binary):
     The caller must generate a new launcher to use newly reviewed dependencies.
     """
     path, native_binary = Path(path).resolve(), Path(native_binary).resolve()
-    binding = launcher_binding(native_binary)
+    require(type(source_request_replay) is bool, 'invalid_source_request_replay_policy')
+    binding = launcher_binding(native_binary, source_request_replay=source_request_replay)
+    module = 'source_request_oracle' if source_request_replay else 'verified_axis_oracle'
     require(not path.exists() and str(path) not in binding['files'], 'new_launcher_path_required')
     require(native_binary.is_file() and os.access(native_binary, os.X_OK), 'native_binary_not_executable')
     require('\n' not in sys.executable and ' ' not in sys.executable, 'unsupported_launcher_interpreter_path')
@@ -120,7 +126,7 @@ def make_launcher(path, native_binary):
             '    if runtime != BINDING["runtime"]: fail("axis_launcher_runtime_changed")\n'
             '    if len(sys.argv) != 2: fail("axis_launcher_requires_only_source_path")\n' +
             f'    sys.path.insert(0, {str(Path(__file__).resolve().parent)!r})\n' +
-            '    from verified_axis_oracle import serve\n' +
+            f'    from {module} import serve\n' +
             f'    raise SystemExit(serve(sys.argv[1], {str(native_binary)!r}))\n' +
             'except Exception:\n'
             '    fail("axis_launcher_dependency_or_startup_failed")\n')
@@ -407,16 +413,24 @@ def decode(line):
 
 
 def serve(source, native_binary, input_stream=sys.stdin, output_stream=sys.stdout,
-          *, response_timeout=120., maximum_batch_bytes=MAX_BATCH_BYTES):
+          *, response_timeout=120., maximum_batch_bytes=MAX_BATCH_BYTES, source_request_replay=False):
     source, native_binary = Path(source).resolve(), Path(native_binary).resolve()
     process = reader = request = None
     external_requests = verified_glyphs = internal_requests = internal_glyphs = 0
+    backend, backend_key = BACKEND, 'axis_verification_backend'
+    metadata_verifier, batch_verifier = verified_metadata, verify_batch
+    source_strict_counts = {'strict_axis_count': 0, 'strict_axis_pass_count': 0, 'strict_axis_failure_count': 0}
 
     def emit(record):
         output_stream.write(json.dumps(record, allow_nan=False, separators=(',', ':')) + '\n')
         output_stream.flush()
 
     try:
+        require(type(source_request_replay) is bool, 'invalid_source_request_replay_policy')
+        if source_request_replay:
+            from source_request_oracle import (BACKEND as backend, verified_metadata as metadata_verifier,
+                                               verify_batch as batch_verifier)
+            backend_key = 'source_request_verification_backend'
         require(finite_number(response_timeout) and response_timeout > 0
                 and type(maximum_batch_bytes) is int and maximum_batch_bytes > 0, 'invalid_transport_limits')
         digest = source_hash(source); byte_size = source.stat().st_size
@@ -432,8 +446,10 @@ def serve(source, native_binary, input_stream=sys.stdin, output_stream=sys.stdou
                 require(bool(line), 'native_process_ended_before_complete_response')
                 return decode(line), len(line.encode('utf-8'))
 
-            metadata = verified_metadata(read()[0], digest, byte_size, identities)
-            metadata['axis_verification_dependency_binding'] = launcher_binding(native_binary)
+            metadata = metadata_verifier(read()[0], digest, byte_size, identities)
+            binding_key = ('source_request_verification_dependency_binding' if source_request_replay
+                           else 'axis_verification_dependency_binding')
+            metadata[binding_key] = launcher_binding(native_binary, source_request_replay=source_request_replay)
             emit(metadata)
 
             def exchange(native_request):
@@ -458,7 +474,11 @@ def serve(source, native_binary, input_stream=sys.stdin, output_stream=sys.stdou
                 if not line.strip():
                     continue
                 request = decode(line)
-                batch = verify_batch(request, identities, digest, exchange, external_requests + 1)
+                batch = batch_verifier(request, identities, digest, exchange, external_requests + 1)
+                if source_request_replay:
+                    observed = batch[0]['source_request_verification']['readback_diagnostic']
+                    for key in source_strict_counts:
+                        source_strict_counts[key] += observed[key]
                 for record in batch:
                     emit(record)
                 verified_glyphs += len(batch); external_requests += 1
@@ -474,10 +494,15 @@ def serve(source, native_binary, input_stream=sys.stdin, output_stream=sys.stdou
             require(not reader.readline(timeout=response_timeout), 'native_unexpected_output_after_summary')
             require(process.wait(timeout=10) == 0, 'native_process_exit_failed')
             require(source_hash(source) == digest, 'source_changed_during_axis_verification')
+            extra = {}
+            if source_request_replay:
+                from source_request_oracle import POLICY
+                extra = {'source_request_verification_policy': copy.deepcopy(POLICY),
+                         'source_request_readback_diagnostic': source_strict_counts}
             emit({**summary, 'request_count': external_requests, 'successful_glyph_count': verified_glyphs,
-                  'axis_verification_backend': BACKEND, 'verified_batch_count': external_requests,
+                  backend_key: backend, 'verified_batch_count': external_requests,
                   'internal_native_request_count': internal_requests, 'internal_native_glyph_count': internal_glyphs,
-                  'upstream_native_summary': summary, 'source_unchanged': True})
+                  'upstream_native_summary': summary, 'source_unchanged': True, **extra})
         return 0
     except Exception as error:
         context = error.context if isinstance(error, VerificationError) else {}
@@ -491,7 +516,7 @@ def serve(source, native_binary, input_stream=sys.stdin, output_stream=sys.stdou
             reason = 'axis_verification_transport_or_source_failed'
         response = {'type': 'request_error' if type(request) is dict else 'fatal_error',
                     'error': reason,
-                    'error_type': type(error).__name__, 'axis_verification_backend': BACKEND, **context}
+                    'error_type': type(error).__name__, backend_key: backend, **context}
         if type(request) is dict:
             for field, kind in (('request_id', str), ('face_index', int)):
                 if type(request.get(field)) is kind:

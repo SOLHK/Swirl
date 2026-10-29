@@ -4,7 +4,7 @@
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="src/Swirl.Quick/assets/icons/swirl_knot_dark.svg"><img src="src/Swirl.Quick/assets/icons/swirl_knot_light.svg" width="88" alt="Swirl 祥云结标志"></picture>
 
-Swirl 是面向 Windows 的网络工具，桌面界面使用 **C++23、Qt 6 Quick/QML**，**自研代理内核使用 Rust**，源码位于 [`core/`](core/)。Rust 在进程内负责协议、TCP/UDP、DNS、路由和运行时；Qt 提供界面、导入、操作系统集成及 HTTP 工具。产品没有 Mihomo 或其他外部代理内核的调用、下载或回退路径。Clash/Mihomo 等订阅格式仍可导入，格式兼容不代表执行其内核。
+Swirl 是面向 Windows 的网络工具，桌面界面使用 **C++23、Qt 6 Quick/QML**，**自研代理内核使用 Rust**，源码位于 [`core/`](core/)。Rust 在进程内负责协议、TCP/UDP、DNS、路由和运行时；Qt 提供界面、导入、操作系统集成及 HTTP 工具。产品没有 Mihomo 或其他外部代理内核的调用、下载或回退路径。Clash/Mihomo、sing-box、Xray/V2Ray 等订阅格式仍可导入，格式兼容不代表执行其内核。
 
 > **当前状态：Windows 开发测试版，版本 0.2.16。** 版本以 `src/Swirl.Quick/PRODUCT_VERSION.txt` 为准。功能是否可用以实际运行状态及同提交验收记录为准；协议可导入、配置可保存，不代表所有远程节点、专用 LAN 或高级功能已经验证。
 
@@ -80,6 +80,22 @@ ctest --test-dir D:/Codex/build/swirl-qa -E "^swirl-system-proxy-recovery$" --ou
 系统代理恢复测试需要可丢弃的独立环境，不能在用户正在使用的代理、TUN、路由或 DNS 上执行设置变更。其余网络回归使用隔离的本机服务；真实远程节点、Codex 登录及长时间输出、TUN 和专用 LAN 验收需另行记录。生产构建使用独立目录，并关闭 `SWIRL_BUILD_UI_TESTS` 与 `SWIRL_BUILD_CORE_TESTS`，不携带测试入口。完整步骤见 [Windows 构建说明](src/Swirl.Quick/BUILDING.md)。
 
 [Windows Qt CI](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml) 执行编译、关键回归、截图与打包，触发分支和发布条件以当前工作流为准。CI 生成的离屏截图是渲染检查，不代表真实网络或物理显示性能。构建状态请以对应提交的 GitHub Actions 结果为准。
+
+## 架构与源码
+
+| 模块 | 单一现行实现 |
+| --- | --- |
+| UI / 页面 / 动效 | `src/Swirl.Quick/qml/`，APEC V3 Qt Quick/QML |
+| Windows 应用、字体与组件 | `src/Swirl.Quick/main.cpp`、`app/` |
+| 控制层与持久化 | `src/Swirl.Quick/engine/`（Qt facade、DPAPI 节点存储、订阅） |
+| 唯一网络运行时 | `core/crates/`：`swirl-api` / `swirl-core` / `swirl-protocol` / `swirl-transport` / `swirl-dns` / `swirl-routing` 等 |
+| 与内核的唯一连接 | `src/Swirl.Quick/engine/RustCoreLibrary.*`、`RustCoreEngine.*`、`cmake/SwirlRustCore.cmake` |
+| 本地抓包及 Windows 集成 | `src/Swirl.Quick/network/`、`app/`、`tools/` |
+| 发布程序 | `scripts/Stage-WindowsRustProduct.ps1`、`scripts/Build-WindowsRustProductInstaller.ps1`、`src/Swirl.Quick/packaging/Swirl.nsi` |
+
+Rust 库必须与 EXE 使用同一源码修订和构建 ID；安装包会检查真实 DLL 及 manifest，并拒绝 Mihomo、Clash、Xray、sing-box 等外部代理可执行文件。订阅源中的 YAML、URI、JSON、配置名称属于**输入数据**，不能误删，否则将破坏导入兼容性。具体架构见 [ARCHITECTURE](docs/ARCHITECTURE.md)、[Rust Core](core/README.md) 和 [构建指南](src/Swirl.Quick/BUILDING.md)。
+
+APEC 设计资料：[基线](docs/SWIRL_V3_APEC_BASELINE.md) · [视觉设计](docs/SWIRL_V3_APEC_DESIGN.md) · [动效](docs/APEC_MOTION_FOUNDATION.md) · [性能](docs/APEC_PERFORMANCE_INTEGRATION.md)。`docs/screenshots/` 中的旧版截图是历史验收材料，**不是现行 APEC V3 的视觉基准**。
 
 ## 仓库结构
 

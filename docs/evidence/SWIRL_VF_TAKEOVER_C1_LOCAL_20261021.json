@@ -1,0 +1,75 @@
+{
+  "scope": "authored_synthetic_controls_only",
+  "macos_native_status": "PASS_SYNTHETIC_NATIVE_OUTLINE_TABLE_METRIC_RECONSTRUCTION_ONLY",
+  "raw_strict_API_849_850_status": "FAIL",
+  "raw_strict_API_tolerance_unchanged": 0.03125,
+  "source_records": 174,
+  "native_outline_table_metric_comparison": {
+    "status": "PASS",
+    "requests": 58,
+    "glyph_records": 174,
+    "max_control_point_error_font_units": 0.0,
+    "max_metric_error_font_units": 0.0,
+    "max_bounds_error_font_units": 0.0,
+    "limit_font_units": 1.0,
+    "continuous_space_proof": false,
+    "command_normalization": "only zero-length straight segments and redundant straight closing edges"
+  },
+  "two_face_production_packing": {
+    "status": "STAGED_COLLECTION",
+    "production_accepted": false,
+    "native_source_equivalence": false,
+    "faces": 2,
+    "source_sha256": [
+      "289c0ad805faa2df0a7e0062c58bff961069b19c6ac7b79344af0c5b572db915",
+      "ff0284a5da4c12d6fd07f499216c866f8161d5bad2586ad9a0d583ae45bed713"
+    ],
+    "sha256": "0c585a4e391b96287acd6037f35c39c1b362c1cbf17952b3432e56a08add303c",
+    "byte_size": 3424,
+    "tables_written": 20,
+    "table_references_shared": 16,
+    "copy_chunk_bytes": 1048576,
+    "binary_validation": {
+      "status": "BINARY_STRUCTURE_VERIFIED",
+      "faces": 2,
+      "table_references": 36,
+      "unique_nonempty_tables": 20,
+      "byte_size": 3424,
+      "sha256": "0c585a4e391b96287acd6037f35c39c1b362c1cbf17952b3432e56a08add303c",
+      "production_accepted": false,
+      "native_source_equivalence": false
+    },
+    "memory_policy": "bounded_byte_buffers_plus_face_table_metadata",
+    "all_table_bytes_preserved_except_head_checksum_adjustment": true
+  },
+  "authored_32_face_binary_control": {
+    "status": "STAGED_COLLECTION",
+    "production_accepted": false,
+    "faces": 32,
+    "sha256": "2d4de3f63f0daebb536ccb8d400a6f2b53482a4919ca1017842a7da9cd92dfb0",
+    "byte_size": 53896,
+    "tables_written": 300,
+    "table_references_shared": 372,
+    "binary_validation": {
+      "status": "BINARY_STRUCTURE_VERIFIED",
+      "faces": 32,
+      "table_references": 672,
+      "unique_nonempty_tables": 300,
+      "byte_size": 53896,
+      "sha256": "2d4de3f63f0daebb536ccb8d400a6f2b53482a4919ca1017842a7da9cd92dfb0",
+      "production_accepted": false,
+      "native_source_equivalence": false
+    },
+    "harfbuzz": {
+      "faces": 32,
+      "direction_runs": 64,
+      "glyph_records": 192,
+      "status": "PASS_AUTHORED_SHAPING_SMOKE_ONLY"
+    }
+  },
+  "raw_API_values_corrected": false,
+  "native_original_font_acceptance": "NOT_RUN",
+  "Windows11": "NOT_RUN",
+  "Qt_Swirl": "NOT_RUN",
+  "proprietary_font_generated": false
+}

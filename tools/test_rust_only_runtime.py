@@ -74,6 +74,18 @@ class RustOnlyRuntimeTests(unittest.TestCase):
                          'SWIRL_RUST_BUILD_ID', 'SWIRL_SOURCE_SHA', 'copy_if_different'):
             self.assertIn(required, pair)
 
+    def test_active_documentation_does_not_advertise_retired_core(self):
+        for name in ('README.md', 'AGENTS.md', 'docs/ARCHITECTURE.md'):
+            document = (ROOT / name).read_text('utf-8-sig')
+            self.assertNotIn('stage-mihomo.ps1 -Destination', document, name)
+            self.assertNotIn('默认 OFF', document, name)
+            self.assertNotIn('MihomoAdapter（独立进程', document, name)
+        cmake = (QUICK / 'CMakeLists.txt').read_text('utf-8-sig')
+        self.assertNotIn('if(SWIRL_USE_RUST_CORE)', cmake)
+        self.assertNotIn('if(NOT SWIRL_USE_RUST_CORE)', cmake)
+        controller = (QUICK / 'engine/EngineController.cpp').read_text('utf-8-sig')
+        self.assertNotIn('#ifdef SWIRL_USE_RUST_CORE', controller)
+
     def test_production_scripts_do_not_fetch_external_core(self):
         paths = list((ROOT / 'scripts').glob('*.ps1')) + list((ROOT / '.github/workflows').glob('*.yml'))
         for path in paths:

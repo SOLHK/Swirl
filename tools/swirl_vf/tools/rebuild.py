@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import array
+from contextlib import contextmanager
 import copy
 import hashlib
 import itertools
@@ -24,6 +25,7 @@ import os
 from pathlib import Path
 import random
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -37,6 +39,8 @@ from fontTools.ttLib.tables.TupleVariation import TupleVariation
 from fontTools.varLib.models import VariationModel, normalizeLocation
 from metric_variations import add_metric_variations, verify_metric_variations
 from incremental_pipe import TimedLineReader
+from ttc_staging_pack import pack_collection
+from ttc_staging_contract import StagingError
 
 
 class ReconstructionError(RuntimeError):
@@ -461,8 +465,25 @@ class NativeOracle:
             check(self.metadata.get("type") == "metadata", "native oracle metadata missing")
             check(self.metadata.get("source_sha256") == sha256(source), "native oracle source SHA mismatch")
             check(self.metadata.get("backend") == "CoreText", "need independent CoreText user-coordinate oracle")
-            check(self.metadata.get("axis_observations_only") is not True,
-                  "unverified native axis observations cannot be used for reconstruction")
+            self.source_request_identities = None
+            if (self.metadata.get("axis_observations_only") is True
+                    or "source_request_verification_backend" in self.metadata):
+                from source_request_oracle import BACKEND, validate_source_metadata
+                from verified_axis_oracle import source_identities, VerificationError
+                check(self.metadata.get("source_request_verification_backend") == BACKEND,
+                      "unverified native axis observations cannot be used for reconstruction")
+                with TTCollection(source, lazy=True) as collection:
+                    identities = source_identities(collection.fonts)
+                try:
+                    validate_source_metadata(self.metadata, sha256(source), source.stat().st_size, identities)
+                except VerificationError as error:
+                    raise ReconstructionError(str(error)) from error
+                # Source-input reproducibility is a distinct contract from
+                # exact axis echo. Keep its observation-only marker and raw
+                # strict failures; never promote this to a target mapping.
+                self.source_request_identities = identities
+                self.source_request_strict_counts = {
+                    'strict_axis_count': 0, 'strict_axis_pass_count': 0, 'strict_axis_failure_count': 0}
             check(bool(self.metadata.get("faces"))
                   and all(face.get("status") == "identity_verified" for face in self.metadata.get("faces", [])),
                   "native oracle could not verify every requested physical face")
@@ -486,7 +507,8 @@ class NativeOracle:
             line = self.reader.readline(timeout=self.response_timeout)
             check(bool(line), "native oracle ended before returning every requested glyph")
             record = json.loads(line)
-            check(record.get("request_id") == request_id and record.get("face_index") == face,
+            check(record.get("request_id") == request_id
+                  and type(record.get("face_index")) is int and record["face_index"] == face,
                   "native oracle response identity mismatch")
             # Request failures intentionally have no glyph/location payload.
             # Report the original native error before validating success fields,
@@ -496,15 +518,36 @@ class NativeOracle:
                 raise ReconstructionError(f"native request {request_id} face {face} failed: {record['error']}",
                                           native_observation=native_failure_details(record))
             check(record.get("type") != "request_error", "native request_error without error detail")
-            check(record.get("location") == location,
+            # Python equates True with 1 and False with 0, including inside
+            # dictionaries. A JSON boolean is not a numeric axis observation.
+            check(record.get("location") == location
+                  and all(type(value) in (int, float) for value in record["location"].values()),
                   "native oracle axis location mismatch: " + json.dumps({
                       "request_id": request_id, "face_index": face,
                       "requested": location, "received": record.get("location"),
                       "reported": record.get("reported_location")}, allow_nan=False))
             gid = record.get("glyph_id")
-            check(gid in glyph_ids and gid not in results, "missing, duplicate or unrelated native glyph")
+            check(type(gid) is int and gid in glyph_ids and gid not in results,
+                  "missing, duplicate or unrelated native glyph")
             check(record.get("error") is None, f"native error on glyph {gid}: {record.get('error')}")
+            if getattr(self, "source_request_identities", None) is not None:
+                from source_request_oracle import validate_source_evidence
+                from verified_axis_oracle import VerificationError
+                check(type(face) is int and 0 <= face < len(self.source_request_identities),
+                      "source request face out of range")
+                try:
+                    validate_source_evidence(record, request, self.metadata["source_sha256"],
+                                             self.source_request_identities[face])
+                except VerificationError as error:
+                    raise ReconstructionError(str(error)) from error
+            else:
+                check("source_request_verification" not in record,
+                      "source request proof requires its bound sampling metadata")
             results[gid] = record
+        if getattr(self, "source_request_identities", None) is not None:
+            diagnostic = next(iter(results.values()))['source_request_verification']['readback_diagnostic']
+            for field in self.source_request_strict_counts:
+                self.source_request_strict_counts[field] += diagnostic[field]
         self.successful_glyph_count += len(results)
         return results
 
@@ -526,6 +569,15 @@ class NativeOracle:
               and type(summary.get("successful_glyph_count")) is int
               and summary["successful_glyph_count"] == self.successful_glyph_count,
               "native final summary is incomplete or disagrees with accepted requests/glyphs")
+        if getattr(self, "source_request_identities", None) is not None:
+            from source_request_oracle import BACKEND, POLICY, exact_json
+            check(summary.get("source_request_verification_backend") == BACKEND
+                  and exact_json(summary.get("source_request_verification_policy"), POLICY)
+                  and type(summary.get("verified_batch_count")) is int
+                  and summary["verified_batch_count"] == self.sequence
+                  and summary.get("source_unchanged") is True
+                  and exact_json(summary.get("source_request_readback_diagnostic"), self.source_request_strict_counts),
+                  "source request replay final evidence is incomplete")
         check(self.reader.readline(timeout=10.0) == "", "native oracle emitted data after its final summary")
         check(self.proc.wait(timeout=10) == 0, "native oracle failed after its final glyph")
         self.summary = summary
@@ -655,6 +707,46 @@ def verify_session_summary(summary, digest, requests, glyphs):
           "native session summary disagrees with this session's accepted requests/glyphs")
 
 
+@contextmanager
+def checkpoint_writer(directory):
+    """Serialize legacy manifest transactions using C1's OS-lock approach.
+
+    Keep one permanent lock inode: unlinking it on release would let another
+    process lock a different file while an existing writer still owns this one.
+    This private-directory lock is released by the OS on process death.
+    """
+    path = Path(directory) / '.writer.lock'
+    check(not path.is_symlink(), 'checkpoint writer lock must not be a symlink')
+    descriptor = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+    locked = False
+    try:
+        info = os.fstat(descriptor)
+        check(stat.S_ISREG(info.st_mode) and info.st_nlink == 1, 'invalid checkpoint writer lock')
+        try:
+            if os.name == 'nt':
+                import msvcrt
+                msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as error:
+            raise ReconstructionError('checkpoint writer busy') from error
+        locked = True
+        if info.st_size == 0:
+            os.write(descriptor, b'\0')
+        yield
+    finally:
+        try:
+            if locked:
+                if os.name == 'nt':
+                    os.lseek(descriptor, 0, os.SEEK_SET)
+                    msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(descriptor)
+
+
 class FaceCheckpoints:
     """Private, verified whole-face checkpoints; never accept a partial face.
 
@@ -679,21 +771,40 @@ class FaceCheckpoints:
                   "source_face_identity_sha256": [identity_digest(face) for face in source_faces],
                   "native_transcript_policy": "independent_complete_native_session_before_each_face_checkpoint",
                   "code_sha256": {name: sha256(code_root / name) for name in
-                                  ("rebuild.py", "metric_variations.py", "audit_font.py", "incremental_pipe.py")},
+                                  ("rebuild.py", "metric_variations.py", "audit_font.py", "incremental_pipe.py",
+                                   "ttc_staging_pack.py", "ttc_staging_binary.py", "ttc_staging_contract.py")},
                   "python_version": list(sys.version_info[:3]),
                   "fonttools_version": __import__('fontTools').__version__,
                   "numpy_version": np.__version__, "settings": settings}
         self.manifest = self.directory / "verified-faces.json"
+        self.recipe = recipe
+        created = False
         if self.directory.exists():
             check(self.directory.is_dir() and self.manifest.is_file()
                   and not self.manifest.is_symlink(), "existing checkpoint directory has no regular manifest")
-            self.state = json.loads(self.manifest.read_text(encoding="utf-8"))
-            check(self.state.get("recipe") == recipe, "checkpoint recipe differs from this build")
-            check(isinstance(self.state.get("faces"), dict), "invalid checkpoint face index")
         else:
-            self.directory.mkdir(parents=True, mode=0o700)
-            self.state = {"recipe": recipe, "faces": {}}
-            self._save_manifest()
+            try:
+                self.directory.mkdir(parents=True, mode=0o700)
+                created = True
+            except FileExistsError:
+                check(self.directory.is_dir() and not self.directory.is_symlink()
+                      and self.manifest.is_file() and not self.manifest.is_symlink(),
+                      "existing checkpoint directory has no regular manifest")
+        with checkpoint_writer(self.directory):
+            if created and not self.manifest.exists() and not self.manifest.is_symlink():
+                self.state = {"recipe": recipe, "faces": {}}
+                self._save_manifest()
+            else:
+                self._reload_manifest()
+
+    def _reload_manifest(self):
+        check(self.manifest.is_file() and not self.manifest.is_symlink(),
+              "existing checkpoint directory has no regular manifest")
+        state = json.loads(self.manifest.read_text(encoding="utf-8"))
+        check(type(state) is dict and state.get("recipe") == self.recipe,
+              "checkpoint recipe differs from this build")
+        check(type(state.get("faces")) is dict, "invalid checkpoint face index")
+        self.state = state
 
     def _save_manifest(self):
         check(not self.manifest.is_symlink(), "checkpoint manifest became a symlink")
@@ -709,6 +820,8 @@ class FaceCheckpoints:
                 os.unlink(temporary)
 
     def restore(self, index, source_font):
+        with checkpoint_writer(self.directory):
+            self._reload_manifest()
         entry = self.state["faces"].get(str(index))
         if entry is None:
             return None
@@ -719,6 +832,8 @@ class FaceCheckpoints:
         check(path.is_file() and not path.is_symlink() and sha256(path) == digest,
               f"checkpoint face {index}: verified font bytes changed or missing")
         report = copy.deepcopy(entry["report"])
+        check(report.get("serialized_model_sha256") == digest,
+              f"checkpoint face {index}: serialized model hash differs from verified bytes")
         count = len(source_font.getGlyphOrder())
         self.verify_transcript(index, report, count)
         check(report.get("face_index") == index and report.get("glyphs_completed") == count
@@ -756,8 +871,20 @@ class FaceCheckpoints:
                                evidence["request_count"], evidence["successful_glyph_count"])
 
     def save(self, index, path, report):
+        # Reload under the same lock as publication. Atomic replace alone does
+        # not stop a stale snapshot from deleting another writer's face entry.
+        with checkpoint_writer(self.directory):
+            self._reload_manifest()
+            self._save_face(index, path, report)
+
+    def _save_face(self, index, path, report):
         self.verify_transcript(index, report, report.get("glyph_count", 0))
         digest = sha256(path)
+        check(report.get("serialized_model_sha256") == digest,
+              f"checkpoint face {index}: serialized model changed after verification")
+        entry = {"sha256": digest, "report": copy.deepcopy(report)}
+        previous = self.state["faces"].get(str(index))
+        check(previous is None or previous == entry, "confirmed checkpoint face differs; previous entry retained")
         target = self.directory / f"face-{index}-{digest}.ttf"
         handle, temporary = tempfile.mkstemp(prefix=f"face-{index}-", suffix=".tmp", dir=self.directory)
         try:
@@ -773,7 +900,7 @@ class FaceCheckpoints:
             except FileExistsError:
                 check(target.is_file() and not target.is_symlink() and sha256(target) == digest,
                       f"checkpoint face {index}: existing file is not the verified face")
-            self.state["faces"][str(index)] = {"sha256": digest, "report": copy.deepcopy(report)}
+            self.state["faces"][str(index)] = entry
             self._save_manifest()
         finally:
             os.unlink(temporary)
@@ -812,6 +939,8 @@ def run(source, executable, destination, report_path, batch_size=64,
         # the JSON boolean false, never a truthy or malformed diagnostic flag.
         check(oracle.metadata.get("diagnostic_readback_observation_only", False) is False,
               "diagnostic-only native observations cannot be used for reconstruction")
+        check("source_request_verification_backend" not in oracle.metadata,
+              "unchanged source-request replay cannot authorize target reconstruction")
         if source_faces is not None:
             verify_checkpoint_session_metadata(oracle.metadata, report["source_sha256"],
                                                source.stat().st_size, source_faces)
@@ -890,7 +1019,10 @@ def run(source, executable, destination, report_path, batch_size=64,
                             open_session()
                     check("MVAR" not in src and "VVAR" not in src,
                           "this reconstruction path has no native font-wide/VVAR metric oracle")
-                    for tag in ("GSUB", "GPOS", "BASE"):
+                    # GPOS VariationIndex records can reference GDEF.VarStore
+                    # indirectly. Retaining its bytes while replacing avar
+                    # changes layout at the same user location (C1 reproducer).
+                    for tag in ("GSUB", "GPOS", "BASE", "GDEF"):
                         if tag in src:
                             layout = src[tag].table
                             check(not getattr(layout, "FeatureVariations", None)
@@ -1015,9 +1147,12 @@ def run(source, executable, destination, report_path, batch_size=64,
                         path = Path(tmp) / f"face-{index}.ttf"
                         context = {"stage": "face_serialization", "face_index": index}
                         out.save(path)
+                        verified_digest = sha256(path)
                         with TTFont(path) as verified:
                             face_report["serialized_model_verification"] = verify_serialized_face(out, verified)
                             check(verified["cmap"].compile(verified) == src["cmap"].compile(src), "serialized cmap changed")
+                        check(sha256(path) == verified_digest, "serialized face changed during model verification")
+                        face_report["serialized_model_sha256"] = verified_digest
                         if checkpoints is not None:
                             context = {"stage": "native_face_finalization", "face_index": index}
                             face_report["native_face_transcript"] = finish_session(index)
@@ -1025,14 +1160,20 @@ def run(source, executable, destination, report_path, batch_size=64,
                     face_paths.append(path)
                 context = {"stage": "collection_serialization"}
                 candidate = Path(tmp) / "candidate.ttc"
-                with TTCollection() as collection:
-                    # Packaging must not rewrite timestamps after each face's
-                    # complete serialized model has already been verified.
-                    for path in face_paths:
-                        collection.fonts.append(TTFont(path, lazy=True, recalcTimestamp=False))
-                    collection.save(candidate, shareTables=True)
-                    with TTCollection(candidate, lazy=True) as reopened:
+                def verify_packed(candidate_path):
+                    with TTCollection(candidate_path, lazy=True) as reopened:
                         report["collection_verification"] = verify_collection_tables(face_paths, reopened)
+                try:
+                    # Reuse C1's byte-preserving, bounded-buffer packer and its
+                    # independent raw TTC verifier. Table-byte equality alone
+                    # cannot detect corrupt padding or directory aliases.
+                    report["collection_packing"] = pack_collection(
+                        face_paths, candidate,
+                        expected_sha256=[face["serialized_model_sha256"] for face in report["faces"]],
+                        validate=verify_packed, share_tables=True)
+                except StagingError as error:
+                    raise ReconstructionError("TTC staging rejected: " + str(error),
+                                              collection_packing=error.to_dict()) from error
                 context = {"stage": "native_finalization"}
                 if checkpoints is None:
                     report["oracle_summary"] = finish_session()["summary"]
@@ -1067,6 +1208,8 @@ def run(source, executable, destination, report_path, batch_size=64,
             context = {**context, "native_observation": native_failure_details(error.context["native_observation"])}
         if isinstance(error, ReconstructionError) and "metric_representation" in error.context:
             context = {**context, "metric_representation": metric_failure_details(error.context["metric_representation"])}
+        if isinstance(error, ReconstructionError) and "collection_packing" in error.context:
+            context = {**context, "collection_packing": error.context["collection_packing"]}
         report["failures"].append({"type": type(error).__name__, "message": str(error),
                                    "context": context})
         raise

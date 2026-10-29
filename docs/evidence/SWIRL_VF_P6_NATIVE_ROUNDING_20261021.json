@@ -1,0 +1,1306 @@
+{
+  "schema": 1,
+  "status": "STRICT_NATIVE_ACCEPTANCE_FAIL_RETAINED",
+  "data_origin": "self_authored_controls_only_no_Apple_font_or_raw_glyph_data",
+  "tested_source_sha": "72b8e289dd99782b3b3e35d3aa60005b1d5d3a09",
+  "source_commits": [
+    "5dce5e0d0df357961ae28325348341d788f0d308",
+    "e003a164135dd8eb5a12b7e1f2b20a02a7f137ad",
+    "72b8e289dd99782b3b3e35d3aa60005b1d5d3a09"
+  ],
+  "CI": {
+    "p6_run": 39580436408,
+    "exact_reference": "success",
+    "coretext": "success",
+    "windows_native": "failure",
+    "failure_step": "unchanged strict 1/32 gate after all native diagnostics",
+    "general_run": 39580436278,
+    "general_jobs": [
+      {
+        "name": "windows-c1-synthetic",
+        "conclusion": "success"
+      },
+      {
+        "name": "original-source",
+        "conclusion": "success"
+      },
+      {
+        "name": "portable",
+        "conclusion": "success"
+      }
+    ],
+    "tests": 818,
+    "audits": 6,
+    "targeted_tests": 22
+  },
+  "platform": {
+    "Windows": "Windows Server 2022,10.0.20348",
+    "local_macOS": "26.3,25D125",
+    "CI_CoreText": "15.7.9,24G830",
+    "existing_original_source_macOS": "27.0.1,26A434"
+  },
+  "exact_evidence": {
+    "old_model_error": "1/80",
+    "old_design_integer_advances": [
+      1462,
+      1463
+    ],
+    "old_native_source_unit_gap": "1/5",
+    "old_HB_scale64000_advances": [
+      18714,
+      18726
+    ],
+    "old_HB_source_gap": "3/16",
+    "new_exact16_nominal_coefficient_error": "0",
+    "new_exact16_nominal_coordinate_error": "1/262144",
+    "new_exact16_nominal_HB_advances": [
+      19088,
+      19084
+    ],
+    "new_exact16_nominal_gap": "1/16",
+    "unscaled_source_vs_exact16_HB_advances": [
+      18688,
+      18720
+    ],
+    "unscaled_source_vs_exact16_source_gap": "1/2",
+    "conditional_same_UPM_HB_threshold_lower_bound_all_legal_UPEM": "3/64",
+    "conditional_bound_scope": "source_UPM1000,scale64000,persistent>=1 integer-design-unit gap,nonnegative,no overflow;same-UPM pairs only",
+    "universal_encoding_impossibility": "NOT_PROVEN"
+  },
+  "avar2_finite_HB": {
+    "nominal_weight_F2_grid_cases": 32769,
+    "q_mismatches": 0,
+    "GID2_h_advance_mismatches": 0,
+    "integer_source_q_recoveries": 6145,
+    "mixed_nominal_cases": 3,
+    "unchanged_model_tables": [
+      "glyf",
+      "gvar",
+      "HVAR",
+      "VVAR",
+      "hmtx",
+      "vmtx",
+      "cmap"
+    ],
+    "source_target_UPM": 1000,
+    "Microsoft_DirectWrite_delivery_accepted": false,
+    "continuous_between_grid_mapping": "NOT_ESTABLISHED"
+  },
+  "local_CoreText": {
+    "p6-coretext-public-bounded5": {
+      "case_name": "public_CoreText_only_bounded5",
+      "os_version": "Version 26.3 (Build 25D125)",
+      "grid_multiplier": 5,
+      "native_records": 16,
+      "exact_reverse_pairs": 8,
+      "raw_native_font_and_run_identity_verified": true,
+      "maximum_native_advance_error": 0.012499999999988631,
+      "maximum_native_outline_error": 0.012499999999988631,
+      "source_hashes_unchanged": {
+        "reference": true,
+        "target": true
+      },
+      "source_hashes": {
+        "reference": "60e47190b550d1999a2679a9de24a3955bc4ace2ef345c1613e59d562c0c1a40",
+        "target": "64257bc7bc1655f970e7e896f51f0ad79ab8304ab39075f835328f1a71e84934"
+      },
+      "native_source_sha256": "8c35421dde8294c830f32876dd0ea9680704f1a3bb235bf157df2d06eb1aa66f",
+      "actual_native_post_avar_coordinates": "NOT_OBSERVED",
+      "baseline_maximum_difference": 0
+    },
+    "p6-coretext-public-exact16-original": {
+      "case_name": "public_CoreText_only_exact16-original",
+      "os_version": "Version 26.3 (Build 25D125)",
+      "grid_multiplier": 16,
+      "native_records": 16,
+      "exact_reverse_pairs": 8,
+      "raw_native_font_and_run_identity_verified": true,
+      "maximum_native_advance_error": 0,
+      "maximum_native_outline_error": 0,
+      "source_hashes_unchanged": {
+        "reference": true,
+        "target": true
+      },
+      "source_hashes": {
+        "reference": "d7d09b17baf158a4a087fd04bb4da2edc2347bdf691c5590d33804525db6da2f",
+        "target": "418b3275bd23e42ce0684ecafa790e34564a8854ccaefe805d2e05e1a2871837"
+      },
+      "native_source_sha256": "8c35421dde8294c830f32876dd0ea9680704f1a3bb235bf157df2d06eb1aa66f",
+      "actual_native_post_avar_coordinates": "NOT_OBSERVED",
+      "baseline_maximum_difference": 0
+    },
+    "p6-coretext-public-exact16-realF2": {
+      "case_name": "public_CoreText_only_exact16-realF2",
+      "os_version": "Version 26.3 (Build 25D125)",
+      "grid_multiplier": 16,
+      "native_records": 16,
+      "exact_reverse_pairs": 8,
+      "raw_native_font_and_run_identity_verified": true,
+      "maximum_native_advance_error": 0.000003814697265625,
+      "maximum_native_outline_error": 0,
+      "source_hashes_unchanged": {
+        "reference": true,
+        "target": true
+      },
+      "source_hashes": {
+        "reference": "d7d09b17baf158a4a087fd04bb4da2edc2347bdf691c5590d33804525db6da2f",
+        "target": "418b3275bd23e42ce0684ecafa790e34564a8854ccaefe805d2e05e1a2871837"
+      },
+      "native_source_sha256": "8c35421dde8294c830f32876dd0ea9680704f1a3bb235bf157df2d06eb1aa66f",
+      "actual_native_post_avar_coordinates": "NOT_OBSERVED",
+      "baseline_maximum_difference": 0
+    },
+    "p6-coretext-avar2q-coefficient": {
+      "case_name": "avar2q_coefficient",
+      "os_version": "Version 26.3 (Build 25D125)",
+      "grid_multiplier": 1,
+      "native_records": 16,
+      "exact_reverse_pairs": 8,
+      "raw_native_font_and_run_identity_verified": true,
+      "maximum_native_advance_error": 0,
+      "maximum_native_outline_error": 0,
+      "source_hashes_unchanged": {
+        "reference": true,
+        "target": true
+      },
+      "source_hashes": {
+        "reference": "71bf4c015e96ffa51405862de7ff0e7370e7205e25a41c29b75af2623508787b",
+        "target": "8480fd1a6454ade9da21d79c343081fee56b1b403e7fcf8630517577110d4d05"
+      },
+      "native_source_sha256": "8c35421dde8294c830f32876dd0ea9680704f1a3bb235bf157df2d06eb1aa66f",
+      "actual_native_post_avar_coordinates": "NOT_OBSERVED",
+      "baseline_maximum_difference": 0
+    },
+    "p6-coretext-avar2q-nominalF2": {
+      "case_name": "avar2q_nominalF2",
+      "os_version": "Version 26.3 (Build 25D125)",
+      "grid_multiplier": 1,
+      "native_records": 16,
+      "exact_reverse_pairs": 8,
+      "raw_native_font_and_run_identity_verified": true,
+      "maximum_native_advance_error": 0,
+      "maximum_native_outline_error": 0,
+      "source_hashes_unchanged": {
+        "reference": true,
+        "target": true
+      },
+      "source_hashes": {
+        "reference": "71bf4c015e96ffa51405862de7ff0e7370e7205e25a41c29b75af2623508787b",
+        "target": "8480fd1a6454ade9da21d79c343081fee56b1b403e7fcf8630517577110d4d05"
+      },
+      "native_source_sha256": "8c35421dde8294c830f32876dd0ea9680704f1a3bb235bf157df2d06eb1aa66f",
+      "actual_native_post_avar_coordinates": "NOT_OBSERVED",
+      "baseline_maximum_difference": 0
+    }
+  },
+  "CI_CoreText": [
+    {
+      "case_name": "bounded5-coefficient",
+      "os_version": "Version 15.7.9 (Build 24G830)",
+      "maximum_native_advance_error": 0.012499999999988631,
+      "maximum_native_outline_error": 0.012499999999988631
+    },
+    {
+      "case_name": "bounded5-F2",
+      "os_version": "Version 15.7.9 (Build 24G830)",
+      "maximum_native_advance_error": 0.005908203124988631,
+      "maximum_native_outline_error": 0.006250000000022737
+    },
+    {
+      "case_name": "exact16-coefficient",
+      "os_version": "Version 15.7.9 (Build 24G830)",
+      "maximum_native_advance_error": 0,
+      "maximum_native_outline_error": 0
+    },
+    {
+      "case_name": "exact16-F2",
+      "os_version": "Version 15.7.9 (Build 24G830)",
+      "maximum_native_advance_error": 0.000003814697265625,
+      "maximum_native_outline_error": 0
+    },
+    {
+      "case_name": "avar2q-coefficient",
+      "os_version": "Version 15.7.9 (Build 24G830)",
+      "maximum_native_advance_error": 0,
+      "maximum_native_outline_error": 0
+    },
+    {
+      "case_name": "avar2q-F2",
+      "os_version": "Version 15.7.9 (Build 24G830)",
+      "maximum_native_advance_error": 0,
+      "maximum_native_outline_error": 0
+    }
+  ],
+  "Windows_native": [
+    {
+      "case": "endpoint_rounding_witness",
+      "units_per_em": 5000,
+      "precision_grid_multiplier": 5,
+      "status": "COMPLETED_AUTHORED_PRECISION_ROUNDING_TRACE_NOT_ACCEPTANCE",
+      "strict_result": "FAIL",
+      "native_protocol_completed": true,
+      "source_files_unchanged": true,
+      "reference_sha256": "60e47190b550d1999a2679a9de24a3955bc4ace2ef345c1613e59d562c0c1a40",
+      "target_sha256": "64257bc7bc1655f970e7e896f51f0ad79ab8304ab39075f835328f1a71e84934",
+      "reference_q_F2DOT14": [
+        63,
+        3072,
+        0
+      ],
+      "unchanged_target_nominal_user": [
+        501.922607421875,
+        900,
+        500
+      ],
+      "nominal_normalized_before_avar_F2DOT14": [
+        63,
+        16384,
+        0
+      ],
+      "native_post_avar_coordinates": "NOT_OBSERVED",
+      "metric_fields_checked": 14,
+      "metric_fields_above_1_32": 2,
+      "maximum_metric_error_source_units": 0.2,
+      "outline_pairs_checked": 36,
+      "outline_point_pairs_checked": 240,
+      "outline_point_pairs_above_1_32": 204,
+      "outline_topology_failures": 0,
+      "maximum_run_geometry_error_source_units": 0.40006852042728636,
+      "actual_FLOAT_and_readback_bits_checked": 12,
+      "upright_design_metrics": [
+        {
+          "name": "leftSideBearing",
+          "reference_raw_design_integer": 60,
+          "target_raw_design_integer": 60,
+          "reference_original_source_font_units": 12,
+          "target_original_source_font_units": 12,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "advanceWidth",
+          "reference_raw_design_integer": 1462,
+          "target_raw_design_integer": 1463,
+          "reference_original_source_font_units": 292.4,
+          "target_original_source_font_units": 292.6,
+          "absolute_error_original_source_font_units": 0.2
+        },
+        {
+          "name": "rightSideBearing",
+          "reference_raw_design_integer": 90,
+          "target_raw_design_integer": 90,
+          "reference_original_source_font_units": 18,
+          "target_original_source_font_units": 18,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "topSideBearing",
+          "reference_raw_design_integer": 2050,
+          "target_raw_design_integer": 2050,
+          "reference_original_source_font_units": 410,
+          "target_original_source_font_units": 410,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "advanceHeight",
+          "reference_raw_design_integer": 5000,
+          "target_raw_design_integer": 5000,
+          "reference_original_source_font_units": 1000,
+          "target_original_source_font_units": 1000,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "bottomSideBearing",
+          "reference_raw_design_integer": 400,
+          "target_raw_design_integer": 400,
+          "reference_original_source_font_units": 80,
+          "target_original_source_font_units": 80,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "verticalOriginY",
+          "reference_raw_design_integer": 4500,
+          "target_raw_design_integer": 4500,
+          "reference_original_source_font_units": 900,
+          "target_original_source_font_units": 900,
+          "absolute_error_original_source_font_units": 0
+        }
+      ],
+      "single_glyph_at_UPM": [
+        {
+          "sideways": false,
+          "maximum_point_error_source_units": 0.2
+        },
+        {
+          "sideways": true,
+          "maximum_point_error_source_units": 0.1
+        }
+      ],
+      "implicit_repeat_at_UPM": [
+        {
+          "sideways": false,
+          "reference": {
+            "vector_DIP": [
+              1462,
+              0
+            ],
+            "vector_original_source_font_units": [
+              292.4,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          },
+          "target": {
+            "vector_DIP": [
+              1463,
+              0
+            ],
+            "vector_original_source_font_units": [
+              292.6,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          }
+        },
+        {
+          "sideways": true,
+          "reference": {
+            "vector_DIP": [
+              5000,
+              0
+            ],
+            "vector_original_source_font_units": [
+              1000,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          },
+          "target": {
+            "vector_DIP": [
+              5000,
+              0
+            ],
+            "vector_original_source_font_units": [
+              1000,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          }
+        }
+      ],
+      "error": ""
+    },
+    {
+      "case": "normalized_F2DOT14_composition_witness",
+      "units_per_em": 5000,
+      "precision_grid_multiplier": 5,
+      "status": "COMPLETED_AUTHORED_PRECISION_ROUNDING_TRACE_NOT_ACCEPTANCE",
+      "strict_result": "PASS",
+      "native_protocol_completed": true,
+      "source_files_unchanged": true,
+      "reference_sha256": "60e47190b550d1999a2679a9de24a3955bc4ace2ef345c1613e59d562c0c1a40",
+      "target_sha256": "64257bc7bc1655f970e7e896f51f0ad79ab8304ab39075f835328f1a71e84934",
+      "reference_q_F2DOT14": [
+        1141,
+        1453,
+        10955
+      ],
+      "unchanged_target_nominal_user": [
+        534.820556640625,
+        689.1845703125,
+        834.320068359375
+      ],
+      "nominal_normalized_before_avar_F2DOT14": [
+        1141,
+        7749,
+        10955
+      ],
+      "native_post_avar_coordinates": "NOT_OBSERVED",
+      "metric_fields_checked": 14,
+      "metric_fields_above_1_32": 0,
+      "maximum_metric_error_source_units": 0,
+      "outline_pairs_checked": 36,
+      "outline_point_pairs_checked": 240,
+      "outline_point_pairs_above_1_32": 0,
+      "outline_topology_failures": 0,
+      "maximum_run_geometry_error_source_units": 0,
+      "actual_FLOAT_and_readback_bits_checked": 12,
+      "upright_design_metrics": [
+        {
+          "name": "leftSideBearing",
+          "reference_raw_design_integer": 60,
+          "target_raw_design_integer": 60,
+          "reference_original_source_font_units": 12,
+          "target_original_source_font_units": 12,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "advanceWidth",
+          "reference_raw_design_integer": 1491,
+          "target_raw_design_integer": 1491,
+          "reference_original_source_font_units": 298.2,
+          "target_original_source_font_units": 298.2,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "rightSideBearing",
+          "reference_raw_design_integer": 90,
+          "target_raw_design_integer": 90,
+          "reference_original_source_font_units": 18,
+          "target_original_source_font_units": 18,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "topSideBearing",
+          "reference_raw_design_integer": 1949,
+          "target_raw_design_integer": 1949,
+          "reference_original_source_font_units": 389.8,
+          "target_original_source_font_units": 389.8,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "advanceHeight",
+          "reference_raw_design_integer": 5200,
+          "target_raw_design_integer": 5200,
+          "reference_original_source_font_units": 1040,
+          "target_original_source_font_units": 1040,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "bottomSideBearing",
+          "reference_raw_design_integer": 500,
+          "target_raw_design_integer": 500,
+          "reference_original_source_font_units": 100,
+          "target_original_source_font_units": 100,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "verticalOriginY",
+          "reference_raw_design_integer": 4600,
+          "target_raw_design_integer": 4600,
+          "reference_original_source_font_units": 920,
+          "target_original_source_font_units": 920,
+          "absolute_error_original_source_font_units": 0
+        }
+      ],
+      "single_glyph_at_UPM": [
+        {
+          "sideways": false,
+          "maximum_point_error_source_units": 0
+        },
+        {
+          "sideways": true,
+          "maximum_point_error_source_units": 0
+        }
+      ],
+      "implicit_repeat_at_UPM": [
+        {
+          "sideways": false,
+          "reference": {
+            "vector_DIP": [
+              1491,
+              0
+            ],
+            "vector_original_source_font_units": [
+              298.2,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          },
+          "target": {
+            "vector_DIP": [
+              1491,
+              0
+            ],
+            "vector_original_source_font_units": [
+              298.2,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          }
+        },
+        {
+          "sideways": true,
+          "reference": {
+            "vector_DIP": [
+              5200,
+              0
+            ],
+            "vector_original_source_font_units": [
+              1040,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          },
+          "target": {
+            "vector_DIP": [
+              5200,
+              0
+            ],
+            "vector_original_source_font_units": [
+              1040,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          }
+        }
+      ],
+      "error": ""
+    },
+    {
+      "case": "endpoint_rounding_witness",
+      "units_per_em": 16000,
+      "precision_grid_multiplier": 16,
+      "status": "COMPLETED_AUTHORED_PRECISION_ROUNDING_TRACE_NOT_ACCEPTANCE",
+      "strict_result": "PASS",
+      "native_protocol_completed": true,
+      "source_files_unchanged": true,
+      "reference_sha256": "d7d09b17baf158a4a087fd04bb4da2edc2347bdf691c5590d33804525db6da2f",
+      "target_sha256": "418b3275bd23e42ce0684ecafa790e34564a8854ccaefe805d2e05e1a2871837",
+      "reference_q_F2DOT14": [
+        63,
+        3072,
+        0
+      ],
+      "unchanged_target_nominal_user": [
+        501.922607421875,
+        900,
+        500
+      ],
+      "nominal_normalized_before_avar_F2DOT14": [
+        63,
+        16384,
+        0
+      ],
+      "native_post_avar_coordinates": "NOT_OBSERVED",
+      "metric_fields_checked": 14,
+      "metric_fields_above_1_32": 0,
+      "maximum_metric_error_source_units": 0,
+      "outline_pairs_checked": 36,
+      "outline_point_pairs_checked": 240,
+      "outline_point_pairs_above_1_32": 0,
+      "outline_topology_failures": 0,
+      "maximum_run_geometry_error_source_units": 0,
+      "actual_FLOAT_and_readback_bits_checked": 12,
+      "upright_design_metrics": [
+        {
+          "name": "leftSideBearing",
+          "reference_raw_design_integer": 192,
+          "target_raw_design_integer": 192,
+          "reference_original_source_font_units": 12,
+          "target_original_source_font_units": 12,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "advanceWidth",
+          "reference_raw_design_integer": 4680,
+          "target_raw_design_integer": 4680,
+          "reference_original_source_font_units": 292.5,
+          "target_original_source_font_units": 292.5,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "rightSideBearing",
+          "reference_raw_design_integer": 288,
+          "target_raw_design_integer": 288,
+          "reference_original_source_font_units": 18,
+          "target_original_source_font_units": 18,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "topSideBearing",
+          "reference_raw_design_integer": 6560,
+          "target_raw_design_integer": 6560,
+          "reference_original_source_font_units": 410,
+          "target_original_source_font_units": 410,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "advanceHeight",
+          "reference_raw_design_integer": 16000,
+          "target_raw_design_integer": 16000,
+          "reference_original_source_font_units": 1000,
+          "target_original_source_font_units": 1000,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "bottomSideBearing",
+          "reference_raw_design_integer": 1280,
+          "target_raw_design_integer": 1280,
+          "reference_original_source_font_units": 80,
+          "target_original_source_font_units": 80,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "verticalOriginY",
+          "reference_raw_design_integer": 14400,
+          "target_raw_design_integer": 14400,
+          "reference_original_source_font_units": 900,
+          "target_original_source_font_units": 900,
+          "absolute_error_original_source_font_units": 0
+        }
+      ],
+      "single_glyph_at_UPM": [
+        {
+          "sideways": false,
+          "maximum_point_error_source_units": 0
+        },
+        {
+          "sideways": true,
+          "maximum_point_error_source_units": 0
+        }
+      ],
+      "implicit_repeat_at_UPM": [
+        {
+          "sideways": false,
+          "reference": {
+            "vector_DIP": [
+              4680,
+              0
+            ],
+            "vector_original_source_font_units": [
+              292.5,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          },
+          "target": {
+            "vector_DIP": [
+              4680,
+              0
+            ],
+            "vector_original_source_font_units": [
+              292.5,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          }
+        },
+        {
+          "sideways": true,
+          "reference": {
+            "vector_DIP": [
+              16000,
+              0
+            ],
+            "vector_original_source_font_units": [
+              1000,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          },
+          "target": {
+            "vector_DIP": [
+              16000,
+              0
+            ],
+            "vector_original_source_font_units": [
+              1000,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          }
+        }
+      ],
+      "error": ""
+    },
+    {
+      "case": "normalized_F2DOT14_composition_witness",
+      "units_per_em": 16000,
+      "precision_grid_multiplier": 16,
+      "status": "COMPLETED_AUTHORED_PRECISION_ROUNDING_TRACE_NOT_ACCEPTANCE",
+      "strict_result": "FAIL",
+      "native_protocol_completed": true,
+      "source_files_unchanged": true,
+      "reference_sha256": "d7d09b17baf158a4a087fd04bb4da2edc2347bdf691c5590d33804525db6da2f",
+      "target_sha256": "418b3275bd23e42ce0684ecafa790e34564a8854ccaefe805d2e05e1a2871837",
+      "reference_q_F2DOT14": [
+        1141,
+        1453,
+        10955
+      ],
+      "unchanged_target_nominal_user": [
+        534.820556640625,
+        689.1845703125,
+        834.320068359375
+      ],
+      "nominal_normalized_before_avar_F2DOT14": [
+        1141,
+        7749,
+        10955
+      ],
+      "native_post_avar_coordinates": "NOT_OBSERVED",
+      "metric_fields_checked": 14,
+      "metric_fields_above_1_32": 2,
+      "maximum_metric_error_source_units": 0.0625,
+      "outline_pairs_checked": 36,
+      "outline_point_pairs_checked": 240,
+      "outline_point_pairs_above_1_32": 124,
+      "outline_topology_failures": 0,
+      "maximum_run_geometry_error_source_units": 0.12500469501201922,
+      "actual_FLOAT_and_readback_bits_checked": 12,
+      "upright_design_metrics": [
+        {
+          "name": "leftSideBearing",
+          "reference_raw_design_integer": 192,
+          "target_raw_design_integer": 192,
+          "reference_original_source_font_units": 12,
+          "target_original_source_font_units": 12,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "advanceWidth",
+          "reference_raw_design_integer": 4772,
+          "target_raw_design_integer": 4771,
+          "reference_original_source_font_units": 298.25,
+          "target_original_source_font_units": 298.1875,
+          "absolute_error_original_source_font_units": 0.0625
+        },
+        {
+          "name": "rightSideBearing",
+          "reference_raw_design_integer": 288,
+          "target_raw_design_integer": 288,
+          "reference_original_source_font_units": 18,
+          "target_original_source_font_units": 18,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "topSideBearing",
+          "reference_raw_design_integer": 6239,
+          "target_raw_design_integer": 6239,
+          "reference_original_source_font_units": 389.9375,
+          "target_original_source_font_units": 389.9375,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "advanceHeight",
+          "reference_raw_design_integer": 16642,
+          "target_raw_design_integer": 16642,
+          "reference_original_source_font_units": 1040.125,
+          "target_original_source_font_units": 1040.125,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "bottomSideBearing",
+          "reference_raw_design_integer": 1601,
+          "target_raw_design_integer": 1601,
+          "reference_original_source_font_units": 100.0625,
+          "target_original_source_font_units": 100.0625,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "verticalOriginY",
+          "reference_raw_design_integer": 14721,
+          "target_raw_design_integer": 14721,
+          "reference_original_source_font_units": 920.0625,
+          "target_original_source_font_units": 920.0625,
+          "absolute_error_original_source_font_units": 0
+        }
+      ],
+      "single_glyph_at_UPM": [
+        {
+          "sideways": false,
+          "maximum_point_error_source_units": 0.0625
+        },
+        {
+          "sideways": true,
+          "maximum_point_error_source_units": 0.03125
+        }
+      ],
+      "implicit_repeat_at_UPM": [
+        {
+          "sideways": false,
+          "reference": {
+            "vector_DIP": [
+              4772,
+              0
+            ],
+            "vector_original_source_font_units": [
+              298.25,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          },
+          "target": {
+            "vector_DIP": [
+              4771,
+              0
+            ],
+            "vector_original_source_font_units": [
+              298.1875,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          }
+        },
+        {
+          "sideways": true,
+          "reference": {
+            "vector_DIP": [
+              16642,
+              0
+            ],
+            "vector_original_source_font_units": [
+              1040.125,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          },
+          "target": {
+            "vector_DIP": [
+              16642,
+              0
+            ],
+            "vector_original_source_font_units": [
+              1040.125,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          }
+        }
+      ],
+      "error": ""
+    },
+    {
+      "case": "endpoint_rounding_witness",
+      "units_per_em": 1000,
+      "precision_grid_multiplier": 1,
+      "status": "COMPLETED_AUTHORED_PRECISION_ROUNDING_TRACE_NOT_ACCEPTANCE",
+      "strict_result": "FAIL",
+      "native_protocol_completed": true,
+      "source_files_unchanged": true,
+      "reference_sha256": "71bf4c015e96ffa51405862de7ff0e7370e7205e25a41c29b75af2623508787b",
+      "target_sha256": "8480fd1a6454ade9da21d79c343081fee56b1b403e7fcf8630517577110d4d05",
+      "reference_q_F2DOT14": [
+        63,
+        3072,
+        0
+      ],
+      "unchanged_target_nominal_user": [
+        501.922607421875,
+        900,
+        500
+      ],
+      "nominal_normalized_before_avar_F2DOT14": [
+        63,
+        16384,
+        0
+      ],
+      "native_post_avar_coordinates": "NOT_OBSERVED",
+      "metric_fields_checked": 14,
+      "metric_fields_above_1_32": 2,
+      "maximum_metric_error_source_units": 1,
+      "outline_pairs_checked": 36,
+      "outline_point_pairs_checked": 240,
+      "outline_point_pairs_above_1_32": 204,
+      "outline_topology_failures": 0,
+      "maximum_run_geometry_error_source_units": 2.0000457763671875,
+      "actual_FLOAT_and_readback_bits_checked": 12,
+      "upright_design_metrics": [
+        {
+          "name": "leftSideBearing",
+          "reference_raw_design_integer": 12,
+          "target_raw_design_integer": 12,
+          "reference_original_source_font_units": 12,
+          "target_original_source_font_units": 12,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "advanceWidth",
+          "reference_raw_design_integer": 292,
+          "target_raw_design_integer": 293,
+          "reference_original_source_font_units": 292,
+          "target_original_source_font_units": 293,
+          "absolute_error_original_source_font_units": 1
+        },
+        {
+          "name": "rightSideBearing",
+          "reference_raw_design_integer": 18,
+          "target_raw_design_integer": 18,
+          "reference_original_source_font_units": 18,
+          "target_original_source_font_units": 18,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "topSideBearing",
+          "reference_raw_design_integer": 410,
+          "target_raw_design_integer": 410,
+          "reference_original_source_font_units": 410,
+          "target_original_source_font_units": 410,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "advanceHeight",
+          "reference_raw_design_integer": 1000,
+          "target_raw_design_integer": 1000,
+          "reference_original_source_font_units": 1000,
+          "target_original_source_font_units": 1000,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "bottomSideBearing",
+          "reference_raw_design_integer": 80,
+          "target_raw_design_integer": 80,
+          "reference_original_source_font_units": 80,
+          "target_original_source_font_units": 80,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "verticalOriginY",
+          "reference_raw_design_integer": 900,
+          "target_raw_design_integer": 900,
+          "reference_original_source_font_units": 900,
+          "target_original_source_font_units": 900,
+          "absolute_error_original_source_font_units": 0
+        }
+      ],
+      "single_glyph_at_UPM": [
+        {
+          "sideways": false,
+          "maximum_point_error_source_units": 1
+        },
+        {
+          "sideways": false,
+          "maximum_point_error_source_units": 1
+        },
+        {
+          "sideways": true,
+          "maximum_point_error_source_units": 0.5
+        },
+        {
+          "sideways": true,
+          "maximum_point_error_source_units": 0.5
+        }
+      ],
+      "implicit_repeat_at_UPM": [
+        {
+          "sideways": false,
+          "reference": {
+            "vector_DIP": [
+              292,
+              0
+            ],
+            "vector_original_source_font_units": [
+              292,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          },
+          "target": {
+            "vector_DIP": [
+              293,
+              0
+            ],
+            "vector_original_source_font_units": [
+              293,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          }
+        },
+        {
+          "sideways": false,
+          "reference": {
+            "vector_DIP": [
+              292,
+              0
+            ],
+            "vector_original_source_font_units": [
+              292,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          },
+          "target": {
+            "vector_DIP": [
+              293,
+              0
+            ],
+            "vector_original_source_font_units": [
+              293,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          }
+        },
+        {
+          "sideways": true,
+          "reference": {
+            "vector_DIP": [
+              1000,
+              0
+            ],
+            "vector_original_source_font_units": [
+              1000,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          },
+          "target": {
+            "vector_DIP": [
+              1000,
+              0
+            ],
+            "vector_original_source_font_units": [
+              1000,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          }
+        },
+        {
+          "sideways": true,
+          "reference": {
+            "vector_DIP": [
+              1000,
+              0
+            ],
+            "vector_original_source_font_units": [
+              1000,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          },
+          "target": {
+            "vector_DIP": [
+              1000,
+              0
+            ],
+            "vector_original_source_font_units": [
+              1000,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          }
+        }
+      ],
+      "error": ""
+    },
+    {
+      "case": "normalized_F2DOT14_composition_witness",
+      "units_per_em": 1000,
+      "precision_grid_multiplier": 1,
+      "status": "COMPLETED_AUTHORED_PRECISION_ROUNDING_TRACE_NOT_ACCEPTANCE",
+      "strict_result": "FAIL",
+      "native_protocol_completed": true,
+      "source_files_unchanged": true,
+      "reference_sha256": "71bf4c015e96ffa51405862de7ff0e7370e7205e25a41c29b75af2623508787b",
+      "target_sha256": "8480fd1a6454ade9da21d79c343081fee56b1b403e7fcf8630517577110d4d05",
+      "reference_q_F2DOT14": [
+        1141,
+        1453,
+        10955
+      ],
+      "unchanged_target_nominal_user": [
+        534.820556640625,
+        689.1845703125,
+        834.320068359375
+      ],
+      "nominal_normalized_before_avar_F2DOT14": [
+        1141,
+        7749,
+        10955
+      ],
+      "native_post_avar_coordinates": "NOT_OBSERVED",
+      "metric_fields_checked": 14,
+      "metric_fields_above_1_32": 2,
+      "maximum_metric_error_source_units": 1,
+      "outline_pairs_checked": 36,
+      "outline_point_pairs_checked": 240,
+      "outline_point_pairs_above_1_32": 204,
+      "outline_topology_failures": 0,
+      "maximum_run_geometry_error_source_units": 2.0000985835207397,
+      "actual_FLOAT_and_readback_bits_checked": 12,
+      "upright_design_metrics": [
+        {
+          "name": "leftSideBearing",
+          "reference_raw_design_integer": 12,
+          "target_raw_design_integer": 12,
+          "reference_original_source_font_units": 12,
+          "target_original_source_font_units": 12,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "advanceWidth",
+          "reference_raw_design_integer": 298,
+          "target_raw_design_integer": 299,
+          "reference_original_source_font_units": 298,
+          "target_original_source_font_units": 299,
+          "absolute_error_original_source_font_units": 1
+        },
+        {
+          "name": "rightSideBearing",
+          "reference_raw_design_integer": 18,
+          "target_raw_design_integer": 18,
+          "reference_original_source_font_units": 18,
+          "target_original_source_font_units": 18,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "topSideBearing",
+          "reference_raw_design_integer": 390,
+          "target_raw_design_integer": 390,
+          "reference_original_source_font_units": 390,
+          "target_original_source_font_units": 390,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "advanceHeight",
+          "reference_raw_design_integer": 1040,
+          "target_raw_design_integer": 1040,
+          "reference_original_source_font_units": 1040,
+          "target_original_source_font_units": 1040,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "bottomSideBearing",
+          "reference_raw_design_integer": 100,
+          "target_raw_design_integer": 100,
+          "reference_original_source_font_units": 100,
+          "target_original_source_font_units": 100,
+          "absolute_error_original_source_font_units": 0
+        },
+        {
+          "name": "verticalOriginY",
+          "reference_raw_design_integer": 920,
+          "target_raw_design_integer": 920,
+          "reference_original_source_font_units": 920,
+          "target_original_source_font_units": 920,
+          "absolute_error_original_source_font_units": 0
+        }
+      ],
+      "single_glyph_at_UPM": [
+        {
+          "sideways": false,
+          "maximum_point_error_source_units": 1
+        },
+        {
+          "sideways": false,
+          "maximum_point_error_source_units": 1
+        },
+        {
+          "sideways": true,
+          "maximum_point_error_source_units": 0.5
+        },
+        {
+          "sideways": true,
+          "maximum_point_error_source_units": 0.5
+        }
+      ],
+      "implicit_repeat_at_UPM": [
+        {
+          "sideways": false,
+          "reference": {
+            "vector_DIP": [
+              298,
+              0
+            ],
+            "vector_original_source_font_units": [
+              298,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          },
+          "target": {
+            "vector_DIP": [
+              299,
+              0
+            ],
+            "vector_original_source_font_units": [
+              299,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          }
+        },
+        {
+          "sideways": false,
+          "reference": {
+            "vector_DIP": [
+              298,
+              0
+            ],
+            "vector_original_source_font_units": [
+              298,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          },
+          "target": {
+            "vector_DIP": [
+              299,
+              0
+            ],
+            "vector_original_source_font_units": [
+              299,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          }
+        },
+        {
+          "sideways": true,
+          "reference": {
+            "vector_DIP": [
+              1040,
+              0
+            ],
+            "vector_original_source_font_units": [
+              1040,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          },
+          "target": {
+            "vector_DIP": [
+              1040,
+              0
+            ],
+            "vector_original_source_font_units": [
+              1040,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          }
+        },
+        {
+          "sideways": true,
+          "reference": {
+            "vector_DIP": [
+              1040,
+              0
+            ],
+            "vector_original_source_font_units": [
+              1040,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          },
+          "target": {
+            "vector_DIP": [
+              1040,
+              0
+            ],
+            "vector_original_source_font_units": [
+              1040,
+              0
+            ],
+            "maximum_nontranslation_residual_DIP": 0
+          }
+        }
+      ],
+      "error": ""
+    }
+  ],
+  "original_font_conversion": "NOT_BUILT",
+  "original_D2_cohort": {
+    "pass": 288,
+    "fail": 96,
+    "mapping_accepted": false
+  },
+  "Windows11": "NOT_RUN",
+  "Qt_Swirl": "NOT_RUN",
+  "third_party_Windows_software": "NOT_RUN",
+  "device_pixel_equivalence": "NOT_RUN",
+  "MVAR_VORG_full_native_acceptance": "NOT_ESTABLISHED",
+  "production_accepted": false
+}
