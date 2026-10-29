@@ -25,6 +25,8 @@ jobs:
         os: [ubuntu-latest, windows-2025]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    env:
+      SWIRL_SOURCE_SHA: ${{ github.sha }}
     defaults:
       run:
         working-directory: core
@@ -57,6 +59,25 @@ jobs:
         run: cargo test --locked -p swirl-tun -p swirl-platform -p swirl-dns -p swirl-transport -p swirl-core -p swirl-api
       - name: Build actual Rust library and helper
         run: cargo build --locked -p swirl-api --release
+      - name: Real Wintun scoped TCP UDP and DNS smoke in this disposable VM
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $smokeIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
+          $smokePrincipal = [Security.Principal.WindowsPrincipal]::new($smokeIdentity)
+          if (-not $smokePrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            throw 'The explicitly scoped driver smoke requires an elevated disposable runner; it must not be silently skipped.'
+          }
+          $smokeArchive = Join-Path $env:RUNNER_TEMP 'wintun-0.14.1.zip'
+          Invoke-WebRequest 'https://www.wintun.net/builds/wintun-0.14.1.zip' -OutFile $smokeArchive
+          if ((Get-FileHash $smokeArchive -Algorithm SHA256).Hash -ne '07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51') {
+            throw 'Official Wintun archive hash mismatch.'
+          }
+          $smokeDirectory = Join-Path $env:RUNNER_TEMP 'swirl-wintun-smoke'
+          Expand-Archive -LiteralPath $smokeArchive -DestinationPath $smokeDirectory
+          $smokeDriver = Join-Path $smokeDirectory 'wintun/bin/amd64/wintun.dll'
+          cargo run --locked --release -p swirl-api --example windows-tun-smoke -- --disposable-network --wintun $smokeDriver 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'swirl-wintun-smoke.log')
+          if ($LASTEXITCODE -ne 0) { throw "Scoped Wintun smoke failed with exit code $LASTEXITCODE" }
       - name: Preserve native backend build
         uses: actions/upload-artifact@v4
         with:
@@ -67,9 +88,19 @@ jobs:
             core/target/release/swirl-tun-helper.exe
             core/target/release/swirl-tun-helper
             ${{ runner.temp }}/swirl-native-notices/
+            ${{ runner.temp }}/swirl-wintun-smoke.log
           if-no-files-found: error
           retention-days: 7
 
-  # These jobs never install a driver or change the runner's routing/DNS.
-  # Packet simulation and native Windows compilation are separate evidence from
-  # Windows 11 Wintun/application acceptance, which must be recorded explicitly.
+      - name: Preserve driver failure diagnostics
+        if: failure() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-tun-driver-failure-${{ github.sha }}
+          path: ${{ runner.temp }}/swirl-wintun-smoke.log
+          if-no-files-found: warn
+
+  # The explicit Windows-only smoke owns one temporary adapter and only exact
+  # test-destination routes. It never changes physical DNS, firewall rules or
+  # default/capture routes. This is real driver evidence on Windows Server,
+  # separate from Windows 11 full-tunnel/application/recovery acceptance.
