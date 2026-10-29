@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: native-tun-isolated-${{ github.ref }}
+  group: native-tun-isolated-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -42,7 +42,7 @@ jobs:
         run: |
           cargo metadata --locked --format-version 1 > "${{ runner.temp }}/swirl-native-metadata.json"
           python ../tools/Collect-RustDependencies.py --metadata "${{ runner.temp }}/swirl-native-metadata.json" --inventory "${{ runner.temp }}/swirl-native-notices/DEPENDENCIES.json" --notices "${{ runner.temp }}/swirl-native-notices" --supplemental-inventory DEPENDENCIES.json
-          python -c "import json,pathlib; p=pathlib.Path('${{ runner.temp }}/swirl-native-notices'); source=json.loads(pathlib.Path('DEPENDENCIES.json').read_text()); built=json.loads((p/'DEPENDENCIES.json').read_text()); assert source==built; notices=[n for a in source['runtime_artifacts'] for n in a['notices']]+[n for a in source['packages'] for n in a.get('supplemental_notices',[])]; assert all(pathlib.Path(n).read_bytes()==(p/n).read_bytes() for n in notices)"
+          python -c "import json,pathlib,sys; p=pathlib.Path(sys.argv[1]); source=json.loads(pathlib.Path('DEPENDENCIES.json').read_text(encoding='utf-8')); built=json.loads((p/'DEPENDENCIES.json').read_text(encoding='utf-8')); assert source==built; notices=[n for a in source['runtime_artifacts'] for n in a['notices']]+[n for a in source['packages'] for n in a.get('supplemental_notices',[])]; assert all(pathlib.Path(n).read_bytes()==(p/n).read_bytes() for n in notices)" "${{ runner.temp }}/swirl-native-notices"
       - name: Parse Windows product staging script
         if: runner.os == 'Windows'
         shell: pwsh
