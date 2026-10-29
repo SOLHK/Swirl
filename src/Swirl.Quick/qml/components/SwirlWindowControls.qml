@@ -79,7 +79,7 @@ Row {
                 }
             }
             onClicked: {
-                if (index === 0) controls.targetWindow.showMinimized()
+                if (index === 0) backdrop.minimizeWindow(controls.targetWindow)
                 else if (index === 1) {
                     if (controls.maximized) controls.targetWindow.showNormal()
                     else controls.targetWindow.showMaximized()
