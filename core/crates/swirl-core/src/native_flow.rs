@@ -96,12 +96,13 @@ impl FlowDispatcher {
         let (requests, incoming) = mpsc::channel(UDP_QUEUE);
         let (replies, responses) = mpsc::channel(UDP_QUEUE);
         let (ready, started) = oneshot::channel();
-        let (finished, closed) = watch::channel(None);
         let shared = self.shared.clone();
+        // Construct before spawn: shutdown can drop a task before its first
+        // poll, and that path still has to publish an authoritative close cause.
+        let (mut completion, mut closed) = UdpCompletion::new(shared.clone(), &registered);
         let task = AbortTask(self.runtime.spawn(async move {
-            let id = registered.guard.id;
             let result = run_udp(
-                shared.clone(),
+                shared,
                 &registered,
                 source,
                 target,
@@ -110,13 +111,13 @@ impl FlowDispatcher {
                 ready,
             )
             .await;
-            if let Err(error) = result {
-                shared.failure(id, error);
-            }
-            let _ = finished.send(Some(result.err().unwrap_or("UdpFlowClosed")));
+            completion.finish(result);
             drop(registered);
         }));
-        started.await.map_err(|_| "NativeFlowTask")??;
+        match started.await {
+            Ok(result) => result?,
+            Err(_) => return Err(udp_closed(&mut closed).await),
+        }
         Ok(NativeUdpFlow {
             requests,
             responses,
@@ -243,6 +244,59 @@ struct SendRequest {
     complete: oneshot::Sender<Result<()>>,
 }
 
+/// Exactly one terminal state survives data-channel closure, task cancellation
+/// and runtime shutdown. Data channels can close before run_udp returns; their
+/// EOF is only a signal to wait for this state, not a separate failure cause.
+struct UdpCompletion {
+    shared: Arc<Shared>,
+    id: u64,
+    cancellation: watch::Receiver<bool>,
+    finished: watch::Sender<Option<&'static str>>,
+    published: bool,
+}
+impl UdpCompletion {
+    fn new(
+        shared: Arc<Shared>,
+        registered: &RegisteredSession,
+    ) -> (Self, watch::Receiver<Option<&'static str>>) {
+        let (finished, closed) = watch::channel(None);
+        (
+            Self {
+                shared,
+                id: registered.guard.id,
+                cancellation: registered.cancellation.clone(),
+                finished,
+                published: false,
+            },
+            closed,
+        )
+    }
+
+    fn finish(&mut self, result: Result<()>) {
+        if let Err(error) = result {
+            self.shared.failure(self.id, error);
+        }
+        self.finished
+            .send_replace(Some(result.err().unwrap_or("UdpFlowClosed")));
+        self.published = true;
+    }
+}
+impl Drop for UdpCompletion {
+    fn drop(&mut self) {
+        if !self.published {
+            // Core shutdown may cancel this worker before it can observe the
+            // registry's watch notification. Preserve revocation even then.
+            let revoked =
+                self.shared.stopped.load(Ordering::Acquire) || *self.cancellation.borrow();
+            self.finish(if revoked {
+                Err("SessionRevoked")
+            } else {
+                Ok(())
+            });
+        }
+    }
+}
+
 /// One connected UDP session. Empty datagrams are valid, responses preserve
 /// boundaries, and a small receive buffer is an explicit error, never truncation.
 pub struct NativeUdpFlow {
@@ -262,7 +316,10 @@ impl NativeUdpFlow {
         let slot = tokio::select! {
             biased;
             error = udp_closed(&mut closed) => return Err(error),
-            slot = self.requests.reserve() => slot.map_err(|_| "UdpFlowClosed")?,
+            slot = self.requests.reserve() => match slot {
+                Ok(slot) => slot,
+                Err(_) => return Err(udp_closed(&mut closed).await),
+            },
         };
         let (complete, completion) = oneshot::channel();
         slot.send(SendRequest {
@@ -272,7 +329,10 @@ impl NativeUdpFlow {
         tokio::select! {
             biased;
             error = udp_closed(&mut closed) => Err(error),
-            result = completion => result.map_err(|_| "UdpFlowClosed")?,
+            result = completion => match result {
+                Ok(result) => result,
+                Err(_) => Err(udp_closed(&mut closed).await),
+            },
         }
     }
 
@@ -280,7 +340,10 @@ impl NativeUdpFlow {
         let payload = tokio::select! {
             biased;
             error = udp_closed(&mut self.closed) => return Err(error),
-            payload = self.responses.recv() => payload.ok_or("UdpFlowClosed")?,
+            payload = self.responses.recv() => match payload {
+                Some(payload) => payload,
+                None => return Err(udp_closed(&mut self.closed).await),
+            },
         };
         if payload.len() > buffer.len() {
             return Err("UdpReceiveBufferTooSmall");
@@ -296,7 +359,7 @@ async fn udp_closed(receiver: &mut watch::Receiver<Option<&'static str>>) -> &'s
             return error;
         }
         if receiver.changed().await.is_err() {
-            return "UdpFlowClosed";
+            return receiver.borrow().unwrap_or("UdpFlowClosed");
         }
     }
 }
@@ -452,12 +515,16 @@ fn response_matches(request: &NetworkTarget, response: &NetworkTarget) -> bool {
 }
 
 async fn connected_udp(address: SocketAddr) -> Result<UdpSocket> {
-    let any = if address.is_ipv4() {
-        "0.0.0.0:0"
-    } else {
-        "[::]:0"
+    // This association has one known peer. Bind local peers to localhost before
+    // pin_udp checks the physical egress guard, as the TCP path already does.
+    // Non-loopback destinations must keep wildcard binding and guard checks.
+    let local = match (address.is_ipv4(), address.ip().is_loopback()) {
+        (true, true) => "127.0.0.1:0",
+        (false, true) => "[::1]:0",
+        (true, false) => "0.0.0.0:0",
+        (false, false) => "[::]:0",
     };
-    let socket = bind_udp(any.parse().map_err(|_| "UdpBind")?)
+    let socket = bind_udp(local.parse().map_err(|_| "UdpBind")?)
         .await
         .map_err(|_| "UdpBind")?;
     socket.connect(address).await.map_err(|_| "UdpConnect")?;

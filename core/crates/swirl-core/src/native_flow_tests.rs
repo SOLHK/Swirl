@@ -310,6 +310,8 @@ fn stopping_core_revokes_idle_udp_and_retained_dispatcher() {
     core.stop();
     runtime.block_on(async {
         assert_eq!(flow.recv(&mut [0; 1]).await, Err("SessionRevoked"));
+        assert_eq!(flow.send(b"after-stop").await, Err("SessionRevoked"));
+        assert_eq!(flow.recv(&mut [0; 1]).await, Err("SessionRevoked"));
         assert!(matches!(
             dispatcher
                 .open_udp(
@@ -321,6 +323,112 @@ fn stopping_core_revokes_idle_udp_and_retained_dispatcher() {
         ));
     });
     assert_eq!(core.snapshot().unwrap()["active"], 0);
+}
+
+#[test]
+fn udp_terminal_state_survives_unpolled_worker_drop_and_keeps_first_error() {
+    let mut core = start(config());
+    let dispatcher = core.flow_dispatcher().unwrap();
+    let registered = dispatcher.shared.register().unwrap();
+    let (mut completed, first) = UdpCompletion::new(dispatcher.shared.clone(), &registered);
+    completed.finish(Err("UdpSend"));
+    drop(registered);
+
+    let registered = dispatcher.shared.register().unwrap();
+    let (completion, revoked) = UdpCompletion::new(dispatcher.shared.clone(), &registered);
+    // Deliberately never poll this worker. Runtime cancellation is permitted to
+    // drop a captured future without executing any line inside its async body.
+    let worker = async move {
+        let _guards = (registered, completion);
+        std::future::pending::<()>().await;
+    };
+    core.stop();
+    drop(worker);
+    drop(completed);
+    assert_eq!(*revoked.borrow(), Some("SessionRevoked"));
+    assert_eq!(*first.borrow(), Some("UdpSend"));
+    let snapshot = core.snapshot().unwrap();
+    assert_eq!(snapshot["active"], 0);
+    assert_eq!(snapshot["failed"], 2);
+}
+
+struct PendingUdpChannels {
+    flow: NativeUdpFlow,
+    incoming: mpsc::Receiver<SendRequest>,
+    replies: mpsc::Sender<Vec<u8>>,
+    finished: watch::Sender<Option<&'static str>>,
+}
+fn pending_udp_channels() -> PendingUdpChannels {
+    let (requests, incoming) = mpsc::channel(UDP_QUEUE);
+    let (replies, responses) = mpsc::channel(UDP_QUEUE);
+    let (finished, closed) = watch::channel(None);
+    PendingUdpChannels {
+        flow: NativeUdpFlow {
+            requests,
+            responses,
+            closed,
+            _task: AbortTask(tokio::spawn(std::future::pending())),
+        },
+        incoming,
+        replies,
+        finished,
+    }
+}
+
+#[tokio::test]
+async fn udp_response_eof_waits_for_the_terminal_reason() {
+    let PendingUdpChannels {
+        mut flow,
+        replies,
+        finished,
+        ..
+    } = pending_udp_channels();
+    drop(replies);
+    let mut bytes = [0; 1];
+    let mut receive = Box::pin(flow.recv(&mut bytes));
+    assert!(
+        timeout(Duration::from_millis(10), &mut receive)
+            .await
+            .is_err()
+    );
+    finished.send(Some("SessionRevoked")).unwrap();
+    assert_eq!(receive.await, Err("SessionRevoked"));
+}
+
+#[tokio::test]
+async fn udp_request_eof_waits_for_the_terminal_reason() {
+    let PendingUdpChannels {
+        flow,
+        incoming,
+        finished,
+        ..
+    } = pending_udp_channels();
+    drop(incoming);
+    let mut send = Box::pin(flow.send(b"queued"));
+    assert!(timeout(Duration::from_millis(10), &mut send).await.is_err());
+    finished.send(Some("SessionRevoked")).unwrap();
+    assert_eq!(send.await, Err("SessionRevoked"));
+}
+
+#[tokio::test]
+async fn udp_send_completion_eof_waits_for_the_terminal_reason() {
+    let PendingUdpChannels {
+        flow,
+        mut incoming,
+        finished,
+        ..
+    } = pending_udp_channels();
+    let mut send = Box::pin(flow.send(b"queued"));
+    let request = tokio::select! {
+        biased;
+        result = &mut send => panic!("send completed before its worker: {result:?}"),
+        request = incoming.recv() => request.unwrap(),
+    };
+    assert_eq!(request.payload, b"queued");
+    drop(request);
+    assert!(timeout(Duration::from_millis(10), &mut send).await.is_err());
+    finished.send(Some("UdpSendTimeout")).unwrap();
+    assert_eq!(send.await, Err("UdpSendTimeout"));
 }
 
 #[test]
