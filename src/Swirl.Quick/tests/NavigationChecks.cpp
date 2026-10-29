@@ -321,7 +321,11 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
   // command handler, import, subscription refresh or system setting is invoked.
   struct RestoreCursor {QPoint position=QCursor::pos();~RestoreCursor(){QCursor::setPos(position);}} restoreCursor;
   eval("Theme.reduceMotion=false;Theme.followSystemMotion=false;SwirlMotion.speed=1");
-  window->requestActivate();window->resize(qRound(eval("Theme.dp(1100)").toDouble()),qRound(eval("Theme.dp(760)").toDouble()));wait(150);
+  const auto available=window->screen()->availableGeometry();
+  const QSize auditSize(qMax(window->minimumWidth(),qMin(qRound(eval("Theme.dp(1100)").toDouble()),available.width())),qMax(window->minimumHeight(),qMin(qRound(eval("Theme.dp(760)").toDouble()),available.height())));
+  window->resize(auditSize);
+  window->setPosition(available.topLeft()+QPoint(qMax(0,(available.width()-auditSize.width())/2),qMax(0,(available.height()-auditSize.height())/2)));
+  window->requestActivate();wait(150);
 #ifdef Q_OS_WIN
   // Keyboard focus and compositor evidence require the owned test HWND to be
   // foreground. Qt's activation request alone can be refused by Windows when
@@ -364,15 +368,18 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
    auto *surface=control->property("background").value<QQuickItem *>();
    const auto size=control->size();const auto position=control->position();
    const auto point=control->mapToScene(QPointF(size.width()/2,size.height()/2)).toPoint();
+   const auto globalPoint=window->mapToGlobal(point);
    const bool inside=QRectF(QPointF(),window->size()).contains(point);
    check(surface&&inside&&control->isVisible(),"marked page button is visible inside the native window: "+key);if(!surface||!inside)return;
+   const bool pointerReachable=window->screen()->availableGeometry().contains(globalPoint);
+   check(pointerReachable,"marked page button native pointer target fits the actual screen: "+key);if(!pointerReachable)return;
    const auto snapshot=[&](const QString &phase){
     const auto image=window->grabWindow();const auto rect=control->mapRectToScene(control->boundingRect()).adjusted(-5,-5,5,5);const auto dpr=window->devicePixelRatio();
     const QRect pixels(qFloor(rect.x()*dpr),qFloor(rect.y()*dpr),qCeil(rect.width()*dpr),qCeil(rect.height()*dpr));
     const auto crop=image.copy(pixels.intersected(image.rect()));
     check(!crop.isNull()&&crop.save(evidence+"/"+key+"-"+phase+".png"),"actual marked-button pixels saved: "+key+"/"+phase);return crop;
    };
-   const auto sample=[&](const QString &phase){const auto cursor=window->mapFromGlobal(QCursor::pos());buttonSamples.append(QJsonObject{{"button",key},{"phase",phase},{"windowActive",window->isActive()},{"activeFocus",control->hasActiveFocus()},{"visualFocus",control->property("visualFocus").toBool()},{"focusReason",control->property("focusReason").toInt()},{"cursorX",cursor.x()},{"cursorY",cursor.y()},{"enabled",control->isEnabled()},{"hovered",control->property("hovered").toBool()},{"down",control->property("down").toBool()},{"scale",control->property("motionScale").toDouble()},{"lift",control->property("motionLift").toDouble()},{"surfaceColor",surface->property("color").value<QColor>().name(QColor::HexArgb)}});};
+   const auto sample=[&](const QString &phase){const auto cursor=window->mapFromGlobal(QCursor::pos());buttonSamples.append(QJsonObject{{"button",key},{"phase",phase},{"windowActive",window->isActive()},{"activeFocus",control->hasActiveFocus()},{"visualFocus",control->property("visualFocus").toBool()},{"focusReason",control->property("focusReason").toInt()},{"cursorX",cursor.x()},{"cursorY",cursor.y()},{"targetGlobalX",globalPoint.x()},{"targetGlobalY",globalPoint.y()},{"targetScreenReachable",pointerReachable},{"enabled",control->isEnabled()},{"hovered",control->property("hovered").toBool()},{"down",control->property("down").toBool()},{"scale",control->property("motionScale").toDouble()},{"lift",control->property("motionLift").toDouble()},{"surfaceColor",surface->property("color").value<QColor>().name(QColor::HexArgb)}});};
    QSignalSpy clicked(control,SIGNAL(clicked()));
    const bool enabled=control->isEnabled();
    const auto fullLift=eval("Theme.dp(1)").toDouble();

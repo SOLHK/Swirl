@@ -103,7 +103,7 @@ static void configureTaskbarIdentity(QQuickWindow *window)
     const auto exe=QDir::toNativeSeparators(QCoreApplication::applicationFilePath());
     // A process AppID alone lets Explorer reuse an older registered shortcut's
     // group icon. Publish this window's own resources before its explicit ID.
-    const auto iconPath=QDir::toNativeSeparators(QCoreApplication::applicationDirPath()+QStringLiteral("/Swirl-brand-0216-original-knot-v2.ico"));
+    const auto iconPath=QDir::toNativeSeparators(QCoreApplication::applicationDirPath()+QStringLiteral("/Swirl-brand-0216-original-knot-v3.ico"));
     result=setString(PKEY_AppUserModel_RelaunchIconResource,iconPath+QStringLiteral(",0"));
     if(SUCCEEDED(result))result=setString(PKEY_AppUserModel_RelaunchCommand,QStringLiteral("\"%1\"").arg(exe));
     if(SUCCEEDED(result))result=setString(PKEY_AppUserModel_RelaunchDisplayNameResource,QStringLiteral("@%1,-100").arg(exe));
@@ -181,8 +181,9 @@ int main(int argc, char *argv[])
     QSvgRenderer brand(QStringLiteral(":/swirl/icons/swirl_knot_mark_light.svg"));
 #endif
     QIcon icon;
+    const auto brandContent=swirlBrandContentBounds(brand);
     for(int size:swirlBrandIconSizes) {
-        icon.addPixmap(QPixmap::fromImage(swirlBrandRaster(brand,size)));
+        icon.addPixmap(QPixmap::fromImage(swirlBrandRaster(brand,size,brandContent)));
     }
     app.setWindowIcon(icon);
     // Native Windows Qt Quick Controls do not support custom backgrounds/content.
@@ -377,7 +378,12 @@ int main(int argc, char *argv[])
     if (engine.rootObjects().isEmpty())
         return 1;
     auto *rootWindow = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
-    if(rootWindow)rootWindow->setIcon(icon);
+    if(rootWindow){
+        // Keep animated and antialiased damage inside this HWND. The native
+        // outer shadow remains in its own window.
+        rootWindow->contentItem()->setClip(true);
+        rootWindow->setIcon(icon);
+    }
 #ifdef Q_OS_WIN
     if(rootWindow)configureTaskbarIdentity(rootWindow);
 #endif

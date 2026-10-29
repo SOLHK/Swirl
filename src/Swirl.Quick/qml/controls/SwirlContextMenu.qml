@@ -24,8 +24,7 @@ Menu {
     signal itemTriggered(int index)
     padding:Theme.dp(6)
     transformOrigin:Item.TopLeft
-    SwirlPopupMotion {id:reveal;popup:contextMenu;enterDuration:SwirlMotion.menuEnterDuration;leaveDuration:SwirlMotion.menuExitDuration}
-    readonly property alias popupMotion:reveal
+    readonly property SwirlPopupMotion popupMotion:SwirlPopupMotion {id:reveal;popup:contextMenu;enterDuration:SwirlMotion.menuEnterDuration;leaveDuration:SwirlMotion.menuExitDuration}
     // Popup owns x/y placement (including screen clamping); translate its
     // visual content and background without changing pointer/keyboard grabs.
     Binding {target:contextMenu.presentationReady?contextMenu.contentItem:null;property:"transform";value:[contentTravel];when:contextMenu.presentationReady;restoreMode:Binding.RestoreBindingOrValue}

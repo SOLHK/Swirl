@@ -92,7 +92,7 @@ ComboBox {
         popupType:Popup.Item
         closePolicy:Popup.CloseOnEscape | Popup.CloseOnPressOutside
         transformOrigin:opensAbove?Item.BottomLeft:Item.TopLeft
-        SwirlPopupMotion {id:reveal;popup:popupLayer;enterDuration:SwirlMotion.menuEnterDuration;leaveDuration:SwirlMotion.menuExitDuration}
+        readonly property SwirlPopupMotion popupMotion:SwirlPopupMotion {id:reveal;popup:popupLayer;enterDuration:SwirlMotion.menuEnterDuration;leaveDuration:SwirlMotion.menuExitDuration}
         opacity:reveal.alpha
     onAboutToShow: {
         anchorPoint=control.mapToItem(parent,0,0)

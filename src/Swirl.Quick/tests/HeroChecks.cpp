@@ -62,7 +62,14 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  const bool recording=!QCoreApplication::arguments().contains("--hero-no-recording")&&!qEnvironmentVariableIsSet("SWIRL_QA_NO_RECORDING");
  auto snapshot=[&](const QString &name,QQuickWindow *sheet=nullptr){if(!recording)return true;auto image=window->grabWindow();QPainter painter(&image);if(sheet&&sheet->isVisible())painter.drawImage(sheet->position()-window->position(),sheet->grabWindow());painter.end();return image.save(directory+"/"+name+".png");};
  auto record=[&](const QString &name,QQuickWindow *sheet=nullptr){if(!recording)return;QDir().mkpath(directory+"/"+name);QElapsedTimer clock;clock.start();QJsonArray timestamps;for(int frame=0;frame<26;++frame){const auto file=QString("%1.png").arg(frame,3,10,QChar('0'));const auto start=clock.nsecsElapsed()/1000000.0;snapshot(name+"/"+file.chopped(4),sheet);timestamps.append(QJsonObject{{"file",file},{"captureStartMs",start},{"captureEndMs",clock.nsecsElapsed()/1000000.0}});wait(10);}QFile output(directory+"/"+name+"/frame-timestamps.json");if(output.open(QIODevice::WriteOnly))output.write(QJsonDocument(QJsonObject{{"frames",timestamps},{"durationMs",clock.nsecsElapsed()/1000000.0},{"method","Actual monotonic readback times; requested 10ms waits are not an assumed frame rate. Qt window readbacks do not capture the final DWM desktop contour."}}).toJson());};
- window->resize(1100,850);window->setPosition(window->screen()->availableGeometry().topLeft()+QPoint(40,40));window->show();window->requestActivate();
+ // Native pointer input must fit the actual monitor, including the smaller
+ // Hyper-V desktop used by CI. Off-screen QTest presses can otherwise succeed
+ // while the real cursor is clamped away from the same button's hover target.
+ const auto available=window->screen()->availableGeometry();
+ const QSize fixtureSize(qMax(window->minimumWidth(),qMin(1100,available.width())),qMax(window->minimumHeight(),qMin(850,available.height())));
+ window->resize(fixtureSize);
+ window->setPosition(available.topLeft()+QPoint(qMax(0,(available.width()-fixtureSize.width())/2),qMax(0,(available.height()-fixtureSize.height())/2)));
+ window->show();window->requestActivate();
 #ifdef Q_OS_WIN
  window->setFlag(Qt::WindowStaysOnTopHint,true);
  const HWND qaWindow=reinterpret_cast<HWND>(window->winId());

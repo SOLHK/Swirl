@@ -1,3 +1,10 @@
+# Current final acceptance and branch delivery (2026-10-29)
+
+- Preserve the canonical horizontally wide cloud-knot paths and proportions; enlarge its Windows optical weight without stretching. Ordinary buttons remain borderless in hover, press and focus. Keep all existing animation and visual effects while fixing measured rendering problems.
+- Complete actual taskbar comparisons, native Windows 100/125/150/175/200% DPI and button-motion checks, plus exact-source installer verification before updating `test`. Temporary scale changes are for acceptance only; restore the original 150% setting and never use system scale/taskbar height to conceal icon defects.
+- The user explicitly authorizes backing up the old `main`, deleting and recreating it after acceptance, including history rewriting. Preserve unrelated work on `test` through integration. Restore any temporarily changed repository protections/default branch after the authorized recreation.
+- Keep Clash/Mihomo configuration and subscription import compatibility; remove obsolete external core, invocation and packaging paths. Preserve required dependencies/licenses and do not touch other installed proxy applications, private data or the host proxy/TUN/routes/DNS.
+
 # Current 0.2.16 interaction and Windows icon repair (2026-10-28)
 
 - Continue `work/swirl-0216-interaction-icon-20261028` from `f895801`; keep main and other worktrees untouched. Keep version 0.2.16.

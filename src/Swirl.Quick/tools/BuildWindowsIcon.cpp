@@ -58,8 +58,9 @@ int main(int argc, char *argv[])
         return 3;
     }
     const auto &sizes = swirlBrandIconSizes;
+    const auto content = swirlBrandContentBounds(renderer);
     QVector<QByteArray> frames;
-    for (int size : sizes) frames.append(makeDib(swirlBrandRaster(renderer,size), size));
+    for (int size : sizes) frames.append(makeDib(swirlBrandRaster(renderer,size,content), size));
     QByteArray icon;
     QDataStream header(&icon, QIODevice::WriteOnly);
     header.setByteOrder(QDataStream::LittleEndian);

@@ -115,7 +115,7 @@ Item {
  Popup {
   id:searchPopup;objectName:"navigationSearchPopup";x:Theme.dp(20);y:Theme.dp(88);width:Theme.dp(300);padding:Theme.dp(8);modal:false;focus:true
   function requestDismiss(){close()}
-  SwirlPopupMotion {id:searchReveal;popup:searchPopup;enterDuration:SwirlMotion.menuEnterDuration;leaveDuration:SwirlMotion.menuExitDuration}
+  readonly property SwirlPopupMotion popupMotion:SwirlPopupMotion {id:searchReveal;popup:searchPopup;enterDuration:SwirlMotion.menuEnterDuration;leaveDuration:SwirlMotion.menuExitDuration}
   enter:searchReveal.enterTransition;exit:searchReveal.exitTransition
   onAboutToShow:{searchReveal.prepare(Qt.point(0,-SwirlMotion.popupDistance));dismissals.push(searchPopup,sidebar.Window.window)}
   onClosed:{dismissals.pop(searchPopup);searchReveal.reset()}

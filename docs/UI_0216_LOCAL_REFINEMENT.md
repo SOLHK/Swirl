@@ -19,6 +19,13 @@ Labels and icons follow the surface scale. Navigation, combo/menu items,
 segmented choices, switches, radio/checkbox controls, subscription dialogs and
 table rows use these shared states. Disabled navigation cannot retain hover
 color, and pooled rows finish old interaction state before reuse.
+The root content clip confines antialiased and animated dirty regions to the
+native window. The software-backend failure previously passed a negative/outside
+dirty rectangle to `UpdateLayeredWindowIndirect`; the outer native shadow keeps
+its separate window and every feather/glass effect remains enabled.
+Nonvisual popup-motion helpers use explicit typed ownership properties, matching
+the dialog contract. This avoids a production compiled-QML default-`data`
+warning; the staged 61-page smoke must remain free of Qt/QML warnings.
 
 Windows uses `assets/icons/swirl_windows.svg`, preserving every original path
 and the original horizontally open cloud-knot proportions. Consistent optical
@@ -33,7 +40,7 @@ regenerated icon. `tools/Verify-WindowsIconResources.py` rejects any frame or
 EXE resource mismatch before package staging writes its manifest.
 
 The window publishes its explicit AppID and relaunch resources before first
-show. `Swirl-brand-0216-original-knot-v2.ico` gives the shell a distinct resource path.
+show. `Swirl-brand-0216-original-knot-v3.ico` gives the shell a distinct resource path.
 The installer repairs only existing Swirl shortcuts targeting that installation
 and notifies the shell. During investigation, correct native HICONs coexisted
 with the old taskbar group image. Item-only notifications retained that bitmap;
@@ -104,7 +111,12 @@ protocol changes are included.
   coverage through the lower sidebar at three window sizes, in addition to live
   sampling, blur, refraction, alpha and local-light checks.
 
-## Native icon investigation and limit
+## Earlier native icon investigation and limit
+
+This earlier record predates the optical ribbon-weight and shell-cache repairs
+described above. Its no-increase statement is historical, not the current
+acceptance result. The final installer and physical-DPI evidence are recorded
+separately.
 
 The existing raster path already removes SVG artboard padding and fits the
 original knot proportionally to the entire square icon width. On this 150%

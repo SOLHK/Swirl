@@ -18,6 +18,7 @@
 #include <QFontMetricsF>
 #include <QFontDatabase>
 #include <QCursor>
+#include <QElapsedTimer>
 #include <QtMath>
 #include <functional>
 
@@ -77,8 +78,26 @@ Item {
                     check(QTest::qWaitFor([&]{return !control->property("hovered").toBool();},1000),"native pointer leaves the shared control before its resting sample");
                     const auto normal=paint->property("color").value<QColor>();
                     const auto restingPixels=window->grabWindow();
-                    movePointer(control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint(),25);
-                    check(paint->property("moving").toBool()&&paint->property("hoverProgress").toReal()>0&&paint->property("hoverProgress").toReal()<1,"real pointer starts an intermediate hover frame instead of jumping to its endpoint");
+                    bool intermediateHoverFrame=false;
+                    qreal sampledHoverProgress=0;
+                    qint64 sampledHoverMs=-1;
+                    int hoveredFrames=0;
+                    QElapsedTimer hoverClock;hoverClock.start();
+                    // Observe rendered-frame preparation from before input: a fixed sleep can
+                    // resume after a short animation has already finished on a busy runner.
+                    const auto hoverSample=QObject::connect(window,&QQuickWindow::afterAnimating,fixture,[&]{
+                        if(!control->property("hovered").toBool())return;
+                        ++hoveredFrames;
+                        const auto progress=paint->property("hoverProgress").toReal();
+                        if(!intermediateHoverFrame&&paint->property("moving").toBool()&&progress>0&&progress<1){
+                            intermediateHoverFrame=true;sampledHoverProgress=progress;sampledHoverMs=hoverClock.elapsed();
+                        }
+                    });
+                    movePointer(control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint(),0);
+                    const bool sampledIntermediate=QTest::qWaitFor([&]{return intermediateHoverFrame;},1000);
+                    QObject::disconnect(hoverSample);
+                    qInfo()<<"CONTROL_HOVER_FRAME"<<theme<<name<<"progress"<<sampledHoverProgress<<"inputElapsedMs"<<sampledHoverMs<<"hoveredFrames"<<hoveredFrames;
+                    check(sampledIntermediate,"real pointer starts an intermediate hover frame instead of jumping to its endpoint");
                     QTest::qWait(160);
                     qInfo()<<"CONTROL_HOVER"<<theme<<name<<control->property("hovered")<<normal<<paint->property("color")
                            <<"cursor"<<window->mapFromGlobal(QCursor::pos())<<"target"<<control->mapToScene(QPointF(control->width()/2,control->height()/2))<<"active"<<window->isActive();
