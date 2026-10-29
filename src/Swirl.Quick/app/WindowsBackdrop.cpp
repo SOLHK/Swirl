@@ -441,9 +441,16 @@ void WindowsBackdrop::updateBackdropBlur() {
     if(m_window->visibility()==QWindow::Minimized){ShowWindow(blur,SW_HIDE);return;}
     const HWND shell=reinterpret_cast<HWND>(m_window->winId());RECT bounds{};
     if(!GetWindowRect(shell,&bounds)){opaqueFallback();return;}
+    const bool rectangular=m_window->visibility()==QWindow::Maximized || m_window->visibility()==QWindow::FullScreen;
+    if(rectangular){
+        // The maximized HWND includes Windows' invisible resize border.
+        // Material belongs behind the visible client, not that outer frame.
+        POINT origin{};
+        if(!GetClientRect(shell,&bounds)||!ClientToScreen(shell,&origin)){opaqueFallback();return;}
+        OffsetRect(&bounds,origin.x,origin.y);
+    }
     const BOOL dark=m_dark;DwmSetWindowAttribute(blur,20,&dark,sizeof(dark));
     const auto dpr=m_window->devicePixelRatio();
-    const bool rectangular=m_window->visibility()==QWindow::Maximized || m_window->visibility()==QWindow::FullScreen;
     const qreal requested=m_window->property("swirlWindowRadius").toReal();
     // DWM material can ignore HRGN. Its rectangular HWND must itself
     // fit inside the visible curve: at the diagonal the superellipse cuts
@@ -524,7 +531,16 @@ bool WindowsBackdrop::nativeEventFilter(const QByteArray &, void *message, qintp
         *result = 0;
         return true;
     case WM_NCCALCSIZE:
-        if (msg->wParam) { *result = 0; return true; } break;
+        if (msg->wParam) {
+            if(IsZoomed(msg->hwnd)&&!m_window->windowStates().testFlag(Qt::WindowFullScreen)){
+                auto *calculation=reinterpret_cast<NCCALCSIZE_PARAMS *>(msg->lParam);
+                MONITORINFO monitor{sizeof(MONITORINFO)};RECT client{};
+                if(GetMonitorInfoW(MonitorFromRect(&calculation->rgrc[0],MONITOR_DEFAULTTONEAREST),&monitor)
+                    &&IntersectRect(&client,&calculation->rgrc[0],&monitor.rcWork))
+                    calculation->rgrc[0]=client;
+            }
+            *result = 0; return true;
+        } break;
     case WM_GETMINMAXINFO: {
         MONITORINFO monitor{sizeof(MONITORINFO)};
         if (GetMonitorInfoW(MonitorFromWindow(msg->hwnd,MONITOR_DEFAULTTONEAREST), &monitor)) {

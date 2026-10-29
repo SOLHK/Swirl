@@ -8,7 +8,7 @@ Swirl 是面向 Windows 的网络工具，桌面界面使用 **C++23、Qt 6 Quic
 
 > **当前状态：Windows x64 开发测试版。** 版本见 [`PRODUCT_VERSION.txt`](src/Swirl.Quick/PRODUCT_VERSION.txt)。产品只运行 Swirl Rust Core，没有外部代理内核的调用、下载或回退路径。协议可导入、配置可保存，不代表所有远程节点、专用 LAN 或高级功能已经验证。
 
-[![Windows Qt 构建与测试](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml/badge.svg?branch=main)](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml) · [下载测试版](https://github.com/SOLHK/Swirl/releases) · [测试分支](https://github.com/SOLHK/Swirl/tree/test) · [Windows 构建说明](src/Swirl.Quick/BUILDING.md)
+[![Windows Qt 构建与测试](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml/badge.svg?branch=main)](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml) · [测试构建与安装包](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml?query=branch%3Atest) · [测试分支](https://github.com/SOLHK/Swirl/tree/test) · [Windows 构建说明](src/Swirl.Quick/BUILDING.md)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/apec-activity-dark.png">
@@ -57,7 +57,7 @@ HTTP/3 解密、完整断点暂停/编辑、WebSocket 帧检查、HTTP 脚本挂
 
 ## 安装与使用
 
-[Releases](https://github.com/SOLHK/Swirl/releases) 中的预发布版本提供 Windows x64 `Swirl-Setup.exe`。下载安装前核对对应提交与构建结果，并退出已运行的旧版 Swirl。当前安装程序未签名。
+测试安装包来自 [test 的 Windows 构建](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml?query=branch%3Atest)产物 `Swirl-Windows-Installer-EXE`，其中包含 Windows x64 `Swirl-Setup.exe`；仅在对应构建与校验成功后使用。[Releases](https://github.com/SOLHK/Swirl/releases) 保留所有者另行发布的版本，分支更新不会自动创建 Release。下载安装前核对对应提交与构建结果，并退出已运行的旧版 Swirl。当前安装程序未签名。
 
 添加或导入节点后，先检查节点能力说明并完成实际联网测试，再在活动页按需要启用系统代理。TUN、LAN 与网关设置不能因保存草稿就视为可用；HTTPS 解密的证书信任需要明确授权。不同应用读取系统代理或环境变量的方式不同，应通过实际连接路径诊断确认代理是否生效。
 

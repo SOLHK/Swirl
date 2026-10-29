@@ -46,13 +46,17 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     window->setPosition(available.topLeft()+QPoint(60,40));
     window->showNormal();window->raise();window->requestActivate();QTest::qWait(900);
 #ifdef Q_OS_WIN
-    // Keep Qt's flag model in sync: a raw HWND_TOPMOST alone is cleared when
-    // Qt reapplies its flags after the manual DPI/size checks below.
+    // Keep Qt's flag model in sync when native DPI and size changes reapply it.
     window->setFlag(Qt::WindowStaysOnTopHint,true);
     // This explicit validation fixture must not sample an unrelated window
     // that happens to cover Swirl. Temporarily keep the test HWND on top and
     // activate it, without changing any other application's window settings.
     const HWND testHwnd=reinterpret_cast<HWND>(window->winId());
+    // A hidden process STARTUPINFO can suppress Qt's first native ShowWindow
+    // even though QWindow already reports visible. Match the quality fixture.
+    ShowWindow(testHwnd,SW_SHOWNORMAL);
+    check(IsWindowVisible(testHwnd)&&(GetWindowLongPtrW(testHwnd,GWL_STYLE)&WS_VISIBLE),
+          "hidden test-process launch explicitly presents the actual native window");
     SetWindowPos(testHwnd,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE);
     if(GetForegroundWindow()!=testHwnd) {
         const DWORD foregroundThread=GetWindowThreadProcessId(GetForegroundWindow(),nullptr);
@@ -80,9 +84,9 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     const auto normalCorner=cornerCoverage();
     check(backdrop->nativeCorners() || normalCorner.second>=5,"system manages the final contour or fallback has antialiased corners");
     state("Theme.setScalePercent(125)");QTest::qWait(150);
-    check(qAbs(state("Theme.windowRadius").toReal()-22.0)<0.001
-          && qAbs(state("Theme.sidebarRadius").toReal()-14.0)<0.001,
-          "approved 22dp shell and 14dp sidebar contours stay independent of manual content zoom");
+    check(qAbs(state("Theme.windowRadius").toReal()-14.0)<0.001
+          && qAbs(state("Theme.sidebarRadius").toReal()-state("Theme.dp(24)").toReal())<0.001,
+          "approved 14dp shell stays fixed while 24dp sidebar follows manual content zoom");
     state("Theme.resetScale()");QTest::qWait(150);
     // Increasing the minimum geometry for manual UI zoom can enlarge the
     // window. Restore the capture bounds so the bottom corners remain on the
@@ -93,6 +97,9 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
 #ifdef Q_OS_WIN
         if(!backdrop->isCaptureForeground()){qCritical()<<"Native screenshot blocked by foreground or secure desktop";return QImage();}
         check(GetForegroundWindow()==testHwnd,"native screenshot samples the foreground test window");
+        DWORD cloaked=0;
+        check(IsWindowVisible(testHwnd)&&SUCCEEDED(DwmGetWindowAttribute(testHwnd,DWMWA_CLOAKED,&cloaked,sizeof(cloaked)))&&!cloaked,
+            "native screenshot samples a visible uncloaked application window");
         qInfo()<<"Capture state"<<name<<"active="<<window->isActive()<<"foreground="<<(GetForegroundWindow()==reinterpret_cast<HWND>(window->winId()))<<"extended style="<<QString::number(GetWindowLongPtrW(reinterpret_cast<HWND>(window->winId()),GWL_EXSTYLE),16)<<"QML opacity="<<state("Theme.sidebarOpacity");
 #endif
         // Read the actual desktop compositor, never QQuickWindow::grabWindow,
@@ -291,7 +298,37 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     }
     click("windowMaximizeButton");QTest::qWait(500);grab("overview-maximized");
     qInfo()<<"Maximized geometry"<<window->geometry()<<"work area"<<available;
-    check(window->visibility()==QWindow::Maximized&&window->geometry()==window->screen()->availableGeometry(),"Windows maximize respects the available work area and taskbar");
+#ifdef Q_OS_WIN
+    const HWND hwnd=reinterpret_cast<HWND>(window->winId());
+    MONITORINFO monitor{sizeof(MONITORINFO)};RECT nativeFrame{},maximizedClient{};POINT maximizedOrigin{};
+    const bool clientBounds=GetMonitorInfoW(MonitorFromWindow(hwnd,MONITOR_DEFAULTTONEAREST),&monitor)
+        &&GetClientRect(hwnd,&maximizedClient)&&ClientToScreen(hwnd,&maximizedOrigin);
+    OffsetRect(&maximizedClient,maximizedOrigin.x,maximizedOrigin.y);
+    const bool frameKnown=SUCCEEDED(DwmGetWindowAttribute(hwnd,DWMWA_EXTENDED_FRAME_BOUNDS,&nativeFrame,sizeof(nativeFrame)));
+    qInfo()<<"MAXIMIZED_NATIVE_FRAME"<<nativeFrame.left<<nativeFrame.top<<nativeFrame.right<<nativeFrame.bottom
+        <<"CLIENT"<<maximizedClient.left<<maximizedClient.top<<maximizedClient.right<<maximizedClient.bottom
+        <<"WORK_AREA"<<monitor.rcWork.left<<monitor.rcWork.top<<monitor.rcWork.right<<monitor.rcWork.bottom;
+    // DWM reports the entire native frame when NC rendering is disabled.
+    // Every actual client pixel must fit the work area without being cropped.
+    check(window->visibility()==QWindow::Maximized&&IsZoomed(hwnd)&&frameKnown&&clientBounds&&EqualRect(&maximizedClient,&monitor.rcWork),
+        "Windows maximize client exactly matches the monitor work area and excludes the taskbar");
+    click("windowMinimizeButton");
+    WINDOWPLACEMENT placement{sizeof(WINDOWPLACEMENT)};
+    check(GetWindowPlacement(hwnd,&placement)&&window->windowStates().testFlag(Qt::WindowMinimized)
+        &&window->windowStates().testFlag(Qt::WindowMaximized)&&(placement.flags&WPF_RESTORETOMAXIMIZED),
+        "actual minimize button preserves maximized Qt and Windows placement state");
+    SendMessageW(hwnd,WM_SYSCOMMAND,SC_RESTORE,0);QTest::qWait(350);
+    check(IsZoomed(hwnd)&&window->visibility()==QWindow::Maximized,"native taskbar restore retains the button's maximized state");
+    SendMessageW(hwnd,WM_SYSCOMMAND,SC_MINIMIZE,0);QTest::qWait(250);
+    check(window->windowStates().testFlag(Qt::WindowMinimized)&&window->windowStates().testFlag(Qt::WindowMaximized),
+        "native taskbar minimize preserves maximized state");
+    window->setWindowStates(window->windowStates()&~Qt::WindowMinimized);
+    if(!window->isVisible())window->setVisible(true);
+    window->requestActivate();QTest::qWait(350);
+    check(IsZoomed(hwnd)&&window->visibility()==QWindow::Maximized,"instance activation restores maximized state without show resetting it");
+#else
+    check(window->visibility()==QWindow::Maximized&&window->geometry()==window->screen()->availableGeometry(),"maximize respects the available work area");
+#endif
     click("windowMaximizeButton");QTest::qWait(300);
     check(window->visibility()==QWindow::Windowed,"restore returns to windowed state");
     click("windowMinimizeButton");QTest::qWait(300);
@@ -299,15 +336,54 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     window->showNormal();window->requestActivate();QTest::qWait(300);
     check(window->visibility()==QWindow::Windowed,"restore from minimized works");
 #ifdef Q_OS_WIN
-    const HWND hwnd=reinterpret_cast<HWND>(window->winId());
     const auto style=GetWindowLongPtrW(hwnd,GWL_STYLE);
-    check(!(style&WS_CAPTION),"one Windows-style caption control set remains after window state changes");
+    constexpr LONG_PTR required=WS_CAPTION|WS_THICKFRAME|WS_SYSMENU|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
+    check((style&required)==required,"native transition, resize and caption-command styles survive repeated window state changes");
     check(!(GetWindowLongPtrW(hwnd,GWL_EXSTYLE)&WS_EX_LAYERED),"restore retains DWM-compatible alpha composition");
-    check((style&WS_THICKFRAME)&&(style&WS_SYSMENU)&&(style&WS_MAXIMIZEBOX),"native resize and system menu styles preserved");
     RECT rect;GetWindowRect(hwnd,&rect);
+    RECT client{};POINT origin{};
+    check(GetClientRect(hwnd,&client)&&ClientToScreen(hwnd,&origin)&&origin.x==rect.left&&origin.y==rect.top
+        &&client.right==rect.right-rect.left&&client.bottom==rect.bottom-rect.top,"custom client covers the entire HWND without a native caption band");
+    NCCALCSIZE_PARAMS calculation{};calculation.rgrc[0]=rect;
+    check(SendMessageW(hwnd,WM_NCCALCSIZE,TRUE,reinterpret_cast<LPARAM>(&calculation))==0
+        &&EqualRect(&rect,&calculation.rgrc[0]),"native nonclient calculation preserves all client pixels");
+    check(SendMessageW(hwnd,WM_NCPAINT,1,0)==0&&SendMessageW(hwnd,WM_NCACTIVATE,FALSE,0)==TRUE
+        &&SendMessageW(hwnd,WM_NCACTIVATE,TRUE,0)==TRUE,"native nonclient paint and activation are suppressed by the custom frame");
     const auto hit=SendMessageW(hwnd,WM_NCHITTEST,0,MAKELPARAM(rect.left+2,rect.top+2));
     check(hit==HTTOPLEFT,"native corner hit test enables edge resizing");
     check(GetSystemMenu(hwnd,FALSE)!=nullptr,"native Alt+Space menu exists");
+    // A translucent test surface exposes native caption painting that opaque
+    // application cards could conceal. The ordinary scene is restored below.
+    QQmlComponent captionComponent(qmlEngine(window));
+    captionComponent.setData("import QtQuick; Rectangle {color:'#ADF52171';radius:14;antialiasing:true}",QUrl());
+    auto *captionProbe=qobject_cast<QQuickItem *>(captionComponent.create(qmlContext(window)));
+    check(captionProbe,"translucent native-caption fixture created");
+    if(captionProbe){
+        QList<QPair<QQuickItem *,bool>> visibility;
+        for(auto *child:window->contentItem()->childItems()){visibility.append(qMakePair(child,child->isVisible()));child->setVisible(false);}
+        captionProbe->setParentItem(window->contentItem());captionProbe->setSize(window->size());
+        QTest::qWait(150);
+        SendMessageW(hwnd,WM_NCPAINT,1,0);SendMessageW(hwnd,WM_NCACTIVATE,FALSE,0);SendMessageW(hwnd,WM_NCACTIVATE,TRUE,0);
+        QTest::qWait(100);
+        const auto alphaSurface=window->grabWindow();
+        check(!alphaSurface.isNull()&&qAbs(alphaSurface.pixelColor(alphaSurface.width()/2,alphaSurface.height()/2).alpha()-173)<=1,
+            "native-caption fixture remains translucent instead of hiding native paint with opaque fill");
+        const auto captionFrame=grab("native-caption-alpha");
+        bool clean=!captionFrame.isNull();int delta=0;
+        if(clean){
+            const auto dpr=window->devicePixelRatio();
+            const auto expected=captionFrame.pixelColor(qRound(window->width()*0.6*dpr),qRound(100*dpr));
+            for(int y=qRound(8*dpr);y<qRound(28*dpr);++y)for(int x=qRound(window->width()*0.55*dpr);x<qRound(window->width()*0.94*dpr);++x){
+                const auto color=captionFrame.pixelColor(x,y);
+                delta=qMax(delta,qMax(qAbs(color.red()-expected.red()),qMax(qAbs(color.green()-expected.green()),qAbs(color.blue()-expected.blue()))));
+            }
+            qInfo()<<"NATIVE_CAPTION_ALPHA_DELTA"<<delta;
+        }
+        check(clean&&delta<=2,"actual DWM translucent header has no native caption, buttons or frame stripe");
+        delete captionProbe;
+        for(const auto &entry:visibility)entry.first->setVisible(entry.second);
+        QTest::qWait(100);
+    }
     const auto cpuTime=[](){FILETIME create{},exit{},kernel{},user{};GetProcessTimes(GetCurrentProcess(),&create,&exit,&kernel,&user);ULARGE_INTEGER k{},u{};k.LowPart=kernel.dwLowDateTime;k.HighPart=kernel.dwHighDateTime;u.LowPart=user.dwLowDateTime;u.HighPart=user.dwHighDateTime;return k.QuadPart+u.QuadPart;};
     PROCESS_MEMORY_COUNTERS_EX before{},after{};
     GetProcessMemoryInfo(GetCurrentProcess(),reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&before),sizeof(before));
