@@ -44,7 +44,7 @@ Item {
     onWindowVisibleChanged:if(!windowVisible)finish()
     Component.onCompleted:{initialized=true;finish()}
     NumberAnimation{id:hoverTravel;target:feedback;property:"hover";duration:SwirlMotion.hoverDuration;easing.type:Easing.OutCubic}
-    NumberAnimation{id:pressTravel;target:feedback;property:"contact";to:1;duration:SwirlMotion.pressDuration;easing.type:Easing.OutCubic}
+    NumberAnimation{id:pressTravel;target:feedback;property:"contact";to:1;duration:SwirlMotion.pressDuration;easing.type:Easing.OutExpo}
     SpringAnimation{id:contactTravel;target:feedback;property:"contact";to:0;spring:SwirlMotion.interactionSpring;damping:SwirlMotion.interactionDamping;epsilon:0.002}
     NumberAnimation{id:focusTravel;target:feedback;property:"focusAmount";duration:SwirlMotion.focusDuration;easing.type:Easing.OutCubic}
     Connections {target:SwirlMotion;function onReducedChanged(){if(SwirlMotion.reduced)feedback.finish()}}
