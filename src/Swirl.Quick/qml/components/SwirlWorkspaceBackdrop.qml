@@ -9,7 +9,9 @@ Item {
     property Item glassSurface: null
     property bool glassSampled: false
     readonly property Item decorationSource: decoration
-    readonly property bool splitDecoration: glassSampled && Theme.effectsSupported
+    // Kept for callers which inspect the material, but the clear sidebar never
+    // replaces any part of the original vector scene with a captured texture.
+    readonly property bool splitDecoration: false
     readonly property rect glassBounds: {
         if (!glassSurface) return Qt.rect(0, 0, 0, 0)
         glassSurface.x; glassSurface.y; glassSurface.width; glassSurface.height
@@ -87,28 +89,10 @@ Item {
                 anchors.fill: parent
                 largeWing: true
                 progress: canvas.progress
-                opacity: Theme.wingOpacity
+                // The gradient already carries per-colour alpha. Keep the
+                // original vector equally legible inside and outside the pane.
+                opacity: Theme.dark ? 0.48 : 0.56
             }
         }
-    }
-    ShaderEffectSource {
-        id: wingTexture
-        sourceItem: canvas.splitDecoration ? decoration : null
-        hideSource: canvas.splitDecoration
-        visible: false
-        live: canvas.presenting && decoration.visible
-        smooth: true
-        textureSize: Qt.size(Math.max(1, Math.ceil(canvas.width * Screen.devicePixelRatio)),
-                             Math.max(1, Math.ceil(canvas.height * Screen.devicePixelRatio)))
-    }
-    ShaderEffect {
-        anchors.fill: parent
-        visible: canvas.splitDecoration && canvas.presenting && decoration.visible
-        property var source: wingTexture
-        property vector2d surfaceSize: Qt.vector2d(width, height)
-        property vector4d glassRect: Qt.vector4d(canvas.glassBounds.x, canvas.glassBounds.y, canvas.glassBounds.width, canvas.glassBounds.height)
-        property real cornerRadius: Theme.sidebarRadius
-        property real glassActive: 1
-        fragmentShader: "qrc:/swirl/shaders/workspace-wing.frag.qsb"
     }
 }

@@ -24,16 +24,16 @@ void main() {
     float aa=max(fwidth(d),0.001);
     // Only a one-physical-pixel bevel catches light. The pane interior is
     // exactly transparent, including while hovering, focusing or pressing.
-    float rim=(1.0-smoothstep(pixelWidth*0.5,pixelWidth*1.15,abs(d+pixelWidth*0.5)))
-        *(1.0-smoothstep(-aa,aa,d));
+    float rim=smoothstep(-pixelWidth-aa*0.5,-pixelWidth+aa*0.5,d)
+        *(1.0-smoothstep(-aa*0.5,aa*0.5,d));
     if(rim<=0.0) { fragColor=vec4(0); return; }
     vec2 normal=normalize(vec2(distanceToSurface(p+vec2(0.5,0))-distanceToSurface(p-vec2(0.5,0)),
         distanceToSurface(p+vec2(0,0.5))-distanceToSurface(p-vec2(0,0.5)))+vec2(0.00001));
     float facing=max(0.0,dot(normal,normalize(vec2(-0.65,-1.0))));
     vec2 lightDelta=(p-lightPoint*surfaceSize)/max(4.0*cornerRadius,1.0);
     float localLight=interaction*exp(-dot(lightDelta,lightDelta)*2.0);
-    float highlight=rim*(0.10+0.22*facing+0.16*localLight)*highlightColor.a;
-    float reflection=rim*(1.0-facing)*0.055*reflectionColor.a;
+    float highlight=rim*(0.28+0.24*facing+0.12*localLight)*highlightColor.a;
+    float reflection=rim*(1.0-facing)*0.16*reflectionColor.a;
     vec4 color=vec4(highlightColor.rgb*highlight,highlight);
     color+=vec4(reflectionColor.rgb*reflection,reflection)*(1.0-color.a);
     fragColor=color*qt_Opacity;

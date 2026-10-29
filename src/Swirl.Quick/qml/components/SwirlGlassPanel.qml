@@ -28,18 +28,18 @@ SwirlContinuousSurface {
     color: surfaceHidden ? Theme.withAlpha(surfaceColor,0) : surfaceColor
     border.width: surfaceHidden ? 0 : Theme.increaseContrast ? Theme.dp(2) : independentCard ? 1 / Screen.devicePixelRatio : 0
     border.color:Theme.increaseContrast ? Theme.text : Theme.border
-    // The same continuous contour casts an exterior-only, background shadow.
+    // A short contact shadow anchors the card without grey side bands.
     ShaderEffect {
         x: -padding; y: -padding; z: -1
         width: panel.width + 2 * padding; height: panel.height + 2 * padding
         visible: !panel.surfaceHidden && panel.independentCard && Theme.effectsSupported
-        property real padding: Theme.dp(16)
+        property real padding: Theme.dp(10)
         property vector2d surfaceSize: Qt.vector2d(panel.width, panel.height)
         property real cornerRadius: panel.radius
-        property vector2d shadowOffset: Qt.vector2d(0, Theme.dp(3))
-        property real softness: Theme.dp(6)
-        property color shadowColor: Theme.withAlpha(Theme.shadowColor, panel.pressed ? Theme.cardShadowOpacity * 0.55 : panel.interactive && panel.hovered ? Theme.cardShadowOpacity + 0.025 : Theme.cardShadowOpacity)
-        fragmentShader: "qrc:/swirl/shaders/sidebar-shadow.frag.qsb"
+        property vector2d shadowOffset: Qt.vector2d(0, Theme.dp(2))
+        property real softness: Theme.dp(3)
+        property color shadowColor: Theme.withAlpha(Theme.shadowColor, (Theme.dark ? 0.10 : 0.025) * (panel.pressed ? 0.65 : panel.interactive && panel.hovered ? 1.15 : 1))
+        fragmentShader: "qrc:/swirl/shaders/card-shadow.frag.qsb"
         Behavior on shadowColor { ColorAnimation { duration: SwirlMotion.hoverDuration } }
     }
 

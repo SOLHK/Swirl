@@ -21,10 +21,12 @@ Item {
         id:surface;parent:slot.animationLayer;z:10
         visible:slot.visible;enabled:slot.enabled
         x:transfer.cardX;y:transfer.cardY;width:transfer.cardWidth;height:transfer.cardHeight
-        clip:true
         Item {
-            id:body;width:slot.width;height:slot.height
-            opacity:transfer.moving?Math.max(0,Math.min(1,(transfer.reveal-0.15)/0.7)):1
+            width: surface.width; height: surface.height; clip: true
+            Item {
+                id:body;width:slot.width;height:slot.height
+                opacity:transfer.moving?Math.max(0,Math.min(1,(transfer.reveal-0.15)/0.7)):1
+            }
         }
     }
 }

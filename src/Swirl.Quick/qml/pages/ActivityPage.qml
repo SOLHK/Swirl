@@ -233,17 +233,38 @@ Item {
                 objectName: "activityStatusCard"
                 Layout.fillWidth: true; Layout.minimumHeight: statusBody.implicitHeight + Theme.dp(24); Layout.preferredHeight: Layout.minimumHeight
                 cornerRadius: Theme.cardRadius; color: Theme.surface
-                SwirlWingAnimation {
-                    objectName: "activityStatusWingBackdrop"
-                    x: statusCard.width - width - Theme.dp(18); y: (statusCard.height - height) / 2
-                    width: Math.min(statusCard.width * 0.32, Theme.dp(200)); height: statusCard.height - Theme.dp(16)
-                    progress: 1; opacity: Theme.dark ? 0.11 : 0.065
+                Item {
+                    id: statusEmblem
+                    objectName: "activityStatusEmblem"
+                    x: page.compact ? Theme.dp(18) : statusCard.width - width - Theme.dp(10)
+                    y: page.compact ? Theme.dp(12) : (statusCard.height - height) / 2
+                    width: Theme.dp(page.compact ? 48 : 108)
+                    height: page.compact ? Theme.dp(32) : statusCard.height - Theme.dp(20)
+                    Accessible.ignored: true
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: Theme.dp(page.compact ? 12 : 24)
+                        color: Theme.raised; antialiasing: true
+                    }
+                    SwirlWingAnimation {
+                        objectName: "activityStatusWingBackdrop"
+                        anchors.fill: parent; anchors.margins: Theme.dp(page.compact ? 4 : 2)
+                        progress: 1
+                        // The resting mark is branding; only the overlaid wing
+                        // follows the actual system-proxy transition.
+                        opacity: 0.62 * (1 - SwirlProxyWingMotion.progress)
+                    }
+                    SwirlFlow {
+                        objectName: "activityProxyWing"
+                        anchors.fill: parent; anchors.margins: Theme.dp(page.compact ? 4 : 2)
+                        phase: page.proxyPhase; proxyWing: true
+                    }
                 }
                 ColumnLayout {
-                    id: statusBody; anchors.fill: parent; anchors.margins: Theme.dp(12); anchors.leftMargin: Theme.dp(18); anchors.rightMargin: Theme.dp(18); spacing: Theme.dp(8)
+                    id: statusBody; anchors.fill: parent; anchors.margins: Theme.dp(12); anchors.leftMargin: Theme.dp(18); anchors.rightMargin: Theme.dp(page.compact ? 18 : 128); spacing: Theme.dp(8)
                     RowLayout {
                         Layout.fillWidth: true; spacing: Theme.dp(10)
-                        SwirlFlow { objectName: "activityProxyWing"; Layout.preferredWidth: Theme.dp(40); Layout.preferredHeight: Theme.dp(20); phase: page.proxyPhase; proxyWing: true }
+                        Item { visible: page.compact; Layout.preferredWidth: Theme.dp(48); Layout.preferredHeight: Theme.dp(32) }
                         SwirlText { text: page.proxySummary; font.pixelSize: Theme.fontSize(15); font.weight: Font.DemiBold; color: Theme.text; Layout.fillWidth: true; elide: Text.ElideRight }
                         Rectangle {
                             objectName: "activityRuntimeCapsule"
