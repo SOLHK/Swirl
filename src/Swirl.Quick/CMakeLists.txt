@@ -509,7 +509,7 @@ if(WIN32)
  add_dependencies(Swirl swirl-generate-icon)
  add_custom_command(TARGET Swirl POST_BUILD
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_GENERATED_ICON}"
-          "${CMAKE_CURRENT_BINARY_DIR}/Swirl-brand-0216-original-knot-v3.ico"
+          "${CMAKE_CURRENT_BINARY_DIR}/Swirl-brand-0216-original-knot-v4.ico"
   VERBATIM)
  configure_file(app/Swirl.rc.in "${CMAKE_CURRENT_BINARY_DIR}/Swirl.rc" @ONLY)
  # RC includes the generated ICO by path; Ninja does not discover that input.

@@ -28,9 +28,10 @@ the dialog contract. This avoids a production compiled-QML default-`data`
 warning; the staged 61-page smoke must remain free of Qt/QML warnings.
 
 Windows uses `assets/icons/swirl_windows.svg`, preserving every original path
-and the original horizontally open cloud-knot proportions. Consistent optical
-ribbon weight improves the painted subject area and small-size clarity. No
-whole-mark stretch or reshaped curl changes the reference artwork. The
+and the original horizontally open cloud-knot proportions. The final requested
+line weight uses the canonical filled ribbon contours with no added stroke.
+Native rasterization removes transparent artboard margins without stretching
+or reshaping any curl. The
 application-scene logo remains canonical SVG. Buttons use filled hover/focus
 feedback, with no added normal-state interaction or focus outlines.
 All 18 native sizes are rendered by the same rasterizer for runtime QIcon and
@@ -40,7 +41,7 @@ regenerated icon. `tools/Verify-WindowsIconResources.py` rejects any frame or
 EXE resource mismatch before package staging writes its manifest.
 
 The window publishes its explicit AppID and relaunch resources before first
-show. `Swirl-brand-0216-original-knot-v3.ico` gives the shell a distinct resource path.
+show. `Swirl-brand-0216-original-knot-v4.ico` gives the shell a distinct resource path.
 The installer repairs only existing Swirl shortcuts targeting that installation
 and notifies the shell. During investigation, correct native HICONs coexisted
 with the old taskbar group image. Item-only notifications retained that bitmap;

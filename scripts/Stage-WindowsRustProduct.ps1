@@ -52,7 +52,7 @@ foreach ($name in $files) { Copy-Item -LiteralPath (Join-Path $bin $name) -Desti
 Copy-Item -LiteralPath (Join-Path $repo 'src/Swirl.Quick/packaging/licenses') -Destination $stage -Recurse
 Copy-Item -LiteralPath (Join-Path $repo 'src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt') -Destination $stage
 Copy-Item -LiteralPath (Join-Path $repo 'src/Swirl.Quick/packaging/README-RustProductPreview.txt') -Destination (Join-Path $stage 'README.txt')
-foreach ($name in @('Swirl-brand-phase3.ico','Swirl-brand-0216-original-knot-v3.ico')) {
+foreach ($name in @('Swirl-brand-phase3.ico','Swirl-brand-0216-original-knot-v4.ico')) {
     Copy-Item -LiteralPath (Join-Path $build 'brand/Swirl.ico') -Destination (Join-Path $stage $name)
 }
 & windeployqt --release --compiler-runtime --qmldir (Join-Path $repo 'src/Swirl.Quick/qml') (Join-Path $stage 'Swirl.exe')
