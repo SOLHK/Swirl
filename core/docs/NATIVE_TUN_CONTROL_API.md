@@ -87,6 +87,22 @@ paths; simultaneous termination of both processes still requires a later
 `--recover` or startup recovery. This is not an installed always-on recovery
 service.
 
+The worker uses one bounded response writer and waits at most two seconds for
+each response to be written. A blocked or broken output poisons the connection;
+the worker restores its owned network state and exits without attempting another
+synchronous stdout write. The supervisor bounds both forwarding cleanup and its
+final recovery report. A timed-out report was not delivered: inspect the exit
+status and use explicit recovery as needed.
+
+Each fixed PowerShell operation has a 30-second deadline covering redirected
+stdin as well as execution. A command starts suspended, joins a private
+kill-on-close Job Object, and then resumes; unowned execution is never a
+fallback. Timeout or command-owner loss terminates its process tree. This does
+not undo an operation already accepted by the external CIM/WMI service: callers
+must still inspect recovery results and preserve a conflicting journal. A
+crash in the small creation-to-assignment window can leave a suspended process
+that has not executed the command, so atomic process creation is not claimed.
+
 ## Request envelope and identity
 
 Every native TUN request contains:
@@ -350,8 +366,13 @@ conflicts are retained.
 A successful response includes `state: "recovered"`, `journals_restored`, and
 `active_owners`. Nonzero `active_owners` means live sessions were deliberately
 left alone; it does not mean all TUN sessions were stopped. Recovery does not
-restore a previously running Core or reconnect a TUN. Start a new session only
-after resolving stale state and obtaining a new valid helper Core handle.
+restore a previously running Core or reconnect a TUN. A live suspended session
+can retain its Core egress lease without a current network journal, in which
+case recovery returns `TunEgressStillOwned`. Use `native_tun_stop` for a live
+session first. Recovery can release an abandoned Core egress guard only after
+its owned journals are safely restored; it never takes a live lease away.
+Start a new session only after resolving stale state and obtaining a valid
+handle/epoch in the current helper worker.
 
 ## Errors and integration behavior
 
@@ -365,7 +386,7 @@ text to execute. Examples from the implemented paths include:
 | `UnknownHandle`, `EngineEpochMismatch` | Refresh the handle/epoch from the same helper worker; a stale reference must not control a new Core. |
 | `TunHelperRequired`, `TunWindowsRequired`, `TunHelperPermission` | The operation is unavailable in the current process/platform/privilege context. Do not elevate the GUI as a fallback. |
 | `DnsEncryptedUpstreamRequired`, `TunRequiresQuiescentCore`, `Reconfiguring` | Resolve Core preconditions through the existing V2 configuration/session workflow. |
-| `TunAlreadyOwned`, `TunOwnedByAnotherHelper`, `TunNetworkConflict` | Respect the current owner or conflicting network; do not replace an existing adapter/journal. |
+| `TunAlreadyOwned`, `TunOwnedByAnotherHelper`, `TunEgressStillOwned`, `TunNetworkConflict` | Respect the current owner or conflicting network; do not replace an existing adapter/journal. |
 | `TunPhysicalNetworkUnavailable`, `TunEgressUnavailable`, `TunWindowsNetworkOperation` | Report failure or pending retry. A generic Windows-operation code can cover a driver, firewall, or OS precondition failure. |
 | `TunRecoveryRequired`, `TunRecoveryConflict`, `TunRecoveryFailed`, `TunRecoveryJournalInvalid` | Keep recovery evidence and use the owned recovery path. Never delete a journal to make a subsequent start appear successful. |
 
