@@ -2,12 +2,12 @@
   "schema": 1,
   "product": "Swirl",
   "version": "0.2.23",
-  "application_source_revision": "4122f72ed8dc8a494854bfa35f3b21be4b6a7154",
-  "application_sha256": "fb3f79b67be0e52649c0b9216cc24026a5038567556d7e9b0efa8583f60911b5",
-  "paired_rust_source_revision": "4122f72ed8dc8a494854bfa35f3b21be4b6a7154",
-  "paired_rust_build_id": "44a62588278b9cbbf426f91ff233a5a0eacc3152ae5224f34cb2b9214e55e245",
+  "application_source_revision": "9ca4b3310ecf2a063861dec367b3238763968500",
+  "application_sha256": "59407aa840eac3cc2c3c9e8a8980b20668fd7088d3971a96eb65c7a624c7ea30",
+  "paired_rust_source_revision": "9ca4b3310ecf2a063861dec367b3238763968500",
+  "paired_rust_build_id": "6b08382a69221e9afcbc4f306dea22bbdd4f0aa0f09ca60b3a70679adc902e81",
   "runtime": "Qt 6.12.0 MinGW x64, loaded from matching SDK kit/bin; original product build cache, not an installer acceptance run",
-  "ui_input_digest_sha256": "7a4d7b83ae95b08171b96cc2639bced1441c6909e29bcda0cda7e8d5a3d3101f",
+  "ui_input_digest_sha256": "1c42b69d973af98493f81d7ab09cd62e30dc95bb1f6d597dc5695ca68a99d0cc",
   "ui_input_digest_algorithm": "SHA-256 over UTF-8 sorted relative-path + NUL + lowercase working-file SHA-256 + LF records",
   "source_match": "Each UI input matches the named Git revision after repository-configured Git text filters; ui_inputs record actual working bytes used by the build",
   "git_text_filter_normalized_paths": [
@@ -60,7 +60,7 @@
     "src/Swirl.Quick/app/WindowEdge.h": "2668c1a23baefd57c675f4ff6fd22cb7a10cdfebc3bf60693db8635a14f82779",
     "src/Swirl.Quick/app/WindowShadowRenderer.cpp": "b75396c7be62e56e0a94d505c269496fc4699234dad28fc6637318eaa9e4e649",
     "src/Swirl.Quick/app/WindowShadowRenderer.h": "ec006bccb709029171e33d76b7153fe182a43329fc25492da5ebbc316e31b551",
-    "src/Swirl.Quick/app/WindowsBackdrop.cpp": "1221a978c589053f727b03079a0333fa4468412df546b8087a4eb5355deda588",
+    "src/Swirl.Quick/app/WindowsBackdrop.cpp": "c00954cf928bae5ae402fe4d2208779b4a849ccfe4abaeb877fa0e66d960aaf3",
     "src/Swirl.Quick/app/WindowsBackdrop.h": "c135682062be127d265aa98618f01da731bc67e72d1e75d4f6f0c49758ace830",
     "src/Swirl.Quick/assets/brand/swirl-symbol.svg": "8db944ef3ca1469b37b991c9feeec5e499422bf46ff1a554db2cc9ec6339eb42",
     "src/Swirl.Quick/assets/fonts/HarmonyOS_Sans_SC_Bold.ttf": "9aa37f5edd6bf15af8b8b1655b8455753cd61abaf5d53454d4966261923b6c61",
@@ -232,7 +232,7 @@
     "src/Swirl.Quick/qml/controls/SwirlLinkedDetail.qml": "f29f942d43d65679efae5f7f06c15528c0445908b28323893a046f898ede96da",
     "src/Swirl.Quick/qml/controls/SwirlMotionButton.qml": "8942bf258a261d70490c8a15701cf01f9c0b7c917fe46d3404c52bc5ee4aa3da",
     "src/Swirl.Quick/qml/controls/SwirlNodeTransfer.qml": "d1589faa031ecaa34ae7d3b129035bee9e07927535485e355cff18fab89120ff",
-    "src/Swirl.Quick/qml/controls/SwirlPageHost.qml": "4c3d1d5f582e503c3f3c5671fe501bfddd32605ae9f7603ea6c6d0a9bb6db655",
+    "src/Swirl.Quick/qml/controls/SwirlPageHost.qml": "1f4febdadb7013d452a291e49fce67fb2ebaaf48817dc740ec54c52bd69c4513",
     "src/Swirl.Quick/qml/controls/SwirlPillSurface.qml": "dd9ef334ed856ee9eed04e9af562aae50eb08432531f33b69597f9bfeaa9538e",
     "src/Swirl.Quick/qml/controls/SwirlPopupMotion.qml": "a5aca6764b869c3038c9ab2ff4d567d99ece8717da86ec84a4697d85e15670fb",
     "src/Swirl.Quick/qml/controls/SwirlPressMotion.qml": "dd67cbedf843be2c12d81ea0b8892b127a3d64539f7aa10a62b9ec473544ab3b",
@@ -300,8 +300,9 @@
     "state": "Not started / not connected. No connect/toggle command was sent.",
     "privacy": "Only owned product and controlled-background pixels; native z-order and every output pixel ownership checked before GDI capture",
     "postprocessing": "None; native screenshot pixels saved as PNG without retouching, recoloring or data replacement",
-    "observer_source_sha256": "250811372a40edea583b18231751c2f837d3adb38a2d5f865540e27127a9b30a",
-    "observer_executable_sha256": "17428990f46c3dbafce1145dc7c575ca525a0647ed2647ea96e5a32dc0dda75b"
+    "observer_source_sha256": "1f10b24f55381e875b7be56e52c2cedba72357acb513f37a683bbc98b76809ea",
+    "observer_executable_sha256": "38f6139cc1d9828bd9e972366d8e83ce0f403d996f472759a36f61b997716c6e",
+    "hover_reset": "WM_MOUSEMOVE(1,1) delivered only to the owned product HWND; no clicks or global cursor movement"
   },
   "screenshots": [
     {
@@ -317,9 +318,9 @@
         1008
       ],
       "device_pixel_ratio": 1.5,
-      "visible_settle_ms": 5414,
+      "visible_settle_ms": 5365,
       "all_output_pixels_ownership_checked": true,
-      "visual_inspection": "Real complete application; version 0.2.23; not started/not connected; no fabricated exit IP, traffic, latency, node or running knot"
+      "visual_inspection": "Real complete application; version 0.2.23; not started/not connected; no tooltip occlusion, fabricated exit IP, traffic, latency, node or running knot"
     },
     {
       "file": "apec-activity-dark.png",
@@ -334,9 +335,9 @@
         1008
       ],
       "device_pixel_ratio": 1.5,
-      "visible_settle_ms": 5377,
+      "visible_settle_ms": 5316,
       "all_output_pixels_ownership_checked": true,
-      "visual_inspection": "Real complete application; version 0.2.23; not started/not connected; no fabricated exit IP, traffic, latency, node or running knot"
+      "visual_inspection": "Real complete application; version 0.2.23; not started/not connected; no tooltip occlusion, fabricated exit IP, traffic, latency, node or running knot"
     }
   ],
   "limits": [
