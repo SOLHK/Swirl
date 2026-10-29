@@ -1,10 +1,11 @@
 # Current final acceptance and branch delivery (2026-10-29)
 
-- The latest user request advances the next delivery to 0.2.17 before the next GitHub push. Keep application, PE and installer versions synchronized, and vertically center Activity's policy-selector arrow across the full two-line control.
+- The next final delivery is 0.2.18, distinguishing the network repair from the 0.2.17 UI checkpoint. Keep application, PE and installer versions synchronized, and vertically center Activity's policy-selector arrow across the full two-line control.
 - The latest user explicitly permits slight Windows-only structural optical correction: tuck the side clouds inward and enlarge the central knot within the fixed taskbar canvas. Preserve a horizontally wide silhouette and fine contours without added strokes; the in-app canonical artwork stays unchanged. Ordinary buttons remain borderless in hover, press and focus. Keep all existing animation and visual effects while fixing measured rendering problems.
 - Complete actual taskbar comparisons, native Windows 100/125/150/175/200% DPI and button-motion checks, plus exact-source installer verification before updating `test`. Temporary scale changes are for acceptance only; restore the original 150% setting and never use system scale/taskbar height to conceal icon defects.
 - The latest user CANCELLED main promotion/recreation. Push only to `test` after acceptance; do not delete, recreate or push main or change its protection/default-branch settings. Preserve unrelated work on `test` through integration.
 - Keep Clash/Mihomo configuration and subscription import compatibility; remove obsolete external core, invocation and packaging paths. Preserve required dependencies/licenses and do not touch other installed proxy applications, private data or the host proxy/TUN/routes/DNS.
+- The user subsequently chose to include the Windows REALITY + Vision compatibility failure before the next test delivery. The already pushed `4ee3b2c` is only a UI checkpoint, not final acceptance. Repair the network root cause with strict tests, then update test after verification. Main remains out of scope.
 
 # Swirl active engineering contract — APEC V3 / Rust-only (2026-10-27)
 

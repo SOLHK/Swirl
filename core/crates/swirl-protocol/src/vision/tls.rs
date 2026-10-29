@@ -6,6 +6,8 @@
 //! those responsibilities stay with the actual inner TLS endpoints. A
 //! `Candidate` is consequently never permission to bypass the outer channel.
 
+use sha2::{Digest, Sha256};
+
 const MAX_HELLO: usize = 64 * 1024;
 const MAX_SUITES: usize = 256;
 const MAX_EXTENSIONS: usize = 256;
@@ -54,13 +56,23 @@ pub enum Eligibility {
 
 struct Hello {
     tls13: bool,
+    retry: bool,
+    random: [u8; 32],
     session_id: Vec<u8>,
     suites: Vec<u16>,
+    stable_extensions: [u8; 32],
+    supported_groups: Vec<u16>,
+    key_share_groups: Vec<u16>,
+    key_share: Option<[u8; 32]>,
+    selected_group: Option<u16>,
+    cookie: Option<[u8; 32]>,
+    early_data: bool,
+    pre_shared_key: bool,
 }
 
 enum Status {
     Inspecting,
-    Hello(Hello),
+    Hello(Box<Hello>),
     Ineligible(Ineligible),
 }
 
@@ -73,6 +85,7 @@ struct DirectionState {
     hello: Vec<u8>,
     hello_total: Option<usize>,
     application_record: bool,
+    retrying: bool,
 }
 
 impl DirectionState {
@@ -86,6 +99,7 @@ impl DirectionState {
             hello: Vec::new(),
             hello_total: None,
             application_record: false,
+            retrying: false,
         }
     }
 
@@ -133,9 +147,13 @@ impl DirectionState {
                 self.hello = Vec::new();
                 self.hello_total = None;
                 self.status = match parsed {
-                    Ok(hello) => Status::Hello(hello),
+                    Ok(hello) => Status::Hello(Box::new(hello)),
                     Err(reason) => Status::Ineligible(reason),
                 };
+                if !bytes.is_empty() && matches!(&self.status, Status::Hello(hello) if hello.retry)
+                {
+                    self.reject(Ineligible::HelloRetryRequest);
+                }
             }
         }
     }
@@ -145,6 +163,8 @@ impl DirectionState {
             if matches!(self.status, Status::Ineligible(_)) {
                 return;
             }
+            let retrying =
+                self.retrying || matches!(&self.status, Status::Hello(hello) if hello.retry);
             if self.header_used < 5 {
                 let count = (5 - self.header_used).min(bytes.len());
                 self.record_header[self.header_used..self.header_used + count]
@@ -153,7 +173,10 @@ impl DirectionState {
                 bytes = &bytes[count..];
                 // Detect ordinary application protocols without retaining a
                 // false TLS header until a later read happens to complete it.
-                if self.record_header[0] != 22 && matches!(self.status, Status::Inspecting) {
+                if self.record_header[0] != 22
+                    && !(retrying && self.record_header[0] == 20)
+                    && matches!(self.status, Status::Inspecting)
+                {
                     self.reject(Ineligible::NotTls);
                     return;
                 }
@@ -161,6 +184,10 @@ impl DirectionState {
                     continue;
                 }
                 let kind = self.record_header[0];
+                if kind == 22 && matches!(&self.status, Status::Hello(hello) if hello.retry) {
+                    self.reject(Ineligible::HelloRetryRequest);
+                    return;
+                }
                 let length =
                     u16::from_be_bytes([self.record_header[3], self.record_header[4]]) as usize;
                 let inspecting = matches!(self.status, Status::Inspecting);
@@ -174,7 +201,8 @@ impl DirectionState {
                     || !matches!(self.record_header[2], 1..=3)
                     || length == 0
                     || length > maximum
-                    || (inspecting && kind != 22)
+                    || (inspecting && kind != 22 && !(retrying && kind == 20))
+                    || (retrying && kind == 20 && (length != 1 || !self.hello.is_empty()))
                 {
                     self.reject(Ineligible::Malformed);
                     return;
@@ -182,8 +210,21 @@ impl DirectionState {
                 self.record_remaining = length;
             }
             let count = self.record_remaining.min(bytes.len());
-            if matches!(self.status, Status::Inspecting) {
+            if retrying && self.record_header[0] == 20 {
+                if count != 0 && bytes[..count] != [1] {
+                    self.reject(Ineligible::Malformed);
+                    return;
+                }
+            } else if matches!(self.status, Status::Inspecting) {
                 self.hello_bytes(&bytes[..count]);
+                // A plaintext HRR must end its record. Otherwise a read split
+                // at the hello boundary could hide a trailing handshake.
+                if self.record_remaining != count
+                    && matches!(&self.status, Status::Hello(hello) if hello.retry)
+                {
+                    self.reject(Ineligible::HelloRetryRequest);
+                    return;
+                }
             }
             bytes = &bytes[count..];
             self.record_remaining -= count;
@@ -235,12 +276,9 @@ fn parse_hello(direction: Direction, bytes: &[u8]) -> Result<Hello, Ineligible> 
     if !(0x0301..=0x0303).contains(&legacy_version) {
         return Err(Ineligible::Version);
     }
-    let random = cursor.take(32)?;
-    if direction == Direction::ServerToClient && random == RETRY_RANDOM {
-        // A retry is not the negotiated ServerHello. Until the second-flight
-        // exchange is implemented, retain the safe outer channel explicitly.
-        return Err(Ineligible::HelloRetryRequest);
-    }
+    let mut random = [0; 32];
+    random.copy_from_slice(cursor.take(32)?);
+    let retry = direction == Direction::ServerToClient && random == RETRY_RANDOM;
     let session_id = cursor.vector8()?.to_vec();
     if session_id.len() > 32 {
         return Err(Ineligible::Malformed);
@@ -277,6 +315,14 @@ fn parse_hello(direction: Direction, bytes: &[u8]) -> Result<Hello, Ineligible> 
         }
     }
     let mut tls13 = false;
+    let mut stable_extensions = Sha256::new();
+    let mut supported_groups = Vec::new();
+    let mut key_share_groups = Vec::new();
+    let mut key_share = None;
+    let mut selected_group = None;
+    let mut cookie = None;
+    let mut early_data = false;
+    let mut pre_shared_key = false;
     if !cursor.0.is_empty() {
         let mut extensions = Cursor(cursor.vector16()?);
         if !cursor.0.is_empty() {
@@ -293,6 +339,67 @@ fn parse_hello(direction: Direction, bytes: &[u8]) -> Result<Hello, Ineligible> 
                 return Err(Ineligible::InspectionLimit);
             }
             seen.push(kind);
+            // RFC 8446 4.1.2 permits only these changes in ClientHello2.
+            // Retain a fixed-size digest, rather than another full hello.
+            if !matches!(kind, 21 | 41 | 42 | 44 | 51) {
+                stable_extensions.update(kind.to_be_bytes());
+                stable_extensions.update((value.len() as u16).to_be_bytes());
+                stable_extensions.update(value);
+            }
+            if retry && !matches!(kind, 43 | 44 | 51) {
+                return Err(Ineligible::HelloRetryRequest);
+            }
+            if kind == 10 && direction == Direction::ClientToServer {
+                let mut groups = Cursor(value);
+                let list = groups.vector16()?;
+                if !groups.0.is_empty()
+                    || list.is_empty()
+                    || !list.len().is_multiple_of(2)
+                    || list.len() / 2 > MAX_EXTENSIONS
+                {
+                    return Err(Ineligible::Malformed);
+                }
+                supported_groups.extend(
+                    list.as_chunks::<2>()
+                        .0
+                        .iter()
+                        .map(|v| u16::from_be_bytes(*v)),
+                );
+            }
+            if kind == 51 {
+                key_share = Some(Sha256::digest(value).into());
+                let mut share = Cursor(value);
+                if direction == Direction::ClientToServer {
+                    let mut entries = Cursor(share.vector16()?);
+                    if !share.0.is_empty() {
+                        return Err(Ineligible::Malformed);
+                    }
+                    while !entries.0.is_empty() {
+                        let group = entries.word()?;
+                        if entries.vector16()?.is_empty()
+                            || key_share_groups.contains(&group)
+                            || key_share_groups.len() == MAX_EXTENSIONS
+                        {
+                            return Err(Ineligible::Malformed);
+                        }
+                        key_share_groups.push(group);
+                    }
+                } else {
+                    selected_group = Some(share.word()?);
+                    if (!retry && share.vector16()?.is_empty()) || !share.0.is_empty() {
+                        return Err(Ineligible::Malformed);
+                    }
+                }
+            }
+            if kind == 44 {
+                let mut encoded = Cursor(value);
+                if encoded.vector16()?.is_empty() || !encoded.0.is_empty() {
+                    return Err(Ineligible::Malformed);
+                }
+                cookie = Some(Sha256::digest(value).into());
+            }
+            early_data |= kind == 42;
+            pre_shared_key |= kind == 41;
             if kind == 43 {
                 match direction {
                     Direction::ClientToServer => {
@@ -319,17 +426,32 @@ fn parse_hello(direction: Direction, bytes: &[u8]) -> Result<Hello, Ineligible> 
     if tls13 && (legacy_version != 0x0303 || compression != [0]) {
         return Err(Ineligible::Malformed);
     }
+    if retry && (!tls13 || (selected_group.is_none() && cookie.is_none())) {
+        return Err(Ineligible::HelloRetryRequest);
+    }
     Ok(Hello {
         tls13,
+        retry,
+        random,
         session_id,
         suites,
+        stable_extensions: stable_extensions.finalize().into(),
+        supported_groups,
+        key_share_groups,
+        key_share,
+        selected_group,
+        cookie,
+        early_data,
+        pre_shared_key,
     })
 }
 
 /// Observes both directions of one inner connection. Retained memory is bounded
-/// to one 64 KiB hello per direction plus at most 256 offered suites/extensions.
+/// to one 64 KiB hello per direction and bounded hello metadata. One retry keeps
+/// only the first flight's metadata and extension digests, not another transcript.
 pub struct Inspection {
     directions: [DirectionState; 2],
+    retry: Option<(Box<Hello>, Box<Hello>)>,
 }
 
 impl Default for Inspection {
@@ -345,11 +467,62 @@ impl Inspection {
                 DirectionState::new(Direction::ClientToServer),
                 DirectionState::new(Direction::ServerToClient),
             ],
+            retry: None,
         }
     }
 
     pub fn observe(&mut self, direction: Direction, bytes: &[u8]) {
         self.directions[direction.index()].observe(bytes);
+        if self.retry.is_some()
+            && matches!(&self.directions[1].status, Status::Hello(hello) if hello.retry)
+        {
+            self.directions[1].reject(Ineligible::HelloRetryRequest);
+            return;
+        }
+        let (Status::Hello(client), Status::Hello(server)) =
+            (&self.directions[0].status, &self.directions[1].status)
+        else {
+            return;
+        };
+        if !server.retry {
+            return;
+        }
+        let selected = server.suites[0];
+        if !client.tls13
+            || !server.tls13
+            || client.session_id != server.session_id
+            || !client.suites.contains(&selected)
+            || !(0x1301..=0x1304).contains(&selected)
+            || client.cookie.is_some()
+            // PSK binder/identity updates need a separate retry-aware parser.
+            // Do not grant direct eligibility based on opaque PSK changes.
+            || client.pre_shared_key
+            || self.directions[1].application_record
+            || server.selected_group.is_some_and(|group| {
+                !client.supported_groups.contains(&group)
+                    || client.key_share_groups.contains(&group)
+            })
+        {
+            self.directions[1].reject(Ineligible::HelloRetryRequest);
+            return;
+        }
+        // Do not reset record offsets: HRR and a partial compatibility CCS can
+        // arrive in one read. Only the hello parser starts a new flight.
+        let Status::Hello(client) =
+            std::mem::replace(&mut self.directions[0].status, Status::Inspecting)
+        else {
+            unreachable!()
+        };
+        let Status::Hello(server) =
+            std::mem::replace(&mut self.directions[1].status, Status::Inspecting)
+        else {
+            unreachable!()
+        };
+        self.retry = Some((client, server));
+        for state in &mut self.directions {
+            state.retrying = true;
+            state.application_record = false;
+        }
     }
 
     pub fn eligibility(&self) -> Eligibility {
@@ -363,6 +536,32 @@ impl Inspection {
         else {
             return Eligibility::Pending;
         };
+        if let Some((first, retry)) = &self.retry
+            && (server.retry
+                || client.random != first.random
+                || client.session_id != first.session_id
+                || client.suites != first.suites
+                || client.stable_extensions != first.stable_extensions
+                || client.cookie != retry.cookie
+                || client.early_data
+                || client.pre_shared_key
+                || server.pre_shared_key
+                || server.suites != retry.suites
+                || server.cookie.is_some()
+                || match retry.selected_group {
+                    Some(group) => {
+                        client.key_share_groups != [group] || server.selected_group != Some(group)
+                    }
+                    None => {
+                        client.key_share != first.key_share
+                            || server
+                                .selected_group
+                                .is_some_and(|group| !client.key_share_groups.contains(&group))
+                    }
+                })
+        {
+            return Eligibility::Ineligible(Ineligible::HelloRetryRequest);
+        }
         if !client.tls13 || !server.tls13 {
             return Eligibility::Ineligible(Ineligible::Version);
         }
@@ -397,6 +596,7 @@ impl Inspection {
     pub fn is_tls(&self, direction: Direction) -> bool {
         let state = &self.directions[direction.index()];
         matches!(state.status, Status::Hello(_))
+            || (state.retrying && matches!(state.status, Status::Inspecting))
             || (matches!(state.status, Status::Inspecting)
                 && (state.header_used > 0 || !state.hello.is_empty())
                 && state.record_header[0] == 22)
