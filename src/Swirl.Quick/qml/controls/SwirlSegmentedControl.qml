@@ -46,7 +46,7 @@ Item {
                     pressed:segment.down
                     focused:segment.visualFocus
                     controlEnabled:segment.enabled
-                    color:control.currentIndex!==segment.index && segment.enabled && segment.hovered?Theme.withAlpha(Theme.hover,0.5):"transparent"
+                    color:control && control.currentIndex!==segment.index && segment.enabled && segment.hovered?Theme.withAlpha(Theme.hover,0.5):"transparent"
                 }
                 contentItem: SwirlText {
                     text: AppState.zh(String(segment.modelData))

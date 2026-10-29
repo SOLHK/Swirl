@@ -161,7 +161,10 @@ jobs:
       - name: Build product and network regression targets
         run: cmake --build build/qt-product --config Release --target Swirl SwirlImportTests SwirlTelemetryTests SwirlQtNetworkPolicyTests --parallel 2
       - name: Deploy actual Qt product runtime
-        run: windeployqt --release --qmldir src/Swirl.Quick/qml build/qt-product/Release/Swirl.exe
+        shell: pwsh
+        run: |
+          windeployqt --release --include-plugins qoffscreen --qmldir src/Swirl.Quick/qml build/qt-product/Release/Swirl.exe
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath 'build/qt-product/Release/platforms/qoffscreen.dll')) { throw 'The isolated offscreen test runtime is incomplete.' }
       - name: Verify Windows DPAPI subscription refresh and redirects
         shell: pwsh
         run: |

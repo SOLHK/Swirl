@@ -3,6 +3,11 @@
 The final follow-up advances the original 0.2.16 request to 0.2.17. Activity's
 policy arrow aligns with the whole two-line selector rather than its caption;
 the text column keeps bounded elision and the existing motion continues.
+The centered arrow retains fractional coordinates at mixed DPI. Segmented
+hover paint also stops reading its owner after page teardown. The Windows CI
+test runtime explicitly includes its offscreen plugin, and independent TLS
+fixtures serve their complete generated chain with one explicit test CA;
+production certificate verification and every rejection gate remain intact.
 
 Continues `f895801` on `work/swirl-0216-interaction-icon-20261028`. The current
 request preserves the neutral theme, APEC background, floating

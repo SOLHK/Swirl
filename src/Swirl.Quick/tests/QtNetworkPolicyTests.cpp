@@ -2,6 +2,7 @@
 #include "network/HttpRequestPolicy.h"
 
 #include <QFile>
+#include <QCryptographicHash>
 #include <QElapsedTimer>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -22,9 +23,13 @@ namespace {
 const QByteArray subscription =
     "proxies:\n  - {name: HTTP1-Fixture, type: socks5, server: 127.0.0.1, port: 1080}\n";
 
-void reportClientTlsErrors(QNetworkReply *reply) {
-    QObject::connect(reply, &QNetworkReply::sslErrors, reply, [](const QList<QSslError> &errors) {
-        for (const auto &error : errors) qWarning() << "Native Qt TLS client:" << error.errorString();
+void reportClientTlsErrors(QNetworkReply *reply, const QSslCertificate &fixtureCa) {
+    QObject::connect(reply, &QNetworkReply::sslErrors, reply, [reply, fixtureCa](const QList<QSslError> &errors) {
+        const auto actual = reply->sslConfiguration();
+        qWarning() << "Native Qt TLS trust:" << "configuredCAcount" << actual.caCertificates().size()
+                   << "fixtureCApresent" << actual.caCertificates().contains(fixtureCa);
+        for (qsizetype i = 0; i < qMin<qsizetype>(4, errors.size()); ++i)
+            qWarning() << "Native Qt TLS client:" << int(errors[i].error()) << errors[i].errorString().left(256);
     });
 }
 
@@ -164,6 +169,7 @@ struct Download {
 class QtNetworkPolicyTests final : public QObject {
     Q_OBJECT
     QSslConfiguration original, trusted;
+    QSslCertificate fixtureCa;
     QTemporaryDir certificateDirectory;
     QByteArray previousH2c;
     bool hadH2c = false;
@@ -181,6 +187,8 @@ class QtNetworkPolicyTests final : public QObject {
         }
     }
     void verifyParsed(const Download &download) {
+        if (download.applied != 1)
+            qWarning() << "Fixture download did not reach parser:" << download.service.message().left(512);
         QCOMPARE(download.applied, 1);
         QCOMPARE(download.parsed.size(), 1);
         QCOMPARE(download.parsed.first().name, QStringLiteral("HTTP1-Fixture"));
@@ -203,14 +211,33 @@ private slots:
         QVERIFY2(prepare.waitForFinished(30000), qPrintable(prepare.errorString()));
         const auto diagnostics = prepare.readAllStandardError();
         QVERIFY2(prepare.exitStatus() == QProcess::NormalExit && prepare.exitCode() == 0, diagnostics.constData());
-        qInfo().noquote() << "Independent TLS fixture" << prepare.readAllStandardOutput().trimmed();
+        const auto prepared = prepare.readAllStandardOutput().trimmed();
+        const auto metadata = QJsonDocument::fromJson(prepared).object();
+        QCOMPARE(metadata.value("event").toString(), QStringLiteral("prepared"));
+        QCOMPARE(metadata.value("chain_certificates").toInt(), 2);
+        qInfo().noquote() << "Independent TLS fixture" << prepared;
         QFile certFile(certificateDirectory.filePath("ca.pem"));
         QVERIFY(certFile.open(QIODevice::ReadOnly));
-        const QSslCertificate certificate(certFile.readAll());
-        QVERIFY(!certificate.isNull());
+        const auto certificates = QSslCertificate::fromData(certFile.readAll());
+        QCOMPARE(certificates.size(), 1);
+        fixtureCa = certificates.first();
+        QVERIFY(!fixtureCa.isNull());
+        const auto fingerprint = fixtureCa.digest(QCryptographicHash::Sha256).toHex();
+        QCOMPARE(metadata.value("ca_sha256").toString(), QString::fromLatin1(fingerprint));
+        QFile chainFile(certificateDirectory.filePath("leaf-chain.pem"));
+        QVERIFY(chainFile.open(QIODevice::ReadOnly));
+        const auto chain = QSslCertificate::fromData(chainFile.readAll());
+        QCOMPARE(chain.size(), 2);
+        QCOMPARE(chain.last(), fixtureCa);
+        QVERIFY(chain.first() != fixtureCa);
         original = QSslConfiguration::defaultConfiguration();
         trusted = original;
-        trusted.addCaCertificate(certificate);
+        // A synthetic positive control trusts exactly its generated CA, independent
+        // of host roots. The original configuration remains the negative control.
+        trusted.setCaCertificates({fixtureCa});
+        QCOMPARE(trusted.caCertificates(), QList<QSslCertificate>{fixtureCa});
+        QVERIFY(trusted.peerVerifyMode() != QSslSocket::VerifyNone);
+        qInfo() << "Fixture TLS anchor SHA256" << fingerprint << "configuredCAcount" << trusted.caCertificates().size();
         hadH2c = qEnvironmentVariableIsSet("QT_NETWORK_H2C_ALLOWED");
         previousH2c = qgetenv("QT_NETWORK_H2C_ALLOWED");
         qputenv("QT_NETWORK_H2C_ALLOWED", "1");
@@ -230,7 +257,7 @@ private slots:
         QNetworkRequest request(origin.url());
         request.setTransferTimeout(3000);
         auto *reply = manager.get(request);
-        reportClientTlsErrors(reply);
+        reportClientTlsErrors(reply, fixtureCa);
         QSignalSpy finished(reply, &QNetworkReply::finished);
         QTRY_VERIFY_WITH_TIMEOUT(origin.protocols.contains("h2"), 5000);
         QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, 5000);
@@ -250,7 +277,7 @@ private slots:
         SwirlNetwork::applyHttp1OnlyPolicy(request);
         request.setTransferTimeout(3000);
         auto *reply = manager.get(request);
-        reportClientTlsErrors(reply);
+        reportClientTlsErrors(reply, fixtureCa);
         QSignalSpy finished(reply, &QNetworkReply::finished);
         QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, 5000);
         QCOMPARE(reply->error(), QNetworkReply::NoError);

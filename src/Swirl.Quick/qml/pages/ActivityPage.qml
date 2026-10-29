@@ -141,7 +141,10 @@ Item {
                 SwirlText { id: policyCaption; text: qsTr("策略"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight }
                 SwirlText { id: policyValue; objectName: "activityPolicyValue"; text: page.defaultTargetName; textFormat: Text.PlainText; tabularFigures: true; color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.Medium; Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight }
             }
-            SwirlIcon { objectName: "activityPolicyArrow"; name: "chevron-right"; size: Theme.dp(12); Layout.alignment: Qt.AlignVCenter; color: policy.hovered || policy.visualFocus ? Theme.accent : Theme.muted; transform: Translate { x: policyCurve.position.x; y: policyCurve.position.y } }
+            Item {
+                Layout.preferredWidth: Theme.dp(12); Layout.fillHeight: true
+                SwirlIcon { objectName: "activityPolicyArrow"; name: "chevron-right"; size: Theme.dp(12); anchors.centerIn: parent; anchors.alignWhenCentered: false; color: policy.hovered || policy.visualFocus ? Theme.accent : Theme.muted; transform: Translate { x: policyCurve.position.x; y: policyCurve.position.y } }
+            }
         }
         HoverHandler { cursorShape: Qt.PointingHandCursor }
         SwirlToolTip { parent: policy; width: Math.min(implicitWidth, Theme.dp(420), page.width - Theme.dp(32)); visible: policy.hovered || policy.visualFocus; text: qsTr("%1 · 打开策略").arg(page.defaultTargetName) }

@@ -54,14 +54,19 @@ def prepare(directory):
         .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()), critical=False)
         .sign(ca_key, hashes.SHA256())
     )
-    (directory / "ca.pem").write_bytes(ca.public_bytes(serialization.Encoding.PEM))
-    (directory / "leaf.pem").write_bytes(leaf.public_bytes(serialization.Encoding.PEM))
+    ca_pem = ca.public_bytes(serialization.Encoding.PEM)
+    leaf_pem = leaf.public_bytes(serialization.Encoding.PEM)
+    (directory / "ca.pem").write_bytes(ca_pem)
+    (directory / "leaf.pem").write_bytes(leaf_pem)
+    (directory / "leaf-chain.pem").write_bytes(leaf_pem + ca_pem)
     key_path = directory / "leaf-key.pem"
     key_path.write_bytes(leaf_key.private_bytes(
         serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
     if os.name != "nt":
         key_path.chmod(0o600)
-    print(json.dumps({"event": "prepared", "tls": ssl.OPENSSL_VERSION, "leaf_days": 2}), flush=True)
+    print(json.dumps({"event": "prepared", "tls": ssl.OPENSSL_VERSION, "leaf_days": 2,
+                      "ca_sha256": ca.fingerprint(hashes.SHA256()).hex(),
+                      "chain_certificates": 2}), flush=True)
 
 
 def serve(directory):
@@ -69,7 +74,7 @@ def serve(directory):
         raise RuntimeError("The independent TLS fixture requires ALPN support")
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
-    context.load_cert_chain(directory / "leaf.pem", directory / "leaf-key.pem")
+    context.load_cert_chain(directory / "leaf-chain.pem", directory / "leaf-key.pem")
     context.set_alpn_protocols(["h2", "http/1.1"])
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.bind(("127.0.0.1", 0))
