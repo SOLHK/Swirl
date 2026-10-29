@@ -39,4 +39,27 @@
 | smoltcp | 0.12.0（MSRV 1.80） | 0BSD | 用户态 IPv4/IPv6 TCP |
 | Wintun 预编译 DLL | 0.14.1，不入库 | WireGuard Prebuilt Binaries License；源码 GPL-2.0 不链接 | 运行时按 `wintun.h` API 装载 |
 
-smoltcp 的 `any_ip` 加上按目的地址监听，用来把任意目的地的 TCP 会话交给已有出站。IPv6 同时登记目的地址，因为仅靠默认路由不够可靠。
+smoltcp 打开 `any_ip`，默认路由的网关是适配器自己的地址。这样任意单播目的地都会进入栈，不必逐个登记目标 IP。
+
+## 实现状态
+
+本分支已经接上可测试的数据面，但真实 Windows TUN 没有验收。
+
+已在 Linux 模拟路径覆盖：
+
+- smoltcp TCP 双向数据和 IPv6 TCP。一条流只做一次策略决定。
+- 直连 UDP 回显。代理 UDP 没有静默改走 DIRECT，返回 `UdpProxyUnsupportedOrRejected`。
+- Fake-IP 的 A/AAAA、非虚拟 DNS 的泄漏计数、真实 IP 冲突时 SERVFAIL。
+- 规则拒绝和代理握手失败都不会改走 DIRECT。
+- 入口队列有上界。停止后新包被拒绝。
+- 路由/DNS 恢复事务只写内存。`execute` 固定返回 `HostMutationNotAuthorized`。
+- `swirl-wintun` 能在 `x86_64-pc-windows-msvc` 上通过 `cargo check`。测试不加载 DLL，也不创建网卡。
+
+给后续 Qt 集成、当前不改 UI：
+
+- `swirl_tun_command`：JSON 操作 `start`、`stop`、`link`、`status`、`execute`、`conflicts`。`optional.tun` 仍是 `false`。
+- `swirl_core::v2::Core::open_tun_engine(proxies, leak_protection)`：TCP/UDP 进入现有 `route` 和 `connect`。
+- `swirl_wintun::open_session(dll, name, authorized)` 返回 `Session`，用 `receive` / `transmit` 收发 IP 包。未授权时返回 `AdapterCreateNotAuthorized`。
+- `swirl_tun::pump` 把设备上的有界报文批次送进引擎，再把栈产生的包写回设备。
+
+还没有执行：安装或加载 Wintun、改系统路由或 DNS、Wi-Fi 切换、休眠唤醒、Chrome / VS Code / Codex、WebSocket / SSE 的真实长连接，以及大流量下的内存和 CPU。GitHub Actions 的 Windows job 只编译，不代表 TUN 验收通过。
