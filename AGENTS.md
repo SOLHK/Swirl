@@ -1,12 +1,11 @@
-# Current final acceptance and branch delivery (2026-10-29)
+# Current delivery and promotion (2026-10-29)
 
-- The next final delivery is 0.2.18, distinguishing the network repair from the 0.2.17 UI checkpoint. Keep application, PE and installer versions synchronized, and vertically center Activity's policy-selector arrow across the full two-line control.
-- The latest user explicitly permits slight Windows-only structural optical correction: tuck the side clouds inward and enlarge the central knot within the fixed taskbar canvas. Preserve a horizontally wide silhouette and fine contours without added strokes; the in-app canonical artwork stays unchanged. Ordinary buttons remain borderless in hover, press and focus. Keep all existing animation and visual effects while fixing measured rendering problems.
-- Complete actual taskbar comparisons, native Windows 100/125/150/175/200% DPI and button-motion checks, plus exact-source installer verification before updating `test`. Temporary scale changes are for acceptance only; restore the original 150% setting and never use system scale/taskbar height to conceal icon defects.
-- The latest user CANCELLED main promotion/recreation. Push only to `test` after acceptance; do not delete, recreate or push main or change its protection/default-branch settings. Preserve unrelated work on `test` through integration.
-- Keep Clash/Mihomo configuration and subscription import compatibility; remove obsolete external core, invocation and packaging paths. Preserve required dependencies/licenses and do not touch other installed proxy applications, private data or the host proxy/TUN/routes/DNS.
-- The user subsequently chose to include the Windows REALITY + Vision compatibility failure before the next test delivery. The already pushed `4ee3b2c` is only a UI checkpoint, not final acceptance. Repair the network root cause with strict tests, then update test after verification. Main remains out of scope.
-
+- The owner explicitly authorized the current 0.2.23 candidate: refine the dark transparent floating sidebar, remove obsolete Mihomo runtime paths, refresh README and real software screenshots, then integrate into test and promote test to main through the existing release-approved process.
+- This authorization applies to this change set. It does not authorize a Release, force-push, branch deletion/recreation, default-branch change or branch-protection change. Earlier main-cancellation and one-time reconstruction plans are superseded for this candidate.
+- Keep the sidebar body fully transparent and unblurred, with clear APEC background detail. Light appearance is already accepted; dark edges must be subtle. Preserve fonts, geometry, animations, caches and actual data bindings.
+- Preserve Clash/Mihomo-format, sing-box and Xray/V2Ray import, subscriptions, provenance and encrypted migration. They are input formats, not external runtime integration. Keep anti-bundling/source guards and licenses for dependencies still in use.
+- Use ordinary merge commits. Preserve unrelated test history. Require the four exact test-HEAD push workflows, then an owner-applied release-approved label after their completion, a successful production-gate and all applicable PR checks before merging test to main. Never infer approval for a later unrelated candidate.
+- Build and verify the local Windows installer and source identity before delivery. Keep private screenshots, endpoints, credentials and profiles local; README screenshots must come from an isolated real UI with truthful empty states.
 # Swirl active engineering contract — APEC V3 / Rust-only (2026-10-27)
 
 ## Source of truth

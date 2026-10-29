@@ -26,6 +26,7 @@ Item {
         property vector2d lightPoint: Qt.vector2d(glass.lightPoint.x, glass.lightPoint.y)
         property color highlightColor: Theme.glassHighlight
         property color reflectionColor: Theme.glassReflection
+        property real darkAppearance: Theme.dark ? 1 : 0
         fragmentShader: "qrc:/swirl/shaders/sidebar-liquid.frag.qsb"
     }
     SwirlShellOutline {
@@ -33,7 +34,7 @@ Item {
         visible: !Theme.effectsSupported || Theme.increaseContrast
         radius: glass.cornerRadius
         fillColor: "transparent"
-        strokeColor: Theme.increaseContrast ? Theme.text : Theme.withAlpha(Theme.border, 0.45)
+        strokeColor: Theme.increaseContrast ? Theme.text : Theme.withAlpha(Theme.border, Theme.dark ? 0.06 : 0.45)
     }
     Accessible.ignored: true
 }

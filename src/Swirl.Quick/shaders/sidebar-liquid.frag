@@ -11,6 +11,7 @@ layout(std140,binding=0) uniform buf {
     vec2 lightPoint;
     vec4 highlightColor;
     vec4 reflectionColor;
+    float darkAppearance;
 };
 float distanceToSurface(vec2 p) {
     float r=min(cornerRadius,min(surfaceSize.x,surfaceSize.y)*0.5);
@@ -32,6 +33,19 @@ void main() {
     float facing=max(0.0,dot(normal,normalize(vec2(-0.65,-1.0))));
     vec2 lightDelta=(p-lightPoint*surfaceSize)/max(4.0*cornerRadius,1.0);
     float localLight=interaction*exp(-dot(lightDelta,lightDelta)*2.0);
+    if(darkAppearance>0.5) {
+        // A dark pane reads through a quiet contour and a short upper glint,
+        // rather than the light material's continuous white bevel.
+        vec2 glintDelta=(p-vec2(cornerRadius*2.0,0.0))
+            /max(vec2(cornerRadius*2.3,cornerRadius*1.2),vec2(1.0));
+        float upperGlint=exp(-dot(glintDelta,glintDelta)*2.0);
+        float highlight=rim*(0.025+0.16*facing*upperGlint+0.07*localLight)*highlightColor.a;
+        float reflection=rim*(1.0-facing)*0.07*reflectionColor.a;
+        vec4 color=vec4(highlightColor.rgb*highlight,highlight);
+        color+=vec4(reflectionColor.rgb*reflection,reflection)*(1.0-color.a);
+        fragColor=color*qt_Opacity;
+        return;
+    }
     float highlight=rim*(0.32+0.26*facing+0.12*localLight)*highlightColor.a;
     float reflection=rim*(1.0-facing)*0.20*reflectionColor.a;
     vec4 color=vec4(highlightColor.rgb*highlight,highlight);
