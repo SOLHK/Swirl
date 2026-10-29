@@ -1,7 +1,11 @@
-# 0.2.16 — global interaction and Windows icon follow-up
+# 0.2.17 — global interaction and Windows icon follow-up
+
+The final follow-up advances the original 0.2.16 request to 0.2.17. Activity's
+policy arrow aligns with the whole two-line selector rather than its caption;
+the text column keeps bounded elision and the existing motion continues.
 
 Continues `f895801` on `work/swirl-0216-interaction-icon-20261028`. The current
-request preserves version 0.2.16, the neutral theme, APEC background, floating
+request preserves the neutral theme, APEC background, floating
 sidebar, page structure and Rust runtime behavior.
 
 ## Current repair
@@ -41,7 +45,7 @@ regenerated icon. `tools/Verify-WindowsIconResources.py` rejects any frame or
 EXE resource mismatch before package staging writes its manifest.
 
 The window publishes its explicit AppID and relaunch resources before first
-show. `Swirl-brand-0216-original-knot-v4.ico` gives the shell a distinct resource path.
+show. `Swirl-brand-0217-canonical.ico` gives the shell a distinct resource path.
 The installer repairs only existing Swirl shortcuts targeting that installation
 and notifies the shell. During investigation, correct native HICONs coexisted
 with the old taskbar group image. Item-only notifications retained that bitmap;

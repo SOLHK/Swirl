@@ -1,4 +1,4 @@
-Swirl 0.2.16 Windows 测试候选版
+Swirl 0.2.17 Windows 测试候选版
 
 Swirl.exe 在进程内使用同源配套的 Rust Core。只安装一个名为 Swirl 的应用，不携带、下载或启动第三方代理内核。保留 Clash/Mihomo 等订阅格式的导入兼容，不提供外部内核回退。
 

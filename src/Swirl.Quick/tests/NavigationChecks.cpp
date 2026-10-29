@@ -420,6 +420,15 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
     check(await([&]{return window->isActive()&&control->hasActiveFocus()&&control->property("visualFocus").toBool()&&control->property("focusReason").toInt()==Qt::TabFocusReason;},600),"marked button exposes keyboard focus: "+key);
     wait(170);snapshot("focus");sample("focus");
    }
+   if(key==QStringLiteral("activityPolicyShortcut")){
+    auto *arrow=item("activityPolicyArrow"),*arc=item("activityPolicyMotion");
+    const auto centerY=[](QQuickItem *target){return target->mapToScene(QPointF(target->width()/2,target->height()/2)).y();};
+    // Compare rendered centers after both the feather arc and shared feedback
+    // settle, so this catches the old caption-row arrow without flattening motion.
+    const bool centered=await([&]{return arrow&&arc&&arrow->isVisible()&&arrow->height()>0&&!arc->property("moving").toBool()&&!surface->property("moving").toBool()&&qAbs(centerY(arrow)-centerY(surface))*window->devicePixelRatio()<=.5;},1000);
+    check(centered,"Activity policy arrow is vertically centered in the full two-line moving button surface");
+    buttonSamples.append(QJsonObject{{"button",key},{"phase","policy-arrow-alignment"},{"arrowCenterSceneY",arrow?QJsonValue(centerY(arrow)):QJsonValue()},{"surfaceCenterSceneY",centerY(surface)},{"centerDeltaPhysicalPx",arrow?QJsonValue(qAbs(centerY(arrow)-centerY(surface))*window->devicePixelRatio()):QJsonValue()},{"arcMoving",arc?arc->property("moving").toBool():false},{"surfaceMoving",surface->property("moving").toBool()},{"centered",centered}});
+   }
    check(clicked.isValid()&&clicked.count()==0&&control->size()==size&&control->position()==position,"marked button feedback preserves layout and invokes no action: "+key);
   };
   check(route("processes"),"marked process-page audit settles");

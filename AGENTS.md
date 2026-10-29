@@ -1,5 +1,6 @@
 # Current final acceptance and branch delivery (2026-10-29)
 
+- The latest user request advances the next delivery to 0.2.17 before the next GitHub push. Keep application, PE and installer versions synchronized, and vertically center Activity's policy-selector arrow across the full two-line control.
 - Preserve the canonical horizontally wide cloud-knot paths and proportions; enlarge its Windows optical weight without stretching. Ordinary buttons remain borderless in hover, press and focus. Keep all existing animation and visual effects while fixing measured rendering problems.
 - Complete actual taskbar comparisons, native Windows 100/125/150/175/200% DPI and button-motion checks, plus exact-source installer verification before updating `test`. Temporary scale changes are for acceptance only; restore the original 150% setting and never use system scale/taskbar height to conceal icon defects.
 - The user explicitly authorizes backing up the old `main`, deleting and recreating it after acceptance, including history rewriting. Preserve unrelated work on `test` through integration. Restore any temporarily changed repository protections/default branch after the authorized recreation.

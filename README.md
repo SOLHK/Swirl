@@ -6,9 +6,9 @@
 
 Swirl 是面向 Windows 的网络工具，桌面界面使用 **C++23、Qt 6 Quick/QML**，**自研代理内核使用 Rust**，源码位于 [`core/`](core/)。Rust 在进程内负责协议、TCP/UDP、DNS、路由和运行时；Qt 提供界面、导入、操作系统集成及 HTTP 工具。产品没有 Mihomo 或其他外部代理内核的调用、下载或回退路径。Clash/Mihomo、sing-box、Xray/V2Ray 等订阅格式仍可导入，格式兼容不代表执行其内核。
 
-> **当前状态：Windows 开发测试版，版本 0.2.16。** 版本以 `src/Swirl.Quick/PRODUCT_VERSION.txt` 为准。功能是否可用以实际运行状态及同提交验收记录为准；协议可导入、配置可保存，不代表所有远程节点、专用 LAN 或高级功能已经验证。
+> **当前状态：Windows 开发测试版，版本 0.2.17。** 版本以 `src/Swirl.Quick/PRODUCT_VERSION.txt` 为准。功能是否可用以实际运行状态及同提交验收记录为准；协议可导入、配置可保存，不代表所有远程节点、专用 LAN 或高级功能已经验证。
 
-当前界面使用中性灰白主题、14 DIP 同级卡片、APEC 羽翼背景及 Liquid Glass 悬浮侧栏。共享控件保留悬停、按压、释放和键盘焦点反馈；普通按钮不添加交互描边。界面实现与验证范围见 [0.2.16 修正记录](docs/UI_0216_LOCAL_REFINEMENT.md)。
+当前界面使用中性灰白主题、14 DIP 同级卡片、APEC 羽翼背景及 Liquid Glass 悬浮侧栏。共享控件保留悬停、按压、释放和键盘焦点反馈；普通按钮不添加交互描边。界面实现与验证范围见 [0.2.17 修正记录](docs/UI_0216_LOCAL_REFINEMENT.md)。
 
 [![Windows Qt 构建与测试](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml/badge.svg?branch=main)](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml) · [测试版安装程序](https://github.com/SOLHK/Swirl/releases) · [测试分支](https://github.com/SOLHK/Swirl/tree/test)
 
@@ -42,7 +42,7 @@ HTTP/3 解密、完整断点暂停/编辑、WebSocket 帧检查、HTTP 脚本挂
 
 ## 历史界面截图
 
-以下截图保留此前 Windows 界面迭代的记录，来源见截图索引；不代表当前 0.2.16 的外观或验收结果。当前界面、任务栏和动态效果应以同提交实际运行的交付证据为准。
+以下截图保留此前 Windows 界面迭代的记录，来源见截图索引；不代表当前 0.2.17 的外观或验收结果。当前界面、任务栏和动态效果应以同提交实际运行的交付证据为准。
 
 ### 网络活动
 
