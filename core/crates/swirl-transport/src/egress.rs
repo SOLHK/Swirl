@@ -13,6 +13,7 @@ use tokio::net::{TcpSocket, TcpStream, UdpSocket};
 
 const BLOCKED: u32 = u32::MAX;
 const SUSPENDED: u64 = u64::MAX;
+const ORPHANED: u64 = u64::MAX - 1;
 static INTERFACES: AtomicU64 = AtomicU64::new(0);
 
 fn encode(v4: Option<u32>, v6: Option<u32>) -> io::Result<u64> {
@@ -33,6 +34,12 @@ fn encode(v4: Option<u32>, v6: Option<u32>) -> io::Result<u64> {
 fn select(state: u64, ipv6: bool) -> io::Result<Option<u32>> {
     if state == 0 {
         return Ok(None);
+    }
+    if state == ORPHANED {
+        return Err(io::Error::new(
+            io::ErrorKind::NetworkUnreachable,
+            "TunEgressRecoveryRequired",
+        ));
     }
     let index = if ipv6 {
         (state >> 32) as u32
@@ -114,11 +121,24 @@ impl Drop for EgressLease {
         if !self.released {
             let _ = INTERFACES.compare_exchange(
                 self.state,
-                SUSPENDED,
+                ORPHANED,
                 Ordering::AcqRel,
                 Ordering::Acquire,
             );
         }
+    }
+}
+
+/// Reset only a dropped owner's fail-closed guard. A live lease, including a
+/// suspended one, cannot be stolen. The privileged caller must first verify
+/// that all durable network journals are restored and no other owner is active.
+pub fn release_orphan_after_routes_restored() -> io::Result<()> {
+    match INTERFACES.compare_exchange(ORPHANED, 0, Ordering::AcqRel, Ordering::Acquire) {
+        Ok(_) | Err(0) => Ok(()),
+        Err(_) => Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "TunEgressStillOwned",
+        )),
     }
 }
 
@@ -168,6 +188,8 @@ mod tests {
         assert!(select(encode(Some(7), None).unwrap(), true).is_err());
         assert!(select(SUSPENDED, false).is_err());
         assert!(select(SUSPENDED, true).is_err());
+        assert!(select(ORPHANED, false).is_err());
+        assert!(select(ORPHANED, true).is_err());
         assert_eq!(select(0, false).unwrap(), None);
         assert!(encode(None, None).is_err());
         assert!(encode(Some(0), Some(1)).is_err());

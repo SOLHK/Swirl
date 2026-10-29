@@ -1,0 +1,75 @@
+name: Native TUN isolated backend
+
+on:
+  push:
+    branches: [work/native-tun-windows-20261030-isolated]
+  pull_request:
+    paths:
+      - 'core/**'
+      - '.github/workflows/native-tun-isolated.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-tun-isolated-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: ${{ matrix.os }} native packet and core tests
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stable Rust with lint and formatting
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+          key: native-tun-isolated
+      - name: Source formatting
+        run: cargo fmt --all -- --check
+      - name: Stage exact locked dependency notices
+        run: |
+          cargo metadata --locked --format-version 1 > "${{ runner.temp }}/swirl-native-metadata.json"
+          python ../tools/Collect-RustDependencies.py --metadata "${{ runner.temp }}/swirl-native-metadata.json" --inventory "${{ runner.temp }}/swirl-native-notices/DEPENDENCIES.json" --notices "${{ runner.temp }}/swirl-native-notices" --supplemental-inventory DEPENDENCIES.json
+          python -c "import json,pathlib; p=pathlib.Path('${{ runner.temp }}/swirl-native-notices'); source=json.loads(pathlib.Path('DEPENDENCIES.json').read_text()); built=json.loads((p/'DEPENDENCIES.json').read_text()); assert source==built; notices=[n for a in source['runtime_artifacts'] for n in a['notices']]+[n for a in source['packages'] for n in a.get('supplemental_notices',[])]; assert all(pathlib.Path(n).read_bytes()==(p/n).read_bytes() for n in notices)"
+      - name: Parse Windows product staging script
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $parseTokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path ../scripts/Stage-WindowsRustProduct.ps1), [ref]$parseTokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+      - name: Lint complete affected crates
+        run: cargo clippy --locked -p swirl-tun -p swirl-platform -p swirl-dns -p swirl-transport -p swirl-core -p swirl-api --all-targets -- -D warnings
+      - name: Packet, resolver, network transaction and original proxy regressions
+        run: cargo test --locked -p swirl-tun -p swirl-platform -p swirl-dns -p swirl-transport -p swirl-core -p swirl-api
+      - name: Build actual Rust library and helper
+        run: cargo build --locked -p swirl-api --release
+      - name: Preserve native backend build
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-tun-backend-${{ runner.os }}-${{ github.sha }}
+          path: |
+            core/target/release/swirl_api.dll
+            core/target/release/libswirl_api.so
+            core/target/release/swirl-tun-helper.exe
+            core/target/release/swirl-tun-helper
+            ${{ runner.temp }}/swirl-native-notices/
+          if-no-files-found: error
+          retention-days: 7
+
+  # These jobs never install a driver or change the runner's routing/DNS.
+  # Packet simulation and native Windows compilation are separate evidence from
+  # Windows 11 Wintun/application acceptance, which must be recorded explicitly.

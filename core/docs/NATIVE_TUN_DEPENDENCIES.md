@@ -170,20 +170,30 @@ excluded from the third-party list. The complete lockfile audit counts all 216
 packages.
 
 The repository's [`Collect-RustDependencies.py`](../../tools/Collect-RustDependencies.py)
-was run against `cargo metadata --locked --format-version 1` into a temporary
-inventory/notice directory. The refreshed inventory retains its schema and
-contains the same 207 packages and all of its recursively collected notices,
-including ring's nested third-party notices. The refresh additionally records
-the UNLICENSE files in byteorder and memchr, which the current collector's
-filename patterns omit, and the Wintun/C2Rust supplemental records below.
+now collects LICENSE, LICENCE, COPYING, NOTICE, COPYRIGHT and UNLICENSE files,
+including nested notices and Cargo's explicit `license_file`. It preserves
+`runtime_artifacts`, `notice_sources` and `supplemental_notices` from the reviewed
+workspace inventory, matching package supplements by exact name/version. An
+explicit `--supplemental-inventory` can select that reviewed input; otherwise it
+uses the Cargo workspace's `DEPENDENCIES.json`. In-place refresh reads the input
+before writing the regenerated inventory. A removed/changed supplemented package
+version requires a notice review instead of silently discarding its notice.
+
+The collector copies the separate runtime/supplemental notices at their original
+core-relative paths under the output notice directory. Missing files, unsafe
+relative paths and symlinks escaping the allowed source/destination directories
+fail the command. It never downloads, loads or installs a runtime binary.
 Archive-local notice filenames do not assert that every file in an upstream
 source archive is linked into Swirl.
 
-The current collector does not preserve `runtime_artifacts`, `notice_sources`
-or `supplemental_notices` when regenerating an inventory, and does not stage the
-separate runtime/supplemental notices. Future generation and installer assembly
-must retain those records/files explicitly or extend the collector. This review
-does not modify that packaging tool or claim installer-license completeness.
+[`Stage-WindowsRustProduct.ps1`](../../scripts/Stage-WindowsRustProduct.ps1) now
+obtains `cargo metadata --locked` using CMake's recorded Cargo executable and
+invokes the collector with the reviewed source inventory. The resulting files
+are staged under `licenses/rust/`, with the regenerated `DEPENDENCIES.json` in
+that directory. This happens before the existing package-manifest hash scan;
+the existing NSIS recursive payload includes those files. The shipped
+`THIRD_PARTY_NOTICES.txt` identifies the inventory and the independent notices.
+No separate manual copy step is needed for Wintun/C2Rust license text.
 
 The published archives for `c2rust-bitfields` and `c2rust-bitfields-derive` 0.18.0
 omit the license file. Both identify upstream revision
@@ -227,6 +237,18 @@ containers and the existing 64 MiB decompression-boundary test. These were local
 Linux tests using the final lockfile. Windows build and whole-Core/TUN integration
 results are recorded separately; a clean audit does not substitute for them.
 
+The updated collector was executed into a fresh temporary directory using the
+final locked metadata. Its regenerated inventory exactly matched the reviewed
+207-package JSON, including the runtime/supplemental records. All **387
+archive-local notice files** were compared byte-for-byte with their source
+files, as were the **two independent notice files** (Wintun and the shared
+C2Rust notice). Together with the inventory this produced 390 files. Fixtures
+also verified LICENCE/UNLICENSE/custom/nested notice collection and in-place
+refresh, plus eight failing cases: traversal, absolute paths, backslashes,
+Windows alternate streams, missing package notice, missing runtime notice,
+stale supplemental version and an escaping symlink. These are local Python
+collector tests; a complete Windows product staging/installer run is separate.
+
 Run from the repository root:
 
 ```sh
@@ -243,11 +265,17 @@ git -C audit-db checkout ee1a49a2769a24a596afc1c20cb33748d2769586
 cargo audit --file core/Cargo.lock --db audit-db --no-fetch --deny warnings --json
 ```
 
-To reproduce the existing collector's package/notice portion without replacing
-the reviewed inventory, redirect Cargo metadata to a temporary JSON file and run
-`python3 tools/Collect-RustDependencies.py --metadata <metadata.json> --inventory
-<temporary-inventory.json> --notices <temporary-notices-directory>`. Compare the
-result while retaining the supplemental records described above.
+To reproduce the complete notice collection without replacing the reviewed
+inventory, redirect Cargo metadata to a temporary JSON file and run:
+
+```sh
+python3 tools/Collect-RustDependencies.py --metadata metadata.json \
+  --inventory temporary-notices/DEPENDENCIES.json --notices temporary-notices \
+  --supplemental-inventory core/DEPENDENCIES.json
+```
+
+The same collector handles repository inventory refresh and release notice
+staging; the runtime and supplemental records are preserved in both cases.
 
 `--no-default-features` on the audit-tool installation disables optional
 executable-binary scanning support, not Cargo.lock security checks. `--no-fetch`
