@@ -9,7 +9,7 @@ use std::{
     collections::HashMap,
     fs::{File, OpenOptions},
     future::Future,
-    io::{Read, Write},
+    io::{Read, Seek, SeekFrom, Write},
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     path::Path,
     pin::Pin,
@@ -91,7 +91,9 @@ impl FakeIpStore {
             return Err("FakeIpJournalSymlink");
         }
         let mut options = OpenOptions::new();
-        options.read(true).append(true).create(true);
+        // Windows append-only handles cannot truncate a torn final record.
+        // The exclusive lock below owns this read/write handle until drop.
+        options.read(true).write(true).create(true).truncate(false);
         #[cfg(unix)]
         {
             use std::os::unix::fs::OpenOptionsExt;
@@ -161,6 +163,11 @@ impl FakeIpStore {
         }
         journal
             .set_len(complete as u64)
+            .map_err(|_| "FakeIpJournalRepair")?;
+        // set_len does not reposition the cursor after reading a torn tail.
+        // Keep subsequent, serialized writes at the repaired journal's end.
+        journal
+            .seek(SeekFrom::End(0))
             .map_err(|_| "FakeIpJournalRepair")?;
         journal.sync_all().map_err(|_| "FakeIpJournalSync")?;
         result.journal_bytes = complete as u64;
@@ -557,6 +564,67 @@ mod tests {
         drop(store);
         let reopened = FakeIpStore::open(&path, 4).unwrap();
         assert_eq!(reopened.active_names(), 2);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn journal_reopen_and_renewal_preserve_complete_record_prefix() {
+        let path = std::env::temp_dir().join(format!(
+            "swirl-fakeip-prefix-{}-{}.jsonl",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let at = now().unwrap();
+        let (first, second) = {
+            let mut store = FakeIpStore::open(&path, 4).unwrap();
+            (
+                store.allocate("one.test", at).unwrap(),
+                store.allocate("two.test", at).unwrap(),
+            )
+        };
+        let prefix = std::fs::read(&path).unwrap();
+        OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .unwrap()
+            .write_all(b"{\"torn\":")
+            .unwrap();
+        let renewed_at = at + RETENTION - u64::from(ANSWER_TTL);
+        let third = {
+            let mut store = FakeIpStore::open(&path, 4).unwrap();
+            assert_eq!(store.allocate("one.test", renewed_at).unwrap(), first);
+            store.allocate("three.test", renewed_at).unwrap()
+        };
+        let repaired = std::fs::read(&path).unwrap();
+        assert!(repaired.starts_with(&prefix));
+        let fourth = {
+            let mut store = FakeIpStore::open(&path, 4).unwrap();
+            store.allocate("four.test", renewed_at).unwrap()
+        };
+        let appended = std::fs::read(&path).unwrap();
+        assert!(appended.starts_with(&repaired));
+        let records: Vec<Record> = appended
+            .split(|byte| *byte == b'\n')
+            .filter(|line| !line.is_empty())
+            .map(|line| serde_json::from_slice(line).unwrap())
+            .collect();
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| (record.name.as_str(), record.id))
+                .collect::<Vec<_>>(),
+            [
+                ("one.test", first),
+                ("two.test", second),
+                ("one.test", first),
+                ("three.test", third),
+                ("four.test", fourth),
+            ]
+        );
+        assert_eq!((second, third, fourth), (first + 1, first + 2, first + 3));
         std::fs::remove_file(path).unwrap();
     }
 
