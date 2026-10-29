@@ -1,5 +1,6 @@
-//! Bounded system/custom/DoT/HTTP-1.1 DoH resolver. Fake-IP is not implemented.
+//! Bounded system/custom/DoT/HTTP-1.1 DoH resolver and native TUN DNS identity.
 mod dot;
+pub mod tun;
 mod wire;
 use std::{
     collections::HashMap,
@@ -27,7 +28,7 @@ impl QueryTransport for DirectQueryTransport {
         address: SocketAddr,
     ) -> Pin<Box<dyn Future<Output = Result<BoxStream, &'static str>> + Send + '_>> {
         Box::pin(async move {
-            let stream = tokio::net::TcpStream::connect(address)
+            let stream = swirl_transport::connect_tcp(address)
                 .await
                 .map_err(|_| "DnsTlsConnect")?;
             Ok(Box::new(stream) as BoxStream)

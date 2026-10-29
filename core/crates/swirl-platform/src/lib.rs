@@ -1,7 +1,21 @@
 //! Host integration shared by the portable core through a platform-neutral API.
-//! Mobile applications supply hosts through configuration; compiling a target
-//! does not grant VPN permissions or implement a system tunnel adapter.
+//! Mobile applications supply hosts through configuration. Desktop TUN adapters
+//! require an explicitly invoked privileged helper; importing this crate never
+//! changes network settings or loads a driver.
 use std::path::PathBuf;
+
+pub mod network_transaction;
+
+#[cfg(windows)]
+mod socket_pin;
+#[cfg(windows)]
+pub mod windows_network;
+#[cfg(windows)]
+mod windows_notify;
+#[cfg(windows)]
+pub mod wintun_device;
+#[cfg(windows)]
+pub use socket_pin::pin_outbound_socket;
 
 /// Location of a desktop hosts file, when this adapter supports one.
 /// `None` means no platform file integration, not a resolver/network failure.
