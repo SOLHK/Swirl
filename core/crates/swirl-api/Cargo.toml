@@ -13,3 +13,10 @@ swirl-dns.workspace = true
 swirl-protocol.workspace = true
 swirl-core.workspace = true
 swirl-subscription.workspace = true
+swirl-transport.workspace = true
+swirl-platform.workspace = true
+swirl-tun.workspace = true
+ipnet.workspace = true
+ring.workspace = true
+[dev-dependencies]
+smoltcp = { version = "=0.14.0", default-features = false, features = ["std", "medium-ip", "proto-ipv4", "proto-ipv6", "socket-tcp", "socket-udp"] }

@@ -1395,12 +1395,18 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 name = "swirl-api"
 version = "0.1.0"
 dependencies = [
+ "ipnet",
+ "ring",
  "serde",
  "serde_json",
+ "smoltcp",
  "swirl-core",
  "swirl-dns",
+ "swirl-platform",
  "swirl-protocol",
  "swirl-subscription",
+ "swirl-transport",
+ "swirl-tun",
  "tokio",
 ]
 

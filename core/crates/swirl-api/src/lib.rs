@@ -10,6 +10,9 @@ use swirl_core::Core;
 use swirl_subscription::Config;
 
 mod control_v2;
+pub mod native_tun;
+#[cfg(test)]
+mod native_tun_tests;
 mod import_ffi;
 mod node_import;
 pub use node_import::swirl_import_node_v1;
