@@ -20,6 +20,56 @@ fn emit(value: &serde_json::Value) -> io::Result<()> {
     stdout.flush()
 }
 
+/// Keep a stalled parent pipe from blocking the lifecycle thread indefinitely.
+/// There is one writer and at most one queued response; timeout poisons this
+/// connection and the worker restores its network state before process exit.
+struct BoundedOutput {
+    pending: mpsc::SyncSender<serde_json::Value>,
+    completed: mpsc::Receiver<io::Result<()>>,
+    poisoned: bool,
+}
+
+impl BoundedOutput {
+    fn new(
+        mut write: impl FnMut(&serde_json::Value) -> io::Result<()> + Send + 'static,
+    ) -> io::Result<Self> {
+        let (pending, input) = mpsc::sync_channel(1);
+        let (finished, completed) = mpsc::sync_channel(1);
+        thread::Builder::new()
+            .name("swirl-helper-response".into())
+            .spawn(move || {
+                while let Ok(value) = input.recv() {
+                    let result = write(&value);
+                    let failed = result.is_err();
+                    if finished.send(result).is_err() || failed {
+                        break;
+                    }
+                }
+            })?;
+        Ok(Self {
+            pending,
+            completed,
+            poisoned: false,
+        })
+    }
+
+    fn write(&mut self, value: serde_json::Value, deadline: Duration) -> io::Result<()> {
+        if self.poisoned {
+            return Err(io::Error::other("TunHelperOutputPoisoned"));
+        }
+        let result = (|| {
+            self.pending
+                .try_send(value)
+                .map_err(|_| io::Error::other("TunHelperOutputClosed"))?;
+            self.completed
+                .recv_timeout(deadline)
+                .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "TunHelperOutputBlocked"))?
+        })();
+        self.poisoned = result.is_err();
+        result
+    }
+}
+
 fn recover() -> serde_json::Value {
     swirl_api::Controller::for_native_tun_helper().dispatch(RECOVER)
 }
@@ -60,7 +110,7 @@ fn main() {
         // A supervisor output thread can still be blocked in a client pipe.
         // Never acquire stdout again on that path: restoration has already run
         // and process exit must be able to terminate the blocked forwarder.
-        if mode != "--serve" {
+        if mode != "--serve" && mode != "--worker" {
             let _ = emit(&serde_json::json!({"ok":false,"error":"TunHelperStopped"}));
         }
         std::process::exit(1);
@@ -117,7 +167,7 @@ fn finish_worker(
     status: io::Result<bool>,
     output: io::Result<thread::JoinHandle<io::Result<u64>>>,
     restore: impl FnOnce() -> serde_json::Value,
-    report: impl FnOnce(&serde_json::Value) -> io::Result<()>,
+    report: impl FnOnce(&serde_json::Value) -> io::Result<()> + Send + 'static,
     drain: Duration,
 ) -> io::Result<()> {
     // Restoring the network is independent of a client's ability to receive
@@ -140,7 +190,18 @@ fn finish_worker(
     output
         .join()
         .map_err(|_| io::Error::other("TunHelperOutput"))??;
-    report(&recovery)?;
+    // Even after forwarding finishes, the client's pipe may still be full.
+    // Bound the final recovery report as well; it must not hold the process up.
+    let (reported, report_done) = mpsc::sync_channel(1);
+    let final_state = recovery.clone();
+    thread::Builder::new()
+        .name("swirl-helper-final-report".into())
+        .spawn(move || {
+            let _ = reported.send(report(&final_state));
+        })?;
+    report_done
+        .recv_timeout(drain)
+        .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "TunHelperOutputBlocked"))??;
     if !status? || recovery["ok"].as_bool() != Some(true) {
         return Err(io::Error::other("TunWorkerOrRecoveryFailed"));
     }
@@ -187,12 +248,13 @@ fn worker() -> io::Result<()> {
             }
         }
     });
+    let mut output = BoundedOutput::new(emit)?;
     let mut controller = swirl_api::Controller::for_native_tun_helper();
     let outcome = loop {
         controller.maintain_native_tun();
         match incoming.recv_timeout(Duration::from_millis(250)) {
             Ok(Ok(command)) => {
-                if let Err(error) = emit(&controller.dispatch(&command)) {
+                if let Err(error) = output.write(controller.dispatch(&command), OUTPUT_DRAIN) {
                     break Err(error);
                 }
             }
@@ -264,5 +326,53 @@ mod tests {
         );
         assert!(restored);
         assert_eq!(result.unwrap_err().kind(), io::ErrorKind::BrokenPipe);
+    }
+
+    #[test]
+    fn blocked_worker_response_times_out_and_cannot_reuse_a_stale_ack() {
+        let (release, blocked) = mpsc::channel();
+        let (done, finished) = mpsc::channel();
+        let mut output = BoundedOutput::new(move |_| {
+            blocked.recv().unwrap();
+            done.send(()).unwrap();
+            Ok(())
+        })
+        .unwrap();
+        let result = output.write(serde_json::json!({"ok":true}), Duration::from_millis(30));
+        release.send(()).unwrap();
+        finished.recv_timeout(Duration::from_secs(1)).unwrap();
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::TimedOut);
+        assert_eq!(
+            output
+                .write(serde_json::json!({"next":true}), Duration::from_secs(1))
+                .unwrap_err()
+                .to_string(),
+            "TunHelperOutputPoisoned"
+        );
+    }
+
+    #[test]
+    fn blocked_final_report_cannot_delay_a_completed_network_recovery() {
+        let (release, blocked) = mpsc::channel();
+        let (done, reported) = mpsc::channel();
+        let mut restored = false;
+        let result = finish_worker(
+            Ok(true),
+            Ok(thread::spawn(|| Ok(0))),
+            || {
+                restored = true;
+                serde_json::json!({"ok":true})
+            },
+            move |_| {
+                blocked.recv().unwrap();
+                done.send(()).unwrap();
+                Ok(())
+            },
+            Duration::from_millis(30),
+        );
+        release.send(()).unwrap();
+        reported.recv_timeout(Duration::from_secs(1)).unwrap();
+        assert!(restored);
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::TimedOut);
     }
 }
