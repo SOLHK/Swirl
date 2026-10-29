@@ -1,0 +1,13 @@
+[package]
+name = "swirl-wintun"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+description = "Isolated Windows Wintun loader. The signed DLL is not vendored."
+
+# `deny` keeps accidental unsafe out of the safe wrapper. The FFI module is the
+# only place allowed to override it. This crate does not inherit the workspace
+# forbid, so the rest of the workspace stays unsafe-free.
+[lints.rust]
+unsafe_code = "deny"

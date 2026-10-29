@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 exclude = ["vendor/rustls"]
-members = ["crates/swirl-platform", "crates/swirl-subscription", "crates/swirl-dns", "crates/swirl-routing", "crates/swirl-protocol", "crates/swirl-transport", "crates/swirl-core", "crates/swirl-api"]
+members = ["crates/swirl-platform", "crates/swirl-subscription", "crates/swirl-dns", "crates/swirl-routing", "crates/swirl-protocol", "crates/swirl-transport", "crates/swirl-core", "crates/swirl-api", "crates/swirl-wintun", "crates/swirl-tun"]
 
 [workspace.package]
 version = "0.1.0"
@@ -46,6 +46,11 @@ swirl-protocol = { path = "crates/swirl-protocol" }
 swirl-transport = { path = "crates/swirl-transport" }
 swirl-core = { path = "crates/swirl-core" }
 swirl-platform = { path = "crates/swirl-platform" }
+swirl-wintun = { path = "crates/swirl-wintun" }
+swirl-tun = { path = "crates/swirl-tun" }
+# 0BSD userspace TCP. Pinned below the 0.13+ MSRV jump so the workspace
+# rust-version stays the floor. Wintun itself is not a crate dependency.
+smoltcp = { version = "=0.12.0", default-features = false, features = ["std", "medium-ip", "proto-ipv4", "proto-ipv6", "socket-tcp", "socket-tcp-reno", "iface-max-addr-count-8", "iface-max-route-count-4"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

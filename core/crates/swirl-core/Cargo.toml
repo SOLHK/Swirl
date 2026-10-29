@@ -14,6 +14,7 @@ swirl-dns.workspace = true
 swirl-routing.workspace = true
 swirl-protocol.workspace = true
 swirl-transport.workspace = true
+swirl-tun.workspace = true
 [dev-dependencies]
 base64.workspace = true
 tokio-rustls.workspace = true
