@@ -5,7 +5,7 @@ compiler matching the Qt kit. Rust is the only product runtime. Importing a
 Clash/Mihomo subscription does not install or execute an external core.
 
 For the MSVC packaging wrapper, run
-`scripts/build-quick-windows.ps1 -QtDir <Qt-MSVC-x64-directory>` from an x64
+`scripts/build-quick-windows.ps1 -QtDir <Qt-MSVC-x64-directory> -OpenSslRoot <verified-runtime-directory>` from an x64
 MSVC developer shell. This script currently requires an MSVC Qt kit and Rust
 `x86_64-pc-windows-msvc`. Output defaults to `D:\Codex`; use fresh distribution
 and output directories. `-InputTests` uses a separate test build;
@@ -15,6 +15,54 @@ Direct CMake builds also support the Qt 6.12.0 GCC 15.1.0 MinGW kit, paired with
 Rust `x86_64-pc-windows-gnu`. Use that kit's compiler environment and a separate
 build cache. Do not pass a MinGW kit to the MSVC-only wrapper, mix Qt runtimes,
 or copy a Rust DLL manually from another build.
+
+## Windows TLS runtime
+
+Build the pinned OpenSSL 3.5.9 runtime before deploying Qt. The repository's
+`tools/openssl-runtime.lock.json` pins the official source archive URL, SHA256
+and license hash. `tools/Build-OpenSslRuntime.py` verifies these inputs, builds
+the unmodified shared libraries with assembly enabled and verifies the actual
+DLL version and TLS initialization. Its receipt records compiler/tool hashes;
+it is build evidence, not an independent signature attestation. Do not copy
+OpenSSL from Git, Poppler, another application or an unrelated Qt kit.
+
+For MSVC, enter an x64 Visual Studio developer shell with native Windows Perl,
+NASM, `cl.exe` and `nmake.exe` on PATH, then run from the repository root:
+
+```powershell
+python tools/Build-OpenSslRuntime.py --output D:/Codex/build/swirl-openssl-msvc --target VC-WIN64A
+./scripts/build-quick-windows.ps1 -QtDir <Qt-MSVC-x64-directory> -OpenSslRoot D:/Codex/build/swirl-openssl-msvc
+```
+
+The other packaging entry points (`Build-WindowsRustProductInstaller.ps1`,
+`build-current-portable.ps1` and `build-network-candidate.ps1`) require the same
+explicit `-OpenSslRoot`. The build reuses a runtime only when its source,
+recipe and current toolchain identities match; it validates cached files again.
+
+For a direct MinGW build, use MSYS2 Perl, GNU make and `sh.exe` with the native
+Qt x64 MinGW `gcc.exe` and matching GNU assembler. Native Strawberry Perl is
+for the MSVC target; it cannot configure the MinGW target. Build a separate
+runtime with `--target mingw64`, then deploy into that build's application
+directory:
+
+```powershell
+python tools/Build-OpenSslRuntime.py --output D:/Codex/build/swirl-openssl-mingw --target mingw64
+./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot D:/Codex/build/swirl-openssl-mingw -ApplicationDirectory <application-directory> -Target mingw64
+windeployqt --release --compiler-runtime --openssl-root D:/Codex/build/swirl-openssl-mingw --include-plugins qopensslbackend --qmldir src/Swirl.Quick/qml <application-directory>/Swirl.exe
+```
+
+`Copy-VerifiedOpenSslRuntime.ps1` validates the runtime with `--verify-only`
+before copying the two DLLs, unchanged upstream license, provenance notice and
+receipt. The application must include `Qt6Network.dll`,
+`tls/qopensslbackend.dll`, `libssl-3-x64.dll` and `libcrypto-3-x64.dll` from
+its own distribution. After staging, run
+`Swirl.exe --tls-runtime-self-test <report-path>` with a clean PATH containing
+only the application, matching compiler runtime and Windows system directories.
+It performs no network requests and must report the expected default backend,
+version and loaded module paths. This deployment check does not replace actual
+HTTPS, certificate rejection or ALPN tests. Production staging and finalization
+also require the fixed TLS file set, recorded hashes, source pin and matching
+Rust/SSL compiler target; a manifest cannot omit these dependencies.
 
 Cargo is mandatory: CMake pairs the Rust library with the product's source SHA
 and content build ID on each incremental build. Configure QA with

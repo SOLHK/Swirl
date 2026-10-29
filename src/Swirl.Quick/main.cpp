@@ -1,5 +1,6 @@
 #include <QGuiApplication>
 #include "engine/RustCoreSelfTest.h"
+#include "network/TlsRuntimeSelfTest.h"
 #include "app/SingleInstance.h"
 #include "app/ShutdownCoordinator.h"
 #include "app/FontManager.h"
@@ -131,6 +132,11 @@ int main(int argc, char *argv[])
     // Package verification runs the real EXE/DLL, before any UI, NodeStore,
     // system-proxy ownership, or persisted settings are opened.
     for (int i = 1; i < argc; ++i) {
+        if (QByteArray(argv[i]) == "--tls-runtime-self-test") {
+            QCoreApplication selfTest(argc, argv);
+            if (i + 1 >= argc) return 64;
+            return runTlsRuntimeSelfTest(QString::fromLocal8Bit(argv[i + 1]));
+        }
         if (QByteArray(argv[i]) == "--rust-core-self-test") {
             QCoreApplication selfTest(argc, argv);
             if (i + 1 >= argc) return 64;

@@ -627,6 +627,23 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or $version -ne '6.12.0' -or $sdk.arch -ne 'win64_msvc2022_64') { throw 'Unexpected Qt version or ABI.' }
           "CMAKE_PREFIX_PATH=$qtRoot" >> $env:GITHUB_ENV
           (Join-Path $qtRoot 'bin') >> $env:GITHUB_PATH
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+      - name: Record native TLS runtime build tools
+        id: tls_tools
+        working-directory: .
+        shell: pwsh
+        run: ./scripts/Build-CiOpenSslRuntime.ps1 -OutputDirectory "$env:RUNNER_TEMP/swirl-openssl-3.5.9" -PrepareOnly -GitHubEnvironment
+      - name: Restore source-verified OpenSSL runtime
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/swirl-openssl-3.5.9
+          key: openssl-${{ runner.os }}-${{ steps.tls_tools.outputs.identity }}-${{ hashFiles('tools/Build-OpenSslRuntime.py', 'tools/openssl-runtime.lock.json') }}
+      - name: Build or verify pinned OpenSSL runtime
+        working-directory: .
+        shell: pwsh
+        run: ./scripts/Build-CiOpenSslRuntime.ps1 -OutputDirectory "$env:RUNNER_TEMP/swirl-openssl-3.5.9" -GitHubEnvironment
       - name: Build Qt to Rust integration test
         working-directory: .
         run: |
@@ -648,7 +665,8 @@ jobs:
         env:
           QT_FORCE_STDERR_LOGGING: '1'
         run: |
-          windeployqt --release build/rust-qt/Release/SwirlRustCoreTests.exe
+          ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory build/rust-qt/Release -Target VC-WIN64A
+          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend build/rust-qt/Release/SwirlRustCoreTests.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:SWIRL_TEST_ROOT=Join-Path $env:RUNNER_TEMP 'swirl-native-qt-tests'
           New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
@@ -789,7 +807,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
           if (-not $IsWindows -or [string]::IsNullOrWhiteSpace($env:SWIRL_QT_PRIVATE_INSPECTOR) -or -not (Test-Path -LiteralPath $env:SWIRL_QT_PRIVATE_INSPECTOR -PathType Leaf)) { throw "Required Windows Qt DPAPI inspector is missing" }
-          windeployqt --release "$env:SWIRL_QT_PRIVATE_INSPECTOR"
+          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_QT_PRIVATE_INSPECTOR"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m unittest tools.tests.test_subscription_capture.CaptureTests.test_qt_offline_inspector_reloads_and_redacts_actual_dpapi -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

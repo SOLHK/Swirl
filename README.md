@@ -67,6 +67,8 @@ HTTP/3 解密、完整断点暂停/编辑、WebSocket 帧检查、HTTP 脚本挂
 
 需要 Windows x64、Qt 6.12.0、CMake 3.25+、Cargo 和匹配 Qt 的 C++23 编译器。当前 UI 构建使用 Qt 6.12.0 的 GCC 15.1.0 MinGW kit，配对 Rust `x86_64-pc-windows-gnu`；MSVC kit 配对 `x86_64-pc-windows-msvc`。不能混用 Qt 库、编译器或另一构建目录的 Rust DLL。制作安装程序另需 NSIS。
 
+Windows 部署还须从锁定源码构建 OpenSSL 3.5.9，并一并部署 Qt OpenSSL 插件、运行库与许可证；不能依赖开发机 PATH 中其他软件的 DLL。构建入口要求显式 `OpenSslRoot`，安装包会检查固定文件清单、哈希和实际加载路径。准备工具、构建及部署命令见 [Windows 构建说明](src/Swirl.Quick/BUILDING.md)。
+
 ```powershell
 # 在匹配 Qt kit 的编译环境中运行；Cargo 必须在 PATH 中。
 cmake -S src/Swirl.Quick -B D:/Codex/build/swirl-qa -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=D:/Codex/toolchains/Qt-6.12.0/6.12.0/mingw_64 -DSWIRL_BUILD_UI_TESTS=ON

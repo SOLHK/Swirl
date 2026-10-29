@@ -2,6 +2,7 @@
 # separate CMake directories; no external proxy executable is downloaded.
 param(
     [Parameter(Mandatory)][string]$QtDir,
+    [Parameter(Mandatory)][string]$OpenSslRoot,
     [string]$BuildDir = 'D:\Codex\build\swirl-rust-product',
     [string]$DistDir = 'D:\Codex\outputs\Swirl-Rust-x64',
     [string]$OutDir = 'D:\Codex\outputs',
@@ -21,6 +22,7 @@ Push-Location $repo
 try {
     if (Test-Path -LiteralPath $DistDir) { throw 'Use a fresh DistDir; existing files are never overwritten.' }
     $qt = (Resolve-Path -LiteralPath $QtDir).Path
+    $openssl = (Resolve-Path -LiteralPath $OpenSslRoot).Path
     $env:PATH = "$(Join-Path $qt 'bin');$env:PATH"
     $configure = @('-G', $Generator, '-DCMAKE_BUILD_TYPE=Release', "-DCMAKE_PREFIX_PATH=$qt")
     if ($Generator -eq 'Visual Studio 17 2022') { $configure += @('-A','x64') }
@@ -36,9 +38,11 @@ try {
         if ($LASTEXITCODE) { throw 'Test build failed.' }
         $testBin = Join-Path $testBuild 'Release'
         if (-not (Test-Path (Join-Path $testBin 'Swirl.exe'))) { $testBin = $testBuild }
-        & windeployqt --release --compiler-runtime --qmldir src/Swirl.Quick/qml (Join-Path $testBin 'Swirl.exe')
+        & (Join-Path $PSScriptRoot 'Copy-VerifiedOpenSslRuntime.ps1') -OpenSslRoot $openssl `
+            -ApplicationDirectory $testBin -Target VC-WIN64A
+        & windeployqt --release --compiler-runtime --openssl-root $openssl --include-plugins qopensslbackend --qmldir src/Swirl.Quick/qml (Join-Path $testBin 'Swirl.exe')
         if ($LASTEXITCODE) { throw 'Test UI deployment failed.' }
-        & windeployqt --release --compiler-runtime (Join-Path $testBin 'SwirlRustCoreTests.exe')
+        & windeployqt --release --compiler-runtime --openssl-root $openssl --include-plugins qopensslbackend (Join-Path $testBin 'SwirlRustCoreTests.exe')
         if ($LASTEXITCODE) { throw 'Test dependency deployment failed.' }
         ctest --test-dir $testBuild -C Release -R '^swirl-(rust-|node-real-chain|import-subscription|subscription-formats|stream-regression|local-extensions|telemetry-accounting|diagnostic-export)' --output-on-failure
         if ($LASTEXITCODE) { throw 'Rust and retained product regression tests failed.' }
@@ -54,7 +58,7 @@ try {
     if ($LASTEXITCODE) { throw 'Production configuration failed.' }
     cmake --build $BuildDir --config Release --target Swirl --parallel $Parallel
     if ($LASTEXITCODE) { throw 'Production build failed; no package was staged.' }
-    & (Join-Path $PSScriptRoot 'Stage-WindowsRustProduct.ps1') -BuildDirectory $BuildDir -Destination $DistDir
+    & (Join-Path $PSScriptRoot 'Stage-WindowsRustProduct.ps1') -BuildDirectory $BuildDir -Destination $DistDir -OpenSslRoot $openssl
     $stage = (Resolve-Path -LiteralPath $DistDir).Path
     $p = Start-Process (Join-Path $stage 'Swirl.exe') -ArgumentList '--smoke-test' -WorkingDirectory ([IO.Path]::GetTempPath()) -WindowStyle Hidden -PassThru
     if (-not $p.WaitForExit(75000)) { $p.Kill(); throw 'Packaged Qt UI smoke timed out.' }

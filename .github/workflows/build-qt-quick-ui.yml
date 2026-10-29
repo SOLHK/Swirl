@@ -83,6 +83,12 @@ jobs:
       - name: Check SDK archive and metadata filesystem boundaries
         shell: pwsh
         run: python tools/tests/test_qt_sdk_installer.py --scratch-root "$env:RUNNER_TEMP/swirl-sdk-installer-tests"
+      - name: Check pinned TLS source and fixed package boundaries
+        shell: pwsh
+        run: |
+          python tools/tests/test_openssl_runtime.py --scratch-root "$env:RUNNER_TEMP/swirl-openssl-boundary-tests"
+          if ($LASTEXITCODE -ne 0) { throw 'TLS source/receipt boundary checks failed.' }
+          ./scripts/tests/Test-RustProductPackagePolicy.ps1
       - name: Restore isolated Qt 6.12 SDK archives
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
@@ -124,6 +130,18 @@ jobs:
           $hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($identity))).ToLowerInvariant()
           "hash=$hash" >> $env:GITHUB_OUTPUT
           $identity | Set-Content -LiteralPath build-evidence/compiler.json -Encoding utf8
+      - name: Record native TLS runtime build tools
+        id: tls_tools
+        shell: pwsh
+        run: ./scripts/Build-CiOpenSslRuntime.ps1 -OutputDirectory "$env:RUNNER_TEMP/swirl-openssl-3.5.9" -PrepareOnly -GitHubEnvironment
+      - name: Restore source-verified OpenSSL runtime
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/swirl-openssl-3.5.9
+          key: openssl-${{ runner.os }}-${{ steps.tls_tools.outputs.identity }}-${{ hashFiles('tools/Build-OpenSslRuntime.py', 'tools/openssl-runtime.lock.json') }}
+      - name: Build or verify pinned OpenSSL runtime
+        shell: pwsh
+        run: ./scripts/Build-CiOpenSslRuntime.ps1 -OutputDirectory "$env:RUNNER_TEMP/swirl-openssl-3.5.9" -GitHubEnvironment
       - name: Restore Qt 6.12 compiler outputs
         id: build_cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -192,8 +210,15 @@ jobs:
           # Qt 6.12 deploys only the Windows QPA plugin by default. The isolated
           # screenshot/input drivers also need offscreen; production staging
           # remains separate and uses the native Windows plugin.
-          windeployqt --release --include-plugins qoffscreen --qmldir src/Swirl.Quick/qml dist/Swirl.exe
+          ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory dist -Target VC-WIN64A
+          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml dist/Swirl.exe
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath 'dist/platforms/qoffscreen.dll')) { throw 'The isolated offscreen test runtime is incomplete.' }
+          # CTest executes these binaries in the build directory, not dist.
+          ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory build/swirl-quick/Release -Target VC-WIN64A
+          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml build/swirl-quick/Release/Swirl.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Qt test runtime deployment failed.' }
+          & dist/Swirl.exe --tls-runtime-self-test build-evidence/ui-tls-runtime.json
+          if ($LASTEXITCODE -ne 0) { throw 'The bundled UI TLS runtime is incomplete or borrowed from PATH.' }
       # Qt's offscreen QPA font database reads appdir/lib/fonts and does not
       # automatically discover the fonts installed on a Windows CI runner.
       # These fixtures are used for synthetic screenshot tests ONLY.
@@ -358,7 +383,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Production configure failed.' }
           cmake --build build/swirl-product --config Release --target Swirl --parallel 4
           if ($LASTEXITCODE -ne 0) { throw 'Production build failed.' }
-          ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/swirl-product -Destination installer-bin
+          ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/swirl-product -Destination installer-bin -OpenSslRoot $env:SWIRL_OPENSSL_ROOT
           New-Item -ItemType Directory -Force -Path out | Out-Null
       - name: Install NSIS packaging tools
         shell: pwsh

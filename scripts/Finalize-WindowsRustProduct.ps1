@@ -27,6 +27,8 @@ if (Test-Path -LiteralPath $diagnostic -PathType Leaf) {
     Move-Item -LiteralPath $diagnostic -Destination $saved
 }
 $manifest = Assert-SwirlProductManifest -ApplicationDirectory $root -ExpectedSourceSha $sha
+$tlsLock=Get-Content -LiteralPath (Join-Path $repo 'tools/openssl-runtime.lock.json') -Raw | ConvertFrom-Json
+$tls=Assert-SwirlTlsPayload -ApplicationDirectory $root -ExpectedVersion $tlsLock.version -ExpectedSourceSha256 $tlsLock.source.sha256
 if (Test-Path -LiteralPath $list) { throw 'Uninstall include already exists.' }
 # Runtime cleanup uses the embedded manifest and hash-aware maintenance helper.
 # Never generate unconditional Delete instructions for potentially modified files.
@@ -35,6 +37,7 @@ $lines = @('; Generated only after exact payload and source verification.',
     ('!define SWIRL_VERIFIED_FILE_COUNT ' + @($manifest.files).Count))
 New-Item -ItemType Directory -Force -Path ([IO.Path]::GetDirectoryName($list)) | Out-Null
 $lines | Set-Content -LiteralPath $list -Encoding utf8
-@{ source_sha=$sha; files=@($manifest.files).Count; exact_inventory=$true; all_hashes_verified=$true } |
+@{ source_sha=$sha; files=@($manifest.files).Count; exact_inventory=$true; all_hashes_verified=$true;
+   tls_version=$tls.version; tls_source_sha256=$tls.source.sha256; tls_closure_verified=$true } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'final-package-verification.json') -Encoding utf8
 Write-Host "Final payload inventory and hashes verified: $sha"
