@@ -169,6 +169,9 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item build/swirl-quick/Release/Swirl.exe dist/
+            Copy-Item build/swirl-quick/Release/Swirl-brand-0217-canonical.ico dist/
+            python tools/Verify-WindowsIconResources.py --exe dist/Swirl.exe --ico dist/Swirl-brand-0217-canonical.ico --output build-evidence/ui-icon-resources.json
+            if ($LASTEXITCODE -ne 0) { throw 'The deployed UI icon resources do not match all native ICO frames.' }
           Copy-Item build/swirl-quick/Release/swirl_api.dll,build/swirl-quick/Release/swirl-rust-build.json dist/
           Copy-Item build/swirl-quick/Release/SwirlProxyGuard.exe dist/
           Copy-Item build/swirl-quick/Release/SwirlGatewayGuard.exe dist/

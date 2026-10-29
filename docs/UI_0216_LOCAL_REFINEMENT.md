@@ -48,6 +48,10 @@ EXE ICO resources. The RC object explicitly depends on its generated ICO;
 previous target ordering alone allowed an old resource object to survive a
 regenerated icon. `tools/Verify-WindowsIconResources.py` rejects any frame or
 EXE resource mismatch before package staging writes its manifest.
+The versioned ICO follows the target EXE directory, including MSVC's Release
+subdirectory, and the CI preview runtime carries the same verified file.
+Taskbar properties are published only for the native Windows platform, which
+has a real HWND; offscreen renderers retain their strict warning checks.
 
 The window publishes its explicit AppID and relaunch resources before first
 show. `Swirl-brand-0217-canonical.ico` gives the shell a distinct resource path.

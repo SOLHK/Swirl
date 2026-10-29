@@ -90,6 +90,7 @@
 #ifdef Q_OS_WIN
 static void configureTaskbarIdentity(QQuickWindow *window)
 {
+    if(QGuiApplication::platformName()!=QStringLiteral("windows"))return;
     IPropertyStore *store=nullptr;
     HRESULT result=SHGetPropertyStoreForWindow(reinterpret_cast<HWND>(window->winId()),IID_PPV_ARGS(&store));
     if(FAILED(result)){qWarning()<<"Taskbar property store unavailable"<<quint32(result);return;}
