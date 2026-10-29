@@ -8,6 +8,7 @@
 #include <QQmlExpression>
 #include <QQmlContext>
 #include <QQmlComponent>
+#include <QQmlProperty>
 #include "engine/SystemProxySession.h"
 #include <memory>
 #include <QTest>
@@ -420,13 +421,24 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
                 &&contents->width()+entry->property("leftPadding").toDouble()+entry->property("rightPadding").toDouble()<=entry->width()+1);
         }
         if(policyEntry&&policyValue){
+            QTest::mouseMove(window,QPoint(1,1));wait(200);
             const auto before=policyEntry->size();
+            auto *contents=policyEntry->property("contentItem").value<QQuickItem *>();
+            auto *footer=findVisual(activity,"activityStatusFooter");
+            auto *surface=policyEntry->property("background").value<QQuickItem *>();
             const auto originalName=policyValue->property("text");
             policyValue->setProperty("text",QString::fromUtf8("新加坡实验性 IEPL 专线 — a deliberately long regional node name that must elide without moving other facts"));wait(80);
+            const auto valueBounds=contents?policyValue->mapRectToItem(contents,QRectF(QPointF(),policyValue->size())):QRectF();
+            const auto contentsInFooter=contents&&footer?contents->mapRectToItem(footer,QRectF(QPointF(),contents->size())):QRectF();
             check("activity-long-policy-name-elides-inside-padded-stable-selector",policyValue->property("truncated").toBool()
-                &&policyEntry->size()==before&&policyValue->width()>0
-                &&policyEntry->property("leftPadding").toDouble()>=eval("Theme.dp(14)").toDouble()
-                &&policyEntry->property("rightPadding").toDouble()>=eval("Theme.dp(14)").toDouble());
+                &&policyValue->property("lineCount").toInt()==1&&policyEntry->size()==before&&policyValue->width()>0
+                &&qAbs(policyEntry->height()-eval("Theme.dp(28)").toDouble())<0.5
+                &&policyEntry->property("leftPadding").toDouble()>=eval("Theme.dp(8)").toDouble()
+                &&policyEntry->property("rightPadding").toDouble()>=eval("Theme.dp(8)").toDouble()
+                &&contents&&footer&&surface&&qAbs(surface->property("radius").toDouble()-surface->height()/2)<0.5
+                &&valueBounds.left()>=-0.5&&valueBounds.right()<=contents->width()+0.5
+                &&QRectF(QPointF(),footer->size()).adjusted(-0.5,-0.5,0.5,0.5).contains(contentsInFooter)
+                &&contents->width()+policyEntry->property("leftPadding").toDouble()+policyEntry->property("rightPadding").toDouble()<=policyEntry->width()+0.5);
             policyValue->setProperty("text",originalName);
         }else check("activity-policy-value-is-present",false);
         const auto diagnosticAt=diagnostic->mapToItem(activity,0,0),trafficAt=trafficCard->mapToItem(activity,0,0);
@@ -600,31 +612,42 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             const auto originalController=capsule->property("controller");
             check("proxy-toggle-test-controller-bound",capsule->setProperty("controller",QVariant::fromValue(fake.get())));
             const auto clickProxy=[&]{QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,capsule->mapToScene(QPointF(capsule->width()/2,capsule->height()/2)).toPoint());wait(30);};
-            check("proxy-off-offers-enable",capsule->property("label").toString()==QStringLiteral("系统代理 · 已关"));
+            auto *fakeProxy=fake->property("systemProxy").value<QObject *>();
+            check("proxy-toggle-test-state-present",fakeProxy!=nullptr);
+            const auto proxyState=[&](bool enabled,bool owned,bool systemEnabled,const QString &tone,const QString &phase,const QString &detailToken){
+                const auto label=capsule->property("label").toString(),detail=capsule->property("detail").toString();
+                return fakeProxy&&fakeProxy->property("systemEnabled").toBool()==systemEnabled
+                    &&fakeProxy->property("owned").toBool()==owned&&fakeProxy->property("enabled").toBool()==owned
+                    &&capsule->isEnabled()&&label==QStringLiteral("系统代理")
+                    &&capsule->property("proxyEnabled").toBool()==enabled&&capsule->property("proxyOwned").toBool()==owned
+                    &&capsule->property("tone").toString()==tone&&capsule->property("activityPhase").toString()==phase
+                    &&detail.contains(detailToken)
+                    &&QQmlProperty::read(capsule,QStringLiteral("Accessible.description"),qmlContext(capsule)).toString()==detail
+                    &&QQmlProperty::read(capsule,QStringLiteral("Accessible.name"),qmlContext(capsule)).toString()==label+QStringLiteral("，")+detail;
+            };
+            check("proxy-off-offers-enable",proxyState(false,false,false,"neutral","idle",QStringLiteral("点击启动已保存策略")));
             clickProxy();
             check("proxy-enable-click-dispatches-once",fake->property("calls").toInt()==1);
-            check("proxy-on-offers-disable",capsule->property("label").toString()==QStringLiteral("系统代理 · 已开"));
+            check("proxy-on-offers-disable",proxyState(true,true,true,"success","succeeded",QStringLiteral("点击恢复原设置并停止内核")));
             check("proxy-enable-stays-on-activity",eval("AppState.currentPage==='activity'").toBool());
             clickProxy();
             check("proxy-disable-click-dispatches-once",fake->property("calls").toInt()==2);
-            check("proxy-disabled-state-updates-action",capsule->property("label").toString()==QStringLiteral("系统代理 · 已关"));
+            check("proxy-disabled-state-updates-action",proxyState(false,false,false,"neutral","idle",QStringLiteral("点击启动已保存策略")));
             fake->setProperty("proxyRequested",true);fake->setProperty("busy",true);fake->setProperty("systemProxyBusy",true);clickProxy();
             check("proxy-pending-request-can-be-cancelled",fake->property("calls").toInt()==3&&!fake->property("proxyRequested").toBool()&&!fake->property("busy").toBool());
             fake->setProperty("systemProxyStopping",true);clickProxy();
             check("proxy-stopping-cannot-repeat-request",fake->property("calls").toInt()==3&&!capsule->isEnabled());
             fake->setProperty("systemProxyStopping",false);
-            auto *fakeProxy=fake->property("systemProxy").value<QObject *>();
-            check("proxy-toggle-test-state-present",fakeProxy!=nullptr);
             if(fakeProxy)fakeProxy->setProperty("systemEnabled",true);
-            check("external-proxy-does-not-claim-swirl-is-running",capsule->property("label").toString()==QStringLiteral("系统代理 · 外部")&&capsule->property("tone").toString()=="neutral");
+            check("external-proxy-does-not-claim-swirl-is-running",proxyState(false,false,true,"neutral","idle",QStringLiteral("其他应用的系统代理已开启")));
             clickProxy();clickProxy();
-            check("master-off-restores-external-proxy-state",fake->property("calls").toInt()==5&&fakeProxy&&fakeProxy->property("systemEnabled").toBool()&&!fakeProxy->property("owned").toBool()&&capsule->property("label").toString()==QStringLiteral("系统代理 · 外部"));
+            check("master-off-restores-external-proxy-state",fake->property("calls").toInt()==5&&proxyState(false,false,true,"neutral","idle",QStringLiteral("其他应用的系统代理已开启")));
             fake->setProperty("processAlive",true);
-            check("running-core-without-owned-proxy-stays-neutral",capsule->property("label").toString()==QStringLiteral("代理 · 仅内核")&&capsule->property("tone").toString()=="neutral");
+            check("running-core-without-owned-proxy-stays-neutral",proxyState(true,false,true,"neutral","idle",QStringLiteral("内核正在运行")));
             fake->setProperty("processAlive",false);
             if(fakeProxy)fakeProxy->setProperty("error",QStringLiteral("stale-owner-error"));
             fake->setProperty("reject",true);clickProxy();
-            check("proxy-failure-keeps-observed-state",fake->property("calls").toInt()==6&&capsule->property("label").toString()==QStringLiteral("系统代理 · 外部"));
+            check("proxy-failure-keeps-observed-state",fake->property("calls").toInt()==6&&proxyState(false,false,true,"warning","failed",QStringLiteral("test-operation-failed")));
             check("proxy-failure-visible",capsule->property("tone").toString()=="warning"&&capsule->property("detail").toString()=="test-operation-failed");
             check("proxy-disable-and-error-stay-on-activity",eval("AppState.currentPage==='activity'").toBool());
             check("proxy-toggle-controller-restored",capsule->setProperty("controller",originalController));

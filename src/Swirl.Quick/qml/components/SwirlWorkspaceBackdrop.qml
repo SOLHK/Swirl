@@ -91,7 +91,7 @@ Item {
                 progress: canvas.progress
                 // The gradient already carries per-colour alpha. Keep the
                 // original vector equally legible inside and outside the pane.
-                opacity: Theme.dark ? 0.48 : 0.56
+                opacity: Theme.wingOpacity
             }
         }
     }

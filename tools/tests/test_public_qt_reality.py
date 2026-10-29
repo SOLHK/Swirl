@@ -70,6 +70,33 @@ class PublicQtEvidenceTests(unittest.TestCase):
         with self.assertRaises(gate.public.ProbeFailure):
             gate.validate_qt_report(safe)
 
+    def test_bounded_tls_predicates_are_diagnostics_and_cannot_turn_failure_into_success(self):
+        value = successful_report()
+        row = next(row for row in value["checks"] if row["port"] == 443)
+        row.update(success=False, stage="tls-handshake", tls_encrypted=True,
+                   peer_certificate_present=True, handshake_error_count=0,
+                   session_protocol=11, alpn_hex="", alpn_status=2,
+                   active_backend="schannel", client_alpn_supported=True)
+        safe = gate.safe_qt_progress(value)
+        observed = next(row for row in safe["checks"] if row["port"] == 443)
+        for field in ("tls_encrypted", "peer_certificate_present", "handshake_error_count",
+                      "session_protocol", "alpn_hex", "alpn_status", "active_backend",
+                      "client_alpn_supported"):
+            self.assertEqual(observed[field], row[field])
+        self.assertFalse(observed["success"])
+        with self.assertRaises(gate.public.ProbeFailure):
+            gate.validate_qt_report(safe)
+        for field, invalid in (("tls_encrypted", 1), ("peer_certificate_present", "true"),
+                               ("handshake_error_count", 257), ("session_protocol", 65),
+                               ("alpn_hex", "secret"), ("alpn_hex", "aa" * 256),
+                               ("alpn_status", 3), ("active_backend", "secret\nvalue"),
+                               ("active_backend", "a" * 65), ("client_alpn_supported", 1)):
+            modified = copy.deepcopy(value)
+            next(item for item in modified["checks"] if item["port"] == 443)[field] = invalid
+            observed = next(item for item in gate.safe_qt_progress(modified)["checks"] if item["port"] == 443)
+            with self.subTest(field=field, invalid=invalid):
+                self.assertNotIn(field, observed)
+
     def test_nonzero_child_and_timeout_keep_partial_progress(self):
         for timeout in (False, True):
             with self.subTest(timeout=timeout), tempfile.TemporaryDirectory() as folder:

@@ -81,12 +81,25 @@ def safe_qt_progress(value):
         row = dict(zip(CASE_FIELDS, key))
         for name, lower, upper in (("http_status", 0, 599), ("proxy_port", 1, 65535),
                                    ("socket_error", -1, 1000), ("tls_error_count", 0, 64),
-                                   ("elapsed_ms", 0, 180000)):
+                                   ("elapsed_ms", 0, 180000), ("handshake_error_count", 0, 256),
+                                   ("session_protocol", -1, 64), ("alpn_status", 0, 2)):
             item = check.get(name)
             if type(item) is int and lower <= item <= upper:
                 row[name] = item
         for name in ("certificate_verified", "expected_body_verified", "closed", "success"):
             row[name] = check.get(name) is True
+        for name in ("tls_encrypted", "peer_certificate_present", "client_alpn_supported"):
+            item = check.get(name)
+            if type(item) is bool:
+                row[name] = item
+        alpn = check.get("alpn_hex")
+        if (isinstance(alpn, str) and len(alpn) <= 510 and len(alpn) % 2 == 0
+                and all(char in "0123456789abcdef" for char in alpn)):
+            row["alpn_hex"] = alpn
+        backend = check.get("active_backend")
+        if (isinstance(backend, str) and len(backend) <= 64
+                and all(char in "abcdefghijklmnopqrstuvwxyz0123456789_-" for char in backend)):
+            row["active_backend"] = backend
         row["proxy_host"] = "127.0.0.1" if check.get("proxy_host") == "127.0.0.1" else "unreported"
         row["tls_version"] = "TLSv1.3" if check.get("tls_version") == "TLSv1.3" else ""
         row["stage"] = check.get("stage") if check.get("stage") in REQUEST_STAGES else "unreported"
