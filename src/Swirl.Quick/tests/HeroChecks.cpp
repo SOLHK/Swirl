@@ -77,8 +77,25 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  SetWindowPos(qaWindow,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
  struct RestoreQaStack {QQuickWindow *window;~RestoreQaStack(){window->setFlag(Qt::WindowStaysOnTopHint,false);}} restoreQaStack{window};
 #endif
- eval("Theme.mode='Light';Theme.transparency=true;Theme.reduceMotion=false;SwirlMotion.speed=1");route("featurehub");
+ eval("Theme.mode='Light';Theme.transparency=true;Theme.reduceMotion=false;SwirlMotion.speed=1;AppState.navigate('featurehub')");
  check(!eval("SwirlMotion.reduced").toBool(),"animated fixture resolves independently of the Windows accessibility preference");
+ const QStringList settingsRoutes{"settings","dns","modules","profiles","scripts","subscriptions","proxies"};
+ const QString hubStateScript=QStringLiteral("JSON.stringify({route:AppState.currentPage,activeRoute:pageLoader.activeLoader?pageLoader.activeLoader.routeId:'',hasItem:pageLoader.item!==null,moving:pageLoader.moving,pending:pageLoader.pendingGrab,preparing:pageLoader.preparing,registry:SwirlTransitionRegistry.activeCount,dismissals:dismissals.count})");
+ const auto initialHubState=QJsonDocument::fromJson(eval(hubStateScript).toString().toUtf8()).object();
+ QElapsedTimer hubReadiness;hubReadiness.start();
+ // Cold pages incubate across frames. A fixed delay can observe the previous
+ // page, then mistake its late navigation animation for the first card opening.
+ const bool hubReady=QTest::qWaitFor([&]{
+  if(!window->isExposed()||!eval("AppState.currentPage==='featurehub' && pageLoader.item && pageLoader.activeLoader && pageLoader.activeLoader.routeId==='featurehub' && !pageLoader.moving && !pageLoader.pendingGrab && SwirlTransitionRegistry.activeCount===0 && dismissals.count===0").toBool())return false;
+  for(const auto &name:settingsRoutes){const auto *card=item("settings-"+name);if(!card||!card->isEnabled()||card->width()<=0||card->height()<=0)return false;}
+  return true;
+ },4000);
+ QJsonArray hubCards;
+ for(const auto &name:settingsRoutes){const auto *card=item("settings-"+name);hubCards.append(QJsonObject{{"route",name},{"visible",card!=nullptr},{"enabled",card&&card->isEnabled()},{"width",card?card->width():0},{"height",card?card->height():0}});}
+ const QJsonObject hubReadyEvidence{{"initial",initialHubState},{"settled",QJsonDocument::fromJson(eval(hubStateScript).toString().toUtf8()).object()},{"elapsedMs",hubReadiness.elapsed()},{"ready",hubReady},{"cards",hubCards}};
+ QFile hubEvidence(directory+"/featurehub-ready.json");if(!hubEvidence.open(QIODevice::WriteOnly))return 3;
+ hubEvidence.write(QJsonDocument(hubReadyEvidence).toJson());hubEvidence.close();
+ check(hubReady,"featurehub route and all seven cards settle before hero input");
  if(qApp->arguments().contains("--hero-material-only")){
   QJsonArray samples;
   QSet<QString> capturedPhases;
@@ -132,9 +149,9 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
    QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,point);wait(70);QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,point);
   };
   eval("SwirlMotion.speed=0.5");
-  for(const auto &name:QStringList{"settings","dns","modules","profiles","scripts","subscriptions","proxies"}){
-   pressCard(name);check(observe(name+"-open")&&settled(),"material fixture expansion settles: "+name);
-   QTest::keyClick(window,Qt::Key_Escape);check(observe(name+"-close")&&settled(),"material fixture Escape return settles: "+name);
+  for(const auto &name:settingsRoutes){
+   pressCard(name);check(observe(name+"-open")&&settled()&&eval("AppState.currentPage==='"+name+"'").toBool(),"material fixture expansion settles: "+name);
+   QTest::keyClick(window,Qt::Key_Escape);check(observe(name+"-close")&&settled()&&eval("AppState.currentPage==='featurehub'").toBool(),"material fixture Escape return settles: "+name);
   }
   for(const double phase:{0.15,0.55,0.95}){
    const auto key=QString::number(phase,'f',2);

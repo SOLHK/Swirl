@@ -316,8 +316,9 @@ jobs:
           retention-days: 7
   windows-rust:
     runs-on: windows-2022
-    # Includes the complete native application after the existing Qt/Core gates.
-    timeout-minutes: 45
+    # Source-built TLS plus the complete native application must fit a cold run;
+    # the original Qt/Core/public gates and final application build all remain.
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: core

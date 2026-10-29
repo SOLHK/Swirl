@@ -1,13 +1,13 @@
 {
   "schema": 1,
   "product": "Swirl",
-  "version": "0.2.24",
-  "application_source_revision": "568322dae3ab92d07471db18a43412143138ce01",
-  "application_sha256": "0886e5af5b1e87b9e7cdf5f7d07ecfd799c4a424c899177cae1de5d0bf28c83e",
-  "paired_rust_source_revision": "568322dae3ab92d07471db18a43412143138ce01",
-  "paired_rust_build_id": "0bda1333b8a2636147d69d0d5b1896cc8b73683bc76b9a14dd326683927237e8",
+  "version": "0.2.25",
+  "application_source_revision": "b98edd3c152fb9b398895ba270d5f737263c5829",
+  "application_sha256": "72f78affe7f6f913405ce252561b1c27b88046eac280ae4887a97152a24717b9",
+  "paired_rust_source_revision": "b98edd3c152fb9b398895ba270d5f737263c5829",
+  "paired_rust_build_id": "6151074d40f44f94362411b517c0f985ceb95b7f7fb4f3824c29df4ff4464f4d",
   "runtime": "Windows Qt 6.12.0, requested D3D11 interactive product UI; explicit matching SDK/runtime paths, no ambient PATH",
-  "ui_input_digest_sha256": "3608b90221816d496ba77f66166329e32ba85cea3378733b5b44a8925fc51a04",
+  "ui_input_digest_sha256": "544d5779bd2f2e9f07d2a509fffe1953186133056e23625cf7335d98221c56c6",
   "ui_input_digest_algorithm": "SHA-256 over UTF-8 sorted relative-path + NUL + lowercase working-file SHA-256 + LF records",
   "source_match": "Every recorded UI input matches the rendering Git revision after repository-configured text filters; working bytes are recorded",
   "git_text_filter_normalized_paths": [
@@ -17,7 +17,7 @@
     "src/Swirl.Quick/qml/components/SwirlLiquidGlass.qml"
   ],
   "ui_inputs": {
-    "src/Swirl.Quick/PRODUCT_VERSION.txt": "4ce70733152daba047916c32d0f6671601a34c45272c34a50c886235652d9c25",
+    "src/Swirl.Quick/PRODUCT_VERSION.txt": "575319fa2b37e219385d7c031940542506ddc44da5421e9ea749b7b66e4d5822",
     "src/Swirl.Quick/app/BrandRaster.h": "c43733d2f40971068bd263b114ad422292c5f9421732fc06ee5f7991bec24618",
     "src/Swirl.Quick/app/DiagnosticService.cpp": "0dc9d5ab8f1e0f7298c53a7dca971e435ce1beecaf4aa6582817fb8c020b32aa",
     "src/Swirl.Quick/app/DiagnosticService.h": "8006f93135aee6b8f33bee9b17303dd7eab8508aab63ac5ff25d36d5e1b5ee65",
@@ -228,7 +228,7 @@
     "src/Swirl.Quick/qml/controls/SwirlHeroCard.qml": "88d065aa7e690c6a5360308ba4a91cf7a79d0d81dc5dded12068a6dcd97db716",
     "src/Swirl.Quick/qml/controls/SwirlHeroTitle.qml": "c3575442220889a8a6dbff8dc7db47fd2d5ee71ee5ede26498fd5c17ff5870b0",
     "src/Swirl.Quick/qml/controls/SwirlIconButton.qml": "a2096aba0e9d26c643e73e91f4cccac20b354aa10a58372e54df0e936a70d6ae",
-    "src/Swirl.Quick/qml/controls/SwirlInteractionMotion.qml": "5b8b456975967dab6dd430a83dbc801f1dc8a980df0e412845599acb5b8f2b5a",
+    "src/Swirl.Quick/qml/controls/SwirlInteractionMotion.qml": "78b8a99d485770a3b4aea79544249408208b6b9fb61cfd1d1d28b9a1f2d90b2f",
     "src/Swirl.Quick/qml/controls/SwirlLinkedDetail.qml": "f29f942d43d65679efae5f7f06c15528c0445908b28323893a046f898ede96da",
     "src/Swirl.Quick/qml/controls/SwirlMotionButton.qml": "8942bf258a261d70490c8a15701cf01f9c0b7c917fe46d3404c52bc5ee4aa3da",
     "src/Swirl.Quick/qml/controls/SwirlNodeTransfer.qml": "d1589faa031ecaa34ae7d3b129035bee9e07927535485e355cff18fab89120ff",
@@ -310,7 +310,7 @@
     {
       "file": "apec-activity-light.png",
       "theme": "light",
-      "render_sha256": "8f31b5f6ec723c5c459aad2a69f3b873dd2fd6d08d432268bfe9efaae75ffe80",
+      "render_sha256": "bd7edbf955743abdbab5cf5363568263e5839b03a75d4c9dc816b2b789dd8956",
       "pixel_size": [
         1443,
         1080
@@ -320,7 +320,7 @@
         1008
       ],
       "device_pixel_ratio": 1.5,
-      "visible_settle_ms": 7529,
+      "visible_settle_ms": 7832,
       "all_output_pixels_ownership_checked": true,
       "post_capture_ownership_checked": true,
       "inspection_scope": "Source, native window, pixel ownership and dimensions; final subjective visual acceptance remains with the owner"
@@ -328,7 +328,7 @@
     {
       "file": "apec-activity-dark.png",
       "theme": "dark",
-      "render_sha256": "56abd3ff36b90b1170653505bef55c9f4a03722e255073f23e2d3bd6882a1b49",
+      "render_sha256": "229b9fa849a9c90af3df89573b275594fd29888808176ff750995e2852e90fc5",
       "pixel_size": [
         1443,
         1080
@@ -338,7 +338,7 @@
         1008
       ],
       "device_pixel_ratio": 1.5,
-      "visible_settle_ms": 7615,
+      "visible_settle_ms": 7871,
       "all_output_pixels_ownership_checked": true,
       "post_capture_ownership_checked": true,
       "inspection_scope": "Source, native window, pixel ownership and dimensions; final subjective visual acceptance remains with the owner"
