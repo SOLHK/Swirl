@@ -117,26 +117,18 @@ Item {
         return entry ? entry.name : qsTr("尚未分配")
     }
 
-    component Fact: ColumnLayout {
+    component Fact: RowLayout {
         id: fact
         property string caption: ""
         property string value: "—"
-        property bool prominent: false
-        Layout.fillWidth: false; Layout.minimumWidth: prominent ? Theme.dp(page.compact ? 150 : 172) : 0
-        Layout.preferredWidth: Theme.dp(prominent ? (page.compact ? 150 : 172) : 80)
-        Layout.alignment: Qt.AlignTop; spacing: Theme.dp(4)
-        SwirlText { text: fact.caption; color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; elide: Text.ElideRight }
-        Item {
-            Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(26)
-            SwirlText {
-                id: factValue
-                objectName: fact.objectName + "Value"
-                anchors.left: parent.left; anchors.right: parent.right
-                y: parent.height - baselineOffset - Theme.dp(4)
-                text: fact.value; textFormat: Text.PlainText; tabularFigures: true; color: Theme.text
-                font.pixelSize: Theme.fontSize(fact.prominent ? (page.compact ? 18 : 20) : 14)
-                font.weight: fact.prominent ? Font.DemiBold : Font.Medium; elide: Text.ElideRight
-            }
+        Layout.fillWidth: false; Layout.minimumWidth: 0; spacing: Theme.dp(5)
+        SwirlText { text: fact.caption; color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.alignment: Qt.AlignBaseline }
+        SwirlText {
+            id: factValue
+            objectName: fact.objectName + "Value"
+            text: fact.value; textFormat: Text.PlainText; tabularFigures: true; color: Theme.text
+            font.pixelSize: Theme.fontSize(12); font.weight: Font.Medium
+            Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.alignment: Qt.AlignBaseline; elide: Text.ElideRight
         }
         HoverHandler { id: factHover }
         SwirlToolTip { parent: fact; visible: factHover.hovered && factValue.truncated; text: fact.value }
@@ -146,7 +138,7 @@ Item {
         readonly property Item motionTitle: policyCaption
         readonly property Item motionSurface: policy
         objectName: "activityPolicyShortcut"
-        Layout.fillWidth: true; Layout.minimumWidth: Theme.dp(100); Layout.preferredWidth: Theme.dp(220); Layout.alignment: Qt.AlignTop
+        Layout.fillWidth: true; Layout.minimumWidth: Theme.dp(80); Layout.preferredWidth: Theme.dp(220)
         implicitWidth: 0; implicitHeight: policyContents.implicitHeight
         padding: 0; hoverEnabled: true; focusPolicy: Qt.StrongFocus
         Accessible.name: qsTr("策略：%1").arg(page.defaultTargetName)
@@ -161,20 +153,9 @@ Item {
         }
         contentItem: RowLayout {
             id: policyContents
-            spacing: Theme.dp(8)
-            ColumnLayout {
-                Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: Theme.dp(4)
-                RowLayout {
-                    Layout.fillWidth: true; spacing: Theme.dp(6)
-                    SwirlText { id: policyCaption; text: qsTr("策略"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.alignment: Qt.AlignBaseline }
-                    SwirlText { objectName: "activityNodeRegionTag"; visible: page.nodeRegionCode.length > 0; text: page.nodeRegionCode; color: Theme.muted; font.pixelSize: Theme.fontSize(11); font.weight: Font.Medium; Layout.alignment: Qt.AlignBaseline; Accessible.ignored: true }
-                    Item { Layout.fillWidth: true }
-                }
-                Item {
-                    Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.preferredHeight: Theme.dp(26)
-                    SwirlText { id: policyValue; objectName: "activityPolicyValue"; anchors.left: parent.left; anchors.right: parent.right; y: parent.height - baselineOffset - Theme.dp(4); text: page.defaultTargetName; textFormat: Text.PlainText; tabularFigures: true; color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.Medium; elide: Text.ElideRight }
-                }
-            }
+            spacing: Theme.dp(6)
+            SwirlText { id: policyCaption; text: qsTr("策略"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.alignment: Qt.AlignBaseline }
+            SwirlText { id: policyValue; objectName: "activityPolicyValue"; text: page.defaultTargetName; textFormat: Text.PlainText; tabularFigures: true; color: Theme.text; font.pixelSize: Theme.fontSize(12); font.weight: Font.Medium; Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.alignment: Qt.AlignBaseline; elide: Text.ElideRight }
             Item {
                 Layout.preferredWidth: Theme.dp(12); Layout.fillHeight: true
                 // Center anchors also use the target item's rounding policy.
@@ -231,26 +212,33 @@ Item {
                 objectName: "activityStatusCard"
                 Layout.fillWidth: true; Layout.minimumHeight: statusBody.implicitHeight + Theme.dp(24); Layout.preferredHeight: Layout.minimumHeight
                 cornerRadius: Theme.sidebarRadius; radius: cornerRadius; color: Theme.surface
+                Item {
+                    id: statusEmblem
+                    objectName: "activityStatusEmblem"
+                    x: statusCard.width - width - Theme.dp(18); y: (statusCard.height - height) / 2
+                    width: Theme.dp(128); height: Theme.dp(88)
+                    clip: true; Accessible.ignored: true
+                    SwirlBrandIcon {
+                        objectName: "activityStatusBrand"
+                        anchors.centerIn: parent; width: Theme.dp(150); height: Theme.dp(150)
+                        Accessible.ignored: true
+                    }
+                }
                 ColumnLayout {
-                    id: statusBody; anchors.fill: parent; anchors.margins: Theme.dp(12); anchors.leftMargin: Theme.dp(18); anchors.rightMargin: Theme.dp(18); spacing: Theme.dp(6)
+                    id: statusBody; anchors.fill: parent; anchors.margins: Theme.dp(12); anchors.leftMargin: Theme.dp(18); anchors.rightMargin: statusEmblem.width + Theme.dp(34); spacing: Theme.dp(5)
                     RowLayout {
                         id: statusHeader
                         objectName: "activityStatusHeader"
-                        Layout.fillWidth: true; spacing: Theme.dp(10)
-                        SwirlBrandIcon {
-                            id: statusBrand
-                            objectName: "activityStatusBrand"
-                            Layout.preferredWidth: Theme.dp(30); Layout.minimumWidth: Theme.dp(30); Layout.preferredHeight: Theme.dp(30)
-                            Accessible.ignored: true
-                        }
+                        Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.maximumWidth: statusBody.width
+                        Layout.minimumHeight: Theme.dp(32); Layout.preferredHeight: Theme.dp(32); Layout.maximumHeight: Theme.dp(32); spacing: Theme.dp(10)
                         SwirlText {
                             id: proxySummary
                             objectName: "activityProxySummary"
                             text: page.proxySummary; textFormat: Text.PlainText
                             font.pixelSize: Theme.fontSize(15); font.weight: Font.DemiBold; color: Theme.text
                             Layout.minimumWidth: 0; Layout.preferredWidth: implicitWidth
-                            Layout.maximumWidth: Math.max(0, statusHeader.width - statusBrand.width - runtimeCapsule.width - outboundMode.width
-                                - (proxyErrorDetails.visible ? proxyErrorDetails.width + statusHeader.spacing : 0) - statusHeader.spacing * 4)
+                            Layout.maximumWidth: Math.max(0, statusHeader.width - runtimeCapsule.width - outboundMode.width
+                                - (proxyErrorDetails.visible ? proxyErrorDetails.width + statusHeader.spacing : 0) - statusHeader.spacing * 3)
                             elide: Text.ElideRight
                             HoverHandler { id: summaryHover }
                             SwirlToolTip { parent: proxySummary; visible: summaryHover.hovered && proxySummary.truncated; text: page.proxySummary }
@@ -282,10 +270,34 @@ Item {
                         OutboundModeControl { id: outboundMode; engineController: page.engineController; Layout.minimumWidth: implicitWidth }
                     }
                     RowLayout {
-                        Layout.fillWidth: true; spacing: Theme.dp(14); Layout.alignment: Qt.AlignTop
-                        Fact { objectName: "activityExitIp"; caption: qsTr("出口 IP"); value: page.telemetry.externalIp || "—"; prominent: true }
-                        Fact { objectName: "activityNetworkFact"; caption: qsTr("网络"); value: page.network.type || qsTr("未连接") }
-                        Fact { objectName: "activityProfileFact"; caption: qsTr("配置"); value: extensionsProvider.profileName || "—" }
+                        objectName: "activityExitIp"
+                        Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.maximumWidth: statusBody.width
+                        Layout.minimumHeight: Theme.dp(26); Layout.preferredHeight: Theme.dp(26); Layout.maximumHeight: Theme.dp(26); spacing: Theme.dp(8)
+                        SwirlText { text: qsTr("出口 IP"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.alignment: Qt.AlignBaseline }
+                        SwirlText {
+                            id: exitIp
+                            objectName: "activityExitIpValue"
+                            text: page.telemetry.externalIp || "—"; textFormat: Text.PlainText; tabularFigures: true
+                            font.pixelSize: Theme.fontSize(page.compact ? 18 : 20); font.weight: Font.DemiBold; color: Theme.text
+                            Layout.preferredWidth: implicitWidth; Layout.minimumWidth: Theme.dp(page.compact ? 150 : 172); Layout.alignment: Qt.AlignBaseline
+                            elide: Text.ElideRight
+                            HoverHandler { id: exitIpHover }
+                            SwirlToolTip { parent: exitIp; visible: exitIpHover.hovered && exitIp.truncated; text: exitIp.text }
+                        }
+                        SwirlText {
+                            objectName: "activityNodeRegionTag"
+                            visible: page.nodeRegionCode.length > 0; text: qsTr("节点 %1").arg(page.nodeRegionCode)
+                            color: Theme.muted; font.pixelSize: Theme.fontSize(11); Layout.alignment: Qt.AlignBaseline
+                            Accessible.name: page.nodeRegionDetail
+                        }
+                        Item { Layout.fillWidth: true }
+                    }
+                    RowLayout {
+                        objectName: "activityStatusFooter"
+                        Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.maximumWidth: statusBody.width
+                        Layout.minimumHeight: Theme.dp(16); Layout.preferredHeight: Theme.dp(16); Layout.maximumHeight: Theme.dp(16); spacing: Theme.dp(12)
+                        Fact { objectName: "activityNetworkFact"; caption: qsTr("网络"); value: page.network.type || qsTr("未连接"); Layout.preferredWidth: Theme.dp(72) }
+                        Fact { objectName: "activityProfileFact"; caption: qsTr("配置"); value: extensionsProvider.profileName || "—"; Layout.preferredWidth: Theme.dp(96) }
                         PolicyFact {}
                     }
                 }
