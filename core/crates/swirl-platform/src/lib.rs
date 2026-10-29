@@ -9,6 +9,8 @@ pub mod network_transaction;
 #[cfg(windows)]
 mod socket_pin;
 #[cfg(windows)]
+mod windows_command;
+#[cfg(windows)]
 pub mod windows_network;
 #[cfg(windows)]
 mod windows_notify;

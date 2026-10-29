@@ -12,7 +12,7 @@ use serde_json::json;
 use std::{
     io::{self, Read, Write},
     net::IpAddr,
-    os::windows::{ffi::OsStringExt, process::CommandExt},
+    os::windows::ffi::OsStringExt,
     path::PathBuf,
     process::{Command, Stdio},
     thread,
@@ -219,6 +219,14 @@ impl NetworkBackend for WindowsNetworkBackend {
 }
 
 fn run_json<T: DeserializeOwned>(script: &'static str, input: &serde_json::Value) -> io::Result<T> {
+    run_json_with_timeout(script, input, COMMAND_TIMEOUT)
+}
+
+fn run_json_with_timeout<T: DeserializeOwned>(
+    script: &'static str,
+    input: &serde_json::Value,
+    timeout: Duration,
+) -> io::Result<T> {
     let bytes = serde_json::to_vec(input).map_err(io::Error::other)?;
     if bytes.len() > 64 * 1024 {
         return Err(io::Error::new(
@@ -231,7 +239,8 @@ fn run_json<T: DeserializeOwned>(script: &'static str, input: &serde_json::Value
         .parent()
         .ok_or_else(|| io::Error::other("missing system PowerShell directory"))?
         .join("Modules");
-    let mut child = Command::new(powershell)
+    let mut command = Command::new(powershell);
+    command
         .args([
             "-NoLogo",
             "-NoProfile",
@@ -242,21 +251,19 @@ fn run_json<T: DeserializeOwned>(script: &'static str, input: &serde_json::Value
         // Never auto-import a user-supplied NetTCPIP or NetAdapter module in a
         // privileged helper via the inherited PSModulePath.
         .env("PSModulePath", modules)
-        .creation_flags(0x0800_0000) // CREATE_NO_WINDOW; never launches/elevates GUI.
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+        .stderr(Stdio::piped());
+    // The command is suspended until assigned to a kill-on-close Job Object.
+    // Worker death terminates this process tree, and normal exit/timeout also
+    // stop descendants before pipe joins. An in-flight CIM service call still
+    // requires journal readback; process exit alone is not rollback proof.
+    // No unowned child fallback is permitted.
+    let mut child = crate::windows_command::spawn_owned(&mut command)?;
     let mut stdin = child
         .stdin
         .take()
         .ok_or_else(|| io::Error::other("missing helper stdin"))?;
-    if let Err(error) = stdin.write_all(&bytes) {
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err(error);
-    }
-    drop(stdin);
     let stdout = child
         .stdout
         .take()
@@ -265,32 +272,45 @@ fn run_json<T: DeserializeOwned>(script: &'static str, input: &serde_json::Value
         .stderr
         .take()
         .ok_or_else(|| io::Error::other("missing helper stderr"))?;
-    // These two bounded readers belong to a control operation, never packet I/O.
+    // Pipe I/O belongs to a control operation, never packet I/O. Write on a
+    // separate thread so a child that stops reading cannot fill the pipe and
+    // block before the operation deadline is checked.
+    let in_writer = thread::spawn(move || stdin.write_all(&bytes));
     let out_reader = thread::spawn(move || read_bounded(stdout));
     let err_reader = thread::spawn(move || read_bounded(stderr));
     let start = Instant::now();
     let status = loop {
-        if let Some(status) = child.try_wait()? {
-            break status;
+        match child.try_wait() {
+            Ok(Some(status)) => break Ok(status),
+            Ok(None) => {}
+            // OwnedChild has already stopped the job and reaped the child on
+            // a wait error. Join every pipe owner below before returning it.
+            Err(error) => break Err(error),
         }
-        if start.elapsed() >= COMMAND_TIMEOUT {
-            let _ = child.kill();
+        if start.elapsed() >= timeout {
+            // kill() terminates the entire Job Object, including descendants
+            // that might otherwise keep a redirected pipe open indefinitely.
+            let termination = child.kill();
             let _ = child.wait();
-            let _ = out_reader.join();
-            let _ = err_reader.join();
-            return Err(io::Error::new(
-                io::ErrorKind::TimedOut,
-                "Windows network operation timed out; recover its journal",
-            ));
+            let message = match termination {
+                Ok(()) => "Windows network operation timed out; recover its journal".into(),
+                Err(error) => format!(
+                    "Windows network operation timed out; job termination reported {error}; recover its journal"
+                ),
+            };
+            break Err(io::Error::new(io::ErrorKind::TimedOut, message));
         }
         thread::sleep(Duration::from_millis(25));
     };
-    let stdout = out_reader
-        .join()
-        .map_err(|_| io::Error::other("stdout reader panicked"))??;
-    let stderr = err_reader
-        .join()
-        .map_err(|_| io::Error::other("stderr reader panicked"))??;
+    // Collect all joins before propagating any I/O error: even a broken stdin
+    // must not leave a reader thread detached from this control operation.
+    let written = in_writer.join();
+    let stdout = out_reader.join();
+    let stderr = err_reader.join();
+    let status = status?;
+    written.map_err(|_| io::Error::other("stdin writer panicked"))??;
+    let stdout = stdout.map_err(|_| io::Error::other("stdout reader panicked"))??;
+    let stderr = stderr.map_err(|_| io::Error::other("stderr reader panicked"))??;
     if !status.success() {
         return Err(io::Error::other(format!(
             "Windows network operation failed: {}",
@@ -298,7 +318,15 @@ fn run_json<T: DeserializeOwned>(script: &'static str, input: &serde_json::Value
         )));
     }
     let stdout = stdout.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(&stdout);
-    serde_json::from_slice(stdout).map_err(io::Error::other)
+    serde_json::from_slice(stdout).map_err(|error| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "Windows network helper returned invalid JSON ({} bytes): {error}",
+                stdout.len()
+            ),
+        )
+    })
 }
 
 fn read_bounded(reader: impl Read) -> io::Result<Vec<u8>> {
@@ -477,7 +505,10 @@ try {
     $current = Read-State
     if (-not (Same-State $current $value)) { throw 'Windows rejected or altered requested network state' }
   } elseif ($p.mode -ne 'read') { throw 'Unsupported helper operation' }
-  ConvertTo-Json -InputObject $current -Compress -Depth 8
+  # Windows PowerShell 5.1 emits nothing for ConvertTo-Json $null. Missing
+  # resources are a successful typed None, so they need an explicit JSON null.
+  if ($null -eq $current) { [Console]::Out.WriteLine('null') }
+  else { ConvertTo-Json -InputObject $current -Compress -Depth 8 }
 } catch {
   [Console]::Error.WriteLine($_.Exception.Message)
   exit 1
@@ -578,6 +609,47 @@ try {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unread_stdin_cannot_block_the_control_deadline() {
+        // A 60 KiB request exceeds the redirected pipe capacity. This actual
+        // PowerShell child intentionally never reads it and would otherwise
+        // keep both the writer and the output readers blocked for two minutes.
+        // No network state changes or administrative access are used.
+        const BLOCKED: &str = "Start-Sleep -Seconds 120; [Console]::Out.WriteLine('true')";
+        let start = Instant::now();
+        let error = run_json_with_timeout::<bool>(
+            BLOCKED,
+            &json!({"blocked_input": "x".repeat(60 * 1024)}),
+            Duration::from_secs(2),
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+        assert!(
+            start.elapsed() < Duration::from_secs(15),
+            "control timeout did not close the blocked pipes"
+        );
+    }
+
+    #[test]
+    fn missing_owned_resource_is_json_null_on_system_powershell() {
+        // Read-only: use an absent test identity and never create an adapter.
+        // Exercise the real system PowerShell version, including 5.1's null
+        // serialization behavior, without creating any network resources.
+        let identity = InterfaceIdentity::new(u32::MAX, 0x72b3267d68984af3a5b41e3152d2a3d9);
+        let mut backend = WindowsNetworkBackend::for_owned_interface(identity.clone()).unwrap();
+        assert_eq!(
+            backend
+                .read(
+                    &identity,
+                    &Resource::Address {
+                        address: "198.18.0.1".parse().unwrap(),
+                    },
+                )
+                .unwrap(),
+            None
+        );
+    }
 
     #[test]
     fn fixed_helper_scripts_parse_without_executing_network_commands() {

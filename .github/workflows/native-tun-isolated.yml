@@ -58,7 +58,7 @@ jobs:
       - name: Packet, resolver, network transaction and original proxy regressions
         run: cargo test --locked -p swirl-tun -p swirl-platform -p swirl-dns -p swirl-transport -p swirl-core -p swirl-api
       - name: Build actual Rust library and helper
-        run: cargo build --locked -p swirl-api --release
+        run: cargo build --locked -p swirl-api --lib --bin swirl-tun-helper --release
       - name: Real Wintun scoped TCP UDP and DNS smoke in this disposable VM
         if: runner.os == 'Windows'
         shell: pwsh

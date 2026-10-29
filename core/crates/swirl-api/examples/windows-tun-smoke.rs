@@ -362,7 +362,10 @@ mod windows {
             }
             // No DNS, firewall, default route, split default, or physical
             // interface mutation is expressible by this desired plan.
-            let journal = Journal::prepare(&mut backend, identity.clone(), owner, desired)?;
+            let journal = Journal::prepare(&mut backend, identity.clone(), owner, desired)
+                .map_err(|error| {
+                    io::Error::other(format!("snapshot owned test resources: {error}"))
+                })?;
             let journal_path =
                 directory.join(format!("{}.network.json", identity.guid.replace('-', "")));
             let store = FileJournalStore::create_new(&journal_path)?;
@@ -452,8 +455,9 @@ mod windows {
                     }
                 }
             }));
-            transaction::apply(&mut run.backend, &mut run.store, &mut run.journal)
-                .map_err(io::Error::other)?;
+            transaction::apply(&mut run.backend, &mut run.store, &mut run.journal).map_err(
+                |error| io::Error::other(format!("apply owned test resources: {error}")),
+            )?;
             Ok(run)
         }
 
