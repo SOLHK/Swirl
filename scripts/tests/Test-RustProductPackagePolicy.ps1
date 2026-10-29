@@ -154,3 +154,167 @@ try {
     Remove-Item -LiteralPath $manifestRoot -Recurse -Force
 }
 Write-Host 'Final manifest regression: 14 scenarios passed.'
+
+# The current product must carry its own complete Qt/OpenSSL TLS closure. These
+# PE headers are synthetic and are never loaded or executed by this test.
+$tlsTestRoot = Join-Path ([IO.Path]::GetTempPath()) ('swirl-tls-policy-' + [guid]::NewGuid().ToString('N'))
+$tlsSourceSha = '603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a'
+$tlsApplicationSha = '0123456789abcdef0123456789abcdef01234567'
+$tlsMap = [ordered]@{
+    'bin/libssl-3-x64.dll'='libssl-3-x64.dll'
+    'bin/libcrypto-3-x64.dll'='libcrypto-3-x64.dll'
+    'licenses/LICENSE.txt'='licenses/OpenSSL-LICENSE.txt'
+    'licenses/NOTICE.txt'='licenses/OpenSSL-NOTICE.txt'
+}
+$tlsRequired = @('Qt6Network.dll','tls/qopensslbackend.dll','openssl-runtime.json') + @($tlsMap.Values)
+$script:tlsFixtureCounter = 0
+$script:tlsAssertions = 0
+New-Item -ItemType Directory -Path $tlsTestRoot | Out-Null
+
+function Write-TlsFixturePe {
+    param([string]$Path, [uint16]$Machine = 0x8664)
+    $bytes = New-Object byte[] 128
+    $bytes[0]=0x4d; $bytes[1]=0x5a
+    [BitConverter]::GetBytes([uint32]64).CopyTo($bytes,60)
+    [BitConverter]::GetBytes([uint32]0x4550).CopyTo($bytes,64)
+    [BitConverter]::GetBytes($Machine).CopyTo($bytes,68)
+    [IO.File]::WriteAllBytes($Path,$bytes)
+}
+
+function Write-TlsFixtureManifest {
+    param([hashtable]$Fixture)
+    $files = @()
+    foreach ($file in (Get-ChildItem -LiteralPath $Fixture.Root -File -Recurse | Sort-Object FullName)) {
+        $relative = $file.FullName.Substring($Fixture.Root.Length+1).Replace('\','/')
+        if ($relative -eq 'package-manifest.json') { continue }
+        $files += @{path=$relative;sha256=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
+    }
+    $Fixture.Manifest.files=$files
+    $Fixture.Manifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $Fixture.Root 'package-manifest.json') -Encoding utf8
+}
+
+function Write-TlsFixtureReceipt {
+    param([hashtable]$Fixture)
+    $Fixture.Receipt | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $Fixture.Root 'openssl-runtime.json') -Encoding utf8
+    Write-TlsFixtureManifest $Fixture
+}
+
+function New-TlsFixture {
+    param([string]$RustTarget = 'x86_64-pc-windows-msvc')
+    $script:tlsFixtureCounter++
+    $directory = Join-Path $tlsTestRoot ('case-' + $script:tlsFixtureCounter)
+    New-Item -ItemType Directory -Path (Join-Path $directory 'tls'),(Join-Path $directory 'licenses') -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $directory 'Swirl.exe'),'synthetic product bytes')
+    foreach ($name in @('Qt6Network.dll','tls/qopensslbackend.dll','libssl-3-x64.dll','libcrypto-3-x64.dll')) {
+        Write-TlsFixturePe (Join-Path $directory $name)
+    }
+    [IO.File]::WriteAllText((Join-Path $directory 'licenses/OpenSSL-LICENSE.txt'),'controlled license fixture')
+    [IO.File]::WriteAllText((Join-Path $directory 'licenses/OpenSSL-NOTICE.txt'),'controlled Swirl provenance notice')
+    $records = [ordered]@{}
+    foreach ($entry in $tlsMap.GetEnumerator()) {
+        $file = Join-Path $directory $entry.Value
+        $records[$entry.Key]=@{sha256=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant();size=(Get-Item -LiteralPath $file).Length}
+    }
+    $runtimeTarget = if ($RustTarget -eq 'x86_64-pc-windows-msvc') { 'VC-WIN64A' } else { 'mingw64' }
+    $fixture = @{Root=$directory;Manifest=@{schema=1;source_sha=$tlsApplicationSha;rust=@{source_sha=$tlsApplicationSha;target=$RustTarget};files=@()};
+        Receipt=@{schema_version=1;status='success';version='3.5.9';source=@{sha256=$tlsSourceSha};target=$runtimeTarget;files=$records}}
+    Write-TlsFixtureReceipt $fixture
+    return $fixture
+}
+
+function Assert-TlsFixtureAccepted {
+    param([hashtable]$Fixture)
+    $null=Assert-SwirlTlsPayload -ApplicationDirectory $Fixture.Root -ExpectedVersion '3.5.9' -ExpectedSourceSha256 $tlsSourceSha
+    $null=Assert-SwirlProductManifest -ApplicationDirectory $Fixture.Root -ExpectedSourceSha $tlsApplicationSha
+    $script:tlsAssertions++
+}
+
+function Assert-TlsFixtureRejected {
+    param([hashtable]$Fixture,[string]$Label,[string]$Expected = '*')
+    $failure=$null
+    try { Assert-TlsFixtureAccepted $Fixture } catch { $failure=$_.Exception.Message }
+    if (-not $failure -or $failure -notlike $Expected) { throw "TLS package policy accepted $Label or failed for another reason: $failure" }
+    $script:tlsAssertions++
+}
+
+try {
+    Assert-TlsFixtureAccepted (New-TlsFixture)
+    Assert-TlsFixtureAccepted (New-TlsFixture 'x86_64-pc-windows-gnu')
+    foreach ($relative in $tlsRequired) {
+        $fixture=New-TlsFixture
+        Remove-Item -LiteralPath (Join-Path $fixture.Root $relative)
+        Write-TlsFixtureManifest $fixture
+        Assert-TlsFixtureRejected $fixture "missing dependency and matching manifest entry: $relative" 'Incomplete Qt TLS payload:*'
+        $fixture=New-TlsFixture
+        $fixture.Manifest.files=@($fixture.Manifest.files | Where-Object { $_.path -ne $relative })
+        $fixture.Manifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $fixture.Root 'package-manifest.json') -Encoding utf8
+        Assert-TlsFixtureRejected $fixture "unmanifested required dependency: $relative" 'Incomplete Qt TLS payload:*'
+    }
+    foreach ($relative in @('Qt6Network.dll','tls/qopensslbackend.dll','libssl-3-x64.dll','libcrypto-3-x64.dll')) {
+        foreach ($kind in @('x86','non-PE')) {
+            $fixture=New-TlsFixture
+            $path=Join-Path $fixture.Root $relative
+            if ($kind -eq 'x86') { Write-TlsFixturePe $path 0x14c } else { [IO.File]::WriteAllText($path,'not a PE') }
+            Write-TlsFixtureManifest $fixture
+            Assert-TlsFixtureRejected $fixture "$kind dependency: $relative" 'TLS dependency*'
+        }
+    }
+    foreach ($field in @('schema_version','status','version','source','target')) {
+        $fixture=New-TlsFixture
+        $fixture.Receipt[$field]=switch ($field) {
+            'schema_version' { 2 }; 'status' { 'partial' }; 'version' { '3.0.16' }
+            'source' { @{sha256=('0'*64)} }; 'target' { 'mingw64' }
+        }
+        Write-TlsFixtureReceipt $fixture
+        Assert-TlsFixtureRejected $fixture "changed receipt identity $field" 'TLS runtime receipt identity mismatch.'
+    }
+    foreach ($relative in $tlsMap.Values) {
+        $fixture=New-TlsFixture
+        [IO.File]::AppendAllText((Join-Path $fixture.Root $relative),'changed after runtime receipt')
+        Write-TlsFixtureManifest $fixture
+        Assert-TlsFixtureRejected $fixture "changed mapped runtime/license: $relative" 'TLS runtime receipt digest mismatch:*'
+    }
+    foreach ($key in @('../outside.dll','bin/libssl-3-x64.dll:stream','licenses/OpenSSL-LICENSE.txt')) {
+        $fixture=New-TlsFixture
+        $record=$fixture.Receipt.files['bin/libssl-3-x64.dll']
+        $fixture.Receipt.files.Remove('bin/libssl-3-x64.dll')
+        $fixture.Receipt.files[$key]=$record
+        Write-TlsFixtureReceipt $fixture
+        Assert-TlsFixtureRejected $fixture "unsafe or unmapped runtime receipt key $key"
+    }
+    $fixture=New-TlsFixture 'aarch64-pc-windows-msvc'
+    Assert-TlsFixtureRejected $fixture 'unsupported Rust/TLS package architecture' 'Unsupported TLS package target.'
+    $fixture=New-TlsFixture
+    $fixture.Receipt.files.Remove('licenses/NOTICE.txt')
+    Write-TlsFixtureReceipt $fixture
+    Assert-TlsFixtureRejected $fixture 'missing mandatory receipt map' 'TLS runtime receipt identity mismatch.'
+    $fixture=New-TlsFixture
+    $fixture.Receipt['padding']='x'*65536
+    Write-TlsFixtureReceipt $fixture
+    Assert-TlsFixtureRejected $fixture 'oversized runtime receipt' 'TLS receipt exceeds the bounded size.'
+    $fixture=New-TlsFixture
+    [IO.File]::AppendAllText((Join-Path $fixture.Root 'Qt6Network.dll'),'changed without manifest update')
+    Assert-TlsFixtureRejected $fixture 'modified Qt dependency after manifest' 'Package digest mismatch:*'
+    $fixture=New-TlsFixture
+    [IO.File]::WriteAllText((Join-Path $fixture.Root 'private.dpapi'),'must not ship')
+    Assert-TlsFixtureRejected $fixture 'unlisted private payload' 'Unlisted package entry:*'
+    $fixture=New-TlsFixture
+    $outside=Join-Path $tlsTestRoot 'outside-tls'
+    $tlsDirectory=(Resolve-Path -LiteralPath (Join-Path $fixture.Root 'tls')).Path
+    if (-not $tlsDirectory.StartsWith([IO.Path]::GetFullPath($tlsTestRoot).TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or
+        [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($outside)) -ne [IO.Path]::GetFullPath($tlsTestRoot)) { throw 'Unexpected TLS link fixture move path.' }
+    Move-Item -LiteralPath $tlsDirectory -Destination $outside
+    $link=Join-Path $fixture.Root 'tls'
+    if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+        New-Item -ItemType Junction -Path $link -Target $outside | Out-Null
+    } else {
+        New-Item -ItemType SymbolicLink -Path $link -Target $outside | Out-Null
+    }
+    try {
+        Assert-TlsFixtureRejected $fixture 'linked TLS directory' 'Linked package or output path is forbidden.'
+    } finally { [IO.Directory]::Delete($link) }
+} finally {
+    if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($tlsTestRoot)) -ne [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\','/')) { throw 'Unexpected TLS fixture cleanup path.' }
+    Remove-Item -LiteralPath $tlsTestRoot -Recurse -Force
+}
+Write-Host "TLS package policy: $script:tlsAssertions scenarios passed."

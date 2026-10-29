@@ -1,5 +1,6 @@
 param(
     [Parameter(Mandatory)][string]$QtDir,
+    [Parameter(Mandatory)][string]$OpenSslRoot,
     [string]$BuildDir='D:\Codex\build\current-portable',
     [string]$DistDir='D:\Codex\outputs\current-portable\app',
     [string]$OutDir='D:\Codex\outputs\current-portable',
@@ -8,6 +9,6 @@ param(
 $ErrorActionPreference='Stop'
 # One verified production build/staging implementation; no obsolete branch
 # restriction, engine archive parameter, or reuse of a test-enabled product.
-& (Join-Path $PSScriptRoot 'build-quick-windows.ps1') -QtDir $QtDir `
+& (Join-Path $PSScriptRoot 'build-quick-windows.ps1') -QtDir $QtDir -OpenSslRoot $OpenSslRoot `
     -BuildDir $BuildDir -DistDir $DistDir -OutDir $OutDir -Parallel $Parallel `
     -InputTests -PortableOnly

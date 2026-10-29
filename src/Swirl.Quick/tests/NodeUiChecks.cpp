@@ -11,6 +11,7 @@
 #include <QQmlExpression>
 #include <QQmlComponent>
 #include <QQmlEngine>
+#include <QQmlProperty>
 #include <QTest>
 #include <QSignalSpy>
 #include <QClipboard>
@@ -245,6 +246,20 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                             ~RestoreController(){capsule->setProperty("controller",original);}
                         } restore{capsule,originalController};
                         if(check(capsule->setProperty("controller",QVariant::fromValue(fake.get())),"read-only Main proxy controller is bound")) {
+                            const auto observedAction=[&](bool enabled){
+                                const auto label=capsule->property("label").toString();
+                                const auto detail=capsule->property("detail").toString();
+                                const auto accessibleName=QQmlProperty::read(capsule,QStringLiteral("Accessible.name"),qmlContext(capsule));
+                                const auto accessibleDescription=QQmlProperty::read(capsule,QStringLiteral("Accessible.description"),qmlContext(capsule));
+                                return label==QStringLiteral("系统代理")&&capsule->isEnabled()
+                                    &&capsule->property("proxyEnabled").toBool()==enabled&&capsule->property("proxyOwned").toBool()==enabled
+                                    &&capsule->property("tone").toString()==(enabled?"success":"neutral")
+                                    &&capsule->property("activityPhase").toString()==(enabled?"succeeded":"idle")
+                                    &&detail.contains(enabled?QStringLiteral("已接管系统代理"):QStringLiteral("点击启动已保存策略"))
+                                    &&detail.contains(enabled?QStringLiteral("点击恢复原设置并停止内核"):QStringLiteral("通过 Swirl 开启代理"))
+                                    &&accessibleName.isValid()&&accessibleName.toString()==label+QStringLiteral("，")+detail
+                                    &&accessibleDescription.isValid()&&accessibleDescription.toString()==detail;
+                            };
                             QSignalSpy clicked(capsule,SIGNAL(clicked()));
                             check(clicked.isValid(),"read-only Main proxy clicked signal is observed");
                             const auto *legacyActive=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;
@@ -254,7 +269,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                             click("proxyCapsule");
                             qInfo()<<"Main proxy legacy readiness evidence"<<legacyReady<<legacyRoute<<legacyPoint<<legacySize<<clicked.count()<<fake->property("calls").toInt();
                             check(clicked.count()==1&&fake->property("calls").toInt()==1,"visible Main proxy accepts an immediate click while the previous page retires");
-                            check(capsule->property("label").toString()==QStringLiteral("系统代理 · 已开")&&eval("AppState.currentPage==='activity'").toBool(),"immediate Main proxy action updates its label without navigation");
+                            check(observedAction(true)&&eval("AppState.currentPage==='activity'").toBool(),"immediate Main proxy action keeps its stable title and exposes owned restore action without navigation");
                             check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;return active&&active->property("routeId").toString()=="activity"&&!host->property("pendingGrab").toBool()&&!host->property("moving").toBool()&&capsule->isVisible()&&capsule->width()>0&&capsule->height()>0;},3500),"read-only Main proxy input test settles on Activity");
                             fake->setProperty("calls",0);
                             fake->setProperty("proxyRequested",false);
@@ -265,10 +280,10 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                             clicked.clear();
                             click("proxyCapsule");
                             check(clicked.count()==1&&fake->property("calls").toInt()==1,"real Main proxy pointer dispatches enable exactly once");
-                            check(capsule->property("label").toString()==QStringLiteral("系统代理 · 已开"),"real Main proxy input updates observed action label");
+                            check(observedAction(true),"real Main proxy input exposes owned state and accessible restore action under its stable title");
                             click("proxyCapsule");
                             check(clicked.count()==2&&fake->property("calls").toInt()==2,"real Main proxy pointer dispatches disable exactly once");
-                            check(capsule->property("label").toString()==QStringLiteral("系统代理 · 已关"),"real Main proxy second input restores enable label");
+                            check(observedAction(false),"real Main proxy second input restores neutral state and accessible enable action under its stable title");
                             check(eval("AppState.currentPage==='activity'").toBool(),"real Main proxy pointer input does not navigate");
                         }
                     }

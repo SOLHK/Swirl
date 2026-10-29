@@ -1,6 +1,7 @@
 # Incremental, exact-source Windows network repair candidate. Run in x64 MSVC.
 param(
     [Parameter(Mandatory)][string]$QtDir,
+    [Parameter(Mandatory)][string]$OpenSslRoot,
     [string]$BuildDir = 'D:/Codex/build/swirl-network-candidate',
     [string]$RustTargetDir = 'D:/Codex/build/swirl-network-rust',
     [Parameter(Mandatory)][string]$OutDir,
@@ -14,6 +15,7 @@ Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'Assert-BuildSource.ps1')
 if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) { throw 'Run in an x64 MSVC developer shell.' }
 $repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+$openssl = (Resolve-Path -LiteralPath $OpenSslRoot).Path
 $build = [IO.Path]::GetFullPath($BuildDir)
 $rustTarget = [IO.Path]::GetFullPath($RustTargetDir)
 $out = [IO.Path]::GetFullPath($OutDir)
@@ -99,7 +101,11 @@ try {
     Run-Step 'save-compiled-input-times' { $null = Sync-SwirlBuildInputTimes -RepositoryRoot $repo -BuildDirectory $build }
     $report.compiler_cache_ready = $true
     if ($env:GITHUB_OUTPUT) { 'cache-ready=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append }
-    Run-Step 'deploy-test-runtime' { Checked windeployqt @('--release','--compiler-runtime',(Join-Path $build 'SwirlRustCoreTests.exe')) }
+    Run-Step 'deploy-test-runtime' {
+        & (Join-Path $PSScriptRoot 'Copy-VerifiedOpenSslRuntime.ps1') -OpenSslRoot $openssl `
+            -ApplicationDirectory $build -Target VC-WIN64A
+        Checked windeployqt @('--release','--compiler-runtime','--openssl-root',$openssl,'--include-plugins','qopensslbackend',(Join-Path $build 'SwirlRustCoreTests.exe'))
+    }
     $pattern = '^swirl-(rust-library-loader|rust-qt-integration|node-real-chain|stream-regression|import-subscription|subscription-download|subscription-formats|diagnostic-export|system-proxy-state|qt-network-policy|codex-proxy-launcher|telemetry-accounting|node-view-model|node-section-model|policy-configuration|catalog-transaction|window-shadow'
     if ($DisposableSystemProxyTests) { $pattern += '|system-proxy-recovery' }
     $pattern += ')$'
@@ -128,7 +134,7 @@ try {
     Run-Step 'measure-no-change-rebuild' { Checked cmake @('--build',$build,'--target','Swirl','--parallel',"$Parallel") }
     if (Select-String -LiteralPath (Join-Path $evidence 'measure-no-change-rebuild.log') -Pattern 'Building CXX object|Building C object|Linking CXX|Compiling swirl-' -Quiet) { throw 'The no-change rebuild unexpectedly recompiled source.' }
     $report.no_change_recompiled_source = $false
-    Run-Step 'stage-and-real-proxy-roundtrips' { & (Join-Path $PSScriptRoot 'Stage-WindowsRustProduct.ps1') -BuildDirectory $build -Destination (Join-Path $out 'app') }
+    Run-Step 'stage-and-real-proxy-roundtrips' { & (Join-Path $PSScriptRoot 'Stage-WindowsRustProduct.ps1') -BuildDirectory $build -Destination (Join-Path $out 'app') -OpenSslRoot $openssl }
     Run-Step 'production-startup' {
         $process = Start-Process (Join-Path $out 'app/Swirl.exe') -ArgumentList '--smoke-test' -WorkingDirectory $evidence -WindowStyle Hidden -PassThru
         if (-not $process.WaitForExit(75000)) { $process.Kill(); throw 'Production startup timed out.' }

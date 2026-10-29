@@ -19,6 +19,13 @@ Module-specific license and third-party metadata:
 https://code.qt.io/cgit/qt/qtbase.git/tree/LICENSES?h=v6.12.0
 https://code.qt.io/cgit/qt/qtdeclarative.git/tree/LICENSES?h=v6.12.0
 
+OpenSSL 3.5.9 is dynamically linked by Qt's TLS backend. Copyright The OpenSSL
+Project Authors. Licensed under Apache License 2.0. The unmodified upstream
+license is licenses/OpenSSL-LICENSE.txt; Swirl's build/source provenance notice
+is licenses/OpenSSL-NOTICE.txt. The source URL and verified SHA256 are recorded
+in openssl-runtime.json and tools/openssl-runtime.lock.json in Swirl source.
+https://openssl-library.org/source/
+
 FreeType 2.14.3, bundled inside Qt, is used for Windows font rasterization.
 Portions of this software are copyright (C) 1996-2026 The FreeType Project
 (https://freetype.org/). All rights reserved.
@@ -32,7 +39,7 @@ https://gcc.gnu.org/releases.html
 https://www.mingw-w64.org/license/
 
 Swirl source and reproducible Windows build instructions:
-https://github.com/SOLHK/Swirl/tree/work/swirl-apec-v3-20261027/src/Swirl.Quick
+https://github.com/SOLHK/Swirl/tree/main/src/Swirl.Quick
 
 Other Windows fonts used during validation are system-installed fonts and are
 not redistributed in this installer. Swirl's original knot identity is retained

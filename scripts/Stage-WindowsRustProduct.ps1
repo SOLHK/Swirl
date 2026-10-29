@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory=$true)][string]$BuildDirectory,
     [Parameter(Mandatory=$true)][string]$Destination,
+    [string]$OpenSslRoot,
     [string]$Configuration = 'Release',
     [string]$Python = 'python'
 )
@@ -55,7 +56,10 @@ Copy-Item -LiteralPath (Join-Path $repo 'src/Swirl.Quick/packaging/README-RustPr
 foreach ($name in @('Swirl-brand-phase3.ico','Swirl-brand-0217-optical.ico')) {
     Copy-Item -LiteralPath (Join-Path $build 'brand/Swirl.ico') -Destination (Join-Path $stage $name)
 }
-& windeployqt --release --compiler-runtime --qmldir (Join-Path $repo 'src/Swirl.Quick/qml') (Join-Path $stage 'Swirl.exe')
+if (-not $OpenSslRoot) { throw 'An explicitly verified OpenSSL runtime root is required.' }
+& (Join-Path $PSScriptRoot 'Copy-VerifiedOpenSslRuntime.ps1') -OpenSslRoot $OpenSslRoot `
+    -ApplicationDirectory $stage -Target VC-WIN64A -Python $Python
+& windeployqt --release --compiler-runtime --openssl-root $OpenSslRoot --include-plugins qopensslbackend --qmldir (Join-Path $repo 'src/Swirl.Quick/qml') (Join-Path $stage 'Swirl.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Qt deployment failed.' }
 foreach ($name in @('Qt6Core.dll','Qt6Gui.dll','Qt6Qml.dll','Qt6Quick.dll','platforms/qwindows.dll','swirl_api.dll')) {
     if (-not (Test-Path -LiteralPath (Join-Path $stage $name) -PathType Leaf)) { throw "Missing packaged dependency: $name" }
@@ -68,7 +72,7 @@ $scratch = Join-Path ([IO.Path]::GetTempPath()) ('swirl-package-' + [guid]::NewG
 New-Item -ItemType Directory -Path $scratch | Out-Null
 $reportPath = Join-Path $stage 'rust-self-test.json'
 $process = Start-Process -FilePath (Join-Path $stage 'Swirl.exe') `
-    -ArgumentList @('--rust-core-self-test', ('"' + $reportPath + '"')) -WorkingDirectory $scratch -PassThru
+    -ArgumentList @('--rust-core-self-test', ('"' + $reportPath + '"')) -WorkingDirectory $scratch -WindowStyle Hidden -PassThru
 if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'Packaged EXE timed out.' }
 if ($process.ExitCode -ne 0) {
     if (Test-Path -LiteralPath $reportPath) { Get-Content -LiteralPath $reportPath }
@@ -92,4 +96,15 @@ foreach ($file in (Get-ChildItem -LiteralPath $stage -Recurse -File | Sort-Objec
         sha256=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
 }
 $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stage 'package-manifest.json') -Encoding utf8
+$tlsLock=Get-Content -LiteralPath (Join-Path $repo 'tools/openssl-runtime.lock.json') -Raw | ConvertFrom-Json
+$null=Assert-SwirlTlsPayload -ApplicationDirectory $stage -ExpectedVersion $tlsLock.version -ExpectedSourceSha256 $tlsLock.source.sha256
+$tlsReport=Join-Path $build ('tls-runtime-'+$sourceSha+'.json')
+$originalPath=$env:PATH
+try {
+    $env:PATH="$stage;$env:SystemRoot/System32;$env:SystemRoot"
+    $process=Start-Process -FilePath (Join-Path $stage 'Swirl.exe') `
+        -ArgumentList @('--tls-runtime-self-test',('"'+$tlsReport+'"')) -WorkingDirectory $scratch -WindowStyle Hidden -PassThru
+    if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'Packaged TLS runtime verification timed out.' }
+    if ($process.ExitCode -ne 0) { if(Test-Path -LiteralPath $tlsReport){Get-Content -LiteralPath $tlsReport}; throw 'Packaged Qt TLS backend is incomplete or borrowed from another application.' }
+} finally { $env:PATH=$originalPath }
 Write-Host "Verified Rust product package: $sourceSha"

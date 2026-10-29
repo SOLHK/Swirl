@@ -1,5 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$QtDir,
+    [Parameter(Mandatory=$true)][string]$OpenSslRoot,
     [string]$Nsis='D:\Codex\toolchains\nsis-3.11\makensis.exe',
     [string]$BuildDir='D:\Codex\build\rust-product',
     [string]$OutRoot='D:\Codex\outputs',
@@ -12,5 +13,5 @@ if ($LASTEXITCODE -ne 0 -or $dirty) { throw 'Commit source changes before packag
 $sha=(& git -C $repo rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $sha -notmatch '^[0-9a-f]{40}$') { throw 'Source SHA unavailable.' }
 $out=Join-Path $OutRoot ('Swirl-Rust-'+$sha.Substring(0,12)+'-'+(Get-Date -Format 'yyyyMMdd-HHmmss'))
-& (Join-Path $PSScriptRoot 'build-quick-windows.ps1') -QtDir $QtDir `
+& (Join-Path $PSScriptRoot 'build-quick-windows.ps1') -QtDir $QtDir -OpenSslRoot $OpenSslRoot `
     -BuildDir $BuildDir -DistDir (Join-Path $out 'app') -OutDir $out -Nsis $Nsis -Parallel $Parallel

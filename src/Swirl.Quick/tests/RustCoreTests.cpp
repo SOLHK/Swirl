@@ -775,7 +775,21 @@ private slots:
    QObject::connect(&socket,&QSslSocket::sslErrors,&socket,[&](const QList<QSslError>& errors){verificationError=true;tlsErrors=int(errors.size());});
    QObject::connect(&socket,&QAbstractSocket::errorOccurred,&socket,[&](QAbstractSocket::SocketError error){socketError=int(error);if(error!=QAbstractSocket::RemoteHostClosedError)transportError=true;});
    QElapsedTimer timer;timer.start();constexpr int totalBudgetMs=15000;
-   const auto finish=[&]{check["socket_error"]=socketError;check["tls_error_count"]=tlsErrors;check["elapsed_ms"]=int(timer.elapsed());check["closed"]=socket.state()==QAbstractSocket::UnconnectedState;return check;};
+   const auto finish=[&]{
+    check["socket_error"]=socketError;check["tls_error_count"]=tlsErrors;check["elapsed_ms"]=int(timer.elapsed());check["closed"]=socket.state()==QAbstractSocket::UnconnectedState;
+    // Keep the verification predicate below unchanged; expose each observed
+    // TLS property so backend/ALPN failures are not mislabeled as certificates.
+    const auto ssl=socket.sslConfiguration();
+    check["tls_encrypted"]=socket.isEncrypted();
+    check["peer_certificate_present"]=!socket.peerCertificate().isNull();
+    check["handshake_error_count"]=socket.sslHandshakeErrors().size();
+    check["session_protocol"]=int(socket.sessionProtocol());
+    check["alpn_hex"]=QString::fromLatin1(ssl.nextNegotiatedProtocol().toHex());
+    check["alpn_status"]=int(ssl.nextProtocolNegotiationStatus());
+    check["active_backend"]=QSslSocket::activeBackend();
+    check["client_alpn_supported"]=QSslSocket::supportedFeatures().contains(QSsl::SupportedFeature::ClientSideAlpn);
+    return check;
+   };
    const auto wait=[&](const auto &predicate){const auto remaining=totalBudgetMs-int(timer.elapsed());return remaining>0&&QTest::qWaitFor(predicate,remaining);};
    if(tls){
     check["stage"]="tls-handshake";auto configuration=QSslConfiguration::defaultConfiguration();configuration.setPeerVerifyMode(QSslSocket::VerifyPeer);configuration.setProtocol(QSsl::TlsV1_3);

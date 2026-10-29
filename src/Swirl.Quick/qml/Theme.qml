@@ -88,7 +88,7 @@ QtObject {
     readonly property color wingSmallStart: dark ? "#B3A0E8" : "#8580C5"
     readonly property color wingSmallMid: dark ? "#8E96E6" : "#555BC4"
     readonly property color wingSmallEnd: dark ? "#7FDBD8" : "#79BDDC"
-    readonly property real wingOpacity: dark ? 0.28 : 0.30
+    readonly property real wingOpacity: dark ? 0.48 : 0.56
     readonly property color brandOrange:"#F5A04D"
     readonly property color brandRed:"#D93962"
     readonly property color brandBlue:"#285DD3"
