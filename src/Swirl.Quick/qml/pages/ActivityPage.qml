@@ -100,8 +100,18 @@ Item {
     readonly property string proxyError: engineController.systemProxy.stateReadError || engineController.systemProxy.error || engineController.routingError || engineController.policyError || (engineController.errorCode !== "None" ? engineController.error : "")
     readonly property string proxyPhase: engineController.systemProxyBusy || engineController.systemProxyStopping ? "pending" : proxyError.length ? "failed" : proxyOwned ? "succeeded" : "idle"
     readonly property string proxySummary: engineController.systemProxyStopping ? qsTr("正在恢复系统设置") : engineController.systemProxyBusy ? qsTr("正在开启代理") : proxyOwned ? qsTr("Swirl 正在接管网络") : engineController.processAlive ? qsTr("内核运行中，系统代理未接管") : qsTr("代理未开启")
+    readonly property string runtimeLabel: proxyPhase === "pending" ? qsTr("切换中") : proxyError.length ? qsTr("需检查") : connected ? qsTr("运行中") : engineController.processAlive ? qsTr("等待内核") : qsTr("未启动")
+    readonly property bool runtimeHealthy: connected && proxyPhase !== "pending" && !proxyError.length
+    readonly property var defaultTarget: ((engineController.policyDocument || {}).default_policy || {}).target || ({})
+    readonly property var defaultNode: defaultTarget.kind === "node"
+        ? engineController.nodeCatalog.find(node => node.id === defaultTarget.id) || ({}) : ({})
+    readonly property string nodeRegionCode: defaultNode.regionCode && defaultNode.regionCode !== "unknown" ? defaultNode.regionCode : ""
+    readonly property string nodeRegionDetail: nodeRegionCode.length
+        ? qsTr("节点标注地区：%1；来自节点名称，并非出口 IP 定位。").arg(defaultNode.regionName)
+        : defaultTarget.kind === "group" ? qsTr("默认出口使用策略组")
+        : defaultTarget.kind === "direct" ? qsTr("默认出口为直连") : qsTr("节点未标注地区")
     readonly property string defaultTargetName: {
-        const target = ((engineController.policyDocument || {}).default_policy || {}).target || {}
+        const target = defaultTarget
         if (target.kind === "direct") return "DIRECT"
         const entry = engineController.policyTargetOptions.find(option => option.kind === target.kind && option.id === target.id)
         return entry ? entry.name : qsTr("尚未分配")
@@ -111,20 +121,35 @@ Item {
         id: fact
         property string caption: ""
         property string value: "—"
-        Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.preferredWidth: 1; spacing: Theme.dp(4)
+        property bool prominent: false
+        Layout.fillWidth: true; Layout.minimumWidth: prominent ? Theme.dp(page.compact ? 150 : 172) : 0
+        Layout.preferredWidth: Theme.dp(prominent ? 172 : 90); Layout.horizontalStretchFactor: prominent ? 0 : 1
+        Layout.alignment: Qt.AlignTop; spacing: Theme.dp(4)
         SwirlText { text: fact.caption; color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; elide: Text.ElideRight }
-        SwirlText { text: fact.value; tabularFigures: true; color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.Medium; Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight }
+        Item {
+            Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(26)
+            SwirlText {
+                id: factValue
+                anchors.left: parent.left; anchors.right: parent.right
+                y: parent.height - baselineOffset - Theme.dp(4)
+                text: fact.value; textFormat: Text.PlainText; tabularFigures: true; color: Theme.text
+                font.pixelSize: Theme.fontSize(fact.prominent ? (page.compact ? 18 : 20) : 14)
+                font.weight: fact.prominent ? Font.DemiBold : Font.Medium; elide: Text.ElideRight
+            }
+        }
+        HoverHandler { id: factHover }
+        SwirlToolTip { parent: fact; visible: factHover.hovered && factValue.truncated; text: fact.value }
     }
     component PolicyFact: SwirlMotionButton {
         id: policy
         readonly property Item motionTitle: policyCaption
         readonly property Item motionSurface: policy
         objectName: "activityPolicyShortcut"
-        Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.preferredWidth: 1.6
+        Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.preferredWidth: Theme.dp(220); Layout.horizontalStretchFactor: 2; Layout.alignment: Qt.AlignTop
         implicitWidth: 0; implicitHeight: policyContents.implicitHeight
         padding: 0; leftPadding: Theme.dp(14); rightPadding: Theme.dp(14); hoverEnabled: true; focusPolicy: Qt.StrongFocus
         Accessible.name: qsTr("策略：%1").arg(page.defaultTargetName)
-        Accessible.description: qsTr("打开策略页面")
+        Accessible.description: qsTr("打开策略页面。%1").arg(page.nodeRegionDetail)
         onClicked: SwirlMotion.navigateFrom(policy, "policies", "")
         background: SwirlControlSurface { objectName: "activityPolicySurface"; quiet: true; hovered: policy.hovered; pressed: policy.down; focused: policy.visualFocus; controlEnabled: policy.enabled }
         SwirlArcMotion {
@@ -135,11 +160,22 @@ Item {
         }
         contentItem: RowLayout {
             id: policyContents
-            spacing: Theme.dp(4)
+            spacing: Theme.dp(8)
+            Rectangle {
+                objectName: "activityNodeRegionBadge"
+                Layout.preferredWidth: Theme.dp(32); Layout.preferredHeight: Theme.dp(32)
+                radius: Theme.dp(11); color: Theme.raised; antialiasing: true
+                Accessible.ignored: true
+                SwirlText { visible: page.nodeRegionCode.length > 0; anchors.centerIn: parent; text: page.nodeRegionCode; color: Theme.text; font.pixelSize: Theme.fontSize(11); font.weight: Font.DemiBold }
+                SwirlIcon { visible: !page.nodeRegionCode.length; anchors.centerIn: parent; name: page.defaultTarget.kind === "group" ? "layers" : page.defaultTarget.kind === "direct" ? "route" : "globe"; size: Theme.dp(17); color: Theme.muted }
+            }
             ColumnLayout {
                 Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: Theme.dp(4)
                 SwirlText { id: policyCaption; text: qsTr("策略"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight }
-                SwirlText { id: policyValue; objectName: "activityPolicyValue"; text: page.defaultTargetName; textFormat: Text.PlainText; tabularFigures: true; color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.Medium; Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight }
+                Item {
+                    Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.preferredHeight: Theme.dp(26)
+                    SwirlText { id: policyValue; objectName: "activityPolicyValue"; anchors.left: parent.left; anchors.right: parent.right; y: parent.height - baselineOffset - Theme.dp(4); text: page.defaultTargetName; textFormat: Text.PlainText; tabularFigures: true; color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.Medium; elide: Text.ElideRight }
+                }
             }
             Item {
                 Layout.preferredWidth: Theme.dp(12); Layout.fillHeight: true
@@ -149,7 +185,7 @@ Item {
             }
         }
         HoverHandler { cursorShape: Qt.PointingHandCursor }
-        SwirlToolTip { parent: policy; width: Math.min(implicitWidth, Theme.dp(420), page.width - Theme.dp(32)); visible: policy.hovered || policy.visualFocus; text: qsTr("%1 · 打开策略").arg(page.defaultTargetName) }
+        SwirlToolTip { parent: policy; width: Math.min(implicitWidth, Theme.dp(420), page.width - Theme.dp(32)); visible: policy.hovered || policy.visualFocus; text: qsTr("%1 · 打开策略\n%2").arg(page.defaultTargetName).arg(page.nodeRegionDetail) }
     }
     component StatRow: RowLayout {
         id: stat
@@ -193,15 +229,34 @@ Item {
             x: Theme.pagePadding; width: scroll.width - 2 * Theme.pagePadding
             height: Math.max(scroll.height - Theme.dp(16), Layout.minimumHeight); spacing: Theme.dp(16)
             SwirlGlassPanel {
+                id: statusCard
                 objectName: "activityStatusCard"
                 Layout.fillWidth: true; Layout.minimumHeight: statusBody.implicitHeight + Theme.dp(24); Layout.preferredHeight: Layout.minimumHeight
                 cornerRadius: Theme.cardRadius; color: Theme.surface
+                SwirlWingAnimation {
+                    objectName: "activityStatusWingBackdrop"
+                    x: statusCard.width - width - Theme.dp(18); y: (statusCard.height - height) / 2
+                    width: Math.min(statusCard.width * 0.32, Theme.dp(200)); height: statusCard.height - Theme.dp(16)
+                    progress: 1; opacity: Theme.dark ? 0.11 : 0.065
+                }
                 ColumnLayout {
-                    id: statusBody; anchors.fill: parent; anchors.margins: Theme.dp(12); spacing: Theme.dp(12)
+                    id: statusBody; anchors.fill: parent; anchors.margins: Theme.dp(12); anchors.leftMargin: Theme.dp(18); anchors.rightMargin: Theme.dp(18); spacing: Theme.dp(8)
                     RowLayout {
                         Layout.fillWidth: true; spacing: Theme.dp(10)
-                        SwirlFlow { objectName: "activityProxyWing"; Layout.preferredWidth: Theme.dp(54); Layout.preferredHeight: Theme.dp(20); phase: page.proxyPhase; proxyWing: true }
+                        SwirlFlow { objectName: "activityProxyWing"; Layout.preferredWidth: Theme.dp(40); Layout.preferredHeight: Theme.dp(20); phase: page.proxyPhase; proxyWing: true }
                         SwirlText { text: page.proxySummary; font.pixelSize: Theme.fontSize(15); font.weight: Font.DemiBold; color: Theme.text; Layout.fillWidth: true; elide: Text.ElideRight }
+                        Rectangle {
+                            objectName: "activityRuntimeCapsule"
+                            Layout.preferredWidth: runtimeContents.implicitWidth + Theme.dp(18); Layout.preferredHeight: Theme.dp(24)
+                            radius: height / 2; antialiasing: true
+                            color: page.runtimeHealthy ? Theme.successSurface : page.proxyError.length ? Theme.warningSurface : Theme.raised
+                            RowLayout {
+                                id: runtimeContents; anchors.centerIn: parent; spacing: Theme.dp(6)
+                                Rectangle { Layout.preferredWidth: Theme.dp(5); Layout.preferredHeight: Theme.dp(5); radius: width / 2; color: page.runtimeHealthy ? Theme.statusGreen : page.proxyError.length ? Theme.warningText : Theme.muted }
+                                SwirlText { text: page.runtimeLabel; textRole: "smallLabel"; font.pixelSize: Theme.fontSize(11); font.weight: Font.Medium; color: page.runtimeHealthy ? Theme.successText : page.proxyError.length ? Theme.warningText : Theme.muted }
+                            }
+                            Accessible.role: Accessible.StaticText; Accessible.name: page.runtimeLabel
+                        }
                         SwirlIconButton {
                             objectName: "activityProxyErrorDetails"
                             visible: page.proxyError.length > 0
@@ -213,11 +268,11 @@ Item {
                         OutboundModeControl { engineController: page.engineController }
                     }
                     RowLayout {
-                        Layout.fillWidth: true; spacing: Theme.dp(14)
+                        Layout.fillWidth: true; spacing: Theme.dp(14); Layout.alignment: Qt.AlignTop
+                        Fact { objectName: "activityExitIp"; caption: qsTr("出口 IP"); value: page.telemetry.externalIp || "—"; prominent: true }
                         Fact { caption: qsTr("网络"); value: page.network.type || qsTr("未连接") }
                         Fact { caption: qsTr("配置"); value: extensionsProvider.profileName || "—" }
                         PolicyFact {}
-                        Fact { caption: qsTr("外部 IP"); value: page.telemetry.externalIp || "—" }
                     }
                 }
             }

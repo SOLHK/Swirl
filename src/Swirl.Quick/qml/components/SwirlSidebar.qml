@@ -25,7 +25,6 @@ Item {
   SwirlLiquidGlass {
    id:liquidGlass
    objectName:"sidebarLiquidGlass";anchors.fill:parent;cornerRadius:floatingBackground.radius
-   captureWidth:Theme.sidebarWidth-2*Theme.shellInset
    backdropSource:sidebar.backdropSource;interaction:materialResponse.light
    lightPoint:glassHover.hovered?Qt.point(glassHover.point.position.x/width,glassHover.point.position.y/height):Qt.point(0.18,(selectionMotion.position.y-floatingBackground.y+Theme.sidebarRowHeight*.5)/height)
   }
@@ -35,9 +34,9 @@ Item {
    z:-1;visible:Theme.effectsSupported && !Theme.increaseContrast
    property vector2d surfaceSize:Qt.vector2d(floatingBackground.width,floatingBackground.height)
    property real cornerRadius:floatingBackground.radius
-   property vector2d shadowOffset:Qt.vector2d(Theme.dp(3),Theme.dp(3))
-   property real softness:Theme.dp(9)
-   property color shadowColor:Theme.withAlpha(Theme.shadowColor,Theme.sidebarShadowOpacity)
+   property vector2d shadowOffset:Qt.vector2d(Theme.dp(1),Theme.dp(2))
+   property real softness:Theme.dp(7)
+   property color shadowColor:Theme.withAlpha(Theme.shadowColor,Theme.dark?0.10:0.035)
    fragmentShader:"qrc:/swirl/shaders/sidebar-shadow.frag.qsb"
   }
  }

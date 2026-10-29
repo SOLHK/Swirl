@@ -19,9 +19,9 @@ SwirlMotionButton {
     readonly property bool pending: submitting || pendingRequestId.length > 0
     readonly property bool savedForNextConnection: !engineController.processAlive && receipt.scope === "saved-next-connect"
     readonly property var modes: [
-        { key: "rule", label: qsTr("规则分流"), description: qsTr("国内直连，其余按专属或默认策略") },
-        { key: "global", label: qsTr("全局代理"), description: qsTr("普通流量走默认出口，保留必要本地例外") },
-        { key: "direct", label: qsTr("直连模式"), description: qsTr("受接管流量不经过代理节点") }
+        { key: "rule", icon: "list", label: qsTr("规则分流"), description: qsTr("国内直连，其余按专属或默认策略") },
+        { key: "global", icon: "globe", label: qsTr("全局代理"), description: qsTr("普通流量走默认出口，保留必要本地例外") },
+        { key: "direct", icon: "route", label: qsTr("直连模式"), description: qsTr("受接管流量不经过代理节点") }
     ]
     property string settledMode: ""
     property string requestedMode: ""
@@ -47,7 +47,7 @@ SwirlMotionButton {
         return qsTr("当前运行模式；实际出口请查看连接详情")
     }
     objectName: "activityOutboundMode"
-    implicitWidth: Math.ceil(modeCaption.implicitWidth) + leftPadding + rightPadding
+    implicitWidth: Math.ceil(modeContents.implicitWidth) + leftPadding + rightPadding
     implicitHeight:Theme.controlHeight
     padding: 0
     leftPadding: Theme.dp(16)
@@ -113,7 +113,7 @@ SwirlMotionButton {
     onAppliedModeChanged: if (!busy && !pending) settledMode = appliedMode
     onBusyChanged: if (!busy && !pending) settledMode = appliedMode
     Component.onCompleted: settledMode = appliedMode
-    onClicked: modeMenu.showAt()
+    onClicked: modeMenu.visible ? modeMenu.requestDismiss() : modeMenu.showAt()
     background: SwirlClearGlassSurface {
         objectName: "activityOutboundModeSurface"
         radius: Theme.pillRadius(height)
@@ -124,33 +124,53 @@ SwirlMotionButton {
         border.width: Theme.increaseContrast ? 1 / Screen.devicePixelRatio : 0
         border.color: Theme.text
     }
-    contentItem: SwirlText {
-        id: modeCaption
-        objectName: "activityOutboundModeText"
-        text: control.text
-        textFormat: Text.PlainText
-        textRole: "smallLabel"
-        color: control.pending ? Theme.muted : Theme.text
-        font.pixelSize: Theme.fontSize(11)
-        font.weight: Theme.bodyFontWeight
-        font.underline: control.visualFocus
-        verticalAlignment: Text.AlignVCenter
-        elide: Text.ElideRight
+    contentItem: RowLayout {
+        id: modeContents
+        spacing: Theme.dp(7)
+        SwirlIcon {
+            name: control.displayMode === "global" ? "globe" : control.displayMode === "direct" ? "route" : "list"
+            size: Theme.dp(14)
+            color: control.pending ? Theme.muted : Theme.text
+            Accessible.ignored: true
+        }
+        SwirlText {
+            id: modeCaption
+            objectName: "activityOutboundModeText"
+            text: control.text
+            textFormat: Text.PlainText
+            textRole: "smallLabel"
+            color: control.pending ? Theme.muted : Theme.text
+            font.pixelSize: Theme.fontSize(11)
+            font.weight: Theme.bodyFontWeight
+            font.underline: control.visualFocus
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
+        SwirlIcon {
+            name: "chevron-right"
+            size: Theme.dp(10)
+            rotation: modeMenu.visible ? 270 : 90
+            color: Theme.muted
+            Accessible.ignored: true
+            Behavior on rotation { enabled: !SwirlMotion.reduced; RotationAnimation { duration: SwirlMotion.hoverDuration; direction: RotationAnimation.Shortest } }
+        }
     }
     HoverHandler { cursorShape: Qt.PointingHandCursor }
     SwirlContextMenu {
         id: modeMenu
         items: []
         objectName: "activityOutboundModeMenu"
-        x: 0
+        x: control.width - width
         y: control.height + Theme.dp(5)
-        width: Theme.dp(310)
+        width: Theme.dp(216)
         margins: Theme.dp(8)
-        padding: Theme.dp(6)
+        padding: Theme.dp(8)
         popupType: Popup.Item
-        transformOrigin: Item.TopLeft
+        transformOrigin: Item.TopRight
         background: Rectangle {
+            transform: Translate { x: modeMenu.popupMotion.xOffset; y: modeMenu.popupMotion.yOffset }
             radius: Theme.popupRadius
+            antialiasing: true
             color: Theme.material("floating")
             border.width: Theme.dp(1)
             border.color: Theme.glassRim
@@ -163,36 +183,52 @@ SwirlMotionButton {
                 id: option
                 SwirlPressMotion{}
                 required property var modelData
+                readonly property bool current: control.displayMode === modelData.key
+                readonly property color foreground: current ? "#FFFFFF" : enabled ? Theme.text : Theme.muted
                 objectName: "activityMode-" + modelData.key
-                height: Theme.dp(59)
+                height: Theme.dp(46)
+                padding: 0
+                leftPadding: Theme.dp(20)
+                rightPadding: Theme.dp(20)
                 text: modelData.label
                 enabled: control.editable
                 Accessible.name: text + ", " + modelData.description
                 Accessible.checkable: true
-                Accessible.checked: control.displayMode === modelData.key
-                Accessible.description: control.displayMode === modelData.key ? qsTr("当前模式") : ""
-                background: SwirlControlSurface {
-                    quiet:true
-                    hovered:option.hovered
-                    pressed:option.down
-                    focused:option.visualFocus
-                    selected:option.highlighted
-                    controlEnabled:option.enabled
+                Accessible.checked: current
+                Accessible.description: current ? qsTr("当前模式") : ""
+                ToolTip.text: modelData.description
+                ToolTip.visible: hovered || visualFocus
+                ToolTip.delay: 650
+                background: Rectangle {
+                    objectName: "activityModeSurface-" + option.modelData.key
+                    y: Theme.dp(3)
+                    width: option.width
+                    height: option.height - Theme.dp(6)
+                    radius: height / 2
+                    antialiasing: true
+                    color: option.current ? (option.down ? "#006DE0" : option.hovered || option.highlighted ? "#198EFF" : "#0783FF")
+                        : option.down ? Theme.pressed : option.hovered || option.highlighted ? Theme.hover : Theme.buttonBase
+                    border.width: Theme.increaseContrast ? 1 / Screen.devicePixelRatio : 0
+                    border.color: option.foreground
+                    Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.hoverDuration } }
                 }
                 contentItem: RowLayout {
-                    spacing: Theme.dp(9)
+                    spacing: Theme.dp(12)
                     SwirlIcon {
-                        name: "checkmark"
-                        size: Theme.dp(14)
-                        opacity: control.displayMode === option.modelData.key ? 1 : 0
-                        color: Theme.text
+                        name: option.modelData.icon
+                        size: Theme.dp(18)
+                        color: option.foreground
                         Accessible.ignored: true
                     }
-                    ColumnLayout {
+                    SwirlText {
                         Layout.fillWidth: true
-                        spacing: Theme.dp(3)
-                        SwirlText { Layout.fillWidth: true; text: option.text; color: option.enabled ? Theme.text : Theme.muted; font.pixelSize: Theme.fontSize(13) }
-                        SwirlText { Layout.fillWidth: true; text: option.modelData.description; color: Theme.muted; font.pixelSize: Theme.fontSize(11); elide: Text.ElideRight }
+                        text: option.text
+                        color: option.foreground
+                        font.pixelSize: Theme.fontSize(13)
+                        font.weight: Font.DemiBold
+                        font.underline: option.visualFocus
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
                     }
                 }
                 onTriggered: control.requestMode(modelData.key)

@@ -141,11 +141,11 @@ QtObject {
     // Qt maps these logical pixels to each screen's device pixel ratio.
     // Apple image reference normalized to the existing 672-unit shell height.
     // These are corner extents for the shared 2.5-power contour, not circle radii.
-    enum ShellMetrics { WindowCornerRadius = 22, SidebarCornerRadius = 14 }
+    enum ShellMetrics { WindowCornerRadius = 14, SidebarCornerRadius = 14 }
     readonly property real windowRadius: Theme.WindowCornerRadius
     readonly property real sidebarRadius: Theme.SidebarCornerRadius
-    // Cards at the same hierarchy share a token, including the settings grid.
-    readonly property real cardRadius: dp(14)
+    // Maximum corner extent; short cards adapt to their smaller dimension.
+    readonly property real cardRadius: dp(28)
     readonly property real containerRadius: cardRadius
     readonly property real radius: containerRadius
     readonly property real independentCardRadius: cardRadius
