@@ -122,14 +122,15 @@ Item {
         property string caption: ""
         property string value: "—"
         property bool prominent: false
-        Layout.fillWidth: true; Layout.minimumWidth: prominent ? Theme.dp(page.compact ? 150 : 172) : 0
-        Layout.preferredWidth: Theme.dp(prominent ? 172 : 90); Layout.horizontalStretchFactor: prominent ? 0 : 1
+        Layout.fillWidth: false; Layout.minimumWidth: prominent ? Theme.dp(page.compact ? 150 : 172) : 0
+        Layout.preferredWidth: Theme.dp(prominent ? (page.compact ? 150 : 172) : 80)
         Layout.alignment: Qt.AlignTop; spacing: Theme.dp(4)
         SwirlText { text: fact.caption; color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; elide: Text.ElideRight }
         Item {
             Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(26)
             SwirlText {
                 id: factValue
+                objectName: fact.objectName + "Value"
                 anchors.left: parent.left; anchors.right: parent.right
                 y: parent.height - baselineOffset - Theme.dp(4)
                 text: fact.value; textFormat: Text.PlainText; tabularFigures: true; color: Theme.text
@@ -145,9 +146,9 @@ Item {
         readonly property Item motionTitle: policyCaption
         readonly property Item motionSurface: policy
         objectName: "activityPolicyShortcut"
-        Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.preferredWidth: Theme.dp(220); Layout.horizontalStretchFactor: 2; Layout.alignment: Qt.AlignTop
+        Layout.fillWidth: true; Layout.minimumWidth: Theme.dp(100); Layout.preferredWidth: Theme.dp(220); Layout.alignment: Qt.AlignTop
         implicitWidth: 0; implicitHeight: policyContents.implicitHeight
-        padding: 0; leftPadding: Theme.dp(14); rightPadding: Theme.dp(14); hoverEnabled: true; focusPolicy: Qt.StrongFocus
+        padding: 0; hoverEnabled: true; focusPolicy: Qt.StrongFocus
         Accessible.name: qsTr("策略：%1").arg(page.defaultTargetName)
         Accessible.description: qsTr("打开策略页面。%1").arg(page.nodeRegionDetail)
         onClicked: SwirlMotion.navigateFrom(policy, "policies", "")
@@ -161,17 +162,14 @@ Item {
         contentItem: RowLayout {
             id: policyContents
             spacing: Theme.dp(8)
-            Rectangle {
-                objectName: "activityNodeRegionBadge"
-                Layout.preferredWidth: Theme.dp(32); Layout.preferredHeight: Theme.dp(32)
-                radius: Theme.dp(11); color: Theme.raised; antialiasing: true
-                Accessible.ignored: true
-                SwirlText { visible: page.nodeRegionCode.length > 0; anchors.centerIn: parent; text: page.nodeRegionCode; color: Theme.text; font.pixelSize: Theme.fontSize(11); font.weight: Font.DemiBold }
-                SwirlIcon { visible: !page.nodeRegionCode.length; anchors.centerIn: parent; name: page.defaultTarget.kind === "group" ? "layers" : page.defaultTarget.kind === "direct" ? "route" : "globe"; size: Theme.dp(17); color: Theme.muted }
-            }
             ColumnLayout {
                 Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: Theme.dp(4)
-                SwirlText { id: policyCaption; text: qsTr("策略"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight }
+                RowLayout {
+                    Layout.fillWidth: true; spacing: Theme.dp(6)
+                    SwirlText { id: policyCaption; text: qsTr("策略"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.alignment: Qt.AlignBaseline }
+                    SwirlText { objectName: "activityNodeRegionTag"; visible: page.nodeRegionCode.length > 0; text: page.nodeRegionCode; color: Theme.muted; font.pixelSize: Theme.fontSize(11); font.weight: Font.Medium; Layout.alignment: Qt.AlignBaseline; Accessible.ignored: true }
+                    Item { Layout.fillWidth: true }
+                }
                 Item {
                     Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.preferredHeight: Theme.dp(26)
                     SwirlText { id: policyValue; objectName: "activityPolicyValue"; anchors.left: parent.left; anchors.right: parent.right; y: parent.height - baselineOffset - Theme.dp(4); text: page.defaultTargetName; textFormat: Text.PlainText; tabularFigures: true; color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.Medium; elide: Text.ElideRight }
@@ -233,37 +231,35 @@ Item {
                 objectName: "activityStatusCard"
                 Layout.fillWidth: true; Layout.minimumHeight: statusBody.implicitHeight + Theme.dp(24); Layout.preferredHeight: Layout.minimumHeight
                 cornerRadius: Theme.sidebarRadius; radius: cornerRadius; color: Theme.surface
-                Item {
-                    id: statusEmblem
-                    objectName: "activityStatusEmblem"
-                    x: page.compact ? Theme.dp(18) : statusCard.width - width - Theme.dp(10)
-                    y: page.compact ? Theme.dp(12) : (statusCard.height - height) / 2
-                    width: Theme.dp(page.compact ? 48 : 108)
-                    height: page.compact ? Theme.dp(32) : statusCard.height - Theme.dp(20)
-                    Accessible.ignored: true
-                    SwirlWingAnimation {
-                        objectName: "activityStatusWingBackdrop"
-                        anchors.fill: parent; anchors.margins: Theme.dp(page.compact ? 4 : 2)
-                        progress: 1
-                        // The resting mark is branding; only the overlaid wing
-                        // follows the actual system-proxy transition.
-                        opacity: 0.62 * (1 - SwirlProxyWingMotion.progress)
-                    }
-                    SwirlFlow {
-                        objectName: "activityProxyWing"
-                        anchors.fill: parent; anchors.margins: Theme.dp(page.compact ? 4 : 2)
-                        phase: page.proxyPhase; proxyWing: true
-                    }
-                }
                 ColumnLayout {
-                    id: statusBody; anchors.fill: parent; anchors.margins: Theme.dp(12); anchors.leftMargin: Theme.dp(18); anchors.rightMargin: Theme.dp(page.compact ? 18 : 128); spacing: Theme.dp(8)
+                    id: statusBody; anchors.fill: parent; anchors.margins: Theme.dp(12); anchors.leftMargin: Theme.dp(18); anchors.rightMargin: Theme.dp(18); spacing: Theme.dp(6)
                     RowLayout {
+                        id: statusHeader
+                        objectName: "activityStatusHeader"
                         Layout.fillWidth: true; spacing: Theme.dp(10)
-                        Item { visible: page.compact; Layout.preferredWidth: Theme.dp(48); Layout.preferredHeight: Theme.dp(32) }
-                        SwirlText { text: page.proxySummary; font.pixelSize: Theme.fontSize(15); font.weight: Font.DemiBold; color: Theme.text; Layout.fillWidth: true; elide: Text.ElideRight }
+                        SwirlBrandIcon {
+                            id: statusBrand
+                            objectName: "activityStatusBrand"
+                            Layout.preferredWidth: Theme.dp(30); Layout.minimumWidth: Theme.dp(30); Layout.preferredHeight: Theme.dp(30)
+                            Accessible.ignored: true
+                        }
+                        SwirlText {
+                            id: proxySummary
+                            objectName: "activityProxySummary"
+                            text: page.proxySummary; textFormat: Text.PlainText
+                            font.pixelSize: Theme.fontSize(15); font.weight: Font.DemiBold; color: Theme.text
+                            Layout.minimumWidth: 0; Layout.preferredWidth: implicitWidth
+                            Layout.maximumWidth: Math.max(0, statusHeader.width - statusBrand.width - runtimeCapsule.width - outboundMode.width
+                                - (proxyErrorDetails.visible ? proxyErrorDetails.width + statusHeader.spacing : 0) - statusHeader.spacing * 4)
+                            elide: Text.ElideRight
+                            HoverHandler { id: summaryHover }
+                            SwirlToolTip { parent: proxySummary; visible: summaryHover.hovered && proxySummary.truncated; text: page.proxySummary }
+                        }
                         Rectangle {
+                            id: runtimeCapsule
                             objectName: "activityRuntimeCapsule"
-                            Layout.preferredWidth: runtimeContents.implicitWidth + Theme.dp(18); Layout.preferredHeight: Theme.dp(24)
+                            implicitWidth: runtimeContents.implicitWidth + Theme.dp(18)
+                            Layout.preferredWidth: implicitWidth; Layout.minimumWidth: implicitWidth; Layout.preferredHeight: Theme.dp(24)
                             radius: height / 2; antialiasing: true
                             color: page.runtimeHealthy ? Theme.successSurface : page.proxyError.length ? Theme.warningSurface : Theme.raised
                             RowLayout {
@@ -273,7 +269,9 @@ Item {
                             }
                             Accessible.role: Accessible.StaticText; Accessible.name: page.runtimeLabel
                         }
+                        Item { Layout.fillWidth: true; Layout.minimumWidth: 0 }
                         SwirlIconButton {
+                            id: proxyErrorDetails
                             objectName: "activityProxyErrorDetails"
                             visible: page.proxyError.length > 0
                             Layout.preferredWidth: Theme.dp(28); Layout.preferredHeight: Theme.dp(28)
@@ -281,13 +279,13 @@ Item {
                             tooltip: qsTr("查看代理错误详情"); Accessible.description: page.proxyError
                             onClicked: { page.errorDetailsText = page.proxyError; page.errorDetailsRequested = true }
                         }
-                        OutboundModeControl { engineController: page.engineController }
+                        OutboundModeControl { id: outboundMode; engineController: page.engineController; Layout.minimumWidth: implicitWidth }
                     }
                     RowLayout {
                         Layout.fillWidth: true; spacing: Theme.dp(14); Layout.alignment: Qt.AlignTop
                         Fact { objectName: "activityExitIp"; caption: qsTr("出口 IP"); value: page.telemetry.externalIp || "—"; prominent: true }
-                        Fact { caption: qsTr("网络"); value: page.network.type || qsTr("未连接") }
-                        Fact { caption: qsTr("配置"); value: extensionsProvider.profileName || "—" }
+                        Fact { objectName: "activityNetworkFact"; caption: qsTr("网络"); value: page.network.type || qsTr("未连接") }
+                        Fact { objectName: "activityProfileFact"; caption: qsTr("配置"); value: extensionsProvider.profileName || "—" }
                         PolicyFact {}
                     }
                 }
