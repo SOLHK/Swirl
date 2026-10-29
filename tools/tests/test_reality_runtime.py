@@ -645,7 +645,8 @@ class RealityRuntimeInterop(ChainBase):
         write_json(self.case / "origins.json", {
             "http_paths": [r.split(b" ")[1].decode() for r in self.http.requests],
             "https_paths": [r.split(b" ")[1].decode() for r in self.https.requests],
-            "https_sni": self.https.sni, "https_authenticated_closes": self.https.tls_closed,
+            "https_sni": self.https.sni, "https_sni_events": self.https.sni_events,
+            "https_authenticated_closes": self.https.tls_closed,
             "echo_bytes": sum(map(len, self.echo.payloads)),
             "echo_sessions": self.echo.sessions,
             "origin_errors": {"http": self.http.errors, "https": self.https.errors, "echo": self.echo.errors}})

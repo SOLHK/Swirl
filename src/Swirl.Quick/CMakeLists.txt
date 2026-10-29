@@ -495,7 +495,7 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  endif()
 endif()
 if(WIN32)
- # Generate the Windows-only ICO from the canonical Swirl SVG before RC compilation.
+ # Generate the Windows-only ICO from its optical SVG before RC compilation.
  add_executable(SwirlIconBuilder tools/BuildWindowsIcon.cpp)
  target_link_libraries(SwirlIconBuilder PRIVATE Qt6::Gui Qt6::Svg)
  set(SWIRL_GENERATED_ICON "${CMAKE_CURRENT_BINARY_DIR}/brand/Swirl.ico")
@@ -513,7 +513,7 @@ if(WIN32)
  add_dependencies(Swirl swirl-generate-icon)
  add_custom_command(TARGET Swirl POST_BUILD
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_GENERATED_ICON}"
-          "$<TARGET_FILE_DIR:Swirl>/Swirl-brand-0217-canonical.ico"
+          "$<TARGET_FILE_DIR:Swirl>/Swirl-brand-0217-optical.ico"
   VERBATIM)
  configure_file(app/Swirl.rc.in "${CMAKE_CURRENT_BINARY_DIR}/Swirl.rc" @ONLY)
  # RC includes the generated ICO by path; Ninja does not discover that input.
