@@ -388,6 +388,38 @@ int main(int argc, char *argv[])
 #ifdef Q_OS_WIN
     if(rootWindow)configureTaskbarIdentity(rootWindow);
 #endif
+    const auto sizeParts = argumentValue(QStringLiteral("--preview-size=")).split('x');
+    if (rootWindow && sizeParts.size() == 2 && sizeParts[0].toInt() >= 760 && sizeParts[1].toInt() >= 520)
+        rootWindow->resize(sizeParts[0].toInt(), sizeParts[1].toInt());
+    if (rootWindow && rootWindow->screen()) {
+        // Commit the restored QML size and screen position before first show.
+        // The first exposed frame must use the final geometry and DPI.
+        const auto area = rootWindow->screen()->availableGeometry();
+        rootWindow->setPosition(area.x()+qMax(0,(area.width()-rootWindow->width())/2),
+                                area.y()+qMax(0,(area.height()-rootWindow->height())/2));
+    }
+    QTimer firstFrameWatchdog;
+    bool firstFramePending=false;
+    QMetaObject::Connection firstFrameConnection;
+    if(rootWindow && backdrop.beginInitialPresentation()){
+        firstFramePending=true;
+        firstFrameWatchdog.setSingleShot(true);
+        firstFrameConnection=QObject::connect(rootWindow,&QQuickWindow::frameSwapped,&app,[&]{
+            if(!firstFramePending)return;
+            firstFramePending=false;
+            firstFrameWatchdog.stop();
+            if(!backdrop.presentFirstFrame())app.exit(2);
+        },Qt::ConnectionType(Qt::QueuedConnection|Qt::SingleShotConnection));
+        QObject::connect(&firstFrameWatchdog,&QTimer::timeout,&app,[&]{
+            if(!firstFramePending)return;
+            firstFramePending=false;
+            QObject::disconnect(firstFrameConnection);
+            qCritical()<<"Startup aborted: Qt Quick did not present its first frame within 5000 ms"
+                       <<rootWindow->geometry()<<rootWindow->devicePixelRatio();
+            app.exit(2);
+        });
+        firstFrameWatchdog.start(5000);
+    }
     if(rootWindow)rootWindow->show();
     std::unique_ptr<ShutdownCoordinator> shutdown;
     if(rootWindow && (lifecycleTest || (!isolatedRun && !appearanceTest))) {
@@ -397,7 +429,15 @@ int main(int argc, char *argv[])
             engineController.shutdown();extensions.shutdown();capture.stop();gateway.shutdown();
             QSettings().sync();
         },[&]{return engineController.processAlive()||engineController.busy()||engineController.tests()->busy()||gateway.busy()||extensions.busy();});
-        instance.activate=[&]{if(!shutdown->started()){rootWindow->showNormal();rootWindow->raise();rootWindow->requestActivate();}};
+        instance.activate=[&]{
+            if(shutdown->started())return;
+            const auto states=rootWindow->windowStates();
+            if(states.testFlag(Qt::WindowMinimized))
+                rootWindow->setWindowStates(states & ~Qt::WindowMinimized);
+            if(!rootWindow->isVisible())rootWindow->setVisible(true);
+            rootWindow->raise();
+            rootWindow->requestActivate();
+        };
     }
 #ifdef SWIRL_UI_TESTS
     if(rootWindow&&lifecycleTest){
@@ -529,16 +569,6 @@ int main(int argc, char *argv[])
         QObject::connect(&hdrOutput,&HdrOutput::displayTestFinished,&app,[&app,&backdrop](bool success){backdrop.finishNativeCapture();app.exit(success?0:2);});
         QTimer::singleShot(1600,&hdrOutput,[&hdrOutput,argumentValue]{hdrOutput.startDisplayTest(argumentValue(QStringLiteral("--hdr-display-output=")));});
         QTimer::singleShot(10000,&app,[&app]{qCritical()<<"HDR display readback timeout";app.exit(3);});
-    }
-    const auto sizeParts = argumentValue(QStringLiteral("--preview-size=")).split('x');
-    if (rootWindow && sizeParts.size() == 2 && sizeParts[0].toInt() >= 760 && sizeParts[1].toInt() >= 520)
-        rootWindow->resize(sizeParts[0].toInt(), sizeParts[1].toInt());
-    if (rootWindow && rootWindow->screen()) {
-        // QML chooses the initial logical size after the platform has placed
-        // its small bootstrap window. Recenter once using the final size.
-        const auto area = rootWindow->screen()->availableGeometry();
-        rootWindow->setPosition(area.x()+qMax(0,(area.width()-rootWindow->width())/2),
-                                area.y()+qMax(0,(area.height()-rootWindow->height())/2));
     }
     const auto previewSection=argumentValue(QStringLiteral("--preview-section="));
     if(rootWindow && !previewSection.isEmpty()) {

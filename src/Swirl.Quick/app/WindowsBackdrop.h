@@ -4,6 +4,7 @@
 #include <QPointer>
 #include <QSize>
 #include <QRectF>
+#include <QTimer>
 #include <QAbstractNativeEventFilter>
 class QQuickWindow;
 // QML uses the effective composition result, never just the requested setting.
@@ -34,6 +35,9 @@ public:
     quint64 compatibilityShadowBuildCount() const { return m_shadowBuildCount; }
     QString status() const { return m_status; }
     Q_INVOKABLE void apply(QObject *window, bool enabled, bool dark = false);
+    bool beginInitialPresentation();
+    bool presentFirstFrame();
+    Q_INVOKABLE void minimizeWindow(QObject *window);
     Q_INVOKABLE void showSystemMenu();
     // Clip a separate short-lived transition HWND without changing the normal
     // shell's contour ownership. The coordinates are local Qt logical pixels.
@@ -53,6 +57,9 @@ private:
     QPointer<QQuickWindow> m_window;
     quintptr m_handle = 0;
     bool m_captureWasTopmost = false;
+    bool m_initialPresentationPending = false;
+    bool m_restoreSettling = false;
+    QTimer m_restoreTimer;
     bool m_enabled = false, m_dark = false, m_active = false, m_nativeCorners = false;
     bool m_translucent = false;
     bool m_blurActive = false;

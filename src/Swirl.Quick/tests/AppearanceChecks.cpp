@@ -306,16 +306,12 @@ Item {
     auto *pane=find(window->contentItem(),"sidebarFloatingBackground");
     check(pane!=nullptr,"sidebar pane exists");
     if(pane){
-        // The sidebar samples decoration over the single shared window base.
-        // Its opaque accessibility fallback uses that same canvas colour.
-        check(pane->metaObject()->indexOfProperty("color")==-1,"sidebar container has no independent fill property");
-        QTest::qWait(250);
+        check(pane->metaObject()->indexOfProperty("color")==-1 && pane->opacity()==1,"sidebar container has no fill or foreground opacity workaround");
         auto *glass=find(pane,"sidebarLiquidGlass");
         auto *workspace=qvariant_cast<QQuickItem *>(eval("appSceneBackdrop"));
         auto *source=qvariant_cast<QQuickItem *>(eval("appSceneBackdrop.decorationSource"));
         auto *shader=glass?glass->findChild<QObject *>("sidebarLiquidShader"):nullptr;
-        check(glass && source && qvariant_cast<QQuickItem *>(glass->property("backdropSource"))==source,"sidebar glass samples the independent application backdrop");
-        check(glass && glass->property("sampled").toBool() && glass->property("captureLive").toBool(),"transparent sidebar uses live sampled material");
+        check(glass && source && qvariant_cast<QQuickItem *>(glass->property("backdropSource"))==source,"clear sidebar remains over the original application backdrop");
         check(shader && shader->property("status").toInt()==0 && shader->property("log").toString().isEmpty(),"production sidebar material shader is compiled without errors");
         const auto capture=[&](QQuickItem *item){
             if(!item)return QImage{};
@@ -324,25 +320,60 @@ Item {
             if(result->image().isNull())ready.wait(2000);
             return result->image();
         };
-        const auto interiorMatches=[](const QImage &image,const QColor &expected=QColor()){
-            if(image.isNull())return false;
-            // Item-local readback excludes navigation labels and avoids any
-            // dependency on page layout or window/DPI sample coordinates.
-            const QPointF samples[]={{0.25,0.25},{0.75,0.25},{0.5,0.5},{0.25,0.75},{0.75,0.75}};
-            for(const auto &sample:samples){
-                const auto actual=image.pixelColor(qRound(sample.x()*(image.width()-1)),qRound(sample.y()*(image.height()-1)));
-                if(actual.alpha()!=255)return false;
-                if(expected.isValid() && (qAbs(actual.red()-expected.red())>2 || qAbs(actual.green()-expected.green())>2 || qAbs(actual.blue()-expected.blue())>2))return false;
+        const auto noSampling=[&]{
+            if(!glass || glass->property("sampled").toBool() || glass->property("captureLive").toBool())return false;
+            for(auto *child:glass->findChildren<QObject *>()){
+                const QByteArray type=child->metaObject()->className();
+                if(type.contains("ShaderEffectSource") || type.contains("Blur") || type.contains("MultiEffect"))return false;
             }
+            return glass->opacity()==1;
+        };
+        // A broad inset rectangle excludes the rounded rim independently of
+        // the shader's contour formula. Compare every interior RGBA pixel.
+        const auto interior=[&](const QImage &image){
+            if(image.isNull() || !glass)return QRect();
+            const auto dpr=qreal(image.width())/glass->width();
+            const int inset=qCeil(glass->property("cornerRadius").toReal()*dpr)+2;
+            return image.rect().adjusted(inset,inset,-inset,-inset);
+        };
+        const auto clearMaterial=[&](const QImage &image){
+            const auto bounds=interior(image);if(bounds.width()<=0 || bounds.height()<=0)return false;
+            for(int y=bounds.top();y<=bounds.bottom();++y)for(int x=bounds.left();x<=bounds.right();++x)
+                if(image.pixelColor(x,y).alpha()!=0)return false;
             return true;
         };
-        const auto matchesToken=[&](QQuickItem *item,const QString &token){
-            const auto expected=eval(token).value<QColor>();
-            return expected.isValid() && interiorMatches(capture(item),expected);
+        const auto unchangedParent=[&]{
+            if(!glass)return false;
+            const auto withPane=window->grabWindow();
+            pane->setVisible(false);QTest::qWait(35);const auto withoutPane=window->grabWindow();
+            pane->setVisible(true);QTest::qWait(35);
+            if(withPane.isNull() || withPane.size()!=withoutPane.size())return false;
+            const auto dpr=window->devicePixelRatio();
+            const int inset=qCeil(glass->property("cornerRadius").toReal()*dpr)+2;
+            const auto origin=glass->mapToScene(QPointF())*dpr;
+            const QRect bounds(qRound(origin.x())+inset,qRound(origin.y())+inset,qRound(glass->width()*dpr)-2*inset,qRound(glass->height()*dpr)-2*inset);
+            return bounds.width()>0 && bounds.height()>0 && withPane.rect().contains(bounds)
+                && withPane.copy(bounds)==withoutPane.copy(bounds);
         };
-        const auto darkMaterial=capture(glass);
-        const auto transmitsBase=[](const QImage &image){return !image.isNull() && image.pixelColor(image.width()/2,image.height()/4).alpha()<3;};
-        check(transmitsBase(darkMaterial),"dark sidebar leaves the shared window base visible");
+        QImage lightMaterial,darkMaterial;
+        for(const QString theme:{QStringLiteral("Light"),QStringLiteral("Dark")}){
+            eval(QStringLiteral("Theme.mode='%1';Theme.reduceMotion=true;Theme.increaseContrast=false").arg(theme));QTest::qWait(180);
+            const auto material=capture(glass);
+            check(noSampling(),"clear sidebar never samples or blurs the original scene");
+            check(clearMaterial(material),"every tested material interior pixel has exactly zero alpha");
+            check(unchangedParent(),"parent wing, colour and foreground RGBA pixels are unchanged through the sidebar");
+            if(theme=="Light"){
+                lightMaterial=material;
+                check(eval("Theme.canvas.toString()==='#f7f7f8' && Theme.surface.toString()==='#ffffff' && Theme.border.toString()==='#e0e0e3'").toBool(),"accepted neutral light canvas and surface colours remain unchanged");
+            }else darkMaterial=material;
+        }
+        qint64 lightAlpha=0,darkAlpha=0;int lightPeak=0,darkPeak=0;
+        if(!lightMaterial.isNull() && darkMaterial.size()==lightMaterial.size())
+            for(int y=0;y<lightMaterial.height();++y)for(int x=0;x<lightMaterial.width();++x){
+                const int light=lightMaterial.pixelColor(x,y).alpha(),dark=darkMaterial.pixelColor(x,y).alpha();
+                lightAlpha+=light;darkAlpha+=dark;lightPeak=qMax(lightPeak,light);darkPeak=qMax(darkPeak,dark);
+            }
+        check(darkAlpha>0 && darkAlpha<lightAlpha*.4 && darkPeak<lightPeak*.5,"dark edge retains a quiet contour instead of the light continuous bright bevel");
         const auto before=window->grabWindow();
         QQmlComponent fixture(qmlEngine(window));
         fixture.setData("import QtQuick; Rectangle {width:600;height:900;color:'#D02A65'; Text {anchors.fill:parent;text:'RIGHT PAGE CONTENT';font.pixelSize:60;wrapMode:Text.Wrap}}",QUrl());
@@ -357,35 +388,92 @@ Item {
             check(!before.isNull() && !after.isNull() && before.copy(strip)==after.copy(strip),"right-page text and color never get copied underneath sidebar navigation");
         }
         delete overlay;
-        eval("Theme.mode='Light';Theme.reduceMotion=true");QTest::qWait(350);
-        const auto lightMaterial=capture(glass);
-        check(glass && glass->property("sampled").toBool() && glass->property("captureLive").toBool() && transmitsBase(lightMaterial),"light sidebar retains live decoration over the shared base");
-        check(!darkMaterial.isNull() && !lightMaterial.isNull() && darkMaterial.size()==lightMaterial.size() && darkMaterial!=lightMaterial,"theme selection changes the rendered sidebar material");
         eval("Theme.increaseContrast=true");QTest::qWait(150);
-        check(glass && !glass->property("sampled").toBool() && !glass->property("captureLive").toBool(),"increased contrast stops sidebar sampling");
-        check(matchesToken(glass,"Theme.canvas"),"increased contrast renders the shared opaque canvas token");
+        check(noSampling() && clearMaterial(capture(glass)) && unchangedParent(),"high-contrast outline preserves the fully clear sidebar interior");
         eval("Theme.increaseContrast=false;Theme.transparency=false");QTest::qWait(150);
-        check(glass && !glass->property("sampled").toBool() && !glass->property("captureLive").toBool(),"opaque fallback stops sidebar sampling");
-        check(matchesToken(glass,"Theme.canvas"),"opaque sidebar fallback uses the shared canvas token");
+        check(noSampling() && clearMaterial(capture(glass)) && unchangedParent(),"window transparency preference never adds a sidebar fill or captured scene");
         QQuickItem *workspaceBase=nullptr;
         if(workspace)for(auto *child:workspace->childItems())if(child->property("tintOpacity").isValid()){workspaceBase=child;break;}
-        check(matchesToken(workspaceBase,"Theme.canvas"),"opaque workspace base uses the same canvas token as the sidebar");
-        check(source && source->isVisible() && interiorMatches(capture(workspace)),"opaque workspace retains the global wing above its fully opaque base");
+        check(workspaceBase && workspaceBase->property("tintOpacity").toReal()==1 && workspaceBase->property("color").value<QColor>()==eval("Theme.canvas").value<QColor>(),"opaque workspace base still uses the shared canvas token");
+        check(source && source->isVisible(),"opaque workspace keeps the original global wing visible");
         eval("Theme.transparency=true");QTest::qWait(150);
-        check(glass && glass->property("sampled").toBool() && glass->property("captureLive").toBool(),"restoring transparency resumes sidebar sampling");
+        check(noSampling() && clearMaterial(capture(glass)) && unchangedParent(),"restoring window transparency preserves the original clear sidebar scene");
     }
     auto *proxy=find(window->contentItem(),"proxyCapsule");
     if(proxy){
-        // Appearance checks observe the real host but never click its network
-        // switch. Motion checks inject a controller into this same control;
-        // native setting mutations are tested only on disposable CI runners.
+        // Observe real ownership without operating the host proxy. Controlled
+        // states below exercise the same component against a counting fake.
         const bool active=eval("engineController.proxyRequested || engineController.systemProxy.owned || engineController.processAlive").toBool();
         const bool pending=eval("engineController.systemProxyBusy").toBool();
         const bool stopping=eval("engineController.systemProxyStopping").toBool();
         check(proxy->property("proxyEnabled").toBool()==active,"master proxy control reflects Swirl runtime and owned settings");
-        const auto action=stopping?QStringLiteral("正在关闭代理…"):pending?QStringLiteral("正在开启代理…"):proxy->property("proxyOwned").toBool()?QStringLiteral("系统代理 · 已开"):active?QStringLiteral("代理 · 仅内核"):eval("engineController.systemProxy.systemEnabled").toBool()?QStringLiteral("系统代理 · 外部"):QStringLiteral("系统代理 · 已关");
-        check(proxy->property("label").toString()==action,"master proxy control presents the matching direct action");
+        const auto label=stopping?QStringLiteral("正在关闭代理…"):pending?QStringLiteral("正在开启代理…"):QStringLiteral("系统代理");
+        check(proxy->property("label").toString()==label,"proxy label is stable outside explicit pending operations");
+        check(eval("proxyCapsule.proxyWing && SwirlProxyWingMotion.active===proxyCapsule.proxyOwned && proxyCapsule.Accessible.description===proxyCapsule.detail").toBool(),"production wing ownership and accessible status stay bound to actual runtime state");
+        auto *weave=find(window->contentItem(),"activityCloudKnotWeave");
+        check(weave && weave->property("active").toBool()==proxy->property("proxyOwned").toBool(),"Activity knot animation is bound to actual owned proxy state");
     } else check(false,"system proxy switch exists");
+    QQmlComponent proxyFixture(qmlEngine(window));
+    proxyFixture.setData(R"QML(
+import QtQuick
+import SwirlQuick
+Item {
+ id: fixture; x:230; y:90; width:420; height:60; z:1100
+ property alias control: capsule
+ property QtObject fake: QtObject {
+  property bool proxyRequested:false; property bool processAlive:false
+  property bool systemProxyBusy:false; property bool systemProxyStopping:false
+  property bool busy:false; property bool policyBusy:false
+  property string routingError:""; property string policyError:""; property string errorCode:"None"; property string error:""
+  property int toggleCalls:0
+  property QtObject imports:QtObject {property bool busy:false}
+  property QtObject systemProxy:QtObject {
+   property bool owned:false; property bool enabled:false; property bool systemEnabled:false
+   property string stateReadError:""; property string error:""
+  }
+  function toggleSystemProxy(){++toggleCalls}
+ }
+ function scenario(name){
+  fake.proxyRequested=false;fake.processAlive=false;fake.systemProxyBusy=false;fake.systemProxyStopping=false
+  fake.systemProxy.owned=false;fake.systemProxy.enabled=false;fake.systemProxy.systemEnabled=false;fake.systemProxy.stateReadError=""
+  if(name==="external")fake.systemProxy.systemEnabled=true
+  if(name==="core")fake.processAlive=true
+  if(name==="owned"){fake.proxyRequested=true;fake.processAlive=true;fake.systemProxy.owned=true;fake.systemProxy.enabled=true}
+  if(name==="starting"){fake.proxyRequested=true;fake.systemProxyBusy=true}
+  if(name==="stopping"){fake.proxyRequested=true;fake.systemProxyStopping=true}
+  if(name==="error")fake.systemProxy.stateReadError="受控读取失败"
+ }
+ SwirlSystemProxyCapsule {id:capsule;controller:fixture.fake;width:240;height:32}
+})QML",QUrl("qrc:/qt/qml/SwirlQuick/ProxyAppearanceFixture.qml"));
+    auto *proxyStates=qobject_cast<QQuickItem *>(proxyFixture.create(qmlContext(window)));
+    check(proxyStates!=nullptr,"isolated proxy presentation fixture loads");
+    if(proxyStates){
+        proxyStates->setParentItem(window->contentItem());
+        auto *control=qvariant_cast<QQuickItem *>(proxyStates->property("control"));
+        auto *fake=proxyStates->property("fake").value<QObject *>();
+        for(const QString scenario:{QStringLiteral("idle"),QStringLiteral("external"),QStringLiteral("core"),QStringLiteral("owned"),QStringLiteral("starting"),QStringLiteral("stopping"),QStringLiteral("error")}){
+            QMetaObject::invokeMethod(proxyStates,"scenario",Q_ARG(QVariant,scenario));QTest::qWait(35);
+            const bool starting=scenario=="starting",stopping=scenario=="stopping",error=scenario=="error",owned=scenario=="owned";
+            const auto expectedLabel=starting?QStringLiteral("正在开启代理…"):stopping?QStringLiteral("正在关闭代理…"):QStringLiteral("系统代理");
+            check(control && control->property("label").toString()==expectedLabel,"controlled proxy states retain stable label or specific pending text");
+            check(control && control->property("proxyEnabled").toBool()==(owned || scenario=="core" || starting || stopping)
+                && control->property("proxyOwned").toBool()==owned,"proxy presentation derives enabled and ownership from controller state");
+            check(control && control->property("tone").toString()==(error?"warning":owned?"success":"neutral")
+                && control->property("activityPhase").toString()==(starting || stopping?"pending":error?"failed":owned?"succeeded":"idle"),"state glyph phase and tone follow actual controller semantics");
+            const auto detailToken=starting?QStringLiteral("正在启动已保存策略"):stopping?QStringLiteral("正在结束配置操作"):error?QStringLiteral("受控读取失败"):owned?QStringLiteral("已接管系统代理"):scenario=="external"?QStringLiteral("其他应用的系统代理已开启"):scenario=="core"?QStringLiteral("内核正在运行"):QStringLiteral("点击启动已保存策略");
+            const auto accessibleDescription=QQmlProperty::read(control,QStringLiteral("Accessible.description"),qmlContext(control));
+            qInfo()<<"PROXY_APPEARANCE_ACCESSIBLE"<<scenario<<accessibleDescription<<"expected detail token"<<detailToken;
+            check(control && control->property("detail").toString().contains(detailToken)
+                && accessibleDescription.isValid() && accessibleDescription==control->property("detail")
+                && (!error || control->property("detail").toString()=="受控读取失败"),"accessible description preserves operation and error details");
+            const auto calls=fake?fake->property("toggleCalls").toInt():-1;
+            if(control)QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint());
+            check(fake && fake->property("toggleCalls").toInt()==calls+((stopping || error)?0:1),"proxy button invokes only its isolated controller and respects blocked states");
+        }
+        delete proxyStates;
+    }else qWarning()<<proxyFixture.errors();
+
+
     stage("glass-and-runtime-state");
     qInfo()<<"APPEARANCE_CHECKS failures"<<failures<<"totalMs"<<totalClock.elapsed();return failures?2:0;
 }

@@ -169,8 +169,8 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item build/swirl-quick/Release/Swirl.exe dist/
-            Copy-Item build/swirl-quick/Release/Swirl-brand-0217-canonical.ico dist/
-            python tools/Verify-WindowsIconResources.py --exe dist/Swirl.exe --ico dist/Swirl-brand-0217-canonical.ico --output build-evidence/ui-icon-resources.json
+            Copy-Item build/swirl-quick/Release/Swirl-brand-0217-optical.ico dist/
+            python tools/Verify-WindowsIconResources.py --exe dist/Swirl.exe --ico dist/Swirl-brand-0217-optical.ico --output build-evidence/ui-icon-resources.json
             if ($LASTEXITCODE -ne 0) { throw 'The deployed UI icon resources do not match all native ICO frames.' }
           Copy-Item build/swirl-quick/Release/swirl_api.dll,build/swirl-quick/Release/swirl-rust-build.json dist/
           Copy-Item build/swirl-quick/Release/SwirlProxyGuard.exe dist/
@@ -486,31 +486,3 @@ jobs:
           path: installer-bin/
           if-no-files-found: error
           retention-days: 14
-
-  publish-test-exe:
-    name: Publish standalone test installer EXE
-    needs: build-qt-ui
-    if: github.event_name == 'push' && github.ref == 'refs/heads/test'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download verified EXE (not a ZIP download for users)
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: Swirl-Windows-Installer-EXE
-          path: release
-      - name: Upload direct EXE to GitHub prerelease from test commit only
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          test -s release/Swirl-Setup.exe
-          SHORT_SHA="${GITHUB_SHA:0:7}"
-          TAG="swirl-qt-test-${SHORT_SHA}"
-          gh release create "${TAG}" "release/Swirl-Setup.exe#Swirl-Setup.exe" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --target "${GITHUB_SHA}" \
-            --title "Swirl · 测试版 ${SHORT_SHA}" \
-            --notes "Windows 开发测试版：C++23 / Qt Quick，Swirl 自研 Rust 唯一代理内核，真实节点与订阅、路由和网络活动监控、本机 HTTP/HTTPS 调试。系统代理和证书信任需用户明确启用；TUN、LAN 和网关转发尚未支持；高级协议与实际网络环境的验证范围请查阅随版本文档。没有演示联网成功，未实现功能保持禁用。请勿作为正式版本使用。" \
-            --prerelease

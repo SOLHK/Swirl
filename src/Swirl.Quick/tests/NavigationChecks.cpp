@@ -427,17 +427,23 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
    if(key==QStringLiteral("activityPolicyShortcut")){
     auto *arrow=item("activityPolicyArrow"),*arc=item("activityPolicyMotion");
     const auto centerY=[](QQuickItem *target){return target->mapToScene(QPointF(target->width()/2,target->height()/2)).y();};
-    // Compare rendered centers after both the feather arc and shared feedback
-    // settle, so this catches the old caption-row arrow without flattening motion.
-    const bool centered=await([&]{return arrow&&arc&&arrow->isVisible()&&arrow->height()>0&&!arc->property("moving").toBool()&&!surface->property("moving").toBool()&&qAbs(centerY(arrow)-centerY(surface))*window->devicePixelRatio()<=.5;},1000);
-    check(centered,"Activity policy arrow is vertically centered in the full two-line moving button surface");
+    auto *contents=control->property("contentItem").value<QQuickItem *>();
+    auto *caption=control->property("motionTitle").value<QQuickItem *>(),*value=item("activityPolicyValue");
+    // The compact footer uses one baseline-aligned row inside a taller hit
+    // surface. Keep the strict pixel tolerance on that row and its arrow.
+    const bool centered=await([&]{return arrow&&arc&&contents&&arrow->isVisible()&&arrow->height()>0&&!arc->property("moving").toBool()&&!surface->property("moving").toBool()&&qAbs(centerY(arrow)-centerY(contents))*window->devicePixelRatio()<=.5;},1000);
+    check(centered,"Activity policy arrow remains centered in the compact footer content row");
+    check(caption&&value&&qAbs(caption->mapToScene(QPointF(0,caption->baselineOffset())).y()-value->mapToScene(QPointF(0,value->baselineOffset())).y())*window->devicePixelRatio()<=.5,
+          "Activity policy caption and current target share the same rendered baseline");
+    check(qAbs(control->height()-eval("Theme.dp(28)").toDouble())<.001&&qAbs(surface->property("radius").toDouble()-surface->height()/2)<.001,
+          "Activity policy hover surface keeps a complete 28dp capsule around the footer row");
     const auto geometry=[](QQuickItem *target){
      if(!target)return QJsonObject();
      const auto origin=target->mapToScene(QPointF()),center=target->mapToScene(QPointF(target->width()/2,target->height()/2));
      return QJsonObject{{"x",target->x()},{"y",target->y()},{"width",target->width()},{"height",target->height()},{"implicitWidth",target->implicitWidth()},{"implicitHeight",target->implicitHeight()},{"scale",target->scale()},{"sceneX",origin.x()},{"sceneY",origin.y()},{"sceneCenterX",center.x()},{"sceneCenterY",center.y()}};
     };
     QJsonObject controlSpacing;for(const auto *name:{"leftInset","rightInset","topInset","bottomInset","leftPadding","rightPadding","topPadding","bottomPadding","availableHeight"})controlSpacing[name]=control->property(name).toDouble();
-    buttonSamples.append(QJsonObject{{"button",key},{"phase","policy-arrow-alignment"},{"arrowCenterSceneY",arrow?QJsonValue(centerY(arrow)):QJsonValue()},{"surfaceCenterSceneY",centerY(surface)},{"centerDeltaPhysicalPx",arrow?QJsonValue(qAbs(centerY(arrow)-centerY(surface))*window->devicePixelRatio()):QJsonValue()},{"arcMoving",arc?arc->property("moving").toBool():false},{"surfaceMoving",surface->property("moving").toBool()},{"centered",centered},{"controlGeometry",geometry(control)},{"backgroundGeometry",geometry(surface)},{"contentGeometry",geometry(control->property("contentItem").value<QQuickItem *>())},{"rightCellGeometry",geometry(arrow?arrow->parentItem():nullptr)},{"arrowGeometry",geometry(arrow)},{"controlSpacing",controlSpacing}});
+    buttonSamples.append(QJsonObject{{"button",key},{"phase","policy-arrow-alignment"},{"arrowCenterSceneY",arrow?QJsonValue(centerY(arrow)):QJsonValue()},{"surfaceCenterSceneY",centerY(surface)},{"centerDeltaPhysicalPx",arrow&&contents?QJsonValue(qAbs(centerY(arrow)-centerY(contents))*window->devicePixelRatio()):QJsonValue()},{"arcMoving",arc?arc->property("moving").toBool():false},{"surfaceMoving",surface->property("moving").toBool()},{"centered",centered},{"controlGeometry",geometry(control)},{"backgroundGeometry",geometry(surface)},{"contentGeometry",geometry(control->property("contentItem").value<QQuickItem *>())},{"rightCellGeometry",geometry(arrow?arrow->parentItem():nullptr)},{"arrowGeometry",geometry(arrow)},{"controlSpacing",controlSpacing}});
    }
    check(clicked.isValid()&&clicked.count()==0&&control->size()==size&&control->position()==position,"marked button feedback preserves layout and invokes no action: "+key);
   };

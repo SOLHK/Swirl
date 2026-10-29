@@ -199,11 +199,11 @@ Item {
       (host.heroData.returning?host.leavingLoader===cachedLoader:host.activeLoader===cachedLoader)
   // The expanded white card becomes the page's own surface. There is no
   // late white-to-transparent swap and no second full-page shadow layer.
-  Rectangle {
+  SwirlContinuousSurface {
    id:settingsCanvas;anchors.fill:parent;z:0
    property bool surfaceHidden:false
    visible:host.insetRoutes.indexOf(cachedLoader.routeId)>=0
-   color:Theme.material("content");radius:Theme.cardRadius;antialiasing:true
+   color:Theme.material("content");radius:Theme.cardRadius
    opacity:surfaceHidden?0:1
   }
   // This is the animated reveal boundary, not a layout workaround. The page

@@ -18,6 +18,7 @@
 #include <QTimer>
 #include <memory>
 #include <functional>
+#include <cmath>
 
 int runApecGlassChecks(QQuickWindow *window,const QString &output) {
     QJsonArray checks;QJsonObject openingFailureDiagnostics;int failures=0;
@@ -50,9 +51,66 @@ int runApecGlassChecks(QQuickWindow *window,const QString &output) {
         if(result->image().isNull())ready.wait(2000);
         return result->image();
     };
+    // The pane only paints its rim. Comparing the composited parent scene is
+    // essential: a standalone clear pane must not contain copied wing pixels.
+    const auto distanceToContour=[](const QPointF &point,const QSizeF &size,qreal radius){
+        const auto r=qMin(radius,qMin(size.width(),size.height())/2);
+        const auto x=qAbs(point.x()-size.width()/2)-size.width()/2+r;
+        const auto y=qAbs(point.y()-size.height()/2)-size.height()/2+r;
+        return std::pow(std::pow(qMax(x,0.0),2.5)+std::pow(qMax(y,0.0),2.5),0.4)
+            +qMin(qMax(x,y),0.0)-r;
+    };
+    const auto clearInterior=[&](const QImage &withGlass,const QImage &withoutGlass,QQuickItem *glass,QQuickItem *parent){
+        if(withGlass.isNull() || withGlass.size()!=withoutGlass.size() || !glass || !parent)return false;
+        const auto dpr=qreal(withGlass.width())/parent->width();
+        const auto origin=glass->mapToItem(parent,QPointF());
+        qint64 samples=0;
+        for(int y=0;y<withGlass.height();++y)for(int x=0;x<withGlass.width();++x){
+            const QPointF local((x+0.5)/dpr-origin.x(),(y+0.5)/dpr-origin.y());
+            if(distanceToContour(local,glass->size(),glass->property("cornerRadius").toDouble())>=-3/dpr)continue;
+            ++samples;
+            if(withGlass.pixel(x,y)!=withoutGlass.pixel(x,y)){
+                qWarning()<<"APEC_CLEAR_INTERIOR_PIXEL_CHANGED"<<x<<y<<withGlass.pixelColor(x,y)<<withoutGlass.pixelColor(x,y);
+                return false;
+            }
+        }
+        return samples>1000;
+    };
+    const auto transparentInterior=[&](const QImage &image,QQuickItem *glass){
+        if(image.isNull() || !glass)return false;
+        const auto dpr=qreal(image.width())/glass->width();qint64 samples=0;
+        for(int y=0;y<image.height();++y)for(int x=0;x<image.width();++x){
+            if(distanceToContour(QPointF((x+0.5)/dpr,(y+0.5)/dpr),glass->size(),glass->property("cornerRadius").toDouble())>=-3/dpr)continue;
+            ++samples;if(image.pixelColor(x,y).alpha()!=0)return false;
+        }
+        return samples>1000;
+    };
+    const auto noCapturedSource=[](QQuickItem *glass){
+        if(!glass || glass->property("sampled").toBool() || glass->property("captureLive").toBool())return false;
+        for(auto *child:glass->findChildren<QObject *>()){
+            const QByteArray type=child->metaObject()->className();
+            if(type.contains("ShaderEffectSource") || type.contains("Blur") || type.contains("MultiEffect"))return false;
+        }
+        return true;
+    };
     auto *productionGlass=window->findChild<QQuickItem *>("sidebarLiquidGlass");
+    auto *productionSurface=window->findChild<QQuickItem *>("sidebarFloatingBackground");
     const auto clearGlass=grab(productionGlass);
-    check("sidebar-preserves-shared-window-base",!clearGlass.isNull() && clearGlass.pixelColor(clearGlass.width()/2,clearGlass.height()/4).alpha()<3);
+    check("sidebar-material-interior-is-exactly-transparent",transparentInterior(clearGlass,productionGlass));
+    check("sidebar-has-no-blur-or-scene-capture",noCapturedSource(productionGlass));
+    auto *productionShadow=window->findChild<QQuickItem *>("sidebarExteriorShadow");
+    const auto shadow=grab(productionShadow);qint64 shadowPixels=0,interiorShadowPixels=0;
+    if(!shadow.isNull() && productionShadow && productionGlass){
+        const auto dpr=qreal(shadow.width())/productionShadow->width();
+        const auto padding=productionShadow->property("padding").toDouble();
+        for(int y=0;y<shadow.height();++y)for(int x=0;x<shadow.width();++x){
+            const auto alpha=shadow.pixelColor(x,y).alpha();
+            const auto distance=distanceToContour(QPointF((x+0.5)/dpr-padding,(y+0.5)/dpr-padding),productionGlass->size(),productionGlass->property("cornerRadius").toDouble());
+            if(distance<-3/dpr && alpha!=0)++interiorShadowPixels;
+            if(distance>3/dpr && alpha!=0)++shadowPixels;
+        }
+    }
+    check("floating-shadow-is-present-exclusively-outside-pane",shadowPixels>100 && interiorShadowPixels==0);
     check("wing-decoration-spans-workspace",decoration && decoration->width()==scene->width() && decoration->height()==scene->height());
     auto *footprint=scene?scene->findChild<QQuickItem *>("apecWingFootprint"):nullptr;
     auto *wingVisual=scene?scene->findChild<QQuickItem *>("apecWingVisual"):nullptr;
@@ -66,16 +124,14 @@ int runApecGlassChecks(QQuickWindow *window,const QString &output) {
             && footprint->x()<0
             && qAbs(footprint->x()+footprint->width()-scene->width()+20)<0.1
             && qAbs(footprint->y()+footprint->height()-scene->height()-8)<0.1);
-        const auto transmitted=grab(productionGlass);
-        qint64 featherPixels=0;
-        for(int y=transmitted.height()*3/4;y<transmitted.height()-8;++y)
-            for(int x=8;x<transmitted.width()-8;++x) {
-                const auto pixel=transmitted.pixelColor(x,y);
-                if(pixel.alpha()>30 && pixel.hsvSaturation()>25)++featherPixels;
-            }
-        check("production-wing-remains-visible-through-lower-glass",featherPixels>transmitted.width()*transmitted.height()/200);
+        const auto withGlass=window->grabWindow();
+        if(productionSurface)productionSurface->setVisible(false);
+        QTest::qWait(35);const auto withoutGlass=window->grabWindow();
+        if(productionSurface)productionSurface->setVisible(true);
+        QTest::qWait(35);
+        check("production-wing-and-foreground-are-pixel-identical-through-pane",clearInterior(withGlass,withoutGlass,productionGlass,window->contentItem()));
     }
-    check("sidebar-retains-floating-inset-and-14dp-contour",eval("sidebar.glassSurface.x===Theme.shellInset && sidebar.glassSurface.y===Theme.shellInset && sidebar.glassSurface.radius===14").toBool());
+    check("sidebar-retains-floating-inset-size-and-24dp-contour",eval("sidebar.glassSurface.x===Theme.shellInset && sidebar.glassSurface.y===Theme.shellInset && sidebar.glassSurface.width===sidebar.width-2*Theme.shellInset && sidebar.glassSurface.height===sidebar.height-2*Theme.shellInset && sidebar.glassSurface.radius===Theme.sidebarRadius && Theme.sidebarRadius===Theme.dp(24)").toBool());
     check("neutral-light-canvas-and-card-palette",eval("Theme.canvas.toString()==='#f7f7f8' && Theme.surface.toString()==='#ffffff' && Theme.border.toString()==='#e0e0e3'").toBool());
     if(decoration){
         auto decorated=grab(scene);
@@ -125,9 +181,10 @@ Item {
   id:scene;width:440;height:320;color:"#164C85"
   Rectangle {x:220;width:220;height:320;color:"#F1C888"}
   Rectangle {x:17;y:0;width:9;height:320;color:"#FFFFFF"}
+  Rectangle {x:104;y:0;width:1;height:320;color:"#78A9FA"}
   Rectangle {x:410;y:0;width:8;height:320;color:"#182A40"}
  }
- SwirlLiquidGlass {id:glass;x:20;y:20;width:400;height:280;backdropSource:scene;cornerRadius:20}
+ SwirlLiquidGlass {id:glass;x:20;y:20;width:400;height:280;backdropSource:scene;cornerRadius:Theme.sidebarRadius}
 })QML",QUrl("qrc:/qt/qml/SwirlQuick/ApecGlassFixture.qml"));
     std::unique_ptr<QObject> owner(component.create(qmlContext(window)));
     auto *fixture=qobject_cast<QQuickItem *>(owner.get());
@@ -140,59 +197,87 @@ Item {
         auto *glass=qvariant_cast<QQuickItem *>(fixture->property("glass"));
         if(!glass)glass=qobject_cast<QQuickItem *>(fixture->property("glass").value<QObject *>());
         check("fixture-load",glass!=nullptr);
-        const auto capture=[&](){
-            if(!glass)return QImage{};
-            auto result=glass->grabToImage();if(!result)return QImage{};
-            QSignalSpy ready(result.data(),&QQuickItemGrabResult::ready);window->update();
-            if(result->image().isNull())ready.wait(2000);
-            return result->image();
-        };
-        const auto sample=[](const QImage &image,qreal x,qreal y){return image.pixelColor(qBound(0,qRound(x*image.width()/400.),image.width()-1),qBound(0,qRound(y*image.height()/280.),image.height()-1));};
-        const auto difference=[](const QImage &a,const QImage &b){qint64 value=0;if(a.size()!=b.size())return qint64(-1);for(int y=0;y<a.height();++y)for(int x=0;x<a.width();++x){const auto p=a.pixelColor(x,y),q=b.pixelColor(x,y);value+=qAbs(p.red()-q.red())+qAbs(p.green()-q.green())+qAbs(p.blue()-q.blue());}return value;};
-        auto initial=capture();
         auto *shader=glass?glass->findChild<QObject *>("sidebarLiquidShader"):nullptr;
-        qInfo()<<"APEC_GLASS_SHADER_STATUS"<<(shader?shader->property("status"):QVariant())<<(shader?shader->property("log"):QVariant())<<"early-binding"<<glass->property("shaderStatus");
         check("cached-fixture-shader-has-no-error",shader && shader->property("status").toInt()!=2 && shader->property("log").toString().isEmpty());
-        check("native-readback",!initial.isNull());
-        if(!initial.isNull()){
-            initial.save(directory+"/glass-source-blue.png");
-            check("rounded-clip-transparent-corner",initial.pixelColor(0,0).alpha()<8);
-            const auto left=sample(initial,100,140),right=sample(initial,300,140),edge=sample(initial,200,140);
-            check("source-colours-transmitted-without-pigment-wash",right.red()>left.red()+100 && left.blue()>left.red()+60 && left.hsvSaturation()>170);
-            const auto stripe=sample(initial,2,140),besideStripe=sample(initial,20,140);
-            check("fine-source-stripe-remains-recognizable",stripe.lightness()>besideStripe.lightness()+40);
-            check("blur-mixes-source-boundary",edge.red()>left.red()+8 && edge.red()<right.red()-8);
-            eval("apecGlass.source.color='#BD334F'");QTest::qWait(100);auto changed=capture();changed.save(directory+"/glass-source-red.png");
-            check("live-source-change-reaches-material",!changed.isNull() && sample(changed,100,140).red()>left.red()+35);
-            eval("apecGlass.glass.refraction=0");QTest::qWait(60);auto unrefracted=capture();
-            check("edge-refraction-changes-sampled-pixels",!changed.isNull() && !unrefracted.isNull() && difference(changed,unrefracted)>100);
-            eval("apecGlass.glass.interaction=1;apecGlass.glass.lightPoint=Qt.point(0,0)");QTest::qWait(60);auto lit=capture();
-            check("interaction-drives-directional-rim",!lit.isNull() && difference(lit,unrefracted)>100);
-            eval("apecGlass.glass.lightPoint=Qt.point(1,0.5)");QTest::qWait(60);auto rightLit=capture();
-            if(!rightLit.isNull() && rightLit.size()==unrefracted.size()){
-                const QRect rightRim(rightLit.width()-12,rightLit.height()/3,12,rightLit.height()/3);
-                const QRect leftRim(0,rightLit.height()/3,12,rightLit.height()/3);
-                const auto rightChange=difference(rightLit.copy(rightRim),unrefracted.copy(rightRim));
-                const auto leftChange=difference(rightLit.copy(leftRim),unrefracted.copy(leftRim));
-                check("right-edge-glint-stays-local",rightChange>100 && leftChange<rightChange/10);
+        check("fixture-never-captures-or-blurs-source",noCapturedSource(glass));
+        check("fixture-and-parent-do-not-fade-foreground",glass && glass->opacity()==1 && fixture->opacity()==1);
+        const auto composedWithoutGlass=[&]{
+            if(glass)glass->setVisible(false);
+            QTest::qWait(35);auto image=grab(fixture);
+            if(glass)glass->setVisible(true);
+            QTest::qWait(35);return image;
+        };
+        const auto rimOnlyChanges=[&](const QImage &a,const QImage &b){
+            if(a.isNull() || a.size()!=b.size() || !glass)return false;
+            const auto dpr=qreal(a.width())/glass->width();qint64 changed=0;
+            for(int y=0;y<a.height();++y)for(int x=0;x<a.width();++x){
+                if(a.pixel(x,y)==b.pixel(x,y))continue;
+                ++changed;
+                const auto distance=distanceToContour(QPointF((x+0.5)/dpr,(y+0.5)/dpr),glass->size(),glass->property("cornerRadius").toDouble());
+                if(distance<-3/dpr || distance>1/dpr)return false;
+            }
+            return changed>10;
+        };
+        const auto difference=[](const QImage &a,const QImage &b){
+            if(a.isNull() || a.size()!=b.size())return qint64(-1);
+            qint64 value=0;
+            for(int y=0;y<a.height();++y)for(int x=0;x<a.width();++x){
+                const auto p=a.pixelColor(x,y),q=b.pixelColor(x,y);
+                value+=qAbs(p.red()-q.red())+qAbs(p.green()-q.green())+qAbs(p.blue()-q.blue())+qAbs(p.alpha()-q.alpha());
+            }
+            return value;
+        };
+        QImage lightRim;
+        for(const QString theme:{QStringLiteral("Light"),QStringLiteral("Dark")}){
+            eval(QStringLiteral("Theme.mode='%1';apecGlass.glass.interaction=0;apecGlass.source.color='#164C85'").arg(theme));
+            QTest::qWait(60);const auto initial=grab(glass);
+            const auto combined=grab(fixture),plain=composedWithoutGlass();
+            check("native-clear-material-readback",!initial.isNull());
+            check("standalone-pane-has-no-interior-pigment-or-copied-scene",transparentInterior(initial,glass));
+            check("composed-colours-hard-boundary-and-fine-stripes-stay-exact",clearInterior(combined,plain,glass,fixture));
+            check("rounded-clip-transparent-corner",!initial.isNull() && initial.pixelColor(0,0).alpha()==0);
+            initial.save(directory+QStringLiteral("/glass-%1-rim.png").arg(theme.toLower()));
+            combined.save(directory+QStringLiteral("/glass-%1-composed.png").arg(theme.toLower()));
+
+            eval("apecGlass.source.color='#BD334F'");QTest::qWait(35);
+            const auto changed=grab(fixture),changedPlain=composedWithoutGlass();
+            check("live-parent-change-remains-unfiltered-through-pane",clearInterior(changed,changedPlain,glass,fixture) && difference(combined,changed)>1000);
+            check("material-never-copies-changing-parent-pixels",initial==grab(glass));
+            eval("apecGlass.source.color='#40BD334F'");QTest::qWait(35);
+            const auto translucent=grab(fixture),translucentPlain=composedWithoutGlass();
+            const auto sourcePixel=translucentPlain.isNull()?QColor():translucentPlain.pixelColor(qRound(translucentPlain.width()*100.0/440),qRound(translucentPlain.height()/2.0));
+            check("composed-parent-alpha-preserved-exactly",sourcePixel.alpha()==64 && clearInterior(translucent,translucentPlain,glass,fixture));
+
+            eval("apecGlass.glass.interaction=1;apecGlass.glass.lightPoint=Qt.point(1,0.5)");QTest::qWait(35);
+            const auto lit=grab(glass);
+            check("interaction-changes-only-the-rim",rimOnlyChanges(initial,lit));
+            if(!lit.isNull() && lit.size()==initial.size()){
+                const QRect rightRim(lit.width()-12,lit.height()/3,12,lit.height()/3);
+                const QRect leftRim(0,lit.height()/3,12,lit.height()/3);
+                const auto rightChange=difference(lit.copy(rightRim),initial.copy(rightRim));
+                const auto leftChange=difference(lit.copy(leftRim),initial.copy(leftRim));
+                check("right-edge-glint-stays-local",rightChange>100 && leftChange==0);
             }else check("right-edge-glint-readback",false);
-            eval("apecGlass.source.color='#40BD334F'");QTest::qWait(60);auto translucent=capture();
-            check("glass-preserves-transmitted-alpha",!translucent.isNull() && qAbs(sample(translucent,100,140).alpha()-64)<=2);
-            eval("apecGlass.source.color='#BD334F'");
+            check("interaction-keeps-interior-exactly-transparent",transparentInterior(lit,glass));
+            if(theme=="Light")lightRim=initial;
+            else if(!initial.isNull() && initial.size()==lightRim.size()){
+                qint64 lightAlpha=0,darkAlpha=0;int lightPeak=0,darkPeak=0;
+                for(int y=0;y<initial.height();++y)for(int x=0;x<initial.width();++x){
+                    const auto light=lightRim.pixelColor(x,y).alpha(),dark=initial.pixelColor(x,y).alpha();
+                    lightAlpha+=light;darkAlpha+=dark;lightPeak=qMax(lightPeak,light);darkPeak=qMax(darkPeak,dark);
+                }
+                check("dark-rim-avoids-continuous-bright-bevel",darkAlpha>0 && darkAlpha<lightAlpha*0.4 && darkPeak<lightPeak*0.5);
+            }else check("dark-and-light-rim-readback",false);
         }
-        const auto size=eval("apecGlass.glass.captureSize").toSizeF();
-        const auto scale=qMin(2.0,window->devicePixelRatio());
-        check("capture-bounded-to-panel-at-native-dpr",size.width()<=qCeil(440*scale) && size.height()<=qCeil(320*scale) && size.width()>0 && size.height()>0);
-        eval("apecGlass.glass.visible=false");QTest::qWait(30);check("hidden-capture-stopped",!eval("apecGlass.glass.captureLive").toBool());
-        eval("apecGlass.glass.visible=true;Theme.transparency=false");QTest::qWait(60);
-        check("opaque-fallback-releases-sample",eval("!apecGlass.glass.sampled && !apecGlass.glass.captureLive").toBool());
-        const auto opaque=capture();
-        const auto canvasColor=eval("Theme.canvas").value<QColor>();
-        check("opaque-fallback-pixels",!opaque.isNull() && sample(opaque,100,140)==canvasColor && sample(opaque,300,140)==canvasColor && canvasColor.alpha()==255);
-        eval("Theme.transparency=true;Theme.increaseContrast=true");QTest::qWait(60);
-        check("high-contrast-fallback",eval("!apecGlass.glass.sampled && !apecGlass.glass.captureLive").toBool());
-        eval("Theme.increaseContrast=false;Theme.mode='Dark'");QTest::qWait(100);auto dark=capture();
-        check("dark-material-readback",!dark.isNull());if(!dark.isNull())dark.save(directory+"/glass-dark.png");
+        eval("apecGlass.glass.visible=false");QTest::qWait(30);
+        check("hidden-pane-does-not-capture",noCapturedSource(glass));
+        eval("apecGlass.glass.visible=true;Theme.transparency=false");QTest::qWait(35);
+        check("transparency-preference-does-not-add-sidebar-fill",noCapturedSource(glass) && transparentInterior(grab(glass),glass));
+        eval("Theme.transparency=true;Theme.increaseContrast=true");QTest::qWait(35);
+        check("high-contrast-outline-keeps-clear-interior",noCapturedSource(glass) && transparentInterior(grab(glass),glass));
+        const auto contrastComposed=grab(fixture),contrastPlain=composedWithoutGlass();
+        check("high-contrast-outline-does-not-wash-parent-scene",clearInterior(contrastComposed,contrastPlain,glass,fixture));
+        eval("Theme.increaseContrast=false");
         qmlEngine(window)->rootContext()->setContextProperty("apecGlass",static_cast<QObject *>(nullptr));
     }
     eval("Theme.mode='Light';Theme.transparency=true;Theme.reduceMotion=false;Theme.followSystemMotion=false");
@@ -285,9 +370,9 @@ Item {
             const auto image=window->grabWindow();
             check("settled-native-page-capture-saved",!image.isNull() && image.save(directory+QStringLiteral("/final-%1-%2.png").arg(theme.toLower(),route)));
             if(route=="activity"){
-                for(const char *name:{"activityProxyWing","diagnosticProxyWing"}){
+                for(const char *name:{"activityCloudKnotWeave","diagnosticProxyWing"}){
                     auto *smallWing=window->findChild<QQuickItem *>(name);
-                    check("stopped-production-proxy-wing-is-empty",smallWing && smallWing->property("progress").toDouble()==0);
+                    check("stopped-production-proxy-art-is-empty",smallWing && smallWing->property("progress").toDouble()==0);
                 }
             }
             if(route=="featurehub"){

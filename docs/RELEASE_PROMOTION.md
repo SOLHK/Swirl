@@ -1,6 +1,6 @@
 # Swirl release promotion (开发 → test → main)
 
-本次 0.2.16（2026-10-29）采用所有者明确确认的一次性例外：先完成本地实际任务栏、五档 DPI、按钮动画和安装包验收，再更新 test；test 的四项同 SHA push 检查全部成功后，备份旧 main，删除并在已验收的 test SHA 重建 main。允许重写 main 历史，必要的临时默认分支/保护调整必须恢复原值。保留 test 独立历史，不修改主机网络设置。以下常规 PR 发布门禁继续适用于后续发布，不因此降低或删除。
+当前采用常规 PR 晋级流程。此前 0.2.16 文档记录的一次性 main 删除／重建方案不适用于当前发布；不得据此强推、删除分支或更改默认分支、保护规则。本轮所有者已明确授权：完成深色侧栏修正、旧外部内核运行路径清理和展示更新后，先集成 test，再按下述同 SHA 检查与 release-approved 门禁合入 main。这不构成创建正式 Release 或后续发布的通用授权。
 
 1. **集成**：从开发分支向 test 发 PR，使用普通 merge commit；保留 test 上的 VF 与其他独立提交，不 force-push 或 reset。
 2. **验收**：合入 test 后，按 test 的最终完整 SHA 核查以下四个 push workflow 均为 success：Build Swirl Qt Quick UI (Preview)、Swirl Rust Core、Validate Qt-only source tree、Qt HTTP client security。不得拿开发分支或旧 SHA 的绿色检查代替。

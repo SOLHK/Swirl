@@ -35,8 +35,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent; radius: Theme.controlRadius
-        color: source.hovered || source.visualFocus ? Theme.navigationSelected : "transparent"
-        Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.hoverDuration } }
+        color: Theme.withAlpha(Theme.navigationSelected, source.visualFocus ? 1 : source.hovered ? sourceBackground.hoverProgress : 0)
     }
     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: Theme.borderWidth; color: Theme.border }
     RowLayout {
@@ -48,7 +47,7 @@ Item {
             Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumWidth: 0
             hoverEnabled: true; padding: Theme.dp(8)
             Accessible.name: qsTr("%1，%2 个节点，%3。%4详情").arg(row.record.name).arg(row.record.nodes).arg(row.stateLabel).arg(row.expanded ? qsTr("收起") : qsTr("展开"))
-            background: SwirlControlSurface {quiet:true;hovered:source.hovered;pressed:source.down;focused:source.visualFocus;controlEnabled:source.enabled;radius:Theme.controlRadius}
+            background: SwirlControlSurface {id:sourceBackground;quiet:true;hovered:source.hovered;pressed:source.down;focused:source.visualFocus;controlEnabled:source.enabled;radius:Theme.controlRadius}
             contentItem: RowLayout {
                 spacing: Theme.dp(10)
                 SwirlIcon { name: "chevron-right"; size: Theme.dp(10); color: Theme.muted; rotation: row.reveal * 90; Accessible.ignored: true }

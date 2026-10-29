@@ -221,6 +221,17 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     setCombo("routingModePicker",1);if(!awaitSaved(QStringLiteral("Global mode is saved through the real mode control")))return finish();
     LoopbackPortLease ports;if(!check(ports.reserve(),QStringLiteral("Dedicated mixed proxy and control ports are reserved")))return finish();controller->setProxyPort(ports.proxyPort());ports.release();
     if(!navigate("activity"))return finish();
+    const auto activityKnotSettled=[&](bool active){
+        auto *weave=item("activityCloudKnotWeave");
+        if(!weave||weave->property("active").toBool()!=active||weave->property("progress").toDouble()!=(active?1:0)||weave->property("moving").toBool())return false;
+        for(const auto &key:QStringList{"warm","return","crown","forward","heart"}){
+            auto *strand=find(weave,"knotStrand-"+key);
+            if(!strand||strand->property("amount").toDouble()!=(active?1:0)||find(strand,"knotEntry-"+key))return false;
+            if(bool(find(strand,"knotRope-"+key))!=active)return false;
+        }
+        return true;
+    };
+    check(QTest::qWaitFor([&]{return activityKnotSettled(false);},1000),QStringLiteral("An external proxy leaves the Activity cloud knot inactive with all five ropes empty"));
     check(item("proxyCapsule")&&item("proxyCapsule")->property("label").toString()==QStringLiteral("系统代理 · 外部"),QStringLiteral("Activity offers to start Swirl even when another proxy is already enabled"));
     {
         auto *value=item("activityInternetValue"),*unit=item("activityInternetUnit"),*caption=item("activityInternetCaption");
@@ -280,7 +291,9 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     if(!check(QTest::qWaitFor([&]{return controller->apiHealthy()&&!controller->policyBusy()&&controller->systemProxy()->owned()&&controller->systemProxy()->enabled();},15000),QStringLiteral("Activity master switch starts the configured actual Rust runtime and takes isolated proxy ownership")))return finish();
     check(proxyBackend->takeoverCalls==1&&proxyBackend->lastPid==controller->processId().toLongLong()&&proxyBackend->lastPort>0,QStringLiteral("Activity takeover follows the healthy live Rust listener rather than a host proxy flag"));
     check(QTest::qWaitFor([&]{return eval("SwirlProxyWingMotion.active && SwirlProxyWingMotion.progress===1 && !SwirlProxyWingMotion.moving").toBool();},3000),QStringLiteral("Actual proxy ownership finishes the shared small-wing expansion"));
-    check(item("activityProxyWing")&&item("diagnosticProxyWing")&&item("activityProxyWing")->property("progress").toDouble()==1&&item("diagnosticProxyWing")->property("progress").toDouble()==1,QStringLiteral("Activity status and diagnostics show the same actual proxy wing"));
+    check(QTest::qWaitFor([&]{return activityKnotSettled(true);},6000)
+        &&item("diagnosticProxyWing")&&item("diagnosticProxyWing")->property("progress").toDouble()==1,
+        QStringLiteral("Actual proxy ownership completes all five Activity knot ropes while diagnostics retain their shared small wing"));
     capsuleSampler.stop();
     check(shellStable&&intermediateOpen&&smoothAccessory&&centered(proxyGroup)
         &&proxyContent&&qAbs(proxyContent->property("accessoryExtent").toReal()-fullAccessory)<0.5,
@@ -344,6 +357,7 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     check(proxyBackend->restoreCalls==1&&proxyBackend->current().systemEnabled&&!proxyBackend->current().owned,QStringLiteral("Stopping Swirl restores the pre-existing isolated external proxy instead of turning it off"));
     QTest::qWait(200);check(!controller->processAlive()&&!controller->systemProxy()->owned()&&proxyBackend->takeoverCalls==1,QStringLiteral("Queued event processing leaves Swirl stopped without a second proxy takeover"));
     check(QTest::qWaitFor([&]{return eval("!SwirlProxyWingMotion.active && SwirlProxyWingMotion.progress===0 && !SwirlProxyWingMotion.moving").toBool();},2000),QStringLiteral("Actual proxy shutdown fully retires the last small feather"));
+    check(QTest::qWaitFor([&]{return activityKnotSettled(false);},4500),QStringLiteral("Actual proxy shutdown withdraws every Activity knot rope and leaves the card empty"));
     QTest::qWait(150);capsuleSampler.stop();
     check(shellStable&&intermediateClose&&smoothAccessory&&centered(proxyLabel)&&proxyContent&&proxyContent->property("accessoryExtent").toReal()==0,
           QStringLiteral("Actual shutdown restores centered external-proxy text through partial positions without moving or resizing the capsule"));
@@ -426,6 +440,7 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
         }
         controller->setSystemProxy(false);
         check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->systemProxyBusy()&&eval("SwirlProxyWingMotion.progress===0 && !SwirlProxyWingMotion.moving").toBool();},10000),QStringLiteral("Rapid repeated reversal settles closed without a stuck animation"));
+        check(QTest::qWaitFor([&]{return activityKnotSettled(false);},4500),QStringLiteral("Rapid actual proxy reversal finishes with every Activity knot rope withdrawn"));
         capture("rapid-proxy-final-wing-hidden");
     }
     return finish();

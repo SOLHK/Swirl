@@ -25,19 +25,19 @@ Item {
   SwirlLiquidGlass {
    id:liquidGlass
    objectName:"sidebarLiquidGlass";anchors.fill:parent;cornerRadius:floatingBackground.radius
-   captureWidth:Theme.sidebarWidth-2*Theme.shellInset
    backdropSource:sidebar.backdropSource;interaction:materialResponse.light
    lightPoint:glassHover.hovered?Qt.point(glassHover.point.position.x/width,glassHover.point.position.y/height):Qt.point(0.18,(selectionMotion.position.y-floatingBackground.y+Theme.sidebarRowHeight*.5)/height)
   }
   ShaderEffect {
+   objectName:"sidebarExteriorShadow"
    readonly property real padding:Theme.dp(24)
    x:-padding;y:-padding;width:floatingBackground.width+2*padding;height:floatingBackground.height+2*padding
    z:-1;visible:Theme.effectsSupported && !Theme.increaseContrast
    property vector2d surfaceSize:Qt.vector2d(floatingBackground.width,floatingBackground.height)
    property real cornerRadius:floatingBackground.radius
-   property vector2d shadowOffset:Qt.vector2d(Theme.dp(3),Theme.dp(3))
-   property real softness:Theme.dp(9)
-   property color shadowColor:Theme.withAlpha(Theme.shadowColor,Theme.sidebarShadowOpacity)
+   property vector2d shadowOffset:Qt.vector2d(Theme.dp(2),Theme.dp(4))
+   property real softness:Theme.dp(8)
+   property color shadowColor:Theme.withAlpha(Theme.shadowColor,Theme.dark?0.16:0.06)
    fragmentShader:"qrc:/swirl/shaders/sidebar-shadow.frag.qsb"
   }
  }
@@ -76,8 +76,7 @@ Item {
  }
  property alias searchField:pageSearch
  function openSearch(){ searchPopup.open();pageSearch.forceActiveFocus() }
- SwirlBrandIcon {x:Theme.dp(25);y:Theme.dp(25);width:Theme.dp(28);height:width}
- SwirlText {x:Theme.dp(62);y:Theme.dp(27);text:"Swirl";font.pixelSize:Theme.fontSize(22);font.weight:Font.DemiBold;color:Theme.text;opacity:sidebar.expansion;visible:opacity>0.1}
+ SwirlText {x:Theme.dp(26);y:Theme.dp(27);text:"Swirl";font.pixelSize:Theme.fontSize(22);font.weight:Font.DemiBold;color:Theme.text;opacity:sidebar.expansion;visible:opacity>0.1}
  SwirlText {
   objectName:"engineIdentityLabel"
   x:Theme.dp(26);y:Theme.dp(62);width:sidebar.width-Theme.dp(52)
