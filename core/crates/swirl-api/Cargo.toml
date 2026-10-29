@@ -13,3 +13,4 @@ swirl-dns.workspace = true
 swirl-protocol.workspace = true
 swirl-core.workspace = true
 swirl-subscription.workspace = true
+swirl-tun.workspace = true

@@ -545,6 +545,17 @@ if let Ok(mut records)=shared.records.lock()&& let Some(record)=records.get_mut(
     pub fn address(&self) -> SocketAddr {
         self.address
     }
+
+    /// Build a TUN engine whose flows call this runtime's `route` and `connect`
+    /// path. Group members are resolved here. Reject and failed proxy dials
+    /// stay errors.
+    pub fn open_tun_engine(
+        &self,
+        proxies: Vec<IpAddr>,
+        leak_protection: bool,
+    ) -> Result<swirl_tun::Engine> {
+        tun_ingress::engine(self, proxies, leak_protection)
+    }
     fn fields(&self, request_id: &str, state: &str) -> Result<Value> {
         let live = self.shared.live.lock().map_err(|_| "ConfigState")?;
         let state = if state == "committing"
@@ -1744,3 +1755,5 @@ mod runtime_tests;
 #[cfg(test)]
 #[path = "v2_tests.rs"]
 mod tests;
+#[path = "tun_ingress.rs"]
+mod tun_ingress;

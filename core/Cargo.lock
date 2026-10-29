@@ -1374,6 +1374,7 @@ dependencies = [
  "swirl-dns",
  "swirl-protocol",
  "swirl-subscription",
+ "swirl-tun",
  "tokio",
 ]
 
@@ -1391,6 +1392,7 @@ dependencies = [
  "swirl-routing",
  "swirl-subscription",
  "swirl-transport",
+ "swirl-tun",
  "tokio",
  "tokio-rustls",
 ]

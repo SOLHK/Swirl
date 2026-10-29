@@ -10,6 +10,8 @@ use swirl_core::Core;
 use swirl_subscription::Config;
 
 mod control_v2;
+mod tun_command;
+pub use tun_command::swirl_tun_command;
 mod import_ffi;
 mod node_import;
 pub use node_import::swirl_import_node_v1;
