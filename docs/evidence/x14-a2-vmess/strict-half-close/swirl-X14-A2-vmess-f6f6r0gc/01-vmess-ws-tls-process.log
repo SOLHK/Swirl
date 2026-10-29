@@ -1,0 +1,6 @@
+Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)
+A unified platform for anti-censorship.
+2026/10/22 21:45:21.700797 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-X14-A2-vmess-f6f6r0gc/01-vmess-ws-tls.json Format:json}
+2026/10/22 21:45:21.701410 [Warning] common/errors: The feature WebSocket transport (with ALPN http/1.1, etc.) is deprecated, not recommended for using and might be removed. Please migrate to XHTTP H2 & H3 as soon as possible.
+2026/10/22 21:45:21.701605 [Warning] common/errors: The feature VMess (with no Forward Secrecy, etc.) is deprecated, not recommended for using and might be removed. Please migrate to VLESS Encryption as soon as possible.
+2026/10/22 21:45:21.711001 http: TLS handshake error from 127.0.0.1:54268: EOF

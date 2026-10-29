@@ -1,0 +1,153 @@
+{
+  "command": [
+    "/workspace/scratch/63c2b083dcfa/build-rust/debug/examples/transport-client"
+  ],
+  "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+  "peers": [
+    {
+      "label": "01-vmess-raw-plain",
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "environment_overrides": {}
+    },
+    {
+      "label": "02-vmess-raw-tls",
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "environment_overrides": {}
+    },
+    {
+      "label": "03-vmess-ws-plain",
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "environment_overrides": {}
+    },
+    {
+      "label": "04-vmess-ws-tls",
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "environment_overrides": {}
+    }
+  ],
+  "records": [
+    {
+      "stage": "X14-A2-vmess",
+      "platform": "Linux",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "server_environment_overrides": {},
+      "transport": "tcp",
+      "protocol": "vmess",
+      "tls": false,
+      "reality": false,
+      "target_tls": false,
+      "mode": "http",
+      "exit_code": 1,
+      "elapsed_ms": 1206.223,
+      "result": {
+        "driver_drain_us": 8,
+        "error": "OperationTimeout",
+        "ok": false,
+        "remaining_tasks": 0
+      }
+    },
+    {
+      "stage": "X14-A2-vmess",
+      "platform": "Linux",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "server_environment_overrides": {},
+      "transport": "tcp",
+      "protocol": "vmess",
+      "tls": true,
+      "reality": false,
+      "target_tls": false,
+      "mode": "http",
+      "exit_code": 1,
+      "elapsed_ms": 6.631,
+      "result": {
+        "driver_drain_us": 4,
+        "error": "HttpRead",
+        "ok": false,
+        "remaining_tasks": 0
+      }
+    },
+    {
+      "stage": "X14-A2-vmess",
+      "platform": "Linux",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "server_environment_overrides": {},
+      "transport": "websocket",
+      "protocol": "vmess",
+      "tls": false,
+      "reality": false,
+      "target_tls": false,
+      "mode": "http",
+      "exit_code": 1,
+      "elapsed_ms": 8.925,
+      "result": {
+        "driver_drain_us": 3,
+        "error": "HttpRead",
+        "ok": false,
+        "remaining_tasks": 0
+      }
+    },
+    {
+      "stage": "X14-A2-vmess",
+      "platform": "Linux",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "server_environment_overrides": {},
+      "transport": "websocket",
+      "protocol": "vmess",
+      "tls": true,
+      "reality": false,
+      "target_tls": false,
+      "mode": "http",
+      "exit_code": 1,
+      "elapsed_ms": 7.787,
+      "result": {
+        "driver_drain_us": 4,
+        "error": "HttpRead",
+        "ok": false,
+        "remaining_tasks": 0
+      }
+    }
+  ],
+  "cleanup_errors": [],
+  "origins": [
+    {
+      "mode": "http",
+      "tls": false,
+      "requests": 0,
+      "received": 0,
+      "client_closes": 0,
+      "tls_closes": 0,
+      "interruptions": 0,
+      "errors": []
+    },
+    {
+      "mode": "http",
+      "tls": false,
+      "requests": 0,
+      "received": 0,
+      "client_closes": 0,
+      "tls_closes": 0,
+      "interruptions": 0,
+      "errors": []
+    },
+    {
+      "mode": "http",
+      "tls": false,
+      "requests": 0,
+      "received": 0,
+      "client_closes": 0,
+      "tls_closes": 0,
+      "interruptions": 0,
+      "errors": []
+    },
+    {
+      "mode": "http",
+      "tls": false,
+      "requests": 0,
+      "received": 0,
+      "client_closes": 0,
+      "tls_closes": 0,
+      "interruptions": 0,
+      "errors": []
+    }
+  ]
+}

@@ -1,0 +1,450 @@
+{
+  "schema": 1,
+  "implementation_commit": "72fa72a77d809d6084080dc5630459ed6d336fcf",
+  "verified_commit": "6dcc212df1f58ce96d555dfa14db29e53b2e4bf2",
+  "branch": "work/core-completion-20261017",
+  "workflow": {
+    "run_id": 39178283551,
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/39178283551",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "os": "ubuntu-latest",
+        "id": 117825412060,
+        "conclusion": "success"
+      },
+      {
+        "os": "macos-latest",
+        "id": 117825412280,
+        "conclusion": "success"
+      },
+      {
+        "os": "windows-2022",
+        "id": 117825412254,
+        "conclusion": "success"
+      }
+    ]
+  },
+  "qt": {
+    "qtest_version": "6.10.3",
+    "qt_version": "6.10.3",
+    "qt_build": "Qt 6.10.3 (x86_64-little_endian-llp64 shared (dynamic) release build; by MSVC 2022)",
+    "native_ctest": {
+      "passed": 3,
+      "failed": 0
+    },
+    "compatibility_ctest": {
+      "passed": 1,
+      "failed": 0
+    },
+    "integration": {
+      "passed": 44,
+      "failed": 0,
+      "skipped": 5,
+      "lifecycle_excluded": true,
+      "cases": [
+        {
+          "name": "fullDocumentCannotUseExternalSelectedNodeAlias",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "nonClashGlobalConfigurationDoesNotAlterNativeState",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "fullClashSubscriptionReachesNativePolicyAndRejectsPartialUpdates",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "iniProfileImportConnectsAndUpdatesAtomically",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "iniRealityCannotStartAsOrdinaryTls",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "profileRefreshKeepsOnlyItsOwnValidSelection",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "atomicNodeNetworkImportUsesPreparedIdsAndSurvivesReload",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "atomicNodeNetworkImportRejectsInvalidGraphAndWriteFailure",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "legacyNetworkSettingsMigrateWithoutStaleSidecarOverride",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "candidateValidationPreservesIndependentSourceNamespaces",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "shutdownDiscardsPendingParsedConfiguration",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "preparedImportMapsStableIdsWithoutPublishingBeforeCommit",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "preparedImportRejectsAmbiguousIdsCrossSourceAndStalePlans",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "preparedImportWriteFailurePreservesMemoryAndDurableSnapshot",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "socks4ImportsMapAndAcceptAcrossNativeAbi",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "socks4ImportsRejectAuthenticationAndUnmappedExtensions",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "socks4ThroughIndependentPeer",
+          "incidents": [
+            {
+              "outcome": "skip",
+              "reason": "Independent Python SOCKS4/4a peer supplies isolated ports in its integration run."
+            }
+          ]
+        },
+        {
+          "name": "webSocketThroughIndependentPeer",
+          "incidents": [
+            {
+              "outcome": "skip",
+              "reason": "Independent Python VLESS WS peer supplies isolated ports in its integration run."
+            }
+          ]
+        },
+        {
+          "name": "webSocketMapsExistingFieldsAndRustAcceptsConfiguration",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "webSocketRejectsUnsupportedParametersWithoutPartialConfiguration",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "dnsQueryFamilyMapsStrictlyAndPersistsAcrossLegacyEdits",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "nativeDohMapsExistingHttpsField",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "strictDotMapsExistingFieldWithoutResolvingOrChangingUi",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "strictDotRejectsAmbiguousOrUnimplementedBootstrap",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "customDnsMapsServersWithoutChangingSystemSettings",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "dnsSettingsUseLocalMappingsAndProxyToggle",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "manualGroupUsesItsMemberRatherThanGlobalSelection",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "nestedAutomaticGroupsUseNativeDataPath",
+          "incidents": [
+            {
+              "outcome": "pass"
+            },
+            {
+              "outcome": "pass"
+            },
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "roundRobinPolicyBalancesNewNativeSessions",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "policyConversionRejectsUnknownSemanticsAndBounds",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "policySettingsPreserveFullMapsAndRejectInvalidReplacements",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "rulesUseActualRustDataPathAndModeSwitches",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "controllerRuleEditsPreserveNoResolve",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "controllerRuleReferencesPreventGroupDeletion",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "controllerRuleValidationAndPersistenceAreAtomic",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "rulesValidateAllFieldsAndPreserveUnsupportedImports",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "vlessThroughIndependentPeer",
+          "incidents": [
+            {
+              "outcome": "skip",
+              "reason": "Independent VLESS peer supplies the port in its integration run."
+            }
+          ]
+        },
+        {
+          "name": "capabilityUsesTheSelectedRustRuntime",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "shadowsocksThroughIndependentPeer",
+          "incidents": [
+            {
+              "outcome": "skip",
+              "reason": "Independent Python SS peer supplies the isolated port in its integration run."
+            }
+          ]
+        },
+        {
+          "name": "disabledFastOpenIsAnExactNoOpAcrossNativeProtocols",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "disabledFastOpenForwardsThroughNativeSocks5",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "loonShadowsocksImportsKeepCredentialsAndRejectUnsafeOptions",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "loonShadowsocksThroughIndependentPeer",
+          "incidents": [
+            {
+              "outcome": "skip",
+              "reason": "Independent Python SS peer supplies the isolated port."
+            }
+          ]
+        },
+        {
+          "name": "referenceAdapterBlockedAtCompileTime",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "realForwardingThroughQtFacade",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "nativeProbeAndUnsupportedDoNotStartCompatibility",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        },
+        {
+          "name": "unsupportedSessionRejectedAndOldStreamSurvivesBadSelection",
+          "incidents": [
+            {
+              "outcome": "pass"
+            }
+          ]
+        }
+      ]
+    },
+    "compiler": "MSVC 19.44.35229.0"
+  },
+  "earlier_failure": {
+    "commit": "72fa72a77d809d6084080dc5630459ed6d336fcf",
+    "run_id": 39176756150,
+    "windows_job_id": 117820908048,
+    "target": "swirl-rust-qt-integration",
+    "duration_seconds": 10.67,
+    "assertion_text_captured": false,
+    "repair": "Compare complete persisted JSON representations; retain live-memory, byte-preservation and forwarding assertions. Write explicit XML and propagate the original CTest exit code."
+  },
+  "physical_windows_verified": false,
+  "private_provider_tests_run": 0,
+  "contains_private_configuration": false,
+  "core_acceptance_percent_unchanged": "10.83%"
+}

@@ -1,0 +1,21 @@
+SOURCE 593e7cddc360cf7f51d9fdc988e6cf8fd99aea96
+COMMAND ["/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3", "/workspace/scratch/ca6cd1f88f6f/Swirl/tools/tests/test_socks5_udp.py", "-v"]
+
+test_associations_are_isolated_and_control_shutdown_releases_upstream (__main__.Socks5UdpIntegration.test_associations_are_isolated_and_control_shutdown_releases_upstream) ... ok
+test_bound_unspecified_domain_and_explicit_ipv6_relay (__main__.Socks5UdpIntegration.test_bound_unspecified_domain_and_explicit_ipv6_relay) ... ok
+test_control_eof_stops_upstream_without_reconnect_or_direct_fallback (__main__.Socks5UdpIntegration.test_control_eof_stops_upstream_without_reconnect_or_direct_fallback) ... ok
+test_disabled_or_omitted_udp_never_reaches_peer_or_origin (__main__.Socks5UdpIntegration.test_disabled_or_omitted_udp_never_reaches_peer_or_origin) ... ok
+test_fragment_malformed_and_foreign_relay_packets_are_dropped (__main__.Socks5UdpIntegration.test_fragment_malformed_and_foreign_relay_packets_are_dropped) ... ok
+test_imported_udp_candidates_execute_through_the_reference (__main__.Socks5UdpIntegration.test_imported_udp_candidates_execute_through_the_reference) ... ok
+test_inbound_source_port_and_fragment_rejection (__main__.Socks5UdpIntegration.test_inbound_source_port_and_fragment_rejection) ... ok
+test_malformed_handshakes_and_auth_downgrade_fail_without_direct (__main__.Socks5UdpIntegration.test_malformed_handshakes_and_auth_downgrade_fail_without_direct) ... ok
+test_qt_imported_socks5_udp_data_path (__main__.Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path) ... skipped 'Windows Qt integration executable required'
+test_sixteen_node_limit_includes_closed_tombstones (__main__.Socks5UdpIntegration.test_sixteen_node_limit_includes_closed_tombstones) ... ok
+test_stalled_handshakes_bound_inflight_work_and_cancel_on_client_close (__main__.Socks5UdpIntegration.test_stalled_handshakes_bound_inflight_work_and_cancel_on_client_close) ... ok
+test_tls_udp_combination_is_rejected_before_network (__main__.Socks5UdpIntegration.test_tls_udp_combination_is_rejected_before_network) ... ok
+test_wire_addresses_authentication_and_datagram_boundaries (__main__.Socks5UdpIntegration.test_wire_addresses_authentication_and_datagram_boundaries) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 8.803s
+
+OK (skipped=1)

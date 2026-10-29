@@ -1,0 +1,665 @@
+{
+  "schema_version": 1,
+  "observed_at_utc": "2026-10-23T03:57:38.443653+00:00",
+  "repository": "SOLHK/Swirl",
+  "api": "https://api.github.com/repos/SOLHK/Swirl/branches?per_page=100",
+  "baseline_sha": "442138a3d40fc13a9a761b43f3a2ce829a2b47ec",
+  "branches": [
+    {
+      "branch": "backup/pre-qt-only-20261012",
+      "sha": "eed41b06d9e49d25fd0d7062fe5018a8fb669222",
+      "merge_base": "eed41b06d9e49d25fd0d7062fe5018a8fb669222",
+      "source_only_commits": [],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "codex/surge-activity",
+      "sha": "49559fa5fa6ad999086afc2444ac17ed35945657",
+      "merge_base": "a83d2b20655eb37481c15f45d30c25fd6a54d832",
+      "source_only_commits": [
+        "49559fa5fa6ad999086afc2444ac17ed35945657",
+        "361053d5bed9238d8e15772bdf0b52800df64495"
+      ],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "feat/mihomo-import-motion",
+      "sha": "b7f058f2f584602e6764fd28a808c3eb1c5ab088",
+      "merge_base": "b7f058f2f584602e6764fd28a808c3eb1c5ab088",
+      "source_only_commits": [],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "feat/phase2-real-node",
+      "sha": "0d8bd85e8af668eee80be609c6c89813a354cb9d",
+      "merge_base": "0d8bd85e8af668eee80be609c6c89813a354cb9d",
+      "source_only_commits": [],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "feat/phase3-final-integration",
+      "sha": "564e213ce604d7b79bb2414cd3aefba5744d46eb",
+      "merge_base": "a83d2b20655eb37481c15f45d30c25fd6a54d832",
+      "source_only_commits": [
+        "564e213ce604d7b79bb2414cd3aefba5744d46eb",
+        "3410ffb2ab872d4dd264e8431fd083193e0a8741",
+        "ac4b051f2ac048bb56144245e558d5244f3f4d54",
+        "de28acb405a4863b27c065bf9232d062efc36171"
+      ],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "feat/phase3-system-proxy-ui",
+      "sha": "0ae36d6f2ac3ef55921f7927e06b6cc9401b99e3",
+      "merge_base": "0ae36d6f2ac3ef55921f7927e06b6cc9401b99e3",
+      "source_only_commits": [],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "feat/qt-quick-ui-demo",
+      "sha": "dcdfc072389d154fd53c542f33089e881e27c99b",
+      "merge_base": "dcdfc072389d154fd53c542f33089e881e27c99b",
+      "source_only_commits": [],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "feature/core-engine",
+      "sha": "170188de532a2f3f802abe89bde07c32908ea85d",
+      "merge_base": "170188de532a2f3f802abe89bde07c32908ea85d",
+      "source_only_commits": [],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "feature/phase1-proxy-engine",
+      "sha": "7101cd25e19bbf292427714e58f5c48be9b6fb28",
+      "merge_base": "7101cd25e19bbf292427714e58f5c48be9b6fb28",
+      "source_only_commits": [],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "feature/ui-animation",
+      "sha": "170188de532a2f3f802abe89bde07c32908ea85d",
+      "merge_base": "170188de532a2f3f802abe89bde07c32908ea85d",
+      "source_only_commits": [],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "fix/node-selection-layout",
+      "sha": "5c6e36adda7d327199ab399c16f54f71390679d5",
+      "merge_base": "9416bd9fd4c66f02ea95ea9fc7941bb6b9dac05d",
+      "source_only_commits": [
+        "5c6e36adda7d327199ab399c16f54f71390679d5",
+        "9d73cbc25f33bc599187ab4b55b99cd9f6f56343"
+      ],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "fix/windows-motion-network",
+      "sha": "c113903e18067fbfc55308bc28bad56e90ae1aca",
+      "merge_base": "c113903e18067fbfc55308bc28bad56e90ae1aca",
+      "source_only_commits": [],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "integration/all-open-prs-20261022",
+      "sha": "fa97b084769b39d8bddd5a6ffa40007345c5bc0f",
+      "merge_base": "b8aa4f6f40a091697e89ae4c8291789661edca60",
+      "source_only_commits": [
+        "fa97b084769b39d8bddd5a6ffa40007345c5bc0f",
+        "95a6db7fcf6adf43fe39eeadfe68960498607efa",
+        "505216bc5007c9a8181c2d18490a50baa2b812c5",
+        "bbb4ea33d3a3ae596027b840af630260ba6bdbcc",
+        "0d47f057b91912e3be4048cbd7a5548e505763da",
+        "b0d26bf68c91d1f6cb7d692954c0950c37d0e09f",
+        "76e3d8f88585bffca16cff2c223089ec9aab8072",
+        "0896c3975e7c22767f255f35c48148e1f84c1532",
+        "3a4ec7ab57481c09ffc0646347d9142b109e0bab",
+        "d75b1b72951baaef17d4d66af3c8920ce4a8b4a1",
+        "0aee48913ca7baec8cb2771c54552317153a7c36",
+        "67a6196d3075821ffe5a3235bf1d1a393c41fe8b",
+        "3b3a4c3a7f7a8ec9455411639d26571a4b98a2c4",
+        "c13a57372ecb27145612094fe4704c5e0b8c3c69",
+        "b2f057e3420e192478c25862cbd9dc6eba78810a",
+        "f7611c69c8768f890318a3490248e2f56f4e4226",
+        "72b8e289dd99782b3b3e35d3aa60005b1d5d3a09",
+        "e003a164135dd8eb5a12b7e1f2b20a02a7f137ad",
+        "5dce5e0d0df357961ae28325348341d788f0d308",
+        "9fff65027d6642f78f793150254c20e13e7ada2c",
+        "8b1493fd153f28747b9ca6ab5606ff2e8adf4e89",
+        "f3f04cff27c87359883f6fa10f78bab3bbb0de09",
+        "88b6ca4fee854bc18ccf0c5cd958fb8cbac30f6c",
+        "5c187caecaef26d49fb909855643fad8d1532d9a",
+        "73e1d430374acbf95e1c8f39fdfd224960502a14",
+        "9f39f24acd0060e54e38302190bb72fe7300f245",
+        "b9823c481eefef8a980d1d6671460fdbf1c0f406",
+        "d3a766f03e2b70033a775702d87ecb5ddab7fb42",
+        "6567f4aca310c7bd7d37cb828b6d12b9624ccb04",
+        "ccc36e2723d39afe365a186098883e3c3158238a",
+        "69ff9049de57c2690a5cdf6a62caf2ccb955785d",
+        "dbff131cd04784e11a9f1c043ffec6b201040bf1",
+        "54e579f1b46ee75187069d40b9ec626b3cc980d5",
+        "fddb0f81c76a21113b26fd37a35c3f38f0709ddd",
+        "216df0f60e910eae5a80c0518f68747785512015",
+        "e45d63bdc6a7110d43d1df8d66e2ce3a1969fa75",
+        "343460c430956b6312c434b467917321fa47b761",
+        "a070ea47f1ef1c792eb8622af557bc34ba086368",
+        "1c90c4d93527b20c0430e59973ad80885b55b889",
+        "971c1d750d061983fa7147e16f1098420e03cb46",
+        "57ffd081b850a094eaa2f93c557cc91f1a5047a2",
+        "e5f0eb14476b90a5fc36c5295ed61ce31b24f10c",
+        "a5bfb228522dff183074b25459a109dcc8b4a475",
+        "30ff0adc9ef358713a269b40a7f4be8dbdb754f1",
+        "ff2ed179fbbe5bc55a634a19ac597ad0604aa08c",
+        "d10354fa02495d63e141b301ffb14be3c1941ac1",
+        "d6e53d83fb1c108ba91465118fd8ec8db67a56d8",
+        "ce33013b4841beff21ca6e4de2b85547d6bab163",
+        "ab4394b836cce7934c28e4e9493bda6e1e3c3842",
+        "e2254f4e321b6112dd3135989907a2664fba4928",
+        "564e213ce604d7b79bb2414cd3aefba5744d46eb",
+        "3410ffb2ab872d4dd264e8431fd083193e0a8741",
+        "ac4b051f2ac048bb56144245e558d5244f3f4d54",
+        "de28acb405a4863b27c065bf9232d062efc36171",
+        "49559fa5fa6ad999086afc2444ac17ed35945657",
+        "361053d5bed9238d8e15772bdf0b52800df64495",
+        "5c6e36adda7d327199ab399c16f54f71390679d5",
+        "9d73cbc25f33bc599187ab4b55b99cd9f6f56343"
+      ],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "main",
+      "sha": "87409c0bf9c957ef113f84c176c5a1529c27b9df",
+      "merge_base": "87409c0bf9c957ef113f84c176c5a1529c27b9df",
+      "source_only_commits": [],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "test",
+      "sha": "e19dc9f663ac326b6654953db212b97177a56966",
+      "merge_base": "b8aa4f6f40a091697e89ae4c8291789661edca60",
+      "source_only_commits": [
+        "e19dc9f663ac326b6654953db212b97177a56966",
+        "fa97b084769b39d8bddd5a6ffa40007345c5bc0f",
+        "95a6db7fcf6adf43fe39eeadfe68960498607efa",
+        "505216bc5007c9a8181c2d18490a50baa2b812c5",
+        "bbb4ea33d3a3ae596027b840af630260ba6bdbcc",
+        "0d47f057b91912e3be4048cbd7a5548e505763da",
+        "b0d26bf68c91d1f6cb7d692954c0950c37d0e09f",
+        "76e3d8f88585bffca16cff2c223089ec9aab8072",
+        "0896c3975e7c22767f255f35c48148e1f84c1532",
+        "3a4ec7ab57481c09ffc0646347d9142b109e0bab",
+        "d75b1b72951baaef17d4d66af3c8920ce4a8b4a1",
+        "0aee48913ca7baec8cb2771c54552317153a7c36",
+        "67a6196d3075821ffe5a3235bf1d1a393c41fe8b",
+        "3b3a4c3a7f7a8ec9455411639d26571a4b98a2c4",
+        "c13a57372ecb27145612094fe4704c5e0b8c3c69",
+        "b2f057e3420e192478c25862cbd9dc6eba78810a",
+        "f7611c69c8768f890318a3490248e2f56f4e4226",
+        "72b8e289dd99782b3b3e35d3aa60005b1d5d3a09",
+        "e003a164135dd8eb5a12b7e1f2b20a02a7f137ad",
+        "5dce5e0d0df357961ae28325348341d788f0d308",
+        "9fff65027d6642f78f793150254c20e13e7ada2c",
+        "8b1493fd153f28747b9ca6ab5606ff2e8adf4e89",
+        "f3f04cff27c87359883f6fa10f78bab3bbb0de09",
+        "88b6ca4fee854bc18ccf0c5cd958fb8cbac30f6c",
+        "5c187caecaef26d49fb909855643fad8d1532d9a",
+        "73e1d430374acbf95e1c8f39fdfd224960502a14",
+        "9f39f24acd0060e54e38302190bb72fe7300f245",
+        "b9823c481eefef8a980d1d6671460fdbf1c0f406",
+        "d3a766f03e2b70033a775702d87ecb5ddab7fb42",
+        "6567f4aca310c7bd7d37cb828b6d12b9624ccb04",
+        "ccc36e2723d39afe365a186098883e3c3158238a",
+        "69ff9049de57c2690a5cdf6a62caf2ccb955785d",
+        "dbff131cd04784e11a9f1c043ffec6b201040bf1",
+        "54e579f1b46ee75187069d40b9ec626b3cc980d5",
+        "fddb0f81c76a21113b26fd37a35c3f38f0709ddd",
+        "216df0f60e910eae5a80c0518f68747785512015",
+        "e45d63bdc6a7110d43d1df8d66e2ce3a1969fa75",
+        "343460c430956b6312c434b467917321fa47b761",
+        "a070ea47f1ef1c792eb8622af557bc34ba086368",
+        "1c90c4d93527b20c0430e59973ad80885b55b889",
+        "971c1d750d061983fa7147e16f1098420e03cb46",
+        "57ffd081b850a094eaa2f93c557cc91f1a5047a2",
+        "e5f0eb14476b90a5fc36c5295ed61ce31b24f10c",
+        "a5bfb228522dff183074b25459a109dcc8b4a475",
+        "30ff0adc9ef358713a269b40a7f4be8dbdb754f1",
+        "ff2ed179fbbe5bc55a634a19ac597ad0604aa08c",
+        "d10354fa02495d63e141b301ffb14be3c1941ac1",
+        "d6e53d83fb1c108ba91465118fd8ec8db67a56d8",
+        "ce33013b4841beff21ca6e4de2b85547d6bab163",
+        "ab4394b836cce7934c28e4e9493bda6e1e3c3842",
+        "e2254f4e321b6112dd3135989907a2664fba4928",
+        "564e213ce604d7b79bb2414cd3aefba5744d46eb",
+        "3410ffb2ab872d4dd264e8431fd083193e0a8741",
+        "ac4b051f2ac048bb56144245e558d5244f3f4d54",
+        "de28acb405a4863b27c065bf9232d062efc36171",
+        "49559fa5fa6ad999086afc2444ac17ed35945657",
+        "361053d5bed9238d8e15772bdf0b52800df64495",
+        "5c6e36adda7d327199ab399c16f54f71390679d5",
+        "9d73cbc25f33bc599187ab4b55b99cd9f6f56343"
+      ],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "work/core-buildkit-20261017",
+      "sha": "6f007c73fdf449bda8322a5cf3a83214144c7999",
+      "merge_base": "866c4375998fcd57cbf6373760ada0770df79ef9",
+      "source_only_commits": [
+        "6f007c73fdf449bda8322a5cf3a83214144c7999"
+      ],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "work/core-completion-20261017",
+      "sha": "f87b6f98eb7018c4a5e86f281fe707764565ce58",
+      "merge_base": "2c2992e35c203ea242485dc919955234de764c3c",
+      "source_only_commits": [
+        "f87b6f98eb7018c4a5e86f281fe707764565ce58",
+        "83e36ee40399c4f14f7b6257d744709c47e1ee1c",
+        "00b9f50973fc14dc4c912c694c344d064e790a20",
+        "75bc81d5ae6fb4b7955b06ebd410f7267c628ac8",
+        "70a18d58f2aafa41072fb422bfd0e4d6d342fb2f"
+      ],
+      "integration_decision": "audit-and-integrate"
+    },
+    {
+      "branch": "work/core-rule-routing-20261021",
+      "sha": "b6dce3a415619c2c3b107fe7b761f63727da11b2",
+      "merge_base": "b6dce3a415619c2c3b107fe7b761f63727da11b2",
+      "source_only_commits": [],
+      "integration_decision": "included-in-baseline"
+    },
+    {
+      "branch": "work/product-ui-fixes-20261021",
+      "sha": "bbb4ea33d3a3ae596027b840af630260ba6bdbcc",
+      "merge_base": "b8aa4f6f40a091697e89ae4c8291789661edca60",
+      "source_only_commits": [
+        "bbb4ea33d3a3ae596027b840af630260ba6bdbcc"
+      ],
+      "integration_decision": "audit-and-integrate"
+    },
+    {
+      "branch": "work/qt-http2-security-20261023",
+      "sha": "9dd8a675eed6374ac1c35265074f594a39262479",
+      "merge_base": "b8aa4f6f40a091697e89ae4c8291789661edca60",
+      "source_only_commits": [
+        "9dd8a675eed6374ac1c35265074f594a39262479",
+        "8cf8d9ed93a38816ba09112ab485911e29480fca",
+        "5d96214ac80d63985cdccf4942c3c1d79035e793",
+        "2d48b29d7289adb5218d8f2783f8cc89dcd6ae15",
+        "5a35bc3a1a0bef19837eda5db9c63f939f4b7e2d",
+        "9eb48789acc9e559bb71cb1dd5129900a5d16143",
+        "9a68ed685fac50891378823aa713569a380773bc"
+      ],
+      "integration_decision": "audit-and-integrate"
+    },
+    {
+      "branch": "work/rust-core-full-replacement-20261022",
+      "sha": "5d96214ac80d63985cdccf4942c3c1d79035e793",
+      "merge_base": "b8aa4f6f40a091697e89ae4c8291789661edca60",
+      "source_only_commits": [
+        "5d96214ac80d63985cdccf4942c3c1d79035e793",
+        "2d48b29d7289adb5218d8f2783f8cc89dcd6ae15",
+        "5a35bc3a1a0bef19837eda5db9c63f939f4b7e2d",
+        "9eb48789acc9e559bb71cb1dd5129900a5d16143",
+        "9a68ed685fac50891378823aa713569a380773bc"
+      ],
+      "integration_decision": "audit-and-integrate"
+    },
+    {
+      "branch": "work/rust-core-network-fixes-20261021",
+      "sha": "b8aa4f6f40a091697e89ae4c8291789661edca60",
+      "merge_base": "b8aa4f6f40a091697e89ae4c8291789661edca60",
+      "source_only_commits": [],
+      "integration_decision": "included-in-baseline"
+    },
+    {
+      "branch": "work/rust-dot-20261017",
+      "sha": "4dca7268bfd63db6b942f169811fa6d09e3388e0",
+      "merge_base": "4dca7268bfd63db6b942f169811fa6d09e3388e0",
+      "source_only_commits": [],
+      "integration_decision": "included-in-baseline"
+    },
+    {
+      "branch": "work/rust-native-protocols-x14a-20261022",
+      "sha": "2a41b360d0fed90bf2818d5e4c8e93b4f41f021b",
+      "merge_base": "21c562a7c7adc2654416636e4de2f038ffc220cd",
+      "source_only_commits": [
+        "2a41b360d0fed90bf2818d5e4c8e93b4f41f021b"
+      ],
+      "integration_decision": "audit-and-integrate"
+    },
+    {
+      "branch": "work/subscription-import-20261021",
+      "sha": "bf40f6dd639b0a9583a0dbea8e50851ac0c9ed29",
+      "merge_base": "bf40f6dd639b0a9583a0dbea8e50851ac0c9ed29",
+      "source_only_commits": [],
+      "integration_decision": "included-in-baseline"
+    },
+    {
+      "branch": "work/subscription-native-bridge-20261023",
+      "sha": "442138a3d40fc13a9a761b43f3a2ce829a2b47ec",
+      "merge_base": "442138a3d40fc13a9a761b43f3a2ce829a2b47ec",
+      "source_only_commits": [],
+      "integration_decision": "integration-baseline"
+    },
+    {
+      "branch": "work/swirl-performance-20261021",
+      "sha": "294cdd29fceb966e9c11437ed57188e4917004ea",
+      "merge_base": "b8aa4f6f40a091697e89ae4c8291789661edca60",
+      "source_only_commits": [
+        "294cdd29fceb966e9c11437ed57188e4917004ea",
+        "c778960a0261ef97d57f50bd43900eee20522380",
+        "1dc581552b21055183393878eb14d25eb12d330d",
+        "3e78e46e424ea647563cab79ae06fd7516c7b059",
+        "380ba601635c98d004397fd0504ce577e6ef5941",
+        "d50fc477ec976715f7b993ef26ce54b09a444320",
+        "d44c903d9b91c88af90c6276af7d91e1b194852f",
+        "e75db60841dcace203e652efa431fb824c1ee5e7",
+        "871cc6e93a083c8624aadae8d9f4c1fe8db6e7e8",
+        "9e892b3746012ef8b1d983467b45cf6f336ddbe7",
+        "e37d8b0048fc7be9a577834f5b4e298ca0fad342",
+        "68b78c30e4848b200579e7a4baf87570e7ce8dfb",
+        "7addeb0c6e3b8143228c8d9cad7f6786dc253c0c",
+        "2b186783a704af3f4c1a91cd835997485282e2ec",
+        "bbb4ea33d3a3ae596027b840af630260ba6bdbcc"
+      ],
+      "integration_decision": "audit-and-integrate"
+    },
+    {
+      "branch": "work/swirl-ui-012-20261022",
+      "sha": "505216bc5007c9a8181c2d18490a50baa2b812c5",
+      "merge_base": "b8aa4f6f40a091697e89ae4c8291789661edca60",
+      "source_only_commits": [
+        "505216bc5007c9a8181c2d18490a50baa2b812c5",
+        "bbb4ea33d3a3ae596027b840af630260ba6bdbcc"
+      ],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "work/vf-axis-a3",
+      "sha": "66594e9d32a33c1d216319e2dccd2f35c7e47a4a",
+      "merge_base": "9c2fd0092284edc7d346b0c9e1d1208095429b39",
+      "source_only_commits": [
+        "66594e9d32a33c1d216319e2dccd2f35c7e47a4a",
+        "7cd579d645c5db437afcfeea63cc490fad494571",
+        "25819080e67908eecb7fb3a4ba532b689f88e2c9",
+        "cb17be48336884f6b5e8c485a2f06b5958d4d968",
+        "6d6a7b5eec6e2c7a630dfd4f692e29a7ecc52115",
+        "73a5bc831c46b25c3480c9d28eae4216b5add2b3",
+        "4288431dec9ca7c4ed3d36ca763095c2666745b4",
+        "b3b8b183bf63fbfb7771b783118c522148ba0478"
+      ],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "work/vf-b1-public-containment-20261020",
+      "sha": "ba8039a1028808140453adcbe150438e2bb20385",
+      "merge_base": "e505326486202ad4c8e98bb8b66a17b4547c559f",
+      "source_only_commits": [
+        "ba8039a1028808140453adcbe150438e2bb20385",
+        "bdbd6a04bfb23d340e495ab5bb3933f572d96cbe",
+        "aeb2574879ca76290f9e22c2e319f27f422e7ae6",
+        "3b8f113d811413464fe38136ca1dd43feedf5397",
+        "03c34a68a6ad52035097d123a9e5ecd2948e310f",
+        "d283e2e5ad8d43aa3808e66ac6093c3252c5d9e0",
+        "9836e89130694fdc336c4f4d7de22259c51741f6"
+      ],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "work/vf-macos-native",
+      "sha": "e6b44f83cd92e4b8082d54a84d4a98bef1cd5b28",
+      "merge_base": "50d2a8e8bac702abb2cdc0212f43953b8b78ffef",
+      "source_only_commits": [
+        "e6b44f83cd92e4b8082d54a84d4a98bef1cd5b28"
+      ],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "work/vf-macos-windows-d1-20261021",
+      "sha": "54e579f1b46ee75187069d40b9ec626b3cc980d5",
+      "merge_base": "6b9628e6a9a5a864e5a7e210cd916868804564c8",
+      "source_only_commits": [
+        "54e579f1b46ee75187069d40b9ec626b3cc980d5",
+        "fddb0f81c76a21113b26fd37a35c3f38f0709ddd",
+        "216df0f60e910eae5a80c0518f68747785512015",
+        "e45d63bdc6a7110d43d1df8d66e2ce3a1969fa75",
+        "343460c430956b6312c434b467917321fa47b761",
+        "a070ea47f1ef1c792eb8622af557bc34ba086368",
+        "1c90c4d93527b20c0430e59973ad80885b55b889",
+        "971c1d750d061983fa7147e16f1098420e03cb46",
+        "57ffd081b850a094eaa2f93c557cc91f1a5047a2",
+        "e5f0eb14476b90a5fc36c5295ed61ce31b24f10c",
+        "a5bfb228522dff183074b25459a109dcc8b4a475",
+        "30ff0adc9ef358713a269b40a7f4be8dbdb754f1",
+        "ff2ed179fbbe5bc55a634a19ac597ad0604aa08c",
+        "d10354fa02495d63e141b301ffb14be3c1941ac1",
+        "d6e53d83fb1c108ba91465118fd8ec8db67a56d8",
+        "ce33013b4841beff21ca6e4de2b85547d6bab163",
+        "ab4394b836cce7934c28e4e9493bda6e1e3c3842"
+      ],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "work/vf-metrics-b1",
+      "sha": "7902cdb7b449a56939346263df54a692c22d8337",
+      "merge_base": "e505326486202ad4c8e98bb8b66a17b4547c559f",
+      "source_only_commits": [
+        "7902cdb7b449a56939346263df54a692c22d8337",
+        "ac8e750bbcd174b5d1ba38214c646e5c55203ded",
+        "bdbd6a04bfb23d340e495ab5bb3933f572d96cbe",
+        "aeb2574879ca76290f9e22c2e319f27f422e7ae6",
+        "3b8f113d811413464fe38136ca1dd43feedf5397",
+        "03c34a68a6ad52035097d123a9e5ecd2948e310f",
+        "d283e2e5ad8d43aa3808e66ac6093c3252c5d9e0",
+        "9836e89130694fdc336c4f4d7de22259c51741f6"
+      ],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "work/vf-p8-gvar-pro",
+      "sha": "7ff8d17cb18c624b50895cda00216a2f3a86f844",
+      "merge_base": "6b9628e6a9a5a864e5a7e210cd916868804564c8",
+      "source_only_commits": [
+        "7ff8d17cb18c624b50895cda00216a2f3a86f844",
+        "c54b211a3d5c626055fcd1ac5eaa2f1f2006f173",
+        "a713a0c157845be82d1b242ba657fa172d79c3fe",
+        "74d322b59466b55026f403471e9dcb201fadbdca",
+        "0aee48913ca7baec8cb2771c54552317153a7c36",
+        "67a6196d3075821ffe5a3235bf1d1a393c41fe8b",
+        "3b3a4c3a7f7a8ec9455411639d26571a4b98a2c4",
+        "c13a57372ecb27145612094fe4704c5e0b8c3c69",
+        "b2f057e3420e192478c25862cbd9dc6eba78810a",
+        "f7611c69c8768f890318a3490248e2f56f4e4226",
+        "72b8e289dd99782b3b3e35d3aa60005b1d5d3a09",
+        "e003a164135dd8eb5a12b7e1f2b20a02a7f137ad",
+        "5dce5e0d0df357961ae28325348341d788f0d308",
+        "9fff65027d6642f78f793150254c20e13e7ada2c",
+        "8b1493fd153f28747b9ca6ab5606ff2e8adf4e89",
+        "f3f04cff27c87359883f6fa10f78bab3bbb0de09",
+        "88b6ca4fee854bc18ccf0c5cd958fb8cbac30f6c",
+        "5c187caecaef26d49fb909855643fad8d1532d9a",
+        "73e1d430374acbf95e1c8f39fdfd224960502a14",
+        "9f39f24acd0060e54e38302190bb72fe7300f245",
+        "b9823c481eefef8a980d1d6671460fdbf1c0f406",
+        "d3a766f03e2b70033a775702d87ecb5ddab7fb42",
+        "6567f4aca310c7bd7d37cb828b6d12b9624ccb04",
+        "ccc36e2723d39afe365a186098883e3c3158238a",
+        "69ff9049de57c2690a5cdf6a62caf2ccb955785d",
+        "dbff131cd04784e11a9f1c043ffec6b201040bf1",
+        "54e579f1b46ee75187069d40b9ec626b3cc980d5",
+        "fddb0f81c76a21113b26fd37a35c3f38f0709ddd",
+        "216df0f60e910eae5a80c0518f68747785512015",
+        "e45d63bdc6a7110d43d1df8d66e2ce3a1969fa75",
+        "343460c430956b6312c434b467917321fa47b761",
+        "a070ea47f1ef1c792eb8622af557bc34ba086368",
+        "1c90c4d93527b20c0430e59973ad80885b55b889",
+        "971c1d750d061983fa7147e16f1098420e03cb46",
+        "57ffd081b850a094eaa2f93c557cc91f1a5047a2",
+        "e5f0eb14476b90a5fc36c5295ed61ce31b24f10c",
+        "a5bfb228522dff183074b25459a109dcc8b4a475",
+        "30ff0adc9ef358713a269b40a7f4be8dbdb754f1",
+        "ff2ed179fbbe5bc55a634a19ac597ad0604aa08c",
+        "d10354fa02495d63e141b301ffb14be3c1941ac1",
+        "d6e53d83fb1c108ba91465118fd8ec8db67a56d8",
+        "ce33013b4841beff21ca6e4de2b85547d6bab163",
+        "ab4394b836cce7934c28e4e9493bda6e1e3c3842"
+      ],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "work/vf-rebuild-c1",
+      "sha": "c0fe6c47f1a4a0854fcbbde7c9f08b791b44123e",
+      "merge_base": "e505326486202ad4c8e98bb8b66a17b4547c559f",
+      "source_only_commits": [
+        "c0fe6c47f1a4a0854fcbbde7c9f08b791b44123e",
+        "75628e3eef45043e88689fd6ee191178ba179622",
+        "88c4474b7faea263d6e1b21ba846915269f398c6",
+        "b8d10801e60a5b0f00540a060b7bd43efab57995",
+        "96e99cd72db72b89b7f6d89ef56591a6674db01d",
+        "110d903ac95a0e793911610a0c99c061d199df8a",
+        "b0c3500afd58a5ecc55bc09dec259ba4b21bb7a6"
+      ],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "work/vf-smart-width-w1",
+      "sha": "2be6c78cae93544af57e90cb4904a399959d6b7c",
+      "merge_base": "50d2a8e8bac702abb2cdc0212f43953b8b78ffef",
+      "source_only_commits": [
+        "2be6c78cae93544af57e90cb4904a399959d6b7c",
+        "11ea18336b3176616672a004ad2a71e17ed65dc6",
+        "eb8249b96732949b5449d6882e1b5abc8a8d426e",
+        "a64f1d0de47fb5eb82246356dcc4a8200a787499",
+        "82541d4033dc444697a0786192cdcd3e7960629f",
+        "127e9fc229bc090cebdb2710745bc78486261900",
+        "134298b2ea9576b6bccd6c60592e89b7d5e6c6e1",
+        "c9fb34a6fcf86ad9f2f4cd49351a4eb065d6b871",
+        "5e06537bf8ef83f99b5eef33d87d255a135a9993",
+        "6bc2faef3bfa2463151d3d78e85e7043671d11bd"
+      ],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "work/vf-takeover-abc-20261021",
+      "sha": "0d47f057b91912e3be4048cbd7a5548e505763da",
+      "merge_base": "6b9628e6a9a5a864e5a7e210cd916868804564c8",
+      "source_only_commits": [
+        "0d47f057b91912e3be4048cbd7a5548e505763da",
+        "b0d26bf68c91d1f6cb7d692954c0950c37d0e09f",
+        "76e3d8f88585bffca16cff2c223089ec9aab8072",
+        "0896c3975e7c22767f255f35c48148e1f84c1532",
+        "3a4ec7ab57481c09ffc0646347d9142b109e0bab",
+        "d75b1b72951baaef17d4d66af3c8920ce4a8b4a1",
+        "0aee48913ca7baec8cb2771c54552317153a7c36",
+        "67a6196d3075821ffe5a3235bf1d1a393c41fe8b",
+        "3b3a4c3a7f7a8ec9455411639d26571a4b98a2c4",
+        "c13a57372ecb27145612094fe4704c5e0b8c3c69",
+        "b2f057e3420e192478c25862cbd9dc6eba78810a",
+        "f7611c69c8768f890318a3490248e2f56f4e4226",
+        "72b8e289dd99782b3b3e35d3aa60005b1d5d3a09",
+        "e003a164135dd8eb5a12b7e1f2b20a02a7f137ad",
+        "5dce5e0d0df357961ae28325348341d788f0d308",
+        "9fff65027d6642f78f793150254c20e13e7ada2c",
+        "8b1493fd153f28747b9ca6ab5606ff2e8adf4e89",
+        "f3f04cff27c87359883f6fa10f78bab3bbb0de09",
+        "88b6ca4fee854bc18ccf0c5cd958fb8cbac30f6c",
+        "5c187caecaef26d49fb909855643fad8d1532d9a",
+        "73e1d430374acbf95e1c8f39fdfd224960502a14",
+        "9f39f24acd0060e54e38302190bb72fe7300f245",
+        "b9823c481eefef8a980d1d6671460fdbf1c0f406",
+        "d3a766f03e2b70033a775702d87ecb5ddab7fb42",
+        "6567f4aca310c7bd7d37cb828b6d12b9624ccb04",
+        "ccc36e2723d39afe365a186098883e3c3158238a",
+        "69ff9049de57c2690a5cdf6a62caf2ccb955785d",
+        "dbff131cd04784e11a9f1c043ffec6b201040bf1",
+        "54e579f1b46ee75187069d40b9ec626b3cc980d5",
+        "fddb0f81c76a21113b26fd37a35c3f38f0709ddd",
+        "216df0f60e910eae5a80c0518f68747785512015",
+        "e45d63bdc6a7110d43d1df8d66e2ce3a1969fa75",
+        "343460c430956b6312c434b467917321fa47b761",
+        "a070ea47f1ef1c792eb8622af557bc34ba086368",
+        "1c90c4d93527b20c0430e59973ad80885b55b889",
+        "971c1d750d061983fa7147e16f1098420e03cb46",
+        "57ffd081b850a094eaa2f93c557cc91f1a5047a2",
+        "e5f0eb14476b90a5fc36c5295ed61ce31b24f10c",
+        "a5bfb228522dff183074b25459a109dcc8b4a475",
+        "30ff0adc9ef358713a269b40a7f4be8dbdb754f1",
+        "ff2ed179fbbe5bc55a634a19ac597ad0604aa08c",
+        "d10354fa02495d63e141b301ffb14be3c1941ac1",
+        "d6e53d83fb1c108ba91465118fd8ec8db67a56d8",
+        "ce33013b4841beff21ca6e4de2b85547d6bab163",
+        "ab4394b836cce7934c28e4e9493bda6e1e3c3842"
+      ],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "work/vf-windows-d1",
+      "sha": "844544f92c8f2c0cc96dfb7af02e4fa8e6604b4f",
+      "merge_base": "e505326486202ad4c8e98bb8b66a17b4547c559f",
+      "source_only_commits": [
+        "844544f92c8f2c0cc96dfb7af02e4fa8e6604b4f",
+        "3ff09aabea00d73ed6b52e0f614f89ec711fe633",
+        "6d4d692d82b3c55bb52592faff3cef12ec91076f",
+        "7bf755d0c8e05f59f505becf5b188f60299cddfe",
+        "205af02ce1db6c9ec525d8962b44e7681ee37ffe",
+        "f7e841816888aecdba19e51457b246a2b55f569f",
+        "4c0fcaf4a66fd34d3487754dd2f849a278da3a3e",
+        "41504fed7ec7ca6d4768389106a03aa9bc5cd36e",
+        "47d6dfc06fa2fddddd1532c1d8370028a6b9da17",
+        "562cbc998d03ad36c7e8b25fa7c614a3b17168ae"
+      ],
+      "integration_decision": "excluded-unrelated-or-legacy-lineage"
+    },
+    {
+      "branch": "work/x12b-resume-20261022",
+      "sha": "44dda9d4fe27a6667aa977d879d8dfc2ca82688d",
+      "merge_base": "44dda9d4fe27a6667aa977d879d8dfc2ca82688d",
+      "source_only_commits": [],
+      "integration_decision": "included-in-baseline"
+    },
+    {
+      "branch": "work/x13-a-protocol-runtime-20261022",
+      "sha": "fca13d3c06f9a6a45cab0b8e28c3587fbbe2f870",
+      "merge_base": "fca13d3c06f9a6a45cab0b8e28c3587fbbe2f870",
+      "source_only_commits": [],
+      "integration_decision": "included-in-baseline"
+    },
+    {
+      "branch": "work/xray-v2ray-json-b-20261022",
+      "sha": "4e9f6ea0411c03bba418bb46884748ba7e0ba03b",
+      "merge_base": "4e9f6ea0411c03bba418bb46884748ba7e0ba03b",
+      "source_only_commits": [],
+      "integration_decision": "included-in-baseline"
+    },
+    {
+      "branch": "work/xray-v2ray-json-import-20261021",
+      "sha": "44dda9d4fe27a6667aa977d879d8dfc2ca82688d",
+      "merge_base": "44dda9d4fe27a6667aa977d879d8dfc2ca82688d",
+      "source_only_commits": [],
+      "integration_decision": "included-in-baseline"
+    },
+    {
+      "branch": "work/xray-v2ray-native-20261021",
+      "sha": "b88bb978d31fad1865e1b648cecd4f230bc3487c",
+      "merge_base": "b88bb978d31fad1865e1b648cecd4f230bc3487c",
+      "source_only_commits": [],
+      "integration_decision": "included-in-baseline"
+    },
+    {
+      "branch": "work/xray-v2ray-qt-import-20261022",
+      "sha": "506014d6386610411f48c939ab62cb93a3509431",
+      "merge_base": "506014d6386610411f48c939ab62cb93a3509431",
+      "source_only_commits": [],
+      "integration_decision": "included-in-baseline"
+    },
+    {
+      "branch": "work/xray-v2ray-transport-20261022",
+      "sha": "fca13d3c06f9a6a45cab0b8e28c3587fbbe2f870",
+      "merge_base": "fca13d3c06f9a6a45cab0b8e28c3587fbbe2f870",
+      "source_only_commits": [],
+      "integration_decision": "included-in-baseline"
+    }
+  ]
+}

@@ -1,0 +1,219 @@
+{
+  "runtime": "Swirl Rust Core",
+  "runtime_sha256": "70180c1598230f096327b97b2116d6ed9e1cf4e720be192f6a8d0e4e52b7fb5d",
+  "server": "official Xray 26.10.21 1b1647c",
+  "server_sha256": "a27e3f95ab6ce270956d0cecd32eda4686a811afc71c64a6a734a3dede14883e",
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "qt_product_acceptance": false,
+  "scope": "classic VLESS command 2 and Trojan command 3; no Vision/XUDP claim",
+  "records": [
+    {
+      "case": "test_closed_carriers_do_not_replay_and_new_associations_reconnect",
+      "protocol": "vless:raw:tls",
+      "active_after_close": 0,
+      "uploaded": 25,
+      "downloaded": 25,
+      "udp_dropped": 2
+    },
+    {
+      "case": "test_closed_carriers_do_not_replay_and_new_associations_reconnect",
+      "protocol": "trojan:raw:tls",
+      "active_after_close": 0,
+      "uploaded": 25,
+      "downloaded": 25,
+      "udp_dropped": 2
+    },
+    {
+      "case": "test_dns_and_ipv6_destination_over_classic_udp",
+      "protocol": "vless:raw:tls",
+      "active_after_close": 0,
+      "uploaded": 87,
+      "downloaded": 135,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_dns_and_ipv6_destination_over_classic_udp",
+      "protocol": "trojan:raw:tls",
+      "active_after_close": 0,
+      "uploaded": 87,
+      "downloaded": 135,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_embedded_transport_has_the_same_udp_behavior_as_runtime_override",
+      "protocol": "vless:grpc:tls",
+      "active_after_close": 0,
+      "uploaded": 13,
+      "downloaded": 13,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_embedded_transport_has_the_same_udp_behavior_as_runtime_override",
+      "protocol": "trojan:grpc:tls",
+      "active_after_close": 0,
+      "uploaded": 13,
+      "downloaded": 13,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_node_selection_preserves_existing_udp_association_and_control_close_stops_it",
+      "protocol": "vless:raw:tls",
+      "active_after_close": 0,
+      "uploaded": 29,
+      "downloaded": 29,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_node_selection_preserves_existing_udp_association_and_control_close_stops_it",
+      "protocol": "trojan:raw:tls",
+      "active_after_close": 0,
+      "uploaded": 29,
+      "downloaded": 29,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_official_reply_size_boundaries_and_retained_upstream_limits",
+      "protocol": "vless",
+      "verified_ipv4_payload_limit": 8190,
+      "upstream_limitation_probe": true,
+      "native_interoperability_pass": false,
+      "limitation": "official Xray 8192-byte response buffer includes framing; one byte larger reached the origin but was not returned"
+    },
+    {
+      "case": "test_official_reply_size_boundaries_and_retained_upstream_limits",
+      "protocol": "vless:raw:tls",
+      "active_after_close": 0,
+      "uploaded": 16381,
+      "downloaded": 8190,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_official_reply_size_boundaries_and_retained_upstream_limits",
+      "protocol": "trojan",
+      "verified_ipv4_payload_limit": 8181,
+      "upstream_limitation_probe": true,
+      "native_interoperability_pass": false,
+      "limitation": "official Xray 8192-byte response buffer includes framing; one byte larger reached the origin but was not returned"
+    },
+    {
+      "case": "test_official_reply_size_boundaries_and_retained_upstream_limits",
+      "protocol": "trojan:raw:tls",
+      "active_after_close": 0,
+      "uploaded": 16363,
+      "downloaded": 8181,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_tcp_tls_ws_and_grpc_transports_authenticate_and_relay_real_udp",
+      "protocol": "vless:raw:plain",
+      "active_after_close": 0,
+      "uploaded": 5537,
+      "downloaded": 5537,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_tcp_tls_ws_and_grpc_transports_authenticate_and_relay_real_udp",
+      "protocol": "vless:raw:tls",
+      "active_after_close": 0,
+      "uploaded": 5537,
+      "downloaded": 5537,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_tcp_tls_ws_and_grpc_transports_authenticate_and_relay_real_udp",
+      "protocol": "vless:ws:plain",
+      "active_after_close": 0,
+      "uploaded": 5537,
+      "downloaded": 5537,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_tcp_tls_ws_and_grpc_transports_authenticate_and_relay_real_udp",
+      "protocol": "vless:ws:tls",
+      "active_after_close": 0,
+      "uploaded": 5537,
+      "downloaded": 5537,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_tcp_tls_ws_and_grpc_transports_authenticate_and_relay_real_udp",
+      "protocol": "trojan:raw:tls",
+      "active_after_close": 0,
+      "uploaded": 5537,
+      "downloaded": 5537,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_tcp_tls_ws_and_grpc_transports_authenticate_and_relay_real_udp",
+      "protocol": "trojan:ws:tls",
+      "active_after_close": 0,
+      "uploaded": 5537,
+      "downloaded": 5537,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_tcp_tls_ws_and_grpc_transports_authenticate_and_relay_real_udp",
+      "protocol": "vless:grpc:tls",
+      "active_after_close": 0,
+      "uploaded": 5537,
+      "downloaded": 5537,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_tcp_tls_ws_and_grpc_transports_authenticate_and_relay_real_udp",
+      "protocol": "trojan:grpc:tls",
+      "active_after_close": 0,
+      "uploaded": 5537,
+      "downloaded": 5537,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_vless_targets_have_separate_carriers_and_trojan_frames_keep_each_address",
+      "protocol": "vless:raw:tls",
+      "active_after_close": 0,
+      "uploaded": 22,
+      "downloaded": 22,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_vless_targets_have_separate_carriers_and_trojan_frames_keep_each_address",
+      "protocol": "trojan:raw:tls",
+      "active_after_close": 0,
+      "uploaded": 22,
+      "downloaded": 22,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_credentials_and_tls_name_never_reach_the_udp_target",
+      "protocol": "vless:raw:tls",
+      "active_after_close": 0,
+      "uploaded": 16,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_credentials_and_tls_name_never_reach_the_udp_target",
+      "protocol": "vless:raw:tls",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 1
+    },
+    {
+      "case": "test_wrong_credentials_and_tls_name_never_reach_the_udp_target",
+      "protocol": "trojan:raw:tls",
+      "active_after_close": 0,
+      "uploaded": 16,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_credentials_and_tls_name_never_reach_the_udp_target",
+      "protocol": "trojan:raw:tls",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 1
+    }
+  ]
+}

@@ -1,0 +1,602 @@
+{
+  "peer": "historical official tuic-server",
+  "version": "1.0.0",
+  "binary_sha256": "989c9fe8288bd07217198b844af83bfac7d949f1445b7447f324701e0e0b8825",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "client": "Swirl Rust",
+  "known_limitations": [
+    "Historical reference server aborts while framing an empty UDP reply; this combination is not passed."
+  ],
+  "records": [
+    {
+      "case": "test_clash_and_uri_import_reach_the_reference_server",
+      "expect_success": true,
+      "mode": "tcp",
+      "payload_bytes": 65536,
+      "udp_relay_mode": null,
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 21993,
+        "downloaded": 65536,
+        "imported": true,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 28299,
+        "uploaded": 65536
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_clash_and_uri_import_reach_the_reference_server",
+      "expect_success": true,
+      "mode": "tcp",
+      "payload_bytes": 65536,
+      "udp_relay_mode": null,
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 2508,
+        "downloaded": 65536,
+        "imported": true,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 7481,
+        "uploaded": 65536
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_dns_request_through_both_udp_modes",
+      "expect_success": true,
+      "mode": "dns",
+      "payload_bytes": 29,
+      "udp_relay_mode": "native",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 2581,
+        "downloaded": 45,
+        "imported": false,
+        "mode": "dns",
+        "ok": true,
+        "sha256": "770622abdbf50d514ee038eff5c8a52360a441ac3b52e5359e7360044bb0874d",
+        "source_port": 57174,
+        "total_us": 4005,
+        "uploaded": 29
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_dns_request_through_both_udp_modes",
+      "expect_success": true,
+      "mode": "dns",
+      "payload_bytes": 29,
+      "udp_relay_mode": "quic",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 2121,
+        "downloaded": 45,
+        "imported": false,
+        "mode": "dns",
+        "ok": true,
+        "sha256": "770622abdbf50d514ee038eff5c8a52360a441ac3b52e5359e7360044bb0874d",
+        "source_port": 57174,
+        "total_us": 3316,
+        "uploaded": 29
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_historical_reference_empty_reply_limitation_is_recorded",
+      "expect_success": false,
+      "mode": "udp",
+      "payload_bytes": 0,
+      "udp_relay_mode": "native",
+      "client_exit_code": 1,
+      "result": {
+        "error": "TotalTimeout",
+        "ok": false
+      },
+      "native_interoperability_pass": false,
+      "expected_outcome_verified": true,
+      "reference_peer_limitation": "empty UDP reply aborts tuic-server-1.0.0"
+    },
+    {
+      "case": "test_ipv6_endpoint_and_domain_destination",
+      "expect_success": true,
+      "mode": "tcp",
+      "payload_bytes": 65536,
+      "udp_relay_mode": "native",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 3110,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 9572,
+        "uploaded": 65536
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_reconnect_node_switch_and_parallel_connections",
+      "expect_success": true,
+      "mode": "tcp",
+      "payload_bytes": 65536,
+      "udp_relay_mode": "native",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 2732,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 7434,
+        "uploaded": 65536
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_reconnect_node_switch_and_parallel_connections",
+      "expect_success": true,
+      "mode": "tcp",
+      "payload_bytes": 65536,
+      "udp_relay_mode": "native",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 2529,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 7781,
+        "uploaded": 65536
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_reconnect_node_switch_and_parallel_connections",
+      "expect_success": true,
+      "mode": "tcp",
+      "payload_bytes": 65536,
+      "udp_relay_mode": "native",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 2761,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 7645,
+        "uploaded": 65536
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_reconnect_node_switch_and_parallel_connections",
+      "expect_success": true,
+      "mode": "tcp",
+      "payload_bytes": 65536,
+      "udp_relay_mode": "native",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 2739,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 10052,
+        "uploaded": 65536
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_reconnect_node_switch_and_parallel_connections",
+      "expect_success": true,
+      "mode": "tcp",
+      "payload_bytes": 65536,
+      "udp_relay_mode": "native",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 2828,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 11092,
+        "uploaded": 65536
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_reconnect_node_switch_and_parallel_connections",
+      "expect_success": true,
+      "mode": "tcp",
+      "payload_bytes": 65536,
+      "udp_relay_mode": "native",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 2817,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 11598,
+        "uploaded": 65536
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_reconnect_node_switch_and_parallel_connections",
+      "expect_success": true,
+      "mode": "tcp",
+      "payload_bytes": 65536,
+      "udp_relay_mode": "native",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 3326,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 11301,
+        "uploaded": 65536
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_tcp_authentication_large_bidirectional_transfer_and_half_close",
+      "expect_success": true,
+      "mode": "tcp",
+      "payload_bytes": 4194304,
+      "udp_relay_mode": "native",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 3068,
+        "downloaded": 4194304,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "fa2797ae7c45bdf5d8ad88f4704ec73263b1a1642ccb0c0fa89e67435aadabc6",
+        "total_us": 350415,
+        "uploaded": 4194304
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_tls_ca_sni_alpn_and_pin_fail_closed",
+      "expect_success": false,
+      "mode": "tcp",
+      "payload_bytes": 65536,
+      "udp_relay_mode": "native",
+      "client_exit_code": 1,
+      "result": {
+        "error": "QuicTlsVerificationOrHandshake",
+        "ok": false
+      },
+      "native_interoperability_pass": false,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_tls_ca_sni_alpn_and_pin_fail_closed",
+      "expect_success": false,
+      "mode": "tcp",
+      "payload_bytes": 65536,
+      "udp_relay_mode": "native",
+      "client_exit_code": 1,
+      "result": {
+        "error": "QuicTlsVerificationOrHandshake",
+        "ok": false
+      },
+      "native_interoperability_pass": false,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_tls_ca_sni_alpn_and_pin_fail_closed",
+      "expect_success": false,
+      "mode": "tcp",
+      "payload_bytes": 65536,
+      "udp_relay_mode": "native",
+      "client_exit_code": 1,
+      "result": {
+        "error": "QuicTlsVerificationOrHandshake",
+        "ok": false
+      },
+      "native_interoperability_pass": false,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_tls_ca_sni_alpn_and_pin_fail_closed",
+      "expect_success": false,
+      "mode": "tcp",
+      "payload_bytes": 65536,
+      "udp_relay_mode": "native",
+      "client_exit_code": 1,
+      "result": {
+        "error": "QuicTlsVerificationOrHandshake",
+        "ok": false
+      },
+      "native_interoperability_pass": false,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_tls_ca_sni_alpn_and_pin_fail_closed",
+      "expect_success": true,
+      "mode": "tcp",
+      "payload_bytes": 65536,
+      "udp_relay_mode": "native",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 2657,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 7972,
+        "uploaded": 65536
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_udp_native_and_quic_modes_small_and_fragmented",
+      "expect_success": true,
+      "mode": "udp",
+      "payload_bytes": 123,
+      "udp_relay_mode": "native",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 2983,
+        "downloaded": 123,
+        "imported": false,
+        "mode": "udp",
+        "ok": true,
+        "sha256": "a6530926ec5ea8880eae4666add8fe14493346311f32a59ec563c6416714dfa3",
+        "source_port": 64585,
+        "total_us": 4951,
+        "uploaded": 123
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_udp_native_and_quic_modes_small_and_fragmented",
+      "expect_success": true,
+      "mode": "udp",
+      "payload_bytes": 4096,
+      "udp_relay_mode": "native",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 3078,
+        "downloaded": 4096,
+        "imported": false,
+        "mode": "udp",
+        "ok": true,
+        "sha256": "bb50289f8b754449c732d87f74370bea84c1a4e496f39389f428065b20057c9d",
+        "source_port": 64585,
+        "total_us": 4813,
+        "uploaded": 4096
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true,
+      "official_server_observed_fragments": 4
+    },
+    {
+      "case": "test_udp_native_and_quic_modes_small_and_fragmented",
+      "expect_success": true,
+      "mode": "udp",
+      "payload_bytes": 65507,
+      "udp_relay_mode": "native",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 2785,
+        "downloaded": 65507,
+        "imported": false,
+        "mode": "udp",
+        "ok": true,
+        "sha256": "2c96b5a3b2972fdcc5d6c0e377260ab9f3a843509e37569dadaeab4a10d9ffcf",
+        "source_port": 64585,
+        "total_us": 8797,
+        "uploaded": 65507
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_udp_native_and_quic_modes_small_and_fragmented",
+      "expect_success": true,
+      "mode": "udp",
+      "payload_bytes": 123,
+      "udp_relay_mode": "quic",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 2972,
+        "downloaded": 123,
+        "imported": false,
+        "mode": "udp",
+        "ok": true,
+        "sha256": "a6530926ec5ea8880eae4666add8fe14493346311f32a59ec563c6416714dfa3",
+        "source_port": 64585,
+        "total_us": 4355,
+        "uploaded": 123
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_udp_native_and_quic_modes_small_and_fragmented",
+      "expect_success": true,
+      "mode": "udp",
+      "payload_bytes": 4096,
+      "udp_relay_mode": "quic",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 2874,
+        "downloaded": 4096,
+        "imported": false,
+        "mode": "udp",
+        "ok": true,
+        "sha256": "bb50289f8b754449c732d87f74370bea84c1a4e496f39389f428065b20057c9d",
+        "source_port": 64585,
+        "total_us": 4736,
+        "uploaded": 4096
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_udp_native_and_quic_modes_small_and_fragmented",
+      "expect_success": true,
+      "mode": "udp",
+      "payload_bytes": 65507,
+      "udp_relay_mode": "quic",
+      "client_exit_code": 0,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 2970,
+        "downloaded": 65507,
+        "imported": false,
+        "mode": "udp",
+        "ok": true,
+        "sha256": "2c96b5a3b2972fdcc5d6c0e377260ab9f3a843509e37569dadaeab4a10d9ffcf",
+        "source_port": 64585,
+        "total_us": 10269,
+        "uploaded": 65507
+      },
+      "native_interoperability_pass": true,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_wrong_password_and_uuid_never_reach_destination",
+      "expect_success": false,
+      "mode": "tcp",
+      "payload_bytes": 65536,
+      "udp_relay_mode": "native",
+      "client_exit_code": 1,
+      "result": {
+        "error": "TuicConnectStream",
+        "ok": false
+      },
+      "native_interoperability_pass": false,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_wrong_password_and_uuid_never_reach_destination",
+      "expect_success": false,
+      "mode": "tcp",
+      "payload_bytes": 65536,
+      "udp_relay_mode": "native",
+      "client_exit_code": 1,
+      "result": {
+        "error": "TcpWrite",
+        "ok": false
+      },
+      "native_interoperability_pass": false,
+      "expected_outcome_verified": true
+    }
+  ],
+  "peer_logs": [
+    {
+      "case": "test_clash_and_uri_import_reach_the_reference_server",
+      "peer_exit_code": -15,
+      "log_tail": "[2026-10-22T13:30:43Z WARN ] server started, listening on 127.0.0.1:55487\n[2026-10-22T13:30:43Z WARN ] [0x01743860] [127.0.0.1:58739] [<redacted-uuid>] connection error: closed by peer: 0\n[2026-10-22T13:30:43Z WARN ] [0x49098010] [127.0.0.1:54814] [<redacted-uuid>] connection error: closed by peer: 0\n",
+      "log_truncated": false
+    },
+    {
+      "case": "test_dns_request_through_both_udp_modes",
+      "peer_exit_code": -15,
+      "log_tail": "[2026-10-22T13:30:43Z WARN ] server started, listening on 127.0.0.1:64437\n[2026-10-22T13:30:43Z WARN ] [0x0335f170] [127.0.0.1:52102] [<redacted-uuid>] connection error: closed by peer: 0\n[2026-10-22T13:30:43Z WARN ] [0x37034010] [127.0.0.1:54384] [<redacted-uuid>] connection error: closed by peer: 0\n",
+      "log_truncated": false
+    },
+    {
+      "case": "test_historical_reference_empty_reply_limitation_is_recorded",
+      "peer_exit_code": -6,
+      "log_tail": "[2026-10-22T13:30:43Z WARN ] server started, listening on 127.0.0.1:59025\nthread 'tokio-runtime-worker' panicked at 'index out of bounds: the len is 0 but the index is 0', /Users/runner/work/tuic/tuic/tuic/src/model/packet.rs:257:32\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+      "log_truncated": false
+    },
+    {
+      "case": "test_ipv6_endpoint_and_domain_destination",
+      "peer_exit_code": -15,
+      "log_tail": "[2026-10-22T13:30:54Z WARN ] server started, listening on [::1]:55151\n[2026-10-22T13:30:54Z WARN ] [0x00d6f7e0] [[::1]:51112] [<redacted-uuid>] connection error: closed by peer: 0\n",
+      "log_truncated": false
+    },
+    {
+      "case": "test_reconnect_node_switch_and_parallel_connections",
+      "peer_exit_code": -15,
+      "log_tail": "[2026-10-22T13:30:54Z WARN ] server started, listening on 127.0.0.1:53984\n[2026-10-22T13:30:55Z WARN ] [0x04c74c10] [127.0.0.1:63272] [<redacted-uuid>] connection error: closed by peer: 0\n[2026-10-22T13:30:55Z WARN ] [0x5f074010] [127.0.0.1:51146] [<redacted-uuid>] connection error: closed by peer: 0\n[2026-10-22T13:30:55Z WARN ] [0x5f077010] [127.0.0.1:51691] [<redacted-uuid>] connection error: closed by peer: 0\n",
+      "log_truncated": false
+    },
+    {
+      "case": "test_reconnect_node_switch_and_parallel_connections",
+      "peer_exit_code": -15,
+      "log_tail": "[2026-10-22T13:30:55Z WARN ] server started, listening on 127.0.0.1:64890\n[2026-10-22T13:30:55Z WARN ] [0x0103f980] [127.0.0.1:64695] [<redacted-uuid>] connection error: closed by peer: 0\n[2026-10-22T13:30:55Z WARN ] [0x6f0a9810] [127.0.0.1:55118] [<redacted-uuid>] connection error: closed by peer: 0\n",
+      "log_truncated": false
+    },
+    {
+      "case": "test_tcp_authentication_large_bidirectional_transfer_and_half_close",
+      "peer_exit_code": -15,
+      "log_tail": "[2026-10-22T13:30:55Z WARN ] server started, listening on 127.0.0.1:52380\n[2026-10-22T13:30:55Z WARN ] [0x04d248e0] [127.0.0.1:57340] [<redacted-uuid>] connection error: closed by peer: 0\n",
+      "log_truncated": false
+    },
+    {
+      "case": "test_tls_ca_sni_alpn_and_pin_fail_closed",
+      "peer_exit_code": -15,
+      "log_tail": "[2026-10-22T13:30:55Z WARN ] server started, listening on 127.0.0.1:63782\n[2026-10-22T13:30:55Z WARN ] [0xffffffff] [127.0.0.1:62458] [unauthenticated] aborted by peer: the cryptographic handshake failed: error 48: invalid peer certificate: UnknownIssuer\n[2026-10-22T13:30:55Z WARN ] [0xffffffff] [127.0.0.1:49237] [unauthenticated] aborted by peer: the cryptographic handshake failed: error 42: invalid peer certificate: certificate not valid for name \"wrong.invalid\"; certificate is only valid for DnsName(\"localhost\") or IpAddress(127.0.0.1)\n[2026-10-22T13:30:55Z WARN ] [0xffffffff] [127.0.0.1:54479] [unauthenticated] aborted by peer: the cryptographic handshake failed: error 49: invalid peer certificate: ApplicationVerificationFailure\n[2026-10-22T13:30:55Z WARN ] [0x3f06f010] [127.0.0.1:63841] [<redacted-uuid>] connection error: closed by peer: 0\n",
+      "log_truncated": false
+    },
+    {
+      "case": "test_udp_native_and_quic_modes_small_and_fragmented",
+      "peer_exit_code": -15,
+      "log_tail": "[2026-10-22T13:30:55Z WARN ] server started, listening on 127.0.0.1:60660\n[2026-10-22T13:30:56Z INFO ] [0x007db7a0] [127.0.0.1:54537] [unauthenticated] connection established\n[2026-10-22T13:30:56Z INFO ] [0x007db7a0] [127.0.0.1:54537] [<redacted-uuid>] [authenticate] <redacted-uuid>\n[2026-10-22T13:30:56Z INFO ] [0x007db7a0] [127.0.0.1:54537] [<redacted-uuid>] [packet] [0x2bc5] [from-native] [0x0000] fragment 1/1\n[2026-10-22T13:30:56Z INFO ] [0x007db7a0] [127.0.0.1:54537] [<redacted-uuid>] [packet] [0x2bc5] [from-native] [0x0000] to 127.0.0.1:64585\n[2026-10-22T13:30:56Z INFO ] [0x007db7a0] [127.0.0.1:54537] [<redacted-uuid>] [packet] [0x2bc5] [to-native] from 127.0.0.1:64585\n[2026-10-22T13:30:56Z INFO ] [0x007db7a0] [127.0.0.1:54537] [<redacted-uuid>] [dissociate] [0x2bc5]\n[2026-10-22T13:30:56Z WARN ] [0x007db7a0] [127.0.0.1:54537] [<redacted-uuid>] connection error: closed by peer: 0\n[2026-10-22T13:30:56Z INFO ] [0x27058010] [127.0.0.1:50968] [unauthenticated] connection established\n[2026-10-22T13:30:56Z INFO ] [0x27058010] [127.0.0.1:50968] [<redacted-uuid>] [authenticate] <redacted-uuid>\n[2026-10-22T13:30:56Z INFO ] [0x27058010] [127.0.0.1:50968] [<redacted-uuid>] [packet] [0x55c8] [from-native] [0x0000] fragment 1/4\n[2026-10-22T13:30:56Z INFO ] [0x27058010] [127.0.0.1:50968] [<redacted-uuid>] [packet] [0x55c8] [from-native] [0x0000] fragment 2/4\n[2026-10-22T13:30:56Z INFO ] [0x27058010] [127.0.0.1:50968] [<redacted-uuid>] [packet] [0x55c8] [from-native] [0x0000] fragment 3/4\n[2026-10-22T13:30:56Z INFO ] [0x27058010] [127.0.0.1:50968] [<redacted-uuid>] [packet] [0x55c8] [from-native] [0x0000] fragment 4/4\n[2026-10-22T13:30:56Z INFO ] [0x27058010] [127.0.0.1:50968] [<redacted-uuid>] [packet] [0x55c8] [from-native] [0x0000] to 127.0.0.1:64585\n[2026-10-22T13:30:56Z INFO ] [0x27058010] [127.0.0.1:50968] [<redacted-uuid>] [packet] [0x55c8] [to-native] from 127.0.0.1:64585\n[2026-10-22T13:30:56Z INFO ] [0x27058010] [127.0.0.1:50968] [<redacted-uuid>] [dissociate] [0x55c8]\n[2026-10-22T13:30:56Z WARN ] [0x27058010] [127.0.0.1:50968] [<redacted-uuid>] connection error: closed by peer: 0\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [unauthenticated] connection established\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [authenticate] <redacted-uuid>\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 1/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 2/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 3/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 4/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 5/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 6/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 7/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 8/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 9/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 11/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 10/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 12/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 13/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 14/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 15/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 16/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 17/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 18/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 19/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 20/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 21/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 22/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 23/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 24/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 25/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 26/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 27/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 28/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 29/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 30/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 31/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 32/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 33/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 34/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 35/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 36/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 37/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 38/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 39/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 40/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 41/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 42/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 43/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 44/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 45/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 46/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] fragment 47/47\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [from-native] [0x0000] to 127.0.0.1:64585\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [packet] [0xfb39] [to-native] from 127.0.0.1:64585\n[2026-10-22T13:30:56Z INFO ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] [dissociate] [0xfb39]\n[2026-10-22T13:30:56Z WARN ] [0x27059810] [127.0.0.1:63799] [<redacted-uuid>] connection error: closed by peer: 0\n[2026-10-22T13:30:56Z INFO ] [0x2705b010] [127.0.0.1:60143] [unauthenticated] connection established\n[2026-10-22T13:30:56Z INFO ] [0x2705b010] [127.0.0.1:60143] [<redacted-uuid>] [authenticate] <redacted-uuid>\n[2026-10-22T13:30:56Z INFO ] [0x2705b010] [127.0.0.1:60143] [<redacted-uuid>] [packet] [0xfcf3] [from-quic] [0x0000] fragment 1/1\n[2026-10-22T13:30:56Z INFO ] [0x2705b010] [127.0.0.1:60143] [<redacted-uuid>] [packet] [0xfcf3] [from-quic] [0x0000] to 127.0.0.1:64585\n[2026-10-22T13:30:56Z INFO ] [0x2705b010] [127.0.0.1:60143] [<redacted-uuid>] [packet] [0xfcf3] [to-quic] from 127.0.0.1:64585\n[2026-10-22T13:30:56Z INFO ] [0x2705b010] [127.0.0.1:60143] [<redacted-uuid>] [dissociate] [0xfcf3]\n[2026-10-22T13:30:56Z WARN ] [0x2705b010] [127.0.0.1:60143] [<redacted-uuid>] connection error: closed by peer: 0\n[2026-10-22T13:30:56Z INFO ] [0x2705c810] [127.0.0.1:50151] [unauthenticated] connection established\n[2026-10-22T13:30:56Z INFO ] [0x2705c810] [127.0.0.1:50151] [<redacted-uuid>] [authenticate] <redacted-uuid>\n[2026-10-22T13:30:56Z INFO ] [0x2705c810] [127.0.0.1:50151] [<redacted-uuid>] [packet] [0x32bf] [from-quic] [0x0000] fragment 1/1\n[2026-10-22T13:30:56Z INFO ] [0x2705c810] [127.0.0.1:50151] [<redacted-uuid>] [packet] [0x32bf] [from-quic] [0x0000] to 127.0.0.1:64585\n[2026-10-22T13:30:56Z INFO ] [0x2705c810] [127.0.0.1:50151] [<redacted-uuid>] [packet] [0x32bf] [to-quic] from 127.0.0.1:64585\n[2026-10-22T13:30:56Z INFO ] [0x2705c810] [127.0.0.1:50151] [<redacted-uuid>] [dissociate] [0x32bf]\n[2026-10-22T13:30:56Z WARN ] [0x2705c810] [127.0.0.1:50151] [<redacted-uuid>] connection error: closed by peer: 0\n[2026-10-22T13:30:56Z INFO ] [0x2705e010] [127.0.0.1:59572] [unauthenticated] connection established\n[2026-10-22T13:30:56Z INFO ] [0x2705e010] [127.0.0.1:59572] [<redacted-uuid>] [authenticate] <redacted-uuid>\n[2026-10-22T13:30:56Z INFO ] [0x2705e010] [127.0.0.1:59572] [<redacted-uuid>] [packet] [0x75f4] [from-quic] [0x0000] fragment 1/1\n[2026-10-22T13:30:56Z INFO ] [0x2705e010] [127.0.0.1:59572] [<redacted-uuid>] [packet] [0x75f4] [from-quic] [0x0000] to 127.0.0.1:64585\n[2026-10-22T13:30:56Z INFO ] [0x2705e010] [127.0.0.1:59572] [<redacted-uuid>] [packet] [0x75f4] [to-quic] from 127.0.0.1:64585\n[2026-10-22T13:30:56Z INFO ] [0x2705e010] [127.0.0.1:59572] [<redacted-uuid>] [dissociate] [0x75f4]\n[2026-10-22T13:30:56Z WARN ] [0x2705e010] [127.0.0.1:59572] [<redacted-uuid>] connection error: closed by peer: 0\n",
+      "log_truncated": false
+    },
+    {
+      "case": "test_wrong_password_and_uuid_never_reach_destination",
+      "peer_exit_code": -15,
+      "log_tail": "[2026-10-22T13:30:56Z WARN ] server started, listening on 127.0.0.1:60919\n[2026-10-22T13:30:56Z WARN ] [0x00c97db0] [127.0.0.1:57119] [unauthenticated] handling incoming unidirectional stream error: authentication failed: <redacted-uuid>\n[2026-10-22T13:30:56Z WARN ] [0x3d034010] [127.0.0.1:59567] [unauthenticated] handling incoming unidirectional stream error: authentication failed: <redacted-uuid>\n",
+      "log_truncated": false
+    }
+  ]
+}

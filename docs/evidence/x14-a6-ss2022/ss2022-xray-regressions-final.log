@@ -1,0 +1,48 @@
+   Compiling swirl-subscription v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-subscription)
+    Finished `test` profile [unoptimized] target(s) in 2.88s
+     Running tests/xray_conversion_password.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/xray_conversion_password-7173fe55692be12a)
+
+running 11 tests
+test long_passwords_are_kept_in_full_and_not_claimed_native ... ok
+test ss2022_base64_psk_is_preserved_and_identity_chains_remain_blocked ... ok
+test removed_trojan_flow_and_out_of_range_byte_level_are_explicit ... ok
+test ss_plugins_uot_and_unknown_secret_keys_survive_with_blocking_diagnostics ... ok
+test multiple_password_servers_and_flat_form_preserve_source_identity ... ok
+test trojan_tls_ws_and_mux_are_retained_independently_of_password_projection ... ok
+test trojan_and_ss_password_algorithm_level_email_and_transport_roundtrip ... ok
+test empty_missing_password_and_method_are_invalid_wrong_type_is_rejected_by_a ... ok
+test official_ss_cipher_aliases_and_xchacha_are_not_rewritten_to_a_native_method ... ok
+test ss_aead_and_unsupported_ciphers_are_retained_not_replaced ... ok
+test official_ss_boolean_extensions_preserve_intent_and_reject_wrong_types ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/xray_native.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/xray_native-2e8a47da8b288515)
+
+running 23 tests
+test late_global_transport_diagnostics_revoke_cached_native_candidates ... ok
+test listen_address_and_mutated_native_config_are_revalidated_at_the_real_ir_boundary ... ok
+test archive_and_diagnostics_cannot_forge_or_leak_execution_authority ... ok
+test all_servers_and_accounts_remain_selectable_by_original_index ... ok
+test every_invalid_port_uuid_and_wrong_type_remains_unexecutable ... ok
+test socks_and_http_authentication_is_exact_and_not_changed_to_no_auth ... ok
+test shadowsocks_exact_aead_cipher_password_and_tcp_scope_are_preserved ... ok
+test short_custom_id_uses_the_fixed_upstream_utf8_byte_boundary ... ok
+test compact_and_partially_separated_uuid_syntax_is_retained_without_native_normalization ... ok
+test source_global_sections_are_kept_but_node_export_is_explicitly_single_node ... ok
+test proxy_no_auth_and_tls_are_distinct_valid_native_variants ... ok
+test shadowsocks_2022_exact_psk_executes_and_invalid_or_identity_keys_have_no_fallback ... ok
+test socks4_explicit_empty_userid_and_uppercase_4a_keep_version_semantics ... ok
+test unknown_fields_mux_and_policy_levels_cannot_authorize_native_execution ... ok
+test explicit_tls_and_websocket_extensions_never_disappear_to_make_a_candidate ... ok
+test trojan_requires_real_tls_and_preserves_the_exact_password ... ok
+test vless_tcp_keeps_uuid_protocol_and_explicit_encryption_requirement ... ok
+test vless_reality_and_vision_never_become_tls_or_lose_flow ... ok
+test vless_and_trojan_websocket_tls_keep_both_layers_host_and_path ... ok
+test unsupported_transports_tls_reality_conflict_and_vision_conflicts_stay_blocked ... ok
+test vless_tls_keeps_sni_and_alpn_without_a_plaintext_candidate ... ok
+test unsupported_shadowsocks_methods_layers_and_replay_options_have_no_fallback ... ok
+test vmess_tcp_and_ws_tls_preserve_supported_aead_and_reject_legacy_modes ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

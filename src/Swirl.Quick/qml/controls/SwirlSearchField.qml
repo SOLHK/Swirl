@@ -1,42 +1,52 @@
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import SwirlQuick
 import "../components"
+
 TextField {
-    renderType:TextInput.NativeRendering
-    font.hintingPreference:Font.PreferFullHinting
-    Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
     id: control
-    property bool borderless:false
-    implicitHeight:Theme.controlHeight
-    implicitWidth:Theme.dp(225)
-    leftPadding:Theme.dp(32)
-    topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
-    rightPadding: Theme.dp(control.objectName === "pageSearch" && control.width > Theme.dp(130) ? 64 : 15)
-    placeholderText: "搜索"
+    property bool borderless: false
+    implicitHeight: Theme.controlHeight
+    implicitWidth: Theme.dp(225)
+    leftPadding: Theme.dp(32)
+    rightPadding: Theme.dp(control.objectName === "pageSearch" && control.width > Theme.dp(130) ? 64 : 12)
+    topPadding: Theme.dp(5)
+    bottomPadding: Theme.dp(5)
+    hoverEnabled: true
+    selectByMouse: true
+    placeholderText: qsTr("搜索")
+    Accessible.name: placeholderText
     placeholderTextColor: Theme.muted
     color: enabled ? Theme.text : Theme.muted
-    selectedTextColor: "white"
-    selectionColor: Theme.accent
+    selectionColor: Theme.fieldSelection
+    selectedTextColor: Theme.text
     font.family: Theme.fontFamily
     font.weight: Theme.bodyFontWeight
-    font.pixelSize:Theme.fontSize(13)
-    background: SwirlPillSurface {
-        hovered:control.hovered||control.activeFocus
-        radius: Theme.controlRadius
-        gradient: null
-        subtleShadow: false
-        antialiasing: true
-        color:Theme.dark?Theme.field:Theme.surface
-        border.width:Theme.dp(control.activeFocus?2:control.borderless?0:1)
-        border.color: control.activeFocus ? Theme.focusBorder : Theme.controlBorder
-        Behavior on color { ColorAnimation { duration: Theme.motion } }
-        Behavior on border.color { ColorAnimation { duration: Theme.motion } }
+    font.pixelSize: Theme.bodySize
+    font.hintingPreference: Font.PreferFullHinting
+    renderType: TextInput.NativeRendering
+    SwirlFontBinding { target: control; textRole: "input" }
+    background: SwirlControlSurface {
+        field: !control.borderless
+        outlined: !control.borderless
+        hovered: control.hovered
+        focused: control.activeFocus
+        controlEnabled: control.enabled
     }
-    SwirlText { visible:control.objectName === "pageSearch" && control.width > Theme.dp(130); anchors.right:parent.right; anchors.rightMargin:Theme.dp(12); anchors.verticalCenter:parent.verticalCenter; text:"Ctrl+K"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
-    SwirlIcon {
-        anchors.left: parent.left; anchors.leftMargin:Theme.dp(8)
+    SwirlText {
+        visible: control.objectName === "pageSearch" && control.width > Theme.dp(130)
+        anchors.right: parent.right
+        anchors.rightMargin: Theme.controlPadding
         anchors.verticalCenter: parent.verticalCenter
-        name: "search"; size:Theme.dp(14); color: control.activeFocus ? Theme.focusBorder : Theme.muted
+        text: "Ctrl+K"; color: Theme.muted; font.pixelSize: Theme.captionSize
+        Accessible.ignored: true
+    }
+    SwirlIcon {
+        anchors.left: parent.left
+        anchors.leftMargin: Theme.dp(10)
+        anchors.verticalCenter: parent.verticalCenter
+        name: "search"; size: Theme.dp(14)
+        color: control.activeFocus ? Theme.text : Theme.muted
+        Accessible.ignored: true
     }
 }

@@ -1,0 +1,559 @@
+{
+  "runtime": "Swirl Rust Core",
+  "runtime_sha256": "8e17ab565a89a6e42ceda652df934013db331eca5931965555ff7a861ea95c3a",
+  "control_boundary": "exported_c_abi_dynamic_library",
+  "control_host_sha256": "6d655c7c8a0406c506d9356a6db68fc2423e97b0e633aa445130efbc2b7de088",
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "tuic_version": "1.0.0",
+  "tuic_peer_sha256": "adb808944ca829857bf408d2ee438a156e8171543dbbed3e94964b66b4135393",
+  "hysteria_version": "v2.13.0",
+  "hysteria_peer_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+  "qt_product_acceptance": false,
+  "records": [
+    {
+      "case": "test_https_application_tls_through_native_core",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 1705,
+      "downloaded": 133998,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_https_application_tls_through_native_core",
+      "protocol": "tuic:quic",
+      "active_after_close": 0,
+      "uploaded": 1705,
+      "downloaded": 133999,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_https_application_tls_through_native_core",
+      "protocol": "hysteria2",
+      "active_after_close": 0,
+      "uploaded": 1705,
+      "downloaded": 133999,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_live_tcp_sessions_node_switch_parallel_streams_and_runtime_restart",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 262184,
+      "downloaded": 262184,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_live_tcp_sessions_node_switch_parallel_streams_and_runtime_restart",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 11,
+      "downloaded": 11,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_live_tcp_sessions_node_switch_parallel_streams_and_runtime_restart",
+      "protocol": "tuic:quic",
+      "active_after_close": 0,
+      "uploaded": 262184,
+      "downloaded": 262184,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_live_tcp_sessions_node_switch_parallel_streams_and_runtime_restart",
+      "protocol": "tuic:quic",
+      "active_after_close": 0,
+      "uploaded": 11,
+      "downloaded": 11,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_live_tcp_sessions_node_switch_parallel_streams_and_runtime_restart",
+      "protocol": "hysteria2",
+      "active_after_close": 0,
+      "uploaded": 262184,
+      "downloaded": 262184,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_live_tcp_sessions_node_switch_parallel_streams_and_runtime_restart",
+      "protocol": "hysteria2",
+      "active_after_close": 0,
+      "uploaded": 11,
+      "downloaded": 11,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_tuic_dns_configuration_change_does_not_reuse_an_old_resolved_endpoint",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 43,
+      "downloaded": 43,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_tuic_heartbeat_keeps_idle_authenticated_stream_open",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 21,
+      "downloaded": 21,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_udp_association_fragments_dns_and_control_close",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 7239,
+      "downloaded": 7255,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_udp_association_fragments_dns_and_control_close",
+      "protocol": "tuic:quic",
+      "active_after_close": 0,
+      "uploaded": 7239,
+      "downloaded": 7255,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_udp_association_fragments_dns_and_control_close",
+      "protocol": "hysteria2",
+      "active_after_close": 0,
+      "uploaded": 7239,
+      "downloaded": 7255,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_credentials_never_forward_tcp_or_udp_and_existing_session_survives_selection",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 76,
+      "downloaded": 44,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_credentials_never_forward_tcp_or_udp_and_existing_session_survives_selection",
+      "protocol": "tuic:quic",
+      "active_after_close": 0,
+      "uploaded": 76,
+      "downloaded": 44,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_credentials_never_forward_tcp_or_udp_and_existing_session_survives_selection",
+      "protocol": "hysteria2",
+      "active_after_close": 0,
+      "uploaded": 44,
+      "downloaded": 44,
+      "udp_dropped": 1
+    }
+  ],
+  "ffi_hosts": [
+    {
+      "case": "test_https_application_tls_through_native_core",
+      "startup": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "8e17ab565a89a6e42ceda652df934013db331eca5931965555ff7a861ea95c3a",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 8,
+        "command_counts": {},
+        "handles_started": 0,
+        "handles_stopped": 0,
+        "active_handles": 0
+      },
+      "before_eof": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "8e17ab565a89a6e42ceda652df934013db331eca5931965555ff7a861ea95c3a",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 23,
+        "command_counts": {
+          "start": 3,
+          "snapshot": 9,
+          "stop": 3
+        },
+        "handles_started": 3,
+        "handles_stopped": 3,
+        "active_handles": 0
+      }
+    },
+    {
+      "case": "test_live_tcp_sessions_node_switch_parallel_streams_and_runtime_restart",
+      "startup": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "8e17ab565a89a6e42ceda652df934013db331eca5931965555ff7a861ea95c3a",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 8,
+        "command_counts": {},
+        "handles_started": 0,
+        "handles_stopped": 0,
+        "active_handles": 0
+      },
+      "before_eof": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "8e17ab565a89a6e42ceda652df934013db331eca5931965555ff7a861ea95c3a",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 38,
+        "command_counts": {
+          "start": 6,
+          "select": 3,
+          "snapshot": 15,
+          "stop": 6
+        },
+        "handles_started": 6,
+        "handles_stopped": 6,
+        "active_handles": 0
+      }
+    },
+    {
+      "case": "test_tuic_dns_configuration_change_does_not_reuse_an_old_resolved_endpoint",
+      "startup": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "8e17ab565a89a6e42ceda652df934013db331eca5931965555ff7a861ea95c3a",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 8,
+        "command_counts": {},
+        "handles_started": 0,
+        "handles_stopped": 0,
+        "active_handles": 0
+      },
+      "before_eof": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "8e17ab565a89a6e42ceda652df934013db331eca5931965555ff7a861ea95c3a",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 15,
+        "command_counts": {
+          "start": 1,
+          "configure": 2,
+          "snapshot": 3,
+          "stop": 1
+        },
+        "handles_started": 1,
+        "handles_stopped": 1,
+        "active_handles": 0
+      }
+    },
+    {
+      "case": "test_tuic_heartbeat_keeps_idle_authenticated_stream_open",
+      "startup": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "8e17ab565a89a6e42ceda652df934013db331eca5931965555ff7a861ea95c3a",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 8,
+        "command_counts": {},
+        "handles_started": 0,
+        "handles_stopped": 0,
+        "active_handles": 0
+      },
+      "before_eof": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "8e17ab565a89a6e42ceda652df934013db331eca5931965555ff7a861ea95c3a",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 13,
+        "command_counts": {
+          "start": 1,
+          "snapshot": 3,
+          "stop": 1
+        },
+        "handles_started": 1,
+        "handles_stopped": 1,
+        "active_handles": 0
+      }
+    },
+    {
+      "case": "test_udp_association_fragments_dns_and_control_close",
+      "startup": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "8e17ab565a89a6e42ceda652df934013db331eca5931965555ff7a861ea95c3a",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 8,
+        "command_counts": {},
+        "handles_started": 0,
+        "handles_stopped": 0,
+        "active_handles": 0
+      },
+      "before_eof": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "8e17ab565a89a6e42ceda652df934013db331eca5931965555ff7a861ea95c3a",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 26,
+        "command_counts": {
+          "start": 3,
+          "snapshot": 12,
+          "stop": 3
+        },
+        "handles_started": 3,
+        "handles_stopped": 3,
+        "active_handles": 0
+      }
+    },
+    {
+      "case": "test_wrong_credentials_never_forward_tcp_or_udp_and_existing_session_survives_selection",
+      "startup": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "8e17ab565a89a6e42ceda652df934013db331eca5931965555ff7a861ea95c3a",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 8,
+        "command_counts": {},
+        "handles_started": 0,
+        "handles_stopped": 0,
+        "active_handles": 0
+      },
+      "before_eof": {
+        "ok": true,
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "library_file": "libswirl_api.so",
+        "library_sha256": "8e17ab565a89a6e42ceda652df934013db331eca5931965555ff7a861ea95c3a",
+        "abi_version": 1,
+        "usize_bytes": 8,
+        "isize_bytes": 8,
+        "input_capacity": 1048576,
+        "output_capacity": 1048576,
+        "buffer_boundaries": {
+          "null_input_rejected": true,
+          "null_output_rejected": true,
+          "empty_input_rejected": true,
+          "input_over_1mib_rejected": true,
+          "output_below_1mib_rejected": true,
+          "input_exactly_1mib_accepted": true,
+          "invalid_utf8_rejected": true,
+          "unknown_private_field_redacted": true,
+          "output_capacity_1mib_and_canary": true
+        },
+        "ffi_command_calls": 28,
+        "command_counts": {
+          "start": 3,
+          "select": 6,
+          "snapshot": 8,
+          "stop": 3
+        },
+        "handles_started": 3,
+        "handles_stopped": 3,
+        "active_handles": 0
+      }
+    }
+  ],
+  "evidence_level": "exported_c_abi_official_quic_loopback",
+  "tests_run": 6,
+  "expected_tests": 6,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "duration_seconds": 23.175,
+  "successful": true,
+  "source_commit": "42fd5782c1d30f32bb4cc2aef21857c52af50dc7",
+  "worktree_changes": [
+    " M .github/workflows/rust-native-protocols.yml",
+    " M core/crates/swirl-api/src/probe_tests.rs",
+    " M core/crates/swirl-api/tests/xray_boundary.rs",
+    " M core/crates/swirl-core/src/probe.rs",
+    " M core/crates/swirl-core/src/probe_tests.rs",
+    " M core/crates/swirl-protocol/src/dial.rs",
+    " M core/crates/swirl-protocol/src/hysteria2.rs",
+    " M core/crates/swirl-protocol/src/lib.rs",
+    " M core/crates/swirl-protocol/src/probe.rs",
+    " M core/crates/swirl-protocol/src/probe_tests.rs",
+    " M core/crates/swirl-protocol/src/socks4.rs",
+    " M core/crates/swirl-protocol/src/transport.rs",
+    " M core/crates/swirl-protocol/src/tuic.rs",
+    " M tools/tests/test_quic_core.py",
+    "?? core/crates/swirl-protocol/src/timing.rs",
+    "?? docs/evidence/x14-a6-local/github-actions.json",
+    "?? docs/evidence/x14-a7-environment/public-ipv4-preflight.json",
+    "?? tools/tests/native_ffi_host.py",
+    "?? tools/tests/test_quic_ffi.py"
+  ],
+  "source_sha256": {
+    "tools/tests/test_quic_ffi.py": "dbb2c46c0500cb9c8bd55adedcb1fef7ef6dedda68524214e2d4c59e8f3d1437",
+    "tools/tests/native_ffi_host.py": "6d655c7c8a0406c506d9356a6db68fc2423e97b0e633aa445130efbc2b7de088",
+    "tools/tests/test_quic_core.py": "601178d53617234c2c40b932261600fd8a78226ca1b48b96becf5465f76844a2",
+    "core/Cargo.lock": "2a2c7bc86a0f2fbce9fbb62843e81d6ec77f6eb66a83d39b187bc94caf2ae301",
+    "core/crates/swirl-api/src/lib.rs": "bf38b038c84da297a4bb443d254f141b1de4ed920d9073c346b405fe6c86fbbd"
+  },
+  "public_network_tested": false
+}

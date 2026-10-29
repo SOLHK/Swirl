@@ -1,0 +1,5 @@
+    Checking swirl-subscription v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-subscription)
+    Checking swirl-transport v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-transport)
+    Checking swirl-dns v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-dns)
+    Checking swirl-protocol v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-protocol)
+    Finished `dev` profile [unoptimized] target(s) in 5.16s

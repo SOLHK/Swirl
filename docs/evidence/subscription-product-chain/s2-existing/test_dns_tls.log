@@ -1,0 +1,19 @@
+SOURCE 593e7cddc360cf7f51d9fdc988e6cf8fd99aea96
+COMMAND ["/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3", "/workspace/scratch/ca6cd1f88f6f/Swirl/tools/tests/test_dns_tls.py", "-v"]
+
+test_cname_followups_stay_on_the_authenticated_stream (__main__.DnsTlsIntegration.test_cname_followups_stay_on_the_authenticated_stream) ... ok
+test_failover_is_only_between_explicit_tls_endpoints (__main__.DnsTlsIntegration.test_failover_is_only_between_explicit_tls_endpoints) ... ok
+test_generation_cache_isolation_preserves_existing_stream (__main__.DnsTlsIntegration.test_generation_cache_isolation_preserves_existing_stream) ... ok
+test_ipv6_bootstrap_uses_the_configured_authentication_name (__main__.DnsTlsIntegration.test_ipv6_bootstrap_uses_the_configured_authentication_name) ... ok
+test_malformed_tls_dns_is_rejected_not_retried_in_cleartext (__main__.DnsTlsIntegration.test_malformed_tls_dns_is_rejected_not_retried_in_cleartext) ... ok
+test_mixed_plaintext_and_tls_config_fails_atomically (__main__.DnsTlsIntegration.test_mixed_plaintext_and_tls_config_fails_atomically) ... ok
+test_native_tls_partial_frames_and_ttl_cache (__main__.DnsTlsIntegration.test_native_tls_partial_frames_and_ttl_cache) ... ok
+test_nxdomain_does_not_fall_through_to_another_resolver (__main__.DnsTlsIntegration.test_nxdomain_does_not_fall_through_to_another_resolver) ... ok
+test_silent_peer_deadline_is_bounded (__main__.DnsTlsIntegration.test_silent_peer_deadline_is_bounded) ... ok
+test_wrong_name_and_untrusted_certificate_send_no_dns_query (__main__.DnsTlsIntegration.test_wrong_name_and_untrusted_certificate_send_no_dns_query) ... ok
+test_zero_ttl_is_not_cached (__main__.DnsTlsIntegration.test_zero_ttl_is_not_cached) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 10.330s
+
+OK

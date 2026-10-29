@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "failedSource": "5f16245a238411c8e57d097995fded50edc65522",
+  "failedRun": "https://github.com/SOLHK/Swirl/actions/runs/39383609297",
+  "failedJob": "https://github.com/SOLHK/Swirl/actions/runs/39383609297/job/118498157952",
+  "firstFailure": "test_analysis_offline_pipeline_sanitizes_reports_and_verifies_output_reload",
+  "rawJobLogSha256": "b6aa55fd98634babfa5d63078807c924900d936faac5bc3c1f9e5b5623246513",
+  "nativeFailureEvidence": {
+    "step": "subscription capture tests",
+    "testsRun": 31,
+    "failures": 1,
+    "skipped": 2,
+    "failureClass": "AssertionError",
+    "cause": "Windows TEMP used RUNNER~1 alias; production output isolation resolved runneradmin path, but mock expected unresolved alias",
+    "productionImpact": "No provider/network or Qt result was executed after the early test failure. Later missing artifacts are consequences, not separate passing checks."
+  },
+  "fix": {
+    "path": "tools/tests/test_subscription_capture.py",
+    "sha256": "390894ef829c7e0eb56778f7ec77467148f268c48650ca53e6f4646ccd869093",
+    "description": "Resolve the fixture temporary root once, retain strict path equality and every isolation/redaction/reload assertion. Production analyzer unchanged."
+  },
+  "localValidation": {
+    "portableEvidenceTests": 7,
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0,
+    "aliasReproduction": {
+      "scope": "Actual Linux filesystem alias reproduction of the Windows fixture path-canonicalization mismatch; not native Windows retest",
+      "beforeSource": "5f16245a238411c8e57d097995fded50edc65522",
+      "results": {
+        "before": {
+          "tests": 1,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "successful": false
+        },
+        "after": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "successful": true
+        }
+      },
+      "networkRequests": 0,
+      "allProductionAssertionsKept": true
+    }
+  },
+  "windowsRerun": "pending-new-source-ci",
+  "oldFailureRetained": true,
+  "noTimeoutOrAssertionWeakening": true,
+  "formalAcceptanceUnchanged": {
+    "items": 79,
+    "passed": 6,
+    "weightedPercent": 10.83
+  }
+}

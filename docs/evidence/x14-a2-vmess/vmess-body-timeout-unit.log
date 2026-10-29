@@ -1,0 +1,22 @@
+    Blocking waiting for file lock on build directory
+   Compiling swirl-transport v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-transport)
+   Compiling swirl-dns v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-dns)
+   Compiling swirl-protocol v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-protocol)
+    Finished `test` profile [unoptimized] target(s) in 11.68s
+     Running unittests src/lib.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/swirl_protocol-04d4463d2a41c0b7)
+
+running 11 tests
+test vmess::tests::checksum_known_answers ... ok
+test vmess::tests::body_nonce_exhaustion_never_reuses_a_nonce ... ok
+test vmess::tests::hmac_primitive_matches_rfc4231_case_one ... ok
+test vmess::tests::altered_response_header_fails_and_failure_is_sticky ... ok
+test vmess::tests::unsupported_security_and_legacy_authentication_are_not_downgraded ... ok
+test vmess::tests::body_prefix_and_ciphertext_drips_have_a_fixed_authentication_deadline ... ok
+test vmess::tests::altered_data_or_terminal_tags_cannot_be_accepted_as_payload_or_eof ... ok
+test vmess::tests::logical_half_close_retains_download_and_authenticates_terminal_record ... ok
+test vmess::tests::response_header_length_is_bounded_before_allocation ... ok
+test vmess::tests::truncated_body_and_unauthenticated_eof_are_rejected ... ok
+test vmess::tests::partial_response_times_out_but_idle_application_does_not ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 99 filtered out; finished in 0.04s
+

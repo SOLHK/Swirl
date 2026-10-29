@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "scope": "preserved public CI failures before final portable fixture correction",
+  "runs": [
+    {
+      "run_id": 39091610693,
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39091610693",
+      "source_sha": "44488e7a88c66125164e85720278be052f4aa74b",
+      "conclusion": "failure",
+      "jobs": {
+        "linux": {
+          "job_id": 117569372048,
+          "conclusion": "success",
+          "rust_tests": {
+            "passed": 125,
+            "failed": 0,
+            "ignored": 0
+          },
+          "fmt_check_clippy_release": "passed",
+          "python": {
+            "executed": 166,
+            "passed": 162,
+            "skipped": 4,
+            "failed": 0,
+            "unrun": 0
+          },
+          "strict_public_https": {
+            "passed": 3,
+            "failed": 0,
+            "scope": "native DIRECT and native DoH, not private-provider validation"
+          }
+        },
+        "macos": {
+          "job_id": 117569372043,
+          "conclusion": "failure",
+          "rust_tests": {
+            "passed": 125,
+            "failed": 0,
+            "ignored": 0
+          },
+          "fmt_check_clippy_release": "passed",
+          "python": {
+            "executed": 159,
+            "passed": 153,
+            "skipped": 4,
+            "failed": 2,
+            "unrun": 7
+          },
+          "failure_tests": [
+            "test_refusal_is_distinct_and_does_not_consume_full_budget",
+            "test_refused_first_address_immediately_falls_back"
+          ]
+        },
+        "windows": {
+          "job_id": 117569371937,
+          "conclusion": "failure",
+          "rust_tests": {
+            "passed": 125,
+            "failed": 0,
+            "ignored": 0
+          },
+          "fmt_check_clippy_release": "passed",
+          "python": {
+            "executed": 159,
+            "passed": 153,
+            "skipped": 4,
+            "failed": 2,
+            "unrun": 41
+          },
+          "failure_tests": [
+            "test_refusal_is_distinct_and_does_not_consume_full_budget",
+            "test_refused_first_address_immediately_falls_back"
+          ],
+          "qt": "not-run-after-Python-failure",
+          "windows_artifact": "absent",
+          "full_log_sha256": "cb89ef36581d1f298f2b271e5b9506be2ecae112292c146cbadc4a6ffdfebb78"
+        }
+      }
+    },
+    {
+      "run_id": 39092269132,
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39092269132",
+      "source_sha": "63df5807499fddad6936d918f8807e550ca3e528",
+      "conclusion": "failure",
+      "jobs": {
+        "linux": {
+          "job_id": 117571330145,
+          "conclusion": "success",
+          "rust_tests": {
+            "passed": 125,
+            "failed": 0,
+            "ignored": 0
+          },
+          "fmt_check_clippy_release": "passed",
+          "python": {
+            "executed": 166,
+            "passed": 162,
+            "skipped": 4,
+            "failed": 0,
+            "unrun": 0
+          },
+          "strict_public_https": {
+            "passed": 3,
+            "failed": 0,
+            "scope": "native DIRECT and native DoH, not private-provider validation"
+          }
+        },
+        "macos": {
+          "job_id": 117571330078,
+          "conclusion": "success",
+          "rust_tests": {
+            "passed": 125,
+            "failed": 0,
+            "ignored": 0
+          },
+          "fmt_check_clippy_release": "passed",
+          "python": {
+            "executed": 166,
+            "passed": 162,
+            "skipped": 4,
+            "failed": 0,
+            "unrun": 0
+          }
+        },
+        "windows": {
+          "job_id": 117571330034,
+          "conclusion": "failure",
+          "rust_tests": {
+            "passed": 125,
+            "failed": 0,
+            "ignored": 0
+          },
+          "fmt_check_clippy_release": "passed",
+          "python": {
+            "executed": 159,
+            "passed": 153,
+            "skipped": 4,
+            "failed": 2,
+            "unrun": 41
+          },
+          "failure_tests": [
+            "test_refusal_is_distinct_and_does_not_consume_full_budget",
+            "test_refused_first_address_immediately_falls_back"
+          ],
+          "qt": "not-run-after-Python-failure",
+          "windows_artifact": "absent",
+          "full_log_sha256": "7ff6f5ff6093f6af424b1b2284eb08c631aa1df9ae35d96cd580e99856cb1262"
+        }
+      }
+    }
+  ],
+  "fixture1_change": "Bound and listened on the refusal endpoint, then closed it before dialing. This corrected macOS but Windows still reached the 500ms and 200ms test deadlines.",
+  "failure_interpretation": "Observed short test-deadline expiry; these runs do not measure Windows refusal notification time or establish a provider protocol failure.",
+  "product_timeouts_changed": false
+}

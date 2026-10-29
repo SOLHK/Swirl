@@ -1,0 +1,53 @@
+name: Swirl VF A3 identity avar independent holdouts
+
+on:
+  push:
+    branches: [work/vf-axis-a3]
+    paths:
+      - '.github/workflows/swirl-vf-a3-identity-avar.yml'
+      - 'tools/swirl_vf/platform/probe_axis_a3_identity_avar.py'
+      - 'tools/swirl_vf/tests/test_axis_a3_identity_avar.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent-controls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fonttools==4.61.1 numpy==2.2.6
+      - run: python -m unittest discover -s tools/swirl_vf/tests -p 'test_axis_a3*.py' -v
+
+  native-identity-avar:
+    needs: independent-controls
+    runs-on: xcode-27
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fonttools==4.61.1 numpy==2.2.6
+      - name: Evaluate frozen identity avar rules on new boundary and three-axis holdouts
+        run: |
+          python tools/swirl_vf/platform/probe_axis_a3_identity_avar.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --output build/axis-a3-identity-summary/identity-avar.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-a3-identity-avar-${{ github.sha }}
+          path: build/axis-a3-identity-summary/*.json
+          retention-days: 7

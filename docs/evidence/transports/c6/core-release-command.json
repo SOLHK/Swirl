@@ -1,0 +1,28 @@
+{
+  "command": [
+    "python3",
+    "tools/tests/test_transport_runtime_xray.py"
+  ],
+  "cwd": "/workspace/scratch/ece554ece7c1/Swirl-transport",
+  "environment": {
+    "SWIRL_RUST_HARNESS": "/workspace/scratch/ece554ece7c1/Swirl-transport/core/target/release/swirl-api",
+    "SWIRL_TRANSPORT_RUNTIME": "/workspace/scratch/ece554ece7c1/Swirl-transport/core/target/release/examples/transport-runtime",
+    "SWIRL_TRANSPORT_CLIENT": "/workspace/scratch/ece554ece7c1/Swirl-transport/core/target/release/examples/transport-client",
+    "SWIRL_XRAY_BINARY": "/workspace/scratch/ece554ece7c1/test-servers/xray-26.10.21/xray",
+    "SWIRL_XRAY_LEGACY_BINARY": "/workspace/scratch/ece554ece7c1/test-servers/xray-1.8.24/xray",
+    "SWIRL_C6_EVIDENCE": "/workspace/scratch/ece554ece7c1/transport-evidence/c6-release-core",
+    "SWIRL_TRANSPORT_EVIDENCE": "/workspace/scratch/ece554ece7c1/transport-evidence/c6-release-core/native"
+  },
+  "binary_sha256": {
+    "SWIRL_RUST_HARNESS": "191bf8741033fc8288438c75825838f7f834f66dd4d79d319ba629b5ca84df09",
+    "SWIRL_TRANSPORT_RUNTIME": "2e2d8b43876f0a714876518824d8fbc7cadf86038219f11901b79d3662f29fa9",
+    "SWIRL_TRANSPORT_CLIENT": "f4fa8cfb328d8f9f38ce96d8dba588c1ff4df406276c4cd12d4fc09f06ed50b6",
+    "SWIRL_XRAY_BINARY": "a27e3f95ab6ce270956d0cecd32eda4686a811afc71c64a6a734a3dede14883e",
+    "SWIRL_XRAY_LEGACY_BINARY": "78680eb058012d03c313d2f969e92bb2e7f1eee40dc89c69497b2dfb48e424db"
+  },
+  "test_source_sha256": "a70fd09cdc47519b66ad3a79013e7e0e7f949584f990387f0f710659b7842ac6",
+  "started_utc": "2026-10-22T04:32:35.804855+00:00",
+  "exit_code": 0,
+  "elapsed_seconds": 3.347,
+  "finished_utc": "2026-10-22T04:32:39.152128+00:00"
+}

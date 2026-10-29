@@ -1,0 +1,14 @@
+test_imported_six_protocols_reach_independent_http_and_verified_https (__main__.ProductChainIntegration.test_imported_six_protocols_reach_independent_http_and_verified_https) ... ok
+test_large_fragmented_concurrent_halfclose_and_cancel (__main__.ProductChainIntegration.test_large_fragmented_concurrent_halfclose_and_cancel) ... ok
+test_ordered_runtime_routes_use_imported_nodes_direct_reject_and_group (__main__.ProductChainIntegration.test_ordered_runtime_routes_use_imported_nodes_direct_reject_and_group) ... ok
+test_ss_uri_and_base64_all_aead_ciphers (__main__.ProductChainIntegration.test_ss_uri_and_base64_all_aead_ciphers) ... ok
+test_switch_uses_b_for_new_sessions_and_keeps_existing_a (__main__.ProductChainIntegration.test_switch_uses_b_for_new_sessions_and_keeps_existing_a) ... ok
+test_unsupported_security_and_transports_are_retained_and_cannot_start (__main__.ProductChainIntegration.test_unsupported_security_and_transports_are_retained_and_cannot_start) ... ok
+test_verified_origin_tls_rejects_wrong_name_without_http_request (__main__.ProductChainIntegration.test_verified_origin_tls_rejects_wrong_name_without_http_request) ... ok
+test_wrong_authentication_never_reaches_origin_or_another_exit (__main__.ProductChainIntegration.test_wrong_authentication_never_reaches_origin_or_another_exit) ... ok
+test_actual_product_import_persist_select_route_and_recreate (__main__.ProductQtIntegration.test_actual_product_import_persist_select_route_and_recreate) ... skipped 'Windows Qt/DPAPI integration executable required'
+
+----------------------------------------------------------------------
+Ran 9 tests in 1.913s
+
+OK (skipped=1)

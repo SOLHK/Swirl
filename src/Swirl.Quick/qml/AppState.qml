@@ -2,7 +2,7 @@ pragma Singleton
 import QtQuick
 QtObject {
     property string currentPage: "activity"
-    readonly property var settingsRoutes:["settings","appearance","fonts","dns","modules","profiles","scripts","subscriptions","proxies"]
+    readonly property var settingsRoutes:["settings","fonts","dns","modules","profiles","scripts","subscriptions","proxies"]
     readonly property bool inSettings:settingsRoutes.indexOf(currentPage)>=0
     readonly property string sidebarPage:inSettings?"featurehub":currentPage
     property bool sidebarCollapsed: false
@@ -14,6 +14,7 @@ QtObject {
     property int trafficPeriod:0
     property string trafficSelectedProcess:""
     property string trafficSelectedDevice:""
+    property string connectionSearchQuery:""
     readonly property string mode: engineController.routingMode==="rule"?"规则判定":engineController.routingMode==="global"?"全局代理":"直接连接"
     readonly property string policy: "固定节点"
     readonly property string selectedNode: engineController.selectedNodeName
@@ -29,6 +30,10 @@ QtObject {
     property int navigationDirection:1
     property int historyIndex: 0
     property var navigationHistory: ["activity"]
+    property var navigationDepths: [0]
+    readonly property int detailDepth:navigationDepths[historyIndex]||0
+    readonly property bool canGoBack:detailDepth>0&&historyIndex>0
+    readonly property var primaryRoutes:["activity","overview","processes","gateway","policies","rules","capture","tls","rewrite","featurehub","external"]
     property date sessionNow: new Date()
     property var recentEvents: []
     property real measuredDown: 0
@@ -43,13 +48,20 @@ QtObject {
         {title:"HTTP",pages:[{id:"capture",title:"捕获",icon:"capture"},{id:"tls",title:"解密",icon:"shield"},{id:"rewrite",title:"重写",icon:"edit"}]}
     ]
     readonly property var allPageIds: groups.reduce(function(all,g){return all.concat(g.pages.map(function(p){return p.id}))},[]).concat(["featurehub","external","processes","requestlogs"]).concat(FeatureCatalog.entries.filter(function(f){return f.id.indexOf("feature-")===0}).map(function(f){return f.id}))
-    function navigate(id) {
-        if (currentPage === id) return
+    function navigate(id,secondary) {
+        const detail=secondary===true || (secondary!==false && primaryRoutes.indexOf(id)<0)
+        if (currentPage === id) {
+            if(!detail){const depths=navigationDepths.slice();depths[historyIndex]=0;navigationDepths=depths}
+            return
+        }
         navigationDirection=1
+        navigationDepths=navigationDepths.slice(0,historyIndex+1).concat([detail?detailDepth+1:0])
         navigationHistory = navigationHistory.slice(0,historyIndex+1).concat([id])
+        if(navigationHistory.length>128){navigationHistory=navigationHistory.slice(-128);navigationDepths=navigationDepths.slice(-128)}
         historyIndex = navigationHistory.length-1
         currentPage = id
     }
+    function openDetail(id){navigate(id,true)}
     function goBack() { if(historyIndex>0){navigationDirection=-1;currentPage=navigationHistory[--historyIndex]} }
     function goForward() { if(historyIndex<navigationHistory.length-1){navigationDirection=1;currentPage=navigationHistory[++historyIndex]} }
     function addEvent(title,tone) {

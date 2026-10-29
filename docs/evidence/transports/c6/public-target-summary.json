@@ -1,0 +1,30 @@
+{
+  "scope": "local_official_peer_to_public_target",
+  "suite_exit_code": 1,
+  "native_requests": 2,
+  "native_errors": [
+    "OperationTimeout",
+    "OperationTimeout"
+  ],
+  "independent_peer_accepted_targets": [
+    "http://example.com/",
+    "https://example.com/"
+  ],
+  "public_response_received": false,
+  "public_certificate_verification_completed": false,
+  "remaining_tasks": [
+    0,
+    0
+  ],
+  "blocking_layer": "system DNS resolution in both direct preflight and independent Xray outbound",
+  "official_peer_dns_errors": [
+    "2026/10/22 13:14:18.471172 [Info] [2451662813] proxy/freedom: failed to get IP address for domain example.com > lookup example.com on 168.63.129.16:53: read udp 172.26.47.169:59341->168.63.129.16:53: read: connection refused",
+    "2026/10/22 13:14:28.477766 [Info] [1945944433] proxy/freedom: failed to get IP address for domain example.com > lookup example.com on 168.63.129.16:53: read udp 172.26.47.169:50782->168.63.129.16:53: i/o timeout",
+    "2026/10/22 13:14:28.477780 [Info] [2451662813] proxy/freedom: failed to get IP address for domain example.com > lookup example.com on 168.63.129.16:53: read udp 172.26.47.169:50782->168.63.129.16:53: i/o timeout",
+    "2026/10/22 13:14:33.479907 [Info] [2451662813] proxy/freedom: failed to get IP address for domain example.com > lookup example.com on 168.63.129.16:53: read udp 172.26.47.169:35589->168.63.129.16:53: read: connection refused",
+    "2026/10/22 13:14:33.479926 [Info] [1945944433] proxy/freedom: failed to get IP address for domain example.com > lookup example.com on 168.63.129.16:53: read udp 172.26.47.169:35589->168.63.129.16:53: read: connection refused"
+  ],
+  "remote_public_proxy_node_tested": false,
+  "environment_dns_modified": false,
+  "insecure_tls_used": false
+}

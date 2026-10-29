@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "base_commit": "c5ed84b9e40a147de743826501d04c711321081d",
+  "supplier_refresh_requests": 0,
+  "rust_tests_passed": 136,
+  "subscription_import_tests_passed": 11,
+  "capture_tests": {
+    "run": 26,
+    "passed": 25,
+    "skipped": 1
+  },
+  "qt_ctest_passed": true,
+  "qt_independent_peer_suites_passed": 4,
+  "offline_corpus": {
+    "entries": 18,
+    "parsed_entries": 18,
+    "total_records_including_duplicate_sources": 1558,
+    "total_tcp_candidates_including_duplicate_sources": 450
+  },
+  "complete_configuration_execution_supported": false,
+  "real_provider_nodes_tested_this_stage": 0,
+  "prior_failed_regressions": 3,
+  "review_boundary_control_bypass_fixed": true,
+  "ci": "pending",
+  "known_failures": [
+    {
+      "test": "appearance UI from unfiltered CTest",
+      "outcome": "timeout",
+      "original_timeout_seconds": 45,
+      "investigated": false
+    }
+  ],
+  "sources": {
+    "core/crates/swirl-subscription/src/inspect.rs": "84c6a775119f351ab629267166ec71d5cab46c19d2f6e9b379250728280ca5bc",
+    "tools/tests/test_subscription_import.py": "a622d0e64fcdefde91c0c77831aac9cd735fed2e11d6f16a46a74cef6cc169fe"
+  },
+  "artifacts": {
+    "D:\\Codex\\work\\Swirl\\core\\target\\release\\swirl-inspect.exe": {
+      "sha256": "55a3ad7fab5c9b1fa1eafdf1ae5aaff9a40626629fa1461f868c6e5776988ac5",
+      "bytes": 2370195
+    },
+    "D:\\Codex\\work\\Swirl\\core\\target\\release\\swirl-api.exe": {
+      "sha256": "91b571acf5ee12ce2c9a3ab51ff12b53e9571a8e0e84d6862fbadbddc84b5a30",
+      "bytes": 4117531
+    },
+    "D:\\Codex\\work\\build-rust-qt\\SwirlRustCoreTests.exe": {
+      "sha256": "bb62e2a03116a7c963d50cfc1256a1fafae319bf3ea9edbcc9a3564483a76f48",
+      "bytes": 2349771
+    },
+    "D:\\Codex\\work\\build-rust-qt\\swirl_api.dll": {
+      "sha256": "017873953d39ce75886b0bc97a1937149c12906f7049bca6e4cb178646e7fbca",
+      "bytes": 7418485
+    }
+  },
+  "local_log_sha256": {
+    "ini-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ini-check.log": "df6b12c55179b7c3abbb454dcfe8a97cb751fa65079cd2fc9ffc32e0ece8f023",
+    "ini-clippy.log": "5dd1545f83ae96096d3cb1957f16dd99ea2ab4341f026e9b8f7d46c5e51d2615",
+    "ini-rust.log": "6f918f9de512bf40641731e33506b9fca24843b823e91af11d9b91edabedb240",
+    "ini-release.log": "cd2013d6a7ae3ced4d0e944475572dff96ff76c5021fa99bd0c018c2d6f43dd8",
+    "ini-subscription-import.log": "1eebd454706d6eed48b1fafad9a284ca0dc1b1e2e86faecea241e90921fa0dd1",
+    "ini-subscription-capture.log": "b28bd4f3c5da4659b80a071e4783342a52f93367e94887c631e8b3600c398e0e",
+    "ini-qt-build.log": "097f3d56f97452653020ad701153e9f8eb12c45dcafe3166e5b2abd7bdc4ae3f",
+    "ini-qt-ctest.log": "8e5c1d8bec6c11f8d4c555131427fc864cc335f6c049db47f1f6858d3f91437f",
+    "ini-qt-ss.log": "efafc23e35531d185542c888f321ae6fc909e0d9292571320837d2aa668cb073",
+    "ini-qt-vless.log": "a4fb27e86529f3a7cafe8469f7ce3a1a1876061062d948b1de985a69ee6fbcc1",
+    "ini-qt-socks4.log": "02ff5ef48973354106abb6596050a68abd38d3eb3522161d5fe2190fa602336e",
+    "ini-qt-ws.log": "f6d9d60188fcdf4c64f6d50c28b30e119754299188c07150e055fd95d372ae70",
+    "ini-structure-before.log": "5834a363bab5023820f28aa798a91d20501b60394c682fca6e56b2aab3694489",
+    "ini-qt-unfiltered-aborted.log": "56621dcefb1b4b7868c160a78c20ebee143420e34d18f786e775ea2f73760586"
+  }
+}

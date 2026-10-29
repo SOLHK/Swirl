@@ -1,0 +1,1470 @@
+{
+  "baseline": "v1",
+  "frozen_at": "2026-10-18",
+  "metric": "verified acceptance weight, not implementation effort",
+  "stage_weights": {
+    "A": 20,
+    "B": 25,
+    "C": 20,
+    "D": 15,
+    "E": 10,
+    "F": 10
+  },
+  "stage_denominators": {
+    "A": 8,
+    "B": 31,
+    "C": 12,
+    "D": 8,
+    "E": 10,
+    "F": 10
+  },
+  "stage_accepted": {
+    "A": 1,
+    "B": 0,
+    "C": 5,
+    "D": 0,
+    "E": 0,
+    "F": 0
+  },
+  "item_count": 79,
+  "accepted_items": 6,
+  "accepted_weight_percent": 10.833333,
+  "display_percent": "10.83%",
+  "partial_credit": false,
+  "scope_change_requires_new_version": true,
+  "protocol_profiles": {
+    "total": 21,
+    "accepted": 0,
+    "partial": 9
+  },
+  "transport_profiles": {
+    "total": 10,
+    "accepted": 0,
+    "partial": 3
+  },
+  "format_profiles": {
+    "total": 10,
+    "accepted": 0
+  },
+  "new_corpus": {
+    "entries": 18,
+    "capture_success": 18,
+    "response_identities": 17,
+    "outer_format_and_node_parse": 18,
+    "complete_document_grammar_accepted": false,
+    "node_records_including_duplicate_exports": 1558,
+    "records_verified_on_real_network": 0,
+    "complete_entry_chains_verified": 0,
+    "network_success_rate": null
+  },
+  "items": [
+    {
+      "id": "A01",
+      "stage": "A",
+      "criterion": "授权采集、逐份加密、哈希、截止和原始入口映射",
+      "status": "已验收",
+      "evidence": "E02/E03；本轮18入口、17响应全部HTTP200、落盘/解密/哈希匹配",
+      "gap": "仅本轮固定清单；未授权引用不应自动下载"
+    },
+    {
+      "id": "A02",
+      "stage": "A",
+      "criterion": "冻结语料的完整正文结构与节点解析",
+      "status": "部分实现",
+      "evidence": "E01/E02；18/18外层格式及节点解析通过，INI所有节头先校验",
+      "gap": "非节点节正文语法/客户端语义未完成，不能称完整正文通过"
+    },
+    {
+      "id": "A03",
+      "stage": "A",
+      "criterion": "全部10个格式档案的字段语义与错误输入兼容",
+      "status": "部分实现",
+      "evidence": "E01/E05/E07；已有Clash、sing-box、URI/Base64和若干INI适配",
+      "gap": "逐格式版本/未知项/异常输入验收矩阵未完成"
+    },
+    {
+      "id": "A04",
+      "stage": "A",
+      "criterion": "完整原文、来源、未知字段及转换诊断进入可持久化IR",
+      "status": "部分实现",
+      "evidence": "E01/E07；Rust保留原始正文，Qt目前主要保留节点级来源",
+      "gap": "Qt完整文档来源及全局字段尚未统一加密保存"
+    },
+    {
+      "id": "A05",
+      "stage": "A",
+      "criterion": "节点到原生IR的无损转换与稳定身份",
+      "status": "部分实现",
+      "evidence": "E02/E07；450候选记录，NodeStore按来源/名称/协议稳定UUID",
+      "gap": "其余记录的执行阻塞仍在；跨文档完整引用转换未验收"
+    },
+    {
+      "id": "A06",
+      "stage": "A",
+      "criterion": "订阅策略组、DNS、顺序规则到Qt产品配置",
+      "status": "部分实现",
+      "evidence": "当前阶段接入自包含Clash组/规则和原生严格图校验；其余格式与DNS未完成",
+      "gap": "候选节点引用、严格DNS语义、未知全局字段和直接节点规则目标需接入"
+    },
+    {
+      "id": "A07",
+      "stage": "A",
+      "criterion": "完整文档导入、刷新、失败及崩溃的原子持久化与恢复",
+      "status": "部分实现",
+      "evidence": "当前阶段采用稳定UUID准备及单个DPAPI/QSaveFile快照；保留旧sidecar只读迁移",
+      "gap": "所有格式、进程崩溃/掉电和恢复矩阵仍需完成"
+    },
+    {
+      "id": "A08",
+      "stage": "A",
+      "criterion": "18份冻结文档的导入→选组/DNS/路由→Rust→联网整链",
+      "status": "未验证",
+      "evidence": "E01/E02 complete_configuration_execution_supported=false",
+      "gap": "逐文档完成整链；不能由节点解析或少量SS成功替代"
+    },
+    {
+      "id": "B01",
+      "stage": "B",
+      "criterion": "HTTP/HTTPS CONNECT及对应原生入口档案",
+      "status": "部分实现",
+      "evidence": "E05/E06；独立协议/Qt证据",
+      "gap": "当前固定矩阵的全门禁与真实出口覆盖未完成"
+    },
+    {
+      "id": "B02",
+      "stage": "B",
+      "criterion": "SOCKS4 TCP档案",
+      "status": "部分实现",
+      "evidence": "E05/E06；独立对端和Qt映射/转发",
+      "gap": "全部门禁/真实节点覆盖未完成"
+    },
+    {
+      "id": "B03",
+      "stage": "B",
+      "criterion": "SOCKS4a TCP档案",
+      "status": "部分实现",
+      "evidence": "E05/E06；远端域名解析语义已独立测试",
+      "gap": "全部门禁/真实节点覆盖未完成"
+    },
+    {
+      "id": "B04",
+      "stage": "B",
+      "criterion": "SOCKS5 TCP与用户名密码认证档案",
+      "status": "部分实现",
+      "evidence": "E05/E06；原生入口/出口已有实现",
+      "gap": "全部门禁/真实节点覆盖未完成"
+    },
+    {
+      "id": "B05",
+      "stage": "B",
+      "criterion": "SOCKS5出口UDP档案",
+      "status": "部分实现",
+      "evidence": "E11；8d045ab真实SOCKS5出口关联、认证、UDP双向转发、关闭、隔离、有界资源与Qt导入路径",
+      "gap": "标准无认证/用户名密码范围；TLS+UDP明确拒绝，真实提供商/NAT/长期负载与完整七门禁未验收"
+    },
+    {
+      "id": "B06",
+      "stage": "B",
+      "criterion": "Shadowsocks传统AEAD TCP（三种已列密码套件）",
+      "status": "部分实现",
+      "evidence": "E04/E05；独立认证/边界/Qt和两组历史严格HTTPS样本",
+      "gap": "全目标节点/本轮语料/长期稳定性尚未验收"
+    },
+    {
+      "id": "B07",
+      "stage": "B",
+      "criterion": "Shadowsocks传统AEAD UDP",
+      "status": "部分实现",
+      "evidence": "E05；有界关联及独立Python对端",
+      "gap": "供应商真实UDP未验收"
+    },
+    {
+      "id": "B08",
+      "stage": "B",
+      "criterion": "Shadowsocks 2022档案",
+      "status": "未实现",
+      "evidence": "E05明确拒绝",
+      "gap": "独立状态机、重放/认证、传输和产品验证"
+    },
+    {
+      "id": "B09",
+      "stage": "B",
+      "criterion": "SSR档案",
+      "status": "未实现",
+      "evidence": "E05 Rust Outbound不提供",
+      "gap": "先冻结公开可验证协议/混淆组合；不能将识别当执行"
+    },
+    {
+      "id": "B10",
+      "stage": "B",
+      "criterion": "Trojan TLS档案",
+      "status": "部分实现",
+      "evidence": "E01/E05；严格TLS独立对端",
+      "gap": "不安全源配置被正确阻止；真实严格TLS节点覆盖待补"
+    },
+    {
+      "id": "B11",
+      "stage": "B",
+      "criterion": "VLESS v0 TCP/通用TLS档案",
+      "status": "部分实现",
+      "evidence": "E05/E06；独立协议和Qt转发",
+      "gap": "真实提供商及完整目标范围未验收"
+    },
+    {
+      "id": "B12",
+      "stage": "B",
+      "criterion": "VMess档案",
+      "status": "未实现",
+      "evidence": "E04/E05明确缺项",
+      "gap": "独立状态机、版本、认证、数据流与互操作"
+    },
+    {
+      "id": "B13",
+      "stage": "B",
+      "criterion": "VLESS REALITY扩展",
+      "status": "部分实现",
+      "evidence": "E17/E18；原生 REALITY TLS 1.3、双方 Finished 与官方 Xray/REALITY 的 12 项/13 会话独立互通，保留 EOF、凭据隔离与回收证据",
+      "gap": "生产异步 REALITY、浏览器指纹/任意伪装站点、完整 VLESS/REALITY/Vision 组合、订阅 IR/路由/Qt 与真实提供商仍未验收"
+    },
+    {
+      "id": "B14",
+      "stage": "B",
+      "criterion": "VLESS Vision扩展",
+      "status": "部分实现",
+      "evidence": "E17/E19；R1 framing、增量内层 TLS、有界异步 framing；初始 f3ce257f macOS/Windows 失败及 0be68231 Windows DNS fixture 失败均保留。最终 7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167 精确三平台 Rust 与 App 完整成功：272 Rust + 1 doctest、5 项 record 回归、R3 12 项/13 会话和 Vision 4 项（3 正例、1 严格 Direct 拒绝），Windows Qt/wrapper/完整应用编译亦成功；未实现 DirectReady 或完成产品验收",
+      "gap": "DirectReady、原始 socket/缓冲所有权交接、HRR、真实 REALITY+Vision 组合及订阅 IR/路由/Qt/供应商整链仍未完成"
+    },
+    {
+      "id": "B15",
+      "stage": "B",
+      "criterion": "WebSocket/WSS传输及已承诺VLESS/Trojan组合",
+      "status": "部分实现",
+      "evidence": "E05/E06；分片、背压、关闭预算和Qt已有证据",
+      "gap": "组合矩阵与真实提供商/长连接覆盖未完整"
+    },
+    {
+      "id": "B16",
+      "stage": "B",
+      "criterion": "gRPC传输",
+      "status": "未实现",
+      "evidence": "E04/E05明确缺项",
+      "gap": "HTTP/2基础依赖可用但代理传输状态机需自研"
+    },
+    {
+      "id": "B17",
+      "stage": "B",
+      "criterion": "XHTTP传输",
+      "status": "未实现",
+      "evidence": "E04/E05明确缺项",
+      "gap": "版本/模式矩阵、取消、复用与真实互操作"
+    },
+    {
+      "id": "B18",
+      "stage": "B",
+      "criterion": "Hysteria v1档案",
+      "status": "未实现",
+      "evidence": "E00既定协议范围，E05无原生执行",
+      "gap": "资料/样本/必要范围固定后实现，未验证不得删除"
+    },
+    {
+      "id": "B19",
+      "stage": "B",
+      "criterion": "Hysteria 2档案",
+      "status": "未实现",
+      "evidence": "E04/E05明确缺项",
+      "gap": "QUIC认证、TCP/UDP、拥塞/关闭与产品接入"
+    },
+    {
+      "id": "B20",
+      "stage": "B",
+      "criterion": "TUIC档案",
+      "status": "未实现",
+      "evidence": "E04/E05明确缺项",
+      "gap": "明确版本、QUIC会话、TCP/UDP与互操作"
+    },
+    {
+      "id": "B21",
+      "stage": "B",
+      "criterion": "QUIC/HTTP3必要传输组合",
+      "status": "未实现",
+      "evidence": "E04/E05明确缺项",
+      "gap": "采用审查后的基础库，Swirl拥有代理会话执行逻辑"
+    },
+    {
+      "id": "B22",
+      "stage": "B",
+      "criterion": "AnyTLS档案",
+      "status": "未实现",
+      "evidence": "E00既定协议范围，E05无原生执行",
+      "gap": "协议版本/认证/复用/互操作"
+    },
+    {
+      "id": "B23",
+      "stage": "B",
+      "criterion": "Naive档案",
+      "status": "未实现",
+      "evidence": "E00既定协议范围，E05无原生执行",
+      "gap": "明确HTTP2/3组合与认证/互操作"
+    },
+    {
+      "id": "B24",
+      "stage": "B",
+      "criterion": "Snell档案",
+      "status": "未实现",
+      "evidence": "E00既定协议范围，E05无原生执行",
+      "gap": "专有或未公开语义必须明确阻塞，不虚构实现"
+    },
+    {
+      "id": "B25",
+      "stage": "B",
+      "criterion": "Mieru档案",
+      "status": "未实现",
+      "evidence": "E00既定协议范围，E05无原生执行",
+      "gap": "版本/传输/认证与互操作"
+    },
+    {
+      "id": "B26",
+      "stage": "B",
+      "criterion": "WireGuard档案",
+      "status": "未实现",
+      "evidence": "E00既定协议范围，E05无原生执行",
+      "gap": "协议执行、路由/DNS和Windows产品整链"
+    },
+    {
+      "id": "B27",
+      "stage": "B",
+      "criterion": "SSH代理档案",
+      "status": "未实现",
+      "evidence": "E00既定协议范围，E05无原生执行",
+      "gap": "严格主机身份/认证、转发与产品接入"
+    },
+    {
+      "id": "B28",
+      "stage": "B",
+      "criterion": "代理多路复用及链式代理执行",
+      "status": "未实现",
+      "evidence": "E00范围；E05 VLESS multiplexing明确拒绝；Qt只保留部分detour",
+      "gap": "绑定协议的已冻结组合、背压、取消和防循环"
+    },
+    {
+      "id": "B29",
+      "stage": "B",
+      "criterion": "HTTP/2代理传输扩展",
+      "status": "未实现",
+      "evidence": "E00范围，E05无原生执行",
+      "gap": "不把库依赖或h2配置识别当协议执行"
+    },
+    {
+      "id": "B30",
+      "stage": "B",
+      "criterion": "HTTPUpgrade传输扩展",
+      "status": "未实现",
+      "evidence": "E00范围，E05无原生执行",
+      "gap": "握手校验、边界、Qt和实际对端"
+    },
+    {
+      "id": "B31",
+      "stage": "B",
+      "criterion": "ShadowTLS扩展",
+      "status": "未实现",
+      "evidence": "E00范围，E05无原生执行",
+      "gap": "版本、身份/认证和安全负面测试"
+    },
+    {
+      "id": "C01",
+      "stage": "C",
+      "criterion": "原生UDP/TCP DNS及严格DoT/DoH协议与Qt映射（不含分流/bootstrap）",
+      "status": "已验收",
+      "evidence": "E05/E06；独立DNS对端、严格证书和Qt映射证据",
+      "gap": "历史精准范围可继承；不能代表本机所有公网DoH成功"
+    },
+    {
+      "id": "C02",
+      "stage": "C",
+      "criterion": "A/AAAA/CNAME与TTL正缓存、大小写规范化、有界资源",
+      "status": "已验收",
+      "evidence": "E05/E06已有实现及独立DNS验证",
+      "gap": "保留配置更换和资源上限契约"
+    },
+    {
+      "id": "C03",
+      "stage": "C",
+      "criterion": "SOA证明的NXDOMAIN/NODATA负缓存",
+      "status": "已验收",
+      "evidence": "E05/E06独立负缓存证据",
+      "gap": "不能把未证明空答案当负缓存"
+    },
+    {
+      "id": "C04",
+      "stage": "C",
+      "criterion": "上游失败恢复、备用解析器及有界失败缓存",
+      "status": "已验收",
+      "evidence": "E08；b903b8b完成一秒失败缓存、原错误码与配置换代清理",
+      "gap": "此前README仍称未实现的段落已过时"
+    },
+    {
+      "id": "C05",
+      "stage": "C",
+      "criterion": "DNS分流、Fake-IP、bootstrap与防泄漏完整策略",
+      "status": "未实现",
+      "evidence": "E05明确缺项",
+      "gap": "三者须逐项验收，不得退化成系统/明文解析"
+    },
+    {
+      "id": "C06",
+      "stage": "C",
+      "criterion": "现有基础规则的顺序与优先级",
+      "status": "已验收",
+      "evidence": "E05/E06；domain/suffix/keyword、CIDR、source CIDR、port、MATCH独立路径",
+      "gap": "仅列举的基础匹配；高级规则不在本项冒领"
+    },
+    {
+      "id": "C07",
+      "stage": "C",
+      "criterion": "复杂策略组及配置/健康更新",
+      "status": "部分实现",
+      "evidence": "E05/E06；嵌套手动、url-test/fallback/显式round-robin",
+      "gap": "默认哈希、更多自动嵌套及完整订阅整合待补"
+    },
+    {
+      "id": "C08",
+      "stage": "C",
+      "criterion": "GEOIP/GEOSITE/MRS执行及更新",
+      "status": "未实现",
+      "evidence": "E05/RustCoreEngine明确拒绝智能MRS会话",
+      "gap": "导入、规则执行、数据更新失败与回滚"
+    },
+    {
+      "id": "C09",
+      "stage": "C",
+      "criterion": "进程分流",
+      "status": "未实现",
+      "evidence": "E05明确未迁移",
+      "gap": "Windows进程归属、生命周期和权限边界"
+    },
+    {
+      "id": "C10",
+      "stage": "C",
+      "criterion": "IPv4/IPv6全目标兼容",
+      "status": "部分实现",
+      "evidence": "E05；多地址拨号/部分独立IPv6证据",
+      "gap": "所有协议、DNS、UDP/TUN和实际网络矩阵未覆盖"
+    },
+    {
+      "id": "C11",
+      "stage": "C",
+      "criterion": "网络切换、超时、重试与流量统计",
+      "status": "部分实现",
+      "evidence": "E05；有界TCP竞速、静态错误阶段、快照统计",
+      "gap": "真实网络切换、恢复及统计一致性待验收"
+    },
+    {
+      "id": "C12",
+      "stage": "C",
+      "criterion": "断开清理、失败不降级DIRECT、不重放与隐私保护",
+      "status": "部分实现",
+      "evidence": "E05/E06；不可变会话、失败保留旧计划已有证据",
+      "gap": "整产品/TUN/异常退出的全路径审计与泄漏测试待补"
+    },
+    {
+      "id": "D01",
+      "stage": "D",
+      "criterion": "Windows虚拟接口生命周期",
+      "status": "未实现",
+      "evidence": "E01/E05；Rust TUN尚未接入",
+      "gap": "驱动/API权限、创建/关闭/残留恢复"
+    },
+    {
+      "id": "D02",
+      "stage": "D",
+      "criterion": "TUN TCP数据路径",
+      "status": "未实现",
+      "evidence": "E01/E05",
+      "gap": "独立内核转发、并发、MTU与取消"
+    },
+    {
+      "id": "D03",
+      "stage": "D",
+      "criterion": "TUN UDP数据路径",
+      "status": "未实现",
+      "evidence": "E01/E05",
+      "gap": "映射、DNS、分片/MTU、超时与回收"
+    },
+    {
+      "id": "D04",
+      "stage": "D",
+      "criterion": "TUN DNS接管与防泄漏",
+      "status": "未实现",
+      "evidence": "E01/E05",
+      "gap": "IPv4/IPv6、不同解析协议与绕过探测"
+    },
+    {
+      "id": "D05",
+      "stage": "D",
+      "criterion": "系统路由安装、所有权及恢复",
+      "status": "未实现",
+      "evidence": "E01/E05原生TUN未完成",
+      "gap": "与用户/其他软件修改冲突的恢复契约"
+    },
+    {
+      "id": "D06",
+      "stage": "D",
+      "criterion": "Rust模式系统代理开关及所有权保护",
+      "status": "部分实现",
+      "evidence": "E05；既有C++SystemProxySession保留",
+      "gap": "完整Windows实际接管、他人接管保护和恢复证明"
+    },
+    {
+      "id": "D07",
+      "stage": "D",
+      "criterion": "网络变化和休眠唤醒恢复",
+      "status": "未验证",
+      "evidence": "E01/E05没有当前原生完整证据",
+      "gap": "切网/断网/唤醒真实测试"
+    },
+    {
+      "id": "D08",
+      "stage": "D",
+      "criterion": "崩溃退出、防火墙与系统状态保护",
+      "status": "未验证",
+      "evidence": "E00契约；E01未执行系统修改",
+      "gap": "异常退出恢复，不覆盖用户后续更改；敏感操作需批准"
+    },
+    {
+      "id": "E01",
+      "stage": "E",
+      "criterion": "节点连接耗时及延迟分布",
+      "status": "部分实现",
+      "evidence": "E04有少量固定SS DNS/TCP耗时",
+      "gap": "预定样本规模、P50/P95/P99及同环境可复现"
+    },
+    {
+      "id": "E02",
+      "stage": "E",
+      "criterion": "TCP吞吐",
+      "status": "未验证",
+      "evidence": "E05有Benchmark工具；本次未核验正式报告",
+      "gap": "固定硬件、负载、时间与阈值"
+    },
+    {
+      "id": "E03",
+      "stage": "E",
+      "criterion": "UDP吞吐与丢包",
+      "status": "未验证",
+      "evidence": "E05有独立功能测试，不等于性能",
+      "gap": "固定包长/速率/丢包/抖动/正确性阈值"
+    },
+    {
+      "id": "E04",
+      "stage": "E",
+      "criterion": "高并发与资源上限",
+      "status": "部分实现",
+      "evidence": "E05有并发及有界资源设计/回归",
+      "gap": "长期压力下正确性、耗尽恢复与公平性"
+    },
+    {
+      "id": "E05",
+      "stage": "E",
+      "criterion": "DNS查询/缓存性能",
+      "status": "未验证",
+      "evidence": "E08功能与恢复证据不等于性能",
+      "gap": "缓存命中/未命中/失败P50/P95/P99"
+    },
+    {
+      "id": "E06",
+      "stage": "E",
+      "criterion": "CPU、内存及泄漏",
+      "status": "未验证",
+      "evidence": "E01本阶段未执行完整性能验收",
+      "gap": "空闲、活跃、长期运行的基准与资源回收"
+    },
+    {
+      "id": "E07",
+      "stage": "E",
+      "criterion": "长时间运行",
+      "status": "未验证",
+      "evidence": "E01/E04明确未执行长跑",
+      "gap": "冻结时长、负载、错误率与泄漏阈值"
+    },
+    {
+      "id": "E08",
+      "stage": "E",
+      "criterion": "SSE/WebSocket及Codex登录和持续输出",
+      "status": "部分实现",
+      "evidence": "E05有WS协议/关闭测试；真实Codex CLI仍可选跳过",
+      "gap": "当前Rust模式真实持续输出、登录、恢复与长连接"
+    },
+    {
+      "id": "E09",
+      "stage": "E",
+      "criterion": "弱网、丢包、断线恢复",
+      "status": "未验证",
+      "evidence": "E01/E04未给完整实测",
+      "gap": "冻结损伤参数，不延长产品超时掩盖问题"
+    },
+    {
+      "id": "E10",
+      "stage": "E",
+      "criterion": "启动、停止、退出与资源回收压力",
+      "status": "部分实现",
+      "evidence": "E05/E06有生命周期及取消测试",
+      "gap": "Windows重复启停、负载中退出和异常退出矩阵"
+    },
+    {
+      "id": "F01",
+      "stage": "F",
+      "criterion": "完整Windows Rust Swirl构建",
+      "status": "部分实现",
+      "evidence": "E08历史完整应用构建；E01当前Qt集成构建通过",
+      "gap": "最终候选完整应用/依赖包精准SHA与可重复构建"
+    },
+    {
+      "id": "F02",
+      "stage": "F",
+      "criterion": "完整Qt产品真实运行",
+      "status": "未验证",
+      "evidence": "E01有测试程序但未完成完整GUI产品验收",
+      "gap": "实际启动、导入、操作、退出；不能替代为CTest"
+    },
+    {
+      "id": "F03",
+      "stage": "F",
+      "criterion": "真实订阅、选节点、分流与联网产品链",
+      "status": "未验证",
+      "evidence": "E01/E02 full configuration=false",
+      "gap": "依赖A08与当前真实网络矩阵"
+    },
+    {
+      "id": "F04",
+      "stage": "F",
+      "criterion": "完整产品TUN和系统代理验收",
+      "status": "未验证",
+      "evidence": "E01/E05 TUN未完成",
+      "gap": "依赖D01-D08及用户批准的实际系统操作"
+    },
+    {
+      "id": "F05",
+      "stage": "F",
+      "criterion": "现有UI/动画/设置/用户数据回归",
+      "status": "部分实现",
+      "evidence": "修正进程局部DLL路径和D盘测试隔离后，原45秒上限外观测试5.68秒通过，设置跨进程恢复通过",
+      "gap": "全部UI/动画/用户数据和安装生命周期矩阵仍未完成"
+    },
+    {
+      "id": "F06",
+      "stage": "F",
+      "criterion": "升级、卸载、异常退出及配置恢复",
+      "status": "未验证",
+      "evidence": "E00最终目标；当前未给完整安装生命周期证据",
+      "gap": "版本迁移、用户修改保护、失败恢复"
+    },
+    {
+      "id": "F07",
+      "stage": "F",
+      "criterion": "Rust为默认且无必要Mihomo运行依赖",
+      "status": "部分实现",
+      "evidence": "E05 Rust显式模式无外核回退，但默认仍兼容构建",
+      "gap": "功能验收后才改默认/移除依赖，检查包内容/进程/流量路径"
+    },
+    {
+      "id": "F08",
+      "stage": "F",
+      "criterion": "依赖许可证、必要署名与供应链记录",
+      "status": "部分实现",
+      "evidence": "E05/E14；130 包库存、29 个新增依赖版本与 58 份完整许可证/notice；ML-KEM 上游未声称独立安全审计",
+      "gap": "对最终依赖及实际安装包逐项核验"
+    },
+    {
+      "id": "F09",
+      "stage": "F",
+      "criterion": "同一候选的三平台CI、Windows Qt及安全门禁",
+      "status": "未验证",
+      "evidence": "E13–E16 分别记录开发提交的精确三平台/Qt结果，保留失败与未执行步骤",
+      "gap": "最终全协议候选及完整安全门禁仍未验证；开发阶段 CI 不代表全目标验收"
+    },
+    {
+      "id": "F10",
+      "stage": "F",
+      "criterion": "最终安装包与源码、证据、交接的一致交付",
+      "status": "未实现",
+      "evidence": "E01/E04明确未做完整应用包装",
+      "gap": "安装包构建/哈希/安装卸载验收、开发分支SHA和交接一致"
+    }
+  ],
+  "status_changes": [
+    {
+      "date": "2026-10-19",
+      "item": "B05",
+      "old_status": "未实现",
+      "new_status": "部分实现",
+      "source_sha": "8d045ab888e6ed0af6dea87adfb752793c455b5b",
+      "source_tree_sha": "125f439f7b929114caa1336bb01f42ba38353da4",
+      "evidence": [
+        "docs/RUST_SOCKS5_UDP_20261019.md",
+        "docs/evidence/RUST_SOCKS5_UDP_PORTABLE_20261019.json",
+        "docs/evidence/RUST_SOCKS5_UDP_WINDOWS_20261019.json"
+      ],
+      "environment": [
+        "isolated Linux Rust 1.99.1 / Qt 6.10.3 production-code subsets",
+        "GitHub Actions ubuntu-latest / macos-latest / windows-2022"
+      ],
+      "local_result": {
+        "rust_passed": 152,
+        "rust_failed": 0,
+        "portable_udp_passed": 12,
+        "portable_udp_skipped": 1,
+        "portable_udp_failed": 0,
+        "qt_hook_subset_passed": 1,
+        "qt_hook_subset_is_complete_windows_target": false
+      },
+      "initial_ci": {
+        "run_id": 39180142737,
+        "linux": "success",
+        "macos": "failure: two maximum-datagram subcases fail in Python sendto before entering Core (EMSGSIZE)",
+        "windows": "failure: preflight self-test collected a later application-existence guard; Qt and complete native application were not executed"
+      },
+      "inheritance": "No previous green run, public peer or partial Qt subset counts as exact-source Windows or private-provider acceptance.",
+      "accepted_score_changed": false,
+      "private_records_tested": 0,
+      "complete_private_profiles_verified": 0,
+      "followup_source_sha": "dc3ed5ef8ba9d3ec3d8d05e9ae0c7e810f19cfbb",
+      "followup_source_tree_sha": "9078aeb88f993a62a3d380a1bfc840c516d51d99",
+      "followup_changes": [
+        "Scope Windows binary preflight to its peer step and inspect both platform menus everywhere",
+        "Configure only insufficient UDP send/receive buffers to a fixed 65536-byte minimum and preserve larger existing values",
+        "Keep 65507-byte wire boundary and add true IPv4/IPv6 bidirectional tests"
+      ],
+      "followup_local_result": {
+        "rust_passed": 154,
+        "rust_failed": 0,
+        "rust_ignored": 0,
+        "portable_udp_passed": 12,
+        "portable_udp_skipped": 1,
+        "portable_udp_failed": 0,
+        "new_release_cli_sha256": "e7135782c474bfc1d18118283c69632a086bef59a9e9f5a2d1511665dcb28bea"
+      },
+      "followup_ci": {
+        "rust_run_id": 39181705419,
+        "status": "completed",
+        "conclusion": "success",
+        "source_sha": "dc3ed5ef8ba9d3ec3d8d05e9ae0c7e810f19cfbb",
+        "linux": {
+          "job_id": 117835644603,
+          "conclusion": "success",
+          "rust_passed": 154,
+          "rust_failed": 0,
+          "rust_ignored": 0,
+          "python_passed": 197,
+          "python_skipped": 5,
+          "python_failed": 0,
+          "new_udp_passed": 12,
+          "new_udp_skipped": 1,
+          "new_udp_failed": 0
+        },
+        "macos": {
+          "job_id": 117835644727,
+          "conclusion": "success",
+          "rust_passed": 154,
+          "rust_failed": 0,
+          "rust_ignored": 0,
+          "python_passed": 197,
+          "python_skipped": 5,
+          "python_failed": 0,
+          "new_udp_passed": 12,
+          "new_udp_skipped": 1,
+          "new_udp_failed": 0,
+          "previously_failed_maximum_response_case": "pass for both authentication modes"
+        },
+        "windows": {
+          "job_id": 117835644750,
+          "conclusion": "success",
+          "rust_passed": 154,
+          "rust_failed": 0,
+          "rust_ignored": 0,
+          "pre_qt_python_passed": 232,
+          "pre_qt_python_skipped": 7,
+          "pre_qt_python_failed": 0,
+          "new_udp_portable_passed": 12,
+          "new_udp_portable_skipped": 1,
+          "new_udp_portable_failed": 0,
+          "native_ctest_passed": 3,
+          "compatibility_ctest_passed": 2,
+          "native_qt_passed_excluding_lifecycle": 45,
+          "native_qt_standalone_peer_skipped": 6,
+          "native_qt_failed": 0,
+          "separately_run_python_qt_hooks_passed": 5,
+          "qt_peer_slots_exercised_by_those_hooks": 6,
+          "new_udp_qt_hook_passed": 1,
+          "new_udp_qt_forwarded_payloads": 4,
+          "complete_native_application_compiled": true,
+          "complete_native_gui_hardware_acceptance": false,
+          "application_installer_published": false
+        },
+        "app_run_id": 39181705430,
+        "app_conclusion": "success",
+        "app_tested_commit": "dc3ed5ef8ba9d3ec3d8d05e9ae0c7e810f19cfbb",
+        "app_does_not_run_new_udp_suite": true
+      }
+    },
+    {
+      "date": "2026-10-19",
+      "item": "B13",
+      "old_status": "未实现",
+      "new_status": "部分实现",
+      "source_sha": "daad7a057ab2c4b347c3ab142ce88af6528cb8f6",
+      "source_tree_sha": "70ccc46a5d938ba524e11f35f9e07531e1b0ede8",
+      "evidence": [
+        "docs/REALITY_HANDSHAKE_FOUNDATION_20261019.md",
+        "docs/evidence/REALITY_FOUNDATION_AND_IMPORT_20261019.json"
+      ],
+      "environment": [
+        "isolated Linux Rust 1.99.1 / actual Rust 1.89.0 MSRV check",
+        "GitHub Actions ubuntu-latest / macos-latest / windows-2022"
+      ],
+      "local_result": {
+        "rust_unit_integration_passed": 188,
+        "rust_doctest_passed": 1,
+        "rust_failed": 0,
+        "rust_ignored": 0,
+        "new_reality_module_tests_passed": 34,
+        "independent_auth_vectors": 3,
+        "independent_tls_transcripts": 2,
+        "independent_negative_checks": 22,
+        "complete_reality_peer_verified": false,
+        "native_reality_outbound_executable": false,
+        "vision_implemented": false
+      },
+      "initial_ci": {
+        "rust_run_id": 39200717679,
+        "linux": "success",
+        "macos": "success",
+        "windows": "failure in DNS peer TCP port allocation; Rust 189, Release and REALITY fixture passed; Qt/native application not run",
+        "app_run_id": 39200717693,
+        "app_actual_tested_sha": "daad7a057ab2c4b347c3ab142ce88af6528cb8f6",
+        "app_conclusion": "success"
+      },
+      "followup_source_sha": "a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40",
+      "followup_source_tree_sha": "66ea18bfc6daf76b5985ac94742d1e12d0a64ae5",
+      "followup_ci": {
+        "rust_run_id": 39202767158,
+        "rust_conclusion": "success",
+        "linux": {
+          "rust_passed": 189,
+          "python_passed": 201,
+          "python_skipped": 5
+        },
+        "macos": {
+          "rust_passed": 189,
+          "python_passed": 201,
+          "python_skipped": 5
+        },
+        "windows": {
+          "job_id": 117899065248,
+          "rust_passed": 189,
+          "common_python_passed": 201,
+          "common_python_skipped": 5,
+          "additional_capture_passed": 25,
+          "additional_capture_skipped": 1,
+          "additional_management_passed": 10,
+          "additional_management_skipped": 1,
+          "separate_python_qt_hooks_passed": 5,
+          "all_python_invocations_passed": 241,
+          "all_python_invocations_skipped": 7,
+          "native_ctest_passed": 3,
+          "compatibility_ctest_passed": 2,
+          "native_integration_qt_passed": 47,
+          "native_integration_qt_skipped": 6,
+          "native_import_qt_passed": 11,
+          "compatibility_import_qt_passed": 11,
+          "compatibility_dns_guard_qt_passed": 2,
+          "qt_counts_exclude_lifecycle": true,
+          "complete_native_application_compiled": true,
+          "physical_display_verified": false
+        },
+        "app_run_id": 39202767154,
+        "app_conclusion": "success",
+        "app_actual_tested_sha": "a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40",
+        "app_rust_passed": 189,
+        "app_guard_passed": 25,
+        "app_network_passed": 69,
+        "app_skipped": 5,
+        "app_archived_regular_source_files_byte_matched": 182,
+        "public_direct_https_native_doh_passed": 3,
+        "public_reality_vision_verified": false,
+        "verification": "verified exact source, original logs and artifacts"
+      },
+      "inheritance": "Only tested handshake foundations justify partial implementation. Stock-rustls verifier/provider tests are not a complete REALITY peer. Older green CI, ordinary TLS, parsing and build success do not establish REALITY/Vision execution or provider compatibility.",
+      "accepted_score_changed": false,
+      "private_records_tested": 0,
+      "complete_private_profiles_verified": 0
+    },
+    {
+      "date": "2026-10-19",
+      "item": "B14",
+      "old_status": "未实现",
+      "new_status": "部分实现",
+      "source_sha": "f3ce257f14e59e82977d89ac4be436d08926c6b8",
+      "source_tree_sha": "342dd35abae1d2932b0f860a1ce09d30fa4e9640",
+      "evidence": [
+        "E17",
+        "E19",
+        "docs/VISION_FRAMING_FOUNDATION_20261019.md",
+        "docs/VISION_ASYNC_INSPECTION_20261019.md",
+        "docs/evidence/vision-r2/local-validation.json",
+        "docs/evidence/vision-r2/first-ci-linux.json",
+        "docs/evidence/vision-r2/first-ci-macos-failure.json",
+        "docs/evidence/vision-r2/first-ci-windows-failure.json",
+        "docs/evidence/vision-r2/first-ci-app.json",
+        "docs/evidence/vision-r2/initial-failures.json",
+        "docs/evidence/vision-r2/record-boundary-local.json",
+        "docs/evidence/vision-r2/record-ci-linux.json",
+        "docs/evidence/vision-r2/record-ci-macos.json",
+        "docs/evidence/vision-r2/record-ci-app.json",
+        "docs/evidence/vision-r2/record-ci-windows-failure.json",
+        "docs/evidence/vision-r2/port-pair-local.json",
+        "docs/evidence/vision-r2/ci-linux.json",
+        "docs/evidence/vision-r2/ci-macos.json",
+        "docs/evidence/vision-r2/ci-windows.json",
+        "docs/evidence/vision-r2/ci-app.json"
+      ],
+      "environment": [
+        "isolated cloud Linux / Rust 1.99.1 / pinned official full Xray v26.10.17",
+        "Initial exact f3ce257f CI: Linux/App success, macOS/Windows failure; downstream Windows Qt/native application not run.",
+        "Record correction 0be68231: Linux/macOS/App success; Windows DNS UDP fixture bind failed before R3/Vision/Qt.",
+        "Final fixture source 7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167: local 94 tests passed; exact Linux/macOS/Windows full Rust jobs and App completed successfully, including Windows Qt/wrappers/native application."
+      ],
+      "local_result": {
+        "rust_unit_integration_passed": 267,
+        "rust_doctest_passed": 1,
+        "new_rust_tests_passed": 28,
+        "rust_failed": 0,
+        "rust_ignored": 0,
+        "workflow_guards_passed": 41,
+        "full_xray_tests_passed": 4,
+        "full_xray_positive_tests": 3,
+        "full_xray_direct_refusal_tests": 1,
+        "full_xray_failed": 0,
+        "full_xray_skipped": 0
+      },
+      "ci": {
+        "rust_run_id": 39243009089,
+        "rust_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39243009089",
+        "linux": "success",
+        "macos": "failure",
+        "windows": "failure",
+        "windows_qt_full_application": "not_run_after_vision_failure",
+        "app_run_id": 39243009132,
+        "app_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39243009132",
+        "app": "success",
+        "failed_case": "test_tls13_direct_request_is_rejected_without_application_data",
+        "observed_failure": "InvalidData at server_first_probe before DirectRequested was observed; strict expected PermissionDenied was not satisfied.",
+        "original_results_preserved": true
+      },
+      "inheritance": "R1 retains its own exact-source success. Original f3ce257f macOS/Windows failures and 0be68231 Windows DNS fixture failure remain preserved. The separate 7c8affba fixture source completed all three Rust platform jobs and App, including the previously unexecuted Windows peer/Qt/application gates. Direct refusal is not successful Direct interoperability.",
+      "remaining": [
+        "DirectReady and raw socket/residual-buffer ownership",
+        "HRR eligibility",
+        "production async REALITY and actual combined VLESS/REALITY/Vision",
+        "subscription IR, routing, runtime, Qt and real-provider chain"
+      ],
+      "accepted_score_changed": false,
+      "private_records_tested": 0,
+      "complete_private_profiles_verified": 0,
+      "current_source_sha": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167",
+      "current_source_tree_sha": "79d2eba424535d42ba95c9e97ca6d0b44bdb7420",
+      "current_ci": {
+        "rust_run_id": 39250098899,
+        "rust_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39250098899",
+        "rust_status": "completed",
+        "rust_conclusion": "success",
+        "linux": "success",
+        "linux_job_id": 118051505320,
+        "macos": "success",
+        "macos_job_id": 118051505781,
+        "windows": "success",
+        "windows_job_id": 118051505764,
+        "windows_qt_integration": "success",
+        "windows_independent_qt_peer_wrappers": "success",
+        "windows_complete_native_application_build": "success",
+        "app_run_id": 39250098637,
+        "app_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39250098637",
+        "app_job_id": 118053482123,
+        "app": "success",
+        "app_status": "completed",
+        "app_archived_source_files_matched": 265,
+        "source_commit": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167",
+        "source_tree": "79d2eba424535d42ba95c9e97ca6d0b44bdb7420",
+        "rust_tests_passed_each_environment": 272,
+        "rust_doctests_passed_each_environment": 1,
+        "real_tls_record_regressions_passed_each_environment": 5,
+        "workflow_guards_passed_each_environment": 41,
+        "reality_tests_passed_each_environment": 12,
+        "reality_sessions_each_environment": 13,
+        "vision_tests_passed_each_environment": 4,
+        "vision_tls12_positive_tests": 3,
+        "vision_tls13_direct_refusal_tests": 1,
+        "mature_peer_failures_errors_skips_each_environment": 0,
+        "dns_tests_passed_each_rust_platform": 37,
+        "port_selector_tests_within_dns": 6,
+        "app_python": {
+          "run": 166,
+          "passed": 161,
+          "skipped": 5,
+          "failed": 0,
+          "skip_reasons": {
+            "qt_executable_prerequisite": 4,
+            "SWIRL_RUST_INSPECTOR_prerequisite": 1
+          },
+          "dns_37_and_policy_groups_16_in_app_menu": false
+        },
+        "portable_qt_wrapper_skips_each_platform": 5,
+        "macos_public_https_doh": "not_run_existing_linux_only_condition",
+        "windows_generic_qt_skips": "original peer hooks preserved; separate independent wrappers subsequently executed",
+        "evidence": [
+          "docs/evidence/vision-r2/ci-linux.json",
+          "docs/evidence/vision-r2/ci-macos.json",
+          "docs/evidence/vision-r2/ci-windows.json",
+          "docs/evidence/vision-r2/ci-app.json"
+        ],
+        "original_prior_failures_preserved": true,
+        "direct_ready_implemented": false,
+        "complete_product_accepted": false,
+        "final_documentation_commit_is_not_a_new_executable_ci_run": true,
+        "policy_group_tests_passed_each_rust_platform": 16,
+        "policy_group_suite": "tools/tests/test_policy_groups.py; 16 total including SS fixture allocation regressions; separate from the 9-test ShadowsocksTests suite."
+      },
+      "record_boundary_local_result": {
+        "evidence": "docs/evidence/vision-r2/record-boundary-local.json",
+        "rust_unit_integration_passed": 272,
+        "rust_doctest_passed": 1,
+        "new_record_boundary_regressions_passed": 5,
+        "rust_failed_final_authorized_run": 0,
+        "rust_ignored": 0,
+        "full_xray_tests_passed": 4,
+        "full_xray_positive_tests": 3,
+        "full_xray_direct_refusal_tests": 1,
+        "full_xray_failed": 0,
+        "full_xray_skipped": 0,
+        "mature_peer_assertions_unchanged": true,
+        "initial_local_loopback_permission_failure_preserved": true,
+        "local_snapshot_does_not_imply_exact_commit_ci": true
+      },
+      "port_pair_followup": {
+        "source_sha": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167",
+        "ci_status": "completed_success",
+        "scope": "Windows independent-test TCP/UDP shared-port allocation; no product transport or protocol acceptance change.",
+        "implementation": [
+          "Read-only netsh excluded-port queries for TCP and UDP on the relevant IPv4/IPv6 address family; explicitly select outside their union.",
+          "Hold both TCP and UDP sockets together; retain OS-selected ports on non-Windows platforms.",
+          "Query/parse failures, candidate exhaustion and unknown WinError 10013 remain errors; keep the eight-attempt collision budget."
+        ],
+        "local": {
+          "dns_tests_passed": 37,
+          "dns_seconds": 81.647,
+          "shadowsocks_fixture_tests_passed": 16,
+          "shadowsocks_seconds": 5.408,
+          "workflow_guards_passed": 41,
+          "guard_seconds": 0.471,
+          "total_tests_passed": 94,
+          "new_selector_regressions": 6,
+          "failures": 0,
+          "skipped": 0,
+          "source_hashes_match_final_four_files": true,
+          "evidence": "docs/evidence/vision-r2/port-pair-local.json"
+        },
+        "preserved_font_parent": "d175d81774aef984265ca440d1b88a406394ccf5",
+        "source_tree_sha": "79d2eba424535d42ba95c9e97ca6d0b44bdb7420",
+        "ci": {
+          "rust_run_id": 39250098899,
+          "rust_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39250098899",
+          "rust_status": "completed",
+          "rust_conclusion": "success",
+          "linux": "success",
+          "linux_job_id": 118051505320,
+          "macos": "success",
+          "macos_job_id": 118051505781,
+          "windows": "success",
+          "windows_job_id": 118051505764,
+          "windows_qt_integration": "success",
+          "windows_independent_qt_peer_wrappers": "success",
+          "windows_complete_native_application_build": "success",
+          "app_run_id": 39250098637,
+          "app_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39250098637",
+          "app_job_id": 118053482123,
+          "app": "success",
+          "app_status": "completed",
+          "app_archived_source_files_matched": 265,
+          "source_commit": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167",
+          "source_tree": "79d2eba424535d42ba95c9e97ca6d0b44bdb7420",
+          "rust_tests_passed_each_environment": 272,
+          "rust_doctests_passed_each_environment": 1,
+          "real_tls_record_regressions_passed_each_environment": 5,
+          "workflow_guards_passed_each_environment": 41,
+          "reality_tests_passed_each_environment": 12,
+          "reality_sessions_each_environment": 13,
+          "vision_tests_passed_each_environment": 4,
+          "vision_tls12_positive_tests": 3,
+          "vision_tls13_direct_refusal_tests": 1,
+          "mature_peer_failures_errors_skips_each_environment": 0,
+          "dns_tests_passed_each_rust_platform": 37,
+          "port_selector_tests_within_dns": 6,
+          "app_python": {
+            "run": 166,
+            "passed": 161,
+            "skipped": 5,
+            "failed": 0,
+            "skip_reasons": {
+              "qt_executable_prerequisite": 4,
+              "SWIRL_RUST_INSPECTOR_prerequisite": 1
+            },
+            "dns_37_and_policy_groups_16_in_app_menu": false
+          },
+          "portable_qt_wrapper_skips_each_platform": 5,
+          "macos_public_https_doh": "not_run_existing_linux_only_condition",
+          "windows_generic_qt_skips": "original peer hooks preserved; separate independent wrappers subsequently executed",
+          "evidence": [
+            "docs/evidence/vision-r2/ci-linux.json",
+            "docs/evidence/vision-r2/ci-macos.json",
+            "docs/evidence/vision-r2/ci-windows.json",
+            "docs/evidence/vision-r2/ci-app.json"
+          ],
+          "original_prior_failures_preserved": true,
+          "direct_ready_implemented": false,
+          "complete_product_accepted": false,
+          "final_documentation_commit_is_not_a_new_executable_ci_run": true,
+          "policy_group_tests_passed_each_rust_platform": 16,
+          "policy_group_suite": "tools/tests/test_policy_groups.py; 16 total including SS fixture allocation regressions; separate from the 9-test ShadowsocksTests suite."
+        },
+        "exact_new_source_ci_verified": true
+      },
+      "record_boundary_source_sha": "0be68231b15c1e4f69b138cda7bae0a3930d956b",
+      "record_boundary_source_tree_sha": "72cf2ebcb652baeefeb415be66ebe59184725697",
+      "record_boundary_ci": {
+        "rust_run_id": 39246770262,
+        "rust_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39246770262",
+        "linux": "success",
+        "macos": "success",
+        "windows": "failure",
+        "windows_r3_vision_qt": "not_executed_after_dns_fixture_failure",
+        "windows_failure": "WinError 10013 while binding UDP on a TCP-selected port inside the observed Windows UDP exclusion ranges.",
+        "app_run_id": 39246770049,
+        "app_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39246770049",
+        "app": "success",
+        "app_archived_source_files_matched": 262,
+        "status": "completed_with_windows_dns_fixture_failure",
+        "original_failure_preserved": true
+      }
+    }
+  ],
+  "evidence_index": {
+    "E17": {
+      "scope": "Previously committed REALITY R2 TLS and Vision R1 framing; historical exact-source evidence, not rerun in this stage",
+      "paths": [
+        "docs/REALITY_TLS_ENGINE_20261019.md",
+        "docs/VISION_FRAMING_FOUNDATION_20261019.md",
+        "docs/CORE_REALITY_VISION_HANDOFF_20261019.md"
+      ],
+      "stages": [
+        {
+          "source_sha": "611edcff6c90d5f6e22637de1a24b4dfde494095",
+          "rust_run_id": 39217803242,
+          "app_run_id": 39217803202,
+          "historical_linux_macos_windows_app_conclusion": "success"
+        },
+        {
+          "source_sha": "5b55ab33dde4c1789547e523b25dcad5abb1cf48",
+          "rust_run_id": 39220250082,
+          "app_run_id": 39220250444,
+          "historical_linux_macos_windows_app_conclusion": "success"
+        }
+      ]
+    },
+    "E18": {
+      "scope": "Pinned mature REALITY TLS-component peer; controlled camouflage target, no arbitrary cover sites, product combination or provider acceptance",
+      "source_sha": "5ad68bcb22a23573d462cbfd972c7120093f504a",
+      "source_tree_sha": "b82dc554aadd144f8745b9ec7763915cfbae4933",
+      "paths": [
+        "docs/REALITY_XRAY_INTEROP_20261019.md",
+        "docs/evidence/reality-r3/local-xray-final-summary.json",
+        "docs/evidence/reality-r3/local-xray-initial-failures.json",
+        "docs/evidence/reality-r3/ci-linux.json",
+        "docs/evidence/reality-r3/ci-macos.json",
+        "docs/evidence/reality-r3/ci-windows.json",
+        "docs/evidence/reality-r3/ci-app.json"
+      ],
+      "upstream": {
+        "xray_commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5",
+        "reality_commit": "83f621788ca88b83179810b12baa7ae518aacb83",
+        "reality_version": "v0.0.0-20261014101318-83f621788ca8",
+        "go_version": "go1.27.2"
+      },
+      "ci": {
+        "rust_run_id": 39239280852,
+        "linux": "success",
+        "macos": "success",
+        "windows_reality_peer_step": "success",
+        "windows_job_qt_full_application": "success",
+        "app_run_id": 39239280949,
+        "app_conclusion": "success",
+        "app_job_id": 118015881436,
+        "app_artifact_ids": [
+          12180996474,
+          12180951591
+        ],
+        "app_tests_passed": 12,
+        "app_sessions": 13,
+        "app_failed": 0,
+        "app_skipped": 0,
+        "app_archived_source_files_matched": 226,
+        "app_actual_tested_sha": "5ad68bcb22a23573d462cbfd972c7120093f504a",
+        "app_repeated_build_hashes_match": true,
+        "rust_conclusion": "success",
+        "windows": "success",
+        "windows_generic_qt_peer_hook_skips": 6,
+        "subsequent_independent_qt_wrappers": 5,
+        "qt_skips_not_relabelled_as_passes": true
+      }
+    },
+    "E19": {
+      "scope": "Vision R2 bounded async framing and incremental inner-TLS inspection substage; no DirectReady or native product enablement",
+      "source_sha": "f3ce257f14e59e82977d89ac4be436d08926c6b8",
+      "paths": [
+        "docs/VISION_ASYNC_INSPECTION_20261019.md",
+        "docs/evidence/vision-r2/local-validation.json",
+        "docs/evidence/vision-r2/first-ci-linux.json",
+        "docs/evidence/vision-r2/first-ci-macos-failure.json",
+        "docs/evidence/vision-r2/first-ci-windows-failure.json",
+        "docs/evidence/vision-r2/first-ci-app.json",
+        "docs/evidence/vision-r2/initial-failures.json",
+        "docs/evidence/vision-r2/record-boundary-local.json",
+        "docs/evidence/vision-r2/record-ci-linux.json",
+        "docs/evidence/vision-r2/record-ci-macos.json",
+        "docs/evidence/vision-r2/record-ci-app.json",
+        "docs/evidence/vision-r2/record-ci-windows-failure.json",
+        "docs/evidence/vision-r2/port-pair-local.json",
+        "docs/evidence/vision-r2/ci-linux.json",
+        "docs/evidence/vision-r2/ci-macos.json",
+        "docs/evidence/vision-r2/ci-windows.json",
+        "docs/evidence/vision-r2/ci-app.json"
+      ],
+      "local_result": {
+        "rust_unit_integration_passed": 267,
+        "rust_doctest_passed": 1,
+        "new_rust_tests_passed": 28,
+        "workflow_guards_passed": 41,
+        "full_xray_tests_passed": 4,
+        "full_xray_positive_tests": 3,
+        "full_xray_direct_refusal_tests": 1,
+        "full_xray_failed": 0,
+        "full_xray_skipped": 0
+      },
+      "ci": {
+        "rust_run_id": 39243009089,
+        "rust_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39243009089",
+        "linux": "success",
+        "macos": "failure",
+        "windows": "failure",
+        "windows_qt_full_application": "not_run_after_vision_failure",
+        "app_run_id": 39243009132,
+        "app_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39243009132",
+        "app": "success",
+        "failed_case": "test_tls13_direct_request_is_rejected_without_application_data",
+        "observed_failure": "InvalidData at server_first_probe before DirectRequested was observed; strict expected PermissionDenied was not satisfied.",
+        "original_results_preserved": true
+      },
+      "source_tree_sha": "342dd35abae1d2932b0f860a1ce09d30fa4e9640",
+      "current_source_sha": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167",
+      "current_source_tree_sha": "79d2eba424535d42ba95c9e97ca6d0b44bdb7420",
+      "current_ci": {
+        "rust_run_id": 39250098899,
+        "rust_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39250098899",
+        "rust_status": "completed",
+        "rust_conclusion": "success",
+        "linux": "success",
+        "linux_job_id": 118051505320,
+        "macos": "success",
+        "macos_job_id": 118051505781,
+        "windows": "success",
+        "windows_job_id": 118051505764,
+        "windows_qt_integration": "success",
+        "windows_independent_qt_peer_wrappers": "success",
+        "windows_complete_native_application_build": "success",
+        "app_run_id": 39250098637,
+        "app_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39250098637",
+        "app_job_id": 118053482123,
+        "app": "success",
+        "app_status": "completed",
+        "app_archived_source_files_matched": 265,
+        "source_commit": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167",
+        "source_tree": "79d2eba424535d42ba95c9e97ca6d0b44bdb7420",
+        "rust_tests_passed_each_environment": 272,
+        "rust_doctests_passed_each_environment": 1,
+        "real_tls_record_regressions_passed_each_environment": 5,
+        "workflow_guards_passed_each_environment": 41,
+        "reality_tests_passed_each_environment": 12,
+        "reality_sessions_each_environment": 13,
+        "vision_tests_passed_each_environment": 4,
+        "vision_tls12_positive_tests": 3,
+        "vision_tls13_direct_refusal_tests": 1,
+        "mature_peer_failures_errors_skips_each_environment": 0,
+        "dns_tests_passed_each_rust_platform": 37,
+        "port_selector_tests_within_dns": 6,
+        "app_python": {
+          "run": 166,
+          "passed": 161,
+          "skipped": 5,
+          "failed": 0,
+          "skip_reasons": {
+            "qt_executable_prerequisite": 4,
+            "SWIRL_RUST_INSPECTOR_prerequisite": 1
+          },
+          "dns_37_and_policy_groups_16_in_app_menu": false
+        },
+        "portable_qt_wrapper_skips_each_platform": 5,
+        "macos_public_https_doh": "not_run_existing_linux_only_condition",
+        "windows_generic_qt_skips": "original peer hooks preserved; separate independent wrappers subsequently executed",
+        "evidence": [
+          "docs/evidence/vision-r2/ci-linux.json",
+          "docs/evidence/vision-r2/ci-macos.json",
+          "docs/evidence/vision-r2/ci-windows.json",
+          "docs/evidence/vision-r2/ci-app.json"
+        ],
+        "original_prior_failures_preserved": true,
+        "direct_ready_implemented": false,
+        "complete_product_accepted": false,
+        "final_documentation_commit_is_not_a_new_executable_ci_run": true,
+        "policy_group_tests_passed_each_rust_platform": 16,
+        "policy_group_suite": "tools/tests/test_policy_groups.py; 16 total including SS fixture allocation regressions; separate from the 9-test ShadowsocksTests suite."
+      },
+      "record_boundary_local_result": {
+        "evidence": "docs/evidence/vision-r2/record-boundary-local.json",
+        "rust_unit_integration_passed": 272,
+        "rust_doctest_passed": 1,
+        "new_record_boundary_regressions_passed": 5,
+        "rust_failed_final_authorized_run": 0,
+        "rust_ignored": 0,
+        "full_xray_tests_passed": 4,
+        "full_xray_positive_tests": 3,
+        "full_xray_direct_refusal_tests": 1,
+        "full_xray_failed": 0,
+        "full_xray_skipped": 0,
+        "mature_peer_assertions_unchanged": true,
+        "initial_local_loopback_permission_failure_preserved": true,
+        "local_snapshot_does_not_imply_exact_commit_ci": true
+      },
+      "concurrent_font_commits_preserved": [
+        "aab06bf",
+        "501099da",
+        "7dfbdda",
+        "b3ac46414ed3921d18b1cf8e9a143c545c8085fb",
+        "6cba41ff43b989a240191a3731d9d8a5e29908b1",
+        "d175d81774aef984265ca440d1b88a406394ccf5"
+      ],
+      "port_pair_followup": {
+        "source_sha": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167",
+        "ci_status": "completed_success",
+        "scope": "Windows independent-test TCP/UDP shared-port allocation; no product transport or protocol acceptance change.",
+        "implementation": [
+          "Read-only netsh excluded-port queries for TCP and UDP on the relevant IPv4/IPv6 address family; explicitly select outside their union.",
+          "Hold both TCP and UDP sockets together; retain OS-selected ports on non-Windows platforms.",
+          "Query/parse failures, candidate exhaustion and unknown WinError 10013 remain errors; keep the eight-attempt collision budget."
+        ],
+        "local": {
+          "dns_tests_passed": 37,
+          "dns_seconds": 81.647,
+          "shadowsocks_fixture_tests_passed": 16,
+          "shadowsocks_seconds": 5.408,
+          "workflow_guards_passed": 41,
+          "guard_seconds": 0.471,
+          "total_tests_passed": 94,
+          "new_selector_regressions": 6,
+          "failures": 0,
+          "skipped": 0,
+          "source_hashes_match_final_four_files": true,
+          "evidence": "docs/evidence/vision-r2/port-pair-local.json"
+        },
+        "preserved_font_parent": "d175d81774aef984265ca440d1b88a406394ccf5",
+        "source_tree_sha": "79d2eba424535d42ba95c9e97ca6d0b44bdb7420",
+        "ci": {
+          "rust_run_id": 39250098899,
+          "rust_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39250098899",
+          "rust_status": "completed",
+          "rust_conclusion": "success",
+          "linux": "success",
+          "linux_job_id": 118051505320,
+          "macos": "success",
+          "macos_job_id": 118051505781,
+          "windows": "success",
+          "windows_job_id": 118051505764,
+          "windows_qt_integration": "success",
+          "windows_independent_qt_peer_wrappers": "success",
+          "windows_complete_native_application_build": "success",
+          "app_run_id": 39250098637,
+          "app_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39250098637",
+          "app_job_id": 118053482123,
+          "app": "success",
+          "app_status": "completed",
+          "app_archived_source_files_matched": 265,
+          "source_commit": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167",
+          "source_tree": "79d2eba424535d42ba95c9e97ca6d0b44bdb7420",
+          "rust_tests_passed_each_environment": 272,
+          "rust_doctests_passed_each_environment": 1,
+          "real_tls_record_regressions_passed_each_environment": 5,
+          "workflow_guards_passed_each_environment": 41,
+          "reality_tests_passed_each_environment": 12,
+          "reality_sessions_each_environment": 13,
+          "vision_tests_passed_each_environment": 4,
+          "vision_tls12_positive_tests": 3,
+          "vision_tls13_direct_refusal_tests": 1,
+          "mature_peer_failures_errors_skips_each_environment": 0,
+          "dns_tests_passed_each_rust_platform": 37,
+          "port_selector_tests_within_dns": 6,
+          "app_python": {
+            "run": 166,
+            "passed": 161,
+            "skipped": 5,
+            "failed": 0,
+            "skip_reasons": {
+              "qt_executable_prerequisite": 4,
+              "SWIRL_RUST_INSPECTOR_prerequisite": 1
+            },
+            "dns_37_and_policy_groups_16_in_app_menu": false
+          },
+          "portable_qt_wrapper_skips_each_platform": 5,
+          "macos_public_https_doh": "not_run_existing_linux_only_condition",
+          "windows_generic_qt_skips": "original peer hooks preserved; separate independent wrappers subsequently executed",
+          "evidence": [
+            "docs/evidence/vision-r2/ci-linux.json",
+            "docs/evidence/vision-r2/ci-macos.json",
+            "docs/evidence/vision-r2/ci-windows.json",
+            "docs/evidence/vision-r2/ci-app.json"
+          ],
+          "original_prior_failures_preserved": true,
+          "direct_ready_implemented": false,
+          "complete_product_accepted": false,
+          "final_documentation_commit_is_not_a_new_executable_ci_run": true,
+          "policy_group_tests_passed_each_rust_platform": 16,
+          "policy_group_suite": "tools/tests/test_policy_groups.py; 16 total including SS fixture allocation regressions; separate from the 9-test ShadowsocksTests suite."
+        },
+        "exact_new_source_ci_verified": true
+      },
+      "record_boundary_source_sha": "0be68231b15c1e4f69b138cda7bae0a3930d956b",
+      "record_boundary_source_tree_sha": "72cf2ebcb652baeefeb415be66ebe59184725697",
+      "record_boundary_ci": {
+        "rust_run_id": 39246770262,
+        "rust_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39246770262",
+        "linux": "success",
+        "macos": "success",
+        "windows": "failure",
+        "windows_r3_vision_qt": "not_executed_after_dns_fixture_failure",
+        "windows_failure": "WinError 10013 while binding UDP on a TCP-selected port inside the observed Windows UDP exclusion ranges.",
+        "app_run_id": 39246770049,
+        "app_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39246770049",
+        "app": "success",
+        "app_archived_source_files_matched": 262,
+        "status": "completed_with_windows_dns_fixture_failure",
+        "original_failure_preserved": true
+      }
+    }
+  }
+}

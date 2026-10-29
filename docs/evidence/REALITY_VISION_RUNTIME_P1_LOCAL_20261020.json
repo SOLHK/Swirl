@@ -1,0 +1,631 @@
+{
+  "schema": 1,
+  "scope": "P1 production VLESS + REALITY + Vision through complete pinned official Xray",
+  "source_base": "169e0cad51fc18a2d6fa4f194fafd90128bf2f7b",
+  "working_tree": true,
+  "exact_commit_ci": false,
+  "provider_connection": false,
+  "qt_execution": false,
+  "flow": "xtls-rprx-vision",
+  "native_fingerprint": "rustls",
+  "gates": {
+    "fmt": {
+      "command": [
+        "/tmp/swirl-cargo/bin/cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "head": "169e0cad51fc18a2d6fa4f194fafd90128bf2f7b",
+      "elapsed_seconds": 0.89,
+      "exit_code": 0,
+      "all_core_files_sha256": "57b7c5a9806be92d930296e06dbd43dbbdccbe73e9f4ce705a5175ff8f7ed049"
+    },
+    "check": {
+      "command": [
+        "/tmp/swirl-cargo/bin/cargo",
+        "check",
+        "--workspace",
+        "--locked"
+      ],
+      "head": "169e0cad51fc18a2d6fa4f194fafd90128bf2f7b",
+      "elapsed_seconds": 0.404,
+      "exit_code": 0,
+      "all_core_files_sha256": "57b7c5a9806be92d930296e06dbd43dbbdccbe73e9f4ce705a5175ff8f7ed049"
+    },
+    "clippy": {
+      "command": [
+        "/tmp/swirl-cargo/bin/cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "head": "169e0cad51fc18a2d6fa4f194fafd90128bf2f7b",
+      "elapsed_seconds": 0.751,
+      "exit_code": 0,
+      "all_core_files_sha256": "57b7c5a9806be92d930296e06dbd43dbbdccbe73e9f4ce705a5175ff8f7ed049"
+    },
+    "test": {
+      "command": [
+        "/tmp/swirl-cargo/bin/cargo",
+        "test",
+        "--workspace",
+        "--locked"
+      ],
+      "head": "169e0cad51fc18a2d6fa4f194fafd90128bf2f7b",
+      "elapsed_seconds": 21.778,
+      "exit_code": 0,
+      "all_core_files_sha256": "57b7c5a9806be92d930296e06dbd43dbbdccbe73e9f4ce705a5175ff8f7ed049",
+      "test_totals": {
+        "passed": 297,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      }
+    }
+  },
+  "release_build": {
+    "result": "success",
+    "seconds": 167,
+    "binaries": {
+      "SWIRL_RUST_HARNESS": {
+        "file": "swirl-api",
+        "sha256": "9c5eecc5073293ced97338882dc95c15e41d9655db8e481f5be25b3b2c93db00"
+      },
+      "SWIRL_RUST_INSPECTOR": {
+        "file": "swirl-inspect",
+        "sha256": "3b5dfd216179fb1e755e6ce20743ca753e0d968cd9234ce2b34a3258f410e865"
+      }
+    }
+  },
+  "runtime_test_summary": {
+    "tests_run": 9,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "successful": true,
+    "product_mode": "rust-runtime",
+    "provider_connection": false,
+    "protocol": "vless+reality+vision"
+  },
+  "runtime_test_log_sha256": "e3a47f2fb5b4279c55f3d74d37de3cd613b1fb6fd4292968300093bec9620f98",
+  "runtime_test_source_sha256": "4a4fcd0ca0515aa5814589a625025216ce0175ccb1923e3e6de9fd6c2a5dff52",
+  "xray": {
+    "commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5",
+    "go_mod_sha256": "31fe6bd6c04eb2738e157b850236b1376cbbac3f33e974256bb7325c8c764250",
+    "go_sum_sha256": "a72c2f2b5dd38fcf42ef55034bd55038703448b55a878eafddd60d4af1f63145",
+    "release": "v26.10.17",
+    "repository": "https://github.com/XTLS/Xray-core.git",
+    "tree": "55fc871fdf3e63149066956e7c60670f3a44fbf2"
+  },
+  "reality": {
+    "commit": "83f621788ca88b83179810b12baa7ae518aacb83",
+    "go_mod_sum": "h1:ptlSkJ8k/7IDauNH0SA96JPOo+nYGLTv2Y3UMpwvAsY=",
+    "module": "github.com/xtls/reality",
+    "sum": "h1:RjLnVvlzK4q6zWaSBPNRGsrgx2fbJDeUWffjw574uzs=",
+    "version": "v0.0.0-20261014101318-83f621788ca8"
+  },
+  "official_binary_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a",
+  "official_repeat_build": {
+    "first_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a",
+    "matches": true,
+    "repeated_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a"
+  },
+  "peer_observations": [
+    {
+      "identity": "A",
+      "protocol": "vless+reality+vision",
+      "tcp_listener_established": true,
+      "reality_authenticated_sessions": 0,
+      "client_finished_verified_sessions": 0,
+      "camouflage_record_size_failures": 0,
+      "vless_accepted_sessions": 0,
+      "vless_target_ports": [],
+      "vision_padding_events": 0,
+      "vision_unpadding_events": 0,
+      "vision_direct_upload_commands": 0,
+      "vision_direct_download_commands": 0,
+      "camouflage_connections": 7,
+      "camouflage_application_bytes": 0,
+      "process_reaped": true,
+      "forced_kill": false,
+      "listener_closed": true,
+      "active_camouflage_connections": 0
+    },
+    {
+      "identity": "A",
+      "protocol": "vless+reality+vision",
+      "tcp_listener_established": true,
+      "reality_authenticated_sessions": 8,
+      "client_finished_verified_sessions": 8,
+      "camouflage_record_size_failures": 0,
+      "vless_accepted_sessions": 8,
+      "vless_target_ports": [
+        60053,
+        59525,
+        60053,
+        59525,
+        60053,
+        59525,
+        60053,
+        59525
+      ],
+      "vision_padding_events": 12,
+      "vision_unpadding_events": 12,
+      "vision_direct_upload_commands": 4,
+      "vision_direct_download_commands": 4,
+      "camouflage_connections": 15,
+      "camouflage_application_bytes": 0,
+      "process_reaped": true,
+      "forced_kill": false,
+      "listener_closed": true,
+      "active_camouflage_connections": 0
+    },
+    {
+      "identity": "A",
+      "protocol": "vless+reality+vision",
+      "tcp_listener_established": true,
+      "reality_authenticated_sessions": 6,
+      "client_finished_verified_sessions": 6,
+      "camouflage_record_size_failures": 0,
+      "vless_accepted_sessions": 6,
+      "vless_target_ports": [
+        53263,
+        53263,
+        53263,
+        53263,
+        53263,
+        53263
+      ],
+      "vision_padding_events": 18,
+      "vision_unpadding_events": 6,
+      "vision_direct_upload_commands": 0,
+      "vision_direct_download_commands": 0,
+      "camouflage_connections": 13,
+      "camouflage_application_bytes": 0,
+      "process_reaped": true,
+      "forced_kill": false,
+      "listener_closed": true,
+      "active_camouflage_connections": 0
+    },
+    {
+      "identity": "A",
+      "protocol": "vless+reality+vision",
+      "tcp_listener_established": true,
+      "reality_authenticated_sessions": 1,
+      "client_finished_verified_sessions": 1,
+      "camouflage_record_size_failures": 0,
+      "vless_accepted_sessions": 1,
+      "vless_target_ports": [
+        37743
+      ],
+      "vision_padding_events": 1,
+      "vision_unpadding_events": 1,
+      "vision_direct_upload_commands": 0,
+      "vision_direct_download_commands": 0,
+      "camouflage_connections": 8,
+      "camouflage_application_bytes": 0,
+      "process_reaped": true,
+      "forced_kill": false,
+      "listener_closed": true,
+      "active_camouflage_connections": 0
+    },
+    {
+      "identity": "B",
+      "protocol": "vless+reality+vision",
+      "tcp_listener_established": true,
+      "reality_authenticated_sessions": 1,
+      "client_finished_verified_sessions": 1,
+      "camouflage_record_size_failures": 0,
+      "vless_accepted_sessions": 1,
+      "vless_target_ports": [
+        37743
+      ],
+      "vision_padding_events": 1,
+      "vision_unpadding_events": 1,
+      "vision_direct_upload_commands": 0,
+      "vision_direct_download_commands": 0,
+      "camouflage_connections": 8,
+      "camouflage_application_bytes": 0,
+      "process_reaped": true,
+      "forced_kill": false,
+      "listener_closed": true,
+      "active_camouflage_connections": 0
+    },
+    {
+      "identity": "A",
+      "protocol": "vless+reality+vision",
+      "tcp_listener_established": true,
+      "reality_authenticated_sessions": 1,
+      "client_finished_verified_sessions": 1,
+      "camouflage_record_size_failures": 0,
+      "vless_accepted_sessions": 1,
+      "vless_target_ports": [
+        37163
+      ],
+      "vision_padding_events": 1,
+      "vision_unpadding_events": 1,
+      "vision_direct_upload_commands": 0,
+      "vision_direct_download_commands": 0,
+      "camouflage_connections": 8,
+      "camouflage_application_bytes": 0,
+      "process_reaped": true,
+      "forced_kill": false,
+      "listener_closed": true,
+      "active_camouflage_connections": 0
+    },
+    {
+      "identity": "A",
+      "protocol": "vless+reality+vision",
+      "tcp_listener_established": true,
+      "reality_authenticated_sessions": 1,
+      "client_finished_verified_sessions": 1,
+      "camouflage_record_size_failures": 0,
+      "vless_accepted_sessions": 1,
+      "vless_target_ports": [
+        34415
+      ],
+      "vision_padding_events": 3,
+      "vision_unpadding_events": 1,
+      "vision_direct_upload_commands": 0,
+      "vision_direct_download_commands": 0,
+      "camouflage_connections": 8,
+      "camouflage_application_bytes": 0,
+      "process_reaped": true,
+      "forced_kill": false,
+      "listener_closed": true,
+      "active_camouflage_connections": 0
+    },
+    {
+      "identity": "B",
+      "protocol": "vless+reality+vision",
+      "tcp_listener_established": true,
+      "reality_authenticated_sessions": 1,
+      "client_finished_verified_sessions": 1,
+      "camouflage_record_size_failures": 0,
+      "vless_accepted_sessions": 1,
+      "vless_target_ports": [
+        39175
+      ],
+      "vision_padding_events": 1,
+      "vision_unpadding_events": 1,
+      "vision_direct_upload_commands": 0,
+      "vision_direct_download_commands": 0,
+      "camouflage_connections": 8,
+      "camouflage_application_bytes": 0,
+      "process_reaped": true,
+      "forced_kill": false,
+      "listener_closed": true,
+      "active_camouflage_connections": 0
+    },
+    {
+      "identity": "A",
+      "protocol": "vless+reality+vision",
+      "tcp_listener_established": true,
+      "reality_authenticated_sessions": 1,
+      "client_finished_verified_sessions": 1,
+      "camouflage_record_size_failures": 0,
+      "vless_accepted_sessions": 1,
+      "vless_target_ports": [
+        47279
+      ],
+      "vision_padding_events": 3,
+      "vision_unpadding_events": 2,
+      "vision_direct_upload_commands": 0,
+      "vision_direct_download_commands": 0,
+      "camouflage_connections": 8,
+      "camouflage_application_bytes": 0,
+      "process_reaped": true,
+      "forced_kill": false,
+      "listener_closed": true,
+      "active_camouflage_connections": 0
+    },
+    {
+      "identity": "A",
+      "protocol": "vless+reality+vision",
+      "tcp_listener_established": true,
+      "reality_authenticated_sessions": 1,
+      "client_finished_verified_sessions": 1,
+      "camouflage_record_size_failures": 0,
+      "vless_accepted_sessions": 1,
+      "vless_target_ports": [
+        51611
+      ],
+      "vision_padding_events": 2,
+      "vision_unpadding_events": 2,
+      "vision_direct_upload_commands": 1,
+      "vision_direct_download_commands": 1,
+      "camouflage_connections": 8,
+      "camouflage_application_bytes": 0,
+      "process_reaped": true,
+      "forced_kill": false,
+      "listener_closed": true,
+      "active_camouflage_connections": 0
+    },
+    {
+      "identity": "A",
+      "protocol": "vless+reality+vision",
+      "tcp_listener_established": true,
+      "reality_authenticated_sessions": 1,
+      "client_finished_verified_sessions": 1,
+      "camouflage_record_size_failures": 0,
+      "vless_accepted_sessions": 0,
+      "vless_target_ports": [],
+      "vision_padding_events": 0,
+      "vision_unpadding_events": 0,
+      "vision_direct_upload_commands": 0,
+      "vision_direct_download_commands": 0,
+      "camouflage_connections": 11,
+      "camouflage_application_bytes": 0,
+      "process_reaped": true,
+      "forced_kill": false,
+      "listener_closed": true,
+      "active_camouflage_connections": 0
+    },
+    {
+      "identity": "B",
+      "protocol": "vless+reality+vision",
+      "tcp_listener_established": true,
+      "reality_authenticated_sessions": 0,
+      "client_finished_verified_sessions": 0,
+      "camouflage_record_size_failures": 0,
+      "vless_accepted_sessions": 0,
+      "vless_target_ports": [],
+      "vision_padding_events": 0,
+      "vision_unpadding_events": 0,
+      "vision_direct_upload_commands": 0,
+      "vision_direct_download_commands": 0,
+      "camouflage_connections": 7,
+      "camouflage_application_bytes": 0,
+      "process_reaped": true,
+      "forced_kill": false,
+      "listener_closed": true,
+      "active_camouflage_connections": 0
+    }
+  ],
+  "origin_observations": [
+    {
+      "http_paths": [],
+      "https_paths": [],
+      "https_sni": [],
+      "https_authenticated_closes": 0,
+      "echo_bytes": 0,
+      "echo_sessions": [],
+      "origin_errors": {
+        "http": [],
+        "https": [],
+        "echo": []
+      }
+    },
+    {
+      "http_paths": [
+        "/uri",
+        "/json",
+        "/yaml",
+        "/base64"
+      ],
+      "https_paths": [
+        "/uri-tls",
+        "/json-tls",
+        "/yaml-tls",
+        "/base64-tls"
+      ],
+      "https_sni": [
+        "localhost",
+        "localhost",
+        "localhost",
+        "localhost"
+      ],
+      "https_authenticated_closes": 4,
+      "echo_bytes": 0,
+      "echo_sessions": [],
+      "origin_errors": {
+        "http": [],
+        "https": [],
+        "echo": []
+      }
+    },
+    {
+      "http_paths": [],
+      "https_paths": [],
+      "https_sni": [],
+      "https_authenticated_closes": 0,
+      "echo_bytes": 1572966,
+      "echo_sessions": [
+        {
+          "expected_bytes": 262161,
+          "received_bytes": 262161,
+          "cancelled": false,
+          "tail_after_client_halfclose": true,
+          "target_closed": true,
+          "sha256": "d18b4d6a27a8f2bcb43d54e1af2425735b1311ca9ebceb9c26d3bdc0279683b2"
+        },
+        {
+          "expected_bytes": 262161,
+          "received_bytes": 262161,
+          "cancelled": false,
+          "tail_after_client_halfclose": true,
+          "target_closed": true,
+          "sha256": "14d1e0bc0795e401b7add79235cf62632e820d277e1d6ec2a71be9d002c6665f"
+        },
+        {
+          "expected_bytes": 262161,
+          "received_bytes": 262161,
+          "cancelled": false,
+          "tail_after_client_halfclose": true,
+          "target_closed": true,
+          "sha256": "ad65c2ca5753314d6836b13f53d02cc440f0aa5df2c0c6b9d4845899a6786403"
+        },
+        {
+          "expected_bytes": 262161,
+          "received_bytes": 262161,
+          "cancelled": false,
+          "tail_after_client_halfclose": true,
+          "target_closed": true,
+          "sha256": "f1c3abcfa025abc45ab9a786c1fc95c6c137b23c564b6a8814a3815244d5449d"
+        },
+        {
+          "expected_bytes": 262161,
+          "received_bytes": 262161,
+          "cancelled": false,
+          "tail_after_client_halfclose": true,
+          "target_closed": true,
+          "sha256": "0e40cdaaa21750ed08c55fdf509fa7ea910e4c08607a50f34f6c5d7d5d36898c"
+        },
+        {
+          "expected_bytes": 262161,
+          "received_bytes": 262161,
+          "cancelled": false,
+          "tail_after_client_halfclose": true,
+          "target_closed": true,
+          "sha256": "63a801c432dc7634d32ee2af2103995ba0d33d1799ed8c5a0b1f5b2e462a36cb"
+        }
+      ],
+      "origin_errors": {
+        "http": [],
+        "https": [],
+        "echo": []
+      }
+    },
+    {
+      "http_paths": [
+        "/route-a",
+        "/route-b",
+        "/direct"
+      ],
+      "https_paths": [],
+      "https_sni": [],
+      "https_authenticated_closes": 0,
+      "echo_bytes": 0,
+      "echo_sessions": [],
+      "origin_errors": {
+        "http": [],
+        "https": [],
+        "echo": []
+      }
+    },
+    {
+      "http_paths": [],
+      "https_paths": [],
+      "https_sni": [],
+      "https_authenticated_closes": 0,
+      "echo_bytes": 35,
+      "echo_sessions": [
+        {
+          "expected_bytes": 36,
+          "received_bytes": 35,
+          "cancelled": true,
+          "tail_after_client_halfclose": false,
+          "target_closed": true
+        }
+      ],
+      "origin_errors": {
+        "http": [],
+        "https": [],
+        "echo": []
+      }
+    },
+    {
+      "http_paths": [
+        "/new-b"
+      ],
+      "https_paths": [],
+      "https_sni": [],
+      "https_authenticated_closes": 0,
+      "echo_bytes": 25,
+      "echo_sessions": [
+        {
+          "expected_bytes": 25,
+          "received_bytes": 25,
+          "cancelled": false,
+          "tail_after_client_halfclose": true,
+          "target_closed": true,
+          "sha256": "a2b976f92111f009d4c4687d3f530a1f82751d0367659fdeca2897804eb91bd5"
+        }
+      ],
+      "origin_errors": {
+        "http": [],
+        "https": [],
+        "echo": []
+      }
+    },
+    {
+      "http_paths": [],
+      "https_paths": [
+        "/inner-tls12"
+      ],
+      "https_sni": [
+        "localhost"
+      ],
+      "https_authenticated_closes": 1,
+      "echo_bytes": 0,
+      "echo_sessions": [],
+      "origin_errors": {
+        "http": [],
+        "https": [],
+        "echo": []
+      }
+    },
+    {
+      "http_paths": [],
+      "https_paths": [],
+      "https_sni": [],
+      "https_authenticated_closes": 0,
+      "echo_bytes": 0,
+      "echo_sessions": [],
+      "origin_errors": {
+        "http": [],
+        "https": [],
+        "echo": []
+      }
+    },
+    {
+      "http_paths": [],
+      "https_paths": [],
+      "https_sni": [],
+      "https_authenticated_closes": 0,
+      "echo_bytes": 0,
+      "echo_sessions": [],
+      "origin_errors": {
+        "http": [],
+        "https": [],
+        "echo": []
+      }
+    }
+  ],
+  "tls13_direct_target": [
+    {
+      "tls_version": "TLSv1.3",
+      "handshake_complete": true,
+      "received_bytes": 524288,
+      "sent_bytes": 524288,
+      "close_notify_received": true,
+      "close_notify_sent": true,
+      "probe_bytes_sent": 34,
+      "connection_closed": true,
+      "thread_released": true,
+      "error": null,
+      "cipher": "TLS_AES_256_GCM_SHA384",
+      "probe_sha256": "d50b77b997f88e72a20fafecc7af9ab0a5c6d19d18b81276262ace4216eb7316",
+      "received_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5",
+      "sent_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5"
+    }
+  ],
+  "limits": [
+    "HRR and unsupported inner TLS Direct states fail closed",
+    "Only explicit rustls profile; declared browser fingerprints and uTLS are not replaced",
+    "Client half-close does not imply official Xray target FIN propagation",
+    "MATCH/DOMAIN routing evidence does not prove global DNS leak freedom"
+  ],
+  "frozen_acceptance": {
+    "items": 79,
+    "accepted": 6,
+    "weighted_percent": 10.83
+  }
+}

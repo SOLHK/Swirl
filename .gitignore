@@ -5,5 +5,21 @@ dist/
 *.zip
 
 build/
+/work/
 system-proxy-tests.txt
 routing-tests.txt
+
+# Private subscription acquisition material must never be committed.
+__pycache__/
+*.pyc
+*.dpapi
+*.private
+private-capture/
+core/target/
+!core/crates/*/src/bin/
+!core/crates/*/src/bin/*.rs
+
+# User font imports and variable-font experiments are local-only.
+*.ttc
+*.otf
+*.ttf

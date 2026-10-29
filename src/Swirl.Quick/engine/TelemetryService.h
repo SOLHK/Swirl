@@ -6,7 +6,6 @@
 #include <QSet>
 #include <QDate>
 #include <QPointer>
-#include "ProxyLatencyProbe.h"
 
 // Single model shared by overview, connections, processes and analytics.
 // Only authenticated adapter observations enter the accounting model.
@@ -30,6 +29,7 @@ public:
  explicit TelemetryService(QString path={},bool networkMeasurements=true,QObject *parent=nullptr);
  ~TelemetryService() override;
  void ingest(const ProxyEngine::Status &);
+ void rejectNativeProbe(quint64 tag,const QString &code);
  int revision() const { return m_revision; }
  bool sampled() const;
  bool connectionsSampled() const;
@@ -45,17 +45,20 @@ public:
  QVariantMap proxyDiagnostic() const { return m_proxyDiagnostic; }
  QString storageError() const { return m_storageError; }
  Q_INVOKABLE QVariantMap summary(int period=0) const;
- Q_INVOKABLE QVariantList ranking(const QString &kind,int period=0,int limit=50) const;
+ Q_INVOKABLE QVariantList ranking(const QString &kind,int period=0,int limit=50,bool proxyOnly=false) const;
+ Q_INVOKABLE bool proxyRankingAvailable(int period=0) const;
  Q_INVOKABLE QVariantList distribution(int period=0) const;
  Q_INVOKABLE QVariantList history(const QString &series="down",int seconds=60,bool normalized=false) const;
  Q_INVOKABLE QVariantList historyPoints(const QString &series="down",int seconds=60) const;
  Q_INVOKABLE QVariantList dailyTraffic(bool proxyOnly=false) const;
+ Q_INVOKABLE QVariantList periodTraffic(int period,bool proxyOnly=false) const;
  Q_INVOKABLE QString formatBytes(double bytes) const;
  Q_INVOKABLE void measureNetwork();
  Q_INVOKABLE void flush();
 signals:
  void changed();
  void diagnostic(const QString &module,const QString &code,const QString &message);
+ void nativeProbeRequested(const QUrl &url,quint64 tag);
 private:
  friend class TelemetryTests;
  void reportMeasurement(const QString &key,bool ok,const QString &message);
@@ -64,11 +67,14 @@ private:
  QJsonObject periodData(int period) const;
  void measureHttp(const QString &key,const QUrl &url,bool throughProxy,bool ip=false);
  void recordInternetResult(int networkError,int http,bool throughProxy,qint64 elapsed);
+ void measureProxy();
+ void finishNativeProbe(const QVariantMap &result);
 
  void finishMeasurement(quint64 generation);
  QString m_path,m_epoch,m_routeEpoch,m_storageError,m_externalIp,m_measurementState;
  int m_revision=0,m_measurements=0;
  bool m_networkEnabled=true,m_dirty=false;
+ bool m_publishedSampled=false,m_publishedConnectionsSampled=false;
  qint64 m_lastConnections=0,m_lastTraffic=0,m_lastUp=0,m_lastDown=0;
  ProxyEngine::Status m_status;
  mutable QHash<int,QJsonObject> m_periodCache;
@@ -80,8 +86,9 @@ private:
  QVariantMap m_internetDiagnostic;
  QVariantMap m_proxyDiagnostic;
  quint64 m_routeGeneration=0;
- QPointer<ProxyLatencyProbe> m_proxyProbe;
+ bool m_nativeProbePending=false,m_nativeProbeObservedRunning=false;
+ quint64 m_nativeProbeGeneration=0,m_nativeProbeTag=0;
  QUrl m_internetProbe{QStringLiteral("https://www.gstatic.com/generate_204")};
  QSet<QString> m_failedMeasurements;
- QTimer m_save,m_measure,m_stale;
+ QTimer m_save,m_measure,m_stale,m_nativeProbeDeadline;
 };

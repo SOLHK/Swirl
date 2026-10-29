@@ -1,0 +1,4 @@
+   Compiling swirl-transport v0.1.0 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/crates/swirl-transport)
+   Compiling swirl-dns v0.1.0 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/crates/swirl-dns)
+   Compiling swirl-protocol v0.1.0 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/crates/swirl-protocol)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.51s

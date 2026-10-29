@@ -1,0 +1,65 @@
+name: Swirl VF exact-source native diagnostics
+
+on:
+  push:
+    branches: [work/core-completion-20261017]
+    paths:
+      - '.github/workflows/swirl-vf-original-probe.yml'
+      - 'tools/swirl_vf/platform/probe_identical_source.py'
+      - 'tools/swirl_vf/platform/coretext_extract.swift'
+      - 'tools/swirl_vf/platform/test_streaming_reader.py'
+      - 'tools/swirl_vf/platform/test_json_transport.py'
+      - 'tools/swirl_vf/tools/rebuild.py'
+      - 'tools/swirl_vf/tools/metric_variations.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swirl-vf-original-probe-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-probe:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile native extractor
+        shell: bash
+        run: |
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          mkdir -p build/original-probe-summary
+          xcrun swiftc -O tools/swirl_vf/platform/coretext_extract.swift -o "$RUNNER_TEMP/coretext_extract"
+      - name: Require responses before EOF using the exact production reader
+        shell: bash
+        run: |
+          git show 72c8f1c3f4523140b3f108eafac0ecf720a94e5b:tools/swirl_vf/platform/coretext_extract.swift > "$RUNNER_TEMP/coretext-stream-baseline.swift"
+          python tools/swirl_vf/platform/test_streaming_reader.py \
+            --baseline-source "$RUNNER_TEMP/coretext-stream-baseline.swift" \
+            --output build/original-probe-summary/streaming-reader.json
+      - name: Require exact numerical JSON roundtrips and retain legacy evidence
+        shell: bash
+        run: |
+          python tools/swirl_vf/platform/test_json_transport.py \
+            --output build/original-probe-summary/json-transport.json
+      - name: Probe only the exact resident source without publishing font data
+        shell: bash
+        run: |
+          python tools/swirl_vf/platform/probe_identical_source.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --binary "$RUNNER_TEMP/coretext_extract" \
+            --output build/original-probe-summary/original-probe-summary.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-original-summary-${{ github.sha }}
+          path: build/original-probe-summary/*.json
+          retention-days: 7

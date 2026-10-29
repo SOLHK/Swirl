@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "platform": "linux-amd64",
+  "client_runtime": false,
+  "peers": {
+    "hysteria2": {
+      "repository": "HyNetworks/hysteria",
+      "release": "app/v2.13.0",
+      "commit": "ca8fbd874fd6ca82413948de6dc5924405e103e1",
+      "protocol": "Hysteria 2",
+      "asset": "hysteria-linux-amd64",
+      "url": "https://github.com/HyNetworks/hysteria/releases/download/app/v2.13.0/hysteria-linux-amd64",
+      "sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+      "bytes": 23924898,
+      "version_output": "\u2591\u2588\u2591\u2588\u2591\u2588\u2591\u2588\u2591\u2588\u2580\u2580\u2591\u2580\u2588\u2580\u2591\u2588\u2580\u2580\u2591\u2588\u2580\u2584\u2591\u2580\u2588\u2580\u2591\u2588\u2580\u2588\u2591\u2591\u2591\u2580\u2580\u2584\n\u2591\u2588\u2580\u2588\u2591\u2591\u2588\u2591\u2591\u2580\u2580\u2588\u2591\u2591\u2588\u2591\u2591\u2588\u2580\u2580\u2591\u2588\u2580\u2584\u2591\u2591\u2588\u2591\u2591\u2588\u2580\u2588\u2591\u2591\u2591\u2584\u2580\u2591\n\u2591\u2580\u2591\u2580\u2591\u2591\u2580\u2591\u2591\u2580\u2580\u2580\u2591\u2591\u2580\u2591\u2591\u2580\u2580\u2580\u2591\u2580\u2591\u2580\u2591\u2580\u2580\u2580\u2591\u2580\u2591\u2580\u2591\u2591\u2591\u2580\u2580\u2580\n\na powerful, lightning fast and censorship resistant proxy\nAperture Internet Laboratory <https://github.com/apernet>\n\nVersion:\tv2.13.0\nBuildDate:\t2026-10-05T04:16:24Z\nBuildType:\trelease\nToolchain:\tgo1.26.8 linux/amd64\nCommitHash:\tca8fbd874fd6ca82413948de6dc5924405e103e1\nPlatform:\tlinux\nArchitecture:\tamd64\nLibraries:\tquic-go=v0.63.1-0.20261004180939-a10df75c260c",
+      "binary": "/workspace/scratch/63c2b083dcfa/peers/ci-native-download-validation/hysteria2/hysteria",
+      "environment": "HY2_SERVER",
+      "role": "independent server test peer only"
+    },
+    "tuic": {
+      "repository": "tuic-protocol/tuic",
+      "release": "tuic-server-1.0.0",
+      "commit": "a299ef02d9f4ab5a0edbf58b9998f41bf768b332",
+      "protocol": "TUIC v5 historical official reference",
+      "asset": "tuic-server-1.0.0-x86_64-unknown-linux-musl",
+      "url": "https://github.com/tuic-protocol/tuic/releases/download/tuic-server-1.0.0/tuic-server-1.0.0-x86_64-unknown-linux-musl",
+      "sha256": "adb808944ca829857bf408d2ee438a156e8171543dbbed3e94964b66b4135393",
+      "bytes": 2275640,
+      "version_output": "1.0.0",
+      "binary": "/workspace/scratch/63c2b083dcfa/peers/ci-native-download-validation/tuic/tuic-server",
+      "environment": "SWIRL_TUIC_SERVER",
+      "role": "independent server test peer only"
+    }
+  }
+}

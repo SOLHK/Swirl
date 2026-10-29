@@ -57,9 +57,10 @@ int main(int argc, char *argv[])
         std::fprintf(stderr, "Invalid Swirl brand SVG\n");
         return 3;
     }
-    const QVector<int> sizes = {16, 20, 24, 32, 40, 48, 64, 128, 256};
+    const auto &sizes = swirlBrandIconSizes;
+    const auto content = swirlBrandContentBounds(renderer);
     QVector<QByteArray> frames;
-    for (int size : sizes) frames.append(makeDib(swirlBrandRaster(renderer,size), size));
+    for (int size : sizes) frames.append(makeDib(swirlBrandRaster(renderer,size,content), size));
     QByteArray icon;
     QDataStream header(&icon, QIODevice::WriteOnly);
     header.setByteOrder(QDataStream::LittleEndian);

@@ -1,0 +1,662 @@
+{
+  "official_version": "v2.13.0",
+  "official_commit": "ca8fbd874fd6ca82413948de6dc5924405e103e1",
+  "official_server_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+  "client_sha256": "3d5e852e6a7f263f6cee2f6095b13e3f6fd0710e0951613d0a60970a22e967b6",
+  "client_role": "Swirl native Rust",
+  "server_role": "official Hysteria2 only",
+  "records": [
+    {
+      "case": "tcp-clean-normal-close",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 47.825,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 26540,
+        "downloaded": 4096,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+        "total_us": 29198,
+        "uploaded": 4096
+      }
+    },
+    {
+      "case": "tcp-4mib-bidirectional",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 452.764,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 18921,
+        "downloaded": 4194304,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "a8ec6dd6b98ced548e257779ed68b08ae544037ff49b5cca6f8f994244fb92f6",
+        "total_us": 442256,
+        "uploaded": 4194304
+      }
+    },
+    {
+      "case": "udp-small",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 12.497,
+      "result": {
+        "dns_quic_auth_us": 6261,
+        "downloaded": 200,
+        "imported": false,
+        "mode": "udp",
+        "ok": true,
+        "sha256": "e6aa32b959de1e2c0b59be14dc034c06d324b8fb74191d6e50cd3d83d2643a39",
+        "uploaded": 200
+      }
+    },
+    {
+      "case": "udp-fragmented-3072",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 14.38,
+      "result": {
+        "dns_quic_auth_us": 6744,
+        "downloaded": 3072,
+        "imported": false,
+        "mode": "udp",
+        "ok": true,
+        "sha256": "2925f8a9109d508016c1edae2ab029a875e66f94e0787d13c23c0bda08a41e94",
+        "uploaded": 3072
+      }
+    },
+    {
+      "case": "udp-fragmented-4000",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 11.163,
+      "result": {
+        "dns_quic_auth_us": 5087,
+        "downloaded": 4000,
+        "imported": false,
+        "mode": "udp",
+        "ok": true,
+        "sha256": "8fa92753ab198d9f7939242eef59c9ec0116a89c2db6c461f40fd9b197ebc8df",
+        "uploaded": 4000
+      }
+    },
+    {
+      "case": "dns-over-native-udp",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 10.147,
+      "result": {
+        "dns_quic_auth_us": 4909,
+        "downloaded": 46,
+        "imported": false,
+        "mode": "dns",
+        "ok": true,
+        "sha256": "3dc0714007615943918be44989b2b9f9ccff4ec346ac2a5ed04a70cede8fe061",
+        "uploaded": 30
+      }
+    },
+    {
+      "case": "wrong-password",
+      "expected_success": false,
+      "upstream_limitation_probe": false,
+      "client_exit": 1,
+      "elapsed_ms": 8.17,
+      "result": {
+        "code": "Hysteria2AuthenticationRejected",
+        "ok": false
+      }
+    },
+    {
+      "case": "untrusted-server-certificate",
+      "expected_success": false,
+      "upstream_limitation_probe": false,
+      "client_exit": 1,
+      "elapsed_ms": 5.877,
+      "result": {
+        "code": "QuicTlsVerificationOrHandshake",
+        "ok": false
+      }
+    },
+    {
+      "case": "wrong-sni",
+      "expected_success": false,
+      "upstream_limitation_probe": false,
+      "client_exit": 1,
+      "elapsed_ms": 4.473,
+      "result": {
+        "code": "QuicTlsVerificationOrHandshake",
+        "ok": false
+      }
+    },
+    {
+      "case": "correct-certificate-pin",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 10.543,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 5965,
+        "downloaded": 4096,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+        "total_us": 7324,
+        "uploaded": 4096
+      }
+    },
+    {
+      "case": "wrong-certificate-pin",
+      "expected_success": false,
+      "upstream_limitation_probe": false,
+      "client_exit": 1,
+      "elapsed_ms": 6.18,
+      "result": {
+        "code": "QuicTlsVerificationOrHandshake",
+        "ok": false
+      }
+    },
+    {
+      "case": "clash-import-to-native",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 12.329,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 6018,
+        "downloaded": 4096,
+        "imported": true,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+        "total_us": 7803,
+        "uploaded": 4096
+      }
+    },
+    {
+      "case": "hy2-uri-to-native",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 11.909,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 6282,
+        "downloaded": 4096,
+        "imported": true,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+        "total_us": 7622,
+        "uploaded": 4096
+      }
+    },
+    {
+      "case": "hysteria2-uri-to-native",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 22.727,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 17319,
+        "downloaded": 4096,
+        "imported": true,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+        "total_us": 18697,
+        "uploaded": 4096
+      }
+    },
+    {
+      "case": "node-0",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 9.986,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 5170,
+        "downloaded": 4096,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+        "total_us": 6477,
+        "uploaded": 4096
+      }
+    },
+    {
+      "case": "node-1",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 11.907,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 6600,
+        "downloaded": 4096,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+        "total_us": 8083,
+        "uploaded": 4096
+      }
+    },
+    {
+      "case": "node-0",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 11.561,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 5537,
+        "downloaded": 4096,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+        "total_us": 7838,
+        "uploaded": 4096
+      }
+    },
+    {
+      "case": "node-1",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 12.41,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 6618,
+        "downloaded": 4096,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+        "total_us": 7962,
+        "uploaded": 4096
+      }
+    },
+    {
+      "case": "new-session-after-server-restart",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 13.045,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 7355,
+        "downloaded": 4096,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+        "total_us": 8734,
+        "uploaded": 4096
+      }
+    },
+    {
+      "case": "verified-https-through-native-proxy",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 56.68,
+      "result": {
+        "dns_quic_auth_tcp_us": 6888,
+        "downloaded": 154,
+        "imported": false,
+        "mode": "http",
+        "ok": true,
+        "sha256": "08bd61a42d14c5bd30aad527abf1b9fda0f307d8fd2305fd46f3f97c12c89d1f",
+        "uploaded": 70
+      }
+    },
+    {
+      "case": "unsupported-obfs",
+      "expected_success": false,
+      "upstream_limitation_probe": false,
+      "client_exit": 1,
+      "elapsed_ms": 3.142,
+      "result": {
+        "code": "Hysteria2ObfsUnsupported",
+        "ok": false
+      }
+    },
+    {
+      "case": "unsupported-ports",
+      "expected_success": false,
+      "upstream_limitation_probe": false,
+      "client_exit": 1,
+      "elapsed_ms": 3.335,
+      "result": {
+        "code": "Hysteria2PortHoppingUnsupported",
+        "ok": false
+      }
+    },
+    {
+      "case": "unsupported-up_mbps",
+      "expected_success": false,
+      "upstream_limitation_probe": false,
+      "client_exit": 1,
+      "elapsed_ms": 6.502,
+      "result": {
+        "code": "Hysteria2BandwidthParameters",
+        "ok": false
+      }
+    },
+    {
+      "case": "unsupported-ech",
+      "expected_success": false,
+      "upstream_limitation_probe": false,
+      "client_exit": 1,
+      "elapsed_ms": 3.094,
+      "result": {
+        "code": "Hysteria2EchUnsupported",
+        "ok": false
+      }
+    },
+    {
+      "case": "upstream-half-close-not-supported",
+      "expected_success": false,
+      "upstream_limitation_probe": true,
+      "client_exit": 1,
+      "elapsed_ms": 12.787,
+      "result": {
+        "code": "TcpTruncated",
+        "ok": false
+      }
+    },
+    {
+      "case": "upstream-4096-byte-udp-reply-drop",
+      "expected_success": false,
+      "upstream_limitation_probe": true,
+      "client_exit": 1,
+      "elapsed_ms": 2006.813,
+      "result": {
+        "code": "Hysteria2AcceptanceTimeout",
+        "ok": false
+      },
+      "independent_udp_target_received_4096_bytes": true
+    },
+    {
+      "case": "salamander-tcp-1mib",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 178.265,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 6190,
+        "downloaded": 1048576,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "92ac717cd44b057c03021776e85fa84e5ddd709a805e14f462186db213798c63",
+        "total_us": 169532,
+        "uploaded": 1048576
+      }
+    },
+    {
+      "case": "salamander-udp-fragmented-3072",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 16.407,
+      "result": {
+        "dns_quic_auth_us": 7202,
+        "downloaded": 3072,
+        "imported": false,
+        "mode": "udp",
+        "ok": true,
+        "sha256": "2925f8a9109d508016c1edae2ab029a875e66f94e0787d13c23c0bda08a41e94",
+        "uploaded": 3072
+      }
+    },
+    {
+      "case": "salamander-wrong-password",
+      "expected_success": false,
+      "upstream_limitation_probe": false,
+      "client_exit": 1,
+      "elapsed_ms": 1505.864,
+      "result": {
+        "code": "Hysteria2AcceptanceTimeout",
+        "ok": false
+      }
+    },
+    {
+      "case": "explicit-insecure-correct-pin",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 14.051,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 7527,
+        "downloaded": 4096,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+        "total_us": 9407,
+        "uploaded": 4096
+      }
+    },
+    {
+      "case": "explicit-insecure-wrong-pin",
+      "expected_success": false,
+      "upstream_limitation_probe": false,
+      "client_exit": 1,
+      "elapsed_ms": 6.543,
+      "result": {
+        "code": "QuicTlsVerificationOrHandshake",
+        "ok": false
+      }
+    },
+    {
+      "case": "client-upload-rate-1mbps",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 2454.871,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 29094,
+        "downloaded": 262144,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "24d4feffed52ef4454c5d46931590d960d2314c1f1bf02e4a374b647af6269fb",
+        "total_us": 2446725,
+        "uploaded": 262144
+      }
+    },
+    {
+      "case": "server-receive-rate-1mbps",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 2446.32,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 9245,
+        "downloaded": 262144,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "24d4feffed52ef4454c5d46931590d960d2314c1f1bf02e4a374b647af6269fb",
+        "total_us": 2437669,
+        "uploaded": 262144
+      }
+    },
+    {
+      "case": "negotiated-download-rate-1mbps",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 2153.05,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 12249,
+        "downloaded": 262144,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "24d4feffed52ef4454c5d46931590d960d2314c1f1bf02e4a374b647af6269fb",
+        "total_us": 2146431,
+        "uploaded": 262144
+      }
+    },
+    {
+      "case": "ipv6-quic-tcp",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 16.926,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 8521,
+        "downloaded": 4096,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+        "total_us": 9889,
+        "uploaded": 4096
+      }
+    },
+    {
+      "case": "ipv6-quic-udp",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 12.931,
+      "result": {
+        "dns_quic_auth_us": 5554,
+        "downloaded": 3072,
+        "imported": false,
+        "mode": "udp",
+        "ok": true,
+        "sha256": "2925f8a9109d508016c1edae2ab029a875e66f94e0787d13c23c0bda08a41e94",
+        "uploaded": 3072
+      }
+    },
+    {
+      "case": "concurrent-3",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 50.775,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 13556,
+        "downloaded": 262144,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "24d4feffed52ef4454c5d46931590d960d2314c1f1bf02e4a374b647af6269fb",
+        "total_us": 45213,
+        "uploaded": 262144
+      }
+    },
+    {
+      "case": "concurrent-1",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 78.514,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 8400,
+        "downloaded": 262144,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "24d4feffed52ef4454c5d46931590d960d2314c1f1bf02e4a374b647af6269fb",
+        "total_us": 69782,
+        "uploaded": 262144
+      }
+    },
+    {
+      "case": "concurrent-0",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 83.739,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 9423,
+        "downloaded": 262144,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "24d4feffed52ef4454c5d46931590d960d2314c1f1bf02e4a374b647af6269fb",
+        "total_us": 74585,
+        "uploaded": 262144
+      }
+    },
+    {
+      "case": "concurrent-2",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 88.494,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 10074,
+        "downloaded": 262144,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "24d4feffed52ef4454c5d46931590d960d2314c1f1bf02e4a374b647af6269fb",
+        "total_us": 76612,
+        "uploaded": 262144
+      }
+    },
+    {
+      "case": "multi-address-localhost-to-ipv4-server",
+      "expected_success": true,
+      "upstream_limitation_probe": false,
+      "client_exit": 0,
+      "elapsed_ms": 3019.012,
+      "result": {
+        "close": "clean",
+        "dns_quic_auth_tcp_us": 3010923,
+        "downloaded": 4096,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+        "total_us": 3012589,
+        "uploaded": 4096
+      }
+    }
+  ],
+  "qt_product_acceptance": false,
+  "known_upstream_limitations": {
+    "half_close": "Not passed: official copyTwoWay returns after either copy finishes and closes both directions.",
+    "udp_reply_buffer": "Official v2.13.0 allocates 4096 bytes for encoded messages; payload plus Hysteria header must fit that buffer.",
+    "source_urls": [
+      "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/server/copy.go",
+      "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/server/server.go",
+      "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/server/udp.go",
+      "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/internal/protocol/proxy.go"
+    ]
+  }
+}

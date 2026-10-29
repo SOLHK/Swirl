@@ -1,0 +1,10 @@
+   Compiling swirl-subscription v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-subscription)
+    Finished `test` profile [unoptimized] target(s) in 3.70s
+     Running unittests src/lib.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/swirl_subscription-a86a20d784da5d9c)
+
+running 2 tests
+test ss2022::tests::optional_ciphers_and_identity_chain_are_explicitly_unsupported ... ok
+test ss2022::tests::accepts_only_exact_base64_keys_without_password_derivation ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 102 filtered out; finished in 0.01s
+

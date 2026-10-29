@@ -44,6 +44,8 @@ Assert-Rejected { Assert-ExplicitLoopbackProxy $native $registry } 'Disabled Win
 $parentBefore = [Environment]::GetEnvironmentVariable('HTTP_PROXY','Process')
 $info = New-CodexProxyStartInfo -ExecutablePath 'C:\Codex\ChatGPT.exe' -ProxyEndpoint 'http://127.0.0.1:17988'
 Assert-True (!$info.UseShellExecute) 'Shell activation could lose the process environment.'
+Assert-True ($info.ArgumentList.Count -eq 2 -and $info.ArgumentList[0] -eq '--proxy-server=http://127.0.0.1:17988') 'Chromium proxy startup switch missing.'
+Assert-True ($info.ArgumentList[1] -eq '--proxy-bypass-list=localhost;127.0.0.1;[::1]') 'Only local callback destinations may bypass the Chromium proxy.'
 foreach ($name in @('HTTP_PROXY','HTTPS_PROXY','ALL_PROXY')) { Assert-True ($info.Environment[$name] -eq 'http://127.0.0.1:17988') 'Child proxy environment missing.' }
 Assert-True ($info.Environment['NO_PROXY'] -eq 'localhost,127.0.0.1,::1') 'Child NO_PROXY must not bypass remote destinations.'
 Assert-True ([Environment]::GetEnvironmentVariable('HTTP_PROXY','Process') -ceq $parentBefore) 'Parent environment was modified.'

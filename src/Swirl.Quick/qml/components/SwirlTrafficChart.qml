@@ -28,7 +28,7 @@ Item {
     implicitHeight:Theme.dp(130); implicitWidth:Theme.dp(550)
     NumberAnimation { id:updateAnimation; target:graph; property:"reveal"; to:1; duration:Theme.motion; easing.type:Easing.OutCubic }
     Connections { target:AppState; function onMeasurementTickChanged(){graph.repaint()} function onProxyOnChanged(){graph.repaint()} }
-    Connections { target:Theme; function onDarkChanged(){graph.repaint()} }
+    Connections { target:Theme; function onDarkChanged(){graph.repaint()} function onIncreaseContrastChanged(){graph.repaint()} }
     Item {
         x:Theme.dp(0); y:Theme.dp(4); width:Theme.dp(66); height:plot.height
         Repeater {
@@ -54,7 +54,7 @@ Item {
             function X(i){return points.length===n?Math.max(0,Math.min(w,(points[i].time-graph.startTime)*w/(graph.endTime-graph.startTime))):i*w/(n-1)}
             var points=graph.points
             function Y(i){return h-graph.valueAt(i)*h/graph.maximum*graph.reveal}
-            c.strokeStyle=Theme.dark?"#405875":"#E0EBFA";c.lineWidth=Theme.dp(1)
+            c.strokeStyle=Theme.chartGrid;c.lineWidth=Theme.dp(1)
             for(var k=0;k<4;k++){c.beginPath();c.moveTo(0,k*h/3);c.lineTo(w,k*h/3);c.stroke()}
             for(var a=0;a<5;a++){c.beginPath();c.moveTo(a*w/4,0);c.lineTo(a*w/4,h);c.stroke()}
             if(n<2)return
@@ -71,12 +71,15 @@ Item {
         MouseArea {
             id:hover; anchors.fill:parent; hoverEnabled:true
             onPositionChanged:plot.requestPaint(); onContainsMouseChanged:plot.requestPaint()
-            ToolTip.visible:containsMouse&&!previewCaptureMode&&graph.nearestIndex(mouseX/width)>=0
-            ToolTip.text: {
-                if(graph.nearestIndex(mouseX/width)<0)return ""
-                var i=Math.max(0,graph.nearestIndex(mouseX/width))
+            SwirlToolTip {
+              parent:hover
+              visible:hover.containsMouse&&!previewCaptureMode&&graph.nearestIndex(hover.mouseX/hover.width)>=0
+              text: {
+                if(graph.nearestIndex(hover.mouseX/hover.width)<0)return ""
+                var i=Math.max(0,graph.nearestIndex(hover.mouseX/hover.width))
                 var when=new Date(graph.points.length===graph.baseHistory.length?graph.points[i].time:graph.startTime+i/(graph.baseHistory.length-1)*(graph.endTime-graph.startTime))
                 return Qt.formatDateTime(when,"MM-dd HH:mm")+" · "+engineController.telemetry.formatBytes(graph.valueAt(i))+"/s"+(i===graph.baseHistory.length-1 ? " · 当前" : " · 历史")
+              }
             }
         }
     }

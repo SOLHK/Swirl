@@ -1,0 +1,78 @@
+{
+  "git_sha": "169e0cad51fc18a2d6fa4f194fafd90128bf2f7b",
+  "tracked_worktree_changes": [],
+  "binaries": {
+    "SWIRL_RUST_HARNESS": {
+      "file": "swirl-api",
+      "sha256": "8bac408ac4adafeaa58f9ce9c8fa86b5705c96583dce962f21825e9fdb6b740a"
+    },
+    "SWIRL_RUST_INSPECTOR": {
+      "file": "swirl-inspect",
+      "sha256": "b9f80f8460b6ffccc6097928be56a0127ed1201ea197f472df07eca5f7cb1882"
+    }
+  },
+  "test_sha256": "e2828b1f7935e7fe166ac9f5dba4068f512a7cbe0074f5159a6d6274692a041b",
+  "python": "3.14.8 (main, Oct  1 2026, 02:38:33) [GCC 13.3.0]",
+  "openssl": "OpenSSL 3.0.13 30 Jan 2024",
+  "platform": "linux",
+  "github_run_id": "39362403837",
+  "build_manifest": {
+    "binaries": {
+      "reality_peer": {
+        "file": "reality-peer",
+        "sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9"
+      },
+      "xray": {
+        "file": "xray",
+        "sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a"
+      }
+    },
+    "finished_unix": 1792465899,
+    "go_version": "go1.27.2",
+    "helper_source_sha256": "17b9af2d2bda7b3c57e95f87e3777065d29f05ffe418ce8c3cfde7beaa691ea0",
+    "lock_sha256": "b32dd9af801c8ed97c489f1120209b74224e595353b19fbfc13bce981eaaa925",
+    "peer_version_output": {
+      "event": "version",
+      "go_version": "go1.27.2",
+      "reality_version": "v0.0.0-20261014101318-83f621788ca8",
+      "xray_commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5"
+    },
+    "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+    "reality": {
+      "commit": "83f621788ca88b83179810b12baa7ae518aacb83",
+      "go_mod_sum": "h1:ptlSkJ8k/7IDauNH0SA96JPOo+nYGLTv2Y3UMpwvAsY=",
+      "module": "github.com/xtls/reality",
+      "sum": "h1:RjLnVvlzK4q6zWaSBPNRGsrgx2fbJDeUWffjw574uzs=",
+      "version": "v0.0.0-20261014101318-83f621788ca8"
+    },
+    "reproducible_rebuild": {
+      "reality_peer": {
+        "first_sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9",
+        "matches": true,
+        "repeated_sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9"
+      },
+      "xray": {
+        "first_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a",
+        "matches": true,
+        "repeated_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a"
+      }
+    },
+    "schema_version": 1,
+    "started_unix": 1792465863,
+    "status": "success",
+    "swirl_source_commit": "169e0cad51fc18a2d6fa4f194fafd90128bf2f7b",
+    "swirl_worktree_status": "",
+    "xray": {
+      "commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5",
+      "go_mod_sha256": "31fe6bd6c04eb2738e157b850236b1376cbbac3f33e974256bb7325c8c764250",
+      "go_sum_sha256": "a72c2f2b5dd38fcf42ef55034bd55038703448b55a878eafddd60d4af1f63145",
+      "release": "v26.10.17",
+      "repository": "https://github.com/XTLS/Xray-core.git",
+      "tree": "55fc871fdf3e63149066956e7c60670f3a44fbf2"
+    },
+    "xray_version_output": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship."
+  },
+  "scope": "production Rust control ABI with portable JSON test host",
+  "provider_connection": false,
+  "fingerprint": "rustls"
+}

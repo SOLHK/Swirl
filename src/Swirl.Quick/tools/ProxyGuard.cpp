@@ -33,6 +33,9 @@ static int repairShortcut(const QStringList &args) {
     if(SUCCEEDED(hr))hr=file->Save(reinterpret_cast<LPCWSTR>(linkPath.absoluteFilePath().utf16()),TRUE);
     if(SUCCEEDED(hr))SHChangeNotify(SHCNE_UPDATEITEM,SHCNF_PATHW,linkPath.absoluteFilePath().utf16(),nullptr);
     if(SUCCEEDED(hr))SHChangeNotify(SHCNE_UPDATEITEM,SHCNF_PATHW,icon.absoluteFilePath().utf16(),nullptr);
+    // Explorer can retain the old AppID group bitmap after item-only updates.
+    // This runs only after a verified, installation-owned shortcut was saved.
+    if(SUCCEEDED(hr))SHChangeNotify(SHCNE_ASSOCCHANGED,SHCNF_IDLIST|SHCNF_FLUSH,nullptr,nullptr);
     if(store)store->Release();if(file)file->Release();if(link)link->Release();CoUninitialize();
     return SUCCEEDED(hr)?0:4;
 }

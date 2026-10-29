@@ -1,0 +1,60 @@
+{
+  "ok": true,
+  "status": {
+    "accepted": 2,
+    "active": 0,
+    "address": "127.0.0.1:37165",
+    "connections": [
+      {
+        "category": "proxy",
+        "download": 94,
+        "elapsed_ms": 67,
+        "ended": true,
+        "error": "",
+        "failure_stage": "",
+        "host": "localhost",
+        "id": 1,
+        "matched_rule": "DEFAULT",
+        "node": "A",
+        "port": 47889,
+        "source_ip": "127.0.0.1",
+        "source_port": 55116,
+        "transport_state": "closed",
+        "udp_dropped": 0,
+        "upload": 71
+      },
+      {
+        "category": "proxy",
+        "download": 2611,
+        "elapsed_ms": 56,
+        "ended": true,
+        "error": "",
+        "failure_stage": "",
+        "host": "localhost",
+        "id": 2,
+        "matched_rule": "DEFAULT",
+        "node": "A",
+        "port": 51615,
+        "source_ip": "127.0.0.1",
+        "source_port": 55128,
+        "transport_state": "closed",
+        "udp_dropped": 0,
+        "upload": 1729
+      }
+    ],
+    "download": 2705,
+    "engine": "swirl-rust",
+    "failed": 0,
+    "generation": 1,
+    "last_error": "",
+    "last_error_stage": "",
+    "policies": {},
+    "rejected": 0,
+    "running": true,
+    "schema": 1,
+    "selected": "A",
+    "selectors": {},
+    "udp_dropped": 0,
+    "upload": 1800
+  }
+}

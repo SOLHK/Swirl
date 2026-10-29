@@ -1,0 +1,800 @@
+{
+  "schema_version": 1,
+  "verification": "passed",
+  "source_commit": "5ad68bcb22a23573d462cbfd972c7120093f504a",
+  "run_id": 39239280852,
+  "run_url": "https://github.com/SOLHK/Swirl/actions/runs/39239280852",
+  "job": {
+    "id": 118015880206,
+    "name": "portable-rust (ubuntu-latest)",
+    "status": "completed",
+    "conclusion": "success",
+    "run_id": 39239280852,
+    "logs_url": null,
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2
+      },
+      {
+        "name": "Install stable Rust tools",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3
+      },
+      {
+        "name": "Run cargo fmt --all -- --check",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4
+      },
+      {
+        "name": "Run cargo check --workspace --locked",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5
+      },
+      {
+        "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6
+      },
+      {
+        "name": "Run cargo test --workspace --locked",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7
+      },
+      {
+        "name": "Run cargo build --release --locked --workspace --lib --bins",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8
+      },
+      {
+        "name": "Run cargo build --release --locked -p swirl-transport --example reality-client",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9
+      },
+      {
+        "name": "Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10
+      },
+      {
+        "name": "Independent portable protocol peers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11
+      },
+      {
+        "name": "Install pinned Go for the independent Xray peer",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12
+      },
+      {
+        "name": "Build pinned Xray and verify REALITY interoperability",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13
+      },
+      {
+        "name": "Preserve Xray build identity and raw interoperability evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14
+      },
+      {
+        "name": "Native public HTTPS and DoH verification",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15
+      },
+      {
+        "name": "Preserve public network evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 16
+      },
+      {
+        "name": "Post Install pinned Go for the independent Xray peer",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 30
+      },
+      {
+        "name": "Post Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 31
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 32
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 33
+      }
+    ]
+  },
+  "artifact": {
+    "id": 12181515366,
+    "name": "Swirl-REALITY-Xray-Linux-5ad68bcb22a23573d462cbfd972c7120093f504a-1",
+    "size_in_bytes": 55070,
+    "url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12181515366",
+    "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12181515366/zip",
+    "expired": false,
+    "created_at": "2026-10-19T10:48:52Z",
+    "expires_at": "2026-11-02T10:48:51Z",
+    "updated_at": "2026-10-19T10:48:52Z",
+    "digest": "sha256:19a40fc3a221e8f47510e3e4a130f6470fa4a90700aac45639862e30ed1c811f",
+    "workflow_run": {
+      "id": 39239280852,
+      "repository_id": 1411888911,
+      "head_repository_id": 1411888911,
+      "head_branch": "work/core-completion-20261017",
+      "head_sha": "5ad68bcb22a23573d462cbfd972c7120093f504a"
+    }
+  },
+  "artifact_digest_verified": true,
+  "source_identity": {
+    "git_sha": "5ad68bcb22a23573d462cbfd972c7120093f504a",
+    "tracked_changes": false,
+    "platform": "linux",
+    "python": "3.14.8 (main, Oct  1 2026, 02:38:33) [GCC 13.3.0]",
+    "github_run_id": "39239280852",
+    "github_run_attempt": "1",
+    "client_sha256": "69d128cf25c51fe15b7ddfaebf8369675ad99976f285f39d48150517092d6faa",
+    "peer_sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9",
+    "xray_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a",
+    "build_manifest": {
+      "binaries": {
+        "reality_peer": {
+          "file": "reality-peer",
+          "sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9"
+        },
+        "xray": {
+          "file": "xray",
+          "sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a"
+        }
+      },
+      "finished_unix": 1792406926,
+      "go_version": "go1.27.2",
+      "helper_source_sha256": "17b9af2d2bda7b3c57e95f87e3777065d29f05ffe418ce8c3cfde7beaa691ea0",
+      "lock_sha256": "b32dd9af801c8ed97c489f1120209b74224e595353b19fbfc13bce981eaaa925",
+      "peer_version_output": {
+        "event": "version",
+        "go_version": "go1.27.2",
+        "reality_version": "v0.0.0-20261014101318-83f621788ca8",
+        "xray_commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5"
+      },
+      "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+      "reality": {
+        "commit": "83f621788ca88b83179810b12baa7ae518aacb83",
+        "go_mod_sum": "h1:ptlSkJ8k/7IDauNH0SA96JPOo+nYGLTv2Y3UMpwvAsY=",
+        "module": "github.com/xtls/reality",
+        "sum": "h1:RjLnVvlzK4q6zWaSBPNRGsrgx2fbJDeUWffjw574uzs=",
+        "version": "v0.0.0-20261014101318-83f621788ca8"
+      },
+      "reproducible_rebuild": {
+        "reality_peer": {
+          "first_sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9",
+          "matches": true,
+          "repeated_sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9"
+        },
+        "xray": {
+          "first_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a",
+          "matches": true,
+          "repeated_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a"
+        }
+      },
+      "schema_version": 1,
+      "started_unix": 1792406882,
+      "status": "success",
+      "swirl_source_commit": "5ad68bcb22a23573d462cbfd972c7120093f504a",
+      "swirl_worktree_status": "",
+      "xray": {
+        "commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5",
+        "go_mod_sha256": "31fe6bd6c04eb2738e157b850236b1376cbbac3f33e974256bb7325c8c764250",
+        "go_sum_sha256": "a72c2f2b5dd38fcf42ef55034bd55038703448b55a878eafddd60d4af1f63145",
+        "release": "v26.10.17",
+        "repository": "https://github.com/XTLS/Xray-core.git",
+        "tree": "55fc871fdf3e63149066956e7c60670f3a44fbf2"
+      },
+      "xray_version_output": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship."
+    },
+    "test_source_sha256": "94eeb538bd7d076ca6a78846e6723c6a27ce909c5222e860086e93740d935273",
+    "client_source_sha256": "6a8548bb59c6362d99d23a5a5293439f6fb7cce8aa84751eb58f314e8cf7cfa5"
+  },
+  "test_summary": {
+    "tests_run": 12,
+    "successful": true,
+    "failures": [],
+    "errors": [],
+    "skipped": []
+  },
+  "sessions": [
+    {
+      "case": "001-test_bare_tcp_fin_is_rejected_after_valid_echo",
+      "peer": {
+        "event": "result",
+        "status": "intentional_unclean_eof",
+        "handshake_complete": true,
+        "client_hello_authenticated": true,
+        "client_finished_verified": true,
+        "tls_version": 772,
+        "group": 4588,
+        "cipher_suite": 4865,
+        "received_bytes": 45,
+        "sent_bytes": 45,
+        "received_sha256": "981f5db04b36e9f6d574c66383fb062514d2696bb47cc41548af9ec4c9bc9377",
+        "sent_sha256": "981f5db04b36e9f6d574c66383fb062514d2696bb47cc41548af9ec4c9bc9377",
+        "close_notify_received": true,
+        "close_notify_sent": false,
+        "transport_eof": false,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0
+      },
+      "client": {
+        "alpn": null,
+        "cipher_suite": 4865,
+        "client_close_notify": true,
+        "error": "peer closed connection without sending TLS close_notify: https://docs.rs/rustls/latest/rustls/manual/_03_howto/index.html#unexpected-eof",
+        "error_kind": "UnexpectedEof",
+        "group": 4588,
+        "handshake_verified": true,
+        "payload_matches": true,
+        "received_bytes": 45,
+        "server_close_notify": false,
+        "stage": "close",
+        "status": "error",
+        "uploaded_bytes": 45
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "002-test_data_cancellation_drops_transport_and_reaps_peer",
+      "peer": {
+        "event": "result",
+        "status": "cancelled",
+        "handshake_complete": true,
+        "client_hello_authenticated": true,
+        "client_finished_verified": true,
+        "tls_version": 772,
+        "group": 4588,
+        "cipher_suite": 4865,
+        "received_bytes": 37,
+        "sent_bytes": 0,
+        "received_sha256": "4fe39b322239459ddc4c9d64609e0d04e0a1d231a24479947cbc86e6760344cd",
+        "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "close_notify_received": false,
+        "close_notify_sent": false,
+        "transport_eof": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0
+      },
+      "client": {
+        "alpn": null,
+        "cipher_suite": 4865,
+        "client_close_notify": false,
+        "error": "SyntheticPeerCancelled",
+        "error_kind": "Interrupted",
+        "group": 4588,
+        "handshake_verified": true,
+        "payload_matches": false,
+        "received_bytes": 0,
+        "server_close_notify": false,
+        "stage": "data",
+        "status": "error",
+        "uploaded_bytes": 37
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "003-test_data_timeout_drops_transport_and_reaps_peer",
+      "peer": {
+        "event": "result",
+        "status": "cancelled",
+        "handshake_complete": true,
+        "client_hello_authenticated": true,
+        "client_finished_verified": true,
+        "tls_version": 772,
+        "group": 4588,
+        "cipher_suite": 4865,
+        "received_bytes": 37,
+        "sent_bytes": 0,
+        "received_sha256": "4fe39b322239459ddc4c9d64609e0d04e0a1d231a24479947cbc86e6760344cd",
+        "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "close_notify_received": false,
+        "close_notify_sent": false,
+        "transport_eof": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0
+      },
+      "client": {
+        "alpn": null,
+        "cipher_suite": 4865,
+        "client_close_notify": false,
+        "error": "SyntheticPeerDeadline",
+        "error_kind": "TimedOut",
+        "group": 4588,
+        "handshake_verified": true,
+        "payload_matches": false,
+        "received_bytes": 0,
+        "server_close_notify": false,
+        "stage": "data",
+        "status": "error",
+        "uploaded_bytes": 37
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "004-test_empty_application_still_requires_both_finished_and_close_notify",
+      "peer": {
+        "event": "result",
+        "status": "completed",
+        "handshake_complete": true,
+        "client_hello_authenticated": true,
+        "client_finished_verified": true,
+        "tls_version": 772,
+        "group": 4588,
+        "cipher_suite": 4865,
+        "received_bytes": 0,
+        "sent_bytes": 0,
+        "received_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "close_notify_received": true,
+        "close_notify_sent": true,
+        "transport_eof": false,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0
+      },
+      "client": {
+        "alpn": null,
+        "cipher_suite": 4865,
+        "client_close_notify": true,
+        "group": 4588,
+        "handshake_verified": true,
+        "payload_matches": true,
+        "received_bytes": 0,
+        "server_close_notify": true,
+        "stage": "close",
+        "status": "ok",
+        "transport_read_bytes": 2153,
+        "transport_written_bytes": 1515,
+        "uploaded_bytes": 0
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "005-test_handshake_cancellation_drops_transport_and_reaps_peer",
+      "peer": {
+        "event": "result",
+        "status": "cancelled",
+        "handshake_complete": false,
+        "client_hello_authenticated": false,
+        "client_finished_verified": false,
+        "tls_version": 0,
+        "group": 0,
+        "cipher_suite": 0,
+        "received_bytes": 0,
+        "sent_bytes": 0,
+        "received_sha256": "",
+        "sent_sha256": "",
+        "close_notify_received": false,
+        "close_notify_sent": false,
+        "transport_eof": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0
+      },
+      "client": {
+        "client_close_notify": false,
+        "error": "SyntheticPeerCancelled",
+        "error_kind": "Interrupted",
+        "handshake_verified": false,
+        "payload_matches": false,
+        "received_bytes": 0,
+        "server_close_notify": false,
+        "stage": "handshake",
+        "status": "error",
+        "uploaded_bytes": 0
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "006-test_handshake_timeout_drops_transport_and_reaps_peer",
+      "peer": {
+        "event": "result",
+        "status": "cancelled",
+        "handshake_complete": false,
+        "client_hello_authenticated": false,
+        "client_finished_verified": false,
+        "tls_version": 0,
+        "group": 0,
+        "cipher_suite": 0,
+        "received_bytes": 0,
+        "sent_bytes": 0,
+        "received_sha256": "",
+        "sent_sha256": "",
+        "close_notify_received": false,
+        "close_notify_sent": false,
+        "transport_eof": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0
+      },
+      "client": {
+        "client_close_notify": false,
+        "error": "SyntheticPeerDeadline",
+        "error_kind": "TimedOut",
+        "handshake_verified": false,
+        "payload_matches": false,
+        "received_bytes": 0,
+        "server_close_notify": false,
+        "stage": "handshake",
+        "status": "error",
+        "uploaded_bytes": 0
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "007-test_native_hybrid_authentication_finished_bidirectional_data_and_close",
+      "peer": {
+        "event": "result",
+        "status": "completed",
+        "handshake_complete": true,
+        "client_hello_authenticated": true,
+        "client_finished_verified": true,
+        "tls_version": 772,
+        "group": 4588,
+        "cipher_suite": 4865,
+        "received_bytes": 32769,
+        "sent_bytes": 32769,
+        "received_sha256": "b93c16c99895f1593347ab57af0c0a82f9672ecb3debb59d124e1b38f3871f01",
+        "sent_sha256": "b93c16c99895f1593347ab57af0c0a82f9672ecb3debb59d124e1b38f3871f01",
+        "close_notify_received": true,
+        "close_notify_sent": true,
+        "transport_eof": false,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0
+      },
+      "client": {
+        "alpn": null,
+        "cipher_suite": 4865,
+        "client_close_notify": true,
+        "group": 4588,
+        "handshake_verified": true,
+        "payload_matches": true,
+        "received_bytes": 32769,
+        "server_close_notify": true,
+        "stage": "close",
+        "status": "ok",
+        "transport_read_bytes": 35869,
+        "transport_written_bytes": 34350,
+        "uploaded_bytes": 32769
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "008-test_native_x25519_authentication_finished_bidirectional_data_and_close",
+      "peer": {
+        "event": "result",
+        "status": "completed",
+        "handshake_complete": true,
+        "client_hello_authenticated": true,
+        "client_finished_verified": true,
+        "tls_version": 772,
+        "group": 29,
+        "cipher_suite": 4865,
+        "received_bytes": 32769,
+        "sent_bytes": 32769,
+        "received_sha256": "751b017cb23d0f5f0baf7fac5a2357b94feff6623f1ee693b53d2bd067ffa257",
+        "sent_sha256": "751b017cb23d0f5f0baf7fac5a2357b94feff6623f1ee693b53d2bd067ffa257",
+        "close_notify_received": true,
+        "close_notify_sent": true,
+        "transport_eof": false,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0
+      },
+      "client": {
+        "alpn": null,
+        "cipher_suite": 4865,
+        "client_close_notify": true,
+        "group": 29,
+        "handshake_verified": true,
+        "payload_matches": true,
+        "received_bytes": 32769,
+        "server_close_notify": true,
+        "stage": "close",
+        "status": "ok",
+        "transport_read_bytes": 34780,
+        "transport_written_bytes": 34350,
+        "uploaded_bytes": 32769
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "009-test_one_mebibyte_binary_transfer_with_short_reads_and_writes",
+      "peer": {
+        "event": "result",
+        "status": "completed",
+        "handshake_complete": true,
+        "client_hello_authenticated": true,
+        "client_finished_verified": true,
+        "tls_version": 772,
+        "group": 4588,
+        "cipher_suite": 4865,
+        "received_bytes": 1048576,
+        "sent_bytes": 1048576,
+        "received_sha256": "fbbab289f7f94b25736c58be46a994c441fd02552cc6022352e3d86d2fab7c83",
+        "sent_sha256": "fbbab289f7f94b25736c58be46a994c441fd02552cc6022352e3d86d2fab7c83",
+        "close_notify_received": true,
+        "close_notify_sent": true,
+        "transport_eof": false,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0
+      },
+      "client": {
+        "alpn": null,
+        "cipher_suite": 4865,
+        "client_close_notify": true,
+        "group": 4588,
+        "handshake_verified": true,
+        "payload_matches": true,
+        "received_bytes": 1048576,
+        "server_close_notify": true,
+        "stage": "close",
+        "status": "ok",
+        "transport_read_bytes": 1080298,
+        "transport_written_bytes": 1051499,
+        "uploaded_bytes": 1048576
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "010-test_single_byte_socket_boundaries",
+      "peer": {
+        "event": "result",
+        "status": "completed",
+        "handshake_complete": true,
+        "client_hello_authenticated": true,
+        "client_finished_verified": true,
+        "tls_version": 772,
+        "group": 4588,
+        "cipher_suite": 4865,
+        "received_bytes": 310,
+        "sent_bytes": 310,
+        "received_sha256": "6499a23dc424e2be745d98f1423f9ebeb6c3dc2ada20e1f5fc393cb08a36afb6",
+        "sent_sha256": "6499a23dc424e2be745d98f1423f9ebeb6c3dc2ada20e1f5fc393cb08a36afb6",
+        "close_notify_received": true,
+        "close_notify_sent": true,
+        "transport_eof": false,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0
+      },
+      "client": {
+        "alpn": null,
+        "cipher_suite": 4865,
+        "client_close_notify": true,
+        "group": 4588,
+        "handshake_verified": true,
+        "payload_matches": true,
+        "received_bytes": 310,
+        "server_close_notify": true,
+        "stage": "close",
+        "status": "ok",
+        "transport_read_bytes": 2485,
+        "transport_written_bytes": 1847,
+        "uploaded_bytes": 310
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "011-test_single_byte_socket_boundaries",
+      "peer": {
+        "event": "result",
+        "status": "completed",
+        "handshake_complete": true,
+        "client_hello_authenticated": true,
+        "client_finished_verified": true,
+        "tls_version": 772,
+        "group": 29,
+        "cipher_suite": 4865,
+        "received_bytes": 310,
+        "sent_bytes": 310,
+        "received_sha256": "6499a23dc424e2be745d98f1423f9ebeb6c3dc2ada20e1f5fc393cb08a36afb6",
+        "sent_sha256": "6499a23dc424e2be745d98f1423f9ebeb6c3dc2ada20e1f5fc393cb08a36afb6",
+        "close_notify_received": true,
+        "close_notify_sent": true,
+        "transport_eof": false,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0
+      },
+      "client": {
+        "alpn": null,
+        "cipher_suite": 4865,
+        "client_close_notify": true,
+        "group": 29,
+        "handshake_verified": true,
+        "payload_matches": true,
+        "received_bytes": 310,
+        "server_close_notify": true,
+        "stage": "close",
+        "status": "ok",
+        "transport_read_bytes": 1399,
+        "transport_written_bytes": 1847,
+        "uploaded_bytes": 310
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "012-test_wrong_reality_public_key_never_exposes_application_data",
+      "peer": {
+        "event": "result",
+        "status": "authentication_rejected",
+        "handshake_complete": false,
+        "client_hello_authenticated": false,
+        "client_finished_verified": false,
+        "tls_version": 0,
+        "group": 0,
+        "cipher_suite": 0,
+        "received_bytes": 0,
+        "sent_bytes": 0,
+        "received_sha256": "",
+        "sent_sha256": "",
+        "close_notify_received": false,
+        "close_notify_sent": false,
+        "transport_eof": false,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "error": "upstream REALITY handshake rejected"
+      },
+      "client": {
+        "client_close_notify": false,
+        "error": "unexpected error: RealityCertificateProfileUnsupported",
+        "error_kind": "InvalidData",
+        "handshake_verified": false,
+        "payload_matches": false,
+        "received_bytes": 0,
+        "server_close_notify": false,
+        "stage": "handshake",
+        "status": "error",
+        "uploaded_bytes": 0
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "013-test_wrong_short_id_never_exposes_application_data",
+      "peer": {
+        "event": "result",
+        "status": "authentication_rejected",
+        "handshake_complete": false,
+        "client_hello_authenticated": false,
+        "client_finished_verified": false,
+        "tls_version": 0,
+        "group": 0,
+        "cipher_suite": 0,
+        "received_bytes": 0,
+        "sent_bytes": 0,
+        "received_sha256": "",
+        "sent_sha256": "",
+        "close_notify_received": false,
+        "close_notify_sent": false,
+        "transport_eof": false,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "error": "upstream REALITY handshake rejected"
+      },
+      "client": {
+        "client_close_notify": false,
+        "error": "unexpected error: RealityCertificateProfileUnsupported",
+        "error_kind": "InvalidData",
+        "handshake_verified": false,
+        "payload_matches": false,
+        "received_bytes": 0,
+        "server_close_notify": false,
+        "stage": "handshake",
+        "status": "error",
+        "uploaded_bytes": 0
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    }
+  ],
+  "rust": {
+    "unit_integration_passed": 239,
+    "doctest_passed": 1,
+    "failed": 0,
+    "ignored": 0
+  },
+  "python": {
+    "existing_menu_passed": 248,
+    "existing_menu_skipped": 5,
+    "xray_passed": 12,
+    "xray_skipped": 0,
+    "existing_skips_reason": "Qt hooks run separately in Windows Qt gates"
+  },
+  "raw_job_log_sha256": "3cb1273648b3642051f2185aa5b89be1a585953879779f56fd4e008ee3319d2b",
+  "raw_build_log_sha256": "8ddc04b2ba5076bc2184b3a33013e7ea7cf2ef9c8b492154e454daa874b0168b",
+  "scope": "Exact-source Linux Rust and mature REALITY component peer CI, not product/supplier acceptance."
+}

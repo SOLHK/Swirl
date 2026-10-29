@@ -1,0 +1,83 @@
+name: Xray JSON conversion
+on:
+  push:
+    branches: [work/xray-v2ray-json-b-20261022, work/xray-v2ray-json-import-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Install Rust tools
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - run: cargo fmt --all -- --check
+      - run: cargo check --workspace --locked
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
+      - name: Verify source was not changed during tests
+        working-directory: .
+        run: git diff --exit-code
+  format-candidate:
+    # Temporary remote formatter for the isolated editing branch. It creates
+    # only dangling Git objects: no commits, branch updates, or automatic fixes.
+    # The assistant reviews and explicitly publishes the formatted tree; then
+    # the unchanged-source matrix above must pass on that exact new commit.
+    if: github.ref == 'refs/heads/work/xray-v2ray-json-b-20261022'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - run: rustup toolchain install stable --profile minimal --component rustfmt
+      - run: cargo fmt --manifest-path core/Cargo.toml --all
+      - name: Export reviewed conversion-only formatting tree
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, pathlib, subprocess, urllib.request
+          assert os.environ['GITHUB_REPOSITORY'] == 'SOLHK/Swirl'
+          assert os.environ['GITHUB_REF'] == 'refs/heads/work/xray-v2ray-json-b-20261022'
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+          assert git('rev-parse', 'HEAD') == os.environ['GITHUB_SHA']
+          base = git('rev-parse', 'HEAD^{tree}')
+          paths = git('diff', '--name-only').splitlines()
+          entries = []
+          def post(endpoint, body):
+              request = urllib.request.Request('https://api.github.com/repos/SOLHK/Swirl/git/' + endpoint,
+                  data=json.dumps(body).encode(), method='POST', headers={
+                  'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                  'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'})
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.load(response)
+          for path in paths:
+              assert (path == 'core/crates/swirl-subscription/src/xray.rs'
+                  or path.startswith('core/crates/swirl-subscription/src/xray/convert')
+                  or path.startswith('core/crates/swirl-subscription/tests/xray_conversion'))
+              assert path.endswith('.rs')
+              blob = post('blobs', {'content': pathlib.Path(path).read_text(), 'encoding': 'utf-8'})
+              entries.append({'path': path, 'mode': '100644', 'type': 'blob', 'sha': blob['sha']})
+          tree = post('trees', {'base_tree': base, 'tree': entries})['sha'] if entries else base
+          print('X12B_FORMATTED_TREE=' + tree)
+          print('X12B_FORMATTED_PARENT=' + os.environ['GITHUB_SHA'])
+          print('X12B_FORMATTED_FILES=' + json.dumps(paths))
+          PY

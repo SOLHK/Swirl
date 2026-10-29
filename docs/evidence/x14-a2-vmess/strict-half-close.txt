@@ -1,0 +1,94 @@
+test_eight_concurrent_independent_sessions_with_target_half_close (__main__.VmessXrayHalfCloseTests.test_eight_concurrent_independent_sessions_with_target_half_close) ... FAIL
+test_four_transports_four_mib_duplex_and_logical_half_close (__main__.VmessXrayHalfCloseTests.test_four_transports_four_mib_duplex_and_logical_half_close) ... 
+  test_four_transports_four_mib_duplex_and_logical_half_close (__main__.VmessXrayHalfCloseTests.test_four_transports_four_mib_duplex_and_logical_half_close) (network='raw', tls=False) ... FAIL
+  test_four_transports_four_mib_duplex_and_logical_half_close (__main__.VmessXrayHalfCloseTests.test_four_transports_four_mib_duplex_and_logical_half_close) (network='raw', tls=True) ... FAIL
+  test_four_transports_four_mib_duplex_and_logical_half_close (__main__.VmessXrayHalfCloseTests.test_four_transports_four_mib_duplex_and_logical_half_close) (network='ws', tls=False) ... FAIL
+  test_four_transports_four_mib_duplex_and_logical_half_close (__main__.VmessXrayHalfCloseTests.test_four_transports_four_mib_duplex_and_logical_half_close) (network='ws', tls=True) ... FAIL
+
+======================================================================
+FAIL: test_eight_concurrent_independent_sessions_with_target_half_close (__main__.VmessXrayHalfCloseTests.test_eight_concurrent_independent_sessions_with_target_half_close)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/63c2b083dcfa/Swirl-X14-A/tools/tests/test_vmess_xray.py", line 341, in test_eight_concurrent_independent_sessions_with_target_half_close
+    reports = list(pool.map(lambda request: self.success(request, size), requests))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/_base.py", line 619, in result_iterator
+    yield _result_or_cancel(fs.pop())
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/_base.py", line 317, in _result_or_cancel
+    return fut.result(timeout)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/63c2b083dcfa/Swirl-X14-A/tools/tests/test_vmess_xray.py", line 341, in <lambda>
+    reports = list(pool.map(lambda request: self.success(request, size), requests))
+                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/63c2b083dcfa/Swirl-X14-A/tools/tests/test_vmess_xray.py", line 81, in success
+    self.assertEqual(report["close"], "clean", report)
+AssertionError: 'transport_error' != 'clean'
+- transport_error
++ clean
+ : {'close': 'transport_error', 'close_detail': 'WebSocketTransportClosed', 'connect_us': 5038, 'downloaded': 131075, 'driver_drain_us': 22, 'ok': True, 'remaining_tasks': 0, 'sha256': 'c296af0f35e6507b4fe80c93949fe1a2a9d9598823f7d2ff19de79e96fa59809', 'transfer_us': 55918, 'uploaded': 131083}
+
+======================================================================
+FAIL: test_four_transports_four_mib_duplex_and_logical_half_close (__main__.VmessXrayHalfCloseTests.test_four_transports_four_mib_duplex_and_logical_half_close) (network='raw', tls=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/63c2b083dcfa/Swirl-X14-A/tools/tests/test_vmess_xray.py", line 331, in test_four_transports_four_mib_duplex_and_logical_half_close
+    self.success(request, size)
+  File "/workspace/scratch/63c2b083dcfa/Swirl-X14-A/tools/tests/test_vmess_xray.py", line 81, in success
+    self.assertEqual(report["close"], "clean", report)
+AssertionError: 'unexpected_eof' != 'clean'
+- unexpected_eof
++ clean
+ : {'close': 'unexpected_eof', 'close_detail': 'UnexpectedEof', 'connect_us': 1781, 'downloaded': 4194321, 'driver_drain_us': 9, 'ok': True, 'remaining_tasks': 0, 'sha256': '1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44', 'transfer_us': 246453, 'uploaded': 4194329}
+
+======================================================================
+FAIL: test_four_transports_four_mib_duplex_and_logical_half_close (__main__.VmessXrayHalfCloseTests.test_four_transports_four_mib_duplex_and_logical_half_close) (network='raw', tls=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/63c2b083dcfa/Swirl-X14-A/tools/tests/test_vmess_xray.py", line 331, in test_four_transports_four_mib_duplex_and_logical_half_close
+    self.success(request, size)
+  File "/workspace/scratch/63c2b083dcfa/Swirl-X14-A/tools/tests/test_vmess_xray.py", line 81, in success
+    self.assertEqual(report["close"], "clean", report)
+AssertionError: 'unexpected_eof' != 'clean'
+- unexpected_eof
++ clean
+ : {'close': 'unexpected_eof', 'close_detail': 'UnexpectedEof', 'connect_us': 4105, 'downloaded': 4194321, 'driver_drain_us': 9, 'ok': True, 'remaining_tasks': 0, 'sha256': '1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44', 'transfer_us': 384456, 'uploaded': 4194329}
+
+======================================================================
+FAIL: test_four_transports_four_mib_duplex_and_logical_half_close (__main__.VmessXrayHalfCloseTests.test_four_transports_four_mib_duplex_and_logical_half_close) (network='ws', tls=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/63c2b083dcfa/Swirl-X14-A/tools/tests/test_vmess_xray.py", line 331, in test_four_transports_four_mib_duplex_and_logical_half_close
+    self.success(request, size)
+  File "/workspace/scratch/63c2b083dcfa/Swirl-X14-A/tools/tests/test_vmess_xray.py", line 81, in success
+    self.assertEqual(report["close"], "clean", report)
+AssertionError: 'unexpected_eof' != 'clean'
+- unexpected_eof
++ clean
+ : {'close': 'unexpected_eof', 'close_detail': 'UnexpectedEof', 'connect_us': 4227, 'downloaded': 4194321, 'driver_drain_us': 7, 'ok': True, 'remaining_tasks': 0, 'sha256': '1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44', 'transfer_us': 343808, 'uploaded': 4194329}
+
+======================================================================
+FAIL: test_four_transports_four_mib_duplex_and_logical_half_close (__main__.VmessXrayHalfCloseTests.test_four_transports_four_mib_duplex_and_logical_half_close) (network='ws', tls=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/63c2b083dcfa/Swirl-X14-A/tools/tests/test_vmess_xray.py", line 331, in test_four_transports_four_mib_duplex_and_logical_half_close
+    self.success(request, size)
+  File "/workspace/scratch/63c2b083dcfa/Swirl-X14-A/tools/tests/test_vmess_xray.py", line 81, in success
+    self.assertEqual(report["close"], "clean", report)
+AssertionError: 'transport_error' != 'clean'
+- transport_error
++ clean
+ : {'close': 'transport_error', 'close_detail': 'WebSocketTransportClosed', 'connect_us': 4688, 'downloaded': 4194321, 'driver_drain_us': 10, 'ok': True, 'remaining_tasks': 0, 'sha256': '1cdad37cfcbe8f0022da562be019afc24fea25f210899ed6deb839c3385ecb44', 'transfer_us': 342555, 'uploaded': 4194329}
+
+----------------------------------------------------------------------
+Ran 2 tests in 7.766s
+
+FAILED (failures=5)

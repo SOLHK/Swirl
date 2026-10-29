@@ -1,0 +1,856 @@
+{
+  "schema": 1,
+  "phase": "X1.4-A8 stack dispatch fix",
+  "head_sha": "5d6b9e370ae29add8ed11d8c8ebf9e54c2ea2611",
+  "workflow_run": {
+    "id": 39804698115,
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/39804698115",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-10-22T15:25:29Z",
+    "updated_at": "2026-10-22T15:31:21Z"
+  },
+  "jobs": [
+    {
+      "id": 119914659260,
+      "name": "native-protocols (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Rust tools",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Format",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Clippy",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Unit and local network tests",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "test_summary_lines": [
+        "2026-10-22T15:26:58.4067432Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T15:26:58.4104364Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T15:26:58.7172825Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s",
+        "2026-10-22T15:26:58.8237839Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s",
+        "2026-10-22T15:26:59.1038345Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s",
+        "2026-10-22T15:26:59.7406045Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.63s",
+        "2026-10-22T15:27:05.1774944Z test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.43s",
+        "2026-10-22T15:27:05.5928951Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s",
+        "2026-10-22T15:27:05.6492157Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+        "2026-10-22T15:27:05.6549641Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T15:27:06.1327163Z test result: ok. 115 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s",
+        "2026-10-22T15:27:06.1875580Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+        "2026-10-22T15:27:06.1923125Z test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T15:27:06.2702809Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s",
+        "2026-10-22T15:27:06.6147148Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s",
+        "2026-10-22T15:27:06.6381202Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "2026-10-22T15:27:07.0973245Z test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s",
+        "2026-10-22T15:27:07.2719319Z test result: ok. 105 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s",
+        "2026-10-22T15:27:07.3425575Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+        "2026-10-22T15:27:07.4735830Z test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s",
+        "2026-10-22T15:27:07.4818849Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T15:27:07.4927177Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T15:27:07.5096475Z test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "2026-10-22T15:27:07.5394054Z test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+        "2026-10-22T15:27:07.5426308Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T15:27:07.5479099Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T15:27:07.6645126Z test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s",
+        "2026-10-22T15:27:10.4038566Z test result: ok. 112 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.74s",
+        "2026-10-22T15:27:10.4099739Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T15:27:10.9936479Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s"
+      ],
+      "stack_overflow_present": false
+    },
+    {
+      "id": 119914659612,
+      "name": "official-interop (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install test certificate library",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Rust",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build native clients and Core harness",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned official Xray peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned Hysteria and TUIC server peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned official Shadowsocks server peer",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Measure and prepare disposable runner UDP prerequisites",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set native client and evidence paths",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "VMess official Xray data and completed-response closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Hysteria2 official server including retained limitation probes",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Hysteria2 original 17 methods with a measured 1 MiB main stack",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Hysteria2 real future cancellation cleanup and same-runtime reconnect",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Hysteria2 cancellation cleanup with a measured 1 MiB main stack",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "TUIC historical official reference including retained limitation probe",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Core ingress TCP UDP DNS HTTPS and node switching",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Dynamically loaded C ABI library through official QUIC peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Phase timing and authentication semantics through C ABI and official peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Imported Xray V2Ray transport configs through ordinary Core start",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "VLESS and Trojan UDP through official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Shadowsocks 2022 official data and replay rejection",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "HTTP and SOCKS authentication TCP UDP and import through official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "REALITY Rustls through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "REALITY Chrome133 through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Vision Rustls TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Vision Chrome133 TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload actual interoperability receipts",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "test_summary_lines": [
+        "2026-10-22T15:27:49.8769739Z Ran 13 tests in 14.539s",
+        "2026-10-22T15:27:52.7456908Z test_01_tcp_and_clean_normal_close (test_hysteria2_official.Hysteria2Official.test_01_tcp_and_clean_normal_close) ... ok",
+        "2026-10-22T15:27:53.3485822Z test_02_large_bidirectional_data (test_hysteria2_official.Hysteria2Official.test_02_large_bidirectional_data) ... ok",
+        "2026-10-22T15:27:53.4233004Z test_03_udp_and_fragmented_datagrams (test_hysteria2_official.Hysteria2Official.test_03_udp_and_fragmented_datagrams) ... ok",
+        "2026-10-22T15:27:53.4467938Z test_04_dns (test_hysteria2_official.Hysteria2Official.test_04_dns) ... ok",
+        "2026-10-22T15:27:53.4673036Z test_05_wrong_password (test_hysteria2_official.Hysteria2Official.test_05_wrong_password) ... ok",
+        "2026-10-22T15:27:53.4998684Z test_06_tls_trust_and_sni (test_hysteria2_official.Hysteria2Official.test_06_tls_trust_and_sni) ... ok",
+        "2026-10-22T15:27:53.5421605Z test_07_certificate_pin (test_hysteria2_official.Hysteria2Official.test_07_certificate_pin) ... ok",
+        "2026-10-22T15:27:53.6218294Z test_08_imported_clash_and_uri (test_hysteria2_official.Hysteria2Official.test_08_imported_clash_and_uri) ... ok",
+        "2026-10-22T15:27:54.1253805Z test_09_node_switch_and_new_session_after_restart (test_hysteria2_official.Hysteria2Official.test_09_node_switch_and_new_session_after_restart) ... ok",
+        "2026-10-22T15:27:54.1539670Z test_10_https_through_native_proxy (test_hysteria2_official.Hysteria2Official.test_10_https_through_native_proxy) ... ok",
+        "2026-10-22T15:27:54.1928783Z test_11_invalid_options_fail_before_connection (test_hysteria2_official.Hysteria2Official.test_11_invalid_options_fail_before_connection) ... ok",
+        "2026-10-22T15:27:56.2377354Z test_12_record_official_server_limitations_without_claiming_support (test_hysteria2_official.Hysteria2Official.test_12_record_official_server_limitations_without_claiming_support) ... ok",
+        "2026-10-22T15:27:58.0200249Z test_13_salamander_tcp_udp_and_wrong_password (test_hysteria2_official.Hysteria2Official.test_13_salamander_tcp_udp_and_wrong_password) ... ok",
+        "2026-10-22T15:27:58.0623709Z test_14_explicit_insecure_still_enforces_certificate_pin (test_hysteria2_official.Hysteria2Official.test_14_explicit_insecure_still_enforces_certificate_pin) ... ok",
+        "2026-10-22T15:28:07.2981923Z test_15_negotiated_bandwidth_is_enforced_in_real_transfers (test_hysteria2_official.Hysteria2Official.test_15_negotiated_bandwidth_is_enforced_in_real_transfers) ... ok",
+        "2026-10-22T15:28:07.3487148Z test_16_ipv6_quic_and_ipv6_tcp_udp_targets (test_hysteria2_official.Hysteria2Official.test_16_ipv6_quic_and_ipv6_tcp_udp_targets) ... ok",
+        "2026-10-22T15:28:10.5162209Z test_17_concurrent_connections_and_multi_address_resolution (test_hysteria2_official.Hysteria2Official.test_17_concurrent_connections_and_multi_address_resolution) ... ok",
+        "2026-10-22T15:28:12.4218027Z Ran 17 tests in 21.900s",
+        "2026-10-22T15:28:17.1751653Z Ran 1 test in 4.130s",
+        "2026-10-22T15:28:33.0149680Z Ran 9 tests in 15.217s",
+        "2026-10-22T15:28:53.8821508Z Ran 6 tests in 20.202s",
+        "2026-10-22T15:29:18.5236643Z Ran 6 tests in 24.022s",
+        "2026-10-22T15:29:22.5059062Z Ran 3 tests in 2.787s",
+        "2026-10-22T15:29:34.9243349Z Ran 5 tests in 11.765s",
+        "2026-10-22T15:29:56.9574773Z Ran 8 tests in 21.263s",
+        "2026-10-22T15:30:06.2667770Z Ran 12 tests in 8.806s",
+        "2026-10-22T15:30:16.9445593Z Ran 8 tests in 9.988s",
+        "2026-10-22T15:30:29.5369257Z Ran 8 tests in 11.822s",
+        "2026-10-22T15:30:44.5742586Z Ran 8 tests in 14.446s",
+        "2026-10-22T15:30:58.1633508Z Ran 10 tests in 13.002s",
+        "2026-10-22T15:31:13.0397485Z Ran 10 tests in 14.305s"
+      ],
+      "stack_overflow_present": false
+    },
+    {
+      "id": 119914659706,
+      "name": "native-protocols (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Rust tools",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Format",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Clippy",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Unit and local network tests",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "test_summary_lines": [
+        "2026-10-22T15:27:06.1330380Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+        "2026-10-22T15:27:06.1637180Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T15:27:06.5830060Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s",
+        "2026-10-22T15:27:06.9687350Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s",
+        "2026-10-22T15:27:07.2603390Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s",
+        "2026-10-22T15:27:07.8594950Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s",
+        "2026-10-22T15:27:13.1736490Z test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.30s",
+        "2026-10-22T15:27:13.6359730Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s",
+        "2026-10-22T15:27:13.7025360Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+        "2026-10-22T15:27:13.7300530Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T15:27:14.3333610Z test result: ok. 115 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s",
+        "2026-10-22T15:27:14.4329410Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s",
+        "2026-10-22T15:27:14.4481620Z test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T15:27:14.5725750Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s",
+        "2026-10-22T15:27:15.8906390Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.30s",
+        "2026-10-22T15:27:15.9098970Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "2026-10-22T15:27:16.2036460Z test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s",
+        "2026-10-22T15:27:16.2907360Z test result: ok. 105 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s",
+        "2026-10-22T15:27:16.3323810Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+        "2026-10-22T15:27:16.4313670Z test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s",
+        "2026-10-22T15:27:16.4397270Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T15:27:16.4486730Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T15:27:16.4607840Z test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T15:27:16.4816430Z test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "2026-10-22T15:27:16.4877340Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T15:27:16.4952310Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T15:27:16.5801040Z test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s",
+        "2026-10-22T15:27:19.7212850Z test result: ok. 112 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.12s",
+        "2026-10-22T15:27:19.7442590Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T15:27:20.5046900Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s"
+      ],
+      "stack_overflow_present": false
+    },
+    {
+      "id": 119914659921,
+      "name": "native-protocols (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Rust tools",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Format",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Clippy",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Unit and local network tests",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "test_summary_lines": [
+        "2026-10-22T15:29:25.7327404Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "2026-10-22T15:29:25.7489711Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T15:29:25.9196091Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s",
+        "2026-10-22T15:29:26.0566888Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s",
+        "2026-10-22T15:29:26.3288897Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s",
+        "2026-10-22T15:29:26.7581504Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s",
+        "2026-10-22T15:29:31.9787250Z test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.21s",
+        "2026-10-22T15:29:32.4114614Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s",
+        "2026-10-22T15:29:32.4432497Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "2026-10-22T15:29:32.4591079Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T15:29:33.0116346Z test result: ok. 115 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s",
+        "2026-10-22T15:29:33.0903649Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+        "2026-10-22T15:29:33.1007803Z test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T15:29:33.1745950Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+        "2026-10-22T15:29:33.6351633Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s",
+        "2026-10-22T15:29:33.6554991Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T15:29:34.0411940Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s",
+        "2026-10-22T15:29:34.1461142Z test result: ok. 105 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s",
+        "2026-10-22T15:29:34.1944039Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+        "2026-10-22T15:29:34.2768791Z test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+        "2026-10-22T15:29:34.2900850Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T15:29:34.3049249Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T15:29:34.3233310Z test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T15:29:34.3475693Z test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "2026-10-22T15:29:34.3586406Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T15:29:34.3697437Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T15:29:34.4644611Z test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s",
+        "2026-10-22T15:29:36.3422075Z test result: ok. 112 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.87s",
+        "2026-10-22T15:29:36.3581824Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T15:29:40.6399671Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s"
+      ],
+      "stack_overflow_present": false
+    },
+    {
+      "id": 119914659990,
+      "name": "official-interop (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install test certificate library",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Rust",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build native clients and Core harness",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned official Xray peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned Hysteria and TUIC server peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned official Shadowsocks server peer",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Measure and prepare disposable runner UDP prerequisites",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set native client and evidence paths",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "VMess official Xray data and completed-response closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Hysteria2 official server including retained limitation probes",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Hysteria2 original 17 methods with a measured 1 MiB main stack",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Hysteria2 real future cancellation cleanup and same-runtime reconnect",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Hysteria2 cancellation cleanup with a measured 1 MiB main stack",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "TUIC historical official reference including retained limitation probe",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Core ingress TCP UDP DNS HTTPS and node switching",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Dynamically loaded C ABI library through official QUIC peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Phase timing and authentication semantics through C ABI and official peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Imported Xray V2Ray transport configs through ordinary Core start",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "VLESS and Trojan UDP through official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Shadowsocks 2022 official data and replay rejection",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "HTTP and SOCKS authentication TCP UDP and import through official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "REALITY Rustls through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "REALITY Chrome133 through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Vision Rustls TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Vision Chrome133 TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload actual interoperability receipts",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "test_summary_lines": [
+        "2026-10-22T15:27:09.9126810Z Ran 13 tests in 14.039s",
+        "2026-10-22T15:27:12.8905740Z test_01_tcp_and_clean_normal_close (test_hysteria2_official.Hysteria2Official.test_01_tcp_and_clean_normal_close) ... ok",
+        "2026-10-22T15:27:13.1991300Z test_02_large_bidirectional_data (test_hysteria2_official.Hysteria2Official.test_02_large_bidirectional_data) ... ok",
+        "2026-10-22T15:27:13.2326060Z test_03_udp_and_fragmented_datagrams (test_hysteria2_official.Hysteria2Official.test_03_udp_and_fragmented_datagrams) ... ok",
+        "2026-10-22T15:27:13.2419630Z test_04_dns (test_hysteria2_official.Hysteria2Official.test_04_dns) ... ok",
+        "2026-10-22T15:27:13.2501050Z test_05_wrong_password (test_hysteria2_official.Hysteria2Official.test_05_wrong_password) ... ok",
+        "2026-10-22T15:27:13.2637310Z test_06_tls_trust_and_sni (test_hysteria2_official.Hysteria2Official.test_06_tls_trust_and_sni) ... ok",
+        "2026-10-22T15:27:13.2818920Z test_07_certificate_pin (test_hysteria2_official.Hysteria2Official.test_07_certificate_pin) ... ok",
+        "2026-10-22T15:27:13.3204650Z test_08_imported_clash_and_uri (test_hysteria2_official.Hysteria2Official.test_08_imported_clash_and_uri) ... ok",
+        "2026-10-22T15:27:13.7539000Z test_09_node_switch_and_new_session_after_restart (test_hysteria2_official.Hysteria2Official.test_09_node_switch_and_new_session_after_restart) ... ok",
+        "2026-10-22T15:27:13.7688450Z test_10_https_through_native_proxy (test_hysteria2_official.Hysteria2Official.test_10_https_through_native_proxy) ... ok",
+        "2026-10-22T15:27:13.7872360Z test_11_invalid_options_fail_before_connection (test_hysteria2_official.Hysteria2Official.test_11_invalid_options_fail_before_connection) ... ok",
+        "2026-10-22T15:27:15.8080170Z test_12_record_official_server_limitations_without_claiming_support (test_hysteria2_official.Hysteria2Official.test_12_record_official_server_limitations_without_claiming_support) ... ok",
+        "2026-10-22T15:27:17.5157710Z test_13_salamander_tcp_udp_and_wrong_password (test_hysteria2_official.Hysteria2Official.test_13_salamander_tcp_udp_and_wrong_password) ... ok",
+        "2026-10-22T15:27:17.5638620Z test_14_explicit_insecure_still_enforces_certificate_pin (test_hysteria2_official.Hysteria2Official.test_14_explicit_insecure_still_enforces_certificate_pin) ... ok",
+        "2026-10-22T15:27:25.2741640Z test_15_negotiated_bandwidth_is_enforced_in_real_transfers (test_hysteria2_official.Hysteria2Official.test_15_negotiated_bandwidth_is_enforced_in_real_transfers) ... ok",
+        "2026-10-22T15:27:25.3276730Z test_16_ipv6_quic_and_ipv6_tcp_udp_targets (test_hysteria2_official.Hysteria2Official.test_16_ipv6_quic_and_ipv6_tcp_udp_targets) ... ok",
+        "2026-10-22T15:27:28.4685960Z test_17_concurrent_connections_and_multi_address_resolution (test_hysteria2_official.Hysteria2Official.test_17_concurrent_connections_and_multi_address_resolution) ... ok",
+        "2026-10-22T15:27:30.6047590Z Ran 17 tests in 20.299s",
+        "2026-10-22T15:27:36.6606320Z Ran 1 test in 4.328s",
+        "2026-10-22T15:27:50.4244870Z Ran 9 tests in 13.544s",
+        "2026-10-22T15:28:12.5481860Z Ran 6 tests in 21.811s",
+        "2026-10-22T15:28:37.6338630Z Ran 6 tests in 24.533s",
+        "2026-10-22T15:28:40.7769220Z Ran 3 tests in 2.504s",
+        "2026-10-22T15:28:51.4684320Z Ran 5 tests in 10.433s",
+        "2026-10-22T15:29:10.1486180Z Ran 8 tests in 18.421s",
+        "2026-10-22T15:29:16.7890430Z Ran 12 tests in 6.440s",
+        "2026-10-22T15:29:24.5837150Z Ran 8 tests in 7.610s",
+        "2026-10-22T15:29:29.1709590Z Ran 8 tests in 4.289s",
+        "2026-10-22T15:29:35.6000790Z Ran 8 tests in 6.064s",
+        "2026-10-22T15:29:43.2368560Z Ran 10 tests in 7.382s",
+        "2026-10-22T15:29:51.1081060Z Ran 10 tests in 7.708s"
+      ],
+      "stack_overflow_present": false
+    },
+    {
+      "id": 119914660020,
+      "name": "official-interop (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install test certificate library",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Rust",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build native clients and Core harness",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned official Xray peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned Hysteria and TUIC server peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Download pinned official Shadowsocks server peer",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Measure and prepare disposable runner UDP prerequisites",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set native client and evidence paths",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "VMess official Xray data and completed-response closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Hysteria2 official server including retained limitation probes",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Hysteria2 original 17 methods with a measured 1 MiB main stack",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Hysteria2 real future cancellation cleanup and same-runtime reconnect",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Hysteria2 cancellation cleanup with a measured 1 MiB main stack",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "TUIC historical official reference including retained limitation probe",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Core ingress TCP UDP DNS HTTPS and node switching",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Dynamically loaded C ABI library through official QUIC peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Phase timing and authentication semantics through C ABI and official peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Imported Xray V2Ray transport configs through ordinary Core start",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "VLESS and Trojan UDP through official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Shadowsocks 2022 official data and replay rejection",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "HTTP and SOCKS authentication TCP UDP and import through official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "REALITY Rustls through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "REALITY Chrome133 through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Vision Rustls TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Vision Chrome133 TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload actual interoperability receipts",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "test_summary_lines": [
+        "2026-10-22T15:26:31.4699119Z Ran 13 tests in 9.445s",
+        "2026-10-22T15:26:33.7673590Z test_01_tcp_and_clean_normal_close (test_hysteria2_official.Hysteria2Official.test_01_tcp_and_clean_normal_close) ... ok",
+        "2026-10-22T15:26:34.1265853Z test_02_large_bidirectional_data (test_hysteria2_official.Hysteria2Official.test_02_large_bidirectional_data) ... ok",
+        "2026-10-22T15:26:34.1498021Z test_03_udp_and_fragmented_datagrams (test_hysteria2_official.Hysteria2Official.test_03_udp_and_fragmented_datagrams) ... ok",
+        "2026-10-22T15:26:34.1574688Z test_04_dns (test_hysteria2_official.Hysteria2Official.test_04_dns) ... ok",
+        "2026-10-22T15:26:34.1638967Z test_05_wrong_password (test_hysteria2_official.Hysteria2Official.test_05_wrong_password) ... ok",
+        "2026-10-22T15:26:34.1737307Z test_06_tls_trust_and_sni (test_hysteria2_official.Hysteria2Official.test_06_tls_trust_and_sni) ... ok",
+        "2026-10-22T15:26:34.1874776Z test_07_certificate_pin (test_hysteria2_official.Hysteria2Official.test_07_certificate_pin) ... ok",
+        "2026-10-22T15:26:34.2153029Z test_08_imported_clash_and_uri (test_hysteria2_official.Hysteria2Official.test_08_imported_clash_and_uri) ... ok",
+        "2026-10-22T15:26:34.6141523Z test_09_node_switch_and_new_session_after_restart (test_hysteria2_official.Hysteria2Official.test_09_node_switch_and_new_session_after_restart) ... ok",
+        "2026-10-22T15:26:34.6651868Z test_10_https_through_native_proxy (test_hysteria2_official.Hysteria2Official.test_10_https_through_native_proxy) ... ok",
+        "2026-10-22T15:26:34.6750105Z test_11_invalid_options_fail_before_connection (test_hysteria2_official.Hysteria2Official.test_11_invalid_options_fail_before_connection) ... ok",
+        "2026-10-22T15:26:36.6873032Z test_12_record_official_server_limitations_without_claiming_support (test_hysteria2_official.Hysteria2Official.test_12_record_official_server_limitations_without_claiming_support) ... ok",
+        "2026-10-22T15:26:38.3512556Z test_13_salamander_tcp_udp_and_wrong_password (test_hysteria2_official.Hysteria2Official.test_13_salamander_tcp_udp_and_wrong_password) ... ok",
+        "2026-10-22T15:26:38.3685404Z test_14_explicit_insecure_still_enforces_certificate_pin (test_hysteria2_official.Hysteria2Official.test_14_explicit_insecure_still_enforces_certificate_pin) ... ok",
+        "2026-10-22T15:26:45.3919951Z test_15_negotiated_bandwidth_is_enforced_in_real_transfers (test_hysteria2_official.Hysteria2Official.test_15_negotiated_bandwidth_is_enforced_in_real_transfers) ... ok",
+        "2026-10-22T15:26:45.4113606Z test_16_ipv6_quic_and_ipv6_tcp_udp_targets (test_hysteria2_official.Hysteria2Official.test_16_ipv6_quic_and_ipv6_tcp_udp_targets) ... ok",
+        "2026-10-22T15:26:48.5089835Z test_17_concurrent_connections_and_multi_address_resolution (test_hysteria2_official.Hysteria2Official.test_17_concurrent_connections_and_multi_address_resolution) ... ok",
+        "2026-10-22T15:26:50.4378556Z Ran 17 tests in 18.815s",
+        "2026-10-22T15:26:52.7329658Z test_01_tcp_and_clean_normal_close (test_hysteria2_official.Hysteria2Official.test_01_tcp_and_clean_normal_close) ... ok",
+        "2026-10-22T15:26:53.1062325Z test_02_large_bidirectional_data (test_hysteria2_official.Hysteria2Official.test_02_large_bidirectional_data) ... ok",
+        "2026-10-22T15:26:53.1966103Z test_03_udp_and_fragmented_datagrams (test_hysteria2_official.Hysteria2Official.test_03_udp_and_fragmented_datagrams) ... ok",
+        "2026-10-22T15:26:53.2274901Z test_04_dns (test_hysteria2_official.Hysteria2Official.test_04_dns) ... ok",
+        "2026-10-22T15:26:53.2570899Z test_05_wrong_password (test_hysteria2_official.Hysteria2Official.test_05_wrong_password) ... ok",
+        "2026-10-22T15:26:53.3110379Z test_06_tls_trust_and_sni (test_hysteria2_official.Hysteria2Official.test_06_tls_trust_and_sni) ... ok",
+        "2026-10-22T15:26:53.3700830Z test_07_certificate_pin (test_hysteria2_official.Hysteria2Official.test_07_certificate_pin) ... ok",
+        "2026-10-22T15:26:53.4660542Z test_08_imported_clash_and_uri (test_hysteria2_official.Hysteria2Official.test_08_imported_clash_and_uri) ... ok",
+        "2026-10-22T15:26:53.9707960Z test_09_node_switch_and_new_session_after_restart (test_hysteria2_official.Hysteria2Official.test_09_node_switch_and_new_session_after_restart) ... ok",
+        "2026-10-22T15:26:54.0425665Z test_10_https_through_native_proxy (test_hysteria2_official.Hysteria2Official.test_10_https_through_native_proxy) ... ok",
+        "2026-10-22T15:26:54.1384104Z test_11_invalid_options_fail_before_connection (test_hysteria2_official.Hysteria2Official.test_11_invalid_options_fail_before_connection) ... ok",
+        "2026-10-22T15:26:56.1952056Z test_12_record_official_server_limitations_without_claiming_support (test_hysteria2_official.Hysteria2Official.test_12_record_official_server_limitations_without_claiming_support) ... ok",
+        "2026-10-22T15:26:57.9433330Z test_13_salamander_tcp_udp_and_wrong_password (test_hysteria2_official.Hysteria2Official.test_13_salamander_tcp_udp_and_wrong_password) ... ok",
+        "2026-10-22T15:26:58.0034098Z test_14_explicit_insecure_still_enforces_certificate_pin (test_hysteria2_official.Hysteria2Official.test_14_explicit_insecure_still_enforces_certificate_pin) ... ok",
+        "2026-10-22T15:27:05.0643557Z test_15_negotiated_bandwidth_is_enforced_in_real_transfers (test_hysteria2_official.Hysteria2Official.test_15_negotiated_bandwidth_is_enforced_in_real_transfers) ... ok",
+        "2026-10-22T15:27:05.1332073Z test_16_ipv6_quic_and_ipv6_tcp_udp_targets (test_hysteria2_official.Hysteria2Official.test_16_ipv6_quic_and_ipv6_tcp_udp_targets) ... ok",
+        "2026-10-22T15:27:08.2992899Z test_17_concurrent_connections_and_multi_address_resolution (test_hysteria2_official.Hysteria2Official.test_17_concurrent_connections_and_multi_address_resolution) ... ok",
+        "2026-10-22T15:27:10.1629452Z Ran 17 tests in 19.599s",
+        "2026-10-22T15:27:14.3647667Z Ran 1 test in 4.057s",
+        "2026-10-22T15:27:18.5896748Z Ran 1 test in 4.084s",
+        "2026-10-22T15:27:30.2294662Z Ran 9 tests in 11.505s",
+        "2026-10-22T15:27:50.3169965Z Ran 6 tests in 19.915s",
+        "2026-10-22T15:28:13.0430872Z Ran 6 tests in 22.573s",
+        "2026-10-22T15:28:15.4041488Z Ran 3 tests in 1.824s",
+        "2026-10-22T15:28:34.9793420Z Ran 5 tests in 19.418s",
+        "2026-10-22T15:28:49.4758835Z Ran 8 tests in 14.356s",
+        "2026-10-22T15:28:54.4916656Z Ran 12 tests in 4.878s",
+        "2026-10-22T15:29:05.1607659Z Ran 8 tests in 10.525s",
+        "2026-10-22T15:29:08.8865500Z Ran 8 tests in 3.499s",
+        "2026-10-22T15:29:12.5667965Z Ran 8 tests in 3.558s",
+        "2026-10-22T15:29:19.2717592Z Ran 10 tests in 6.580s",
+        "2026-10-22T15:29:25.9545234Z Ran 10 tests in 6.554s"
+      ],
+      "stack_overflow_present": false
+    }
+  ]
+}

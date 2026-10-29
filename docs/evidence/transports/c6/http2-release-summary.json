@@ -1,0 +1,65 @@
+{
+  "stage": "C6 final release regression",
+  "suite": "http2",
+  "platform": "Linux",
+  "command_file": "/workspace/scratch/ece554ece7c1/transport-evidence/c6-release-http2.commands.json",
+  "log_file": "/workspace/scratch/ece554ece7c1/transport-evidence/c6-release-http2.log",
+  "exit_file": "/workspace/scratch/ece554ece7c1/transport-evidence/c6-release-http2.exit",
+  "attempts_file": "/workspace/scratch/ece554ece7c1/transport-evidence/c6-release-http2-attempts.json",
+  "evidence_directory": "/workspace/scratch/ece554ece7c1/c6-release-http2",
+  "exit_code": 0,
+  "test_methods": 8,
+  "test_elapsed_seconds": 2.981,
+  "fixture_count": 8,
+  "native_invocations": 28,
+  "successful_invocations": 14,
+  "expected_negative_invocations": 14,
+  "success_protocols": {
+    "vless": 12,
+    "trojan": 2
+  },
+  "success_outer_tls": {
+    "true": 14
+  },
+  "success_target_tls": {
+    "false": 12,
+    "true": 2
+  },
+  "successful_close_labels": {
+    "cancelled": 8,
+    "clean": 6
+  },
+  "negative_error_codes": {
+    "HttpRead": 5,
+    "TlsVerificationOrHandshake": 2,
+    "TlsAlpnUnsupported": 1,
+    "OperationTimeout": 1,
+    "Http2TlsRequired": 1,
+    "Http2ReservedHeader": 3,
+    "InputSyntax": 1
+  },
+  "lifecycle": {
+    "runtime_reports": 27,
+    "reports_with_zero_remaining_tasks": 27,
+    "pre_runtime_input_rejections": 1,
+    "maximum_driver_drain_us": 9473,
+    "origin_count": 13,
+    "origin_request_count": 17,
+    "origin_client_closes": 12,
+    "origin_reciprocal_tls_closes": 2,
+    "cleanup_errors": [],
+    "origin_errors": [],
+    "counter_scope": "Origin counters are observations saved at fixture teardown; positive half-close/cancellation assertions in the test methods passed before teardown."
+  },
+  "client_release_sha256": "f4fa8cfb328d8f9f38ce96d8dba588c1ff4df406276c4cd12d4fc09f06ed50b6",
+  "peer_versions": [
+    "Xray 1.8.24 (Xray, Penetrates Everything.) 6baad79 (go1.23.0 linux/amd64)"
+  ],
+  "peer_environment_overrides": [
+    "{}"
+  ],
+  "source_state": "C5 committed HEAD plus C6 working-tree integration; the exact tested final release artifact is identified by SHA256. This is not a claim of a later commit or Windows/macOS execution.",
+  "evidence_level": "Independent official Xray server on loopback with upper protocol authentication and local HTTP/HTTPS/duplex targets.",
+  "public_network_tested": false,
+  "performance_benchmark": false
+}

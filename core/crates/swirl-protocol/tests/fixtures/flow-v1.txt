@@ -1,0 +1,5 @@
+# Public synthetic VLESS v0 request Addons vectors v1.
+# name|flow kind|flow text|complete length-prefixed Addons hex
+missing|none||00
+empty|some||00
+vision|some|xtls-rprx-vision|120a1078746c732d727072782d766973696f6e

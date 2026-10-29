@@ -1,0 +1,64 @@
+name: S4 macOS Hysteria2 strict shutdown diagnosis
+on:
+  push:
+    branches: [work/swirl-s4-final-completion-20261023]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: s4-hy2-shutdown-diagnostic-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  macos-shutdown:
+    runs-on: macos-latest
+    timeout-minutes: 25
+    env:
+      SWIRL_SOURCE_SHA: ${{ github.sha }}
+      PYTHONUTF8: '1'
+      HY2_CLIENT: ${{ github.workspace }}/core/target/debug/examples/hysteria2-client
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the independent certificate fixture
+        run: python -m pip install cryptography==50.0.2
+      - name: Install current Rust
+        run: rustup toolchain install stable --profile minimal
+      - name: Build exact-source native Hysteria2 client
+        run: cargo build --manifest-path core/Cargo.toml --locked -p swirl-protocol --example hysteria2-client
+      - name: Fetch hash-locked independent official server peers
+        run: python tools/Fetch-NativeProtocolPeers.py --output "${{ runner.temp }}/s4-hy2-shutdown-peers"
+      - name: Preserve source and host identity
+        shell: python
+        run: |
+          import json, os, pathlib, platform, subprocess
+          output = pathlib.Path(os.environ['RUNNER_TEMP']) / 's4-hy2-shutdown-identity'
+          output.mkdir(parents=True, exist_ok=True)
+          sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          if sha != os.environ['SWIRL_SOURCE_SHA']:
+              raise SystemExit('Diagnostic checkout differs from the triggered commit')
+          report = {'source_sha': sha, 'platform': platform.platform(), 'architecture': platform.machine(),
+                    'runner_os': os.environ.get('RUNNER_OS'), 'image_os': os.environ.get('ImageOS'),
+                    'image_version': os.environ.get('ImageVersion'),
+                    'rustc': subprocess.check_output(['rustc', '-vV'], text=True),
+                    'original_test_assertions_reduced': False, 'private_inputs': False}
+          (output / 'identity.json').write_text(json.dumps(report, indent=2) + '\n')
+      - name: Run original 17 methods before repeating 200 HTTPS requests with TLS close receipts
+        run: python tools/Run-Hysteria2ShutdownProbe.py --output "$RUNNER_TEMP/s4-hy2-shutdown"
+      - name: Require unchanged tracked source after the probe
+        if: ${{ !cancelled() }}
+        run: git diff --exit-code
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: S4-macOS-HY2-shutdown-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/s4-hy2-shutdown
+            ${{ runner.temp }}/s4-hy2-shutdown-identity
+            ${{ runner.temp }}/s4-hy2-shutdown-peers/manifest.json
+          if-no-files-found: warn
+          retention-days: 14

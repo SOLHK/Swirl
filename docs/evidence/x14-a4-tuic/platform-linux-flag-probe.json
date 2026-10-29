@@ -1,0 +1,183 @@
+{
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "prepare_macos_requested": true,
+  "scope": "host UDP prerequisite; not proxy protocol interoperability",
+  "sources": [
+    "https://github.com/apple-oss-distributions/xnu/blob/main/bsd/netinet/udp_usrreq.c",
+    "https://github.com/apple-oss-distributions/xnu/blob/main/bsd/netinet6/udp6_usrreq.c",
+    "https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/uipc_socket.c",
+    "https://github.com/tuic-protocol/tuic/blob/a299ef02d9f4ab5a0edbf58b9998f41bf768b332/tuic-server/src/connection/udp_session.rs"
+  ],
+  "system_setting_changed": false,
+  "ok": true,
+  "before": {
+    "utc": "2026-10-22T13:26:45.677553+00:00",
+    "sysctl": {},
+    "udp_roundtrips": [
+      {
+        "address_family": "IPv4",
+        "payload_bytes": 123,
+        "ok": true,
+        "stage": "roundtrip-complete",
+        "socket_defaults": {
+          "sender_sndbuf": 212992,
+          "sender_rcvbuf": 212992,
+          "receiver_sndbuf": 212992,
+          "receiver_rcvbuf": 212992
+        },
+        "sha256": "a6530926ec5ea8880eae4666add8fe14493346311f32a59ec563c6416714dfa3"
+      },
+      {
+        "address_family": "IPv4",
+        "payload_bytes": 4096,
+        "ok": true,
+        "stage": "roundtrip-complete",
+        "socket_defaults": {
+          "sender_sndbuf": 212992,
+          "sender_rcvbuf": 212992,
+          "receiver_sndbuf": 212992,
+          "receiver_rcvbuf": 212992
+        },
+        "sha256": "bb50289f8b754449c732d87f74370bea84c1a4e496f39389f428065b20057c9d"
+      },
+      {
+        "address_family": "IPv4",
+        "payload_bytes": 65507,
+        "ok": true,
+        "stage": "roundtrip-complete",
+        "socket_defaults": {
+          "sender_sndbuf": 212992,
+          "sender_rcvbuf": 212992,
+          "receiver_sndbuf": 212992,
+          "receiver_rcvbuf": 212992
+        },
+        "sha256": "2c96b5a3b2972fdcc5d6c0e377260ab9f3a843509e37569dadaeab4a10d9ffcf"
+      },
+      {
+        "address_family": "IPv6",
+        "payload_bytes": 123,
+        "ok": true,
+        "stage": "roundtrip-complete",
+        "socket_defaults": {
+          "sender_sndbuf": 212992,
+          "sender_rcvbuf": 212992,
+          "receiver_sndbuf": 212992,
+          "receiver_rcvbuf": 212992
+        },
+        "sha256": "a6530926ec5ea8880eae4666add8fe14493346311f32a59ec563c6416714dfa3"
+      },
+      {
+        "address_family": "IPv6",
+        "payload_bytes": 4096,
+        "ok": true,
+        "stage": "roundtrip-complete",
+        "socket_defaults": {
+          "sender_sndbuf": 212992,
+          "sender_rcvbuf": 212992,
+          "receiver_sndbuf": 212992,
+          "receiver_rcvbuf": 212992
+        },
+        "sha256": "bb50289f8b754449c732d87f74370bea84c1a4e496f39389f428065b20057c9d"
+      },
+      {
+        "address_family": "IPv6",
+        "payload_bytes": 65507,
+        "ok": true,
+        "stage": "roundtrip-complete",
+        "socket_defaults": {
+          "sender_sndbuf": 212992,
+          "sender_rcvbuf": 212992,
+          "receiver_sndbuf": 212992,
+          "receiver_rcvbuf": 212992
+        },
+        "sha256": "2c96b5a3b2972fdcc5d6c0e377260ab9f3a843509e37569dadaeab4a10d9ffcf"
+      }
+    ],
+    "ok": true
+  },
+  "after": {
+    "utc": "2026-10-22T13:26:45.677553+00:00",
+    "sysctl": {},
+    "udp_roundtrips": [
+      {
+        "address_family": "IPv4",
+        "payload_bytes": 123,
+        "ok": true,
+        "stage": "roundtrip-complete",
+        "socket_defaults": {
+          "sender_sndbuf": 212992,
+          "sender_rcvbuf": 212992,
+          "receiver_sndbuf": 212992,
+          "receiver_rcvbuf": 212992
+        },
+        "sha256": "a6530926ec5ea8880eae4666add8fe14493346311f32a59ec563c6416714dfa3"
+      },
+      {
+        "address_family": "IPv4",
+        "payload_bytes": 4096,
+        "ok": true,
+        "stage": "roundtrip-complete",
+        "socket_defaults": {
+          "sender_sndbuf": 212992,
+          "sender_rcvbuf": 212992,
+          "receiver_sndbuf": 212992,
+          "receiver_rcvbuf": 212992
+        },
+        "sha256": "bb50289f8b754449c732d87f74370bea84c1a4e496f39389f428065b20057c9d"
+      },
+      {
+        "address_family": "IPv4",
+        "payload_bytes": 65507,
+        "ok": true,
+        "stage": "roundtrip-complete",
+        "socket_defaults": {
+          "sender_sndbuf": 212992,
+          "sender_rcvbuf": 212992,
+          "receiver_sndbuf": 212992,
+          "receiver_rcvbuf": 212992
+        },
+        "sha256": "2c96b5a3b2972fdcc5d6c0e377260ab9f3a843509e37569dadaeab4a10d9ffcf"
+      },
+      {
+        "address_family": "IPv6",
+        "payload_bytes": 123,
+        "ok": true,
+        "stage": "roundtrip-complete",
+        "socket_defaults": {
+          "sender_sndbuf": 212992,
+          "sender_rcvbuf": 212992,
+          "receiver_sndbuf": 212992,
+          "receiver_rcvbuf": 212992
+        },
+        "sha256": "a6530926ec5ea8880eae4666add8fe14493346311f32a59ec563c6416714dfa3"
+      },
+      {
+        "address_family": "IPv6",
+        "payload_bytes": 4096,
+        "ok": true,
+        "stage": "roundtrip-complete",
+        "socket_defaults": {
+          "sender_sndbuf": 212992,
+          "sender_rcvbuf": 212992,
+          "receiver_sndbuf": 212992,
+          "receiver_rcvbuf": 212992
+        },
+        "sha256": "bb50289f8b754449c732d87f74370bea84c1a4e496f39389f428065b20057c9d"
+      },
+      {
+        "address_family": "IPv6",
+        "payload_bytes": 65507,
+        "ok": true,
+        "stage": "roundtrip-complete",
+        "socket_defaults": {
+          "sender_sndbuf": 212992,
+          "sender_rcvbuf": 212992,
+          "receiver_sndbuf": 212992,
+          "receiver_rcvbuf": 212992
+        },
+        "sha256": "2c96b5a3b2972fdcc5d6c0e377260ab9f3a843509e37569dadaeab4a10d9ffcf"
+      }
+    ],
+    "ok": true
+  }
+}

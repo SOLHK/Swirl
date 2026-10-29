@@ -4,7 +4,7 @@
 #include <QDir>
 #include <QFile>
 #include <QSaveFile>
-#include <QStandardPaths>
+#include "StoragePaths.h"
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -46,7 +46,7 @@ QByteArray makeZip(const QList<QPair<QByteArray,QByteArray>> &files){
 }
 }
 DiagnosticService::DiagnosticService(QString directory,QObject *parent):QObject(parent),m_directory(directory){
- if(m_directory.isEmpty())m_directory=QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/diagnostics";QDir().mkpath(m_directory);
+ if(m_directory.isEmpty())m_directory=SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/diagnostics";QDir().mkpath(m_directory);
  // The last append can take a rotated file slightly beyond 1 MiB.
  QFile recent(m_directory+"/events.jsonl");if(recent.open(QIODevice::ReadOnly)&&recent.size()<=2*1024*1024){for(const auto &line:recent.readAll().split('\n')){auto row=QJsonDocument::fromJson(line).object();if(row.isEmpty())continue;
   if(row.value("source")=="Diagnostics"&&row.value("code")=="EventsCleared"){m_records.clear();m_events=0;continue;}
@@ -56,14 +56,16 @@ DiagnosticService::~DiagnosticService(){if(active==this){qInstallMessageHandler(
 QString DiagnosticService::redact(QString text){
  text=text.left(8192);
  text.replace(QRegularExpression("-----BEGIN [^-]*PRIVATE KEY-----[\\s\\S]*?(?:-----END [^-]*PRIVATE KEY-----|$)"),"[private key removed]");
- text.replace(QRegularExpression("(?:https?|ss|ssr|vmess|vless|trojan|hysteria2?)://[^\\s\\\"<>]+",QRegularExpression::CaseInsensitiveOption),"[URL removed]");
+ text.replace(QRegularExpression("[A-Za-z][A-Za-z0-9+.-]*://[^\\s\\\"<>]+"),"[URL removed]");
  text.replace(QRegularExpression("(authorization|cookie|set-cookie)\\s*[:=]\\s*[^\\r\\n]+",QRegularExpression::CaseInsensitiveOption),"\\1: [removed]");
- text.replace(QRegularExpression("[\\\"']?(?:password|passwd|token|secret|uuid|api[-_]?key|private[-_]?key|subscription)[\\\"']?\\s*[:=]\\s*(?:\\\"[^\\\"]*\\\"|'[^']*'|[^,;\\s}]+)",QRegularExpression::CaseInsensitiveOption),"[credential removed]");
+ text.replace(QRegularExpression("[\\\"']?(?:user(?:name)?|password|passwd|passphrase|token|secret|uuid|psk|auth(?:entication)?(?:[-_]?str)?|short[-_]?id|api[-_]?key|private[-_]?key(?:[-_]?passphrase)?|pre[-_]?shared[-_]?key|subscription)[\\\"']?\\s*[:=]\\s*(?:\\\"[^\\\"]*\\\"|'[^']*'|[^,;\\s}]+)",QRegularExpression::CaseInsensitiveOption),"[credential removed]");
  text.replace(QRegularExpression("\\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\\b",QRegularExpression::CaseInsensitiveOption),"[UUID removed]");
  text.replace(QRegularExpression("\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b"),"[IP removed]");
  text.replace(QRegularExpression("\\b[0-9a-f]{0,4}:[0-9a-f:]{2,}\\b",QRegularExpression::CaseInsensitiveOption),"[IP removed]");
  text.replace(QRegularExpression("[A-Za-z]:[\\\\/][^\\r\\n\\\"]*"),"[local path removed]");
  text.replace(QRegularExpression("\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b"),"[email removed]");
+ // Bare DNS names in TLS/network errors are browsing metadata too.
+ text.replace(QRegularExpression("(?:[\\p{L}\\p{M}\\p{N}-]+\\.)+[\\p{L}]{2,63}"),"[hostname removed]");
  text.replace(QRegularExpression("\\b[A-Za-z0-9_-]{32,}={0,2}\\b"),"[opaque value removed]");
  return text;
 }
@@ -91,10 +93,18 @@ bool DiagnosticService::exportReport(const QUrl &file,const QVariantMap &snapsho
  QList<QPair<QByteArray,QByteArray>> entries;QByteArray logs;
  for(const auto &row:records()){auto safe=row.toMap();safe["message"]=redact(safe.value("message").toString());logs+=QJsonDocument(QJsonObject::fromVariantMap(safe)).toJson(QJsonDocument::Compact)+"\n";}
  entries.append({"logs.jsonl",logs});
- // Snapshot is constructed from an allowlist; URLs, connections, node options,
- // process paths, environment variables and credentials are never included.
+ // Snapshot is constructed from an allowlist; it includes the Swirl.exe path,
+ // hash, build SHA, actual engine and PID, but no node or credential fields.
  auto environment=QJsonObject{{"version",QCoreApplication::applicationVersion()},{"qt",qVersion()},{"os",QSysInfo::prettyProductName()},{"architecture",QSysInfo::currentCpuArchitecture()},{"created",QDateTime::currentDateTime().toString(Qt::ISODate)}};
  entries.append({"environment.json",QJsonDocument(environment).toJson()});
+ const auto sourceSha=snapshot.value("sourceSha").toString(),binarySha=snapshot.value("executableSha256").toString();
+ const auto engine=snapshot.value("actualEngineType").toString();
+ const auto isHex=[](const QString &value,int length){return value.size()==length&&QRegularExpression(QStringLiteral("^[0-9a-fA-F]+$")).match(value).hasMatch();};
+ const auto actualEngine=QStringList{"rust","compatibility","native","not-running"}.contains(engine)?engine:QStringLiteral("unknown");
+ const QJsonObject identity{{"sourceSha",isHex(sourceSha,40)?sourceSha:QStringLiteral("source-archive")},
+  {"executablePath",QCoreApplication::applicationFilePath()},{"executableSha256",isHex(binarySha,64)?binarySha:QString()},
+  {"actualEngineType",actualEngine},{"engineProcessId",snapshot.value("engineProcessId").toString().toLongLong()}};
+ entries.append({"identity.json",QJsonDocument(identity).toJson()});
  std::function<QVariant(const QVariant &)> sanitize=[&](const QVariant &value)->QVariant {
   if(value.metaType().id()==QMetaType::QString)return redact(value.toString());
   if(value.metaType().id()==QMetaType::QVariantMap){auto map=value.toMap();for(auto it=map.begin();it!=map.end();++it)it.value()=sanitize(it.value());return map;}

@@ -1,0 +1,619 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "local_uncommitted_source_snapshot",
+  "scope": "Vision R2 outer TLS record-boundary correction after exact f3ce257f macOS and Windows interop failures; local tests only.",
+  "source_identity": {
+    "evidence_kind": "local_uncommitted_source_snapshot",
+    "local_base_commit": "271ed3f5d2abe185a7b3308dd77f00b904bc58be",
+    "upstream_ci_failure_commit": "f3ce257f14e59e82977d89ac4be436d08926c6b8",
+    "files": [
+      {
+        "path": "core/Cargo.lock",
+        "bytes": 31545,
+        "sha256": "1ddd4b6878c5d0c1226fb00f111822ce8d6842961486df46560136d9b475e170"
+      },
+      {
+        "path": "core/crates/swirl-protocol/Cargo.toml",
+        "bytes": 564,
+        "sha256": "98cd567d25d089d5553e564607c019856f2a25d8896ce9c2ddc2a1c9a5c7c7ef"
+      },
+      {
+        "path": "core/crates/swirl-protocol/src/vision.rs",
+        "bytes": 12875,
+        "sha256": "10019b9878b3e50246824f0d52f9d0c6ec26e6124bde2c1a821445e0fe195a7e"
+      },
+      {
+        "path": "core/crates/swirl-protocol/src/vision/record.rs",
+        "bytes": 6166,
+        "sha256": "99172e1a3fba975dc7d12e028e42f4be7d2f2350fcd479427357cb869e74951f"
+      },
+      {
+        "path": "core/crates/swirl-protocol/tests/vision_record.rs",
+        "bytes": 12585,
+        "sha256": "6471335d12d67e1e7a76834ad3924060f426b8583084f917ffb45897243c24e3"
+      },
+      {
+        "path": "core/crates/swirl-protocol/examples/vision-client.rs",
+        "bytes": 11009,
+        "sha256": "0ea01d72b175de36a8d101efaf42e13f70b6fb4a7fe322699152057fdd5aa1c6"
+      }
+    ]
+  },
+  "source_identity_scope": "The local checkout base remains 271ed3f5d2abe185a7b3308dd77f00b904bc58be. The frozen file hashes identify the tested modifications; this document does not claim a new commit or exact-SHA CI result.",
+  "implementation": [
+    "Explicit TlsRecordIo reads at most the current TLS header or ciphertext body and retains only a five-byte header plus counters; TLS authentication and close_notify validation remain with rustls.",
+    "Explicit PlaintextChunks consumes one authenticated plaintext chunk per read so command 2 is delivered to Vision before tokio-rustls can read a subsequent raw inner-TLS record.",
+    "The synthetic vision-client outer TLS path uses both adapters. Default product secure transport and inner TLS behavior are unchanged.",
+    "DirectRequested is still rejected with PermissionDenied. This change does not enable DirectReady, raw socket extraction, or product outbound support."
+  ],
+  "regression_evidence": {
+    "tests_run": 5,
+    "failed": 0,
+    "ignored": 0,
+    "properties": [
+      "A deterministic real TLS peer supplies an authenticated command-2 record followed immediately by an actual ciphertext record from an unrelated TLS session. The original batching path reproduces InvalidData and a bad-record-MAC alert.",
+      "The four ciphertext/plaintext adapter combinations demonstrate that both boundaries are required: ciphertext limiting alone can still consume raw bytes and emit an alert during a second plaintext fill.",
+      "Both adapters preserve PermissionDenied and DirectRequested, expose zero application bytes, leave the complete raw suffix unread, and drop the transport owner exactly once.",
+      "A tampered authenticated command-2 record remains InvalidData; it cannot become a DirectRequested refusal.",
+      "Authenticated close_notify succeeds; bare TCP EOF and partial close-record header/body remain UnexpectedEof.",
+      "A cancelled read preserves a partial header, upload half-close still permits downlink, and an oversized record is rejected after its five-byte header without reading its body."
+    ]
+  },
+  "toolchain": {
+    "rust": "1.99.1",
+    "cargo_target_dir": "/tmp/swirl-target-vision",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "gate_results": [
+    {
+      "gate": "targeted",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "swirl-protocol",
+        "--test",
+        "vision_record",
+        "--locked",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.497,
+      "log_path": "/tmp/swirl-vision-record-fix/01-targeted.log",
+      "log_sha256": "5b2d4beade44c2401a30258e2c0e5c98a5ba6315c0cbf46370348e8612813678",
+      "log_bytes": 756,
+      "raw_log": "   Compiling swirl-protocol v0.1.0 (/workspace/scratch/1e3e4089c3c8/Swirl/core/crates/swirl-protocol)\n    Finished `test` profile [unoptimized] target(s) in 1.43s\n     Running tests/vision_record.rs (/tmp/swirl-target-vision/debug/deps/vision_record-859cd6f377cca0b8)\n\nrunning 5 tests\ntest partial_header_survives_cancelled_read_and_write_half_close ... ok\ntest tampered_outer_direct_record_remains_an_authentication_failure ... ok\ntest oversized_record_is_rejected_without_reading_its_body ... ok\ntest real_tls_close_notify_is_required_even_at_record_boundaries ... ok\ntest both_boundaries_deliver_authenticated_direct_request_before_coalesced_raw_tls ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s\n\n"
+    },
+    {
+      "gate": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.284,
+      "log_path": "/tmp/swirl-vision-record-fix/02-fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log_bytes": 0,
+      "raw_log": ""
+    },
+    {
+      "gate": "example",
+      "command": [
+        "cargo",
+        "build",
+        "-p",
+        "swirl-protocol",
+        "--example",
+        "vision-client",
+        "--release",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 9.012,
+      "log_path": "/tmp/swirl-vision-record-fix/03-example.log",
+      "log_sha256": "adf3774588cc913ea96a65dd6b0da3e27f6c8677ff6a849447799c3ee3ba97f8",
+      "log_bytes": 164,
+      "raw_log": "   Compiling swirl-protocol v0.1.0 (/workspace/scratch/1e3e4089c3c8/Swirl/core/crates/swirl-protocol)\n    Finished `release` profile [optimized] target(s) in 8.97s\n"
+    },
+    {
+      "gate": "check",
+      "command": [
+        "cargo",
+        "check",
+        "--workspace",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.398,
+      "log_path": "/tmp/swirl-vision-record-fix/04-check.log",
+      "log_sha256": "b3f0020a3bf91826187e7a8a38ae792ee350c2e340323f1dbbd4fbf4c823c048",
+      "log_bytes": 348,
+      "raw_log": "    Checking swirl-protocol v0.1.0 (/workspace/scratch/1e3e4089c3c8/Swirl/core/crates/swirl-protocol)\n    Checking swirl-core v0.1.0 (/workspace/scratch/1e3e4089c3c8/Swirl/core/crates/swirl-core)\n    Checking swirl-api v0.1.0 (/workspace/scratch/1e3e4089c3c8/Swirl/core/crates/swirl-api)\n    Finished `dev` profile [unoptimized] target(s) in 1.35s\n"
+    },
+    {
+      "gate": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.766,
+      "log_path": "/tmp/swirl-vision-record-fix/05-clippy.log",
+      "log_sha256": "800ba819ba04f6bd419934b2512e8bd4246fb0fdda697d55b5fd80caf9566498",
+      "log_bytes": 348,
+      "raw_log": "    Checking swirl-protocol v0.1.0 (/workspace/scratch/1e3e4089c3c8/Swirl/core/crates/swirl-protocol)\n    Checking swirl-core v0.1.0 (/workspace/scratch/1e3e4089c3c8/Swirl/core/crates/swirl-core)\n    Checking swirl-api v0.1.0 (/workspace/scratch/1e3e4089c3c8/Swirl/core/crates/swirl-api)\n    Finished `dev` profile [unoptimized] target(s) in 1.69s\n"
+    },
+    {
+      "gate": "test",
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 2.603,
+      "log_path": "/tmp/swirl-vision-record-fix/06-test.log",
+      "log_sha256": "877e39a3349618d866145490bf3f6969ee76fe51e0c754143e245f539a792c4d",
+      "log_bytes": 2802,
+      "raw_log": "   Compiling swirl-protocol v0.1.0 (/workspace/scratch/1e3e4089c3c8/Swirl/core/crates/swirl-protocol)\n   Compiling swirl-core v0.1.0 (/workspace/scratch/1e3e4089c3c8/Swirl/core/crates/swirl-core)\n   Compiling swirl-api v0.1.0 (/workspace/scratch/1e3e4089c3c8/Swirl/core/crates/swirl-api)\n    Finished `test` profile [unoptimized] target(s) in 2.55s\n     Running unittests src/lib.rs (/tmp/swirl-target-vision/debug/deps/swirl_api-eb4b84fcb204254e)\n\nrunning 1 test\ntest tests::rejects_unknown_and_redacts_secrets ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running unittests src/main.rs (/tmp/swirl-target-vision/debug/deps/swirl_api-7df840569e8d00b9)\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running unittests src/bin/swirl-diagnose.rs (/tmp/swirl-target-vision/debug/deps/swirl_diagnose-14d42a075e2df8ee)\n\nrunning 3 tests\ntest tests::stdin_preserves_small_budgets_and_normalizes_ipv6 ... ok\ntest tests::diagnostic_uses_product_dns_validation ... ok\ntest tests::stdin_rejects_ambiguous_input_and_never_echoes_private_values ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running unittests src/bin/swirl-inspect.rs (/tmp/swirl-target-vision/debug/deps/swirl_inspect-297c5edaf0b8b46c)\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running unittests src/lib.rs (/tmp/swirl-target-vision/debug/deps/swirl_core-2b25c67efa02f287)\n\nrunning 6 tests\ntest policy::tests::fallback_keeps_member_priority_and_fails_closed_when_health_expires ... ok\ntest policy::tests::url_test_hysteresis_and_expiration_are_explicit ... ok\ntest policy::tests::scheduler_skips_active_members_and_never_enqueues_catchup_rounds ... ok\ntest policy::tests::accepted_policy_views_do_not_change_when_live_health_changes ... ok\ntest policy::tests::round_robin_advances_only_once_per_used_policy_and_session ... ok\ntest socks5_udp::tests::queued_reply_cannot_outlive_its_control_worker ... FAILED\n\nfailures:\n\n---- socks5_udp::tests::queued_reply_cannot_outlive_its_control_worker stdout ----\n\nthread 'socks5_udp::tests::queued_reply_cannot_outlive_its_control_worker' (717) panicked at crates/swirl-core/src/socks5_udp.rs:205:58:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    socks5_udp::tests::queued_reply_cannot_outlive_its_control_worker\n\ntest result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\nerror: test failed, to rerun pass `-p swirl-core --lib`\n"
+    },
+    {
+      "gate": "test-loopback",
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.313,
+      "log_path": "/tmp/swirl-vision-record-fix/07-test-loopback.log",
+      "log_sha256": "85208bf34fe7450c3a3eeb9262b33818956804717e95b11890f54dd09da9d6f8",
+      "execution_context": "loopback network permission enabled",
+      "log_bytes": 27039,
+      "raw_log": "    Finished `test` profile [unoptimized] target(s) in 0.05s\n     Running unittests src/lib.rs (/tmp/swirl-target-vision/debug/deps/swirl_api-eb4b84fcb204254e)\n\nrunning 1 test\ntest tests::rejects_unknown_and_redacts_secrets ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running unittests src/main.rs (/tmp/swirl-target-vision/debug/deps/swirl_api-7df840569e8d00b9)\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running unittests src/bin/swirl-diagnose.rs (/tmp/swirl-target-vision/debug/deps/swirl_diagnose-14d42a075e2df8ee)\n\nrunning 3 tests\ntest tests::stdin_preserves_small_budgets_and_normalizes_ipv6 ... ok\ntest tests::diagnostic_uses_product_dns_validation ... ok\ntest tests::stdin_rejects_ambiguous_input_and_never_echoes_private_values ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running unittests src/bin/swirl-inspect.rs (/tmp/swirl-target-vision/debug/deps/swirl_inspect-297c5edaf0b8b46c)\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running unittests src/lib.rs (/tmp/swirl-target-vision/debug/deps/swirl_core-2b25c67efa02f287)\n\nrunning 6 tests\ntest policy::tests::scheduler_skips_active_members_and_never_enqueues_catchup_rounds ... ok\ntest policy::tests::round_robin_advances_only_once_per_used_policy_and_session ... ok\ntest policy::tests::fallback_keeps_member_priority_and_fails_closed_when_health_expires ... ok\ntest policy::tests::url_test_hysteresis_and_expiration_are_explicit ... ok\ntest policy::tests::accepted_policy_views_do_not_change_when_live_health_changes ... ok\ntest socks5_udp::tests::queued_reply_cannot_outlive_its_control_worker ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s\n\n     Running tests/network.rs (/tmp/swirl-target-vision/debug/deps/network-0bdaa9ee6a65ef0c)\n\nrunning 11 tests\ntest atomic_update_preserves_existing_stream_and_rejects_new ... ok\ntest failed_socks_auth_never_reaches_target_or_direct ... ok\ntest manual_selector_updates_only_new_streams_and_rejects_non_members ... ok\ntest udp_associate_preserves_boundaries_and_rejects_fragments ... ok\ntest resolving_cidr_pins_destination_and_rule_updates_preserve_stream ... ok\ntest tcp_large_transfer_halfclose_and_exact_counters ... ok\ntest automatic_udp_association_retains_choices_after_policy_replacement ... ok\ntest socks5_fragmented_ipv6_and_bad_command ... ok\ntest udp_reject_dns_and_icmp_do_not_kill_association_or_change_snapshot ... ok\ntest inbound_authentication_and_resource_limit ... ok\ntest automatic_health_generation_manual_selection_and_stop_preserve_lifetimes ... ok\n\ntest result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.33s\n\n     Running tests/socks5_udp.rs (/tmp/swirl-target-vision/debug/deps/socks5_udp-c58842fb955cf7c0)\n\nrunning 2 tests\ntest association_reuses_control_keeps_old_route_and_closes_with_inbound ... ok\ntest closed_proxy_never_reconnects_or_sends_direct_and_other_routes_survive ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s\n\n     Running unittests src/lib.rs (/tmp/swirl-target-vision/debug/deps/swirl_dns-143d445359eebeb8)\n\nrunning 19 tests\ntest dot::doh::tests::strict_http_metadata_and_cache_hints ... ok\ntest tests::cached_ip_sets_share_hosts_and_attach_each_requested_port ... ok\ntest dot::doh::tests::chunked_body_is_exact_and_bounded ... ok\ntest tests::failure_cache_preserves_code_deadline_and_successful_answers ... ok\ntest tests::hosts_file_aliases_comments_and_duplicate_priority ... ok\ntest tests::host_maps_are_case_insensitive_and_generations_share_only_budget ... ok\ntest tests::ipv4_query_policy_preserves_literal_and_static_ipv6_without_os_fallback ... ok\ntest tests::negative_cache_is_shared_across_ports_but_not_configurations ... ok\ntest wire::tests::cname_denials_belong_to_the_terminal_name_and_obey_alias_ttl ... ok\ntest wire::tests::ipv6_and_cname_only_responses_preserve_ttl ... ok\ntest wire::tests::family_merge_never_confuses_nodata_name_error_or_transport_failure ... ok\ntest tests::cancelled_upstream_query_does_not_create_failure_cache ... ok\ntest tests::failure_cache_is_bounded_and_excludes_local_and_invalid_response_errors ... ok\ntest wire::tests::negative_responses_require_complete_matching_messages_and_applicable_soa ... ok\ntest wire::tests::soa_mailbox_local_part_is_a_dns_label_not_a_hostname ... ok\ntest wire::tests::rejects_alias_loops_compression_cycles_and_foreign_answers ... ok\ntest wire::tests::soa_rdata_names_must_fit_the_record_and_use_valid_compression ... ok\ntest wire::tests::validates_identity_question_and_all_truncations ... ok\ntest tests::ipv4_ipv6_and_system_localhost ... ok\n\ntest result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running unittests src/lib.rs (/tmp/swirl-target-vision/debug/deps/swirl_protocol-e8991080bf208347)\n\nrunning 49 tests\ntest dial::tests::address_limit_is_checked_before_any_socket_attempt ... ok\ntest dial::tests::a_single_address_retains_the_original_budget ... ok\ntest dial::tests::caller_cancellation_drops_all_pending_dials ... ok\ntest dial::tests::diagnostic_classifies_os_failures_without_preserving_error_messages ... ok\ntest dial::tests::diagnostic_counts_unique_families_and_records_cancelled_loser ... ok\ntest dial::tests::diagnostic_dns_cap_prevents_tcp_and_total_cap_can_be_shorter ... ok\ntest dial::tests::diagnostic_dns_error_has_a_fixed_redacted_category ... ok\ntest connect_tests::shadowsocks_obfs_does_not_wait_for_application_response_during_connect ... ok\ntest dial::tests::diagnostic_dns_time_reduces_tcp_budget_and_counts_unattempted_addresses ... ok\ntest connect_tests::shadowsocks_initial_write_reports_plain_and_obfs_failures_separately ... ok\ntest dial::tests::diagnostic_invalid_budget_does_not_poll_dns_or_dial ... ok\ntest dial::tests::diagnostic_slot_timeout_and_winner_cancellation_remain_distinct ... ok\ntest dial::tests::external_cancellation_updates_trace_and_drops_all_connects ... ok\ntest dial::tests::diagnostic_real_loopback_connect_closes_without_application_data ... ok\ntest dial::tests::protocol_phases_use_the_same_deadline_without_renewing_it ... ok\ntest dial::tests::hanging_first_family_does_not_block_other_family_and_losers_drop ... ok\ntest probe::tests::fragmented_interim_responses_require_a_complete_final_status ... ok\ntest dial::tests::refused_first_address_does_not_spend_a_short_budget_waiting_for_stagger ... ok\ntest dial::tests::refusal_and_expiration_are_distinct_and_no_new_dial_passes_deadline ... ok\ntest probe::tests::header_completion_does_not_wait_for_a_response_body ... ok\ntest probe::tests::malformed_truncated_redirect_and_upgrade_responses_are_unhealthy ... ok\ntest dial::tests::two_stalled_addresses_release_a_slot_for_the_third ... ok\ntest probe::tests::interim_headers_share_one_total_byte_and_count_budget ... ok\ntest shadowsocks::tests::nonce_overflow_fails_closed ... ok\ntest shadowsocks::tests::replay_is_key_scoped ... ok\ntest socks5::tests::authentication_is_shared_strict_and_does_not_downgrade ... ok\ntest vless::tests::canonical_uuid_and_domain_wire_layout ... ok\ntest shadowsocks::tests::coalesced_http_header_and_ciphertext_are_buffered_without_loss ... ok\ntest socks5::tests::datagram_boundaries_addresses_and_fragments ... ok\ntest vless::tests::unsupported_request_flow_is_a_static_error_instead_of_empty_addons ... ok\ntest websocket::tests::close_codes_and_utf8_are_validated ... ok\ntest vless::tests::vision_and_unchanged_empty_addons_complete_request_layouts ... ok\ntest websocket::tests::closed_control_receiver_fails_without_waiting_or_releasing_payload ... ok\ntest websocket::tests::handshake_token_and_unsolicited_extensions ... ok\ntest websocket::tests::coalesced_ping_burst_backpressures_the_bounded_control_queue ... ok\ntest websocket::tests::invalid_server_frame_headers_fail_before_releasing_data ... ok\ntest socks5::tests::malformed_associate_replies_are_rejected ... ok\ntest websocket::tests::idle_has_no_deadline_and_drop_cancels_blocked_drivers ... ok\ntest websocket::tests::one_close_deadline_covers_write_flush_peer_reply_and_shutdown ... ok\ntest websocket::tests::local_shutdown_bounds_a_previously_backpressured_data_frame ... ok\ntest websocket::tests::local_eof_flushes_queued_data_and_answers_ping_until_peer_close ... ok\ntest websocket::tests::peer_close_behind_a_full_control_queue_has_a_deadline ... ok\ntest websocket::tests::silent_peer_and_repeated_shutdown_cannot_extend_the_close_budget ... ok\ntest websocket::tests::transport_eof_without_peer_close_is_never_reported_as_success ... ok\ntest dial::tests::real_tcp_refusal_falls_back_without_sending_application_bytes ... ok\ntest websocket::tests::full_duplex_fragmented_transfer_and_ping_survive_backpressure ... ok\ntest vless::tests::partial_response_header_has_deadline_without_timing_out_idle_application ... ok\ntest socks5::tests::disabled_tls_and_handshake_timeout_fail_closed ... ok\ntest socks5::tests::relay_uses_bound_address_configured_dns_and_control_lifetime ... ok\n\ntest result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s\n\n     Running tests/vision.rs (/tmp/swirl-target-vision/debug/deps/vision-953e41fb6801d139)\n\nrunning 21 tests\ntest advertised_maximum_lengths_do_not_require_the_body_to_be_buffered ... ok\ntest direct_is_only_an_event_after_all_content_and_padding ... ok\ntest content_and_padding_eof_are_distinguished_at_every_partial_offset ... ok\ntest empty_decode_is_not_an_eof_signal ... ok\ntest empty_and_complete_frame_eof_are_legal_and_idempotent ... ok\ntest encoder_enforces_both_wire_limits_before_changing_first_frame_state ... ok\ntest directions_keep_independent_uuid_and_terminal_state ... ok\ntest encoder_matches_ten_independent_python_wire_vectors ... ok\ntest every_unknown_command_is_rejected_without_returning_payload ... ok\ntest encoders_reject_frames_after_either_terminal_command ... ok\ntest first_uuid_is_mandatory_and_all_mismatch_positions_poison_decoder ... ok\ntest later_partial_headers_are_not_mistaken_for_clean_eof ... ok\ntest padding_only_frames_make_bounded_progress_without_payload_or_extra_events ... ok\ntest payload_header_lookalikes_are_never_reinterpreted_as_framing ... ok\ntest request_addons_match_independent_protobuf_vectors ... ok\ntest unknown_flows_cannot_silently_become_empty_addons ... ok\ntest uuid_and_header_eof_are_distinguished_at_every_partial_offset ... ok\ntest terminal_boundary_does_not_consume_or_forward_pending_transport_bytes ... ok\ntest several_frames_in_one_read_keep_boundaries_and_payload_order ... ok\ntest decoder_accepts_independent_vectors_at_every_split_and_bytewise ... ok\ntest maximum_content_and_padding_are_accepted_without_decoder_buffering ... ok\n\ntest result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running tests/vision_record.rs (/tmp/swirl-target-vision/debug/deps/vision_record-859cd6f377cca0b8)\n\nrunning 5 tests\ntest partial_header_survives_cancelled_read_and_write_half_close ... ok\ntest oversized_record_is_rejected_without_reading_its_body ... ok\ntest tampered_outer_direct_record_remains_an_authentication_failure ... ok\ntest real_tls_close_notify_is_required_even_at_record_boundaries ... ok\ntest both_boundaries_deliver_authenticated_direct_request_before_coalesced_raw_tls ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s\n\n     Running tests/vision_stream.rs (/tmp/swirl-target-vision/debug/deps/vision_stream-0733c4b75df972d3)\n\nrunning 16 tests\ntest client_component_uses_real_vless_flow_request_and_lazy_response_prefix ... ok\ntest incomplete_direct_frame_is_rejected_before_releasing_terminal_content ... ok\ntest direct_command_drops_owned_stream_and_never_releases_terminal_tail ... ok\ntest eof_in_every_partial_frame_position_remains_an_error ... ok\ntest invalid_uuid_or_command_is_fatal_in_both_directions ... ok\ntest invalid_vless_response_cannot_be_reinterpreted_as_vision_payload ... ok\ntest outer_tls_truncation_is_not_converted_to_clean_framing_eof ... ok\ntest upload_half_close_keeps_downlink_alive_and_cannot_be_reopened ... ok\ntest write_zero_drops_owner_instead_of_reencoding_or_spinning ... ok\ntest cancelling_flush_keeps_the_exact_partial_wire_offset ... ok\ntest abort_releases_paused_transport_and_cannot_resume ... ok\ntest abort_releases_partial_inner_tls_hello_and_pending_frame_memory ... ok\ntest paused_reader_limits_writer_to_one_owned_frame_and_resumes_without_replay ... ok\ntest cancelling_read_keeps_partial_uuid_and_padding_state ... ok\ntest terminal_frame_tail_and_many_padding_frames_keep_exact_order ... ok\ntest large_bidirectional_transfer_survives_partial_writes_and_backpressure ... ok\n\ntest result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s\n\n     Running tests/vision_tls.rs (/tmp/swirl-target-vision/debug/deps/vision_tls-e8475a9eeb2639e7)\n\nrunning 12 tests\ntest duplicate_extensions_and_trailing_or_short_lengths_fail_closed ... ok\ntest encrypted_record_is_complete_only_after_its_last_byte ... ok\ntest random_and_unknown_extension_patterns_cannot_claim_tls13 ... ok\ntest hello_retry_request_never_becomes_a_final_server_hello ... ok\ntest advertised_limits_reject_without_allocating_untrusted_body ... ok\ntest wrong_message_type_and_mid_hello_non_handshake_record_are_rejected ... ok\ntest session_id_echo_and_tls13_legacy_fields_are_checked ... ok\ntest tls12_and_missing_client_tls13_offer_are_not_candidates ... ok\ntest supported_suites_require_exact_client_offer_and_reject_short_tag_cipher ... ok\ntest randomized_bidirectional_slices_preserve_hello_and_record_state ... ok\ntest incomplete_hellos_never_become_candidates ... ok\ntest both_hellos_work_at_every_network_split_and_one_byte_records ... ok\n\ntest result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s\n\n     Running unittests src/lib.rs (/tmp/swirl-target-vision/debug/deps/swirl_routing-f626348b23041055)\n\nrunning 4 tests\ntest tests::suffix_is_label_bounded_and_first_match_wins ... ok\ntest tests::keyword_port_source_and_final_are_ordered ... ok\ntest tests::dns_is_lazy_and_no_resolve_does_not_reorder_rules ... ok\ntest tests::nested_and_automatic_groups_require_a_valid_runtime_choice ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running unittests src/lib.rs (/tmp/swirl-target-vision/debug/deps/swirl_subscription-4532641bc1d61870)\n\nrunning 58 tests\ntest inspect::inspect_socks4::tests::userid_is_not_base64_password_authentication ... ok\ntest dns_tls::tests::legacy_dns_and_explicit_tls_round_trip ... ok\ntest dns_tls::tests::tls_cannot_downgrade_or_exceed_endpoint_budget ... ok\ntest dns_tls::tests::https_is_explicit_and_cannot_use_dot_or_h2_framing ... ok\ntest dns_tls::tests::query_family_is_strict_defaults_to_dual_and_requires_explicit_upstream ... ok\ntest dns_tls::tests::tls_rejects_ambiguous_addresses_names_and_options ... ok\ntest inspect::tests::base64_uri_and_ini ... ok\ntest inspect::tests::alias_coalescing_cannot_override_authority_authentication_or_plugin_options ... ok\ntest inspect::tests::ini_comments_and_builtin_policies_do_not_hide_nodes ... ok\ntest inspect::tests::duplicate_keys_and_remote_tags_fail ... ok\ntest inspect::tests::ini_control_validation_precedes_whitespace_normalization ... ok\ntest inspect::tests::equivalent_distinct_uri_aliases_preserve_originals_and_typed_values ... ok\ntest inspect::inspect_websocket::tests::known_websocket_formats_map_but_extensions_remain_rejected ... ok\ntest inspect::tests::ini_duplicate_proxy_sections_and_empty_node_names_fail_closed ... ok\ntest inspect::tests::ini_string_credentials_and_alias_collisions ... ok\ntest inspect::tests::ini_section_spacing_comments_and_unknown_bodies_are_preserved ... ok\ntest inspect::tests::ipv6_base64_subscription_preserves_ss_authentication_and_unknowns ... ok\ntest inspect::tests::ini_implicit_tls_cannot_be_downgraded ... ok\ntest inspect::tests::ini_positional_and_named_authentication_cannot_overwrite_each_other ... ok\ntest inspect::tests::ipv6_uri_hosts_are_literals_in_typed_outbounds ... ok\ntest inspect::tests::json_with_resource_urls_is_not_misclassified_as_uri ... ok\ntest inspect::tests::legacy_loon_trojan_options_preserve_credentials_and_tls_policy ... ok\ntest inspect::tests::ini_rejects_malformed_structure_after_valid_nodes ... ok\ntest inspect::inspect_socks4::tests::formats_preserve_userid_and_local_or_remote_dns ... ok\ntest inspect::tests::legacy_loon_colon_options_cannot_overwrite_named_parameters ... ok\ntest inspect::tests::legacy_ss_does_not_discard_authority_options_or_accept_unknown_ciphers ... ok\ntest inspect::tests::loon_http_obfs_positional_and_named_exports_use_native_ss ... ok\ntest inspect::tests::malformed_ipv6_authorities_do_not_become_candidates ... ok\ntest inspect::tests::loon_obfs_unsupported_modes_options_and_incomplete_pairs_never_downgrade ... ok\ntest inspect::tests::quoted_ini_credentials_preserve_spaces_and_escaped_quotes ... ok\ntest inspect::tests::sip002_base64_userinfo_can_escape_its_padding ... ok\ntest inspect::inspect_socks4::tests::unsafe_or_ambiguous_parameters_stay_preserved_and_unexecutable ... ok\ntest inspect::tests::sip002_percent_encoding_is_distinct_from_legacy_password_text ... ok\ntest inspect::tests::legacy_ss_passwords_keep_reserved_characters_and_literal_percent_sequences ... ok\ntest inspect::tests::sip002_plugin_mapping_escaping_and_unknown_retention ... ok\ntest inspect::tests::quoted_ini_password_delimiters_remain_credentials ... ok\ntest inspect::tests::private_fields_retained_not_reported ... ok\ntest inspect::tests::names_never_determine_protocol ... ok\ntest inspect::tests::uri_insecure_alias_is_typed_and_never_overwrites ... ok\ntest inspect::tests::unsupported_tls_policy_is_explicit_and_preserved ... ok\ntest inspect::tests::unequal_aliases_repeated_keys_and_invalid_booleans_fail_closed ... ok\ntest inspect::tests::unsupported_transport_and_bool_rejected ... ok\ntest policy::tests::nested_manual_groups_are_acyclic_and_reference_real_members ... ok\ntest inspect::tests::ss_aead_http_obfs_maps_without_losing_unsupported_options ... ok\ntest inspect::tests::uri_udp_boolean_mapping_preserves_capability_and_certificate_limits ... ok\ntest policy::tests::automatic_policy_requires_explicit_bounded_safe_probe ... ok\ntest policy::tests::automatic_groups_reject_implicit_defaults_nested_members_and_ignored_options ... ok\ntest tests::duplicate_schema_rejected ... ok\ntest tests::host_validation_rejects_injection ... ok\ntest tests::dns_rejects_ambiguous_mapping_and_unknown_settings ... ok\ntest tests::invalid_routing_fields_fail_before_activation ... ok\ntest tests::unknown_fields_preserved_but_not_executed ... ok\ntest tests::selectors_reject_missing_duplicate_nested_and_unknown_members ... ok\ntest tests::socks5_udp_is_explicit_and_never_weakens_tls ... ok\ntest inspect::tests::socks5_udp_capability_requires_plain_standard_transport ... ok\ntest websocket::tests::websocket_rejects_header_injection_ambiguous_hosts_and_bad_escapes ... ok\ntest inspect::tests::vless_base_tls_maps_but_flow_and_reality_never_downgrade ... ok\ntest policy::tests::policy_depth_and_total_probe_work_are_bounded ... ok\n\ntest result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s\n\n     Running unittests src/lib.rs (/tmp/swirl-target-vision/debug/deps/swirl_transport-d54ddc9666c49c65)\n\nrunning 65 tests\ntest reality::backend::tests::first_flight_rejects_partial_records_extra_records_and_unknown_framing ... ok\ntest reality::backend::tests::reentry_and_key_start_order_are_bounded_without_owner_aliases ... ok\ntest reality::backend::tests::actual_clienthello_has_bound_authentication_and_only_native_tls13_profile ... ok\ntest reality::backend::tests::failed_constructor_and_unwind_drop_untransferred_material ... ok\ntest reality::backend::tests::scoped_rng_refuses_wrong_shape_extra_calls_and_outside_calls ... ok\ntest reality::backend::tests::preview_has_no_completion_or_server_authentication_capability ... ok\ntest reality::backend::tests::encrypted_flight_tampering_fails_before_application_plaintext ... ok\ntest reality::backend::tests::modifying_only_queued_network_bytes_cannot_match_the_tls_transcript ... ok\ntest reality::certificate::tests::all_three_ed25519_algorithm_identifiers_require_absent_parameters ... ok\ntest reality::certificate::tests::bit_strings_require_exact_key_and_mac_lengths_and_no_unused_bits ... ok\ntest reality::certificate::tests::certificate_chain_and_ocsp_are_explicitly_rejected ... ok\ntest reality::backend::tests::alpn_limits_preserve_raw_values_order_and_exact_boundaries ... ok\ntest reality::certificate::tests::certificate_verify_never_accepts_an_unauthenticated_key ... ok\ntest reality::certificate::tests::debug_redacts_authentication_key ... ok\ntest reality::certificate::tests::every_truncated_certificate_and_trailing_data_are_rejected ... ok\ntest reality::certificate::tests::certificate_mac_and_public_key_tampering_are_rejected ... ok\ntest reality::certificate::tests::independent_certificate_hmac_and_upstream_minimal_profile_are_accepted ... ok\ntest reality::certificate::tests::malformed_year_one_placeholder_is_not_accepted_as_arbitrary_time ... ok\ntest reality::certificate::tests::ordinary_valid_certificate_and_unsupported_mldsa_have_no_fallback ... ok\ntest reality::certificate::tests::nested_trailing_fields_and_nonminimal_lengths_are_rejected ... ok\ntest reality::backend::tests::valid_der_and_possession_do_not_replace_certificate_authentication ... ok\ntest reality::certificate::tests::certificate_verify_rejects_modified_transcript_context_and_signature ... ok\ntest reality::backend::tests::valid_certificate_mac_does_not_replace_real_certificateverify_transcript ... ok\ntest reality::certificate::tests::independent_sha256_and_sha384_certificate_verify_transcripts_are_accepted ... ok\ntest reality::certificate::tests::tls12_and_other_certificate_verify_algorithms_are_rejected ... ok\ntest reality::certificate::tests::wrong_authentication_key_is_rejected ... ok\ntest reality::certificate::tests::rustls_rejects_wrong_reality_authentication_before_plaintext ... ok\ntest reality::certificate::tests::rustls_rejects_tampered_encrypted_server_flight_before_plaintext ... ok\ntest reality::certificate::tests::rustls_verifier_and_classical_hybrid_component_complete_tls13_data_and_close ... ok\ntest reality::backend::tests::native_three_suite_profile_authenticates_cv_finished_data_and_close ... ok\ntest reality::backend::tests::simultaneous_connections_get_distinct_randoms_sessions_and_keys ... ok\ntest reality::client::tests::debug_output_contains_no_keys_session_or_server_identity ... ok\ntest reality::client::tests::a_blocked_partial_record_is_resumable_without_reauthentication ... ok\ntest reality::client::tests::fatal_read_and_write_errors_preserve_the_first_error_and_end_the_attempt ... ok\ntest reality::client::tests::first_flight_budgets_and_trailing_plaintext_are_rejected ... ok\ntest reality::client::tests::hrr_is_rejected_without_emitting_a_second_clienthello ... ok\ntest reality::client::tests::interrupted_read_and_write_remain_resumable ... ok\ntest reality::client::tests::invalid_session_echo_fails_before_backend_and_poison_is_sticky ... ok\ntest reality::client::tests::server_hello_input_never_consumes_bytes_from_the_next_record ... ok\ntest reality::client::tests::no_application_or_negotiated_success_before_finished ... ok\ntest reality::client::tests::initial_flight_partial_and_blocked_writes_preserve_all_bytes ... ok\ntest reality::client::tests::zero_write_with_pending_flight_fails_instead_of_spinning ... ok\ntest reality::client::tests::first_flight_does_not_treat_ccs_or_ciphertext_as_authenticated_data ... ok\ntest reality::tests::client_hello_extension_semantics_never_silently_downgrade ... ok\ntest reality::tests::client_hello_requires_owned_random_keys_name_and_zero_session_id ... ok\ntest reality::tests::every_truncated_client_hello_is_rejected_without_panic ... ok\ntest reality::tests::authentication_matches_independent_python_vectors_byte_for_byte ... ok\ntest reality::tests::corrupted_mlkem_ciphertext_requires_later_finished_rejection ... ok\ntest reality::tests::grease_key_shares_must_follow_the_unique_supported_group_order ... ok\ntest reality::tests::fresh_key_owners_do_not_reuse_random_or_either_share ... ok\ntest reality::tests::all_aad_bytes_are_authenticated_and_records_are_not_in_the_transcript ... ok\ntest reality::tests::ordinary_low_order_server_authentication_key_is_rejected ... ok\ntest reality::tests::optional_classical_share_must_follow_hybrid_and_use_same_key ... ok\ntest reality::tests::key_group_advertises_only_tls13_and_retains_the_classical_owner ... ok\ntest reality::tests::nested_client_hello_vectors_reject_truncation_with_correct_outer_lengths ... ok\ntest tests::eof_keeps_reverse_direction_alive ... ok\ntest udp::tests::buffer_setup_retains_larger_existing_values ... ok\ntest reality::tests::real_mlkem_ciphertext_matches_independent_openssl_shared_secret ... ok\ntest udp::tests::full_datagrams_survive_small_buffers_and_address_families ... ok\ntest reality::client::tests::malformed_record_headers_fail_before_payload_allocation ... ok\ntest reality::tests::server_hello_rejects_truncation_echo_hrr_tls12_and_unoffered_cipher ... ok\ntest reality::client::tests::fragmented_record_and_handshake_eof_are_failures ... ok\ntest reality::client::tests::server_hello_record_fragmentation_preserves_the_exact_message ... ok\ntest reality::tests::server_hello_matches_independent_sha256_and_sha384_checkpoints ... ok\ntest reality::tests::hybrid_key_share_lengths_and_noncontributory_peers_fail ... ok\n\ntest result: ok. 65 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s\n\n   Doc-tests swirl_api\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n   Doc-tests swirl_core\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n   Doc-tests swirl_dns\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n   Doc-tests swirl_protocol\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n   Doc-tests swirl_routing\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n   Doc-tests swirl_subscription\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n   Doc-tests swirl_transport\n\nrunning 1 test\ntest crates/swirl-transport/src/reality/mod.rs - reality::ClientKeys::authenticate (line 106) - compile fail ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s\n\n"
+    },
+    {
+      "gate": "build",
+      "command": [
+        "cargo",
+        "build",
+        "--workspace",
+        "--release",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 24.301,
+      "log_path": "/tmp/swirl-vision-record-fix/08-build.log",
+      "log_sha256": "56e05e8bd605d0af23002302bbaba4cfff7d7e99a2c8ff0948d7fe7c92d06582",
+      "execution_context": "loopback network permission enabled",
+      "log_bytes": 351,
+      "raw_log": "   Compiling swirl-protocol v0.1.0 (/workspace/scratch/1e3e4089c3c8/Swirl/core/crates/swirl-protocol)\n   Compiling swirl-core v0.1.0 (/workspace/scratch/1e3e4089c3c8/Swirl/core/crates/swirl-core)\n   Compiling swirl-api v0.1.0 (/workspace/scratch/1e3e4089c3c8/Swirl/core/crates/swirl-api)\n    Finished `release` profile [optimized] target(s) in 24.25s\n"
+    }
+  ],
+  "rust_test_counts": {
+    "unit_and_integration": {
+      "passed": 272,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "doctests": {
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 0
+    }
+  },
+  "initial_environment_failure": {
+    "gate": "test",
+    "exit_code": 101,
+    "test": "swirl_core::socks5_udp::tests::queued_reply_cannot_outlive_its_control_worker",
+    "cause": "Default sandbox denied the existing loopback socket bind with OS code 1 PermissionDenied / Operation not permitted.",
+    "resolution": "The identical cargo test --workspace --locked command ran successfully with authorized loopback permission. No test assertion, source, or required gate was removed or weakened; both original logs are embedded."
+  },
+  "release_client": {
+    "path": "/tmp/swirl-target-vision/release/examples/vision-client",
+    "sha256": "14f57cb8d0d3f2abdb97424bd41cb2f2758104d9a34055d3be33b18ef8877f76"
+  },
+  "mature_xray_evidence": {
+    "bundle_path": "/tmp/swirl-vision-record-fix-xray.json",
+    "bundle_bytes": 39334,
+    "bundle_sha256": "e4b8d64eeacf4b203247af8107226f417cdf67060dfcd266d3795f85f2a556e7",
+    "data": {
+      "schema_version": 1,
+      "scope": "Local full-Xray validation of the minimal TLS record-boundary fix; no DirectReady implementation or CI acceptance claimed",
+      "evidence_kind": "local_uncommitted_source_snapshot",
+      "source_and_command": {
+        "scope": "One strict full-Xray suite rerun after TLS record-boundary source fix; existing Python assertions unchanged",
+        "evidence_kind": "local_uncommitted_source_snapshot",
+        "git_sha": "271ed3f5d2abe185a7b3308dd77f00b904bc58be",
+        "command": [
+          "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+          "/workspace/scratch/1e3e4089c3c8/Swirl/tools/tests/test_vision_xray.py"
+        ],
+        "environment": {
+          "SWIRL_VISION_CLIENT": "/tmp/swirl-target-vision/release/examples/vision-client",
+          "SWIRL_XRAY_PEER_DIR": "/tmp/swirl-xray-peer",
+          "SWIRL_VISION_EVIDENCE": "/tmp/swirl-vision-record-fix-xray"
+        },
+        "started_unix": 1792409883.5255613,
+        "finished_unix": 1792409884.4910376,
+        "exit_code": 0,
+        "expected_client_sha256": "14f57cb8d0d3f2abdb97424bd41cb2f2758104d9a34055d3be33b18ef8877f76",
+        "client_sha256_before": "14f57cb8d0d3f2abdb97424bd41cb2f2758104d9a34055d3be33b18ef8877f76",
+        "client_sha256_after": "14f57cb8d0d3f2abdb97424bd41cb2f2758104d9a34055d3be33b18ef8877f76",
+        "test_sha256_before": "6148d18e541cc5f540318e221efc4f25ca8646bd174ea9253f0ec7466b07d0bd",
+        "test_sha256_after": "6148d18e541cc5f540318e221efc4f25ca8646bd174ea9253f0ec7466b07d0bd",
+        "files_before": {
+          "core/Cargo.lock": "1ddd4b6878c5d0c1226fb00f111822ce8d6842961486df46560136d9b475e170",
+          "core/Cargo.toml": "d5bca4408b84fe233f9bc38577e8d7d3ba5076208e3d7ddd345dd0a48a3d2d05",
+          "core/crates/swirl-api/Cargo.toml": "79d0875874085b39ae72720cc669ff92d9552ac83733550ac165df364f99251d",
+          "core/crates/swirl-api/src/bin/swirl-diagnose.rs": "bfd534a8f41cd44e660dcf1e5fb7484883af15e405a2b2a3357cd54c4635b9a9",
+          "core/crates/swirl-api/src/bin/swirl-inspect.rs": "26b8f8752afd300215e4c7235351893e59d736ee1fe15bca2e3b13f84324735f",
+          "core/crates/swirl-api/src/lib.rs": "ec6b747eaae7aa0004781f08f6969a71445ea2086a14de15c2266f46f8aa3cbb",
+          "core/crates/swirl-api/src/main.rs": "d6f04d4dcbcbf00ad14ee29b514ea593e3f5bfb00fcf2fe5dd5f4307e4411b63",
+          "core/crates/swirl-core/Cargo.toml": "ec3f5509a077cd86f866661a222a6c0991e265b6818366d0f4da8496232fba5a",
+          "core/crates/swirl-core/src/lib.rs": "9a22e16f7df0a2c1227a90d7114acb8fc0ccd4b6da536860de24dea3647137b9",
+          "core/crates/swirl-core/src/policy.rs": "ecf8abfc008448f7c23eab55e8c7ad3eb02b288d09410db120fcfca65272bafd",
+          "core/crates/swirl-core/src/socks5_udp.rs": "fb56e515e0ddc6560a1eaddc017e8b83c3a0ac09919ef2aa75eb8a7c5792bf9e",
+          "core/crates/swirl-core/tests/network.rs": "ae723edad068e25d8b94c76a7e89c76c91c76117abc0e40ec0ccaa9a03569abf",
+          "core/crates/swirl-core/tests/socks5_udp.rs": "b6e0f77986f8463bd35bafa08749c0f93f43ec6a8a5e3019fcadfa33727e4ed1",
+          "core/crates/swirl-dns/Cargo.toml": "4cab2b3eb309c21e725e4cc5dc5172fb173bafeeefb283f94cd37e2f057a0346",
+          "core/crates/swirl-dns/src/doh.rs": "3c16891567a27ea1d66e03e5bf4dedf04b1fff394dfa7b374900295f70f32481",
+          "core/crates/swirl-dns/src/dot.rs": "6e643f9233f7470d86997ec5a44dc95afbb98ecdf4ef24c39c6f1b74fd80c34c",
+          "core/crates/swirl-dns/src/lib.rs": "0c2e01332d02c471fee76240270f344988f1fc79da27ac50a94987fb4fb7439c",
+          "core/crates/swirl-dns/src/wire.rs": "44150266189f66e9dcb84b69d2be887c898f3782f3679167348e76cc7d748184",
+          "core/crates/swirl-protocol/Cargo.toml": "98cd567d25d089d5553e564607c019856f2a25d8896ce9c2ddc2a1c9a5c7c7ef",
+          "core/crates/swirl-protocol/examples/vision-client.rs": "0ea01d72b175de36a8d101efaf42e13f70b6fb4a7fe322699152057fdd5aa1c6",
+          "core/crates/swirl-protocol/src/diagnostics.rs": "548b197fa05fdd384b66658864c76e171c7d828100ff1a3ed063ea33e838fd40",
+          "core/crates/swirl-protocol/src/dial.rs": "f5f582e0c216d8dd74571008de73bb4616b89380b12b20b6e07a190b77b020d4",
+          "core/crates/swirl-protocol/src/lib.rs": "300c3685c7988a649cc6c64d6ff292c6ee0943ea9ce5ce50732fda1a4ca60732",
+          "core/crates/swirl-protocol/src/probe.rs": "8350b8ed215b7c681d05d98faa962f45fda9c66f0f132e21a769abf9f707b261",
+          "core/crates/swirl-protocol/src/shadowsocks.rs": "29ef909543e129e0d94652e7db81d9777eb0747b113d62ccc669d7b2e9238efc",
+          "core/crates/swirl-protocol/src/socks4.rs": "bc619d53e7bca902250c3a90a37410893b5048100a03d345792309b98be1c3ae",
+          "core/crates/swirl-protocol/src/socks5.rs": "8ea696f1df8b498cb3ae1b3f71a3712753fcbc14af0d9659c3d9f18b16773b9f",
+          "core/crates/swirl-protocol/src/socks5_tests.rs": "822d3ba16cf19a2902b61bfd14b1a0554c7c4bca29b65ee317424b28f007a623",
+          "core/crates/swirl-protocol/src/vision.rs": "10019b9878b3e50246824f0d52f9d0c6ec26e6124bde2c1a821445e0fe195a7e",
+          "core/crates/swirl-protocol/src/vision/record.rs": "99172e1a3fba975dc7d12e028e42f4be7d2f2350fcd479427357cb869e74951f",
+          "core/crates/swirl-protocol/src/vision/stream.rs": "5358ce27589d852b8968b91fa5dbbcff5712b805bdf36592753cde6d014c69fa",
+          "core/crates/swirl-protocol/src/vision/tls.rs": "152857f55fa92845ad01b29d01dd994038f34dab4847631993158a132bf84cc9",
+          "core/crates/swirl-protocol/src/vless.rs": "9c3ac47da411e3d8d753c75f84414bba8d184e5a44b07ab7a5c21c32bbe50f4e",
+          "core/crates/swirl-protocol/src/websocket.rs": "9705fc9bd703a833ef523f4b2b9e8f0cdaf535a7f685a17b04522619dc40078a",
+          "core/crates/swirl-protocol/tests/vision.rs": "24ac0abc67da95666ec9a8cffa6b5810a1e5d82b1a59afb4c52bc61f7a6acca2",
+          "core/crates/swirl-protocol/tests/vision_record.rs": "6471335d12d67e1e7a76834ad3924060f426b8583084f917ffb45897243c24e3",
+          "core/crates/swirl-protocol/tests/vision_stream.rs": "51bf7ce7973db87fb86a73514ba6563b7324bce1cc7ac54a2fb114323206ee59",
+          "core/crates/swirl-protocol/tests/vision_tls.rs": "47f75592cff0c9705c492e94884a30337f01f132725751121503005cce88a7fb",
+          "core/crates/swirl-routing/Cargo.toml": "480cbc4af7ad4e8e518069f576457a83377df0915ceff2809e418fb00799db07",
+          "core/crates/swirl-routing/src/lib.rs": "d450eacf11ceda105b70759466aa03b6f74d3be95cba2c4539ac505e40c3d312",
+          "core/crates/swirl-subscription/Cargo.toml": "37ad02621dd0a4b82e911f968d5ddb9ba34dceba3712a9bb1b1546a6e2455977",
+          "core/crates/swirl-subscription/src/dns_tls.rs": "55858b949bc90232d90959483b0b4224e22283233a6b21ceeec6c144f714be9c",
+          "core/crates/swirl-subscription/src/inspect.rs": "c3a8fd05c4c67888ed156e1b90a0e70e1ee4e1ebe13ca743cc0a66757abb845f",
+          "core/crates/swirl-subscription/src/inspect_socks4.rs": "24a89d8845fcfc4f193d4de306f2b1103964384bdb962bc031566f01bc1ad472",
+          "core/crates/swirl-subscription/src/inspect_websocket.rs": "c02cc984435675591df030a6dfb0b0101d69d3927bbba9ea7e31231e61af4326",
+          "core/crates/swirl-subscription/src/lib.rs": "d8276b8044f63c6a9fd5a39197b713c4dfe903fcc13db92d42a6203c26c98913",
+          "core/crates/swirl-subscription/src/policy.rs": "a786cc760eac98bd3ddcee2c0f56328ec561d731a871702c58b025512c4aeccb",
+          "core/crates/swirl-subscription/src/websocket.rs": "e746d719b43dd2e0fa4bd30a7d912e7dacc00388dc1496fd12dce7ecb780662e",
+          "core/crates/swirl-transport/Cargo.toml": "ad8d17005ad899355b31836ff9a4cce9cb9eeacccd1540e2ac30d4522bf9919c",
+          "core/crates/swirl-transport/examples/reality-client.rs": "6a8548bb59c6362d99d23a5a5293439f6fb7cce8aa84751eb58f314e8cf7cfa5",
+          "core/crates/swirl-transport/src/lib.rs": "1d4384706a19ef66c5e7e681ab4766a62156eea5a4797bc87073714e524a0d55",
+          "core/crates/swirl-transport/src/reality/backend.rs": "cdfd1f23057884dc092d8ce3f7248e764f8d7ae1ac94a266c1537a6bf26f5ca5",
+          "core/crates/swirl-transport/src/reality/backend_tests.rs": "6d28e62f47e7138e97be5b1ab2d761c86fe297d3e9f133559b7135a14f49f5b9",
+          "core/crates/swirl-transport/src/reality/certificate.rs": "919499a85d47093c2d1d0d35473a6bd7689318402f554daca70711a235213c6b",
+          "core/crates/swirl-transport/src/reality/client.rs": "340f8d393dabec0601f1b78456211d6fc4a42c702a80b648bb6c5eeebffc7172",
+          "core/crates/swirl-transport/src/reality/client_tests.rs": "97f1983b38269f918ab71aa1fcb99f78d55dd307262ee69876221a69927a5269",
+          "core/crates/swirl-transport/src/reality/hello.rs": "cb1d5347f096096d57fecabd788bc01ee4a2ac088fde90f4f8af563136efcd27",
+          "core/crates/swirl-transport/src/reality/kx.rs": "a575d7af318b312ab031d7e97e8d025e075b13f5b345c8d4a373712eac349d3d",
+          "core/crates/swirl-transport/src/reality/mod.rs": "832ed55a7e56979b57f90e067f6074654b27a8c7bc8459173308ffe59cb3abaa",
+          "core/crates/swirl-transport/src/reality/tests.rs": "7cb760d3888a46c2fde757abb7dd1be56c2552055f57b1d69daebec1b354c633",
+          "core/crates/swirl-transport/src/udp.rs": "e5f6a2d0d056aabbe941e98c1a3885ea2473f7a9882b6a88653c79f1682ab966"
+        },
+        "files_after": {
+          "core/Cargo.lock": "1ddd4b6878c5d0c1226fb00f111822ce8d6842961486df46560136d9b475e170",
+          "core/Cargo.toml": "d5bca4408b84fe233f9bc38577e8d7d3ba5076208e3d7ddd345dd0a48a3d2d05",
+          "core/crates/swirl-api/Cargo.toml": "79d0875874085b39ae72720cc669ff92d9552ac83733550ac165df364f99251d",
+          "core/crates/swirl-api/src/bin/swirl-diagnose.rs": "bfd534a8f41cd44e660dcf1e5fb7484883af15e405a2b2a3357cd54c4635b9a9",
+          "core/crates/swirl-api/src/bin/swirl-inspect.rs": "26b8f8752afd300215e4c7235351893e59d736ee1fe15bca2e3b13f84324735f",
+          "core/crates/swirl-api/src/lib.rs": "ec6b747eaae7aa0004781f08f6969a71445ea2086a14de15c2266f46f8aa3cbb",
+          "core/crates/swirl-api/src/main.rs": "d6f04d4dcbcbf00ad14ee29b514ea593e3f5bfb00fcf2fe5dd5f4307e4411b63",
+          "core/crates/swirl-core/Cargo.toml": "ec3f5509a077cd86f866661a222a6c0991e265b6818366d0f4da8496232fba5a",
+          "core/crates/swirl-core/src/lib.rs": "9a22e16f7df0a2c1227a90d7114acb8fc0ccd4b6da536860de24dea3647137b9",
+          "core/crates/swirl-core/src/policy.rs": "ecf8abfc008448f7c23eab55e8c7ad3eb02b288d09410db120fcfca65272bafd",
+          "core/crates/swirl-core/src/socks5_udp.rs": "fb56e515e0ddc6560a1eaddc017e8b83c3a0ac09919ef2aa75eb8a7c5792bf9e",
+          "core/crates/swirl-core/tests/network.rs": "ae723edad068e25d8b94c76a7e89c76c91c76117abc0e40ec0ccaa9a03569abf",
+          "core/crates/swirl-core/tests/socks5_udp.rs": "b6e0f77986f8463bd35bafa08749c0f93f43ec6a8a5e3019fcadfa33727e4ed1",
+          "core/crates/swirl-dns/Cargo.toml": "4cab2b3eb309c21e725e4cc5dc5172fb173bafeeefb283f94cd37e2f057a0346",
+          "core/crates/swirl-dns/src/doh.rs": "3c16891567a27ea1d66e03e5bf4dedf04b1fff394dfa7b374900295f70f32481",
+          "core/crates/swirl-dns/src/dot.rs": "6e643f9233f7470d86997ec5a44dc95afbb98ecdf4ef24c39c6f1b74fd80c34c",
+          "core/crates/swirl-dns/src/lib.rs": "0c2e01332d02c471fee76240270f344988f1fc79da27ac50a94987fb4fb7439c",
+          "core/crates/swirl-dns/src/wire.rs": "44150266189f66e9dcb84b69d2be887c898f3782f3679167348e76cc7d748184",
+          "core/crates/swirl-protocol/Cargo.toml": "98cd567d25d089d5553e564607c019856f2a25d8896ce9c2ddc2a1c9a5c7c7ef",
+          "core/crates/swirl-protocol/examples/vision-client.rs": "0ea01d72b175de36a8d101efaf42e13f70b6fb4a7fe322699152057fdd5aa1c6",
+          "core/crates/swirl-protocol/src/diagnostics.rs": "548b197fa05fdd384b66658864c76e171c7d828100ff1a3ed063ea33e838fd40",
+          "core/crates/swirl-protocol/src/dial.rs": "f5f582e0c216d8dd74571008de73bb4616b89380b12b20b6e07a190b77b020d4",
+          "core/crates/swirl-protocol/src/lib.rs": "300c3685c7988a649cc6c64d6ff292c6ee0943ea9ce5ce50732fda1a4ca60732",
+          "core/crates/swirl-protocol/src/probe.rs": "8350b8ed215b7c681d05d98faa962f45fda9c66f0f132e21a769abf9f707b261",
+          "core/crates/swirl-protocol/src/shadowsocks.rs": "29ef909543e129e0d94652e7db81d9777eb0747b113d62ccc669d7b2e9238efc",
+          "core/crates/swirl-protocol/src/socks4.rs": "bc619d53e7bca902250c3a90a37410893b5048100a03d345792309b98be1c3ae",
+          "core/crates/swirl-protocol/src/socks5.rs": "8ea696f1df8b498cb3ae1b3f71a3712753fcbc14af0d9659c3d9f18b16773b9f",
+          "core/crates/swirl-protocol/src/socks5_tests.rs": "822d3ba16cf19a2902b61bfd14b1a0554c7c4bca29b65ee317424b28f007a623",
+          "core/crates/swirl-protocol/src/vision.rs": "10019b9878b3e50246824f0d52f9d0c6ec26e6124bde2c1a821445e0fe195a7e",
+          "core/crates/swirl-protocol/src/vision/record.rs": "99172e1a3fba975dc7d12e028e42f4be7d2f2350fcd479427357cb869e74951f",
+          "core/crates/swirl-protocol/src/vision/stream.rs": "5358ce27589d852b8968b91fa5dbbcff5712b805bdf36592753cde6d014c69fa",
+          "core/crates/swirl-protocol/src/vision/tls.rs": "152857f55fa92845ad01b29d01dd994038f34dab4847631993158a132bf84cc9",
+          "core/crates/swirl-protocol/src/vless.rs": "9c3ac47da411e3d8d753c75f84414bba8d184e5a44b07ab7a5c21c32bbe50f4e",
+          "core/crates/swirl-protocol/src/websocket.rs": "9705fc9bd703a833ef523f4b2b9e8f0cdaf535a7f685a17b04522619dc40078a",
+          "core/crates/swirl-protocol/tests/vision.rs": "24ac0abc67da95666ec9a8cffa6b5810a1e5d82b1a59afb4c52bc61f7a6acca2",
+          "core/crates/swirl-protocol/tests/vision_record.rs": "6471335d12d67e1e7a76834ad3924060f426b8583084f917ffb45897243c24e3",
+          "core/crates/swirl-protocol/tests/vision_stream.rs": "51bf7ce7973db87fb86a73514ba6563b7324bce1cc7ac54a2fb114323206ee59",
+          "core/crates/swirl-protocol/tests/vision_tls.rs": "47f75592cff0c9705c492e94884a30337f01f132725751121503005cce88a7fb",
+          "core/crates/swirl-routing/Cargo.toml": "480cbc4af7ad4e8e518069f576457a83377df0915ceff2809e418fb00799db07",
+          "core/crates/swirl-routing/src/lib.rs": "d450eacf11ceda105b70759466aa03b6f74d3be95cba2c4539ac505e40c3d312",
+          "core/crates/swirl-subscription/Cargo.toml": "37ad02621dd0a4b82e911f968d5ddb9ba34dceba3712a9bb1b1546a6e2455977",
+          "core/crates/swirl-subscription/src/dns_tls.rs": "55858b949bc90232d90959483b0b4224e22283233a6b21ceeec6c144f714be9c",
+          "core/crates/swirl-subscription/src/inspect.rs": "c3a8fd05c4c67888ed156e1b90a0e70e1ee4e1ebe13ca743cc0a66757abb845f",
+          "core/crates/swirl-subscription/src/inspect_socks4.rs": "24a89d8845fcfc4f193d4de306f2b1103964384bdb962bc031566f01bc1ad472",
+          "core/crates/swirl-subscription/src/inspect_websocket.rs": "c02cc984435675591df030a6dfb0b0101d69d3927bbba9ea7e31231e61af4326",
+          "core/crates/swirl-subscription/src/lib.rs": "d8276b8044f63c6a9fd5a39197b713c4dfe903fcc13db92d42a6203c26c98913",
+          "core/crates/swirl-subscription/src/policy.rs": "a786cc760eac98bd3ddcee2c0f56328ec561d731a871702c58b025512c4aeccb",
+          "core/crates/swirl-subscription/src/websocket.rs": "e746d719b43dd2e0fa4bd30a7d912e7dacc00388dc1496fd12dce7ecb780662e",
+          "core/crates/swirl-transport/Cargo.toml": "ad8d17005ad899355b31836ff9a4cce9cb9eeacccd1540e2ac30d4522bf9919c",
+          "core/crates/swirl-transport/examples/reality-client.rs": "6a8548bb59c6362d99d23a5a5293439f6fb7cce8aa84751eb58f314e8cf7cfa5",
+          "core/crates/swirl-transport/src/lib.rs": "1d4384706a19ef66c5e7e681ab4766a62156eea5a4797bc87073714e524a0d55",
+          "core/crates/swirl-transport/src/reality/backend.rs": "cdfd1f23057884dc092d8ce3f7248e764f8d7ae1ac94a266c1537a6bf26f5ca5",
+          "core/crates/swirl-transport/src/reality/backend_tests.rs": "6d28e62f47e7138e97be5b1ab2d761c86fe297d3e9f133559b7135a14f49f5b9",
+          "core/crates/swirl-transport/src/reality/certificate.rs": "919499a85d47093c2d1d0d35473a6bd7689318402f554daca70711a235213c6b",
+          "core/crates/swirl-transport/src/reality/client.rs": "340f8d393dabec0601f1b78456211d6fc4a42c702a80b648bb6c5eeebffc7172",
+          "core/crates/swirl-transport/src/reality/client_tests.rs": "97f1983b38269f918ab71aa1fcb99f78d55dd307262ee69876221a69927a5269",
+          "core/crates/swirl-transport/src/reality/hello.rs": "cb1d5347f096096d57fecabd788bc01ee4a2ac088fde90f4f8af563136efcd27",
+          "core/crates/swirl-transport/src/reality/kx.rs": "a575d7af318b312ab031d7e97e8d025e075b13f5b345c8d4a373712eac349d3d",
+          "core/crates/swirl-transport/src/reality/mod.rs": "832ed55a7e56979b57f90e067f6074654b27a8c7bc8459173308ffe59cb3abaa",
+          "core/crates/swirl-transport/src/reality/tests.rs": "7cb760d3888a46c2fde757abb7dd1be56c2552055f57b1d69daebec1b354c633",
+          "core/crates/swirl-transport/src/udp.rs": "e5f6a2d0d056aabbe941e98c1a3885ea2473f7a9882b6a88653c79f1682ab966"
+        },
+        "source_unchanged": true,
+        "client_unchanged": true,
+        "python_assertions_unchanged": true,
+        "full_workspace_gates_rerun_by_this_invocation": false,
+        "original_failed_ci_source": "f3ce257f14e59e82977d89ac4be436d08926c6b8",
+        "original_failed_ci_evidence_preserved": [
+          "/tmp/swirl-vision-macos-ci-failure.json",
+          "/tmp/swirl-vision-windows-ci-failure.json"
+        ]
+      },
+      "source_identity": {
+        "git_sha": "271ed3f5d2abe185a7b3308dd77f00b904bc58be",
+        "tracked_changes": true,
+        "client_sha256": "14f57cb8d0d3f2abdb97424bd41cb2f2758104d9a34055d3be33b18ef8877f76",
+        "test_sha256": "6148d18e541cc5f540318e221efc4f25ca8646bd174ea9253f0ec7466b07d0bd",
+        "client_source_sha256": "0ea01d72b175de36a8d101efaf42e13f70b6fb4a7fe322699152057fdd5aa1c6",
+        "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+        "openssl": "OpenSSL 3.5.8 25 Aug 2026",
+        "platform": "linux",
+        "github_run_id": null,
+        "build_manifest": {
+          "binaries": {
+            "reality_peer": {
+              "file": "reality-peer",
+              "sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9"
+            },
+            "xray": {
+              "file": "xray",
+              "sha256": "9bb6352dc05e7ffc713863aabc99158b3c1480814ebfdc7f878b84f9a22a41d2"
+            }
+          },
+          "finished_unix": 1792404282,
+          "go_version": "go1.27.2",
+          "helper_source_sha256": "17b9af2d2bda7b3c57e95f87e3777065d29f05ffe418ce8c3cfde7beaa691ea0",
+          "lock_sha256": "b32dd9af801c8ed97c489f1120209b74224e595353b19fbfc13bce981eaaa925",
+          "peer_version_output": {
+            "event": "version",
+            "go_version": "go1.27.2",
+            "reality_version": "v0.0.0-20261014101318-83f621788ca8",
+            "xray_commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5"
+          },
+          "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+          "reality": {
+            "commit": "83f621788ca88b83179810b12baa7ae518aacb83",
+            "go_mod_sum": "h1:ptlSkJ8k/7IDauNH0SA96JPOo+nYGLTv2Y3UMpwvAsY=",
+            "module": "github.com/xtls/reality",
+            "sum": "h1:RjLnVvlzK4q6zWaSBPNRGsrgx2fbJDeUWffjw574uzs=",
+            "version": "v0.0.0-20261014101318-83f621788ca8"
+          },
+          "reproducible_rebuild": {
+            "reality_peer": {
+              "first_sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9",
+              "matches": true,
+              "repeated_sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9"
+            },
+            "xray": {
+              "first_sha256": "9bb6352dc05e7ffc713863aabc99158b3c1480814ebfdc7f878b84f9a22a41d2",
+              "matches": true,
+              "repeated_sha256": "9bb6352dc05e7ffc713863aabc99158b3c1480814ebfdc7f878b84f9a22a41d2"
+            }
+          },
+          "schema_version": 1,
+          "started_unix": 1792404279,
+          "status": "success",
+          "swirl_source_commit": "271ed3f5d2abe185a7b3308dd77f00b904bc58be",
+          "swirl_worktree_status": "M .github/workflows/core-development.yml\n M .github/workflows/rust-core.yml\n M core/crates/swirl-protocol/src/vision.rs\n M core/crates/swirl-protocol/src/vless.rs\n M core/crates/swirl-transport/examples/reality-client.rs\n M tools/ApplyCoreDevelopment.py\n M tools/tests/test_core_development.py\n?? core/crates/swirl-protocol/src/vision/stream.rs\n?? core/crates/swirl-protocol/src/vision/tls.rs\n?? core/crates/swirl-protocol/tests/vision_stream.rs\n?? core/crates/swirl-protocol/tests/vision_tls.rs\n?? tools/Build-XrayPeer.py\n?? tools/tests/test_reality_xray.py\n?? tools/tests/xray_peer/README.md\n?? tools/tests/xray_peer/lock.json\n?? tools/tests/xray_peer/main.go",
+          "xray": {
+            "commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5",
+            "go_mod_sha256": "31fe6bd6c04eb2738e157b850236b1376cbbac3f33e974256bb7325c8c764250",
+            "go_sum_sha256": "a72c2f2b5dd38fcf42ef55034bd55038703448b55a878eafddd60d4af1f63145",
+            "release": "v26.10.17",
+            "repository": "https://github.com/XTLS/Xray-core.git",
+            "tree": "55fc871fdf3e63149066956e7c60670f3a44fbf2"
+          },
+          "xray_version_output": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship."
+        }
+      },
+      "test_summary": {
+        "tests_run": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "successful": true
+      },
+      "peer_test_log": {
+        "sha256": "1e34e69a81ad05bc43c9beff77e5ecc0d1f48eb0556d16dfbc080f3c07218d44",
+        "text": "test_tls12_authentication_framing_bidirectional_data_and_close (__main__.VisionXrayInterop.test_tls12_authentication_framing_bidirectional_data_and_close) ... ok\ntest_tls12_large_transfer_pause_resume_and_application_boundaries (__main__.VisionXrayInterop.test_tls12_large_transfer_pause_resume_and_application_boundaries) ... ok\ntest_tls12_single_byte_reads_and_small_writes (__main__.VisionXrayInterop.test_tls12_single_byte_reads_and_small_writes) ... ok\ntest_tls13_direct_request_is_rejected_without_application_data (__main__.VisionXrayInterop.test_tls13_direct_request_is_rejected_without_application_data) ... ok\n\n----------------------------------------------------------------------\nRan 4 tests in 0.855s\n\nOK\n"
+      },
+      "cases": [
+        {
+          "name": "001-test_tls12_authentication_framing_bidirectional_data_and_close-1792409883661842571",
+          "files": {
+            "client-stdout.jsonl": {
+              "sha256": "122867f2e5cb44935b2a232ee25b222970a1f73b93f96f391161170a47cdc836",
+              "text": "{\"direct_ready\":false,\"direct_rejected\":false,\"ok\":true,\"payload_sha256\":\"35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4\",\"received\":45,\"stage\":\"complete\",\"tls13_candidate\":false,\"uploaded\":45}\n"
+            },
+            "client-stderr.log": {
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "text": ""
+            },
+            "target-result.json": {
+              "sha256": "1237d547ffc97aff6900188d647f60277adc4ccb67ca091be23a61fff610e5aa",
+              "text": "{\n  \"tls_version\": \"TLSv1.2\",\n  \"handshake_complete\": true,\n  \"received_bytes\": 45,\n  \"sent_bytes\": 45,\n  \"close_notify_received\": true,\n  \"close_notify_sent\": true,\n  \"probe_bytes_sent\": 0,\n  \"connection_closed\": true,\n  \"thread_released\": true,\n  \"error\": null,\n  \"cipher\": \"ECDHE-ECDSA-AES256-GCM-SHA384\",\n  \"received_sha256\": \"35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4\",\n  \"sent_sha256\": \"35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4\"\n}\n"
+            },
+            "xray-lifecycle.json": {
+              "sha256": "25737a8563a0be36affa8b5654d34d0a4b09bbabec8d7864dd7a4a2c33f59435",
+              "text": "{\n  \"process_reaped\": true,\n  \"forced_kill\": false,\n  \"listener_closed\": true,\n  \"exit_code\": 0\n}\n"
+            },
+            "xray.log": {
+              "sha256": "040760fdb10bd625a922e784702f79511524d541b93b1dfad4105733365e1dd7",
+              "text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship.\n2026/10/19 19:38:03.704248 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-vision-record-fix-xray/001-test_tls12_authentication_framing_bidirectional_data_and_close-1792409883661842571/xray-config.json Format:json}\n2026/10/19 19:38:03.705717 [Debug] app/log: Logger started\n2026/10/19 19:38:03.709048 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:51929\n2026/10/19 19:38:03.711303 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:51929\n2026/10/19 19:38:03.713127 [Warning] core: Xray 26.10.17 started\n2026/10/19 19:38:03.729516 [Info] [541966593] app/proxyman/inbound: connection ends > EOF\n2026/10/19 19:38:03.776694 [Info] [3034583498] proxy/vless/inbound: firstLen = 44\n2026/10/19 19:38:03.778029 [Info] [3034583498] proxy/vless/inbound: received request for tcp:127.0.0.1:56991\n2026/10/19 19:38:03.778048 [Info] [3034583498] app/dispatcher: taking detour [loopback] for [tcp:127.0.0.1:56991]\n2026/10/19 19:38:03.778052 [Info] [3034583498] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:56991\n2026/10/19 19:38:03.778053 from 127.0.0.1:60644 accepted tcp:127.0.0.1:56991 [loopback]\n2026/10/19 19:38:03.778056 [Debug] [3034583498] transport/internet: dialing to tcp:127.0.0.1:56991\n2026/10/19 19:38:03.778220 [Info] [3034583498] proxy/freedom: connection opened to tcp:127.0.0.1:56991, local endpoint 127.0.0.1:51534, remote endpoint 127.0.0.1:56991\n2026/10/19 19:38:03.778299 [Debug] [3034583498] proxy: Xtls Unpadding new block, content 250 padding 674 command 0\n2026/10/19 19:38:03.778311 [Debug] [3034583498] proxy: XtlsFilterTls found tls client hello! 250\n2026/10/19 19:38:03.778878 [Debug] [3034583498] proxy: XtlsFilterTls found tls 1.2! 983\n2026/10/19 19:38:03.778887 [Debug] [3034583498] proxy: XtlsPadding 983 48 0\n2026/10/19 19:38:03.779507 [Debug] [3034583498] proxy: Xtls Unpadding new block, content 42 padding 1311 command 1\n2026/10/19 19:38:03.820952 [Debug] [3034583498] proxy: XtlsPadding 51 1193 0\n2026/10/19 19:38:03.821499 [Debug] [3034583498] proxy: XtlsPadding 74 1171 1\n"
+            },
+            "invocation.json": {
+              "sha256": "12c0d4fd208fb644d70c62d0a0f23e4f31d2cd64a634b9bbfedee4366f8ca88c",
+              "text": "{\n  \"elapsed_seconds\": 0.09468564100097865,\n  \"exit_code\": 0,\n  \"payload_bytes\": 45,\n  \"payload_sha256\": \"35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4\",\n  \"tls13\": false,\n  \"pause_reads\": false,\n  \"read_chunk\": 16384,\n  \"write_chunk\": 16384\n}\n"
+            }
+          }
+        },
+        {
+          "name": "002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792409883828470609",
+          "files": {
+            "client-stdout.jsonl": {
+              "sha256": "c598206c0225422be64b523595984d8318c2d07a04035b6af2247727c418e1ed",
+              "text": "{\"direct_ready\":false,\"direct_rejected\":false,\"ok\":true,\"payload_sha256\":\"33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5\",\"received\":524288,\"stage\":\"complete\",\"tls13_candidate\":false,\"uploaded\":524288}\n"
+            },
+            "client-stderr.log": {
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "text": ""
+            },
+            "target-result.json": {
+              "sha256": "06648cb4a6bee655b17ca88242d4842adadb427f304c05ab1e47faa1bd512a5c",
+              "text": "{\n  \"tls_version\": \"TLSv1.2\",\n  \"handshake_complete\": true,\n  \"received_bytes\": 524288,\n  \"sent_bytes\": 524288,\n  \"close_notify_received\": true,\n  \"close_notify_sent\": true,\n  \"probe_bytes_sent\": 0,\n  \"connection_closed\": true,\n  \"thread_released\": true,\n  \"error\": null,\n  \"cipher\": \"ECDHE-ECDSA-AES256-GCM-SHA384\",\n  \"received_sha256\": \"33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5\",\n  \"sent_sha256\": \"33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5\"\n}\n"
+            },
+            "xray-lifecycle.json": {
+              "sha256": "25737a8563a0be36affa8b5654d34d0a4b09bbabec8d7864dd7a4a2c33f59435",
+              "text": "{\n  \"process_reaped\": true,\n  \"forced_kill\": false,\n  \"listener_closed\": true,\n  \"exit_code\": 0\n}\n"
+            },
+            "xray.log": {
+              "sha256": "35852cf30b145a5cd57ae3901310a72be7ca464af2d7d6ec6bfb35c72ae40372",
+              "text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship.\n2026/10/19 19:38:03.874603 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-vision-record-fix-xray/002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792409883828470609/xray-config.json Format:json}\n2026/10/19 19:38:03.875806 [Debug] app/log: Logger started\n2026/10/19 19:38:03.877982 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:39767\n2026/10/19 19:38:03.879426 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:39767\n2026/10/19 19:38:03.880800 [Warning] core: Xray 26.10.17 started\n2026/10/19 19:38:03.891410 [Info] [1532447126] app/proxyman/inbound: connection ends > EOF\n2026/10/19 19:38:03.948669 [Info] [1359489405] proxy/vless/inbound: firstLen = 44\n2026/10/19 19:38:03.948718 [Info] [1359489405] proxy/vless/inbound: received request for tcp:127.0.0.1:35847\n2026/10/19 19:38:03.948725 [Info] [1359489405] app/dispatcher: taking detour [loopback] for [tcp:127.0.0.1:35847]\n2026/10/19 19:38:03.948728 [Info] [1359489405] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:35847\n2026/10/19 19:38:03.948730 [Debug] [1359489405] transport/internet: dialing to tcp:127.0.0.1:35847\n2026/10/19 19:38:03.948799 from 127.0.0.1:49418 accepted tcp:127.0.0.1:35847 [loopback]\n2026/10/19 19:38:03.948874 [Info] [1359489405] proxy/freedom: connection opened to tcp:127.0.0.1:35847, local endpoint 127.0.0.1:35212, remote endpoint 127.0.0.1:35847\n2026/10/19 19:38:03.948937 [Debug] [1359489405] proxy: Xtls Unpadding new block, content 250 padding 985 command 0\n2026/10/19 19:38:03.948940 [Debug] [1359489405] proxy: XtlsFilterTls found tls client hello! 250\n2026/10/19 19:38:03.949498 [Debug] [1359489405] proxy: XtlsFilterTls found tls 1.2! 984\n2026/10/19 19:38:03.949505 [Debug] [1359489405] proxy: XtlsPadding 984 246 0\n2026/10/19 19:38:03.949966 [Debug] [1359489405] proxy: Xtls Unpadding new block, content 42 padding 1077 command 1\n2026/10/19 19:38:03.993187 [Debug] [1359489405] proxy: XtlsPadding 51 1172 0\n2026/10/19 19:38:04.143662 [Debug] [1359489405] proxy: XtlsPadding 1026 210 1\n2026/10/19 19:38:04.159188 [Debug] app/log: Logger closing\n"
+            },
+            "invocation.json": {
+              "sha256": "1b9b110c4a5a2dd003a2d00b3002fe5a3e03952db098740eaca2b2b11ec94be7",
+              "text": "{\n  \"elapsed_seconds\": 0.26505827499204315,\n  \"exit_code\": 0,\n  \"payload_bytes\": 524288,\n  \"payload_sha256\": \"33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5\",\n  \"tls13\": false,\n  \"pause_reads\": true,\n  \"read_chunk\": 257,\n  \"write_chunk\": 1021\n}\n"
+            }
+          }
+        },
+        {
+          "name": "003-test_tls12_single_byte_reads_and_small_writes-1792409884163235185",
+          "files": {
+            "client-stdout.jsonl": {
+              "sha256": "5820b564ff9146e9a0fbd9d4fac20e9cf6f579b61fb49aac9502ae32ac43b4b1",
+              "text": "{\"direct_ready\":false,\"direct_rejected\":false,\"ok\":true,\"payload_sha256\":\"7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12\",\"received\":289,\"stage\":\"complete\",\"tls13_candidate\":false,\"uploaded\":289}\n"
+            },
+            "client-stderr.log": {
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "text": ""
+            },
+            "target-result.json": {
+              "sha256": "6ac2fb4c6ccddaa591b16a3d06d305d67a5086e024c33196d2bc9ba895258dba",
+              "text": "{\n  \"tls_version\": \"TLSv1.2\",\n  \"handshake_complete\": true,\n  \"received_bytes\": 289,\n  \"sent_bytes\": 289,\n  \"close_notify_received\": true,\n  \"close_notify_sent\": true,\n  \"probe_bytes_sent\": 0,\n  \"connection_closed\": true,\n  \"thread_released\": true,\n  \"error\": null,\n  \"cipher\": \"ECDHE-ECDSA-AES256-GCM-SHA384\",\n  \"received_sha256\": \"7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12\",\n  \"sent_sha256\": \"7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12\"\n}\n"
+            },
+            "xray-lifecycle.json": {
+              "sha256": "25737a8563a0be36affa8b5654d34d0a4b09bbabec8d7864dd7a4a2c33f59435",
+              "text": "{\n  \"process_reaped\": true,\n  \"forced_kill\": false,\n  \"listener_closed\": true,\n  \"exit_code\": 0\n}\n"
+            },
+            "xray.log": {
+              "sha256": "b7c0e0e5445262338520ffb41b4a36ffbe201669f2e553da523f67d29a537c4b",
+              "text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship.\n2026/10/19 19:38:04.208813 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-vision-record-fix-xray/003-test_tls12_single_byte_reads_and_small_writes-1792409884163235185/xray-config.json Format:json}\n2026/10/19 19:38:04.210433 [Debug] app/log: Logger started\n2026/10/19 19:38:04.212480 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:50353\n2026/10/19 19:38:04.214265 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:50353\n2026/10/19 19:38:04.216070 [Warning] core: Xray 26.10.17 started\n2026/10/19 19:38:04.218962 [Info] [1683383988] app/proxyman/inbound: connection ends > EOF\n2026/10/19 19:38:04.265113 [Info] [305477686] proxy/vless/inbound: firstLen = 44\n2026/10/19 19:38:04.265386 [Info] [305477686] proxy/vless/inbound: received request for tcp:127.0.0.1:33887\n2026/10/19 19:38:04.265401 [Info] [305477686] app/dispatcher: taking detour [loopback] for [tcp:127.0.0.1:33887]\n2026/10/19 19:38:04.265409 [Info] [305477686] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:33887\n2026/10/19 19:38:04.265409 from 127.0.0.1:38866 accepted tcp:127.0.0.1:33887 [loopback]\n2026/10/19 19:38:04.265412 [Debug] [305477686] transport/internet: dialing to tcp:127.0.0.1:33887\n2026/10/19 19:38:04.265556 [Info] [305477686] proxy/freedom: connection opened to tcp:127.0.0.1:33887, local endpoint 127.0.0.1:45898, remote endpoint 127.0.0.1:33887\n2026/10/19 19:38:04.265675 [Debug] [305477686] proxy: Xtls Unpadding new block, content 250 padding 691 command 0\n2026/10/19 19:38:04.265683 [Debug] [305477686] proxy: XtlsFilterTls found tls client hello! 250\n2026/10/19 19:38:04.266277 [Debug] [305477686] proxy: XtlsFilterTls found tls 1.2! 984\n2026/10/19 19:38:04.266287 [Debug] [305477686] proxy: XtlsPadding 984 188 0\n2026/10/19 19:38:04.266755 [Debug] [305477686] proxy: Xtls Unpadding new block, content 42 padding 1337 command 1\n2026/10/19 19:38:04.308905 [Debug] [305477686] proxy: XtlsPadding 51 1010 0\n2026/10/19 19:38:04.309458 [Debug] [305477686] proxy: XtlsPadding 216 1022 1\n2026/10/19 19:38:04.313014 [Debug] app/log: Logger closing\n"
+            },
+            "invocation.json": {
+              "sha256": "7a6035e7183da197a3e1f9723d1012b5b2b0cad280fa00d2a6d45e48619873f5",
+              "text": "{\n  \"elapsed_seconds\": 0.09367368998937309,\n  \"exit_code\": 0,\n  \"payload_bytes\": 289,\n  \"payload_sha256\": \"7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12\",\n  \"tls13\": false,\n  \"pause_reads\": false,\n  \"read_chunk\": 1,\n  \"write_chunk\": 7\n}\n"
+            }
+          }
+        },
+        {
+          "name": "004-test_tls13_direct_request_is_rejected_without_application_data-1792409884317493631",
+          "files": {
+            "client-stdout.jsonl": {
+              "sha256": "24d9187240fe82e63d4021059b120b9e50a683adb226f0aae9bb80010190e2d3",
+              "text": "{\"direct_ready\":false,\"direct_rejected\":true,\"error\":\"VisionDirectOwnershipUnavailable\",\"error_kind\":\"PermissionDenied\",\"ok\":false,\"received\":0,\"stage\":\"server_first_probe\",\"tls13_candidate\":true,\"uploaded\":0}\n"
+            },
+            "client-stderr.log": {
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "text": ""
+            },
+            "target-result.json": {
+              "sha256": "9a5d3044fa8818622ae21d9d94876db72f12559dd2dcf4e3c54d3b0edcc7243c",
+              "text": "{\n  \"tls_version\": \"TLSv1.3\",\n  \"handshake_complete\": true,\n  \"received_bytes\": 0,\n  \"sent_bytes\": 0,\n  \"close_notify_received\": false,\n  \"close_notify_sent\": false,\n  \"probe_bytes_sent\": 34,\n  \"connection_closed\": true,\n  \"thread_released\": true,\n  \"error\": {\n    \"type\": \"BrokenPipeError\",\n    \"message\": \"[Errno 32] Broken pipe\"\n  },\n  \"cipher\": \"TLS_AES_256_GCM_SHA384\",\n  \"probe_sha256\": \"d50b77b997f88e72a20fafecc7af9ab0a5c6d19d18b81276262ace4216eb7316\",\n  \"received_sha256\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\n  \"sent_sha256\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"\n}\n"
+            },
+            "xray-lifecycle.json": {
+              "sha256": "25737a8563a0be36affa8b5654d34d0a4b09bbabec8d7864dd7a4a2c33f59435",
+              "text": "{\n  \"process_reaped\": true,\n  \"forced_kill\": false,\n  \"listener_closed\": true,\n  \"exit_code\": 0\n}\n"
+            },
+            "xray.log": {
+              "sha256": "512184129b46853f1c68013ed4e2d9bad27b43419e144c5856e95ea3b64e59a4",
+              "text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship.\n2026/10/19 19:38:04.349782 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-vision-record-fix-xray/004-test_tls13_direct_request_is_rejected_without_application_data-1792409884317493631/xray-config.json Format:json}\n2026/10/19 19:38:04.358353 [Debug] app/log: Logger started\n2026/10/19 19:38:04.360791 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:59875\n2026/10/19 19:38:04.362514 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:59875\n2026/10/19 19:38:04.363825 [Warning] core: Xray 26.10.17 started\n2026/10/19 19:38:04.380726 [Info] [4289202393] app/proxyman/inbound: connection ends > EOF\n2026/10/19 19:38:04.424721 [Info] [1804858430] proxy/vless/inbound: firstLen = 44\n2026/10/19 19:38:04.424750 [Info] [1804858430] proxy/vless/inbound: received request for tcp:127.0.0.1:47913\n2026/10/19 19:38:04.424754 [Info] [1804858430] app/dispatcher: taking detour [loopback] for [tcp:127.0.0.1:47913]\n2026/10/19 19:38:04.424835 from 127.0.0.1:51206 accepted tcp:127.0.0.1:47913 [loopback]\n2026/10/19 19:38:04.424900 [Info] [1804858430] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:47913\n2026/10/19 19:38:04.424904 [Debug] [1804858430] transport/internet: dialing to tcp:127.0.0.1:47913\n2026/10/19 19:38:04.425280 [Info] [1804858430] proxy/freedom: connection opened to tcp:127.0.0.1:47913, local endpoint 127.0.0.1:55790, remote endpoint 127.0.0.1:47913\n2026/10/19 19:38:04.425346 [Debug] [1804858430] proxy: Xtls Unpadding new block, content 250 padding 1097 command 0\n2026/10/19 19:38:04.425350 [Debug] [1804858430] proxy: XtlsFilterTls found tls client hello! 250\n2026/10/19 19:38:04.425907 [Debug] [1804858430] proxy: XtlsFilterTls found tls 1.3! 1137 TLS_AES_256_GCM_SHA384\n2026/10/19 19:38:04.425916 [Debug] [1804858430] proxy: XtlsPadding 1137 95 0\n2026/10/19 19:38:04.426399 [Debug] [1804858430] proxy: Xtls Unpadding new block, content 6 padding 1094 command 0\n2026/10/19 19:38:04.468676 [Debug] [1804858430] proxy: Xtls Unpadding new block, content 74 padding 935 command 1\n2026/10/19 19:38:04.468909 [Debug] [1804858430] proxy: XtlsPadding 79 905 2\n2026/10/19 19:38:04.471660 [Debug] app/log: Logger closing\n"
+            },
+            "invocation.json": {
+              "sha256": "7d97e183e26ca599bdddfcc497c3ff02889f75a3eceb3a14c97b64123d8e2e9e",
+              "text": "{\n  \"elapsed_seconds\": 0.09092694600985851,\n  \"exit_code\": 1,\n  \"payload_bytes\": 38,\n  \"payload_sha256\": \"c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364\",\n  \"tls13\": true,\n  \"pause_reads\": false,\n  \"read_chunk\": 16384,\n  \"write_chunk\": 16384\n}\n"
+            }
+          }
+        }
+      ],
+      "acceptance": {
+        "total_items": 79,
+        "fully_accepted_items": 6,
+        "accepted_weight_percent": 10.83
+      }
+    }
+  },
+  "ci_status": {
+    "new_commit_sha": null,
+    "exact_new_commit_ci": "Not yet executed when this local evidence was recorded. The previous f3ce257f Rust workflow failed on macOS and Windows; prior Linux/App success is not used as acceptance for this correction."
+  },
+  "acceptance": {
+    "total": 79,
+    "fully_accepted": 6,
+    "weighted_progress_percent": 10.83,
+    "changed": false
+  },
+  "remaining_limits": [
+    "This is a safe refusal path for TLS 1.3 Vision Direct requests; full raw transport ownership handoff and DirectReady remain unimplemented.",
+    "Independent full-Xray TLS 1.2 framing interoperability is synthetic loopback evidence, not private supplier or complete Swirl product acceptance.",
+    "The original CI packet coalescing cause is inferred from upstream behavior and observed bad-record-MAC failures; the new deterministic real TLS regression directly reproduces the batching mechanism.",
+    "Linux, macOS, Windows, and App CI must run against the forthcoming exact correction commit before cross-platform success is claimed."
+  ]
+}

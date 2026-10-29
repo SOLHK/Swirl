@@ -1,0 +1,212 @@
+name: U1 retained native network regressions
+
+on:
+  push:
+    branches: [work/subscription-unified-integration-20261023, work/swirl-s3-max-ultra-20261023, work/swirl-s4-final-completion-20261023]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: u1-native-supplement-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  retained-network-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      SWIRL_SOURCE_SHA: ${{ github.sha }}
+      RUSTUP_TOOLCHAIN: stable
+      CARGO_INCREMENTAL: '0'
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Rust for the single release build
+        run: rustup toolchain install stable --profile minimal
+      - name: Install the locked Go toolchain for the independent source peer
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: '1.27.2'
+          cache: false
+      - name: Record the exact checkout and isolated fixture paths
+        shell: python
+        run: |
+          import hashlib, json, os, pathlib, platform, subprocess, sys
+          root = pathlib.Path.cwd()
+          temporary = pathlib.Path(os.environ['RUNNER_TEMP'])
+          output = temporary / 'u1-native-supplement'
+          output.mkdir(parents=True, exist_ok=True)
+          source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          changes = subprocess.check_output(
+              ['git', 'status', '--porcelain', '--untracked-files=all'], text=True)
+          if source != os.environ['SWIRL_SOURCE_SHA'] or changes:
+              raise SystemExit('The retained network tests require a clean exact-SHA checkout')
+          paths = {
+              'SWIRL_RUST_BIN_DIR': root / 'core/target/release',
+              'SWIRL_XRAY_PEER_DIR': temporary / 'u1-source-xray-peer',
+              'SWIRL_XRAY_RELEASE_DIR': temporary / 'u1-release-xray-peers',
+          }
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as destination:
+              for name, path in paths.items():
+                  destination.write(f'{name}={path.resolve()}\n')
+          inputs = ('tools/Run-U1NativeSupplement.py', 'tools/tests/test_u1_native_supplement.py',
+                    'tools/tests/test_r1_public_proxy.py',
+                    '.github/workflows/u1-native-supplement.yml', 'tools/Build-XrayPeer.py',
+                    'tools/Fetch-TransportPeers.py', 'tools/tests/xray_peer/lock.json',
+                    'tools/tests/transport-peer-lock.json', 'core/Cargo.lock')
+          identity = {
+              'source_sha': source, 'tracked_and_untracked_worktree_clean': not changes,
+              'runner_os': os.environ['RUNNER_OS'], 'platform': platform.platform(),
+              'python': sys.version, 'rustc': subprocess.check_output(['rustc', '-vV'], text=True),
+              'go': subprocess.check_output(['go', 'version'], text=True).strip(),
+              'run_id': os.environ['GITHUB_RUN_ID'], 'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'input_sha256': {name: hashlib.sha256((root / name).read_bytes()).hexdigest()
+                               for name in inputs},
+              'scope': 'Retained native network regressions; not Qt, private-provider or device acceptance',
+          }
+          (output / 'workflow-source.json').write_text(
+              json.dumps(identity, indent=2) + '\n', encoding='utf-8')
+      - name: Install the independent certificate fixture dependency
+        run: python -m pip install cryptography==50.0.2
+      - name: Build one release set of Core hosts and required native clients
+        shell: python
+        run: |
+          import json, os, pathlib, subprocess, sys
+          output = pathlib.Path(os.environ['RUNNER_TEMP']) / 'u1-native-supplement'
+          commands = [
+              ['cargo', 'build', '--manifest-path', 'core/Cargo.toml', '--workspace',
+               '--release', '--locked', '--lib', '--bins'],
+              ['cargo', 'build', '--manifest-path', 'core/Cargo.toml', '--release', '--locked',
+               '-p', 'swirl-transport', '--example', 'reality-client', '--example', 'reality-hello'],
+              ['cargo', 'build', '--manifest-path', 'core/Cargo.toml', '--release', '--locked',
+               '-p', 'swirl-protocol', '--example', 'vision-client', '--example', 'transport-client'],
+              ['cargo', 'build', '--manifest-path', 'core/Cargo.toml', '--release', '--locked',
+               '-p', 'swirl-core', '--example', 'transport-runtime'],
+          ]
+          for index, command in enumerate(commands, 1):
+              with (output / f'rust-build-{index}.log').open('w', encoding='utf-8') as log:
+                  log.write(json.dumps({'argv': command}) + '\n')
+                  log.flush()
+                  with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                        text=True, encoding='utf-8', errors='replace') as process:
+                      for line in process.stdout:
+                          print(line, end='', flush=True)
+                          log.write(line)
+                      status = process.wait()
+                  log.write(f'\nexit_code={status}\n')
+              if status:
+                  sys.exit(status)
+      - name: Build and verify the original locked Xray REALITY source peer
+        run: python tools/Build-XrayPeer.py --output "${{ runner.temp }}/u1-source-xray-peer"
+      - name: Fetch the separately pinned official release required by strict VMess
+        run: python tools/Fetch-TransportPeers.py --output "${{ runner.temp }}/u1-release-xray-peers"
+      - name: Verify strict public TLS diagnostic controls on this OS
+        if: ${{ !cancelled() }}
+        shell: python
+        run: |
+          import json, os, pathlib, subprocess, sys, unittest
+          sys.path.insert(0, str(pathlib.Path('tools/tests').resolve()))
+          expected = [
+              'test_r1_public_proxy.PublicTlsControlTests.test_control_records_missing_close_notify_as_failure_after_204',
+              'test_r1_public_proxy.PublicTlsControlTests.test_control_rejects_untrusted_tls_before_http',
+              'test_r1_public_proxy.PublicTlsControlTests.test_control_requires_verified_tls_response_and_orderly_close',
+          ]
+          suite = unittest.defaultTestLoader.loadTestsFromName('test_r1_public_proxy.PublicTlsControlTests')
+          def ids(node):
+              if isinstance(node, unittest.TestSuite):
+                  return [item for child in node for item in ids(child)]
+              return [node.id()]
+          discovered = ids(suite)
+          executed = []
+          class Recorded(unittest.TextTestResult):
+              def startTest(self, test):
+                  executed.append(test.id())
+                  super().startTest(test)
+          result = unittest.TextTestRunner(verbosity=2, resultclass=Recorded).run(suite)
+          source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          clean = not subprocess.check_output(
+              ['git', 'status', '--porcelain', '--untracked-files=all'], text=True)
+          report = {'source_sha': source, 'source_clean': clean, 'runner_os': os.environ['RUNNER_OS'],
+                    'discovered': discovered, 'executed': executed, 'tests_run': result.testsRun,
+                    'failed': [test.id() for test, _ in result.failures],
+                    'errors': [test.id() for test, _ in result.errors],
+                    'skipped': [test.id() for test, _ in result.skipped],
+                    'expected_failures': [test.id() for test, _ in result.expectedFailures],
+                    'unexpected_successes': [test.id() for test in result.unexpectedSuccesses],
+                    'scope': 'Actual loopback TLS controls; not public-origin or proxy acceptance'}
+          output = pathlib.Path(os.environ['RUNNER_TEMP']) / 'u1-native-supplement'
+          output.mkdir(parents=True, exist_ok=True)
+          (output / 'public-tls-controls.json').write_text(json.dumps(report, indent=2) + '\n')
+          valid = (source == os.environ['SWIRL_SOURCE_SHA'] and clean
+                   and discovered == executed == expected and result.testsRun == 3
+                   and result.wasSuccessful() and not result.skipped and not result.expectedFailures)
+          if not valid:
+              raise SystemExit('Strict TLS diagnostic controls did not pass the complete exact-SHA menu')
+      - name: Verify the thin runner cannot hide missing, skipped or failed tests
+        if: ${{ !cancelled() }}
+        run: python -m unittest discover -s tools/tests -p test_u1_native_supplement.py -v
+      - name: Execute all 76 retained methods and both vector checks
+        if: ${{ !cancelled() }}
+        run: python tools/Run-U1NativeSupplement.py --phase deterministic --output "${{ runner.temp }}/u1-native-supplement"
+      - name: Execute both original strict VMess peer-closure methods
+        if: ${{ !cancelled() }}
+        run: python tools/Run-U1NativeSupplement.py --phase strict-vmess --output "${{ runner.temp }}/u1-native-supplement"
+      - name: Compare native and official clients using a target post-EOF receipt
+        if: ${{ !cancelled() }}
+        shell: python
+        run: |
+          import os, pathlib, subprocess, sys
+          root = pathlib.Path.cwd()
+          suffix = '.exe' if os.name == 'nt' else ''
+          output = pathlib.Path(os.environ['RUNNER_TEMP']) / 'u1-native-supplement' / 's4-close-control'
+          env = dict(os.environ)
+          env.update(SWIRL_TRANSPORT_CLIENT=str(root / 'core/target/release/examples' / ('transport-client' + suffix)),
+                     SWIRL_TRANSPORT_RUNTIME=str(root / 'core/target/release/examples' / ('transport-runtime' + suffix)),
+                     SWIRL_TRANSPORT_EVIDENCE=str(output / 'peers'),
+                     SWIRL_XRAY_BINARY=str(pathlib.Path(os.environ['RUNNER_TEMP']) / 'u1-release-xray-peers/current' / ('xray' + suffix)))
+          subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s', 'tools/tests', '-p', 'test_vmess_close_diagnostic.py', '-v'], check=True)
+          subprocess.run([sys.executable, 'tools/tests/diagnose_vmess_close.py', '--output', str(output / 'receipt.json')], env=env, check=True)
+      # The original public REALITY verifier explicitly requires Linux.
+      # Keep every public menu independent so a prior failure cannot suppress it.
+      - name: Original public REALITY with the Rust TLS fingerprint
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        run: python tools/Run-U1NativeSupplement.py --phase public-reality --output "${{ runner.temp }}/u1-native-supplement"
+      - name: Original public REALITY and Vision with the Rust TLS fingerprint
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        run: python tools/Run-U1NativeSupplement.py --phase public-vision --output "${{ runner.temp }}/u1-native-supplement"
+      - name: Original public REALITY with the Chrome TLS fingerprint
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        run: python tools/Run-U1NativeSupplement.py --phase public-chrome --output "${{ runner.temp }}/u1-native-supplement"
+      - name: Original public REALITY and Vision with the Chrome TLS fingerprint
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        run: python tools/Run-U1NativeSupplement.py --phase public-chrome-vision --output "${{ runner.temp }}/u1-native-supplement"
+      - name: Original public DIRECT and native DoH menu
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        run: python tools/Run-U1NativeSupplement.py --phase public-direct --output "${{ runner.temp }}/u1-native-supplement"
+      - name: Require complete actual results and matching source identity
+        if: ${{ !cancelled() }}
+        run: python tools/Run-U1NativeSupplement.py --phase summary --output "${{ runner.temp }}/u1-native-supplement"
+      - name: Preserve actual results, build identity and pinned-peer manifests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: U1-retained-network-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/u1-native-supplement
+            ${{ runner.temp }}/u1-source-xray-peer/build.log
+            ${{ runner.temp }}/u1-source-xray-peer/build-manifest.json
+            ${{ runner.temp }}/u1-release-xray-peers/manifest.json
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,75 @@
+{
+  "source_sha": "4d2b26469ee1b2da765db4d188f9cba9d52ab487",
+  "runs": [
+    {
+      "id": 39101504705,
+      "name": "Core implementation validation",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "sha": "4d2b26469ee1b2da765db4d188f9cba9d52ab487",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39101504705",
+      "jobs": [
+        {
+          "id": 117598546919,
+          "name": "core",
+          "status": "completed",
+          "conclusion": "success",
+          "active": [],
+          "failed": []
+        }
+      ]
+    },
+    {
+      "id": 39101504694,
+      "name": "Swirl Rust Core",
+      "status": "completed",
+      "conclusion": "failure",
+      "attempt": 2,
+      "sha": "4d2b26469ee1b2da765db4d188f9cba9d52ab487",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39101504694",
+      "jobs": [
+        {
+          "id": 117600767602,
+          "name": "portable-rust (macos-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "active": [],
+          "failed": [
+            "Independent portable protocol peers"
+          ]
+        },
+        {
+          "id": 117600768309,
+          "name": "windows-rust",
+          "status": "completed",
+          "conclusion": "success",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 117600782150,
+          "name": "portable-rust (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "active": [],
+          "failed": []
+        }
+      ]
+    }
+  ],
+  "three_platform_success": false,
+  "initial_macos_failure": {
+    "job_id": 117598546817,
+    "test": "test_permanently_stalled_dns_worker_does_not_hold_process_open",
+    "error": "DiagnosticOutputInvalid",
+    "location": "tools/Diagnose-NativeConnectivity.py:328"
+  },
+  "macos_reproduction": {
+    "job_id": 117600767602,
+    "same_test_and_error": true,
+    "attempt": 2,
+    "source_and_budgets_unchanged": true,
+    "further_retries": 0
+  }
+}

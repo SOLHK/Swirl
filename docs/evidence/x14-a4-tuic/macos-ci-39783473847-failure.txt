@@ -1,0 +1,90 @@
+2026-10-22T13:05:07.0444540Z ##[group]Run python -m unittest -v test_tuic_reference
+2026-10-22T13:05:07.0445010Z [36;1mpython -m unittest -v test_tuic_reference[0m
+2026-10-22T13:05:07.0716720Z shell: /bin/bash -e {0}
+2026-10-22T13:05:07.0717000Z env:
+2026-10-22T13:05:07.0717260Z   CARGO_INCREMENTAL: 0
+2026-10-22T13:05:07.0717480Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-22T13:05:07.0718170Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-10-22T13:05:07.0718430Z   PYTHONUTF8: 1
+2026-10-22T13:05:07.0718750Z   pythonLocation: /Users/runner/hostedtoolcache/Python/3.12.10/arm64
+2026-10-22T13:05:07.0719160Z   PKG_CONFIG_PATH: /Users/runner/hostedtoolcache/Python/3.12.10/arm64/lib/pkgconfig
+2026-10-22T13:05:07.0719620Z   Python_ROOT_DIR: /Users/runner/hostedtoolcache/Python/3.12.10/arm64
+2026-10-22T13:05:07.0720110Z   Python2_ROOT_DIR: /Users/runner/hostedtoolcache/Python/3.12.10/arm64
+2026-10-22T13:05:07.0720460Z   Python3_ROOT_DIR: /Users/runner/hostedtoolcache/Python/3.12.10/arm64
+2026-10-22T13:05:07.0721310Z   SWIRL_XRAY_BINARY: /Users/runner/work/Swirl/Swirl/out/peers/xray/current/xray
+2026-10-22T13:05:07.0721880Z   SWIRL_XRAY_LEGACY_BINARY: /Users/runner/work/Swirl/Swirl/out/peers/xray/legacy_h2/xray
+2026-10-22T13:05:07.0722380Z   HY2_SERVER: /Users/runner/work/Swirl/Swirl/out/peers/quic/hysteria2/hysteria
+2026-10-22T13:05:07.0722890Z   SWIRL_TUIC_SERVER: /Users/runner/work/Swirl/Swirl/out/peers/quic/tuic/tuic-server
+2026-10-22T13:05:07.0723310Z   PYTHONPATH: /Users/runner/work/Swirl/Swirl/tools/tests
+2026-10-22T13:05:07.0723890Z   SWIRL_TRANSPORT_CLIENT: /Users/runner/work/Swirl/Swirl/core/target/debug/examples/transport-client
+2026-10-22T13:05:07.0724590Z   SWIRL_TRANSPORT_RUNTIME: /Users/runner/work/Swirl/Swirl/core/target/debug/examples/transport-runtime
+2026-10-22T13:05:07.0725270Z   SWIRL_INSPECT: /Users/runner/work/Swirl/Swirl/core/target/debug/swirl-inspect
+2026-10-22T13:05:07.0725810Z   SWIRL_INSPECT_BINARY: /Users/runner/work/Swirl/Swirl/core/target/debug/swirl-inspect
+2026-10-22T13:05:07.0726270Z   HY2_CLIENT: /Users/runner/work/Swirl/Swirl/core/target/debug/examples/hysteria2-client
+2026-10-22T13:05:07.0726860Z   SWIRL_TUIC_CLIENT: /Users/runner/work/Swirl/Swirl/core/target/debug/examples/tuic-client
+2026-10-22T13:05:07.0727400Z   SWIRL_TRANSPORT_EVIDENCE: /Users/runner/work/Swirl/Swirl/out/native-interop/vmess
+2026-10-22T13:05:07.0727990Z   SWIRL_VMESS_EVIDENCE: /Users/runner/work/Swirl/Swirl/out/native-interop/vmess
+2026-10-22T13:05:07.0728480Z   HY2_EVIDENCE: /Users/runner/work/Swirl/Swirl/out/native-interop/hysteria2.json
+2026-10-22T13:05:07.0729000Z   SWIRL_TUIC_EVIDENCE: /Users/runner/work/Swirl/Swirl/out/native-interop/tuic.json
+2026-10-22T13:05:07.0729570Z   SWIRL_QUIC_CORE_EVIDENCE: /Users/runner/work/Swirl/Swirl/out/native-interop/quic-core.json
+2026-10-22T13:05:07.0729960Z ##[endgroup]
+2026-10-22T13:05:07.6969780Z test_clash_and_uri_import_reach_the_reference_server (test_tuic_reference.TuicReferenceTests.test_clash_and_uri_import_reach_the_reference_server) ... ok
+2026-10-22T13:05:07.8991380Z test_dns_request_through_both_udp_modes (test_tuic_reference.TuicReferenceTests.test_dns_request_through_both_udp_modes) ... ok
+2026-10-22T13:05:19.0817600Z test_historical_reference_empty_reply_limitation_is_recorded (test_tuic_reference.TuicReferenceTests.test_historical_reference_empty_reply_limitation_is_recorded) ... ok
+2026-10-22T13:05:19.3607660Z test_ipv6_endpoint_and_domain_destination (test_tuic_reference.TuicReferenceTests.test_ipv6_endpoint_and_domain_destination) ... ok
+2026-10-22T13:05:19.8273800Z test_reconnect_node_switch_and_parallel_connections (test_tuic_reference.TuicReferenceTests.test_reconnect_node_switch_and_parallel_connections) ... ok
+2026-10-22T13:05:20.8791710Z test_tcp_authentication_large_bidirectional_transfer_and_half_close (test_tuic_reference.TuicReferenceTests.test_tcp_authentication_large_bidirectional_transfer_and_half_close) ... ok
+2026-10-22T13:05:21.1416910Z test_tls_ca_sni_alpn_and_pin_fail_closed (test_tuic_reference.TuicReferenceTests.test_tls_ca_sni_alpn_and_pin_fail_closed) ... ok
+2026-10-22T13:05:32.3959380Z test_udp_native_and_quic_modes_small_and_fragmented (test_tuic_reference.TuicReferenceTests.test_udp_native_and_quic_modes_small_and_fragmented) ... 
+2026-10-22T13:05:32.4040030Z   test_udp_native_and_quic_modes_small_and_fragmented (test_tuic_reference.TuicReferenceTests.test_udp_native_and_quic_modes_small_and_fragmented) (mode='native', size=65507) ... FAIL
+2026-10-22T13:05:43.5058570Z   test_udp_native_and_quic_modes_small_and_fragmented (test_tuic_reference.TuicReferenceTests.test_udp_native_and_quic_modes_small_and_fragmented) (mode='quic', size=65507) ... FAIL
+2026-10-22T13:05:43.5105580Z test_udp_native_and_quic_modes_small_and_fragmented (test_tuic_reference.TuicReferenceTests.test_udp_native_and_quic_modes_small_and_fragmented) ... FAIL
+2026-10-22T13:05:43.7242770Z test_wrong_password_and_uuid_never_reach_destination (test_tuic_reference.TuicReferenceTests.test_wrong_password_and_uuid_never_reach_destination) ... ok
+2026-10-22T13:05:43.7501590Z 
+2026-10-22T13:05:43.7502510Z ======================================================================
+2026-10-22T13:05:43.7503710Z FAIL: test_udp_native_and_quic_modes_small_and_fragmented (test_tuic_reference.TuicReferenceTests.test_udp_native_and_quic_modes_small_and_fragmented) (mode='native', size=65507)
+2026-10-22T13:05:43.7504770Z ----------------------------------------------------------------------
+2026-10-22T13:05:43.7505460Z Traceback (most recent call last):
+2026-10-22T13:05:43.7526530Z   File "/Users/runner/work/Swirl/Swirl/tools/tests/test_tuic_reference.py", line 185, in test_udp_native_and_quic_modes_small_and_fragmented
+2026-10-22T13:05:43.7532920Z     self.run_client(self.request(node, origin, mode="udp", size=size))
+2026-10-22T13:05:43.7534340Z   File "/Users/runner/work/Swirl/Swirl/tools/tests/test_tuic_reference.py", line 144, in run_client
+2026-10-22T13:05:43.7534990Z     self.assertEqual(process.returncode, 0 if ok else 1, (report, process.stderr))
+2026-10-22T13:05:43.7535590Z AssertionError: 1 != 0 : ({'error': 'TotalTimeout', 'ok': False}, '')
+2026-10-22T13:05:43.7535880Z 
+2026-10-22T13:05:43.7535980Z ======================================================================
+2026-10-22T13:05:43.7537570Z FAIL: test_udp_native_and_quic_modes_small_and_fragmented (test_tuic_reference.TuicReferenceTests.test_udp_native_and_quic_modes_small_and_fragmented) (mode='quic', size=65507)
+2026-10-22T13:05:43.7538560Z ----------------------------------------------------------------------
+2026-10-22T13:05:43.7538970Z Traceback (most recent call last):
+2026-10-22T13:05:43.7539750Z   File "/Users/runner/work/Swirl/Swirl/tools/tests/test_tuic_reference.py", line 185, in test_udp_native_and_quic_modes_small_and_fragmented
+2026-10-22T13:05:43.7540940Z     self.run_client(self.request(node, origin, mode="udp", size=size))
+2026-10-22T13:05:43.7541670Z   File "/Users/runner/work/Swirl/Swirl/tools/tests/test_tuic_reference.py", line 144, in run_client
+2026-10-22T13:05:43.7543030Z     self.assertEqual(process.returncode, 0 if ok else 1, (report, process.stderr))
+2026-10-22T13:05:43.7544460Z AssertionError: 1 != 0 : ({'error': 'TotalTimeout', 'ok': False}, '')
+2026-10-22T13:05:43.7544840Z 
+2026-10-22T13:05:43.7545030Z ======================================================================
+2026-10-22T13:05:43.7545660Z FAIL: test_udp_native_and_quic_modes_small_and_fragmented (test_tuic_reference.TuicReferenceTests.test_udp_native_and_quic_modes_small_and_fragmented)
+2026-10-22T13:05:43.7546510Z ----------------------------------------------------------------------
+2026-10-22T13:05:43.7546990Z Traceback (most recent call last):
+2026-10-22T13:05:43.7547860Z   File "/Users/runner/work/Swirl/Swirl/tools/tests/test_tuic_reference.py", line 186, in test_udp_native_and_quic_modes_small_and_fragmented
+2026-10-22T13:05:43.7549750Z     self.assertEqual([len(value) for value in origin.received], [123, 4096, 65_507] * 2)
+2026-10-22T13:05:43.7550260Z AssertionError: Lists differ: [123, 4096, 123, 4096] != [123, 4096, 65507, 123, 4096, 65507]
+2026-10-22T13:05:43.7556650Z 
+2026-10-22T13:05:43.7556940Z First differing element 2:
+2026-10-22T13:05:43.7558100Z 123
+2026-10-22T13:05:43.7558420Z 65507
+2026-10-22T13:05:43.7558580Z 
+2026-10-22T13:05:43.7558680Z Second list contains 2 additional elements.
+2026-10-22T13:05:43.7560200Z First extra element 4:
+2026-10-22T13:05:43.7560540Z 4096
+2026-10-22T13:05:43.7565910Z 
+2026-10-22T13:05:43.7566070Z - [123, 4096, 123, 4096]
+2026-10-22T13:05:43.7566440Z + [123, 4096, 65507, 123, 4096, 65507]
+2026-10-22T13:05:43.7566780Z ?             +++++++         +++++++
+2026-10-22T13:05:43.7566980Z 
+2026-10-22T13:05:43.7566980Z 
+2026-10-22T13:05:43.7567170Z ----------------------------------------------------------------------
+2026-10-22T13:05:43.7568020Z Ran 9 tests in 36.395s
+2026-10-22T13:05:43.7569310Z 
+2026-10-22T13:05:43.7569380Z FAILED (failures=3)
+2026-10-22T13:05:43.7809140Z ##[error]Process completed with exit code 1.
+2

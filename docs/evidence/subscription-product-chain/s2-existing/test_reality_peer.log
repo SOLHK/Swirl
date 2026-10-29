@@ -1,0 +1,24 @@
+SOURCE 593e7cddc360cf7f51d9fdc988e6cf8fd99aea96
+COMMAND ["/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3", "/workspace/scratch/ca6cd1f88f6f/Swirl/tools/tests/test_reality_peer.py", "-v"]
+
+test_all_three_record_suites_boundary_padding_integrity_and_replay (__main__.RealityPeerSelfChecks.test_all_three_record_suites_boundary_padding_integrity_and_replay) ... ok
+test_authentication_binds_hello_random_sni_key_share_and_session_tag (__main__.RealityPeerSelfChecks.test_authentication_binds_hello_random_sni_key_share_and_session_tag) ... ok
+test_authentication_rejects_authenticated_invalid_parameters (__main__.RealityPeerSelfChecks.test_authentication_rejects_authenticated_invalid_parameters) ... ok
+test_context_manager_does_not_hide_a_server_failure (__main__.RealityPeerSelfChecks.test_context_manager_does_not_hide_a_server_failure) ... ok
+test_distinct_optional_x25519_and_duplicate_shares_are_refused (__main__.RealityPeerSelfChecks.test_distinct_optional_x25519_and_duplicate_shares_are_refused) ... ok
+test_fragmented_client_finished_is_verified_before_application (__main__.RealityPeerSelfChecks.test_fragmented_client_finished_is_verified_before_application) ... ok
+test_live_hybrid_and_classical_exchanges_decapsulate_independently (__main__.RealityPeerSelfChecks.test_live_hybrid_and_classical_exchanges_decapsulate_independently) ... ok
+test_loopback_wrong_authentication_reports_explicit_rejection (__main__.RealityPeerSelfChecks.test_loopback_wrong_authentication_reports_explicit_rejection) ... ok
+test_modern_authentication_matches_both_independent_fixtures (__main__.RealityPeerSelfChecks.test_modern_authentication_matches_both_independent_fixtures) ... ok
+test_parser_rejects_truncations_extra_data_and_legacy_profile (__main__.RealityPeerSelfChecks.test_parser_rejects_truncations_extra_data_and_legacy_profile) ... ok
+test_plaintext_ccs_is_forbidden_after_client_finished (__main__.RealityPeerSelfChecks.test_plaintext_ccs_is_forbidden_after_client_finished) ... ok
+test_record_header_length_is_rejected_before_reading_body (__main__.RealityPeerSelfChecks.test_record_header_length_is_rejected_before_reading_body) ... ok
+test_rfc8448_client_finished_record_and_key_derivation (__main__.RealityPeerSelfChecks.test_rfc8448_client_finished_record_and_key_derivation) ... ok
+test_server_mutations_change_the_exact_authenticated_fields (__main__.RealityPeerSelfChecks.test_server_mutations_change_the_exact_authenticated_fields) ... ok
+test_two_complete_server_transcripts_match_fixed_checkpoints (__main__.RealityPeerSelfChecks.test_two_complete_server_transcripts_match_fixed_checkpoints) ... ok
+test_wrong_client_finished_and_early_application_are_rejected (__main__.RealityPeerSelfChecks.test_wrong_client_finished_and_early_application_are_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.014s
+
+OK

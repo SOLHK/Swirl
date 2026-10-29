@@ -1,0 +1,135 @@
+name: Swirl VF A3 B1 C1 isolated takeover
+
+on:
+  push:
+    branches: [work/vf-takeover-abc-20261021]
+    paths:
+      - 'tools/swirl_vf/**'
+      - '.github/workflows/swirl-vf-takeover-abc.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fonttools==4.61.1 numpy==2.2.6 uharfbuzz==0.56.3
+      - name: Preserve all old and new portable regressions
+        run: |
+          python -m unittest discover -s tools/swirl_vf/tests -q
+          python -m unittest discover -s tools/swirl_vf/audit -p 'test_*.py' -q
+
+  original-source:
+    runs-on: xcode-27
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fonttools==4.61.1 numpy==2.2.6
+      - name: Build unchanged native extractor
+        run: |
+          mkdir -p build/vf-takeover-private/bin
+          xcrun swiftc -O tools/swirl_vf/platform/coretext_extract.swift -o build/vf-takeover-private/bin/coretext_extract
+      - name: Verify original requests while retaining old strict failures
+        run: |
+          python tools/swirl_vf/platform/probe_source_request_replay.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --binary build/vf-takeover-private/bin/coretext_extract \
+            --output build/vf-takeover-private/original-replay \
+            --expected-sha256 39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890 \
+            --source-kind original
+      - name: Export fixed aggregate only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: takeover-original-aggregate-${{ github.sha }}
+          path: build/vf-takeover-private/original-replay/summary.json
+          retention-days: 7
+
+  windows-c1-synthetic:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fonttools==4.61.1 numpy==2.2.6
+      - name: Package authored 32-face control through reused C1 code
+        shell: bash
+        run: |
+          python - <<'PYCODE'
+          import json, sys
+          from pathlib import Path
+          sys.path[:0] = ['tools/swirl_vf/tools', 'tools/swirl_vf/platform']
+          from rebuild_c1_fixture import write_faces
+          from ttc_staging_pack import pack_collection
+          from rebuild import sha256, verify_collection_tables
+          from fontTools.ttLib import TTCollection
+          root = Path('build/vf-takeover-private/c1-synthetic')
+          faces = write_faces(root / 'faces', count=32)
+          def verify(candidate):
+              with TTCollection(candidate, lazy=True) as collection:
+                  result = verify_collection_tables(faces, collection)
+                  assert result['faces_checked'] == 32
+          result = pack_collection(faces, root / 'c1-control.ttc',
+              expected_sha256=[sha256(path) for path in faces], validate=verify)
+          assert result['binary_validation']['faces'] == 32
+          assert result['production_accepted'] is False
+          (root / 'pack-summary.json').write_text(json.dumps(result, indent=2))
+          PYCODE
+      - name: Run DirectWrite on actual C1-packed authored control
+        run: |
+          ./tools/swirl_vf/platform/run_directwrite_probe.ps1 -Font build/vf-takeover-private/c1-synthetic/c1-control.ttc -OutputDirectory build/vf-takeover-private/c1-synthetic/directwrite -AllGlyphs -Render
+          if ($LASTEXITCODE -ne 0) { throw 'C1-packed synthetic DirectWrite probe failed' }
+      - name: Keep Windows Server and synthetic scope explicit
+        shell: bash
+        run: |
+          python - <<'PYCODE'
+          import json
+          from pathlib import Path
+          root = Path('build/vf-takeover-private/c1-synthetic')
+          report = json.loads((root / 'directwrite/directwrite-run.json').read_text(encoding='utf-8-sig'))
+          pack = json.loads((root / 'pack-summary.json').read_text())
+          assert report['status'] == 'PASS_NATIVE_PROBE' and report['native_exit_code'] == 0
+          assert report['native_runtime'] == 'RAN' and report['input_unchanged'] is True
+          assert report['native_summary'][0]['faces_passed'] == 32
+          assert report['input_sha256'] == pack['sha256']
+          scope = {'scope': 'authored_32_face_C1_packaging_control_only',
+              'faces_passed': 32, 'windows_product': report['windows_product'],
+              'windows_build': report['windows_build'], 'raster_count': len(report['rasters']),
+              'input_sha256': report['input_sha256'], 'original_font_acceptance': 'NOT_RUN',
+              'Windows11': 'NOT_RUN', 'Qt_Swirl': 'NOT_RUN', 'system_installation': 'NOT_TESTED'}
+          (root / 'acceptance-scope.json').write_text(json.dumps(scope, indent=2))
+          print(json.dumps(scope))
+          PYCODE
+      - name: Export synthetic aggregate only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: takeover-c1-synthetic-aggregate-${{ github.sha }}
+          path: |
+            build/vf-takeover-private/c1-synthetic/pack-summary.json
+            build/vf-takeover-private/c1-synthetic/acceptance-scope.json
+          retention-days: 7

@@ -2,6 +2,7 @@
 #include <QQuickWindow>
 #include <QGuiApplication>
 #include <QEvent>
+#include <QWindowStateChangeEvent>
 #include <QPainterPath>
 #include <QRegion>
 #include <QTimer>
@@ -10,6 +11,7 @@
 #include <QSGRendererInterface>
 #include <QImage>
 #include <cmath>
+#include <numbers>
 #include <cstring>
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -17,17 +19,19 @@
 #include <dwmapi.h>
 
 namespace {
-// Evaluate a circular corner at physical pixel centres. Mirroring each row
+// Evaluate the reference corner at physical pixel centres. Mirroring each row
 // makes all four curves identical at fractional DPI, without rounding the
 // design radius to a logical pixel or allocating a whole-window texture.
-HRGN roundedWindowRegion(int width, int height, qreal radius) {
+HRGN roundedWindowRegion(int width, int height, qreal radius, qreal coverageFringe = 0, qreal power = 2) {
     radius = qBound<qreal>(0, radius, qMin(width, height) / 2.0);
     const int rows = qCeil(radius);
     const HRGN region = CreateRectRgn(0, rows, width, height - rows);
     if (!region) return nullptr;
     for (int y = 0; y < rows; ++y) {
         const qreal dy = qMax<qreal>(0, radius - y - 0.5);
-        const int inset = qMax(0, qCeil(radius - std::sqrt(qMax<qreal>(0, radius * radius - dy * dy)) - 0.5));
+        const qreal coverageRadius=radius+coverageFringe;
+        const int inset = qMax(0, qCeil(radius - std::pow(qMax<qreal>(0,
+            std::pow(coverageRadius, power) - std::pow(dy, power)), 1 / power) - 0.5));
         const HRGN top = CreateRectRgn(inset, y, width - inset, y + 1);
         const HRGN bottom = CreateRectRgn(inset, height - y - 1, width - inset, height - y);
         if (top) { CombineRgn(region, region, top, RGN_OR); DeleteObject(top); }
@@ -57,49 +61,16 @@ HWND createShadowWindow() {
         L"SwirlExactContourShadow", L"", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
 }
 
-qreal roundedDistance(qreal x, qreal y, qreal width, qreal height, qreal radius) {
-    const qreal dx = std::abs(x - width / 2) - (width / 2 - radius);
-    const qreal dy = std::abs(y - height / 2) - (height / 2 - radius);
-    return std::hypot(qMax<qreal>(dx, 0), qMax<qreal>(dy, 0)) + qMin(qMax(dx, dy), qreal(0)) - radius;
-}
 
-QImage shadowImage(QSize body, qreal radius, qreal dpr, bool active) {
-    const int padding = qCeil(20 * dpr);
-    const qreal sigma = 6.0 * dpr, offset = 2.5 * dpr;
-    const qreal strength = active ? 0.22 : 0.14;
-    QImage image(body + QSize(padding * 2, padding * 2), QImage::Format_ARGB32_Premultiplied);
-    image.fill(Qt::transparent);
-    // Only the perimeter is painted. The interior stays completely clear so
-    // the main window's Acrylic never blurs an artificial dark rectangle.
-    for (int y = 0; y < image.height(); ++y) {
-        auto *row = reinterpret_cast<QRgb *>(image.scanLine(y));
-        const qreal localY = y + 0.5 - padding;
-        int clearLeft = image.width(), clearRight = image.width();
-        if (localY >= 0 && localY < body.height()) {
-            const qreal dy = qMax<qreal>(0, qMax(radius - localY, localY - (body.height() - radius)));
-            const qreal inset = radius - std::sqrt(qMax<qreal>(0, radius * radius - dy * dy));
-            clearLeft = padding + qMax(0, qCeil(inset - 0.5));
-            clearRight = padding + body.width() - qMax(0, qCeil(inset - 0.5));
-        }
-        for (int x = 0; x < image.width(); ++x) {
-            if (x == clearLeft) { x = clearRight; if (x >= image.width()) break; }
-            const qreal localX = x + 0.5 - padding;
-            if (localX >= radius && localX < body.width() - radius
-                && localY >= 0 && localY < body.height()) continue;
-            if (localY >= radius && localY < body.height() - radius
-                && localX >= 0 && localX < body.width()) continue;
-            if (roundedDistance(localX, localY, body.width(), body.height(), radius) <= 0) continue;
-            const qreal distance = qMax<qreal>(0, roundedDistance(localX, localY - offset, body.width(), body.height(), radius));
-            const int alpha = qRound(255 * strength * std::exp(-distance * distance / (2 * sigma * sigma)));
-            row[x] = qRgba(0, 0, 0, alpha);
-        }
-    }
-    return image;
-}
 }
 #endif
 WindowsBackdrop::WindowsBackdrop(QObject *parent) : QObject(parent) {
     if (qApp) qApp->installNativeEventFilter(this);
+    m_restoreTimer.setSingleShot(true);
+    connect(&m_restoreTimer, &QTimer::timeout, this, [this] {
+        m_restoreSettling = false;
+        updateCornerMask();
+    });
 }
 WindowsBackdrop::~WindowsBackdrop() {
     destroyBackdropBlur();
@@ -110,16 +81,58 @@ void WindowsBackdrop::apply(QObject *object, bool enabled, bool dark) {
     auto *window = qobject_cast<QQuickWindow *>(object);
     if (!window) return;
     if (m_window != window) {
+        m_restoreTimer.stop();
+        m_restoreSettling = false;
         if (m_window) m_window->removeEventFilter(this);
         destroyCompatibilityShadow();
         destroyBackdropBlur();
         m_window = window;
         window->installEventFilter(this);
         connect(window, &QObject::destroyed, this, [this, window] {
-            if (!m_window || m_window.data() == window) {destroyCompatibilityShadow();destroyBackdropBlur();}
+            if (!m_window || m_window.data() == window) {
+                m_restoreTimer.stop();
+                m_restoreSettling = false;
+                destroyCompatibilityShadow();destroyBackdropBlur();
+            }
         });
     }
     m_enabled = enabled; m_dark = dark; refresh();
+}
+bool WindowsBackdrop::beginInitialPresentation() {
+#ifdef Q_OS_WIN
+    if (!m_window || m_window->isVisible() || QGuiApplication::platformName() == QStringLiteral("offscreen")) return false;
+    const BOOL cloaked = TRUE;
+    const auto result = DwmSetWindowAttribute(reinterpret_cast<HWND>(m_window->winId()), DWMWA_CLOAK, &cloaked, sizeof(cloaked));
+    if (FAILED(result)) {
+        qWarning() << "Initial window cloaking unavailable" << Qt::hex << quint32(result);
+        return false;
+    }
+    m_initialPresentationPending = true;
+    updateCompatibilityShadow();
+    updateBackdropBlur();
+    return true;
+#else
+    return false;
+#endif
+}
+bool WindowsBackdrop::presentFirstFrame() {
+    if (!m_initialPresentationPending) return true;
+    // The hidden helpers already hold their final region and shadow bitmap.
+    // Present them in the same GUI turn, before revealing the rendered shell.
+    m_initialPresentationPending = false;
+    updateCornerMask();
+#ifdef Q_OS_WIN
+    if (!m_window) return false;
+    const BOOL cloaked = FALSE;
+    const auto result = DwmSetWindowAttribute(reinterpret_cast<HWND>(m_window->winId()), DWMWA_CLOAK, &cloaked, sizeof(cloaked));
+    if (FAILED(result)) {
+        m_initialPresentationPending = true;
+        updateCornerMask();
+        qCritical() << "Initial window reveal failed" << Qt::hex << quint32(result);
+        return false;
+    }
+#endif
+    return true;
 }
 void WindowsBackdrop::refresh() {
     if (!m_window) return;
@@ -133,14 +146,14 @@ void WindowsBackdrop::refresh() {
         m_handle = reinterpret_cast<quintptr>(hwnd);
         const bool exact = m_window->property("swirlExactWindowRadius").toBool();
         const auto oldStyle = GetWindowLongPtrW(hwnd, GWL_STYLE);
-        // Keep Swirl's traffic lights as the ONLY caption controls. A native
-        // WS_CAPTION can paint Microsoft's buttons into the extended frame.
-        const auto style = (oldStyle & ~WS_CAPTION) | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+        // DWM needs the caption style for native minimize/restore transitions.
+        // WM_NCCALCSIZE still removes its visible frame and caption controls.
+        const auto style = oldStyle | WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
         if (oldStyle != style) {
             SetWindowLongPtrW(hwnd, GWL_STYLE, style);
             SetWindowPos(hwnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE|SWP_FRAMECHANGED);
         }
-        // Exact regions cannot receive the system's automatic rounded shadow.
+        // Custom alpha contours cannot receive the system's rounded shadow.
         // Their input-transparent sibling supplies the matching shadow below.
         const int nc = 1; // DWMNCRP_DISABLED: no system caption band
         DwmSetWindowAttribute(hwnd, 2, &nc, sizeof(nc));
@@ -170,32 +183,38 @@ void WindowsBackdrop::refresh() {
         SYSTEM_POWER_STATUS power{};
         const bool batterySaver=GetSystemPowerStatus(&power) && power.SystemStatusFlag==1;
         const bool remote=GetSystemMetrics(SM_REMOTESESSION)!=0;
-        // DWMSBT_TRANSIENTWINDOW paints a full HWND brush even outside a
+        // DWM system materials paint a full HWND brush even outside a
         // custom region on Windows 11. Keep exact corners free of pale square
         // tips by using the existing opaque palette for this capability case.
-        // The saved transparency preference is retained for preset windows.
+        // An inset material-only helper preserves the exact alpha contour.
         const bool transparencyAllowed = m_enabled && !software && !batterySaver && !remote && contrastKnown && !(contrast.dwFlags & HCF_HIGHCONTRASTON)
             && transparencyKnown && transparency && compositionEnabled;
         const bool allowed = transparencyAllowed && !exact;
-        // Preserve subtle live desktop transmission with exact AA corners.
-        // This is alpha composition, explicitly not system Acrylic blur.
+        // The helper owns a native material; raw desktop alpha is never a fallback.
         translucent = transparencyAllowed && exact;
-        // Windows 11 22H2+: Desktop Acrylic samples the LIVE compositor.
-        // Mica intentionally uses wallpaper; it cannot satisfy live blur-behind.
-        const int backdrop = allowed ? 3 : 1; // DWMSBT_TRANSIENTWINDOW / NONE
+        // Windows 11 22H2+: Mica samples the wallpaper rather than revealing
+        // desktop icons or the contents of other application windows.
+        const int backdrop = allowed ? 2 : 1; // DWMSBT_MAINWINDOW / NONE
         const HRESULT material = DwmSetWindowAttribute(hwnd,38,&backdrop,sizeof(backdrop));
         const MARGINS margins{-1,-1,-1,-1};
         const HRESULT frame = DwmExtendFrameIntoClientArea(hwnd, &margins);
         active = allowed && SUCCEEDED(material) && SUCCEEDED(frame);
-        status = active ? QStringLiteral("Windows Desktop Acrylic: DWM live backdrop, %1 contour").arg(exact ? QStringLiteral("exact HWND") : QStringLiteral("native preset"))
+        status = active ? QStringLiteral("Windows Mica: DWM wallpaper material, native preset contour")
             : !m_enabled ? QStringLiteral("Opaque: application transparency disabled")
-            : translucent ? QStringLiteral("Alpha translucency: exact 10pt contour; system Acrylic unavailable for custom contours")
-            : exact ? QStringLiteral("Opaque: exact 10pt contour; system transparency policy or renderer requires fallback")
+            : translucent ? QStringLiteral("Windows Mica requested: exact logical contour; opaque until native material is available")
+            : exact ? QStringLiteral("Opaque: exact logical contour; system transparency policy or renderer requires fallback")
             : software ? QStringLiteral("Opaque: software renderer")
             : batterySaver ? QStringLiteral("Opaque: battery saver")
             : remote ? QStringLiteral("Opaque: remote desktop session")
             : QStringLiteral("Opaque: native backdrop unavailable (DWM 0x%1)").arg(quint32(material),8,16,QChar('0'));    } else status = QStringLiteral("Opaque: offscreen renderer");
 #endif
+    m_materialEligible = translucent;
+    m_materialAttempted = false;
+    translucent = m_materialEligible && (m_micaActive || m_blurActive);
+    if (m_micaActive && m_materialEligible)
+        status = QStringLiteral("Windows Mica: DWM wallpaper material, exact logical contour");
+    else if (m_blurActive && m_materialEligible)
+        status = QStringLiteral("Windows native blur: exact logical contour, neutral overlay");
     if (active != m_active || translucent != m_translucent || corners != m_nativeCorners || status != m_status) {
         m_active = active; m_translucent = translucent; m_nativeCorners = corners; m_status = status;
         qInfo().noquote() << "Window composition:" << status;
@@ -220,11 +239,13 @@ void WindowsBackdrop::updateCornerMask() {
         if (m_exactCorners && m_regionSize == physicalSize && qFuzzyCompare(m_regionDpr, dpr)
             && qFuzzyCompare(m_cornerRadius + 1, effectiveRadius + 1)) { updateCompatibilityShadow(); return; }
         const bool software=QQuickWindow::graphicsApi()==QSGRendererInterface::Software;
-        // Accelerated windows feather the final framebuffer alpha using four
-        // tiny WindowEdge quads. An integer HRGN would cut those AA samples off.
-        // Software remains an explicitly reported binary compatibility path.
-        const HRGN region = rectangular || !software ? nullptr : roundedWindowRegion(physicalSize.width(), physicalSize.height(), radius * dpr);
-        if (!rectangular && software && !region) return;
+        // A binary HWND region cuts away fractional alpha at the final DWM
+        // composition and reintroduces staircase pixels. On the GPU path,
+        // WindowEdge owns the visible contour; only the inset blur helper is
+        // region-clipped. The software fallback still needs a native region.
+        const bool useRegion = !rectangular && software;
+        const HRGN region = useRegion ? roundedWindowRegion(physicalSize.width(), physicalSize.height(), radius * dpr,0,2.5) : nullptr;
+        if (useRegion && !region) return;
         // Windows takes ownership only after a successful SetWindowRgn.
         if (!SetWindowRgn(hwnd, region, FALSE)) {
             if (region) DeleteObject(region);
@@ -248,7 +269,14 @@ void WindowsBackdrop::updateCornerMask() {
     }
     // Compatibility fallback for platforms without the Win32 region path.
     QPainterPath path;
-    path.addRoundedRect(QRectF(0,0,m_window->width(),m_window->height()),radius,radius);
+    const qreal r=qMin(radius,qMin(m_window->width(),m_window->height())/2.0);
+    for(int corner=0;corner<4;++corner)for(int step=0;step<=64;++step){
+        const qreal angle=(corner+step/64.0)*std::numbers::pi/2,c=std::cos(angle),s=std::sin(angle);
+        const QPointF point((corner==0||corner==3?m_window->width()-r:r)+r*std::copysign(std::pow(std::abs(c),0.8),c),
+            (corner<2?m_window->height()-r:r)+r*std::copysign(std::pow(std::abs(s),0.8),s));
+        if(corner==0&&step==0)path.moveTo(point);else path.lineTo(point);
+    }
+    path.closeSubpath();
     m_window->setMask(QRegion(path.toFillPolygon().toPolygon()));
 }
 void WindowsBackdrop::applyTransientClip(QObject *object, const QRectF &logicalRect, qreal logicalRadius) {
@@ -297,7 +325,7 @@ void WindowsBackdrop::updateCompatibilityShadow() {
         if (visible == m_shadowVisible) return;
         m_shadowVisible = visible; emit changed();
     };
-    if (!m_window || !m_exactCorners || !m_window->isVisible() || m_window->property("swirlSuppressShadow").toBool()
+    if (!m_window || !m_exactCorners || m_window->property("swirlSuppressShadow").toBool()
         || m_window->visibility() == QWindow::Maximized || m_window->visibility() == QWindow::FullScreen
         || m_window->visibility() == QWindow::Minimized) {
         if (m_shadowHandle) ShowWindow(reinterpret_cast<HWND>(m_shadowHandle), SW_HIDE);
@@ -318,7 +346,8 @@ void WindowsBackdrop::updateCompatibilityShadow() {
     const HWND shadow = reinterpret_cast<HWND>(m_shadowHandle);
     if (m_shadowSize != body || !qFuzzyCompare(m_shadowRadius + 1, radius + 1)
         || !qFuzzyCompare(m_shadowDpr, dpr) || m_shadowActive != active) {
-        const auto image = shadowImage(body, radius, dpr, active);
+        const auto image = m_shadowRenderer.render(body, radius, dpr, active);
+        if (image.isNull()) { ShowWindow(shadow, SW_HIDE); setVisible(false); return; }
         BITMAPINFO info{};
         info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
         info.bmiHeader.biWidth = image.width(); info.bmiHeader.biHeight = -image.height();
@@ -342,6 +371,10 @@ void WindowsBackdrop::updateCompatibilityShadow() {
         ++m_shadowBuildCount;
         m_shadowSize = body; m_shadowRadius = radius; m_shadowDpr = dpr; m_shadowActive = active;
     }
+    if (m_initialPresentationPending || m_restoreSettling || !m_window->isVisible()) {
+        ShowWindow(shadow, SW_HIDE);
+        setVisible(false); return;
+    }
     // Moving changes only the cached HWND's placement. There is no desktop
     // sampling, timer, input capture, or per-frame image reconstruction.
     const bool visible = SetWindowPos(shadow, target, bounds.left - padding, bounds.top - padding, 0, 0,
@@ -353,15 +386,22 @@ void WindowsBackdrop::destroyBackdropBlur() {
 #ifdef Q_OS_WIN
     if(m_blurHandle)DestroyWindow(reinterpret_cast<HWND>(m_blurHandle));
 #endif
-    m_blurHandle=0;
-    if(m_blurActive){m_blurActive=false;emit changed();}
+    m_blurHandle=0;m_blurRegionSize={};m_blurRegionRadius=-1;
+    if(m_blurActive || m_micaActive || m_translucent){m_blurActive=false;m_micaActive=false;m_translucent=false;emit changed();}
 }
 void WindowsBackdrop::updateBackdropBlur() {
 #ifdef Q_OS_WIN
     const auto width=m_window && m_window->property("swirlUnifiedBlur").toBool()?m_window->width():0;
-    const bool available=m_window && m_translucent && width>0;
+    const bool available=m_window && m_materialEligible && width>0;
     if(!available){destroyBackdropBlur();return;}
+    const auto opaqueFallback=[this] {
+        destroyBackdropBlur();
+        m_status=QStringLiteral("Opaque: native material unavailable for exact logical contour");
+        emit changed();
+    };
     if(!m_blurHandle){
+        if(m_materialAttempted)return;
+        m_materialAttempted=true;
         static const auto registered=[] {
             WNDCLASSEXW cls{};cls.cbSize=sizeof(cls);cls.hInstance=GetModuleHandleW(nullptr);
             cls.lpfnWndProc=[](HWND hwnd,UINT message,WPARAM wp,LPARAM lp)->LRESULT {
@@ -370,42 +410,72 @@ void WindowsBackdrop::updateBackdropBlur() {
             };
             cls.lpszClassName=L"SwirlUnifiedBackdrop";return RegisterClassExW(&cls);
         }();
-        if(!registered)return;
+        if(!registered){opaqueFallback();return;}
         const HWND blur=CreateWindowExW(WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE|WS_EX_TRANSPARENT,
-            L"SwirlUnifiedBackdrop",L"",WS_POPUP|WS_THICKFRAME,0,0,0,0,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
-        if(!blur)return;
-        const int material=1,corner=2,nc=1;const DWORD border=0xFFFFFFFE;
+            L"SwirlUnifiedBackdrop",L"",WS_POPUP,0,0,0,0,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
+        if(!blur){opaqueFallback();return;}
+        const int material=1,corner=1,nc=1;const DWORD border=0xFFFFFFFE;
         const BOOL dark=m_dark;const MARGINS margins{-1,-1,-1,-1};
         DwmSetWindowAttribute(blur,2,&nc,sizeof(nc));
         DwmSetWindowAttribute(blur,33,&corner,sizeof(corner));
         DwmSetWindowAttribute(blur,34,&border,sizeof(border));
         DwmSetWindowAttribute(blur,20,&dark,sizeof(dark));
-        if(FAILED(DwmSetWindowAttribute(blur,38,&material,sizeof(material))) || FAILED(DwmExtendFrameIntoClientArea(blur,&margins))){DestroyWindow(blur);return;}
-        // Desktop Acrylic becomes opaque for an inactive helper HWND. Use
-        // the compositor's blur policy for this non-activating visual only.
-        // Resolve the optional API dynamically and keep the alpha fallback
-        // when Windows does not expose it; never claim a blur from alpha.
+        if(FAILED(DwmSetWindowAttribute(blur,38,&material,sizeof(material))) || FAILED(DwmExtendFrameIntoClientArea(blur,&margins))){DestroyWindow(blur);opaqueFallback();return;}
+        // Mica's wallpaper state cannot be verified on a non-activating
+        // custom-contour helper. Retain the existing compositor blur path,
+        // whose desktop-color response is checked in the native fixture.
+        // Failure leaves QML opaque; never expose unblurred desktop alpha.
         struct AccentPolicy {int state;int flags;DWORD tint;int animation;};
         struct CompositionData {int attribute;void *data;SIZE_T size;};
         using SetComposition=BOOL(WINAPI *)(HWND,CompositionData *);
         const auto setComposition=reinterpret_cast<SetComposition>(GetProcAddress(GetModuleHandleW(L"user32.dll"),"SetWindowCompositionAttribute"));
         AccentPolicy accent{3,0,0,0};CompositionData data{19,&accent,sizeof(accent)};
-        if(!setComposition || !setComposition(blur,&data)){DestroyWindow(blur);return;}
+        if(!setComposition || !setComposition(blur,&data)){DestroyWindow(blur);opaqueFallback();return;}
         m_blurHandle=reinterpret_cast<quintptr>(blur);
-        m_blurActive=true;emit changed();
+        m_blurActive=true;
+        m_translucent=true;
+        m_status=QStringLiteral("Windows native blur: exact logical contour, neutral overlay");
+        emit changed();
     }
     const HWND blur=reinterpret_cast<HWND>(m_blurHandle);
-    if(!m_window->isVisible() || m_window->visibility()==QWindow::Minimized){ShowWindow(blur,SW_HIDE);return;}
+    if(m_window->visibility()==QWindow::Minimized){ShowWindow(blur,SW_HIDE);return;}
     const HWND shell=reinterpret_cast<HWND>(m_window->winId());RECT bounds{};
-    if(!GetWindowRect(shell,&bounds))return;
+    if(!GetWindowRect(shell,&bounds)){opaqueFallback();return;}
+    const bool rectangular=m_window->visibility()==QWindow::Maximized || m_window->visibility()==QWindow::FullScreen;
+    if(rectangular){
+        // The maximized HWND includes Windows' invisible resize border.
+        // Material belongs behind the visible client, not that outer frame.
+        POINT origin{};
+        if(!GetClientRect(shell,&bounds)||!ClientToScreen(shell,&origin)){opaqueFallback();return;}
+        OffsetRect(&bounds,origin.x,origin.y);
+    }
     const BOOL dark=m_dark;DwmSetWindowAttribute(blur,20,&dark,sizeof(dark));
-    const auto dpr=m_window->devicePixelRatio();const int inset=qMax(1,qCeil(dpr));
+    const auto dpr=m_window->devicePixelRatio();
+    const qreal requested=m_window->property("swirlWindowRadius").toReal();
+    // DWM material can ignore HRGN. Its rectangular HWND must itself
+    // fit inside the visible curve: at the diagonal the superellipse cuts
+    // r * (1 - 2^(-1/2.5)) from each axis. Keep one physical AA pixel clear.
+    const int inset=rectangular?1:qMax(1,qCeil(requested*dpr*(1-std::pow(0.5,0.4))+1));
+    const QSize body(bounds.right-bounds.left-2*inset,bounds.bottom-bounds.top-2*inset);
+    const qreal radius=rectangular?0:qMax<qreal>(0,requested*dpr-inset);
+    if(body!=m_blurRegionSize || !qFuzzyCompare(radius+1,m_blurRegionRadius+1)){
+        // Keep the compositor blur's hard edge inside fully covered shell
+        // pixels. A system preset radius here leaks beyond the custom curve.
+        const HRGN region=rectangular?nullptr:roundedWindowRegion(body.width(),body.height(),radius,0,2.5);
+        if(!rectangular&&!region){opaqueFallback();return;}
+        if(!SetWindowRgn(blur,region,FALSE)){
+            if(region)DeleteObject(region);
+            opaqueFallback();return;
+        }
+        m_blurRegionSize=body;m_blurRegionRadius=radius;
+    }
     // One compositor-only surface covers the entire shell. Sidebar and
-    // workspace sample the same live backdrop, with one uniform tint above.
+    // workspace share the same native backdrop, with one neutral tint above.
     // No desktop capture, CPU blur, foreground texture or timer is involved.
-    SetWindowPos(blur,shell,bounds.left+inset,bounds.top+inset,
-        bounds.right-bounds.left-2*inset,bounds.bottom-bounds.top-2*inset,
-        SWP_NOACTIVATE|SWP_NOOWNERZORDER|SWP_SHOWWINDOW);
+    const auto visibility = m_initialPresentationPending || m_restoreSettling || !m_window->isVisible() ? SWP_HIDEWINDOW : SWP_SHOWWINDOW;
+    if(!SetWindowPos(blur,shell,bounds.left+inset,bounds.top+inset,
+        body.width(),body.height(),
+        SWP_NOACTIVATE|SWP_NOOWNERZORDER|visibility))opaqueFallback();
 #endif
 }
 void WindowsBackdrop::scheduleCornerUpdate() {
@@ -414,6 +484,26 @@ void WindowsBackdrop::scheduleCornerUpdate() {
     QTimer::singleShot(0, this, [this] { m_cornerUpdateQueued = false; updateCornerMask(); });
 }
 bool WindowsBackdrop::eventFilter(QObject *object, QEvent *event) {
+    if (object == m_window && (event->type() == QEvent::WindowStateChange || event->type() == QEvent::Hide)) {
+        m_restoreTimer.stop();
+        m_restoreSettling = false;
+#ifdef Q_OS_WIN
+        if (event->type() == QEvent::WindowStateChange
+            && !m_window->windowStates().testFlag(Qt::WindowMinimized)
+            && static_cast<QWindowStateChangeEvent *>(event)->oldState().testFlag(Qt::WindowMinimized)) {
+            ANIMATIONINFO animation{sizeof(ANIMATIONINFO), 0};
+            BOOL clientAnimation = FALSE;
+            if (SystemParametersInfoW(SPI_GETANIMATION, sizeof(animation), &animation, 0) && animation.iMinAnimate
+                && SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &clientAnimation, 0) && clientAnimation) {
+                // Expose, frameSwapped and MINIMIZEEND precede DWM's final
+                // transform. Keep only the separate helper HWNDs hidden for
+                // this bounded settling interval; the shell stays native.
+                m_restoreSettling = true;
+                m_restoreTimer.start(220);
+            }
+        }
+#endif
+    }
     if (object == m_window && event->type() == QEvent::Show)
         QTimer::singleShot(0,this,[this]{refresh();});
     else if (object == m_window && (event->type() == QEvent::Resize || event->type() == QEvent::WindowStateChange
@@ -431,10 +521,26 @@ bool WindowsBackdrop::nativeEventFilter(const QByteArray &, void *message, qintp
     case WM_SIZE: case WM_DPICHANGED: case WM_WINDOWPOSCHANGED:
         scheduleCornerUpdate(); break;
     case WM_NCACTIVATE:
-        *result=DefWindowProcW(msg->hwnd,msg->message,msg->wParam,-1);
+        // DefWindowProc can paint a classic caption into DWM's restore
+        // snapshot even with lParam=-1. Qt owns all visible activation cues.
+        *result=TRUE;
+        return true;
+    case WM_NCPAINT:
+        // Retain the native transition styles without painting a second
+        // caption beneath the translucent Qt client surface.
+        *result = 0;
         return true;
     case WM_NCCALCSIZE:
-        if (msg->wParam) { *result = 0; return true; } break;
+        if (msg->wParam) {
+            if(IsZoomed(msg->hwnd)&&!m_window->windowStates().testFlag(Qt::WindowFullScreen)){
+                auto *calculation=reinterpret_cast<NCCALCSIZE_PARAMS *>(msg->lParam);
+                MONITORINFO monitor{sizeof(MONITORINFO)};RECT client{};
+                if(GetMonitorInfoW(MonitorFromRect(&calculation->rgrc[0],MONITOR_DEFAULTTONEAREST),&monitor)
+                    &&IntersectRect(&client,&calculation->rgrc[0],&monitor.rcWork))
+                    calculation->rgrc[0]=client;
+            }
+            *result = 0; return true;
+        } break;
     case WM_GETMINMAXINFO: {
         MONITORINFO monitor{sizeof(MONITORINFO)};
         if (GetMonitorInfoW(MonitorFromWindow(msg->hwnd,MONITOR_DEFAULTTONEAREST), &monitor)) {
@@ -483,6 +589,10 @@ void WindowsBackdrop::showSystemMenu() {
     const int command = TrackPopupMenu(menu,TPM_RETURNCMD|TPM_LEFTALIGN,r.left+16,r.top+40,0,hwnd,nullptr);
     if (command) PostMessageW(hwnd,WM_SYSCOMMAND,command,0);
 #endif
+}
+void WindowsBackdrop::minimizeWindow(QObject *object) {
+    auto *window = qobject_cast<QQuickWindow *>(object);
+    if (window) window->setWindowStates(window->windowStates() | Qt::WindowMinimized);
 }
 bool WindowsBackdrop::prepareNativeCapture() {
 #ifdef Q_OS_WIN

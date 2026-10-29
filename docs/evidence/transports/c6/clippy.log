@@ -1,0 +1,12 @@
+    Checking tokio v1.53.3
+    Checking swirl-subscription v0.1.0 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/crates/swirl-subscription)
+    Checking swirl-routing v0.1.0 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/crates/swirl-routing)
+    Checking tokio-util v0.7.20
+    Checking tokio-rustls v0.26.6
+    Checking h2 v0.4.20
+    Checking swirl-transport v0.1.0 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/crates/swirl-transport)
+    Checking swirl-dns v0.1.0 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/crates/swirl-dns)
+    Checking swirl-protocol v0.1.0 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/crates/swirl-protocol)
+    Checking swirl-core v0.1.0 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/crates/swirl-core)
+    Checking swirl-api v0.1.0 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/crates/swirl-api)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.62s

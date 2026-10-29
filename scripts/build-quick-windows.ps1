@@ -1,81 +1,84 @@
+# Run in an x64 MSVC developer shell. Test builds and release products use
+# separate CMake directories; no external proxy executable is downloaded.
 param(
     [Parameter(Mandatory)][string]$QtDir,
-    [string]$BuildDir = "build/swirl-quick",
-    [string]$DistDir = "dist/swirl-quick",
-    [string]$OutDir = "out",
-    [string]$Nsis = "C:/Program Files (x86)/NSIS/makensis.exe",
-    [string]$Generator = "Ninja",
-    [int]$Parallel = 6,
-    [string]$MihomoArchive,
+    [Parameter(Mandatory)][string]$OpenSslRoot,
+    [string]$BuildDir = 'D:\Codex\build\swirl-rust-product',
+    [string]$DistDir = 'D:\Codex\outputs\Swirl-Rust-x64',
+    [string]$OutDir = 'D:\Codex\outputs',
+    [string]$Nsis = 'D:\Codex\toolchains\nsis-3.11\makensis.exe',
+    [ValidateSet('Ninja','Visual Studio 17 2022')][string]$Generator = 'Ninja',
+    [ValidateRange(1,64)][int]$Parallel = 4,
     [switch]$InputTests,
-    [switch]$NativeBackdropTests
+    [switch]$NativeBackdropTests,
+    [switch]$PortableOnly
 )
-$ErrorActionPreference = "Stop"
-if ($NativeBackdropTests -and !$InputTests) { throw "Native backdrop checks require -InputTests and an unlocked Windows desktop." }
-$repo = Split-Path $PSScriptRoot -Parent
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+if ($NativeBackdropTests -and -not $InputTests) { throw 'Native backdrop checks require InputTests and an unlocked Windows desktop.' }
+$repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$previousPath = $env:PATH
 Push-Location $repo
 try {
+    if (Test-Path -LiteralPath $DistDir) { throw 'Use a fresh DistDir; existing files are never overwritten.' }
     $qt = (Resolve-Path -LiteralPath $QtDir).Path
-    $env:PATH = "$qt/bin;$env:PATH"
-    $testFlag = if ($InputTests) { "ON" } else { "OFF" }
-    cmake -S src/Swirl.Quick -B $BuildDir -G $Generator -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=$qt" "-DSWIRL_BUILD_UI_TESTS=$testFlag"
-    if ($LASTEXITCODE) { throw "CMake configure failed." }
-    cmake --build $BuildDir --config Release --parallel $Parallel
-    if ($LASTEXITCODE) { throw "Release build failed." }
-    $exe = Join-Path $BuildDir "Swirl.exe"
-    if (!(Test-Path $exe)) { $exe = Join-Path $BuildDir "Release/Swirl.exe" }
-    $exe = (Resolve-Path $exe).Path
-    & (Join-Path $PSScriptRoot 'stage-mihomo.ps1') -Destination (Split-Path $exe) -Archive $MihomoArchive
+    $openssl = (Resolve-Path -LiteralPath $OpenSslRoot).Path
+    $env:PATH = "$(Join-Path $qt 'bin');$env:PATH"
+    $configure = @('-G', $Generator, '-DCMAKE_BUILD_TYPE=Release', "-DCMAKE_PREFIX_PATH=$qt")
+    if ($Generator -eq 'Visual Studio 17 2022') { $configure += @('-A','x64') }
+    else {
+        if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) { throw 'Run this script in an x64 MSVC developer shell.' }
+        $configure += @('-DCMAKE_C_COMPILER=cl.exe','-DCMAKE_CXX_COMPILER=cl.exe')
+    }
     if ($InputTests) {
-        ctest --test-dir $BuildDir -C Release -R 'swirl-engine-(contract|real)|swirl-native-engine|swirl-subscription-formats|swirl-appearance-ui|swirl-node-real-chain|swirl-import-subscription|swirl-motion|swirl-hero|swirl-font|swirl-local-extensions|swirl-gateway-network|swirl-telemetry-accounting' --output-on-failure
-        if ($LASTEXITCODE) { throw "Engine contract, integration or QML checks failed." }
-        $test = Start-Process $exe -ArgumentList '--engine-self-test' -WindowStyle Hidden -Wait -PassThru
-        if ($test.ExitCode) { throw "Native engine QML checks failed: $($test.ExitCode)." }
-        $test = Start-Process $exe -ArgumentList "--node-self-test" -WindowStyle Hidden -Wait -PassThru
-        if ($test.ExitCode) { throw "Native node QML checks failed: $($test.ExitCode)." }
-        # This input test uses the actual Windows platform plugin and fonts.
-        $test = Start-Process $exe -ArgumentList "--interaction-test" -WindowStyle Hidden -Wait -PassThru
-        if ($test.ExitCode) { throw "Input checks failed: $($test.ExitCode). See Swirl-diagnostics.txt." }
-        $test = Start-Process $exe -ArgumentList "--capture-self-test" -WindowStyle Hidden -Wait -PassThru
-        if ($test.ExitCode) { throw "Capture checks failed: $($test.ExitCode)." }
-        $test = Start-Process $exe -ArgumentList "--smoke-test" -WindowStyle Hidden -Wait -PassThru
-        if ($test.ExitCode) { throw "Module startup checks failed: $($test.ExitCode)." }
+        $testBuild = "$BuildDir-tests"
+        cmake -S src/Swirl.Quick -B $testBuild @configure -DSWIRL_BUILD_UI_TESTS=ON
+        if ($LASTEXITCODE) { throw 'Test configuration failed.' }
+        cmake --build $testBuild --config Release --parallel $Parallel
+        if ($LASTEXITCODE) { throw 'Test build failed.' }
+        $testBin = Join-Path $testBuild 'Release'
+        if (-not (Test-Path (Join-Path $testBin 'Swirl.exe'))) { $testBin = $testBuild }
+        & (Join-Path $PSScriptRoot 'Copy-VerifiedOpenSslRuntime.ps1') -OpenSslRoot $openssl `
+            -ApplicationDirectory $testBin -Target VC-WIN64A
+        & windeployqt --release --compiler-runtime --openssl-root $openssl --include-plugins qopensslbackend --qmldir src/Swirl.Quick/qml (Join-Path $testBin 'Swirl.exe')
+        if ($LASTEXITCODE) { throw 'Test UI deployment failed.' }
+        & windeployqt --release --compiler-runtime --openssl-root $openssl --include-plugins qopensslbackend (Join-Path $testBin 'SwirlRustCoreTests.exe')
+        if ($LASTEXITCODE) { throw 'Test dependency deployment failed.' }
+        ctest --test-dir $testBuild -C Release -R '^swirl-(rust-|node-real-chain|import-subscription|subscription-formats|stream-regression|local-extensions|telemetry-accounting|diagnostic-export)' --output-on-failure
+        if ($LASTEXITCODE) { throw 'Rust and retained product regression tests failed.' }
         if ($NativeBackdropTests) {
-            New-Item -ItemType Directory -Force $OutDir | Out-Null
-            $nativeOutput = Join-Path (Resolve-Path $OutDir).Path "window-validation"
-            $test = Start-Process $exe -ArgumentList @("--window-test", ('"--window-test-output=' + $nativeOutput + '"')) -WindowStyle Hidden -Wait -PassThru
-            if ($test.ExitCode) { throw "Native compositor checks failed: $($test.ExitCode)." }
-            Copy-Item (Join-Path (Split-Path $exe) "Swirl-diagnostics.txt") (Join-Path $OutDir "window-validation.log") -Force
+            New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+            $report = Join-Path ([IO.Path]::GetFullPath($OutDir)) 'window-validation'
+            $p = Start-Process (Join-Path $testBin 'Swirl.exe') -ArgumentList @('--window-test',('"--window-test-output='+$report+'"')) -PassThru
+            if (-not $p.WaitForExit(90000)) { $p.Kill(); throw 'Native compositor test timed out.' }
+            if ($p.ExitCode) { throw 'Native compositor test failed.' }
         }
-        cmake -S src/Swirl.Quick -B $BuildDir -DSWIRL_BUILD_UI_TESTS=OFF
-        if ($LASTEXITCODE) { throw "Production reconfigure failed." }
-        cmake --build $BuildDir --config Release --parallel $Parallel
-        if ($LASTEXITCODE) { throw "Production build failed." }
     }
-    if (Test-Path (Join-Path $DistDir "Swirl.exe")) {
-        throw "Use a fresh DistDir so stale plugins cannot enter the installer."
+    cmake -S src/Swirl.Quick -B $BuildDir @configure -DSWIRL_BUILD_UI_TESTS=OFF
+    if ($LASTEXITCODE) { throw 'Production configuration failed.' }
+    cmake --build $BuildDir --config Release --target Swirl --parallel $Parallel
+    if ($LASTEXITCODE) { throw 'Production build failed; no package was staged.' }
+    & (Join-Path $PSScriptRoot 'Stage-WindowsRustProduct.ps1') -BuildDirectory $BuildDir -Destination $DistDir -OpenSslRoot $openssl
+    $stage = (Resolve-Path -LiteralPath $DistDir).Path
+    $p = Start-Process (Join-Path $stage 'Swirl.exe') -ArgumentList '--smoke-test' -WorkingDirectory ([IO.Path]::GetTempPath()) -WindowStyle Hidden -PassThru
+    if (-not $p.WaitForExit(75000)) { $p.Kill(); throw 'Packaged Qt UI smoke timed out.' }
+    if ($p.ExitCode) { throw 'Packaged Qt UI smoke failed.' }
+    New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+    $out = (Resolve-Path -LiteralPath $OutDir).Path
+    $uninstallList = Join-Path $out 'Swirl-UninstallFiles.nsh'
+    & (Join-Path $PSScriptRoot 'Finalize-WindowsRustProduct.ps1') -ApplicationDirectory $stage `
+        -EvidenceDirectory (Join-Path $out 'package-evidence') -UninstallList $uninstallList
+    $zip = Join-Path $out 'Swirl-Rust-x64.zip'
+    if (Test-Path -LiteralPath $zip) { throw 'Use a fresh OutDir; existing archive is preserved.' }
+    Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip
+    if (-not $PortableOnly) {
+        if (-not (Test-Path -LiteralPath $Nsis -PathType Leaf)) { throw 'NSIS is unavailable; verified portable output is retained.' }
+        if (Test-Path -LiteralPath (Join-Path $out 'Swirl-Setup.exe')) { throw 'Existing installer is preserved; use a fresh OutDir.' }
+        $icon = (Resolve-Path -LiteralPath (Join-Path $BuildDir 'brand/Swirl.ico')).Path
+        $appVersion = (Get-Content -LiteralPath 'src/Swirl.Quick/PRODUCT_VERSION.txt' -Raw).Trim()
+        if ($appVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid PRODUCT_VERSION.txt' }
+        & $Nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$stage" "/DOUT_DIR=$out" "/DAPP_ICON=$icon" "/DAPP_VERSION=$appVersion" "/DUNINSTALL_LIST=$uninstallList" "/DREPO_ROOT=$repo" src/Swirl.Quick/packaging/Swirl.nsi
+        if ($LASTEXITCODE) { throw 'NSIS failed; verified portable output is retained.' }
     }
-    New-Item -ItemType Directory -Force $DistDir,$OutDir | Out-Null
-    Copy-Item -LiteralPath $exe -Destination $DistDir
-    Copy-Item -LiteralPath (Join-Path (Split-Path $exe) 'SwirlProxyGuard.exe') -Destination $DistDir
-    Copy-Item -LiteralPath (Join-Path (Split-Path $exe) 'SwirlGatewayGuard.exe') -Destination $DistDir
-    Copy-Item -LiteralPath (Join-Path (Split-Path $exe) 'SwirlScriptRunner.exe') -Destination $DistDir
-    Copy-Item -LiteralPath 'src/Swirl.Quick/packaging/rules' -Destination (Join-Path $DistDir 'rules') -Recurse
-    Copy-Item -LiteralPath (Join-Path (Split-Path $exe) 'core') -Destination (Join-Path $DistDir 'core') -Recurse
-    $icon = Join-Path (Resolve-Path $BuildDir).Path "brand/Swirl.ico"
-    if (!(Test-Path -LiteralPath $icon)) { throw "SVG-derived icon is missing: $icon" }
-    Copy-Item -LiteralPath $icon -Destination (Join-Path $DistDir "Swirl-brand-phase3.ico")
-    Copy-Item -LiteralPath $icon -Destination (Join-Path $DistDir "Swirl-brand-phase3-v2.ico")
-    & "$qt/bin/windeployqt.exe" --release --qmldir src/Swirl.Quick/qml (Join-Path $DistDir "Swirl.exe")
-    if ($LASTEXITCODE) { throw "Qt runtime deployment failed." }
-    Copy-Item src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt $DistDir
-    Copy-Item src/Swirl.Quick/packaging/licenses (Join-Path $DistDir "licenses") -Recurse
-    $documentation = Join-Path $DistDir 'docs'
-    New-Item -ItemType Directory -Force -Path $documentation | Out-Null
-    Copy-Item -LiteralPath 'src/Swirl.Quick/CAPTURE.md','docs/LOCAL_EXTENSIONS.md','docs/FONTS.md','docs/ANIMATION_DEPENDENCY_RESEARCH.md','docs/PR12_GRAPHICS_UPGRADE.md','docs/PR12_NATIVE_ACCEPTANCE.md','docs/PR12_NATIVE_UI_FIXES.md','docs/SWIRL_NATIVE_RESEARCH.md' -Destination $documentation
-    $dist = (Resolve-Path $DistDir).Path
-    $out = (Resolve-Path $OutDir).Path
-    & $Nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$dist" "/DOUT_DIR=$out" "/DAPP_ICON=$icon" src/Swirl.Quick/packaging/Swirl.nsi
-    if ($LASTEXITCODE) { throw "NSIS packaging failed." }
-    Get-Item (Join-Path $out "Swirl-Setup.exe")
-} finally { Pop-Location }
+    Write-Host "Verified Rust-only product: $stage"
+} finally { $env:PATH=$previousPath; Pop-Location }

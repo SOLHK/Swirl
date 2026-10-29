@@ -1,117 +1,63 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import SwirlQuick
 import "../components"
 import "../controls"
+
 Item {
     id:page
     readonly property bool implemented:true
     property string tool:"DNS 查询"
-    property string result:"上方诊断使用真实测量；下面的自定义工具研发中。"
+    property string result:qsTr("此工具尚未接入执行服务。上方网络诊断使用真实测量。")
     property var tools:["DNS 查询","TCP 连通性","Traceroute","HTTP 请求","TLS 证书检查","端口检查","IP 地址查询","Whois","连接测试","网络接口信息"]
-    ColumnLayout {
-        anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
-        SwirlText { text:"网络诊断";font.weight:Font.DemiBold; font.pixelSize:Theme.fontSize(28);color:Theme.text }
-        RowLayout {
-            Layout.fillWidth:true
-            SwirlText {text:engineController.telemetry.measurementState||"尚未测量";color:Theme.muted;Layout.fillWidth:true}
-            SwirlButton {text:"开始检测";enabled:engineController.telemetry.measurementState!=="正在测量";onClicked:{engineController.telemetry.measureNetwork();if(engineController.selectedNodeId.length&&!engineController.tests.busy)engineController.testSelectedNode(engineController.selectedNodeId,"https://www.gstatic.com/generate_204")}}
+    property string networkType:""
+    property bool componentReady:false
+    function refreshNetwork(){networkType=systemProvider.currentNetwork().type||""}
+    Component.onCompleted:{componentReady=true;refreshNetwork()}
+    Connections{target:page.componentReady?page:null;function onVisibleChanged(){if(page.visible)page.refreshNetwork()}}
+    readonly property bool measuring:engineController.telemetry.measurementState==="正在测量"
+    readonly property string measurementPhase:page.measuring?"pending":/^\d+ ms$/.test(engineController.telemetry.latencies.internet||"")?"succeeded":engineController.telemetry.measurementState==="测量完成"?"failed":"idle"
+    SwirlArcMotion{id:tabMotion;targetX:Math.max(0,page.tools.indexOf(page.tool))*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
+    ColumnLayout{
+        anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap
+        SwirlPageHeader{Layout.fillWidth:true;title:qsTr("网络诊断");description:qsTr("分别查看 HTTPS 请求、网关 ICMP 与 DNS 查询耗时。");metadata:qsTr("各项分别采样，HTTPS 请求耗时包含连接、TLS 与目标响应")
+            SwirlButton{objectName:"toolboxMeasure";text:page.measuring?qsTr("检测中…"):qsTr("开始检测");primary:true;enabled:!page.measuring;onClicked:{page.refreshNetwork();engineController.telemetry.measureNetwork();if(engineController.selectedNodeId.length&&!engineController.tests.busy)engineController.testSelectedNode(engineController.selectedNodeId,"https://www.gstatic.com/generate_204")}}
         }
-        SwirlGlassPanel { Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(155)
-            ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(10)
-                SwirlText {text:"互联网 TCP："+(engineController.telemetry.latencies.internet||"未采集")+"  ·  默认网关 ICMP："+(engineController.telemetry.latencies.router||"未采集")+"  ·  DNS 查询："+(engineController.telemetry.latencies.dns||"未采集");color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
-                SwirlText {text:"外部 IP："+(engineController.telemetry.externalIp||"未检测")+"  ·  "+systemProvider.currentNetwork().type;color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
-                SwirlText {text:"互联网测量为直连 TCP 握手；网关来自当前活动网卡；出口检测经实际 Swirl 分流。节点检测使用独立引擎。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
-            }
+        RowLayout{Layout.fillWidth:true;spacing:Theme.gap
+            SwirlFlow{Layout.preferredWidth:Theme.dp(48);Layout.preferredHeight:Theme.dp(20);phase:page.measurementPhase}
+            SwirlText{text:engineController.telemetry.measurementState||qsTr("尚未检测");color:Theme.muted;font.pixelSize:Theme.captionSize;Layout.fillWidth:true}
+            SwirlText{text:qsTr("外部 IP：%1").arg(engineController.telemetry.externalIp||qsTr("未检测"))+" · "+page.networkType;color:Theme.muted;font.pixelSize:Theme.captionSize}
         }
-        SwirlText { text:"其他自定义工具（研发中）"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
-        RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(15)
-            SwirlGlassPanel {
-                Layout.preferredWidth:Theme.dp(235); Layout.fillHeight:true
-                ScrollView {
-                    id:detailScroll0; anchors.fill:parent; anchors.margins:Theme.dp(13); clip:true
-                    ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
-                    ColumnLayout {
-                    width:detailScroll0.availableWidth; height:Math.max(implicitHeight,detailScroll0.availableHeight); spacing:Theme.dp(9)
-                    SwirlText { text:"网络实用工具"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); leftPadding:Theme.dp(8) }
-                    ListView { pixelAligned: true;
-                    add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} }
-                    remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
-                    move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
-                    displaced: Transition { enabled:!SwirlMotion.reduced; SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration} }
-                        Layout.fillWidth:true; Layout.fillHeight:true; clip:true; spacing:Theme.dp(4)
-                        model:page.tools
-                        delegate:Rectangle {
-                            width:Math.floor(ListView.view.width); height:Theme.dp(40); radius:Theme.roundedRadius(width,height)
-                            color:page.tool===modelData?Theme.selected:area.containsMouse?Theme.hover:"transparent"
-                            RowLayout {
-                                anchors.fill:parent; anchors.leftMargin:Theme.dp(10)
-                                SwirlIcon { name:"tool"; size:Theme.dp(17); color:Theme.muted }
-                                SwirlText { text:modelData; color:Theme.text; font.pixelSize:Theme.fontSize(12); elide:Text.ElideRight; Layout.fillWidth:true }
-                            }
-                            MouseArea { id:area; anchors.fill:parent; hoverEnabled:true; onClicked:AppState.notice("研发中") }
-                        }
-                    }
-                }
+        GridLayout{Layout.fillWidth:true;columns:3;columnSpacing:Theme.sectionGap
+            Repeater{model:[{label:qsTr("HTTPS 请求"),key:"internet"},{label:qsTr("网关 ICMP"),key:"router"},{label:qsTr("DNS 查询"),key:"dns"}]
+                ColumnLayout{required property var modelData;Layout.fillWidth:true;Layout.minimumWidth:0;spacing:Theme.dp(6)
+                    SwirlText{text:modelData.label;color:Theme.muted;font.pixelSize:Theme.captionSize}
+                    SwirlText{text:engineController.telemetry.latencies[modelData.key]||qsTr("未采集");color:Theme.text;font.pixelSize:Theme.sectionTitleSize;font.weight:Font.DemiBold;Layout.fillWidth:true;elide:Text.ElideRight}
                 }
             }
-            SwirlGlassPanel {
-                Layout.fillWidth:true; Layout.fillHeight:true
-                ColumnLayout {
-                    anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(17)
-                    RowLayout {
-                        Layout.fillWidth:true
-                        ColumnLayout {
-                            Layout.fillWidth:true
-                            SwirlText { text:page.tool; color:Theme.text; font.pixelSize:Theme.fontSize(22); font.weight:Font.DemiBold }
-                            SwirlText { text:"独立检查面板"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
-                        }
-                        SwirlStatusBadge { label:"本地"; tone:"accent" }
-                    }
-                    Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
-                    SwirlText { text:page.tool==="网络接口信息"?"网卡名称":"目标域名、地址或 URL"; color:Theme.text; font.pixelSize:Theme.fontSize(13) }
-                    SwirlTextField {
-                        id:target; Layout.fillWidth:true
-                        placeholderText:page.tool==="HTTP 请求"?"https://example.test/path":"example.test"
-                    }
-                    RowLayout {
-                        Layout.fillWidth:true
-                        SwirlComboBox {
-                            visible:page.tool==="HTTP 请求"
-                            model:["GET","POST","PUT","DELETE","HEAD"]
-                        }
-                        SwirlTextField {
-                            visible:page.tool==="端口检查" || page.tool==="TCP 连通性"
-                            Layout.preferredWidth:Theme.dp(130)
-                            placeholderText:"端口（443）"
-                            validator:IntValidator { bottom:1; top:65535 }
-                        }
-                        Item { Layout.fillWidth:true }
-                        SwirlButton { development:true; enabled:false;
-                            text:"运行"; primary:true; iconName:"play"
-
-                            onClicked:AppState.notice("研发中")
-                        }
-                    }
-                    SwirlText { text:"结果"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); font.weight:Font.DemiBold }
-                    Rectangle {
-                        Layout.fillWidth:true; Layout.fillHeight:true
-                        color:Theme.field; border.color:Theme.border; radius:Theme.roundedRadius(width,height)
-                        ScrollView {
-                            anchors.fill:parent; anchors.margins:Theme.dp(12)
-                            TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
-                                readOnly:true; selectByMouse:true
-                                text:page.result
-                                color:Theme.text
-                                wrapMode:Text.Wrap
-                                font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(12)
-                                background:Rectangle { color:"transparent" }
-                            }
-                        }
-                    }
-                    SwirlButton { development:true; enabled:false; text:"复制结果"; onClicked:AppState.notice("研发中") }
+        }
+        Rectangle{Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(1);color:Theme.border}
+        RowLayout{Layout.fillWidth:true;Layout.fillHeight:true;spacing:Theme.sectionGap
+            ListView{id:toolList;Layout.preferredWidth:Theme.dp(220);Layout.fillHeight:true;pixelAligned:true;clip:true;spacing:Theme.dp(4);model:page.tools
+                delegate:SwirlButton{required property string modelData;width:toolList.width;text:modelData;quiet:page.tool!==modelData;onClicked:page.tool=modelData}
+                ScrollBar.vertical:SwirlScrollBar{}
+            }
+            Rectangle{Layout.fillHeight:true;Layout.preferredWidth:Theme.dp(1);color:Theme.border}
+            ColumnLayout{Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumWidth:0;spacing:Theme.gap
+                SwirlText{transform:Translate{x:tabMotion.position.x-tabMotion.targetX;y:tabMotion.position.y}
+                text:page.tool;color:Theme.text;font.pixelSize:Theme.sectionTitleSize;font.weight:Font.DemiBold}
+                SwirlText{Layout.fillWidth:true;wrapMode:Text.Wrap;text:qsTr("当前可编辑检查目标，执行服务尚未接入。");color:Theme.muted;font.pixelSize:Theme.captionSize}
+                SwirlTextField{id:target;Layout.fillWidth:true;placeholderText:page.tool==="网络接口信息"?qsTr("网卡名称"):page.tool==="HTTP 请求"?"https://example.test/path":"example.test"}
+                RowLayout{Layout.fillWidth:true
+                    SwirlComboBox{visible:page.tool==="HTTP 请求";model:["GET","POST","PUT","DELETE","HEAD"]}
+                    SwirlTextField{visible:page.tool==="端口检查"||page.tool==="TCP 连通性";Layout.preferredWidth:Theme.dp(150);placeholderText:qsTr("端口（443）");validator:IntValidator{bottom:1;top:65535}}
+                    Item{Layout.fillWidth:true}
+                    SwirlButton{text:qsTr("运行工具");primary:true;development:true;enabled:false}
+                }
+                ScrollView{Layout.fillWidth:true;Layout.fillHeight:true;clip:true
+                    SwirlTextArea{readOnly:true;selectByMouse:true;text:page.result;font.pixelSize:Theme.captionSize;wrapMode:TextEdit.Wrap;}
                 }
             }
         }

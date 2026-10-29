@@ -1,5 +1,7 @@
 #include "NodeImporter.h"
+#include <QCryptographicHash>
 #include "SubscriptionNormalizer.h"
+#include "XrayJsonBridge.h"
 #include "../third_party/fkYAML/node.hpp"
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -10,6 +12,57 @@
 #include <stdexcept>
 
 namespace {
+QJsonValue singleDocument(const QByteArray &bytes);
+bool safeShape(const QByteArray &bytes);
+bool xrayJsonCandidate(const QByteArray &bytes) {
+    auto view = bytes.trimmed();
+    if (view.startsWith("\xef\xbb\xbf")) view = view.mid(3).trimmed();
+    if (!view.startsWith('{') && !view.startsWith('[')) return false;
+    // This is only dialect selection. Every Xray candidate, including invalid
+    // JSON, is passed unmodified to Rust before a single node is constructed.
+    const auto sniff = QJsonDocument::fromJson(view);
+    // A section header such as [Proxy] or [server_local] belongs to the INI
+    // normalizer. Do not let the JSON array prefix capture those subscriptions.
+    // Valid JSON arrays and every other malformed JSON candidate remain on the
+    // strict Rust path; the INI parser still validates headers and all content.
+    if (sniff.isNull() && view.startsWith('[') &&
+        QRegularExpression("^\\[\\s*[A-Za-z][A-Za-z0-9 _-]*(?:\\]|$)").match(QString::fromUtf8(view.split('\n').first())).hasMatch())
+        return false;
+    // A Clash flow sequence uses the same '[' prefix as a JSON array, but
+    // permits unquoted YAML keys. Only a complete, bounded, strict YAML
+    // sequence of typed Clash nodes can leave the JSON path. Malformed JSON,
+    // duplicate keys and mixed/Xray dialects still reach Rust unchanged.
+    if (sniff.isNull() && view.startsWith('[') && safeShape(view)) {
+        try {
+            const auto root = singleDocument(view);
+            const auto nodes = root.toArray();
+            if (!nodes.isEmpty() && std::all_of(nodes.cbegin(), nodes.cend(), [](const auto &node) {
+                return node.isObject() && node.toObject().value("type").isString()
+                    && !node.toObject().contains("protocol");
+            })) return false;
+        } catch (...) {
+            // Parser messages may contain credentials and are never exposed.
+        }
+    }
+    if (sniff.isObject()) {
+        const auto object = sniff.object();
+        for (const auto &key : {"protocol", "outbound", "outboundDetour", "inbound", "inboundDetour"})
+            if (object.contains(key)) return true;
+        if (object.contains("outbounds")) {
+            const auto outbounds = object.value("outbounds").toArray();
+            return outbounds.isEmpty() || std::any_of(outbounds.cbegin(), outbounds.cend(), [](const auto &node) {
+                return !node.isObject() || !node.toObject().contains("type") || node.toObject().contains("protocol");
+            });
+        }
+        if (object.contains("proxies") || object.contains("type")) return false;
+    } else if (sniff.isArray()) {
+        const auto nodes = sniff.array();
+        if (!nodes.isEmpty() && std::all_of(nodes.cbegin(), nodes.cend(), [](const auto &node) {
+            return node.isObject() && node.toObject().contains("type") && !node.toObject().contains("protocol");
+        })) return false;
+    }
+    return true;
+}
 QJsonValue convert(const fkyaml::node &value, int depth, int &budget) {
     if (depth > 32 || --budget < 0) throw std::runtime_error("limit");
     if (value.is_null()) return QJsonValue();
@@ -41,6 +94,11 @@ QJsonValue convert(const fkyaml::node &value, int depth, int &budget) {
         if (name!="<<")out.insert(name,convert(entry,depth+1,budget));
     }
     return out;
+}
+QJsonValue singleDocument(const QByteArray &bytes) {
+    const auto documents=fkyaml::node::deserialize_docs(bytes.constData(),bytes.constData()+bytes.size());
+    if(documents.size()!=1)throw std::runtime_error("document count");
+    int budget=100000;return convert(documents.front(),0,budget);
 }
 bool safeShape(const QByteArray &bytes) {
     // Bound nesting before the YAML parser allocates an AST. A conservative
@@ -78,32 +136,38 @@ bool safeOptions(const QJsonValue &value) {
 QJsonObject NodeImporter::strictJsonObject(const QByteArray &bytes){
     if(bytes.isEmpty()||bytes.size()>MaximumBytes||!safeShape(bytes))return {};
     QJsonParseError error;const auto json=QJsonDocument::fromJson(bytes,&error);if(error.error!=QJsonParseError::NoError||!json.isObject())return {};
-    try{const auto parsed=fkyaml::node::deserialize(bytes.constData(),bytes.constData()+bytes.size());int budget=100000;return convert(parsed,0,budget).toObject();}catch(...){return {};}
+    try{return singleDocument(bytes).toObject();}catch(...){return {};}
 }
 NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
     Result result;
-    if(bytes.isEmpty() || bytes.size()>MaximumBytes || !safeShape(bytes)) {
+    if(bytes.isEmpty() || bytes.size()>MaximumBytes) {
         result.error=QStringLiteral("导入内容为空、超过 4 MiB 或嵌套过深；原节点保持不变。"); return result;
     }
+    result.sourceDigest=QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex());
+    if (xrayJsonCandidate(bytes)) {auto native=XrayJsonBridge::parse(bytes);native.sourceDigest=result.sourceDigest;return native;}
+    if(!safeShape(bytes)){result.error=QStringLiteral("导入内容嵌套过深；原节点保持不变。");return result;}
     QJsonValue root;
     const auto normalized=SubscriptionNormalizer::normalize(bytes);
     result.format=normalized.format;
-    if(!normalized.error.isEmpty()){result.error=normalized.error;return result;}
+    result.configuration=normalized.configuration;
+    result.executionConfiguration=normalized.executionConfiguration;
+    result.configurationFormat=normalized.configurationFormat;
     const auto effective=normalized.decodedDocument.isEmpty()?bytes:normalized.decodedDocument;
+    if (!normalized.decodedDocument.isEmpty() && xrayJsonCandidate(effective)) {auto native=XrayJsonBridge::parse(effective);native.sourceDigest=result.sourceDigest;return native;}
+    if(!normalized.error.isEmpty()){result.error=normalized.error;return result;}
     if(!safeShape(effective)){result.error=QStringLiteral("订阅解码后嵌套过深。");return result;}
     if(normalized.handled){
         // QJsonDocument accepts duplicate keys. Validate the original JSON
         // with the existing strict parser before adapting sing-box objects.
-        if(effective.trimmed().startsWith('{')){
-            try{const auto checked=fkyaml::node::deserialize(effective.constData(),effective.constData()+effective.size());int budget=100000;convert(checked,0,budget);}
+        if(normalized.configurationFormat=="sing-box"||effective.trimmed().startsWith('{')){
+            try{singleDocument(effective);}
             catch(...){result.error=QStringLiteral("JSON 含重复键、无效结构或过深嵌套。");return result;}
         }
         root=normalized.nodes;
     }
     else {
     try {
-        auto yaml=fkyaml::node::deserialize(effective.constData(),effective.constData()+effective.size());
-        int budget=100000; root=convert(yaml,0,budget);
+        root=singleDocument(effective);
     } catch(...) {
         // Parser messages can quote password/token-bearing input; never expose them.
         result.error=QStringLiteral("无法解析 Clash YAML/JSON：请检查格式、重复键、锚点循环和嵌套层数。"); return result;
@@ -113,8 +177,15 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
     if(root.isArray())array=root.toArray();
     else if(root.isObject()) {
         const auto obj=root.toObject();
-        if(obj.contains("proxies"))array=obj.value("proxies").toArray();
+        if(obj.contains("proxies")) {
+            array=obj.value("proxies").toArray();
+            result.configuration=obj;result.configuration.remove("proxies");result.configurationFormat="clash";
+        }
         else if(obj.contains("type"))array.append(obj);
+    }
+    if(!normalized.handled && !root.isArray() && (!root.isObject() || (!root.toObject().contains("proxies")&&!root.toObject().contains("type")))) {
+        result.errorKind="unsupported-format";result.format.clear();
+        result.error=QStringLiteral("实际内容未检测到受支持的节点列表；可能是登录页、错误正文或其它配置格式。原节点保持不变。");return result;
     }
     if(array.isEmpty() || array.size()>2000) {
         result.error=QStringLiteral("需要包含 1–2000 个节点的 proxies 列表或单个节点；只导入节点，不执行订阅内的全局配置。");return result;
@@ -127,18 +198,49 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
         else n.originalConfiguration=params;
         if(!n.conversionIssues.isEmpty())++result.incompleteNodes;
         n.id=QUuid::createUuid().toString(QUuid::WithoutBraces);
+        // Validate before extracting the scalar fields. QVariant::toString()
+        // would turn numbers/bools into credentials, and QJsonValue::toString()
+        // would turn null/objects into an absent SNI or cipher. The encrypted
+        // original remains the provenance; invalid values never become defaults.
+        for(const auto &key:QStringList{"username","password","cipher","sni","servername"})if(params.contains(key)&&!params.value(key).isString()){
+            result.nodes.clear();result.error=QStringLiteral("第 %1 个节点：凭据、加密方式和 TLS 名称必须为字符串，不能为 null 或其它类型。").arg(i+1);return result;
+        }
+        if(params.contains("sni")&&params.contains("servername")&&params.value("sni")!=params.value("servername")){
+            result.nodes.clear();result.error=QStringLiteral("第 %1 个节点：sni 与 servername 冲突，不能以别名覆盖 TLS 名称。").arg(i+1);return result;
+        }
         n.name=params.take("name").toString().trimmed();n.protocol=params.take("type").toString().toLower();
+        // Subscription authors cannot weaken Swirl's TLS policy. A correctly
+        // typed Trojan flag is safely projected to stricter verification, with
+        // an explicit persistent notice; originalConfiguration stays untouched.
+        // This is not an insecure runtime option: manual/runtime true, wrong
+        // types, nested flags and all unrelated options still fail validation.
+        if(n.protocol=="trojan" && params.value("skip-cert-verify")==QJsonValue(true)) {
+            params["skip-cert-verify"]=false;
+            n.certificateVerificationEnforced=true;
+        }
+        if(!result.configuration.isEmpty() && names.contains(n.name)) {
+            result.nodes.clear();result.error=QStringLiteral("完整配置含重复节点名称，策略引用不明确；未应用配置。");return result;
+        }
+        if(n.protocol=="socks4"||n.protocol=="socks4a"){
+            const auto port=params.value("port");
+            if(!port.isDouble()||port.toDouble()!=port.toInt()||port.toInt()<1||port.toInt()>65535){
+                result.nodes.clear();result.error=QStringLiteral("第 %1 个节点：SOCKS4/4a 端口须为 1–65535 的整数。").arg(i+1);return result;
+            }
+        }
         n.host=params.take("server").toString().trimmed();
         const auto portValue=params.take("port");bool portOk=false;
         const auto port=portValue.toVariant().toString().toInt(&portOk);
         if(!portOk && n.protocol=="ssh" && portValue.isUndefined()){n.port=22;portOk=true;}
         else if(portOk && port>=1 && port<=65535)n.port=quint16(port);
-        n.username=params.take("username").toVariant().toString();n.password=params.take("password").toVariant().toString();
+        n.username=params.take("username").toString();n.password=params.take("password").toString();
         n.cipher=params.take("cipher").toString();n.serverName=params.take("sni").toString();
         if(n.serverName.isEmpty())n.serverName=params.value("servername").toString();
+        if(n.serverName.isEmpty()&&params.value("_swirl-source-format")==QJsonValue("sing-box")&&
+            (n.protocol=="tuic"||n.protocol=="hysteria2"))
+            n.serverName=params.value("tls").toObject().value("server_name").toString();
         n.parameters=params;
         auto error=ProxyNode::validate(n);
-        if(!safeOptions(params))error=QStringLiteral("节点含本地文件、脚本或系统网络设置；请移除此类字段后导入。");
+        if(error.isEmpty()&&!safeOptions(params))error=QStringLiteral("节点含本地文件、脚本或系统网络设置；请移除此类字段后导入。");
         if(names.contains(n.name))error=QStringLiteral("节点名称重复，无法安全确定链式代理引用。");
         if(!error.isEmpty()) {
             result.nodes.clear();result.error=QStringLiteral("第 %1 个节点：%2").arg(i+1).arg(error);return result;

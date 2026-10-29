@@ -1,41 +1,37 @@
 import QtQuick
-import QtQuick.Controls
-import QtQuick.Effects
+import QtQuick.Controls.Basic
 import SwirlQuick
+
 Switch {
     id: control
     property bool large: false
-    property real motionScale:down?SwirlMotion.pressScale:1
-    Behavior on motionScale {enabled:!SwirlMotion.reduced;SwirlSpring{}}
-    Binding {target:control.indicator;property:"scale";value:control.motionScale}
-    onPressed:SwirlMotion.noteTrigger(control)
+    property real motionScale:1-(1-SwirlMotion.pressScale)*feedback.contact
+    SwirlInteractionMotion {id:feedback;hovered:control.hovered;pressed:control.down;focused:control.visualFocus;controlEnabled:control.enabled}
     implicitWidth: Theme.dp(large ? 52 : 36)
     implicitHeight: Theme.dp(large ? 24 : 17)
-    padding:Theme.dp(0)
+    padding: 0
     hoverEnabled: true
+    onPressed: SwirlMotion.noteTrigger(control)
     indicator: Rectangle {
         width: control.width; height: control.height
-        radius: height * 0.5
-        color: control.checked ? Theme.primaryControl : Theme.dark ? "#626262" : "#DADADD"
-        border.width: Theme.dp(control.visualFocus ? 2 : 0)
-        border.color: Theme.focusBorder
-        opacity: control.enabled?(control.hovered ? 0.88 : 1):0.45
-        Behavior on opacity{NumberAnimation{duration:SwirlMotion.hoverDuration}}
+        scale: control.motionScale
+        radius: height / 2
+        color: control.checked ? Theme.primaryButton : Theme.toggleTrack
+        opacity:control.enabled ? 1-0.1*feedback.hover : Theme.disabledOpacity
+        Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.switchDuration } }
         Rectangle {
-            property real thumbPosition:control.checked?1:0
+            property real thumbPosition: control.checked ? 1 : 0
             width: parent.height - Theme.dp(4); height: width
-            x:Math.round(Theme.dp(2)+(parent.width-width-2*Theme.dp(2))*thumbPosition); y:Theme.dp(2)
-            radius: height * 0.5
-            color: "#FEFEFF"
-            RectangularShadow {
-                anchors.fill:parent; z:-1
-                visible:Theme.effectsSupported
-                radius:parent.radius; blur:Theme.dp(6)
-                offset:Qt.vector2d(0,Theme.dp(2)); color:"#30000000"
-            }
-            Behavior on thumbPosition {enabled:!SwirlMotion.reduced;NumberAnimation {duration:SwirlMotion.switchDuration;easing.type:Easing.OutCubic}}
+            x: Theme.dp(2) + (parent.width - width - 2 * Theme.dp(2)) * thumbPosition
+            y: Theme.dp(2); radius: height / 2
+            color: control.checked ? Theme.primaryButtonText : Theme.controlThumb
+            Behavior on thumbPosition { enabled: !SwirlMotion.reduced; NumberAnimation { duration: SwirlMotion.switchDuration; easing.type: Easing.OutCubic } }
+            Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.switchDuration } }
         }
-        Behavior on color { ColorAnimation { duration: Theme.motion } }
+        Rectangle {
+            anchors.fill: parent
+            visible:opacity>0;opacity:feedback.focusAmount;color:Theme.withAlpha(Theme.text,0.12);radius:height/2
+        }
     }
     contentItem: Item {}
 }

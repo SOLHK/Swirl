@@ -1,0 +1,767 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-10-19T11:05:29.865090+00:00",
+  "scope": "Original failed local Vision full-Xray experiments, preserved separately from later successful code and CI. This archive performs no tests and changes no prior source, configuration, local-validation bundle or result.",
+  "experiments": [
+    {
+      "original_directory": "/tmp/swirl-vision-xray-first",
+      "summary": {
+        "tests_run": 4,
+        "failures": 4,
+        "errors": 0,
+        "skipped": 0,
+        "successful": false
+      },
+      "original_summary_file": {
+        "original_path": "/tmp/swirl-vision-xray-first/test-summary.json",
+        "relative_path": "test-summary.json",
+        "sha256": "6a292ad2856f9a8680d5591c56818d54f9d64f31217a4987eec0c1902fef624b",
+        "size_bytes": 92,
+        "encoding": "utf-8",
+        "raw_text": "{\n  \"tests_run\": 4,\n  \"failures\": 4,\n  \"errors\": 0,\n  \"skipped\": 0,\n  \"successful\": false\n}\n"
+      },
+      "original_source_identity_file": {
+        "original_path": "/tmp/swirl-vision-xray-first/source-identity.json",
+        "relative_path": "source-identity.json",
+        "sha256": "ceab5ac56cf680ea0cf716b5b15e2ef5093fe8e687a37dacfe37d4d84c286374",
+        "size_bytes": 3620,
+        "encoding": "utf-8",
+        "raw_text": "{\n  \"git_sha\": \"271ed3f5d2abe185a7b3308dd77f00b904bc58be\",\n  \"tracked_changes\": true,\n  \"client_sha256\": \"934aa2718c1a05169c0b19e13e3c9302887e5fac24b60fd4e332daf1edfcc883\",\n  \"test_sha256\": \"dce8fbfd48d756795092cda4c8a3de8a95daaae285bf5811f66ddc7630bf78a7\",\n  \"client_source_sha256\": \"f684a3b941ec9038d6c7b6e45186cdba20de8aeb017c8306e2ff667fb7d4a261\",\n  \"python\": \"3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]\",\n  \"openssl\": \"OpenSSL 3.5.8 25 Aug 2026\",\n  \"platform\": \"linux\",\n  \"github_run_id\": null,\n  \"build_manifest\": {\n    \"binaries\": {\n      \"reality_peer\": {\n        \"file\": \"reality-peer\",\n        \"sha256\": \"3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9\"\n      },\n      \"xray\": {\n        \"file\": \"xray\",\n        \"sha256\": \"9bb6352dc05e7ffc713863aabc99158b3c1480814ebfdc7f878b84f9a22a41d2\"\n      }\n    },\n    \"finished_unix\": 1792404282,\n    \"go_version\": \"go1.27.2\",\n    \"helper_source_sha256\": \"17b9af2d2bda7b3c57e95f87e3777065d29f05ffe418ce8c3cfde7beaa691ea0\",\n    \"lock_sha256\": \"b32dd9af801c8ed97c489f1120209b74224e595353b19fbfc13bce981eaaa925\",\n    \"peer_version_output\": {\n      \"event\": \"version\",\n      \"go_version\": \"go1.27.2\",\n      \"reality_version\": \"v0.0.0-20261014101318-83f621788ca8\",\n      \"xray_commit\": \"92ccc939aaf4f8965f369cf0b142e005aeaa11d5\"\n    },\n    \"platform\": \"Linux-6.18.55-x86_64-with-glibc2.39\",\n    \"reality\": {\n      \"commit\": \"83f621788ca88b83179810b12baa7ae518aacb83\",\n      \"go_mod_sum\": \"h1:ptlSkJ8k/7IDauNH0SA96JPOo+nYGLTv2Y3UMpwvAsY=\",\n      \"module\": \"github.com/xtls/reality\",\n      \"sum\": \"h1:RjLnVvlzK4q6zWaSBPNRGsrgx2fbJDeUWffjw574uzs=\",\n      \"version\": \"v0.0.0-20261014101318-83f621788ca8\"\n    },\n    \"reproducible_rebuild\": {\n      \"reality_peer\": {\n        \"first_sha256\": \"3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9\",\n        \"matches\": true,\n        \"repeated_sha256\": \"3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9\"\n      },\n      \"xray\": {\n        \"first_sha256\": \"9bb6352dc05e7ffc713863aabc99158b3c1480814ebfdc7f878b84f9a22a41d2\",\n        \"matches\": true,\n        \"repeated_sha256\": \"9bb6352dc05e7ffc713863aabc99158b3c1480814ebfdc7f878b84f9a22a41d2\"\n      }\n    },\n    \"schema_version\": 1,\n    \"started_unix\": 1792404279,\n    \"status\": \"success\",\n    \"swirl_source_commit\": \"271ed3f5d2abe185a7b3308dd77f00b904bc58be\",\n    \"swirl_worktree_status\": \"M .github/workflows/core-development.yml\\n M .github/workflows/rust-core.yml\\n M core/crates/swirl-protocol/src/vision.rs\\n M core/crates/swirl-protocol/src/vless.rs\\n M core/crates/swirl-transport/examples/reality-client.rs\\n M tools/ApplyCoreDevelopment.py\\n M tools/tests/test_core_development.py\\n?? core/crates/swirl-protocol/src/vision/stream.rs\\n?? core/crates/swirl-protocol/src/vision/tls.rs\\n?? core/crates/swirl-protocol/tests/vision_stream.rs\\n?? core/crates/swirl-protocol/tests/vision_tls.rs\\n?? tools/Build-XrayPeer.py\\n?? tools/tests/test_reality_xray.py\\n?? tools/tests/xray_peer/README.md\\n?? tools/tests/xray_peer/lock.json\\n?? tools/tests/xray_peer/main.go\",\n    \"xray\": {\n      \"commit\": \"92ccc939aaf4f8965f369cf0b142e005aeaa11d5\",\n      \"go_mod_sha256\": \"31fe6bd6c04eb2738e157b850236b1376cbbac3f33e974256bb7325c8c764250\",\n      \"go_sum_sha256\": \"a72c2f2b5dd38fcf42ef55034bd55038703448b55a878eafddd60d4af1f63145\",\n      \"release\": \"v26.10.17\",\n      \"repository\": \"https://github.com/XTLS/Xray-core.git\",\n      \"tree\": \"55fc871fdf3e63149066956e7c60670f3a44fbf2\"\n    },\n    \"xray_version_output\": \"Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\\nA unified platform for anti-censorship.\"\n  }\n}\n"
+      },
+      "identity_scope": "The reported git SHA is the local checkout base with tracked_changes=true, not a committed source attestation. Original client/test/source hashes and complete public upstream build identity are preserved unchanged.",
+      "interpretation": "All four original tests failed. Raw Xray logs show its freedom outbound blocked the loopback target and blackholed the connection; clients timed out during inner TLS and targets completed no handshake. This is not a successful protocol run or a private-provider result.",
+      "failed_cases_archived": [
+        {
+          "case_directory": "001-test_tls12_authentication_framing_bidirectional_data_and_close-1792404603338213067",
+          "client_outcome": {
+            "direct_ready": false,
+            "direct_rejected": false,
+            "error": "SyntheticVisionSessionFailed",
+            "error_kind": "TimedOut",
+            "ok": false,
+            "received": 0,
+            "stage": "inner_tls",
+            "tls13_candidate": false,
+            "uploaded": 0
+          },
+          "target_outcome": {
+            "tls_version": null,
+            "handshake_complete": false,
+            "received_bytes": 0,
+            "sent_bytes": 0,
+            "close_notify_received": false,
+            "close_notify_sent": false,
+            "connection_closed": true,
+            "thread_released": true,
+            "error": {
+              "type": "TimeoutError",
+              "message": "timed out"
+            },
+            "received_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "invocation": {
+            "elapsed_seconds": 10.005998069013003,
+            "exit_code": 1,
+            "payload_bytes": 45,
+            "payload_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4",
+            "tls13": false,
+            "pause_reads": false,
+            "read_chunk": 16384,
+            "write_chunk": 16384
+          },
+          "xray_lifecycle": {
+            "process_reaped": true,
+            "forced_kill": false,
+            "listener_closed": true,
+            "exit_code": 0
+          },
+          "original_files": [
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/001-test_tls12_authentication_framing_bidirectional_data_and_close-1792404603338213067/client-stdout.jsonl",
+              "relative_path": "001-test_tls12_authentication_framing_bidirectional_data_and_close-1792404603338213067/client-stdout.jsonl",
+              "sha256": "25139d6c230110d5b9ae1e10036494a68cca8e56666e473313eacf32f0fb49c1",
+              "size_bytes": 191,
+              "encoding": "utf-8",
+              "raw_text": "{\"direct_ready\":false,\"direct_rejected\":false,\"error\":\"SyntheticVisionSessionFailed\",\"error_kind\":\"TimedOut\",\"ok\":false,\"received\":0,\"stage\":\"inner_tls\",\"tls13_candidate\":false,\"uploaded\":0}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/001-test_tls12_authentication_framing_bidirectional_data_and_close-1792404603338213067/client-stderr.log",
+              "relative_path": "001-test_tls12_authentication_framing_bidirectional_data_and_close-1792404603338213067/client-stderr.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "size_bytes": 0,
+              "encoding": "utf-8",
+              "raw_text": ""
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/001-test_tls12_authentication_framing_bidirectional_data_and_close-1792404603338213067/target-result.json",
+              "relative_path": "001-test_tls12_authentication_framing_bidirectional_data_and_close-1792404603338213067/target-result.json",
+              "sha256": "a2e3bdf79d6b7eec94c7266ceb16ea5204cf19ca9b403cbc863fbdbe6da05b78",
+              "size_bytes": 466,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"tls_version\": null,\n  \"handshake_complete\": false,\n  \"received_bytes\": 0,\n  \"sent_bytes\": 0,\n  \"close_notify_received\": false,\n  \"close_notify_sent\": false,\n  \"connection_closed\": true,\n  \"thread_released\": true,\n  \"error\": {\n    \"type\": \"TimeoutError\",\n    \"message\": \"timed out\"\n  },\n  \"received_sha256\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\n  \"sent_sha256\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/001-test_tls12_authentication_framing_bidirectional_data_and_close-1792404603338213067/invocation.json",
+              "relative_path": "001-test_tls12_authentication_framing_bidirectional_data_and_close-1792404603338213067/invocation.json",
+              "sha256": "ee117c0795497f5d8a09a1225706f87e8b3be0454aadcd244936e99198a0931c",
+              "size_bytes": 262,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"elapsed_seconds\": 10.005998069013003,\n  \"exit_code\": 1,\n  \"payload_bytes\": 45,\n  \"payload_sha256\": \"35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4\",\n  \"tls13\": false,\n  \"pause_reads\": false,\n  \"read_chunk\": 16384,\n  \"write_chunk\": 16384\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/001-test_tls12_authentication_framing_bidirectional_data_and_close-1792404603338213067/xray-lifecycle.json",
+              "relative_path": "001-test_tls12_authentication_framing_bidirectional_data_and_close-1792404603338213067/xray-lifecycle.json",
+              "sha256": "25737a8563a0be36affa8b5654d34d0a4b09bbabec8d7864dd7a4a2c33f59435",
+              "size_bytes": 98,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"process_reaped\": true,\n  \"forced_kill\": false,\n  \"listener_closed\": true,\n  \"exit_code\": 0\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/001-test_tls12_authentication_framing_bidirectional_data_and_close-1792404603338213067/xray.log",
+              "relative_path": "001-test_tls12_authentication_framing_bidirectional_data_and_close-1792404603338213067/xray.log",
+              "sha256": "37e2d08c390d9c89eb2a9ef026b591d29a5042a4f2dfaede9ae307e50ea403cb",
+              "size_bytes": 1538,
+              "encoding": "utf-8",
+              "raw_text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship.\n2026/10/19 18:10:03.390374 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-vision-xray-first/001-test_tls12_authentication_framing_bidirectional_data_and_close-1792404603338213067/xray-config.json Format:json}\n2026/10/19 18:10:03.392569 [Debug] app/log: Logger started\n2026/10/19 18:10:03.406018 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:52377\n2026/10/19 18:10:03.406049 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:52377\n2026/10/19 18:10:03.407752 [Warning] core: Xray 26.10.17 started\n2026/10/19 18:10:03.421305 [Info] [1486273887] app/proxyman/inbound: connection ends > EOF\n2026/10/19 18:10:03.468574 [Info] [4016985115] proxy/vless/inbound: firstLen = 44\n2026/10/19 18:10:03.468756 [Info] [4016985115] proxy/vless/inbound: received request for tcp:127.0.0.1:44545\n2026/10/19 18:10:03.468804 [Info] [4016985115] app/dispatcher: taking detour [loopback] for [tcp:127.0.0.1:44545]\n2026/10/19 18:10:03.468831 [Info] [4016985115] proxy/freedom: blocked target: tcp:127.0.0.1:44545, blackholing connection for 42s\n2026/10/19 18:10:03.468835 [Debug] [4016985115] proxy: Xtls Unpadding new block, content 250 padding 1101 command 0\n2026/10/19 18:10:03.468838 [Debug] [4016985115] proxy: XtlsFilterTls found tls client hello! 250\n2026/10/19 18:10:03.468837 from 127.0.0.1:47184 accepted tcp:127.0.0.1:44545 [loopback]\n2026/10/19 18:10:15.360540 [Debug] app/log: Logger closing\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/001-test_tls12_authentication_framing_bidirectional_data_and_close-1792404603338213067/xray-config-validation.log",
+              "relative_path": "001-test_tls12_authentication_framing_bidirectional_data_and_close-1792404603338213067/xray-config-validation.log",
+              "sha256": "5e630a82595cb372370e3880e8e38ca02fd53700ffd1941814269fa1fa69e308",
+              "size_bytes": 415,
+              "encoding": "utf-8",
+              "raw_text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship.\n2026/10/19 18:10:03.362674 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-vision-xray-first/001-test_tls12_authentication_framing_bidirectional_data_and_close-1792404603338213067/xray-config.json Format:json}\n2026/10/19 18:10:03.364754 [Debug] app/log: Logger started\nConfiguration OK.\n"
+            }
+          ]
+        },
+        {
+          "case_directory": "002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792404615365184274",
+          "client_outcome": {
+            "direct_ready": false,
+            "direct_rejected": false,
+            "error": "SyntheticVisionSessionFailed",
+            "error_kind": "TimedOut",
+            "ok": false,
+            "received": 0,
+            "stage": "inner_tls",
+            "tls13_candidate": false,
+            "uploaded": 0
+          },
+          "target_outcome": {
+            "tls_version": null,
+            "handshake_complete": false,
+            "received_bytes": 0,
+            "sent_bytes": 0,
+            "close_notify_received": false,
+            "close_notify_sent": false,
+            "connection_closed": true,
+            "thread_released": true,
+            "error": {
+              "type": "TimeoutError",
+              "message": "timed out"
+            },
+            "received_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "invocation": {
+            "elapsed_seconds": 10.061435890005669,
+            "exit_code": 1,
+            "payload_bytes": 524288,
+            "payload_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5",
+            "tls13": false,
+            "pause_reads": true,
+            "read_chunk": 257,
+            "write_chunk": 1021
+          },
+          "xray_lifecycle": {
+            "process_reaped": true,
+            "forced_kill": false,
+            "listener_closed": true,
+            "exit_code": 0
+          },
+          "original_files": [
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792404615365184274/client-stdout.jsonl",
+              "relative_path": "002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792404615365184274/client-stdout.jsonl",
+              "sha256": "25139d6c230110d5b9ae1e10036494a68cca8e56666e473313eacf32f0fb49c1",
+              "size_bytes": 191,
+              "encoding": "utf-8",
+              "raw_text": "{\"direct_ready\":false,\"direct_rejected\":false,\"error\":\"SyntheticVisionSessionFailed\",\"error_kind\":\"TimedOut\",\"ok\":false,\"received\":0,\"stage\":\"inner_tls\",\"tls13_candidate\":false,\"uploaded\":0}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792404615365184274/client-stderr.log",
+              "relative_path": "002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792404615365184274/client-stderr.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "size_bytes": 0,
+              "encoding": "utf-8",
+              "raw_text": ""
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792404615365184274/target-result.json",
+              "relative_path": "002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792404615365184274/target-result.json",
+              "sha256": "a2e3bdf79d6b7eec94c7266ceb16ea5204cf19ca9b403cbc863fbdbe6da05b78",
+              "size_bytes": 466,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"tls_version\": null,\n  \"handshake_complete\": false,\n  \"received_bytes\": 0,\n  \"sent_bytes\": 0,\n  \"close_notify_received\": false,\n  \"close_notify_sent\": false,\n  \"connection_closed\": true,\n  \"thread_released\": true,\n  \"error\": {\n    \"type\": \"TimeoutError\",\n    \"message\": \"timed out\"\n  },\n  \"received_sha256\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\n  \"sent_sha256\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792404615365184274/invocation.json",
+              "relative_path": "002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792404615365184274/invocation.json",
+              "sha256": "9aace4fc9fdbbf6af36e694bcfce5ff7612793e6fa38a5df349cac4a2dec143a",
+              "size_bytes": 262,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"elapsed_seconds\": 10.061435890005669,\n  \"exit_code\": 1,\n  \"payload_bytes\": 524288,\n  \"payload_sha256\": \"33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5\",\n  \"tls13\": false,\n  \"pause_reads\": true,\n  \"read_chunk\": 257,\n  \"write_chunk\": 1021\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792404615365184274/xray-lifecycle.json",
+              "relative_path": "002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792404615365184274/xray-lifecycle.json",
+              "sha256": "25737a8563a0be36affa8b5654d34d0a4b09bbabec8d7864dd7a4a2c33f59435",
+              "size_bytes": 98,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"process_reaped\": true,\n  \"forced_kill\": false,\n  \"listener_closed\": true,\n  \"exit_code\": 0\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792404615365184274/xray.log",
+              "relative_path": "002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792404615365184274/xray.log",
+              "sha256": "b82e03c2b639000d152924dbd9b27dacc350943e4d222835a9f0c86f5675d8d4",
+              "size_bytes": 1542,
+              "encoding": "utf-8",
+              "raw_text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship.\n2026/10/19 18:10:15.391688 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-vision-xray-first/002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792404615365184274/xray-config.json Format:json}\n2026/10/19 18:10:15.393265 [Debug] app/log: Logger started\n2026/10/19 18:10:15.395800 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:47125\n2026/10/19 18:10:15.395826 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:47125\n2026/10/19 18:10:15.397354 [Warning] core: Xray 26.10.17 started\n2026/10/19 18:10:15.402498 [Info] [4151769773] app/proxyman/inbound: connection ends > EOF\n2026/10/19 18:10:15.504688 from 127.0.0.1:57250 accepted tcp:127.0.0.1:47327 [loopback]\n2026/10/19 18:10:15.504722 [Info] [3562705042] proxy/vless/inbound: firstLen = 44\n2026/10/19 18:10:15.504726 [Info] [3562705042] proxy/vless/inbound: received request for tcp:127.0.0.1:47327\n2026/10/19 18:10:15.504730 [Info] [3562705042] app/dispatcher: taking detour [loopback] for [tcp:127.0.0.1:47327]\n2026/10/19 18:10:15.504737 [Info] [3562705042] proxy/freedom: blocked target: tcp:127.0.0.1:47327, blackholing connection for 1m25s\n2026/10/19 18:10:15.504741 [Debug] [3562705042] proxy: Xtls Unpadding new block, content 250 padding 765 command 0\n2026/10/19 18:10:15.504743 [Debug] [3562705042] proxy: XtlsFilterTls found tls client hello! 250\n2026/10/19 18:10:27.379490 [Debug] app/log: Logger closing\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792404615365184274/xray-config-validation.log",
+              "relative_path": "002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792404615365184274/xray-config-validation.log",
+              "sha256": "23b3f802856a7c364e73e4fca2e718f831c9174bd6e61e245b23b023b0d9f8b9",
+              "size_bytes": 418,
+              "encoding": "utf-8",
+              "raw_text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship.\n2026/10/19 18:10:15.378100 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-vision-xray-first/002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792404615365184274/xray-config.json Format:json}\n2026/10/19 18:10:15.379263 [Debug] app/log: Logger started\nConfiguration OK.\n"
+            }
+          ]
+        },
+        {
+          "case_directory": "003-test_tls12_single_byte_reads_and_small_writes-1792404627383642762",
+          "client_outcome": {
+            "direct_ready": false,
+            "direct_rejected": false,
+            "error": "SyntheticVisionSessionFailed",
+            "error_kind": "TimedOut",
+            "ok": false,
+            "received": 0,
+            "stage": "inner_tls",
+            "tls13_candidate": false,
+            "uploaded": 0
+          },
+          "target_outcome": {
+            "tls_version": null,
+            "handshake_complete": false,
+            "received_bytes": 0,
+            "sent_bytes": 0,
+            "close_notify_received": false,
+            "close_notify_sent": false,
+            "connection_closed": true,
+            "thread_released": true,
+            "error": {
+              "type": "TimeoutError",
+              "message": "timed out"
+            },
+            "received_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "invocation": {
+            "elapsed_seconds": 10.00485961700906,
+            "exit_code": 1,
+            "payload_bytes": 289,
+            "payload_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12",
+            "tls13": false,
+            "pause_reads": false,
+            "read_chunk": 1,
+            "write_chunk": 7
+          },
+          "xray_lifecycle": {
+            "process_reaped": true,
+            "forced_kill": false,
+            "listener_closed": true,
+            "exit_code": 0
+          },
+          "original_files": [
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/003-test_tls12_single_byte_reads_and_small_writes-1792404627383642762/client-stdout.jsonl",
+              "relative_path": "003-test_tls12_single_byte_reads_and_small_writes-1792404627383642762/client-stdout.jsonl",
+              "sha256": "25139d6c230110d5b9ae1e10036494a68cca8e56666e473313eacf32f0fb49c1",
+              "size_bytes": 191,
+              "encoding": "utf-8",
+              "raw_text": "{\"direct_ready\":false,\"direct_rejected\":false,\"error\":\"SyntheticVisionSessionFailed\",\"error_kind\":\"TimedOut\",\"ok\":false,\"received\":0,\"stage\":\"inner_tls\",\"tls13_candidate\":false,\"uploaded\":0}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/003-test_tls12_single_byte_reads_and_small_writes-1792404627383642762/client-stderr.log",
+              "relative_path": "003-test_tls12_single_byte_reads_and_small_writes-1792404627383642762/client-stderr.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "size_bytes": 0,
+              "encoding": "utf-8",
+              "raw_text": ""
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/003-test_tls12_single_byte_reads_and_small_writes-1792404627383642762/target-result.json",
+              "relative_path": "003-test_tls12_single_byte_reads_and_small_writes-1792404627383642762/target-result.json",
+              "sha256": "a2e3bdf79d6b7eec94c7266ceb16ea5204cf19ca9b403cbc863fbdbe6da05b78",
+              "size_bytes": 466,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"tls_version\": null,\n  \"handshake_complete\": false,\n  \"received_bytes\": 0,\n  \"sent_bytes\": 0,\n  \"close_notify_received\": false,\n  \"close_notify_sent\": false,\n  \"connection_closed\": true,\n  \"thread_released\": true,\n  \"error\": {\n    \"type\": \"TimeoutError\",\n    \"message\": \"timed out\"\n  },\n  \"received_sha256\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\n  \"sent_sha256\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/003-test_tls12_single_byte_reads_and_small_writes-1792404627383642762/invocation.json",
+              "relative_path": "003-test_tls12_single_byte_reads_and_small_writes-1792404627383642762/invocation.json",
+              "sha256": "0db221385bcae9653d96f644ae65bcd95537f3635c6482ddeae0a42c13370d51",
+              "size_bytes": 254,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"elapsed_seconds\": 10.00485961700906,\n  \"exit_code\": 1,\n  \"payload_bytes\": 289,\n  \"payload_sha256\": \"7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12\",\n  \"tls13\": false,\n  \"pause_reads\": false,\n  \"read_chunk\": 1,\n  \"write_chunk\": 7\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/003-test_tls12_single_byte_reads_and_small_writes-1792404627383642762/xray-lifecycle.json",
+              "relative_path": "003-test_tls12_single_byte_reads_and_small_writes-1792404627383642762/xray-lifecycle.json",
+              "sha256": "25737a8563a0be36affa8b5654d34d0a4b09bbabec8d7864dd7a4a2c33f59435",
+              "size_bytes": 98,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"process_reaped\": true,\n  \"forced_kill\": false,\n  \"listener_closed\": true,\n  \"exit_code\": 0\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/003-test_tls12_single_byte_reads_and_small_writes-1792404627383642762/xray.log",
+              "relative_path": "003-test_tls12_single_byte_reads_and_small_writes-1792404627383642762/xray.log",
+              "sha256": "6d00fabccb9a1cf8d37ea7a5a89232f2d2e677a9cbd308073fbb75bf9af0bb41",
+              "size_bytes": 1520,
+              "encoding": "utf-8",
+              "raw_text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship.\n2026/10/19 18:10:27.417008 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-vision-xray-first/003-test_tls12_single_byte_reads_and_small_writes-1792404627383642762/xray-config.json Format:json}\n2026/10/19 18:10:27.418308 [Debug] app/log: Logger started\n2026/10/19 18:10:27.420563 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:38547\n2026/10/19 18:10:27.420860 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:38547\n2026/10/19 18:10:27.422152 [Warning] core: Xray 26.10.17 started\n2026/10/19 18:10:27.425337 [Info] [3438246416] app/proxyman/inbound: connection ends > EOF\n2026/10/19 18:10:27.476704 [Info] [1412182949] proxy/vless/inbound: firstLen = 44\n2026/10/19 18:10:27.476746 [Info] [1412182949] proxy/vless/inbound: received request for tcp:127.0.0.1:49199\n2026/10/19 18:10:27.476754 [Info] [1412182949] app/dispatcher: taking detour [loopback] for [tcp:127.0.0.1:49199]\n2026/10/19 18:10:27.476764 [Info] [1412182949] proxy/freedom: blocked target: tcp:127.0.0.1:49199, blackholing connection for 43s\n2026/10/19 18:10:27.476768 [Debug] [1412182949] proxy: Xtls Unpadding new block, content 250 padding 756 command 0\n2026/10/19 18:10:27.476771 [Debug] [1412182949] proxy: XtlsFilterTls found tls client hello! 250\n2026/10/19 18:10:27.476787 from 127.0.0.1:59724 accepted tcp:127.0.0.1:49199 [loopback]\n2026/10/19 18:10:39.397982 [Debug] app/log: Logger closing\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/003-test_tls12_single_byte_reads_and_small_writes-1792404627383642762/xray-config-validation.log",
+              "relative_path": "003-test_tls12_single_byte_reads_and_small_writes-1792404627383642762/xray-config-validation.log",
+              "sha256": "39ede6f3f774782416f67825888ae0de40addd0f607221701334d595da551f82",
+              "size_bytes": 398,
+              "encoding": "utf-8",
+              "raw_text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship.\n2026/10/19 18:10:27.400285 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-vision-xray-first/003-test_tls12_single_byte_reads_and_small_writes-1792404627383642762/xray-config.json Format:json}\n2026/10/19 18:10:27.401844 [Debug] app/log: Logger started\nConfiguration OK.\n"
+            }
+          ]
+        },
+        {
+          "case_directory": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404639401864961",
+          "client_outcome": {
+            "direct_ready": false,
+            "direct_rejected": false,
+            "error": "SyntheticVisionSessionFailed",
+            "error_kind": "TimedOut",
+            "ok": false,
+            "received": 0,
+            "stage": "inner_tls",
+            "tls13_candidate": false,
+            "uploaded": 0
+          },
+          "target_outcome": {
+            "tls_version": null,
+            "handshake_complete": false,
+            "received_bytes": 0,
+            "sent_bytes": 0,
+            "close_notify_received": false,
+            "close_notify_sent": false,
+            "connection_closed": true,
+            "thread_released": true,
+            "error": {
+              "type": "TimeoutError",
+              "message": "timed out"
+            },
+            "received_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "invocation": {
+            "elapsed_seconds": 10.004425250008353,
+            "exit_code": 1,
+            "payload_bytes": 38,
+            "payload_sha256": "c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364",
+            "tls13": true,
+            "pause_reads": false,
+            "read_chunk": 16384,
+            "write_chunk": 16384
+          },
+          "xray_lifecycle": {
+            "process_reaped": true,
+            "forced_kill": false,
+            "listener_closed": true,
+            "exit_code": 0
+          },
+          "original_files": [
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/004-test_tls13_direct_request_is_rejected_without_application_data-1792404639401864961/client-stdout.jsonl",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404639401864961/client-stdout.jsonl",
+              "sha256": "25139d6c230110d5b9ae1e10036494a68cca8e56666e473313eacf32f0fb49c1",
+              "size_bytes": 191,
+              "encoding": "utf-8",
+              "raw_text": "{\"direct_ready\":false,\"direct_rejected\":false,\"error\":\"SyntheticVisionSessionFailed\",\"error_kind\":\"TimedOut\",\"ok\":false,\"received\":0,\"stage\":\"inner_tls\",\"tls13_candidate\":false,\"uploaded\":0}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/004-test_tls13_direct_request_is_rejected_without_application_data-1792404639401864961/client-stderr.log",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404639401864961/client-stderr.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "size_bytes": 0,
+              "encoding": "utf-8",
+              "raw_text": ""
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/004-test_tls13_direct_request_is_rejected_without_application_data-1792404639401864961/target-result.json",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404639401864961/target-result.json",
+              "sha256": "a2e3bdf79d6b7eec94c7266ceb16ea5204cf19ca9b403cbc863fbdbe6da05b78",
+              "size_bytes": 466,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"tls_version\": null,\n  \"handshake_complete\": false,\n  \"received_bytes\": 0,\n  \"sent_bytes\": 0,\n  \"close_notify_received\": false,\n  \"close_notify_sent\": false,\n  \"connection_closed\": true,\n  \"thread_released\": true,\n  \"error\": {\n    \"type\": \"TimeoutError\",\n    \"message\": \"timed out\"\n  },\n  \"received_sha256\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\n  \"sent_sha256\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/004-test_tls13_direct_request_is_rejected_without_application_data-1792404639401864961/invocation.json",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404639401864961/invocation.json",
+              "sha256": "530e73f9d0e1855488cd6ec4ddd296378bc775df54b03fca6e038964c212bca5",
+              "size_bytes": 261,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"elapsed_seconds\": 10.004425250008353,\n  \"exit_code\": 1,\n  \"payload_bytes\": 38,\n  \"payload_sha256\": \"c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364\",\n  \"tls13\": true,\n  \"pause_reads\": false,\n  \"read_chunk\": 16384,\n  \"write_chunk\": 16384\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/004-test_tls13_direct_request_is_rejected_without_application_data-1792404639401864961/xray-lifecycle.json",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404639401864961/xray-lifecycle.json",
+              "sha256": "25737a8563a0be36affa8b5654d34d0a4b09bbabec8d7864dd7a4a2c33f59435",
+              "size_bytes": 98,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"process_reaped\": true,\n  \"forced_kill\": false,\n  \"listener_closed\": true,\n  \"exit_code\": 0\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/004-test_tls13_direct_request_is_rejected_without_application_data-1792404639401864961/xray.log",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404639401864961/xray.log",
+              "sha256": "19e3993e1636f8f4d146f220630d43705baea44ce638068f50c628fee205e241",
+              "size_bytes": 1539,
+              "encoding": "utf-8",
+              "raw_text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship.\n2026/10/19 18:10:39.434548 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-vision-xray-first/004-test_tls13_direct_request_is_rejected_without_application_data-1792404639401864961/xray-config.json Format:json}\n2026/10/19 18:10:39.435865 [Debug] app/log: Logger started\n2026/10/19 18:10:39.438040 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:47451\n2026/10/19 18:10:39.438054 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:47451\n2026/10/19 18:10:39.439556 [Warning] core: Xray 26.10.17 started\n2026/10/19 18:10:39.441155 [Info] [2386187546] app/proxyman/inbound: connection ends > EOF\n2026/10/19 18:10:39.492537 [Info] [2128294480] proxy/vless/inbound: firstLen = 44\n2026/10/19 18:10:39.492695 [Info] [2128294480] proxy/vless/inbound: received request for tcp:127.0.0.1:42577\n2026/10/19 18:10:39.492706 [Info] [2128294480] app/dispatcher: taking detour [loopback] for [tcp:127.0.0.1:42577]\n2026/10/19 18:10:39.492711 [Info] [2128294480] proxy/freedom: blocked target: tcp:127.0.0.1:42577, blackholing connection for 1m21s\n2026/10/19 18:10:39.492753 [Debug] [2128294480] proxy: Xtls Unpadding new block, content 250 padding 955 command 0\n2026/10/19 18:10:39.492753 from 127.0.0.1:33222 accepted tcp:127.0.0.1:42577 [loopback]\n2026/10/19 18:10:39.492756 [Debug] [2128294480] proxy: XtlsFilterTls found tls client hello! 250\n2026/10/19 18:10:51.416255 [Debug] app/log: Logger closing\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-first/004-test_tls13_direct_request_is_rejected_without_application_data-1792404639401864961/xray-config-validation.log",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404639401864961/xray-config-validation.log",
+              "sha256": "db9aa6d8f8f5238fc0b3c983cdc578164dd7bb51dc0c5530545c8bb8752626e7",
+              "size_bytes": 415,
+              "encoding": "utf-8",
+              "raw_text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship.\n2026/10/19 18:10:39.414865 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-vision-xray-first/004-test_tls13_direct_request_is_rejected_without_application_data-1792404639401864961/xray-config.json Format:json}\n2026/10/19 18:10:39.416254 [Debug] app/log: Logger started\nConfiguration OK.\n"
+            }
+          ]
+        }
+      ],
+      "successful_case_payloads_omitted": 0,
+      "original_test_console_output": {
+        "availability": "not_found_in_original_experiment_directory_or_matching_top_level_tmp_files",
+        "traceback_reconstructed": false,
+        "scope": "Original test-summary.json, client stdout/stderr and relevant Xray/target outcomes are retained; no console traceback is invented."
+      }
+    },
+    {
+      "original_directory": "/tmp/swirl-vision-xray-loopback-authorized",
+      "summary": {
+        "tests_run": 4,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "successful": false
+      },
+      "original_summary_file": {
+        "original_path": "/tmp/swirl-vision-xray-loopback-authorized/test-summary.json",
+        "relative_path": "test-summary.json",
+        "sha256": "0325b64b7a8777a3e5d2d0603f5c1fc48d2741c36e5f3171bc7f7c643896da5e",
+        "size_bytes": 92,
+        "encoding": "utf-8",
+        "raw_text": "{\n  \"tests_run\": 4,\n  \"failures\": 1,\n  \"errors\": 0,\n  \"skipped\": 0,\n  \"successful\": false\n}\n"
+      },
+      "original_source_identity_file": {
+        "original_path": "/tmp/swirl-vision-xray-loopback-authorized/source-identity.json",
+        "relative_path": "source-identity.json",
+        "sha256": "901e60247c84536e5c7b2d9a43dbf8d41b61461fa0a9a99ad5f98ae4f2903919",
+        "size_bytes": 3620,
+        "encoding": "utf-8",
+        "raw_text": "{\n  \"git_sha\": \"271ed3f5d2abe185a7b3308dd77f00b904bc58be\",\n  \"tracked_changes\": true,\n  \"client_sha256\": \"934aa2718c1a05169c0b19e13e3c9302887e5fac24b60fd4e332daf1edfcc883\",\n  \"test_sha256\": \"a2202df6d2ba4d065596504559d7bf0307d128739a6688e8cc0e2a1d3319f40f\",\n  \"client_source_sha256\": \"f684a3b941ec9038d6c7b6e45186cdba20de8aeb017c8306e2ff667fb7d4a261\",\n  \"python\": \"3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]\",\n  \"openssl\": \"OpenSSL 3.5.8 25 Aug 2026\",\n  \"platform\": \"linux\",\n  \"github_run_id\": null,\n  \"build_manifest\": {\n    \"binaries\": {\n      \"reality_peer\": {\n        \"file\": \"reality-peer\",\n        \"sha256\": \"3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9\"\n      },\n      \"xray\": {\n        \"file\": \"xray\",\n        \"sha256\": \"9bb6352dc05e7ffc713863aabc99158b3c1480814ebfdc7f878b84f9a22a41d2\"\n      }\n    },\n    \"finished_unix\": 1792404282,\n    \"go_version\": \"go1.27.2\",\n    \"helper_source_sha256\": \"17b9af2d2bda7b3c57e95f87e3777065d29f05ffe418ce8c3cfde7beaa691ea0\",\n    \"lock_sha256\": \"b32dd9af801c8ed97c489f1120209b74224e595353b19fbfc13bce981eaaa925\",\n    \"peer_version_output\": {\n      \"event\": \"version\",\n      \"go_version\": \"go1.27.2\",\n      \"reality_version\": \"v0.0.0-20261014101318-83f621788ca8\",\n      \"xray_commit\": \"92ccc939aaf4f8965f369cf0b142e005aeaa11d5\"\n    },\n    \"platform\": \"Linux-6.18.55-x86_64-with-glibc2.39\",\n    \"reality\": {\n      \"commit\": \"83f621788ca88b83179810b12baa7ae518aacb83\",\n      \"go_mod_sum\": \"h1:ptlSkJ8k/7IDauNH0SA96JPOo+nYGLTv2Y3UMpwvAsY=\",\n      \"module\": \"github.com/xtls/reality\",\n      \"sum\": \"h1:RjLnVvlzK4q6zWaSBPNRGsrgx2fbJDeUWffjw574uzs=\",\n      \"version\": \"v0.0.0-20261014101318-83f621788ca8\"\n    },\n    \"reproducible_rebuild\": {\n      \"reality_peer\": {\n        \"first_sha256\": \"3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9\",\n        \"matches\": true,\n        \"repeated_sha256\": \"3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9\"\n      },\n      \"xray\": {\n        \"first_sha256\": \"9bb6352dc05e7ffc713863aabc99158b3c1480814ebfdc7f878b84f9a22a41d2\",\n        \"matches\": true,\n        \"repeated_sha256\": \"9bb6352dc05e7ffc713863aabc99158b3c1480814ebfdc7f878b84f9a22a41d2\"\n      }\n    },\n    \"schema_version\": 1,\n    \"started_unix\": 1792404279,\n    \"status\": \"success\",\n    \"swirl_source_commit\": \"271ed3f5d2abe185a7b3308dd77f00b904bc58be\",\n    \"swirl_worktree_status\": \"M .github/workflows/core-development.yml\\n M .github/workflows/rust-core.yml\\n M core/crates/swirl-protocol/src/vision.rs\\n M core/crates/swirl-protocol/src/vless.rs\\n M core/crates/swirl-transport/examples/reality-client.rs\\n M tools/ApplyCoreDevelopment.py\\n M tools/tests/test_core_development.py\\n?? core/crates/swirl-protocol/src/vision/stream.rs\\n?? core/crates/swirl-protocol/src/vision/tls.rs\\n?? core/crates/swirl-protocol/tests/vision_stream.rs\\n?? core/crates/swirl-protocol/tests/vision_tls.rs\\n?? tools/Build-XrayPeer.py\\n?? tools/tests/test_reality_xray.py\\n?? tools/tests/xray_peer/README.md\\n?? tools/tests/xray_peer/lock.json\\n?? tools/tests/xray_peer/main.go\",\n    \"xray\": {\n      \"commit\": \"92ccc939aaf4f8965f369cf0b142e005aeaa11d5\",\n      \"go_mod_sha256\": \"31fe6bd6c04eb2738e157b850236b1376cbbac3f33e974256bb7325c8c764250\",\n      \"go_sum_sha256\": \"a72c2f2b5dd38fcf42ef55034bd55038703448b55a878eafddd60d4af1f63145\",\n      \"release\": \"v26.10.17\",\n      \"repository\": \"https://github.com/XTLS/Xray-core.git\",\n      \"tree\": \"55fc871fdf3e63149066956e7c60670f3a44fbf2\"\n    },\n    \"xray_version_output\": \"Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\\nA unified platform for anti-censorship.\"\n  }\n}\n"
+      },
+      "identity_scope": "The reported git SHA is the local checkout base with tracked_changes=true, not a committed source attestation. Original client/test/source hashes and complete public upstream build identity are preserved unchanged.",
+      "interpretation": "The original suite still failed one of four tests. In its TLS 1.3 echo negative case, the client and target each recorded 38 uploaded/received bytes before the client reported VisionDirectOwnershipUnavailable. The client reports direct_rejected=true and direct_ready=false. These observations contradict that experiment's zero-application-upload premise; they do not prove a Swirl raw-socket handoff. Xray's own server-side CopyRawConn log is not a Swirl DirectReady transition. The original failure is not relabelled as a pass.",
+      "failed_cases_archived": [
+        {
+          "case_directory": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404681300439049",
+          "client_outcome": {
+            "direct_ready": false,
+            "direct_rejected": true,
+            "error": "VisionDirectOwnershipUnavailable",
+            "error_kind": "PermissionDenied",
+            "ok": false,
+            "received": 0,
+            "stage": "exchange_and_close",
+            "tls13_candidate": true,
+            "uploaded": 38
+          },
+          "target_outcome": {
+            "tls_version": "TLSv1.3",
+            "handshake_complete": true,
+            "received_bytes": 38,
+            "sent_bytes": 38,
+            "close_notify_received": true,
+            "close_notify_sent": true,
+            "connection_closed": true,
+            "thread_released": true,
+            "error": null,
+            "cipher": "TLS_AES_256_GCM_SHA384",
+            "received_sha256": "c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364",
+            "sent_sha256": "c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364"
+          },
+          "invocation": {
+            "elapsed_seconds": 0.05256457600626163,
+            "exit_code": 1,
+            "payload_bytes": 38,
+            "payload_sha256": "c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364",
+            "tls13": true,
+            "pause_reads": false,
+            "read_chunk": 16384,
+            "write_chunk": 16384
+          },
+          "xray_lifecycle": {
+            "process_reaped": true,
+            "forced_kill": false,
+            "listener_closed": true,
+            "exit_code": 0
+          },
+          "original_files": [
+            {
+              "original_path": "/tmp/swirl-vision-xray-loopback-authorized/004-test_tls13_direct_request_is_rejected_without_application_data-1792404681300439049/client-stdout.jsonl",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404681300439049/client-stdout.jsonl",
+              "sha256": "42e9e3b74c80bce2b0c01515a71278b779b28a7994b541d682375d600bee55d3",
+              "size_bytes": 211,
+              "encoding": "utf-8",
+              "raw_text": "{\"direct_ready\":false,\"direct_rejected\":true,\"error\":\"VisionDirectOwnershipUnavailable\",\"error_kind\":\"PermissionDenied\",\"ok\":false,\"received\":0,\"stage\":\"exchange_and_close\",\"tls13_candidate\":true,\"uploaded\":38}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-loopback-authorized/004-test_tls13_direct_request_is_rejected_without_application_data-1792404681300439049/client-stderr.log",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404681300439049/client-stderr.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "size_bytes": 0,
+              "encoding": "utf-8",
+              "raw_text": ""
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-loopback-authorized/004-test_tls13_direct_request_is_rejected_without_application_data-1792404681300439049/target-result.json",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404681300439049/target-result.json",
+              "sha256": "e3d73ba9923dab3d2162170c5faecbd3bfd90ef00b86fc19e83adf309c327679",
+              "size_bytes": 452,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"tls_version\": \"TLSv1.3\",\n  \"handshake_complete\": true,\n  \"received_bytes\": 38,\n  \"sent_bytes\": 38,\n  \"close_notify_received\": true,\n  \"close_notify_sent\": true,\n  \"connection_closed\": true,\n  \"thread_released\": true,\n  \"error\": null,\n  \"cipher\": \"TLS_AES_256_GCM_SHA384\",\n  \"received_sha256\": \"c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364\",\n  \"sent_sha256\": \"c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364\"\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-loopback-authorized/004-test_tls13_direct_request_is_rejected_without_application_data-1792404681300439049/invocation.json",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404681300439049/invocation.json",
+              "sha256": "738a1fe114ecfe256f023ee4f22b0e873d41756d0383514c8a6837ae76e446b3",
+              "size_bytes": 262,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"elapsed_seconds\": 0.05256457600626163,\n  \"exit_code\": 1,\n  \"payload_bytes\": 38,\n  \"payload_sha256\": \"c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364\",\n  \"tls13\": true,\n  \"pause_reads\": false,\n  \"read_chunk\": 16384,\n  \"write_chunk\": 16384\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-loopback-authorized/004-test_tls13_direct_request_is_rejected_without_application_data-1792404681300439049/xray-lifecycle.json",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404681300439049/xray-lifecycle.json",
+              "sha256": "25737a8563a0be36affa8b5654d34d0a4b09bbabec8d7864dd7a4a2c33f59435",
+              "size_bytes": 98,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"process_reaped\": true,\n  \"forced_kill\": false,\n  \"listener_closed\": true,\n  \"exit_code\": 0\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-loopback-authorized/004-test_tls13_direct_request_is_rejected_without_application_data-1792404681300439049/xray.log",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404681300439049/xray.log",
+              "sha256": "9f85d59642497032ba5890cdd97e59c7ef0029cf09368532f9c5eac827a24edb",
+              "size_bytes": 2348,
+              "encoding": "utf-8",
+              "raw_text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship.\n2026/10/19 18:11:21.348403 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-vision-xray-loopback-authorized/004-test_tls13_direct_request_is_rejected_without_application_data-1792404681300439049/xray-config.json Format:json}\n2026/10/19 18:11:21.350054 [Debug] app/log: Logger started\n2026/10/19 18:11:21.352102 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:41013\n2026/10/19 18:11:21.355909 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:41013\n2026/10/19 18:11:21.357311 [Warning] core: Xray 26.10.17 started\n2026/10/19 18:11:21.357567 [Info] [240647550] app/proxyman/inbound: connection ends > EOF\n2026/10/19 18:11:21.404716 [Info] [576079874] proxy/vless/inbound: firstLen = 44\n2026/10/19 18:11:21.404754 [Info] [576079874] proxy/vless/inbound: received request for tcp:127.0.0.1:60909\n2026/10/19 18:11:21.404856 [Info] [576079874] app/dispatcher: taking detour [loopback] for [tcp:127.0.0.1:60909]\n2026/10/19 18:11:21.404916 [Info] [576079874] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:60909\n2026/10/19 18:11:21.404920 [Debug] [576079874] transport/internet: dialing to tcp:127.0.0.1:60909\n2026/10/19 18:11:21.404945 from 127.0.0.1:52012 accepted tcp:127.0.0.1:60909 [loopback]\n2026/10/19 18:11:21.405090 [Info] [576079874] proxy/freedom: connection opened to tcp:127.0.0.1:60909, local endpoint 127.0.0.1:44342, remote endpoint 127.0.0.1:60909\n2026/10/19 18:11:21.405176 [Debug] [576079874] proxy: Xtls Unpadding new block, content 250 padding 799 command 0\n2026/10/19 18:11:21.405180 [Debug] [576079874] proxy: XtlsFilterTls found tls client hello! 250\n2026/10/19 18:11:21.405724 [Debug] [576079874] proxy: XtlsFilterTls found tls 1.3! 1137 TLS_AES_256_GCM_SHA384\n2026/10/19 18:11:21.405734 [Debug] [576079874] proxy: XtlsPadding 1137 106 0\n2026/10/19 18:11:21.406843 [Debug] [576079874] proxy: Xtls Unpadding new block, content 6 padding 1307 command 0\n2026/10/19 18:11:21.406848 [Debug] [576079874] proxy: Xtls Unpadding new block, content 74 padding 956 command 1\n2026/10/19 18:11:21.407007 [Debug] [576079874] proxy: XtlsPadding 79 1259 2\n2026/10/19 18:11:21.407318 [Debug] [576079874] proxy: CopyRawConn splice\n2026/10/19 18:11:21.410369 [Debug] app/log: Logger closing\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-loopback-authorized/004-test_tls13_direct_request_is_rejected_without_application_data-1792404681300439049/xray-config-validation.log",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404681300439049/xray-config-validation.log",
+              "sha256": "2fedfb15045e7b796916bd43fd6741b5d85d46519a038b43ca7611d8d03a7179",
+              "size_bytes": 528,
+              "encoding": "utf-8",
+              "raw_text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship.\n2026/10/19 18:11:21.329584 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-vision-xray-loopback-authorized/004-test_tls13_direct_request_is_rejected_without_application_data-1792404681300439049/xray-config.json Format:json}\n2026/10/19 18:11:21.331021 [Debug] app/log: Logger started\n2026/10/19 18:11:21.332997 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:41013\nConfiguration OK.\n"
+            }
+          ]
+        }
+      ],
+      "successful_case_payloads_omitted": 3,
+      "original_test_console_output": {
+        "availability": "not_found_in_original_experiment_directory_or_matching_top_level_tmp_files",
+        "traceback_reconstructed": false,
+        "scope": "Original test-summary.json, client stdout/stderr and relevant Xray/target outcomes are retained; no console traceback is invented."
+      }
+    },
+    {
+      "original_directory": "/tmp/swirl-vision-xray-release",
+      "summary": {
+        "tests_run": 4,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "successful": false
+      },
+      "original_summary_file": {
+        "original_path": "/tmp/swirl-vision-xray-release/test-summary.json",
+        "relative_path": "test-summary.json",
+        "sha256": "0325b64b7a8777a3e5d2d0603f5c1fc48d2741c36e5f3171bc7f7c643896da5e",
+        "size_bytes": 92,
+        "encoding": "utf-8",
+        "raw_text": "{\n  \"tests_run\": 4,\n  \"failures\": 1,\n  \"errors\": 0,\n  \"skipped\": 0,\n  \"successful\": false\n}\n"
+      },
+      "original_source_identity_file": {
+        "original_path": "/tmp/swirl-vision-xray-release/source-identity.json",
+        "relative_path": "source-identity.json",
+        "sha256": "7c85bddca6a84e97d99f95473fa0fb2a7e68e068cc8ff04f4cdcec83ee35866e",
+        "size_bytes": 3620,
+        "encoding": "utf-8",
+        "raw_text": "{\n  \"git_sha\": \"271ed3f5d2abe185a7b3308dd77f00b904bc58be\",\n  \"tracked_changes\": true,\n  \"client_sha256\": \"5c183edd93aa5e118ed54e02178af26a16ded5fcffb5a793491e35c3fd09b514\",\n  \"test_sha256\": \"a2202df6d2ba4d065596504559d7bf0307d128739a6688e8cc0e2a1d3319f40f\",\n  \"client_source_sha256\": \"f684a3b941ec9038d6c7b6e45186cdba20de8aeb017c8306e2ff667fb7d4a261\",\n  \"python\": \"3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]\",\n  \"openssl\": \"OpenSSL 3.5.8 25 Aug 2026\",\n  \"platform\": \"linux\",\n  \"github_run_id\": null,\n  \"build_manifest\": {\n    \"binaries\": {\n      \"reality_peer\": {\n        \"file\": \"reality-peer\",\n        \"sha256\": \"3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9\"\n      },\n      \"xray\": {\n        \"file\": \"xray\",\n        \"sha256\": \"9bb6352dc05e7ffc713863aabc99158b3c1480814ebfdc7f878b84f9a22a41d2\"\n      }\n    },\n    \"finished_unix\": 1792404282,\n    \"go_version\": \"go1.27.2\",\n    \"helper_source_sha256\": \"17b9af2d2bda7b3c57e95f87e3777065d29f05ffe418ce8c3cfde7beaa691ea0\",\n    \"lock_sha256\": \"b32dd9af801c8ed97c489f1120209b74224e595353b19fbfc13bce981eaaa925\",\n    \"peer_version_output\": {\n      \"event\": \"version\",\n      \"go_version\": \"go1.27.2\",\n      \"reality_version\": \"v0.0.0-20261014101318-83f621788ca8\",\n      \"xray_commit\": \"92ccc939aaf4f8965f369cf0b142e005aeaa11d5\"\n    },\n    \"platform\": \"Linux-6.18.55-x86_64-with-glibc2.39\",\n    \"reality\": {\n      \"commit\": \"83f621788ca88b83179810b12baa7ae518aacb83\",\n      \"go_mod_sum\": \"h1:ptlSkJ8k/7IDauNH0SA96JPOo+nYGLTv2Y3UMpwvAsY=\",\n      \"module\": \"github.com/xtls/reality\",\n      \"sum\": \"h1:RjLnVvlzK4q6zWaSBPNRGsrgx2fbJDeUWffjw574uzs=\",\n      \"version\": \"v0.0.0-20261014101318-83f621788ca8\"\n    },\n    \"reproducible_rebuild\": {\n      \"reality_peer\": {\n        \"first_sha256\": \"3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9\",\n        \"matches\": true,\n        \"repeated_sha256\": \"3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9\"\n      },\n      \"xray\": {\n        \"first_sha256\": \"9bb6352dc05e7ffc713863aabc99158b3c1480814ebfdc7f878b84f9a22a41d2\",\n        \"matches\": true,\n        \"repeated_sha256\": \"9bb6352dc05e7ffc713863aabc99158b3c1480814ebfdc7f878b84f9a22a41d2\"\n      }\n    },\n    \"schema_version\": 1,\n    \"started_unix\": 1792404279,\n    \"status\": \"success\",\n    \"swirl_source_commit\": \"271ed3f5d2abe185a7b3308dd77f00b904bc58be\",\n    \"swirl_worktree_status\": \"M .github/workflows/core-development.yml\\n M .github/workflows/rust-core.yml\\n M core/crates/swirl-protocol/src/vision.rs\\n M core/crates/swirl-protocol/src/vless.rs\\n M core/crates/swirl-transport/examples/reality-client.rs\\n M tools/ApplyCoreDevelopment.py\\n M tools/tests/test_core_development.py\\n?? core/crates/swirl-protocol/src/vision/stream.rs\\n?? core/crates/swirl-protocol/src/vision/tls.rs\\n?? core/crates/swirl-protocol/tests/vision_stream.rs\\n?? core/crates/swirl-protocol/tests/vision_tls.rs\\n?? tools/Build-XrayPeer.py\\n?? tools/tests/test_reality_xray.py\\n?? tools/tests/xray_peer/README.md\\n?? tools/tests/xray_peer/lock.json\\n?? tools/tests/xray_peer/main.go\",\n    \"xray\": {\n      \"commit\": \"92ccc939aaf4f8965f369cf0b142e005aeaa11d5\",\n      \"go_mod_sha256\": \"31fe6bd6c04eb2738e157b850236b1376cbbac3f33e974256bb7325c8c764250\",\n      \"go_sum_sha256\": \"a72c2f2b5dd38fcf42ef55034bd55038703448b55a878eafddd60d4af1f63145\",\n      \"release\": \"v26.10.17\",\n      \"repository\": \"https://github.com/XTLS/Xray-core.git\",\n      \"tree\": \"55fc871fdf3e63149066956e7c60670f3a44fbf2\"\n    },\n    \"xray_version_output\": \"Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\\nA unified platform for anti-censorship.\"\n  }\n}\n"
+      },
+      "identity_scope": "The reported git SHA is the local checkout base with tracked_changes=true, not a committed source attestation. Original client/test/source hashes and complete public upstream build identity are preserved unchanged.",
+      "interpretation": "The original suite still failed one of four tests. In its TLS 1.3 echo negative case, the client and target each recorded 38 uploaded/received bytes before the client reported VisionDirectOwnershipUnavailable. The client reports direct_rejected=true and direct_ready=false. These observations contradict that experiment's zero-application-upload premise; they do not prove a Swirl raw-socket handoff. Xray's own server-side CopyRawConn log is not a Swirl DirectReady transition. The original failure is not relabelled as a pass.",
+      "failed_cases_archived": [
+        {
+          "case_directory": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404707400970349",
+          "client_outcome": {
+            "direct_ready": false,
+            "direct_rejected": true,
+            "error": "VisionDirectOwnershipUnavailable",
+            "error_kind": "PermissionDenied",
+            "ok": false,
+            "received": 0,
+            "stage": "exchange_and_close",
+            "tls13_candidate": true,
+            "uploaded": 38
+          },
+          "target_outcome": {
+            "tls_version": "TLSv1.3",
+            "handshake_complete": true,
+            "received_bytes": 38,
+            "sent_bytes": 38,
+            "close_notify_received": true,
+            "close_notify_sent": true,
+            "connection_closed": true,
+            "thread_released": true,
+            "error": null,
+            "cipher": "TLS_AES_256_GCM_SHA384",
+            "received_sha256": "c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364",
+            "sent_sha256": "c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364"
+          },
+          "invocation": {
+            "elapsed_seconds": 0.04985646900604479,
+            "exit_code": 1,
+            "payload_bytes": 38,
+            "payload_sha256": "c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364",
+            "tls13": true,
+            "pause_reads": false,
+            "read_chunk": 16384,
+            "write_chunk": 16384
+          },
+          "xray_lifecycle": {
+            "process_reaped": true,
+            "forced_kill": false,
+            "listener_closed": true,
+            "exit_code": 0
+          },
+          "original_files": [
+            {
+              "original_path": "/tmp/swirl-vision-xray-release/004-test_tls13_direct_request_is_rejected_without_application_data-1792404707400970349/client-stdout.jsonl",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404707400970349/client-stdout.jsonl",
+              "sha256": "42e9e3b74c80bce2b0c01515a71278b779b28a7994b541d682375d600bee55d3",
+              "size_bytes": 211,
+              "encoding": "utf-8",
+              "raw_text": "{\"direct_ready\":false,\"direct_rejected\":true,\"error\":\"VisionDirectOwnershipUnavailable\",\"error_kind\":\"PermissionDenied\",\"ok\":false,\"received\":0,\"stage\":\"exchange_and_close\",\"tls13_candidate\":true,\"uploaded\":38}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-release/004-test_tls13_direct_request_is_rejected_without_application_data-1792404707400970349/client-stderr.log",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404707400970349/client-stderr.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "size_bytes": 0,
+              "encoding": "utf-8",
+              "raw_text": ""
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-release/004-test_tls13_direct_request_is_rejected_without_application_data-1792404707400970349/target-result.json",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404707400970349/target-result.json",
+              "sha256": "e3d73ba9923dab3d2162170c5faecbd3bfd90ef00b86fc19e83adf309c327679",
+              "size_bytes": 452,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"tls_version\": \"TLSv1.3\",\n  \"handshake_complete\": true,\n  \"received_bytes\": 38,\n  \"sent_bytes\": 38,\n  \"close_notify_received\": true,\n  \"close_notify_sent\": true,\n  \"connection_closed\": true,\n  \"thread_released\": true,\n  \"error\": null,\n  \"cipher\": \"TLS_AES_256_GCM_SHA384\",\n  \"received_sha256\": \"c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364\",\n  \"sent_sha256\": \"c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364\"\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-release/004-test_tls13_direct_request_is_rejected_without_application_data-1792404707400970349/invocation.json",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404707400970349/invocation.json",
+              "sha256": "2d5921f2a0ce7ea428880589d618019584540622cb14045f0086d2cbc951d9b5",
+              "size_bytes": 262,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"elapsed_seconds\": 0.04985646900604479,\n  \"exit_code\": 1,\n  \"payload_bytes\": 38,\n  \"payload_sha256\": \"c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364\",\n  \"tls13\": true,\n  \"pause_reads\": false,\n  \"read_chunk\": 16384,\n  \"write_chunk\": 16384\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-release/004-test_tls13_direct_request_is_rejected_without_application_data-1792404707400970349/xray-lifecycle.json",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404707400970349/xray-lifecycle.json",
+              "sha256": "25737a8563a0be36affa8b5654d34d0a4b09bbabec8d7864dd7a4a2c33f59435",
+              "size_bytes": 98,
+              "encoding": "utf-8",
+              "raw_text": "{\n  \"process_reaped\": true,\n  \"forced_kill\": false,\n  \"listener_closed\": true,\n  \"exit_code\": 0\n}\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-release/004-test_tls13_direct_request_is_rejected_without_application_data-1792404707400970349/xray.log",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404707400970349/xray.log",
+              "sha256": "07d87293fd817db52af2bc238adefe6c410e00ba013d5e6af7815926264a9a13",
+              "size_bytes": 2338,
+              "encoding": "utf-8",
+              "raw_text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship.\n2026/10/19 18:11:47.434686 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-vision-xray-release/004-test_tls13_direct_request_is_rejected_without_application_data-1792404707400970349/xray-config.json Format:json}\n2026/10/19 18:11:47.436177 [Debug] app/log: Logger started\n2026/10/19 18:11:47.442576 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:40271\n2026/10/19 18:11:47.444835 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:40271\n2026/10/19 18:11:47.446085 [Warning] core: Xray 26.10.17 started\n2026/10/19 18:11:47.463641 [Info] [1303781841] app/proxyman/inbound: connection ends > EOF\n2026/10/19 18:11:47.510606 [Info] [889239129] proxy/vless/inbound: firstLen = 44\n2026/10/19 18:11:47.510694 [Info] [889239129] proxy/vless/inbound: received request for tcp:127.0.0.1:41661\n2026/10/19 18:11:47.510713 [Info] [889239129] app/dispatcher: taking detour [loopback] for [tcp:127.0.0.1:41661]\n2026/10/19 18:11:47.510716 [Info] [889239129] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:41661\n2026/10/19 18:11:47.510718 [Debug] [889239129] transport/internet: dialing to tcp:127.0.0.1:41661\n2026/10/19 18:11:47.510832 from 127.0.0.1:42046 accepted tcp:127.0.0.1:41661 [loopback]\n2026/10/19 18:11:47.510918 [Info] [889239129] proxy/freedom: connection opened to tcp:127.0.0.1:41661, local endpoint 127.0.0.1:54448, remote endpoint 127.0.0.1:41661\n2026/10/19 18:11:47.511004 [Debug] [889239129] proxy: Xtls Unpadding new block, content 250 padding 1040 command 0\n2026/10/19 18:11:47.511009 [Debug] [889239129] proxy: XtlsFilterTls found tls client hello! 250\n2026/10/19 18:11:47.511669 [Debug] [889239129] proxy: XtlsFilterTls found tls 1.3! 1139 TLS_AES_256_GCM_SHA384\n2026/10/19 18:11:47.511678 [Debug] [889239129] proxy: XtlsPadding 1139 209 0\n2026/10/19 18:11:47.512168 [Debug] [889239129] proxy: Xtls Unpadding new block, content 6 padding 1311 command 0\n2026/10/19 18:11:47.512254 [Debug] [889239129] proxy: Xtls Unpadding new block, content 74 padding 1105 command 1\n2026/10/19 18:11:47.512391 [Debug] [889239129] proxy: XtlsPadding 79 914 2\n2026/10/19 18:11:47.512578 [Debug] [889239129] proxy: CopyRawConn splice\n2026/10/19 18:11:47.513537 [Debug] app/log: Logger closing\n"
+            },
+            {
+              "original_path": "/tmp/swirl-vision-xray-release/004-test_tls13_direct_request_is_rejected_without_application_data-1792404707400970349/xray-config-validation.log",
+              "relative_path": "004-test_tls13_direct_request_is_rejected_without_application_data-1792404707400970349/xray-config-validation.log",
+              "sha256": "4d3f53caa2328e9ce4431cfe9c9c8be3cf8833e7c4a404c4d342e399ab90b8cc",
+              "size_bytes": 516,
+              "encoding": "utf-8",
+              "raw_text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship.\n2026/10/19 18:11:47.416490 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-vision-xray-release/004-test_tls13_direct_request_is_rejected_without_application_data-1792404707400970349/xray-config.json Format:json}\n2026/10/19 18:11:47.417879 [Debug] app/log: Logger started\n2026/10/19 18:11:47.419810 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:40271\nConfiguration OK.\n"
+            }
+          ]
+        }
+      ],
+      "successful_case_payloads_omitted": 3,
+      "original_test_console_output": {
+        "availability": "not_found_in_original_experiment_directory_or_matching_top_level_tmp_files",
+        "traceback_reconstructed": false,
+        "scope": "Original test-summary.json, client stdout/stderr and relevant Xray/target outcomes are retained; no console traceback is invented."
+      }
+    }
+  ],
+  "selection": {
+    "experiments": 3,
+    "failed_cases": 6,
+    "raw_files": 48,
+    "included_root_files": [
+      "test-summary.json",
+      "source-identity.json"
+    ],
+    "included_failure_case_files": [
+      "client-stdout.jsonl",
+      "client-stderr.log",
+      "target-result.json",
+      "invocation.json",
+      "xray-lifecycle.json",
+      "xray.log",
+      "xray-config-validation.log"
+    ],
+    "excluded": [
+      "private keys and certificate files",
+      "complete temporary Xray/client configuration",
+      "synthetic credential material and payload contents",
+      "successful case raw files from the two partially passing experiments"
+    ],
+    "log_boundary": "Configuration validation/startup logs mention only the local configuration path; the configuration file itself is neither read nor included."
+  },
+  "integrity": {
+    "all_raw_text_round_trips_to_original_bytes": true,
+    "all_recorded_sha256_computed_from_original_bytes": true,
+    "original_bytes_and_mtime_unchanged_after_archive_read": true,
+    "original_failed_summaries_preserved": true
+  },
+  "interpretation_boundary": "Derived summaries and interpretations are labelled separately from original raw_text. Original unittest console tracebacks were not present in the searched files and are not reconstructed. The documented later server-first negative fixture and its successes remain separate evidence; none of these old failed runs is a green CI result."
+}

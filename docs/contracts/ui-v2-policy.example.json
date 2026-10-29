@@ -1,0 +1,101 @@
+{
+  "fixture_kind": "design_example_not_runtime_config",
+  "product_implementation_status": "not_implemented",
+  "context": {
+    "catalog_node_ids": [
+      "10000000-0000-4000-8000-000000000001",
+      "10000000-0000-4000-8000-000000000002"
+    ],
+    "note": "Synthetic identities only; no credentials or real providers."
+  },
+  "policy_document": {
+    "schema": 2,
+    "mode": "rule",
+    "default_policy": {
+      "id": "policy:default",
+      "target": {
+        "kind": "group",
+        "id": "20000000-0000-4000-8000-000000000001"
+      }
+    },
+    "services": [
+      {
+        "id": "30000000-0000-4000-8000-000000000001",
+        "name": "Example service A",
+        "enabled": true,
+        "priority": 10,
+        "match_set": {
+          "kind": "domains",
+          "items": [
+            {
+              "kind": "domain_suffix",
+              "value": "service-a.example.invalid"
+            }
+          ],
+          "exclusions": []
+        },
+        "target": {
+          "kind": "node",
+          "id": "10000000-0000-4000-8000-000000000001"
+        }
+      },
+      {
+        "id": "30000000-0000-4000-8000-000000000002",
+        "name": "Example service B",
+        "enabled": true,
+        "priority": 20,
+        "match_set": {
+          "kind": "domains",
+          "items": [
+            {
+              "kind": "domain",
+              "value": "service-b.example.invalid"
+            },
+            {
+              "kind": "domain",
+              "value": "api.service-b.example.invalid"
+            }
+          ],
+          "exclusions": []
+        },
+        "target": {
+          "kind": "node",
+          "id": "10000000-0000-4000-8000-000000000002"
+        }
+      }
+    ],
+    "groups": [
+      {
+        "id": "20000000-0000-4000-8000-000000000001",
+        "name": "Example manual group",
+        "type": "manual",
+        "members": [
+          {
+            "kind": "node",
+            "id": "10000000-0000-4000-8000-000000000001"
+          },
+          {
+            "kind": "node",
+            "id": "10000000-0000-4000-8000-000000000002"
+          }
+        ],
+        "selected": {
+          "kind": "node",
+          "id": "10000000-0000-4000-8000-000000000001"
+        }
+      }
+    ],
+    "explicit_direct_rules": [],
+    "custom_rules": [],
+    "missing_targets": [],
+    "classification_dns": {
+      "mode": "disabled",
+      "profile_id": null
+    },
+    "assets": {
+      "local_rules_version": "design-fixture-v1",
+      "china_rules_version": "existing-bundled-pinned-assets",
+      "service_catalog_version": "design-fixture-only"
+    }
+  }
+}

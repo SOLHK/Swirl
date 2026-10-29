@@ -1,5 +1,6 @@
 #include "WindowChecks.h"
 #include "../app/WindowsBackdrop.h"
+#include "../app/BrandRaster.h"
 #include <QQuickWindow>
 #include <QGuiApplication>
 #include <QScreen>
@@ -45,13 +46,17 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     window->setPosition(available.topLeft()+QPoint(60,40));
     window->showNormal();window->raise();window->requestActivate();QTest::qWait(900);
 #ifdef Q_OS_WIN
-    // Keep Qt's flag model in sync: a raw HWND_TOPMOST alone is cleared when
-    // Qt reapplies its flags after the manual DPI/size checks below.
+    // Keep Qt's flag model in sync when native DPI and size changes reapply it.
     window->setFlag(Qt::WindowStaysOnTopHint,true);
     // This explicit validation fixture must not sample an unrelated window
     // that happens to cover Swirl. Temporarily keep the test HWND on top and
     // activate it, without changing any other application's window settings.
     const HWND testHwnd=reinterpret_cast<HWND>(window->winId());
+    // A hidden process STARTUPINFO can suppress Qt's first native ShowWindow
+    // even though QWindow already reports visible. Match the quality fixture.
+    ShowWindow(testHwnd,SW_SHOWNORMAL);
+    check(IsWindowVisible(testHwnd)&&(GetWindowLongPtrW(testHwnd,GWL_STYLE)&WS_VISIBLE),
+          "hidden test-process launch explicitly presents the actual native window");
     SetWindowPos(testHwnd,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE);
     if(GetForegroundWindow()!=testHwnd) {
         const DWORD foregroundThread=GetWindowThreadProcessId(GetForegroundWindow(),nullptr);
@@ -79,8 +84,9 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     const auto normalCorner=cornerCoverage();
     check(backdrop->nativeCorners() || normalCorner.second>=5,"system manages the final contour or fallback has antialiased corners");
     state("Theme.setScalePercent(125)");QTest::qWait(150);
-    check(qAbs(state("Theme.windowRadius").toReal()-10.0*96.0/72.0)<0.001,
-          "10pt window contour stays independent of manual content zoom");
+    check(qAbs(state("Theme.windowRadius").toReal()-14.0)<0.001
+          && qAbs(state("Theme.sidebarRadius").toReal()-state("Theme.dp(24)").toReal())<0.001,
+          "approved 14dp shell stays fixed while 24dp sidebar follows manual content zoom");
     state("Theme.resetScale()");QTest::qWait(150);
     // Increasing the minimum geometry for manual UI zoom can enlarge the
     // window. Restore the capture bounds so the bottom corners remain on the
@@ -91,6 +97,9 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
 #ifdef Q_OS_WIN
         if(!backdrop->isCaptureForeground()){qCritical()<<"Native screenshot blocked by foreground or secure desktop";return QImage();}
         check(GetForegroundWindow()==testHwnd,"native screenshot samples the foreground test window");
+        DWORD cloaked=0;
+        check(IsWindowVisible(testHwnd)&&SUCCEEDED(DwmGetWindowAttribute(testHwnd,DWMWA_CLOAKED,&cloaked,sizeof(cloaked)))&&!cloaked,
+            "native screenshot samples a visible uncloaked application window");
         qInfo()<<"Capture state"<<name<<"active="<<window->isActive()<<"foreground="<<(GetForegroundWindow()==reinterpret_cast<HWND>(window->winId()))<<"extended style="<<QString::number(GetWindowLongPtrW(reinterpret_cast<HWND>(window->winId()),GWL_EXSTYLE),16)<<"QML opacity="<<state("Theme.sidebarOpacity");
 #endif
         // Read the actual desktop compositor, never QQuickWindow::grabWindow,
@@ -133,18 +142,43 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     const auto nativeIcon=reinterpret_cast<HICON>(SendMessageW(testHwnd,WM_GETICON,ICON_BIG,0));
     check(nativeIcon!=nullptr,"Windows taskbar receives an explicit large icon");
     if(nativeIcon){
-        BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=32;info.bmiHeader.biHeight=-32;info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
+        ICONINFO nativeInfo{};BITMAP nativeBitmap{};
+        const bool iconInfoKnown=GetIconInfo(nativeIcon,&nativeInfo);
+        const bool nativeSizeKnown=iconInfoKnown && nativeInfo.hbmColor && GetObjectW(nativeInfo.hbmColor,sizeof(nativeBitmap),&nativeBitmap);
+        if(nativeInfo.hbmColor)DeleteObject(nativeInfo.hbmColor);
+        if(nativeInfo.hbmMask)DeleteObject(nativeInfo.hbmMask);
+        check(nativeSizeKnown && nativeBitmap.bmWidth>0 && nativeBitmap.bmWidth==nativeBitmap.bmHeight,"native taskbar icon reports its actual square raster frame");
+        const int size=nativeSizeKnown?nativeBitmap.bmWidth:0;
+        if(size>0){
+        BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=size;info.bmiHeader.biHeight=-size;info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
         void *bits=nullptr;const auto dc=CreateCompatibleDC(nullptr);const auto bitmap=CreateDIBSection(dc,&info,DIB_RGB_COLORS,&bits,nullptr,0);
-        const auto previous=SelectObject(dc,bitmap);RECT box{0,0,32,32};FillRect(dc,&box,reinterpret_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
-        DrawIconEx(dc,0,0,nativeIcon,32,32,0,nullptr,DI_NORMAL);
-        QImage image(static_cast<uchar *>(bits),32,32,QImage::Format_RGB32);int dark=0,blue=0;
-        for(int y=0;y<32;++y)for(int x=0;x<32;++x){const auto c=image.pixelColor(x,y);if(c.red()<80&&c.green()<80&&c.blue()<80)++dark;if(c.blue()>c.red()+35)++blue;}
-        check(dark>40 && blue==0,"native taskbar icon is the monochrome knot, not the blue legacy logo");
+        const auto previous=SelectObject(dc,bitmap);RECT box{0,0,size,size};FillRect(dc,&box,reinterpret_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
+        DrawIconEx(dc,0,0,nativeIcon,size,size,0,nullptr,DI_NORMAL);
+        QImage image(static_cast<uchar *>(bits),size,size,QImage::Format_RGB32);
+        QSvgRenderer canonical(QStringLiteral(":/swirl/icons/swirl_windows.svg"));
+        QImage reference(size,size,QImage::Format_RGB32);reference.fill(Qt::white);
+        {QPainter painter(&reference);painter.drawImage(QPoint(),swirlBrandRaster(canonical,size));}
+        int maximumError=0,warm=0,cool=0,green=0;qint64 totalError=0;
+        for(int y=0;y<size;++y)for(int x=0;x<size;++x){
+            const auto actual=image.pixelColor(x,y),expected=reference.pixelColor(x,y);
+            maximumError=qMax(maximumError,qMax(qAbs(actual.red()-expected.red()),qMax(qAbs(actual.green()-expected.green()),qAbs(actual.blue()-expected.blue()))));
+            totalError+=distance(actual,expected);
+            if(actual.red()>actual.green()+35 && actual.red()>actual.blue()+35)++warm;
+            if(actual.blue()>actual.red()+35)++cool;
+            if(actual.green()>actual.red()+25 && actual.green()>actual.blue()+10)++green;
+        }
+        qInfo()<<"NATIVE_ICON_CANONICAL"<<size<<"maxChannelError"<<maximumError<<"totalChannelError"<<totalError<<"warm/cool/green"<<warm<<cool<<green;
+        check(canonical.isValid() && warm>0 && cool>0 && green>0 && maximumError<=2 && totalError<=size*size,
+              "native taskbar frame matches the canonical colored knot and every color passage");
         image.save(directory+"/taskbar-native-icon.png");SelectObject(dc,previous);DeleteObject(bitmap);DeleteDC(dc);
+        }
     }
 #endif
+    state("Theme.mode='Light'");QTest::qWait(300);
     QCursor::setPos(window->screen()->availableGeometry().topLeft()+QPoint(10,10));QTest::qWait(300);
     auto red=grab("backdrop-red");
+    const auto lightShell=sample(red,0.995,0.5);
+    check(lightShell.red()>=230&&lightShell.green()>=230&&lightShell.blue()>=230,"light shell reads neutral white in the native compositor");
     const QColor behind("#D72D31");
     const auto cornerShowsBackground=[&](QColor pixel){
         // DWM's frame shadow also surrounds Qt's own alpha outline. Check
@@ -168,24 +202,51 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     background.setColor(QColor("#2464D8"));QTest::qWait(800);
     auto blue=grab("backdrop-blue");
     const int sidebarChange=distance(sample(red,0.01,0.83),sample(blue,0.01,0.83));
-    const int contentChange=distance(sample(red,0.995,0.5),sample(blue,0.995,0.5));
+    const int contentChange=distance(red.pixelColor(red.width()-2,red.height()/2),blue.pixelColor(blue.width()-2,blue.height()/2));
+    const QPoint headerPoint(red.width()/2,qRound(8*window->devicePixelRatio()));
+    const int workspaceMaterialChange=distance(red.pixelColor(headerPoint),blue.pixelColor(headerPoint));
     qInfo()<<"Native pixel delta: sidebar="<<sidebarChange<<"content="<<contentChange<<"DPR="<<window->devicePixelRatio()<<backdrop->status();
-    const bool exactOpaque=backdrop->exactCorners()&&!backdrop->translucent();
-    check(exactOpaque ? !backdrop->active()&&backdrop->status().contains("exact 10pt")
-                      : (backdrop->active()&&backdrop->status().contains("Desktop Acrylic"))||(backdrop->translucent()&&backdrop->status().contains("Alpha translucency")),
-          "composition reports native Acrylic, exact alpha, or a policy-required opaque fallback");
-    check(exactOpaque ? sidebarChange<=3 : sidebarChange>=4&&sidebarChange<(backdrop->blurActive()?160:40),"sidebar follows the effective composition capability");
-    check(exactOpaque ? contentChange<=3 : contentChange>=4&&contentChange<(backdrop->blurActive()?160:40),"workspace follows the effective composition capability");
+    const bool exactOpaque=backdrop->exactCorners()&&!backdrop->micaActive()&&!backdrop->blurActive();
+    check(exactOpaque ? !backdrop->translucent()&&backdrop->status().startsWith("Opaque:")
+                      : (backdrop->micaActive()&&backdrop->status().contains("Windows Mica"))||(backdrop->blurActive()&&backdrop->status().contains("Windows native blur")),
+          "composition reports actual native material or an opaque fallback without raw desktop alpha");
+    check(sidebarChange<=12,"sidebar retains a restrained neutral material tint");
+    check(contentChange<=3,"opaque outer edge does not reveal desktop content");
+    check(state("window.opacity===1 && !scaledCanvas.layer.enabled").toBool(),"native material changes background only; foreground text and controls remain fully opaque");
     if(backdrop->blurActive()){
-        check(qAbs(sidebarChange-contentChange)<=8,"sidebar and workspace transmit the same live desktop material");
+        check(sidebarChange<=workspaceMaterialChange&&workspaceMaterialChange<80,"darker sidebar subdues the shared native material while workspace tint remains restrained");
         const auto scale=window->devicePixelRatio();const auto divider=state("window.actualSidebarWidth").toReal();
-        const auto lhs=red.pixelColor(qRound((divider-12)*scale),qRound(8*scale));
-        const auto rhs=red.pixelColor(qRound((divider+12)*scale),qRound(8*scale));
-        check(distance(lhs,rhs)<=3,"the former sidebar boundary has no vertical tint seam");
+        const auto lhs=red.pixelColor(qRound((divider-12)*scale),qRound(20*scale));
+        const auto rhs=red.pixelColor(qRound((divider+12)*scale),qRound(20*scale));
+        qInfo()<<"SIDEBAR_INTENTIONAL_RIM_SHADOW"<<QPointF(divider-12,20)<<lhs<<QPointF(divider+12,20)<<rhs<<"delta"<<distance(lhs,rhs);
+        auto *pane=find(window->contentItem(),QStringLiteral("sidebarFloatingBackground"));
+        auto *identity=find(window->contentItem(),QStringLiteral("engineIdentityLabel"));
+        auto *firstNavigation=find(window->contentItem(),QStringLiteral("nav-activity"));
+        auto *statusCard=find(window->contentItem(),QStringLiteral("activityStatusCard"));
+        QQuickItem *shadow=nullptr;
+        if(pane)for(auto *child:pane->childItems())if(child->property("shadowOffset").isValid() && child->property("softness").isValid())shadow=child;
+        const auto sceneRect=[](QQuickItem *item){return item?item->mapRectToScene(QRectF(QPointF(),item->size())):QRectF();};
+        const auto paneRect=sceneRect(pane),shadowRect=sceneRect(shadow),identityRect=sceneRect(identity),navigationRect=sceneRect(firstNavigation);
+        const qreal quietY=(identityRect.bottom()+navigationRect.top())/2;
+        const qreal paneRadius=pane?pane->property("radius").toReal():0;
+        const QPointF inside(paneRect.right()-2*paneRadius,quietY),outside(shadowRect.right()+2/scale,quietY);
+        const bool quietSamplesKnown=pane && shadow && identity && firstNavigation && statusCard
+            && quietY>identityRect.bottom() && quietY<navigationRect.top() && paneRect.contains(inside)
+            && inside.x()<paneRect.right()-paneRadius && !paneRect.contains(outside) && !shadowRect.contains(outside)
+            && !sceneRect(statusCard).contains(outside) && QRectF(QPointF(),window->size()).contains(outside);
+        check(quietSamplesKnown,"sidebar continuity samples avoid foreground content, rounded rim and the full shadow envelope");
+        const auto interior=quietSamplesKnown?red.pixelColor((inside*scale).toPoint()):QColor();
+        const auto exterior=quietSamplesKnown?red.pixelColor((outside*scale).toPoint()):QColor();
+        qInfo()<<"SIDEBAR_QUIET_CONTINUITY"<<inside<<interior<<outside<<exterior<<"delta"<<distance(interior,exterior);
+        check(quietSamplesKnown && distance(interior,exterior)<=20,"sidebar and workspace share the base material away from the intentional floating rim and shadow");
     }
-    // Cards remain readable while the shell and page gutter reveal the desktop.
-    const auto materialAlpha=window->grabWindow().pixelColor(int(window->width()*0.995*window->devicePixelRatio()),int(window->height()*0.5*window->devicePixelRatio())).alpha();
-    check(exactOpaque ? materialAlpha==255 : backdrop->blurActive()?materialAlpha>=187&&materialAlpha<=191:backdrop->translucent()?materialAlpha>=232&&materialAlpha<=242:materialAlpha>=215&&materialAlpha<=225,"actual alpha matches the single material tint");
+    // The native material stays behind an opaque perimeter. The QML
+    // tint is translucent only where the native helper fully covers it.
+    const auto perimeter=window->grabWindow();
+    const auto materialAlpha=perimeter.pixelColor(perimeter.width()-2,perimeter.height()/2).alpha();
+    check(materialAlpha==255,"outer material perimeter is fully opaque");
+    const auto innerAlpha=window->grabWindow().pixelColor(int(window->width()*0.5*window->devicePixelRatio()),qRound(8*window->devicePixelRatio())).alpha();
+    check(exactOpaque ? innerAlpha==255 : qAbs(innerAlpha-qRound(state("Theme.nativeTintOpacity").toReal()*255))<=2,"inner alpha follows effective native-material capability");
     // Move Swirl relative to a split-color native QML window to verify position-
     // dependent composition. The scene is a test window, not a wallpaper image.
     QQuickItem split;
@@ -200,7 +261,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     window->setPosition(available.topLeft()+QPoint(available.width()/2,30));QTest::qWait(600);
     auto right=grab("backdrop-moved-right");
     const auto moveDelta=distance(sample(left,0.01,0.83),sample(right,0.01,0.83));
-    check(exactOpaque ? moveDelta<=3 : moveDelta>1,"moving follows opaque fallback or actual screen-position Acrylic composition");
+    check(moveDelta<=12,"moving across other windows retains the restrained neutral shell tint");
     const qreal sidebar=state("window.actualSidebarWidth * window.contentScale").toReal();
     window->setPosition(available.topLeft()+QPoint(int(available.width()/2-sidebar/2),30));QTest::qWait(600);
     auto edge=grab("backdrop-blurred-edge");
@@ -211,8 +272,9 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     int intermediate=0;
     for(int x=cx-50;x<=cx+50;++x){const int value=edge.pixelColor(x,row).red();if(value>low+2&&value<high-2)++intermediate;}
     qInfo()<<"Alpha edge profile: left="<<a<<"right="<<b<<"intermediate pixels="<<intermediate;
-    check(backdrop->blurActive() ? intermediate>=12&&high-low>3 : backdrop->translucent() ? !backdrop->active()&&high-low>3 : exactOpaque ? !backdrop->active()&&intermediate==0 : backdrop->active()&&intermediate>0,
-          "sidebar Acrylic spreads the real desktop edge across at least twelve pixels; alpha fallback is not blur");
+    auto *sidebarPane=find(window->contentItem(),QStringLiteral("sidebarFloatingBackground"));
+    check(sidebarPane&&sidebarPane->x()>0&&sidebarPane->y()>0&&sidebarPane->width()<sidebar&&sidebarPane->height()<window->height()&&sidebarPane->property("radius").toDouble()>0,
+          "floating sidebar background is inset and rounded");
     delete rectangle;
     window->setPosition(available.topLeft()+QPoint(60,40));
     state("Theme.transparency=false");QTest::qWait(500);
@@ -223,9 +285,8 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     check(distance(sample(opaqueBlue,0.01,0.83),sample(opaqueRed,0.01,0.83))<=3,"disabled transparency gives opaque sidebar fallback");
     check(distance(sample(opaqueBlue,0.995,0.5),sample(opaqueRed,0.995,0.5))<=3,"disabled transparency gives opaque page fallback");
     state("Theme.transparency=true;Theme.mode='Dark'");QTest::qWait(500);grab("overview-native-dark");
-    check(exactOpaque ? !backdrop->active()&&backdrop->status().contains("exact 10pt")
-                      : (backdrop->active()&&backdrop->status().contains("Desktop Acrylic"))||(backdrop->translucent()&&backdrop->status().contains("Alpha translucency")),
-          "dark theme retains its effective contour and composition capability");
+    check(backdrop->micaActive() ? backdrop->status().contains("Windows Mica") : backdrop->blurActive()?backdrop->status().contains("Windows native blur"):!backdrop->translucent()&&backdrop->status().startsWith("Opaque:"),
+          "dark theme retains actual native material or opaque capability fallback");
     state("Theme.mode='Light'");
     auto *title=find(window->contentItem(),"titleDragArea");
     check(title,"title drag region exists");
@@ -237,7 +298,37 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     }
     click("windowMaximizeButton");QTest::qWait(500);grab("overview-maximized");
     qInfo()<<"Maximized geometry"<<window->geometry()<<"work area"<<available;
-    check(window->visibility()==QWindow::FullScreen&&window->geometry()==window->screen()->geometry(),"green traffic light enters true full screen without corner gaps");
+#ifdef Q_OS_WIN
+    const HWND hwnd=reinterpret_cast<HWND>(window->winId());
+    MONITORINFO monitor{sizeof(MONITORINFO)};RECT nativeFrame{},maximizedClient{};POINT maximizedOrigin{};
+    const bool clientBounds=GetMonitorInfoW(MonitorFromWindow(hwnd,MONITOR_DEFAULTTONEAREST),&monitor)
+        &&GetClientRect(hwnd,&maximizedClient)&&ClientToScreen(hwnd,&maximizedOrigin);
+    OffsetRect(&maximizedClient,maximizedOrigin.x,maximizedOrigin.y);
+    const bool frameKnown=SUCCEEDED(DwmGetWindowAttribute(hwnd,DWMWA_EXTENDED_FRAME_BOUNDS,&nativeFrame,sizeof(nativeFrame)));
+    qInfo()<<"MAXIMIZED_NATIVE_FRAME"<<nativeFrame.left<<nativeFrame.top<<nativeFrame.right<<nativeFrame.bottom
+        <<"CLIENT"<<maximizedClient.left<<maximizedClient.top<<maximizedClient.right<<maximizedClient.bottom
+        <<"WORK_AREA"<<monitor.rcWork.left<<monitor.rcWork.top<<monitor.rcWork.right<<monitor.rcWork.bottom;
+    // DWM reports the entire native frame when NC rendering is disabled.
+    // Every actual client pixel must fit the work area without being cropped.
+    check(window->visibility()==QWindow::Maximized&&IsZoomed(hwnd)&&frameKnown&&clientBounds&&EqualRect(&maximizedClient,&monitor.rcWork),
+        "Windows maximize client exactly matches the monitor work area and excludes the taskbar");
+    click("windowMinimizeButton");
+    WINDOWPLACEMENT placement{sizeof(WINDOWPLACEMENT)};
+    check(GetWindowPlacement(hwnd,&placement)&&window->windowStates().testFlag(Qt::WindowMinimized)
+        &&window->windowStates().testFlag(Qt::WindowMaximized)&&(placement.flags&WPF_RESTORETOMAXIMIZED),
+        "actual minimize button preserves maximized Qt and Windows placement state");
+    SendMessageW(hwnd,WM_SYSCOMMAND,SC_RESTORE,0);QTest::qWait(350);
+    check(IsZoomed(hwnd)&&window->visibility()==QWindow::Maximized,"native taskbar restore retains the button's maximized state");
+    SendMessageW(hwnd,WM_SYSCOMMAND,SC_MINIMIZE,0);QTest::qWait(250);
+    check(window->windowStates().testFlag(Qt::WindowMinimized)&&window->windowStates().testFlag(Qt::WindowMaximized),
+        "native taskbar minimize preserves maximized state");
+    window->setWindowStates(window->windowStates()&~Qt::WindowMinimized);
+    if(!window->isVisible())window->setVisible(true);
+    window->requestActivate();QTest::qWait(350);
+    check(IsZoomed(hwnd)&&window->visibility()==QWindow::Maximized,"instance activation restores maximized state without show resetting it");
+#else
+    check(window->visibility()==QWindow::Maximized&&window->geometry()==window->screen()->availableGeometry(),"maximize respects the available work area");
+#endif
     click("windowMaximizeButton");QTest::qWait(300);
     check(window->visibility()==QWindow::Windowed,"restore returns to windowed state");
     click("windowMinimizeButton");QTest::qWait(300);
@@ -245,15 +336,54 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     window->showNormal();window->requestActivate();QTest::qWait(300);
     check(window->visibility()==QWindow::Windowed,"restore from minimized works");
 #ifdef Q_OS_WIN
-    const HWND hwnd=reinterpret_cast<HWND>(window->winId());
     const auto style=GetWindowLongPtrW(hwnd,GWL_STYLE);
-    check(!(style&WS_CAPTION),"only Swirl traffic lights remain after window state changes");
+    constexpr LONG_PTR required=WS_CAPTION|WS_THICKFRAME|WS_SYSMENU|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
+    check((style&required)==required,"native transition, resize and caption-command styles survive repeated window state changes");
     check(!(GetWindowLongPtrW(hwnd,GWL_EXSTYLE)&WS_EX_LAYERED),"restore retains DWM-compatible alpha composition");
-    check((style&WS_THICKFRAME)&&(style&WS_SYSMENU)&&(style&WS_MAXIMIZEBOX),"native resize and system menu styles preserved");
     RECT rect;GetWindowRect(hwnd,&rect);
+    RECT client{};POINT origin{};
+    check(GetClientRect(hwnd,&client)&&ClientToScreen(hwnd,&origin)&&origin.x==rect.left&&origin.y==rect.top
+        &&client.right==rect.right-rect.left&&client.bottom==rect.bottom-rect.top,"custom client covers the entire HWND without a native caption band");
+    NCCALCSIZE_PARAMS calculation{};calculation.rgrc[0]=rect;
+    check(SendMessageW(hwnd,WM_NCCALCSIZE,TRUE,reinterpret_cast<LPARAM>(&calculation))==0
+        &&EqualRect(&rect,&calculation.rgrc[0]),"native nonclient calculation preserves all client pixels");
+    check(SendMessageW(hwnd,WM_NCPAINT,1,0)==0&&SendMessageW(hwnd,WM_NCACTIVATE,FALSE,0)==TRUE
+        &&SendMessageW(hwnd,WM_NCACTIVATE,TRUE,0)==TRUE,"native nonclient paint and activation are suppressed by the custom frame");
     const auto hit=SendMessageW(hwnd,WM_NCHITTEST,0,MAKELPARAM(rect.left+2,rect.top+2));
     check(hit==HTTOPLEFT,"native corner hit test enables edge resizing");
     check(GetSystemMenu(hwnd,FALSE)!=nullptr,"native Alt+Space menu exists");
+    // A translucent test surface exposes native caption painting that opaque
+    // application cards could conceal. The ordinary scene is restored below.
+    QQmlComponent captionComponent(qmlEngine(window));
+    captionComponent.setData("import QtQuick; Rectangle {color:'#ADF52171';radius:14;antialiasing:true}",QUrl());
+    auto *captionProbe=qobject_cast<QQuickItem *>(captionComponent.create(qmlContext(window)));
+    check(captionProbe,"translucent native-caption fixture created");
+    if(captionProbe){
+        QList<QPair<QQuickItem *,bool>> visibility;
+        for(auto *child:window->contentItem()->childItems()){visibility.append(qMakePair(child,child->isVisible()));child->setVisible(false);}
+        captionProbe->setParentItem(window->contentItem());captionProbe->setSize(window->size());
+        QTest::qWait(150);
+        SendMessageW(hwnd,WM_NCPAINT,1,0);SendMessageW(hwnd,WM_NCACTIVATE,FALSE,0);SendMessageW(hwnd,WM_NCACTIVATE,TRUE,0);
+        QTest::qWait(100);
+        const auto alphaSurface=window->grabWindow();
+        check(!alphaSurface.isNull()&&qAbs(alphaSurface.pixelColor(alphaSurface.width()/2,alphaSurface.height()/2).alpha()-173)<=1,
+            "native-caption fixture remains translucent instead of hiding native paint with opaque fill");
+        const auto captionFrame=grab("native-caption-alpha");
+        bool clean=!captionFrame.isNull();int delta=0;
+        if(clean){
+            const auto dpr=window->devicePixelRatio();
+            const auto expected=captionFrame.pixelColor(qRound(window->width()*0.6*dpr),qRound(100*dpr));
+            for(int y=qRound(8*dpr);y<qRound(28*dpr);++y)for(int x=qRound(window->width()*0.55*dpr);x<qRound(window->width()*0.94*dpr);++x){
+                const auto color=captionFrame.pixelColor(x,y);
+                delta=qMax(delta,qMax(qAbs(color.red()-expected.red()),qMax(qAbs(color.green()-expected.green()),qAbs(color.blue()-expected.blue()))));
+            }
+            qInfo()<<"NATIVE_CAPTION_ALPHA_DELTA"<<delta;
+        }
+        check(clean&&delta<=2,"actual DWM translucent header has no native caption, buttons or frame stripe");
+        delete captionProbe;
+        for(const auto &entry:visibility)entry.first->setVisible(entry.second);
+        QTest::qWait(100);
+    }
     const auto cpuTime=[](){FILETIME create{},exit{},kernel{},user{};GetProcessTimes(GetCurrentProcess(),&create,&exit,&kernel,&user);ULARGE_INTEGER k{},u{};k.LowPart=kernel.dwLowDateTime;k.HighPart=kernel.dwHighDateTime;u.LowPart=user.dwLowDateTime;u.HighPart=user.dwHighDateTime;return k.QuadPart+u.QuadPart;};
     PROCESS_MEMORY_COUNTERS_EX before{},after{};
     GetProcessMemoryInfo(GetCurrentProcess(),reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&before),sizeof(before));

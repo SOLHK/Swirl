@@ -1,0 +1,47 @@
+{
+  "official_version": "v2.13.0",
+  "official_commit": "ca8fbd874fd6ca82413948de6dc5924405e103e1",
+  "official_server_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+  "client_sha256": "ed2eebdcee092c46c8864cdc2f797d4d2d67a0334b02cac77390ab1d7391765b",
+  "client_role": "Swirl native Rust",
+  "server_role": "official Hysteria2 only",
+  "qt_product_acceptance": false,
+  "client_exit": 0,
+  "elapsed_ms": 3325.477,
+  "main_stack_limit": {
+    "soft_bytes": 1048576,
+    "hard_bytes": 1048576
+  },
+  "result": {
+    "authenticated_read_cancel": {
+      "alive_tasks_after_drop": 0,
+      "alive_tasks_before_cancel": 3,
+      "downloaded": 4096,
+      "future_owned_stream": true,
+      "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+      "uploaded": 4096
+    },
+    "baseline_alive_tasks": 0,
+    "cleanup_asserted_before_process_exit": true,
+    "connect_future_cancel": {
+      "alive_tasks_after_drop": 0,
+      "alive_tasks_before_cancel": 2,
+      "stage": "pending connector with QUIC tasks; TLS and authentication not asserted"
+    },
+    "ok": true,
+    "runtime": "current_thread",
+    "same_runtime_reconnect": {
+      "alive_tasks_after_close": 0,
+      "close": "clean",
+      "downloaded": 65536,
+      "sha256": "b03a3e1e12b699bd2c526e13a0d73f39b761de545f248b3d5faac391ad3b8d97",
+      "uploaded": 65536
+    }
+  },
+  "independent_target": {
+    "accepted_connections": 2,
+    "closed_connections": 2,
+    "active_connections": 0,
+    "received_bytes": 69632
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "stage": "C6 release regression",
+  "suite": "http2",
+  "started_at_utc": "2026-10-22T04:32:42.404962+00:00",
+  "cwd": "/workspace/scratch/ece554ece7c1/Swirl-transport",
+  "argv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "tools/tests/test_transport_http2_xray.py",
+    "-v"
+  ],
+  "environment": {
+    "SWIRL_TRANSPORT_CLIENT": "/workspace/scratch/ece554ece7c1/Swirl-transport/core/target/release/examples/transport-client",
+    "SWIRL_XRAY_BINARY": "/workspace/scratch/ece554ece7c1/test-servers/xray-26.10.21/xray",
+    "SWIRL_XRAY_LEGACY_BINARY": "/workspace/scratch/ece554ece7c1/test-servers/xray-1.8.24/xray",
+    "SWIRL_TRANSPORT_EVIDENCE": "/workspace/scratch/ece554ece7c1/c6-release-http2"
+  },
+  "git_head": "a2fd0fd782841dafaaa5a1bcf5f2c0f45b479572",
+  "client_sha256": "f4fa8cfb328d8f9f38ce96d8dba588c1ff4df406276c4cd12d4fc09f06ed50b6",
+  "peer_binaries": [
+    {
+      "path": "/workspace/scratch/ece554ece7c1/test-servers/xray-26.10.21/xray",
+      "sha256": "a27e3f95ab6ce270956d0cecd32eda4686a811afc71c64a6a734a3dede14883e",
+      "version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)\nA unified platform for anti-censorship."
+    },
+    {
+      "path": "/workspace/scratch/ece554ece7c1/test-servers/xray-1.8.24/xray",
+      "sha256": "78680eb058012d03c313d2f969e92bb2e7f1eee40dc89c69497b2dfb48e424db",
+      "version": "Xray 1.8.24 (Xray, Penetrates Everything.) 6baad79 (go1.23.0 linux/amd64)\nA unified platform for anti-censorship."
+    }
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 3.207,
+  "completed_at_utc": "2026-10-22T04:32:45.763174+00:00"
+}

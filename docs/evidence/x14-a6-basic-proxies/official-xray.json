@@ -1,0 +1,1902 @@
+{
+  "schema": 1,
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "server": "official Xray 26.10.21 1b1647c",
+  "binaries": {
+    "harness": {
+      "filename": "transport-runtime",
+      "sha256": "d1289eb6e7b31ea9e235ff3deb7c33ccadb1084e1f34d6a160cc67659bc5bd22"
+    },
+    "inspector": {
+      "filename": "swirl-inspect",
+      "sha256": "fe31412c916ee1209ae4bc12fe3d01f3d3a9a4d5ad79f7d3bee668e87b678f96"
+    },
+    "xray": {
+      "filename": "xray",
+      "sha256": "a27e3f95ab6ce270956d0cecd32eda4686a811afc71c64a6a734a3dede14883e"
+    }
+  },
+  "client": "Swirl Rust Core",
+  "qt_product_acceptance": false,
+  "native_interoperability_passed": true,
+  "tests_run": 8,
+  "skipped": 0,
+  "failures": [],
+  "errors": [],
+  "records": [
+    {
+      "case": "test_authenticated_socks5_udp_echo_dns_and_association_close",
+      "protocol": "socks5",
+      "authentication": "none",
+      "udp_sizes": [
+        1,
+        37,
+        1400,
+        4000
+      ],
+      "dns_wire_query_and_reply": true,
+      "remote_domain_destination": true,
+      "native_import": true,
+      "xray_import_udp_enabled": true,
+      "official_accepted": true
+    },
+    {
+      "case": "test_authenticated_socks5_udp_echo_dns_and_association_close",
+      "protocol": "socks5-udp",
+      "active_after_close": 0,
+      "uploaded": 5467,
+      "downloaded": 5483,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_authenticated_socks5_udp_echo_dns_and_association_close",
+      "protocol": "socks5",
+      "authentication": "password",
+      "udp_sizes": [
+        1,
+        37,
+        1400,
+        4000
+      ],
+      "dns_wire_query_and_reply": true,
+      "remote_domain_destination": true,
+      "native_import": true,
+      "xray_import_udp_enabled": true,
+      "official_accepted": true
+    },
+    {
+      "case": "test_authenticated_socks5_udp_echo_dns_and_association_close",
+      "protocol": "socks5-udp",
+      "active_after_close": 0,
+      "uploaded": 5467,
+      "downloaded": 5483,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_existing_session_survives_node_switch_and_concurrent_new_connections",
+      "protocol": "http",
+      "authentication": "password",
+      "ingress": "http_connect",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 2.266,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_existing_session_survives_node_switch_and_concurrent_new_connections",
+      "protocol": "socks",
+      "authentication": "none",
+      "ingress": "http_connect",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 2.142,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_existing_session_survives_node_switch_and_concurrent_new_connections",
+      "protocol": "socks",
+      "authentication": "password",
+      "ingress": "http_connect",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 1.941,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_existing_session_survives_node_switch_and_concurrent_new_connections",
+      "protocol": "socks",
+      "authentication": "password",
+      "ingress": "http_connect",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 7.175,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_existing_session_survives_node_switch_and_concurrent_new_connections",
+      "protocol": "socks",
+      "authentication": "password",
+      "ingress": "http_connect",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 6.729,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_existing_session_survives_node_switch_and_concurrent_new_connections",
+      "protocol": "socks",
+      "authentication": "password",
+      "ingress": "http_connect",
+      "application_tls": true,
+      "downloaded": 131328,
+      "elapsed_ms": 18.495,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_existing_session_survives_node_switch_and_concurrent_new_connections",
+      "protocol": "socks",
+      "authentication": "password",
+      "ingress": "http_connect",
+      "application_tls": true,
+      "downloaded": 131328,
+      "elapsed_ms": 61.52,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_existing_session_survives_node_switch_and_concurrent_new_connections",
+      "selected_nodes": 4,
+      "old_connection_preserved": true,
+      "parallel_connections": 4
+    },
+    {
+      "case": "test_existing_session_survives_node_switch_and_concurrent_new_connections",
+      "protocol": "http-to-socks5-node-switch",
+      "active_after_close": 0,
+      "uploaded": 3794,
+      "downloaded": 925016,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_invalid_tcp_credentials_are_rejected_without_origin_traffic",
+      "protocol": "http",
+      "mutation": "wrong-user",
+      "rejected": true,
+      "origin_requests": 0,
+      "last_error_stage": "protocol_handshake"
+    },
+    {
+      "case": "test_invalid_tcp_credentials_are_rejected_without_origin_traffic",
+      "protocol": "http",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_invalid_tcp_credentials_are_rejected_without_origin_traffic",
+      "protocol": "http",
+      "mutation": "wrong-password",
+      "rejected": true,
+      "origin_requests": 0,
+      "last_error_stage": "protocol_handshake"
+    },
+    {
+      "case": "test_invalid_tcp_credentials_are_rejected_without_origin_traffic",
+      "protocol": "http",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_invalid_tcp_credentials_are_rejected_without_origin_traffic",
+      "protocol": "http",
+      "mutation": "absent-auth",
+      "rejected": true,
+      "origin_requests": 0,
+      "last_error_stage": "protocol_handshake"
+    },
+    {
+      "case": "test_invalid_tcp_credentials_are_rejected_without_origin_traffic",
+      "protocol": "http",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_invalid_tcp_credentials_are_rejected_without_origin_traffic",
+      "protocol": "socks",
+      "mutation": "wrong-user",
+      "rejected": true,
+      "origin_requests": 0,
+      "last_error_stage": "protocol_handshake"
+    },
+    {
+      "case": "test_invalid_tcp_credentials_are_rejected_without_origin_traffic",
+      "protocol": "socks",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_invalid_tcp_credentials_are_rejected_without_origin_traffic",
+      "protocol": "socks",
+      "mutation": "wrong-password",
+      "rejected": true,
+      "origin_requests": 0,
+      "last_error_stage": "protocol_handshake"
+    },
+    {
+      "case": "test_invalid_tcp_credentials_are_rejected_without_origin_traffic",
+      "protocol": "socks",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_invalid_tcp_credentials_are_rejected_without_origin_traffic",
+      "protocol": "socks",
+      "mutation": "absent-auth",
+      "rejected": true,
+      "origin_requests": 0,
+      "last_error_stage": "protocol_handshake"
+    },
+    {
+      "case": "test_invalid_tcp_credentials_are_rejected_without_origin_traffic",
+      "protocol": "socks",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_invalid_udp_credentials_cannot_reach_the_dns_target",
+      "protocol": "socks5",
+      "rejected": true,
+      "dns_target_datagrams": 0,
+      "udp_dropped": 1
+    },
+    {
+      "case": "test_invalid_udp_credentials_cannot_reach_the_dns_target",
+      "protocol": "socks5-udp",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 1
+    },
+    {
+      "case": "test_ipv6_official_peer_and_reconnect_after_server_restart",
+      "protocol": "http",
+      "authentication": "password",
+      "ingress": "http_connect",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 2.991,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_ipv6_official_peer_and_reconnect_after_server_restart",
+      "protocol": "http",
+      "authentication": "password",
+      "ingress": "http_connect",
+      "application_tls": true,
+      "downloaded": 131328,
+      "elapsed_ms": 17.062,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_ipv6_official_peer_and_reconnect_after_server_restart",
+      "protocol": "http",
+      "ipv6_proxy_endpoint": true,
+      "fresh_connection_after_peer_restart": true
+    },
+    {
+      "case": "test_ipv6_official_peer_and_reconnect_after_server_restart",
+      "protocol": "http",
+      "active_after_close": 0,
+      "uploaded": 1768,
+      "downloaded": 265389,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_ipv6_official_peer_and_reconnect_after_server_restart",
+      "protocol": "socks",
+      "authentication": "password",
+      "ingress": "http_connect",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 2.732,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_ipv6_official_peer_and_reconnect_after_server_restart",
+      "protocol": "socks",
+      "authentication": "password",
+      "ingress": "http_connect",
+      "application_tls": true,
+      "downloaded": 131328,
+      "elapsed_ms": 4.009,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_ipv6_official_peer_and_reconnect_after_server_restart",
+      "protocol": "socks",
+      "ipv6_proxy_endpoint": true,
+      "fresh_connection_after_peer_restart": true
+    },
+    {
+      "case": "test_ipv6_official_peer_and_reconnect_after_server_restart",
+      "protocol": "socks",
+      "active_after_close": 0,
+      "uploaded": 1768,
+      "downloaded": 265390,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server",
+      "protocol": "socks",
+      "authentication": "none",
+      "ingress": "http_connect",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 2.411,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server",
+      "protocol": "socks",
+      "authentication": "none",
+      "ingress": "http_connect",
+      "application_tls": true,
+      "downloaded": 131328,
+      "elapsed_ms": 14.123,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server",
+      "protocol": "socks4",
+      "user_id_present": false,
+      "authentication": "USERID identifier only; SOCKS4 has no password authentication",
+      "destination": "127.0.0.1",
+      "official_accepted": true,
+      "native_import": true,
+      "source_format": "V2Ray v4 JSON (version available since v4.42.2)"
+    },
+    {
+      "case": "test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server",
+      "protocol": "socks4",
+      "active_after_close": 0,
+      "uploaded": 1768,
+      "downloaded": 265390,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server",
+      "protocol": "socks",
+      "authentication": "none",
+      "ingress": "http_connect",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 2.101,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server",
+      "protocol": "socks",
+      "authentication": "none",
+      "ingress": "http_connect",
+      "application_tls": true,
+      "downloaded": 131328,
+      "elapsed_ms": 53.863,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server",
+      "protocol": "socks4",
+      "user_id_present": true,
+      "authentication": "USERID identifier only; SOCKS4 has no password authentication",
+      "destination": "127.0.0.1",
+      "official_accepted": true,
+      "native_import": true,
+      "source_format": "V2Ray v4 JSON (version available since v4.42.2)"
+    },
+    {
+      "case": "test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server",
+      "protocol": "socks4",
+      "active_after_close": 0,
+      "uploaded": 1768,
+      "downloaded": 265390,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server",
+      "protocol": "socks",
+      "authentication": "none",
+      "ingress": "http_connect",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 13.301,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server",
+      "protocol": "socks",
+      "authentication": "none",
+      "ingress": "http_connect",
+      "application_tls": true,
+      "downloaded": 131328,
+      "elapsed_ms": 14.471,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server",
+      "protocol": "socks4a",
+      "user_id_present": false,
+      "authentication": "USERID identifier only; SOCKS4 has no password authentication",
+      "destination": "localhost",
+      "official_accepted": true,
+      "native_import": true,
+      "source_format": "V2Ray v4 JSON (version available since v4.42.2)"
+    },
+    {
+      "case": "test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server",
+      "protocol": "socks4a",
+      "active_after_close": 0,
+      "uploaded": 1768,
+      "downloaded": 265389,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server",
+      "protocol": "socks",
+      "authentication": "none",
+      "ingress": "http_connect",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 2.591,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server",
+      "protocol": "socks",
+      "authentication": "none",
+      "ingress": "http_connect",
+      "application_tls": true,
+      "downloaded": 131328,
+      "elapsed_ms": 13.664,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server",
+      "protocol": "socks4a",
+      "user_id_present": true,
+      "authentication": "USERID identifier only; SOCKS4 has no password authentication",
+      "destination": "localhost",
+      "official_accepted": true,
+      "native_import": true,
+      "source_format": "V2Ray v4 JSON (version available since v4.42.2)"
+    },
+    {
+      "case": "test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server",
+      "protocol": "socks4a",
+      "active_after_close": 0,
+      "uploaded": 1768,
+      "downloaded": 265390,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_two_mib_binary_transfer_each_way_and_completed_application_close",
+      "protocol": "http",
+      "uploaded": 2097152,
+      "downloaded": 2097152,
+      "native_import": true,
+      "elapsed_ms": 1226.267,
+      "close": "application-complete",
+      "official_accepted": true
+    },
+    {
+      "case": "test_two_mib_binary_transfer_each_way_and_completed_application_close",
+      "protocol": "http",
+      "active_after_close": 0,
+      "uploaded": 2097160,
+      "downloaded": 2097152,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_two_mib_binary_transfer_each_way_and_completed_application_close",
+      "protocol": "socks",
+      "uploaded": 2097152,
+      "downloaded": 2097152,
+      "native_import": true,
+      "elapsed_ms": 1286.444,
+      "close": "application-complete",
+      "official_accepted": true
+    },
+    {
+      "case": "test_two_mib_binary_transfer_each_way_and_completed_application_close",
+      "protocol": "socks",
+      "active_after_close": 0,
+      "uploaded": 2097160,
+      "downloaded": 2097152,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "http",
+      "authentication": "none",
+      "ingress": "http_connect",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 3.425,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "http",
+      "authentication": "none",
+      "ingress": "http_connect",
+      "application_tls": true,
+      "downloaded": 131328,
+      "elapsed_ms": 4.165,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "http",
+      "authentication": "none",
+      "ingress": "socks5",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 1.833,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "http",
+      "authentication": "none",
+      "ingress": "socks5",
+      "application_tls": true,
+      "downloaded": 131328,
+      "elapsed_ms": 3.801,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "http",
+      "active_after_close": 0,
+      "uploaded": 3536,
+      "downloaded": 530783,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "http",
+      "authentication": "password",
+      "ingress": "http_connect",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 2.569,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "http",
+      "authentication": "password",
+      "ingress": "http_connect",
+      "application_tls": true,
+      "downloaded": 131328,
+      "elapsed_ms": 50.396,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "http",
+      "authentication": "password",
+      "ingress": "socks5",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 2.173,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "http",
+      "authentication": "password",
+      "ingress": "socks5",
+      "application_tls": true,
+      "downloaded": 131328,
+      "elapsed_ms": 14.385,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "http",
+      "active_after_close": 0,
+      "uploaded": 3536,
+      "downloaded": 530781,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "socks",
+      "authentication": "none",
+      "ingress": "http_connect",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 2.331,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "socks",
+      "authentication": "none",
+      "ingress": "http_connect",
+      "application_tls": true,
+      "downloaded": 131328,
+      "elapsed_ms": 13.857,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "socks",
+      "authentication": "none",
+      "ingress": "socks5",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 2.411,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "socks",
+      "authentication": "none",
+      "ingress": "socks5",
+      "application_tls": true,
+      "downloaded": 131328,
+      "elapsed_ms": 13.547,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "socks",
+      "active_after_close": 0,
+      "uploaded": 3536,
+      "downloaded": 530782,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "socks",
+      "authentication": "password",
+      "ingress": "http_connect",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 2.314,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "socks",
+      "authentication": "password",
+      "ingress": "http_connect",
+      "application_tls": true,
+      "downloaded": 131328,
+      "elapsed_ms": 4.795,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "socks",
+      "authentication": "password",
+      "ingress": "socks5",
+      "application_tls": false,
+      "downloaded": 131328,
+      "elapsed_ms": 2.819,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "socks",
+      "authentication": "password",
+      "ingress": "socks5",
+      "application_tls": true,
+      "downloaded": 131328,
+      "elapsed_ms": 14.411,
+      "normal_close": true,
+      "official_accepted": true,
+      "native_import": true
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "protocol": "socks",
+      "active_after_close": 0,
+      "uploaded": 3536,
+      "downloaded": 530781,
+      "udp_dropped": 0
+    }
+  ],
+  "peer_records": [
+    {
+      "case": "test_authenticated_socks5_udp_echo_dns_and_association_close",
+      "label": "00-socks-noauth",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "00-socks-noauth.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "127.0.0.1",
+            "port": 37811,
+            "protocol": "socks",
+            "settings": {
+              "auth": "noauth",
+              "udp": true,
+              "ip": "127.0.0.1"
+            },
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 1,
+      "access_sha256": "654e9aed9b20e39dceab66af5eb9e1c81b2fbd0c55855622737ae117bf6b43de"
+    },
+    {
+      "case": "test_authenticated_socks5_udp_echo_dns_and_association_close",
+      "label": "01-socks-password",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "01-socks-password.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "127.0.0.1",
+            "port": 52319,
+            "protocol": "socks",
+            "settings": {
+              "auth": "password",
+              "udp": true,
+              "ip": "127.0.0.1",
+              "accounts": [
+                {
+                  "user": "[synthetic fixture user]",
+                  "pass": "[redacted synthetic password]"
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 1,
+      "access_sha256": "5ef0b0c2e1d2f0ddee4fc9ddd3a6c250e45cc421d4c0831cad098969c6baa94a"
+    },
+    {
+      "case": "test_existing_session_survives_node_switch_and_concurrent_new_connections",
+      "label": "00-http-noauth",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "00-http-noauth.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "127.0.0.1",
+            "port": 59169,
+            "protocol": "http",
+            "settings": {},
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 1,
+      "access_sha256": "f3b9dcd4e657128ff98860059163013a4d3e7283b4e5ddc2e173f5f56e8a19ef"
+    },
+    {
+      "case": "test_existing_session_survives_node_switch_and_concurrent_new_connections",
+      "label": "01-http-password",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "01-http-password.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "127.0.0.1",
+            "port": 53925,
+            "protocol": "http",
+            "settings": {
+              "accounts": [
+                {
+                  "user": "[synthetic fixture user]",
+                  "pass": "[redacted synthetic password]"
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 1,
+      "access_sha256": "e639d4abcbe5149760916315f01407a6729adcd9e5b05c67c125d05f6354baef"
+    },
+    {
+      "case": "test_existing_session_survives_node_switch_and_concurrent_new_connections",
+      "label": "02-socks-noauth",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "02-socks-noauth.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "127.0.0.1",
+            "port": 57407,
+            "protocol": "socks",
+            "settings": {
+              "auth": "noauth",
+              "udp": true,
+              "ip": "127.0.0.1"
+            },
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 1,
+      "access_sha256": "30fb1d5e2de4173d28995b1df9e0c38ab0c2cfec20734494f0047eed7bb02ae8"
+    },
+    {
+      "case": "test_existing_session_survives_node_switch_and_concurrent_new_connections",
+      "label": "03-socks-password",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "03-socks-password.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "127.0.0.1",
+            "port": 40893,
+            "protocol": "socks",
+            "settings": {
+              "auth": "password",
+              "udp": true,
+              "ip": "127.0.0.1",
+              "accounts": [
+                {
+                  "user": "[synthetic fixture user]",
+                  "pass": "[redacted synthetic password]"
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 5,
+      "access_sha256": "d9aadfd52e7bf3f5de62fb1db9098fdc75419ed42bec36cc77ab61249915b145"
+    },
+    {
+      "case": "test_invalid_tcp_credentials_are_rejected_without_origin_traffic",
+      "label": "00-http-password",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "00-http-password.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "127.0.0.1",
+            "port": 52731,
+            "protocol": "http",
+            "settings": {
+              "accounts": [
+                {
+                  "user": "[synthetic fixture user]",
+                  "pass": "[redacted synthetic password]"
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 0,
+      "access_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "case": "test_invalid_tcp_credentials_are_rejected_without_origin_traffic",
+      "label": "01-socks-password",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "01-socks-password.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "127.0.0.1",
+            "port": 48821,
+            "protocol": "socks",
+            "settings": {
+              "auth": "password",
+              "udp": true,
+              "ip": "127.0.0.1",
+              "accounts": [
+                {
+                  "user": "[synthetic fixture user]",
+                  "pass": "[redacted synthetic password]"
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 0,
+      "access_sha256": "e8e44d0b3a9ccb875289923bccbc3c2abc0d2009cab416ea63aac53334dcadf7"
+    },
+    {
+      "case": "test_invalid_udp_credentials_cannot_reach_the_dns_target",
+      "label": "00-socks-password",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "00-socks-password.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "127.0.0.1",
+            "port": 49119,
+            "protocol": "socks",
+            "settings": {
+              "auth": "password",
+              "udp": true,
+              "ip": "127.0.0.1",
+              "accounts": [
+                {
+                  "user": "[synthetic fixture user]",
+                  "pass": "[redacted synthetic password]"
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 0,
+      "access_sha256": "07fd141d53d73289a3c3b0644b2f5c41e7f32288c0446f2a435ad7c04866bbd7"
+    },
+    {
+      "case": "test_ipv6_official_peer_and_reconnect_after_server_restart",
+      "label": "00-http-password",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "00-http-password.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "::1",
+            "port": 42081,
+            "protocol": "http",
+            "settings": {
+              "accounts": [
+                {
+                  "user": "[synthetic fixture user]",
+                  "pass": "[redacted synthetic password]"
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 2,
+      "access_sha256": "0907a1e14ff2dd2a690be824c2b761e79f7bb129861a5fc3d2653d4dc3ffa74d"
+    },
+    {
+      "case": "test_ipv6_official_peer_and_reconnect_after_server_restart",
+      "label": "01-socks-password",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "01-socks-password.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "::1",
+            "port": 40289,
+            "protocol": "socks",
+            "settings": {
+              "auth": "password",
+              "udp": true,
+              "ip": "::1",
+              "accounts": [
+                {
+                  "user": "[synthetic fixture user]",
+                  "pass": "[redacted synthetic password]"
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 2,
+      "access_sha256": "bd969f1382e1f4ca2335cee8bddad19956e038ae225f42031de72df3a9393696"
+    },
+    {
+      "case": "test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server",
+      "label": "00-socks-noauth",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "00-socks-noauth.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "127.0.0.1",
+            "port": 35317,
+            "protocol": "socks",
+            "settings": {
+              "auth": "noauth",
+              "udp": true,
+              "ip": "127.0.0.1"
+            },
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 8,
+      "access_sha256": "ac8d2782aa0110bbddead82f5c1a881ea10debb3e3080ffaec34832c22211a1e"
+    },
+    {
+      "case": "test_two_mib_binary_transfer_each_way_and_completed_application_close",
+      "label": "00-http-password",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "00-http-password.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "127.0.0.1",
+            "port": 48069,
+            "protocol": "http",
+            "settings": {
+              "accounts": [
+                {
+                  "user": "[synthetic fixture user]",
+                  "pass": "[redacted synthetic password]"
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 1,
+      "access_sha256": "a6eaf72b14bc64e3de2dbd315ccade6c813670d575163800e9f0e398c33f04f6"
+    },
+    {
+      "case": "test_two_mib_binary_transfer_each_way_and_completed_application_close",
+      "label": "01-socks-password",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "01-socks-password.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "127.0.0.1",
+            "port": 35123,
+            "protocol": "socks",
+            "settings": {
+              "auth": "password",
+              "udp": true,
+              "ip": "127.0.0.1",
+              "accounts": [
+                {
+                  "user": "[synthetic fixture user]",
+                  "pass": "[redacted synthetic password]"
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 1,
+      "access_sha256": "581755aa54436b4d5692ee6d8d9ad8dd7ae6b288702cc2596230973cfab8d680"
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "label": "00-http-noauth",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "00-http-noauth.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "127.0.0.1",
+            "port": 56667,
+            "protocol": "http",
+            "settings": {},
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 4,
+      "access_sha256": "2ef9598c793c5f7a93051573d002195e2054b250b40c4205fbe142d40edd1321"
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "label": "01-http-password",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "01-http-password.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "127.0.0.1",
+            "port": 50875,
+            "protocol": "http",
+            "settings": {
+              "accounts": [
+                {
+                  "user": "[synthetic fixture user]",
+                  "pass": "[redacted synthetic password]"
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 4,
+      "access_sha256": "d02bd548ce5b04a6e8e5406af46ca549c2a7b443b643b31280628e94a887cd42"
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "label": "02-socks-noauth",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "02-socks-noauth.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "127.0.0.1",
+            "port": 56919,
+            "protocol": "socks",
+            "settings": {
+              "auth": "noauth",
+              "udp": true,
+              "ip": "127.0.0.1"
+            },
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 4,
+      "access_sha256": "dfa7fb84b670a0c5062cbd393ee9b3b9206f5c43be27e26a9e514d8a291c0f99"
+    },
+    {
+      "case": "test_xray_import_http_https_authentication_and_normal_close",
+      "label": "03-socks-password",
+      "command": [
+        "xray",
+        "run",
+        "-config",
+        "03-socks-password.json"
+      ],
+      "config": {
+        "log": {
+          "loglevel": "debug",
+          "access": "access.log",
+          "error": "error.log"
+        },
+        "inbounds": [
+          {
+            "listen": "127.0.0.1",
+            "port": 38359,
+            "protocol": "socks",
+            "settings": {
+              "auth": "password",
+              "udp": true,
+              "ip": "127.0.0.1",
+              "accounts": [
+                {
+                  "user": "[synthetic fixture user]",
+                  "pass": "[redacted synthetic password]"
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "raw"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "freedom",
+            "settings": {
+              "finalRules": [
+                {
+                  "action": "allow",
+                  "network": "tcp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                },
+                {
+                  "action": "allow",
+                  "network": "udp",
+                  "ip": [
+                    "127.0.0.0/8",
+                    "::1/128"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "accepted_requests": 4,
+      "access_sha256": "03a08cb1bdd8a86ce3b1bdf4257ca303c4ff9ac7c71f0fa14c09662b89bf94a7"
+    }
+  ]
+}

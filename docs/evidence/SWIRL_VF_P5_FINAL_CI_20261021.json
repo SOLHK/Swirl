@@ -1,0 +1,211 @@
+{
+  "source_commit": "8b1493fd153f28747b9ca6ab5606ff2e8adf4e89",
+  "precision_workflow": {
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/39567110282",
+    "conclusion": "failure",
+    "jobs": [
+      {
+        "name": "exact-model",
+        "id": 119111919595,
+        "conclusion": "success"
+      },
+      {
+        "name": "windows-native",
+        "id": 119111919802,
+        "conclusion": "failure"
+      }
+    ],
+    "failed_gate": "Enforce unchanged strict native acceptance separately from diagnostics",
+    "strict_native_acceptance": "FAIL_RETAINED",
+    "targeted_regressions_passed": 37
+  },
+  "regression_workflow": {
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/39567110276",
+    "conclusion": "success",
+    "portable_tests_passed": 796,
+    "audit_tests_passed": 6,
+    "jobs": [
+      {
+        "name": "windows-c1-synthetic",
+        "id": 119111919809,
+        "conclusion": "success"
+      },
+      {
+        "name": "portable",
+        "id": 119111919941,
+        "conclusion": "success"
+      },
+      {
+        "name": "original-source",
+        "id": 119111920070,
+        "conclusion": "success"
+      }
+    ]
+  },
+  "controls": {
+    "status": "COMPLETED_AUTHORED_PRECISION_CONTROL_NOT_ACCEPTANCE",
+    "font_kind": "self_authored_32_faces_7_GIDs_only",
+    "faces": 32,
+    "selected_multiplier": 5,
+    "requests": 416,
+    "HarfBuzz": "14.6.0",
+    "continuous_decoded_model": {
+      "all_32_within_1_32": true,
+      "maximum_metric_error_exact": [
+        1,
+        80
+      ],
+      "maximum_point_squared_error_exact": [
+        1,
+        6400
+      ],
+      "scope": "entire_design_cube_only_excludes_user_mapping_and_native_rounding"
+    },
+    "actual_HarfBuzz_native": {
+      "metrics": {
+        "observations": 5824,
+        "above_1_32": 714,
+        "maximum_error_source_font_units": 0.203125,
+        "within_1_32": false
+      },
+      "extent_fields": {
+        "observations": 11648,
+        "above_1_32": 510,
+        "maximum_error_source_font_units": 0.203125,
+        "within_1_32": false
+      },
+      "layout_fields": {
+        "observations": 13312,
+        "above_1_32": 816,
+        "maximum_error_source_font_units": 0.203125,
+        "within_1_32": false
+      },
+      "shaping_runs": 832,
+      "GIDs_and_clusters_preserved": true,
+      "reference_already_upscaled": true
+    },
+    "finite_metric_error_components_exact": {
+      "coordinate_composition": [
+        0,
+        1
+      ],
+      "coefficient_model": [
+        1,
+        80
+      ],
+      "reference_native_rounding": [
+        105,
+        1024
+      ],
+      "target_native_rounding": [
+        17,
+        160
+      ]
+    },
+    "target_user_inputs": "unchanged_nominal",
+    "application_compensation": false,
+    "packing": {
+      "normalized-scaled": {
+        "faces": 32,
+        "sha256": "9de2e8490be445c1e18aeb35b1a117ae5deb1f6c95f1322500e0b6562eb05cd1",
+        "byte_size": 53480
+      },
+      "precision": {
+        "faces": 32,
+        "sha256": "f1cb8e2719028151f45c9a55bd0c850d5159c656127813146a1829efe5008451",
+        "byte_size": 201268
+      }
+    },
+    "original_font": "NOT_RUN",
+    "Windows11": "NOT_RUN",
+    "Qt_Swirl": "NOT_RUN",
+    "production_accepted": false
+  },
+  "native": {
+    "schema": 1,
+    "status": "COMPLETED_AUTHORED_PRECISION_DIAGNOSTIC_NOT_ACCEPTANCE",
+    "backend": "DirectWrite_CreateFontResource",
+    "data_origin": "self_authored_twins",
+    "role": "authored_native_precision_grid_diagnostic_not_original_native_parity",
+    "original_font_acceptance": "NOT_RUN",
+    "source_x_to_q_proven": false,
+    "production_accepted": false,
+    "windows11_acceptance": "NOT_RUN",
+    "qt_swirl_acceptance": "NOT_RUN",
+    "normalized_twin_sha256": "9de2e8490be445c1e18aeb35b1a117ae5deb1f6c95f1322500e0b6562eb05cd1",
+    "transported_twin_sha256": "f1cb8e2719028151f45c9a55bd0c850d5159c656127813146a1829efe5008451",
+    "source_unchanged": true,
+    "requests_completed": 832,
+    "physical_faces_observed": 32,
+    "glyph_pairs_checked": 5824,
+    "metric_fields_checked": 40768,
+    "outline_pairs_checked": 11648,
+    "outline_point_pairs_checked": 36608,
+    "bit_exact_outline_point_pairs": 29672,
+    "actual_FLOAT_and_readback_bits_checked": 9984,
+    "max_metric_error_font_units": 0.2,
+    "max_outline_error_font_units": 0.2000244140625,
+    "limit_font_units": 0.03125,
+    "precision_grid_multiplier": 5,
+    "error_reporting_units": "original_unscaled_source_font_units",
+    "native_protocol_completed": true,
+    "within_1_32_native_parity": false,
+    "strict_native_metric_field_failures": 1836,
+    "strict_native_metric_glyph_failures": 1428,
+    "strict_native_outline_point_failures": 6936,
+    "strict_native_outline_pair_failures": 2040,
+    "native_outline_topology_failures": 0,
+    "strict_native_glyph_failures": 1428,
+    "strict_native_request_failures": 204,
+    "target_double_to_FLOAT_rounding_observations": 0,
+    "rasterization": "NOT_RUN",
+    "DPI_rendering": "NOT_RUN",
+    "error": ""
+  },
+  "render": {
+    "scope": "self_authored_P5_precision_target_only",
+    "faces_passed": 32,
+    "windows_product": "Microsoft Windows Server 2022 Datacenter",
+    "windows_build": "20348",
+    "raster_count": 10,
+    "input_sha256": "f1cb8e2719028151f45c9a55bd0c850d5159c656127813146a1829efe5008451",
+    "raster_pixel_equivalence": "NOT_TESTED",
+    "original_font": "NOT_RUN",
+    "Windows11": "NOT_RUN",
+    "Qt_Swirl": "NOT_RUN",
+    "system_installation": "NOT_TESTED"
+  },
+  "original_source_replay": {
+    "host": "macOS-27.0.1-arm64-arm-64bit",
+    "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+    "physical_faces_verified": 32,
+    "internal_native_glyph_records": 3184,
+    "D2_cohort": {
+      "source_request_cases": 384,
+      "all_cases_exact_source_replay": true,
+      "strict_request_passed": 288,
+      "strict_request_failed": 96,
+      "mapping_accepted": false
+    },
+    "source_unchanged": true,
+    "source_user_mapping_accepted": false
+  },
+  "new_integer_grid_counterexample": {
+    "source_UPM": 1144,
+    "legal_integer_multipliers_refused": 14,
+    "best_endpoint_lower_bound_exact": [
+      7,
+      208
+    ],
+    "within_1_32": false,
+    "scope": "integer multiplier expanded hmtx/HVAR representation only"
+  },
+  "original_face_reconstruction": "NOT_RUN",
+  "original_Swirl_VF_ttc": "NOT_BUILT",
+  "complete_MVAR_reparameterization": "UNSUPPORTED_BY_BOUNDED_CANDIDATE",
+  "complete_VORG_native_equivalence": "NOT_ESTABLISHED",
+  "Windows11": "NOT_RUN",
+  "Qt_Swirl": "NOT_RUN",
+  "third_party_Windows_apps": "NOT_RUN",
+  "production_accepted": false
+}

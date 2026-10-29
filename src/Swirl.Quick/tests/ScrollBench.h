@@ -40,7 +40,7 @@ static int runScrollBench(QQuickWindow *window, const QString &output) {
     if(live){
         if(!controller||!peers.start())return 3;
         const auto freePort=[](){QTcpServer server;server.listen(QHostAddress::LocalHost);return server.serverPort();};
-        controller->setProxyPort(freePort());controller->setControlPort(freePort());controller->setRoutingMode("global");
+        controller->setProxyPort(freePort());controller->setRoutingMode("global");
         if(!controller->saveNode({{"name","Loopback scroll acceptance"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",peers.a.serverPort()}}))return 4;
         controller->connectNode(controller->nodes().last().toMap().value("id").toString());
         for(int i=0;i<100&&!controller->connected();++i)wait(50);

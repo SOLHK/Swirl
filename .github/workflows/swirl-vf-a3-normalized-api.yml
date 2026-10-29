@@ -1,0 +1,46 @@
+name: Swirl VF A3 conditional normalized API channel
+
+on:
+  push:
+    branches: [work/vf-axis-a3]
+    paths:
+      - '.github/workflows/swirl-vf-a3-normalized-api.yml'
+      - 'tools/swirl_vf/platform/probe_axis_a3_normalized_api.py'
+      - 'tools/swirl_vf/tests/test_axis_a3_normalized_api.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-native-api:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install real native libraries for this conditional channel test
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libharfbuzz0b libfreetype6
+          python -m pip install fonttools==4.61.1
+      - name: Require native libraries and run all six integration controls
+        run: |
+          python -c 'import ctypes.util; assert ctypes.util.find_library("harfbuzz") and ctypes.util.find_library("freetype")'
+          python -m unittest discover -s tools/swirl_vf/tests -p 'test_axis_a3_normalized_api.py' -v
+      - name: Save synthetic native evidence with explicit scope
+        run: |
+          python tools/swirl_vf/platform/probe_axis_a3_normalized_api.py \
+            --output build/axis-a3-normalized-summary/normalized-api.json
+          python -c 'import json; r=json.load(open("build/axis-a3-normalized-summary/normalized-api.json")); assert r["conditional_native_channel_proven_on_this_runtime"] and r["freetype"]["q0_and_q65_preserved"]'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-a3-normalized-api-${{ github.sha }}
+          path: build/axis-a3-normalized-summary/*.json
+          retention-days: 7

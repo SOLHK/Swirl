@@ -5,7 +5,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QSaveFile>
-#include <QStandardPaths>
+#include "StoragePaths.h"
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -28,7 +28,7 @@ QByteArray protect(QByteArray bytes,bool decrypt){
 bool enabled(const QVariantList &rows){for(const auto &row:rows)if(row.toMap().value("enabled").toBool())return true;return false;}
 }
 ExtensionService::ExtensionService(EngineController *engine,QString path,QObject *parent):QObject(parent),m_engine(engine),m_path(std::move(path)){
-    if(m_path.isEmpty())m_path=QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/extensions.dpapi";load();
+    if(m_path.isEmpty())m_path=SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/extensions.dpapi";load();
     // Complete the durable intent before exposing a configuration after a crash.
     if(m_configurationPending)finishConfigurationTransaction();
     else if(enabled(m_modules)&&m_baseCaptured){if(!m_engine->replaceNetworkConfiguration(merged(m_modules,m_base)))m_error=m_engine->networkConfigurationError();}

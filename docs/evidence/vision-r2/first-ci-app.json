@@ -1,0 +1,702 @@
+{
+  "schema_version": 1,
+  "verification": "passed",
+  "source_commit": "f3ce257f14e59e82977d89ac4be436d08926c6b8",
+  "run": {
+    "id": 39243009132,
+    "name": "Core implementation validation",
+    "path": ".github/workflows/core-development.yml",
+    "head_sha": "f3ce257f14e59e82977d89ac4be436d08926c6b8",
+    "head_branch": "work/core-completion-20261017",
+    "status": "completed",
+    "conclusion": "success",
+    "run_attempt": 1,
+    "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39243009132",
+    "created_at": "2026-10-19T11:12:54Z",
+    "updated_at": "2026-10-19T11:18:51Z"
+  },
+  "job": {
+    "id": 118028096043,
+    "name": "core",
+    "status": "completed",
+    "conclusion": "success",
+    "run_id": 39243009132,
+    "logs_url": null,
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1
+      },
+      {
+        "name": "Generate scoped Swirl GitHub App token",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3
+      },
+      {
+        "name": "Install Rust tools",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4
+      },
+      {
+        "name": "Apply checked core refactoring and format the development branch",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5
+      },
+      {
+        "name": "Rust static and unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6
+      },
+      {
+        "name": "Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7
+      },
+      {
+        "name": "Independent network peers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8
+      },
+      {
+        "name": "Install pinned Go for the independent Xray peer",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9
+      },
+      {
+        "name": "Build pinned Xray and verify REALITY interoperability",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10
+      },
+      {
+        "name": "Preserve Xray build identity and raw interoperability evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11
+      },
+      {
+        "name": "Build native Vision client and verify Xray interoperability",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12
+      },
+      {
+        "name": "Preserve Vision client and full Xray interoperability evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13
+      },
+      {
+        "name": "Export exact source and result identity",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14
+      },
+      {
+        "name": "Run actions/upload-artifact@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15
+      },
+      {
+        "name": "Post Install pinned Go for the independent Xray peer",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 27
+      },
+      {
+        "name": "Post Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 28
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 29
+      },
+      {
+        "name": "Post Generate scoped Swirl GitHub App token",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 30
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 31
+      }
+    ],
+    "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39243009132/job/118028096043"
+  },
+  "artifacts": [
+    {
+      "role": "vision",
+      "id": 12182686336,
+      "name": "App-Vision-Xray-Linux-f3ce257f14e59e82977d89ac4be436d08926c6b8-1",
+      "sha256": "9cd95c5d2ff6391fd5decb31fe94d505bab67c99c029450d3620d503d35f8885",
+      "github_digest_matches": true,
+      "local_file": "/tmp/swirl-vision-app-vision.zip"
+    },
+    {
+      "role": "source",
+      "id": 12182396871,
+      "name": "Core-development-evidence",
+      "sha256": "f14189a9db799fde37137caff66097ddcef99b8b707de75c5521da1ed498d5f5",
+      "github_digest_matches": true,
+      "local_file": "/tmp/swirl-vision-app-source.zip"
+    },
+    {
+      "role": "reality",
+      "id": 12181764456,
+      "name": "App-REALITY-Xray-Linux-f3ce257f14e59e82977d89ac4be436d08926c6b8-1",
+      "sha256": "78ad15d3ead1c4b1147d1507eba111da63f6c116bf7ea577dee25006d7eafbe3",
+      "github_digest_matches": true,
+      "local_file": "/tmp/swirl-vision-app-reality.zip"
+    }
+  ],
+  "source_identity": {
+    "actual_tested_sha": "f3ce257f14e59e82977d89ac4be436d08926c6b8",
+    "tar_commit": "f3ce257f14e59e82977d89ac4be436d08926c6b8",
+    "tree_sha": "342dd35abae1d2932b0f860a1ce09d30fa4e9640",
+    "tar_sha256": "c381cac1d4feeb908de4b8b83dc761f77ed340f9969db4c242749e3b31c1a9d2",
+    "archived_regular_files_matched_to_git_blob_and_mode": 232,
+    "all_archived_files_match_exact_commit": true,
+    "worktree_state": [
+      "?? CORE_TESTED_COMMIT",
+      "?? CORE_WORKTREE_STATE",
+      "?? core-tested-source.tar"
+    ],
+    "tracked_changes": false,
+    "archive_scopes": [
+      "core/",
+      "tools/",
+      ".github/workflows/",
+      "src/Swirl.Quick/engine/",
+      "src/Swirl.Quick/tests/"
+    ]
+  },
+  "reality": {
+    "tests_passed": 12,
+    "sessions": 13,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "raw_job_success_lines": [
+      "2026-10-19T11:18:20.6263648Z test_bare_tcp_fin_is_rejected_after_valid_echo (__main__.RealityXrayInterop.test_bare_tcp_fin_is_rejected_after_valid_echo) ... ok",
+      "2026-10-19T11:18:22.1811651Z test_data_cancellation_drops_transport_and_reaps_peer (__main__.RealityXrayInterop.test_data_cancellation_drops_transport_and_reaps_peer) ... ok",
+      "2026-10-19T11:18:23.7163206Z test_data_timeout_drops_transport_and_reaps_peer (__main__.RealityXrayInterop.test_data_timeout_drops_transport_and_reaps_peer) ... ok",
+      "2026-10-19T11:18:23.7273339Z test_empty_application_still_requires_both_finished_and_close_notify (__main__.RealityXrayInterop.test_empty_application_still_requires_both_finished_and_close_notify) ... ok",
+      "2026-10-19T11:18:24.3558090Z test_handshake_cancellation_drops_transport_and_reaps_peer (__main__.RealityXrayInterop.test_handshake_cancellation_drops_transport_and_reaps_peer) ... ok",
+      "2026-10-19T11:18:24.9957066Z test_handshake_timeout_drops_transport_and_reaps_peer (__main__.RealityXrayInterop.test_handshake_timeout_drops_transport_and_reaps_peer) ... ok",
+      "2026-10-19T11:18:25.0082772Z test_native_hybrid_authentication_finished_bidirectional_data_and_close (__main__.RealityXrayInterop.test_native_hybrid_authentication_finished_bidirectional_data_and_close) ... ok",
+      "2026-10-19T11:18:25.0212723Z test_native_x25519_authentication_finished_bidirectional_data_and_close (__main__.RealityXrayInterop.test_native_x25519_authentication_finished_bidirectional_data_and_close) ... ok",
+      "2026-10-19T11:18:25.1796979Z test_one_mebibyte_binary_transfer_with_short_reads_and_writes (__main__.RealityXrayInterop.test_one_mebibyte_binary_transfer_with_short_reads_and_writes) ... ok",
+      "2026-10-19T11:18:25.2274128Z test_single_byte_socket_boundaries (__main__.RealityXrayInterop.test_single_byte_socket_boundaries) ... ok",
+      "2026-10-19T11:18:25.2384641Z test_wrong_reality_public_key_never_exposes_application_data (__main__.RealityXrayInterop.test_wrong_reality_public_key_never_exposes_application_data) ... ok",
+      "2026-10-19T11:18:25.2479862Z test_wrong_short_id_never_exposes_application_data (__main__.RealityXrayInterop.test_wrong_short_id_never_exposes_application_data) ... ok"
+    ],
+    "session_status_counts": {
+      "intentional_unclean_eof": 1,
+      "cancelled": 4,
+      "completed": 6,
+      "authentication_rejected": 2
+    },
+    "session_results": [
+      {
+        "case": "001-test_bare_tcp_fin_is_rejected_after_valid_echo",
+        "server_status": "intentional_unclean_eof",
+        "client_status": "error",
+        "client_exit_code": 1,
+        "received_bytes": 45,
+        "sent_bytes": 45,
+        "group": 4588,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "002-test_data_cancellation_drops_transport_and_reaps_peer",
+        "server_status": "cancelled",
+        "client_status": "error",
+        "client_exit_code": 1,
+        "received_bytes": 37,
+        "sent_bytes": 0,
+        "group": 4588,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "003-test_data_timeout_drops_transport_and_reaps_peer",
+        "server_status": "cancelled",
+        "client_status": "error",
+        "client_exit_code": 1,
+        "received_bytes": 37,
+        "sent_bytes": 0,
+        "group": 4588,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "004-test_empty_application_still_requires_both_finished_and_close_notify",
+        "server_status": "completed",
+        "client_status": "ok",
+        "client_exit_code": 0,
+        "received_bytes": 0,
+        "sent_bytes": 0,
+        "group": 4588,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "005-test_handshake_cancellation_drops_transport_and_reaps_peer",
+        "server_status": "cancelled",
+        "client_status": "error",
+        "client_exit_code": 1,
+        "received_bytes": 0,
+        "sent_bytes": 0,
+        "group": 0,
+        "client_finished_verified": false,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "006-test_handshake_timeout_drops_transport_and_reaps_peer",
+        "server_status": "cancelled",
+        "client_status": "error",
+        "client_exit_code": 1,
+        "received_bytes": 0,
+        "sent_bytes": 0,
+        "group": 0,
+        "client_finished_verified": false,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "007-test_native_hybrid_authentication_finished_bidirectional_data_and_close",
+        "server_status": "completed",
+        "client_status": "ok",
+        "client_exit_code": 0,
+        "received_bytes": 32769,
+        "sent_bytes": 32769,
+        "group": 4588,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "008-test_native_x25519_authentication_finished_bidirectional_data_and_close",
+        "server_status": "completed",
+        "client_status": "ok",
+        "client_exit_code": 0,
+        "received_bytes": 32769,
+        "sent_bytes": 32769,
+        "group": 29,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "009-test_one_mebibyte_binary_transfer_with_short_reads_and_writes",
+        "server_status": "completed",
+        "client_status": "ok",
+        "client_exit_code": 0,
+        "received_bytes": 1048576,
+        "sent_bytes": 1048576,
+        "group": 4588,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "010-test_single_byte_socket_boundaries",
+        "server_status": "completed",
+        "client_status": "ok",
+        "client_exit_code": 0,
+        "received_bytes": 310,
+        "sent_bytes": 310,
+        "group": 4588,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "011-test_single_byte_socket_boundaries",
+        "server_status": "completed",
+        "client_status": "ok",
+        "client_exit_code": 0,
+        "received_bytes": 310,
+        "sent_bytes": 310,
+        "group": 29,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "012-test_wrong_reality_public_key_never_exposes_application_data",
+        "server_status": "authentication_rejected",
+        "client_status": "error",
+        "client_exit_code": 1,
+        "received_bytes": 0,
+        "sent_bytes": 0,
+        "group": 0,
+        "client_finished_verified": false,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "013-test_wrong_short_id_never_exposes_application_data",
+        "server_status": "authentication_rejected",
+        "client_status": "error",
+        "client_exit_code": 1,
+        "received_bytes": 0,
+        "sent_bytes": 0,
+        "group": 0,
+        "client_finished_verified": false,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      }
+    ],
+    "client_binary_sha256": "69d128cf25c51fe15b7ddfaebf8369675ad99976f285f39d48150517092d6faa"
+  },
+  "vision": {
+    "tests_passed": 4,
+    "positive_tls12": 3,
+    "negative_direct_refusal": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "raw_job_success_lines": [
+      "2026-10-19T11:18:41.9132785Z test_tls12_authentication_framing_bidirectional_data_and_close (__main__.VisionXrayInterop.test_tls12_authentication_framing_bidirectional_data_and_close) ... ok",
+      "2026-10-19T11:18:42.2233945Z test_tls12_large_transfer_pause_resume_and_application_boundaries (__main__.VisionXrayInterop.test_tls12_large_transfer_pause_resume_and_application_boundaries) ... ok",
+      "2026-10-19T11:18:42.3591685Z test_tls12_single_byte_reads_and_small_writes (__main__.VisionXrayInterop.test_tls12_single_byte_reads_and_small_writes) ... ok",
+      "2026-10-19T11:18:42.4947383Z test_tls13_direct_request_is_rejected_without_application_data (__main__.VisionXrayInterop.test_tls13_direct_request_is_rejected_without_application_data) ... ok"
+    ],
+    "cases": [
+      {
+        "case": "001-test_tls12_authentication_framing_bidirectional_data_and_close-1792408721770772955",
+        "invocation": {
+          "elapsed_seconds": 0.08672238900004459,
+          "exit_code": 0,
+          "payload_bytes": 45,
+          "payload_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4",
+          "tls13": false,
+          "pause_reads": false,
+          "read_chunk": 16384,
+          "write_chunk": 16384
+        },
+        "client": {
+          "direct_ready": false,
+          "direct_rejected": false,
+          "ok": true,
+          "payload_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4",
+          "received": 45,
+          "stage": "complete",
+          "tls13_candidate": false,
+          "uploaded": 45
+        },
+        "target": {
+          "tls_version": "TLSv1.2",
+          "handshake_complete": true,
+          "received_bytes": 45,
+          "sent_bytes": 45,
+          "close_notify_received": true,
+          "close_notify_sent": true,
+          "probe_bytes_sent": 0,
+          "connection_closed": true,
+          "thread_released": true,
+          "error": null,
+          "cipher": "ECDHE-ECDSA-AES256-GCM-SHA384",
+          "received_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4",
+          "sent_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4"
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_kill": false,
+          "listener_closed": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792408721913353761",
+        "invocation": {
+          "elapsed_seconds": 0.25912028900000905,
+          "exit_code": 0,
+          "payload_bytes": 524288,
+          "payload_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5",
+          "tls13": false,
+          "pause_reads": true,
+          "read_chunk": 257,
+          "write_chunk": 1021
+        },
+        "client": {
+          "direct_ready": false,
+          "direct_rejected": false,
+          "ok": true,
+          "payload_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5",
+          "received": 524288,
+          "stage": "complete",
+          "tls13_candidate": false,
+          "uploaded": 524288
+        },
+        "target": {
+          "tls_version": "TLSv1.2",
+          "handshake_complete": true,
+          "received_bytes": 524288,
+          "sent_bytes": 524288,
+          "close_notify_received": true,
+          "close_notify_sent": true,
+          "probe_bytes_sent": 0,
+          "connection_closed": true,
+          "thread_released": true,
+          "error": null,
+          "cipher": "ECDHE-ECDSA-AES256-GCM-SHA384",
+          "received_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5",
+          "sent_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5"
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_kill": false,
+          "listener_closed": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "003-test_tls12_single_byte_reads_and_small_writes-1792408722223176135",
+        "invocation": {
+          "elapsed_seconds": 0.0883182429999465,
+          "exit_code": 0,
+          "payload_bytes": 289,
+          "payload_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12",
+          "tls13": false,
+          "pause_reads": false,
+          "read_chunk": 1,
+          "write_chunk": 7
+        },
+        "client": {
+          "direct_ready": false,
+          "direct_rejected": false,
+          "ok": true,
+          "payload_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12",
+          "received": 289,
+          "stage": "complete",
+          "tls13_candidate": false,
+          "uploaded": 289
+        },
+        "target": {
+          "tls_version": "TLSv1.2",
+          "handshake_complete": true,
+          "received_bytes": 289,
+          "sent_bytes": 289,
+          "close_notify_received": true,
+          "close_notify_sent": true,
+          "probe_bytes_sent": 0,
+          "connection_closed": true,
+          "thread_released": true,
+          "error": null,
+          "cipher": "ECDHE-ECDSA-AES256-GCM-SHA384",
+          "received_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12",
+          "sent_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12"
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_kill": false,
+          "listener_closed": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "004-test_tls13_direct_request_is_rejected_without_application_data-1792408722358968038",
+        "invocation": {
+          "elapsed_seconds": 0.08703648099998418,
+          "exit_code": 1,
+          "payload_bytes": 38,
+          "payload_sha256": "c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364",
+          "tls13": true,
+          "pause_reads": false,
+          "read_chunk": 16384,
+          "write_chunk": 16384
+        },
+        "client": {
+          "direct_ready": false,
+          "direct_rejected": true,
+          "error": "VisionDirectOwnershipUnavailable",
+          "error_kind": "PermissionDenied",
+          "ok": false,
+          "received": 0,
+          "stage": "server_first_probe",
+          "tls13_candidate": true,
+          "uploaded": 0
+        },
+        "target": {
+          "tls_version": "TLSv1.3",
+          "handshake_complete": true,
+          "received_bytes": 0,
+          "sent_bytes": 0,
+          "close_notify_received": false,
+          "close_notify_sent": false,
+          "probe_bytes_sent": 34,
+          "connection_closed": true,
+          "thread_released": true,
+          "error": {
+            "type": "SSLEOFError",
+            "message": "[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:2713)"
+          },
+          "cipher": "TLS_AES_256_GCM_SHA384",
+          "probe_sha256": "d50b77b997f88e72a20fafecc7af9ab0a5c6d19d18b81276262ace4216eb7316",
+          "received_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_kill": false,
+          "listener_closed": true,
+          "exit_code": 0
+        }
+      }
+    ],
+    "client_binary_sha256": "6404e8a8b6caf030e7774ddb0934a0560748470c259d73a3ee987f97b271f82e",
+    "server_first_probe_verified_from_archived_test_source": true,
+    "direct_ready_ever_true": false
+  },
+  "build_identity": {
+    "go_version": "go1.27.2",
+    "upstream_xray": {
+      "commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5",
+      "go_mod_sha256": "31fe6bd6c04eb2738e157b850236b1376cbbac3f33e974256bb7325c8c764250",
+      "go_sum_sha256": "a72c2f2b5dd38fcf42ef55034bd55038703448b55a878eafddd60d4af1f63145",
+      "release": "v26.10.17",
+      "repository": "https://github.com/XTLS/Xray-core.git",
+      "tree": "55fc871fdf3e63149066956e7c60670f3a44fbf2"
+    },
+    "upstream_reality": {
+      "commit": "83f621788ca88b83179810b12baa7ae518aacb83",
+      "go_mod_sum": "h1:ptlSkJ8k/7IDauNH0SA96JPOo+nYGLTv2Y3UMpwvAsY=",
+      "module": "github.com/xtls/reality",
+      "sum": "h1:RjLnVvlzK4q6zWaSBPNRGsrgx2fbJDeUWffjw574uzs=",
+      "version": "v0.0.0-20261014101318-83f621788ca8"
+    },
+    "source_and_module_hashes_match_exact_commit": true,
+    "reproducible_rebuild": {
+      "reality_peer": {
+        "first_sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9",
+        "matches": true,
+        "repeated_sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9"
+      },
+      "xray": {
+        "first_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a",
+        "matches": true,
+        "repeated_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a"
+      }
+    },
+    "same_manifest_and_build_log_in_both_artifacts": true,
+    "both_go_mod_verify_passed": true,
+    "binary_hash_verification_scope": "CI builder and tests hash the binaries; downloaded evidence archives do not contain those binaries."
+  },
+  "raw_logs": {
+    "job": "/tmp/swirl-vision-app-job.log",
+    "builder": "/tmp/swirl-vision-app-builder.log",
+    "vision_build": "/tmp/swirl-vision-app-client-build.log",
+    "vision_tests": "/tmp/swirl-vision-app-peer-test.log"
+  },
+  "scope": "Exact App core-development run with mature REALITY and full-Xray Vision substage. Direct rejection is not Direct interoperability; full Qt product, raw ownership handoff, combined REALITY/Vision and private-provider acceptance are not implied.",
+  "issues": []
+}

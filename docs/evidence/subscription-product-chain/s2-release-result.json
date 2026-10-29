@@ -1,0 +1,29 @@
+{
+  "completed_utc": "2026-10-19T15:54:14.215546+00:00",
+  "command": "cargo build --workspace --release --locked",
+  "exit_code": 0,
+  "input_record": "/workspace/scratch/ca6cd1f88f6f/Swirl/.local-runtime/logs/rust-release-input.json",
+  "build_log": "/workspace/scratch/ca6cd1f88f6f/Swirl/.local-runtime/logs/rust-release-build.log",
+  "artifacts": [
+    {
+      "path": "/workspace/scratch/ca6cd1f88f6f/Swirl/.local-runtime/target/release/swirl-api",
+      "bytes": 4213016,
+      "sha256": "8730c60b40d00d7030635641bf4d623e0f537fa735d2f6348c61b43f64d91d6b"
+    },
+    {
+      "path": "/workspace/scratch/ca6cd1f88f6f/Swirl/.local-runtime/target/release/swirl-inspect",
+      "bytes": 2463456,
+      "sha256": "56a812c2362d7495c82d7d7af2a8bb03b4e1a163b7b03365894dcf843ae24c64"
+    },
+    {
+      "path": "/workspace/scratch/ca6cd1f88f6f/Swirl/.local-runtime/target/release/swirl-diagnose",
+      "bytes": 3108472,
+      "sha256": "0d4018d4709a40447728243a8eb5ba57cec076b37772bf4cb6f98f6fdc27fc0d"
+    },
+    {
+      "path": "/workspace/scratch/ca6cd1f88f6f/Swirl/.local-runtime/target/release/libswirl_api.so",
+      "bytes": 4282256,
+      "sha256": "d9a36a58ebb133d4efc5e7e3bd230ac28c7a23a51bae1212f635e14bd8028cb5"
+    }
+  ]
+}

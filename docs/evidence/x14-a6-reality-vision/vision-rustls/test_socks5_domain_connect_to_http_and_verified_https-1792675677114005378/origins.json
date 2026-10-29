@@ -1,0 +1,19 @@
+{
+  "http_paths": [
+    "/socks-domain-http"
+  ],
+  "https_paths": [
+    "/socks-domain-https"
+  ],
+  "https_sni": [
+    "localhost"
+  ],
+  "https_authenticated_closes": 1,
+  "echo_bytes": 0,
+  "echo_sessions": [],
+  "origin_errors": {
+    "http": [],
+    "https": [],
+    "echo": []
+  }
+}

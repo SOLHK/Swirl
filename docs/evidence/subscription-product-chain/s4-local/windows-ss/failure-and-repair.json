@@ -1,0 +1,67 @@
+{
+  "failed_source_sha": "292df3ba9763414947ec9b5dffa7886c45a00879",
+  "failed_job_url": "https://github.com/SOLHK/Swirl/actions/runs/39280252948/job/118152921964",
+  "raw_log_path": "/workspace/scratch/ca6cd1f88f6f/swirl-chain-ci/final-checkpoint/logs/s1-windows-118152921964.log",
+  "raw_log_sha256": "4214d0d4fe7720924dd2f5b6f01a58fcc9f62ed2c55088ea78b1f0102cc1d688",
+  "failure": {
+    "test": "PolicyIntegration.test_udp_association_pins_distinct_ss_exit_across_health_and_configure",
+    "bind_address": [
+      "127.0.0.1",
+      49666
+    ],
+    "protocol": "TCP",
+    "winerror": 10013,
+    "attempt": "1/8",
+    "error_timestamp": "2026-10-19T15:51:45.9918972Z"
+  },
+  "observed_exclusions": {
+    "tcp_ipv4_and_ipv6": [
+      [
+        80,
+        80
+      ],
+      [
+        5985,
+        5985
+      ],
+      [
+        5986,
+        5986
+      ],
+      [
+        47001,
+        47001
+      ],
+      [
+        58723,
+        58822
+      ],
+      [
+        58823,
+        58922
+      ]
+    ],
+    "udp_ipv4_and_ipv6": [
+      [
+        62327,
+        62426
+      ],
+      [
+        62427,
+        62526
+      ]
+    ],
+    "failed_port_in_exclusions": false
+  },
+  "verified_defect": "A random unexcluded fixed port does not reserve that port or establish that it is currently available. TCP was explicitly bound to that unreserved candidate.",
+  "not_proven": "The log contains no contemporaneous endpoint ownership table. An exclusive incumbent is a documented possible cause, not the established owner of port 49666.",
+  "change": "Request port zero for the actual TCP server and retain its socket. Check the OS-assigned port against the existing Windows TCP/UDP candidate table before UDP binding. Retain ineligible TCP reservations until selection ends. Hold both accepted sockets before starting threads.",
+  "unchanged": "All actual unknown access-denial errors propagate immediately. Only EADDRINUSE/10048 bind errors may retry, within the existing total eight-attempt budget. Protocol handlers and forwarding assertions are unchanged.",
+  "primary_references": [
+    "https://github.com/python/cpython/blob/v3.14.0/Lib/test/support/socket_helper.py",
+    "https://learn.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-bind",
+    "https://learn.microsoft.com/en-us/windows/win32/winsock/so-exclusiveaddruse",
+    "https://github.com/MicrosoftDocs/win32/blob/docs/desktop-src/WinSock/windows-sockets-error-codes-2.md"
+  ],
+  "windows_validation_status": "Pending new-source GitHub CI; local Linux tests do not prove Windows native execution."
+}

@@ -1,0 +1,24 @@
+{
+  "started_utc": "2026-10-22T13:50:33.130205+00:00",
+  "scope": "direct public IPv4 HTTPS reachability preflight only; not proxy acceptance",
+  "targets": [
+    {
+      "address": "1.1.1.1",
+      "port": 443,
+      "server_name": "one.one.one.one",
+      "error_type": "ConnectionRefusedError",
+      "error": "[Errno 111] Connection refused",
+      "passed": false,
+      "elapsed_seconds": 0.002
+    },
+    {
+      "address": "8.8.8.8",
+      "port": 443,
+      "server_name": "dns.google",
+      "error_type": "ConnectionRefusedError",
+      "error": "[Errno 111] Connection refused",
+      "passed": false,
+      "elapsed_seconds": 0.0001
+    }
+  ]
+}

@@ -1,0 +1,158 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-20T06:40:14.058656+00:00",
+  "base_sha": "72f1c20a52241c9f506ad601902c9b895c289cda",
+  "source_file_sha256": {
+    "core/crates/swirl-subscription/src/inspect.rs": "458aa44d9a282dca28bfc57b3bab020b3f5b4e9fd503991471f18ad86dd05551",
+    "core/crates/swirl-subscription/src/inspect_reality_fingerprints.rs": "23fe8b52a48120cd6fa0b9cd66f436f010a597da257227afbe06053ad84b5753",
+    "src/Swirl.Quick/CMakeLists.txt": "8b7217c5d554cafed392ea94be6f3c3328a1ab4a286e3ce1c107ef30f1440487",
+    "src/Swirl.Quick/engine/NodeStore.cpp": "d50b058f53424ab0f813988613bbcead2461853fdc786131cfecd92fe0e78fcd",
+    "src/Swirl.Quick/engine/SubscriptionNormalizer.cpp": "ec6d72115d581619211173437726d10d158a85fe1fde8e4ca02dcf9f8f63bd22",
+    "src/Swirl.Quick/tests/ImportTests.cpp": "ff6d4bdcdca9ecbec3c28d80f47dba38befbaf6791b4d02a33927082ecd50ec9"
+  },
+  "rust": {
+    "regular_tests": 324,
+    "doctests": 1,
+    "failed": 0,
+    "ignored": 0,
+    "commands": [
+      {
+        "step": "version-final",
+        "command": [
+          "cargo",
+          "--version"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.181
+      },
+      {
+        "step": "fmt-final",
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 1.061
+      },
+      {
+        "step": "check-final",
+        "command": [
+          "cargo",
+          "check",
+          "--workspace",
+          "--locked",
+          "--offline"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 5.642
+      },
+      {
+        "step": "clippy-final",
+        "command": [
+          "cargo",
+          "clippy",
+          "--workspace",
+          "--all-targets",
+          "--locked",
+          "--offline",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 5.195
+      },
+      {
+        "step": "test-final",
+        "command": [
+          "cargo",
+          "test",
+          "--workspace",
+          "--locked",
+          "--offline"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 21.593
+      }
+    ]
+  },
+  "qt_parser": {
+    "base_sha": "cf99f2c5a1664879ce1e3ad5e6669388ca10a3a3",
+    "scope": "fresh production importer build, Linux Qt 6.4.2; not Windows DPAPI",
+    "results": [
+      {
+        "label": "recovered",
+        "exit_code": 1,
+        "result": {
+          "baselineCases": 5,
+          "baselinePassed": true,
+          "blocked": 54,
+          "cases": 58,
+          "conflictsRejected": true,
+          "dpapiExecuted": false,
+          "failures": 4,
+          "neutralUriCases": 8,
+          "neutralUriControlsPassed": true,
+          "originalsPreserved": 58,
+          "productionImporter": true,
+          "qtVersion": "6.4.2",
+          "websocketMappingPassed": true
+        }
+      },
+      {
+        "label": "fixed",
+        "exit_code": 0,
+        "result": {
+          "baselineCases": 5,
+          "baselinePassed": true,
+          "blocked": 58,
+          "cases": 58,
+          "conflictsRejected": true,
+          "dpapiExecuted": false,
+          "failures": 0,
+          "neutralUriCases": 8,
+          "neutralUriControlsPassed": true,
+          "originalsPreserved": 58,
+          "productionImporter": true,
+          "qtVersion": "6.4.2",
+          "websocketMappingPassed": true
+        }
+      }
+    ],
+    "source_sha256": {
+      "src/Swirl.Quick/engine/SubscriptionNormalizer.cpp": "ec6d72115d581619211173437726d10d158a85fe1fde8e4ca02dcf9f8f63bd22",
+      "src/Swirl.Quick/engine/NodeImporter.cpp": "3b2888e7cae62bda34d8fc81986fa4ed0a9609934673cef3c6dc9ca07b93a2d1",
+      "src/Swirl.Quick/tests/ImportTests.cpp": "ff6d4bdcdca9ecbec3c28d80f47dba38befbaf6791b4d02a33927082ecd50ec9"
+    }
+  },
+  "qt_slots_syntax": {
+    "scope": "Four exact new ImportTests C++ slots, production NodeStore/NodeImporter/ProtocolRegistry declarations, Linux Qt 6.4.2 headers; not Windows runtime DPAPI",
+    "moc_exit_code": 0,
+    "syntax_exit_code": 0
+  },
+  "windows_dpapi": "pending exact new source CI",
+  "private_provider": "not accessed; current 59-node native candidate count unknown",
+  "historical_dns_timeouts": "root cause unresolved",
+  "frozen_acceptance": {
+    "items": 79,
+    "fully_passed": 6,
+    "weighted_percent": 10.83
+  },
+  "log_sha256": {
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "check.log": "e331a9f342921032aefae5417537d950a52d366ec90acf6648be0055ce4b19b4",
+    "build-release-sockets.log": "621608ff016dde27ba756ea07173163f551f80dda0b4cda9fed70a9b7ae6ff5d",
+    "version.log": "c35608815f43d0b8788a9b826fad2bb17384f49fb328dc4fe64da9db5f5ef4d6",
+    "check-final.log": "bd58b62095bbfc9121a9d7900a0a2cf400d3025beb087b3d5022a748efd3103b",
+    "fmt-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test.log": "dae0a822e513f63e30c9d6e766afb23b9d3c7740cf10284ee4ff2ee5ea9d9431",
+    "test-final.log": "5de59dc9ea2c51ebd6dab129b65089aced2293d29b7605aada28cb172184bdb7",
+    "test-sockets.log": "670953b8b48aacb358121ae8cb891348c67253e4fba3a3415151c305b34d72dd",
+    "version-final.log": "c35608815f43d0b8788a9b826fad2bb17384f49fb328dc4fe64da9db5f5ef4d6",
+    "clippy.log": "00cf05296a028ccfbf167c65d532ad538af2b368d37d8c9f7b947321c15c7fc8",
+    "clippy-final.log": "e595d6cb804e604d5138243dad044de643776feac9e172c713104c379b769e3d"
+  }
+}

@@ -1,0 +1,10 @@
+test_four_mib_each_way_after_import_with_application_completed_close (test_imported_transports_xray.ImportedTransportXrayTests.test_four_mib_each_way_after_import_with_application_completed_close) ... ok
+test_legacy_v2ray_envelope_and_concurrent_core_sessions (test_imported_transports_xray.ImportedTransportXrayTests.test_legacy_v2ray_envelope_and_concurrent_core_sessions) ... ok
+test_required_combinations_import_to_core_http_https_and_normal_close (test_imported_transports_xray.ImportedTransportXrayTests.test_required_combinations_import_to_core_http_https_and_normal_close) ... ok
+test_unsupported_security_transport_modes_and_options_block_native_export (test_imported_transports_xray.ImportedTransportXrayTests.test_unsupported_security_transport_modes_and_options_block_native_export) ... ok
+test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target (test_imported_transports_xray.ImportedTransportXrayTests.test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 13.539s
+
+OK

@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -8,7 +9,7 @@ import "../controls"
 Item {
     id:page
     readonly property bool implemented:false
-    property string pageId: "dashboard"
+    property string pageId:"dashboard"
     property var features: ({
         processes:["进程名称","活动连接","上传 / 下载","进程策略"],
         requestlogs:["请求时间","目标地址","HTTP 方法","响应状态","匹配规则"],
@@ -30,137 +31,40 @@ Item {
         gateway:["Devices","Gateway","DHCP","端口转发","远程设备","Interfaces"],
         logs:["Level","Search","Filters","Details","Timeline","Clear","导出"]
     })
+
     readonly property var featureList:features[pageId]||[]
     property string selected:""
     property var records:[]
-    Component.onCompleted:regenerate()
-    onPageIdChanged:regenerate()
-    function regenerate() { records=[]; selected="" }
-    readonly property var filtered:records.filter(function(r){
-        return r.name.toLowerCase().indexOf(search.text.toLowerCase())>=0 &&
-            (filter.currentText==="全部"||r.status===filter.currentText)
-    })
-    ColumnLayout {
-        anchors.fill:parent
-        anchors.margins:Theme.dp(24)
-        spacing:Theme.dp(15)
-        SwirlGlassPanel {
-            Layout.fillWidth:true
-            Layout.preferredHeight:Theme.dp(103)
-            RowLayout {
-                anchors.fill:parent; anchors.margins:Theme.dp(18)
-                ColumnLayout {
-                    Layout.fillWidth:true; spacing:Theme.dp(6)
-                    SwirlText { text:AppState.page(page.pageId).title+"工作区"; color:Theme.text; font.pixelSize:Theme.fontSize(20); font.weight:Font.DemiBold }
-                    SwirlText { text:featureList.length+" 个功能区域研发中，保留布局供后续接入。"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
-                }
-                SwirlStatusBadge { label:"研发中"; tone:"warning" }
-                SwirlButton { development:true; enabled:false; text:"新建"; primary:true; onClicked:addDialog.open() }
-            }
+    property var editorBuffers:({})
+    property bool componentReady:false
+    function regenerate(){records=[];selected=""}
+    function updateBuffer(value){if(!componentReady||editorBuffers[selected]===value)return;var next=Object.assign({},editorBuffers);next[selected]=value;editorBuffers=next}
+    Component.onCompleted:{componentReady=true;regenerate()}
+    onPageIdChanged:if(componentReady)regenerate()
+    SwirlArcMotion{id:tabMotion;targetX:Math.max(0,page.featureList.indexOf(page.selected))*SwirlMotion.pageDistance;duration:SwirlMotion.selectionDuration;bend:SwirlMotion.pageArc;motionEnabled:page.visible}
+    ColumnLayout{
+        anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap
+        SwirlPageHeader{Layout.fillWidth:true;title:AppState.page(page.pageId).title+qsTr("工作区");description:qsTr("选择功能，整理本地编辑草稿。");metadata:qsTr("实际服务尚未接入，草稿不会修改系统或网络")
+            SwirlStatusBadge{label:qsTr("研发中");tone:"warning"}
         }
-        SwirlGlassPanel {
-            Layout.fillWidth:true
-            Layout.preferredHeight:Theme.dp(228)
-            visible:pageId==="dashboard"||pageId==="traffic"
-            ColumnLayout {
-                anchors.fill:parent; anchors.margins:Theme.dp(16)
-                SwirlText { text:"流量详情 · 研发中"; color:Theme.text; font.pixelSize:Theme.fontSize(15); font.weight:Font.DemiBold }
-                SwirlTrafficChart { Layout.fillWidth:true; Layout.fillHeight:true }
-            }
-        }
-        RowLayout {
-            Layout.fillWidth:true
-            SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"搜索记录" }
-            SwirlComboBox { id:filter; model:["全部","已启用","","规划中"] }
-            SwirlButton { development:true; enabled:false; text:"刷新"; onClicked:AppState.notice("研发中") }
-            SwirlButton { development:true; enabled:false; text:"导出"; onClicked:AppState.notice("导出"+page.pageId) }
-        }
-        RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(15)
-            SwirlGlassPanel {
-                Layout.fillHeight:true; Layout.fillWidth:true; clip:true
-                SwirlDataTable {
-                    anchors.fill:parent; anchors.margins:Theme.dp(1)
-                    rows:page.filtered
-                    columns:[{key:"name",label:"名称 / 操作",w:230},{key:"type",label:"模块",w:160},
-                        {key:"status",label:"状态",w:105},{key:"updated",label:"时间",w:100}]
-                    onRowSelected:function(record){page.selected=record.name}
-                }
-                SwirlEmptyState {
-                    anchors.centerIn:parent
-                    visible:page.filtered.length===0
-                    headline:"没有匹配的记录"
+        RowLayout{Layout.fillWidth:true;Layout.fillHeight:true;spacing:Theme.sectionGap
+            ColumnLayout{Layout.preferredWidth:Theme.dp(230);Layout.fillHeight:true;spacing:Theme.gap
+                SwirlText{text:qsTr("功能区域");color:Theme.text;font.pixelSize:Theme.sectionTitleSize;font.weight:Font.DemiBold}
+                SwirlSearchField{id:search;Layout.fillWidth:true;placeholderText:qsTr("筛选功能")}
+                ListView{id:featureListView;Layout.fillWidth:true;Layout.fillHeight:true;clip:true;spacing:Theme.dp(4);pixelAligned:true;model:page.featureList.filter(function(name){return String(name).toLowerCase().indexOf(search.text.toLowerCase())>=0})
+                    delegate:SwirlButton{required property string modelData;width:featureListView.width;text:modelData;quiet:page.selected!==modelData;onClicked:page.selected=modelData}
+                    ScrollBar.vertical:SwirlScrollBar{}
                 }
             }
-            SwirlGlassPanel {
-                Layout.preferredWidth:Theme.dp(310); Layout.fillHeight:true
-                ScrollView {
-                    id:detailScroll0; anchors.fill:parent; anchors.margins:Theme.dp(17); clip:true
-                    ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
-                    ColumnLayout {
-                    width:detailScroll0.availableWidth; height:Math.max(implicitHeight,detailScroll0.availableHeight); spacing:Theme.dp(11)
-                    SwirlText { text:"模块详情"; color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
-                    SwirlText { text:page.selected; color:Theme.accent; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold; Layout.fillWidth:true; wrapMode:Text.WordWrap }
-                    SwirlText { text:"功能"; font.pixelSize:Theme.fontSize(10); color:Theme.muted }
-                    ScrollView {
-                        Layout.fillWidth:true
-                        Layout.preferredHeight:Math.floor(Math.min(Theme.dp(260),page.height*0.34))
-                        clip:true
-                        ColumnLayout {
-                            width:parent.width; spacing:Theme.dp(4)
-                            Repeater {
-                                model:page.featureList
-                                RowLayout {
-                                    Layout.fillWidth:true
-                                    SwirlText {
-                                        Layout.fillWidth:true
-                                        text:modelData; color:Theme.text; font.pixelSize:Theme.fontSize(12); elide:Text.ElideRight
-                                        MouseArea { anchors.fill:parent; onClicked:page.selected=modelData }
-                                    }
-                                    SwirlToggle { enabled:false;checked:false; onToggled:AppState.notice(modelData) }
-                                }
-                            }
-                        }
-                    }
-                    SwirlText { text:"编辑器 / 输出"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
-                    Rectangle {
-                        Layout.fillWidth:true; Layout.fillHeight:true
-                        color:Theme.field; radius:Theme.roundedRadius(width,height); border.color:Theme.border
-                        ScrollView {
-                            anchors.fill:parent; anchors.margins:Theme.dp(8)
-                            TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
-                                text:"# Swirl\nfeature: "+page.selected+"\nstatus: not connected\n\n# Changes will not affect system settings."
-                                color:Theme.text
-                                font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(11)
-                                selectByMouse:true; wrapMode:Text.Wrap
-                                background:Rectangle { color:"transparent" }
-                            }
-                        }
-                    }
-                    RowLayout {
-                        Layout.fillWidth:true
-                        SwirlButton { development:true; enabled:false; text:page.pageId==="replay"?"发送":"应用"; onClicked:AppState.notice(text) }
-                        SwirlButton { development:true; enabled:false; text:"更多"; quiet:false; onClicked:AppState.notice("更多选项") }
-                    }
+            Rectangle{Layout.fillHeight:true;Layout.preferredWidth:Theme.dp(1);color:Theme.border}
+            ColumnLayout{Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumWidth:0;spacing:Theme.gap
+                SwirlText{transform:Translate{x:tabMotion.position.x-tabMotion.targetX;y:tabMotion.position.y}
+                text:page.selected||qsTr("本地草稿");color:Theme.text;font.pixelSize:Theme.sectionTitleSize;font.weight:Font.DemiBold}
+                SwirlText{Layout.fillWidth:true;wrapMode:Text.Wrap;text:page.selected?qsTr("当前功能的编辑内容分别保留在页面中。"):qsTr("从左侧选择功能后编辑草稿。");color:Theme.muted;font.pixelSize:Theme.captionSize}
+                ScrollView{Layout.fillWidth:true;Layout.fillHeight:true;clip:true
+                    SwirlTextArea{text:page.editorBuffers[page.selected]||"";onTextChanged:page.updateBuffer(text);enabled:page.selected.length>0;placeholderText:qsTr("输入本地功能草稿");selectByMouse:true;wrapMode:TextEdit.Wrap;font.family:Theme.codeFontFamily;font.pixelSize:Theme.captionSize;}
                 }
-                }
-            }
-        }
-    }
-    SwirlDialog {
-        id:addDialog
-        title:"创建记录"
-        ColumnLayout {
-            width:parent.width; spacing:Theme.dp(13)
-            SwirlText { text:"记录名称"; color:Theme.text }
-            SwirlTextField { id:nameField; Layout.fillWidth:true; placeholderText:"请输入名称" }
-            RowLayout {
-                Layout.alignment:Qt.AlignRight
-                SwirlButton { development:true; enabled:false; text:"取消"; onClicked:addDialog.close() }
-                SwirlButton { development:true; enabled:false;
-                    text:"添加"; primary:true;
-                    onClicked:AppState.notice("研发中")
-                }
+                RowLayout{Layout.fillWidth:true;SwirlStatusBadge{label:qsTr("服务未接入");tone:"warning"}Item{Layout.fillWidth:true}SwirlButton{text:qsTr("应用");primary:true;development:true;enabled:false}}
             }
         }
     }

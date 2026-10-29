@@ -1,0 +1,14 @@
+{
+  "scope": "authored_32_face_C1_packaging_control_only",
+  "faces_passed": 32,
+  "windows_product": "Microsoft Windows Server 2022 Datacenter",
+  "windows_build": "20348",
+  "raster_count": 10,
+  "input_sha256": "9eba822516e0eb38229b0b103dd9424980b22e0272dd5ec5f03b3640932a7a8f",
+  "original_font_acceptance": "NOT_RUN",
+  "Windows11": "NOT_RUN",
+  "Qt_Swirl": "NOT_RUN",
+  "system_installation": "NOT_TESTED",
+  "source_commit": "69ff9049de57c2690a5cdf6a62caf2ccb955785d",
+  "ci_run_id": 39547139952
+}

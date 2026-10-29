@@ -1,0 +1,160 @@
+{
+  "source_files": {
+    "src/Swirl.Quick/tests/RustCoreTests.cpp": "a3d0970e8e864b3db41ec8ea0952d75ad3240c718e23ee9b1f6cb433dfc6e2ac",
+    "tools/Verify-PublicQtReality.py": "91be8a776ecbcbb694ab38509456948458965b2b24ea8d40e0c69ea443a67b36",
+    "tools/tests/test_public_qt_reality.py": "8e8b9822f11add13e04f539a5cf01c2dd4a8d7ef8832c59bd70691722d081d5d",
+    "tools/ApplyCoreDevelopment.py": "2f6ee19c5a6984dd4c789bca6654fa2a979885276349634632c69edf04d16a1c",
+    "tools/tests/test_core_development.py": "104baa6547ecd4c7aff13a9c8609b763662c4d33f9d1615310c6edbab23dc27e",
+    ".github/workflows/rust-core.yml": "59633d89a85cee5a55e7d36b90eda50ea37f88624acca98d1d3bd56312a6d511"
+  },
+  "public_evidence_tests": {
+    "passed": 9,
+    "failed": 0,
+    "log": "public-evidence-tests-final.log"
+  },
+  "workflow_guard_tests": {
+    "passed": 55,
+    "failed": 0,
+    "log": "workflow-tests-inspector-build.log"
+  },
+  "workflow_generator_idempotent": true,
+  "cpp_slot": {
+    "scope": "Exact public slot C++23 syntax with production declarations, Qt 6.4.2; no Windows DPAPI or public execution",
+    "source_sha256": "a3d0970e8e864b3db41ec8ea0952d75ad3240c718e23ee9b1f6cb433dfc6e2ac",
+    "slot_sha256": "aa89d5cd57903b547e6c80ad31c10afdfa36cbe2599c596e0069aded9cd07c9d",
+    "unchanged": true,
+    "initial_failed_sdk_check": [
+      {
+        "name": "str-moc",
+        "exit_code": 0,
+        "command": [
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/lib/qt6/libexec/moc",
+          "-I",
+          "/workspace/scratch/4ac02da16d32/Swirl/src/Swirl.Quick",
+          "-I",
+          "/workspace/scratch/4ac02da16d32/Swirl/src/Swirl.Quick/tests",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6/QtCore",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6/QtGui",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6/QtNetwork",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6/QtTest",
+          "-DSWIRL_USE_RUST_CORE=1",
+          "/workspace/scratch/4ac02da16d32/evidence/public-qt/public-slot.cpp",
+          "-o",
+          "/workspace/scratch/4ac02da16d32/evidence/public-qt/public-slot.moc"
+        ]
+      },
+      {
+        "name": "syntax",
+        "exit_code": 1,
+        "command": [
+          "g++",
+          "-std=c++23",
+          "-fPIC",
+          "-fsyntax-only",
+          "-DSWIRL_USE_RUST_CORE=1",
+          "-I",
+          "/workspace/scratch/4ac02da16d32/Swirl/src/Swirl.Quick",
+          "-I",
+          "/workspace/scratch/4ac02da16d32/Swirl/src/Swirl.Quick/tests",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6/QtCore",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6/QtGui",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6/QtNetwork",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6/QtTest",
+          "/workspace/scratch/4ac02da16d32/evidence/public-qt/public-slot.cpp"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "name": "moc-final",
+        "exit_code": 0,
+        "command": [
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/lib/qt6/libexec/moc",
+          "-I",
+          "/workspace/scratch/4ac02da16d32/Swirl/src/Swirl.Quick",
+          "-I",
+          "/workspace/scratch/4ac02da16d32/Swirl/src/Swirl.Quick/tests",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6/QtCore",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6/QtGui",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6/QtNetwork",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6/QtTest",
+          "-DSWIRL_USE_RUST_CORE=1",
+          "-DSWIRL_FIXTURE_DIR=\"/workspace/scratch/4ac02da16d32/Swirl/tools/tests/fixtures\"",
+          "/workspace/scratch/4ac02da16d32/evidence/public-qt/public-slot.cpp",
+          "-o",
+          "/workspace/scratch/4ac02da16d32/evidence/public-qt/public-slot.moc"
+        ]
+      },
+      {
+        "name": "syntax-final",
+        "exit_code": 0,
+        "command": [
+          "g++",
+          "-std=c++23",
+          "-fPIC",
+          "-fsyntax-only",
+          "-DSWIRL_USE_RUST_CORE=1",
+          "-DSWIRL_FIXTURE_DIR=\"/workspace/scratch/4ac02da16d32/Swirl/tools/tests/fixtures\"",
+          "-I",
+          "/workspace/scratch/4ac02da16d32/Swirl/src/Swirl.Quick",
+          "-I",
+          "/workspace/scratch/4ac02da16d32/Swirl/src/Swirl.Quick/tests",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6/QtCore",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6/QtGui",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6/QtNetwork",
+          "-I",
+          "/workspace/scratch/87da89b25d27/qt-local/sdk/usr/include/x86_64-linux-gnu/qt6/QtTest",
+          "/workspace/scratch/4ac02da16d32/evidence/public-qt/public-slot.cpp"
+        ]
+      }
+    ],
+    "harness_only_adjustment": "Omit unused StoragePaths.h requiring Qt>=6.7; supply existing fixture directory build macro. Slot text and production engine declarations unchanged."
+  },
+  "windows_execution": "not performed locally; exact-source CI required",
+  "retained_initial_failures": [
+    "copy2 old mtime source restoration did not persist across tool calls; write_bytes restored with fresh timestamp; cause inferred not established",
+    "Qt 6.4.2 full include check failed on unused StoragePaths Qt>=6.7 enum; exact slot checked separately, source unchanged"
+  ],
+  "extra_full_qt_chain_missing": [
+    "TLS1.2 non-Direct inner stream via Qt",
+    "REALITY wrong-key/short-id/VLESS UUID via Qt",
+    "active authenticated transfer cancellation via Qt"
+  ],
+  "controlled_qt_already_present": [
+    "half-close with independent echo tail and actual half-close signal",
+    "certificate hostname failure",
+    "A/B selection/recreation",
+    "DIRECT plus named and group routes",
+    "TLS1.3 origin with independent close proof"
+  ],
+  "public_qt_scope": [
+    "8 public A/B x HTTP CONNECT/SOCKS5 x HTTP/HTTPS requests",
+    "actual DPAPI import/reload and selection",
+    "MATCH REJECT exact reply against reachable loopback listener",
+    "independent pinned public Xray sockets and bidirectional Vision Direct"
+  ],
+  "public_tls_close_limit": "QSslSocket disconnected state is not independent public close_notify receipt proof; controlled Qt fixture verifies own origin TLS close"
+}

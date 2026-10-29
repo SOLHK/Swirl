@@ -1,38 +1,37 @@
-Swirl - Windows development preview
+Swirl - Rust Core Windows development preview
 
-This build includes a separate Mihomo engine, real proxy configuration,
-optional Windows system proxy/TUN, HTTP capture and scoped HTTPS decryption,
-rewrites, local JavaScript execution, configuration overlays and DHCP gateway
-control. Credentials and local private keys use Windows DPAPI. Network
-takeover and certificate trust require explicit user actions. Unimplemented
-features remain unavailable. See the source documentation for limitations.
+All proxy node forwarding is implemented by the in-process Swirl Rust Core.
+Qt/C++ supplies the UI, configuration/import, operating-system integration and
+HTTP debugging/capture tools. No external proxy engine is included or started.
+TUN, LAN proxy and gateway forwarding are not yet supported by this Rust product;
+unsupported settings are preserved and explicitly rejected, never downgraded.
 
-Mihomo v1.19.32, Copyright MetaCubeX and other contributors, is bundled as an
-unmodified, separate executable under GPL version 3. Its full license is in
-licenses/mihomo-GPL-3.0.txt. Version, upstream asset URL, archive SHA-256 and
-executable SHA-256 are recorded in core/mihomo-manifest.json. Swirl verifies
-the executable against its compiled-in manifest before each launch.
-Corresponding upstream source for this exact version:
-https://github.com/MetaCubeX/mihomo/tree/v1.19.32
-https://github.com/MetaCubeX/mihomo/archive/refs/tags/v1.19.32.tar.gz
-Mihomo API documentation: https://wiki.metacubex.one/en/api/
+Clash-compatible subscription parsing is a data-format feature. The proxy
+runtime is Swirl Rust Core, with no external core executable or fallback.
 
-Qt 6.10.3 is dynamically linked. Copyright The Qt Company Ltd. and other
+Qt 6.12.0 is dynamically linked. Copyright The Qt Company Ltd. and other
 contributors. Qt is used under LGPL version 3; corresponding license texts
 are in licenses/. You may replace the bundled Qt libraries with compatible
 modified versions, and reverse engineer this application for debugging such
 modifications as allowed by the LGPL. Qt source archives are available at:
-https://download.qt.io/archive/qt/6.10/6.10.3/single/
+https://download.qt.io/official_releases/qt/6.12/6.12.0/single/
 Module-specific license and third-party metadata:
-https://code.qt.io/cgit/qt/qtbase.git/tree/LICENSES?h=v6.10.3
-https://code.qt.io/cgit/qt/qtdeclarative.git/tree/LICENSES?h=v6.10.3
+https://code.qt.io/cgit/qt/qtbase.git/tree/LICENSES?h=v6.12.0
+https://code.qt.io/cgit/qt/qtdeclarative.git/tree/LICENSES?h=v6.12.0
 
-FreeType 2.14.2, bundled inside Qt, is used for Windows font rasterization.
-Portions of this software are copyright (C) 1996-2025 The FreeType Project
+OpenSSL 3.5.9 is dynamically linked by Qt's TLS backend. Copyright The OpenSSL
+Project Authors. Licensed under Apache License 2.0. The unmodified upstream
+license is licenses/OpenSSL-LICENSE.txt; Swirl's build/source provenance notice
+is licenses/OpenSSL-NOTICE.txt. The source URL and verified SHA256 are recorded
+in openssl-runtime.json and tools/openssl-runtime.lock.json in Swirl source.
+https://openssl-library.org/source/
+
+FreeType 2.14.3, bundled inside Qt, is used for Windows font rasterization.
+Portions of this software are copyright (C) 1996-2026 The FreeType Project
 (https://freetype.org/). All rights reserved.
 License: licenses/FreeType-FTL.txt
 Corresponding Qt-vendored source:
-https://github.com/qt/qtbase/tree/v6.10.3/src/3rdparty/freetype
+https://github.com/qt/qtbase/tree/v6.12.0/src/3rdparty/freetype
 
 MinGW builds also contain GCC/libstdc++ runtime libraries under GPL version 3
 with the GCC Runtime Library Exception (see licenses/). Source and notices:
@@ -40,11 +39,12 @@ https://gcc.gnu.org/releases.html
 https://www.mingw-w64.org/license/
 
 Swirl source and reproducible Windows build instructions:
-https://github.com/SOLHK/Swirl/tree/test/src/Swirl.Quick
+https://github.com/SOLHK/Swirl/tree/main/src/Swirl.Quick
 
 Other Windows fonts used during validation are system-installed fonts and are
-not redistributed in this installer. Swirl's brand SVG artwork is preserved;
-interface glyphs are independently authored for Swirl.
+not redistributed in this installer. Swirl's original knot identity is retained
+in independently redrawn SVG artwork; interface glyphs are authored for Swirl.
+No APEC emblem, official feather arrangement, poster or video is packaged.
 
 fkYAML v0.5.0 — MIT — Copyright Kensuke Fukutani (2023-2026)
 https://github.com/fktn-k/fkYAML

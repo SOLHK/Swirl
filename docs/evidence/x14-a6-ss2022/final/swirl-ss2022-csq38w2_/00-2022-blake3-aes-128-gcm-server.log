@@ -1,0 +1,6 @@
+2026-10-22T22:07:24.781902223+09:00  INFO main ThreadId(01) shadowsocks_rust::service::server: shadowsocks server 1.25.0 build 2026-08-26T23:15:24.779049808+00:00
+2026-10-22T22:07:24.782789056+09:00  INFO main ThreadId(01) shadowsocks_service::server::tcprelay: shadowsocks tcp server listening on 127.0.0.1:39805, inbound address 127.0.0.1:39805
+2026-10-22T22:07:24.782802877+09:00  INFO main ThreadId(01) shadowsocks_service::server::udprelay: shadowsocks udp server listening on 127.0.0.1:39805, inbound address 127.0.0.1:39805
+2026-10-22T22:07:24.800928212+09:00 DEBUG main ThreadId(01) shadowsocks_service::server::tcprelay: tcp handshake failed, received EOF before a complete target Address, peer: 127.0.0.1:40150
+2026-10-22T22:07:24.806633843+09:00 ERROR main ThreadId(01) shadowsocks_service::server::udprelay: udp server recv packet failed. peer: 127.0.0.1:45832, decrypt payload error
+2026-10-22T22:07:25.833860305+09:00  INFO main ThreadId(01) shadowsocks_rust::monitor::imp: received SIGTERM, exiting

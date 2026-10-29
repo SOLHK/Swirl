@@ -1,0 +1,24 @@
+SOURCE 593e7cddc360cf7f51d9fdc988e6cf8fd99aea96
+COMMAND ["/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3", "/workspace/scratch/ca6cd1f88f6f/Swirl/tools/tests/test_policy_groups.py", "-v"]
+
+test_all_unhealthy_fails_without_direct_fallback (__main__.PolicyIntegration.test_all_unhealthy_fails_without_direct_fallback) ... ok
+test_fallback_priority_and_failed_request_are_never_replayed (__main__.PolicyIntegration.test_fallback_priority_and_failed_request_are_never_replayed) ... ok
+test_https_origin_inside_verified_tls_proxy_uses_two_tls_sessions (__main__.PolicyIntegration.test_https_origin_inside_verified_tls_proxy_uses_two_tls_sessions) ... ok
+test_https_untrusted_or_wrong_certificate_never_becomes_healthy (__main__.PolicyIntegration.test_https_untrusted_or_wrong_certificate_never_becomes_healthy) ... ok
+test_invalid_reconfigure_is_atomic_and_does_not_probe (__main__.PolicyIntegration.test_invalid_reconfigure_is_atomic_and_does_not_probe) ... ok
+test_manual_selection_keeps_health_and_existing_connections (__main__.PolicyIntegration.test_manual_selection_keeps_health_and_existing_connections) ... ok
+test_redirect_is_unhealthy_and_target_is_never_followed (__main__.PolicyIntegration.test_redirect_is_unhealthy_and_target_is_never_followed) ... ok
+test_round_robin_consumes_only_new_routed_sessions (__main__.PolicyIntegration.test_round_robin_consumes_only_new_routed_sessions) ... ok
+test_saturated_probe_budget_stops_and_reconfigure_does_not_leak (__main__.PolicyIntegration.test_saturated_probe_budget_stops_and_reconfigure_does_not_leak) ... ok
+test_udp_association_pins_distinct_ss_exit_across_health_and_configure (__main__.PolicyIntegration.test_udp_association_pins_distinct_ss_exit_across_health_and_configure) ... ok
+test_unsupported_udp_member_does_not_retry_a_direct_member (__main__.PolicyIntegration.test_unsupported_udp_member_does_not_retry_a_direct_member) ... ok
+test_url_test_switches_only_new_tcp_sessions (__main__.PolicyIntegration.test_url_test_switches_only_new_tcp_sessions) ... ok
+test_verified_https_runs_inside_native_proxy_tunnel (__main__.PolicyIntegration.test_verified_https_runs_inside_native_proxy_tunnel) ... ok
+test_pair_allocation_preserves_denials_and_cleans_up_non_socket_errors (__main__.SsPolicyPeerAllocationTests.test_pair_allocation_preserves_denials_and_cleans_up_non_socket_errors) ... ok
+test_pair_allocation_stops_after_eight_collisions_with_original_error (__main__.SsPolicyPeerAllocationTests.test_pair_allocation_stops_after_eight_collisions_with_original_error) ... ok
+test_pair_retries_only_collisions_and_releases_failed_sockets (__main__.SsPolicyPeerAllocationTests.test_pair_retries_only_collisions_and_releases_failed_sockets) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 5.196s
+
+OK

@@ -1,0 +1,316 @@
+{
+  "schema": 1,
+  "scope": "Retained exact-commit CI failure and locally compiled QML acceptance follow-up; new-commit Windows acceptance pending at publication",
+  "parent_commit": "7b35bb1474fa5827c3e184231e07d059609532a7",
+  "branch": "work/subscription-native-bridge-20261023",
+  "run_id": 39885164416,
+  "run_url": "https://github.com/SOLHK/Swirl/actions/runs/39885164416",
+  "preceding_linux_macos": [
+    {
+      "os": "ubuntu-24.04",
+      "rust_totals": {
+        "passed": 661,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "rust_nonempty_suites": 30,
+      "qt_reports": [
+        {
+          "report": "swirl-xray-import.xml",
+          "test_functions": 25
+        },
+        {
+          "report": "swirl-xray-download.xml",
+          "test_functions": 15
+        },
+        {
+          "report": "swirl-xray-store.xml",
+          "test_functions": 11
+        },
+        {
+          "report": "swirl-xray-catalog.xml",
+          "test_functions": 6
+        },
+        {
+          "report": "swirl-xray-runtime.xml",
+          "test_functions": 5
+        }
+      ],
+      "qt_test_functions": 62,
+      "traffic_profiles": [
+        {
+          "protocol": "http",
+          "success": true,
+          "evidence": "http-1792720055248086803"
+        },
+        {
+          "protocol": "socks5",
+          "success": true,
+          "evidence": "socks5-1792720055707651313"
+        },
+        {
+          "protocol": "ss",
+          "success": true,
+          "evidence": "ss-1792720056147895929"
+        },
+        {
+          "protocol": "vless",
+          "success": true,
+          "evidence": "vless-1792720056648504435"
+        },
+        {
+          "protocol": "vless-reality",
+          "success": true,
+          "evidence": "vless-reality-1792720057088741066"
+        },
+        {
+          "protocol": "vmess",
+          "success": true,
+          "evidence": "vmess-1792720057675422720"
+        },
+        {
+          "protocol": "trojan",
+          "success": true,
+          "evidence": "trojan-1792720058149039785"
+        }
+      ]
+    },
+    {
+      "os": "macos-14",
+      "rust_totals": {
+        "passed": 661,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "rust_nonempty_suites": 30,
+      "qt_reports": [
+        {
+          "report": "swirl-xray-import.xml",
+          "test_functions": 25
+        },
+        {
+          "report": "swirl-xray-download.xml",
+          "test_functions": 15
+        },
+        {
+          "report": "swirl-xray-store.xml",
+          "test_functions": 11
+        },
+        {
+          "report": "swirl-xray-catalog.xml",
+          "test_functions": 6
+        },
+        {
+          "report": "swirl-xray-runtime.xml",
+          "test_functions": 5
+        }
+      ],
+      "qt_test_functions": 62,
+      "traffic_profiles": [
+        {
+          "protocol": "http",
+          "success": true,
+          "evidence": "http-1792720034408115000"
+        },
+        {
+          "protocol": "socks5",
+          "success": true,
+          "evidence": "socks5-1792720035293416000"
+        },
+        {
+          "protocol": "ss",
+          "success": true,
+          "evidence": "ss-1792720036061028000"
+        },
+        {
+          "protocol": "vless",
+          "success": true,
+          "evidence": "vless-1792720036857409000"
+        },
+        {
+          "protocol": "vless-reality",
+          "success": true,
+          "evidence": "vless-reality-1792720037612241000"
+        },
+        {
+          "protocol": "vmess",
+          "success": true,
+          "evidence": "vmess-1792720038472947000"
+        },
+        {
+          "protocol": "trojan",
+          "success": true,
+          "evidence": "trojan-1792720039508638000"
+        }
+      ]
+    }
+  ],
+  "preceding_windows": {
+    "schema": 1,
+    "scope": "Exact remote commit Windows CI failed-run history; not final acceptance",
+    "commit": "7b35bb1474fa5827c3e184231e07d059609532a7",
+    "run_id": 39885164416,
+    "job_id": 120191536667,
+    "job_url": "https://github.com/SOLHK/Swirl/actions/runs/39885164416/job/120191536667",
+    "conclusion": "failure",
+    "rust": {
+      "unit_integration_passed": 661,
+      "doctests_passed": 1,
+      "total_passed": 662,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0
+    },
+    "qt": {
+      "test_functions": 76,
+      "zero_skips": true,
+      "suites": {
+        "import": 25,
+        "download": 15,
+        "store": 24,
+        "catalog": 7,
+        "runtime": 5
+      },
+      "mandatory_dpapi_and_catalog_names_step": "success",
+      "evidence_lines": [
+        "2026-10-23T01:58:51.7309279Z swirl-xray-import.xml: 25 test functions passed, zero skips",
+        "2026-10-23T01:58:51.7309602Z swirl-xray-download.xml: 15 test functions passed, zero skips",
+        "2026-10-23T01:58:51.7309841Z swirl-xray-store.xml: 24 test functions passed, zero skips",
+        "2026-10-23T01:58:51.7310108Z swirl-xray-catalog.xml: 7 test functions passed, zero skips",
+        "2026-10-23T01:58:51.7310329Z swirl-xray-runtime.xml: 5 test functions passed, zero skips"
+      ]
+    },
+    "traffic": {
+      "profile_passes": 7,
+      "provider_acceptance": false,
+      "profiles": [
+        {
+          "utc": "2026-10-23T02:00:01.9849379Z",
+          "protocol": "http",
+          "success": true,
+          "evidence": "http-1792720800990573200"
+        },
+        {
+          "utc": "2026-10-23T02:00:02.9608518Z",
+          "protocol": "socks5",
+          "success": true,
+          "evidence": "socks5-1792720801982876900"
+        },
+        {
+          "utc": "2026-10-23T02:00:03.9282855Z",
+          "protocol": "ss",
+          "success": true,
+          "evidence": "ss-1792720802958795600"
+        },
+        {
+          "utc": "2026-10-23T02:00:04.9091280Z",
+          "protocol": "vless",
+          "success": true,
+          "evidence": "vless-1792720803926362400"
+        },
+        {
+          "utc": "2026-10-23T02:00:06.0061012Z",
+          "protocol": "vless-reality",
+          "success": true,
+          "evidence": "vless-reality-1792720804906791400"
+        },
+        {
+          "utc": "2026-10-23T02:00:07.1390528Z",
+          "protocol": "vmess",
+          "success": true,
+          "evidence": "vmess-1792720806005925600"
+        },
+        {
+          "utc": "2026-10-23T02:00:08.2332499Z",
+          "protocol": "trojan",
+          "success": true,
+          "evidence": "trojan-1792720807136961100"
+        }
+      ]
+    },
+    "package": {
+      "complete_app_build": "success",
+      "source_identity_and_dll_equality_gate": "success",
+      "swirl_exe_sha256": "1f92c3c6b878eccb9d6440727107cb023027c1e6da5026ea8ef1e9b342fb4aab",
+      "swirl_api_dll_sha256": "74795755295969cd0f84d41fbb377600b1ea8ecc820bc996e50c704ea8329134",
+      "hash_mapping": "Order of Get-FileHash loop in job log: Swirl.exe, then swirl_api.dll."
+    },
+    "qml": {
+      "pages": "passed",
+      "scale_1": "failed",
+      "scale_1_5": "not_executed",
+      "failure": "XRAY_UI_FAIL cancel-preview-button",
+      "actual_dpr": 1,
+      "expected_dpr": 1,
+      "evidence_lines": [
+        "2026-10-23T02:00:40.1234576Z pages: exit 0 and required completion marker",
+        "2026-10-23T02:00:43.8117037Z 4: XRAY_UI_DPR actual=1.000 expected=1.000",
+        "2026-10-23T02:00:43.8118085Z 2: XRAY_UI_FAIL cancel-preview-button"
+      ],
+      "timing_limit": "Diagnostics are printed from file after process exit; individual checks lack timestamps, so this log cannot distinguish immediate click precondition failure from 2-second click signal timeout."
+    }
+  },
+  "candidate": {
+    "source_sha256": {
+      "src/Swirl.Quick/CMakeLists.txt": "aa7c978ff3817fe3895b280239a02de8d52ca578be83111c7098785d7c31f754",
+      "src/Swirl.Quick/qml/pages/ProxiesPage.qml": "2fad591a511a3648fd045ac1349da072eb617eba836c885e8af51cc920493d3d",
+      "src/Swirl.Quick/tests/XrayUiChecks.cpp": "2e6f1b640c023c75c64bcbb834f55791822a72891e5e25ca65d4390e6f9e6c7c"
+    },
+    "changes": [
+      "Stable cancellation object name, scoped to the mounted import dialog",
+      "Wait for whole-window Qt polish before pointer coordinate calculation",
+      "Preserve real QTest pointer events and exactly-one-click assertions; add phase-specific failures",
+      "Link Qt QuickTest only in SWIRL_XRAY_UI_TESTS builds"
+    ],
+    "workflow_unchanged_sha256": "5532ff2b388fa4a057f6bebfb29a9b92e018eda1561958866797af4e9be0696f",
+    "native_abi_unchanged_sha256": "5e9cad3c9b275227c020af54dcb75a70dad4bc88fd21dcab4501b68e43a9859f"
+  },
+  "local_validation": {
+    "platform": "Linux offscreen, Qt6.10.3; not Windows product acceptance",
+    "modified_complete_cpp_driver": [
+      {
+        "name": "configure",
+        "exit_code": 0,
+        "elapsed_seconds": 0.718
+      },
+      {
+        "name": "compile",
+        "exit_code": 0,
+        "elapsed_seconds": 8.802
+      }
+    ],
+    "footer_experiment": {
+      "paired_trials": 18,
+      "immediate_trials": 9,
+      "polished_trials": 9,
+      "all_trials_exactly_one_cancel_zero_close_apply": true,
+      "stale_positive_geometry_observed": true,
+      "item_polish_pending": false,
+      "window_polish_pending": true,
+      "baseline_scene_center_before_polish": 830.84375,
+      "baseline_scene_center_after_polish": 774,
+      "long_confirm_scene_center_after_polish": 719,
+      "windows_failure_reproduced": false,
+      "fail_before_pass_after_claimed": false,
+      "limitation": "Standalone standard Qt controls do not use the complete Swirl font/control implementation; immediate clicks succeeded on Linux/offscreen."
+    },
+    "dialog_scope_trials": 12,
+    "dialog_scope_same_visual_button_and_actual_click_passes": 12,
+    "experiment_file_sha256": {
+      "baseline-main.cpp": "33482f1199e0458b00bd29bc10c5051dde299f1b40c5640d3c75ee936d6140f4",
+      "baseline-result.jsonl": "6d8e27b9286f68310cb4f7a8ea9dd964336eded8b5618ac9504948db36a0350c",
+      "main.cpp": "7a995a40199dfa7a36cfbc4616156a829dd535ce393fd6195d68c379ad57cbda",
+      "variant-result.jsonl": "800acdc70132cc4835d86f9a05477e62871eb82f04c8b9923b17448c7e6bff7a",
+      "scope-result.jsonl": "5d052c179252ca3ccce9de93c7c94d6cc934764362e4d9e843af0d6d20536ac4"
+    }
+  },
+  "primary_references": [
+    "https://doc.qt.io/qt-6/qquicktest.html",
+    "https://github.com/qt/qtdeclarative/blob/v6.10.3/src/qmltest/quicktest.cpp"
+  ],
+  "remaining_required": "All three CI jobs on the new exact commit, including Windows page smoke and import at scale1 and1.5. Original failed run remains failure."
+}

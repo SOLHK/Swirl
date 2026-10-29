@@ -8,6 +8,8 @@ import "../controls"
 
 Item {
     id: page
+    readonly property Item motionTitle:heading.titleItem
+    readonly property bool compact:width<Theme.dp(620)
     property var selected:null
  property bool detailHasSelection:selected!==null
  onDetailHasSelectionChanged:{if(visible)detailClock.moveTo(detailHasSelection?1:0);else{detailClock.destination=detailHasSelection?1:0;detailClock.finish()}}
@@ -20,43 +22,22 @@ Item {
     }).map(function(r){return {id:r.id||[r.time,r.correlation,r.source,r.code].join("/"),time:r.time,level:r.level,source:r.source,message:r.message}}).reverse()
     FileDialog { id:diagnosticFile;title:"导出诊断报告";fileMode:FileDialog.SaveFile;nameFilters:["诊断 ZIP (*.zip)"];defaultSuffix:"zip";onAccepted:{diagnostics.exportReport(selectedFile,systemProvider.diagnosticSnapshot());AppState.toast=diagnostics.exportMessage} }
     ColumnLayout {
-        anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(13)
-        RowLayout {
-            Layout.fillWidth:true
-            SwirlStatusBadge { label:"日志记录"; tone:"accent" }
-            SwirlText { text:displayLogs.length+" 条诊断事件"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { text:"导出诊断报告"; iconName:"folder"; onClicked:diagnosticFile.open() }
-            SwirlButton { text:"标记已读";enabled:diagnostics.eventCount>0;onClicked:diagnostics.acknowledge() }
-            SwirlButton { text:"清空"; danger:true; onClicked:{systemProvider.clearLogs();page.selected=null} }
+        anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.dp(16)
+        SwirlPageHeader {id:heading;Layout.fillWidth:true;title:qsTr("日志");description:qsTr("应用内可观测事件与诊断信息。");metadata:qsTr("%1 条诊断事件").arg(page.displayLogs.length)
+            SwirlButton {text:qsTr("导出诊断报告");iconName:"folder";onClicked:diagnosticFile.open()}
+            SwirlButton {text:qsTr("标记已读");quiet:true;enabled:diagnostics.eventCount>0;onClicked:diagnostics.acknowledge()}
+            SwirlButton {text:qsTr("清空");danger:true;quiet:true;onClicked:{systemProvider.clearLogs();page.selected=null}}
         }
-        RowLayout {
-            Layout.fillWidth:true
-            SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"搜索消息、级别或组件" }
-            SwirlComboBox { id:level; model:["全部级别","INFO","DEBUG","WARN","ERROR"] }
-            SwirlText { text:"跟随最新日志"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
-            SwirlToggle { checked:page.followTail; onToggled:page.followTail=checked }
+        GridLayout {Layout.fillWidth:true;columns:width<Theme.dp(620)?1:2;columnSpacing:Theme.dp(16);rowSpacing:Theme.compactGap
+            SwirlSearchField {id:search;Layout.fillWidth:true;placeholderText:qsTr("搜索消息、级别或组件")}
+            RowLayout {spacing:Theme.dp(12);SwirlComboBox {id:level;model:["全部级别","INFO","DEBUG","WARN","ERROR"];Accessible.name:qsTr("日志级别")} SwirlText {text:qsTr("跟随最新日志");color:Theme.muted;font.pixelSize:Theme.fontSize(12)} SwirlToggle {checked:page.followTail;onToggled:page.followTail=checked;Accessible.name:qsTr("跟随最新日志")}}
         }
-        RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(14)
-            SwirlGlassPanel {
-                Layout.fillWidth:true; Layout.fillHeight:true; clip:true
-                SwirlDataTable {
-                    anchors.fill:parent; anchors.margins:Theme.dp(1)
-                    rows:page.displayLogs;incrementalRows:true;followTail:page.followTail;animateRowChanges:false
-                    selectedId:page.selected?page.selected.id:""
-                    columns:[{key:"time",label:"时间",w:108},{key:"level",label:"级别",w:84},
-                             {key:"source",label:"来源",w:104},{key:"message",label:"信息",w:570}]
-                    onRowSelected:function(r){page.selected=r}
-                }
-                SwirlEmptyState {
-                    visible:page.displayLogs.length===0; anchors.centerIn:parent
-                    headline:"没有日志记录"
-                    detail:"暂无真实引擎事件"
-                }
+        GridLayout {Layout.fillWidth:true;Layout.fillHeight:true;columns:page.compact?1:2;columnSpacing:Theme.sectionGap;rowSpacing:Theme.sectionGap
+            Item {Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:Theme.dp(100)
+                SwirlDataTable {id:logTable;objectName:"logTable";anchors.fill:parent;rows:page.displayLogs;incrementalRows:true;followTail:page.followTail;animateRowChanges:false;selectedId:page.selected?page.selected.id:"";minimal:true;columns:[{key:"time",label:qsTr("时间"),w:108},{key:"level",label:qsTr("级别"),w:84},{key:"source",label:qsTr("来源"),w:104},{key:"message",label:qsTr("信息"),w:570}];onRowSelected:function(r){page.selected=r;logDetail.present(logTable.selectedItem)}}
+                SwirlEmptyState {visible:page.displayLogs.length===0;anchors.centerIn:parent;width:Math.max(0,parent.width-Theme.dp(24));headline:qsTr("没有匹配的日志");detail:page.records.length?qsTr("调整搜索或级别筛选。"):qsTr("暂无真实引擎事件。")}
             }
-            SwirlGlassPanel {
-                Layout.preferredWidth:Theme.dp(289); Layout.fillHeight:true
-                transform:Translate{x:SwirlMotion.reduced?0:Theme.dp(16)*(1-detailClock.progress)}
+            SwirlLinkedDetail {id:logDetail;animationLayer:page;sourceViewport:logTable;detailOpen:page.selected!==null;visible:!page.compact||page.selected!==null||moving;Layout.preferredWidth:page.compact?1:Theme.dp(300);Layout.fillWidth:page.compact;Layout.fillHeight:!page.compact;Layout.preferredHeight:page.compact?Theme.dp(180):-1
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:Theme.dp(18); spacing:Theme.dp(12)
                     ScrollView {
@@ -72,7 +53,7 @@ Item {
                         ColumnLayout {
                             Layout.fillWidth:true; spacing:Theme.dp(4)
                             SwirlText { text:AppState.zh(modelData[0]); font.pixelSize:Theme.fontSize(10); color:Theme.muted }
-                            SwirlText { text:AppState.zh(modelData[1]); font.pixelSize:Theme.fontSize(12); color:Theme.text; Layout.fillWidth:true; wrapMode:Text.WordWrap }
+                            SwirlText { text:String(modelData[1]); textFormat:Text.PlainText; font.pixelSize:Theme.fontSize(12); color:Theme.text; Layout.fillWidth:true; wrapMode:Text.WordWrap }
                         }
                     }
                     Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }

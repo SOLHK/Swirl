@@ -55,7 +55,14 @@ Item { Rectangle {anchors.fill:parent;color:'#536BB4'}
         check(!image.isNull()&&image.save(directory+"/"+name+".png"),name+": actual DWM image saved");
         int corner=0,material=0;DwmGetWindowAttribute(hwnd,33,&corner,sizeof(corner));DwmGetWindowAttribute(hwnd,38,&material,sizeof(material));
         qInfo()<<name<<"DPR"<<w->devicePixelRatio()<<"styles"<<QString::number(GetWindowLongPtrW(hwnd,GWL_STYLE),16)<<QString::number(GetWindowLongPtrW(hwnd,GWL_EXSTYLE),16)<<"DWM"<<corner<<material;
-        if(!baseline){const bool exact=w->property("swirlExactWindowRadius").toBool();check(corner==(exact?1:2)&&material==(backdrop->active()?3:1),name+": exact-region or native-preset contour and effective material confirmed");check(!(GetWindowLongPtrW(hwnd,GWL_EXSTYLE)&WS_EX_LAYERED),name+": no layered HWND blocking native composition");check(!(GetWindowLongPtrW(hwnd,GWL_STYLE)&WS_CAPTION),name+": only Swirl traffic lights, no native caption buttons");
+        if(!baseline){const bool exact=w->property("swirlExactWindowRadius").toBool();check(corner==(exact?1:2)&&material==(backdrop->active()?3:1),name+": exact-region or native-preset contour and effective material confirmed");check(!(GetWindowLongPtrW(hwnd,GWL_EXSTYLE)&WS_EX_LAYERED),name+": no layered HWND blocking native composition");
+            constexpr LONG_PTR required=WS_CAPTION|WS_THICKFRAME|WS_SYSMENU|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
+            check((GetWindowLongPtrW(hwnd,GWL_STYLE)&required)==required,name+": native transition, resize, system menu and minimize/maximize styles retained");
+            RECT client{};POINT origin{};
+            check(GetClientRect(hwnd,&client)&&ClientToScreen(hwnd,&origin)&&origin.x==r.left&&origin.y==r.top
+                &&client.right==r.right-r.left&&client.bottom==r.bottom-r.top,name+": custom client occupies the full HWND without a native caption band");
+            check(SendMessageW(hwnd,WM_NCPAINT,1,0)==0&&SendMessageW(hwnd,WM_NCACTIVATE,FALSE,0)==TRUE
+                &&SendMessageW(hwnd,WM_NCACTIVATE,TRUE,0)==TRUE,name+": native caption paint and activation are handled by the custom frame");
             // The fixture is visible outside the system contour. Each tip must
             // match the nearby desktop rather than QML's light-blue rectangle.
             const auto desktop=GetDC(nullptr);int matches=0;
@@ -89,7 +96,9 @@ Item { Rectangle {anchors.fill:parent;color:'#536BB4'}
     for(const auto &route:QStringList{"activity","overview","processes","policies","rules","capture","tls","featurehub"}){eval(QString("AppState.navigate('%1')").arg(route));QTest::qWait(250);const auto frame=capture(main,route);if(!baseline)auditText(main,route);
         if(!baseline && route=="capture"){eval("pageLoader.item.scrollToBottom()");QTest::qWait(150);capture(main,"capture-bottom");}
         if(!baseline && route=="activity" && !frame.isNull()){
-            const auto ratio=main->devicePixelRatio();const auto a=frame.pixelColor(qRound(195*ratio),qRound(20*ratio)),b=frame.pixelColor(qRound(195*ratio),qRound(45*ratio));
+            // The old x=195 sample crosses the floating sidebar's curved rim.
+            // The workspace centre stays clear of controls and that shadow.
+            const auto ratio=main->devicePixelRatio();const auto a=frame.pixelColor(frame.width()/2,qRound(20*ratio)),b=frame.pixelColor(frame.width()/2,qRound(45*ratio));
             const int delta=qAbs(a.red()-b.red())+qAbs(a.green()-b.green())+qAbs(a.blue()-b.blue());qInfo()<<"TITLE_BAND_DELTA"<<delta;check(delta<5,"traffic lights and proxy row have no horizontal caption band");
         }
     }
@@ -107,22 +116,56 @@ Item { Rectangle {anchors.fill:parent;color:'#536BB4'}
     }
     pattern->setVisible(false);
     if(!baseline){
-        eval("proxyPanel.toggle()");QTest::qWait(300);
-        auto *button=find(main->contentItem(),"proxyNodesButton");
-        // Popup may own a native surface; inspect the QML object as fallback.
-        if(!button)button=main->findChild<QQuickItem *>("proxyNodesButton");
-        check(button&&!button->property("quiet").toBool(),"node/policy navigation uses a visible bordered button");
-        eval("proxyPanel.requestDismiss()");QTest::qWait(250);
+        auto *button=find(main->contentItem(),"nav-policies");
+        check(button&&button->isVisible()&&button->isEnabled(),"policy navigation has a visible operable sidebar entry");
+        if(button)QTest::mouseClick(main,Qt::LeftButton,Qt::NoModifier,button->mapToScene(QPointF(button->width()/2,button->height()/2)).toPoint());
+        QTest::qWait(300);
+        check(eval("AppState.currentPage==='policies' && pageLoader.item!==null").toBool(),"real sidebar mouse input opens the current policy workspace");
     }
     // Real node-store entries, reserved loopback endpoints; never connect.
-    for(int i=0;i<13;++i)eval(QString("engineController.saveNode({name:'验证节点 %1 · 长名称自适应排版',protocol:'http',host:'127.0.0.1',port:%2})").arg(i+1).arg(25000+i));
-    eval("AppState.navigate('policies')");QTest::qWait(200);capture(main,"policies-many");
-    if(!baseline){check(eval("pageLoader.item.nodePages>1").toBool(),"many nodes have explicit pages");auto *next=find(main->contentItem(),"nextNodePage");check(next&&next->isVisible()&&next->isEnabled(),"next node page is visible and operable");if(next){QTest::mouseClick(main,Qt::LeftButton,Qt::NoModifier,next->mapToScene(QPointF(next->width()/2,next->height()/2)).toPoint());QTest::qWait(100);check(eval("pageLoader.item.nodePage===1").toBool(),"pagination responds to real mouse input");capture(main,"policies-page-2");}}
+    for(int i=0;i<13;++i)check(eval(QString("engineController.saveNode({name:'验证节点 %1 · 长名称自适应排版',protocol:'http',host:'127.0.0.1',port:%2})").arg(i+1).arg(25000+i)).toBool(),"isolated node fixture saved");
+    eval("AppState.navigate('proxies')");QTest::qWait(200);capture(main,"nodes-many");
+    if(!baseline){
+        check(eval("pageLoader.item.resultCount===13 && pageLoader.item.filteredNodeIds().length===13").toBool(),"all thirteen nodes belong to the current source-sectioned library");
+        auto *table=find(main->contentItem(),"realNodeTable");
+        auto *viewport=table?find(table,"tableRowsViewport"):nullptr;
+        check(viewport&&viewport->isVisible()&&viewport->property("reuseItems").toBool(),"many-node library has an operable recycled-row viewport");
+        if(viewport){
+            bool reachable=true;
+            for(int i=0;i<13;++i){
+                const auto id=eval(QString("pageLoader.item.filteredNodeIds()[%1]").arg(i)).toString();
+                const auto rowIndex=eval(QString("pageLoader.item.sectionIndexForNode('%1')").arg(id)).toInt();
+                const bool positioned=QMetaObject::invokeMethod(viewport,"positionViewAtIndex",Q_ARG(int,rowIndex),Q_ARG(int,1));
+                QTest::qWait(35);QQuickItem *row=nullptr;
+                const bool materialized=QMetaObject::invokeMethod(viewport,"itemAtIndex",Q_RETURN_ARG(QQuickItem *,row),Q_ARG(int,rowIndex));
+                QQmlExpression rowId(row?qmlContext(row):nullptr,row,"record.id");
+                const auto actual=row?rowId.evaluate().toString():QString();
+                const auto visible=viewport->mapRectToScene(QRectF(QPointF(),viewport->size()));
+                reachable=reachable&&positioned&&materialized&&row&&!rowId.hasError()&&actual==id
+                    &&visible.contains(row->mapToScene(QPointF(row->width()/2,row->height()/2)));
+            }
+            check(reachable,"each of thirteen real node rows can be scrolled into view with its matching identity");
+            const auto firstRow=eval("pageLoader.item.sectionIndexForNode(pageLoader.item.filteredNodeIds()[0])").toInt();
+            viewport->setProperty("currentIndex",firstRow);
+            QMetaObject::invokeMethod(viewport,"positionViewAtBeginning");QTest::qWait(50);
+            viewport->forceActiveFocus();
+            // Qt ListView implements arrow navigation; End is not bound here.
+            for(int index=firstRow;index<viewport->property("count").toInt()-1;++index){QTest::keyClick(main,Qt::Key_Down);QTest::qWait(20);}
+            QTest::qWait(100);
+            qInfo()<<"NODE_ARROW_NAVIGATION"<<"first row"<<firstRow<<"current"<<viewport->property("currentIndex")
+                <<"count"<<viewport->property("count")<<"contentY"<<viewport->property("contentY")
+                <<"originY"<<viewport->property("originY")<<"contentHeight"<<viewport->property("contentHeight")
+                <<"height"<<viewport->height()<<"activeFocus"<<viewport->hasActiveFocus();
+            check(viewport->property("contentY").toReal()>viewport->property("originY").toReal()
+                &&viewport->property("currentIndex").toInt()==viewport->property("count").toInt()-1,"native Down keys scroll the virtual node list to its final row");
+            capture(main,"nodes-scrolled-end");
+        }
+    }
     for(const auto &route:QStringList{"proxies","settings","subscriptions"}){
         eval(QString("window.openSettings('%1')").arg(route));QTest::qWait(450);
         check(eval("pageLoader.item.Window.window===window").toBool(),route+": route belongs to main HWND");
         capture(main,route=="proxies"?"nodes":route);if(!baseline)auditText(main,route);
-        if(route=="proxies"&&!baseline){auto *search=find(main->contentItem(),"nodeSearchField"),*combo=find(main->contentItem(),"proxyRegionCombo");check(search&&combo&&qAbs(search->height()-combo->height())<1,"node search and protocol filter share height");}
+        if(route=="proxies"&&!baseline){auto *search=find(main->contentItem(),"nodeSearchField"),*combo=find(main->contentItem(),"nodeSourceFilter");check(search&&combo&&qAbs(search->height()-combo->height())<1,"node search and the current source filter share control height");}
     }
     eval("window.openDashboard()");QTest::qWait(200);auto *panel=main->findChild<QQuickWindow *>("dashboardWindow");if(panel){panel->resize(qMin(1300,area.width()-60),600);capture(panel,"panel");panel->hide();}
     eval("Theme.mode='Dark';AppState.navigate('activity')");QTest::qWait(200);capture(main,"activity-dark");eval("Theme.transparency=false");QTest::qWait(200);

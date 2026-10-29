@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "purpose": "Independent server interoperability peers only; not Swirl runtime dependencies or proxy clients.",
+  "peers": {
+    "hysteria2": {
+      "repository": "HyNetworks/hysteria",
+      "release": "app/v2.13.0",
+      "version": "v2.13.0",
+      "commit": "ca8fbd874fd6ca82413948de6dc5924405e103e1",
+      "protocol": "Hysteria 2",
+      "environment": "HY2_SERVER",
+      "binary": "hysteria",
+      "version_args": ["version"],
+      "version_contains": ["v2.13.0", "ca8fbd874fd6ca82413948de6dc5924405e103e1"],
+      "assets": {
+        "linux-amd64": {
+          "name": "hysteria-linux-amd64",
+          "sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691"
+        },
+        "darwin-amd64": {
+          "name": "hysteria-darwin-amd64",
+          "sha256": "7a155230ae4bbffc92657f486484a48ed703bd828abf7a3e19287fea1f9ca74a"
+        },
+        "darwin-arm64": {
+          "name": "hysteria-darwin-arm64",
+          "sha256": "c8c3589239ce4ecf335c07a3f6ec11b3ef8fbdfe9e5a5ea0ef8ba8ce50d2bb90"
+        },
+        "windows-amd64": {
+          "name": "hysteria-windows-amd64.exe",
+          "sha256": "162ef8fe55dc7ec810dda662908f8e65ec36bd6da39cb87c3bd66184ab68f067"
+        }
+      }
+    },
+    "tuic": {
+      "repository": "tuic-protocol/tuic",
+      "release": "tuic-server-1.0.0",
+      "version": "1.0.0",
+      "commit": "a299ef02d9f4ab5a0edbf58b9998f41bf768b332",
+      "protocol": "TUIC v5 historical official reference",
+      "environment": "SWIRL_TUIC_SERVER",
+      "binary": "tuic-server",
+      "version_args": ["--version"],
+      "version_exact": "1.0.0",
+      "assets": {
+        "linux-amd64": {
+          "name": "tuic-server-1.0.0-x86_64-unknown-linux-musl",
+          "sha256": "adb808944ca829857bf408d2ee438a156e8171543dbbed3e94964b66b4135393"
+        },
+        "darwin-amd64": {
+          "name": "tuic-server-1.0.0-x86_64-apple-darwin",
+          "sha256": "2031a3ae3c76d64ed63b803f4f3ff34536d4ecfdf3b0e190acb518657819f5fe"
+        },
+        "darwin-arm64": {
+          "name": "tuic-server-1.0.0-aarch64-apple-darwin",
+          "sha256": "989c9fe8288bd07217198b844af83bfac7d949f1445b7447f324701e0e0b8825"
+        },
+        "windows-amd64": {
+          "name": "tuic-server-1.0.0-x86_64-pc-windows-msvc.exe",
+          "sha256": "09c3bf3790117bf4c0d0505ada439800f19b68a52a018ca2cda7e7f8125adeb6"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "baseline": "ff2e2ad76022a2742b1eb256fdb8058873ca1a3e",
+  "source_sha256": {
+    "core/crates/swirl-protocol/src/lib.rs": "6622d81dedb8792890017988e9df6345f44f8582a3beba6996df72c8e95d9d4c",
+    "core/crates/swirl-protocol/src/transport.rs": "d2c16a878cd52217a6f6a6dcb0cb00bdc55b07469b5f15084c7cbf32e77640a0",
+    "core/crates/swirl-protocol/src/websocket.rs": "3ce385ba64c893202ab7335dd1568508a013af1ca79b8d55aabbfe6470ce7ac5",
+    "core/crates/swirl-protocol/examples/transport-client.rs": "b55a934afff0d12a974214c0b1ed31a6e45726a64721a7db2ec26a20cc086e7c",
+    "tools/tests/test_transport_c1_xray.py": "75b05ff96f00ce20aa5efd5464cf79d53827a8bafca06607dd7d3903987e40c2"
+  },
+  "commands": [
+    {
+      "command": "cargo fmt --all -- --check",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo check --workspace --locked",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --locked -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo test --workspace --locked",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo build --locked -p swirl-api --bin swirl-api -p swirl-protocol --example transport-client",
+      "exit_code": 0
+    },
+    {
+      "command": "python tools/tests/test_transport_c1_xray.py -v",
+      "exit_code": 0
+    }
+  ],
+  "rust_tests_passed": 409,
+  "official_xray_test_methods": 6,
+  "official_xray_test_skips": 0,
+  "public_network_tested": false,
+  "outer_wss_clean_close": "not uniformly achieved; preserve terminal errors"
+}

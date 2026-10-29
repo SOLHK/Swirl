@@ -1,0 +1,27 @@
+{
+  "status": "PASS_AUTHORED_FONT_ONLY_REPARAMETERIZATION",
+  "algorithm": "fontTools.varLib.instancer.instantiateVariableFont",
+  "harfbuzz": "14.6.0",
+  "faces": 32,
+  "requests": 256,
+  "glyph_metric_extents_checks": 5376,
+  "target_inputs": "unchanged_original_nominal_user_coordinates",
+  "application_compensation": false,
+  "original_conversion_accepted": false,
+  "original_font_generated": false,
+  "Windows11": "NOT_RUN",
+  "Qt_Swirl": "NOT_RUN",
+  "packing": {
+    "normalized": {
+      "faces": 32,
+      "sha256": "3e50923af4f494e7c7d20beb93dde01c8c4d485bca9763e9d67bc3008de6aeb8",
+      "byte_size": 53264
+    },
+    "font-level": {
+      "faces": 32,
+      "sha256": "bac15ffe51c5b8b297acfaa46411bd420aa789ee5e270c79ca25d4e348e9b6ad",
+      "byte_size": 562696
+    }
+  },
+  "static_default_protected_tables_exact_faces": 32
+}

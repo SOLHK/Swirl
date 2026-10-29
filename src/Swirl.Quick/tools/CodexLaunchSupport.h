@@ -14,5 +14,5 @@ unsigned existingDesktops(const std::wstring &path);
 void requireListener(const Proxy &proxy);
 std::vector<wchar_t> childEnvironment(const std::vector<std::wstring> &parent, const Proxy &proxy);
 std::vector<std::wstring> currentEnvironment();
-unsigned long startChild(const std::wstring &path, std::vector<wchar_t> &environment);
+unsigned long startChild(const std::wstring &path, std::vector<wchar_t> &environment, const Proxy &proxy);
 }

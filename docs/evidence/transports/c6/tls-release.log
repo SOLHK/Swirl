@@ -1,0 +1,8 @@
+test_empty_client_alpn_offers_h2_to_the_tls_peer (__main__.TransportTlsPolicyTests.test_empty_client_alpn_offers_h2_to_the_tls_peer) ... ok
+test_h1_only_server_cannot_accept_automatic_h2_offer (__main__.TransportTlsPolicyTests.test_h1_only_server_cannot_accept_automatic_h2_offer) ... ok
+test_missing_negotiated_alpn_rejects_before_proxy_bytes (__main__.TransportTlsPolicyTests.test_missing_negotiated_alpn_rejects_before_proxy_bytes) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.033s
+
+OK

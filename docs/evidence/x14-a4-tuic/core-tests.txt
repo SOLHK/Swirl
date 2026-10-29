@@ -1,0 +1,11 @@
+test_https_application_tls_through_native_core (test_quic_core.QuicCoreTests.test_https_application_tls_through_native_core) ... ok
+test_live_tcp_sessions_node_switch_parallel_streams_and_runtime_restart (test_quic_core.QuicCoreTests.test_live_tcp_sessions_node_switch_parallel_streams_and_runtime_restart) ... ok
+test_tuic_dns_configuration_change_does_not_reuse_an_old_resolved_endpoint (test_quic_core.QuicCoreTests.test_tuic_dns_configuration_change_does_not_reuse_an_old_resolved_endpoint) ... ok
+test_tuic_heartbeat_keeps_idle_authenticated_stream_open (test_quic_core.QuicCoreTests.test_tuic_heartbeat_keeps_idle_authenticated_stream_open) ... ok
+test_udp_association_fragments_dns_and_control_close (test_quic_core.QuicCoreTests.test_udp_association_fragments_dns_and_control_close) ... ok
+test_wrong_credentials_never_forward_tcp_or_udp_and_existing_session_survives_selection (test_quic_core.QuicCoreTests.test_wrong_credentials_never_forward_tcp_or_udp_and_existing_session_survives_selection) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 20.018s
+
+OK

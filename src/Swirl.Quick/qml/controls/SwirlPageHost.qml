@@ -45,11 +45,14 @@ Item {
  readonly property real pageReveal:heroData!==null && heroData.key==="settings"?ramp(position,heroData.returning?0:0.12,heroData.returning?0.80:0.92):position
  function valid(item){return item && item.width>0 && item.height>0}
  function sampledColor(item){
-  if(item && item.color!==undefined){const c=item.color;return Qt.rgba(c.r,c.g,c.b,c.a)}
+  // A hidden card still owns its material, not its zero-alpha presentation.
+  // Keep the live morph color for reversals, which snapshot the current frame.
+  if(item && item.color!==undefined){const c=item.surfaceHidden && item.surfaceColor!==undefined?item.surfaceColor:item.color;return Qt.rgba(c.r,c.g,c.b,c.a)}
   return Qt.rgba(Theme.independentCard.r,Theme.independentCard.g,Theme.independentCard.b,0)
  }
  function surfaceFor(page,key){return page.motionSurfaces && page.motionSurfaces[key] || page.motionSurface || null}
  function trimCache(){
+  if(cachedPageCount<=maximumCachedPages)return
   const next=Object.assign({},pages),saved=Object.assign({},savedPages)
   for(const key of accessOrder){if(Object.keys(next).length<=maximumCachedPages)break;const loader=next[key];if(!loader || loader===activeLoader || loader===leavingLoader || loader===pendingLoader || !loader.item || !loader.item.exportCacheState || (SwirlMotion.returnShared && SwirlMotion.returnShared.previous===key))continue;saved[key]=loader.item.exportCacheState();loader.destroy();delete next[key]}
   pages=next;savedPages=saved
@@ -65,7 +68,7 @@ Item {
   releaseSurfaces()
   hero.cancel()
   sourceSurface=null;targetSurface=null;heroData=null
-  for(const key of Object.keys(pages)){const loader=pages[key];loader.visible=loader===activeLoader;loader.enabled=loader===activeLoader;loader.startOpacity=loader===activeLoader?1:0;loader.endOpacity=loader.startOpacity;loader.startShift=Qt.point(0,0);loader.endShift=Qt.point(0,0)}
+  for(const key of Object.keys(pages)){const loader=pages[key];loader.visible=loader===activeLoader;loader.enabled=loader===activeLoader;loader.startOpacity=loader===activeLoader?1:0;loader.endOpacity=loader.startOpacity;loader.startShift=Qt.point(0,0);loader.endShift=Qt.point(0,0);loader.arcBend=0}
   leavingLoader=null
   if(activeLoader){activeLoader.visible=true;activeLoader.enabled=true}
   SwirlTransitionRegistry.setActive(transitionToken,false);trimCache()
@@ -75,7 +78,7 @@ Item {
   // Snapshot all live layers before retargeting. A third click must not drop
   // the still-visible first page or reset the incoming page to transparent.
   const values=Object.keys(pages).map(key=>({loader:pages[key],alpha:pages[key].visible?pages[key].opacity:0,shift:pages[key].contentShift}))
-  for(const value of values){value.loader.startOpacity=value.alpha;value.loader.endOpacity=value.loader===next?1:0;value.loader.startShift=value.shift;value.loader.endShift=Qt.point(0,0);value.loader.visible=value.alpha>0||value.loader===next;value.loader.enabled=value.loader===next}
+  for(const value of values){value.loader.startOpacity=value.alpha;value.loader.endOpacity=value.loader===next?1:0;value.loader.startShift=value.shift;value.loader.endShift=Qt.point(0,0);value.loader.arcBend=0;value.loader.visible=value.alpha>0||value.loader===next;value.loader.enabled=value.loader===next}
  }
  function carryReturningContent(){
   if(heroData && heroData.key==="settings" && heroData.returning && leavingLoader)
@@ -96,7 +99,7 @@ Item {
   pendingLoader=null
   if(!next.item){const copy=Object.assign({},pages);delete copy[routeKey];pages=copy;next.destroy();releaseShared();return}
   if(!next.stateRestored){if(savedPages[routeKey]&&next.item.restoreCacheState)next.item.restoreCacheState(savedPages[routeKey]);next.stateRestored=true}
-  if(next===activeLoader){releaseShared();return}
+  if(next===activeLoader){releaseShared();if(preparing)finish();return}
   const request=SwirlMotion.shared,back=SwirlMotion.returnShared
   releaseShared()
   // Reverse the same two live trees without visiting either endpoint.
@@ -123,6 +126,9 @@ Item {
   if(previous)motionPolicy.leavePage(previous.item)
   leavingLoader=previous;activeLoader=next
   preparing=true
+  // A synchronous preparation observer may request another route and return
+  // here. Its newer generation owns the presentation, including progress.
+  if(token!==generation)return
   accessOrder=accessOrder.filter(key=>key!==routeKey).concat([routeKey])
   progress=0
   if(!previous || SwirlMotion.reduced || !animateRoutes){finish();return}
@@ -147,7 +153,16 @@ Item {
    animate()
   })
  }
- function animate(){preparing=false;commit.stop();SwirlTransitionRegistry.setActive(transitionToken,true);travel.from=progress;travel.to=1;travel.easing.type=heroData&&heroData.key==="settings"?Easing.Linear:Easing.OutCubic;travel.duration=Math.max(1,(heroData?SwirlMotion.expandDuration*(heroData.key==="settings"?1.15:1):SwirlMotion.pageDuration)*(1-progress));travel.start()}
+ function animate(){
+  preparing=false;commit.stop()
+  if(!heroData && !SwirlMotion.reduced){
+   const direction=AppState.navigationDirection
+   if(activeLoader && activeLoader.startOpacity===0)activeLoader.startShift=Qt.point(SwirlMotion.pageDistance*direction,0)
+   if(activeLoader)activeLoader.arcBend=-SwirlMotion.pageArc*direction
+   if(leavingLoader){leavingLoader.endShift=Qt.point(-SwirlMotion.pageDistance*0.5*direction,0);leavingLoader.arcBend=SwirlMotion.pageArc*0.5*direction}
+  }
+  SwirlTransitionRegistry.setActive(transitionToken,true);travel.from=progress;travel.to=1;travel.easing.type=heroData&&heroData.key==="settings"?Easing.Linear:Easing.OutCubic;travel.duration=Math.max(1,(heroData?SwirlMotion.expandDuration*(heroData.key==="settings"?1.15:1):SwirlMotion.pageDuration)*(1-progress));travel.start()
+ }
  function retargetGeometry(){
   if(!moving || !heroData || !valid(targetSurface))return
   const current=Qt.rect(morph.x,morph.y,morph.width,morph.height)
@@ -174,7 +189,8 @@ Item {
   property real endOpacity:0
   property point startShift:Qt.point(0,0)
   property point endShift:Qt.point(0,0)
-  readonly property point contentShift:Qt.point(host.interpolate(startShift.x,endShift.x,host.surfacePosition),host.interpolate(startShift.y,endShift.y,host.surfacePosition))
+  property real arcBend:0
+  readonly property point contentShift:Qt.point(host.interpolate(startShift.x,endShift.x,host.surfacePosition),host.interpolate(startShift.y,endShift.y,host.surfacePosition)+arcBend*SwirlMotion.arch(host.surfacePosition))
   opacity:startOpacity+(endOpacity-startOpacity)*host.pageReveal
   x:0;y:host.insetFor(routeId);width:host.width;height:host.height-y;visible:false
   z:host.heroData && host.heroData.key==="settings" && host.heroData.returning?
@@ -183,11 +199,11 @@ Item {
       (host.heroData.returning?host.leavingLoader===cachedLoader:host.activeLoader===cachedLoader)
   // The expanded white card becomes the page's own surface. There is no
   // late white-to-transparent swap and no second full-page shadow layer.
-  Rectangle {
+  SwirlContinuousSurface {
    id:settingsCanvas;anchors.fill:parent;z:0
    property bool surfaceHidden:false
    visible:host.insetRoutes.indexOf(cachedLoader.routeId)>=0
-   color:Theme.material("content");radius:Theme.cardRadius;antialiasing:true
+   color:Theme.material("content");radius:Theme.cardRadius
    opacity:surfaceHidden?0:1
   }
   // This is the animated reveal boundary, not a layout workaround. The page
@@ -233,9 +249,9 @@ Item {
   height:host.interpolate(host.surfaceStart.height,host.surfaceEnd.height,host.surfacePosition)
   cornerRadius:(host.sourceSurface && host.sourceSurface.radius!==undefined?host.sourceSurface.radius:settingsTransition?Theme.cardRadius:0)*(1-host.position)+(host.targetSurface && host.targetSurface.radius!==undefined?host.targetSurface.radius:settingsTransition?Theme.cardRadius:0)*host.position
   color:host.heroData && host.heroData.key==="settings"?Qt.rgba(
-    host.heroData.returning?host.heroData.toColor.r:host.heroData.fromColor.r,
-    host.heroData.returning?host.heroData.toColor.g:host.heroData.fromColor.g,
-    host.heroData.returning?host.heroData.toColor.b:host.heroData.fromColor.b,
+    host.interpolate(host.heroData.fromColor.r,host.heroData.toColor.r,materialReveal),
+    host.interpolate(host.heroData.fromColor.g,host.heroData.toColor.g,materialReveal),
+    host.interpolate(host.heroData.fromColor.b,host.heroData.toColor.b,materialReveal),
     host.heroData.fromColor.a*(1-materialReveal)+host.heroData.toColor.a*materialReveal):Theme.independentCard
   Column {
    readonly property var card:morph.settingsTransition&&host.heroData?host.heroData.card:null

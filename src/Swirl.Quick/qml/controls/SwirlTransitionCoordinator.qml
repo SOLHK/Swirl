@@ -36,5 +36,5 @@ Item {
     onMovingChanged: SwirlTransitionRegistry.setActive(token, moving)
     Component.onDestruction: SwirlTransitionRegistry.setActive(token, false)
     Connections { target: SwirlMotion; function onReducedChanged() { if (SwirlMotion.reduced) coordinator.finish() } }
-    NumberAnimation { id: travel; target: coordinator; property: "progress"; easing.type: Easing.OutCubic }
+    NumberAnimation { id: travel; target: coordinator; property: "progress"; easing.type: SwirlMotion.standardEasing }
 }

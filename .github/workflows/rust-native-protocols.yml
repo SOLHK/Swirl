@@ -1,0 +1,238 @@
+name: Swirl Native Protocols X14
+on:
+  push:
+    branches: [work/rust-native-protocols-x14a-20261022, work/subscription-unified-integration-20261023, work/swirl-s3-max-ultra-20261023, work/swirl-s4-final-completion-20261023]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: rust-native-protocols-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native-protocols:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    env:
+      SWIRL_SOURCE_SHA: ${{ github.sha }}
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install Rust tools
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - name: Format
+        working-directory: core
+        run: cargo fmt --all -- --check
+      - name: Check
+        working-directory: core
+        run: cargo check --workspace --locked
+      - name: Clippy
+        working-directory: core
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Unit and local network tests
+        working-directory: core
+        run: cargo test --workspace --locked
+  official-interop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    env:
+      SWIRL_SOURCE_SHA: ${{ github.sha }}
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test certificate library
+        run: python -m pip install cryptography==50.0.2
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal
+      - name: Build native clients and Core harness
+        working-directory: core
+        run: cargo build --workspace --lib --bins --examples --locked
+      - name: Download pinned official Xray peers
+        run: python tools/Fetch-TransportPeers.py --output out/peers/xray
+      - name: Download pinned Hysteria and TUIC server peers
+        run: python tools/Fetch-NativeProtocolPeers.py --output out/peers/quic
+      - name: Download pinned official Shadowsocks server peer
+        run: python tools/tests/fetch_ss2022_peer.py out/peers/shadowsocks
+      - name: Measure and prepare disposable runner UDP prerequisites
+        run: python tools/Prepare-NativeInteropPlatform.py --prepare-macos --output out/native-interop/platform.json
+      - name: Set native client and evidence paths
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          import platform
+          import subprocess
+          import sys
+          from pathlib import Path
+          root = Path.cwd()
+          binary = root / 'core/target/debug'
+          evidence = root / 'out/native-interop'
+          evidence.mkdir(parents=True, exist_ok=True)
+          suffix = '.exe' if os.name == 'nt' else ''
+          library = ('swirl_api.dll' if os.name == 'nt' else
+                     'libswirl_api.dylib' if sys.platform == 'darwin' else 'libswirl_api.so')
+          values = {
+              'PYTHONPATH': root / 'tools/tests',
+              'SWIRL_TRANSPORT_CLIENT': binary / ('examples/transport-client' + suffix),
+              'SWIRL_TRANSPORT_RUNTIME': binary / ('examples/transport-runtime' + suffix),
+              'SWIRL_INSPECT': binary / ('swirl-inspect' + suffix),
+              'SWIRL_INSPECT_BINARY': binary / ('swirl-inspect' + suffix),
+              'SWIRL_RUST_INSPECTOR': binary / ('swirl-inspect' + suffix),
+              'SWIRL_RUST_HARNESS': binary / ('swirl-api' + suffix),
+              'SWIRL_BUILT_LIBRARY': binary / library,
+              'SWIRL_XRAY_RELEASE_MANIFEST': root / 'out/peers/xray/manifest.json',
+              'HY2_CLIENT': binary / ('examples/hysteria2-client' + suffix),
+              'HY2_LIFECYCLE_CLIENT': binary / ('examples/hysteria2-lifecycle' + suffix),
+              'SWIRL_TUIC_CLIENT': binary / ('examples/tuic-client' + suffix),
+              'SWIRL_SS2022_CLIENT': binary / ('examples/ss2022-client' + suffix),
+              'SWIRL_SS2022_SERVER': root / 'out/peers/shadowsocks' / ('ssserver' + suffix),
+              'SWIRL_TRANSPORT_EVIDENCE': evidence / 'vmess',
+              'SWIRL_VMESS_EVIDENCE': evidence / 'vmess',
+              'HY2_EVIDENCE': evidence / 'hysteria2.json',
+              'HY2_LIFECYCLE_EVIDENCE': evidence / 'hysteria2-lifecycle.json',
+              'SWIRL_TUIC_EVIDENCE': evidence / 'tuic.json',
+              'SWIRL_QUIC_CORE_EVIDENCE': evidence / 'quic-core.json',
+              'SWIRL_QUIC_FFI_EVIDENCE': evidence / 'quic-ffi.json',
+              'SWIRL_NATIVE_TIMING_EVIDENCE': evidence / 'native-timing.json',
+              'SWIRL_SS2022_EVIDENCE': evidence / 'shadowsocks2022',
+              'SWIRL_STREAM_UDP_EVIDENCE': evidence / 'stream-udp.json',
+              'SWIRL_IMPORTED_TRANSPORT_EVIDENCE': evidence / 'imported-transports.json',
+              'SWIRL_BASIC_PROXY_EVIDENCE': evidence / 'basic-proxies.json',
+          }
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
+              for name, value in values.items():
+                  output.write(f'{name}={value}\n')
+          source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          if source != os.environ['GITHUB_SHA']:
+              raise SystemExit('Native protocol checkout differs from the triggered commit')
+          clients = [values[key] for key in (
+              'HY2_CLIENT', 'HY2_LIFECYCLE_CLIENT', 'SWIRL_TUIC_CLIENT',
+              'SWIRL_TRANSPORT_CLIENT', 'SWIRL_BUILT_LIBRARY')]
+          identity = {
+              'source_sha': source, 'runner_os': os.environ['RUNNER_OS'],
+              'platform': platform.platform(),
+              'rustc': subprocess.check_output(['rustc', '-vV'], text=True),
+              'artifacts': {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+                            for path in clients},
+              'qt_product_acceptance': False,
+          }
+          (evidence / 'source.json').write_text(json.dumps(identity, indent=2) + '\n', encoding='utf-8')
+      - name: VMess official Xray data and completed-response closure
+        run: python tools/tests/test_vmess_xray.py
+      - name: Hysteria2 official server including retained limitation probes
+        if: ${{ !cancelled() }}
+        run: python tools/tests/run_hysteria2_official.py
+      - name: Hysteria2 original 17 methods with a measured 1 MiB main stack
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        env:
+          HY2_CONSTRAINED_STACK: '1'
+          HY2_EVIDENCE: ${{ github.workspace }}/out/native-interop/hysteria2-small-stack.json
+        run: python tools/tests/run_hysteria2_official.py
+      - name: Hysteria2 real future cancellation cleanup and same-runtime reconnect
+        if: ${{ !cancelled() }}
+        run: python -m unittest -v test_hysteria2_lifecycle
+      - name: Hysteria2 cancellation cleanup with a measured 1 MiB main stack
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        env:
+          HY2_CONSTRAINED_STACK: '1'
+          HY2_LIFECYCLE_EVIDENCE: ${{ github.workspace }}/out/native-interop/hysteria2-lifecycle-small-stack.json
+        run: python -m unittest -v test_hysteria2_lifecycle
+      - name: Require original Hysteria2 methods and lifecycle evidence on this runner
+        if: ${{ !cancelled() }}
+        shell: python
+        run: |
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path('out/native-interop')
+          identity = json.loads((root / 'source.json').read_text())
+          official = json.loads((root / 'hysteria2.json').read_text())
+          lifecycle = json.loads((root / 'hysteria2-lifecycle.json').read_text())
+          suite = official['suite']
+          assert identity['source_sha'] == os.environ['GITHUB_SHA']
+          assert identity['runner_os'] == os.environ['RUNNER_OS']
+          assert suite['expected_methods'] == suite['executed_methods'] == 17
+          assert suite['all_original_methods_passed'] and not (suite['failures'] or suite['errors'] or suite['skips'])
+          for report, variable in ((official, 'HY2_CLIENT'), (lifecycle, 'HY2_LIFECYCLE_CLIENT')):
+              path = Path(os.environ[variable])
+              assert report['client_sha256'] == hashlib.sha256(path.read_bytes()).hexdigest()
+          assert lifecycle['client_exit'] == 0 and lifecycle['result']['ok']
+          assert lifecycle['result']['cleanup_asserted_before_process_exit']
+          assert lifecycle['result']['same_runtime_reconnect']['alive_tasks_after_close'] == 0
+          print(os.environ['RUNNER_OS'] + ': exact-source HY2 17 methods and same-runtime cleanup/reconnect passed')
+      - name: TUIC historical official reference including retained limitation probe
+        if: ${{ !cancelled() }}
+        run: python -m unittest -v test_tuic_reference
+      - name: Native Core ingress TCP UDP DNS HTTPS and node switching
+        if: ${{ !cancelled() }}
+        run: python -m unittest -v test_quic_core
+      - name: Dynamically loaded C ABI library through official QUIC peers
+        if: ${{ !cancelled() }}
+        env:
+          SWIRL_NATIVE_LIBRARY: ${{ env.SWIRL_BUILT_LIBRARY }}
+        run: python tools/tests/test_quic_ffi.py
+      - name: Phase timing and authentication semantics through C ABI and official peers
+        if: ${{ !cancelled() }}
+        env:
+          SWIRL_NATIVE_LIBRARY: ${{ env.SWIRL_BUILT_LIBRARY }}
+        run: python -m unittest -v test_native_timing
+      - name: Imported Xray V2Ray transport configs through ordinary Core start
+        if: ${{ !cancelled() }}
+        run: python -m unittest -v test_imported_transports_xray
+      - name: VLESS and Trojan UDP through official Xray
+        if: ${{ !cancelled() }}
+        run: python -m unittest -v test_stream_udp_xray
+      - name: Shadowsocks 2022 official data and replay rejection
+        if: ${{ !cancelled() }}
+        run: python tools/tests/test_ss2022_official.py
+      - name: HTTP and SOCKS authentication TCP UDP and import through official Xray
+        if: ${{ !cancelled() }}
+        run: python tools/tests/test_basic_proxies_xray.py
+      - name: REALITY Rustls through production Core and official Xray
+        if: ${{ !cancelled() }}
+        env:
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ github.workspace }}/out/native-interop/reality-rustls
+        run: python tools/tests/test_reality_native_release.py
+      - name: REALITY Chrome133 through production Core and official Xray
+        if: ${{ !cancelled() }}
+        env:
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ github.workspace }}/out/native-interop/reality-chrome133
+        run: python tools/tests/test_reality_native_release.py --fingerprint chrome_133
+      - name: Vision Rustls TLS13 Direct and authenticated closure
+        if: ${{ !cancelled() }}
+        env:
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ github.workspace }}/out/native-interop/vision-rustls
+        run: python tools/tests/test_reality_native_release.py --vision
+      - name: Vision Chrome133 TLS13 Direct and authenticated closure
+        if: ${{ !cancelled() }}
+        env:
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ github.workspace }}/out/native-interop/vision-chrome133
+        run: python tools/tests/test_reality_native_release.py --vision --fingerprint chrome_133
+      - name: Upload actual interoperability receipts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-protocol-interop-${{ matrix.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: out/native-interop
+          if-no-files-found: warn

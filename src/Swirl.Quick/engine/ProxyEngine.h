@@ -3,16 +3,11 @@
 #include <QString>
 #include <QUrl>
 #include <QVariantList>
+#include <QJsonObject>
 #include "ProxyNode.h"
 
-// Swirl-owned contract. No Mihomo JSON or transport objects cross this boundary.
+// Swirl-owned UI/control contract; forwarding belongs exclusively to Rust.
 struct EngineStartOptions {
-    bool preferCompatibility=false;
-    QString executablePath;
-    QByteArray expectedSha256;
-    QString expectedVersion;
-    quint16 controlPort = 9097;
-    bool autoControlPort = false;
     int startupTimeoutMs = 10000;
     int requestTimeoutMs = 1000;
     int healthIntervalMs = 2000;
@@ -22,10 +17,15 @@ struct EngineStartOptions {
     bool meteredNetwork = false;
     QStringList meteredAllowlist;
     quint16 proxyPort = 7898;
+    // Internal node-test capability only, never loaded from user settings or
+    // subscriptions. Rust atomically binds loopback port zero for these workers.
+    bool internalProbeListener = false;
     QString routingMode = QStringLiteral("rule");
     // Production uses verified, bundled China domain/IP MRS providers. The
     // controlled transport fixtures intentionally retain MATCH-only routing.
     bool smartRouting = false;
+    // Manually configured native rules reserve private destinations for DIRECT.
+    bool nativePrivateRouting = false;
     QString rulesDirectory;
     bool tunEnabled=false;
     bool gatewayForwarding=false;
@@ -37,6 +37,8 @@ struct EngineStartOptions {
     QStringList customRules;
     QVariantList customGroups;
     QString inboundUsername,inboundPassword;
+    QJsonObject policyDocument;
+    QString configurationStoreId,configurationRevision,configurationDigest,configurationRequestId;
 };
 
 class ProxyEngine : public QObject {
@@ -60,9 +62,8 @@ public:
         qint64 processId = 0;
         qint64 uptimeSeconds = 0;
         QString version;
-        QString engineName="Mihomo 兼容",engineKind="compatibility",sessionId,engineReason;
+        QString engineName="Swirl Core Rust",engineKind="rust",sessionId,engineReason;
         QString mode;
-        QString executablePath;
         QString configPath;
         QString controlEndpoint;
         QString selectedNodeId;
@@ -73,11 +74,18 @@ public:
         int latencyMs = -1;
         int responseCode = 0;
         QString nodeMessage;
+        QString probeFailureStage;
+        QString probeFailureCode;
+        qint64 probeOutboundConnectMs=-1,probeOriginTlsMs=-1;
+        quint64 probeRequestTag=0;
         QVariantList connections;
         qint64 connectionsAt = 0;
         qint64 trafficAt = 0;
         qint64 uploadTotal = 0;
         qint64 downloadTotal = 0;
+        qint64 rustAccepted = 0;
+        qint64 rustFailed = 0;
+        QString rustLastErrorStage;
         double uploadRate = 0;
         double downloadRate = 0;
         QString telemetryError;
@@ -85,6 +93,7 @@ public:
         bool gatewayForwarding=false;
         bool directSession=false;
         bool tunEnabled=false,allowLan=false;
+        QJsonObject configurationReceipt;
     };
     using QObject::QObject;
     virtual ~ProxyEngine() = default;
@@ -93,11 +102,25 @@ public:
     virtual void refresh() = 0;
     virtual void selectNode(const QString &id) = 0;
     virtual void probeNode(const QUrl &url) = 0;
+    // The UI uses a request tag to distinguish periodic telemetry from a
+    // concurrent user-selected URL. Zero identifies an ordinary manual probe.
+    virtual void probeNodeTagged(const QUrl &url,quint64 tag) {
+        Q_UNUSED(url);
+        emit probeRequestRejected(tag,QStringLiteral("probe-unavailable"));
+    }
     virtual void setRoutingMode(const QString &mode) { Q_UNUSED(mode); }
+    virtual void configurationCommand(const QJsonObject &command) {
+        emit configurationCommandFinished(command.value("request_id").toString(),QJsonObject{{"ok",false},{"code","UnsupportedCapability"},{"phase","prepare"}});
+    }
     virtual Status status() const = 0;
     virtual QString configurationSummary() const = 0;
     virtual QVariantList routingRules() const { return {}; }
+    virtual QString probeFailureStage() const { return {}; }
+    virtual qint64 probeOutboundConnectMs() const { return -1; }
+    virtual qint64 probeOriginTlsMs() const { return -1; }
 signals:
     void statusChanged();
     void diagnostic(const QString &module,const QString &code,const QString &message);
+    void probeRequestRejected(quint64 tag,const QString &code);
+    void configurationCommandFinished(const QString &requestId,const QJsonObject &response);
 };

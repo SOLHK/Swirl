@@ -12,9 +12,9 @@ void require(bool condition,const char *message){if(!condition)throw message;++a
 void rejected(const std::function<void()> &action){bool failed=false;try{action();}catch(const CodexLaunch::Error &){failed=true;}require(failed,"unsafe input accepted");}
 std::wstring variable(const wchar_t *name){wchar_t value[32768]{};GetEnvironmentVariableW(name,value,32768);return value;}
 }
-int wmain() {
+int wmain(int argc,wchar_t **argv) {
     if(variable(L"SWIRL_CODEX_TEST_CHILD")==L"1") {
-        const bool valid=variable(L"HTTP_PROXY")==L"http://127.0.0.1:17988" && variable(L"HTTPS_PROXY")==L"http://127.0.0.1:17988" && variable(L"ALL_PROXY")==L"http://127.0.0.1:17988" && variable(L"NO_PROXY")==L"localhost,127.0.0.1,::1" && variable(L"SWIRL_CODEX_TEST_UNRELATED")==L"preserved-测试";
+        const bool valid=variable(L"HTTP_PROXY")==L"http://127.0.0.1:17988" && variable(L"HTTPS_PROXY")==L"http://127.0.0.1:17988" && variable(L"ALL_PROXY")==L"http://127.0.0.1:17988" && variable(L"NO_PROXY")==L"localhost,127.0.0.1,::1" && variable(L"SWIRL_CODEX_TEST_UNRELATED")==L"preserved-测试" && argc==3 && std::wstring(argv[1])==L"--proxy-server=http://127.0.0.1:17988" && std::wstring(argv[2])==L"--proxy-bypass-list=localhost;127.0.0.1;[::1]";
         auto file=CreateFileW(variable(L"SWIRL_CODEX_TEST_REPORT").c_str(),GENERIC_WRITE,0,nullptr,TRUNCATE_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
         if(file==INVALID_HANDLE_VALUE)return 2;DWORD written=0;WriteFile(file,valid?"PASS":"FAIL",4,&written,nullptr);CloseHandle(file);return valid?0:1;
     }
@@ -42,14 +42,18 @@ int wmain() {
         parent.insert(parent.end(),{L"http_proxy=http://stale.invalid:1",L"HTTPS_PROXY=http://stale.invalid:2",L"all_proxy=socks5://stale.invalid:3",L"NO_PROXY=*",L"SWIRL_CODEX_TEST_CHILD=1",L"SWIRL_CODEX_TEST_UNRELATED=preserved-测试",std::wstring(L"SWIRL_CODEX_TEST_REPORT=")+report});
         auto block=childEnvironment(parent,parseProxy(L"127.0.0.1:17988"));
         require(block.size()>2 && block.back()==0 && block[block.size()-2]==0,"environment double NUL");
-        wchar_t executable[32768]{};GetModuleFileNameW(nullptr,executable,32768);require(startChild(executable,block)!=0,"child creation");
+        wchar_t executable[32768]{};GetModuleFileNameW(nullptr,executable,32768);
+        auto unsafeProxy=parseProxy(L"127.0.0.1:17988");unsafeProxy.endpoint=L"http://127.0.0.1:17988 --no-proxy-server";
+        rejected([&]{startChild(executable,block,unsafeProxy);});
+        rejected([&]{startChild(L"C:\\Codex\" --no-proxy-server",block,parseProxy(L"127.0.0.1:17988"));});
+        require(startChild(executable,block,parseProxy(L"127.0.0.1:17988"))!=0,"child creation");
         bool passed=false;
         for(int i=0;i<500 && !passed;++i) {
             auto file=CreateFileW(report,GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
             if(file!=INVALID_HANDLE_VALUE){char value[5]{};DWORD read=0;ReadFile(file,value,4,&read,nullptr);CloseHandle(file);if(read==4){passed=std::string(value)=="PASS";break;}}
             Sleep(10);
         }
-        require(passed,"real child did not receive scoped proxy and preserved environment");
+        require(passed,"real child did not receive Chromium arguments, scoped proxy and preserved environment");
         require(currentEnvironment()==parentBefore,"parent environment changed");DeleteFileW(report);
         std::printf("Codex native launcher: %u assertions passed; real child environment and live/closed listener verified.\n",assertions);return 0;
     } catch(const char *error){if(*report)DeleteFileW(report);std::fprintf(stderr,"%s\n",error);return 1;}

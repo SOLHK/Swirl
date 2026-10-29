@@ -1,36 +1,34 @@
 #include "app/DiagnosticService.h"
-#include "engine/MihomoLogDiagnostic.h"
 #include <QTest>
 #include <QTemporaryDir>
 #include <QFile>
 class DiagnosticTests:public QObject {
  Q_OBJECT
 private slots:
- void mihomoFailureReasons_data(){
-  QTest::addColumn<QString>("reason");QTest::addColumn<QString>("code");QTest::addColumn<QString>("detail");
-  const auto row=[](const char *name,const char *reason,const char *code,const char *detail){QTest::newRow(name)<<QString::fromUtf8(reason)<<QString::fromUtf8(code)<<QString::fromUtf8(detail);};
-  row("proxy-auth","407 Proxy Authentication Required","ProxyAuthenticationFailure","407");
-  row("socks-auth","socks5 authentication failed","ProxyAuthenticationFailure","认证被拒绝");
-  row("dns","dns resolve failed: no such host","DNSFailure","域名不存在");
-  row("dns-timeout","all DNS requests failed: i/o timeout","DNSFailure","解析失败");
-  row("tls-eof","TLS handshake EOF","TLSFailure","EOF");
-  row("certificate","x509: certificate signed by unknown authority","TLSFailure","证书校验失败");
-  row("reset","read: connection reset by peer","UpstreamConnectionReset","被重置");
-  row("refused","connect: connection refused","UpstreamConnectionRefused","被拒绝");
-  row("timeout","context deadline exceeded","UpstreamTimeout","超时");
-  row("eof","unexpected EOF","UpstreamEOF","阶段未确定");
+ void bareBrowsingMetadataIsRemoved(){const auto safe=DiagnosticService::redact("TLS failure for private.example.net and https://private.example.net/path Cookie: session-private");QVERIFY(!safe.contains("private.example.net"));QVERIFY(!safe.contains("session-private"));}
+ void nodeFailureReferencesSurvivePrivateExport(){
+  QTemporaryDir temp;DiagnosticService log(temp.path());
+  const auto message=QStringLiteral("节点 #a137b946f6c1 · origin_tls · UrlTestTimeout · Rust HEAD 探测失败");
+  log.record("ERROR","NodeTest","NodeTestFailed",message);
+  const auto path=temp.filePath("node-diagnostics.zip");
+  QVERIFY(log.exportReport(QUrl::fromLocalFile(path),{{"nodeTests",QVariantList{QVariantMap{{"nodeReference","a137b946f6c1"},{"phase","origin_tls"},{"failureCode","UrlTestTimeout"},{"testSucceeded",false}}}}}));
+  QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto bytes=file.readAll();
+  QVERIFY(bytes.contains("a137b946f6c1"));QVERIFY(bytes.contains("origin_tls"));QVERIFY(bytes.contains("UrlTestTimeout"));
  }
- void mihomoFailureReasons(){
-  QFETCH(QString,reason);QFETCH(QString,code);QFETCH(QString,detail);
-  const auto payload="[TCP] dial NODE-DNS-TLS (match RuleSet/private-rule) 192.168.1.1:5678 --> auth.openai.com:443 error: "+reason+" via https://user:SECRET@private-node.invalid/path?token=PRIVATE";
-  const auto fault=classifyMihomoLog(payload);QCOMPARE(fault.code,code);QVERIFY(fault.message.contains(detail));QVERIFY(fault.message.contains("auth.openai.com:443"));
-  for(const auto &secret:{"SECRET","PRIVATE","private-node","private-rule","192.168","5678","NODE-DNS-TLS"})QVERIFY2(!fault.message.contains(secret),secret);
+ void unicodeHostsAndProxyUrisAreRemoved(){const auto safe=DiagnosticService::redact(QStringLiteral("TLS failure for 私人.测试 socks5://fixture-user:fixture-secret@fixture.test:1080 tuic://fixture-id:fixture-pass@fixture.test username=fixture-account"));for(const auto &value:{QStringLiteral("私人.测试"),QStringLiteral("fixture-user"),QStringLiteral("fixture-secret"),QStringLiteral("fixture-pass"),QStringLiteral("fixture-account")})QVERIFY(!safe.contains(value));}
+ void protocolCredentialsAreRemoved(){const auto safe=DiagnosticService::redact("psk=fixture-psk pre-shared-key=fixture-peer auth-str=fixture-auth private-key-passphrase=fixture-pass short-id=abcdef12");for(const auto &value:{"fixture-psk","fixture-peer","fixture-auth","fixture-pass","abcdef12"})QVERIFY(!safe.contains(value));}
+ void nativeProtocolSecretsStayRemovedAfterRestartAndExport(){
+  QTemporaryDir temp;const auto path=temp.filePath("native-diagnostics.zip");
+  const auto message=QStringLiteral("tuic://fixture-user:fixture-password@fixture.invalid:443 psk=fixture-psk auth-str=fixture-auth 私人.测试");
+  {DiagnosticService log(temp.path());log.record("ERROR","NativeProxy","Handshake",message);}
+  DiagnosticService restored(temp.path());QCOMPARE(restored.records().size(),1);
+  QVERIFY(restored.exportReport(QUrl::fromLocalFile(path),{{"failure",message}}));
+  QFile archive(path);QVERIFY(archive.open(QIODevice::ReadOnly));const auto bytes=archive.readAll();
+  for(const auto &secret:{QByteArray("fixture-user"),QByteArray("fixture-password"),QByteArray("fixture-psk"),QByteArray("fixture-auth"),QStringLiteral("私人.测试").toUtf8()})QVERIFY(!bytes.contains(secret));
  }
- void mihomoPreambleDoesNotInventFailure(){
-  const auto fault=classifyMihomoLog("[TCP] dial DNS TLS certificate rule --> private.example:443 error: opaque failure");
-  QCOMPARE(fault.code,QStringLiteral("RouteHandshakeFailure"));QVERIFY(!fault.message.contains("private.example"));
-  QCOMPARE(classifyMihomoLog("warning tls EOF at private-node").code,QStringLiteral("RouteHandshakeFailure"));
- }
+ // Native failure stages are verified in RustCoreTests and the real DLL
+ // loader tests. Keep the application log/redaction/export tests independent
+ // of a removed third-party log grammar.
  void activityCountIncludesNonFailureEvents(){
   QTemporaryDir temp;
   {DiagnosticService log(temp.path());log.record("INFO","Engine","Connected","connected");log.record("WARN","Import","Notice","notice");log.record("DEBUG","Qt","Trace","trace");QCOMPARE(log.eventCount(),2);}
@@ -58,7 +56,12 @@ private slots:
  void redactionAndZip(){QTemporaryDir temp;DiagnosticService log(temp.path());
   const auto secrets=QStringLiteral("token=FIXTURE-TOKEN password: FIXTURE-PASSWORD Cookie: private-cookie\nhttps://fixture.test/sub?secret=PRIVATE-URL\nuuid: 11111111-1111-4111-8111-111111111111\n-----BEGIN PRIVATE KEY-----\nPRIVATE-KEY\n-----END PRIVATE KEY-----");
   log.record("ERROR","Fixture","ExpectedFailure",secrets);QCOMPARE(log.eventCount(),1);const auto text=log.records().first().toMap().value("message").toString();for(const auto &secret:{"FIXTURE-TOKEN","FIXTURE-PASSWORD","private-cookie","PRIVATE-URL","11111111","PRIVATE-KEY"})QVERIFY2(!text.contains(secret),secret);
-  const auto path=qEnvironmentVariable("SWIRL_DIAGNOSTIC_SAMPLE",temp.filePath("diagnostics.zip"));QVERIFY(log.exportReport(QUrl::fromLocalFile(path),{{"sample",true},{"state","controlled failure"}}));QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto archive=file.readAll();QVERIFY(archive.startsWith("PK"));QVERIFY(archive.contains("logs.jsonl"));QVERIFY(archive.contains("environment.json"));QVERIFY(!archive.contains("FIXTURE-TOKEN"));log.acknowledge();QCOMPARE(log.eventCount(),0);
+  const auto path=qEnvironmentVariable("SWIRL_DIAGNOSTIC_SAMPLE",temp.filePath("diagnostics.zip"));
+  const auto sourceSha=QString(40,'a'),binarySha=QString(64,'b');
+  QVERIFY(log.exportReport(QUrl::fromLocalFile(path),{{"sample",true},{"state","controlled failure"},{"sourceSha",sourceSha},{"executableSha256",binarySha},{"actualEngineType","rust"},{"engineProcessId","1234"}}));
+  QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto archive=file.readAll();QVERIFY(archive.startsWith("PK"));QVERIFY(archive.contains("logs.jsonl"));QVERIFY(archive.contains("environment.json"));
+  QVERIFY(archive.contains("identity.json"));QVERIFY(archive.contains(sourceSha.toLatin1()));QVERIFY(archive.contains(binarySha.toLatin1()));
+  QVERIFY(!archive.contains("FIXTURE-TOKEN"));log.acknowledge();QCOMPARE(log.eventCount(),0);
  }
  void rotationAndBound(){QTemporaryDir temp;DiagnosticService log(temp.path());for(int i=0;i<750;++i)log.record("INFO","Fixture","Bound",QStringLiteral("fixture diagnostic text ").repeated(250));QCOMPARE(log.records().size(),500);QVERIFY(QFileInfo(temp.filePath("events.jsonl.1")).exists());QVERIFY(QFileInfo(temp.filePath("events.jsonl")).size()<1024*1024+9000);}
 };

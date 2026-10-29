@@ -1,0 +1,185 @@
+name: U1 complete Windows Qt independent fixtures
+on:
+  push:
+    branches: [work/subscription-unified-integration-20261023, work/swirl-s3-max-ultra-20261023, work/swirl-s4-final-completion-20261023]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: u1-qt-fixtures-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  SWIRL_SOURCE_SHA: ${{ github.sha }}
+  PYTHONUTF8: '1'
+jobs:
+  qt-fixtures:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+      QT_FORCE_STDERR_LOGGING: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+      - name: Rust MSVC x64
+        run: rustup toolchain install stable --profile minimal --target x86_64-pc-windows-msvc
+      - uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4
+        with:
+          version: '6.11.3'
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          modules: qtshadertools
+          # Upstream PR 1000 handles Qt 6.11's architecture-specific repository path.
+          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b'
+          cache: true
+      # The Qt action runs setup-python itself. Restore the acceptance Python
+      # after it changes PATH, then install and exercise the fixture dependency
+      # with the same interpreter that will execute the nine protocol slots.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install independent fixture TLS implementation
+        run: python -m pip install cryptography==50.0.2
+      - name: Validate the fixture evidence gate
+        run: python -m unittest discover -s tools/tests -p test_u1_qt_fixtures.py -v
+      - name: Build current-source Rust command hosts
+        run: cargo build --manifest-path core/Cargo.toml --workspace --release --locked --lib --bins
+      - name: Configure the paired Qt fixture executable
+        run: cmake -S src/Swirl.Quick -B build/u1-qt-fixtures -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
+      - name: Build actual Qt product-chain and private-inspector tests
+        run: cmake --build build/u1-qt-fixtures --config Release --target SwirlRustCoreTests SwirlPrivateSubscriptionInspect SwirlStoragePathsTests --parallel 4
+      - name: Deploy Qt dependencies and initialize isolated fixture paths
+        run: |
+          $ErrorActionPreference = 'Stop'
+          windeployqt --release --compiler-runtime build/u1-qt-fixtures/Release/SwirlRustCoreTests.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Qt fixture deployment failed.' }
+          windeployqt --release --compiler-runtime build/u1-qt-fixtures/Release/SwirlPrivateSubscriptionInspect.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Qt private inspector deployment failed.' }
+          $root = Join-Path $env:RUNNER_TEMP 'u1-qt-fixture-tests'
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+          "SWIRL_TEST_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SWIRL_XRAY_PEER_DIR=$(Join-Path $env:RUNNER_TEMP 'u1-qt-xray-peer')" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SWIRL_RUST_HARNESS=$((Resolve-Path core/target/release/swirl-api.exe).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SWIRL_RUST_INSPECTOR=$((Resolve-Path core/target/release/swirl-inspect.exe).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SWIRL_RUST_QT_TESTS=$((Resolve-Path build/u1-qt-fixtures/Release/SwirlRustCoreTests.exe).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SWIRL_QT_PRIVATE_INSPECTOR=$((Resolve-Path build/u1-qt-fixtures/Release/SwirlPrivateSubscriptionInspect.exe).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SWIRL_CAPTURE_INSPECTOR=$((Resolve-Path build/u1-qt-fixtures/Release/SwirlPrivateSubscriptionInspect.exe).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Install the toolchain pinned by the independent Xray peer lock
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: '1.27.2'
+          cache: false
+      - name: Build and repeat-verify the locked official Xray peer
+        run: python tools/Build-XrayPeer.py --output "$env:SWIRL_XRAY_PEER_DIR"
+      - name: Fetch and verify pinned independent QUIC peers
+        run: |
+          python tools/Fetch-NativeProtocolPeers.py --output "$env:RUNNER_TEMP/s4-qt-quic-peers"
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned QUIC peer fetch failed.' }
+          "HY2_SERVER=$env:RUNNER_TEMP/s4-qt-quic-peers/hysteria2/hysteria.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SWIRL_TUIC_SERVER=$env:RUNNER_TEMP/s4-qt-quic-peers/tuic/tuic-server.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Exercise all ten Qt fixture slots with zero skips
+        run: python tools/Run-U1QtFixtures.py --output "$env:RUNNER_TEMP/u1-qt-fixture-evidence" --qt-version 6.11.3
+      - name: Verify isolated persistent storage and per-build QML cache paths
+        run: ctest --test-dir build/u1-qt-fixtures -C Release -R '^swirl-storage-paths$' --output-on-failure --no-tests=error
+      - name: Complete subscription capture, DPAPI persistence and redaction regression
+        if: ${{ !cancelled() }}
+        run: |
+          @'
+          import hashlib, json, os, platform, subprocess, sys, unittest
+          from pathlib import Path
+
+          module = 'tools.tests.test_subscription_capture'
+          required = {module + '.CaptureTests.' + name for name in (
+              'test_dpapi_seal_reopen_and_tamper',
+              'test_rust_offline_pipeline_preserves_private_fields',
+              'test_qt_offline_inspector_reloads_and_redacts_actual_dpapi',
+              'test_offline_cpp_import_and_existing_store_protection',
+          )}
+          report = {'schema': 1, 'success': False, 'command': ['python', '-'],
+                    'suite': module, 'platform': platform.platform(),
+                    'python': platform.python_version(), 'required_tests': sorted(required),
+                    'provider_credentials_used': False, 'physical_windows_verified': False}
+          output = Path(os.environ['RUNNER_TEMP']) / 'u1-qt-fixture-evidence'
+          output.mkdir(parents=True, exist_ok=True)
+          executed = []
+
+          class ObservedResult(unittest.TextTestResult):
+              def startTest(self, test):
+                  executed.append(test.id())
+                  super().startTest(test)
+
+          def test_ids(suite):
+              for test in suite:
+                  if isinstance(test, unittest.TestSuite):
+                      yield from test_ids(test)
+                  else:
+                      yield test.id()
+
+          try:
+              if os.name != 'nt':
+                  raise RuntimeError('Complete capture and DPAPI regression requires Windows')
+              source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+              report['source_sha'] = source
+              if source != os.environ.get('GITHUB_SHA') or source != os.environ.get('SWIRL_SOURCE_SHA'):
+                  raise RuntimeError('Capture test source differs from the triggered commit')
+              if subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=no'], text=True):
+                  raise RuntimeError('Tracked source changed before capture regression')
+              paths = {key: Path(os.environ[key]).resolve(strict=True) for key in (
+                  'SWIRL_CAPTURE_INSPECTOR', 'SWIRL_QT_PRIVATE_INSPECTOR', 'SWIRL_RUST_INSPECTOR')}
+              if paths['SWIRL_CAPTURE_INSPECTOR'] != paths['SWIRL_QT_PRIVATE_INSPECTOR']:
+                  raise RuntimeError('Legacy and private capture must use the same Qt inspector')
+              paired = paths['SWIRL_QT_PRIVATE_INSPECTOR'].parent
+              metadata = json.loads((paired / 'swirl-rust-build.json').read_text(encoding='utf-8-sig'))
+              if metadata['source_sha'] != source or metadata['target'] != 'x86_64-pc-windows-msvc' or metadata['abi_version'] != 1:
+                  raise RuntimeError('Capture inspector Rust library is not the current Windows build')
+              paths['RUST_FFI_LIBRARY'] = paired / 'swirl_api.dll'
+              report['rust'] = metadata
+              report['binaries'] = {key: {'filename': path.name, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+                                    for key, path in paths.items()}
+              suite = unittest.defaultTestLoader.loadTestsFromName(module)
+              discovered = list(test_ids(suite))
+              report.update(discovered_tests=discovered, expected=len(discovered))
+              if len(discovered) < 31 or len(set(discovered)) != len(discovered) or not required <= set(discovered):
+                  raise RuntimeError('Complete existing capture regression or required DPAPI tests missing')
+              result = unittest.TextTestRunner(verbosity=2, resultclass=ObservedResult).run(suite)
+              report.update(executed=result.testsRun, executed_tests=executed,
+                            failures=len(result.failures), errors=len(result.errors), skipped=len(result.skipped),
+                            expected_failures=len(result.expectedFailures), unexpected_successes=len(result.unexpectedSuccesses))
+              clean = not subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=no'], text=True)
+              report['tracked_source_unchanged'] = clean
+              report['success'] = (result.wasSuccessful() and clean and not result.skipped
+                                   and not result.expectedFailures and not result.unexpectedSuccesses
+                                   and executed == discovered and required <= set(executed))
+          except Exception as error:
+              report['failure_type'] = type(error).__name__
+              print('Capture evidence gate failed: ' + type(error).__name__, file=sys.stderr)
+          finally:
+              (output / 'subscription-capture-tests.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
+          raise SystemExit(0 if report['success'] else 1)
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw 'Complete subscription capture and DPAPI regression failed.' }
+          python tools/tests/test_qt_reality_lifecycle.py
+          if ($LASTEXITCODE -ne 0) { throw 'Qt lifecycle evidence guards failed.' }
+          python tools/tests/test_public_qt_reality.py
+          if ($LASTEXITCODE -ne 0) { throw 'Qt public-exit evidence guards failed.' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: S4-Windows-Qt-ten-fixtures-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/u1-qt-fixture-evidence
+            ${{ runner.temp }}/u1-qt-xray-peer/build-manifest.json
+            ${{ runner.temp }}/u1-qt-xray-peer/build.log
+            build/u1-qt-fixtures/Release/swirl-rust-build.json
+          if-no-files-found: error
+          retention-days: 14

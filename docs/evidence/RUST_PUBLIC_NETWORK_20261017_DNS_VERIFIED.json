@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "commit": "f13c695ab1747e84de8594bfe208bd278b6149a6",
+  "platform": "Linux",
+  "tracked_worktree_clean": true,
+  "timestamp_utc": "2026-10-17T18:01:05.647353+00:00",
+  "harness_sha256": "1e3c4abcbb03d0fa73f176629e29c6b955fbbd14979c1fd2fc2fa0146638efda",
+  "scope": "Public HTTPS via native DIRECT and native DoH; no provider, UDP, TUN or performance claim",
+  "checks": [
+    {
+      "host": "example.com",
+      "port": 443,
+      "method": "HEAD",
+      "path": "/",
+      "dns": "system",
+      "route": "explicit-native-direct",
+      "success": true,
+      "engine": "swirl-rust",
+      "native_connect_accepted": true,
+      "certificate_verified": true,
+      "tls_version": "TLSv1.3",
+      "http_status": 200,
+      "orderly_close": true,
+      "core": {
+        "accepted": 1,
+        "active": 0,
+        "failed": 0,
+        "upload": 700,
+        "download": 4788,
+        "last_error": "",
+        "recorded_connections": 1
+      },
+      "native_session_settled": true,
+      "elapsed_ms": 89
+    },
+    {
+      "host": "www.rust-lang.org",
+      "port": 443,
+      "method": "HEAD",
+      "path": "/",
+      "dns": "system",
+      "route": "explicit-native-direct",
+      "success": true,
+      "engine": "swirl-rust",
+      "native_connect_accepted": true,
+      "certificate_verified": true,
+      "tls_version": "TLSv1.3",
+      "http_status": 301,
+      "orderly_close": true,
+      "core": {
+        "accepted": 1,
+        "active": 0,
+        "failed": 0,
+        "upload": 690,
+        "download": 5385,
+        "last_error": "",
+        "recorded_connections": 1
+      },
+      "native_session_settled": true,
+      "elapsed_ms": 139
+    },
+    {
+      "host": "example.com",
+      "port": 443,
+      "method": "HEAD",
+      "path": "/",
+      "dns": "native-doh",
+      "route": "explicit-native-direct",
+      "success": true,
+      "dns_endpoint": "https://cloudflare-dns.com/dns-query",
+      "dns_bootstrap": "1.1.1.1:443",
+      "engine": "swirl-rust",
+      "native_connect_accepted": true,
+      "certificate_verified": true,
+      "tls_version": "TLSv1.3",
+      "http_status": 200,
+      "orderly_close": true,
+      "core": {
+        "accepted": 1,
+        "active": 0,
+        "failed": 0,
+        "upload": 700,
+        "download": 4790,
+        "last_error": "",
+        "recorded_connections": 1
+      },
+      "native_session_settled": true,
+      "elapsed_ms": 200
+    }
+  ],
+  "success": true
+}

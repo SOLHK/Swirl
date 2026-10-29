@@ -1,0 +1,12 @@
+2026/10/22 21:45:25.185343 [Debug] app/log: Logger started
+2026/10/22 21:45:25.186836 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:45365
+2026/10/22 21:45:25.189454 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:45365
+2026/10/22 21:45:25.191557 [Warning] core: Xray 26.10.21 started
+2026/10/22 21:45:25.214627 [Info] [1452359686] app/proxyman/inbound: connection ends > proxy/vmess/encoding: failed to read request header > EOF
+2026/10/22 21:45:25.220858 [Info] [4282258632] proxy/vmess/inbound: received request for tcp:127.0.0.1:60929
+2026/10/22 21:45:25.221039 [Info] [4282258632] app/dispatcher: default route for tcp:127.0.0.1:60929
+2026/10/22 21:45:25.221111 [Info] [4282258632] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:60929
+2026/10/22 21:45:25.221126 [Debug] [4282258632] transport/internet: dialing to tcp:127.0.0.1:60929
+2026/10/22 21:45:25.224393 [Info] [4282258632] proxy/freedom: connection opened to tcp:127.0.0.1:60929, local endpoint 127.0.0.1:58836, remote endpoint 127.0.0.1:60929
+2026/10/22 21:45:25.224412 [Debug] [4282258632] proxy: CopyRawConn (maybe) readv
+2026/10/22 21:45:26.606300 [Info] [4282258632] app/proxyman/inbound: connection ends > proxy/vmess/inbound: connection ends > context canceled

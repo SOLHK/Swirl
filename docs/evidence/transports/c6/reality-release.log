@@ -1,0 +1,17 @@
+test_bad_public_key_short_id_sni_and_proxy_authentication_fail_closed (test_transport_reality_xray.RealityTransportXrayTests.test_bad_public_key_short_id_sni_and_proxy_authentication_fail_closed) ... ok
+test_chrome_133_h2_profile_is_preserved_for_both_transports (test_transport_reality_xray.RealityTransportXrayTests.test_chrome_133_h2_profile_is_preserved_for_both_transports) ... ok
+test_empty_rustls_alpn_derives_h2_and_explicit_http1_offer_is_rejected (test_transport_reality_xray.RealityTransportXrayTests.test_empty_rustls_alpn_derives_h2_and_explicit_http1_offer_is_rejected) ... ok
+test_grpc_tun_and_multi_with_http_and_verified_https (test_transport_reality_xray.RealityTransportXrayTests.test_grpc_tun_and_multi_with_http_and_verified_https) ... ok
+test_https_destination_certificate_error_remains_fatal_inside_reality (test_transport_reality_xray.RealityTransportXrayTests.test_https_destination_certificate_error_remains_fatal_inside_reality) ... ok
+test_parallel_bidirectional_streams_and_explicit_client_cancel (test_transport_reality_xray.RealityTransportXrayTests.test_parallel_bidirectional_streams_and_explicit_client_cancel) ... ok
+test_raw_reality_authenticated_http_regression (test_transport_reality_xray.RealityTransportXrayTests.test_raw_reality_authenticated_http_regression) ... ok
+test_raw_reality_vision_authenticated_https_regression (test_transport_reality_xray.RealityTransportXrayTests.test_raw_reality_vision_authenticated_https_regression) ... ok
+test_unsupported_transport_vision_and_spider_options_are_explicit_errors (test_transport_reality_xray.RealityTransportXrayTests.test_unsupported_transport_vision_and_spider_options_are_explicit_errors) ... ok
+test_xhttp_stream_one_http_https_and_large_duplex (test_transport_reality_xray.RealityTransportXrayTests.test_xhttp_stream_one_http_https_and_large_duplex) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 14.998s
+
+OK
+
+actual_exit_code=0

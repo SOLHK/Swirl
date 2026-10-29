@@ -1,5 +1,7 @@
 #include "TelemetryService.h"
-#include <QStandardPaths>
+#include "../network/HttpRequestPolicy.h"
+#include "../app/StoragePaths.h"
+#include "RouteObservation.h"
 #include <QDir>
 #include <QFile>
 #include <QSaveFile>
@@ -33,15 +35,17 @@ void aggregate(QJsonObject &day,const QString &kind,QString key,double up,double
 }
 }
 TelemetryService::TelemetryService(QString path,bool networkMeasurements,QObject *parent):QObject(parent),m_path(path),m_networkEnabled(networkMeasurements){
- if(m_path.isEmpty())m_path=QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/telemetry.json";
+ if(m_path.isEmpty())m_path=SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/telemetry.json";
  load();m_save.setInterval(5000);connect(&m_save,&QTimer::timeout,this,&TelemetryService::flush);m_save.start();
  m_measure.setInterval(60000);connect(&m_measure,&QTimer::timeout,this,[this]{if(m_networkEnabled&&m_status.apiHealthy)measureNetwork();});m_measure.start();
- m_stale.setInterval(1000);connect(&m_stale,&QTimer::timeout,this,[this]{if(!sampled()||!connectionsSampled())publish();});m_stale.start();
+ m_stale.setInterval(1000);connect(&m_stale,&QTimer::timeout,this,[this]{if(sampled()!=m_publishedSampled||connectionsSampled()!=m_publishedConnectionsSampled)publish();});m_stale.start();
+ m_nativeProbeDeadline.setSingleShot(true);m_nativeProbeDeadline.setInterval(10000);
+ connect(&m_nativeProbeDeadline,&QTimer::timeout,this,[this]{finishNativeProbe({{"code","timeout"},{"state",QStringLiteral("Rust 节点检测超时")},{"success",false},{"metricType","http_headers"}});});
 }
 TelemetryService::~TelemetryService(){flush();}
 bool TelemetryService::sampled() const{return m_status.apiHealthy&&m_status.trafficAt>0&&nowMs()-m_status.trafficAt<6000;}
 bool TelemetryService::connectionsSampled() const{return m_status.apiHealthy&&m_status.connectionsAt>0&&nowMs()-m_status.connectionsAt<6000;}
-void TelemetryService::publish(){m_periodCache.clear();++m_revision;emit changed();}
+void TelemetryService::publish(){m_publishedSampled=sampled();m_publishedConnectionsSampled=connectionsSampled();m_periodCache.clear();++m_revision;emit changed();}
 QString TelemetryService::formatBytes(double bytes) const {
  const QStringList units={"B","KB","MB","GB","TB"};int i=0;while(bytes>=1024&&i<4){bytes/=1024;++i;}
  return QString::number(bytes,'f',i?1:0)+" "+units[i];
@@ -51,14 +55,29 @@ int TelemetryService::activeProcesses() const {QSet<QString> names;for(const aut
 void TelemetryService::ingest(const ProxyEngine::Status &status){
  const auto epoch=QString::number(status.processId)+"/"+status.sessionId;
  if(status.processAlive&&m_epoch!=epoch){m_epoch=epoch;m_seen.clear();m_lastConnections=0;m_lastTraffic=0;m_lastUp=0;m_lastDown=0;m_externalIp.clear();m_latencies.clear();}
- const auto route=epoch+"/"+status.selectedNodeId+"/"+status.mode+"/"+QString::number(status.proxyPort)+"/"+QString::number(status.processAlive)+"/"+QString::number(status.apiHealthy)+"/"+QString::number(status.directSession);
- if(route!=m_routeEpoch){m_routeEpoch=route;++m_routeGeneration;m_externalIp.clear();m_latencies.clear();m_failedMeasurements.clear();m_internetDiagnostic.clear();m_proxyDiagnostic.clear();m_latencies["proxy"]=status.processAlive&&!status.directSession?QStringLiteral("尚未测量"):QStringLiteral("未连接");m_measurementState=QStringLiteral("尚未测量");}
+ const auto route=epoch+"/"+status.selectedNodeId+"/"+status.mode+"/"+QString::number(status.proxyPort)+"/"+QString::number(status.processAlive)+"/"+QString::number(status.apiHealthy)+"/"+QString::number(status.directSession)+"/"+status.configurationReceipt.value("applied_revision").toString()+"/"+status.configurationReceipt.value("generation").toString();
+ if(route!=m_routeEpoch){m_routeEpoch=route;++m_routeGeneration;
+  // Switching away and back still invalidates the old native measurement.
+  if(m_nativeProbePending){m_nativeProbePending=false;m_nativeProbeObservedRunning=false;m_nativeProbeDeadline.stop();--m_measurements;}
+  m_externalIp.clear();m_latencies.clear();m_failedMeasurements.clear();m_internetDiagnostic.clear();m_proxyDiagnostic.clear();m_latencies["proxy"]=status.processAlive&&!status.directSession?QStringLiteral("尚未测量"):QStringLiteral("未连接");m_measurementState=QStringLiteral("尚未测量");}
  m_status=status;
- if(m_proxyProbe)m_proxyProbe->observe(status);
+ if(m_nativeProbePending&&m_nativeProbeGeneration==m_routeGeneration&&status.probeRequestTag==m_nativeProbeTag){
+  if(status.nodeBusy&&status.requestState==ProxyEngine::RequestState::InProgress)m_nativeProbeObservedRunning=true;
+  if(!status.nodeBusy&&(status.requestState==ProxyEngine::RequestState::Succeeded||status.requestState==ProxyEngine::RequestState::Failed)){
+   const bool ok=status.requestState==ProxyEngine::RequestState::Succeeded;
+   finishNativeProbe({{"code",ok?QString("success"):status.probeFailureStage.isEmpty()?QString("native-probe"):status.probeFailureStage},
+    {"state",ok?QString::number(status.latencyMs)+" ms":status.nodeMessage},{"success",ok},{"http",status.responseCode},{"elapsedMs",status.latencyMs},
+    {"outboundConnectMs",status.probeOutboundConnectMs},{"originTlsMs",status.probeOriginTlsMs},{"metricType","http_headers"},
+    {"routeVerified",ok},{"route",status.configurationReceipt.isEmpty()?QStringLiteral("当前所选 Rust 出站"):QStringLiteral("当前 Rust 策略")},{"detail",status.configurationReceipt.isEmpty()?QStringLiteral("Rust Core 测量所选出站至最终响应首部；不含界面刷新等待时间。"):QStringLiteral("Rust Core 根据当前策略测量至响应首部；本次实际出口见连接详情。")}});
+  }
+ }
  if(!status.apiHealthy){for(auto it=m_seen.begin();it!=m_seen.end();++it)if(it->value("status")!="已结束")(*it)["status"]=status.processAlive?QStringLiteral("采样中断"):QStringLiteral("已结束");publish();return;}
  if(status.connectionsAt>m_lastConnections){
   m_lastConnections=status.connectionsAt;const auto date=QDateTime::fromMSecsSinceEpoch(status.connectionsAt).date().toString(Qt::ISODate);
-  auto day=m_days.value(date).toObject();day["sampled"]=true;
+  auto day=m_days.value(date).toObject();
+  // Earlier persisted days cannot be split by source after the fact.
+  if(!day.value("sampled").toBool()&&!day.contains("proxyRankingComplete"))day["proxyRankingComplete"]=true;
+  day["sampled"]=true;
   // Session counters are owned by this process. A reset starts a new baseline.
   const auto up=qMax<qint64>(0,status.uploadTotal),down=qMax<qint64>(0,status.downloadTotal);
   const auto totalDelta=(up>=m_lastUp?up-m_lastUp:up)+(down>=m_lastDown?down-m_lastDown:down);
@@ -68,16 +87,26 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
   QSet<QString> active;
   for(const auto &value:status.connections){
    auto row=value.toMap();const auto id=row.value("id").toString();if(id.isEmpty()||active.contains(id))continue;active.insert(id);
+   if(row.contains("route"))row.insert("route",SwirlRouteObservation::sanitized(QJsonObject::fromVariantMap(row.value("route").toMap())));
    const auto old=m_seen.value(id);const auto u=row.value("uploadBytes").toLongLong(),d=row.value("downloadBytes").toLongLong();
    const auto ou=old.value("uploadBytes").toLongLong(),od=old.value("downloadBytes").toLongLong();
    const auto du=qMax<qint64>(0,u>=ou?u-ou:u),dd=qMax<qint64>(0,d>=od?d-od:d);
    const bool count=old.value("accountedDay").toString()!=date;
+   const bool proxy=row.value("category").toString()==QStringLiteral("proxy");
+   const bool proxyCount=old.value("proxyAccountedDay").toString()!=date;
    aggregate(day,"apps",row.value("process","未知进程").toString(),du,dd,count);
    aggregate(day,"domains",row.value("host",row.value("ip")).toString(),du,dd,count);
    if(!row.value("sourceIp").toString().isEmpty())aggregate(day,"devices",row.value("sourceIp").toString(),du,dd,count);
    aggregate(day,"nodes",row.value("policy").toString(),du,dd,count);
    aggregate(day,"categories",row.value("category","other").toString(),du,dd,count);
-   if(row.value("category")=="proxy")add(bucket,"proxy",du+dd);
+   if(proxy){
+    aggregate(day,"proxyApps",row.value("process","未知进程").toString(),du,dd,proxyCount);
+    aggregate(day,"proxyDomains",row.value("host",row.value("ip")).toString(),du,dd,proxyCount);
+    if(!row.value("sourceIp").toString().isEmpty())aggregate(day,"proxyDevices",row.value("sourceIp").toString(),du,dd,proxyCount);
+    aggregate(day,"proxyNodes",row.value("policy").toString(),du,dd,proxyCount);
+    add(bucket,"proxy",du+dd);
+    row["proxyAccountedDay"]=date;
+   }else if(old.contains("proxyAccountedDay"))row["proxyAccountedDay"]=old.value("proxyAccountedDay");
    const auto interval=status.connectionsAt-old.value("lastSeen").toLongLong();
    row["uploadRate"]=!old.isEmpty()&&interval>0?double(du)*1000/interval:0;row["downloadRate"]=!old.isEmpty()&&interval>0?double(dd)*1000/interval:0;
    row["accountedDay"]=date;row["lastSeen"]=status.connectionsAt;row["status"]=row.value("closed").toBool()?"已结束":"活动";
@@ -98,19 +127,25 @@ QJsonObject TelemetryService::periodData(int period) const {
  const auto today=QDate::currentDate();
  if(m_periodCacheDate!=today){m_periodCache.clear();m_periodCacheDate=today;}
  if(m_periodCache.contains(period))return m_periodCache.value(period);
- QJsonObject out;const auto start=period==1?today.addDays(-1):period==2?today.addDays(1-today.dayOfWeek()):period==3?QDate(today.year(),today.month(),1):today;
+ QJsonObject out{{"proxyRankingComplete",true}};const auto start=period==1?today.addDays(-1):period==2?today.addDays(1-today.dayOfWeek()):period==3?QDate(today.year(),today.month(),1):today;
  const auto end=period==1?today.addDays(-1):today;
- for(const auto &key:m_days.keys()){const auto date=QDate::fromString(key,Qt::ISODate);if(date<start||date>end)continue;const auto d=m_days.value(key).toObject();if(d.value("sampled").toBool())out["sampled"]=true;add(out,"up",d.value("up").toDouble());add(out,"down",d.value("down").toDouble());
-  for(const auto &kind:{"apps","domains","nodes","devices","categories"}){auto group=out.value(kind).toObject();const auto entries=d.value(kind).toObject();for(const auto &name:entries.keys()){auto sum=group.value(name).toObject();const auto row=entries.value(name).toObject();for(const auto &field:{"up","down","count"})add(sum,field,row.value(field).toDouble());group[name]=sum;}out[kind]=group;}
+ for(const auto &key:m_days.keys()){const auto date=QDate::fromString(key,Qt::ISODate);if(date<start||date>end)continue;const auto d=m_days.value(key).toObject();if(d.value("sampled").toBool()){out["sampled"]=true;if(!d.value("proxyRankingComplete").toBool())out["proxyRankingComplete"]=false;}add(out,"up",d.value("up").toDouble());add(out,"down",d.value("down").toDouble());
+  for(const auto &kind:{"apps","domains","nodes","devices","categories","proxyApps","proxyDomains","proxyNodes","proxyDevices"}){auto group=out.value(kind).toObject();const auto entries=d.value(kind).toObject();for(const auto &name:entries.keys()){auto sum=group.value(name).toObject();const auto row=entries.value(name).toObject();for(const auto &field:{"up","down","count"})add(sum,field,row.value(field).toDouble());group[name]=sum;}out[kind]=group;}
  }m_periodCache.insert(period,out);return out;
 }
 QVariantMap TelemetryService::summary(int period) const {auto d=periodData(period);return {{"sampled",d.value("sampled").toBool()},{"up",d.value("up").toDouble()},{"down",d.value("down").toDouble()},{"total",d.value("up").toDouble()+d.value("down").toDouble()},{"domains",d.value("domains").toObject().size()},{"apps",d.value("apps").toObject().size()}};}
-QVariantList TelemetryService::ranking(const QString &kind,int period,int limit) const {
- if(kind!="apps"&&kind!="domains"&&kind!="nodes"&&kind!="devices")return {};const auto data=periodData(period),entries=data.value(kind).toObject();QVariantList result;const auto total=data.value("up").toDouble()+data.value("down").toDouble();
+bool TelemetryService::proxyRankingAvailable(int period) const {return periodData(period).value("proxyRankingComplete").toBool();}
+QVariantList TelemetryService::ranking(const QString &kind,int period,int limit,bool proxyOnly) const {
+ if(kind!="apps"&&kind!="domains"&&kind!="nodes"&&kind!="devices")return {};
+ const auto data=periodData(period);
+ if(proxyOnly&&!data.value("proxyRankingComplete").toBool())return {};
+ const auto group=proxyOnly?QStringLiteral("proxy")+kind.left(1).toUpper()+kind.mid(1):kind;
+ const auto entries=data.value(group).toObject();QVariantList result;
+ const auto total=proxyOnly?data.value("categories").toObject().value("proxy").toObject().value("up").toDouble()+data.value("categories").toObject().value("proxy").toObject().value("down").toDouble():data.value("up").toDouble()+data.value("down").toDouble();
  for(const auto &name:entries.keys()){const auto r=entries.value(name).toObject();const auto up=r.value("up").toDouble(),down=r.value("down").toDouble();result.append(QVariantMap{{"id",name},{"name",name},{"upload",formatBytes(up)},{"download",formatBytes(down)},{"value",formatBytes(up+down)},{"total",up+down},{"connections",r.value("count").toDouble()},{"percent",total>0?QString::number(100*(up+down)/total,'f',1)+"%":"0%"},{"mark",name.left(1)},{"color","#596273"}});}
  QHash<QString,double> speeds;
  if(connectionsSampled())for(const auto &value:m_seen){
-  if(value.value("status")!="活动")continue;
+  if(value.value("status")!="活动"||(proxyOnly&&value.value("category")!="proxy"))continue;
   const auto key=kind=="apps"?value.value("process"):kind=="domains"?value.value("host",value.value("ip")):kind=="devices"?value.value("sourceIp"):value.value("policy");
   speeds[key.toString()]+=value.value("uploadRate").toDouble()+value.value("downloadRate").toDouble();
  }
@@ -129,6 +164,24 @@ QVariantList TelemetryService::dailyTraffic(bool proxyOnly) const {
  const auto date=QDate::currentDate();const auto buckets=m_days.value(date.toString(Qt::ISODate)).toObject().value("buckets").toObject();QVariantList rows;
  for(int i=0;i<48;++i){const auto bucket=buckets.value(QString::number(i)).toObject();rows.append(QVariantMap{{"time",QDateTime(date,QTime(i/2,(i%2)*30)).toMSecsSinceEpoch()},{"sampled",bucket.value("sampled").toBool()},{"value",bucket.value(proxyOnly?"proxy":"total").toDouble()}});}return rows;
 }
+QVariantList TelemetryService::periodTraffic(int period,bool proxyOnly) const {
+ if(period==0)return dailyTraffic(proxyOnly);
+ if(period!=3)return {};
+ const auto today=QDate::currentDate(),first=QDate(today.year(),today.month(),1);
+ QVariantList rows;
+ for(auto date=first;date<=today;date=date.addDays(1)){
+  const auto day=m_days.value(date.toString(Qt::ISODate)).toObject();
+  double value=day.value("up").toDouble()+day.value("down").toDouble();
+  if(proxyOnly){
+   value=0;
+   const auto buckets=day.value("buckets").toObject();
+   for(const auto &bucket:buckets)value+=bucket.toObject().value("proxy").toDouble();
+  }
+  rows.append(QVariantMap{{"time",QDateTime(date,QTime(0,0)).toMSecsSinceEpoch()},
+                          {"sampled",day.value("sampled").toBool()},{"value",value}});
+ }
+ return rows;
+}
 void TelemetryService::load(){QFile file(m_path);if(!file.exists())return;if(!file.open(QIODevice::ReadOnly)||file.size()>16*1024*1024){m_storageError="监控历史无法读取或超过大小限制";return;}QJsonParseError e;const auto doc=QJsonDocument::fromJson(file.readAll(),&e);if(e.error!=QJsonParseError::NoError||doc.object().value("schema").toInt()!=1){m_storageError="监控历史格式无效";return;}m_days=doc.object().value("days").toObject();m_history=doc.object().value("history").toArray().toVariantList();while(m_history.size()>3600)m_history.removeFirst();}
 void TelemetryService::flush(){if(!m_dirty)return;QDir().mkpath(QFileInfo(m_path).absolutePath());QSaveFile file(m_path);const auto bytes=QJsonDocument(QJsonObject{{"schema",1},{"days",m_days},{"history",QJsonArray::fromVariantList(m_history)}}).toJson(QJsonDocument::Compact);if(!file.open(QIODevice::WriteOnly)||file.write(bytes)!=bytes.size()||!file.commit()){m_storageError="监控历史保存失败";emit diagnostic("Telemetry","StorageWrite",m_storageError);publish();return;}m_dirty=false;}
 void TelemetryService::reportMeasurement(const QString &key,bool ok,const QString &message){
@@ -140,15 +193,15 @@ void TelemetryService::reportMeasurement(const QString &key,bool ok,const QStrin
 void TelemetryService::recordInternetResult(int error,int http,bool proxy,qint64 elapsed) {
  QString code,state,advice;
  const bool success=error==int(QNetworkReply::NoError)&&http>=200&&http<300;
- if(success){code="ok";state=QStringLiteral("请求成功");advice=proxy?QStringLiteral("HTTPS 已通过 Swirl 当前代理策略；此结果仅代表本次检测请求。"):QStringLiteral("直连 HTTPS 请求成功；未验证代理节点。");}
+ if(success){code="ok";state=QStringLiteral("请求成功");advice=proxy?QStringLiteral("HTTPS 请求经 Swirl 当前策略完成；耗时包含连接、TLS 与目标响应，仅代表本次检测。"):QStringLiteral("直连 HTTPS 请求成功；耗时包含连接、TLS 与目标响应，未验证代理节点。");}
  else if(m_status.error==ProxyEngine::Error::SelectionFailed){code="policy";state=QStringLiteral("策略选择失败");advice=QStringLiteral("检查所选节点和代理策略。");}
  else if(proxy && m_status.nodeHealth==ProxyEngine::NodeHealth::Unavailable){code="node";state=QStringLiteral("节点不可用");advice=QStringLiteral("尝试测速或切换节点，再检测实际请求。");}
  else if(error==int(QNetworkReply::SslHandshakeFailedError)){code="tls";state=QStringLiteral("TLS 握手失败");advice=QStringLiteral("检查证书信任与系统时间；不要关闭证书校验。");}
  else if(error==int(QNetworkReply::HostNotFoundError)||error==int(QNetworkReply::ProxyNotFoundError)){code="dns";state=QStringLiteral("DNS 解析失败");advice=QStringLiteral("检查系统 DNS 与 Swirl DNS 配置。");}
  else if(error==int(QNetworkReply::TimeoutError)||error==int(QNetworkReply::OperationCanceledError)){code="timeout";state=QStringLiteral("检测超时");advice=QStringLiteral("检查网络、节点可达性或稍后重试。");}
- else if(proxy && (error==int(QNetworkReply::ProxyConnectionRefusedError)||error==int(QNetworkReply::ConnectionRefusedError))){code="proxy-port";state=QStringLiteral("本地代理端口不可用");advice=QStringLiteral("确认 Mihomo 正在运行，且本地代理端口正常监听。");}
+ else if(proxy && (error==int(QNetworkReply::ProxyConnectionRefusedError)||error==int(QNetworkReply::ConnectionRefusedError))){code="proxy-port";state=QStringLiteral("本地代理端口不可用");advice=QStringLiteral("确认 Rust Core 正在运行，且本地代理端口正常监听。");}
  else if(!proxy && error==int(QNetworkReply::NetworkSessionFailedError)){code="offline";state=QStringLiteral("本机网络不可用");advice=QStringLiteral("检查 Wi-Fi、网线或系统网络连接。");}
- else if(!proxy && m_status.processAlive && !m_status.apiHealthy){code="proxy-unconnected";state=QStringLiteral("代理尚未就绪");advice=QStringLiteral("确认 Mihomo 控制接口健康，等待连接完成或检查引擎错误。");}
+ else if(!proxy && m_status.processAlive && !m_status.apiHealthy){code="proxy-unconnected";state=QStringLiteral("代理尚未就绪");advice=QStringLiteral("确认 Rust Core 状态健康，等待连接完成或检查内核错误。");}
  else if(http>=300){code="service";state=QStringLiteral("检测服务响应异常");advice=QStringLiteral("检测服务未返回成功响应，可使用节点详情中的自选 URL 测试。");}
  else {code="outbound";state=QStringLiteral("出站请求失败");advice=QStringLiteral("检查网络和节点；路由、DNS 有延迟不代表 HTTPS 出站成功。");}
  m_internetDiagnostic["code"]=code;m_internetDiagnostic["state"]=state;m_internetDiagnostic["advice"]=advice;
@@ -163,9 +216,30 @@ void TelemetryService::finishMeasurement(quint64 generation){
  publish();
 }
 void TelemetryService::measureHttp(const QString &key,const QUrl &url,bool throughProxy,bool ip){
- auto network=new QNetworkAccessManager(this);network->setProxy(throughProxy?QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",m_status.proxyPort):QNetworkProxy(QNetworkProxy::NoProxy));QNetworkRequest req(url);req.setTransferTimeout(8000);req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);req.setAttribute(QNetworkRequest::CacheLoadControlAttribute,QNetworkRequest::AlwaysNetwork);req.setRawHeader("Connection","close");auto timer=std::make_shared<QElapsedTimer>();timer->start();auto reply=network->get(req);auto deadline=new QTimer(reply);deadline->setSingleShot(true);connect(deadline,&QTimer::timeout,reply,&QNetworkReply::abort);deadline->start(9000);const auto epoch=m_routeGeneration;
+ auto network=new QNetworkAccessManager(this);network->setProxy(throughProxy?QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",m_status.proxyPort):QNetworkProxy(QNetworkProxy::NoProxy));QNetworkRequest req(url);
+ SwirlNetwork::applyHttp1OnlyPolicy(req);
+ req.setTransferTimeout(8000);req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);req.setAttribute(QNetworkRequest::CacheLoadControlAttribute,QNetworkRequest::AlwaysNetwork);req.setRawHeader("Connection","close");auto timer=std::make_shared<QElapsedTimer>();timer->start();auto reply=network->get(req);auto deadline=new QTimer(reply);deadline->setSingleShot(true);connect(deadline,&QTimer::timeout,reply,&QNetworkReply::abort);deadline->start(9000);const auto epoch=m_routeGeneration;
  connect(reply,&QNetworkReply::readyRead,this,[reply]{if(reply->bytesAvailable()>4096)reply->abort();});
  connect(reply,&QNetworkReply::finished,this,[this,network,reply,timer,key,ip,epoch,throughProxy]{const auto code=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();const bool ok=reply->error()==QNetworkReply::NoError&&code>=200&&code<300;if(epoch==m_routeGeneration){if(key=="internet")recordInternetResult(int(reply->error()),code,throughProxy,timer->elapsed());if(ip){const QString candidate=QString::fromUtf8(reply->readAll()).trimmed();m_externalIp=ok&&!QHostAddress(candidate).isNull()?candidate:QString();}else if(key!="internet")m_latencies[key]=ok?QString::number(timer->elapsed())+" ms":"检测失败";reportMeasurement(key,ok,QString("测量失败，HTTP %1，网络错误 %2").arg(code).arg(int(reply->error())));}reply->deleteLater();network->deleteLater();finishMeasurement(epoch);});
+}
+void TelemetryService::measureProxy(){
+ if(m_nativeProbePending)return;
+ if(!m_status.apiHealthy||!m_status.processAlive||m_status.directSession||(m_status.selectedNodeId.isEmpty()&&m_status.configurationReceipt.isEmpty())){m_latencies["proxy"]=QStringLiteral("未连接");return;}
+ if(m_status.nodeBusy){m_latencies["proxy"]=QStringLiteral("节点检测进行中");return;}
+ ++m_measurements;m_nativeProbePending=true;m_nativeProbeObservedRunning=false;m_nativeProbeGeneration=m_routeGeneration;
+ m_latencies["proxy"]=QStringLiteral("测量中");m_proxyDiagnostic={{"code","measuring"},{"metricType","http_headers"},{"route",m_status.configurationReceipt.isEmpty()?QStringLiteral("当前所选 Rust 出站"):QStringLiteral("当前 Rust 策略")}};
+ if(++m_nativeProbeTag==0)++m_nativeProbeTag;
+ m_nativeProbeDeadline.start();emit nativeProbeRequested(m_internetProbe,m_nativeProbeTag);
+}
+void TelemetryService::rejectNativeProbe(quint64 tag,const QString &code){
+ if(m_nativeProbePending&&tag==m_nativeProbeTag)finishNativeProbe({{"code",code},{"state",code=="probe-busy"?QStringLiteral("另一个节点检测正在进行"):QStringLiteral("Rust 节点检测不可用")},{"success",false},{"metricType","http_headers"}});
+}
+void TelemetryService::finishNativeProbe(const QVariantMap &result){
+ if(!m_nativeProbePending)return;
+ m_nativeProbePending=false;m_nativeProbeObservedRunning=false;m_nativeProbeDeadline.stop();
+ const auto generation=m_nativeProbeGeneration;
+ if(generation==m_routeGeneration){m_proxyDiagnostic=result;m_latencies["proxy"]=result.value("state");reportMeasurement("proxy",result.value("success").toBool(),result.value("code").toString());}
+ finishMeasurement(generation);
 }
 void TelemetryService::measureNetwork(){
  if(!m_networkEnabled||m_measurements)return;m_measurementState="正在测量";m_measurements=2;
@@ -175,14 +249,7 @@ void TelemetryService::measureNetwork(){
  const bool throughProxy=m_status.apiHealthy && m_status.proxyPort>0;
  m_internetDiagnostic={{"code","measuring"},{"state",QStringLiteral("正在检测")},{"route",throughProxy?QStringLiteral("Swirl 本地代理策略"):QStringLiteral("直连")},{"engineRunning",m_status.processAlive},{"apiHealthy",m_status.apiHealthy},{"proxyPort",m_status.proxyPort},{"selectedNode",!m_status.selectedNodeId.isEmpty()},{"directSession",m_status.directSession}};
  measureHttp("internet",m_internetProbe,throughProxy);
- if(throughProxy&&!m_status.directSession){
-  ++m_measurements;m_latencies["proxy"]=QStringLiteral("测量中");m_proxyDiagnostic={{"code","measuring"},{"entryPort",m_status.proxyPort},{"route",QStringLiteral("当前代理入口策略")}};
-  const auto generation=m_routeGeneration;
-  m_proxyProbe=new ProxyLatencyProbe(m_status,m_internetProbe,[this,generation](const QVariantMap &result){
-   if(generation==m_routeGeneration){m_proxyDiagnostic=result;m_latencies["proxy"]=result.value("state");reportMeasurement("proxy",result.value("success").toBool(),result.value("code").toString());}
-   finishMeasurement(generation);
-  },this);
- }
+ if(throughProxy&&!m_status.directSession)measureProxy();
  else m_latencies["proxy"]=QStringLiteral("未连接");
  if(m_status.apiHealthy&&m_status.proxyPort>0){++m_measurements;measureHttp("exit",QUrl("https://api.ipify.org"),true,true);}
  auto dns=new QDnsLookup(QDnsLookup::A,"www.microsoft.com",this);auto elapsed=std::make_shared<QElapsedTimer>();elapsed->start();const auto epoch=m_routeGeneration;

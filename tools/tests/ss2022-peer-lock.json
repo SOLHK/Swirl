@@ -1,0 +1,24 @@
+{
+  "repository": "https://github.com/shadowsocks/shadowsocks-rust",
+  "release": "v1.25.0",
+  "license": "MIT",
+  "purpose": "independent test server only; never a Swirl client dependency",
+  "assets": {
+    "Linux-x86_64": {
+      "name": "shadowsocks-v1.25.0.x86_64-unknown-linux-gnu.tar.xz",
+      "sha256": "874f817fcf3e6d7681ec715a1c13c686c6eaae936524d102639b38364f3966ae"
+    },
+    "Windows-AMD64": {
+      "name": "shadowsocks-v1.25.0.x86_64-pc-windows-msvc.zip",
+      "sha256": "882151ea5c52941d4a3360ebd12c74c6d6bd1b599596089ef1811b379c705666"
+    },
+    "Darwin-x86_64": {
+      "name": "shadowsocks-v1.25.0.x86_64-apple-darwin.tar.xz",
+      "sha256": "f4d7e8d9e3fe905c5c4a28e05593f2bcbd247e1618454c7996b81d951556282a"
+    },
+    "Darwin-arm64": {
+      "name": "shadowsocks-v1.25.0.aarch64-apple-darwin.tar.xz",
+      "sha256": "58e0caf0cc9266c4ea226f38aa20fb28c1be12efc87a73cf5903197867555208"
+    }
+  }
+}

@@ -1,28 +1,33 @@
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import SwirlQuick
 import "../components"
+
 SwirlMotionButton {
     id: control
     property string iconName: "plus"
     property string tooltip: ""
-    property bool quiet:false
-    property real iconSize:Theme.dp(16)
-    property color iconColor:Theme.muted
-    implicitWidth:Theme.controlHeight; implicitHeight:Theme.controlHeight
+    property bool quiet: false
+    property real iconSize: Theme.dp(16)
+    property color iconColor: Theme.muted
+    implicitWidth: Theme.controlHeight
+    implicitHeight: Theme.controlHeight
     hoverEnabled: true
-    background: SwirlPillSurface {
-        Behavior on color { ColorAnimation {duration:SwirlMotion.duration} }
-        radius:Theme.controlRadius
-        color:control.quiet?"transparent":Theme.buttonBase
-        gradient:null
-        border.width:control.quiet?0:Theme.borderWidth
-        hovered: control.hovered; pressed: control.down
-        border.color: control.activeFocus ? Theme.focusBorder : Theme.pillRim
-        opacity: control.enabled ? 1 : 0.45
+    background: SwirlControlSurface {
+        hovered: control.hovered
+        pressed: control.down
+        focused: control.visualFocus
+        quiet: control.quiet
+        controlEnabled: control.enabled
     }
-    contentItem: Item { SwirlIcon { anchors.centerIn:parent; name:control.iconName; size:control.iconSize; color:control.iconColor } }
-    ToolTip.visible: hovered && tooltip.length > 0 && !previewCaptureMode
-    ToolTip.text: tooltip
+    contentItem: Item {
+        opacity: control.enabled ? 1 : Theme.disabledOpacity
+        SwirlIcon { anchors.centerIn: parent; name: control.iconName; size: control.iconSize; color: control.iconColor }
+    }
+    SwirlToolTip {
+        parent: control
+        visible: (control.hovered || control.visualFocus) && control.tooltip.length > 0 && !previewCaptureMode
+        text: control.tooltip
+    }
     Accessible.name: tooltip
 }

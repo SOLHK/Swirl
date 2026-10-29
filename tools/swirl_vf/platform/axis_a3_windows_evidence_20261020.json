@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "kind": "swirl_vf_a3_independent_d1_windows_synthetic_evidence",
+  "status": "measured_synthetic_partial_evidence_ci_failure_retained",
+  "scope": "Independent audit of original D1 synthetic fixtures on Windows Server 2022/2025. The A3 original Apple Face15 full locations and both Windows normalized-coordinate routes remain unmeasured.",
+  "acceptance": {
+    "windows_synthetic_api_executed": true,
+    "original_a3_contract_accepted": false,
+    "original_apple_face15_tested_on_windows": false,
+    "windows_normalized_routes_tested": false,
+    "production_mapping_accepted": false,
+    "continuous_space_accepted": false,
+    "final_font_accepted": false,
+    "windows11_desktop_tested": false,
+    "real_swirl_ui_tested": false
+  },
+  "provenance": {
+    "repository": "SOLHK/Swirl",
+    "branch_at_audit": "work/vf-windows-d1",
+    "native_source_commit": "41504fed7ec7ca6d4768389106a03aa9bc5cd36e",
+    "evidence_commit": "4c0fcaf4a66fd34d3487754dd2f849a278da3a3e",
+    "native_source_url": "https://github.com/SOLHK/Swirl/tree/41504fed7ec7ca6d4768389106a03aa9bc5cd36e",
+    "evidence_url": "https://github.com/SOLHK/Swirl/tree/4c0fcaf4a66fd34d3487754dd2f849a278da3a3e",
+    "ci_run_id": 39401509155,
+    "ci_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39401509155",
+    "ci_status": "completed",
+    "ci_conclusion": "failure",
+    "native_run_status": "FAILED",
+    "analysis_status": "FAILED_EVIDENCE_ANALYSIS",
+    "analysis_error": "Windows execution has not passed",
+    "validated_section_status": "PARTIAL_EVIDENCE_ONLY",
+    "d1_full_acceptance": false,
+    "d1_final_summary_path": "docs/evidence/SWIRL_VF_WINDOWS_D1_FINAL_20261020.json",
+    "d1_final_summary_git_blob_sha1": "b9ac09e04c786e928712ff0f0b7f2e6ac5f68f1c",
+    "artifacts_independently_sha256_verified": true,
+    "artifact_reports_match_committed_git_blobs": true,
+    "raw_jsonl_independently_compared": true,
+    "audit_method": "Read both immutable source commits; hash downloaded ZIPs and raw analysis bytes; verify Git blob hashes; compare complete native JSONL outputs, old-pair inputs/outputs, cross-OS outputs, saved raster bytes and diagnostic summaries. Publish aggregates only."
+  },
+  "source_files": [
+    {"path":"tools/swirl_vf/platform/win_axis_precision_directwrite.cpp","sha256":"65e1656b32322cf11458a008843a24d2f2f27c04b42a1a89fe5ac7c3dbd7e093"},
+    {"path":"tools/swirl_vf/platform/win_axis_precision_qt.cpp","sha256":"79cad751da027ec95122a6a4581d9bcea993b72518912f973ebe20d761b334fe"},
+    {"path":"tools/swirl_vf/platform/make_win_axis_precision_fixture.py","sha256":"03e175660fbf538d4a3eb0c4269390c1881e45e9e0ce3af3dc690a482dd30336"},
+    {"path":"tools/swirl_vf/platform/analyze_win_axis_precision.py","sha256":"f0362ddb6f2833243ebea2f228909b7f4a679d38cd979e8d3549e4b3dccac89d"}
+  ],
+  "artifacts": [
+    {
+      "runtime": "windows2022",
+      "job_id": 118557079537,
+      "job_conclusion": "failure",
+      "artifact_id": 12254259788,
+      "artifact_url": "https://github.com/SOLHK/Swirl/actions/runs/39401509155/artifacts/12254259788",
+      "zip_bytes": 3275954,
+      "zip_sha256": "7825518135349628ab0d0f3a83a54ebab8f57225e281d04daef270b2988343bd",
+      "report_path_in_zip": "d1-evidence/d1-analysis.json",
+      "report_sha256": "b742af59a7dd8491376faf20e27f5796507e23ed4f76cb53028a7fa647bd1427",
+      "committed_report_path": "docs/evidence/SWIRL_VF_WINDOWS_D1_SERVER2022_20261020.json",
+      "committed_report_git_blob_sha1": "f2ce5d46c8b1d97af8da9d3bca28f99575a51327",
+      "environment": {"windows_product":"Microsoft Windows Server 2022 Datacenter","windows_build":"20348","dwrite_version":"10.0.20348.1 (WinBuild.160101.0800)","qt_sdk":"6.10.3"}
+    },
+    {
+      "runtime": "windows2025",
+      "job_id": 118557079179,
+      "job_conclusion": "failure",
+      "artifact_id": 12255265257,
+      "artifact_url": "https://github.com/SOLHK/Swirl/actions/runs/39401509155/artifacts/12255265257",
+      "zip_bytes": 3275868,
+      "zip_sha256": "ca1dc2d7720c81228ba28035efcd6ebe75d2c95c3788617b58b2595229e41c6e",
+      "report_path_in_zip": "d1-evidence/d1-analysis.json",
+      "report_sha256": "999e7edb535a1de478c11143bc1ed30454898b050f761b1a715f6fef5a4964b8",
+      "committed_report_path": "docs/evidence/SWIRL_VF_WINDOWS_D1_SERVER2025_20261020.json",
+      "committed_report_git_blob_sha1": "746982b28cbfd8e387f67c8227fa38200f2918a0",
+      "environment": {"windows_product":"Microsoft Windows Server 2025 Datacenter","windows_build":"26100","dwrite_version":"10.0.26100.1 (WinBuild.160101.0800)","qt_sdk":"6.10.3"}
+    }
+  ],
+  "synthetic_fixture": {
+    "axis_order": ["wght","WDTH","HGHT"],
+    "axes_min_default_max": {"wght":[100,400,900],"WDTH":[50,100,200],"HGHT":[50,100,200]},
+    "units_per_em": 1000,
+    "glyph_count": 6,
+    "compared_glyph_name": "A",
+    "compared_glyph_id": 2,
+    "original_apple_font": false,
+    "original_apple_avar": false,
+    "fonts": [
+      {"id":"ordinary","family":"Swirl D1 Precision","bytes":3300,"sha256":"1011e838786f1516db99d783bb9b85d962de1783e5cfc20c22fa552db22ed211"},
+      {"id":"gain","family":"Swirl D1 Precision Gain","bytes":3384,"sha256":"1d05d64130cd12a14d8de40e25302b6468cfd4168923ec3319c02edf69cabb47"}
+    ],
+    "scope": "The two original synthetic fixtures test API behavior. Their ranges, defaults, avar and glyph identity differ from Apple Face15; synthetic glyph2 metrics cannot be compared directly with Apple glyph5 metrics."
+  },
+  "old_pair": {
+    "a3_pair_id": "existing_collision",
+    "d1_case_ids": ["pair_lo","pair_hi"],
+    "requested_full_locations": [{"wght":499.006199,"WDTH":100,"HGHT":100},{"wght":499.006201,"WDTH":100,"HGHT":100}],
+    "original_binary64_bits": [{"wght":"407f3019641f6449","WDTH":"4059000000000000","HGHT":"4059000000000000"},{"wght":"407f30196638433d","WDTH":"4059000000000000","HGHT":"4059000000000000"}],
+    "identical_float32_location": {"wght":499.006195068359375,"WDTH":100,"HGHT":100},
+    "identical_float32_bits": {"wght":"43f980cb","WDTH":"42c80000","HGHT":"42c80000"},
+    "calculated_fixed16_integers": [{"wght":32702870,"WDTH":6553600,"HGHT":6553600},{"wght":32702870,"WDTH":6553600,"HGHT":6553600}],
+    "fixed16_values_are_numeric_calculations_not_native_stage_observations": true,
+    "full_payload_pairs_per_os": {"directwrite":16,"qt_native":240},
+    "full_payload_pairs_both_os": 512,
+    "different_pairs_both_os": 0,
+    "saved_directwrite_raster_byte_pairs_per_os": 8,
+    "saved_directwrite_raster_byte_pair_differences": 0,
+    "synthetic_gid2_directwrite_advance_font_units": {"ordinary":[636,636],"gain":[19000,19000]},
+    "original_a3_full_location_tested": false
+  },
+  "input_trace": {
+    "directwrite_actual_native_field_pair_equality_checked": true,
+    "directwrite_assignment": "DWRITE_FONT_AXIS_VALUE.value = float(original_binary64); memcpy bits before the native instance call; compare the actual native fields for the old pair.",
+    "directwrite_serialized_bits_origin": "native_recast_of_original_binary64",
+    "directwrite_actual_field_bit_array_serialized": false,
+    "qt_storage_is_native_face_readback": false,
+    "scope": "The DirectWrite JSONL serializer repeats the same cast instead of serializing the captured actual-field bit array. QFont variableAxis storage is request storage. The stricter original A3 trace contract is not declared satisfied."
+  },
+  "coverage_per_os": {
+    "expected_primary_processes": 16,
+    "complete_validated_processes": 12,
+    "complete_observations": 3568,
+    "missing_processes": 0,
+    "unexpected_processes": 0,
+    "binding_errors": 0,
+    "complete_groups": [
+      {"api":"directwrite","processes":8,"cases_per_process":28,"scenarios_per_case":1,"passes_per_process":2,"observations_per_process":56,"observations_total":448},
+      {"api":"qt_native_private","processes":2,"cases_per_process":13,"scenarios_per_case":24,"passes_per_process":3,"observations_per_process":936,"observations_total":1872},
+      {"api":"qt_native_installed","processes":2,"cases_per_process":13,"scenarios_per_case":24,"passes_per_process":2,"observations_per_process":624,"observations_total":1248}
+    ],
+    "opposite_process_comparisons": 6,
+    "opposite_process_comparison_differences": 0,
+    "private_vs_installed_summary_comparisons": 3,
+    "private_vs_installed_summary_comparison_differences": 0,
+    "failed_qt_freetype_processes": 4,
+    "failed_process_observations_included_in_complete_counts": false
+  },
+  "cross_os": {
+    "complete_process_pairs": 12,
+    "full_payload_observation_pairs": 3568,
+    "different_observation_pairs": 0,
+    "complete_observations_across_both_os": 7136,
+    "scope": "Corresponding complete observations are compared once across the two OS versions. This is 3568 paired comparisons, not 7136 comparisons. Failed FreeType processes are excluded."
+  },
+  "qt_freetype_failures": {
+    "processes_per_os": 4,
+    "processes_both_os": 8,
+    "status": "FAILED",
+    "exit_code_each": 1,
+    "timeout_each": false,
+    "observations_before_failure_each": 13,
+    "completed_full_replay_checks_each": 0,
+    "completed_pair_comparisons_each": 0,
+    "failed_pair_comparison_records_each": 1,
+    "native_error": "Identical API inputs produced different actual pair outputs",
+    "primary_failures_retained": true,
+    "windows_normalized_setter_tested": false
+  },
+  "fixed_object_state_diagnostics": {
+    "processes_both_os": 8,
+    "observations_each": 9,
+    "observations_total": 72,
+    "status": "DIAGNOSTIC_COMPLETED_NOT_ACCEPTANCE",
+    "fixed_raw_object_each": true,
+    "fixed_axis_request_each": true,
+    "requested_full_location": {"wght":499.006199,"WDTH":100,"HGHT":100},
+    "weight_float32_bits": "43f980cb",
+    "distinct_path_shapes_each": 3,
+    "path_changed_after_raster_count_each": 2,
+    "path_changed_after_advance_count_each": 0,
+    "all_advances_equal_each": true,
+    "horizontal_advance_pixels": 7.625,
+    "primary_failure_waived": false,
+    "decimal_precision_preservation_proven": false,
+    "private_backend_state_inspected": false,
+    "system_cache_reset_claimed": false,
+    "scope": "A fixed QRawFont and unchanged request produced path changes after raster subpixel-offset changes. This is evidence of preceding-render state effects, not evidence that the two original decimal requests remain distinguishable. The PreferNoHinting diagnostic does not validate the real Swirl PreferFullHinting UI."
+  },
+  "a3_request_coverage": [
+    {"pair_id":"existing_collision","original_wght_members_submitted_to_d1":[true,true],"original_full_locations_tested":false,"windows_outcome":"unmeasured"},
+    {"pair_id":"fixed_only_collision","original_wght_members_submitted_to_d1":[false,false],"original_full_locations_tested":false,"windows_outcome":"unmeasured"},
+    {"pair_id":"float32_only_collision","original_wght_members_submitted_to_d1":[false,true],"original_full_locations_tested":false,"windows_outcome":"unmeasured"}
+  ],
+  "unmeasured_original_wght_binary64_bits": ["407f30196fffffff","407f301970000001","407f3019513f8db5"],
+  "normalized_routes": [
+    {"id":"freetype_normalized","api":"FT_Set_Var_Blend_Coordinates","status":"unmeasured_on_windows","direct_native_setter_called":false},
+    {"id":"harfbuzz_normalized","api":"hb_font_set_var_coords_normalized","status":"unmeasured_on_windows","direct_native_setter_called":false}
+  ],
+  "normalized_scope": "Qt's FreeType backend receives a QFont float design-coordinate request; it does not test externally supplied q=0/65 via FT/HB normalized setters. The D1 normalized16-before-avar finite numeric hypothesis is not a native setter observation or proof of proprietary Windows internals.",
+  "strict_source_contract": {"advance_font_units":0.03125,"outline_font_units":0.03125,"may_be_relaxed":false,"source_gid5_difference_font_units":0.5474853515625,"conditional_minimum_worst_case_error_font_units":0.27374267578125,"bound_is_deterministic_identical_state_condition_only":true,"d1_synthetic_metrics_used_as_apple_metrics":false},
+  "safety": {"aggregate_only":true,"raw_native_payload_embedded":false,"apple_font_or_outline_embedded":false,"artifact_archive_embedded":false}
+}

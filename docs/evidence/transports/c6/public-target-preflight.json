@@ -1,0 +1,59 @@
+{
+  "scope": "direct_public_target_preflight_only",
+  "timestamp_utc": "2026-10-22T04:10:38.837951+00:00",
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "automatic_ci": false,
+  "command": [
+    "tools/tests/test_transport_public.py",
+    "--direct-only",
+    "--timeout",
+    "8",
+    "--output",
+    "/workspace/scratch/ece554ece7c1/transport-evidence/c6-public-direct.json"
+  ],
+  "environment_proxy_used": false,
+  "remote_public_proxy_node_tested": false,
+  "requested_transports": [
+    "tcp",
+    "tcp_tls",
+    "websocket",
+    "wss",
+    "grpc",
+    "grpc_tls",
+    "grpc_multi",
+    "grpc_multi_tls",
+    "http2_tls",
+    "httpupgrade",
+    "httpupgrade_tls",
+    "xhttp_stream_one",
+    "xhttp_stream_one_tls"
+  ],
+  "protocol": "vless",
+  "direct_preflight": [
+    {
+      "target": "http://example.com/",
+      "ok": false,
+      "environment_proxy_used": false,
+      "certificate_verified": false,
+      "error_type": "gaierror",
+      "error": "[Errno -3] Temporary failure in name resolution",
+      "failure_phase": "dns_tcp",
+      "elapsed_ms": 3.256,
+      "exit_code": 1
+    },
+    {
+      "target": "https://example.com/",
+      "ok": false,
+      "environment_proxy_used": false,
+      "certificate_verified": false,
+      "error_type": "gaierror",
+      "error": "[Errno -3] Temporary failure in name resolution",
+      "failure_phase": "dns_tcp",
+      "elapsed_ms": 5009.053,
+      "exit_code": 1
+    }
+  ],
+  "native_probes": [],
+  "ok": false,
+  "public_target_response_verified": false
+}

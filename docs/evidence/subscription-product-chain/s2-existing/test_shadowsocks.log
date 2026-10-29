@@ -1,0 +1,17 @@
+SOURCE 593e7cddc360cf7f51d9fdc988e6cf8fd99aea96
+COMMAND ["/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3", "/workspace/scratch/ca6cd1f88f6f/Swirl/tools/tests/test_shadowsocks.py", "-v"]
+
+test_authenticated_empty_chunks_are_not_mistaken_for_eof (__main__.ShadowsocksTests.test_authenticated_empty_chunks_are_not_mistaken_for_eof) ... ok
+test_concurrent_encrypted_sessions_do_not_share_nonce_state (__main__.ShadowsocksTests.test_concurrent_encrypted_sessions_do_not_share_nonce_state) ... ok
+test_explicit_udp_false_never_sends_to_server (__main__.ShadowsocksTests.test_explicit_udp_false_never_sends_to_server) ... ok
+test_ipv4_and_ipv6_target_encodings (__main__.ShadowsocksTests.test_ipv4_and_ipv6_target_encodings) ... ok
+test_qt_facade_http_obfs_with_udp_declared (__main__.ShadowsocksTests.test_qt_facade_http_obfs_with_udp_declared) ... skipped 'Qt integration executable required'
+test_response_salt_replay_rejected_across_connections (__main__.ShadowsocksTests.test_response_salt_replay_rejected_across_connections) ... ok
+test_tampered_truncated_and_reserved_lengths_never_release_plaintext (__main__.ShadowsocksTests.test_tampered_truncated_and_reserved_lengths_never_release_plaintext) ... ok
+test_three_ciphers_plain_and_http_obfs_large_transfer_halfclose (__main__.ShadowsocksTests.test_three_ciphers_plain_and_http_obfs_large_transfer_halfclose) ... ok
+test_udp_all_ciphers_boundaries_authentication_replay_and_client_pin (__main__.ShadowsocksTests.test_udp_all_ciphers_boundaries_authentication_replay_and_client_pin) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 12.861s
+
+OK (skipped=1)

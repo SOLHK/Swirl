@@ -6,8 +6,7 @@
 #include <QUrl>
 #include <QVariantList>
 
-// Opt-in diagnostic client. Production forwarding remains in the selected
-// Swirl native or Mihomo engine: this class
+// Opt-in diagnostic client. Production forwarding remains in Rust Core: this class
 // never sits in front of application tunnels or imposes a session idle timer.
 class ConnectionDiagnostics final : public QObject {
     Q_OBJECT

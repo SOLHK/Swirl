@@ -1,0 +1,239 @@
+{
+  "schema_version": 1,
+  "scope": "Retained original Windows attempt-1 DNS fixture failure before R3/Vision execution",
+  "source_commit": "0be68231b15c1e4f69b138cda7bae0a3930d956b",
+  "run_id": 39246770262,
+  "run_attempt": 1,
+  "run_url": "https://github.com/SOLHK/Swirl/actions/runs/39246770262",
+  "job": {
+    "id": 118040482716,
+    "name": "windows-rust",
+    "status": "completed",
+    "conclusion": "failure",
+    "run_id": 39246770262,
+    "logs_url": null,
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2
+      },
+      {
+        "name": "Install stable Rust tools",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3
+      },
+      {
+        "name": "Run cargo fmt --all -- --check",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4
+      },
+      {
+        "name": "Run cargo check --workspace --locked",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5
+      },
+      {
+        "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6
+      },
+      {
+        "name": "Run cargo test --workspace --locked",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7
+      },
+      {
+        "name": "Run cargo build --release --locked --workspace --lib --bins",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8
+      },
+      {
+        "name": "Build native REALITY TLS peer client",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9
+      },
+      {
+        "name": "Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10
+      },
+      {
+        "name": "Independent TLS and protocol peers",
+        "status": "completed",
+        "conclusion": "failure",
+        "number": 11
+      },
+      {
+        "name": "Diagnose hosted Windows port allocation after a peer failure",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12
+      },
+      {
+        "name": "Install pinned Go for the independent Xray peer",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 13
+      },
+      {
+        "name": "Build pinned Xray and verify REALITY interoperability",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 14
+      },
+      {
+        "name": "Preserve Xray build identity and raw interoperability evidence",
+        "status": "completed",
+        "conclusion": "failure",
+        "number": 15
+      },
+      {
+        "name": "Build native Vision client and verify Xray interoperability",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 16
+      },
+      {
+        "name": "Preserve Vision client and full Xray interoperability evidence",
+        "status": "completed",
+        "conclusion": "failure",
+        "number": 17
+      },
+      {
+        "name": "Run actions/upload-artifact@v4",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 18
+      },
+      {
+        "name": "Install Qt for Rust control adapter",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 19
+      },
+      {
+        "name": "Build Qt to Rust integration test",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 20
+      },
+      {
+        "name": "Reject native DNS policy in compatibility builds without starting a core",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 21
+      },
+      {
+        "name": "Run Qt to Rust integration without Mihomo",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 22
+      },
+      {
+        "name": "Build complete native Rust application",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 23
+      },
+      {
+        "name": "Preserve isolated Qt test reports",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 24
+      },
+      {
+        "name": "Post Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 47
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 48
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 49
+      }
+    ],
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/39246770262/job/118040482716"
+  },
+  "complete_job_success": false,
+  "rust_passed_including_doctest": 273,
+  "new_record_regressions_passed": [
+    "2026-10-19T11:46:31.9227225Z test both_boundaries_deliver_authenticated_direct_request_before_coalesced_raw_tls ... ok",
+    "2026-10-19T11:46:31.9020786Z test tampered_outer_direct_record_remains_an_authentication_failure ... ok",
+    "2026-10-19T11:46:31.9175741Z test real_tls_close_notify_is_required_even_at_record_boundaries ... ok",
+    "2026-10-19T11:46:31.8843368Z test partial_header_survives_cancelled_read_and_write_half_close ... ok",
+    "2026-10-19T11:46:31.9021675Z test oversized_record_is_rejected_without_reading_its_body ... ok"
+  ],
+  "first_failure": "test_dns_negative.py: 10 UDP bind subcase errors with WinError 10013; selected TCP ports fell within the same host reported UDP excluded ranges.",
+  "host_exclusion_evidence": {
+    "ipv4_udp_ranges": [
+      [
+        63203,
+        63302
+      ],
+      [
+        63303,
+        63402
+      ]
+    ],
+    "ipv6_udp_ranges": [
+      [
+        63203,
+        63302
+      ],
+      [
+        63303,
+        63402
+      ]
+    ],
+    "observed_failed_ports": [
+      63213,
+      63221,
+      63223,
+      63231,
+      63236,
+      63237
+    ]
+  },
+  "raw_failure_and_host_diagnostics": {
+    "sha256": "af28c9015a4476b68076ea36a305b990910387c9e4bbfbac1d85d4d811fe1566",
+    "text": "======================================================================\n2026-10-19T11:52:51.9731302Z ERROR: test_pair_retries_collision_and_releases_failed_sockets (__main__.DnsPeerAllocationTests.test_pair_retries_collision_and_releases_failed_sockets) (collision_kind=<SocketKind.SOCK_DGRAM: 2>, windows=False, fail_count=1)\n2026-10-19T11:52:51.9733127Z ----------------------------------------------------------------------\n2026-10-19T11:52:51.9733752Z Traceback (most recent call last):\n2026-10-19T11:52:51.9740020Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 124, in test_pair_retries_collision_and_releases_failed_sockets\n2026-10-19T11:52:51.9740682Z     peer = DnsPeer()\n2026-10-19T11:52:51.9741075Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\dns_peer.py\", line 74, in __init__\n2026-10-19T11:52:51.9741549Z     udp = cleanup.enter_context(UDP(address, UDPHandler))\n2026-10-19T11:52:51.9741915Z                                 ~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9742467Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 457, in __init__\n2026-10-19T11:52:51.9743020Z     self.server_bind()\n2026-10-19T11:52:51.9743246Z     ~~~~~~~~~~~~~~~~^^\n2026-10-19T11:52:51.9743625Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 121, in collide\n2026-10-19T11:52:51.9744322Z     original(server)\n2026-10-19T11:52:51.9744510Z     ~~~~~~~~^^^^^^^^\n2026-10-19T11:52:51.9744911Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 478, in server_bind\n2026-10-19T11:52:51.9745392Z     self.socket.bind(self.server_address)\n2026-10-19T11:52:51.9745658Z     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9746160Z PermissionError: [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions\n2026-10-19T11:52:51.9746784Z DNS fixture UDP bind on loopback ('127.0.0.1', 63213); pair attempt 2/8\n2026-10-19T11:52:51.9747055Z \n2026-10-19T11:52:51.9747165Z ======================================================================\n2026-10-19T11:52:51.9748098Z ERROR: test_pair_retries_collision_and_releases_failed_sockets (__main__.DnsPeerAllocationTests.test_pair_retries_collision_and_releases_failed_sockets) (collision_kind=<SocketKind.SOCK_DGRAM: 2>, windows=False, fail_count=7)\n2026-10-19T11:52:51.9749060Z ----------------------------------------------------------------------\n2026-10-19T11:52:51.9749387Z Traceback (most recent call last):\n2026-10-19T11:52:51.9749938Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 124, in test_pair_retries_collision_and_releases_failed_sockets\n2026-10-19T11:52:51.9750468Z     peer = DnsPeer()\n2026-10-19T11:52:51.9750771Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\dns_peer.py\", line 74, in __init__\n2026-10-19T11:52:51.9751303Z     udp = cleanup.enter_context(UDP(address, UDPHandler))\n2026-10-19T11:52:51.9751633Z                                 ~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9752087Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 457, in __init__\n2026-10-19T11:52:51.9752520Z     self.server_bind()\n2026-10-19T11:52:51.9752716Z     ~~~~~~~~~~~~~~~~^^\n2026-10-19T11:52:51.9753160Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 121, in collide\n2026-10-19T11:52:51.9753524Z     original(server)\n2026-10-19T11:52:51.9753716Z     ~~~~~~~~^^^^^^^^\n2026-10-19T11:52:51.9754103Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 478, in server_bind\n2026-10-19T11:52:51.9754575Z     self.socket.bind(self.server_address)\n2026-10-19T11:52:51.9754834Z     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9755322Z PermissionError: [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions\n2026-10-19T11:52:51.9755931Z DNS fixture UDP bind on loopback ('127.0.0.1', 63221); pair attempt 8/8\n2026-10-19T11:52:51.9756201Z \n2026-10-19T11:52:51.9756312Z ======================================================================\n2026-10-19T11:52:51.9757241Z ERROR: test_pair_retries_collision_and_releases_failed_sockets (__main__.DnsPeerAllocationTests.test_pair_retries_collision_and_releases_failed_sockets) (collision_kind=<SocketKind.SOCK_DGRAM: 2>, windows=True, fail_count=1)\n2026-10-19T11:52:51.9758195Z ----------------------------------------------------------------------\n2026-10-19T11:52:51.9758514Z Traceback (most recent call last):\n2026-10-19T11:52:51.9759069Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 124, in test_pair_retries_collision_and_releases_failed_sockets\n2026-10-19T11:52:51.9759592Z     peer = DnsPeer()\n2026-10-19T11:52:51.9759886Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\dns_peer.py\", line 74, in __init__\n2026-10-19T11:52:51.9760281Z     udp = cleanup.enter_context(UDP(address, UDPHandler))\n2026-10-19T11:52:51.9760596Z                                 ~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9761053Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 457, in __init__\n2026-10-19T11:52:51.9761478Z     self.server_bind()\n2026-10-19T11:52:51.9761668Z     ~~~~~~~~~~~~~~~~^^\n2026-10-19T11:52:51.9762011Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 121, in collide\n2026-10-19T11:52:51.9762369Z     original(server)\n2026-10-19T11:52:51.9762549Z     ~~~~~~~~^^^^^^^^\n2026-10-19T11:52:51.9763033Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 478, in server_bind\n2026-10-19T11:52:51.9763498Z     self.socket.bind(self.server_address)\n2026-10-19T11:52:51.9763757Z     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9764244Z PermissionError: [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions\n2026-10-19T11:52:51.9764858Z DNS fixture UDP bind on loopback ('127.0.0.1', 63223); pair attempt 2/8\n2026-10-19T11:52:51.9765125Z \n2026-10-19T11:52:51.9765233Z ======================================================================\n2026-10-19T11:52:51.9766177Z ERROR: test_pair_retries_collision_and_releases_failed_sockets (__main__.DnsPeerAllocationTests.test_pair_retries_collision_and_releases_failed_sockets) (collision_kind=<SocketKind.SOCK_DGRAM: 2>, windows=True, fail_count=7)\n2026-10-19T11:52:51.9767575Z ----------------------------------------------------------------------\n2026-10-19T11:52:51.9767910Z Traceback (most recent call last):\n2026-10-19T11:52:51.9768466Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 124, in test_pair_retries_collision_and_releases_failed_sockets\n2026-10-19T11:52:51.9768992Z     peer = DnsPeer()\n2026-10-19T11:52:51.9769290Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\dns_peer.py\", line 74, in __init__\n2026-10-19T11:52:51.9769686Z     udp = cleanup.enter_context(UDP(address, UDPHandler))\n2026-10-19T11:52:51.9770131Z                                 ~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9770601Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 457, in __init__\n2026-10-19T11:52:51.9771032Z     self.server_bind()\n2026-10-19T11:52:51.9771225Z     ~~~~~~~~~~~~~~~~^^\n2026-10-19T11:52:51.9771558Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 121, in collide\n2026-10-19T11:52:51.9771923Z     original(server)\n2026-10-19T11:52:51.9772112Z     ~~~~~~~~^^^^^^^^\n2026-10-19T11:52:51.9772501Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 478, in server_bind\n2026-10-19T11:52:51.9772960Z     self.socket.bind(self.server_address)\n2026-10-19T11:52:51.9773215Z     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9773707Z PermissionError: [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions\n2026-10-19T11:52:51.9774310Z DNS fixture UDP bind on loopback ('127.0.0.1', 63231); pair attempt 8/8\n2026-10-19T11:52:51.9774572Z \n2026-10-19T11:52:51.9774681Z ======================================================================\n2026-10-19T11:52:51.9775616Z ERROR: test_pair_retries_collision_and_releases_failed_sockets (__main__.DnsPeerAllocationTests.test_pair_retries_collision_and_releases_failed_sockets) (collision_kind=<SocketKind.SOCK_STREAM: 1>, windows=False, fail_count=1)\n2026-10-19T11:52:51.9776579Z ----------------------------------------------------------------------\n2026-10-19T11:52:51.9776895Z Traceback (most recent call last):\n2026-10-19T11:52:51.9777446Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 124, in test_pair_retries_collision_and_releases_failed_sockets\n2026-10-19T11:52:51.9777959Z     peer = DnsPeer()\n2026-10-19T11:52:51.9778254Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\dns_peer.py\", line 74, in __init__\n2026-10-19T11:52:51.9778646Z     udp = cleanup.enter_context(UDP(address, UDPHandler))\n2026-10-19T11:52:51.9778970Z                                 ~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9779472Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 457, in __init__\n2026-10-19T11:52:51.9779918Z     self.server_bind()\n2026-10-19T11:52:51.9780129Z     ~~~~~~~~~~~~~~~~^^\n2026-10-19T11:52:51.9780449Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 121, in collide\n2026-10-19T11:52:51.9780813Z     original(server)\n2026-10-19T11:52:51.9780994Z     ~~~~~~~~^^^^^^^^\n2026-10-19T11:52:51.9781381Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 478, in server_bind\n2026-10-19T11:52:51.9781943Z     self.socket.bind(self.server_address)\n2026-10-19T11:52:51.9782194Z     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9782680Z PermissionError: [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions\n2026-10-19T11:52:51.9783268Z DNS fixture UDP bind on loopback ('127.0.0.1', 63232); pair attempt 2/8\n2026-10-19T11:52:51.9783533Z \n2026-10-19T11:52:51.9783640Z ======================================================================\n2026-10-19T11:52:51.9784563Z ERROR: test_pair_retries_collision_and_releases_failed_sockets (__main__.DnsPeerAllocationTests.test_pair_retries_collision_and_releases_failed_sockets) (collision_kind=<SocketKind.SOCK_STREAM: 1>, windows=False, fail_count=7)\n2026-10-19T11:52:51.9785516Z ----------------------------------------------------------------------\n2026-10-19T11:52:51.9785832Z Traceback (most recent call last):\n2026-10-19T11:52:51.9786383Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 124, in test_pair_retries_collision_and_releases_failed_sockets\n2026-10-19T11:52:51.9786893Z     peer = DnsPeer()\n2026-10-19T11:52:51.9787194Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\dns_peer.py\", line 74, in __init__\n2026-10-19T11:52:51.9787581Z     udp = cleanup.enter_context(UDP(address, UDPHandler))\n2026-10-19T11:52:51.9787898Z                                 ~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9788445Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 457, in __init__\n2026-10-19T11:52:51.9788883Z     self.server_bind()\n2026-10-19T11:52:51.9789087Z     ~~~~~~~~~~~~~~~~^^\n2026-10-19T11:52:51.9789419Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 121, in collide\n2026-10-19T11:52:51.9789857Z     original(server)\n2026-10-19T11:52:51.9790057Z     ~~~~~~~~^^^^^^^^\n2026-10-19T11:52:51.9790443Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 478, in server_bind\n2026-10-19T11:52:51.9790913Z     self.socket.bind(self.server_address)\n2026-10-19T11:52:51.9791169Z     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9791656Z PermissionError: [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions\n2026-10-19T11:52:51.9792245Z DNS fixture UDP bind on loopback ('127.0.0.1', 63233); pair attempt 8/8\n2026-10-19T11:52:51.9792518Z \n2026-10-19T11:52:51.9792619Z ======================================================================\n2026-10-19T11:52:51.9793552Z ERROR: test_pair_retries_collision_and_releases_failed_sockets (__main__.DnsPeerAllocationTests.test_pair_retries_collision_and_releases_failed_sockets) (collision_kind=<SocketKind.SOCK_STREAM: 1>, windows=True, fail_count=1)\n2026-10-19T11:52:51.9794508Z ----------------------------------------------------------------------\n2026-10-19T11:52:51.9794822Z Traceback (most recent call last):\n2026-10-19T11:52:51.9795495Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 124, in test_pair_retries_collision_and_releases_failed_sockets\n2026-10-19T11:52:51.9796076Z     peer = DnsPeer()\n2026-10-19T11:52:51.9796374Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\dns_peer.py\", line 74, in __init__\n2026-10-19T11:52:51.9796773Z     udp = cleanup.enter_context(UDP(address, UDPHandler))\n2026-10-19T11:52:51.9797138Z                                 ~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9797649Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 457, in __init__\n2026-10-19T11:52:51.9798136Z     self.server_bind()\n2026-10-19T11:52:51.9798368Z     ~~~~~~~~~~~~~~~~^^\n2026-10-19T11:52:51.9798737Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 121, in collide\n2026-10-19T11:52:51.9799149Z     original(server)\n2026-10-19T11:52:51.9799385Z     ~~~~~~~~^^^^^^^^\n2026-10-19T11:52:51.9799823Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 478, in server_bind\n2026-10-19T11:52:51.9800426Z     self.socket.bind(self.server_address)\n2026-10-19T11:52:51.9800741Z     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9801265Z PermissionError: [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions\n2026-10-19T11:52:51.9801901Z DNS fixture UDP bind on loopback ('127.0.0.1', 63234); pair attempt 2/8\n2026-10-19T11:52:51.9802188Z \n2026-10-19T11:52:51.9802335Z ======================================================================\n2026-10-19T11:52:51.9803254Z ERROR: test_pair_retries_collision_and_releases_failed_sockets (__main__.DnsPeerAllocationTests.test_pair_retries_collision_and_releases_failed_sockets) (collision_kind=<SocketKind.SOCK_STREAM: 1>, windows=True, fail_count=7)\n2026-10-19T11:52:51.9804236Z ----------------------------------------------------------------------\n2026-10-19T11:52:51.9804549Z Traceback (most recent call last):\n2026-10-19T11:52:51.9805094Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 124, in test_pair_retries_collision_and_releases_failed_sockets\n2026-10-19T11:52:51.9805606Z     peer = DnsPeer()\n2026-10-19T11:52:51.9805895Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\dns_peer.py\", line 74, in __init__\n2026-10-19T11:52:51.9806282Z     udp = cleanup.enter_context(UDP(address, UDPHandler))\n2026-10-19T11:52:51.9806596Z                                 ~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9807133Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 457, in __init__\n2026-10-19T11:52:51.9807581Z     self.server_bind()\n2026-10-19T11:52:51.9807773Z     ~~~~~~~~~~~~~~~~^^\n2026-10-19T11:52:51.9808089Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 121, in collide\n2026-10-19T11:52:51.9808445Z     original(server)\n2026-10-19T11:52:51.9808630Z     ~~~~~~~~^^^^^^^^\n2026-10-19T11:52:51.9809010Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 478, in server_bind\n2026-10-19T11:52:51.9809469Z     self.socket.bind(self.server_address)\n2026-10-19T11:52:51.9809734Z     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9810215Z PermissionError: [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions\n2026-10-19T11:52:51.9810800Z DNS fixture UDP bind on loopback ('127.0.0.1', 63235); pair attempt 8/8\n2026-10-19T11:52:51.9811059Z \n2026-10-19T11:52:51.9811173Z ======================================================================\n2026-10-19T11:52:51.9811929Z ERROR: test_tcp_selects_port_before_udp_and_forwards_both_families (__main__.DnsPeerAllocationTests.test_tcp_selects_port_before_udp_and_forwards_both_families) (ipv6=False)\n2026-10-19T11:52:51.9812694Z ----------------------------------------------------------------------\n2026-10-19T11:52:51.9813022Z Traceback (most recent call last):\n2026-10-19T11:52:51.9813589Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 66, in test_tcp_selects_port_before_udp_and_forwards_both_families\n2026-10-19T11:52:51.9814134Z     peer = DnsPeer(ipv6=ipv6)\n2026-10-19T11:52:51.9814460Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\dns_peer.py\", line 74, in __init__\n2026-10-19T11:52:51.9814848Z     udp = cleanup.enter_context(UDP(address, UDPHandler))\n2026-10-19T11:52:51.9815164Z                                 ~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9815615Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 457, in __init__\n2026-10-19T11:52:51.9816058Z     self.server_bind()\n2026-10-19T11:52:51.9816252Z     ~~~~~~~~~~~~~~~~^^\n2026-10-19T11:52:51.9816559Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 63, in bind\n2026-10-19T11:52:51.9816912Z     original(server)\n2026-10-19T11:52:51.9817093Z     ~~~~~~~~^^^^^^^^\n2026-10-19T11:52:51.9817480Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 478, in server_bind\n2026-10-19T11:52:51.9817935Z     self.socket.bind(self.server_address)\n2026-10-19T11:52:51.9818193Z     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9818800Z PermissionError: [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions\n2026-10-19T11:52:51.9819392Z DNS fixture UDP bind on loopback ('127.0.0.1', 63236); pair attempt 1/8\n2026-10-19T11:52:51.9819652Z \n2026-10-19T11:52:51.9819757Z ======================================================================\n2026-10-19T11:52:51.9820494Z ERROR: test_tcp_selects_port_before_udp_and_forwards_both_families (__main__.DnsPeerAllocationTests.test_tcp_selects_port_before_udp_and_forwards_both_families) (ipv6=True)\n2026-10-19T11:52:51.9821252Z ----------------------------------------------------------------------\n2026-10-19T11:52:51.9821563Z Traceback (most recent call last):\n2026-10-19T11:52:51.9822120Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 66, in test_tcp_selects_port_before_udp_and_forwards_both_families\n2026-10-19T11:52:51.9822656Z     peer = DnsPeer(ipv6=ipv6)\n2026-10-19T11:52:51.9822980Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\dns_peer.py\", line 74, in __init__\n2026-10-19T11:52:51.9823383Z     udp = cleanup.enter_context(UDP(address, UDPHandler))\n2026-10-19T11:52:51.9823705Z                                 ~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9824154Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 457, in __init__\n2026-10-19T11:52:51.9824589Z     self.server_bind()\n2026-10-19T11:52:51.9824781Z     ~~~~~~~~~~~~~~~~^^\n2026-10-19T11:52:51.9825181Z   File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_dns_negative.py\", line 63, in bind\n2026-10-19T11:52:51.9825537Z     original(server)\n2026-10-19T11:52:51.9825718Z     ~~~~~~~~^^^^^^^^\n2026-10-19T11:52:51.9826107Z   File \"C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\\Lib\\socketserver.py\", line 478, in server_bind\n2026-10-19T11:52:51.9826560Z     self.socket.bind(self.server_address)\n2026-10-19T11:52:51.9826820Z     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n2026-10-19T11:52:51.9827299Z PermissionError: [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions\n2026-10-19T11:52:51.9827979Z DNS fixture UDP bind on loopback ('::1', 63237); pair attempt 1/8\n2026-10-19T11:52:51.9828226Z \n2026-10-19T11:52:51.9828363Z ----------------------------------------------------------------------\n2026-10-19T11:52:51.9828666Z Ran 31 tests in 86.181s\n2026-10-19T11:52:51.9828801Z \n2026-10-19T11:52:51.9828872Z FAILED (errors=10)\n2026-10-19T11:52:52.0230261Z ##[error]Process completed with exit code 1.\n2026-10-19T11:52:52.0390595Z ##[group]Run # Read only: retain the failed test's outcome and host reservation facts.\n2026-10-19T11:52:52.0391474Z \u001b[36;1m# Read only: retain the failed test's outcome and host reservation facts.\u001b[0m\n2026-10-19T11:52:52.0392197Z \u001b[36;1m# TCP and UDP have separate dynamic/excluded port ranges on Windows.\u001b[0m\n2026-10-19T11:52:52.0392618Z \u001b[36;1mnetsh interface ipv4 show dynamicport tcp\u001b[0m\n2026-10-19T11:52:52.0392934Z \u001b[36;1mnetsh interface ipv4 show dynamicport udp\u001b[0m\n2026-10-19T11:52:52.0393321Z \u001b[36;1mnetsh interface ipv4 show excludedportrange protocol=tcp\u001b[0m\n2026-10-19T11:52:52.0393740Z \u001b[36;1mnetsh interface ipv4 show excludedportrange protocol=udp\u001b[0m\n2026-10-19T11:52:52.0394094Z \u001b[36;1mnetsh interface ipv6 show dynamicport tcp\u001b[0m\n2026-10-19T11:52:52.0394391Z \u001b[36;1mnetsh interface ipv6 show dynamicport udp\u001b[0m\n2026-10-19T11:52:52.0394734Z \u001b[36;1mnetsh interface ipv6 show excludedportrange protocol=tcp\u001b[0m\n2026-10-19T11:52:52.0395194Z \u001b[36;1mnetsh interface ipv6 show excludedportrange protocol=udp\u001b[0m\n2026-10-19T11:52:52.0446329Z shell: C:\\Program Files\\PowerShell\\7\\pwsh.EXE -command \". '{0}'\"\n2026-10-19T11:52:52.0446679Z env:\n2026-10-19T11:52:52.0446951Z   pythonLocation: C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\n2026-10-19T11:52:52.0447419Z   PKG_CONFIG_PATH: C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64/lib/pkgconfig\n2026-10-19T11:52:52.0447878Z   Python_ROOT_DIR: C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\n2026-10-19T11:52:52.0448277Z   Python2_ROOT_DIR: C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\n2026-10-19T11:52:52.0448880Z   Python3_ROOT_DIR: C:\\hostedtoolcache\\windows\\Python\\3.14.8\\x64\n2026-10-19T11:52:52.0449215Z ##[endgroup]\n2026-10-19T11:52:52.9493920Z \n2026-10-19T11:52:52.9494543Z Protocol tcp Dynamic Port Range\n2026-10-19T11:52:52.9495016Z ---------------------------------\n2026-10-19T11:52:52.9495332Z Start Port      : 49152\n2026-10-19T11:52:52.9495591Z Number of Ports : 16384\n2026-10-19T11:52:52.9495759Z \n2026-10-19T11:52:53.0298776Z \n2026-10-19T11:52:53.0299290Z Protocol udp Dynamic Port Range\n2026-10-19T11:52:53.0299815Z ---------------------------------\n2026-10-19T11:52:53.0300254Z Start Port      : 49152\n2026-10-19T11:52:53.0300614Z Number of Ports : 16384\n2026-10-19T11:52:53.0300817Z \n2026-10-19T11:52:53.0684900Z \n2026-10-19T11:52:53.0685439Z Protocol tcp Port Exclusion Ranges\n2026-10-19T11:52:53.0685810Z \n2026-10-19T11:52:53.0685954Z Start Port    End Port      \n2026-10-19T11:52:53.0686373Z ----------    --------      \n2026-10-19T11:52:53.0686826Z         80          80      \n2026-10-19T11:52:53.0687200Z       5985        5985      \n2026-10-19T11:52:53.0687543Z       5986        5986      \n2026-10-19T11:52:53.0687904Z      47001       47001      \n2026-10-19T11:52:53.0688270Z      60437       60536      \n2026-10-19T11:52:53.0688626Z      60537       60636      \n2026-10-19T11:52:53.0688846Z \n2026-10-19T11:52:53.0689103Z * - Administered port exclusions.\n2026-10-19T11:52:53.0689383Z \n2026-10-19T11:52:53.1077323Z \n2026-10-19T11:52:53.1077941Z Protocol udp Port Exclusion Ranges\n2026-10-19T11:52:53.1078306Z \n2026-10-19T11:52:53.1078423Z Start Port    End Port      \n2026-10-19T11:52:53.1078855Z ----------    --------      \n2026-10-19T11:52:53.1079199Z      63203       63302      \n2026-10-19T11:52:53.1079525Z      63303       63402      \n2026-10-19T11:52:53.1079674Z \n2026-10-19T11:52:53.1079771Z * - Administered port exclusions.\n2026-10-19T11:52:53.1080086Z \n2026-10-19T11:52:53.1473128Z \n2026-10-19T11:52:53.1473650Z Protocol tcp Dynamic Port Range\n2026-10-19T11:52:53.1473981Z ---------------------------------\n2026-10-19T11:52:53.1474272Z Start Port      : 49152\n2026-10-19T11:52:53.1474510Z Number of Ports : 16384\n2026-10-19T11:52:53.1474663Z \n2026-10-19T11:52:53.1870202Z \n2026-10-19T11:52:53.1870713Z Protocol udp Dynamic Port Range\n2026-10-19T11:52:53.1871038Z ---------------------------------\n2026-10-19T11:52:53.1871305Z Start Port      : 49152\n2026-10-19T11:52:53.1871527Z Number of Ports : 16384\n2026-10-19T11:52:53.1874340Z \n2026-10-19T11:52:53.2270558Z \n2026-10-19T11:52:53.2271273Z Protocol tcp Port Exclusion Ranges\n2026-10-19T11:52:53.2271635Z \n2026-10-19T11:52:53.2271784Z Start Port    End Port      \n2026-10-19T11:52:53.2272192Z ----------    --------      \n2026-10-19T11:52:53.2272580Z         80          80      \n2026-10-19T11:52:53.2272945Z       5985        5985      \n2026-10-19T11:52:53.2273301Z       5986        5986      \n2026-10-19T11:52:53.2273665Z      47001       47001      \n2026-10-19T11:52:53.2274067Z      60437       60536      \n2026-10-19T11:52:53.2274421Z      60537       60636      \n2026-10-19T11:52:53.2274675Z \n2026-10-19T11:52:53.2274847Z * - Administered port exclusions.\n2026-10-19T11:52:53.2275135Z \n2026-10-19T11:52:53.2672316Z \n2026-10-19T11:52:53.2672851Z Protocol udp Port Exclusion Ranges\n2026-10-19T11:52:53.2673224Z \n2026-10-19T11:52:53.2673384Z Start Port    End Port      \n2026-10-19T11:52:53.2673791Z ----------    --------      \n2026-10-19T11:52:53.2674249Z      63203       63302      \n2026-10-19T11:52:53.2674547Z      63303       63402      \n2026-10-19T11:52:53.2674695Z \n2026-10-19T11:52:53.2674796Z * - Administered port exclusions.\n2026-10-19T11:52:53.2674967Z \n2026-10-19T11:52:53.3982271Z "
+  },
+  "raw_full_job_log": {
+    "path": "/tmp/swirl-vision-fixed-windows-attempt1-job.log",
+    "sha256": "aba4ee7ff483707204ea307f3d904bd258b576a8a73f329fc770fcd9a0c89bee"
+  },
+  "r3_tests_executed": false,
+  "vision_tests_executed": false,
+  "qt_app_executed": false,
+  "secondary_upload_failures": "The always-upload R3/Vision steps correctly failed for missing files because the earlier independent-peer step prevented those builds/tests from running.",
+  "original_failure_preserved": true,
+  "source_or_assertions_modified_for_retry": false,
+  "limitations": [
+    "No successful Windows R3/Vision or App result is claimed for this attempt.",
+    "No access-denial retry, test skip, host exclusion change or disabled assertion was applied."
+  ]
+}

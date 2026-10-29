@@ -1,5 +1,5 @@
 #include "TlsCertificateService.h"
-#include <QStandardPaths>
+#include "../app/StoragePaths.h"
 #include <QSaveFile>
 #include <QFile>
 #include <QDir>
@@ -149,7 +149,7 @@ QByteArray certificateFor(HCRYPTPROV subjectKey,HCRYPTPROV signingKey,const QByt
 #endif
 
 TlsCertificateService::TlsCertificateService(QString path,QObject *parent):QObject(parent),d(std::make_unique<Impl>()),m_path(path) {
-    if(m_path.isEmpty())m_path=QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/certificates/ca.dpapi";
+    if(m_path.isEmpty())m_path=SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/certificates/ca.dpapi";
     load();
 }
 TlsCertificateService::~TlsCertificateService()=default;

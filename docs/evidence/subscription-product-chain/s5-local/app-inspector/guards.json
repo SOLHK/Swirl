@@ -1,0 +1,21 @@
+{
+  "label": "guards",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "tools/tests/test_core_development.py",
+    "-v"
+  ],
+  "source_base_sha": "a066f7d4c8acb96f5d6a46cee5700b2590328b64",
+  "source_hashes": {
+    ".github/workflows/core-development.yml": "e8a8dfb7873046a8c3df30ab70ed528699400c1db6b65d7a9413b1a546eddbd4",
+    "tools/tests/test_core_development.py": "36feb71cf3469381b751dfa1e9224f447e2f9e4ee8f8ae394094c37075536a15",
+    "tools/ApplyCoreDevelopment.py": "6256e0df347dd5b966f1afe1abf8dd51a8a6775cdf2274e44362cea2f068150b",
+    ".github/workflows/rust-core.yml": "260738d1637d3351a94171ce677ac0881be22e76017d36b9362ad361da6cee45",
+    "tools/tests/test_socks4.py": "2da52d3c5cf02c41518363ebd188b963c804e019be45635d70bf4f7cb5df7f60"
+  },
+  "source_unchanged_during_test": true,
+  "exit_code": 0,
+  "elapsed_seconds": 0.886,
+  "log": "/workspace/scratch/ca6cd1f88f6f/swirl-chain-evidence/s5-app-inspector/guards.log",
+  "log_sha256": "14aa44f85f823f595087c6f86d91da8125ef7daf6f08aa798607c4be37efec56"
+}

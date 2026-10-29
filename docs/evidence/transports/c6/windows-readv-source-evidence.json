@@ -1,0 +1,36 @@
+[
+  {
+    "path": "/workspace/scratch/ece554ece7c1/c3-readv-upstream-evidence/legacy-1.8.24/common/buf/readv_windows.go",
+    "repository": "XTLS/Xray-core",
+    "commit": "6baad79f9881ee2cf75bdc825b3e2e92b289477a",
+    "git_blob_sha": "a812ee04bc1023205b82cda2169c37744eab9525",
+    "source_url": "https://github.com/XTLS/Xray-core/blob/6baad79f9881ee2cf75bdc825b3e2e92b289477a/common/buf/readv_windows.go",
+    "sha256": "692bbc3ca344d8549a650cf143ba2d79811c9ac879ecc0d04348ac5d7c8b9c5c",
+    "git_blob_verified": true
+  },
+  {
+    "path": "/workspace/scratch/ece554ece7c1/c3-readv-upstream-evidence/legacy-1.8.24/common/buf/readv_reader.go",
+    "repository": "XTLS/Xray-core",
+    "commit": "6baad79f9881ee2cf75bdc825b3e2e92b289477a",
+    "git_blob_sha": "bcd0f0ed121ab50356380100e0ad25ff08fa607e",
+    "source_url": "https://github.com/XTLS/Xray-core/blob/6baad79f9881ee2cf75bdc825b3e2e92b289477a/common/buf/readv_reader.go",
+    "sha256": "449ec6c8c2b16175b7a57f0f3c338d6bd9352147f3f415f27ca8e67459fec822",
+    "git_blob_verified": true
+  },
+  {
+    "path": "/workspace/scratch/ece554ece7c1/c3-readv-upstream-evidence/legacy-1.8.24/common/platform/platform.go",
+    "repository": "XTLS/Xray-core",
+    "commit": "6baad79f9881ee2cf75bdc825b3e2e92b289477a",
+    "git_blob_sha": "51e254475039e1066da1fc9cc0c3d596be7a0771",
+    "source_url": "https://github.com/XTLS/Xray-core/blob/6baad79f9881ee2cf75bdc825b3e2e92b289477a/common/platform/platform.go",
+    "sha256": "3f47e5f168dd1f22aec721e5e4658022de4ec9fc1fdce701cd93f3e18db30f74",
+    "git_blob_verified": true
+  },
+  {
+    "path": "/workspace/scratch/ece554ece7c1/upstream-xray-26.10.21/common/buf/readv_windows.go",
+    "repository": "XTLS/Xray-core",
+    "commit": "1b1647cd9ddf0abc34b981d4611fc03bcac1ca74",
+    "source_url": "https://github.com/XTLS/Xray-core/blob/1b1647cd9ddf0abc34b981d4611fc03bcac1ca74/common/buf/readv_windows.go",
+    "sha256": "b806e07b1f5b18d10a1b229c6b2d919758cf3abcdc3e6ec83cde2a4d494525c8"
+  }
+]

@@ -1,0 +1,484 @@
+{
+  "document_kind": "future_implementation_acceptance_manifest",
+  "status": "planned_not_executed",
+  "requirements": {
+    "R01": "订阅来源管理、自动格式识别、失败保留和删除关联节点",
+    "R02": "外部完整配置须一次性显式确认",
+    "R03": "节点资源库与运行出口分离",
+    "R04": "来源分区、搜索筛选排序、收藏和详情",
+    "R05": "真实Rust协议测量、有界并发和取消",
+    "R06": "五层规则与国内DIRECT和专属服务共存",
+    "R07": "永存默认策略、未知目标和失效安全语义",
+    "R08": "服务域名边界、冲突、优先级及启停",
+    "R09": "稳定node/group/rule/policy IDs与迁移",
+    "R10": "四类组、全部嵌套组合、循环/深度预算",
+    "R11": "健康检测、高级参数及服务粘性",
+    "R12": "DNS、IPv4/IPv6及分类路径可解释",
+    "R13": "系统代理、TUN和进程识别能力真实性",
+    "R14": "模式切换实际生效、失败回滚和崩溃恢复",
+    "R15": "真实规则、策略链和实际节点观测",
+    "R16": "统一空间动效、可中断、键盘/Esc和减少动态效果",
+    "R17": "窗口侧栏14dp且原尺寸结构保持",
+    "R18": "性能、增量更新和长时稳定测量",
+    "R19": "精确源码身份Windows包、代理恢复和人工教程"
+  },
+  "cases": [
+    {
+      "id": "C01",
+      "stage": 5,
+      "covers": [
+        "R01"
+      ],
+      "level": "unit_and_controlled_network",
+      "title": "刷新失败保留数据",
+      "expected": "下载/解析/安全校验/写入分别失败，节点与上次成功时间均不更新。",
+      "status": "planned"
+    },
+    {
+      "id": "C02",
+      "stage": 4,
+      "covers": [
+        "R01",
+        "R02"
+      ],
+      "level": "integration",
+      "title": "自动完整配置不覆盖策略",
+      "expected": "成功识别完整订阅只更新来源节点；现有DNS/规则/组逐项一致。",
+      "status": "planned"
+    },
+    {
+      "id": "C03",
+      "stage": 5,
+      "covers": [
+        "R02"
+      ],
+      "level": "integration",
+      "title": "一次性确认失效",
+      "expected": "源内容、source版本、基线、候选或会话变化均要求新预览；定时刷新不能重放ticket。",
+      "status": "planned"
+    },
+    {
+      "id": "C04",
+      "stage": 4,
+      "covers": [
+        "R01",
+        "R07",
+        "R09"
+      ],
+      "level": "controlled_network",
+      "title": "删除正在使用的来源",
+      "expected": "凭据从当前库移除，相关会话/探测/池终止；失效引用可解释且无DIRECT回退。",
+      "status": "planned"
+    },
+    {
+      "id": "C05",
+      "stage": 5,
+      "covers": [
+        "R01"
+      ],
+      "level": "integration",
+      "title": "过期下载与取消",
+      "expected": "删除来源/修改URL后晚到响应不复活节点；取消及commit前失败保留旧状态；删除已commit但撤销待确认则显示恢复状态，不恢复凭据。",
+      "status": "planned"
+    },
+    {
+      "id": "C06",
+      "stage": 3,
+      "covers": [
+        "R03"
+      ],
+      "level": "native_ui_and_signal_observation",
+      "title": "浏览节点不改变出口",
+      "expected": "单击/双击/Enter/详情/收藏/测速都不调用chooseNode/connectNode；真实运行出口不变。",
+      "status": "planned"
+    },
+    {
+      "id": "C07",
+      "stage": 3,
+      "covers": [
+        "R04",
+        "R09"
+      ],
+      "level": "model_and_native_ui",
+      "title": "来源分区与稳定焦点",
+      "expected": "组内排序、搜索临时展开、清空恢复折叠；节点ID和滚动锚点不串行。",
+      "status": "planned"
+    },
+    {
+      "id": "C08",
+      "stage": 3,
+      "covers": [
+        "R05"
+      ],
+      "level": "controlled_network",
+      "title": "协议探测失败分类",
+      "expected": "TCP通但TLS/认证/HEAD错误均失败；最多3 worker，取消后旧回调无效，不能称RTT。",
+      "status": "planned"
+    },
+    {
+      "id": "C09",
+      "stage": 4,
+      "covers": [
+        "R06"
+      ],
+      "level": "controlled_network",
+      "title": "CN与服务策略同时生效",
+      "expected": "添加专属策略后，CN目标真实直连、专属目标到专属受控出口。",
+      "status": "planned"
+    },
+    {
+      "id": "C10",
+      "stage": 4,
+      "covers": [
+        "R06",
+        "R08"
+      ],
+      "level": "unit_and_controlled_network",
+      "title": "五层重叠顺序",
+      "expected": "本地/显式直连、服务、CN、普通规则和最终默认按固定层次获胜。",
+      "status": "planned"
+    },
+    {
+      "id": "C11",
+      "stage": 4,
+      "covers": [
+        "R07",
+        "R10"
+      ],
+      "level": "integration",
+      "title": "默认实体与代理闭包",
+      "expected": "默认不可删停，支持节点/四组；未选择分支藏DIRECT/REJECT也拒绝；不自动选首项。",
+      "status": "planned"
+    },
+    {
+      "id": "C12",
+      "stage": 4,
+      "covers": [
+        "R07",
+        "R12"
+      ],
+      "level": "controlled_network",
+      "title": "未知域名与分类失败",
+      "expected": "CN分类超时走默认并记录未分类；无系统/明文回退；无可用默认则明确失败。",
+      "status": "planned"
+    },
+    {
+      "id": "C13",
+      "stage": 4,
+      "covers": [
+        "R08"
+      ],
+      "level": "unit_and_controlled_network",
+      "title": "服务集与共享域",
+      "expected": "Google/YouTube、OpenAI/Claude边界互不误抢；共享CDN不因页面上下文伪归属。",
+      "status": "planned"
+    },
+    {
+      "id": "C14",
+      "stage": 4,
+      "covers": [
+        "R08"
+      ],
+      "level": "unit",
+      "title": "域名与优先级冲突",
+      "expected": "点边界/IDNA/结尾点正确；同层重复priority或相同匹配不同出口拒绝，部分遮蔽可解释。",
+      "status": "planned"
+    },
+    {
+      "id": "C15",
+      "stage": 4,
+      "covers": [
+        "R08",
+        "R09"
+      ],
+      "level": "integration",
+      "title": "编辑禁用重命名",
+      "expected": "服务/组重命名不换ID；停用服务回默认；优先级改变生成新计划且可观测。",
+      "status": "planned"
+    },
+    {
+      "id": "C16",
+      "stage": 4,
+      "covers": [
+        "R09"
+      ],
+      "level": "integration",
+      "title": "旧配置迁移",
+      "expected": "未确认保持LegacyOrdered；歧义名称不猜；失败保留原加密数据；改变语义逐项预览。",
+      "status": "planned"
+    },
+    {
+      "id": "C17",
+      "stage": 4,
+      "covers": [
+        "R10"
+      ],
+      "level": "controlled_network",
+      "title": "全部嵌套组组合",
+      "expected": "四类父×四类子16组合保留每层策略；不flatten忽略子选择。",
+      "status": "planned"
+    },
+    {
+      "id": "C18",
+      "stage": 4,
+      "covers": [
+        "R10",
+        "R11"
+      ],
+      "level": "unit_and_integration",
+      "title": "隐藏循环和展开预算",
+      "expected": "未选分支循环、深度17、探测展开超限拒绝；无静默截断，无新探测副作用。",
+      "status": "planned"
+    },
+    {
+      "id": "C19",
+      "stage": 4,
+      "covers": [
+        "R11"
+      ],
+      "level": "controlled_network",
+      "title": "健康结果不得跨节点或参数复用",
+      "expected": "子组选项/节点配置/profile变更后旧结果失效；父profile不能用A成功批准B。",
+      "status": "planned"
+    },
+    {
+      "id": "C20",
+      "stage": 4,
+      "covers": [
+        "R11"
+      ],
+      "level": "controlled_network",
+      "title": "同服务多域粘性",
+      "expected": "健康期间同服务100个新连接保持leaf；改名不换IP，明确故障只影响新连接且记原因。",
+      "status": "planned"
+    },
+    {
+      "id": "C21",
+      "stage": 4,
+      "covers": [
+        "R11",
+        "R07"
+      ],
+      "level": "controlled_network",
+      "title": "无健康候选和冷启动",
+      "expected": "显示等待检测/不可用；检测走独立路径；不自动DIRECT，不重放业务请求。",
+      "status": "planned"
+    },
+    {
+      "id": "C22",
+      "stage": 4,
+      "covers": [
+        "R12"
+      ],
+      "level": "controlled_network",
+      "title": "DNS双栈混合答案",
+      "expected": "只对实际拨号IP判定；不因其他CN答案误直连、不跨不同出口重试。",
+      "status": "planned"
+    },
+    {
+      "id": "C23",
+      "stage": 4,
+      "covers": [
+        "R12"
+      ],
+      "level": "controlled_network",
+      "title": "分类DNS递归与TLS",
+      "expected": "固定bootstrap、验证TLS名、经默认leaf绕过分类器；依赖环被拒绝，无TLS降级。",
+      "status": "planned"
+    },
+    {
+      "id": "C24",
+      "stage": 4,
+      "covers": [
+        "R12",
+        "R08"
+      ],
+      "level": "controlled_network",
+      "title": "强制解析阻断失败",
+      "expected": "强制解析REJECT规则DNS失败时拒绝请求，不能借未知默认绕过阻断。",
+      "status": "planned"
+    },
+    {
+      "id": "C25",
+      "stage": 4,
+      "covers": [
+        "R13"
+      ],
+      "level": "integration_and_native_ui",
+      "title": "不可用进程/TUN能力",
+      "expected": "核心报告false时界面禁用并说明；app+site整条不可启用，不降成domain-only假成功。",
+      "status": "planned"
+    },
+    {
+      "id": "C26",
+      "stage": 6,
+      "covers": [
+        "R14"
+      ],
+      "level": "controlled_network_and_native_ui",
+      "title": "三种模式语义",
+      "expected": "rule/global/direct实际出口各正确；global只保留必要本地例外，UI在真回执后更新。",
+      "status": "planned"
+    },
+    {
+      "id": "C27",
+      "stage": 4,
+      "covers": [
+        "R14"
+      ],
+      "level": "fault_injection_and_controlled_network",
+      "title": "提交失败没有候选流量逃逸",
+      "expected": "prepare/intent失败旧计划继续；activate后final-save失败时gate内无新请求经候选出口。",
+      "status": "planned"
+    },
+    {
+      "id": "C28",
+      "stage": 4,
+      "covers": [
+        "R14"
+      ],
+      "level": "fault_injection",
+      "title": "不确定写入及ACK丢失",
+      "expected": "超时不盲回滚；committed receipt决定finish/rollback；同requestId无重复激活。",
+      "status": "planned"
+    },
+    {
+      "id": "C29",
+      "stage": 4,
+      "covers": [
+        "R14"
+      ],
+      "level": "fault_injection",
+      "title": "恢复失败与忙碌",
+      "expected": "恢复失败拒绝新流不切DIRECT/自动关系统代理；新mutation返回Busy，陈旧epoch不覆盖。",
+      "status": "planned"
+    },
+    {
+      "id": "C30",
+      "stage": 4,
+      "covers": [
+        "R14",
+        "R01"
+      ],
+      "level": "fault_injection",
+      "title": "逐阶段崩溃和撤销恢复",
+      "expected": "只从有效committed恢复；pending撤销不以旧凭据自连；旧程序不覆盖V2格式。",
+      "status": "planned"
+    },
+    {
+      "id": "C31",
+      "stage": 4,
+      "covers": [
+        "R15"
+      ],
+      "level": "controlled_network",
+      "title": "真实观测链",
+      "expected": "规则ID/层/服务/组路径/leaf/revision与受控收包一致；Qt不伪造policy=node。",
+      "status": "planned"
+    },
+    {
+      "id": "C32",
+      "stage": 6,
+      "covers": [
+        "R16"
+      ],
+      "level": "native_ui",
+      "title": "反向动画与键盘",
+      "expected": "A-B-A-C导航、菜单/弹窗反向、Esc逐层关闭、焦点回归、复用节点无残留。",
+      "status": "planned"
+    },
+    {
+      "id": "C33",
+      "stage": 6,
+      "covers": [
+        "R16"
+      ],
+      "level": "native_ui",
+      "title": "减少动态效果",
+      "expected": "系统/用户开关生效、最终状态/可访问性完整；不是性能故障时擅自删动画。",
+      "status": "planned"
+    },
+    {
+      "id": "C34",
+      "stage": 6,
+      "covers": [
+        "R17"
+      ],
+      "level": "native_geometry_and_user_visual",
+      "title": "14dp全链一致",
+      "expected": "窗口/侧栏/遮罩/shader/阴影同源，分数DPR正确，尺寸不变，最大化恢复无漏角。",
+      "status": "planned"
+    },
+    {
+      "id": "C35",
+      "stage": 3,
+      "covers": [
+        "R18",
+        "R04"
+      ],
+      "level": "model_and_native_ui",
+      "title": "列表规模与增量更新",
+      "expected": "100/500/2000生产规模delegate随视口有界；正常刷新无全reset、无重复信号。",
+      "status": "planned"
+    },
+    {
+      "id": "C36",
+      "stage": 6,
+      "covers": [
+        "R18"
+      ],
+      "level": "native_performance_measurement",
+      "title": "真实帧时间和稳定性",
+      "expected": "同机同SHA场景记录P95/P99/长帧/内存/对象数，区分冷暖和输入反馈，不冒称稳定60FPS。",
+      "status": "planned"
+    },
+    {
+      "id": "C37",
+      "stage": 7,
+      "covers": [
+        "R19"
+      ],
+      "level": "isolated_windows_ci",
+      "title": "代理恢复与包身份",
+      "expected": "可丢弃Windows环境测开启/失败/恢复；EXE/DLL/manifest与实现SHA一致。",
+      "status": "planned"
+    },
+    {
+      "id": "C38",
+      "stage": 7,
+      "covers": [
+        "R06",
+        "R07",
+        "R08",
+        "R12",
+        "R13",
+        "R19"
+      ],
+      "level": "authorized_user_device_network",
+      "title": "实际国内海外服务验收",
+      "expected": "国内DIRECT、普通国外默认、OpenAI/Claude/Google各自出口有真实记录；系统代理/TUN范围分开。",
+      "status": "planned"
+    },
+    {
+      "id": "C39",
+      "stage": 7,
+      "covers": [
+        "R19",
+        "R16"
+      ],
+      "level": "user_acceptance",
+      "title": "易懂教程和已知问题",
+      "expected": "教程按实际按钮写安装/订阅/策略/模式/动画/截图日志；已过未过未测逐项标记。",
+      "status": "planned"
+    },
+    {
+      "id": "C40",
+      "stage": 4,
+      "covers": ["R10", "R11"],
+      "level": "controlled_network",
+      "title": "祖先健康约束下子组备用选择",
+      "expected": "child A本身健康但不满足parent profile、B满足双方时，自动child可选B；manual选A仍失败；缓存不得跨祖先上下文复用。",
+      "status": "planned"
+    }
+  ]
+}

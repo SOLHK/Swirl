@@ -29,6 +29,8 @@ public:
     Q_INVOKABLE void releaseGrab(int id);
     int activeGrabCount() const { return m_grabs.size(); }
     Q_INVOKABLE void setTransitioning(bool);
+    Q_INVOKABLE void finishPopup(QObject *popup);
+    Q_INVOKABLE bool reversePopupExit(QObject *popup);
 private:
     std::atomic_bool m_transitioning{false};
     QElapsedTimer m_clock;

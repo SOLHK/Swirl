@@ -1,0 +1,187 @@
+name: Swirl VF exact-source reconstruction attempt
+
+on:
+  push:
+    branches: [work/core-completion-20261017]
+    paths:
+      - '.github/workflows/swirl-vf-source-rebuild.yml'
+      - 'tools/swirl_vf/tools/rebuild.py'
+      - 'tools/swirl_vf/platform/coretext_extract.swift'
+      - 'tools/swirl_vf/platform/compare_axis_construction.py'
+      - 'tools/swirl_vf/platform/probe_axis_cache.py'
+      - 'tools/swirl_vf/platform/probe_axis_first_writer.py'
+      - 'tools/swirl_vf/tools/verified_axis_oracle.py'
+      - 'tools/swirl_vf/tools/incremental_pipe.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-rebuild:
+    needs: original-axis-construction
+    runs-on: xcode-27
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile CoreText with its unchanged strict default readback guard
+        run: |
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          xcrun swiftc -O tools/swirl_vf/platform/coretext_extract.swift -o "$RUNNER_TEMP/coretext_extract"
+      - name: Actually attempt all-face reconstruction and publish aggregates only
+        env:
+          NATIVE_BINARY: ${{ runner.temp }}/coretext_extract
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, pathlib, platform, re, subprocess, sys, tempfile
+          sys.path.insert(0, str(pathlib.Path('tools/swirl_vf/tools').resolve()))
+          from verified_axis_oracle import make_launcher
+          from rebuild import native_failure_details, metric_failure_details
+          source = pathlib.Path('/System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc')
+          expected = '39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890'
+          def digest(path):
+              with path.open('rb') as stream:
+                  return hashlib.file_digest(stream, 'sha256').hexdigest()
+          summary = {'status':'NOT_RUN', 'source_sha256':expected, 'source_commit':os.environ['GITHUB_SHA'],
+              'platform':platform.platform(), 'original_font_published':False, 'original_outlines_published':False,
+              'font_artifact_published':False, 'windows_acceptance':'NOT_RUN', 'outline_budget':1., 'metric_budget':1.}
+          output = pathlib.Path('build/rebuild-summary'); output.mkdir(parents=True, exist_ok=True)
+          code = 1
+          try:
+              if digest(source) != expected:
+                  raise ValueError('source_hash_mismatch')
+              with tempfile.TemporaryDirectory(prefix='swirl-original-rebuild-') as tmp:
+                  private = pathlib.Path(tmp)
+                  candidate, report = private/'Swirl-VF.ttc', private/'rebuild.json'
+                  oracle = make_launcher(private/'verified-axis-oracle', pathlib.Path(os.environ['NATIVE_BINARY']))
+                  summary.update(native_binary_sha256=digest(pathlib.Path(os.environ['NATIVE_BINARY'])),
+                      verified_axis_launcher_sha256=digest(oracle),
+                      axis_acceptance='every_requested_GID_exact_native_replay_before_batch_release',
+                      original_strict_readback_tolerance=1e-6)
+                  with (private/'stdout.log').open('wb') as stdout, (private/'stderr.log').open('wb') as stderr:
+                      try:
+                          run = subprocess.run([sys.executable, 'tools/swirl_vf/tools/rebuild.py', str(source),
+                              '--oracle', str(oracle), '--output', str(candidate),
+                              '--report', str(report), '--batch-size', '64',
+                              '--checkpoint-dir', str(private/'verified-faces')], stdout=stdout, stderr=stderr, timeout=300)
+                          summary['process_exit_code'] = run.returncode
+                      except subprocess.TimeoutExpired:
+                          summary['status'] = 'REBUILD_TIME_LIMIT_NOT_ACCEPTED'
+                  if report.exists():
+                      raw = json.loads(report.read_text())
+                      summary.update(status=raw['status'], source_unchanged=digest(source)==expected,
+                          native_faces_verified=len(raw.get('oracle', {}).get('faces', [])),
+                          faces_completed=sum('serialized_model_verification' in f for f in raw.get('faces', [])),
+                          faces_started=len(raw.get('faces', [])), output_generated=raw['output_generated'])
+                      summary['face_progress']=[{key: face[key] for key in ('face_index', 'glyph_count',
+                          'glyphs_completed', 'max_outline_error', 'max_metric_error') if key in face}
+                          for face in raw.get('faces', [])]
+                      progress=raw.get('native_observation_progress', {})
+                      summary['native_observation_progress']={key: progress[key] for key in
+                          ('attempted_batches_this_run', 'completed_batches_this_run',
+                           'glyph_observations_in_completed_batches_this_run')
+                          if type(progress.get(key)) is int and progress[key] >= 0}
+                      summary['native_observation_progress']['count_scope']=(
+                          'completed native batches; no completed glyph model or finalized transcript implied')
+                      final = raw.get('oracle_summary', {})
+                      summary['oracle_finalization']={key: final[key] for key in ('request_count',
+                          'successful_glyph_count', 'error_count', 'verified_batch_count', 'source_unchanged')
+                          if key in final}
+                      failures=[]
+                      for item in raw.get('failures', []):
+                          message=item.get('message', '')
+                          # Known messages contain no outlines. Unknown failure details stay private.
+                          reasons=('coretext_did_not_report_requested_axis_value:WDTH',
+                              'coretext_did_not_report_requested_axis_value:wght',
+                              'coretext_did_not_report_requested_axis_value:HGHT',
+                              'native horizontal coordinate of vertical origin is not representable by standard vmtx',
+                              'native outline command topology differs between instances',
+                              'training/default quantization exceeds error budget',
+                              'holdout error persists', 'native oracle could not verify every requested physical face')
+                          reasons += ('native_nondefault_axis_not_reported',
+                              'predeclared_axis_candidate_outside_source_range',
+                              'native_readback_replay_not_exactly_stable', 'native_readback_not_named_decimal4_candidate',
+                              'native_replay_payload_not_exact', 'native_final_summary_mismatch',
+                              'source_changed_during_axis_verification', 'native final summary is incomplete',
+                              'native oracle failed after its final glyph')
+                          context=item.get('context', {})
+                          safe={key: context[key] for key in ('stage', 'face_index', 'glyph_id', 'gid_first',
+                              'gid_last', 'sample_number', 'adaptive_points', 'max_outline_error', 'max_metric_error')
+                              if key in context and isinstance(context[key], (int, float, str))}
+                          location=context.get('user_location', {})
+                          if isinstance(location, dict):
+                              safe['user_location']={tag: value for tag, value in location.items()
+                                  if tag in ('WDTH', 'wght', 'HGHT') and isinstance(value, (int, float))}
+                          if 'native_observation' in context:
+                              safe['native_observation']=native_failure_details(context['native_observation'])
+                          if 'metric_representation' in context:
+                              safe['metric_representation']=metric_failure_details(context['metric_representation'])
+                          failures.append({'type':item.get('type'), 'reason':next((r for r in reasons if r in message),
+                              'OTHER_PRIVATE_FAILURE'), 'face_gid':re.findall(r'face (\d+) gid (\d+)', message),
+                              'context':safe})
+                      summary['failures']=failures
+                      if candidate.exists():
+                          summary.update(output_bytes=candidate.stat().st_size, output_sha256=digest(candidate))
+                      code=0 if raw['output_generated'] and summary.get('process_exit_code')==0 else 1
+                  summary['private_temporary_font_data_removed_on_exit']=True
+          except Exception as error:
+              summary.update(status='REBUILD_EXECUTION_ERROR', failure_type=type(error).__name__)
+          finally:
+              summary['source_unchanged']=source.is_file() and digest(source)==expected
+              if not summary['source_unchanged']: code=1
+              (output/'rebuild.json').write_text(json.dumps(summary, indent=2)+'\n')
+              print(json.dumps(summary), flush=True)
+          raise SystemExit(code)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-original-rebuild-summary-${{ github.sha }}
+          path: build/rebuild-summary/*.json
+          retention-days: 7
+
+  original-axis-construction:
+    runs-on: xcode-27
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned private diagnostic dependencies
+        run: python -m pip install fonttools==4.61.1 numpy==2.2.6
+      - name: Preserve strict production guard and diagnose original axis readback separately
+        run: |
+          python tools/swirl_vf/platform/diagnose_axis_readback.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --output build/axis-summary/readback.json
+          python tools/swirl_vf/platform/compare_axis_construction.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --output build/axis-summary/construction.json
+      - name: Compare independent request orders and readback-created instances
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/probe_axis_cache.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --output build/axis-summary/cache.json
+      - name: Require exact typed paths and raw metrics with opposite first writers
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/probe_axis_first_writer.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --output build/axis-summary/first-writer.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-original-axis-summary-${{ github.sha }}
+          path: build/axis-summary/*.json
+          retention-days: 7

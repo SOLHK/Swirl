@@ -1,0 +1,575 @@
+{
+  "archived_at_utc": "2026-10-22T13:24:39.255782+00:00",
+  "record_type": "unmodified_local_test_receipt_archive",
+  "scope": "independent_official_server_loopback_only",
+  "qt_product_tested": false,
+  "public_network_tested": false,
+  "sensitive_content_scan": {
+    "private_key_blocks": 0,
+    "credential_assignments": 0,
+    "known_fixture_passwords_or_psks": 0,
+    "config_or_key_files_copied": false
+  },
+  "notes": [
+    "Original reports and console logs copied byte-for-byte. Test failures are preserved.",
+    "Receipt client hashes identify the binaries tested at that run, not later rebuilt binaries.",
+    "Synthetic test UUIDs may appear; no user credentials or private server key files are included."
+  ],
+  "files": [
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/summary.json",
+      "bytes": 561,
+      "sha256": "9226950396d0bc28e871ef72f4d4a700b4a27ad436d81d75b10002b3ce71a07d"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-1a6te8wz/01-vmess-raw-tls-access.log",
+      "bytes": 77,
+      "sha256": "3a73fd4ffd9decc17e3ff903a5f5a5eff32f2ffcf7cea932ac59aca93a1e6728"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-1a6te8wz/01-vmess-raw-tls-error.log",
+      "bytes": 1180,
+      "sha256": "df76f2c1f7a68e585c37e94a441a921df8a3bfc53af336c10c9ea5752f0d544d"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-1a6te8wz/01-vmess-raw-tls-process.log",
+      "bytes": 481,
+      "sha256": "a5ee75c85c5e571c77c8f48da556a8e060097d685cd80562aba9944b173089a7"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-1a6te8wz/results.json",
+      "bytes": 1446,
+      "sha256": "6f2cee7b0a22f593fcebeb387dd77558063ee94530cdd804c7ab427d6fc8fd26"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-26e091jj/01-vmess-raw-plain-access.log",
+      "bytes": 231,
+      "sha256": "a613c4cd1c5df0c87d27fdc5a7f351835f7f364d73a2f5039db739f4b8e1f301"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-26e091jj/01-vmess-raw-plain-error.log",
+      "bytes": 2504,
+      "sha256": "63909133dc488ba1fefa57c65cca17d941c4e1f8747f8726708f17c6e5676218"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-26e091jj/01-vmess-raw-plain-process.log",
+      "bytes": 483,
+      "sha256": "d6ddeaafb085ae09577bf225230751a6ab474e039221863c5e427fa48816f653"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-26e091jj/02-vmess-ws-plain-access.log",
+      "bytes": 231,
+      "sha256": "ca237db0d004d95c6f134f4f2f3fc75d8067208c572b32028b82c4ee56961e18"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-26e091jj/02-vmess-ws-plain-error.log",
+      "bytes": 2838,
+      "sha256": "29dbf19a71f4207d609418af0ab0ff42fbacce962c4c930919230547acee31c0"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-26e091jj/02-vmess-ws-plain-process.log",
+      "bytes": 709,
+      "sha256": "7e1b50607720103c6487725c080468f7247523030efc548c1d7c6c209b9c6982"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-26e091jj/results.json",
+      "bytes": 6374,
+      "sha256": "1aa9080cf27907b2a06249bfaecbbdb3281a306d7427bfafcf2c24432885b7c8"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-9hzvir1q/01-vmess-raw-plain-access.log",
+      "bytes": 176,
+      "sha256": "13fe2708764e13b413b934834766086c3a50d77d54db1643caff99a4230f3d20"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-9hzvir1q/01-vmess-raw-plain-error.log",
+      "bytes": 724,
+      "sha256": "2876859fdfd4c36df213ea02fe57badf49431204d36beaaafeddae72111ca749"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-9hzvir1q/01-vmess-raw-plain-process.log",
+      "bytes": 483,
+      "sha256": "c8d02612f9fb1338e6541373a5630fa1f6ad3d0c53fe9157b08f2d8ad1f031ba"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-9hzvir1q/02-vmess-raw-tls-access.log",
+      "bytes": 113,
+      "sha256": "482763f1c7c0f544087eb5fe942e6e607f28ac940fefb3beb9d67546145dbf58"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-9hzvir1q/02-vmess-raw-tls-error.log",
+      "bytes": 661,
+      "sha256": "3d90c72d7b21d897e98fb043ef047222dcf5938e9e701f7cdf1289fe98951dee"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-9hzvir1q/02-vmess-raw-tls-process.log",
+      "bytes": 481,
+      "sha256": "1349525979d00d2515875aa1a1c0236f6b62b92b58da9242b0058f66fcf7a09a"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-9hzvir1q/03-vmess-ws-plain-access.log",
+      "bytes": 113,
+      "sha256": "44599d193f561d65512420610d82000a21cc56e76b9775150d45b3276270758f"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-9hzvir1q/03-vmess-ws-plain-error.log",
+      "bytes": 529,
+      "sha256": "41e2c5debc5009272279577702b2f959ba0cf80dfda197f7152b576d6d72edcd"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-9hzvir1q/03-vmess-ws-plain-process.log",
+      "bytes": 709,
+      "sha256": "641ac46bcb1e6571365abe8357d339617b2739f9438d04c463ce48077766c6b0"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-9hzvir1q/04-vmess-ws-tls-access.log",
+      "bytes": 113,
+      "sha256": "e9003d77271a5b9b38dcce346476c7d7318e2c2a58d22c7cc2f78ef07b1e7bac"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-9hzvir1q/04-vmess-ws-tls-error.log",
+      "bytes": 589,
+      "sha256": "577b3eb3e42832c9c8d7b664835c48b931d0554791396776525d2b5eeb1031f7"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-9hzvir1q/04-vmess-ws-tls-process.log",
+      "bytes": 786,
+      "sha256": "fb98c39d37e3df6ee754669371ae2f4d50596167cb49c404a80fee4f51732319"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-9hzvir1q/results.json",
+      "bytes": 3961,
+      "sha256": "c128efb35d0722f149c810ceaa2a587e623cb173ad48b247de53c5466798989d"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-b6ujgavr/01-vmess-raw-tls-access.log",
+      "bytes": 308,
+      "sha256": "0442b435e75651b3d86cac22aea912409011af069a904318611a6e81af08347e"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-b6ujgavr/01-vmess-raw-tls-error.log",
+      "bytes": 1002,
+      "sha256": "6ab64a0a00ecea4eef59f8c3241b433885732bacab36173aaafa058e628a6a5f"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-b6ujgavr/01-vmess-raw-tls-process.log",
+      "bytes": 481,
+      "sha256": "b978a5f37c7c600787a7fc3b448960f4a3838b5ca914cf67e62ac97869b7ac4f"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-b6ujgavr/results.json",
+      "bytes": 1768,
+      "sha256": "b919c0c552cea89f012c3f748e670f55db8e1b21ae92aaa993e74184718dc8b1"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-fsj5v9k7/01-vmess-ws-tls-access.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-fsj5v9k7/01-vmess-ws-tls-error.log",
+      "bytes": 464,
+      "sha256": "e5a8e939f7aa9b5b30948883e862f089b28be829676f77d3053d666b2f1dc055"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-fsj5v9k7/01-vmess-ws-tls-process.log",
+      "bytes": 786,
+      "sha256": "c4f5b385f4360027c340c8452601404ff0ed8cd35daa78a7273ea45134d6c8d8"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-fsj5v9k7/results.json",
+      "bytes": 1215,
+      "sha256": "41c622c653629ed94acf968039ec4a7348dd673ada6b0a5d34dfe6f75814dccd"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-fzjn9u8g/01-vmess-raw-plain-access.log",
+      "bytes": 73,
+      "sha256": "58b7a7a577e1cbfcfb57b309bea7c463e643f3befe1c33a3a4f751522c3a29cc"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-fzjn9u8g/01-vmess-raw-plain-error.log",
+      "bytes": 1115,
+      "sha256": "83d91979dcfe875b91748b05ceff12427fa548a4bc15c335253d91c74da336fa"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-fzjn9u8g/01-vmess-raw-plain-process.log",
+      "bytes": 483,
+      "sha256": "f379739adf1aec303ca25696a1da792eb3a43805f57d6267b94b7af4b90a1b49"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-fzjn9u8g/results.json",
+      "bytes": 1422,
+      "sha256": "7617f39dc5e415adc8fc4b3ef1356ba5a1ab63fcac47ef0abbc0802335fd917a"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-m5oqu5hp/01-vmess-ws-tls-access.log",
+      "bytes": 616,
+      "sha256": "922d2b4c71475317525f096d35506def66d35f6dfd7a4991c287ef6ebf4d1896"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-m5oqu5hp/01-vmess-ws-tls-error.log",
+      "bytes": 6392,
+      "sha256": "5519c3e271bebcd08d99353ffc20ec45fb3273099a40a3cae06c5eb59834e821"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-m5oqu5hp/01-vmess-ws-tls-process.log",
+      "bytes": 786,
+      "sha256": "b91b980db47fda27b0988b347ddbb6880b8f7bd013e698c099b9cadd112f335a"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-m5oqu5hp/results.json",
+      "bytes": 6869,
+      "sha256": "6cf98ab8427590bd6386e1dc0448582f297afaf63d711db3ed57c268bbecb054"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qgliz6y2/01-vmess-raw-plain-access.log",
+      "bytes": 77,
+      "sha256": "9a147fecd04b2e98e2b96919c1995ba2dd595c5f02c76b48455e7fe117435c01"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qgliz6y2/01-vmess-raw-plain-error.log",
+      "bytes": 1176,
+      "sha256": "aea21aab98fcb568905c0f731a5443a925279cc66a413cc5c49d40ffe96c7895"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qgliz6y2/01-vmess-raw-plain-process.log",
+      "bytes": 483,
+      "sha256": "a7e34020ffdd4490f62124b0c5c426912f2ac4478f2dc7d8ce941c34af9ffe05"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qgliz6y2/02-vmess-raw-tls-access.log",
+      "bytes": 77,
+      "sha256": "51f7525a61523692cbbbe1eec46089dbf58ce7b40b02bdd4ab0d20868f5b08c6"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qgliz6y2/02-vmess-raw-tls-error.log",
+      "bytes": 1182,
+      "sha256": "89070acb143064fefcd3cd597dceea0e6ff927d5058e2e4ff2820687a1e0fbd1"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qgliz6y2/02-vmess-raw-tls-process.log",
+      "bytes": 481,
+      "sha256": "de54c30fc6fe58d07265a6489e14d17e4ceeb8256bc5daebe04512106116dae1"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qgliz6y2/03-vmess-ws-plain-access.log",
+      "bytes": 77,
+      "sha256": "67126af85f0e97588c15fcb0d24a9dc6d40ac70ceeb4214dfb637e16ab90dce2"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qgliz6y2/03-vmess-ws-plain-error.log",
+      "bytes": 1051,
+      "sha256": "68a7b7f4a40031fb8817e1997ca249690bf2e1bdd0eaa01c12e3a8f666423900"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qgliz6y2/03-vmess-ws-plain-process.log",
+      "bytes": 709,
+      "sha256": "4bb7490485258003fb32cdb5513c8478e4159197686dfdbb3f20cb46a093325d"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qgliz6y2/04-vmess-ws-tls-access.log",
+      "bytes": 77,
+      "sha256": "59f6a51f61e60a98ac6d810be95cf275df5416b04a7b97fdbba93886b6d3bc01"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qgliz6y2/04-vmess-ws-tls-error.log",
+      "bytes": 1051,
+      "sha256": "736ba04294daef38ea05af0d8c3d171075d59cd3f5dba934423fe321f08ae948"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qgliz6y2/04-vmess-ws-tls-process.log",
+      "bytes": 786,
+      "sha256": "ea8f1537c130c116822caf5157d425afd52ea2b9642250ce1166cb83f4a648dd"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qgliz6y2/results.json",
+      "bytes": 4940,
+      "sha256": "3619f3508b2e4aa8e54fbbf18e987a061564b96795a8e70d1f3409519e7668ad"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qr04rogb/01-vmess-raw-plain-access.log",
+      "bytes": 77,
+      "sha256": "d7f0e5224d1ad60eb64763cba9f276c3b49a47490312f76c928672ad3b19359b"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qr04rogb/01-vmess-raw-plain-error.log",
+      "bytes": 1325,
+      "sha256": "5110a238044aea038a9f01dfadb961bb4d3695fc661c5bde2352bede7b812053"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qr04rogb/01-vmess-raw-plain-process.log",
+      "bytes": 483,
+      "sha256": "b446b572bde9dd9b1704e7f0a09e19548275e8a57f0c2af726ce2d37c30e4061"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qr04rogb/02-vmess-ws-tls-access.log",
+      "bytes": 77,
+      "sha256": "f772bbb79a337600b93ab5a28940e9a3714f90a01f3884f0d213b4b0eb692a37"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qr04rogb/02-vmess-ws-tls-error.log",
+      "bytes": 1128,
+      "sha256": "a631515eef3886f55155abe8355e3029d56688d4b9c0a57530d1be2bbafb4f50"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qr04rogb/02-vmess-ws-tls-process.log",
+      "bytes": 786,
+      "sha256": "bb7a1f7f064eec98c82835e86e3a4fe3af94db359c3fbde05db0de8f8c2d7292"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-qr04rogb/results.json",
+      "bytes": 843,
+      "sha256": "1628c64a8c2beab64dde60c1d6f754a99c6a076f1819ccd40f6bb320f4268a97"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-skbgsksn/01-vmess-raw-plain-access.log",
+      "bytes": 77,
+      "sha256": "5a22136c7ec7fa73b4d091e4f0fbeaf275c217ec169ce1335798378b06ac62af"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-skbgsksn/01-vmess-raw-plain-error.log",
+      "bytes": 1182,
+      "sha256": "0661a49e6095105bcd3501d91cf669b3627890c51d5eb96f87a160234de99cf3"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-skbgsksn/01-vmess-raw-plain-process.log",
+      "bytes": 483,
+      "sha256": "9b6c41433344f9c025ba71cd95d783a1eb74e1279ff16b88b98adc2d890e3030"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-skbgsksn/02-vmess-raw-plain-access.log",
+      "bytes": 77,
+      "sha256": "f64430cd4ee282d203cc8244bf09181793c691a6436d6fce24cb924e7f3ea319"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-skbgsksn/02-vmess-raw-plain-error.log",
+      "bytes": 1123,
+      "sha256": "5332181769670dcfe8152cd4446bb1a70cad005129003daf473cd949bf8f42ad"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-skbgsksn/02-vmess-raw-plain-process.log",
+      "bytes": 483,
+      "sha256": "f002e6103a1e9c63a4a7d3893ce919ea9cd1b784c8b48da1215aeb0c2a3faf20"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-skbgsksn/results.json",
+      "bytes": 2339,
+      "sha256": "97a5b342fffdeac9d9a0306a5922a3773fbf8c3a73c9ad6d6120f36306d15509"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-tai_4456/01-vmess-raw-tls-access.log",
+      "bytes": 77,
+      "sha256": "a7e011eb4a99613c43d589233f97598768fe59c67d688d56ad247e6df1fde05b"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-tai_4456/01-vmess-raw-tls-error.log",
+      "bytes": 1182,
+      "sha256": "96ccea1ded41c09bac58e17c9009550cc664efd70859d3fbf4bbcacf377cc45e"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-tai_4456/01-vmess-raw-tls-process.log",
+      "bytes": 481,
+      "sha256": "d8af299d6f2637c70018387e0864af362b1eef8f0fd66361ddcb68c05cdd1c63"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-tai_4456/results.json",
+      "bytes": 1417,
+      "sha256": "93a6e99c8e515332c28217a4001c5ce78a5cf9c93aa8a780c938a1c34adef417"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-tlncnffe/01-vmess-raw-plain-access.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-tlncnffe/01-vmess-raw-plain-error.log",
+      "bytes": 458,
+      "sha256": "0a6b1a36c79506a4e1a6f7d09369be1b17bdf5cd6e1bbc7a1bc030b752e7bbe2"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-tlncnffe/01-vmess-raw-plain-process.log",
+      "bytes": 483,
+      "sha256": "80553e8c2c66d83ad5635f6c9db0657e5104b8ec2d2e9a6899dc6fac6b313b72"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-tlncnffe/results.json",
+      "bytes": 3413,
+      "sha256": "67c20e8139bc7b43d09e941b99346479a985c35b05c582413cfa843538e39d32"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-zx4zuzw2/01-vmess-raw-plain-access.log",
+      "bytes": 154,
+      "sha256": "ac7e454201855b262000a9c437e61bdcfd83b21cdbc8e05c5508c8747e193b66"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-zx4zuzw2/01-vmess-raw-plain-error.log",
+      "bytes": 1845,
+      "sha256": "3c319eefe0c25b35e333c6c1df05b281d6ccf25d60d56bd21a5051e652f67b49"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-zx4zuzw2/01-vmess-raw-plain-process.log",
+      "bytes": 483,
+      "sha256": "8c53134892fc38f111e506bd58da67a3ff4ed69b093ce56b9040d55f56280b68"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-zx4zuzw2/02-vmess-raw-tls-access.log",
+      "bytes": 154,
+      "sha256": "c80802c9946817968c8f9f0040e750b61cb31e86182fb9c80a32001732a76863"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-zx4zuzw2/02-vmess-raw-tls-error.log",
+      "bytes": 1786,
+      "sha256": "3230b0f1cb375830cd779b945389d4a5e9d8ffa41dc11e9edceca8417b1a2ecf"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-zx4zuzw2/02-vmess-raw-tls-process.log",
+      "bytes": 481,
+      "sha256": "7e26fa40ac3f184a00ff3b75123e94243dd2008496ac0a1a9eb3b48fcadb5c12"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-zx4zuzw2/03-vmess-ws-plain-access.log",
+      "bytes": 154,
+      "sha256": "2a5fe94e34f5e338c74ffe43e1fca7caac219fd436856db57f73067cc2eee477"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-zx4zuzw2/03-vmess-ws-plain-error.log",
+      "bytes": 1709,
+      "sha256": "f4d94b524fa7a2abcad9778769e45e920d950195a133f1476c4030925d7e361d"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-zx4zuzw2/03-vmess-ws-plain-process.log",
+      "bytes": 709,
+      "sha256": "d6c2c1dabb39d02c995b00a24fe240a5dc254cce9dc32f85b7d4ebea7e4fd13b"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-zx4zuzw2/04-vmess-ws-tls-access.log",
+      "bytes": 154,
+      "sha256": "ce1c3dcf634a8a01e07488dfdd61162e1ac8f619f0da368990a625371e78783f"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-zx4zuzw2/04-vmess-ws-tls-error.log",
+      "bytes": 1889,
+      "sha256": "3f2825e04832c6393036bcb7769c20cba3b13605900383508f908ccb87ddc57f"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-zx4zuzw2/04-vmess-ws-tls-process.log",
+      "bytes": 786,
+      "sha256": "2df00f044ab9add523150ad3e58da6ca8c98ff14867bb23860f520d28d33707f"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/verified-progress-timeout/swirl-X14-A2-vmess-zx4zuzw2/results.json",
+      "bytes": 8681,
+      "sha256": "28fbf091f9531b8c969572e9918f08e790b4dfaa9e5064015d1d995337ad4556"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/summary.json",
+      "bytes": 544,
+      "sha256": "ac828513a198d0c3975959e97193143ff9a4f72bb2da47b7f21ae1d33a6234cc"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/swirl-X14-A2-vmess-f6f6r0gc/01-vmess-ws-tls-access.log",
+      "bytes": 616,
+      "sha256": "357c907aa33a337340a325e529184ee02e6814fbabfc789cec806e83d99743af"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/swirl-X14-A2-vmess-f6f6r0gc/01-vmess-ws-tls-error.log",
+      "bytes": 6634,
+      "sha256": "e5892e968dec6a97c661e712c96f705c1db92749aa72bef1b7894d42c05d6e22"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/swirl-X14-A2-vmess-f6f6r0gc/01-vmess-ws-tls-process.log",
+      "bytes": 786,
+      "sha256": "7fce878bc72259b7e17be99e91881a98143f8ee6c2e37601c81364886aeedcb8"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/swirl-X14-A2-vmess-f6f6r0gc/results.json",
+      "bytes": 7085,
+      "sha256": "9d078f4bd5306c1d2d57d95c7e31c2cf7e67d99c112c59070041dca0eb3232e7"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/swirl-X14-A2-vmess-wffmp4t_/01-vmess-raw-plain-access.log",
+      "bytes": 77,
+      "sha256": "be63cdd1f92a272cf08e3a95c251507f66fecd73f9d49ece280c6b44aa85c7ae"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/swirl-X14-A2-vmess-wffmp4t_/01-vmess-raw-plain-error.log",
+      "bytes": 1324,
+      "sha256": "57a1a7918db072f3b15a3ad3398d1aab1db26c607f234faffdd3a0f0b61afe19"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/swirl-X14-A2-vmess-wffmp4t_/01-vmess-raw-plain-process.log",
+      "bytes": 483,
+      "sha256": "20189fe8bc650f5583d3aa5b211f03ff7e42d398c3c847a39b4cd000d63d9419"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/swirl-X14-A2-vmess-wffmp4t_/02-vmess-raw-tls-access.log",
+      "bytes": 77,
+      "sha256": "1bb4bd15a2183f075de52224a0a120059b2ffff37e47a74c3d19d3cd0d576378"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/swirl-X14-A2-vmess-wffmp4t_/02-vmess-raw-tls-error.log",
+      "bytes": 1266,
+      "sha256": "41a7413db805427fb2060735e082d5f50499929011e53d22e28c87506bf86197"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/swirl-X14-A2-vmess-wffmp4t_/02-vmess-raw-tls-process.log",
+      "bytes": 481,
+      "sha256": "c8ccad42d9f96bc26e5932528e7fd6163897d41fbaf7228da694a696220a8757"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/swirl-X14-A2-vmess-wffmp4t_/03-vmess-ws-plain-access.log",
+      "bytes": 77,
+      "sha256": "30c968eae91b7f2df3c4e260825d4b309027b10ee03c2682dc98a8ae475f7c8f"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/swirl-X14-A2-vmess-wffmp4t_/03-vmess-ws-plain-error.log",
+      "bytes": 1187,
+      "sha256": "6249d88b9fcf9696c91bf0fc8e89ded7530ea178f44689af0dfcffbb308acf0b"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/swirl-X14-A2-vmess-wffmp4t_/03-vmess-ws-plain-process.log",
+      "bytes": 709,
+      "sha256": "4ffa269de0708e31d8753e006b8a5f50c310d7bce4d1de2f2c88cfe56b883157"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/swirl-X14-A2-vmess-wffmp4t_/04-vmess-ws-tls-access.log",
+      "bytes": 77,
+      "sha256": "c8da3e5b37de497768fd4682d5b299bdc15eff97bfb72719473cb951a2a62281"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/swirl-X14-A2-vmess-wffmp4t_/04-vmess-ws-tls-error.log",
+      "bytes": 1128,
+      "sha256": "a7a5cdf2a26f3b98a137d7223f2dc6a78b5839c3f0e4420cbc14260b1b6e355a"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/swirl-X14-A2-vmess-wffmp4t_/04-vmess-ws-tls-process.log",
+      "bytes": 786,
+      "sha256": "81ad49061b5ac933182310376a05d0d5581744c641496459c78a979df99c182a"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/strict-half-close/swirl-X14-A2-vmess-wffmp4t_/results.json",
+      "bytes": 5003,
+      "sha256": "86598ab616bffb3b33d12497f823b9aaeba259889a080f5e434d0f3415df868d"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/vmess-interop-final.log",
+      "bytes": 1989,
+      "sha256": "f5d1175f5ac725294b23a28f120494599016979d2e1e64054847392fb8aa1356"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/vmess-interop-strict-half-close.log",
+      "bytes": 8002,
+      "sha256": "805dc461168b5ec527246bbfae571f5df849d27fcf03375da63ad28dcb241faf"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/vmess-body-timeout-unit.log",
+      "bytes": 1548,
+      "sha256": "4cf77443a436c7549b574fe16336551dfe6573912b201b0543ec466282b9b830"
+    },
+    {
+      "file": "docs/evidence/x14-a2-vmess/vmess-import-unit.log",
+      "bytes": 1556,
+      "sha256": "59f75db2700e569956ef7487a82d4bbc73b72d5f2ea47358ea337063853fb4e7"
+    }
+  ]
+}

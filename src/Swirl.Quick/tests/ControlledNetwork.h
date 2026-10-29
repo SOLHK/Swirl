@@ -10,6 +10,7 @@
 #include <QHash>
 #include <QPointer>
 #include <QUrl>
+#include <QStringList>
 
 // Test-only real TCP relay. It never accepts non-fixture destinations and does
 // not decrypt or rewrite traffic. The origin tags replies by relay source port.
@@ -19,6 +20,7 @@ public:
     QString label;
     QByteArray username,password;
     QList<quint16> targetPorts;
+    QStringList aliases;
     int forwarded=0;
     bool reject=false;
     SocksPeer(QHash<quint16,QString> *map,QString marker):exits(map),label(std::move(marker)) {
@@ -57,7 +59,7 @@ public:
             else if(buffer[3]==3){if(buffer.size()<5)return;const int len=quint8(buffer[4]);if(buffer.size()<7+len)return client->setProperty("buffer",buffer),client->setProperty("stage",stage),void();host=QString::fromLatin1(buffer.mid(5,len));offset=5+len;}
             else {client->abort();return;}
             const auto port=quint16(quint8(buffer[offset])*256+quint8(buffer[offset+1]));
-            if(reject || buffer[1]!=1 || (host!="127.0.0.1" && host!="localhost") || !targetPorts.contains(port)){client->write(QByteArray::fromHex("050200017f0000010000"));client->disconnectFromHost();return;}
+            if(reject || buffer[1]!=1 || (host!="127.0.0.1" && host!="localhost" && !aliases.contains(host)) || !targetPorts.contains(port)){client->write(QByteArray::fromHex("050200017f0000010000"));client->disconnectFromHost();return;}
             buffer.remove(0,offset+2);stage=3;client->setProperty("upstreamPending",buffer);buffer.clear();
             auto *upstream=new QTcpSocket(client);
             QObject::connect(upstream,&QTcpSocket::connected,client,[this,client,upstream]{
@@ -70,7 +72,7 @@ public:
             QObject::connect(client,&QTcpSocket::disconnected,upstream,&QTcpSocket::abort);
             QObject::connect(upstream,&QTcpSocket::disconnected,client,&QTcpSocket::disconnectFromHost);
             QObject::connect(upstream,&QTcpSocket::errorOccurred,client,[client](QAbstractSocket::SocketError error){if(error!=QAbstractSocket::RemoteHostClosedError)client->abort();});
-            upstream->connectToHost(host,port);
+            upstream->connectToHost(aliases.contains(host)?QStringLiteral("127.0.0.1"):host,port);
         }
         client->setProperty("buffer",buffer);client->setProperty("stage",stage);
     }
@@ -84,6 +86,7 @@ public:
     SocksPeer a{&exits,"exit-A"}, b{&exits,"exit-B"};
     QSslCertificate certificate;
     int httpRequests=0,httpsRequests=0;
+    QHash<QString,int> httpRequestsByExit;
     bool start() {
         QFile cert(QString::fromUtf8(SWIRL_FIXTURE_DIR)+"/localhost-cert.pem"),key(QString::fromUtf8(SWIRL_FIXTURE_DIR)+"/localhost-key.pem");
         if(!cert.open(QIODevice::ReadOnly)||!key.open(QIODevice::ReadOnly))return false;
@@ -106,6 +109,7 @@ private:
                     if(!request.contains("\r\n\r\n"))return;
                     if(tls)++httpsRequests;else ++httpRequests;
                     const auto exit=exits.value(socket->peerPort(),"DIRECT-BYPASS");
+                    if(!tls)++httpRequestsByExit[exit];
                     const auto body=exit.toUtf8();
                     socket->write("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nConnection: close\r\nContent-Length: "+QByteArray::number(body.size())+"\r\n\r\n"+body);
                     socket->disconnectFromHost();

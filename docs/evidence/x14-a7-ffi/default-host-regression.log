@@ -1,0 +1,6 @@
+test_xray_import_http_https_authentication_and_normal_close (test_basic_proxies_xray.BasicProxyXrayTests.test_xray_import_http_https_authentication_and_normal_close) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.484s
+
+OK

@@ -1,0 +1,6 @@
+test_actual_product_import_persist_select_route_and_recreate (__main__.ProductQtIntegration.test_actual_product_import_persist_select_route_and_recreate) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 5.774s
+
+OK

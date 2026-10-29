@@ -1,0 +1,98 @@
+{
+  "source_commit": "9f39f24acd0060e54e38302190bb72fe7300f245",
+  "workflow_run": "https://github.com/SOLHK/Swirl/actions/runs/39556281421",
+  "job_id": 119076681183,
+  "scope": "original source coordinate composition only; no target glyph coefficient serialization",
+  "result": {
+    "status": "COMPLETED_FINITE_SOURCE_Q_AND_FONT_REPRESENTATION_TEST_NOT_ACCEPTANCE",
+    "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+    "host": "macOS-27.0.1-arm64-arm-64bit",
+    "source_user_mapping_accepted": false,
+    "target_mapping_accepted": false,
+    "font_only_equivalence_accepted": false,
+    "original_font_generated": false,
+    "Windows11": "NOT_RUN",
+    "Qt_Swirl": "NOT_RUN",
+    "limits_unchanged": true,
+    "physical_faces": 32,
+    "source_positions": 165,
+    "fresh_seeded_positions": 32,
+    "D2_fraction_positions": 96,
+    "endpoint_controls": 32,
+    "historical_controls": 5,
+    "direct_q_space_legal_axis_candidates": 64,
+    "direct_q_space_compiler_refusals": {
+      "wght:candidate_required_anchor_not_preserved": 32
+    },
+    "rebased_legal_axis_candidates": 96,
+    "original_glyph_model_reparameterization": "NOT_RUN",
+    "rebased_coordinate_probe_excludes_integer_coefficient_rounding": true,
+    "all_plans_frozen_before_native": true,
+    "native_os_version": "Version 27.0.1 (Build 26A434)",
+    "native_sessions": [
+      {
+        "requests": 165,
+        "verified_glyph_records": 825,
+        "verified_batches": 165,
+        "internal_native_requests": 330,
+        "internal_native_glyph_records": 1650
+      },
+      {
+        "requests": 165,
+        "verified_glyph_records": 825,
+        "verified_batches": 165,
+        "internal_native_requests": 330,
+        "internal_native_glyph_records": 1650
+      }
+    ],
+    "opposite_order_exact_glyph_pairs": 825,
+    "D2_strict_fraction_pass": 0,
+    "D2_strict_fraction_fail": 96,
+    "HVAR": {
+      "positions": 165,
+      "exact_positions": 165,
+      "outside_1_32": 0,
+      "maximum_error": 0
+    },
+    "native_HVF_geometry": {
+      "legacy": {
+        "checks": 330,
+        "failures": 0,
+        "maximum_point_error": 0,
+        "failure_types": {}
+      },
+      "preserved_controls": {
+        "checks": 330,
+        "failures": 0,
+        "maximum_point_error": 0,
+        "failure_types": {}
+      },
+      "glyphs_with_restored_Q": 0
+    },
+    "native_HVF_unique_calls": 432,
+    "rebased_coordinate_composition": {
+      "positions": 165,
+      "HVAR_maximum_error": 0.0036952052687411197,
+      "HVAR_outside_1_32": 0,
+      "native_HVF_geometry": {
+        "legacy": {
+          "checks": 330,
+          "failures": 0,
+          "maximum_point_error": 0.0025511955074080106,
+          "failure_types": {}
+        },
+        "preserved_controls": {
+          "checks": 330,
+          "failures": 0,
+          "maximum_point_error": 0.0025511955074080106,
+          "failure_types": {}
+        },
+        "glyphs_with_restored_Q": 0
+      },
+      "glyph_integer_coefficient_reencoding": "NOT_TESTED_BY_THIS_PROBE"
+    },
+    "finite_preserved_control_budget_passed": true,
+    "rebased_coordinate_control_budget_passed": true,
+    "source_unchanged": true
+  }
+}
