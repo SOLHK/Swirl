@@ -6,10 +6,14 @@ import "../components"
 import "../controls"
 Item {
     id:page
+    property bool embedded:false
     readonly property Item motionTitle:heading.titleItem
     readonly property bool compact:width<Theme.dp(620)
     property string selectedId:""
-    readonly property var selected:engineController.connections.find(record=>String(record.id)===selectedId)||null
+    property var connectionRows:[]
+    property bool snapshotDirty:true
+    property string protocolFilter:""
+    readonly property var selected:connectionRows.find(record=>String(record.id)===selectedId)||null
     readonly property var observedRoute:selected&&selected.route?selected.route:({})
     function observed(value) {return value===undefined||value===null||value===""?qsTr("未提供"):String(value)}
     function nodeLabel(id) {
@@ -36,49 +40,80 @@ Item {
             [qsTr("出口保持原因"),observed(route.affinity_reason)],[qsTr("配置版本"),observed(route.revision)],[qsTr("运行代次"),observed(route.generation)]]
     }
     readonly property var connectionDetailRows:!selected?[]:[
+        [qsTr("连接 ID"),observed(selected.id)],
         [qsTr("域名"),observed(selected.host)],[qsTr("目标"),observed(observedRoute.chosen_ip||selected.ip)],
+        [qsTr("目标端口"),observed(selected.port)],
+        [qsTr("来源地址"),observed(selected.sourceIp)],[qsTr("来源端口"),observed(selected.sourcePort)],
         [qsTr("应用程序"),observed(selected.process)],[qsTr("协议"),observed(selected.protocol)]].concat(routingDetailRows,[
+        [qsTr("连接状态"),observed(selected.status)],
         [qsTr("传输状态"),observed(selected.transportState)],[qsTr("上传"),observed(selected.up)],
         [qsTr("下载"),observed(selected.down)],[qsTr("耗时"),observed(selected.latency)],[qsTr("建立时间"),observed(selected.time)]])
     SwirlTransitionCoordinator {id:detailClock;duration:SwirlMotion.dialogDuration;Component.onCompleted:{destination=AppState.detailOpen?1:0;finish()}}
     Connections {target:AppState;function onDetailOpenChanged(){detailClock.moveTo(AppState.detailOpen?1:0)}}
     readonly property var heroTargets:({activeConnections:activeCount})
     readonly property var motionSurfaces:({activeConnections:connectionSummary})
+    readonly property var protocolOptions:[qsTr("全部协议")].concat(Array.from(new Set(connectionRows.map(row=>row.protocol||"").concat([protocolFilter]).filter(value=>value.length))).sort())
+    function refreshSnapshot() {
+        if(!visible)return
+        connectionRows=engineController.connections
+        snapshotDirty=false
+    }
+    onVisibleChanged:if(visible)refreshSnapshot()
+    Component.onCompleted:refreshSnapshot()
+    Connections {target:engineController.telemetry;function onChanged(){page.snapshotDirty=true}}
+    Timer {interval:300;running:page.visible&&page.snapshotDirty;repeat:true;onTriggered:page.refreshSnapshot()}
+    function latencyValue(record) {
+        const value=String(record.latency||"")
+        return /^\d+(\.\d+)?( ms)?$/.test(value)?parseFloat(value):Number.POSITIVE_INFINITY
+    }
     property var visibleRows:{
-        if(!visible)return []
-        var q=search.text.toLowerCase()
-        var s=sort.currentText
-        var state=status.currentText
-        var rows=engineController.connections.filter(function(r){
-            return (r.host+" "+r.process+" "+r.ip+" "+r.policy+" "+(r.route?String(r.route.rule_id||"")+" "+String(r.route.service_policy_id||"")+" "+String(r.route.chosen_ip||""):"")).toLowerCase().indexOf(q)>=0 &&
-                   (state==="全部状态"||r.status===state)
+        const q=search.text.trim().toLowerCase()
+        const state=status.currentIndex
+        const selectedProtocol=protocolFilter
+        var rows=connectionRows.filter(function(r){
+            const route=r.route||{}
+            const searchable=[r.host,r.process,r.ip,r.port,r.sourceIp,r.sourcePort,r.protocol,r.status,r.transportState,r.policy,r.proxyNode,route.rule_id,route.service_policy_id,route.chosen_ip]
+                .map(value=>value===undefined||value===null?"":String(value)).join(" ").toLowerCase()
+            return searchable.indexOf(q)>=0 &&
+                   (state===0||r.status===status.currentText) &&
+                   (!selectedProtocol||r.protocol===selectedProtocol)
         })
         rows.sort(function(a,b){
-            var key=s==="域名"?"host":s==="延迟"?"latency":s==="下载"?"down":"process"
-            return String(a[key]).localeCompare(String(b[key]),undefined,{numeric:true})
+            let order=0
+            if(sort.currentIndex===1) {
+                const av=page.latencyValue(a),bv=page.latencyValue(b)
+                order=av===bv?0:av<bv?-1:1
+            } else if(sort.currentIndex===2||sort.currentIndex===4) {
+                const key=sort.currentIndex===2?"downloadBytes":"uploadBytes"
+                order=Number(b[key]||0)-Number(a[key]||0)
+            } else if(sort.currentIndex===5) order=Number(b.lastSeen||0)-Number(a.lastSeen||0)
+            else {
+                const key=sort.currentIndex===0?"host":"process"
+                order=String(a[key]||"").localeCompare(String(b[key]||""),undefined,{numeric:true})
+            }
+            return order||String(a.id).localeCompare(String(b.id),undefined,{numeric:true})
         })
         return rows
     }
     ColumnLayout {
-        anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.dp(16)
-        Item {id:connectionSummary;property color color:Theme.material("content");Layout.fillWidth:true;implicitHeight:heading.implicitHeight
+        anchors.fill:parent;anchors.margins:page.embedded?0:Theme.pagePadding;spacing:Theme.dp(16)
+        Item {id:connectionSummary;visible:!page.embedded;property color color:Theme.material("content");Layout.fillWidth:true;implicitHeight:heading.implicitHeight
             SwirlPageHeader {id:heading;anchors.left:parent.left;anchors.right:parent.right;title:qsTr("活动连接");description:qsTr("查看连接与它实际命中的策略、节点和配置版本。")
                 SwirlText {id:activeCount;textRole:"data";text:engineController.telemetry.connectionsSampled?String(engineController.telemetry.activeConnections):"—";color:Theme.text;font.pixelSize:Theme.fontSize(30);font.weight:Font.DemiBold}
                 SwirlButton {text:qsTr("返回");visible:SwirlMotion.returnShared&&SwirlMotion.returnShared.route===AppState.currentPage;onClicked:SwirlMotion.returnToHub(activeCount)}
             }
         }
-        GridLayout {Layout.fillWidth:true;columns:width<Theme.dp(700)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap
-            SwirlSearchField {id:search;Layout.fillWidth:true;text:AppState.connectionSearchQuery;placeholderText:qsTr("搜索域名、IP、进程或策略");onTextEdited:AppState.connectionSearchQuery=text}
-            RowLayout {spacing:Theme.compactGap
-                SwirlComboBox {id:status;model:["全部状态","活动","已结束"];Accessible.name:qsTr("连接状态筛选")}
-                SwirlComboBox {id:sort;model:["域名","延迟","下载","进程"];Accessible.name:qsTr("连接排序")}
+        SwirlSearchField {id:search;objectName:"activityConnectionSearch";Layout.fillWidth:true;text:AppState.connectionSearchQuery;placeholderText:qsTr("搜索进程、目标地址、来源、协议或策略");onTextEdited:AppState.connectionSearchQuery=text}
+        GridLayout {Layout.fillWidth:true;columns:width<Theme.dp(570)?2:5;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap
+                SwirlComboBox {id:status;objectName:"activityConnectionStatus";Layout.fillWidth:true;model:[qsTr("全部状态"),qsTr("活动"),qsTr("已结束"),qsTr("采样中断")];Accessible.name:qsTr("连接状态筛选")}
+                SwirlComboBox {id:protocol;objectName:"activityConnectionProtocol";Layout.fillWidth:true;model:page.protocolOptions;currentIndex:page.protocolFilter.length?model.indexOf(page.protocolFilter):0;onActivated:page.protocolFilter=currentIndex>0?currentText:"";Accessible.name:qsTr("连接协议筛选")}
+                SwirlComboBox {id:sort;objectName:"activityConnectionSort";Layout.fillWidth:true;model:[qsTr("域名"),qsTr("耗时从短到长"),qsTr("下载从多到少"),qsTr("进程"),qsTr("上传从多到少"),qsTr("最近采集")];Accessible.name:qsTr("连接排序")}
                 SwirlButton {development:true;enabled:false;text:qsTr("导出");iconName:"folder";onClicked:AppState.notice("导出连接记录")}
                 SwirlButton {development:true;enabled:false;text:qsTr("清空");onClicked:{page.selectedId="";AppState.notice("清空连接记录")}}
-            }
         }
         RowLayout {Layout.fillWidth:true
             SwirlText {text:qsTr("%1 条记录").arg(page.visibleRows.length);color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true}
-            SwirlButton {text:AppState.detailOpen?qsTr("隐藏详情"):qsTr("显示详情");quiet:true;onClicked:AppState.detailOpen=!AppState.detailOpen}
+            SwirlButton {text:AppState.detailOpen?qsTr("隐藏详情"):qsTr("显示详情");enabled:page.selected!==null;quiet:true;onClicked:AppState.detailOpen=!AppState.detailOpen}
         }
         GridLayout {Layout.fillWidth:true;Layout.fillHeight:true;columns:page.compact?1:2;columnSpacing:Theme.sectionGap;rowSpacing:Theme.sectionGap
             Item {Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:Theme.dp(100)
@@ -88,7 +123,7 @@ Item {
                 }
                 SwirlEmptyState {visible:page.visibleRows.length===0;anchors.centerIn:parent;width:Math.max(0,parent.width-Theme.dp(24));headline:qsTr("没有匹配的连接");detail:qsTr("连接经过 Swirl 后会显示在这里，也可调整搜索或状态筛选。")}
             }
-            SwirlLinkedDetail {id:connectionDetail;animationLayer:page;sourceViewport:connectionTable;detailOpen:AppState.detailOpen;visible:AppState.detailOpen||moving;enabled:AppState.detailOpen;Layout.preferredWidth:page.compact?1:Theme.dp(300);Layout.fillWidth:page.compact;Layout.fillHeight:!page.compact;Layout.preferredHeight:page.compact?Theme.dp(180):-1
+            SwirlLinkedDetail {id:connectionDetail;animationLayer:page;sourceViewport:connectionTable;detailOpen:AppState.detailOpen&&page.selected!==null;visible:detailOpen||moving;enabled:detailOpen;Layout.preferredWidth:page.compact?1:Theme.dp(300);Layout.fillWidth:page.compact;Layout.fillHeight:!page.compact;Layout.preferredHeight:page.compact?Theme.dp(180):-1
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:Theme.dp(20); spacing:Theme.dp(12)
                     ScrollView {

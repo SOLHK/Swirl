@@ -131,7 +131,7 @@ int runApecGlassChecks(QQuickWindow *window,const QString &output) {
         QTest::qWait(35);
         check("production-wing-and-foreground-are-pixel-identical-through-pane",clearInterior(withGlass,withoutGlass,productionGlass,window->contentItem()));
     }
-    check("sidebar-retains-floating-inset-size-and-24dp-contour",eval("sidebar.glassSurface.x===Theme.shellInset && sidebar.glassSurface.y===Theme.shellInset && sidebar.glassSurface.width===sidebar.width-2*Theme.shellInset && sidebar.glassSurface.height===sidebar.height-2*Theme.shellInset && sidebar.glassSurface.radius===Theme.sidebarRadius && Theme.sidebarRadius===Theme.dp(24)").toBool());
+    check("sidebar-retains-floating-inset-size-and-14dp-contour",eval("sidebar.glassSurface.x===Theme.shellInset && sidebar.glassSurface.y===Theme.shellInset && sidebar.glassSurface.width===sidebar.width-2*Theme.shellInset && sidebar.glassSurface.height===sidebar.height-2*Theme.shellInset && sidebar.glassSurface.radius===Theme.sidebarRadius && Theme.sidebarRadius===Theme.dp(14)").toBool());
     check("neutral-light-canvas-and-card-palette",eval("Theme.canvas.toString()==='#f7f7f8' && Theme.surface.toString()==='#ffffff' && Theme.border.toString()==='#e0e0e3'").toBool());
     if(decoration){
         auto decorated=grab(scene);

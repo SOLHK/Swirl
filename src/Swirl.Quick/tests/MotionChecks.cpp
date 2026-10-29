@@ -8,8 +8,11 @@
 #include <QQmlExpression>
 #include <QQmlContext>
 #include <QQmlComponent>
+#include <QQmlIncubator>
 #include <QQmlProperty>
 #include "engine/SystemProxySession.h"
+#include "engine/EngineController.h"
+#include <QDateTime>
 #include <memory>
 #include <QTest>
 #include <QSignalSpy>
@@ -40,6 +43,272 @@
 #include <psapi.h>
 #endif
 
+namespace {
+QQuickItem *activityVisual(QQuickItem *root,const QString &name) {
+    if(!root)return nullptr;
+    if(root->objectName()==name)return root;
+    for(auto *child:root->childItems())if(auto *found=activityVisual(child,name))return found;
+    return nullptr;
+}
+void activityWait(int milliseconds) {
+    QEventLoop loop;QTimer timer;timer.setTimerType(Qt::PreciseTimer);timer.setSingleShot(true);
+    QObject::connect(&timer,&QTimer::timeout,&loop,&QEventLoop::quit);timer.start(milliseconds);loop.exec();
+}
+const QStringList activityDetailKeys={"sources","diagnostics","traffic","connections"};
+const QStringList activityDetailButtons={"activitySourcesDetails","networkDiagnosticDetails","activityTrafficDetails","activityConnectionsDetails"};
+const QStringList activityDetailCards={"activitySourcesCard","activityDiagnosticCard","activityTrafficCard","activityConnectionsCard"};
+
+int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
+    QJsonArray checks,samples,dataSamples;int failures=0;
+    const auto check=[&](const QString &name,bool passed){checks.append(QJsonObject{{"name",name},{"passed",passed}});if(!passed)++failures;qInfo()<<"ACTIVITY_DETAIL_CHECK"<<name<<passed;};
+    const auto eval=[&](const QString &code){QQmlExpression expression(qmlContext(window),window,code);auto result=expression.evaluate();if(expression.hasError()){qWarning()<<expression.error();check("expression: "+expression.error().toString(),false);}return result;};
+    auto *policy=qobject_cast<MotionPolicy *>(qmlContext(window)->contextProperty("motionPolicy").value<QObject *>());
+    check("motion-policy-present",policy!=nullptr);if(!policy)return 1;
+    policy->setSystemReducedMotionOverrideForTest(0);
+    struct RestorePolicy{MotionPolicy *policy;~RestorePolicy(){policy->setSystemReducedMotionOverrideForTest(-1);}} restore{policy};
+    const auto hostProxyBefore=SystemProxySession::snapshot();
+    eval("Theme.reduceMotion=false;Theme.followSystemMotion=false;AppState.navigate('activity')");
+    const QSize initialSize=window->size();window->resize(1100,760);window->requestActivate();activityWait(650);
+    auto *page=activityVisual(window->contentItem(),"activityScroll");page=page?page->parentItem():nullptr;
+    auto *transition=activityVisual(window->contentItem(),"activityDetailTransition");
+    auto *surface=activityVisual(window->contentItem(),"activityDetailSurface");
+    check("all-four-details-share-one-transition-container",page&&transition&&surface);
+    if(!page||!transition||!surface)return 1;
+    const auto bounds=[&](QQuickItem *item){return item->mapRectToItem(window->contentItem(),QRectF(QPointF(),item->size()));};
+    QRectF firstVisibleBounds;double firstVisibleProgress=0;bool originObserved=false;
+    const auto originConnection=QObject::connect(transition,&QQuickItem::visibleChanged,window,[&]{if(transition->isVisible()){firstVisibleBounds=bounds(surface);firstVisibleProgress=transition->property("progress").toDouble();originObserved=true;}});
+    const auto settled=[&]{return QTest::qWaitFor([&]{return !transition->property("moving").toBool();},2000);};
+    const auto close=[&]{QMetaObject::invokeMethod(transition,"closeDetail");settled();};
+    const auto click=[&](const QString &name){auto *button=activityVisual(window->contentItem(),name);if(!button||!button->isVisible()||!button->isEnabled())return false;QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,button->mapToScene(QPointF(button->width()/2,button->height()/2)).toPoint());return true;};
+    const auto snapshot=[&](const QString &key,const QString &phase){const auto rect=bounds(surface);samples.append(QJsonObject{{"key",key},{"phase",phase},{"progress",transition->property("progress").toDouble()},{"x",rect.x()},{"y",rect.y()},{"width",rect.width()},{"height",rect.height()},{"radius",surface->property("radius").toDouble()}});return rect;};
+    auto *sourceOverview=activityVisual(window->contentItem(),activityDetailCards[0]);
+    auto *diagnosticOverview=activityVisual(window->contentItem(),activityDetailCards[1]);
+    auto *trafficOverview=activityVisual(window->contentItem(),activityDetailCards[2]);
+    auto *connectionOverview=activityVisual(window->contentItem(),activityDetailCards[3]);
+    check("overview-grid-keeps-card-row-and-column-edges-aligned",sourceOverview&&diagnosticOverview&&trafficOverview&&connectionOverview
+        &&qAbs(sourceOverview->y()-diagnosticOverview->y())<1&&qAbs(sourceOverview->y()+sourceOverview->height()-diagnosticOverview->y()-diagnosticOverview->height())<1
+        &&qAbs(trafficOverview->y()-connectionOverview->y())<1&&qAbs(trafficOverview->y()+trafficOverview->height()-connectionOverview->y()-connectionOverview->height())<1
+        &&qAbs(sourceOverview->x()-trafficOverview->x())<1&&qAbs(diagnosticOverview->x()-connectionOverview->x())<1);
+    for(const auto &name:{activityDetailButtons[0],activityDetailButtons[2]}){
+        auto *heading=activityVisual(window->contentItem(),name);auto *content=heading?heading->property("contentItem").value<QQuickItem *>():nullptr;
+        check(name+"-chevron-stays-beside-its-title",heading&&content&&heading->width()<=content->implicitWidth()+heading->property("leftPadding").toDouble()+heading->property("rightPadding").toDouble()+2);
+    }
+    auto *sourceCategory=activityVisual(window->contentItem(),"activitySourceFilter");
+    check("source-category-control-aligns-with-card-right-inset",sourceCategory&&sourceOverview&&qAbs(sourceCategory->mapToItem(sourceOverview,sourceCategory->width(),0).x()-(sourceOverview->width()-eval("Theme.dp(14)").toDouble()))<1);
+    const int historyIndex=eval("AppState.historyIndex").toInt();
+    auto *homeScroll=activityVisual(window->contentItem(),"activityScroll");
+    const double scrollBefore=homeScroll->property("contentY").toDouble();
+    for(int i=0;i<activityDetailKeys.size();++i){
+        const auto key=activityDetailKeys[i];auto *card=activityVisual(window->contentItem(),activityDetailCards[i]);
+        check(key+"-opaque-origin-card-present",card&&card->isVisible()&&card->property("color").value<QColor>().alpha()==255);if(!card)continue;
+        const auto source=bounds(card);
+        originObserved=false;check(key+"-title-click-opens",click(activityDetailButtons[i]));
+        const auto start=snapshot(key,"open-start");
+        const auto storedOrigin=transition->mapRectToItem(window->contentItem(),transition->property("origin").toRectF());
+        check(key+"-begins-at-own-card",originObserved&&firstVisibleProgress==0&&qAbs(firstVisibleBounds.x()-source.x())<6&&qAbs(firstVisibleBounds.y()-source.y())<6&&qAbs(firstVisibleBounds.width()-source.width())<6&&qAbs(firstVisibleBounds.height()-source.height())<6
+            &&qAbs(storedOrigin.x()-source.x())<6&&qAbs(storedOrigin.y()-source.y())<6&&qAbs(storedOrigin.width()-source.width())<6&&qAbs(storedOrigin.height()-source.height())<6);
+        const auto destination=transition->mapRectToItem(window->contentItem(),transition->property("destination").toRectF());const auto startProgress=transition->property("progress").toDouble();
+        check(key+"-surface-keeps-origin-through-click-dispatch",qAbs(start.x()-storedOrigin.x()-(destination.x()-storedOrigin.x())*startProgress)<1&&qAbs(start.y()-storedOrigin.y()-(destination.y()-storedOrigin.y())*startProgress)<1
+            &&qAbs(start.width()-storedOrigin.width()-(destination.width()-storedOrigin.width())*startProgress)<1&&qAbs(start.height()-storedOrigin.height()-(destination.height()-storedOrigin.height())*startProgress)<1);
+        activityWait(90);const auto middle=snapshot(key,"open-middle");const auto progress=transition->property("progress").toDouble();
+        check(key+"-visible-geometric-expansion",transition->property("moving").toBool()&&progress>0&&progress<1&&middle.width()>source.width()+2&&middle.height()>source.height()+2);
+        const double originRadius=card->property("radius").toDouble(),targetRadius=eval("Theme.dp(32)").toDouble();
+        check(key+"-corner-curvature-morphs-continuously",surface->property("radius").toDouble()>originRadius&&surface->property("radius").toDouble()<targetRadius);
+        check(key+"-opens-correct-detail",settled()&&transition->property("opened").toBool()&&transition->property("detailKey").toString()==key);
+        const auto full=snapshot(key,"open-end");
+        check(key+"-expanded-corner-curvature-reaches-target",qAbs(surface->property("radius").toDouble()-targetRadius)<0.1);
+        check(key+"-fills-main-content",full.width()>source.width()&&full.height()>source.height()&&full.left()>=0&&full.right()<=window->width()+1&&full.bottom()<=window->height()+1);
+        QTest::keyClick(window,Qt::Key_Escape);activityWait(80);const auto reverse=snapshot(key,"close-middle");
+        check(key+"-escape-geometrically-contracts",transition->property("moving").toBool()&&transition->property("progress").toDouble()>0&&transition->property("progress").toDouble()<1&&reverse.width()<full.width()-2&&reverse.height()<full.height()-2);
+        check(key+"-return-restores-corner-curvature-continuously",surface->property("radius").toDouble()>originRadius&&surface->property("radius").toDouble()<targetRadius);
+        check(key+"-returns-cleanly",settled()&&!transition->property("opened").toBool()&&transition->property("progress").toDouble()==0&&!transition->isVisible());
+        check(key+"-preserves-main-route-and-history",eval("AppState.currentPage==='activity'").toBool()&&eval("AppState.historyIndex").toInt()==historyIndex);
+    }
+    if(auto *sourceCard=activityVisual(window->contentItem(),"activitySourcesCard")){
+        QTest::mouseMove(window,QPoint(1,1));activityWait(150);const auto rest=bounds(sourceCard);
+        const auto blank=sourceCard->mapToScene(QPointF(sourceCard->width()*0.65,sourceCard->height()*0.55)).toPoint();
+        QTest::mouseMove(window,blank);activityWait(150);const auto hover=bounds(sourceCard);
+        check("card-hover-has-a-gentle-continuous-lift",sourceCard->property("hovered").toBool()&&hover.y()<rest.y()-0.3&&rest.y()-hover.y()<4);
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,blank);activityWait(55);const auto press=bounds(sourceCard);
+        check("card-press-continues-from-hover-without-scale-jump",sourceCard->property("pressed").toBool()&&press.y()>hover.y()&&qAbs(press.width()-hover.width())<0.1);
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,blank);activityWait(50);
+        check("card-blank-area-opens-same-source-detail",transition->property("opened").toBool()&&transition->property("detailKey").toString()=="sources");close();
+    }
+    check("source-segment-click-does-not-open-detail",click("activitySourceFilter")&&!transition->property("opened").toBool()&&transition->property("progress").toDouble()==0);
+    check("traffic-segment-click-does-not-open-detail",click("activityTrafficFilter")&&!transition->property("opened").toBool()&&transition->property("progress").toDouble()==0);
+    check("period-segment-click-does-not-open-detail",click("activityPeriodFilter")&&!transition->property("opened").toBool()&&transition->property("progress").toDouble()==0);
+    click(activityDetailButtons[1]);settled();check("shared-return-button-receives-input",click("activityDetailBack"));activityWait(70);
+    check("return-button-uses-same-geometric-contraction",transition->property("moving").toBool()&&transition->property("progress").toDouble()>0&&transition->property("progress").toDouble()<1);close();
+    click(activityDetailButtons[0]);activityWait(95);const auto beforeReverse=transition->property("progress").toDouble();
+    QTest::keyClick(window,Qt::Key_Escape);activityWait(30);
+    check("escape-reverses-incomplete-expansion-continuously",beforeReverse>0&&beforeReverse<1&&transition->property("moving").toBool()&&transition->property("progress").toDouble()<beforeReverse);
+    for(int repeat=0;repeat<8;++repeat)QTest::keyClick(window,Qt::Key_Escape);
+    check("repeated-escape-settles-without-history-pop",settled()&&!transition->isVisible()&&eval("AppState.currentPage==='activity'").toBool()&&eval("AppState.historyIndex").toInt()==historyIndex);
+    for(int i=0;i<8;++i){click(activityDetailButtons[i%4]);activityWait(14);QTest::keyClick(window,Qt::Key_Escape);activityWait(9);}
+    close();check("rapid-repeated-input-releases-overlay",!transition->isVisible()&&!transition->property("moving").toBool());
+    for(const auto size:{QSize(914,672),QSize(1100,760)}){
+        click(activityDetailButtons[1]);activityWait(70);window->resize(size);activityWait(60);
+        check("resize-during-expansion-"+QString::number(size.width()),settled()&&transition->property("progress").toDouble()==1&&bounds(surface).right()<=window->width()+1&&bounds(surface).bottom()<=window->height()+1);
+        QTest::keyClick(window,Qt::Key_Escape);activityWait(70);window->resize(1100,760);close();
+        check("resize-during-contraction-"+QString::number(size.width()),!transition->isVisible()&&transition->property("progress").toDouble()==0);
+    }
+    click(activityDetailButtons[2]);activityWait(85);
+    eval("pageLoader.item.refreshSnapshot()");
+    check("real-model-refresh-does-not-interrupt-transition",transition->property("moving").toBool()&&transition->property("detailKey").toString()=="traffic"&&settled());
+    close();
+    check("home-scroll-retained",qAbs(homeScroll->property("contentY").toDouble()-scrollBefore)<1);
+    eval("Theme.reduceMotion=true");click(activityDetailButtons[3]);activityWait(30);
+    check("reduced-motion-opens-complete-detail",!transition->property("moving").toBool()&&transition->property("progress").toDouble()==1);
+    QTest::keyClick(window,Qt::Key_Escape);activityWait(30);
+    check("reduced-motion-return-releases-overlay",!transition->isVisible()&&transition->property("progress").toDouble()==0);
+    eval("Theme.reduceMotion=false");
+    auto *controller=qobject_cast<EngineController *>(qmlContext(window)->contextProperty("engineController").value<QObject *>());
+    check("real-telemetry-model-present",controller!=nullptr);
+    if(controller){
+        // Reserved-address records enter the actual isolated model. They are
+        // controlled rendering/filter fixtures, never measured network results.
+        ProxyEngine::Status fixture;fixture.processAlive=true;fixture.apiHealthy=true;fixture.processId=1;
+        fixture.connectionsAt=fixture.trafficAt=QDateTime::currentMSecsSinceEpoch();
+        for(int row=0;row<600;++row){
+            const int down=row==1?1024*1024:row==2?950*1024:1000+row;
+            const int up=10+row;
+            fixture.uploadTotal+=up;fixture.downloadTotal+=down;
+            fixture.connections.append(QVariantMap{{"id",QString("activity-fixture-%1").arg(row)},{"host",QString("source-%1.example.test").arg(row,4,10,QChar('0'))},
+                {"process",QString("fixture-%1.exe").arg(row,4,10,QChar('0'))},{"ip","198.51.100.8"},{"port",443},{"sourceIp","192.0.2.10"},{"sourcePort",40000+row},
+                {"protocol",row%2?"tcp":"udp"},{"category",row%2?"proxy":"direct"},{"policy",row%2?"fixture-proxy":"DIRECT"},
+                {"uploadBytes",up},{"downloadBytes",down},{"time",QDateTime::fromMSecsSinceEpoch(fixture.connectionsAt).toString(Qt::ISODateWithMs)}});
+        }
+        controller->telemetry()->ingest(fixture);click(activityDetailButtons[0]);settled();activityWait(350);
+        const auto owner=[&](QObject *control,const char *property){while(control&&control->metaObject()->indexOfProperty(property)<0)control=control->parent();return control;};
+        const auto evalOn=[&](QObject *target,const QString &code){if(!target)return QVariant();QQmlExpression expression(qmlContext(target),target,code);auto result=expression.evaluate();if(expression.hasError()){qWarning()<<expression.error();check("detail-expression: "+expression.error().toString(),false);}return result;};
+        auto *sourceSearch=activityVisual(window->contentItem(),"activitySourcesSearch");
+        auto *sourceSort=activityVisual(window->contentItem(),"activitySourcesSort");
+        auto *sources=owner(sourceSearch,"kindIndex");
+        auto *sourceTable=activityVisual(window->contentItem(),"activitySourcesTable");
+        check("sources-search-sort-and-reused-table-present",sourceSearch&&sourceSort&&sources&&sourceTable);
+        if(sourceSearch&&sourceSort&&sources&&sourceTable){
+            sources->setProperty("kindIndex",2);sources->setProperty("period",0);sources->setProperty("proxyOnly",false);QMetaObject::invokeMethod(sources,"refreshSnapshot");activityWait(100);
+            check("sources-details-preserve-all-retained-classifications-and-overflow",evalOn(sources,"sourceRows.length===129 && visibleRows.length===129 && sourceRows.some(row=>row.name==='其他（分类上限）' && row.connections===472)").toBool());
+            sourceSearch->setProperty("text","source-0001");
+            check("sources-search-applies-to-real-records",evalOn(sources,"visibleRows.length===1 && visibleRows[0].name==='source-0001.example.test'").toBool());
+            sourceSearch->setProperty("text",QString());sourceSort->setProperty("currentIndex",2);
+            check("sources-sort-uses-numeric-byte-values",evalOn(sources,"visibleRows[0].downloadBytes===1048576 && visibleRows[1].downloadBytes===972800").toBool());
+            sourceSort->setProperty("currentIndex",5);activityWait(70);
+            check("large-source-table-virtualizes-delegates",sourceTable->property("renderedRows").toInt()>0&&sourceTable->property("renderedRows").toInt()<80&&sourceTable->property("incrementalRows").toBool());
+            sourceTable->setProperty("scrollPosition",500);activityWait(80);
+            const auto sourceScroll=sourceTable->property("scrollPosition").toDouble();
+            const auto selected=evalOn(sources,"visibleRows[20].id").toString();sources->setProperty("selectedId",selected);
+            auto last=fixture.connections.last().toMap();last["downloadBytes"]=last.value("downloadBytes").toLongLong()+1024;fixture.connections.last()=last;
+            fixture.connectionsAt+=1000;fixture.trafficAt=fixture.connectionsAt;fixture.downloadTotal+=1024;controller->telemetry()->ingest(fixture);activityWait(380);
+            check("source-refresh-retains-scroll-and-selection",qAbs(sourceTable->property("scrollPosition").toDouble()-sourceScroll)<1&&sources->property("selectedId").toString()==selected);
+            close();click(activityDetailButtons[0]);settled();
+            check("source-reentry-retains-sort-selection-and-scroll",sourceSort->property("currentIndex").toInt()==5&&sources->property("selectedId").toString()==selected&&qAbs(sourceTable->property("scrollPosition").toDouble()-sourceScroll)<1);
+        }
+        close();click(activityDetailButtons[3]);settled();
+        auto *connectionSearch=activityVisual(window->contentItem(),"activityConnectionSearch");
+        auto *connectionSort=activityVisual(window->contentItem(),"activityConnectionSort");
+        auto *connectionProtocol=activityVisual(window->contentItem(),"activityConnectionProtocol");
+        auto *connectionStatus=activityVisual(window->contentItem(),"activityConnectionStatus");
+        auto *connectionPage=owner(connectionSearch,"visibleRows");
+        auto *connectionTable=activityVisual(window->contentItem(),"connectionTable");
+        check("connection-search-protocol-status-sort-and-table-present",connectionSearch&&connectionSort&&connectionProtocol&&connectionStatus&&connectionPage&&connectionTable);
+        if(connectionSearch&&connectionSort&&connectionProtocol&&connectionStatus&&connectionPage&&connectionTable){
+            connectionSearch->setProperty("text","192.0.2.10");
+            check("connections-searches-source-address",evalOn(connectionPage,"visibleRows.length===600").toBool());
+            connectionSearch->setProperty("text","fixture-0002.exe");
+            check("connections-searches-process",evalOn(connectionPage,"visibleRows.length===1 && visibleRows[0].id==='activity-fixture-2'").toBool());
+            connectionSearch->setProperty("text",QString());connectionSort->setProperty("currentIndex",2);
+            check("connections-sort-uses-raw-bytes-across-unit-boundary",evalOn(connectionPage,"visibleRows[0].downloadBytes===1048576 && visibleRows[1].downloadBytes===972800").toBool());
+            connectionProtocol->setProperty("currentIndex",1);QMetaObject::invokeMethod(connectionProtocol,"activated",Q_ARG(int,1));
+            dataSamples.append(QJsonObject{{"phase","protocol-filter"},{"filter",connectionPage->property("protocolFilter").toString()},{"rows",evalOn(connectionPage,"visibleRows.length").toInt()}});
+            check("connections-protocol-filter-uses-actual-field",evalOn(connectionPage,"protocolFilter==='tcp' && visibleRows.length===300 && visibleRows.every(row=>row.protocol===protocolFilter)").toBool());
+            connectionProtocol->setProperty("currentIndex",0);QMetaObject::invokeMethod(connectionProtocol,"activated",Q_ARG(int,0));connectionStatus->setProperty("currentIndex",1);
+            dataSamples.append(QJsonObject{{"phase","status-filter"},{"protocolFilter",connectionPage->property("protocolFilter").toString()},{"status",connectionStatus->property("currentText").toString()},{"rows",evalOn(connectionPage,"visibleRows.length").toInt()}});
+            check("connections-status-filter-uses-actual-field",evalOn(connectionPage,"visibleRows.length===600 && visibleRows.every(row=>row.status==='活动')").toBool());
+            connectionStatus->setProperty("currentIndex",0);activityWait(80);
+            check("large-connection-table-virtualizes-delegates",connectionTable->property("renderedRows").toInt()>0&&connectionTable->property("renderedRows").toInt()<80&&connectionTable->property("incrementalRows").toBool());
+        }
+        close();
+        controller->telemetry()->ingest({});
+    }
+    const auto privateBytes=[]()->qint64{
+#ifdef Q_OS_WIN
+        PROCESS_MEMORY_COUNTERS_EX counters{};
+        if(GetProcessMemoryInfo(GetCurrentProcess(),reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&counters),sizeof(counters)))return qint64(counters.PrivateUsage);
+#endif
+        return 0;
+    };
+    qmlEngine(window)->collectGarbage();activityWait(100);const auto memoryBefore=privateBytes();
+    QList<double> frameIntervals;QElapsedTimer delivery;delivery.start();qint64 previousFrame=0;
+    const auto frameConnection=QObject::connect(window,&QQuickWindow::frameSwapped,window,[&]{
+        const auto now=delivery.nsecsElapsed();
+        if(previousFrame&&transition->property("moving").toBool())frameIntervals.append((now-previousFrame)/1000000.0);
+        previousFrame=now;
+    });
+    for(int cycle=0;cycle<8;++cycle){click(activityDetailButtons[cycle%4]);activityWait(470);QTest::keyClick(window,Qt::Key_Escape);activityWait(410);}
+    QObject::disconnect(frameConnection);qmlEngine(window)->collectGarbage();activityWait(100);
+    const auto memoryAfter=privateBytes();std::sort(frameIntervals.begin(),frameIntervals.end());
+    check("repeated-details-release-transient-input-and-grab-state",!transition->isVisible()&&!transition->property("moving").toBool()&&eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").toBool());
+    check("repeated-details-private-memory-growth-below-24MiB",memoryBefore>0&&memoryAfter-memoryBefore<24*1024*1024);
+    check("native-animation-delivers-multiple-frames",frameIntervals.size()>=16);
+    check("host-system-proxy-unchanged",SystemProxySession::snapshot()==hostProxyBefore);
+    QObject::disconnect(originConnection);window->resize(initialSize);window->update();activityWait(100);
+    auto *incubation=qmlEngine(window)->incubationController();
+    check("restored-viewport-finishes-delegate-incubation-before-exit",!incubation||QTest::qWaitFor([&]{return incubation->incubatingObjectCount()==0;},1500));
+    QJsonObject performance{{"cycles",8},{"privateBytesBefore",memoryBefore},{"privateBytesAfter",memoryAfter},{"privateGrowthBytes",memoryAfter-memoryBefore},{"frameSamples",frameIntervals.size()},
+        {"p95FrameDeliveryMs",frameIntervals.isEmpty()?0:frameIntervals[qMin(frameIntervals.size()-1,qsizetype(frameIntervals.size()*0.95))]},
+        {"maxFrameDeliveryMs",frameIntervals.isEmpty()?0:frameIntervals.last()},
+        {"method","Passive Qt frameSwapped delivery during eight warm forward/reverse cycles driven by precise timers, without screenshot readback. Qt frame delivery is not hardware presentation FPS. Private memory compares this finite warmed sequence, not an unlimited leak proof."}};
+    QJsonObject report{{"checks",checks},{"failures",failures},{"geometrySamples",samples},{"dataSamples",dataSamples},{"performance",performance},{"qt",qVersion()},{"renderer",int(window->rendererInterface()->graphicsApi())},{"dpr",window->devicePixelRatio()},{"scaleFactor",qEnvironmentVariable("QT_SCALE_FACTOR")},{"controlledFixtureRows",600},{"limitations",QJsonArray{"Qt scale-factor runs validate native-window layout and geometry at controlled DPR; they do not prove physical cross-monitor DPI transitions.","Geometry and input observations do not establish display presentation FPS or subjective animation smoothness.","Filter, sort and virtualization use 600 controlled records passed through the actual isolated TelemetryService, not real network acceptance. The separate animation demo has truthful empty production data."}}};
+    QDir().mkpath(QFileInfo(output).absolutePath());QFile file(output);if(!file.open(QIODevice::WriteOnly))return 1;file.write(QJsonDocument(report).toJson());
+    qInfo()<<"ACTIVITY_DETAIL_RESULT"<<failures;return failures?1:0;
+}
+
+int recordActivityDetailDemo(QQuickWindow *window,const QString &directory) {
+    QDir().mkpath(directory);QJsonArray frames;int failures=0;
+    const auto eval=[&](const QString &code){QQmlExpression expression(qmlContext(window),window,code);expression.evaluate();if(expression.hasError()){qWarning()<<expression.error();++failures;}};
+    auto *policy=qobject_cast<MotionPolicy *>(qmlContext(window)->contextProperty("motionPolicy").value<QObject *>());
+    if(!policy)return 1;
+    policy->setSystemReducedMotionOverrideForTest(0);
+    struct RestorePolicy{MotionPolicy *policy;~RestorePolicy(){policy->setSystemReducedMotionOverrideForTest(-1);}} restore{policy};
+    eval("Theme.reduceMotion=false;Theme.followSystemMotion=false;Theme.mode='Light';AppState.navigate('activity')");
+    window->resize(1100,760);window->requestActivate();activityWait(700);
+    auto *transition=activityVisual(window->contentItem(),"activityDetailTransition");
+    if(!transition)return 1;
+    QElapsedTimer clock;clock.start();int index=0;
+    const auto capture=[&](const QString &key,const QString &phase,int duration,bool finishTransition=false){
+        QElapsedTimer phaseClock;phaseClock.start();
+        while(phaseClock.elapsed()<duration||(finishTransition&&transition->property("moving").toBool())){
+            if(phaseClock.elapsed()>5000){++failures;break;}
+            const auto name=QString("%1.png").arg(index++,5,10,QChar('0'));
+            const double start=clock.nsecsElapsed()/1000000.0;const auto image=window->grabWindow();
+            if(!image.save(directory+"/"+name))++failures;
+            frames.append(QJsonObject{{"file",name},{"key",key},{"phase",phase},{"startMs",start},{"endMs",clock.nsecsElapsed()/1000000.0},{"progress",transition->property("progress").toDouble()}});
+            activityWait(16);
+        }
+    };
+    for(int i=0;i<4;++i){
+        auto *button=activityVisual(window->contentItem(),activityDetailButtons[i]);
+        if(!button){++failures;continue;}
+        auto *sourceCard=activityVisual(window->contentItem(),activityDetailCards[i]);
+        const auto center=i==0&&sourceCard?sourceCard->mapToScene(QPointF(sourceCard->width()*0.65,sourceCard->height()*0.55)).toPoint()
+            :button->mapToScene(QPointF(button->width()/2,button->height()/2)).toPoint();
+        QTest::mouseMove(window,center);capture(activityDetailKeys[i],"hover",160);
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,center);capture(activityDetailKeys[i],"press",90);
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,center);capture(activityDetailKeys[i],"expand",650,true);
+        if(transition->property("progress").toDouble()!=1||transition->property("detailKey").toString()!=activityDetailKeys[i])++failures;
+        capture(activityDetailKeys[i],"detail",450);
+        QTest::keyClick(window,Qt::Key_Escape);capture(activityDetailKeys[i],"return",600,true);
+        if(transition->isVisible()||transition->property("progress").toDouble()!=0)++failures;
+    }
+    activityWait(400);window->update();
+    if(auto *incubation=qmlEngine(window)->incubationController())if(!QTest::qWaitFor([&]{return incubation->incubatingObjectCount()==0;},1500))++failures;
+    QFile report(directory+"/frames.json");if(!report.open(QIODevice::WriteOnly))return 1;
+    report.write(QJsonDocument(QJsonObject{{"frames",frames},{"failures",failures},{"qt",qVersion()},{"renderer",int(window->rendererInterface()->graphicsApi())},{"dpr",window->devicePixelRatio()},{"method","Actual Qt Quick window readbacks of isolated real UI, with monotonic capture times. Readback overhead changes cadence; this clip demonstrates geometry and is not display FPS evidence."}}).toJson());
+    return failures?1:0;
+}
+}
+
 int runViewportChecks(QQuickWindow *window,const QString &directory) {
     QDir().mkpath(directory);QJsonArray checks;int failures=0;
     auto eval=[&](const QString &code){QQmlExpression e(qmlContext(window),window,code);return e.evaluate();};
@@ -66,6 +335,7 @@ int runViewportChecks(QQuickWindow *window,const QString &directory) {
 }
 
 int runMotionDemo(QQuickWindow *window,const QString &directory) {
+    if(qEnvironmentVariableIsSet("SWIRL_ACTIVITY_DETAIL_DEMO"))return recordActivityDetailDemo(window,directory);
     QDir().mkpath(directory);
     const auto eval=[&](const QString &code){QQmlExpression e(qmlContext(window),window,code);e.evaluate();};
     std::function<QQuickItem *(QQuickItem *,const QString &)> find;
@@ -169,6 +439,7 @@ int runMotionVisualChecks(QQuickWindow *window, const QString &directory) {
 #include "ScrollBench.h"
 #include "SixAChecks.h"
 int runMotionChecks(QQuickWindow *window, const QString &output) {
+    if(qEnvironmentVariableIsSet("SWIRL_ACTIVITY_DETAIL_CHECKS"))return runActivityDetailChecks(window,output);
     if(qEnvironmentVariableIsSet("SWIRL_APEC_GLASS_CHECKS")) {
         extern int runApecGlassChecks(QQuickWindow *,const QString &);
         return runApecGlassChecks(window,output);
@@ -441,23 +712,25 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
                 &&contents->width()+policyEntry->property("leftPadding").toDouble()+policyEntry->property("rightPadding").toDouble()<=policyEntry->width()+0.5);
             policyValue->setProperty("text",originalName);
         }else check("activity-policy-value-is-present",false);
-        const auto diagnosticAt=diagnostic->mapToItem(activity,0,0),trafficAt=trafficCard->mapToItem(activity,0,0);
+        auto *diagnosticSurface=findVisual(activity,"activityDiagnosticCard");
+        auto *connectionsSurface=findVisual(activity,"activityConnectionsCard");
+        const auto diagnosticAt=diagnosticSurface?diagnosticSurface->mapToItem(activity,0,0):QPointF(),trafficAt=trafficCard->mapToItem(activity,0,0);
         const auto sourceAt=sourceCard?sourceCard->mapToItem(activity,0,0):QPointF();
         const auto uploadAt=upload->mapToItem(activity,0,0),connectionsAt=connections->mapToItem(activity,0,0),totalAt=total->mapToItem(activity,0,0);
         std::function<int(QQuickItem *)> panelCount=[&](QQuickItem *root){
-            int count=root->property("independentCard").isValid()?1:0;
+            int count=root->isVisible()&&root->property("independentCard").toBool()?1:0;
             for(auto *child:root->childItems())count+=panelCount(child);
             return count;
         };
-        check("activity-source-primary-surface-above-compact-transfer-and-open-diagnostic-rail",panelCount(activity)==3&&sourceCard&&diagnostic->isVisible()&&trafficCard->isVisible()
-            &&diagnostic->parentItem()==trafficCard->parentItem()&&qAbs(diagnosticAt.y()-sourceAt.y())<2
+        check("activity-five-opaque-cards-retain-source-and-transfer-proportions",panelCount(activity)==5&&sourceCard&&diagnosticSurface&&connectionsSurface&&diagnosticSurface->isVisible()&&trafficCard->isVisible()
+            &&diagnosticSurface->parentItem()==trafficCard->parentItem()&&qAbs(diagnosticAt.y()-sourceAt.y())<2
             &&trafficAt.y()>=sourceAt.y()+sourceCard->height()
             &&sourceCard->height()>trafficCard->height()
-            &&diagnosticAt.x()>=trafficAt.x()+trafficCard->width()&&trafficCard->width()>diagnostic->width());
-        const auto unboxed=[](QQuickItem *section){return !section->property("color").isValid()&&!section->property("background").isValid();};
-        check("activity-apec-semantic-detail-origins-stay-in-their-reading-groups",upload->parentItem()==total->parentItem()
-            &&unboxed(upload)&&unboxed(connections)&&unboxed(total)
-            &&uploadAt.y()>trafficAt.y()&&totalAt.y()>uploadAt.y()&&qAbs(connectionsAt.y()-trafficAt.y())<2);
+            &&diagnosticAt.x()>=trafficAt.x()+trafficCard->width()&&trafficCard->width()>diagnosticSurface->width());
+        const auto insideSurface=[](QQuickItem *section,QQuickItem *surface){return section&&surface&&QRectF(QPointF(),surface->size()).adjusted(-1,-1,1,1).contains(section->mapRectToItem(surface,QRectF(QPointF(),section->size())));};
+        check("activity-detail-data-stays-in-its-own-opaque-reading-card",upload->parentItem()==total->parentItem()
+            &&insideSurface(upload,trafficCard)&&insideSurface(total,trafficCard)&&insideSurface(connections,connectionsSurface)
+            &&uploadAt.y()>trafficAt.y()&&totalAt.y()>uploadAt.y()&&connectionsAt.y()>=trafficAt.y());
         const double contentHeight=activityScroll->property("contentHeight").toDouble();
         qInfo()<<"ACTIVITY_APEC_NORMAL_GEOMETRY"<<window->size()<<activityScroll->size()<<contentHeight
                <<diagnostic->size()<<trafficCard->size()<<upload->size()<<connections->size()<<total->size();

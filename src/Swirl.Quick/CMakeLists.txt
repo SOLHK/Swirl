@@ -188,6 +188,8 @@ set(SWIRL_QML_FILES
  qml/controls/SwirlPressMotion.qml qml/controls/SwirlAnimatedModel.qml qml/controls/SwirlMotionButton.qml qml/controls/SwirlSpring.qml qml/controls/SwirlPageHost.qml
  qml/pages/FeatureHubPage.qml qml/pages/FeatureModulePage.qml qml/components/SwirlBrandIcon.qml
  qml/components/SwirlCloudKnotWeave.qml qml/components/SwirlCloudKnotPaths.js qml/components/SwirlSilkRope.qml qml/components/SwirlSilkRopeGeometry.js
+ qml/components/SwirlActivityCard.qml qml/controls/ActivityDetailTransition.qml
+ qml/pages/ActivitySourcesDetail.qml qml/pages/ActivityDiagnosticsDetail.qml
  qml/controls/SwirlPillSurface.qml qml/controls/SwirlIconButton.qml qml/controls/SwirlButton.qml qml/controls/SwirlSegmentedControl.qml qml/controls/SwirlToggle.qml
  qml/controls/SwirlSearchField.qml qml/controls/SwirlTextField.qml
  qml/controls/SwirlComboBox.qml qml/controls/SwirlDialog.qml

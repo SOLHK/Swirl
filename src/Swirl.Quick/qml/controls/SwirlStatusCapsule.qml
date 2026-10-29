@@ -30,8 +30,8 @@ SwirlMotionButton {
    GradientStop { position: 0; color: control.enabled && control.down ? Theme.pressed : control.enabled && control.visualFocus ? Qt.tint(Theme.surface,Theme.withAlpha(Theme.text,0.08)) : control.enabled && control.hovered ? Theme.surface : Theme.withAlpha(Theme.surface, 0.95); Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.hoverDuration } } }
    GradientStop { position: 1; color: control.enabled && control.down ? Theme.pressed : control.enabled && control.visualFocus ? Qt.tint(capsuleSurface.base,Theme.withAlpha(Theme.text,0.08)) : control.enabled && control.hovered ? Qt.lighter(capsuleSurface.base, 1.02) : capsuleSurface.base; Behavior on color { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.hoverDuration } } }
   }
-  border.width:Theme.increaseContrast ? 1 / Screen.devicePixelRatio : 0
-  border.color:Theme.text
+  border.width:1 / Screen.devicePixelRatio
+  border.color:Theme.increaseContrast ? Theme.text : Theme.border
  }
  HoverHandler { enabled: control.enabled; cursorShape: Qt.PointingHandCursor }
  TextMetrics { id: proxyLabelMetrics; font: caption.font; text: qsTr("系统代理 · 外部") }

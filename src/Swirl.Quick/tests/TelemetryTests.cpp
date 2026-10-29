@@ -14,6 +14,7 @@
 #include "engine/ThreadedEngine.h"
 #include <QUuid>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QFile>
 class PulseEngine final:public ProxyEngine {
 public:
@@ -30,6 +31,18 @@ class TelemetryTests:public QObject {
  Q_OBJECT
  ProxyEngine::Status sample(qint64 time,int up,int down){ProxyEngine::Status s;s.processAlive=true;s.processId=1;s.apiHealthy=true;s.connectionsAt=time;s.trafficAt=time;s.uploadTotal=up;s.downloadTotal=down;s.uploadRate=up;s.downloadRate=down;s.connections={QVariantMap{{"id","connection-a"},{"host","fixture.test"},{"process","fixture.exe"},{"policy","DIRECT"},{"category","direct"},{"uploadBytes",up},{"downloadBytes",down},{"time",QDateTime::fromMSecsSinceEpoch(time).toString(Qt::ISODateWithMs)}}};return s;}
 private slots:
+ void completeSourceRankingKeepsRecordedRowsAndNumericBytes(){
+  QTemporaryDir directory;const auto path=directory.filePath("ranking.json");QJsonObject domains;
+  for(int i=0;i<600;++i)domains.insert(QString("source-%1.test").arg(i),QJsonObject{{"up",i},{"down",i*2},{"count",1}});
+  QFile fixture(path);QVERIFY(fixture.open(QIODevice::WriteOnly));
+  fixture.write(QJsonDocument(QJsonObject{{"schema",1},{"days",QJsonObject{{QDate::currentDate().toString(Qt::ISODate),QJsonObject{{"sampled",true},{"up",179700},{"down",359400},{"proxyRankingComplete",true},{"domains",domains}}}}}}).toJson());fixture.close();
+  TelemetryService model(path,false);
+  const auto complete=model.ranking("domains",0,0);QCOMPARE(complete.size(),600);
+  const auto first=complete.first().toMap();QCOMPARE(first.value("uploadBytes").toDouble(),599.0);QCOMPARE(first.value("downloadBytes").toDouble(),1198.0);QCOMPARE(first.value("total").toDouble(),1797.0);
+  QCOMPARE(model.ranking("domains").size(),50);QCOMPARE(model.ranking("domains",0,10000).size(),512);QCOMPARE(model.ranking("domains",0,-1).size(),1);
+  QCOMPARE(model.ranking("domains",0,0,true).size(),0);model.flush();
+  TelemetryService restored(path,false);QCOMPARE(restored.ranking("domains",0,0).size(),600);
+ }
  void actualRouteObservationKeepsStableIdentityAndDropsPrivateFields(){
   QTemporaryDir directory;TelemetryService model(directory.filePath("route.json"),false);auto status=sample(QDateTime::currentMSecsSinceEpoch(),0,0);
   const QVariantMap expected{{"revision","9007199254740993"},{"generation","4"},{"mode","rule"},{"tier",2},

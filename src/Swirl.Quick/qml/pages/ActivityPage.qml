@@ -24,6 +24,23 @@ Item {
     property bool snapshotDirty: true
     property bool errorDetailsRequested: false
     property string errorDetailsText: ""
+    readonly property bool detailOpen: details.activeDetail
+    property var visitedDetails: ({})
+    property var pendingSourceRow: null
+    function dismissDetail() { return details.closeDetail() }
+    function openCard(card, key, title) {
+        if (details.activeDetail) return
+        const next = Object.assign({}, visitedDetails)
+        next[key] = true
+        visitedDetails = next
+        details.openFrom(card, key, title)
+    }
+    onWidthChanged: Qt.callLater(details.updateOrigin)
+    onHeightChanged: Qt.callLater(details.updateOrigin)
+    onVisibleChanged: {
+        if (visible) refreshSnapshot()
+        else if (details.activeDetail) { details.opened = false; details.reset() }
+    }
     readonly property bool connected: engineController.processAlive && engineController.apiHealthy
     readonly property string internetLatency: telemetry.latencies.internet || ""
     readonly property bool internetMeasured: /^\d+ ms$/.test(internetLatency)
@@ -67,30 +84,28 @@ Item {
     }
     function latency(key) {
         const value = telemetry.latencies[key] || ""
-        return /^\d+ ms$/.test(value) ? value : "—"
+        return value || qsTr("尚未测量")
     }
+    readonly property bool diagnosticWarning: ["internet", "router", "dns", "proxy"].some(key => {
+        const value = telemetry.latencies[key] || ""
+        return value.length > 0 && !/^\d+ ms$/.test(value)
+            && ["未连接", "尚未测量", "尚未检测", "未支持", "测量中", "正在测量", "节点检测进行中"].indexOf(value) < 0
+    })
     function goTraffic(item, key) {
-        AppState.trafficPeriod = period === 0 ? 0 : 3
-        SwirlMotion.navigateFrom(item, "traffic", key)
+        openCard(trafficCard, "traffic", qsTr("传输"))
     }
     function openRank(row) {
-        AppState.trafficPeriod = period === 0 ? 0 : 3
-        if (row.kind === "apps") {
-            AppState.trafficSelectedProcess = row.name
-            AppState.openDetail("processes")
-        } else if (row.kind === "devices") {
-            AppState.trafficSelectedDevice = row.name
-            AppState.openDetail("gateway")
-        } else {
-            AppState.connectionSearchQuery = row.name
-            AppState.openDetail("connections")
+        pendingSourceRow = row
+        openCard(sourcesCard, "sources", qsTr("流量来源"))
+        if (sourcesDetail.status === Loader.Ready) {
+            sourcesDetail.item.selectSource(row)
+            pendingSourceRow = null
         }
     }
     function scrollToBottom() { scroll.contentY = Math.max(0, scroll.contentHeight - scroll.height) }
     onPeriodChanged: { snapshotDirty = true; refreshSnapshot() }
     onTrafficKindChanged: { snapshotDirty = true; refreshSnapshot() }
     onRankingKindChanged: { snapshotDirty = true; refreshSnapshot() }
-    onVisibleChanged: if (visible) refreshSnapshot()
     Component.onCompleted: refreshSnapshot()
     Connections { target: page.telemetry; function onChanged() { page.snapshotDirty = true } }
     Timer { interval: 300; running: page.visible && page.snapshotDirty; repeat: true; onTriggered: page.refreshSnapshot() }
@@ -195,7 +210,7 @@ Item {
         contentItem: RowLayout {
             id: titleContents
             spacing: Theme.dp(8)
-            SwirlText { id: titleCaption; text: titleControl.caption; color: Theme.text; font.pixelSize: Theme.fontSize(16); font.weight: Font.DemiBold }
+            SwirlText { id: titleCaption; text: titleControl.caption; color: Theme.text; font.pixelSize: Theme.fontSize(18); font.weight: Font.DemiBold }
             SwirlIcon { name: "chevron-right"; size: Theme.dp(14); color: Theme.muted }
         }
         Accessible.name: qsTr("%1详情").arg(caption)
@@ -205,6 +220,9 @@ Item {
     Flickable {
         id: scroll; objectName: "activityScroll"
         anchors.fill: parent; anchors.topMargin: Theme.dp(52)
+        opacity: 1 - details.progress
+        visible: details.progress < 1
+        enabled: !details.activeDetail
         contentWidth: width; contentHeight: content.height + Theme.dp(16)
         interactive: contentHeight > height + 1
         flickableDirection: Flickable.VerticalFlick; boundsBehavior: Flickable.StopAtBounds
@@ -217,7 +235,7 @@ Item {
                 id: statusCard
                 objectName: "activityStatusCard"
                 Layout.fillWidth: true; Layout.minimumHeight: statusBody.implicitHeight + Theme.dp(24); Layout.preferredHeight: Layout.minimumHeight
-                cornerRadius: Theme.sidebarRadius; radius: cornerRadius; color: Theme.surface
+                cornerRadius: Theme.cardRadius; color: Theme.surface
                 Item {
                     id: statusEmblem
                     objectName: "activityStatusEmblem"
@@ -302,8 +320,11 @@ Item {
             GridLayout {
                 Layout.fillWidth: true; Layout.fillHeight: true
                 columns: page.wide ? 2 : 1; columnSpacing: Theme.dp(20); rowSpacing: Theme.dp(16)
-                SwirlGlassPanel {
+                SwirlActivityCard {
                     id: sourcesCard; objectName: "activitySourcesCard"
+                    title: qsTr("流量来源"); titleItem: sourcesHeading.motionTitle
+                    opacity: details.activeDetail && details.sourceCard === sourcesCard ? 0 : 1
+                    onActivated: page.openCard(sourcesCard, "sources", title)
                     Layout.fillWidth: true; Layout.fillHeight: true; Layout.preferredWidth: 3; Layout.minimumWidth: 0
                     Layout.minimumHeight: Theme.dp(202); Layout.preferredHeight: Theme.dp(258)
                     cornerRadius: Theme.cardRadius
@@ -312,8 +333,12 @@ Item {
                         anchors.fill: parent; anchors.margins: Theme.dp(14); spacing: Theme.dp(8)
                         GridLayout {
                             Layout.fillWidth: true; columns: page.compact ? 1 : 2; columnSpacing: Theme.dp(8); rowSpacing: Theme.dp(6)
-                            SwirlText { text: qsTr("流量来源"); font.pixelSize: Theme.fontSize(18); font.weight: Font.DemiBold; color: Theme.text; Layout.fillWidth: true }
-                            SwirlSegmentedControl { id: sourceFilter; objectName: "activitySourceFilter"; Layout.preferredWidth: Theme.dp(230); Layout.preferredHeight: Theme.dp(28); options: [qsTr("进程与设备"), qsTr("域名"), qsTr("策略")]; currentIndex: page.rankingKind; onActivated: index => page.rankingKind = index }
+                            Item {
+                                Layout.fillWidth: true; Layout.minimumWidth: sourcesHeading.implicitWidth
+                                Layout.preferredHeight: sourcesHeading.implicitHeight
+                                SectionTitle { id: sourcesHeading; objectName: "activitySourcesDetails"; caption: qsTr("流量来源"); x: -leftPadding; height: parent.height; onNavigate: page.openCard(sourcesCard, "sources", caption) }
+                            }
+                            SwirlSegmentedControl { id: sourceFilter; objectName: "activitySourceFilter"; Layout.alignment: Qt.AlignRight; Layout.preferredWidth: Theme.dp(230); Layout.preferredHeight: Theme.dp(28); options: [qsTr("进程与设备"), qsTr("域名"), qsTr("策略")]; currentIndex: page.rankingKind; onActivated: index => page.rankingKind = index }
                         }
                         Flickable {
                             id: rankViewport; objectName: "activitySourceList"
@@ -357,13 +382,19 @@ Item {
                         }
                     }
                 }
+                SwirlActivityCard {
+                    id: diagnosticSurface; objectName: "activityDiagnosticCard"
+                    title: qsTr("网络诊断"); titleItem: diagnosticShortcut.motionTitle
+                    opacity: details.activeDetail && details.sourceCard === diagnosticSurface ? 0 : 1
+                    onActivated: page.openCard(diagnosticSurface, "diagnostics", title)
+                    Layout.fillWidth: true; Layout.fillHeight: true; Layout.preferredWidth: 2; Layout.minimumWidth: 0
+                    Layout.minimumHeight: Theme.dp(202); Layout.preferredHeight: Theme.dp(258)
                 ColumnLayout {
                     id: diagnosticCard; objectName: "internetDiagnosticCard"
-                    Layout.fillWidth: true; Layout.fillHeight: true; Layout.preferredWidth: 2; Layout.minimumWidth: 0
-                    Layout.minimumHeight: implicitHeight; Layout.preferredHeight: Theme.dp(258); spacing: Theme.dp(6)
+                    anchors.fill: parent; anchors.margins: Theme.dp(16); spacing: Theme.dp(6)
                     RowLayout {
                         Layout.fillWidth: true
-                        SectionTitle { id: diagnosticShortcut; objectName: "networkDiagnosticDetails"; caption: qsTr("网络诊断"); onNavigate: SwirlMotion.navigateFrom(diagnosticShortcut, "toolbox", "") }
+                        SectionTitle { id: diagnosticShortcut; objectName: "networkDiagnosticDetails"; caption: qsTr("网络诊断"); onNavigate: page.openCard(diagnosticSurface, "diagnostics", caption) }
                         Item { Layout.fillWidth: true }
                         SwirlIconButton { objectName: "networkDiagnosticButton"; Layout.preferredWidth: Theme.dp(30); Layout.preferredHeight: Theme.dp(30); iconName: "refresh"; quiet: true; enabled: page.telemetry.measurementState !== "正在测量"; Accessible.name: qsTr("刷新 INTERNET 耗时"); onClicked: page.telemetry.measureNetwork() }
                     }
@@ -374,7 +405,7 @@ Item {
                         Item { Layout.fillWidth: true }
                         SwirlFlow { objectName: "diagnosticProxyWing"; Layout.preferredWidth: Theme.dp(42); Layout.preferredHeight: Theme.dp(18); phase: page.proxyPhase; proxyWing: true }
                     }
-                    SwirlText { objectName: "activityInternetCaption"; text: page.internetMeasured ? qsTr("INTERNET · HTTPS 完整请求") : page.telemetry.measurementState || qsTr("尚未检测"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; Layout.minimumWidth: 0; wrapMode: Text.WordWrap }
+                    SwirlText { objectName: "activityInternetCaption"; text: page.diagnosticWarning ? qsTr("诊断需检查 · 查看详情") : page.internetMeasured ? qsTr("INTERNET · HTTPS 完整请求") : page.telemetry.measurementState || qsTr("尚未检测"); color: page.diagnosticWarning ? Theme.warningText : Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.fillWidth: true; Layout.minimumWidth: 0; wrapMode: Text.WordWrap }
                     Rectangle { Layout.fillWidth: true; Layout.preferredHeight: Theme.borderWidth; color: Theme.separator }
                     ColumnLayout {
                         Layout.fillWidth: true; spacing: 0
@@ -384,17 +415,22 @@ Item {
                     }
                     Item { Layout.fillHeight: true }
                 }
-                SwirlGlassPanel {
+                }
+                SwirlActivityCard {
                     id: trafficCard; objectName: "activityTrafficCard"
-                    Layout.fillWidth: true; Layout.fillHeight: false; Layout.preferredWidth: 3; Layout.minimumWidth: 0
+                    title: qsTr("传输"); titleItem: trafficHeading.motionTitle
+                    opacity: details.activeDetail && details.sourceCard === trafficCard ? 0 : 1
+                    onActivated: page.openCard(trafficCard, "traffic", title)
+                    Layout.fillWidth: true; Layout.fillHeight: true; Layout.preferredWidth: 3; Layout.minimumWidth: 0
                     Layout.minimumHeight: trafficBody.implicitHeight + Theme.dp(24); Layout.preferredHeight: Layout.minimumHeight
-                    cornerRadius: Theme.cardRadius; color: Theme.surface; border.width: 0
+                    cornerRadius: Theme.cardRadius
                     ColumnLayout {
                         id: trafficBody
                         anchors.fill: parent; anchors.margins: Theme.dp(12); spacing: Theme.dp(4)
                         RowLayout {
                             Layout.fillWidth: true
-                            SwirlText { text: qsTr("传输"); font.pixelSize: Theme.fontSize(18); font.weight: Font.DemiBold; color: Theme.text; Layout.fillWidth: true }
+                            SectionTitle { id: trafficHeading; objectName: "activityTrafficDetails"; caption: qsTr("传输"); Layout.fillWidth: false; onNavigate: page.openCard(trafficCard, "traffic", caption) }
+                            Item { Layout.fillWidth: true }
                             SwirlSegmentedControl { id: trafficFilter; objectName: "activityTrafficFilter"; Layout.preferredWidth: Theme.dp(138); Layout.preferredHeight: Theme.dp(28); options: [qsTr("全部"), qsTr("仅代理")]; currentIndex: page.trafficKind; onActivated: index => page.trafficKind = index }
                         }
                         RowLayout {
@@ -405,7 +441,7 @@ Item {
                             ColumnLayout {
                                 Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: Theme.dp(3)
                                 SectionTitle { caption: qsTr("上传"); onNavigate: page.goTraffic(uploadSection, "uploadRate") }
-                                SwirlText { id: uploadRateText; objectName: "activityUploadRate"; Layout.fillWidth: true; Layout.minimumWidth: 0; text: page.telemetry.sampled ? page.telemetry.formatBytes(page.telemetry.uploadRate) + "/s" : "—"; tabularFigures: true; font.pixelSize: Theme.fontSize(21); font.weight: Font.DemiBold; color: Theme.text; elide: Text.ElideRight }
+                                SwirlText { id: uploadRateText; objectName: "activityUploadRate"; Layout.fillWidth: true; Layout.minimumWidth: 0; text: page.telemetry.sampled ? page.telemetry.formatBytes(page.telemetry.uploadRate) + "/s" : "—"; tabularFigures: true; font.pixelSize: Theme.fontSize(24); font.weight: Font.DemiBold; color: Theme.text; elide: Text.ElideRight }
                             }
                             ColumnLayout {
                                 id: downloadSection
@@ -413,7 +449,7 @@ Item {
                                 readonly property Item motionSurface: downloadSection
                                 Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: Theme.dp(3)
                                 SectionTitle { caption: qsTr("下载"); onNavigate: page.goTraffic(downloadSection, "downloadRate") }
-                                SwirlText { id: downloadRateText; objectName: "activityDownloadRate"; Layout.fillWidth: true; Layout.minimumWidth: 0; text: page.telemetry.sampled ? page.telemetry.formatBytes(page.telemetry.downloadRate) + "/s" : "—"; tabularFigures: true; font.pixelSize: Theme.fontSize(21); font.weight: Font.DemiBold; color: Theme.text; elide: Text.ElideRight }
+                                SwirlText { id: downloadRateText; objectName: "activityDownloadRate"; Layout.fillWidth: true; Layout.minimumWidth: 0; text: page.telemetry.sampled ? page.telemetry.formatBytes(page.telemetry.downloadRate) + "/s" : "—"; tabularFigures: true; font.pixelSize: Theme.fontSize(24); font.weight: Font.DemiBold; color: Theme.text; elide: Text.ElideRight }
                             }
                         }
                         SwirlDailyTrafficChart { id: trafficChart; objectName: "activityTrafficChart"; Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(52); Layout.minimumHeight: Theme.dp(52); proxyOnly: page.trafficKind === 1 }
@@ -423,23 +459,68 @@ Item {
                             readonly property Item motionSurface: totalSection
                             Layout.fillWidth: true
                             SectionTitle { Layout.alignment: Qt.AlignBaseline; caption: qsTr("累计"); onNavigate: page.goTraffic(totalSection, "totalTraffic") }
-                            SwirlText { id: totalTrafficText; Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.alignment: Qt.AlignBaseline; text: page.bytes(page.totals.total, page.totals.sampled); tabularFigures: true; color: Theme.text; font.pixelSize: Theme.fontSize(16); font.weight: Font.DemiBold; elide: Text.ElideRight }
+                            SwirlText { id: totalTrafficText; Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.alignment: Qt.AlignBaseline; text: page.bytes(page.totals.total, page.totals.sampled); tabularFigures: true; color: Theme.text; font.pixelSize: Theme.fontSize(20); font.weight: Font.DemiBold; elide: Text.ElideRight }
                             SwirlSegmentedControl { objectName: "activityPeriodFilter"; Layout.preferredWidth: Theme.dp(112); Layout.preferredHeight: Theme.dp(28); options: [qsTr("今日"), qsTr("本月")]; currentIndex: page.period; onActivated: index => page.period = index }
                         }
                     }
                 }
+                SwirlActivityCard {
+                    id: connectionsCard; objectName: "activityConnectionsCard"
+                    title: qsTr("活动连接"); titleItem: connectionsHeading.motionTitle
+                    opacity: details.activeDetail && details.sourceCard === connectionsCard ? 0 : 1
+                    onActivated: page.openCard(connectionsCard, "connections", title)
+                    Layout.fillWidth: true; Layout.fillHeight: true; Layout.preferredWidth: 2; Layout.minimumWidth: 0
+                    Layout.minimumHeight: connectionsSection.implicitHeight + Theme.dp(32)
                 ColumnLayout {
                     id: connectionsSection; objectName: "activityConnections"
-                    readonly property Item motionTitle: connectionCountRow.valueItem
+                    readonly property Item motionTitle: connectionCountValue
                     readonly property Item motionSurface: connectionsSection
-                    Layout.fillWidth: true; Layout.fillHeight: false; Layout.preferredWidth: 2; Layout.minimumWidth: 0; Layout.alignment: Qt.AlignTop; spacing: Theme.dp(2)
-                    SectionTitle { objectName: "activityConnectionsDetails"; caption: qsTr("活动连接"); onNavigate: SwirlMotion.navigateFrom(connectionsSection, "connections", "activeConnections") }
-                    StatRow { id: connectionCountRow; caption: qsTr("连接数量"); value: page.telemetry.connectionsSampled ? String(page.telemetry.activeConnections) : "—" }
+                    anchors.fill: parent; anchors.margins: Theme.dp(16); spacing: Theme.dp(2)
+                    SectionTitle { id: connectionsHeading; objectName: "activityConnectionsDetails"; caption: qsTr("活动连接"); onNavigate: page.openCard(connectionsCard, "connections", caption) }
+                    RowLayout {
+                        Layout.fillWidth: true; spacing: Theme.dp(6)
+                        SwirlText { id: connectionCountValue; text: page.telemetry.connectionsSampled ? String(page.telemetry.activeConnections) : "—"; tabularFigures: true; color: Theme.text; font.pixelSize: Theme.fontSize(32); font.weight: Font.DemiBold }
+                        SwirlText { text: qsTr("当前连接"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); Layout.alignment: Qt.AlignBaseline }
+                        Item { Layout.fillWidth: true }
+                    }
                     StatRow { caption: qsTr("进程"); value: page.telemetry.connectionsSampled ? String(page.telemetry.activeProcesses) : "—" }
                     StatRow { caption: qsTr("设备"); value: page.telemetry.connectionsSampled ? String(page.activeDeviceCount) : "—" }
                     StatRow { caption: qsTr("DHCP 设备"); value: gatewayProvider.running ? String(page.dhcpDeviceCount) : "—" }
                 }
+                }
             }
+        }
+    }
+    ActivityDetailTransition {
+        id: details
+        anchors.fill: parent
+        Loader {
+            id: sourcesDetail; anchors.fill: parent
+            asynchronous: true
+            active: page.visitedDetails.sources === true
+            visible: details.detailKey === "sources"
+            sourceComponent: ActivitySourcesDetail {
+                engineController: page.engineController
+                period: page.period === 0 ? 0 : 3
+                kindIndex: page.rankingKind === 0 ? 0 : page.rankingKind === 1 ? 2 : 3
+                proxyOnly: page.trafficKind === 1
+            }
+            onLoaded: if (page.pendingSourceRow) { item.selectSource(page.pendingSourceRow); page.pendingSourceRow = null }
+        }
+        Loader {
+            anchors.fill: parent; asynchronous: true; active: page.visitedDetails.connections === true
+            visible: details.detailKey === "connections"
+            sourceComponent: ConnectionsPage { embedded: true }
+        }
+        Loader {
+            anchors.fill: parent; asynchronous: true; active: page.visitedDetails.traffic === true
+            visible: details.detailKey === "traffic"
+            sourceComponent: TrafficAnalyticsPage { embedded: true; period: page.period === 0 ? 0 : 3 }
+        }
+        Loader {
+            anchors.fill: parent; asynchronous: true; active: page.visitedDetails.diagnostics === true
+            visible: details.detailKey === "diagnostics"
+            sourceComponent: ActivityDiagnosticsDetail { engineController: page.engineController; systemProvider: page.systemProvider }
         }
     }
     Loader {

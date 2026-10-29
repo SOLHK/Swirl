@@ -45,6 +45,7 @@ public:
  QVariantMap proxyDiagnostic() const { return m_proxyDiagnostic; }
  QString storageError() const { return m_storageError; }
  Q_INVOKABLE QVariantMap summary(int period=0) const;
+ // A zero limit exposes every recorded source to the virtualized detail view.
  Q_INVOKABLE QVariantList ranking(const QString &kind,int period=0,int limit=50,bool proxyOnly=false) const;
  Q_INVOKABLE bool proxyRankingAvailable(int period=0) const;
  Q_INVOKABLE QVariantList distribution(int period=0) const;

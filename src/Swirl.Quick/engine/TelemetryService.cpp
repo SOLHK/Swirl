@@ -142,7 +142,7 @@ QVariantList TelemetryService::ranking(const QString &kind,int period,int limit,
  const auto group=proxyOnly?QStringLiteral("proxy")+kind.left(1).toUpper()+kind.mid(1):kind;
  const auto entries=data.value(group).toObject();QVariantList result;
  const auto total=proxyOnly?data.value("categories").toObject().value("proxy").toObject().value("up").toDouble()+data.value("categories").toObject().value("proxy").toObject().value("down").toDouble():data.value("up").toDouble()+data.value("down").toDouble();
- for(const auto &name:entries.keys()){const auto r=entries.value(name).toObject();const auto up=r.value("up").toDouble(),down=r.value("down").toDouble();result.append(QVariantMap{{"id",name},{"name",name},{"upload",formatBytes(up)},{"download",formatBytes(down)},{"value",formatBytes(up+down)},{"total",up+down},{"connections",r.value("count").toDouble()},{"percent",total>0?QString::number(100*(up+down)/total,'f',1)+"%":"0%"},{"mark",name.left(1)},{"color","#596273"}});}
+ for(const auto &name:entries.keys()){const auto r=entries.value(name).toObject();const auto up=r.value("up").toDouble(),down=r.value("down").toDouble();result.append(QVariantMap{{"id",name},{"name",name},{"upload",formatBytes(up)},{"download",formatBytes(down)},{"uploadBytes",up},{"downloadBytes",down},{"value",formatBytes(up+down)},{"total",up+down},{"connections",r.value("count").toDouble()},{"percent",total>0?QString::number(100*(up+down)/total,'f',1)+"%":"0%"},{"mark",name.left(1)},{"color","#596273"}});}
  QHash<QString,double> speeds;
  if(connectionsSampled())for(const auto &value:m_seen){
   if(value.value("status")!="活动"||(proxyOnly&&value.value("category")!="proxy"))continue;
@@ -150,7 +150,7 @@ QVariantList TelemetryService::ranking(const QString &kind,int period,int limit,
   speeds[key.toString()]+=value.value("uploadRate").toDouble()+value.value("downloadRate").toDouble();
  }
  for(auto &entry:result){auto row=entry.toMap();const auto speed=speeds.value(row.value("name").toString());row["speed"]=speed;row["speedText"]=formatBytes(speed)+"/s";row["kind"]=kind;entry=row;}
- std::sort(result.begin(),result.end(),[](const QVariant &a,const QVariant &b){return a.toMap().value("total").toDouble()>b.toMap().value("total").toDouble();});while(result.size()>qBound(1,limit,512))result.removeLast();return result;
+ std::sort(result.begin(),result.end(),[](const QVariant &a,const QVariant &b){return a.toMap().value("total").toDouble()>b.toMap().value("total").toDouble();});if(limit!=0)while(result.size()>qBound(1,limit,512))result.removeLast();return result;
 }
 QVariantList TelemetryService::distribution(int period) const {
  const auto d=periodData(period),cats=d.value("categories").toObject();double measured=0;for(const auto &v:cats){const auto r=v.toObject();measured+=r.value("up").toDouble()+r.value("down").toDouble();}
