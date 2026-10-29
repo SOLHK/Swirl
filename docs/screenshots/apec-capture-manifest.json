@@ -1,15 +1,15 @@
 {
   "schema": 1,
   "product": "Swirl",
-  "version": "0.2.23",
-  "application_source_revision": "9ca4b3310ecf2a063861dec367b3238763968500",
-  "application_sha256": "59407aa840eac3cc2c3c9e8a8980b20668fd7088d3971a96eb65c7a624c7ea30",
-  "paired_rust_source_revision": "9ca4b3310ecf2a063861dec367b3238763968500",
-  "paired_rust_build_id": "6b08382a69221e9afcbc4f306dea22bbdd4f0aa0f09ca60b3a70679adc902e81",
-  "runtime": "Qt 6.12.0 MinGW x64, loaded from matching SDK kit/bin; original product build cache, not an installer acceptance run",
-  "ui_input_digest_sha256": "1c42b69d973af98493f81d7ab09cd62e30dc95bb1f6d597dc5695ca68a99d0cc",
+  "version": "0.2.24",
+  "application_source_revision": "568322dae3ab92d07471db18a43412143138ce01",
+  "application_sha256": "0886e5af5b1e87b9e7cdf5f7d07ecfd799c4a424c899177cae1de5d0bf28c83e",
+  "paired_rust_source_revision": "568322dae3ab92d07471db18a43412143138ce01",
+  "paired_rust_build_id": "0bda1333b8a2636147d69d0d5b1896cc8b73683bc76b9a14dd326683927237e8",
+  "runtime": "Windows Qt 6.12.0, requested D3D11 interactive product UI; explicit matching SDK/runtime paths, no ambient PATH",
+  "ui_input_digest_sha256": "3608b90221816d496ba77f66166329e32ba85cea3378733b5b44a8925fc51a04",
   "ui_input_digest_algorithm": "SHA-256 over UTF-8 sorted relative-path + NUL + lowercase working-file SHA-256 + LF records",
-  "source_match": "Each UI input matches the named Git revision after repository-configured Git text filters; ui_inputs record actual working bytes used by the build",
+  "source_match": "Every recorded UI input matches the rendering Git revision after repository-configured text filters; working bytes are recorded",
   "git_text_filter_normalized_paths": [
     "src/Swirl.Quick/assets/icons/swirl_windows.svg",
     "src/Swirl.Quick/qml/components/SwirlCloudKnotPaths.js",
@@ -17,7 +17,7 @@
     "src/Swirl.Quick/qml/components/SwirlLiquidGlass.qml"
   ],
   "ui_inputs": {
-    "src/Swirl.Quick/PRODUCT_VERSION.txt": "13b377964e3a32083a6f53e6c4a9c0e4d81594f31035faed41aba7c4cb340e0f",
+    "src/Swirl.Quick/PRODUCT_VERSION.txt": "4ce70733152daba047916c32d0f6671601a34c45272c34a50c886235652d9c25",
     "src/Swirl.Quick/app/BrandRaster.h": "c43733d2f40971068bd263b114ad422292c5f9421732fc06ee5f7991bec24618",
     "src/Swirl.Quick/app/DiagnosticService.cpp": "0dc9d5ab8f1e0f7298c53a7dca971e435ce1beecaf4aa6582817fb8c020b32aa",
     "src/Swirl.Quick/app/DiagnosticService.h": "8006f93135aee6b8f33bee9b17303dd7eab8508aab63ac5ff25d36d5e1b5ee65",
@@ -152,14 +152,14 @@
     "src/Swirl.Quick/assets/icons/ui/user.svg": "5575c42c63130e1efa4161d01f6b623b6572e137541374e12ad0084bc6e4c88e",
     "src/Swirl.Quick/assets/icons/ui/wifi.svg": "d445415b17d82ccdc02dad204228ad0d90e9394f78079451e8efe11714a7e2d6",
     "src/Swirl.Quick/assets/swirl_knot.ico": "2e6499e69daff367fa5e3b62a76226643e1bc9cbacc89f30ad7a32b847ba4981",
-    "src/Swirl.Quick/main.cpp": "02561bf963895c245feb9546bffbdcc659732cef4271b92873c03b56a3193560",
+    "src/Swirl.Quick/main.cpp": "e8a1807e3cf5a3c7b510854d34aa545ea984c964a863ca2fe08c2e8659018c8c",
     "src/Swirl.Quick/qml/AppState.qml": "edd54b4a737c1d500b10496535545d618db134a9fe0640b916e3b68f437b0107",
     "src/Swirl.Quick/qml/FeatureCatalog.qml": "875a7e0367216d5112ee74c7175ab26e5fb10fd4269f902a5fcb8187b6b2d7a0",
     "src/Swirl.Quick/qml/Main.qml": "17d98296b7ac24f14a78b35c640a6d814c5494a64c899f42aedf660e989cba71",
     "src/Swirl.Quick/qml/SwirlMotion.qml": "1b2657978ff885cc2ed26624721ed55bef2dcbef3919cea4ebafbdc2237ccbda",
     "src/Swirl.Quick/qml/SwirlProxyWingMotion.qml": "2e729b2994801d6aa217e14a40b981c6adad351f7779ec65501fcc1d6bc2e4f7",
     "src/Swirl.Quick/qml/SwirlTransitionRegistry.qml": "ac67524ebae6b3de38e8e4218c55f7c5aa8bbcd52db3a425a1df6ea64e06d000",
-    "src/Swirl.Quick/qml/Theme.qml": "a417fbf22b6ed9073caca44e2c1aa643de4631b53b1fd620954971caf77399ee",
+    "src/Swirl.Quick/qml/Theme.qml": "1120e49c6bba04737bcf1203d78e4674d477a521c6be145ee2b88deebabc20f5",
     "src/Swirl.Quick/qml/components/ConfigurationReviewDialog.qml": "f78756827bb44e3c27a266b28cc1b343ff7d4183644074928d1ba031dfe58bf1",
     "src/Swirl.Quick/qml/components/NodeRowActions.qml": "94c3731d037336bae68c1b3992769abd92e50fcb89f7e028daf4cdbc284d1679",
     "src/Swirl.Quick/qml/components/NodeSourceHeader.qml": "52e34e686f602620305aaf81eafdd54e0f07d4f74d78f6c6c4cf04f88ce872ab",
@@ -210,7 +210,7 @@
     "src/Swirl.Quick/qml/components/SwirlTrafficChart.qml": "d8f57151e231eca40502296609bb65c0cb81d55120877645917f86ab1f478589",
     "src/Swirl.Quick/qml/components/SwirlWindowControls.qml": "25cd433a7aead1af01479655e4cf85d487f0c4aad569d60d708c6098a72c9f45",
     "src/Swirl.Quick/qml/components/SwirlWindowTitleBar.qml": "0a81626b80626ce8fe0f50596ba8365857c7970595bc8a677041a3ca27c14f05",
-    "src/Swirl.Quick/qml/components/SwirlWorkspaceBackdrop.qml": "07cbd0fba8b4f774ad28b4b2a46d296a920e16cc2459391402d9ecb00217dad0",
+    "src/Swirl.Quick/qml/components/SwirlWorkspaceBackdrop.qml": "fe5721fc1200e9bb0e3fa901196f28df6170c1c422a0a3862efab3d61dc9d5c5",
     "src/Swirl.Quick/qml/controls/RewriteRulesDialog.qml": "f4c1c1a70ab24329c6c57dd7cdafb83460996639368d5d1a9a8df60acc99802b",
     "src/Swirl.Quick/qml/controls/SwirlActivityIndicator.qml": "d9fea3e1c27af7d0c2f86bc6f6ebfc95a522ef61b32e26a1173d264d6460a388",
     "src/Swirl.Quick/qml/controls/SwirlAnimatedModel.qml": "28c514b33a590bd9e2b6b92994c2b96fa56ed5d960d8030bcdfbcc285081c6b1",
@@ -289,26 +289,28 @@
     "src/Swirl.Quick/qml/pages/WorkbenchPage.qml": "4365716e83a2a11f489799f1df8be4bab5d2c5b00a878c91f7bae375f8f13d72"
   },
   "capture": {
-    "method": "Native Windows GDI screen ROI of real Swirl HWND and observer-owned opaque background",
+    "method": "Native GDI ROI of actual Swirl HWND over observer-owned opaque background",
     "arguments": [
       "--ui-preview",
       "--preview-page=activity",
       "--preview-size=914x672",
       "--preview-theme=<light|dark>"
     ],
-    "profiles": "A separate new empty SWIRL_TEST_ROOT for each theme; no private profile or subscriptions",
-    "state": "Not started / not connected. No connect/toggle command was sent.",
-    "privacy": "Only owned product and controlled-background pixels; native z-order and every output pixel ownership checked before GDI capture",
-    "postprocessing": "None; native screenshot pixels saved as PNG without retouching, recoloring or data replacement",
-    "observer_source_sha256": "1f10b24f55381e875b7be56e52c2cedba72357acb513f37a683bbc98b76809ea",
-    "observer_executable_sha256": "38f6139cc1d9828bd9e972366d8e83ce0f403d996f472759a36f61b997716c6e",
-    "hover_reset": "WM_MOUSEMOVE(1,1) delivered only to the owned product HWND; no clicks or global cursor movement"
+    "requested_qpa": "windows",
+    "requested_rhi": "d3d11",
+    "profiles": "Separate fresh empty SWIRL_TEST_ROOT per theme; no private profile, node or subscription",
+    "state": "Not started/not connected; no connect/toggle operation or fake data",
+    "privacy": "Only owned window/background ROI; native z-order and every output pixel checked, ownership rechecked before PNG save",
+    "postprocessing": "None; actual native pixels saved without recoloring, retouching or data replacement",
+    "hover_reset": "Only owned HWND WM_MOUSEMOVE(1,1), no clicks/global cursor movement",
+    "observer_source_sha256": "19166f3d0ba7a8ce5cd63e537ac1895c7c44b61254df41a261a61f57c27dad41",
+    "observer_executable_sha256": "e5f94e7e6e502b1435724ffd75947d90244dbd4b093a8f9a9b70febdc53aaa48"
   },
   "screenshots": [
     {
       "file": "apec-activity-light.png",
       "theme": "light",
-      "render_sha256": "896183db3c6f6af3a98b9b0bbe394c9a67139126b7d6d0ecee6f7b6204a46e96",
+      "render_sha256": "8f31b5f6ec723c5c459aad2a69f3b873dd2fd6d08d432268bfe9efaae75ffe80",
       "pixel_size": [
         1443,
         1080
@@ -318,14 +320,15 @@
         1008
       ],
       "device_pixel_ratio": 1.5,
-      "visible_settle_ms": 5365,
+      "visible_settle_ms": 7529,
       "all_output_pixels_ownership_checked": true,
-      "visual_inspection": "Real complete application; version 0.2.23; not started/not connected; no tooltip occlusion, fabricated exit IP, traffic, latency, node or running knot"
+      "post_capture_ownership_checked": true,
+      "inspection_scope": "Source, native window, pixel ownership and dimensions; final subjective visual acceptance remains with the owner"
     },
     {
       "file": "apec-activity-dark.png",
       "theme": "dark",
-      "render_sha256": "942eda8ed073884998fb9317757042593314bc32da1dda56bea8a095a93d7943",
+      "render_sha256": "56abd3ff36b90b1170653505bef55c9f4a03722e255073f23e2d3bd6882a1b49",
       "pixel_size": [
         1443,
         1080
@@ -335,15 +338,15 @@
         1008
       ],
       "device_pixel_ratio": 1.5,
-      "visible_settle_ms": 5316,
+      "visible_settle_ms": 7615,
       "all_output_pixels_ownership_checked": true,
-      "visual_inspection": "Real complete application; version 0.2.23; not started/not connected; no tooltip occlusion, fabricated exit IP, traffic, latency, node or running knot"
+      "post_capture_ownership_checked": true,
+      "inspection_scope": "Source, native window, pixel ownership and dimensions; final subjective visual acceptance remains with the owner"
     }
   ],
   "limits": [
-    "Screenshots demonstrate appearance only; not animation frame-rate or private-provider/network acceptance.",
-    "The running cloud-knot is not forced into the disconnected state.",
-    "No claim that this source has merged to main, passed all CI or been released.",
-    "Native screenshot capture from the build cache is separate from installer integrity and installation acceptance."
+    "Appearance captures do not establish subjective acceptance, animation FPS, private-provider or physical display acceptance.",
+    "The disconnected-state running knot is not forced into view.",
+    "No claim of main promotion, CI success, release, or installer acceptance."
   ]
 }
