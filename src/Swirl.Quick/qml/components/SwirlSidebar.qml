@@ -29,14 +29,15 @@ Item {
    lightPoint:glassHover.hovered?Qt.point(glassHover.point.position.x/width,glassHover.point.position.y/height):Qt.point(0.18,(selectionMotion.position.y-floatingBackground.y+Theme.sidebarRowHeight*.5)/height)
   }
   ShaderEffect {
+   objectName:"sidebarExteriorShadow"
    readonly property real padding:Theme.dp(24)
    x:-padding;y:-padding;width:floatingBackground.width+2*padding;height:floatingBackground.height+2*padding
    z:-1;visible:Theme.effectsSupported && !Theme.increaseContrast
    property vector2d surfaceSize:Qt.vector2d(floatingBackground.width,floatingBackground.height)
    property real cornerRadius:floatingBackground.radius
-   property vector2d shadowOffset:Qt.vector2d(Theme.dp(1),Theme.dp(2))
-   property real softness:Theme.dp(7)
-   property color shadowColor:Theme.withAlpha(Theme.shadowColor,Theme.dark?0.10:0.035)
+   property vector2d shadowOffset:Qt.vector2d(Theme.dp(2),Theme.dp(4))
+   property real softness:Theme.dp(8)
+   property color shadowColor:Theme.withAlpha(Theme.shadowColor,Theme.dark?0.16:0.06)
    fragmentShader:"qrc:/swirl/shaders/sidebar-shadow.frag.qsb"
   }
  }

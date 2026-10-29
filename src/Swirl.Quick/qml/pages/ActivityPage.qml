@@ -232,7 +232,7 @@ Item {
                 id: statusCard
                 objectName: "activityStatusCard"
                 Layout.fillWidth: true; Layout.minimumHeight: statusBody.implicitHeight + Theme.dp(24); Layout.preferredHeight: Layout.minimumHeight
-                cornerRadius: Theme.cardRadius; color: Theme.surface
+                cornerRadius: Theme.sidebarRadius; radius: cornerRadius; color: Theme.surface
                 Item {
                     id: statusEmblem
                     objectName: "activityStatusEmblem"
@@ -241,11 +241,6 @@ Item {
                     width: Theme.dp(page.compact ? 48 : 108)
                     height: page.compact ? Theme.dp(32) : statusCard.height - Theme.dp(20)
                     Accessible.ignored: true
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: Theme.dp(page.compact ? 12 : 24)
-                        color: Theme.raised; antialiasing: true
-                    }
                     SwirlWingAnimation {
                         objectName: "activityStatusWingBackdrop"
                         anchors.fill: parent; anchors.margins: Theme.dp(page.compact ? 4 : 2)
