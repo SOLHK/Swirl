@@ -192,7 +192,8 @@ class ShadowsocksTests(unittest.TestCase):
             result=subprocess.run([os.environ['SWIRL_RUST_QT_TESTS'],'shadowsocksThroughIndependentPeer','loonShadowsocksThroughIndependentPeer','-o',log+',txt'],env=env,capture_output=True,text=True,timeout=15)
             output=Path(log).read_text(encoding='utf-8') if os.path.exists(log) else ''
             self.assertEqual(result.returncode,0,output+result.stdout+result.stderr)
-        self.assertEqual(server.targets,[('origin.example',80)] * 4)
+        # One native case and four Loon cases, including both fast-open values.
+        self.assertEqual(server.targets,[('origin.example',80)] * 5)
     def test_ipv4_and_ipv6_target_encodings(self):
         server=self.setup_peer()
         for authority,host in [('127.0.0.1:8080','127.0.0.1'),('[::1]:8080','::1')]:
