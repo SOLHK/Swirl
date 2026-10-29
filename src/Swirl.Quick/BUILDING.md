@@ -29,6 +29,12 @@ OpenSSL from Git, Poppler, another application or an unrelated Qt kit.
 For MSVC, enter an x64 Visual Studio developer shell with native Windows Perl,
 NASM, `cl.exe` and `nmake.exe` on PATH, then run from the repository root:
 
+The CI helper prepares NASM 3.02 from the fixed official Windows ZIP via
+`scripts/Prepare-Nasm.ps1`; it verifies the archive, executable and license
+hashes instead of assuming the runner contains NASM. These pins identify the
+exact official HTTPS download; no separate upstream checksum or signature is
+claimed. The tool stays outside the deployable OpenSSL runtime and installer.
+
 ```powershell
 python tools/Build-OpenSslRuntime.py --output D:/Codex/build/swirl-openssl-msvc --target VC-WIN64A
 ./scripts/build-quick-windows.ps1 -QtDir <Qt-MSVC-x64-directory> -OpenSslRoot D:/Codex/build/swirl-openssl-msvc

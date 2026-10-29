@@ -1575,6 +1575,33 @@ class CoreDevelopmentTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     development.prepare_update(root)
 
+    def test_windows_qt_public_gate_requires_exact_verified_tls_deployment(self):
+        root = Path(__file__).resolve().parents[2]
+        source = (root / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
+        block = development.public_qt_steps()
+        deploy = ('          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT '
+                  '--include-plugins qopensslbackend "$env:SWIRL_QT_PRIVATE_INSPECTOR"\n')
+        self.assertIn(deploy + development.WINDOWS_STATUS_GUARD, block)
+        # The generator owns the public gate, not the reviewed runtime setup,
+        # cache or integration deployment elsewhere in this actual workflow.
+        self.assertEqual(development.updated_workflow(source), source)
+        self.assertEqual(development.without_public_qt_steps(source), source.replace(block, "", 1))
+        mutations = (
+            deploy.replace(' --openssl-root $env:SWIRL_OPENSSL_ROOT', ''),
+            deploy.replace('$env:SWIRL_OPENSSL_ROOT', '$env:PATH'),
+            deploy.replace(' --include-plugins qopensslbackend', ''),
+            deploy.replace('qopensslbackend', 'qschannelbackend'),
+            deploy.replace('--openssl-root $env:SWIRL_OPENSSL_ROOT', '--force-openssl'),
+            deploy + deploy,
+            deploy + "          Write-Host 'unreviewed deployment command'\n",
+        )
+        for changed in mutations:
+            with self.subTest(deployment=changed), self.assertRaises(ValueError):
+                development.updated_workflow(source.replace(deploy, changed, 1))
+        with self.assertRaises(ValueError):
+            development.updated_workflow(source.replace(deploy + development.WINDOWS_STATUS_GUARD,
+                                                        deploy, 1))
+
     def test_qt_lifecycle_guard_is_required_only_in_explicit_chrome_vision_product_group(self):
         final = development.updated_workflow(FIXTURE)
         command = "python tools/tests/" + development.QT_LIFECYCLE_TEST

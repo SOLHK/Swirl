@@ -135,13 +135,20 @@ jobs:
         shell: pwsh
         run: ./scripts/Build-CiOpenSslRuntime.ps1 -OutputDirectory "$env:RUNNER_TEMP/swirl-openssl-3.5.9" -PrepareOnly -GitHubEnvironment
       - name: Restore source-verified OpenSSL runtime
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: tls_cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ runner.temp }}/swirl-openssl-3.5.9
           key: openssl-${{ runner.os }}-${{ steps.tls_tools.outputs.identity }}-${{ hashFiles('tools/Build-OpenSslRuntime.py', 'tools/openssl-runtime.lock.json') }}
       - name: Build or verify pinned OpenSSL runtime
         shell: pwsh
         run: ./scripts/Build-CiOpenSslRuntime.ps1 -OutputDirectory "$env:RUNNER_TEMP/swirl-openssl-3.5.9" -GitHubEnvironment
+      - name: Save verified TLS compiler outputs before downstream checks
+        if: steps.tls_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/swirl-openssl-3.5.9
+          key: ${{ steps.tls_cache.outputs.cache-primary-key }}
       - name: Restore Qt 6.12 compiler outputs
         id: build_cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
