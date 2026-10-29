@@ -249,9 +249,9 @@ Item {
   height:host.interpolate(host.surfaceStart.height,host.surfaceEnd.height,host.surfacePosition)
   cornerRadius:(host.sourceSurface && host.sourceSurface.radius!==undefined?host.sourceSurface.radius:settingsTransition?Theme.cardRadius:0)*(1-host.position)+(host.targetSurface && host.targetSurface.radius!==undefined?host.targetSurface.radius:settingsTransition?Theme.cardRadius:0)*host.position
   color:host.heroData && host.heroData.key==="settings"?Qt.rgba(
-    host.heroData.returning?host.heroData.toColor.r:host.heroData.fromColor.r,
-    host.heroData.returning?host.heroData.toColor.g:host.heroData.fromColor.g,
-    host.heroData.returning?host.heroData.toColor.b:host.heroData.fromColor.b,
+    host.interpolate(host.heroData.fromColor.r,host.heroData.toColor.r,materialReveal),
+    host.interpolate(host.heroData.fromColor.g,host.heroData.toColor.g,materialReveal),
+    host.interpolate(host.heroData.fromColor.b,host.heroData.toColor.b,materialReveal),
     host.heroData.fromColor.a*(1-materialReveal)+host.heroData.toColor.a*materialReveal):Theme.independentCard
   Column {
    readonly property var card:morph.settingsTransition&&host.heroData?host.heroData.card:null

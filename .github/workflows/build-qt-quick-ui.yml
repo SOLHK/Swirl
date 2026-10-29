@@ -442,6 +442,7 @@ jobs:
             build/swirl-quick/Release/Swirl-appearance-restore.txt
             build/swirl-quick/motion-report.json
             build/swirl-quick/hero-evidence/
+            build/swirl-quick/navigation-evidence/
             build/swirl-quick/settings-material-evidence/
             build/swirl-quick/Release/Swirl-diagnostics.txt
             build/swirl-quick/Release/Swirl-node-ui-diagnostics.txt

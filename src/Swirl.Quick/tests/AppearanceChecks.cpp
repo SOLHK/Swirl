@@ -167,7 +167,7 @@ Item {
                             const auto scale=paint->scale();
                             const auto labelScale=content?content->scale():0;
                             pressFrames.append(QJsonObject{{"phase",QString::fromLatin1(phase)},{"elapsedMs",elapsed},{"down",down},{"contact",paint->property("contactProgress").toReal()},{"surfaceScale",scale},{"contentScale",labelScale}});
-                            if(qstrcmp(phase,"afterAnimating")==0&&elapsed<=40&&down&&scale<.995&&content&&qAbs(labelScale-scale)<.001)contractedWithin40ms=true;
+                            if((qstrcmp(phase,"afterAnimating")==0||qstrcmp(phase,"frameSwappedQueued")==0)&&elapsed<=40&&down&&scale<.995&&content&&qAbs(labelScale-scale)<.001)contractedWithin40ms=true;
                         };
                         QObject pressContext;
                         const auto pressAnimation=QObject::connect(window,&QQuickWindow::afterAnimating,&pressContext,[&]{samplePress("afterAnimating");});

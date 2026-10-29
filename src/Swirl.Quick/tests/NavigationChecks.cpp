@@ -83,7 +83,7 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
    backFollowsPage&=eval("!pageLoader.heroData || pageLoader.heroData.key!=='settings' || pageLoader.position>=0.82 || settingsBack.opacity===0").toBool();
    if(auto *morph=item("sharedSurface")){
     unframed&=!morph->property("independentCard").toBool()&&morph->property("radius").toDouble()>0&&QQmlExpression(qmlContext(morph),morph,"border.width===0").evaluate().toBool();
-    unframed&=QQmlExpression(qmlContext(morph),morph,"!settingsTransition || color.a<0.01 || ['r','g','b'].every(channel=>Math.abs(color[channel]-(host.heroData.returning?host.heroData.toColor[channel]:host.heroData.fromColor[channel]))<0.005)").evaluate().toBool();
+    unframed&=QQmlExpression(qmlContext(morph),morph,"!settingsTransition || color.a<0.01 || ['r','g','b'].every(channel=>color[channel]>=Math.min(host.heroData.fromColor[channel],host.heroData.toColor[channel])-0.005 && color[channel]<=Math.max(host.heroData.fromColor[channel],host.heroData.toColor[channel])+0.005)").evaluate().toBool();
     // A pointer click can sample an intermediate hover/press color. Preserve
     // that live neutral feedback rather than requiring the resting white.
     unframed&=QQmlExpression(qmlContext(morph),morph,"!settingsTransition || color.a<0.01 || ['r','g','b'].every(channel=>color[channel]>=Math.min(Theme.cardPressed[channel],Theme.independentCard[channel])-0.005 && color[channel]<=Math.max(Theme.cardPressed[channel],Theme.independentCard[channel])+0.005)").evaluate().toBool();
@@ -190,6 +190,10 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
  // Its pixels must already equal the committed page; otherwise completion
  // swaps a hidden title, material or clip boundary in a single frame.
  for(const auto &id:routes){
+  if(auto *card=item("settings-"+id)){
+   const auto center=card->mapToScene(QPointF(card->width()/2,card->height()/2)).toPoint();
+   QCursor::setPos(window->mapToGlobal(center));QTest::mouseMove(window,center);wait(160);
+  }
   click("settings-"+id);
   // Leave the destination's controls unhovered: this comparison concerns
   // surface retirement, not a new hover animation under the old card point.
@@ -209,7 +213,7 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
       &&dragRect.contains(parkingPoint)&&!controlsRect.contains(parkingPoint)
       &&!sidebarRect.contains(parkingPoint)&&(!backButton||!backRect.contains(parkingPoint));
   check(parkingSafe,"endpoint pointer has an empty title-bar position outside controls: "+id);
-  if(parkingSafe)QTest::mouseMove(window,parkingPoint);
+  if(parkingSafe){QCursor::setPos(window->mapToGlobal(parkingPoint));QTest::mouseMove(window,parkingPoint);}
   QElapsedTimer endpointWait;endpointWait.start();bool reachedEndpoint=false;
   do{wait(2);reachedEndpoint=eval("pageLoader.moving && pageLoader.position===1").toBool();}while(!reachedEndpoint&&endpointWait.elapsed()<4000);
   check(reachedEndpoint,"endpoint fixture naturally reaches the final expansion segment: "+id);
@@ -235,7 +239,7 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
   const double changedRatio=before.isNull()?1:double(changed)/(before.width()*before.height());
   check(!before.isNull()&&before.size()==after.size()&&changedRatio<0.0005,"final expanded frame and committed page have no visual jump: "+id);
   endpointSamples.append(QJsonObject{{"route",id},{"changedPixels",double(changed)},{"changedRatio",changedRatio},{"geometryBefore",geometryBefore},{"geometryAfter",id=="profiles"?eval(geometryScript).toString():QString()}});
-  if(!qApp->arguments().contains("--hero-no-recording")){before.save(directory+"/"+id+"-before-retirement.png");after.save(directory+"/"+id+"-after-retirement.png");}
+  if(changedRatio>=0.0005||!qApp->arguments().contains("--hero-no-recording")){before.save(directory+"/"+id+"-before-retirement.png");after.save(directory+"/"+id+"-after-retirement.png");}
   click("settingsBackButton");check(settle(),"endpoint fixture returns to the card hub: "+id);
  }
  const auto cacheCount=eval("pageLoader.cachedPageCount").toInt();
