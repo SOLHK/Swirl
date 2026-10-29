@@ -76,8 +76,7 @@ Item {
  }
  property alias searchField:pageSearch
  function openSearch(){ searchPopup.open();pageSearch.forceActiveFocus() }
- SwirlBrandIcon {x:Theme.dp(25);y:Theme.dp(25);width:Theme.dp(28);height:width}
- SwirlText {x:Theme.dp(62);y:Theme.dp(27);text:"Swirl";font.pixelSize:Theme.fontSize(22);font.weight:Font.DemiBold;color:Theme.text;opacity:sidebar.expansion;visible:opacity>0.1}
+ SwirlText {x:Theme.dp(26);y:Theme.dp(27);text:"Swirl";font.pixelSize:Theme.fontSize(22);font.weight:Font.DemiBold;color:Theme.text;opacity:sidebar.expansion;visible:opacity>0.1}
  SwirlText {
   objectName:"engineIdentityLabel"
   x:Theme.dp(26);y:Theme.dp(62);width:sidebar.width-Theme.dp(52)

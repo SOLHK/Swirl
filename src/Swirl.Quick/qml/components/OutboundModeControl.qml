@@ -234,28 +234,6 @@ SwirlMotionButton {
                 onTriggered: control.requestMode(modelData.key)
             }
         }
-        MenuSeparator { contentItem: Rectangle { implicitHeight: 1; color: Theme.separator } }
-        MenuItem {
-            enabled: false
-            height: Math.max(Theme.dp(40), statusLabel.implicitHeight + Theme.dp(14))
-            contentItem: SwirlText {
-                id: statusLabel
-                text: control.statusText
-                textFormat: Text.PlainText
-                color: control.message.length ? Theme.orange : Theme.muted
-                font.pixelSize: Theme.fontSize(11)
-                wrapMode: Text.Wrap
-            }
-        }
-        MenuItem {
-            id: strategyLink
-            SwirlPressMotion{}
-            text: qsTr("前往策略")
-            height: Theme.dp(34)
-            contentItem: SwirlText { text: strategyLink.text; color: Theme.text; font.pixelSize: Theme.fontSize(12); verticalAlignment: Text.AlignVCenter }
-            background: SwirlControlSurface {quiet:true;hovered:strategyLink.hovered;pressed:strategyLink.down;focused:strategyLink.visualFocus;selected:strategyLink.highlighted;controlEnabled:strategyLink.enabled}
-            onTriggered: AppState.navigate("policies")
-        }
     }
     Connections {
         target: control.engineController
