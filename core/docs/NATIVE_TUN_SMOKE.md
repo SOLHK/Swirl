@@ -50,8 +50,9 @@ Windows driver package from DriverStore. Dispose of the runner afterward.
 The executable starts one ordinary V2 Core and uses the existing
 `FlowDispatcher`, `TunDns`, `native_tun::spawn`, protocol dispatch and session
 bookkeeping. The same Core remains alive while its policies change through the
-normal V2 transaction API. There is no local SOCKS relay or alternative proxy
-engine.
+normal V2 transaction API. There is no added ingress proxy hop or alternative
+proxy engine. The protocol servers below are test peers selected by the native
+Core outbounds; they do not replace the TUN packet path.
 
 The initial DIRECT data tests use exact static hosts mapping two `.invalid`
 fixture names to `127.0.0.1` and `::1`. This initial configuration includes the
@@ -145,6 +146,56 @@ the checked-in `src/Swirl.Quick/packaging/rules` directory from the compiled
 manifest path; those source assets must remain available when running this
 acceptance executable. This checks Rule-mode loading for the REJECT case, not
 the classification behavior of every MRS rule.
+
+### UDP policy and native SOCKS5 controls
+
+The additional UDP policy cases run for both IPv4 and IPv6 through real Windows
+client sockets and the same exact fake-address routes, Wintun bridge and V2 Core.
+The selected PROXY node uses the existing native SOCKS5 UDP implementation.
+Its loopback TCP control server and UDP relay are bounded protocol fixtures;
+the TUN is not forwarded wholesale to a local system proxy. The encrypted DNS
+fixture still has no static-host entries, so PROXY and REJECT are selected
+before any loopback target resolution can select the built-in local rule.
+
+| UDP case | Required observations |
+| --- | --- |
+| PROXY data and established-node failure | One native SOCKS5 UDP association carries an empty datagram and a checked 1,200-byte datagram. The relay validates the original domain, port, source family, stable association endpoint and complete payload. Windows receives both replies from the original fake endpoint. Core first records the selected proxy node, no error and exactly 1,200 upload/download bytes. Only then does the test signal the peer to close TCP control; Core must terminate that same record with `Socks5UdpControlClosed`, preserving both byte counters. |
+| REJECT | The existing Rule-mode domain-suffix rule returns category `reject`, node `SWIRL_V2_REJECT`, error `Rejected`, and zero upload/download bytes. Neither the DIRECT trap nor the unused UDP relay or TCP proxy listener may receive traffic. |
+| Proxy denies UDP ASSOCIATE | The real SOCKS5 peer reads the expected greeting and UDP ASSOCIATE request and writes REP `0x02`. Core must terminate with category `proxy`, the selected node, `UpstreamRejected`, and zero byte counters. No UDP relay or DIRECT traffic is allowed. |
+| Proxy unavailable | A loopback TCP port remains bound without listening, and an explicit connection control first verifies `ConnectionRefused`. Core must terminate the UDP admission with category `proxy`, the selected node, `UpstreamConnectionRefused`, and zero byte counters. This is a refused control connection, not a claim about UDP unreachable-network behavior. |
+
+Every case has a successful DIRECT control before and after against the same
+hostname, target port and still-open UDP trap. Those controls use different
+Windows source sockets, retained until all cases finish so their ports cannot
+be reused accidentally. UDP has no FIN: an existing source tuple intentionally
+retains its original Core association rather than adopting a newly selected
+policy. Each DIRECT control checks the real trap request/reply and an active
+Core record with its exact source endpoint, DIRECT node and four-byte counters.
+Those control flows are cleaned up with the bridge at the end of the smoke.
+
+After each case's exact terminal record is observed, the policy switches to
+DIRECT and the original failed source tuple sends a 1,200-byte retry. Within
+the bridge's existing failed-tuple retention window, its dropped-datagram
+counter must advance by exactly one and Core's admission counter must remain
+unchanged. The trap, relay and client must have no unexpected queued datagram,
+including an empty one, and the proxy listener must have no new connection.
+Only a fresh source tuple may then complete the final DIRECT control. This
+tests the failed tuple's prohibition on redial or DIRECT fallback; a receive
+timeout by itself cannot satisfy the negative case. The DoT query counter must
+also remain unchanged during each PROXY/REJECT attempt.
+
+The fixture reserves 32 bounded UDP slots for the two initial DIRECT tuples
+plus two families × four policy cases × three retained source tuples: 26 in
+total. This accommodates the additional controls and failed-tuple entries
+without evicting them or changing the production capacity checks.
+
+Each passing case emits `Wintun smoke: PASS UDP policy` with its source endpoint,
+actual Core record ID, category, node, terminal error and byte counters. Final
+JSON distinguishes `additional_cases.tcp_policy` from
+`additional_cases.udp_policy`; the latter contains all eight case results and
+their retry/control evidence. These are implemented assertions pending a
+successful driver run for the exact source, not acceptance inferred from a
+portable fixture or compilation result.
 
 Core server-side peers must observe loopback sources. Both Wintun receive and
 send counters must be nonzero. A successful final result requires all packet
@@ -261,7 +312,8 @@ This test does **not** certify Windows 11 Chrome/VS Code/Codex, internet proxy
 protocol interoperability, full-system routing, DNS leakage, physical-interface
 loop prevention, firewall enforcement, Wi-Fi switching, suspend/resume, abrupt
 termination recovery, long-duration streaming, or throughput/CPU/memory limits.
-It does not test UDP PROXY/REJECT policies or every supported proxy protocol.
+The UDP policy extension covers native SOCKS5 UDP, not every supported proxy
+protocol or arbitrary UDP endpoint failure mode.
 Network rebuilding still has a period without capture and no complete
 kill-switch; this smoke cannot establish zero-leak switching. It always reports
 `windows_11_application_acceptance: false` and
@@ -269,6 +321,6 @@ kill-switch; this smoke cannot establish zero-leak switching. It always reports
 
 Its intended Stage B evidence is specific: real Windows L3 packets traverse
 Wintun, the existing Rust stack and Core, reach controlled loopback peers, and
-return correctly for both IP families, with the stated TCP policy cases and
+return correctly for both IP families, with the stated TCP/UDP policy cases and
 verified cleanup. The broader acceptance items remain open until independently
 executed and recorded.

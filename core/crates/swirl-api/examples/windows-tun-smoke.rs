@@ -341,6 +341,7 @@ mod windows {
         runtime: Handle,
         bridge: BridgeControl,
         stats: TunStats,
+        bridge_stats: Arc<native_tun::BridgeStats>,
         reader: Option<thread::JoinHandle<()>>,
         writer: Option<JoinHandle<()>>,
         closing: Arc<AtomicBool>,
@@ -439,6 +440,7 @@ mod windows {
                 runtime,
                 bridge: packet.control,
                 stats: packet.stats,
+                bridge_stats: packet.bridge_stats,
                 reader: None,
                 writer: None,
                 closing: Arc::new(AtomicBool::new(false)),
@@ -1258,6 +1260,509 @@ mod windows {
         Ok(())
     }
 
+    #[derive(Clone, Copy)]
+    struct UdpOutcome {
+        ended: bool,
+        error: &'static str,
+        bytes: u64,
+    }
+
+    fn udp_record(
+        core: &Core,
+        baseline: u64,
+        source: SocketAddr,
+        host: &str,
+        port: u16,
+        category: &str,
+        expected: UdpOutcome,
+    ) -> io::Result<serde_json::Value> {
+        let deadline = Instant::now() + IO_WAIT;
+        let node = match category {
+            "direct" => "SWIRL_V2_DIRECT",
+            "reject" => "SWIRL_V2_REJECT",
+            "proxy" => NODE_ID,
+            _ => return Err(io::Error::other("unexpected UDP evidence category")),
+        };
+        loop {
+            let snapshot = core.snapshot().map_err(io::Error::other)?;
+            let matches = snapshot["connections"]
+                .as_array()
+                .ok_or_else(|| io::Error::other("missing Core UDP records"))?
+                .iter()
+                .filter(|row| {
+                    row["id"].as_u64().is_some_and(|id| id > baseline)
+                        && row["host"] == host
+                        && row["port"] == port
+                })
+                .collect::<Vec<_>>();
+            let diagnose = || {
+                eprintln!(
+                    "Wintun smoke: UDP Core assertion {}",
+                    json!({"host":host,"port":port,"source":source,"baseline":baseline,
+                        "expected":{"category":category,"node":node,"ended":expected.ended,
+                            "error":expected.error,"upload":expected.bytes,"download":expected.bytes},
+                        "observed":matches})
+                );
+            };
+            if matches.len() > 1 {
+                diagnose();
+                return Err(io::Error::other(
+                    "one UDP tuple produced multiple Core admissions",
+                ));
+            }
+            if let Some(row) = matches.first() {
+                if row["source_ip"] != source.ip().to_string()
+                    || row["source_port"] != source.port()
+                    || row["category"] != category
+                    || row["node"] != node
+                {
+                    diagnose();
+                    return Err(io::Error::other(
+                        "UDP Core source or selected route changed",
+                    ));
+                }
+                if row["ended"] == true
+                    || (!expected.ended
+                        && row["upload"] == expected.bytes
+                        && row["download"] == expected.bytes)
+                {
+                    if row["ended"] != expected.ended
+                        || row["error"] != expected.error
+                        || row["upload"] != expected.bytes
+                        || row["download"] != expected.bytes
+                    {
+                        diagnose();
+                        return Err(io::Error::other(
+                            "UDP Core terminal state or counters changed",
+                        ));
+                    }
+                    return Ok((*row).clone());
+                }
+            }
+            if Instant::now() >= deadline {
+                diagnose();
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "UDP Core evidence deadline",
+                ));
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    fn no_udp_receive(socket: &std::net::UdpSocket) -> io::Result<()> {
+        socket.set_nonblocking(true)?;
+        match socket.recv_from(&mut [0; UDP_BYTES + 1]) {
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => Ok(()),
+            Err(error) => Err(error),
+            Ok((length, _)) => Err(io::Error::other(format!(
+                "forbidden UDP endpoint received {length} bytes, including empty datagrams"
+            ))),
+        }
+    }
+
+    fn udp_direct_control(
+        core: &Core,
+        directory: &Path,
+        runtime: &Handle,
+        mut config: RuntimeConfig,
+        fake: IpAddr,
+        trap: &std::net::UdpSocket,
+    ) -> io::Result<std::net::UdpSocket> {
+        config.policy.mode = Mode::Direct;
+        apply_policy(core, directory, config)?;
+        let port = trap.local_addr()?.port();
+        let baseline = accepted_count(core)?;
+        let server = trap.try_clone()?;
+        let peer = Peer::spawn(runtime, "UDP DIRECT trap control", async move {
+            timeout(IO_WAIT, async {
+                let server = tokio::net::UdpSocket::from_std(server)?;
+                let mut buffer = [0; UDP_BYTES + 1];
+                let (length, source) = server.recv_from(&mut buffer).await?;
+                require(
+                    source.ip().is_loopback(),
+                    "UDP DIRECT control escaped loopback",
+                )?;
+                require(
+                    &buffer[..length] == b"trap",
+                    "UDP DIRECT trap received unexpected payload",
+                )?;
+                require(
+                    server.send_to(b"live", source).await? == 4,
+                    "short UDP DIRECT control reply",
+                )
+            })
+            .await
+            .map_err(io::Error::other)?
+        });
+        let client = local_udp(fake.is_ipv6())?;
+        let destination = SocketAddr::new(fake, port);
+        require(
+            client.send_to(b"trap", destination)? == 4,
+            "short UDP DIRECT control send",
+        )?;
+        let mut response = [0; UDP_BYTES + 1];
+        let (length, sender) = client.recv_from(&mut response)?;
+        require(
+            sender == destination && &response[..length] == b"live",
+            "UDP DIRECT control did not return through Wintun",
+        )?;
+        peer.finish(runtime)?;
+        udp_record(
+            core,
+            baseline,
+            client.local_addr()?,
+            if fake.is_ipv6() { HOST_V6 } else { HOST_V4 },
+            port,
+            "direct",
+            UdpOutcome {
+                ended: false,
+                error: "",
+                bytes: 4,
+            },
+        )?;
+        // Keep this Windows source port occupied: UDP has no FIN, and reusing
+        // its five-tuple would intentionally retain the previous Core policy.
+        Ok(client)
+    }
+
+    fn socks5_udp_peer(
+        runtime: &Handle,
+        listener: std::net::TcpListener,
+        relay: std::net::UdpSocket,
+        host: &'static str,
+        port: u16,
+        reject: bool,
+    ) -> (Peer, tokio::sync::oneshot::Sender<()>) {
+        let (close, closed) = tokio::sync::oneshot::channel();
+        let peer = Peer::spawn(
+            runtime,
+            format!("SOCKS5 UDP host={host} reject={reject}"),
+            async move {
+                timeout(IO_WAIT, async {
+                    let listener = tokio::net::TcpListener::from_std(listener)?;
+                    let relay = tokio::net::UdpSocket::from_std(relay)?;
+                    let address = relay.local_addr()?;
+                    let (mut control, source) = listener.accept().await?;
+                    require(source.ip().is_loopback(), "SOCKS5 control escaped loopback")?;
+                    let mut greeting = [0; 3];
+                    control.read_exact(&mut greeting).await?;
+                    require(greeting == [5, 1, 0], "unexpected SOCKS5 UDP greeting")?;
+                    control.write_all(&[5, 0]).await?;
+                    let mut command = [0; 4];
+                    control.read_exact(&mut command).await?;
+                    require(
+                        command == [5, 3, 0, if source.is_ipv6() { 4 } else { 1 }],
+                        "SOCKS5 UDP ASSOCIATE command changed",
+                    )?;
+                    let mut unspecified = vec![0; if source.is_ipv6() { 18 } else { 6 }];
+                    control.read_exact(&mut unspecified).await?;
+                    require(
+                        unspecified.iter().all(|byte| *byte == 0),
+                        "SOCKS5 association source request changed",
+                    )?;
+                    let mut reply = vec![5, if reject { 2 } else { 0 }, 0];
+                    match address.ip() {
+                        IpAddr::V4(ip) => {
+                            reply.push(1);
+                            reply.extend_from_slice(&ip.octets());
+                        }
+                        IpAddr::V6(ip) => {
+                            reply.push(4);
+                            reply.extend_from_slice(&ip.octets());
+                        }
+                    }
+                    reply.extend_from_slice(&address.port().to_be_bytes());
+                    control.write_all(&reply).await?;
+                    if reject {
+                        // A client may abort as soon as it reads the nonzero REP.
+                        // The full denial is written; no UDP relay was admitted.
+                        return Ok(());
+                    }
+                    let mut header = vec![0, 0, 0, 3, host.len() as u8];
+                    header.extend_from_slice(host.as_bytes());
+                    header.extend_from_slice(&port.to_be_bytes());
+                    let mut original_source = None;
+                    let mut buffer = vec![0; header.len() + UDP_BYTES + 1];
+                    for size in [0, UDP_BYTES] {
+                        let (length, source) = relay.recv_from(&mut buffer).await?;
+                        require(
+                            source.ip().is_loopback() && source.is_ipv6() == address.is_ipv6(),
+                            "SOCKS5 UDP relay source changed family or escaped loopback",
+                        )?;
+                        require(
+                            original_source.is_none_or(|original| original == source),
+                            "SOCKS5 UDP source changed during one association",
+                        )?;
+                        original_source = Some(source);
+                        let expected = [header.as_slice(), &payload(size)].concat();
+                        require(
+                            buffer[..length] == expected,
+                            "SOCKS5 UDP target, empty boundary or payload changed",
+                        )?;
+                        require(
+                            relay.send_to(&buffer[..length], source).await? == length,
+                            "short SOCKS5 UDP reply",
+                        )?;
+                    }
+                    // Close only after Windows received both replies. Otherwise an
+                    // intentional control failure could overtake the final packet.
+                    closed.await.map_err(io::Error::other)?;
+                    control.shutdown().await
+                })
+                .await
+                .map_err(io::Error::other)?
+            },
+        );
+        (peer, close)
+    }
+
+    fn udp_policy_roundtrips(
+        core: &Core,
+        directory: &Path,
+        runtime: &Handle,
+        fake: [IpAddr; 2],
+        run: &DeviceRun,
+    ) -> io::Result<Vec<serde_json::Value>> {
+        let (encrypted_dns, _dns_peer, dns_queries) = dns_fixture(runtime)?;
+        let mut retained_clients = Vec::new();
+        let mut evidence = Vec::new();
+        for (index, host) in [HOST_V4, HOST_V6].into_iter().enumerate() {
+            let ipv6 = index == 1;
+            let family = if ipv6 { 6 } else { 4 };
+            for case in ["proxy", "reject", "proxy_rejected", "proxy_unavailable"] {
+                eprintln!("Wintun smoke: IPv{family} UDP {case} with reachable DIRECT controls");
+                let trap = std::net::UdpSocket::bind(SocketAddr::new(loopback(ipv6), 0))?;
+                trap.set_nonblocking(true)?;
+                let port = trap.local_addr()?.port();
+                let relay = std::net::UdpSocket::bind(SocketAddr::new(loopback(ipv6), 0))?;
+                relay.set_nonblocking(true)?;
+                let proxy = std::net::TcpListener::bind(SocketAddr::new(loopback(ipv6), 0))?;
+                proxy.set_nonblocking(true)?;
+                let unavailable = if case == "proxy_unavailable" {
+                    let socket = if ipv6 {
+                        tokio::net::TcpSocket::new_v6()?
+                    } else {
+                        tokio::net::TcpSocket::new_v4()?
+                    };
+                    socket.bind(SocketAddr::new(loopback(ipv6), 0))?;
+                    Some(socket)
+                } else {
+                    None
+                };
+                let proxy_address = match &unavailable {
+                    Some(socket) => socket.local_addr()?,
+                    None => proxy.local_addr()?,
+                };
+                if unavailable.is_some() {
+                    match std::net::TcpStream::connect_timeout(&proxy_address, IO_WAIT) {
+                        Err(error) if error.kind() == io::ErrorKind::ConnectionRefused => {}
+                        Err(error) => {
+                            return Err(io::Error::other(format!(
+                                "UDP unavailable proxy control did not refuse: {error}"
+                            )));
+                        }
+                        Ok(_) => {
+                            return Err(io::Error::other(
+                                "UDP unavailable proxy control unexpectedly connected",
+                            ));
+                        }
+                    }
+                }
+                let mut config = runtime_config()?;
+                config.dns = encrypted_dns.clone();
+                config.nodes[0].outbound = Outbound::Socks5 {
+                    host: proxy_address.ip().to_string(),
+                    port: proxy_address.port(),
+                    auth: None,
+                    tls: None,
+                    udp: true,
+                };
+                retained_clients.push(udp_direct_control(
+                    core,
+                    directory,
+                    runtime,
+                    config.clone(),
+                    fake[index],
+                    &trap,
+                )?);
+                no_udp_receive(&trap)?;
+                config.policy.mode = if case == "reject" {
+                    Mode::Rule
+                } else {
+                    Mode::Global
+                };
+                if case == "reject" {
+                    config.china_rules_directory = Some(
+                        Path::new(env!("CARGO_MANIFEST_DIR"))
+                            .join("../../../src/Swirl.Quick/packaging/rules")
+                            .canonicalize()?
+                            .to_str()
+                            .ok_or_else(|| io::Error::other("MRS fixture path is not UTF-8"))?
+                            .into(),
+                    );
+                    config.policy.custom_rules.push(PolicyRule {
+                        id: "e1000000-0000-4000-8000-000000000001".into(),
+                        name: "Reject owned Wintun UDP targets".into(),
+                        enabled: true,
+                        priority: 0,
+                        matcher: Matcher::DomainSuffix {
+                            value: "wintun.smoke.invalid".into(),
+                        },
+                        target: Target::Reject {},
+                    });
+                }
+                apply_policy(core, directory, config.clone())?;
+                let baseline = accepted_count(core)?;
+                let queries_before = dns_queries.load(Ordering::Acquire);
+                let peer = if matches!(case, "reject" | "proxy_unavailable") {
+                    None
+                } else {
+                    Some(socks5_udp_peer(
+                        runtime,
+                        proxy.try_clone()?,
+                        relay.try_clone()?,
+                        host,
+                        port,
+                        case == "proxy_rejected",
+                    ))
+                };
+                let client = local_udp(ipv6)?;
+                let source = client.local_addr()?;
+                let destination = SocketAddr::new(fake[index], port);
+                require(
+                    client.send_to(&[], destination)? == 0,
+                    "empty UDP send changed length",
+                )?;
+                if case == "proxy" {
+                    let mut response = [0; UDP_BYTES + 1];
+                    let (length, sender) = client.recv_from(&mut response)?;
+                    require(
+                        length == 0 && sender == destination,
+                        "SOCKS5 empty UDP reply identity changed",
+                    )?;
+                    let message = payload(UDP_BYTES);
+                    require(
+                        client.send_to(&message, destination)? == UDP_BYTES,
+                        "short SOCKS5 UDP payload send",
+                    )?;
+                    let (length, sender) = client.recv_from(&mut response)?;
+                    require(
+                        sender == destination && response[..length] == message,
+                        "SOCKS5 UDP payload or fake source identity changed",
+                    )?;
+                    udp_record(
+                        core,
+                        baseline,
+                        source,
+                        host,
+                        port,
+                        "proxy",
+                        UdpOutcome {
+                            ended: false,
+                            error: "",
+                            bytes: UDP_BYTES as u64,
+                        },
+                    )?;
+                }
+                if let Some((peer, close)) = peer {
+                    if case == "proxy" {
+                        close.send(()).map_err(|_| {
+                            io::Error::other("SOCKS5 control peer ended before close request")
+                        })?;
+                    }
+                    peer.finish(runtime)?;
+                }
+                let (category, error, bytes) = match case {
+                    "proxy" => ("proxy", "Socks5UdpControlClosed", UDP_BYTES as u64),
+                    "reject" => ("reject", "Rejected", 0),
+                    "proxy_rejected" => ("proxy", "UpstreamRejected", 0),
+                    _ => ("proxy", "UpstreamConnectionRefused", 0),
+                };
+                let record = udp_record(
+                    core,
+                    baseline,
+                    source,
+                    host,
+                    port,
+                    category,
+                    UdpOutcome {
+                        ended: true,
+                        error,
+                        bytes,
+                    },
+                )?;
+                require(
+                    dns_queries.load(Ordering::Acquire) == queries_before,
+                    "UDP proxy/reject attempted direct target DNS",
+                )?;
+                no_udp_receive(&trap)?;
+                no_udp_receive(&relay)?;
+                no_udp_receive(&client)?;
+                no_tcp_accept(&proxy)?;
+
+                // A policy switch is not permission to replay a failed UDP
+                // association. Verify that this very source tuple is consumed
+                // and dropped, without another Core admission or DIRECT send.
+                config.policy.mode = Mode::Direct;
+                apply_policy(core, directory, config.clone())?;
+                let admissions = accepted_count(core)?;
+                require(
+                    admissions == baseline + 1,
+                    "UDP fixture performed unexpected Core admissions",
+                )?;
+                let dropped = run.bridge_stats.udp_dropped.load(Ordering::Acquire);
+                let retry = payload(UDP_BYTES);
+                require(
+                    client.send_to(&retry, destination)? == retry.len(),
+                    "short failed-tuple UDP retry",
+                )?;
+                let deadline = Instant::now() + IO_WAIT;
+                loop {
+                    if run.bridge_stats.udp_dropped.load(Ordering::Acquire) == dropped + 1 {
+                        break;
+                    }
+                    if Instant::now() >= deadline {
+                        return Err(io::Error::new(
+                            io::ErrorKind::TimedOut,
+                            "failed UDP tuple was not observed and dropped by the packet bridge",
+                        ));
+                    }
+                    thread::sleep(Duration::from_millis(10));
+                }
+                require(
+                    accepted_count(core)? == admissions,
+                    "failed UDP tuple redialled after switching to DIRECT",
+                )?;
+                no_udp_receive(&trap)?;
+                no_udp_receive(&relay)?;
+                no_udp_receive(&client)?;
+                no_tcp_accept(&proxy)?;
+                retained_clients.push(client);
+                retained_clients.push(udp_direct_control(
+                    core,
+                    directory,
+                    runtime,
+                    config,
+                    fake[index],
+                    &trap,
+                )?);
+                no_udp_receive(&trap)?;
+                let result = json!({"family":family,"case":case,"source":source,
+                    "host":host,"port":port,"core_record_id":record["id"],
+                    "category":record["category"],"node":record["node"],"error":record["error"],
+                    "upload":record["upload"],"download":record["download"],"ended":record["ended"],
+                    "proxy_payload_lengths":if case == "proxy" { vec![0,UDP_BYTES] } else { vec![] },
+                    "initial_empty_datagram":true,"blocked_retry_payload_bytes":UDP_BYTES,
+                    "same_tuple_retry_after_direct_switch_dropped":true,
+                    "core_admissions_during_retry":0,"direct_trap_controls":2,"unexpected_trap_datagrams":0});
+                eprintln!("Wintun smoke: PASS UDP policy {}", result);
+                evidence.push(result);
+            }
+        }
+        Ok(evidence)
+    }
+
     fn payload(size: usize) -> Vec<u8> {
         (0..size).map(|index| (index % 251) as u8).collect()
     }
@@ -1705,7 +2210,10 @@ mod windows {
             TunConfig {
                 mtu: MTU as usize,
                 max_tcp_flows: 8,
-                max_udp_endpoints: 8,
+                // Two existing DIRECT tuples plus 2 families * 4 policy cases
+                // * 3 retained source tuples (before/case/after) require 26.
+                // Keep capacity bounded without evicting negative tombstones.
+                max_udp_endpoints: 32,
                 ..TunConfig::default()
             },
         )
@@ -1720,6 +2228,7 @@ mod windows {
             fake,
             binding,
         )?;
+        let mut udp_policy_evidence = Vec::new();
         let tests = (|| {
             for index in 0..2 {
                 let family = if index == 0 { 4 } else { 6 };
@@ -1740,6 +2249,7 @@ mod windows {
                 eprintln!("Wintun smoke: PASS IPv{family} empty and full UDP datagrams");
             }
             policy_roundtrips(&core, &directory, &runtime, fake)?;
+            udp_policy_evidence = udp_policy_roundtrips(&core, &directory, &runtime, fake, &run)?;
             require(
                 !run.failed.load(Ordering::Acquire),
                 "Wintun packet pump failed",
@@ -1817,6 +2327,14 @@ mod windows {
             "proxy_failure_no_direct_ipv4":true,"proxy_failure_no_direct_ipv6":true,
             "proxy_failure_cases":["http_403_rejected","connection_refused"],
             "direct_trap_controls_before_and_after":true,"verified_dot_fixture":true,
+            "tcp_policy":{"transport":"native_http_connect","families":[4,6],
+                "direct":true,"proxy":true,"reject":true,
+                "proxy_failure_no_direct":["UpstreamRejected","UpstreamConnectionRefused"]},
+            "udp_policy":{"transport":"native_socks5_udp","families":[4,6],
+                "proxy_payload_lengths":[0,UDP_BYTES],"direct":true,"proxy":true,"reject":true,
+                "proxy_failure_no_direct":["UpstreamRejected","UpstreamConnectionRefused","Socks5UdpControlClosed"],
+                "failed_source_tuple_no_redial_after_direct_switch":true,
+                "results":udp_policy_evidence},
             "windows_tcp_rst_ipv4":true,"windows_tcp_rst_ipv6":true,
             "tcp_reuse_rounds_each_family":REUSE_ROUNDS,
             "tcp_reuse_payload_bytes_each_round":REUSE_BYTES,
