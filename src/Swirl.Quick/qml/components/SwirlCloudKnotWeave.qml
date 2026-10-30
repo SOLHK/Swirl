@@ -29,7 +29,7 @@ Item {
     property var routes: ({})
     readonly property bool windowVisible: !Window.window || (Window.window.visible && Window.window.visibility !== Window.Minimized)
     readonly property bool moving: flight.running || withdrawal.running
-    readonly property real settledScale: 1 - 0.48 * smooth(0.95, 1, progress)
+    readonly property real settledScale: 1 - 0.48 * phaseEase(0.95, 1, progress)
     readonly property real markX: knotRect.x + (knotRect.width - markSize) / 2
     readonly property real markY: knotRect.y + (knotRect.height - markSize) / 2
     readonly property real pathScale: markSize / 1024 * 1.016216216
@@ -38,7 +38,7 @@ Item {
     readonly property var cardItems: [connectionItem, transferItem, sourcesItem, diagnosticItem, connectionsItem]
     Accessible.ignored: true
 
-    function smooth(start, end, value) {
+    function phaseEase(start, end, value) {
         const t = Math.max(0,Math.min(1,(value-start)/(end-start)));
         return t*t*(3-2*t);
     }
@@ -176,8 +176,8 @@ Item {
                 parent: backView; width: parent.width; height: parent.height
                 guide: strand.route?strand.route.guide:""; ink: strand.ink; ribbonWidth: Theme.dp(3.4)
                 trimStart: strand.tail; trimEnd: strand.head
-                broadening: weave.smooth(0.40,0.48,weave.progress)*(1-weave.smooth(0.57,0.64,weave.progress))
-                settlement: weave.smooth(0.70,0.95,weave.progress)
+                broadening: weave.phaseEase(0.40,0.48,weave.progress)*(1-weave.phaseEase(0.57,0.64,weave.progress))
+                settlement: weave.phaseEase(0.70,0.95,weave.progress)
             }
             Item {
                 parent: frontView
@@ -188,7 +188,7 @@ Item {
                     x: -parent.x; y: -parent.y; width: frontView.width; height: frontView.height
                     guide: strand.route?strand.route.guide:""; ink: strand.ink; ribbonWidth: Theme.dp(3.4)
                     trimStart: strand.tail; trimEnd: strand.head
-                    settlement: weave.smooth(0.70,0.95,weave.progress)
+                    settlement: weave.phaseEase(0.70,0.95,weave.progress)
                 }
             }
             RibbonStroke {
@@ -199,7 +199,7 @@ Item {
                 guide: strand.route?strand.route.guide:""; ink: strand.ink
                 ribbonWidth: Theme.dp(3.4)/weave.settledScale
                 trimStart: strand.tail; trimEnd: strand.head
-                settlement: weave.smooth(0.70,0.95,weave.progress)
+                settlement: weave.phaseEase(0.70,0.95,weave.progress)
             }
         }
     }
