@@ -1,0 +1,501 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-30T02:58:41.342444+00:00",
+  "source_commit": "200225ebf44374e2e5a4156b67be3cf73993c63e",
+  "source_tree": "8aade423bc74e581bfe3d4b27f8ec62b68ca2aa9",
+  "source_identity_basis": "The continuation root verified the frozen working tree matched the pushed 200225e source tree before archival. These are the original final-workspace logs, not a run at 87c3f9.",
+  "environment": {
+    "host": "x86_64-unknown-linux-gnu",
+    "network": "Real local IPv4/IPv6 loopback sockets and synthetic L3 packet tests; no host route, DNS, firewall or driver changes.",
+    "cargo_executable": "/tmp/swirl-cargo/bin/cargo",
+    "variables": {
+      "CARGO_HOME": "/tmp/swirl-cargo",
+      "RUSTUP_HOME": "/tmp/swirl-rustup",
+      "CARGO_TARGET_DIR": "/tmp/swirl-core-validation",
+      "CARGO_INCREMENTAL": "0"
+    },
+    "socket_permission": "The execution script ran with approval for real loopback sockets; the default sandbox rejects socket creation."
+  },
+  "working_directory": "core",
+  "commands": {
+    "tests": {
+      "normalized_reproduction_command": "cargo test --offline --locked --workspace --all-targets",
+      "exit_code": 0,
+      "log": {
+        "file": "linux-200225e.log",
+        "sha256": "55f796d93d2da28ef24c17aa638b732359dd6fd0446688e0dc15b07d5d0e71f5",
+        "bytes": 87249
+      }
+    },
+    "fmt": {
+      "normalized_reproduction_command": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "log": {
+        "file": "linux-200225e-fmt.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      }
+    },
+    "check": {
+      "normalized_reproduction_command": "cargo check --offline --locked --workspace --all-targets",
+      "exit_code": 0,
+      "log": {
+        "file": "linux-200225e-check.log",
+        "sha256": "ac4ea478b1bd49a89cc514871eece65994080f6f2c27248d24a382c3bcad7bf2",
+        "bytes": 1174
+      }
+    },
+    "clippy": {
+      "normalized_reproduction_command": "cargo clippy --offline --locked --workspace --all-targets -- -D warnings",
+      "exit_code": 0,
+      "log": {
+        "file": "linux-200225e-clippy.log",
+        "sha256": "66b60623bcadb03622f857713d361fcada3192e2b6faaedcd3cbafa668c1cb7b",
+        "bytes": 960
+      }
+    }
+  },
+  "totals": {
+    "passed": 884,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered": 0
+  },
+  "test_target_count": 46,
+  "test_targets": [
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/swirl_api-426684ea21090e67",
+      "passed": 52,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/main.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/swirl_api-bd03197c9c65d2ba",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/bin/swirl-diagnose.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/swirl_diagnose-368c1154764faac8",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/bin/swirl-inspect.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/swirl_inspect-2111ef278b598ff6",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/bin/swirl-tun-helper.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/swirl_tun_helper-8de41164957fbc1d",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_boundary.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/xray_boundary-cbbafe28e8738a15",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_cli.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/xray_cli-529e52bab6565132",
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/windows-tun-smoke.rs",
+      "executable": "/tmp/swirl-core-validation/debug/examples/windows_tun_smoke-9fa3ff1da3f7d97a",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/swirl_core-065f95485466834b",
+      "passed": 63,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/china_rules.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/china_rules-be41d98afae1a58e",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/network.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/network-ca20e70a0b6048a8",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/socks5_udp.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/socks5_udp-35245916f407e2a6",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_import.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/xray_import-3c7abda33287303e",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/transport-runtime.rs",
+      "executable": "/tmp/swirl-core-validation/debug/examples/transport_runtime-82778a88fc9e7241",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/swirl_dns-5b4cf5cc74ae43dd",
+      "passed": 27,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/swirl_platform-f3da1f6165522819",
+      "passed": 20,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/swirl_protocol-8362561c1aa41f73",
+      "passed": 127,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/quic_preflight.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/quic_preflight-99ee9af4ad1f43de",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/tuic_egress.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/tuic_egress-7097db414b8dd599",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/vision.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/vision-efdeb379e533e739",
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/vision_record.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/vision_record-c27416654b6be5ea",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/vision_stream.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/vision_stream-a647359a56898987",
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/vision_tls.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/vision_tls-7db6e6b4aece1273",
+      "passed": 26,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/hysteria2-client.rs",
+      "executable": "/tmp/swirl-core-validation/debug/examples/hysteria2_client-8413ae73a59eb720",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/hysteria2-lifecycle.rs",
+      "executable": "/tmp/swirl-core-validation/debug/examples/hysteria2_lifecycle-c8df0567ed163426",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/ss2022-client.rs",
+      "executable": "/tmp/swirl-core-validation/debug/examples/ss2022_client-86a863dd61b23a74",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/transport-client.rs",
+      "executable": "/tmp/swirl-core-validation/debug/examples/transport_client-86dd95598f188ba0",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/tuic-client.rs",
+      "executable": "/tmp/swirl-core-validation/debug/examples/tuic_client-83d1f4825bfe14ac",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/vision-client.rs",
+      "executable": "/tmp/swirl-core-validation/debug/examples/vision_client-18562e35bac00155",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/swirl_routing-e10e8c9ddfe9fa71",
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/swirl_subscription-8dd2d592b3febcfe",
+      "passed": 160,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_adversarial.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/xray_adversarial-433ffe0422fe1fce",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_conversion.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/xray_conversion-949626aab44960bb",
+      "passed": 18,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_conversion_auth.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/xray_conversion_auth-11ad419afa4d7620",
+      "passed": 19,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_conversion_password.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/xray_conversion_password-355869ed3c2d170e",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_conversion_security.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/xray_conversion_security-2d7b5489d7ddef0e",
+      "passed": 27,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_native.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/xray_native-327993910f6b9966",
+      "passed": 23,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_native_selection.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/xray_native_selection-511b19641cf60921",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_native_transports.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/xray_native_transports-15dd231c8de076f1",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_structure.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/xray_structure-ad7b35c47045f84f",
+      "passed": 27,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/swirl_transport-2b0b08542b5a58cf",
+      "passed": 123,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/client_hello_customizer.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/client_hello_customizer-344026226a6bea31",
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/reality-client.rs",
+      "executable": "/tmp/swirl-core-validation/debug/examples/reality_client-f9809014dd40b2fd",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/reality-hello.rs",
+      "executable": "/tmp/swirl-core-validation/debug/examples/reality_hello-778baba909207f52",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/swirl_tun-457ed9389d24520c",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/packet_flows.rs",
+      "executable": "/tmp/swirl-core-validation/debug/deps/packet_flows-6ccf4d3a3b0cd9f5",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    }
+  ],
+  "source_files_sha256": {
+    "core/Cargo.lock": "1c539260d5bfdcbc332ea217a81a113257918b129c06cf8a1afdbe3029c8dd42",
+    "core/crates/swirl-api/src/native_tun.rs": "bf7b0e7556e1102af0a212d29a0a9bcab7d5603e4ddcaf725b784c6e0ae63045",
+    "core/crates/swirl-api/examples/windows-tun-smoke.rs": "d8a80787a039aeacd9f1634fa7b5aad519153e732ed16a786b2339f543f07737",
+    "core/crates/swirl-platform/src/windows_network.rs": "57fa6888cc83176c75cde84e638441990f550a289d1e869f9292059591500c6a",
+    "core/crates/swirl-platform/src/network_transaction.rs": "fd31e3fc5d6eead98c1dd0c3f564e53a149bd38885fadb992f53e2638f4b9ee3",
+    "core/crates/swirl-protocol/src/tuic.rs": "4ef3f759f035f6104eb96bacf373f44577d40c00c3f4459f62849adebfb1cfe3",
+    "core/crates/swirl-transport/src/egress.rs": "1f756c824c0e1007e4a178f05f274d8385afe29cdb63af95cc336f3864da3ed0"
+  },
+  "scope_notes": [
+    "This historical continuation run is complete for 200225e only; it does not cover later SS2022/SOCKS5 UDP guard, automatic health admission or nullable IPAddress InstanceID changes.",
+    "All-target compilation of the Windows smoke example does not execute its driver-changing main.",
+    "Windows-only tests are cfg-gated on Linux. Windows MSVC, Wintun driver, physical egress, crash recovery and Windows 11 application acceptance require their own exact-source execution.",
+    "The zero-test executable targets are included in the count of 46; that count is not a count of independent Windows scenarios.",
+    "Commands are normalized from the exact argv confirmed by the executing root agent. The original stdout/stderr files do not themselves contain the shell invocation."
+  ],
+  "cargo_lock_sha256": "1c539260d5bfdcbc332ea217a81a113257918b129c06cf8a1afdbe3029c8dd42",
+  "command": "cargo test --offline --locked --workspace --all-targets",
+  "exit_code": 0
+}

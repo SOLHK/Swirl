@@ -79,3 +79,19 @@ Licensed under HarmonyOS Sans Fonts License Agreement, not MIT or OFL.
 Full license: licenses/HarmonyOS-Sans.txt (also embedded and shown in Font Settings).
 Source: https://github.com/openharmony/resources/tree/0d79cad76b37ba0f3ccb1323c83833c78e0860de/fonts
 Other fonts are selected from the local system or imported by the user.
+
+Rust Core dependency notices
+The release staging step collects notices from the exact Cargo.lock sources into
+licenses/rust/<package>-<version>/, including nested upstream notices.
+The complete version, license and source inventory is licenses/rust/DEPENDENCIES.json.
+It also records separately distributed runtime artifacts; listing an artifact
+does not assert that its binary is included or installed by this package.
+
+The Native TUN TCP/IP library smoltcp is licensed under 0BSD. The Rust Wintun
+binding is MIT-licensed; that license does not cover the Wintun driver binary.
+The separate official Wintun 0.14.1 prebuilt-binary redistribution terms are in
+licenses/rust/crates/swirl-platform/licenses/WINTUN-0.14.1.txt.
+The c2rust-bitfields 0.18.0 crates omit their license file from their archives;
+the BSD-3-Clause notice from their exact upstream revision is retained in
+licenses/rust/crates/swirl-platform/licenses/C2RUST-BITFIELDS-0.18.0.txt.
+Official Wintun source and binary distribution information: https://www.wintun.net/

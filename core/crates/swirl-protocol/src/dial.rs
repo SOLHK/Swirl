@@ -119,7 +119,7 @@ pub async fn diagnose_tcp(
             Phase::Resolution,
             resolver.resolve(&target.host, target.port),
         ),
-        TcpStream::connect,
+        swirl_transport::connect_tcp,
     )
     .await;
     if let Ok(stream) = result {
@@ -228,7 +228,7 @@ pub async fn connect_direct_resolved(
 async fn connect_tcp_addresses(addresses: Vec<SocketAddr>, deadline: Instant) -> Result<TcpStream> {
     let stream = timing::measure(
         Phase::TcpDial,
-        dial_addresses(addresses, deadline, TcpStream::connect),
+        dial_addresses(addresses, deadline, swirl_transport::connect_tcp),
     )
     .await?;
     stream.set_nodelay(true).map_err(|_| "SocketOptions")?;
@@ -634,7 +634,7 @@ mod tests {
                 listener.local_addr().unwrap(),
             ],
             Instant::now() + Duration::from_secs(3),
-            TcpStream::connect,
+            swirl_transport::connect_tcp,
         )
         .await
         .unwrap();

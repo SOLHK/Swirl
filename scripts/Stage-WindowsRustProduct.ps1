@@ -51,6 +51,19 @@ foreach ($name in $files) { Copy-Item -LiteralPath (Join-Path $bin $name) -Desti
 & (Join-Path $PSScriptRoot 'Copy-VerifiedChinaRules.ps1') `
     -SourceDirectory (Join-Path $repo 'src/Swirl.Quick/packaging/rules') -ApplicationDirectory $stage
 Copy-Item -LiteralPath (Join-Path $repo 'src/Swirl.Quick/packaging/licenses') -Destination $stage -Recurse
+# Collect notices from the exact locked Rust sources, including reviewed driver
+# and supplemental notices that are absent from some published crate archives.
+if ($cache -notmatch '(?m)^SWIRL_CARGO:FILEPATH=(.+)$') { throw 'Configured Cargo path is missing for Rust license staging.' }
+$licenseCargo = $Matches[1].Trim()
+$licenseMetadataPath = Join-Path $build 'rust-license-metadata.json'
+& $licenseCargo metadata --locked --format-version 1 --manifest-path (Join-Path $repo 'core/Cargo.toml') |
+    Set-Content -LiteralPath $licenseMetadataPath -Encoding utf8
+if ($LASTEXITCODE -ne 0) { throw 'Locked Rust dependency metadata collection failed.' }
+$licenseDirectory = Join-Path $stage 'licenses/rust'
+& $Python (Join-Path $repo 'tools/Collect-RustDependencies.py') `
+    --metadata $licenseMetadataPath --inventory (Join-Path $licenseDirectory 'DEPENDENCIES.json') `
+    --notices $licenseDirectory --supplemental-inventory (Join-Path $repo 'core/DEPENDENCIES.json')
+if ($LASTEXITCODE -ne 0) { throw 'Rust dependency notice staging failed.' }
 Copy-Item -LiteralPath (Join-Path $repo 'src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt') -Destination $stage
 Copy-Item -LiteralPath (Join-Path $repo 'src/Swirl.Quick/packaging/README-RustProductPreview.txt') -Destination (Join-Path $stage 'README.txt')
 foreach ($name in @('Swirl-brand-phase3.ico','Swirl-brand-0217-optical.ico')) {

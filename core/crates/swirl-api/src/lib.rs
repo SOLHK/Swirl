@@ -11,6 +11,10 @@ use swirl_subscription::Config;
 
 mod control_v2;
 mod import_ffi;
+pub mod native_tun;
+pub mod native_tun_control;
+#[cfg(windows)]
+mod native_windows;
 mod node_import;
 pub use node_import::swirl_import_node_v1;
 mod profile_import;
@@ -60,11 +64,63 @@ enum Command {
 }
 #[derive(Default)]
 pub struct Controller {
+    // Rust drops fields in declaration order. Native sessions must restore their
+    // journals and join packet tasks while the Core runtimes still exist.
+    #[cfg(windows)]
+    native_sessions: HashMap<u64, native_windows::NativeSession>,
     next: u64,
     cores: HashMap<u64, Core>,
     cores_v2: HashMap<u64, swirl_core::v2::Core>,
+    native_helper: bool,
+}
+impl Drop for Controller {
+    fn drop(&mut self) {
+        // Errors leave the durable journal for the supervising helper. Do not
+        // turn a failed restore into a panic or skip the remaining sessions.
+        let _ = self.stop_native_tunnels();
+        #[cfg(windows)]
+        self.native_sessions.clear();
+    }
 }
 impl Controller {
+    /// Used only by the separately launched helper. The process-global C ABI
+    /// remains an ordinary, unelevated GUI controller.
+    pub fn for_native_tun_helper() -> Self {
+        Self {
+            #[cfg(windows)]
+            native_sessions: HashMap::new(),
+            next: 0,
+            cores: HashMap::new(),
+            cores_v2: HashMap::new(),
+            native_helper: true,
+        }
+    }
+
+    pub fn maintain_native_tun(&mut self) {
+        #[cfg(windows)]
+        for session in self.native_sessions.values_mut() {
+            session.maintain();
+        }
+    }
+
+    pub fn stop_native_tunnels(&mut self) -> Result<(), &'static str> {
+        #[cfg(windows)]
+        {
+            let mut first_error = None;
+            for session in self.native_sessions.values_mut() {
+                if let Err(error) = session.stop() {
+                    first_error.get_or_insert(error);
+                }
+            }
+            if let Some(error) = first_error {
+                // Explicit callers retain failed sessions for a retry. Drop
+                // still clears them before destroying any Core runtime.
+                return Err(error);
+            }
+            self.native_sessions.clear();
+        }
+        Ok(())
+    }
     pub fn dispatch(&mut self, input: &[u8]) -> Value {
         if input.is_empty() || input.len() > MAX_COMMAND {
             return json!({"ok":false,"error":"CommandSize"});
@@ -73,6 +129,9 @@ impl Controller {
             Ok(value) => value,
             Err(_) => return json!({"ok":false,"error":"CommandInvalidOrUnsupported"}),
         };
+        if parsed.get("native_tun_schema").is_some() {
+            return native_tun_control::dispatch(self, input);
+        }
         if parsed.get("control_schema").is_some() {
             return control_v2::dispatch(self, input);
         }
@@ -173,6 +232,7 @@ impl Controller {
                 Ok(json!({"ok":true}))
             }
             Command::Stop { handle } => {
+                native_tun_control::stop_for_core(self, handle)?;
                 if let Some(mut core) = self.cores_v2.remove(&handle) {
                     core.stop();
                     return Ok(json!({"ok":true}));

@@ -5,7 +5,6 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use swirl_subscription::DnsQueryFamily;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpStream, UdpSocket},
     time::{Duration, timeout},
 };
 type Result<T> = std::result::Result<T, &'static str>;
@@ -42,7 +41,7 @@ pub(super) struct Resolution {
     pub(super) ttl: u32,
 }
 
-fn word(data: &[u8], at: usize) -> Result<u16> {
+pub(super) fn word(data: &[u8], at: usize) -> Result<u16> {
     let bytes = data.get(at..at + 2).ok_or("DnsTruncated")?;
     Ok(u16::from_be_bytes([bytes[0], bytes[1]]))
 }
@@ -56,7 +55,7 @@ fn covers(zone: &str, host: &str) -> bool {
             .strip_suffix(zone)
             .is_some_and(|prefix| prefix.ends_with('.'))
 }
-fn name_labels<'a>(data: &'a [u8], cursor: &mut usize) -> Result<Vec<&'a [u8]>> {
+pub(super) fn name_labels<'a>(data: &'a [u8], cursor: &mut usize) -> Result<Vec<&'a [u8]>> {
     let mut at = *cursor;
     let mut end = None;
     let mut labels = Vec::new();
@@ -312,10 +311,10 @@ pub(super) fn parse(data: &[u8], request: &[u8], host: &str, kind: u16) -> Resul
 }
 async fn exchange(server: SocketAddr, host: &str, kind: u16) -> Result<Answer> {
     let request = query(host, kind)?;
-    let socket = UdpSocket::bind(if server.is_ipv4() {
-        "0.0.0.0:0"
+    let socket = swirl_transport::bind_udp(if server.is_ipv4() {
+        SocketAddr::from(([0, 0, 0, 0], 0))
     } else {
-        "[::]:0"
+        SocketAddr::from(([0u16; 8], 0))
     })
     .await
     .map_err(|_| "DnsSocket")?;
@@ -327,7 +326,7 @@ async fn exchange(server: SocketAddr, host: &str, kind: u16) -> Result<Answer> {
     match parse(&data, &request, host, kind)? {
         Response::Answer(answer) => Ok(answer),
         Response::Truncated => {
-            let mut stream = TcpStream::connect(server)
+            let mut stream = swirl_transport::connect_tcp(server)
                 .await
                 .map_err(|_| "DnsTcpConnect")?;
             stream
