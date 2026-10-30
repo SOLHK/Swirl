@@ -1361,6 +1361,55 @@ mod windows {
         }
     }
 
+    fn udp_stage_error(
+        core: &Core,
+        run: &DeviceRun,
+        context: &serde_json::Value,
+        phase: &str,
+        error: io::Error,
+    ) -> io::Error {
+        // Read evidence before teardown cancels the association. Only this
+        // bounded fixture tuple is included, never the complete traffic log.
+        let snapshot = core
+            .snapshot()
+            .unwrap_or_else(|error| json!({"snapshot_error":error}));
+        let baseline = context["baseline"].as_u64().unwrap_or(u64::MAX);
+        let rows = snapshot["connections"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|row| {
+                row["id"].as_u64().is_some_and(|id| id > baseline)
+                    && row["host"] == context["host"]
+                    && row["port"] == context["port"]
+            })
+            .take(8)
+            .collect::<Vec<_>>();
+        let stats = run.stats.snapshot();
+        eprintln!(
+            "Wintun smoke: UDP stage failure {}",
+            json!({"phase":phase,"context":context,"error":error.to_string(),
+                "os_error":error.raw_os_error(),"kind":format!("{:?}",error.kind()),
+                "core":{"active":snapshot["active"],"accepted":snapshot["accepted"],
+                    "failed":snapshot["failed"],"rejected":snapshot["rejected"],
+                    "last_error":snapshot["last_error"],"udp_dropped":snapshot["udp_dropped"],
+                    "configuration":snapshot["configuration"],"connections":rows},
+                "tun":{"received_packets":stats.received_packets,
+                    "malformed_packets":stats.malformed_packets,
+                    "dropped_udp_datagrams":stats.dropped_udp_datagrams,
+                    "active_tcp_flows":stats.active_tcp_flows,
+                    "active_udp_endpoints":stats.active_udp_endpoints},
+                "bridge":{"udp_failures":run.bridge_stats.udp_failures.load(Ordering::Acquire),
+                    "udp_dropped":run.bridge_stats.udp_dropped.load(Ordering::Acquire),
+                    "tcp_failures":run.bridge_stats.tcp_failures.load(Ordering::Acquire),
+                    "dns_failures":run.bridge_stats.dns_failures.load(Ordering::Acquire)},
+                "wintun":{"received_packets":run.read_packets.load(Ordering::Acquire),
+                    "sent_packets":run.written_packets.load(Ordering::Acquire),
+                    "failed":run.failed.load(Ordering::Acquire)}})
+        );
+        io::Error::new(error.kind(), format!("{phase}: {error}"))
+    }
+
     fn udp_direct_control(
         core: &Core,
         directory: &Path,
@@ -1439,28 +1488,52 @@ mod windows {
             runtime,
             format!("SOCKS5 UDP host={host} reject={reject}"),
             async move {
-                timeout(IO_WAIT, async {
+                let started = Instant::now();
+                let note_stage = |phase: &'static str| {
+                    eprintln!(
+                        "Wintun smoke: SOCKS5 UDP pending {}",
+                        json!({"host":host,"port":port,"stage":phase})
+                    );
+                    phase
+                };
+                let mut stage = note_stage("register control listener and relay");
+                let result = timeout(IO_WAIT, async {
                     let listener = tokio::net::TcpListener::from_std(listener)?;
                     let relay = tokio::net::UdpSocket::from_std(relay)?;
                     let address = relay.local_addr()?;
+                    stage = note_stage("accept TCP control");
                     let (mut control, source) = listener.accept().await?;
+                    eprintln!(
+                        "Wintun smoke: SOCKS5 UDP stage {}",
+                        json!({"host":host,"port":port,"stage":"control_accepted",
+                            "source":source,"control_local":control.local_addr()?,"relay":address})
+                    );
                     require(source.ip().is_loopback(), "SOCKS5 control escaped loopback")?;
                     let mut greeting = [0; 3];
+                    stage = note_stage("read TCP greeting");
                     control.read_exact(&mut greeting).await?;
                     require(greeting == [5, 1, 0], "unexpected SOCKS5 UDP greeting")?;
+                    stage = note_stage("write TCP greeting selection");
                     control.write_all(&[5, 0]).await?;
                     let mut command = [0; 4];
+                    stage = note_stage("read TCP ASSOCIATE header");
                     control.read_exact(&mut command).await?;
                     require(
                         command == [5, 3, 0, if source.is_ipv6() { 4 } else { 1 }],
                         "SOCKS5 UDP ASSOCIATE command changed",
                     )?;
                     let mut unspecified = vec![0; if source.is_ipv6() { 18 } else { 6 }];
+                    stage = note_stage("read TCP ASSOCIATE address and port");
                     control.read_exact(&mut unspecified).await?;
                     require(
                         unspecified.iter().all(|byte| *byte == 0),
                         "SOCKS5 association source request changed",
                     )?;
+                    eprintln!(
+                        "Wintun smoke: SOCKS5 UDP stage {}",
+                        json!({"host":host,"port":port,"stage":"associate_request_validated",
+                            "command":command,"address_bytes":unspecified.len()})
+                    );
                     let mut reply = vec![5, if reject { 2 } else { 0 }, 0];
                     match address.ip() {
                         IpAddr::V4(ip) => {
@@ -1473,7 +1546,13 @@ mod windows {
                         }
                     }
                     reply.extend_from_slice(&address.port().to_be_bytes());
+                    stage = note_stage("write TCP ASSOCIATE reply");
                     control.write_all(&reply).await?;
+                    eprintln!(
+                        "Wintun smoke: SOCKS5 UDP stage {}",
+                        json!({"host":host,"port":port,"stage":"associate_reply_written",
+                            "reply_code":if reject { 2 } else { 0 },"relay":address})
+                    );
                     if reject {
                         // A client may abort as soon as it reads the nonzero REP.
                         // The full denial is written; no UDP relay was admitted.
@@ -1485,7 +1564,18 @@ mod windows {
                     let mut original_source = None;
                     let mut buffer = vec![0; header.len() + UDP_BYTES + 1];
                     for size in [0, UDP_BYTES] {
+                        stage = note_stage(if size == 0 {
+                            "receive empty UDP relay datagram"
+                        } else {
+                            "receive full UDP relay datagram"
+                        });
                         let (length, source) = relay.recv_from(&mut buffer).await?;
+                        eprintln!(
+                            "Wintun smoke: SOCKS5 UDP stage {}",
+                            json!({"host":host,"port":port,"stage":"relay_received",
+                                "source":source,"relay":address,"wire_bytes":length,
+                                "expected_payload_bytes":size})
+                        );
                         require(
                             source.ip().is_loopback() && source.is_ipv6() == address.is_ipv6(),
                             "SOCKS5 UDP relay source changed family or escaped loopback",
@@ -1500,18 +1590,37 @@ mod windows {
                             buffer[..length] == expected,
                             "SOCKS5 UDP target, empty boundary or payload changed",
                         )?;
+                        stage = note_stage(if size == 0 {
+                            "send empty UDP relay reply"
+                        } else {
+                            "send full UDP relay reply"
+                        });
                         require(
                             relay.send_to(&buffer[..length], source).await? == length,
                             "short SOCKS5 UDP reply",
                         )?;
+                        eprintln!(
+                            "Wintun smoke: SOCKS5 UDP stage {}",
+                            json!({"host":host,"port":port,"stage":"relay_reply_sent",
+                                "source":source,"wire_bytes":length,"payload_bytes":size})
+                        );
                     }
                     // Close only after Windows received both replies. Otherwise an
                     // intentional control failure could overtake the final packet.
+                    stage = note_stage("wait for Windows to receive both UDP replies");
                     closed.await.map_err(io::Error::other)?;
+                    stage = note_stage("shutdown TCP control");
                     control.shutdown().await
                 })
                 .await
-                .map_err(io::Error::other)?
+                .map_err(io::Error::other)
+                .and_then(|result| result);
+                result.map_err(|error| {
+                    io::Error::new(
+                        error.kind(),
+                        format!("{stage} after {}ms: {error}", started.elapsed().as_millis()),
+                    )
+                })
             },
         );
         (peer, close)
@@ -1586,6 +1695,11 @@ mod windows {
                     fake[index],
                     &trap,
                 )?);
+                eprintln!(
+                    "Wintun smoke: UDP client stage {}",
+                    json!({"family":family,"case":case,"host":host,"port":port,
+                        "stage":"direct_before_received"})
+                );
                 no_udp_receive(&trap)?;
                 config.policy.mode = if case == "reject" {
                     Mode::Rule
@@ -1630,27 +1744,53 @@ mod windows {
                 let client = local_udp(ipv6)?;
                 let source = client.local_addr()?;
                 let destination = SocketAddr::new(fake[index], port);
+                let context = json!({"family":family,"case":case,"host":host,"port":port,
+                    "source":source,"destination":destination,"baseline":baseline,
+                    "proxy_control":proxy_address,"proxy_relay":relay.local_addr()?,
+                    "configuration":core.configuration().map_err(io::Error::other)?});
                 require(
-                    client.send_to(&[], destination)? == 0,
+                    client.send_to(&[], destination).map_err(|error| {
+                        udp_stage_error(core, run, &context, "send initial empty UDP", error)
+                    })? == 0,
                     "empty UDP send changed length",
                 )?;
+                eprintln!(
+                    "Wintun smoke: UDP client stage {}",
+                    json!({"stage":"initial_empty_sent","context":context})
+                );
                 if case == "proxy" {
                     let mut response = [0; UDP_BYTES + 1];
-                    let (length, sender) = client.recv_from(&mut response)?;
+                    let (length, sender) = client.recv_from(&mut response).map_err(|error| {
+                        udp_stage_error(core, run, &context, "receive initial empty UDP", error)
+                    })?;
                     require(
                         length == 0 && sender == destination,
                         "SOCKS5 empty UDP reply identity changed",
                     )?;
+                    eprintln!(
+                        "Wintun smoke: UDP client stage {}",
+                        json!({"family":family,"case":case,"source":source,
+                            "stage":"empty_reply_received","sender":sender,"bytes":length})
+                    );
                     let message = payload(UDP_BYTES);
                     require(
-                        client.send_to(&message, destination)? == UDP_BYTES,
+                        client.send_to(&message, destination).map_err(|error| {
+                            udp_stage_error(core, run, &context, "send full UDP", error)
+                        })? == UDP_BYTES,
                         "short SOCKS5 UDP payload send",
                     )?;
-                    let (length, sender) = client.recv_from(&mut response)?;
+                    let (length, sender) = client.recv_from(&mut response).map_err(|error| {
+                        udp_stage_error(core, run, &context, "receive full UDP", error)
+                    })?;
                     require(
                         sender == destination && response[..length] == message,
                         "SOCKS5 UDP payload or fake source identity changed",
                     )?;
+                    eprintln!(
+                        "Wintun smoke: UDP client stage {}",
+                        json!({"family":family,"case":case,"source":source,
+                            "stage":"full_reply_received","sender":sender,"bytes":length})
+                    );
                     udp_record(
                         core,
                         baseline,
@@ -1663,7 +1803,10 @@ mod windows {
                             error: "",
                             bytes: UDP_BYTES as u64,
                         },
-                    )?;
+                    )
+                    .map_err(|error| {
+                        udp_stage_error(core, run, &context, "verify active UDP Core record", error)
+                    })?;
                 }
                 if let Some((peer, close)) = peer {
                     if case == "proxy" {
@@ -1671,7 +1814,9 @@ mod windows {
                             io::Error::other("SOCKS5 control peer ended before close request")
                         })?;
                     }
-                    peer.finish(runtime)?;
+                    peer.finish(runtime).map_err(|error| {
+                        udp_stage_error(core, run, &context, "finish SOCKS5 UDP peer", error)
+                    })?;
                 }
                 let (category, error, bytes) = match case {
                     "proxy" => ("proxy", "Socks5UdpControlClosed", UDP_BYTES as u64),
