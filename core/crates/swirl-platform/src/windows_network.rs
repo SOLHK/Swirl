@@ -135,8 +135,11 @@ pub struct IpInterfaceConfiguration {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct IpAddressConfiguration {
-    /// Preserve the provider's opaque identity across network compartments.
-    pub instance_id: String,
+    /// MSFT_NetIPAddress exposes this inherited field as null on real Windows
+    /// adapters. Preserve that raw value without inventing an opaque identity.
+    /// The JSON member remains required; only its provider value is nullable.
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub instance_id: Option<String>,
     pub address_family: u32,
     /// Keep any IPv6 scope identifier; an IpAddr alone cannot represent it.
     pub address: String,
@@ -991,6 +994,40 @@ ConvertTo-Json -InputObject $true
         assert!(message.contains("expected a string"));
         assert!(message.contains("/private~1~0field/1"));
         assert!(!message.contains("do-not-log-this-value"));
+    }
+
+    #[test]
+    fn address_snapshot_preserves_raw_nullable_instance_id_without_defaults() {
+        let raw = json!({
+            "instance_id":null,"address_family":23,"address":"fe80::1%71",
+            "prefix_len":64,"skip_as_source":false,
+            "prefix_origin":"WellKnown","suffix_origin":"Link"
+        });
+        let absent_id: IpAddressConfiguration = serde_json::from_value(raw.clone()).unwrap();
+        assert_eq!(absent_id.instance_id, None);
+        assert_eq!(serde_json::to_value(&absent_id).unwrap(), raw);
+
+        let mut identified = raw.clone();
+        identified["instance_id"] = json!("provider supplied identity");
+        let present: IpAddressConfiguration = serde_json::from_value(identified.clone()).unwrap();
+        assert_eq!(
+            present.instance_id.as_deref(),
+            Some("provider supplied identity")
+        );
+        assert_eq!(serde_json::to_value(&present).unwrap(), identified);
+        assert_ne!(
+            absent_id, present,
+            "a changed provider value must remain visible"
+        );
+
+        let mut missing = raw.clone();
+        missing.as_object_mut().unwrap().remove("instance_id");
+        assert!(serde_json::from_value::<IpAddressConfiguration>(missing).is_err());
+        for invalid in [json!(0), json!(false), json!([]), json!({})] {
+            let mut malformed = raw.clone();
+            malformed["instance_id"] = invalid;
+            assert!(serde_json::from_value::<IpAddressConfiguration>(malformed).is_err());
+        }
     }
 
     #[test]
