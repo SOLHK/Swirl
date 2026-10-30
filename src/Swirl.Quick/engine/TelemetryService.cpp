@@ -16,6 +16,7 @@
 #include <QThreadPool>
 #include <QPointer>
 #include <QSet>
+#include <QHash>
 #include <QTcpSocket>
 #include <cmath>
 #include <algorithm>
@@ -85,11 +86,41 @@ struct TelemetryConnectionsProfile {
 #endif
 qint64 nowMs(){return QDateTime::currentMSecsSinceEpoch();}
 void add(QJsonObject &o,const QString &key,double value){o[key]=o.value(key).toDouble()+value;}
-void aggregate(QJsonObject &group,QString key,double up,double down,bool count){
- key=key.left(256);if(!group.contains(key)&&group.size()>=128)key=QStringLiteral("其他（分类上限）");
- auto row=group.value(key).toObject();add(row,"up",up);add(row,"down",down);if(count)add(row,"count",1);
- group[key]=row;
-}
+struct TelemetryGroupAccumulator {
+ struct Totals {
+  QJsonObject original;
+  double up=0,down=0,count=0;
+  bool countTouched=false;
+ };
+ QJsonObject original;
+ QHash<QString,Totals> entries;
+ qsizetype addedKeys=0;
+ void accumulate(QString key,double up,double down,bool count){
+  key=key.left(256);
+  auto entry=entries.find(key);
+  if(entry==entries.end()&&!original.contains(key)&&original.size()+addedKeys>=128){
+   key=QStringLiteral("其他（分类上限）");entry=entries.find(key);
+  }
+  if(entry==entries.end()){
+   const bool existing=original.contains(key);const auto row=original.value(key).toObject();
+   entry=entries.insert(key,Totals{row,row.value("up").toDouble(),row.value("down").toDouble(),row.value("count").toDouble(),false});
+   if(!existing)++addedKeys;
+  }
+  // Preserve the exact per-key addition order, including floating-point
+  // rounding. Do not sum a separate delta and add it to the old total later.
+  entry->up+=up;entry->down+=down;
+  if(count){entry->count+=1;entry->countTouched=true;}
+ }
+ QJsonObject finish() const {
+  auto group=original;
+  for(auto entry=entries.cbegin();entry!=entries.cend();++entry){
+   auto row=entry->original;row["up"]=entry->up;row["down"]=entry->down;
+   if(entry->countTouched)row["count"]=entry->count;
+   group[entry.key()]=row;
+  }
+  return group;
+ }
+};
 }
 TelemetryService::TelemetryService(QString path,bool networkMeasurements,QObject *parent):QObject(parent),m_path(path),m_networkEnabled(networkMeasurements){
  if(m_path.isEmpty())m_path=SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/telemetry.json";
@@ -159,11 +190,11 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
   const auto time=QDateTime::fromMSecsSinceEpoch(status.connectionsAt).time();const auto bucketKey=QString::number(time.hour()*2+time.minute()/30);
   auto buckets=day.value("buckets").toObject(),bucket=buckets.value(bucketKey).toObject();bucket["sampled"]=true;add(bucket,"total",totalDelta);
   const QStringList groupKeys={"apps","domains","devices","nodes","categories","proxyApps","proxyDomains","proxyDevices","proxyNodes"};
-  std::array<QJsonObject,9> groups;std::array<bool,9> touched{};
-  for(int index=0;index<int(groups.size());++index)groups[index]=day.value(groupKeys[index]).toObject();
-  // Keep each group detached for this whole sample. Publishing it back into
-  // day after every connection would copy all its entries on the next write.
-  const auto aggregateGroup=[&](int index,const QString &key,double up,double down,bool count){touched[index]=true;aggregate(groups[index],key,up,down,count);};
+  std::array<TelemetryGroupAccumulator,9> groups;
+  for(int index=0;index<int(groups.size());++index)groups[index].original=day.value(groupKeys[index]).toObject();
+  // Update native scalars in the original record order, then construct each
+  // touched JSON row once. Hot categories no longer detach a row per connection.
+  const auto aggregateGroup=[&](int index,const QString &key,double up,double down,bool count){groups[index].accumulate(key,up,down,count);};
   QSet<QString> active;
   for(const auto &value:status.connections){
    auto row=value.toMap();const auto id=row.value("id").toString();if(id.isEmpty()||active.contains(id))continue;active.insert(id);
@@ -194,7 +225,7 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
    m_seen[id]=row;
   }
   // Untouched groups retain their original missing/empty representation.
-  for(int index=0;index<int(groups.size());++index)if(touched[index])day[groupKeys[index]]=groups[index];
+  for(int index=0;index<int(groups.size());++index)if(!groups[index].entries.isEmpty())day[groupKeys[index]]=groups[index].finish();
   for(auto it=m_seen.begin();it!=m_seen.end();++it)if(!active.contains(it.key()))(*it)["status"]="已结束";
   while(m_seen.size()>2000){auto oldest=m_seen.end();for(auto it=m_seen.begin();it!=m_seen.end();++it)if(!active.contains(it.key())&&(oldest==m_seen.end()||it->value("lastSeen").toLongLong()<oldest->value("lastSeen").toLongLong()))oldest=it;if(oldest==m_seen.end())break;m_seen.erase(oldest);}
   buckets[bucketKey]=bucket;day["buckets"]=buckets;

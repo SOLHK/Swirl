@@ -82,6 +82,7 @@ private slots:
    const auto notifications=changes.size();const int revision=model.revision();model.ingest(status);
    QCOMPARE(changes.size(),notifications+1);QCOMPARE(model.revision(),revision+1);
    QCOMPARE(model.m_days,expected);QCOMPARE(model.m_history,history);
+   QCOMPARE(QJsonDocument(model.m_days).toJson(QJsonDocument::Compact),QJsonDocument(expected).toJson(QJsonDocument::Compact));
    // Public rankings must expose the same complete numeric group values,
    // including the overflow bucket; the result order is intentionally irrelevant.
    const int period=QDateTime::fromMSecsSinceEpoch(status.connectionsAt).date()==QDate::currentDate()?0:1;
@@ -125,6 +126,24 @@ private slots:
   for(auto &value:status.connections){auto row=value.toMap();row["uploadBytes"]=row.value("uploadBytes").toInt()+7;row["downloadBytes"]=row.value("downloadBytes").toInt()+13;value=row;}advance(todayTime+2000);
   for(auto &value:status.connections){auto row=value.toMap();row["uploadBytes"]=5;row["downloadBytes"]=10;value=row;}advance(todayTime+3000);
   status.processId=2;status.sessionId="batch-reference-restarted";advance(todayTime+4000);
+  // Each +1 rounds away at 2^53. Accumulating a separate batch delta would
+  // change the result, even though small-byte fixtures would still pass.
+  auto seededDay=model.m_days.value(today).toObject();auto seededApps=seededDay.value("apps").toObject();
+  const QString overflowKey=QStringLiteral("其他（分类上限）");
+  auto seededOverflow=seededApps.value(overflowKey).toObject();
+  const QJsonObject retainedMetadata{{"nested",QJsonArray{1,"two",QJsonObject{{"present",true}}}}};
+  seededOverflow["up"]=9007199254740992.0;seededOverflow["count"]="retained-until-counted";seededOverflow["extra"]=retainedMetadata;
+  seededApps[overflowKey]=seededOverflow;seededDay["apps"]=seededApps;model.m_days[today]=seededDay;
+  for(auto &value:status.connections){auto row=value.toMap();row["uploadBytes"]=row.value("uploadBytes").toLongLong()+1;row["downloadBytes"]=row.value("downloadBytes").toLongLong()+2;value=row;}
+  advance(todayTime+5000);
+  const auto roundedOverflow=model.m_days.value(today).toObject().value("apps").toObject().value(overflowKey).toObject();
+  QCOMPARE(roundedOverflow.value("up").toDouble(),9007199254740992.0);
+  QCOMPARE(roundedOverflow.value("count").toString(),QString("retained-until-counted"));
+  QCOMPARE(roundedOverflow.value("extra").toObject(),retainedMetadata);
+  auto newIdentity=status.connections.first().toMap();newIdentity["id"]="late-new-identity";newIdentity["process"]="late-new-process";status.connections.first()=newIdentity;
+  advance(todayTime+6000);
+  const auto countedOverflow=model.m_days.value(today).toObject().value("apps").toObject().value(overflowKey).toObject();
+  QCOMPARE(countedOverflow.value("count").toDouble(),1.0);QCOMPARE(countedOverflow.value("extra").toObject(),retainedMetadata);
   TelemetryService restored(path,false);QCOMPARE(restored.m_days,model.m_days);QCOMPARE(restored.m_history,model.m_history);
   for(int period=0;period<4;++period){QCOMPARE(restored.summary(period),model.summary(period));QCOMPARE(restored.distribution(period),model.distribution(period));}
  }

@@ -20,6 +20,7 @@ import threading
 
 
 def prepare(directory):
+    import cryptography
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
@@ -66,6 +67,13 @@ def prepare(directory):
         key_path.chmod(0o600)
     print(json.dumps({"event": "prepared", "tls": ssl.OPENSSL_VERSION, "leaf_days": 2,
                       "ca_sha256": ca.fingerprint(hashes.SHA256()).hex(),
+                      "leaf_sha256": leaf.fingerprint(hashes.SHA256()).hex(),
+                      "prepared_utc": now.isoformat(), "python": sys.version.split()[0],
+                      "cryptography": cryptography.__version__,
+                      "ca_not_before_utc": ca.not_valid_before_utc.isoformat(),
+                      "ca_not_after_utc": ca.not_valid_after_utc.isoformat(),
+                      "leaf_not_before_utc": leaf.not_valid_before_utc.isoformat(),
+                      "leaf_not_after_utc": leaf.not_valid_after_utc.isoformat(),
                       "chain_certificates": 2}), flush=True)
 
 
@@ -91,13 +99,24 @@ def serve(directory):
 
     def connection(raw, identifier):
         tls = None
+        stage = "accepted"
         try:
+            addresses = {}
+            for name, reader in (("local", raw.getsockname), ("peer", raw.getpeername)):
+                try:
+                    addresses[name] = list(reader())
+                except OSError as error:
+                    addresses[name + "_observation_error"] = str(error)
+            emit("accepted", id=identifier, **addresses,
+                 observed_utc=datetime.now(timezone.utc).isoformat())
             raw.settimeout(5)
+            stage = "tls-handshake"
             tls = context.wrap_socket(raw, server_side=True)
             protocol = tls.selected_alpn_protocol() or ""
             emit("protocol", id=identifier, value=protocol)
             if protocol == "h2":
                 return
+            stage = "http-request-headers"
             headers = bytearray()
             while b"\r\n\r\n" not in headers:
                 data = tls.recv(4096)
@@ -111,6 +130,7 @@ def serve(directory):
             with state_lock:
                 responses[identifier] = pending
             emit("request", id=identifier, headers=base64.b64encode(headers).decode("ascii"))
+            stage = "awaiting-fixture-response"
             response = pending.get(timeout=10)
             if response.get("hanging"):
                 tls.settimeout(0.2)
@@ -121,6 +141,7 @@ def serve(directory):
                     except socket.timeout:
                         continue
             else:
+                stage = "http-response"
                 body = base64.b64decode(response["body"], validate=True)
                 location = response.get("location", "").encode("ascii")
                 if b"\r" in location or b"\n" in location:
@@ -131,7 +152,8 @@ def serve(directory):
                 wire += b"Content-Type: application/yaml\r\nConnection: close\r\nContent-Length: "
                 tls.sendall(wire + str(len(body)).encode("ascii") + b"\r\n\r\n" + body)
         except (OSError, RuntimeError, ValueError, queue.Empty) as error:
-            emit("error", id=identifier, message=f"{type(error).__name__}: {error}")
+            emit("error", id=identifier, message=f"{type(error).__name__}: {error}", stage=stage,
+                 observed_utc=datetime.now(timezone.utc).isoformat())
         finally:
             with state_lock:
                 responses.pop(identifier, None)
@@ -157,7 +179,9 @@ def serve(directory):
 
     accept_thread = threading.Thread(target=accept, daemon=True)
     accept_thread.start()
-    emit("ready", port=listener.getsockname()[1], tls=ssl.OPENSSL_VERSION)
+    emit("ready", port=listener.getsockname()[1], tls=ssl.OPENSSL_VERSION,
+         bound=list(listener.getsockname()), family="AF_INET", python=sys.version.split()[0],
+         executable=sys.executable, observed_utc=datetime.now(timezone.utc).isoformat())
     try:
         for line in sys.stdin:
             message = json.loads(line)
