@@ -76,8 +76,10 @@ fn execute(driver: PathBuf) -> io::Result<()> {
 #[cfg(windows)]
 mod windows {
     use super::*;
+    use base64::Engine;
     use ring::rand::{SecureRandom, SystemRandom};
     use serde_json::json;
+    use smoltcp::wire::{IpProtocol, Ipv4Packet, Ipv6Packet, TcpPacket};
     use std::{
         collections::BTreeMap,
         future::Future,
@@ -86,15 +88,15 @@ mod windows {
         path::Path,
         pin::Pin,
         sync::{
-            Arc,
+            Arc, Mutex,
             atomic::{AtomicBool, AtomicU64, Ordering},
         },
         thread,
         time::{Duration, Instant},
     };
     use swirl_api::native_tun::{self, BridgeControl, PacketBridge};
-    use swirl_core::v2::{Core, FlowDispatcher, RuntimeConfig};
-    use swirl_dns::tun::{DNS_IPV4, DNS_IPV6, FakeIpStore, TunDns, TunLookup};
+    use swirl_core::v2::{Core, DurableReceipt, FlowDispatcher, RuntimeConfig};
+    use swirl_dns::tun::{ANSWER_TTL, DNS_IPV4, DNS_IPV6, FakeIpStore, TunDns, TunLookup};
     use swirl_platform::{
         network_transaction::{
             self as transaction, FileJournalStore, InterfaceIdentity, Journal, NetworkBackend,
@@ -104,8 +106,11 @@ mod windows {
         wintun_device::{WintunConfig, WintunDevice, official_driver_sha256},
     };
     use swirl_subscription::{
-        Dns, DnsTlsServer, HostMapping, Limits, Node, Outbound, Tls,
-        v2::{ClassificationDns, DEFAULT_POLICY_ID, DefaultPolicy, Mode, PolicyDocument, Target},
+        Dns, DnsTlsServer, HostMapping, Limits, Matcher, Node, Outbound, Tls,
+        v2::{
+            ClassificationDns, DEFAULT_POLICY_ID, DefaultPolicy, Mode, PolicyDocument, PolicyRule,
+            Target,
+        },
     };
     use swirl_transport::egress::EgressLease;
     use swirl_tun::{TunConfig, TunStats};
@@ -115,15 +120,61 @@ mod windows {
         task::JoinHandle,
         time::timeout,
     };
+    use tokio_rustls::{
+        TlsAcceptor,
+        rustls::{
+            ServerConfig,
+            pki_types::{CertificateDer, PrivatePkcs8KeyDer},
+        },
+    };
 
     const IO_WAIT: Duration = Duration::from_secs(15);
     const MTU: u32 = 1500;
     const TCP_BYTES: usize = 256 * 1024;
     const UDP_BYTES: usize = 1200;
+    const REUSE_ROUNDS: usize = 64;
+    const REUSE_BYTES: usize = 4096;
+    const STORE_ID: &str = "a1000000-0000-4000-8000-000000000001";
+    const NODE_ID: &str = "c1000000-0000-4000-8000-000000000001";
     const HOST_V4: &str = "ipv4.wintun.smoke.invalid";
     const HOST_V6: &str = "ipv6.wintun.smoke.invalid";
     const OWN_V4: Ipv4Addr = Ipv4Addr::new(198, 18, 0, 1);
     const OWN_V6: Ipv6Addr = Ipv6Addr::new(0xfd53, 0x7769, 0x726c, 0, 0, 0, 0, 1);
+    type TcpTuple = (SocketAddr, SocketAddr);
+
+    fn reset_tuple(bytes: &[u8]) -> Option<TcpTuple> {
+        let (source, destination, protocol, payload) = match bytes.first()? >> 4 {
+            4 => {
+                let packet = Ipv4Packet::new_checked(bytes).ok()?;
+                (
+                    IpAddr::V4(packet.src_addr()),
+                    IpAddr::V4(packet.dst_addr()),
+                    packet.next_header(),
+                    packet.payload(),
+                )
+            }
+            6 => {
+                let packet = Ipv6Packet::new_checked(bytes).ok()?;
+                (
+                    IpAddr::V6(packet.src_addr()),
+                    IpAddr::V6(packet.dst_addr()),
+                    packet.next_header(),
+                    packet.payload(),
+                )
+            }
+            _ => return None,
+        };
+        if protocol != IpProtocol::Tcp {
+            return None;
+        }
+        let tcp = TcpPacket::new_checked(payload).ok()?;
+        tcp.rst().then(|| {
+            (
+                SocketAddr::new(source, tcp.src_port()),
+                SocketAddr::new(destination, tcp.dst_port()),
+            )
+        })
+    }
 
     fn require(condition: bool, reason: &'static str) -> io::Result<()> {
         if condition {
@@ -151,7 +202,7 @@ mod windows {
             schema: 2,
             listen: "127.0.0.1:0".parse().map_err(io::Error::other)?,
             nodes: vec![Node {
-                id: "c1000000-0000-4000-8000-000000000001".into(),
+                id: NODE_ID.into(),
                 // Direct mode must never dial this unused proxy fixture.
                 outbound: Outbound::HttpConnect {
                     host: "127.0.0.1".into(),
@@ -165,9 +216,7 @@ mod windows {
                 mode: Mode::Direct,
                 default_policy: DefaultPolicy {
                     id: DEFAULT_POLICY_ID.into(),
-                    target: Target::Node {
-                        id: "c1000000-0000-4000-8000-000000000001".into(),
-                    },
+                    target: Target::Node { id: NODE_ID.into() },
                 },
                 service_policies: vec![],
                 groups: vec![],
@@ -267,6 +316,10 @@ mod windows {
             "DNS answer type/class",
         )?;
         require(
+            u32::from_be_bytes(answer[6..10].try_into().map_err(io::Error::other)?) == ANSWER_TTL,
+            "DNS answer TTL changed",
+        )?;
+        require(
             u16::from_be_bytes([answer[10], answer[11]]) as usize == length,
             "DNS address length",
         )?;
@@ -294,6 +347,7 @@ mod windows {
         failed: Arc<AtomicBool>,
         read_packets: Arc<AtomicU64>,
         written_packets: Arc<AtomicU64>,
+        reset_packets: Arc<Mutex<Vec<TcpTuple>>>,
         backend: WindowsNetworkBackend,
         journal: Journal,
         store: FileJournalStore,
@@ -391,6 +445,7 @@ mod windows {
                 failed: Arc::new(AtomicBool::new(false)),
                 read_packets: Arc::new(AtomicU64::new(0)),
                 written_packets: Arc::new(AtomicU64::new(0)),
+                reset_packets: Arc::new(Mutex::new(Vec::new())),
                 backend,
                 journal,
                 store,
@@ -406,6 +461,7 @@ mod windows {
             let closing = run.closing.clone();
             let failed = run.failed.clone();
             let count = run.read_packets.clone();
+            let resets = run.reset_packets.clone();
             run.reader = Some(
                 thread::Builder::new()
                     .name("swirl-smoke-wintun-read".into())
@@ -415,6 +471,17 @@ mod windows {
                             match reader_device.receive_blocking(&mut bytes) {
                                 Ok(()) if bytes.len() <= MTU as usize => {
                                     count.fetch_add(1, Ordering::Relaxed);
+                                    if let Some(tuple) = reset_tuple(&bytes) {
+                                        match resets.lock() {
+                                            Ok(mut observed) if observed.len() < 64 => {
+                                                observed.push(tuple)
+                                            }
+                                            _ => {
+                                                failed.store(true, Ordering::Release);
+                                                break;
+                                            }
+                                        }
+                                    }
                                     if packet.input.blocking_send(bytes).is_err() {
                                         if !closing.load(Ordering::Acquire) {
                                             failed.store(true, Ordering::Release);
@@ -478,12 +545,39 @@ mod windows {
             }
             let mut errors = Vec::new();
             match transaction::recover(&mut self.backend, &mut self.store, &mut self.journal) {
-                Ok(report) if report.conflicts.is_empty() && self.journal.is_restored() => {}
+                Ok(report) if report.conflicts.is_empty() && self.journal.is_restored() => {
+                    eprintln!("Wintun smoke: recovery report {}", json!(report));
+                }
                 Ok(report) => errors.push(format!(
                     "network recovery conflicts: {:?}",
                     report.conflicts
                 )),
                 Err(error) => errors.push(format!("network recovery: {error}")),
+            }
+            // Read back before closing the adapter: deleting the interface is
+            // not proof that its MTU or any other before value was restored.
+            // These are only this smoke's six owned resources, never a dump of
+            // the runner's physical network configuration.
+            for change in &self.journal.changes {
+                match self.backend.read(&self.journal.interface, &change.resource) {
+                    Ok(observed) => {
+                        let exact = observed == change.before;
+                        eprintln!(
+                            "Wintun smoke: restored raw state {}",
+                            json!({"resource":change.resource,"before":change.before,
+                                "observed":observed,"exact":exact,"state":change.state})
+                        );
+                        if !exact {
+                            errors.push(format!(
+                                "restored value differs from original {:?}",
+                                change.resource
+                            ));
+                        }
+                    }
+                    Err(error) => {
+                        errors.push(format!("recovery readback {:?}: {error}", change.resource))
+                    }
+                }
             }
             // Always shut down packet tasks after attempting compare-restore,
             // even when an OS failure must leave a journal for later recovery.
@@ -539,6 +633,22 @@ mod windows {
 
     struct Peer(JoinHandle<io::Result<()>>);
     impl Peer {
+        fn spawn<F>(runtime: &Handle, label: impl Into<String>, work: F) -> Self
+        where
+            F: Future<Output = io::Result<()>> + Send + 'static,
+        {
+            let label = label.into();
+            Self(runtime.spawn(async move {
+                let result = work.await;
+                if let Err(error) = &result {
+                    // A client can observe the resulting reset and return
+                    // before finish(). Preserve the originating fixture error.
+                    eprintln!("Wintun smoke: peer failure [{label}]: {error}");
+                }
+                result
+            }))
+        }
+
         fn finish(mut self, runtime: &Handle) -> io::Result<()> {
             runtime.block_on(async {
                 timeout(IO_WAIT, &mut self.0)
@@ -552,6 +662,600 @@ mod windows {
         fn drop(&mut self) {
             self.0.abort();
         }
+    }
+
+    fn apply_policy(core: &Core, directory: &Path, candidate: RuntimeConfig) -> io::Result<()> {
+        let current = core.configuration().map_err(io::Error::other)?;
+        let revision = current["applied_revision"]
+            .as_str()
+            .ok_or_else(|| io::Error::other("missing applied revision"))?
+            .parse::<u64>()
+            .map_err(io::Error::other)?;
+        let generation = current["generation"]
+            .as_str()
+            .ok_or_else(|| io::Error::other("missing generation"))?
+            .parse::<u64>()
+            .map_err(io::Error::other)?;
+        let next = revision + 1;
+        let request = format!("d1000000-0000-4000-8000-{next:012x}");
+        let prepared = core
+            .prepare(
+                request.clone(),
+                STORE_ID,
+                revision,
+                next,
+                generation,
+                revision,
+                candidate.clone(),
+                vec![],
+            )
+            .map_err(io::Error::other)?;
+        let token = prepared["prepared_token"]
+            .as_str()
+            .ok_or_else(|| io::Error::other("missing prepared token"))?;
+        let digest = prepared["plan_digest"]
+            .as_str()
+            .ok_or_else(|| io::Error::other("missing plan digest"))?;
+        core.activate(&request, token, digest, generation, next)
+            .map_err(io::Error::other)?;
+        let receipt = DurableReceipt {
+            store_id: STORE_ID.into(),
+            request_id: request.clone(),
+            saved_revision: next.to_string(),
+            plan_digest: digest.into(),
+        };
+        // Use the actual V2 admission transaction, including a synced fixture
+        // receipt, rather than replacing a dispatcher or bypassing finish().
+        let (id, _) = nonce()?;
+        let mut saved = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(directory.join(format!("smoke-policy-{id}.json")))?;
+        saved.write_all(
+            &serde_json::to_vec(&json!({"runtime":candidate,"receipt":receipt}))
+                .map_err(io::Error::other)?,
+        )?;
+        saved.sync_all()?;
+        drop(saved);
+        let finished = core
+            .finish(&request, token, receipt)
+            .map_err(io::Error::other)?;
+        require(
+            finished["outcome"] == "applied",
+            "policy transaction not applied",
+        )
+    }
+
+    fn loopback(ipv6: bool) -> IpAddr {
+        if ipv6 {
+            Ipv6Addr::LOCALHOST.into()
+        } else {
+            Ipv4Addr::LOCALHOST.into()
+        }
+    }
+
+    /// A real encrypted resolver for the policy controls below. Unlike static
+    /// hosts, a resolved answer does not preselect the built-in LAN/direct rule.
+    /// Thus both PROXY/REJECT and a reachable DIRECT control can target exactly
+    /// the same hostname, port and listening socket.
+    fn dns_fixture(runtime: &Handle) -> io::Result<(Dns, Peer, Arc<AtomicU64>)> {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../swirl-transport/tests/fixtures/reality_auth.json"
+        ))
+        .map_err(io::Error::other)?;
+        let decode = |field: &str| -> io::Result<Vec<u8>> {
+            let encoded = fixture["certificate"][field]
+                .as_str()
+                .ok_or_else(|| io::Error::other("missing fixture certificate field"))?;
+            require(encoded.len() % 2 == 0, "odd fixture certificate hex")?;
+            encoded
+                .as_bytes()
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|pair| {
+                    u8::from_str_radix(std::str::from_utf8(pair).map_err(io::Error::other)?, 16)
+                        .map_err(io::Error::other)
+                })
+                .collect()
+        };
+        let certificate = decode("ordinary_self_signed_der_hex")?;
+        let server = ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(
+                vec![CertificateDer::from(certificate.clone())],
+                PrivatePkcs8KeyDer::from(decode("ed25519_pkcs8_der_hex")?).into(),
+            )
+            .map_err(io::Error::other)?;
+        let acceptor = TlsAcceptor::from(Arc::new(server));
+        let listener = runtime.block_on(tokio::net::TcpListener::bind("127.0.0.1:0"))?;
+        let address = listener.local_addr()?;
+        let queries = Arc::new(AtomicU64::new(0));
+        let observed = queries.clone();
+        let peer = Peer::spawn(runtime, "DoT A/AAAA resolver", async move {
+            loop {
+                let (stream, source) = listener.accept().await?;
+                require(
+                    source.ip().is_loopback(),
+                    "DoT fixture received non-loopback client",
+                )?;
+                timeout(IO_WAIT, async {
+                    let mut stream = acceptor.accept(stream).await?;
+                    // The production DoT resolver sends A then AAAA on this
+                    // same verified TLS connection, not separate sockets.
+                    for expected_v6 in [false, true] {
+                        let length = usize::from(stream.read_u16().await?);
+                        require((12..=4096).contains(&length), "DoT fixture query length")?;
+                        let mut request = vec![0; length];
+                        stream.read_exact(&mut request).await?;
+                        let mut selected = None;
+                        for (host, ipv6) in [(HOST_V4, false), (HOST_V6, true)] {
+                            for q6 in [false, true] {
+                                let expected = query(host, q6);
+                                if request[4..] == expected[4..] {
+                                    selected = Some((ipv6, q6));
+                                }
+                            }
+                        }
+                        let (host_v6, query_v6) = selected
+                            .ok_or_else(|| io::Error::other("unexpected DoT fixture question"))?;
+                        require(query_v6 == expected_v6, "DoT family order changed")?;
+                        let mut reply = request;
+                        reply[2..4].copy_from_slice(&[0x81, 0x80]);
+                        if host_v6 == query_v6 {
+                            reply[6..8].copy_from_slice(&[0, 1]);
+                            reply.extend_from_slice(&[0xc0, 0x0c]);
+                            reply.extend_from_slice(if query_v6 {
+                                &[0, 28, 0, 1]
+                            } else {
+                                &[0, 1, 0, 1]
+                            });
+                            reply.extend_from_slice(&ANSWER_TTL.to_be_bytes());
+                            if query_v6 {
+                                reply.extend_from_slice(&[0, 16]);
+                                reply.extend_from_slice(&Ipv6Addr::LOCALHOST.octets());
+                            } else {
+                                reply.extend_from_slice(&[0, 4]);
+                                reply.extend_from_slice(&Ipv4Addr::LOCALHOST.octets());
+                            }
+                        }
+                        observed.fetch_add(1, Ordering::AcqRel);
+                        stream.write_u16(reply.len() as u16).await?;
+                        stream.write_all(&reply).await?;
+                        stream.flush().await?;
+                    }
+                    stream.shutdown().await
+                })
+                .await
+                .map_err(io::Error::other)??;
+            }
+        });
+        Ok((
+            Dns {
+                tls_servers: vec![DnsTlsServer {
+                    address,
+                    tls: Tls {
+                        server_name: "reality.test".into(),
+                        alpn: vec![],
+                        ca_der_base64: Some(
+                            base64::engine::general_purpose::STANDARD.encode(certificate),
+                        ),
+                    },
+                    https_path: None,
+                }],
+                hosts: vec![],
+                use_system_hosts: false,
+                ..Dns::default()
+            },
+            peer,
+            queries,
+        ))
+    }
+
+    fn no_tcp_accept(listener: &std::net::TcpListener) -> io::Result<()> {
+        match listener.accept() {
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => Ok(()),
+            Err(error) => Err(error),
+            Ok(_) => Err(io::Error::other(
+                "forbidden DIRECT/unused proxy listener accepted traffic",
+            )),
+        }
+    }
+
+    fn flow_ended(
+        core: &Core,
+        baseline: u64,
+        host: &str,
+        port: u16,
+        category: &str,
+        error: &str,
+    ) -> io::Result<()> {
+        let deadline = Instant::now() + IO_WAIT;
+        loop {
+            let snapshot = core.snapshot().map_err(io::Error::other)?;
+            let records = snapshot["connections"]
+                .as_array()
+                .ok_or_else(|| io::Error::other("missing Core flow records"))?;
+            let matches = records
+                .iter()
+                .filter(|row| {
+                    row["id"].as_u64().is_some_and(|id| id > baseline)
+                        && row["host"] == host
+                        && row["port"] == port
+                })
+                .collect::<Vec<_>>();
+            let diagnose = || {
+                let observed = matches
+                    .iter()
+                    .map(|row| {
+                        json!({"id":row["id"],"category":row["category"],
+                            "error":row["error"],"node":row["node"],"ended":row["ended"]})
+                    })
+                    .collect::<Vec<_>>();
+                eprintln!(
+                    "Wintun smoke: Core flow assertion {}",
+                    json!({"host":host,"port":port,"baseline":baseline,
+                        "expected":{"category":category,"error":error,
+                            "node":(category == "proxy").then_some(NODE_ID)},
+                        "observed":observed})
+                );
+            };
+            if matches.len() > 1 {
+                diagnose();
+                return Err(io::Error::other(
+                    "one native flow produced multiple Core admissions",
+                ));
+            }
+            if let Some(row) = matches.first()
+                && row["ended"] == true
+            {
+                if row["category"] != category
+                    || row["error"] != error
+                    || (category == "proxy" && row["node"] != NODE_ID)
+                {
+                    diagnose();
+                }
+                require(
+                    row["category"] == category,
+                    "Core selected an unexpected route category",
+                )?;
+                require(
+                    row["error"] == error,
+                    "Core did not preserve the exact flow result",
+                )?;
+                if category == "proxy" {
+                    require(
+                        row["node"] == NODE_ID,
+                        "Core switched away from selected proxy",
+                    )?;
+                }
+                return Ok(());
+            }
+            if Instant::now() >= deadline {
+                diagnose();
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "Core flow did not reach its expected terminal record",
+                ));
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    fn accepted_count(core: &Core) -> io::Result<u64> {
+        core.snapshot().map_err(io::Error::other)?["accepted"]
+            .as_u64()
+            .ok_or_else(|| io::Error::other("missing Core admission count"))
+    }
+
+    fn direct_trap_control(
+        core: &Core,
+        directory: &Path,
+        runtime: &Handle,
+        mut config: RuntimeConfig,
+        fake: IpAddr,
+        listener: std::net::TcpListener,
+    ) -> io::Result<()> {
+        config.policy.mode = Mode::Direct;
+        apply_policy(core, directory, config)?;
+        let port = listener.local_addr()?.port();
+        let baseline = accepted_count(core)?;
+        let label = format!(
+            "IPv{} DIRECT trap control",
+            if fake.is_ipv6() { 6 } else { 4 }
+        );
+        let peer = Peer::spawn(runtime, label, async move {
+            timeout(IO_WAIT, async {
+                let listener = tokio::net::TcpListener::from_std(listener)?;
+                let (mut stream, source) = listener.accept().await?;
+                require(
+                    source.ip().is_loopback(),
+                    "DIRECT control did not resolve to loopback",
+                )?;
+                let mut message = [0; 4];
+                stream.read_exact(&mut message).await?;
+                require(&message == b"trap", "DIRECT control payload changed")?;
+                stream.write_all(b"live").await?;
+                stream.shutdown().await
+            })
+            .await
+            .map_err(io::Error::other)?
+        });
+        let mut client =
+            std::net::TcpStream::connect_timeout(&SocketAddr::new(fake, port), IO_WAIT)?;
+        client.set_read_timeout(Some(IO_WAIT))?;
+        client.set_write_timeout(Some(IO_WAIT))?;
+        require(
+            client.local_addr()?.ip() == own(fake.is_ipv6()),
+            "DIRECT control bypassed owned TUN source",
+        )?;
+        client.write_all(b"trap")?;
+        client.shutdown(Shutdown::Write)?;
+        let mut message = Vec::new();
+        (&mut client).take(5).read_to_end(&mut message)?;
+        require(
+            message == b"live",
+            "DIRECT control was not reachable through Wintun",
+        )?;
+        peer.finish(runtime)?;
+        flow_ended(
+            core,
+            baseline,
+            if fake.is_ipv6() { HOST_V6 } else { HOST_V4 },
+            port,
+            "direct",
+            "",
+        )
+    }
+
+    fn proxy_peer(
+        runtime: &Handle,
+        listener: std::net::TcpListener,
+        host: &'static str,
+        port: u16,
+        reject: bool,
+    ) -> Peer {
+        let label = format!("HTTP CONNECT host={host} port={port} reject={reject}");
+        Peer::spawn(runtime, label, async move {
+            timeout(IO_WAIT, async {
+                let listener = tokio::net::TcpListener::from_std(listener)?;
+                let (mut stream, source) = listener.accept().await?;
+                require(
+                    source.ip().is_loopback(),
+                    "proxy fixture received non-loopback egress",
+                )?;
+                let mut header = Vec::new();
+                while !header.ends_with(b"\r\n\r\n") {
+                    require(header.len() < 8192, "oversized fixture CONNECT header")?;
+                    header.push(stream.read_u8().await?);
+                }
+                require(
+                    header
+                        == format!("CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n")
+                            .as_bytes(),
+                    "native HTTP CONNECT changed target identity",
+                )?;
+                if reject {
+                    stream
+                        .write_all(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n")
+                        .await?;
+                    return stream.shutdown().await;
+                }
+                stream
+                    .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+                    .await?;
+                let mut received = Vec::new();
+                (&mut stream)
+                    .take((TCP_BYTES + 1) as u64)
+                    .read_to_end(&mut received)
+                    .await?;
+                require(
+                    received == payload(TCP_BYTES),
+                    "native proxy payload or client FIN lost",
+                )?;
+                stream.write_all(&received).await?;
+                stream.write_all(b"reply-after-client-fin").await?;
+                stream.shutdown().await
+            })
+            .await
+            .map_err(io::Error::other)?
+        })
+    }
+
+    fn tcp_must_reset(destination: SocketAddr) -> io::Result<()> {
+        let reset = |error: io::Error| -> io::Result<()> {
+            if matches!(
+                error.kind(),
+                io::ErrorKind::ConnectionReset
+                    | io::ErrorKind::ConnectionAborted
+                    | io::ErrorKind::ConnectionRefused
+                    | io::ErrorKind::BrokenPipe
+            ) {
+                Ok(())
+            } else {
+                Err(io::Error::other(format!(
+                    "expected rejected TCP flow/reset, observed {error}"
+                )))
+            }
+        };
+        let mut client = match std::net::TcpStream::connect_timeout(&destination, IO_WAIT) {
+            Ok(client) => client,
+            Err(error) => return reset(error),
+        };
+        client.set_read_timeout(Some(IO_WAIT))?;
+        client.set_write_timeout(Some(IO_WAIT))?;
+        require(
+            client.local_addr()?.ip() == own(destination.is_ipv6()),
+            "rejection probe bypassed Wintun",
+        )?;
+        if let Err(error) = client.write_all(b"must-not-forward") {
+            return reset(error);
+        }
+        let mut response = [0; 1];
+        match client.read(&mut response) {
+            Err(error) => reset(error),
+            Ok(size) => Err(io::Error::other(format!(
+                "rejected flow returned {size} bytes or graceful EOF instead of reset"
+            ))),
+        }
+    }
+
+    fn policy_roundtrips(
+        core: &Core,
+        directory: &Path,
+        runtime: &Handle,
+        fake: [IpAddr; 2],
+    ) -> io::Result<()> {
+        let (encrypted_dns, _dns_peer, dns_queries) = dns_fixture(runtime)?;
+        // First prove the real DoT fixture can resolve both families with TLS
+        // verification. The Core subsequently builds its own uncached resolver.
+        let resolver = swirl_dns::Resolver::default()
+            .with_config(&encrypted_dns)
+            .map_err(io::Error::other)?;
+        for (index, host) in [HOST_V4, HOST_V6].iter().enumerate() {
+            let addresses = runtime
+                .block_on(resolver.resolve(host, 443))
+                .map_err(io::Error::other)?;
+            require(
+                addresses == vec![SocketAddr::new(loopback(index == 1), 443)],
+                "DoT fixture did not return the exact reachable target family",
+            )?;
+        }
+        eprintln!("Wintun smoke: PASS verified DoT A/AAAA resolver fixture");
+        for (index, host) in [HOST_V4, HOST_V6].into_iter().enumerate() {
+            let ipv6 = index == 1;
+            let family = if ipv6 { 6 } else { 4 };
+            for case in ["proxy", "reject", "proxy_rejected", "proxy_unavailable"] {
+                eprintln!("Wintun smoke: IPv{family} {case} with reachable DIRECT controls");
+                let trap = std::net::TcpListener::bind(SocketAddr::new(loopback(ipv6), 0))?;
+                trap.set_nonblocking(true)?;
+                let port = trap.local_addr()?.port();
+                let proxy = std::net::TcpListener::bind(SocketAddr::new(loopback(ipv6), 0))?;
+                proxy.set_nonblocking(true)?;
+                // Keep the unused port bound for the entire case without
+                // listening. No race with another process reusing a dropped
+                // listener is permitted in the connection-refused fixture.
+                let unavailable = if case == "proxy_unavailable" {
+                    let socket = if ipv6 {
+                        tokio::net::TcpSocket::new_v6()?
+                    } else {
+                        tokio::net::TcpSocket::new_v4()?
+                    };
+                    socket.bind(SocketAddr::new(loopback(ipv6), 0))?;
+                    Some(socket)
+                } else {
+                    None
+                };
+                let proxy_address = match &unavailable {
+                    Some(socket) => socket.local_addr()?,
+                    None => proxy.local_addr()?,
+                };
+                if unavailable.is_some() {
+                    match std::net::TcpStream::connect_timeout(&proxy_address, IO_WAIT) {
+                        Err(error) if error.kind() == io::ErrorKind::ConnectionRefused => {}
+                        Err(error) => {
+                            return Err(io::Error::other(format!(
+                                "unavailable proxy fixture did not refuse: {error}"
+                            )));
+                        }
+                        Ok(_) => {
+                            return Err(io::Error::other(
+                                "unavailable proxy fixture unexpectedly accepted TCP",
+                            ));
+                        }
+                    }
+                }
+                let mut config = runtime_config()?;
+                config.dns = encrypted_dns.clone();
+                config.nodes[0].outbound = Outbound::HttpConnect {
+                    host: proxy_address.ip().to_string(),
+                    port: proxy_address.port(),
+                    auth: None,
+                    tls: None,
+                };
+                direct_trap_control(
+                    core,
+                    directory,
+                    runtime,
+                    config.clone(),
+                    fake[index],
+                    trap.try_clone()?,
+                )?;
+                no_tcp_accept(&trap)?;
+                config.policy.mode = if case == "reject" {
+                    Mode::Rule
+                } else {
+                    Mode::Global
+                };
+                if case == "reject" {
+                    // Release executables do not use the development fallback
+                    // for bundled rules. Use the repository's existing pinned
+                    // MRS assets explicitly; no special rule set is invented.
+                    config.china_rules_directory = Some(
+                        Path::new(env!("CARGO_MANIFEST_DIR"))
+                            .join("../../../src/Swirl.Quick/packaging/rules")
+                            .canonicalize()?
+                            .to_str()
+                            .ok_or_else(|| io::Error::other("MRS fixture path is not UTF-8"))?
+                            .into(),
+                    );
+                    config.policy.custom_rules.push(PolicyRule {
+                        id: "e1000000-0000-4000-8000-000000000001".into(),
+                        name: "Reject owned Wintun smoke targets".into(),
+                        enabled: true,
+                        priority: 0,
+                        matcher: Matcher::DomainSuffix {
+                            value: "wintun.smoke.invalid".into(),
+                        },
+                        target: Target::Reject {},
+                    });
+                }
+                apply_policy(core, directory, config.clone())?;
+                let baseline = accepted_count(core)?;
+                let queries_before = dns_queries.load(Ordering::Acquire);
+                let peer = if matches!(case, "reject" | "proxy_unavailable") {
+                    None
+                } else {
+                    Some(proxy_peer(
+                        runtime,
+                        proxy.try_clone()?,
+                        host,
+                        port,
+                        case == "proxy_rejected",
+                    ))
+                };
+                let destination = SocketAddr::new(fake[index], port);
+                if case == "proxy" {
+                    tcp_client_roundtrip(destination)?;
+                } else {
+                    tcp_must_reset(destination)?;
+                }
+                if let Some(peer) = peer {
+                    peer.finish(runtime)?;
+                }
+                let (category, error) = match case {
+                    "proxy" => ("proxy", ""),
+                    "reject" => ("reject", "Rejected"),
+                    "proxy_rejected" => ("proxy", "UpstreamRejected"),
+                    _ => ("proxy", "UpstreamConnectionRefused"),
+                };
+                flow_ended(core, baseline, host, port, category, error)?;
+                require(
+                    dns_queries.load(Ordering::Acquire) == queries_before,
+                    "proxy/reject path unexpectedly attempted direct DNS resolution",
+                )?;
+                no_tcp_accept(&trap)?;
+                no_tcp_accept(&proxy)?;
+                // Same name, port, DNS and still-open listener; only the policy
+                // changes. This proves absence of an accept above was not an
+                // unreachable or broken DIRECT trap.
+                direct_trap_control(core, directory, runtime, config, fake[index], trap)?;
+                eprintln!(
+                    "Wintun smoke: PASS IPv{family} {case}, exact Core outcome and reachable DIRECT trap controls"
+                );
+            }
+        }
+        Ok(())
     }
 
     fn payload(size: usize) -> Vec<u8> {
@@ -604,6 +1308,42 @@ mod windows {
         )
     }
 
+    fn dns_tcp_roundtrip(fake: IpAddr, request: &[u8]) -> io::Result<()> {
+        let ipv6 = fake.is_ipv6();
+        let mut client = std::net::TcpStream::connect_timeout(&dns_address(ipv6), IO_WAIT)?;
+        client.set_read_timeout(Some(IO_WAIT))?;
+        client.set_write_timeout(Some(IO_WAIT))?;
+        require(
+            client.local_addr()?.ip() == own(ipv6),
+            "Windows TCP DNS did not select the owned TUN address",
+        )?;
+        // Two framed messages on one connection exercise frame boundaries and
+        // reuse of the real bridge's TCP DNS handler.
+        for _ in 0..2 {
+            client.write_all(&(request.len() as u16).to_be_bytes())?;
+            client.write_all(request)?;
+            let mut length = [0; 2];
+            client.read_exact(&mut length)?;
+            let length = usize::from(u16::from_be_bytes(length));
+            require(
+                (12..=4096).contains(&length),
+                "invalid TCP DNS frame length",
+            )?;
+            let mut response = vec![0; length];
+            client.read_exact(&mut response)?;
+            require(
+                answer_ip(request, &response, ipv6)? == fake,
+                "Windows TCP DNS returned another fake identity",
+            )?;
+        }
+        client.shutdown(Shutdown::Write)?;
+        let mut byte = [0];
+        require(
+            client.read(&mut byte)? == 0,
+            "TCP DNS did not finish after client FIN",
+        )
+    }
+
     fn tcp_roundtrip(runtime: &Handle, fake: IpAddr) -> io::Result<()> {
         let ipv6 = fake.is_ipv6();
         let real = SocketAddr::new(
@@ -616,7 +1356,8 @@ mod windows {
         );
         let listener = runtime.block_on(tokio::net::TcpListener::bind(real))?;
         let destination = SocketAddr::new(fake, listener.local_addr()?.port());
-        let peer = Peer(runtime.spawn(async move {
+        let label = format!("IPv{} TCP payload and half-close", if ipv6 { 6 } else { 4 });
+        let peer = Peer::spawn(runtime, label, async move {
             timeout(IO_WAIT, async {
                 let (mut stream, source) = listener.accept().await?;
                 require(
@@ -638,12 +1379,17 @@ mod windows {
             })
             .await
             .map_err(io::Error::other)?
-        }));
+        });
+        tcp_client_roundtrip(destination)?;
+        peer.finish(runtime)
+    }
+
+    fn tcp_client_roundtrip(destination: SocketAddr) -> io::Result<()> {
         let mut client = std::net::TcpStream::connect_timeout(&destination, IO_WAIT)?;
         client.set_read_timeout(Some(IO_WAIT))?;
         client.set_write_timeout(Some(IO_WAIT))?;
         require(
-            client.local_addr()?.ip() == own(ipv6),
+            client.local_addr()?.ip() == own(destination.is_ipv6()),
             "Windows TCP did not select the owned TUN address",
         )?;
         client.write_all(&payload(TCP_BYTES))?;
@@ -657,8 +1403,7 @@ mod windows {
         require(
             response == expected,
             "TCP response bytes or half-close semantics lost",
-        )?;
-        peer.finish(runtime)
+        )
     }
 
     fn udp_roundtrip(runtime: &Handle, fake: IpAddr) -> io::Result<()> {
@@ -673,7 +1418,8 @@ mod windows {
         );
         let server = runtime.block_on(tokio::net::UdpSocket::bind(real))?;
         let destination = SocketAddr::new(fake, server.local_addr()?.port());
-        let peer = Peer(runtime.spawn(async move {
+        let label = format!("IPv{} empty/full UDP", if ipv6 { 6 } else { 4 });
+        let peer = Peer::spawn(runtime, label, async move {
             timeout(IO_WAIT, async {
                 let mut buffer = [0u8; UDP_BYTES + 1];
                 for size in [0, UDP_BYTES] {
@@ -695,7 +1441,7 @@ mod windows {
             })
             .await
             .map_err(io::Error::other)?
-        }));
+        });
         let client = local_udp(ipv6)?;
         for size in [0, UDP_BYTES] {
             let message = payload(size);
@@ -717,6 +1463,169 @@ mod windows {
         peer.finish(runtime)
     }
 
+    fn reused_frame(round: usize) -> Vec<u8> {
+        let mut frame = payload(REUSE_BYTES);
+        frame[..4].copy_from_slice(&(round as u32).to_be_bytes());
+        frame
+    }
+
+    fn tcp_reuse_and_reset(runtime: &Handle, fake: IpAddr, run: &DeviceRun) -> io::Result<()> {
+        let ipv6 = fake.is_ipv6();
+        let listener = runtime.block_on(tokio::net::TcpListener::bind(SocketAddr::new(
+            loopback(ipv6),
+            0,
+        )))?;
+        let destination = SocketAddr::new(fake, listener.local_addr()?.port());
+        let label = format!("IPv{} persistent TCP", if ipv6 { 6 } else { 4 });
+        let peer = Peer::spawn(runtime, label, async move {
+            timeout(IO_WAIT, async {
+                let (mut stream, source) = listener.accept().await?;
+                require(
+                    source.ip().is_loopback(),
+                    "reused TCP Core egress escaped loopback",
+                )?;
+                let mut frame = vec![0; REUSE_BYTES];
+                for round in 0..REUSE_ROUNDS {
+                    stream.read_exact(&mut frame).await?;
+                    require(
+                        frame == reused_frame(round),
+                        "reused TCP request order or bytes changed",
+                    )?;
+                    frame[0] ^= 0xa5;
+                    stream.write_all(&frame).await?;
+                }
+                let mut byte = [0];
+                require(
+                    stream.read(&mut byte).await? == 0,
+                    "reused TCP client FIN missing",
+                )?;
+                stream.write_all(b"reuse-finished").await?;
+                stream.shutdown().await
+            })
+            .await
+            .map_err(io::Error::other)?
+        });
+        let mut client = std::net::TcpStream::connect_timeout(&destination, IO_WAIT)?;
+        client.set_read_timeout(Some(IO_WAIT))?;
+        client.set_write_timeout(Some(IO_WAIT))?;
+        let original_source = client.local_addr()?;
+        require(
+            original_source.ip() == own(ipv6),
+            "reused TCP did not enter owned TUN",
+        )?;
+        for round in 0..REUSE_ROUNDS {
+            if round == REUSE_ROUNDS / 2 {
+                let reset_listener = runtime.block_on(tokio::net::TcpListener::bind(
+                    SocketAddr::new(loopback(ipv6), 0),
+                ))?;
+                let reset_destination = SocketAddr::new(fake, reset_listener.local_addr()?.port());
+                let label = format!("IPv{} abortive TCP reset", if ipv6 { 6 } else { 4 });
+                let reset_peer = Peer::spawn(runtime, label, async move {
+                    timeout(IO_WAIT, async {
+                        let (mut stream, source) = reset_listener.accept().await?;
+                        require(
+                            source.ip().is_loopback(),
+                            "RST Core egress escaped loopback",
+                        )?;
+                        let mut ready = [0; 11];
+                        stream.read_exact(&mut ready).await?;
+                        require(&ready == b"reset-ready", "RST setup request changed")?;
+                        stream.write_all(b"reset-armed").await?;
+                        let mut byte = [0];
+                        match stream.read(&mut byte).await {
+                            Ok(0) => Ok(()),
+                            Err(error)
+                                if matches!(
+                                    error.kind(),
+                                    io::ErrorKind::ConnectionReset
+                                        | io::ErrorKind::ConnectionAborted
+                                ) =>
+                            {
+                                Ok(())
+                            }
+                            Err(error) => Err(error),
+                            Ok(_) => {
+                                Err(io::Error::other("aborted flow delivered unexpected bytes"))
+                            }
+                        }
+                    })
+                    .await
+                    .map_err(io::Error::other)?
+                });
+                let reset_source = runtime.block_on(async {
+                    let socket = if ipv6 {
+                        tokio::net::TcpSocket::new_v6()?
+                    } else {
+                        tokio::net::TcpSocket::new_v4()?
+                    };
+                    socket.bind(SocketAddr::new(own(ipv6), 0))?;
+                    socket.set_zero_linger()?;
+                    require(
+                        socket.linger()? == Some(Duration::ZERO),
+                        "SO_LINGER=0 was not applied",
+                    )?;
+                    let mut reset = timeout(IO_WAIT, socket.connect(reset_destination))
+                        .await
+                        .map_err(io::Error::other)??;
+                    let source = reset.local_addr()?;
+                    timeout(IO_WAIT, async {
+                        reset.write_all(b"reset-ready").await?;
+                        let mut ready = [0; 11];
+                        reset.read_exact(&mut ready).await?;
+                        require(&ready == b"reset-armed", "RST setup response changed")
+                    })
+                    .await
+                    .map_err(io::Error::other)??;
+                    // No shutdown(): dropping this real Windows socket must
+                    // produce the abortive RST observed by the Wintun reader.
+                    drop(reset);
+                    Ok::<_, io::Error>(source)
+                })?;
+                reset_peer.finish(runtime)?;
+                let deadline = Instant::now() + IO_WAIT;
+                loop {
+                    let observed = run
+                        .reset_packets
+                        .lock()
+                        .map_err(|_| io::Error::other("RST observation lock poisoned"))?
+                        .contains(&(reset_source, reset_destination));
+                    if observed && run.stats.snapshot().active_tcp_flows == 1 {
+                        break;
+                    }
+                    if Instant::now() >= deadline {
+                        return Err(io::Error::new(
+                            io::ErrorKind::TimedOut,
+                            "exact Windows RST packet or aborted-flow cleanup was not observed",
+                        ));
+                    }
+                    thread::sleep(Duration::from_millis(10));
+                }
+                eprintln!(
+                    "Wintun smoke: PASS IPv{} exact Windows SO_LINGER=0 RST tuple and independent flow cleanup",
+                    if ipv6 { 6 } else { 4 }
+                );
+            }
+            let mut frame = reused_frame(round);
+            client.write_all(&frame)?;
+            frame[0] ^= 0xa5;
+            let mut reply = vec![0; REUSE_BYTES];
+            client.read_exact(&mut reply)?;
+            require(reply == frame, "reused TCP response order or bytes changed")?;
+            require(
+                client.local_addr()? == original_source,
+                "persistent TCP connection changed",
+            )?;
+        }
+        client.shutdown(Shutdown::Write)?;
+        let mut final_reply = Vec::new();
+        (&mut client).take(32).read_to_end(&mut final_reply)?;
+        require(
+            final_reply == b"reuse-finished",
+            "persistent TCP final half-close reply changed",
+        )?;
+        peer.finish(runtime)
+    }
+
     fn sorted_routes(mut routes: Vec<SystemRoute>) -> Vec<SystemRoute> {
         routes.sort_by_key(|route| {
             (
@@ -733,14 +1642,13 @@ mod windows {
         require(driver.is_absolute(), "driver path must be absolute")?;
         let directory = windows_network::secure_state_directory()?;
         let before = windows_network::snapshot()?;
+        let configuration_before = windows_network::snapshot_network_configuration()?;
         let (owner, guid) = nonce()?;
-        let dns = TunDns::new(
-            FakeIpStore::open(&directory.join(format!("smoke-{owner}.fake-ip.jsonl")), 8)
-                .map_err(io::Error::other)?,
-        );
+        let fake_path = directory.join(format!("smoke-{owner}.fake-ip.jsonl"));
+        let dns = TunDns::new(FakeIpStore::open(&fake_path, 8).map_err(io::Error::other)?);
         let mut core = Core::start(
             runtime_config()?,
-            "a1000000-0000-4000-8000-000000000001".into(),
+            STORE_ID.into(),
             1,
             "b1000000-0000-4000-8000-000000000001".into(),
         )
@@ -751,19 +1659,8 @@ mod windows {
         // the fixture never needs an external bootstrap but does not exercise
         // physical-interface pinning or a full-tunnel routing configuration.
         let binding = EgressLease::acquire_suspended()?;
-        let packet = native_tun::spawn(
-            dispatcher.clone(),
-            dns.clone(),
-            TunConfig {
-                mtu: MTU as usize,
-                max_tcp_flows: 8,
-                max_udp_endpoints: 8,
-                ..TunConfig::default()
-            },
-        )
-        .map_err(io::Error::other)?;
         let requests = [query(HOST_V4, false), query(HOST_V6, true)];
-        let lookup = Lookup(dispatcher);
+        let lookup = Lookup(dispatcher.clone());
         let mut fake = [
             IpAddr::V4(Ipv4Addr::UNSPECIFIED),
             IpAddr::V6(Ipv6Addr::UNSPECIFIED),
@@ -781,6 +1678,38 @@ mod windows {
                 "fake identity did not retain the host",
             )?;
         }
+        // Close the actual file owner and reconstruct from durable bytes. The
+        // Wintun path below uses this reopened store, not the original memory.
+        drop(dns);
+        let dns = TunDns::new(FakeIpStore::open(&fake_path, 8).map_err(io::Error::other)?);
+        for index in 0..2 {
+            require(
+                runtime
+                    .block_on(dns.target_host(fake[index]))
+                    .map_err(io::Error::other)?
+                    == [HOST_V4, HOST_V6][index],
+                "persisted fake identity changed after reopening",
+            )?;
+            let response = runtime
+                .block_on(dns.answer(&requests[index], &lookup))
+                .map_err(io::Error::other)?;
+            require(
+                answer_ip(&requests[index], &response, index == 1)? == fake[index],
+                "persisted fake address changed after reopening",
+            )?;
+        }
+        eprintln!("Wintun smoke: PASS durable dual-stack Fake-IP close/reopen identity");
+        let packet = native_tun::spawn(
+            dispatcher.clone(),
+            dns,
+            TunConfig {
+                mtu: MTU as usize,
+                max_tcp_flows: 8,
+                max_udp_endpoints: 8,
+                ..TunConfig::default()
+            },
+        )
+        .map_err(io::Error::other)?;
         eprintln!("Wintun smoke: creating an owned adapter and applying exact test routes");
         let mut run = DeviceRun::start(
             driver,
@@ -796,11 +1725,21 @@ mod windows {
                 let family = if index == 0 { 4 } else { 6 };
                 eprintln!("Wintun smoke: IPv{family} DNS identity");
                 dns_roundtrip(fake[index], &requests[index])?;
+                eprintln!("Wintun smoke: PASS IPv{family} UDP DNS identity and TTL");
+                dns_tcp_roundtrip(fake[index], &requests[index])?;
+                eprintln!("Wintun smoke: PASS IPv{family} TCP DNS framing, identity and TTL");
                 eprintln!("Wintun smoke: IPv{family} TCP payload and half-close");
                 tcp_roundtrip(&runtime, fake[index])?;
+                eprintln!("Wintun smoke: PASS IPv{family} TCP payload and half-close");
+                tcp_reuse_and_reset(&runtime, fake[index], &run)?;
+                eprintln!(
+                    "Wintun smoke: PASS IPv{family} {REUSE_ROUNDS} rounds on one TCP connection across a second connection reset"
+                );
                 eprintln!("Wintun smoke: IPv{family} empty and full UDP datagrams");
                 udp_roundtrip(&runtime, fake[index])?;
+                eprintln!("Wintun smoke: PASS IPv{family} empty and full UDP datagrams");
             }
+            policy_roundtrips(&core, &directory, &runtime, fake)?;
             require(
                 !run.failed.load(Ordering::Acquire),
                 "Wintun packet pump failed",
@@ -812,31 +1751,78 @@ mod windows {
             )
         })();
         eprintln!("Wintun smoke: restoring owned network state");
-        let restored = run.stop();
-        if let Err(error) = restored {
-            return Err(io::Error::other(format!(
-                "test result: {tests:?}; recovery failed: {error}"
-            )));
+        let mut errors = Vec::new();
+        if let Err(error) = tests {
+            errors.push(format!("data tests: {error}"));
         }
-        tests?;
+        if let Err(error) = run.stop() {
+            errors.push(format!("network recovery: {error}"));
+        }
+        // A failed data test must still execute every shutdown assertion. A
+        // successful stop alone is not evidence that the adapter disappeared
+        // or that the runner's original capture/default routes are unchanged.
         let stats = run.stats.snapshot();
-        require(
-            stats.active_tcp_flows == 0 && stats.active_udp_endpoints == 0,
-            "packet resources survived shutdown",
-        )?;
-        let after = windows_network::snapshot()?;
-        require(
-            sorted_routes(before.routes) == sorted_routes(after.routes),
-            "unrelated default/split-default routes changed",
-        )?;
-        require(
-            !after
-                .adapters
-                .iter()
-                .any(|adapter| adapter.identity.guid == run.journal.interface.guid),
-            "owned Wintun adapter survived shutdown",
-        )?;
+        if stats.active_tcp_flows != 0 || stats.active_udp_endpoints != 0 {
+            errors.push("packet resources survived shutdown".into());
+        } else {
+            eprintln!("Wintun smoke: PASS packet resources released");
+        }
+        match windows_network::snapshot() {
+            Ok(after) => {
+                if sorted_routes(before.routes) != sorted_routes(after.routes) {
+                    errors.push("unrelated default/split-default routes changed".into());
+                } else {
+                    eprintln!("Wintun smoke: PASS default/split-default routes unchanged");
+                }
+                if after
+                    .adapters
+                    .iter()
+                    .any(|adapter| adapter.identity.guid == run.journal.interface.guid)
+                {
+                    errors.push("owned Wintun adapter survived shutdown".into());
+                } else {
+                    eprintln!("Wintun smoke: PASS owned Wintun adapter removed");
+                }
+            }
+            Err(error) => errors.push(format!("post-cleanup system snapshot: {error}")),
+        }
+        match windows_network::snapshot_network_configuration() {
+            Ok(after) => {
+                let adapters_equal = after.adapters == configuration_before.adapters;
+                let routes_equal = after.routes == configuration_before.routes;
+                eprintln!(
+                    "Wintun smoke: exact network configuration verification {}",
+                    json!({"adapters_equal":adapters_equal,"all_routes_equal":routes_equal,
+                        "adapters_before":configuration_before.adapters.len(),"adapters_after":after.adapters.len(),
+                        "routes_before":configuration_before.routes.len(),"routes_after":after.routes.len()})
+                );
+                if !adapters_equal {
+                    errors.push("original adapter addresses/DNS/MTU/DHCP/metrics changed".into());
+                }
+                if !routes_equal {
+                    errors.push("original complete ActiveStore route configuration changed".into());
+                }
+            }
+            Err(error) => errors.push(format!("post-cleanup full network configuration: {error}")),
+        }
         core.stop();
+        if !errors.is_empty() {
+            return Err(io::Error::other(errors.join("; ")));
+        }
+        let additional_cases = json!({
+            "dns_tcp_ipv4":true,"dns_tcp_ipv6":true,"dns_ttl":ANSWER_TTL,
+            "fake_ip_persisted_reopen":true,
+            "native_http_connect_ipv4":true,"native_http_connect_ipv6":true,
+            "reject_tcp_ipv4":true,"reject_tcp_ipv6":true,
+            "proxy_failure_no_direct_ipv4":true,"proxy_failure_no_direct_ipv6":true,
+            "proxy_failure_cases":["http_403_rejected","connection_refused"],
+            "direct_trap_controls_before_and_after":true,"verified_dot_fixture":true,
+            "windows_tcp_rst_ipv4":true,"windows_tcp_rst_ipv6":true,
+            "tcp_reuse_rounds_each_family":REUSE_ROUNDS,
+            "tcp_reuse_payload_bytes_each_round":REUSE_BYTES,
+            "long_duration_soak_acceptance":false,
+            "original_network_configuration_exact":true
+        });
         println!(
             "{}",
             json!({
@@ -846,6 +1832,7 @@ mod windows {
                 "interface_index":run.journal.interface.index,
                 "dns_a":true,"dns_aaaa":true,"tcp_ipv4":true,"tcp_ipv6":true,
                 "tcp_payload_bytes_each_family":TCP_BYTES,"tcp_reply_after_client_fin":true,
+                "additional_cases":additional_cases,
                 "udp_ipv4":true,"udp_ipv6":true,"udp_payload_lengths":[0,UDP_BYTES],
                 "wintun_received_packets":run.read_packets.load(Ordering::Relaxed),
                 "wintun_sent_packets":run.written_packets.load(Ordering::Relaxed),

@@ -97,6 +97,107 @@ pub fn snapshot() -> io::Result<NetworkSnapshot> {
     run_json(SNAPSHOT_SCRIPT, &json!({}))
 }
 
+/// Stable configuration of every enumerated adapter and every ActiveStore
+/// route. This read-only acceptance snapshot excludes aging lifetimes and
+/// counters; Windows does not provide an atomic snapshot across these cmdlets.
+/// It is separate from the mutation journal and never authorizes a write.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NetworkConfigurationSnapshot {
+    pub adapters: Vec<AdapterConfiguration>,
+    pub routes: Vec<NetworkRouteConfiguration>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdapterConfiguration {
+    pub identity: InterfaceIdentity,
+    pub name: String,
+    pub hardware: bool,
+    pub interfaces: Vec<IpInterfaceConfiguration>,
+    pub addresses: Vec<IpAddressConfiguration>,
+    pub dns: Vec<DnsConfiguration>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IpInterfaceConfiguration {
+    pub compartment_id: u32,
+    /// Windows AF_INET / AF_INET6 values, preserved without reinterpretation.
+    pub address_family: u32,
+    /// Raw MSFT_NetIPInterface.NlMtu in bytes, independent of requested TUN MTU.
+    pub nl_mtu_bytes: u32,
+    pub dhcp: String,
+    pub automatic_metric: String,
+    pub interface_metric: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IpAddressConfiguration {
+    /// Preserve the provider's opaque identity across network compartments.
+    pub instance_id: String,
+    pub address_family: u32,
+    /// Keep any IPv6 scope identifier; an IpAddr alone cannot represent it.
+    pub address: String,
+    pub prefix_len: u8,
+    pub skip_as_source: bool,
+    pub prefix_origin: String,
+    pub suffix_origin: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DnsConfiguration {
+    pub address_family: u32,
+    /// Server order is resolver priority. Normalization must not sort it.
+    pub servers: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NetworkRouteConfiguration {
+    /// MSFT_NetRoute exposes InstanceID, not a portable CompartmentId property.
+    pub instance_id: String,
+    pub interface_index: u32,
+    pub address_family: u32,
+    pub destination: String,
+    pub next_hop: String,
+    pub route_metric: u32,
+    pub protocol: String,
+    pub publish: String,
+}
+
+impl NetworkConfigurationSnapshot {
+    fn normalize(&mut self) {
+        for adapter in &mut self.adapters {
+            adapter.interfaces.sort();
+            adapter.addresses.sort();
+            // This sorts family rows, never the ordered servers inside a row.
+            adapter.dns.sort();
+        }
+        self.adapters.sort_by(|left, right| {
+            (&left.identity.guid, left.identity.index)
+                .cmp(&(&right.identity.guid, right.identity.index))
+        });
+        self.routes.sort();
+        // Preserve duplicate rows. Removing them could conceal a real change.
+    }
+}
+
+pub fn snapshot_network_configuration() -> io::Result<NetworkConfigurationSnapshot> {
+    let mut snapshot: NetworkConfigurationSnapshot =
+        run_json(CONFIGURATION_SNAPSHOT_SCRIPT, &json!({}))?;
+    if snapshot.adapters.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Windows network configuration snapshot returned no adapters",
+        ));
+    }
+    snapshot.normalize();
+    Ok(snapshot)
+}
+
 /// Create/verify the helper's fixed state directory through the Windows known
 /// CommonApplicationData location, never an inherited environment variable.
 /// Existing untrusted/reparse-point directories or files are rejected rather
@@ -555,6 +656,49 @@ try {
 }
 "#;
 
+// Enumerate globally before filtering by adapter index: a disabled address
+// family is represented by an actually empty list, while a cmdlet failure must
+// fail the snapshot. No per-interface ObjectNotFound error is suppressed.
+const CONFIGURATION_SNAPSHOT_SCRIPT: &str = r#"
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+Set-StrictMode -Version Latest
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+try {
+  $adapters = @(Get-NetAdapter -IncludeHidden -ErrorAction Stop)
+  $interfaces = @(Get-NetIPInterface -PolicyStore ActiveStore -IncludeAllCompartments -ErrorAction Stop)
+  $addresses = @(Get-NetIPAddress -PolicyStore ActiveStore -IncludeAllCompartments -ErrorAction Stop)
+  $dns = @(Get-DnsClientServerAddress -ErrorAction Stop)
+  $routes = @(Get-NetRoute -PolicyStore ActiveStore -IncludeAllCompartments -ErrorAction Stop | ForEach-Object {
+    @{instance_id=$_.InstanceID;interface_index=$_.InterfaceIndex;address_family=$_.AddressFamily;destination=$_.DestinationPrefix;next_hop=$_.NextHop;route_metric=$_.RouteMetric;protocol=$_.Protocol.ToString();publish=$_.Publish.ToString()}
+  })
+  $configuration = @($adapters | ForEach-Object {
+    $adapter = $_
+    $index = $adapter.ifIndex
+    $ip = @($interfaces | Where-Object { $_.InterfaceIndex -eq $index } | ForEach-Object {
+      $mtuProperty = $_.PSObject.Properties['NlMtu']
+      if ($null -eq $mtuProperty -or $null -eq $mtuProperty.Value) { throw 'Windows configuration snapshot missing NlMtu property or value' }
+      @{compartment_id=$_.CompartmentId;address_family=$_.AddressFamily;nl_mtu_bytes=$mtuProperty.Value;dhcp=$_.Dhcp.ToString();automatic_metric=$_.AutomaticMetric.ToString();interface_metric=$_.InterfaceMetric}
+    })
+    $address = @($addresses | Where-Object { $_.InterfaceIndex -eq $index } | ForEach-Object {
+      @{instance_id=$_.InstanceID;address_family=$_.AddressFamily;address=$_.IPAddress;prefix_len=$_.PrefixLength;skip_as_source=$_.SkipAsSource;prefix_origin=$_.PrefixOrigin.ToString();suffix_origin=$_.SuffixOrigin.ToString()}
+    })
+    $servers = @($dns | Where-Object { $_.InterfaceIndex -eq $index } | ForEach-Object {
+      # A present DNS row with null ServerAddresses has no configured servers.
+      # Keep null entries inside a non-null array visible to the typed decoder.
+      $serverAddresses = @()
+      if ($null -ne $_.ServerAddresses) { $serverAddresses = @($_.ServerAddresses) }
+      @{address_family=$_.AddressFamily;servers=$serverAddresses}
+    })
+    @{identity=@{index=$index;guid=([guid]$adapter.InterfaceGuid).ToString('D').ToLowerInvariant()};name=$adapter.Name;hardware=$adapter.HardwareInterface;interfaces=$ip;addresses=$address;dns=$servers}
+  })
+  ConvertTo-Json -InputObject @{adapters=$configuration;routes=$routes} -Compress -Depth 12
+} catch {
+  [Console]::Error.WriteLine($_.Exception.Message)
+  exit 1
+}
+"#;
+
 const SECURE_STATE_SCRIPT: &str = r#"
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
@@ -787,9 +931,73 @@ $null = [System.Management.Automation.Language.Parser]::ParseInput([string]$p.sc
 if (@($errors).Count -ne 0) { [Console]::Error.WriteLine(($errors | Out-String)); exit 1 }
 ConvertTo-Json -InputObject $true
 "#;
-        for script in [RESOURCE_SCRIPT, SNAPSHOT_SCRIPT, SECURE_STATE_SCRIPT] {
+        for script in [
+            RESOURCE_SCRIPT,
+            SNAPSHOT_SCRIPT,
+            CONFIGURATION_SNAPSHOT_SCRIPT,
+            SECURE_STATE_SCRIPT,
+        ] {
             assert!(run_json::<bool>(PARSE, &json!({"script":script})).unwrap());
         }
+    }
+
+    #[test]
+    fn configuration_snapshot_reads_system_state_without_network_writes() {
+        let snapshot = snapshot_network_configuration().unwrap();
+        assert!(!snapshot.adapters.is_empty());
+        let bytes = serde_json::to_vec(&snapshot).unwrap();
+        let decoded: NetworkConfigurationSnapshot = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(snapshot, decoded);
+    }
+
+    #[test]
+    fn configuration_normalization_preserves_raw_mtu_dns_priority_scope_and_duplicates() {
+        let adapter = AdapterConfiguration {
+            identity: InterfaceIdentity::new(71, 1),
+            name: "test adapter".into(),
+            hardware: false,
+            interfaces: vec![IpInterfaceConfiguration {
+                compartment_id: 1,
+                address_family: 23,
+                nl_mtu_bytes: u32::MAX,
+                dhcp: "Disabled".into(),
+                automatic_metric: "Enabled".into(),
+                interface_metric: 75,
+            }],
+            addresses: vec![],
+            dns: vec![DnsConfiguration {
+                address_family: 23,
+                servers: vec!["fe80::2%71".into(), "fe80::1%71".into()],
+            }],
+        };
+        let route = NetworkRouteConfiguration {
+            instance_id: "test-route".into(),
+            interface_index: 71,
+            address_family: 23,
+            destination: "::/0".into(),
+            next_hop: "fe80::1%71".into(),
+            route_metric: 256,
+            protocol: "NetMgmt".into(),
+            publish: "No".into(),
+        };
+        let mut another = adapter.clone();
+        another.identity = InterfaceIdentity::new(72, 2);
+        let mut snapshot = NetworkConfigurationSnapshot {
+            adapters: vec![another.clone(), adapter.clone()],
+            routes: vec![route.clone(), route.clone()],
+        };
+        snapshot.normalize();
+        assert_eq!(snapshot.adapters, vec![adapter.clone(), another]);
+        assert_eq!(snapshot.adapters[0].interfaces[0].nl_mtu_bytes, u32::MAX);
+        assert_eq!(snapshot.adapters[0].dns[0].servers, adapter.dns[0].servers);
+        assert_eq!(snapshot.routes, vec![route.clone(), route]);
+        let mut reversed_dns = snapshot.clone();
+        reversed_dns.adapters[0].dns[0].servers.reverse();
+        reversed_dns.normalize();
+        assert_ne!(
+            snapshot, reversed_dns,
+            "DNS priority changes must remain visible"
+        );
     }
 
     #[test]
