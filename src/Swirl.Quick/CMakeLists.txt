@@ -234,7 +234,7 @@ qt_add_qml_module(Swirl
     RESOURCE_PREFIX /qt/qml
     NO_GENERATE_EXTRA_QMLDIRS
     QML_FILES ${SWIRL_QML_FILES}
-    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp app/WindowEdge.h app/WindowEdge.cpp app/RibbonStroke.h app/RibbonStroke.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp app/NodeViewModel.h app/NodeViewModel.cpp app/NodeSectionModel.h app/NodeSectionModel.cpp
+    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp app/WindowEdge.h app/WindowEdge.cpp app/RibbonStroke.h app/RibbonStroke.cpp app/WholeFeatherItem.h app/WholeFeatherItem.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp app/NodeViewModel.h app/NodeViewModel.cpp app/NodeSectionModel.h app/NodeSectionModel.cpp
 )
 set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 file(GLOB SWIRL_UI_ICONS CONFIGURE_DEPENDS "${SWIRL_ASSET_PATH}/icons/ui/*.svg")

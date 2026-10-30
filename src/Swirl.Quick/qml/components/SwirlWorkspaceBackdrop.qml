@@ -13,6 +13,9 @@ Item {
     property real ribbonStrength: 1
     readonly property Item mainWingItem: visual
     function mapWingPoint(target, x, y) { return visual.mapMasterPoint(target, x, y) }
+    function featherSource(target, side, lane) {
+        return (side === "right" ? echo : visual).featherSource(target, lane)
+    }
     function ribbonWaypoints(target, side, lane) {
         const source = side === "right" ? echo : visual
         return [source.routePoint(target, "root", lane), source.routePoint(target, "shoulder", lane),

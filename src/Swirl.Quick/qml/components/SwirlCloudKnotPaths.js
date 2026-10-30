@@ -84,186 +84,108 @@ var crossings = [
     { passage: 3, start: 0.112, end: 0.193 }  // purple over coral
 ];
 
-// Five feather tips leave together at the peak of their wing's lift.
-// The longer destination tours leave about 2.5s of the 6s clock for the weave.
-var timing = { connections: [0.055, 0.55, 0.84], connection: [0.055, 0.54, 0.91],
-    traffic: [0.055, 0.50, 0.88], sources: [0.055, 0.60, 0.96], diagnostics: [0.055, 0.64, 0.99] };
-function phaseEase(start, end, value) {
-    const t=Math.max(0,Math.min(1,(value-start)/(end-start)));
-    return t*t*(3-2*t);
+// Closed original feather pieces travel as bodies, never as trimmed strokes.
+var sourceIndices = [7, 10, 0, 11, 5];
+var sourceSides = ["left", "left", "right", "left", "right"];
+var arrivals = [0.68, 0.65, 0.69, 0.73, 0.76];
+var widths = [74, 86, 80, 86, 54];
+var cachedMaterials = null;
+function point(x,y) { return {x:x,y:y}; }
+function mix(a,b,t) { return point(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t); }
+function distance(a,b) { return Math.hypot(a.x-b.x,a.y-b.y); }
+function phaseEase(a,b,p) { const t=Math.max(0,Math.min(1,(p-a)/(b-a)));return t*t*(3-2*t); }
+function cubic(a,b,c,d,t) { return mix(mix(mix(a,b,t),mix(b,c,t),t),mix(mix(b,c,t),mix(c,d,t),t),t); }
+function sample(path) {
+    const t=path.match(/[MCZ]|[-+]?\d*\.?\d+/g), result=[point(Number(t[1]),Number(t[2]))];
+    for(let i=3;i<t.length && t[i]!=="Z";) {
+        ++i; const a=result[result.length-1];
+        const b=point(Number(t[i++]),Number(t[i++])),c=point(Number(t[i++]),Number(t[i++])),d=point(Number(t[i++]),Number(t[i++]));
+        for(let n=1;n<=32;++n)result.push(cubic(a,b,c,d,n/32));
+    }
+    return result;
 }
-function closePhase(value, card) {
-    const delay={diagnostics:0,sources:0.035,connection:0.07,traffic:0.105,connections:0.14}[card];
-    return phaseEase(0.04+delay,0.84+delay,value);
+function resample(points,count) {
+    const lengths=[0];for(let i=1;i<points.length;++i)lengths.push(lengths[i-1]+distance(points[i-1],points[i]));
+    const result=[];let next=1;
+    for(let i=0;i<=count;++i) { const d=lengths[lengths.length-1]*i/count;while(next<lengths.length-1 && lengths[next]<d)++next;
+        result.push(mix(points[next-1],points[next],(d-lengths[next-1])/(lengths[next]-lengths[next-1]||1))); }
+    return result;
 }
-function point(x, y) { return { x: x, y: y } }
-function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y) }
-function mix(a, b, t) { return point(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t) }
-function command(p) { return p.x.toFixed(3) + " " + p.y.toFixed(3) }
-function cubicPoint(a, b, c, d, t) {
-    const ab = mix(a, b, t), bc = mix(b, c, t), cd = mix(c, d, t);
-    return mix(mix(ab, bc, t), mix(bc, cd, t), t);
+function bounds(points) {
+    const xs=points.map(p=>p.x),ys=points.map(p=>p.y);
+    const l=Math.min.apply(null,xs),r=Math.max.apply(null,xs),t=Math.min.apply(null,ys),b=Math.max.apply(null,ys);
+    return {x:l,y:t,width:r-l,height:b-t,center:point((l+r)/2,(t+b)/2)};
 }
-
-// Tours visit the requested real surfaces: sidebar, sources, connections,
-// toolbar->traffic, connections. Narrow/offscreen cards project to the viewport
-// edge; their hidden headings are never copied into a fake visible location.
-function route(passage, cards, emblem, origin, scale, wide, gap, scene) {
-    const card=passage.card, status=cards.connection, wing=scene.wing;
-    const entry=point(origin.x+passage.start[0]*scale,origin.y+passage.start[1]*scale);
-    const tangent=point(passage.tangent[0],passage.tangent[1]);
-    const tangentLength=Math.hypot(tangent.x,tangent.y);
-    const approach=point(entry.x-tangent.x/tangentLength*gap,entry.y-tangent.y/tangentLength*gap);
-    const rightLimit=scene.viewport.x+scene.viewport.width-gap*0.5;
-    const bottomLimit=scene.viewport.y+scene.viewport.height-gap*0.6;
-    const rowY=status.y+status.height+gap*0.5;
-    const column=Math.min(rightLimit,status.x+status.width+gap*0.5);
-    const gate=point(emblem.x+emblem.width*0.78,emblem.y+emblem.height-gap*0.5);
-    const start=point(wing[0].x,wing[0].y), curves=[];
-    let cursor=start;
-    let aperture={x:0,y:0,width:0,height:0};
-    function bend(b,c,d) { curves.push([cursor,b,c,d]); cursor=d; }
-    function visibleTour(rect) {
-        const y=Math.max(scene.viewport.y+gap*0.4,Math.min(rect.y,bottomLimit-gap*3));
-        return {x:rect.x,y:y,width:rect.width,height:Math.max(gap*2,Math.min(rect.height,bottomLimit-y))};
-    }
-    function enterBelow(b) {
-        bend(b,point(gate.x+gap,gate.y+gap),gate);
-        bend(point(gate.x-gap,gate.y-gap),approach,entry);
-    }
-    function skimHeading(rect,title,incoming) {
-        // A broad feather needs room: skim above the glyphs, never through the
-        // five-dp gap between a title and its live values/filters.
-        const visible=title.y>=scene.viewport.y && title.y+title.height<=bottomLimit;
-        const y=visible?title.y-gap*0.48:rect.y-gap*0.5;
-        const left=point(rect.x+gap*1.7,y);
-        const end=point(Math.min(rect.x+rect.width-gap*1.7,left.x+Math.max(title.width+gap*2,gap*6)),y);
-        bend(incoming,point(left.x-gap,y),left);
-        bend(point(left.x+(end.x-left.x)*0.34,y),point(left.x+(end.x-left.x)*0.66,y),end);
-        if (visible) {
-            const half=gap*0.32;
-            aperture={x:rect.x+gap*1.3,y:y-half,width:end.x-rect.x-gap*0.7,height:half*2};
-        }
-    }
-    if (card === "connections") {
-        // Gold lifts out along the sidebar's clear outer margin and over its
-        // brand heading, then returns down the sidebar/content gutter.
-        const left=scene.sidebar.x+gap*0.3, top=scene.sidebar.y+gap*0.35;
-        const right=scene.sidebar.x+scene.sidebar.width+gap*0.5;
-        const shoulder=point(left,scene.sidebar.y+gap*2.1);
-        bend(wing[1],point(left,start.y-gap*3),point(left,start.y-gap*4));
-        bend(point(left,cursor.y-gap*6),point(left,shoulder.y+gap*2),shoulder);
-        bend(point(left,top),point(left+gap,top),point(left+gap*2.2,top));
-        bend(point(left+gap*4,top),point(right,top),point(right,top+gap*2.2));
-        const sweep=point(right+gap,rowY);
-        bend(point(right,cursor.y+gap*4),point(right-gap,rowY),sweep);
-        enterBelow(point(sweep.x+(gate.x-sweep.x)*0.5,rowY));
-    } else if (card === "traffic") {
-        // Coral visits the sources surface and its heading from the left.
-        const target=visibleTour(cards.sources), left=target.x-gap*0.55;
-        const side=point(left,target.y+Math.min(target.height*0.45,gap*4));
-        bend(point(start.x+gap*2,start.y-gap),point(left,side.y+gap*3),side);
-        skimHeading(target,scene.sourcesTitle,point(left,side.y-gap*3));
-        const turn=point(Math.min(rightLimit,target.x+target.width+gap*0.45),target.y-gap*0.5);
-        bend(point(cursor.x+gap*2,cursor.y),point(turn.x,turn.y+gap*2),turn);
-        const back=point(column,rowY);
-        bend(point(turn.x,turn.y-gap*2),point(back.x+gap*2,back.y),back);
-        enterBelow(point(back.x-gap,rowY));
-    } else if (card === "sources") {
-        // Purple takes the low arc to the activity-connections card, then
-        // rises beside its left shoulder. It does not queue in the left gutter.
-        const target=visibleTour(cards.connections);
-        const low=Math.min(bottomLimit,target.y+target.height+gap*0.45);
-        const left=target.x-gap*0.55;
-        const foot=point(left-gap,low);
-        bend(point(start.x+gap*2,start.y+gap),point(foot.x-gap*4,low),foot);
-        bend(point(left+gap,low),point(left,target.y+gap*4),point(left,target.y+gap*2));
-        skimHeading(target,scene.connectionsTitle,point(left,target.y-gap));
-        const seam=point(Math.min(rightLimit,target.x-gap*0.55),rowY+gap*0.2);
-        bend(point(cursor.x+gap*1.5,cursor.y),point(seam.x,seam.y+gap*4),seam);
-        enterBelow(point(seam.x,seam.y-gap*2));
-    } else if (card === "connection") {
-        // Cyan skims each of the three live toolbar controls from right to
-        // left, with a shallow dip under TUN, before visiting the traffic card.
-        for (let index=scene.toolbar.length-1;index>=0;--index) {
-            const control=scene.toolbar[index];
-            const stop=point(control.x+control.width*0.5,control.y+control.height+gap*(index===1?0.95:0.45));
-            const reach=Math.max(gap,Math.abs(cursor.x-stop.x)*0.35);
-            bend(point(cursor.x-reach,cursor.y),point(stop.x+reach,stop.y),stop);
-        }
-        const target=visibleTour(cards.traffic);
-        skimHeading(target,scene.trafficTitle,point(cursor.x-gap,cursor.y));
-        const side=point(column,emblem.y+emblem.height*0.5);
-        bend(point(cursor.x+gap*2,cursor.y),point(column,side.y-gap*3),side);
-        bend(point(column,side.y+gap*1.4),approach,entry);
-    } else {
-        // Green reaches the same connections card from the right, curls below
-        // it, then climbs the seam between the lower cards back to the knot.
-        const target=visibleTour(cards.connections);
-        const outer=Math.min(rightLimit,target.x+target.width+gap*0.5);
-        const lower=Math.min(bottomLimit,target.y+target.height+gap*0.45);
-        const radius=gap*1.2, k=0.55228475;
-        bend(point(start.x+gap,start.y),point(outer,start.y+gap),point(outer,start.y+gap*2));
-        bend(point(outer,cursor.y+gap*4),point(outer,lower-radius-gap*2),point(outer,lower-radius));
-        bend(point(outer,lower-radius+k*radius),point(outer-radius+k*radius,lower),point(outer-radius,lower));
-        const left=Math.max(status.x+gap,target.x-gap*0.55), lowerLeft=point(left+radius,lower);
-        bend(point(cursor.x-gap*2,lower),point(lowerLeft.x+gap*2,lower),lowerLeft);
-        bend(point(left+radius-k*radius,lower),point(left,lower-radius+k*radius),point(left,lower-radius));
-        const turn=point(left,rowY+gap);
-        bend(point(left,cursor.y-gap*4),point(left,turn.y+gap*4),turn);
-        enterBelow(point(left,turn.y-gap*2));
-    }
-    let guide = "M" + command(start), leadLength = 0;
-    for (let j=0; j<curves.length; ++j) {
-        const curve = curves[j];
-        guide += " C" + command(curve[1]) + " " + command(curve[2]) + " " + command(curve[3]);
-        let previous = curve[0];
-        for (let n=1; n<=40; ++n) {
-            const p=cubicPoint(curve[0],curve[1],curve[2],curve[3],n/40);
-            leadLength+=distance(previous,p); previous=p;
-        }
-    }
-    const tokens = passage.guide.match(/[MC]|[-+]?\d*\.?\d+/g);
-    let i = 3, previous = entry, knotLength = 0;
-    while (i < tokens.length) {
-        ++i;
-        const b = point(origin.x + Number(tokens[i++]) * scale, origin.y + Number(tokens[i++]) * scale);
-        const c = point(origin.x + Number(tokens[i++]) * scale, origin.y + Number(tokens[i++]) * scale);
-        const d = point(origin.x + Number(tokens[i++]) * scale, origin.y + Number(tokens[i++]) * scale);
-        guide += " C" + command(b) + " " + command(c) + " " + command(d);
-        const a = previous;
-        for (let n = 1; n <= 40; ++n) { const p = cubicPoint(a, b, c, d, n / 40); knotLength += distance(previous, p); previous = p; }
-    }
-    const total = leadLength + knotLength;
-    const times = timing[card];
-    const cues = [[times[0],0], [times[1],leadLength/total], [times[2],1]];
-    return {guide:guide, join:leadLength/total, span:110*gap/16/total, aperture:aperture, cues:cues};
+function closedPath(points) {
+    function xy(p){return p.x.toFixed(3)+" "+p.y.toFixed(3);}
+    let path="M"+xy(points[0]);
+    for(let i=1;i<points.length;++i)path+=" C"+xy(mix(points[i-1],points[i],1/3))+" "+xy(mix(points[i-1],points[i],2/3))+" "+xy(points[i]);
+    return path+" Z";
 }
-function hermite(t, a, b, startSlope, endSlope, duration) {
-    return (2*t*t*t-3*t*t+1)*a + (t*t*t-2*t*t+t)*startSlope*duration
-        + (-2*t*t*t+3*t*t)*b + (t*t*t-t*t)*endSlope*duration;
+function materials(left,right) {
+    if(cachedMaterials)return cachedMaterials;
+    cachedMaterials=passages.map(function(p,index){
+        const record=(sourceSides[index]==="right"?right:left)[sourceIndices[index]];
+        const polygon=sample(record.path),root=point(record.root[0],record.root[1]),tip=point(record.tip[0],record.tip[1]);
+        if(distance(polygon[0],polygon[polygon.length-1])<0.001)polygon.pop();
+        function nearest(p){let best=0;for(let i=1;i<polygon.length;++i)if(distance(polygon[i],p)<distance(polygon[best],p))best=i;return best;}
+        const ri=nearest(root),ti=nearest(tip);
+        function side(direction){const part=[polygon[ri]];for(let i=(ri+direction+polygon.length)%polygon.length;i!==ri;i=(i+direction+polygon.length)%polygon.length){part.push(polygon[i]);if(i===ti)break;}return resample(part,96);}
+        const a=side(1),b=side(-1),mid=a.map((v,i)=>mix(v,b[i],0.5));
+        const profile=a.map(function(v,i){const tangent=point(mid[Math.min(96,i+1)].x-mid[Math.max(0,i-1)].x,mid[Math.min(96,i+1)].y-mid[Math.max(0,i-1)].y);return Math.abs((v.x-b[i].x)*(-tangent.y)+(v.y-b[i].y)*tangent.x)/(Math.hypot(tangent.x,tangent.y)||1);});
+        const maximum=Math.max.apply(null,profile),spine=resample(sample(p.guide),96),first=[],second=[];
+        for(let i=0;i<=96;++i){const before=spine[Math.max(0,i-1)],after=spine[Math.min(96,i+1)],length=distance(before,after)||1;
+            const nx=-(after.y-before.y)/length,ny=(after.x-before.x)/length,w=widths[index]*profile[i]/maximum;
+            first.push(point(spine[i].x+nx*w*.52,spine[i].y+ny*w*.52));second.push(point(spine[i].x-nx*w*.48,spine[i].y-ny*w*.48));}
+        const contour=first.concat(second.reverse());
+        return {key:p.key,card:p.card,ink:p.ink,index:index,side:sourceSides[index],sourceIndex:sourceIndices[index],record:record,
+            sourceCenter:bounds(polygon).center,sourceRoot:root,sourceTip:tip,targetPath:closedPath(contour),
+            targetRoot:spine[0],targetTip:spine[96],targetCenter:bounds(contour).center,arrival:arrivals[index]};
+    });
+    return cachedMaterials;
 }
-function head(progress, card, route) {
-    const cues = route.cues;
-    if (progress <= cues[0][0]) return 0;
-    if (progress >= cues[cues.length-1][0]) return 1;
-    function slope(index) {
-        if (index === 0 || index === cues.length-1) return 0;
-        const left = (cues[index][1]-cues[index-1][1])/(cues[index][0]-cues[index-1][0]);
-        const right = (cues[index+1][1]-cues[index][1])/(cues[index+1][0]-cues[index][0]);
-        return Math.min(left,right);
-    }
-    for (let i=0; i<cues.length-1; ++i) {
-        if (progress <= cues[i+1][0]) {
-            const duration = cues[i+1][0]-cues[i][0];
-            return hermite((progress-cues[i][0])/duration,cues[i][1],cues[i+1][1],slope(i),slope(i+1),duration);
-        }
-    }
-    return 1;
+function transformPoint(s,p) { return point(s.tx+s.a*p.x+s.c*p.y,s.ty+s.b*p.x+s.d*p.y); }
+function flight(material,source,scene,destination,gap) {
+    const start=transformPoint(source,material.sourceCenter),sidebar=scene.sidebar;
+    const lift=point(start.x+(material.side==="left"?-gap*.45:-gap*.6),start.y+(material.side==="left"?-gap*.6:gap*.45));
+    const bottom=scene.viewport.y+scene.viewport.height-gap*2;
+    function centre(rect,vertical){return point(rect.x+rect.width*.5,Math.max(scene.viewport.y+gap*2,Math.min(bottom,rect.y+rect.height*vertical)));}
+    let way;
+    if(material.index===0)way=[lift,point(sidebar.x+sidebar.width*.55,sidebar.y+sidebar.height*.45),point(sidebar.x+sidebar.width*.62,sidebar.y+gap*4),destination];
+    else if(material.index===1)way=[lift,centre(scene.sources,.68),centre(scene.sources,.18),destination];
+    else if(material.index===3)way=[lift,point(scene.connections.x-gap*3,bottom-gap),centre(scene.connections,.4),destination];
+    else if(material.index===2){const buttons=scene.toolbar;way=[lift];for(let i=buttons.length-1;i>=0;--i)way.push(point(buttons[i].x+buttons[i].width*.5,buttons[i].y+buttons[i].height+gap*2));way.push(centre(scene.traffic,.45),destination);}
+    else way=[lift,point(scene.traffic.x+scene.traffic.width*.64,scene.traffic.y+scene.traffic.height*.7),centre(scene.connections,.72),destination];
+    const points=[way[0]];
+    for(let i=0;i<way.length-1;++i){const a=way[i],d=way[i+1],before=way[Math.max(0,i-1)],after=way[Math.min(way.length-1,i+2)];
+        const b=point(a.x+(d.x-before.x)*.18,a.y+(d.y-before.y)*.18),c=point(d.x-(after.x-a.x)*.18,d.y-(after.y-a.y)*.18);
+        for(let n=1;n<=24;++n)points.push(cubic(a,b,c,d,n/24));}
+    return {origin:start,lift:lift,points:resample(points,160),source:source};
 }
-function tail(progress, card, route, headPosition) {
-    const times = timing[card];
-    const t = Math.max(0, Math.min(1, (progress - times[1]) / (times[2] - times[1])));
-    const tucked = route.join * t * t * (3 - 2 * t);
-    return Math.min(headPosition, route.join, Math.max(0, headPosition - route.span, tucked));
+function pose(material,route,progress,release,origin,scale,gap) {
+    const dest=point(origin.x+material.targetCenter.x*scale,origin.y+material.targetCenter.y*scale);
+    const localMorph=phaseEase(material.arrival,0.98,progress);
+    const morph=localMorph*(1-phaseEase(0.03,0.6,release));
+    let center=dest,angle=0,size=scale,fold=1,basis=null;
+    if(progress<0.98 && route){
+        const travel=phaseEase(.055,material.arrival,progress),i=travel*160,lo=Math.floor(i),hi=Math.min(160,lo+1);
+        center=progress<.055?mix(route.origin,route.lift,phaseEase(0,.055,progress)):mix(route.points[lo],route.points[hi],i-lo);
+        const breeze=Math.sin(Math.PI*travel);
+        center.y+=gap*.55*breeze*Math.sin(travel*Math.PI*2+material.index*.7);
+        const sourceScale=Math.sqrt(Math.abs(route.source.a*route.source.d-route.source.b*route.source.c));
+        const startAngle=Math.atan2(route.source.b,route.source.a);
+        angle=(startAngle+(material.side==="left"?-.09:.09)*phaseEase(0,.055,progress))*(1-travel)
+            +breeze*([.36,-.55,.42,.68,-.48][material.index]+.18*Math.sin(travel*Math.PI*3+material.index));
+        size=sourceScale+(scale-sourceScale)*localMorph;
+        fold=1-.16*breeze*Math.pow(Math.sin(travel*Math.PI*2+material.index),2);
+        if(progress<.055)basis=route.source;
+    }
+    center.x+=gap*(material.side==="left"?-2:2)*phaseEase(0,1,release);
+    center.y-=gap*1.4*phaseEase(0,1,release);
+    angle+=(material.index-2)*.11*phaseEase(0,1,release);
+    const pivot=mix(material.sourceCenter,material.targetCenter,morph),cos=Math.cos(angle),sin=Math.sin(angle);
+    let a=size*cos,b=size*sin,c=-size*sin*fold,d=size*cos*fold;
+    if(basis){const lift=phaseEase(0,.055,progress);a=basis.a+(a-basis.a)*lift;b=basis.b+(b-basis.b)*lift;c=basis.c+(c-basis.c)*lift;d=basis.d+(d-basis.d)*lift;}
+    return {a:a,b:b,c:c,d:d,tx:center.x-a*pivot.x-c*pivot.y,ty:center.y-b*pivot.x-d*pivot.y,morph:morph,
+        opacity:phaseEase(0,.035,progress)*(.27+.73*phaseEase(.08,.60,progress))};
 }

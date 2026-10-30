@@ -17,16 +17,8 @@ Item {
     readonly property real artWidth: largeWing ? (echoWing ? Master.echoWidth : Master.width) : 96
     readonly property real artHeight: largeWing ? (echoWing ? Master.echoHeight : Master.height) : 48
     readonly property real fit: Math.min(width / artWidth, height / artHeight)
-    readonly property var emissionFeathers: echoWing ? [4, 6] : [0, 2, 4]
+    readonly property var emissionFeathers: echoWing ? [0, 5] : [7, 10, 11]
     readonly property var emissionColors: echoWing ? ["#459AB3", "#59A990"] : ["#E9A54E", "#DD6A78", "#8874C2"]
-    readonly property var emissionPaths: echoWing ? [
-        [[320,109], [305,114], [288,117], [252,122]],
-        [[401,122], [380,126], [360,128], [323,128]]
-    ] : [
-        [[151,173], [121,138], [92,93], [76,54]],
-        [[282,265], [251,226], [223,179], [205,137]],
-        [[410,353], [379,316], [348,272], [326,232]]
-    ]
     readonly property real peelTravel: Theme.dp(echoWing ? 7 : 8)
     readonly property real peelAngle: (echoWing ? 2.8 : -3.2) * Math.PI / 180
     readonly property real peelDirection: echoWing ? -1 : 1
@@ -45,25 +37,20 @@ Item {
     Accessible.ignored: true
 
     function mapMasterPoint(target, x, y) { return artwork.mapToItem(target, x, y) }
+    function featherSource(target, lane) {
+        const item=featherRepeater.itemAt(emissionFeathers[lane])
+        if (!item) return null
+        const p=item.mapToItem(target,0,0), x=item.mapToItem(target,1,0), y=item.mapToItem(target,0,1)
+        return {a:x.x-p.x,b:x.y-p.y,c:y.x-p.x,d:y.y-p.y,tx:p.x,ty:p.y}
+    }
     function routePoint(target, name, lane) {
         if (lane !== undefined) {
-            const p = emissionPaths[lane][["root", "shoulder", "tip", "gap"].indexOf(name)]
-            const record = masterFeathers[emissionFeathers[lane]]
-            const ax = record.tip[0] - record.root[0], ay = record.tip[1] - record.root[1]
-            const length = Math.hypot(ax, ay), ux = ax / length, uy = ay / length
-            const dx = p[0] - record.root[0], dy = p[1] - record.root[1]
-            const along = (dx * ux + dy * uy) * (1 + peelStretch)
-            const across = (-dx * uy + dy * ux) * (1 - peelNarrowing)
-            const sx = along * ux - across * uy, sy = along * uy + across * ux
-            const travel = fit > 0 ? peelDirection * peelTravel / fit : 0
-            // The route starts at the peak lift. It stays fixed as the feather
-            // settles, so launch geometry never needs per-frame regeneration.
-            return mapMasterPoint(target,
-                record.root[0] + sx * Math.cos(peelAngle) - sy * Math.sin(peelAngle) + ux * travel,
-                record.root[1] + sx * Math.sin(peelAngle) + sy * Math.cos(peelAngle) + uy * travel)
+            const record=masterFeathers[emissionFeathers[lane]], item=featherRepeater.itemAt(emissionFeathers[lane])
+            const t=[0,.33,.66,1][["root","shoulder","tip","gap"].indexOf(name)]
+            return item.mapToItem(target,record.root[0]+(record.tip[0]-record.root[0])*t,record.root[1]+(record.tip[1]-record.root[1])*t)
         }
-        const p = (echoWing ? Master.echoRoute : Master.route)[name]
-        return mapMasterPoint(target, p[0], p[1])
+        const p=(echoWing?Master.echoRoute:Master.route)[name]
+        return mapMasterPoint(target,p[0],p[1])
     }
     function featherProgress(index) {
         const order = largeWing ? masterFeathers[index].order : index
@@ -73,18 +60,16 @@ Item {
         return t * t * (3 - 2 * t)
     }
     function passageResponse(lane) {
-        if (!largeWing || lane < 0 || SwirlMotion.reduced) return 0
-        const phase = ribbonProgress <= 0.055 ? ribbonProgress / 0.055
-            : 1 - (ribbonProgress - 0.055) / 0.065
-        const t = Math.max(0, Math.min(1, phase))
-        return t * t * (3 - 2 * t) * ribbonStrength
+        // The actual departing pieces are carried by the foreground renderer.
+        // Only their remaining neighbours respond to the brief wingbeat.
+        if (!largeWing || lane >= 0 || SwirlMotion.reduced) return 0
+        const t=Math.max(0,Math.min(1,ribbonProgress/.18))
+        return Math.sin(Math.PI*t)*0.35*ribbonStrength
     }
     function handoffResponse(lane) {
         if (!largeWing || lane < 0 || SwirlMotion.reduced) return 0
-        const phase = ribbonProgress <= 0.09 ? (ribbonProgress - 0.055) / 0.035
-            : 1 - (ribbonProgress - 0.09) / 0.14
-        const t = Math.max(0, Math.min(1, phase))
-        return t * t * (3 - 2 * t) * ribbonStrength
+        const t=Math.max(0,Math.min(1,ribbonProgress/.035))
+        return t*t*(3-2*t)*ribbonStrength
     }
 
     Item {
@@ -94,6 +79,7 @@ Item {
         width: wing.artWidth; height: wing.artHeight
         scale: wing.fit; transformOrigin: Item.TopLeft
         Repeater {
+            id: featherRepeater
             model: wing.featherCount
             Item {
                 id: feather
@@ -130,7 +116,7 @@ Item {
                 readonly property color rootColor: record && record.rootColor ? record.rootColor : featherColor
                 width: wing.artWidth; height: wing.artHeight
                 visible: reveal > 0
-                opacity: wing.largeWing ? Math.min(1, reveal * 5) * (1 - 0.65 * handoff)
+                opacity: wing.largeWing ? Math.min(1, reveal * 5) * (1 - handoff)
                     : Math.min(1, reveal * 8) * (1-index*0.18)
                 transform: [
                     Matrix4x4 {

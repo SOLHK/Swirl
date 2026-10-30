@@ -21,7 +21,7 @@ Item {
     property real sceneRevision: 0
     onSceneSettledChanged: if (sceneSettled) Qt.callLater(updateLayoutOrigin)
     readonly property real ribbonTourProgress: overviewActive && statusWeave.release < 1 ? statusWeave.progress : 1
-    readonly property real ribbonTourStrength: overviewActive ? 1 - statusWeave.release : 0
+    readonly property real ribbonTourStrength: overviewActive && sceneSettled ? 1 - statusWeave.release : 0
     onSceneRevisionChanged: Qt.callLater(updateLayoutOrigin)
     readonly property var telemetry: engineController.telemetry
     readonly property real contentLogicalWidth: content.width
@@ -119,8 +119,7 @@ Item {
     }
     function scrollToBottom() { scroll.contentY = Math.max(0, scroll.contentHeight - scroll.height) }
     function updateLayoutOrigin() {
-        topRow.ensurePolished(); bottomRow.ensurePolished(); rightStack.ensurePolished(); narrowColumn.ensurePolished()
-        details.updateOrigin()
+        if (details.activeDetail) details.updateOrigin()
         statusWeave.updateGeometry()
     }
     function ensureSourceVisible(card) {

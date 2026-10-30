@@ -118,7 +118,7 @@ ApplicationWindow {
         }
         SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false;backdropSource:appSceneBackdrop.decorationSource }
         SwirlWindowControls {
-            id:windowControls;objectName:"windowControls";z:70
+            id:windowControls;objectName:"windowControls";z:90
             anchors.right:parent.right;anchors.rightMargin:Theme.dp(5);y:Theme.dp(5)
             targetWindow:window
         }
