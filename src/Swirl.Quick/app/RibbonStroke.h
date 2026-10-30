@@ -7,7 +7,7 @@
 
 // A finite, flat ribbon drawn directly in scene coordinates. The guide is
 // authored by Swirl (absolute M/C commands), never supplied by a subscription.
-class RibbonStroke final : public QQuickItem {
+class RibbonStroke : public QQuickItem {
     Q_OBJECT
     QML_ELEMENT
     Q_PROPERTY(QString guide READ guide WRITE setGuide NOTIFY guideChanged)
