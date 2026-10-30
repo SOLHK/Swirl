@@ -4,16 +4,21 @@
 
 The Rust packet backend, shared Core ingress, DNS identity adapter, Windows
 network controller and versioned helper control are implemented on an isolated
-branch. This continuation record is current through pushed commit
-[`87c3f900b2628bac6040d670b458b727bda31a6b`](https://github.com/SOLHK/Swirl/commit/87c3f900b2628bac6040d670b458b727bda31a6b).
+branch. This document records source-specific evidence; the latest branch head
+and completed workflow results are maintained in [Draft PR #42](https://github.com/SOLHK/Swirl/pull/42).
 The [dedicated Native TUN run 40994211698](https://github.com/SOLHK/Swirl/actions/runs/40994211698)
 passed on Linux and Windows. Its [Windows job](https://github.com/SOLHK/Swirl/actions/runs/40994211698/job/123863856692)
 executed real Wintun successfully on Windows Server 2025, using PR merge source
 `11852ebc49d4b51582583f42f94c39748200376b`. Both families passed scoped
 DNS/TCP/UDP, TCP policy and exact restoration checks. This is real driver
 evidence with loopback upstreams; Windows 11 and public-internet application
-acceptance remain outstanding. The separate complete Rust Core and Qt workflow
-results for the latest source remain pending in this record.
+acceptance remain outstanding. Subsequent UDP policy testing exposed an IPv6
+timeout at `ab0cde7`; diagnostics alone passed all eight cases at `a87a80e`.
+That successful rerun did not establish a fix. Four real Windows socket probes
+then identified a reproducible blocking TCP listener clone at `2bf61c4` in three
+independent Windows jobs. The correction explicitly restores nonblocking mode
+before Tokio handoff. Its unchanged probe assertions and complete driver cases
+must pass at the corrected source; see the evidence sequence below.
 
 The original **870 tests / 45 targets** result belongs to the historical
 `ffea437` evidence. A later complete local Linux run at
@@ -24,13 +29,16 @@ The subsequent complete local validation of candidate
 [`ab005b90670953e43ace45ff7f708730f40a7fd1`](https://github.com/SOLHK/Swirl/commit/ab005b90670953e43ace45ff7f708730f40a7fd1)
 passed **890 tests across 48 targets, zero failed/ignored/filtered**, plus
 fmt/check/Clippy. This candidate consists of `87c3f9` and the frozen UDP policy
-smoke extension. Its added driver cases still need a new exact-source Windows
-execution; the successful `87c3f9` run cannot establish them.
+smoke extension. These are complete local Linux results, separate from the
+later Windows driver executions and Windows-only socket regressions.
 
 The subsequent CI-only change `418a1a5` enables the existing full native-protocol
-workflow for this isolated branch. Its Windows/Linux/macOS official protocol
-interoperability results are pending; no job or assertion was removed. These
-checks are needed because the continuation changed native UDP/QUIC egress paths.
+workflow for this isolated branch. All six jobs passed at `ab0cde7` in
+[run 40996148242](https://github.com/SOLHK/Swirl/actions/runs/40996148242), including
+the Windows/Linux/macOS official protocol fixtures. Its workspace commands
+reported 891/891/920 passing tests on Linux/macOS/Windows respectively, including
+one real doctest. These historical counts do not include the four later Windows
+socket probes. Existing protocol boundary limitations remain documented below.
 
 [Draft PR #42](https://github.com/SOLHK/Swirl/pull/42) carries the live exact-head
 CI checks. The initial CI attempts found Windows journal access, native UDP
@@ -50,6 +58,13 @@ Companion documents:
   opt-in, restoration assertions and limits.
 - [Successful Windows driver evidence at 87c3f9](native-tun-evidence/windows-wintun-87c3f9.json)
   and [its complete original job log](native-tun-evidence/windows-wintun-87c3f9-job.log).
+- [Failed UDP policy run at ab0cde7](native-tun-evidence/windows-wintun-ab0cde7-failed.json)
+  and [its complete job log](native-tun-evidence/windows-wintun-ab0cde7-failed-job.log).
+- [Eight-case UDP success at a87a80e](native-tun-evidence/windows-wintun-a87a80e.json)
+  and [its complete job log](native-tun-evidence/windows-wintun-a87a80e-job.log).
+- [Reproduced blocking TCP clone at 2bf61c4](native-tun-evidence/windows-fixture-sockets-2bf61c4-failed.json)
+  and [its complete job log](native-tun-evidence/windows-fixture-sockets-2bf61c4-failed-job.log).
+- [Qt cold-cache cancellation at 200225e](native-tun-evidence/qt-200225e-cancelled.json).
 - [Complete local candidate evidence at ab005b9](native-tun-evidence/linux-ab005b9.json)
   and [its original workspace log](native-tun-evidence/linux-ab005b9-tests.log).
 - [Continuation evidence at 200225e](native-tun-evidence/linux-200225e.json) and
@@ -226,9 +241,79 @@ This test did not change physical DNS or firewall rules, install production
 full-capture guards, inject helper crashes, switch Wi-Fi or run Windows 11 apps.
 Its policy cases were TCP-only. Candidate
 [`ab005b9`](https://github.com/SOLHK/Swirl/commit/ab005b90670953e43ace45ff7f708730f40a7fd1)
-adds UDP policy driver assertions to this same smoke; those new cases await
-their own real Windows run. The recorded `windows_11_application_acceptance`
+added UDP policy driver assertions to this same smoke; their later executions
+are recorded separately below. The recorded `windows_11_application_acceptance`
 and `long_duration_soak_acceptance` flags remain `false`.
+
+### UDP policy failure, diagnostic success and a reproduced Windows fixture defect
+
+At `ab0cde7`, [Windows job 123870094093](https://github.com/SOLHK/Swirl/actions/runs/40996154340/job/123870094093)
+passed all prior data cases and all four IPv4 UDP policy cases, then the first
+IPv6 UDP proxy client timed out with Winsock `10060`. The protocol peer reported
+`10054` during cleanup. The original log did not identify whether the control
+handshake or either UDP reply stalled. Cleanup still restored all six resources
+exactly, removed the adapter and retained the original 8-adapter/26-route
+configuration. This run failed and is preserved as a failure.
+
+Commit `a87a80e` added bounded phase diagnostics without changing socket behavior,
+timeouts or assertions. [Windows job 123876726847](https://github.com/SOLHK/Swirl/actions/runs/40998240151/job/123876726847)
+then passed all eight UDP policy cases and their sixteen live DIRECT controls.
+Both families carried empty and complete 1,200-byte SOCKS5 UDP payloads; REJECT,
+ASSOCIATE denial, connection refusal and established control closure retained
+their exact Core outcomes. Every failed tuple was observed and dropped after
+switching policy to DIRECT, with zero new admissions or unexpected trap packets.
+The job recorded 1,998 received / 1,737 sent Wintun packets, six exact restores,
+original MTUs of 65,535 and the same complete network snapshot equality. The
+archived JSON explicitly states that this diagnostics-only success did not fix
+the preceding intermittent failure.
+
+Commit `7f1e6ce` extracted the existing, unchanged `try_clone()` handoff and added
+four Windows-only real-socket contract probes. At `2bf61c4`, the original TCP
+listener first passed an actual empty-accept `WouldBlock` assertion, but the
+cloned listener blocked until its owned wake connection arrived about two
+seconds later. Both address families failed, while both UDP clone probes passed.
+This reproduced independently in
+[Native Protocols](https://github.com/SOLHK/Swirl/actions/runs/41000188895/job/123882541130),
+[Native TUN](https://github.com/SOLHK/Swirl/actions/runs/41000194812/job/123882958639)
+and [Rust Core](https://github.com/SOLHK/Swirl/actions/runs/41000194136/job/123882558512).
+The failure occurs at the cloned listener's actual syscall; these are not
+performance thresholds. Accepted-stream read probes were not reached in those
+failed TCP tests, and the Native TUN driver step did not run after its gate failed.
+
+[`787b61bc7b14cd3ea09064b1a2d13aff56044005`](https://github.com/SOLHK/Swirl/commit/787b61bc7b14cd3ea09064b1a2d13aff56044005)
+restores `set_nonblocking(true)` on each cloned TCP listener before Tokio
+registration, including DIRECT, HTTP CONNECT and SOCKS5 UDP control fixtures.
+UDP cloning, all four probe assertions, wake deadlines and driver data
+assertions remain unchanged. This corrects a demonstrated violation of Tokio's
+nonblocking handoff contract. Such a blocking fixture can occupy a worker in
+the Core's shared runtime; this is a concrete mechanism consistent with the
+prior UDP timeout, not retrospective proof of its unlogged exact stall point.
+The corrected source requires its own Windows probes and driver result. The
+probe also tests empty reads on an accepted stream after the listener check
+passes, so merely making `accept` appear successful cannot satisfy the gate.
+
+Complete decoded Windows logs in this directory retain all entries, timestamps,
+BOM and ANSI sequences; CRLF is normalized to LF for repository text storage.
+Their manifests hash the stored UTF-8 text, not the original HTTP byte stream.
+
+### Qt regression runtime and cache correction
+
+The [200225e Qt job](https://github.com/SOLHK/Swirl/actions/runs/40992587728/job/123859804295)
+was cancelled after 55 minutes; it is not a Qt acceptance pass. Its nine critical
+UI and ten network tests had passed, and its production build and installer
+completed, but the eleventh of fifteen final suites was interrupted. The
+compiler cache's only restore prefix included `Cargo.lock`, making a harmless
+lock change cold-build the same compiler's entire Rust/C++ graph. The raw log
+records `Cache not found`; UI construction took 25m26s versus about two minutes
+on the preceding cached source.
+
+Commit `feaef3b` adds a lower-priority same-OS/same-compiler cache fallback while
+preserving content-checked build-input timestamps, locked Cargo rebuilds and
+binary/source identity checks. It also cancels obsolete Qt runs only on the
+authorized isolated branch. Test commands, assertions and the 55-minute budget
+are unchanged. At `2bf61c4`, cache restoration and content validation completed
+and UI construction took two minutes. That observation alone is not completion
+of the later Qt suites; the latest completed workflow must supply that result.
 
 ## Stage A: findings at the audited baseline
 

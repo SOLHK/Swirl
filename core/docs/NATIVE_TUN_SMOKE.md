@@ -54,6 +54,19 @@ normal V2 transaction API. There is no added ingress proxy hop or alternative
 proxy engine. The protocol servers below are test peers selected by the native
 Core outbounds; they do not replace the TUN packet path.
 
+All cloned TCP fixture listeners are explicitly set to nonblocking mode on the
+cloned handle before `tokio::net::TcpListener::from_std`. Three Windows CI jobs
+reproduced blocking empty `accept` on a bare `try_clone()` despite an immediate
+`WouldBlock` result on its original handle. The smoke peers share the Core
+runtime, so a blocking handoff can also prevent unrelated packet/protocol work
+from progressing. `tests/windows_fixture_sockets.rs` exercises the exact shared
+helper on actual Windows sockets: both TCP families must return `WouldBlock`
+from empty cloned-listener accept and accepted-stream read; both UDP families
+must return it from an empty cloned-socket receive. An owned wake connection or
+datagram bounds a broken test's lifetime, but a syscall that consumes that wake
+fails the assertion. No driver or system configuration is changed by those
+four probes, and they are separate from the real Wintun execution.
+
 The initial DIRECT data tests use exact static hosts mapping two `.invalid`
 fixture names to `127.0.0.1` and `::1`. This initial configuration includes the
 encrypted upstream `192.0.2.1:853` to satisfy native DNS configuration validation;
@@ -193,9 +206,11 @@ Each passing case emits `Wintun smoke: PASS UDP policy` with its source endpoint
 actual Core record ID, category, node, terminal error and byte counters. Final
 JSON distinguishes `additional_cases.tcp_policy` from
 `additional_cases.udp_policy`; the latter contains all eight case results and
-their retry/control evidence. These are implemented assertions pending a
-successful driver run for the exact source, not acceptance inferred from a
-portable fixture or compilation result.
+their retry/control evidence. Acceptance requires a successful driver run for
+the specific source. The [evidence sequence](NATIVE_TUN_WINDOWS.md#udp-policy-failure-diagnostic-success-and-a-reproduced-windows-fixture-defect)
+preserves a failed run, a diagnostics-only successful run and the subsequently
+reproduced Windows TCP fixture defect; none is inferred from compilation or
+portable simulation.
 
 Core server-side peers must observe loopback sources. Both Wintun receive and
 send counters must be nonzero. A successful final result requires all packet
