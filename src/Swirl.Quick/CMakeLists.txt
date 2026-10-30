@@ -326,7 +326,7 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  add_test(NAME swirl-appearance-ui COMMAND Swirl --appearance-test)
  # Includes ten shared-control/theme samples, repeated native popups, a bounded
  # 15s restoration process and glass readbacks. Per-input 40ms checks stay strict.
- set_tests_properties(swirl-appearance-ui PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+ set_tests_properties(swirl-appearance-ui PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;QSG_INFO=1" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
  qt_add_resources(Swirl material_tests PREFIX "/tests" BASE "${CMAKE_CURRENT_SOURCE_DIR}/tests" FILES tests/MaterialBench.qml)
  target_link_libraries(Swirl PRIVATE Qt6::Test Qt6::QmlPrivate Qt6::QuickPrivate)
  target_compile_definitions(Swirl PRIVATE SWIRL_UI_TESTS)

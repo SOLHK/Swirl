@@ -181,6 +181,8 @@ Item {
                             bool pending=false;
                             quint64 frame=0;
                             qreal synchronizedMs=0;
+                            qreal renderStartMs=-1;
+                            qreal renderEndMs=-1;
                             qreal surfaceScale=1;
                             qreal contentScale=1;
                             bool hasContent=false;
@@ -200,11 +202,23 @@ Item {
                             QMutexLocker lock(&presented->mutex);
                             if(!presented->armed)return;
                             presented->synchronizedMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
+                            presented->renderStartMs=-1;
+                            presented->renderEndMs=-1;
                             presented->surfaceScale=paint->scale();
                             presented->hasContent=content!=nullptr;
                             presented->contentScale=content?content->scale():0;
                             ++presented->frame;
                             presented->pending=true;
+                        },Qt::DirectConnection);
+                        const auto pressRenderStart=QObject::connect(window,&QQuickWindow::beforeRendering,&pressContext,[presented]{
+                            QMutexLocker lock(&presented->mutex);
+                            if(presented->armed&&presented->pending)
+                                presented->renderStartMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
+                        },Qt::DirectConnection);
+                        const auto pressRenderEnd=QObject::connect(window,&QQuickWindow::afterRendering,&pressContext,[presented]{
+                            QMutexLocker lock(&presented->mutex);
+                            if(presented->armed&&presented->pending)
+                                presented->renderEndMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
                         },Qt::DirectConnection);
                         const auto pressSwap=QObject::connect(window,&QQuickWindow::frameSwapped,&pressContext,[presented]{
                             QMutexLocker lock(&presented->mutex);
@@ -212,6 +226,7 @@ Item {
                             const qreal elapsed=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
                             presented->frames.append(QJsonObject{{"frame",qint64(presented->frame)},
                                 {"synchronizedMs",presented->synchronizedMs},{"swappedMs",elapsed},
+                                {"renderStartMs",presented->renderStartMs},{"renderEndMs",presented->renderEndMs},
                                 {"down",presented->inputDown},{"surfaceScale",presented->surfaceScale},
                                 {"contentScale",presented->contentScale},{"hasContent",presented->hasContent}});
                             presented->pending=false;
@@ -245,7 +260,8 @@ Item {
                             presented->armed=false;
                             presentedFrames=presented->frames;
                         }
-                        QObject::disconnect(pressSync);QObject::disconnect(pressSwap);
+                        QObject::disconnect(pressSync);QObject::disconnect(pressRenderStart);
+                        QObject::disconnect(pressRenderEnd);QObject::disconnect(pressSwap);
                         bool contractedWithin40ms=false;
                         for(const auto &frame:presentedFrames){
                             const auto sample=frame.toObject();

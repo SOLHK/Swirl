@@ -22,15 +22,17 @@ Menu {
     property string payload: ""
     property bool handleItemsInternally:true
     implicitWidth:Math.ceil(Math.max(Theme.dp(150),items.reduce((width,label)=>Math.max(width,itemMetrics.advanceWidth(AppState.zh(String(label)))+Theme.dp(24)+leftPadding+rightPadding),0)))
-    FontMetrics {id:itemMetrics;font.family:Theme.fontFamily;font.pixelSize:Theme.buttonSize;font.weight:Theme.bodyFontWeight}
+    // Keep helpers out of Menu.contentData: that getter starts deferred
+    // content creation before a derived menu can install its contentItem.
+    readonly property FontMetrics ownedMetrics: FontMetrics {id:itemMetrics;font.family:Theme.fontFamily;font.pixelSize:Theme.buttonSize;font.weight:Theme.bodyFontWeight}
     signal itemTriggered(int index)
     padding:Theme.dp(6)
     transformOrigin:Item.TopLeft
     readonly property SwirlPopupMotion popupMotion:SwirlPopupMotion {id:reveal;popup:contextMenu;enterDuration:SwirlMotion.menuEnterDuration;leaveDuration:SwirlMotion.menuExitDuration}
     // Popup owns x/y placement (including screen clamping); translate its
     // visual content and background without changing pointer/keyboard grabs.
-    Binding {target:contextMenu.presentationReady?contextMenu.contentItem:null;property:"transform";value:[contentTravel];when:contextMenu.presentationReady;restoreMode:Binding.RestoreBindingOrValue}
-    Translate {id:contentTravel;x:reveal.xOffset;y:reveal.yOffset}
+    readonly property Binding contentMotionBinding: Binding {target:contextMenu.presentationReady?contextMenu.contentItem:null;property:"transform";value:[contentTravel];when:contextMenu.presentationReady;restoreMode:Binding.RestoreBindingOrValue}
+    readonly property Translate contentMotionTransform: Translate {id:contentTravel;x:reveal.xOffset;y:reveal.yOffset}
     opacity:reveal.alpha
     onAboutToShow: {
         dismissals.push(contextMenu,parent?parent.Window.window:null)
@@ -43,7 +45,7 @@ Menu {
         transform: Translate { x: reveal.xOffset; y: reveal.yOffset }
         cornerRadius: Theme.menuRadius
     }
-    Instantiator {
+    readonly property Instantiator itemInstantiator: Instantiator {
         model: contextMenu.items
         onObjectAdded:(index,object)=>contextMenu.insertItem(index,object)
         onObjectRemoved:(index,object)=>contextMenu.removeItem(object)

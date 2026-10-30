@@ -316,7 +316,14 @@ Item {
         qmlEngine(window)->rootContext()->setContextProperty("apecFixture",static_cast<QObject *>(nullptr));
     }
     eval("Theme.reduceMotion=false;Theme.transparency=true;AppState.navigate('activity')");wait(80);
-    auto *wing=window->findChild<QQuickItem *>("apecWingVisual");
+    // The hidden dashboard is a child Window with its own identically named
+    // wing. Resolve the main scene's published item instead of searching the
+    // broader QObject tree, then verify its real visual/window ownership.
+    auto *wing=qvariant_cast<QQuickItem *>(eval("appSceneBackdrop.mainWingItem"));
+    auto *wingScene=qvariant_cast<QQuickItem *>(eval("appSceneBackdrop"));
+    check("production-wing-belongs-to-main-scene",wing && wingScene
+        && wing->window()==window && wingScene->window()==window
+        && wingScene->isAncestorOf(wing));
     // The accepted whole-feather master puts transparency in each painted
     // gradient. Its container stays opaque; multiplying the retired global
     // wingOpacity here would incorrectly dim the current artwork a second time.

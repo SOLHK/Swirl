@@ -232,6 +232,29 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
    reportFile.write(QJsonDocument(QJsonObject{{"checks",checks},{"failures",failures},{"navigationPrerequisite",navigationPrerequisite}}).toJson());
    return 2;
   }
+  // The old in-process navigation prerequisite also created these pages in
+  // this QQmlEngine. A report from another process proves its assertions,
+  // but cannot supply that engine-local cache. Restore only this setup with
+  // the navigation suite's existing 4000 ms readiness bound. The measured
+  // interaction pacing below remains 350 ms, with the same click limits,
+  // sample/loop counts and CTest deadline; cold preparation is reported apart.
+  const QString originalRoute=eval("AppState.currentPage").toString();
+  QJsonArray processLocalRoutePreparation;
+  for(const auto &name:QStringList{"subscriptions","proxies",originalRoute}){
+   const bool cachedBefore=eval("pageLoader.pages['"+name+"']!==undefined").toBool();
+   QElapsedTimer preparation;preparation.start();
+   eval("AppState.navigate('"+name+"')");
+   const bool prepared=QTest::qWaitFor([&]{
+    return eval("AppState.currentPage==='"+name+"' && pageLoader.item && pageLoader.activeLoader && pageLoader.activeLoader.routeId==='"+name+"' && pageLoader.activeLoader.status===Loader.Ready && !pageLoader.pendingGrab && !pageLoader.preparing && !pageLoader.moving && SwirlTransitionRegistry.activeCount===0").toBool();
+   },4000);
+   auto state=QJsonDocument::fromJson(eval("JSON.stringify({route:AppState.currentPage,activeRoute:pageLoader.activeLoader?pageLoader.activeLoader.routeId:'',status:pageLoader.activeLoader?pageLoader.activeLoader.status:-1,loaded:!!pageLoader.item,pending:pageLoader.pendingGrab,preparing:pageLoader.preparing,moving:pageLoader.moving,progress:pageLoader.position,registry:SwirlTransitionRegistry.activeCount})").toString().toUtf8()).object();
+   state.insert("requestedRoute",name);state.insert("cachedBefore",cachedBefore);
+   state.insert("elapsedMs",double(preparation.elapsed()));state.insert("settled",prepared);
+   processLocalRoutePreparation.append(state);
+   check(prepared,"engine-local navigation prerequisite settles before hero sampling: "+name);
+   qInfo().noquote()<<"HERO_PROCESS_LOCAL_ROUTE_PREPARATION"<<QJsonDocument(state).toJson(QJsonDocument::Compact);
+  }
+  navigationPrerequisite.insert("processLocalRoutePreparation",processLocalRoutePreparation);
  }else{
   const int navigationFailures=runNavigationChecks(window,controller,directory);
   failures+=navigationFailures;
@@ -370,7 +393,7 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  struct Presentation {double qpcMs;quint32 count,refresh,sync;double syncQpcMs;int hz;};
  struct DeliveryState {
   QMutex mutex;bool armed=true;QElapsedTimer elapsed;qint64 previous=0;
-  QList<double> intervals;QList<Presentation> presentations;
+  QList<double> intervals,allIntervals;QList<Presentation> presentations;
   std::atomic_int presentationHz{0};quint32 previousPresent=0;int statisticsErrors=0;
  };
  auto delivery=std::make_shared<DeliveryState>();delivery->elapsed.start();delivery->presentationHz=qRound(window->screen()->refreshRate());
@@ -379,7 +402,12 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  auto frameConnection=QObject::connect(window,&QQuickWindow::frameSwapped,window,[delivery,window]{
   QMutexLocker guard(&delivery->mutex);if(!delivery->armed)return;
   const auto now=delivery->elapsed.nsecsElapsed();
-  if(delivery->previous){const double ms=(now-delivery->previous)/1000000.0;if(ms<100)delivery->intervals.append(ms);}delivery->previous=now;
+  if(delivery->previous){
+   const double ms=(now-delivery->previous)/1000000.0;
+   delivery->allIntervals.append(ms);
+   if(ms<100)delivery->intervals.append(ms);
+  }
+  delivery->previous=now;
 #ifdef Q_OS_WIN
   if(window->rendererInterface()->graphicsApi()==QSGRendererInterface::Direct3D11){
    auto chain=static_cast<QD3D11SwapChain *>(window->rendererInterface()->getResource(window,QSGRendererInterface::RhiSwapchainResource));
@@ -432,14 +460,25 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
   refreshPhases.append(QJsonObject{{"requestedHz",hz},{"available",true},{"qtRefreshHz",window->screen()->refreshRate()},{"startQpcMs",phaseStart},{"endQpcMs",qpcMs()},{"resources",resources()}});
  }
  const double performanceEnd=qpcMs();
- QList<double> intervals;QList<Presentation> presentations;int statisticsErrors=0;
+ QList<double> intervals,allIntervals;QList<Presentation> presentations;int statisticsErrors=0;
  {
   // Waiting for this lock drains any current callback; later callbacks see
   // armed=false before touching the window. Only immutable copies leave here.
   QMutexLocker guard(&delivery->mutex);delivery->armed=false;
-  intervals=delivery->intervals;presentations=delivery->presentations;statisticsErrors=delivery->statisticsErrors;
+  intervals=delivery->intervals;allIntervals=delivery->allIntervals;presentations=delivery->presentations;statisticsErrors=delivery->statisticsErrors;
  }
  QObject::disconnect(frameConnection);std::sort(intervals.begin(),intervals.end());double mean=0;for(double ms:intervals)mean+=ms;if(!intervals.isEmpty())mean/=intervals.size();
+ QJsonArray chronologicalIntervalsMs;int intervalsAtLeast100Ms=0;double maximumMs=0;
+ for(const double ms:allIntervals){
+  chronologicalIntervalsMs.append(ms);maximumMs=qMax(maximumMs,ms);
+  if(ms>=100)++intervalsAtLeast100Ms;
+ }
+ const QJsonObject unfilteredFrameDelivery{
+  {"chronologicalIntervalsMs",chronologicalIntervalsMs},{"intervalCount",allIntervals.size()},
+  {"intervalsAtLeast100Ms",intervalsAtLeast100Ms},
+  {"maximumMs",allIntervals.isEmpty()?QJsonValue(QJsonValue::Null):QJsonValue(maximumMs)},
+  {"maximumAtLeast100Ms",intervalsAtLeast100Ms?QJsonValue(maximumMs):QJsonValue(QJsonValue::Null)},
+  {"scope","All consecutive frameSwapped intervals observed while this sampler is armed, in chronological order, including idle gaps. Intervals >=100 ms are retained, not automatically classified as animation stalls. Request-based animationWindows do not establish exact animation boundaries; these values are not physical display presentation intervals."}};
  QJsonArray displaySamples;for(const auto &frame:presentations)displaySamples.append(QJsonObject{{"displayQpcMs",frame.qpcMs},{"presentCount",int(frame.count)},{"presentRefreshCount",int(frame.refresh)},{"syncRefreshCount",int(frame.sync)},{"syncQpcMs",frame.syncQpcMs},{"hz",frame.hz}});
  QJsonObject background;
  if(sweep){const auto before=resources();window->showMinimized();wait(60000);const auto after=resources();background={{"durationMs",60000},{"cpuMs",after.value("cpuMs").toDouble()-before.value("cpuMs").toDouble()},{"before",before},{"after",after}};window->showNormal();wait(350);}
@@ -447,6 +486,6 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  policy->setSystemReducedMotionOverrideForTest(-1);
  check(policy->systemReducedMotion()==actualSystemReducedMotion,"hero fixture restores the actual Windows accessibility policy");
  QFile report(directory+"/hero-report.json");if(!report.open(QIODevice::WriteOnly))return 3;
- report.write(QJsonDocument(QJsonObject{{"actualSystemReducedMotion",actualSystemReducedMotion},{"animatedSystemPolicyFixture",0},{"systemReducedPolicyFixture",1},{"restoredSystemPolicy",policy->systemReducedMotion()==actualSystemReducedMotion},{"settingsRetargetSamples",settingsRetargetSamples},{"nodeClickDispatchMs",nodeClickMs},{"checks",checks},{"failures",failures},{"navigationPrerequisite",navigationPrerequisite},{"dxgiPresentations",displaySamples},{"dxgiStatisticsErrors",statisticsErrors},{"animationWindows",animationWindows},{"refreshPhases",refreshPhases},{"resourceBefore",resourceBefore},{"resourceAfter",resources()},{"minimizedIdle",background},{"performanceStartQpcMs",performanceStart},{"performanceEndQpcMs",performanceEnd},{"reportedRefreshHz",window->screen()->refreshRate()},{"nativeDpr",window->devicePixelRatio()},{"sampleCount",intervals.size()},{"meanFrameDeliveryMs",mean},{"p95FrameDeliveryMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.95))]},{"p99FrameDeliveryMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.99))]},{"method","Passive Qt frameSwapped delivery during native interaction, excluding screenshot readback. These intervals are not hardware display presentation FPS; use external PresentMon data for presentation evidence."}}).toJson());
+ report.write(QJsonDocument(QJsonObject{{"actualSystemReducedMotion",actualSystemReducedMotion},{"animatedSystemPolicyFixture",0},{"systemReducedPolicyFixture",1},{"restoredSystemPolicy",policy->systemReducedMotion()==actualSystemReducedMotion},{"settingsRetargetSamples",settingsRetargetSamples},{"nodeClickDispatchMs",nodeClickMs},{"checks",checks},{"failures",failures},{"navigationPrerequisite",navigationPrerequisite},{"dxgiPresentations",displaySamples},{"dxgiStatisticsErrors",statisticsErrors},{"animationWindows",animationWindows},{"refreshPhases",refreshPhases},{"resourceBefore",resourceBefore},{"resourceAfter",resources()},{"minimizedIdle",background},{"performanceStartQpcMs",performanceStart},{"performanceEndQpcMs",performanceEnd},{"reportedRefreshHz",window->screen()->refreshRate()},{"nativeDpr",window->devicePixelRatio()},{"sampleCount",intervals.size()},{"meanFrameDeliveryMs",mean},{"p95FrameDeliveryMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.95))]},{"p99FrameDeliveryMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.99))]},{"filteredFrameDeliveryScope","Legacy sampleCount, meanFrameDeliveryMs, p95FrameDeliveryMs and p99FrameDeliveryMs include only intervals <100 ms; they omit longer intervals and are not an animation-only distribution. See unfilteredFrameDelivery for every observed interval."},{"unfilteredFrameDelivery",unfilteredFrameDelivery},{"method","Passive Qt frameSwapped delivery during native interaction, excluding screenshot readback. These intervals are not hardware display presentation FPS; use external PresentMon data for presentation evidence."}}).toJson());
  return failures?2:0;
 }
