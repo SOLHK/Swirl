@@ -74,7 +74,12 @@ fn execute(driver: PathBuf) -> io::Result<()> {
 }
 
 #[cfg(windows)]
+#[path = "support/nonblocking_fixture_socket.rs"]
+mod nonblocking_fixture_socket;
+
+#[cfg(windows)]
 mod windows {
+    use super::nonblocking_fixture_socket::{clone_listener_for_tokio, clone_udp_for_tokio};
     use super::*;
     use base64::Engine;
     use ring::rand::{SecureRandom, SystemRandom};
@@ -1734,8 +1739,8 @@ mod windows {
                 } else {
                     Some(socks5_udp_peer(
                         runtime,
-                        proxy.try_clone()?,
-                        relay.try_clone()?,
+                        clone_listener_for_tokio(&proxy)?,
+                        clone_udp_for_tokio(&relay)?,
                         host,
                         port,
                         case == "proxy_rejected",
