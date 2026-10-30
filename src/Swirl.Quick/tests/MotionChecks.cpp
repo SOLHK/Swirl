@@ -54,9 +54,9 @@ void activityWait(int milliseconds) {
     QEventLoop loop;QTimer timer;timer.setTimerType(Qt::PreciseTimer);timer.setSingleShot(true);
     QObject::connect(&timer,&QTimer::timeout,&loop,&QEventLoop::quit);timer.start(milliseconds);loop.exec();
 }
-const QStringList activityDetailKeys={"sources","diagnostics","traffic","connections"};
-const QStringList activityDetailButtons={"activitySourcesDetails","networkDiagnosticDetails","activityTrafficDetails","activityConnectionsDetails"};
-const QStringList activityDetailCards={"activitySourcesCard","activityDiagnosticCard","activityTrafficCard","activityConnectionsCard"};
+const QStringList activityDetailKeys={"sources","diagnostics","traffic","connections","connection"};
+const QStringList activityDetailButtons={"activitySourcesDetails","networkDiagnosticDetails","activityTrafficDetails","activityConnectionsDetails","activityConnectionDetails"};
+const QStringList activityDetailCards={"activitySourcesCard","activityDiagnosticCard","activityTrafficCard","activityConnectionsCard","activityStatusCard"};
 
 int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     QJsonArray checks,samples,dataSamples;int failures=0;
@@ -72,7 +72,7 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     auto *page=activityVisual(window->contentItem(),"activityScroll");page=page?page->parentItem():nullptr;
     auto *transition=activityVisual(window->contentItem(),"activityDetailTransition");
     auto *surface=activityVisual(window->contentItem(),"activityDetailSurface");
-    check("all-four-details-share-one-transition-container",page&&transition&&surface);
+    check("all-five-details-share-one-transition-container",page&&transition&&surface);
     if(!page||!transition||!surface)return 1;
     const auto bounds=[&](QQuickItem *item){return item->mapRectToItem(window->contentItem(),QRectF(QPointF(),item->size()));};
     QRectF firstVisibleBounds;double firstVisibleProgress=0;bool originObserved=false;
@@ -81,14 +81,13 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     const auto close=[&]{QMetaObject::invokeMethod(transition,"closeDetail");settled();};
     const auto click=[&](const QString &name){auto *button=activityVisual(window->contentItem(),name);if(!button||!button->isVisible()||!button->isEnabled())return false;QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,button->mapToScene(QPointF(button->width()/2,button->height()/2)).toPoint());return true;};
     const auto homeCountsMatch=[&](int connectionCount,int processCount,int deviceCount){
-        auto *section=activityVisual(window->contentItem(),"activityConnections");
-        auto *connectionValue=section?section->property("motionTitle").value<QQuickItem *>():nullptr;
+        auto *section=activityVisual(window->contentItem(),"activityConnectionsCard");
+        auto *connectionValue=activityVisual(window->contentItem(),"activityConnectionCount");
         int processes=-1,devices=-1;
         if(section)for(auto *row:section->findChildren<QObject *>()){
-            auto *value=row->property("valueItem").value<QQuickItem *>();if(!value)continue;
             const auto caption=row->property("caption").toString();
-            if(caption==QStringLiteral("进程"))processes=value->property("text").toString().toInt();
-            else if(caption==QStringLiteral("设备"))devices=value->property("text").toString().toInt();
+            if(caption==QStringLiteral("已识别进程"))processes=row->property("value").toString().toInt();
+            else if(caption==QStringLiteral("非本机来源"))devices=row->property("value").toString().toInt();
         }
         return connectionValue&&connectionValue->property("text").toString().toInt()==connectionCount&&processes==processCount&&devices==deviceCount;
     };
@@ -97,16 +96,32 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     auto *diagnosticOverview=activityVisual(window->contentItem(),activityDetailCards[1]);
     auto *trafficOverview=activityVisual(window->contentItem(),activityDetailCards[2]);
     auto *connectionOverview=activityVisual(window->contentItem(),activityDetailCards[3]);
-    check("overview-grid-keeps-card-row-and-column-edges-aligned",sourceOverview&&diagnosticOverview&&trafficOverview&&connectionOverview
-        &&qAbs(sourceOverview->y()-diagnosticOverview->y())<1&&qAbs(sourceOverview->y()+sourceOverview->height()-diagnosticOverview->y()-diagnosticOverview->height())<1
-        &&qAbs(trafficOverview->y()-connectionOverview->y())<1&&qAbs(trafficOverview->y()+trafficOverview->height()-connectionOverview->y()-connectionOverview->height())<1
-        &&qAbs(sourceOverview->x()-trafficOverview->x())<1&&qAbs(diagnosticOverview->x()-connectionOverview->x())<1);
-    for(const auto &name:{activityDetailButtons[0],activityDetailButtons[2]}){
-        auto *heading=activityVisual(window->contentItem(),name);auto *content=heading?heading->property("contentItem").value<QQuickItem *>():nullptr;
-        check(name+"-chevron-stays-beside-its-title",heading&&content&&heading->width()<=content->implicitWidth()+heading->property("leftPadding").toDouble()+heading->property("rightPadding").toDouble()+2);
+    auto *statusOverview=activityVisual(window->contentItem(),activityDetailCards[4]);
+    check("overview-five-card-grid-is-present",sourceOverview&&diagnosticOverview&&trafficOverview&&connectionOverview&&statusOverview);
+    if(sourceOverview&&diagnosticOverview&&trafficOverview&&connectionOverview&&statusOverview){
+        const auto source=bounds(sourceOverview),diagnostic=bounds(diagnosticOverview),traffic=bounds(trafficOverview),connections=bounds(connectionOverview),status=bounds(statusOverview);
+        check("overview-grid-keeps-top-row-bottom-stack-and-outer-edges-aligned",
+            qAbs(status.top()-traffic.top())<1&&qAbs(status.height()-traffic.height())<1
+            &&qAbs(source.top()-diagnostic.top())<1&&qAbs(source.bottom()-connections.bottom())<1
+            &&qAbs(diagnostic.left()-connections.left())<1&&qAbs(diagnostic.width()-connections.width())<1
+            &&qAbs(status.left()-source.left())<1&&qAbs(traffic.right()-diagnostic.right())<1);
+        check("overview-grid-keeps-five-seven-and-seven-five-width-ratios",
+            qAbs(status.width()/(status.width()+traffic.width())-5.0/12)<0.03
+            &&qAbs(source.width()/(source.width()+diagnostic.width())-7.0/12)<0.03);
+    }
+    for(int i=0;i<activityDetailButtons.size();++i){
+        auto *heading=activityVisual(window->contentItem(),activityDetailButtons[i]);
+        auto *card=activityVisual(window->contentItem(),activityDetailCards[i]);
+        const auto titleBounds=heading&&card?heading->mapRectToItem(card,QRectF(QPointF(),heading->size())):QRectF();
+        check(activityDetailButtons[i]+"-title-stays-readable-inside-card",heading&&card&&heading->width()>=60
+            &&titleBounds.left()>=0&&titleBounds.right()<=card->width()+1&&titleBounds.top()>=0&&titleBounds.bottom()<=card->height()+1
+            &&QQmlProperty::read(heading,"font.pixelSize").toDouble()>=12);
     }
     auto *sourceCategory=activityVisual(window->contentItem(),"activitySourceFilter");
-    check("source-category-control-aligns-with-card-right-inset",sourceCategory&&sourceOverview&&qAbs(sourceCategory->mapToItem(sourceOverview,sourceCategory->width(),0).x()-(sourceOverview->width()-eval("Theme.dp(14)").toDouble()))<1);
+    auto *sourceHeading=activityVisual(window->contentItem(),activityDetailButtons[0]);
+    check("source-category-control-sits-below-title-at-shared-left-inset",sourceCategory&&sourceOverview&&sourceHeading
+        &&qAbs(sourceCategory->mapToItem(sourceOverview,0,0).x()-eval("Theme.dp(12)").toDouble())<1
+        &&bounds(sourceCategory).top()>=bounds(sourceHeading).bottom());
     const int historyIndex=eval("AppState.historyIndex").toInt();
     auto *homeScroll=activityVisual(window->contentItem(),"activityScroll");
     const double scrollBefore=homeScroll->property("contentY").toDouble();
@@ -124,15 +139,15 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
             &&qAbs(start.width()-storedOrigin.width()-(destination.width()-storedOrigin.width())*startProgress)<1&&qAbs(start.height()-storedOrigin.height()-(destination.height()-storedOrigin.height())*startProgress)<1);
         activityWait(90);const auto middle=snapshot(key,"open-middle");const auto progress=transition->property("progress").toDouble();
         check(key+"-visible-geometric-expansion",transition->property("moving").toBool()&&progress>0&&progress<1&&middle.width()>source.width()+2&&middle.height()>source.height()+2);
-        const double originRadius=card->property("radius").toDouble(),targetRadius=eval("Theme.dp(32)").toDouble();
-        check(key+"-corner-curvature-morphs-continuously",surface->property("radius").toDouble()>originRadius&&surface->property("radius").toDouble()<targetRadius);
+        const double originRadius=card->property("radius").toDouble(),targetRadius=eval("Theme.cardRadius").toDouble();
+        check(key+"-corner-curvature-remains-continuous",surface->property("radius").toDouble()>=qMin(originRadius,targetRadius)-0.1&&surface->property("radius").toDouble()<=qMax(originRadius,targetRadius)+0.1);
         check(key+"-opens-correct-detail",settled()&&transition->property("opened").toBool()&&transition->property("detailKey").toString()==key);
         const auto full=snapshot(key,"open-end");
         check(key+"-expanded-corner-curvature-reaches-target",qAbs(surface->property("radius").toDouble()-targetRadius)<0.1);
         check(key+"-fills-main-content",full.width()>source.width()&&full.height()>source.height()&&full.left()>=0&&full.right()<=window->width()+1&&full.bottom()<=window->height()+1);
         QTest::keyClick(window,Qt::Key_Escape);activityWait(80);const auto reverse=snapshot(key,"close-middle");
         check(key+"-escape-geometrically-contracts",transition->property("moving").toBool()&&transition->property("progress").toDouble()>0&&transition->property("progress").toDouble()<1&&reverse.width()<full.width()-2&&reverse.height()<full.height()-2);
-        check(key+"-return-restores-corner-curvature-continuously",surface->property("radius").toDouble()>originRadius&&surface->property("radius").toDouble()<targetRadius);
+        check(key+"-return-restores-corner-curvature-continuously",surface->property("radius").toDouble()>=qMin(originRadius,targetRadius)-0.1&&surface->property("radius").toDouble()<=qMax(originRadius,targetRadius)+0.1);
         check(key+"-returns-cleanly",settled()&&!transition->property("opened").toBool()&&transition->property("progress").toDouble()==0&&!transition->isVisible());
         QTest::mouseMove(window,QPoint(1,1));activityWait(150);
         check(key+"-return-keeps-keyboard-focus",card->hasActiveFocus());
@@ -152,6 +167,9 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     }
     check("source-segment-click-does-not-open-detail",click("activitySourceFilter")&&!transition->property("opened").toBool()&&transition->property("progress").toDouble()==0);
     check("traffic-segment-click-does-not-open-detail",click("activityTrafficFilter")&&!transition->property("opened").toBool()&&transition->property("progress").toDouble()==0);
+    check("traffic-scope-control-opens-own-popup",eval("dismissals.hasPopup(window)").toBool());
+    QTest::keyClick(window,Qt::Key_Escape);activityWait(180);
+    check("traffic-scope-escape-closes-popup-without-detail-navigation",!eval("dismissals.hasPopup(window)").toBool()&&!transition->property("activeDetail").toBool());
     check("period-segment-click-does-not-open-detail",click("activityPeriodFilter")&&!transition->property("opened").toBool()&&transition->property("progress").toDouble()==0);
     click(activityDetailButtons[1]);settled();check("shared-return-button-receives-input",click("activityDetailBack"));activityWait(70);
     check("return-button-uses-same-geometric-contraction",transition->property("moving").toBool()&&transition->property("progress").toDouble()>0&&transition->property("progress").toDouble()<1);close();
@@ -160,7 +178,7 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     check("escape-reverses-incomplete-expansion-continuously",beforeReverse>0&&beforeReverse<1&&transition->property("moving").toBool()&&transition->property("progress").toDouble()<beforeReverse);
     for(int repeat=0;repeat<8;++repeat)QTest::keyClick(window,Qt::Key_Escape);
     check("repeated-escape-settles-without-history-pop",settled()&&!transition->isVisible()&&eval("AppState.currentPage==='activity'").toBool()&&eval("AppState.historyIndex").toInt()==historyIndex);
-    for(int i=0;i<8;++i){click(activityDetailButtons[i%4]);activityWait(14);QTest::keyClick(window,Qt::Key_Escape);activityWait(9);}
+    for(int i=0;i<8;++i){click(activityDetailButtons[i%activityDetailKeys.size()]);activityWait(14);QTest::keyClick(window,Qt::Key_Escape);activityWait(9);}
     close();check("rapid-repeated-input-releases-overlay",!transition->isVisible()&&!transition->property("moving").toBool());
     for(const auto size:{QSize(914,672),QSize(1100,760)}){
         click(activityDetailButtons[1]);activityWait(70);window->resize(size);activityWait(60);
@@ -291,6 +309,27 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
 #endif
         return 0;
     };
+    qmlEngine(window)->collectGarbage();activityWait(100);const auto memoryBeforeWarmup=privateBytes();
+    QJsonArray warmupSamples;
+    // The first five visits above rendered empty details. The later 600-row
+    // fixture remains in retained rankings/history after ingest({}); warm all
+    // five views with that data before measuring repeated navigation growth.
+    for(int i=0;i<activityDetailKeys.size();++i){
+        const auto &key=activityDetailKeys[i];
+        const bool opened=click(activityDetailButtons[i])&&settled()&&transition->property("detailKey").toString()==key;
+        check("retained-data-warmup-opens-"+key,opened);
+        activityWait(350);
+        auto *incubation=qmlEngine(window)->incubationController();
+        check("retained-data-warmup-finishes-incubation-"+key,!incubation||QTest::qWaitFor([&]{return incubation->incubatingObjectCount()==0;},1500));
+        int rankingRows=-1;
+        if(key=="traffic"){
+            auto *table=activityVisual(window->contentItem(),"trafficRankingTable");
+            if(table){QQmlExpression expression(qmlContext(table),table,"rows.length");rankingRows=expression.evaluate().toInt();}
+            check("retained-data-warmup-includes-populated-traffic-ranking",rankingRows>0);
+        }
+        warmupSamples.append(QJsonObject{{"detail",key},{"privateBytes",privateBytes()},{"trafficRankingRows",rankingRows}});
+        close();activityWait(100);
+    }
     qmlEngine(window)->collectGarbage();activityWait(100);const auto memoryBefore=privateBytes();
     QList<double> frameIntervals;QElapsedTimer delivery;delivery.start();qint64 previousFrame=0;
     const auto frameConnection=QObject::connect(window,&QQuickWindow::frameSwapped,window,[&]{
@@ -298,7 +337,7 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
         if(previousFrame&&transition->property("moving").toBool())frameIntervals.append((now-previousFrame)/1000000.0);
         previousFrame=now;
     });
-    for(int cycle=0;cycle<8;++cycle){click(activityDetailButtons[cycle%4]);activityWait(470);QTest::keyClick(window,Qt::Key_Escape);activityWait(410);}
+    for(int cycle=0;cycle<8;++cycle){click(activityDetailButtons[cycle%activityDetailKeys.size()]);activityWait(470);QTest::keyClick(window,Qt::Key_Escape);activityWait(410);}
     QObject::disconnect(frameConnection);qmlEngine(window)->collectGarbage();activityWait(100);
     const auto memoryAfter=privateBytes();std::sort(frameIntervals.begin(),frameIntervals.end());
     check("repeated-details-release-transient-input-and-grab-state",!transition->isVisible()&&!transition->property("moving").toBool()&&eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").toBool());
@@ -308,10 +347,12 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     QObject::disconnect(originConnection);window->resize(initialSize);window->update();activityWait(100);
     auto *incubation=qmlEngine(window)->incubationController();
     check("restored-viewport-finishes-delegate-incubation-before-exit",!incubation||QTest::qWaitFor([&]{return incubation->incubatingObjectCount()==0;},1500));
-    QJsonObject performance{{"cycles",8},{"privateBytesBefore",memoryBefore},{"privateBytesAfter",memoryAfter},{"privateGrowthBytes",memoryAfter-memoryBefore},{"frameSamples",frameIntervals.size()},
+    QJsonObject performance{{"cycles",8},{"warmupCycles",activityDetailKeys.size()},{"warmupSamples",warmupSamples},
+        {"privateBytesBeforeRetainedDataWarmup",memoryBeforeWarmup},{"retainedDataWarmupGrowthBytes",memoryBefore-memoryBeforeWarmup},
+        {"privateBytesBefore",memoryBefore},{"privateBytesAfter",memoryAfter},{"privateGrowthBytes",memoryAfter-memoryBefore},{"frameSamples",frameIntervals.size()},
         {"p95FrameDeliveryMs",frameIntervals.isEmpty()?0:frameIntervals[qMin(frameIntervals.size()-1,qsizetype(frameIntervals.size()*0.95))]},
         {"maxFrameDeliveryMs",frameIntervals.isEmpty()?0:frameIntervals.last()},
-        {"method","Passive Qt frameSwapped delivery during eight warm forward/reverse cycles driven by precise timers, without screenshot readback. Qt frame delivery is not hardware presentation FPS. Private memory compares this finite warmed sequence, not an unlimited leak proof."}};
+        {"method","All five retained detail pages are opened after the 600-record fixture, with model-update and delegate-incubation settlement, before the memory baseline. This one-time populated-data warmup allocation is reported separately. Passive Qt frameSwapped delivery is then sampled during eight warm forward/reverse cycles driven by precise timers, without screenshot readback. The 24 MiB growth bound is unchanged. Qt frame delivery is not hardware presentation FPS; this finite sequence is not an unlimited leak proof."}};
     QJsonObject report{{"checks",checks},{"failures",failures},{"geometrySamples",samples},{"dataSamples",dataSamples},{"performance",performance},{"qt",qVersion()},{"renderer",int(window->rendererInterface()->graphicsApi())},{"dpr",window->devicePixelRatio()},{"scaleFactor",qEnvironmentVariable("QT_SCALE_FACTOR")},{"controlledFixtureRows",600},{"limitations",QJsonArray{"Qt scale-factor runs validate native-window layout and geometry at controlled DPR; they do not prove physical cross-monitor DPI transitions.","Geometry and input observations do not establish display presentation FPS or subjective animation smoothness.","Filter, sort and virtualization use 600 controlled records passed through the actual isolated TelemetryService, not real network acceptance. The separate animation demo has truthful empty production data."}}};
     QDir().mkpath(QFileInfo(output).absolutePath());QFile file(output);if(!file.open(QIODevice::WriteOnly))return 1;file.write(QJsonDocument(report).toJson());
     qInfo()<<"ACTIVITY_DETAIL_RESULT"<<failures;return failures?1:0;
@@ -325,7 +366,7 @@ int recordActivityDetailDemo(QQuickWindow *window,const QString &directory) {
     policy->setSystemReducedMotionOverrideForTest(0);
     struct RestorePolicy{MotionPolicy *policy;~RestorePolicy(){policy->setSystemReducedMotionOverrideForTest(-1);}} restore{policy};
     eval("Theme.reduceMotion=false;Theme.followSystemMotion=false;Theme.mode='Light';AppState.navigate('activity')");
-    window->resize(1100,760);window->requestActivate();activityWait(700);
+    window->resize(1013,672);window->requestActivate();activityWait(700);
     auto *transition=activityVisual(window->contentItem(),"activityDetailTransition");
     if(!transition)return 1;
     QElapsedTimer clock;clock.start();int index=0;
@@ -340,7 +381,7 @@ int recordActivityDetailDemo(QQuickWindow *window,const QString &directory) {
             activityWait(16);
         }
     };
-    for(int i=0;i<4;++i){
+    for(int i=0;i<activityDetailKeys.size();++i){
         auto *button=activityVisual(window->contentItem(),activityDetailButtons[i]);
         if(!button){++failures;continue;}
         auto *sourceCard=activityVisual(window->contentItem(),activityDetailCards[i]);

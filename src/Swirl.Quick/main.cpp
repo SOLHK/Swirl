@@ -71,6 +71,7 @@
 #include "tests/PolicyUiChecks.h"
 #include "tests/PolicySystemProxyBackend.h"
 #include "tests/MotionChecks.h"
+#include "tests/ActivityLayoutChecks.h"
 #include "tests/MaterialChecks.h"
 #include "tests/HeroChecks.h"
 #include "tests/NavigationChecks.h"
@@ -197,6 +198,10 @@ int main(int argc, char *argv[])
     // Swirl draws its own visual controls, so explicitly use the customizable style.
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     const bool motionTest=app.arguments().contains("--motion-test");
+    const bool activityLayoutTest=app.arguments().contains("--activity-layout-test");
+#ifndef SWIRL_UI_TESTS
+    if(activityLayoutTest)return 4;
+#endif
 #ifdef SWIRL_UI_TESTS
     // Opt-in tracing in the isolated test executable only. No debugger in packages.
     if(motionTest && qEnvironmentVariableIsSet("SWIRL_QML_PROFILE")) {
@@ -247,7 +252,7 @@ int main(int argc, char *argv[])
 #ifdef SWIRL_UI_TESTS
     lifecycleTest=app.arguments().contains("--lifecycle-test");
 #endif
-    const bool isolatedRun=xrayUiTest||appearanceTest||lifecycleTest||realAcceptance||heroTest||navigationTest||radiusTest||nodeTest||policyTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
+    const bool isolatedRun=xrayUiTest||appearanceTest||lifecycleTest||realAcceptance||heroTest||navigationTest||radiusTest||nodeTest||policyTest||motionTest||activityLayoutTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
     SingleInstance instance;
     if(lifecycleTest || (!isolatedRun && !appearanceTest)) {
         const auto ownership=instance.acquire(lifecycleTest?QStringLiteral("isolated-lifecycle-test"):QStringLiteral("production"));
@@ -347,7 +352,7 @@ int main(int argc, char *argv[])
         qCritical()<<"Preview font unavailable:"<<previewFont;return 2;
     }
     const QString previewState = argumentValue(QStringLiteral("--preview-state="));
-    if (xrayUiTest || appearanceTest || heroTest || navigationTest || radiusTest || nodeTest || policyTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
+    if (xrayUiTest || appearanceTest || heroTest || navigationTest || radiusTest || nodeTest || policyTest || motionTest || activityLayoutTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
         if(uiQualityTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-ui-quality.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-ui-quality.txt");}
         if(appearanceTest){const QString file=app.arguments().contains("--appearance-restore-test")?"Swirl-appearance-restore.txt":"Swirl-appearance.txt";app.setProperty("qtDiagnosticFile",file);QFile::remove(QCoreApplication::applicationDirPath()+"/"+file);}
         if(heroTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-hero-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-hero-diagnostics.txt");}
@@ -485,6 +490,10 @@ int main(int argc, char *argv[])
 #endif
 #ifdef SWIRL_UI_TESTS
     if(realAcceptance&&rootWindow)startRuntimeEvidence(rootWindow,&engineController,&systemData,&diagnostics,runtimeCommands,runtimeState);
+    if(activityLayoutTest) {
+        const auto output=argumentValue(QStringLiteral("--activity-layout-output="));
+        QTimer::singleShot(450,&app,[&app,rootWindow,output]{app.exit(runActivityLayoutChecks(rootWindow,output));});
+    }
 #endif
     hdrOutput.attach(rootWindow);
 #if defined(SWIRL_UI_TESTS) && defined(Q_OS_WIN)
@@ -774,7 +783,7 @@ int main(int argc, char *argv[])
     // This also keeps scripted page-navigation shutdown free of incubation warnings.
     if (auto *controller = engine.incubationController())
         controller->incubateFor(100);
-    const int finalResult=(xrayUiTest || heroTest || radiusTest || nodeTest || policyTest || motionTest || previewMode || engineTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
+    const int finalResult=(xrayUiTest || heroTest || radiusTest || nodeTest || policyTest || motionTest || activityLayoutTest || previewMode || engineTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
     if(xrayUiTest) {
         if(!xrayUiCompleted||xrayUiTimedOut)return finalResult==0?3:finalResult;
         if(finalResult==0)qInfo()<<"XRAY_UI_PASS";

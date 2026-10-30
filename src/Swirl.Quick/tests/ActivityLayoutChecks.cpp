@@ -1,0 +1,305 @@
+#include "ActivityLayoutChecks.h"
+#include "app/MotionPolicy.h"
+#include "engine/SystemProxySession.h"
+#include <QColor>
+#include <QCoreApplication>
+#include <QDateTime>
+#include <QDebug>
+#include <QDir>
+#include <QElapsedTimer>
+#include <QFile>
+#include <QGuiApplication>
+#include <QImage>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QKeyEvent>
+#include <QQmlContext>
+#include <QQmlExpression>
+#include <QQuickItem>
+#include <QQuickWindow>
+#include <QScreen>
+#include <QSGRendererInterface>
+#include <QTest>
+#include <algorithm>
+#include <cmath>
+#include <functional>
+
+namespace {
+QQuickItem *visual(QQuickItem *root, const QString &name) {
+    if (root->objectName() == name) return root;
+    for (auto *child : root->childItems())
+        if (auto *found = visual(child, name)) return found;
+    return nullptr;
+}
+QJsonObject rectangle(const QRectF &rect) {
+    return {{"x", rect.x()}, {"y", rect.y()}, {"width", rect.width()}, {"height", rect.height()}};
+}
+bool near(qreal a, qreal b, qreal tolerance = 1.1) { return std::abs(a - b) <= tolerance; }
+bool nearRect(const QRectF &a, const QRectF &b, qreal tolerance = 2) {
+    return near(a.x(), b.x(), tolerance) && near(a.y(), b.y(), tolerance)
+        && near(a.width(), b.width(), tolerance) && near(a.height(), b.height(), tolerance);
+}
+}
+
+int runActivityLayoutChecks(QQuickWindow *window, const QString &outputDirectory) {
+    QDir directory(outputDirectory);
+    if (!QDir().mkpath(directory.absolutePath())) return 2;
+    QJsonArray checks, layouts, travel;
+    int failures = 0;
+    const auto check = [&](const QString &name, bool success) {
+        checks.append(QJsonObject{{"name", name}, {"passed", success}});
+        qInfo() << "ACTIVITY_LAYOUT_CHECK" << name << success;
+        if (!success) ++failures;
+    };
+    const auto eval = [&](const QString &script) {
+        QQmlExpression expression(qmlContext(window), window, script);
+        const auto result = expression.evaluate();
+        check("qml-expression: " + script.left(90), !expression.hasError());
+        if (expression.hasError()) qWarning() << expression.error();
+        return result;
+    };
+    auto *policy = qobject_cast<MotionPolicy *>(qmlContext(window)->contextProperty("motionPolicy").value<QObject *>());
+    check("motion-policy-present", policy != nullptr);
+    if (!policy) return 2;
+    const auto hostProxyBefore = SystemProxySession::snapshot();
+    const bool nativeDpi = qEnvironmentVariableIsEmpty("QT_SCALE_FACTOR") && qEnvironmentVariableIsEmpty("QT_SCREEN_SCALE_FACTORS");
+    if (qEnvironmentVariableIsSet("SWIRL_LAYOUT_EXPECTED_DPR"))
+        check("window-DPR-matches-requested-Windows-scale", near(window->devicePixelRatio(), qEnvironmentVariable("SWIRL_LAYOUT_EXPECTED_DPR").toDouble(), 0.01));
+    policy->setSystemReducedMotionOverrideForTest(0);
+    struct PolicyRestore {
+        MotionPolicy *policy;
+        ~PolicyRestore() { policy->setSystemReducedMotionOverrideForTest(-1); }
+    } restore{policy};
+    eval("Theme.reduceMotion=false;Theme.followSystemMotion=false;Theme.mode='Light';AppState.navigate('activity')");
+    window->requestActivate();
+    QTest::qWait(550);
+    const auto find = [&](const char *name) { return visual(window->contentItem(), QString::fromLatin1(name)); };
+    auto *scroll = find("activityScroll");
+    auto *transition = find("activityDetailTransition");
+    auto *surface = find("activityDetailSurface");
+    auto *page = scroll ? scroll->parentItem() : nullptr;
+    check("real-activity-page-and-transition-loaded", scroll && page && transition && surface);
+    if (!scroll || !page || !transition || !surface) return 2;
+    const QStringList names = {"activityStatusCard", "activityTrafficCard", "activitySourcesCard", "activityDiagnosticCard", "activityConnectionsCard"};
+    const QStringList keys = {"connection", "traffic", "sources", "diagnostics", "connections"};
+    QList<QQuickItem *> cards;
+    for (const auto &name : names) {
+        auto *item = visual(window->contentItem(), name);
+        check(name + "-exists", item != nullptr);
+        if (!item) return 2;
+        cards.append(item);
+    }
+    const auto rect = [&](QQuickItem *item) { return item->mapRectToItem(page, QRectF(QPointF(), item->size())); };
+    const auto screenshot = [&](const QString &name) {
+        const auto image = window->grabWindow();
+        check(name + "-native-render-image-saved", !image.isNull() && image.save(directory.filePath(name + ".png")));
+    };
+    const auto settle = [&] {
+        return QTest::qWaitFor([&] { return !transition->property("moving").toBool(); }, 2500);
+    };
+    const auto close = [&] {
+        QMetaObject::invokeMethod(transition, "closeDetail");
+        check("transition-settles-after-close", settle());
+    };
+    const auto scrollTo = [&](QQuickItem *card) {
+        const auto local = card->mapToItem(scroll, QPointF());
+        const qreal before = scroll->property("contentY").toDouble();
+        const qreal limit = std::max(0.0, scroll->property("contentHeight").toDouble() - scroll->height());
+        scroll->setProperty("contentY", std::clamp(before + local.y() - 2, 0.0, limit));
+        QTest::qWait(40);
+    };
+    const auto clickCard = [&](QQuickItem *card) {
+        scrollTo(card);
+        // The heading is a card navigation target, outside all inner controls.
+        const auto *heading = card->property("titleItem").value<QQuickItem *>();
+        const auto point = heading ? heading->mapToScene(QPointF(heading->width() / 2, heading->height() / 2))
+                                   : card->mapToScene(QPointF(20, 20));
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, point.toPoint());
+    };
+    const auto captureLayout = [&](const QString &caseName) {
+        QTest::mouseMove(window, QPoint(1, 1));
+        scroll->setProperty("contentY", 0);
+        QTest::qWait(200);
+        const qreal contentWidth = page->property("contentLogicalWidth").toDouble();
+        const qreal breakpoint = page->property("dualColumnMinimumWidth").toDouble();
+        const bool wide = page->property("wide").toBool();
+        QJsonObject sample{{"case", caseName}, {"logicalWidth", window->width()}, {"logicalHeight", window->height()},
+            {"physicalWidth", window->width() * window->devicePixelRatio()}, {"physicalHeight", window->height() * window->devicePixelRatio()},
+            {"devicePixelRatio", window->devicePixelRatio()}, {"contentLogicalWidth", contentWidth},
+            {"dualColumnMinimumWidth", breakpoint}, {"wide", wide},
+            {"viewport", rectangle(rect(scroll))}, {"contentHeight", scroll->property("contentHeight").toDouble()}};
+        QList<QRectF> bounds;
+        for (int index = 0; index < cards.size(); ++index) {
+            const auto boundsHere = rect(cards[index]);
+            bounds.append(boundsHere);
+            sample.insert(names[index], rectangle(boundsHere));
+            check(caseName + "-" + names[index] + "-positive-readable-size", boundsHere.width() >= 240 && boundsHere.height() >= 130);
+            check(caseName + "-" + names[index] + "-opaque", cards[index]->property("color").value<QColor>().alpha() == 255);
+            check(caseName + "-" + names[index] + "-inside-content-horizontal-edges",
+                boundsHere.left() >= -1 && boundsHere.right() <= page->width() + 1);
+            QJsonArray clippedText;
+            std::function<void(QQuickItem *)> inspectText = [&](QQuickItem *item) {
+                if (!item->isVisible() || item->opacity() <= 0) return;
+                if (item->inherits("QQuickText") && !item->property("text").toString().isEmpty()) {
+                    const auto textRect = item->mapRectToItem(cards[index], QRectF(QPointF(), item->size()));
+                    if (!QRectF(QPointF(-1, -1), cards[index]->size() + QSizeF(2, 2)).contains(textRect))
+                        clippedText.append(QJsonObject{{"objectName", item->objectName()}, {"text", item->property("text").toString().left(90)}, {"bounds", rectangle(textRect)}});
+                }
+                for (auto *child : item->childItems()) inspectText(child);
+            };
+            inspectText(cards[index]);
+            sample.insert(names[index] + "ClippedText", clippedText);
+            check(caseName + "-" + names[index] + "-text-stays-inside-card", clippedText.isEmpty());
+        }
+        check(caseName + "-breakpoint-follows-real-content-width", breakpoint > 0 && wide == (contentWidth >= breakpoint));
+        for (int first = 0; first < bounds.size(); ++first)
+            for (int second = first + 1; second < bounds.size(); ++second)
+                check(caseName + "-cards-do-not-overlap-" + QString::number(first) + "-" + QString::number(second),
+                    !bounds[first].adjusted(1, 1, -1, -1).intersects(bounds[second].adjusted(1, 1, -1, -1)));
+        const auto status = bounds[0], traffic = bounds[1], sources = bounds[2], diagnosis = bounds[3], connections = bounds[4];
+        if (wide) {
+            const qreal topRatio = status.width() / (status.width() + traffic.width());
+            const qreal bottomRatio = sources.width() / (sources.width() + diagnosis.width());
+            sample.insert("topWidthRatio", topRatio);
+            sample.insert("bottomWidthRatio", bottomRatio);
+            check(caseName + "-top-row-aligned", near(status.top(), traffic.top()) && near(status.height(), traffic.height()));
+            check(caseName + "-top-ratio-five-seven", std::abs(topRatio - 5.0 / 12) < 0.03);
+            check(caseName + "-bottom-ratio-seven-five", std::abs(bottomRatio - 7.0 / 12) < 0.03);
+            check(caseName + "-bottom-stack-matches-source", near(sources.top(), diagnosis.top())
+                && near(sources.bottom(), connections.bottom()) && near(diagnosis.x(), connections.x())
+                && near(diagnosis.width(), connections.width()));
+            const qreal gap = traffic.left() - status.right();
+            check(caseName + "-consistent-gaps", gap > 8 && gap < 25
+                && near(diagnosis.left() - sources.right(), gap) && near(connections.top() - diagnosis.bottom(), gap)
+                && near(sources.top() - status.bottom(), gap));
+            check(caseName + "-same-page-outer-edges", near(status.left(), sources.left()) && near(traffic.right(), diagnosis.right()));
+            check(caseName + "-status-row-has-no-excess-vertical-empty-space", status.height() <= std::max(290.0, scroll->height() * 0.47));
+            check(caseName + "-source-reserves-summary-records", sources.height() >= 326);
+            if (scroll->height() >= 596) {
+                const auto viewport = rect(scroll);
+                check(caseName + "-all-five-cards-fit-current-viewport", std::all_of(bounds.cbegin(), bounds.cend(), [&](const QRectF &card) {
+                    return card.top() >= viewport.top() - 1 && card.bottom() <= viewport.bottom() + 1;
+                }));
+            }
+        } else {
+            for (int index = 1; index < bounds.size(); ++index)
+                check(caseName + "-single-column-order-" + keys[index], bounds[index].top() > bounds[index - 1].bottom()
+                    && near(bounds[index].left(), bounds[0].left()) && near(bounds[index].width(), bounds[0].width()));
+            check(caseName + "-single-column-scrolls", scroll->property("contentHeight").toDouble() > scroll->height());
+        }
+        check(caseName + "-content-height-encloses-last-card", scroll->property("contentHeight").toDouble() + rect(scroll).top() >= bounds[4].bottom() - 1);
+        if (auto *chart = find("activityTrafficChart")) check(caseName + "-trend-chart-remains-readable", chart->height() >= 110 && chart->width() >= 230);
+        layouts.append(sample);
+        screenshot(caseName);
+    };
+    const QSize initialSize = window->size();
+    captureLayout("current-physical-window");
+    if (near(window->width() * window->devicePixelRatio(), 1520, 20) && near(window->devicePixelRatio(), 1.5, 0.05))
+        check("current-1520px-at150pct-is-dual-column", page->property("wide").toBool());
+    window->resize(1100, 760);
+    captureLayout("wide-1100x760");
+    check("wide-1100-window-is-dual-column", page->property("wide").toBool());
+    window->resize(1030, 672);
+    captureLayout("reference-1030x672");
+    check("reference-1030-window-is-dual-column", page->property("wide").toBool());
+    window->resize(1100, window->minimumHeight());
+    captureLayout("short-window");
+    window->resize(760, window->minimumHeight());
+    captureLayout("narrow-window");
+    check("narrow-760-window-is-single-column", !page->property("wide").toBool());
+    window->resize(1100, 760);
+    QTest::qWait(200);
+    const int routeHistory = eval("AppState.historyIndex").toInt();
+    for (int index = 0; index < cards.size(); ++index) {
+        auto *card = cards[index];
+        scrollTo(card);
+        const auto origin = rect(card);
+        clickCard(card);
+        check(keys[index] + "-card-click-immediately-starts-expansion", transition->property("opened").toBool()
+            && transition->property("detailKey").toString() == keys[index]);
+        const auto storedOrigin = transition->mapRectToItem(page, transition->property("origin").toRectF());
+        check(keys[index] + "-expands-from-current-card-geometry", nearRect(storedOrigin, origin, 4));
+        QTest::qWait(90);
+        const qreal openingProgress = transition->property("progress").toDouble();
+        check(keys[index] + "-expansion-has-intermediate-geometry", transition->property("moving").toBool() && openingProgress > 0 && openingProgress < 1);
+        travel.append(QJsonObject{{"detail", keys[index]}, {"phase", "expanding"}, {"progress", openingProgress}, {"surface", rectangle(rect(surface))}});
+        screenshot(keys[index] + "-expanding");
+        check(keys[index] + "-settles-open", settle() && transition->property("progress").toDouble() == 1);
+        const auto destination = transition->mapRectToItem(page, transition->property("destination").toRectF());
+        check(keys[index] + "-fills-current-detail-destination", nearRect(rect(surface), destination));
+        screenshot(keys[index] + "-detail");
+        QTest::keyClick(window, Qt::Key_Escape);
+        QTest::qWait(75);
+        const auto closingProgress = transition->property("progress").toDouble();
+        check(keys[index] + "-escape-starts-visible-contraction", transition->property("moving").toBool() && closingProgress > 0 && closingProgress < 1);
+        travel.append(QJsonObject{{"detail", keys[index]}, {"phase", "contracting-escape"}, {"progress", closingProgress}, {"surface", rectangle(rect(surface))}});
+        screenshot(keys[index] + "-contracting-escape");
+        check(keys[index] + "-returns-without-residual-shield", settle() && !transition->isVisible() && !transition->property("activeDetail").toBool());
+        const auto returnedOrigin = transition->mapRectToItem(page, transition->property("origin").toRectF());
+        check(keys[index] + "-returns-to-current-source-card", nearRect(returnedOrigin, rect(card), 4));
+    }
+    clickCard(cards[1]);
+    QTest::qWait(65);
+    const auto progressBeforeInterrupt = transition->property("progress").toDouble();
+    const auto beforeInterrupt = rect(surface);
+    // QTest::keyClick(QWindow*) processes the event loop after both press and
+    // release. Compare synchronous dispatch so a normal intervening animation
+    // frame is not mistaken for a discontinuity in the reversal itself.
+    QKeyEvent interruptPress(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+    interruptPress.setAccepted(false);
+    QElapsedTimer dispatchTimer;
+    dispatchTimer.start();
+    const bool interruptDelivered = QCoreApplication::sendEvent(window, &interruptPress);
+    const auto afterInterrupt = rect(surface);
+    const auto progressAfterInterrupt = transition->property("progress").toDouble();
+    const double dispatchMilliseconds = dispatchTimer.nsecsElapsed() / 1000000.0;
+    QKeyEvent interruptRelease(QEvent::KeyRelease, Qt::Key_Escape, Qt::NoModifier);
+    QCoreApplication::sendEvent(window, &interruptRelease);
+    travel.append(QJsonObject{{"detail", "traffic"}, {"phase", "synchronous-escape-reversal"},
+        {"dispatchMs", dispatchMilliseconds}, {"delivered", interruptDelivered}, {"accepted", interruptPress.isAccepted()},
+        {"progressBefore", progressBeforeInterrupt}, {"progressAfter", progressAfterInterrupt},
+        {"surfaceBefore", rectangle(beforeInterrupt)}, {"surfaceAfter", rectangle(afterInterrupt)}});
+    check("escape-interrupts-in-progress-expansion-synchronously", interruptDelivered && progressBeforeInterrupt > 0
+        && progressBeforeInterrupt < 1 && !transition->property("opened").toBool() && transition->property("moving").toBool());
+    check("escape-during-expansion-preserves-drawn-geometry", nearRect(beforeInterrupt, afterInterrupt, 5));
+    check("interrupted-expansion-releases-shield", settle() && !transition->isVisible());
+    clickCard(cards[2]);
+    check("resize-case-opens", settle() && transition->property("opened").toBool());
+    window->resize(760, window->minimumHeight());
+    QTest::qWait(200);
+    QTest::keyClick(window, Qt::Key_Escape);
+    check("resize-while-open-returns-without-shield", settle() && !transition->isVisible());
+    const auto resizedOrigin = transition->mapRectToItem(page, transition->property("origin").toRectF());
+    check("resize-while-open-returns-to-new-single-column-position", nearRect(resizedOrigin, rect(cards[2]), 4));
+    window->resize(1100, 760);
+    QTest::qWait(200);
+    clickCard(cards[3]);
+    check("back-button-case-opens", settle());
+    if (auto *back = find("activityDetailBack"))
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, back->mapToScene(QPointF(back->width() / 2, back->height() / 2)).toPoint());
+    check("back-button-contracts-and-releases-shield", settle() && !transition->isVisible());
+    for (int attempt = 0; attempt < 4; ++attempt) {
+        clickCard(cards[attempt]);
+        QTest::qWait(15);
+        QTest::keyClick(window, Qt::Key_Escape);
+        check("rapid-input-return-" + QString::number(attempt), settle() && !transition->isVisible());
+    }
+    close();
+    check("main-route-and-history-preserved", eval("AppState.currentPage==='activity'").toBool() && eval("AppState.historyIndex").toInt() == routeHistory);
+    check("host-system-proxy-unchanged", hostProxyBefore == SystemProxySession::snapshot());
+    window->resize(initialSize);
+    const auto *screen = window->screen();
+    const QJsonObject report{{"schema", 1}, {"source", "live ActivityPage.qml QObject/QQuickItem geometry"},
+        {"qtVersion", QString::fromLatin1(qVersion())}, {"renderer", int(window->rendererInterface()->graphicsApi())},
+        {"nativeD3D11", window->rendererInterface()->graphicsApi() == QSGRendererInterface::Direct3D11},
+        {"dpiMode", nativeDpi ? "Actual Windows display scaling; no Qt scale overrides" : "Qt scale-factor simulation on the current Windows screen"},
+        {"scaleFactorEnvironment", QString::fromUtf8(qgetenv("QT_SCALE_FACTOR"))},
+        {"screenLogicalDpi", screen ? screen->logicalDotsPerInch() : 0},
+        {"screenDevicePixelRatio", screen ? screen->devicePixelRatio() : 0}, {"devicePixelRatio", window->devicePixelRatio()},
+        {"startedAtUtc", QDateTime::currentDateTimeUtc().toString(Qt::ISODate)}, {"checks", checks},
+        {"layouts", layouts}, {"animationSamples", travel}, {"failures", failures}, {"success", failures == 0}};
+    QFile file(directory.filePath("activity-layout-report.json"));
+    if (!file.open(QIODevice::WriteOnly) || file.write(QJsonDocument(report).toJson()) < 0) return 2;
+    return failures == 0 ? 0 : 1;
+}
