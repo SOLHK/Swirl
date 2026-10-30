@@ -19,6 +19,7 @@
 #include <QTcpSocket>
 #include <cmath>
 #include <algorithm>
+#include <array>
 #ifdef Q_OS_WIN
 #include <winsock2.h>
 #include <windows.h>
@@ -28,10 +29,10 @@
 namespace {
 qint64 nowMs(){return QDateTime::currentMSecsSinceEpoch();}
 void add(QJsonObject &o,const QString &key,double value){o[key]=o.value(key).toDouble()+value;}
-void aggregate(QJsonObject &day,const QString &kind,QString key,double up,double down,bool count){
- key=key.left(256);auto group=day.value(kind).toObject();if(!group.contains(key)&&group.size()>=128)key=QStringLiteral("其他（分类上限）");
+void aggregate(QJsonObject &group,QString key,double up,double down,bool count){
+ key=key.left(256);if(!group.contains(key)&&group.size()>=128)key=QStringLiteral("其他（分类上限）");
  auto row=group.value(key).toObject();add(row,"up",up);add(row,"down",down);if(count)add(row,"count",1);
- group[key]=row;day[kind]=group;
+ group[key]=row;
 }
 }
 TelemetryService::TelemetryService(QString path,bool networkMeasurements,QObject *parent):QObject(parent),m_path(path),m_networkEnabled(networkMeasurements){
@@ -93,6 +94,12 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
   add(day,"up",up>=m_lastUp?up-m_lastUp:up);add(day,"down",down>=m_lastDown?down-m_lastDown:down);m_lastUp=up;m_lastDown=down;
   const auto time=QDateTime::fromMSecsSinceEpoch(status.connectionsAt).time();const auto bucketKey=QString::number(time.hour()*2+time.minute()/30);
   auto buckets=day.value("buckets").toObject(),bucket=buckets.value(bucketKey).toObject();bucket["sampled"]=true;add(bucket,"total",totalDelta);
+  const QStringList groupKeys={"apps","domains","devices","nodes","categories","proxyApps","proxyDomains","proxyDevices","proxyNodes"};
+  std::array<QJsonObject,9> groups;std::array<bool,9> touched{};
+  for(int index=0;index<int(groups.size());++index)groups[index]=day.value(groupKeys[index]).toObject();
+  // Keep each group detached for this whole sample. Publishing it back into
+  // day after every connection would copy all its entries on the next write.
+  const auto aggregateGroup=[&](int index,const QString &key,double up,double down,bool count){touched[index]=true;aggregate(groups[index],key,up,down,count);};
   QSet<QString> active;
   for(const auto &value:status.connections){
    auto row=value.toMap();const auto id=row.value("id").toString();if(id.isEmpty()||active.contains(id))continue;active.insert(id);
@@ -103,16 +110,16 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
    const bool count=old.value("accountedDay").toString()!=date;
    const bool proxy=row.value("category").toString()==QStringLiteral("proxy");
    const bool proxyCount=old.value("proxyAccountedDay").toString()!=date;
-   aggregate(day,"apps",row.value("process","未知进程").toString(),du,dd,count);
-   aggregate(day,"domains",row.value("host",row.value("ip")).toString(),du,dd,count);
-   if(!row.value("sourceIp").toString().isEmpty())aggregate(day,"devices",row.value("sourceIp").toString(),du,dd,count);
-   aggregate(day,"nodes",row.value("policy").toString(),du,dd,count);
-   aggregate(day,"categories",row.value("category","other").toString(),du,dd,count);
+   aggregateGroup(0,row.value("process","未知进程").toString(),du,dd,count);
+   aggregateGroup(1,row.value("host",row.value("ip")).toString(),du,dd,count);
+   if(!row.value("sourceIp").toString().isEmpty())aggregateGroup(2,row.value("sourceIp").toString(),du,dd,count);
+   aggregateGroup(3,row.value("policy").toString(),du,dd,count);
+   aggregateGroup(4,row.value("category","other").toString(),du,dd,count);
    if(proxy){
-    aggregate(day,"proxyApps",row.value("process","未知进程").toString(),du,dd,proxyCount);
-    aggregate(day,"proxyDomains",row.value("host",row.value("ip")).toString(),du,dd,proxyCount);
-    if(!row.value("sourceIp").toString().isEmpty())aggregate(day,"proxyDevices",row.value("sourceIp").toString(),du,dd,proxyCount);
-    aggregate(day,"proxyNodes",row.value("policy").toString(),du,dd,proxyCount);
+    aggregateGroup(5,row.value("process","未知进程").toString(),du,dd,proxyCount);
+    aggregateGroup(6,row.value("host",row.value("ip")).toString(),du,dd,proxyCount);
+    if(!row.value("sourceIp").toString().isEmpty())aggregateGroup(7,row.value("sourceIp").toString(),du,dd,proxyCount);
+    aggregateGroup(8,row.value("policy").toString(),du,dd,proxyCount);
     add(bucket,"proxy",du+dd);
     row["proxyAccountedDay"]=date;
    }else if(old.contains("proxyAccountedDay"))row["proxyAccountedDay"]=old.value("proxyAccountedDay");
@@ -122,6 +129,8 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
    row["up"]=formatBytes(u);row["down"]=formatBytes(d);row["time"]=QDateTime::fromString(row.value("time").toString(),Qt::ISODateWithMs).toLocalTime().toString("MM-dd HH:mm:ss");
    m_seen[id]=row;
   }
+  // Untouched groups retain their original missing/empty representation.
+  for(int index=0;index<int(groups.size());++index)if(touched[index])day[groupKeys[index]]=groups[index];
   for(auto it=m_seen.begin();it!=m_seen.end();++it)if(!active.contains(it.key()))(*it)["status"]="已结束";
   while(m_seen.size()>2000){auto oldest=m_seen.end();for(auto it=m_seen.begin();it!=m_seen.end();++it)if(!active.contains(it.key())&&(oldest==m_seen.end()||it->value("lastSeen").toLongLong()<oldest->value("lastSeen").toLongLong()))oldest=it;if(oldest==m_seen.end())break;m_seen.erase(oldest);}
   buckets[bucketKey]=bucket;day["buckets"]=buckets;

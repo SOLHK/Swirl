@@ -29,7 +29,7 @@
 
 int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QString &directory) {
     if(!window||!controller)return 1;
-    QJsonArray checks,captures;int failures=0;
+    QJsonArray checks,captures;QJsonObject minimumDefaultPicker;int failures=0;
     const auto check=[&](bool passed,const QString &name){checks.append(QJsonObject{{"name",name},{"passed",passed}});if(!passed)++failures;qInfo()<<(passed?"PASS":"FAIL")<<name;return passed;};
     std::function<QQuickItem *(QQuickItem *,const QString &)> find;
     find=[&](QQuickItem *parent,const QString &name)->QQuickItem *{if(parent->objectName()==name&&parent->isVisible())return parent;for(auto *child:parent->childItems())if(auto *found=find(child,name))return found;return nullptr;};
@@ -71,7 +71,7 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     };
     const auto fill=[&](const QString &name,const QString &text){auto *field=item(name);if(!check(field!=nullptr,QStringLiteral("Field exists: ")+name))return false;if(!check(std::all_of(text.cbegin(),text.cend(),[](QChar character){return character.unicode()<128;}),QStringLiteral("Keyboard fixture contains only ASCII input")))return false;field->forceActiveFocus();QTest::qWait(45);QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);for(const auto character:text)QTest::keyClick(window,character.toLatin1());return true;};
     auto *proxyBackend=dynamic_cast<PolicySystemProxyBackend *>(controller->systemProxy()->backend());
-    const auto finish=[&]{controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->policyBusy();},10000),QStringLiteral("Owned runtime and transaction finish before cleanup"));if(proxyBackend)check(!proxyBackend->current().owned&&proxyBackend->current().systemEnabled,QStringLiteral("Cleanup preserves the isolated external proxy after releasing only Swirl ownership"));if(!directory.isEmpty()){QDir().mkpath(directory);QFile report(directory+"/policy-ui.json");if(!report.open(QIODevice::WriteOnly))return 3;const QJsonObject proxyEvidence{{"backend",proxyBackend?"per-instance-memory":"missing"},{"takeovers",proxyBackend?proxyBackend->takeoverCalls:0},{"restores",proxyBackend?proxyBackend->restoreCalls:0},{"last_port",proxyBackend?proxyBackend->lastPort:0},{"last_pid",proxyBackend?double(proxyBackend->lastPid):0}};report.write(QJsonDocument(QJsonObject{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"checks",checks},{"captures",captures},{"system_proxy",proxyEvidence},{"failures",failures},{"scope","Isolated real Qt input, committed policy receipts, Rust runtime and controlled loopback peers. System-proxy ownership uses a per-instance in-memory adapter. No private-provider, host proxy, TUN or DNS mutations."}}).toJson());}return failures?2:0;};
+    const auto finish=[&]{controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->policyBusy();},10000),QStringLiteral("Owned runtime and transaction finish before cleanup"));if(proxyBackend)check(!proxyBackend->current().owned&&proxyBackend->current().systemEnabled,QStringLiteral("Cleanup preserves the isolated external proxy after releasing only Swirl ownership"));if(!directory.isEmpty()){QDir().mkpath(directory);QFile report(directory+"/policy-ui.json");if(!report.open(QIODevice::WriteOnly))return 3;const QJsonObject proxyEvidence{{"backend",proxyBackend?"per-instance-memory":"missing"},{"takeovers",proxyBackend?proxyBackend->takeoverCalls:0},{"restores",proxyBackend?proxyBackend->restoreCalls:0},{"last_port",proxyBackend?proxyBackend->lastPort:0},{"last_pid",proxyBackend?double(proxyBackend->lastPid):0}};report.write(QJsonDocument(QJsonObject{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"checks",checks},{"captures",captures},{"minimum_default_picker",minimumDefaultPicker},{"system_proxy",proxyEvidence},{"failures",failures},{"scope","Isolated real Qt input, committed policy receipts, Rust runtime and controlled loopback peers. System-proxy ownership uses a per-instance in-memory adapter. No private-provider, host proxy, TUN or DNS mutations."}}).toJson());}return failures?2:0;};
     if(!check(proxyBackend!=nullptr,QStringLiteral("Policy UI acceptance has a per-instance system-proxy adapter before any user action")))return finish();
     check(proxyBackend->current().systemEnabled&&!proxyBackend->current().owned&&!controller->processAlive(),QStringLiteral("An external proxy starts enabled while Swirl remains stopped and unowned"));
     eval("Theme.reduceMotion=false;Theme.followSystemMotion=false");
@@ -197,8 +197,48 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
         };
         if(choose)inspect(choose);
         const auto contained=[&](QQuickItem *child){return choose&&reachable(child)&&QRectF(QPointF(),choose->size()).adjusted(-0.5,-0.5,0.5,0.5).contains(child->mapRectToItem(choose,QRectF(QPointF(),child->size())));};
-        check(contained(hint)&&!hint->property("truncated").toBool()&&hint->width()+0.5>=hint->implicitWidth()
-              &&contained(chevron)&&chevron->width()>=eval("Theme.cardRadius").toReal(),QStringLiteral("Minimum-size default picker keeps its complete change-exit hint and clear downward arrow inside the clickable row"));
+        // cff01e6 specified a 16dp legibility floor for this 18dp icon.
+        // 39a1b91 accidentally replaced it with the unrelated card-corner token.
+        // Retain that floor and verify the accepted icon's exact square size.
+        const qreal minimumChevron=eval("Theme.dp(16)").toReal(),expectedChevron=eval("Theme.dp(18)").toReal();
+        const bool hintComplete=hint&&hint->property("text").toString()==QStringLiteral("更换出口");
+        const bool hintContained=contained(hint),hintUntruncated=hint&&!hint->property("truncated").toBool();
+        const bool hintWidthFits=hint&&hint->width()+0.5>=hint->implicitWidth();
+        const bool chevronContained=contained(chevron);
+        const bool chevronPointsDown=chevron&&qAbs(chevron->rotation()-90)<0.5;
+        const bool chevronLegible=chevron&&chevron->width()>=minimumChevron;
+        const bool chevronExactSize=chevron&&chevron->width()==expectedChevron&&chevron->height()==expectedChevron;
+        const auto rectEvidence=[](const QRectF &rect){return QJsonObject{{"x",rect.x()},{"y",rect.y()},{"width",rect.width()},{"height",rect.height()}};};
+        const auto geometryEvidence=[&](QQuickItem *candidate){
+            QJsonObject result{{"present",candidate!=nullptr}};
+            if(!candidate)return result;
+            const auto sceneRect=candidate->mapRectToScene(QRectF(QPointF(),candidate->size()));
+            qreal effectiveOpacity=1;QJsonArray ancestorClips;
+            for(auto *ancestor=candidate;ancestor;ancestor=ancestor->parentItem()){
+                effectiveOpacity*=ancestor->opacity();
+                if(ancestor->clip())ancestorClips.append(QJsonObject{{"objectName",ancestor->objectName()},
+                    {"sceneRect",rectEvidence(ancestor->mapRectToScene(QRectF(QPointF(),ancestor->size())))}});
+            }
+            result.insert("width",candidate->width());result.insert("height",candidate->height());
+            result.insert("implicitWidth",candidate->implicitWidth());result.insert("implicitHeight",candidate->implicitHeight());
+            result.insert("rotation",candidate->rotation());result.insert("scale",candidate->scale());
+            result.insert("visible",candidate->isVisible());result.insert("enabled",candidate->isEnabled());
+            result.insert("effectiveOpacity",effectiveOpacity);result.insert("reachable",reachable(candidate));
+            result.insert("sceneRect",rectEvidence(sceneRect));result.insert("ancestorClips",ancestorClips);
+            if(choose)result.insert("rowRect",rectEvidence(candidate->mapRectToItem(choose,QRectF(QPointF(),candidate->size()))));
+            return result;
+        };
+        auto hintEvidence=geometryEvidence(hint);
+        if(hint){hintEvidence.insert("text",hint->property("text").toString());hintEvidence.insert("truncated",hint->property("truncated").toBool());}
+        minimumDefaultPicker={{"windowWidth",window->width()},{"windowHeight",window->height()},{"dpr",window->devicePixelRatio()},
+            {"minimumChevronDp",minimumChevron},{"expectedChevronDp",expectedChevron},{"row",geometryEvidence(choose)},
+            {"hint",hintEvidence},{"chevron",geometryEvidence(chevron)},
+            {"conditions",QJsonObject{{"hintComplete",hintComplete},{"hintContained",hintContained},{"hintUntruncated",hintUntruncated},
+                {"hintWidthFits",hintWidthFits},{"chevronContained",chevronContained},{"chevronPointsDown",chevronPointsDown},
+                {"chevronLegible",chevronLegible},{"chevronExactSize",chevronExactSize}}}};
+        qInfo().noquote()<<"POLICY_MINIMUM_DEFAULT_PICKER"<<QJsonDocument(minimumDefaultPicker).toJson(QJsonDocument::Compact);
+        check(hintComplete&&hintContained&&hintUntruncated&&hintWidthFits&&chevronContained&&chevronPointsDown&&chevronLegible&&chevronExactSize,
+              QStringLiteral("Minimum-size default picker keeps its complete change-exit hint and clear downward arrow inside the clickable row"));
         QTest::mouseMove(window,QPoint(window->width()-10,10));QTest::qWait(150);
         auto *surface=choose?choose->property("background").value<QQuickItem *>():nullptr;
         check(choose&&!choose->property("hovered").toBool()&&surface&&surface->property("color").value<QColor>().alphaF()>0.95,

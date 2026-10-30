@@ -92,13 +92,15 @@ Item {
         previewing=false;flight.stop();withdrawal.stop();
         if(!visible || !windowVisible || !presentationActive || SwirlMotion.reduced || Theme.increaseContrast){settleHidden();return;}
         updateGeometry(true);
+        // An already reached endpoint needs no animation clock: Qt's threaded
+        // render loop also submits frames for animations without visual changes.
         if(active){
             if(progress===0 && release===1)release=0;
-            else {withdrawal.to=0;withdrawal.duration=SwirlMotion.ms(250);withdrawal.start();}
+            else if(release!==0){withdrawal.to=0;withdrawal.duration=SwirlMotion.ms(250);withdrawal.start();}
             if(progress<1){flight.from=progress;flight.to=1;flight.duration=Math.max(1,SwirlMotion.ms(6000*(1-progress)));flight.start();}
-        }else{
+        }else if(release!==1){
             withdrawal.to=1;withdrawal.duration=SwirlMotion.ms(850);withdrawal.start();
-        }
+        }else progress=0;
     }
     onActiveChanged:retarget()
     onVisibleChanged:if(!visible && initialized)settleHidden()

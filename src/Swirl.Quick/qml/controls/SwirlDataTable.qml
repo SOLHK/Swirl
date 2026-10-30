@@ -121,7 +121,7 @@ Item {
         return Theme.dp(column.min||12)+Math.round(flexible*(before+column.w)/totalWidth)-Math.round(flexible*before/totalWidth)
     }
     function chooseRow(row,activate) {
-        if(!row)return
+        if(!row||!row.enabled)return
         if(row.sectionRow){if(activate)sectionActivated(String(row.record.sectionKey));return}
         selectedItem=row
         if(!incrementalRows&&!managedSelection)selectedId=String(row.record.id||row.record.name)
@@ -204,6 +204,9 @@ Item {
                 ScrollBar.vertical:SwirlScrollBar {parent:table;z:11;anchors.right:parent.right;y:table.headerHeight;height:list.height}
                 delegate:Item {
                     id:recordRow
+                    // Removed delegates can remain visible until the next model
+                    // polish. Their retired contexts must not receive input.
+                    enabled:index>=0&&!pooled
                     z:1
                     width:list.width; height:sectionRow?table.sectionHeight:table.itemHeight
                     property var record:table.externalModel!==null||table.incrementalRows?model.entry:modelData

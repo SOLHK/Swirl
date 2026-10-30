@@ -15,6 +15,7 @@
 #include <QUuid>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QFile>
 class PulseEngine final:public ProxyEngine {
 public:
@@ -31,6 +32,102 @@ class TelemetryTests:public QObject {
  Q_OBJECT
  ProxyEngine::Status sample(qint64 time,int up,int down){ProxyEngine::Status s;s.processAlive=true;s.processId=1;s.apiHealthy=true;s.connectionsAt=time;s.trafficAt=time;s.uploadTotal=up;s.downloadTotal=down;s.uploadRate=up;s.downloadRate=down;s.connections={QVariantMap{{"id","connection-a"},{"host","fixture.test"},{"process","fixture.exe"},{"policy","DIRECT"},{"category","direct"},{"uploadBytes",up},{"downloadBytes",down},{"time",QDateTime::fromMSecsSinceEpoch(time).toString(Qt::ISODateWithMs)}}};return s;}
 private slots:
+ void batchedGroupsMatchLegacyAccountingAtCardinalityAndSessionBoundaries(){
+  QTemporaryDir temp;const auto path=temp.filePath("batched-groups.json");TelemetryService model(path,false);
+  const QStringList kinds={"apps","domains","devices","nodes","categories","proxyApps","proxyDomains","proxyDevices","proxyNodes"};
+  // Keep the former per-record algorithm as an independent reference. It
+  // deliberately writes each group back immediately, unlike production's batch.
+  const auto legacyAdd=[](QJsonObject &object,const QString &key,double value){object[key]=object.value(key).toDouble()+value;};
+  const auto legacyAggregate=[&](QJsonObject &day,const QString &kind,QString key,double up,double down,bool count){
+   key=key.left(256);auto group=day.value(kind).toObject();if(!group.contains(key)&&group.size()>=128)key=QStringLiteral("其他（分类上限）");
+   auto row=group.value(key).toObject();legacyAdd(row,"up",up);legacyAdd(row,"down",down);if(count)legacyAdd(row,"count",1);group[key]=row;day[kind]=group;
+  };
+  QSignalSpy changes(&model,&TelemetryService::changed);
+  const auto verify=[&](const ProxyEngine::Status &status){
+   auto expected=model.m_days;auto history=model.m_history;
+   const bool newEpoch=status.processAlive&&model.m_epoch!=QString::number(status.processId)+"/"+status.sessionId;
+   const auto previous=newEpoch?QHash<QString,QVariantMap>():model.m_seen;
+   const auto lastConnections=newEpoch?0:model.m_lastConnections,lastTraffic=newEpoch?0:model.m_lastTraffic;
+   const auto lastUp=newEpoch?0:model.m_lastUp,lastDown=newEpoch?0:model.m_lastDown;
+   const auto date=QDateTime::fromMSecsSinceEpoch(status.connectionsAt).date().toString(Qt::ISODate);
+   if(status.apiHealthy&&status.connectionsAt>lastConnections){
+    auto day=expected.value(date).toObject();if(!day.value("sampled").toBool()&&!day.contains("proxyRankingComplete"))day["proxyRankingComplete"]=true;day["sampled"]=true;
+    const auto up=qMax<qint64>(0,status.uploadTotal),down=qMax<qint64>(0,status.downloadTotal);
+    const auto du=up>=lastUp?up-lastUp:up,dd=down>=lastDown?down-lastDown:down;
+    legacyAdd(day,"up",du);legacyAdd(day,"down",dd);
+    const auto time=QDateTime::fromMSecsSinceEpoch(status.connectionsAt).time();const auto bucketKey=QString::number(time.hour()*2+time.minute()/30);
+    auto buckets=day.value("buckets").toObject(),bucket=buckets.value(bucketKey).toObject();bucket["sampled"]=true;legacyAdd(bucket,"total",du+dd);
+    QSet<QString> seen;
+    for(const auto &value:status.connections){
+     const auto row=value.toMap();const auto id=row.value("id").toString();if(id.isEmpty()||seen.contains(id))continue;seen.insert(id);
+     const auto old=previous.value(id);const auto u=row.value("uploadBytes").toLongLong(),d=row.value("downloadBytes").toLongLong();
+     const auto ou=old.value("uploadBytes").toLongLong(),od=old.value("downloadBytes").toLongLong();
+     const auto rowUp=qMax<qint64>(0,u>=ou?u-ou:u),rowDown=qMax<qint64>(0,d>=od?d-od:d);
+     const bool count=old.value("accountedDay").toString()!=date,proxyCount=old.value("proxyAccountedDay").toString()!=date;
+     legacyAggregate(day,"apps",row.value("process","未知进程").toString(),rowUp,rowDown,count);
+     legacyAggregate(day,"domains",row.value("host",row.value("ip")).toString(),rowUp,rowDown,count);
+     if(!row.value("sourceIp").toString().isEmpty())legacyAggregate(day,"devices",row.value("sourceIp").toString(),rowUp,rowDown,count);
+     legacyAggregate(day,"nodes",row.value("policy").toString(),rowUp,rowDown,count);
+     legacyAggregate(day,"categories",row.value("category","other").toString(),rowUp,rowDown,count);
+     if(row.value("category").toString()=="proxy"){
+      legacyAggregate(day,"proxyApps",row.value("process","未知进程").toString(),rowUp,rowDown,proxyCount);
+      legacyAggregate(day,"proxyDomains",row.value("host",row.value("ip")).toString(),rowUp,rowDown,proxyCount);
+      if(!row.value("sourceIp").toString().isEmpty())legacyAggregate(day,"proxyDevices",row.value("sourceIp").toString(),rowUp,rowDown,proxyCount);
+      legacyAggregate(day,"proxyNodes",row.value("policy").toString(),rowUp,rowDown,proxyCount);legacyAdd(bucket,"proxy",rowUp+rowDown);
+     }
+    }
+    buckets[bucketKey]=bucket;day["buckets"]=buckets;expected[date]=day;
+   }
+   if(status.apiHealthy&&status.trafficAt>lastTraffic)history.append(QVariantMap{{"time",status.trafficAt},{"down",status.downloadRate},{"up",status.uploadRate}});
+   const auto notifications=changes.size();const int revision=model.revision();model.ingest(status);
+   QCOMPARE(changes.size(),notifications+1);QCOMPARE(model.revision(),revision+1);
+   QCOMPARE(model.m_days,expected);QCOMPARE(model.m_history,history);
+   // Public rankings must expose the same complete numeric group values,
+   // including the overflow bucket; the result order is intentionally irrelevant.
+   const int period=QDateTime::fromMSecsSinceEpoch(status.connectionsAt).date()==QDate::currentDate()?0:1;
+   for(const auto &kind:{QString("apps"),QString("domains"),QString("devices"),QString("nodes")})for(bool proxyOnly:{false,true}){
+    const auto groupKey=proxyOnly?QString("proxy")+kind.left(1).toUpper()+kind.mid(1):kind;
+    const auto group=expected.value(date).toObject().value(groupKey).toObject();const auto ranking=model.ranking(kind,period,0,proxyOnly);QCOMPARE(ranking.size(),group.size());
+    for(const auto &value:ranking){const auto row=value.toMap();const auto key=row.value("id").toString();QVERIFY(group.contains(key));const auto entry=group.value(key).toObject();
+     QCOMPARE(row.value("uploadBytes").toDouble(),entry.value("up").toDouble());QCOMPARE(row.value("downloadBytes").toDouble(),entry.value("down").toDouble());QCOMPARE(row.value("connections").toDouble(),entry.value("count").toDouble());
+    }
+   }
+   model.flush();QFile saved(path);QVERIFY(saved.open(QIODevice::ReadOnly));const auto document=QJsonDocument::fromJson(saved.readAll()).object();
+   QCOMPARE(document.value("days").toObject(),expected);QCOMPARE(document.value("history").toArray(),QJsonArray::fromVariantList(history));
+  };
+  const auto yesterday=QDate::currentDate().addDays(-1);const auto firstTime=QDateTime(yesterday,QTime(12,0)).toMSecsSinceEpoch();
+  const auto firstDay=yesterday.toString(Qt::ISODate);model.m_days[firstDay]=QJsonObject{{"devices",QJsonObject{}}};
+  auto status=sample(firstTime,0,0);status.sessionId="batch-reference";status.connections.clear();verify(status);
+  const auto emptyDay=model.m_days.value(firstDay).toObject();QVERIFY(emptyDay.contains("devices"));QVERIFY(emptyDay.value("devices").toObject().isEmpty());
+  for(const auto &kind:kinds)if(kind!="devices")QVERIFY(!emptyDay.contains(kind));
+  const auto record=[&](int index){return QVariantMap{{"id",QString("edge-%1").arg(index)},{"process",QString("process-%1").arg(index)},{"host",QString("host-%1.test").arg(index)},
+   {"sourceIp",QString("2001:db8::%1").arg(index+1,0,16)},{"ip","198.51.100.8"},{"policy",QString("node-%1").arg(index)},{"category","proxy"},{"uploadBytes",index+1},{"downloadBytes",2*index+3},{"time",QDateTime::fromMSecsSinceEpoch(firstTime).toString(Qt::ISODateWithMs)}};};
+  const auto advance=[&](qint64 time){status.connectionsAt=status.trafficAt=time;status.uploadTotal=status.downloadTotal=0;QSet<QString> ids;
+   for(const auto &value:status.connections){const auto row=value.toMap();const auto id=row.value("id").toString();if(id.isEmpty()||ids.contains(id))continue;ids.insert(id);status.uploadTotal+=row.value("uploadBytes").toLongLong();status.downloadTotal+=row.value("downloadBytes").toLongLong();}
+   verify(status);
+  };
+  for(int index=0;index<128;++index)status.connections.append(record(index));advance(firstTime+1000);
+  for(const auto &kind:kinds)if(kind!="categories")QCOMPARE(model.m_days.value(firstDay).toObject().value(kind).toObject().size(),128);
+  status.connections.append(record(128));advance(firstTime+2000);
+  const auto overflow=model.m_days.value(firstDay).toObject().value("apps").toObject();QCOMPARE(overflow.size(),129);
+  QCOMPARE(overflow.value(QStringLiteral("其他（分类上限）")).toObject().value("count").toInt(),1);
+  auto duplicate=record(0);duplicate["process"]="must-not-appear";duplicate["uploadBytes"]=999999;status.connections.append(duplicate);
+  auto invalid=record(999);invalid["id"]="";status.connections.append(invalid);
+  auto noSource=record(129);noSource.remove("sourceIp");noSource.remove("process");noSource.remove("host");noSource["category"]="direct";status.connections.append(noSource);advance(firstTime+3000);
+  const QString longKey(256,QChar(0x4e2d));auto longA=record(2001),longB=record(2002);
+  longA["process"]=longKey+"A";longB["process"]=longKey+"B";longA["category"]=longB["category"]="direct";longA.remove("sourceIp");longB.remove("sourceIp");
+  status.connections={longA,longB};const auto todayTime=QDateTime(QDate::currentDate(),QTime(12,0)).toMSecsSinceEpoch();advance(todayTime);
+  const auto today=QDate::currentDate().toString(Qt::ISODate);const auto todayDay=model.m_days.value(today).toObject();
+  QCOMPARE(todayDay.value("apps").toObject().size(),1);QCOMPARE(todayDay.value("apps").toObject().value(longKey).toObject().value("count").toInt(),2);
+  QVERIFY(!todayDay.contains("devices"));for(const auto &kind:{"proxyApps","proxyDomains","proxyDevices","proxyNodes"})QVERIFY(!todayDay.contains(kind));
+  status.connections.clear();for(int index=0;index<2000;++index){auto row=record(index);if(index%2)row["category"]="direct";if(index%11==0)row.remove("sourceIp");status.connections.append(row);}advance(todayTime+1000);
+  verify(status); // Identical heartbeat retains every value but still publishes.
+  for(auto &value:status.connections){auto row=value.toMap();row["uploadBytes"]=row.value("uploadBytes").toInt()+7;row["downloadBytes"]=row.value("downloadBytes").toInt()+13;value=row;}advance(todayTime+2000);
+  for(auto &value:status.connections){auto row=value.toMap();row["uploadBytes"]=5;row["downloadBytes"]=10;value=row;}advance(todayTime+3000);
+  status.processId=2;status.sessionId="batch-reference-restarted";advance(todayTime+4000);
+  TelemetryService restored(path,false);QCOMPARE(restored.m_days,model.m_days);QCOMPARE(restored.m_history,model.m_history);
+  for(int period=0;period<4;++period){QCOMPARE(restored.summary(period),model.summary(period));QCOMPARE(restored.distribution(period),model.distribution(period));}
+ }
  void completeSourceRankingKeepsRecordedRowsAndNumericBytes(){
   QTemporaryDir directory;const auto path=directory.filePath("ranking.json");QJsonObject domains;
   for(int i=0;i<600;++i)domains.insert(QString("source-%1.test").arg(i),QJsonObject{{"up",i},{"down",i*2},{"count",1}});

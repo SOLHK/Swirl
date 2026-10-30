@@ -214,6 +214,11 @@ int main(int argc, char *argv[])
     }
 #ifdef Q_OS_WIN
     SetCurrentProcessExplicitAppUserModelID(L"SOLHK.Swirl.Desktop");
+    // Keep at most one frame queued for this interactive desktop UI. Qt's
+    // D3D11 backend applies this before creating its waitable swapchain;
+    // vsync and double buffering remain enabled. Honour an explicit override.
+    if (!qEnvironmentVariableIsSet("QT_D3D_MAX_FRAME_LATENCY"))
+        qputenv("QT_D3D_MAX_FRAME_LATENCY", "1");
 #endif
     configureSwirlFontRendering();
     // Keep fractional Windows monitor scale factors (125%, 150%, 175%) intact;

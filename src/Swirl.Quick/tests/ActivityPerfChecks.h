@@ -6,7 +6,8 @@
 static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
     struct Frame {qint64 ns=0;double progress=0;int phase=-1,cycle=-1,kind=0,destination=-1,visibility=0;bool moving=false,opened=false,active=false,exposed=false,visible=false;};
     struct Resources {double cpuMs=0;quint64 privateBytes=0,workingSet=0;};
-    struct Phase {QString name; qint64 start=0,end=0;Resources before,after;int updatesBefore=0,updatesAfter=0,realUpdatesBefore=0,realUpdatesAfter=0;bool dataPulseActive=false;std::array<int,4> rowsBefore{},rowsAfter{},syncBefore{},syncAfter{};};
+    struct Clocks {double weaveProgress=-1,weaveRelease=-1;int registryActive=-1;bool weavePresent=false,weaveMoving=false,weaveActive=false,weavePresentationActive=false;std::array<double,5> cardLift{};std::array<bool,5> cardPresent{},cardHovered{},cardFocused{};};
+    struct Phase {QString name; qint64 start=0,end=0;Resources before,after;Clocks clocksBefore,clocksAfter;int updatesBefore=0,updatesAfter=0,realUpdatesBefore=0,realUpdatesAfter=0;bool dataPulseActive=false;std::array<int,4> rowsBefore{},rowsAfter{},syncBefore{},syncAfter{};};
     struct Update {qint64 start=0,ingestStart=0,end=0,uploadTotal=0,downloadTotal=0;int phase=-1,revisionBefore=0,revisionAfter=0;bool fixtureChanged=false;};
     struct Scroll {qint64 ns=0;double before=0,requested=0,after=0,progress=0,bodyOpacity=0,effectiveOpacity=0;QRectF visibleRect;int phase=-1;bool moving=false,opened=false,returning=false,presented=false,pulseActive=false;};
     const int rowCount=qEnvironmentVariableIsSet("SWIRL_ACTIVITY_PERF_ROWS")?qEnvironmentVariableIntValue("SWIRL_ACTIVITY_PERF_ROWS"):600;
@@ -64,6 +65,20 @@ static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
     auto *scrollViewport=tables[1]?activityVisual(tables[1],"tableRowsViewport"):nullptr;
     auto *detailBody=qvariant_cast<QQuickItem *>(transition->property("bodyItem"));
     check("scroll-observation-uses-real-detail-viewport",scrollViewport&&detailBody);
+    auto *weave=activityVisual(window->contentItem(),"activityCloudKnotWeave");
+    auto *registry=eval(window,"SwirlTransitionRegistry").value<QObject *>();
+    const QStringList cardNames={"activityStatusCard","activityTrafficCard","activitySourcesCard","activityDiagnosticCard","activityConnectionsCard"};
+    std::array<QQuickItem *,5> cards{};bool allCardsPresent=true;for(int index=0;index<int(cards.size());++index){cards[index]=activityVisual(window->contentItem(),cardNames[index]);allCardsPresent=allCardsPresent&&cards[index];}
+    check("phase-clock-observation-uses-real-weave-and-registry",weave&&registry);
+    check("phase-clock-observation-uses-all-five-activity-cards",allCardsPresent);
+    const auto clockSnapshot=[&]{Clocks value;value.weavePresent=weave!=nullptr;
+        if(weave){value.weaveProgress=weave->property("progress").toDouble();value.weaveRelease=weave->property("release").toDouble();value.weaveMoving=weave->property("moving").toBool();value.weaveActive=weave->property("active").toBool();value.weavePresentationActive=weave->property("presentationActive").toBool();}
+        if(registry)value.registryActive=registry->property("activeCount").toInt();
+        for(int index=0;index<int(cards.size());++index)if(auto *card=cards[index]){value.cardPresent[index]=true;value.cardLift[index]=card->property("lift").toDouble();value.cardHovered[index]=card->property("hovered").toBool();value.cardFocused[index]=card->property("focused").toBool();}
+        return value;};
+    const auto warmedClocks=clockSnapshot();
+    check("inactive-overview-has-no-same-endpoint-weave-animation",warmedClocks.weavePresent&&!warmedClocks.weaveActive
+        &&warmedClocks.weaveProgress==0&&warmedClocks.weaveRelease==1&&!warmedClocks.weaveMoving);
     std::vector<Frame> frames(20000);size_t frameCount=0;bool frameOverflow=false;int currentPhase=-1,currentCycle=-1;
     std::array<Phase,12> phases;int phaseCount=0;
     std::array<double,128> ingestTimes{},prepareTimes{};std::array<Update,128> updateSamples{};int updateCount=0,realUpdateCount=0,heartbeatCount=0;bool updateOverflow=false;
@@ -97,9 +112,9 @@ static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
     });
     const auto phase=[&](const QString &name,int duration,const std::function<void()> &work=std::function<void()>()){
         if(timedOut)return;
-        auto &result=phases[phaseCount];currentPhase=phaseCount++;result.name=name;result.start=elapsed.nsecsElapsed();result.before=resources();result.updatesBefore=updateCount;result.realUpdatesBefore=realUpdateCount;result.dataPulseActive=pulse.isActive();result.rowsBefore=rowChanges;result.syncBefore=projections;sample(1);
+        auto &result=phases[phaseCount];currentPhase=phaseCount++;result.name=name;result.clocksBefore=clockSnapshot();result.start=elapsed.nsecsElapsed();result.before=resources();result.updatesBefore=updateCount;result.realUpdatesBefore=realUpdateCount;result.dataPulseActive=pulse.isActive();result.rowsBefore=rowChanges;result.syncBefore=projections;sample(1);
         if(work)work();else activityWait(duration);
-        sample(2);result.after=resources();result.end=elapsed.nsecsElapsed();result.updatesAfter=updateCount;result.realUpdatesAfter=realUpdateCount;result.rowsAfter=rowChanges;result.syncAfter=projections;
+        sample(2);result.after=resources();result.end=elapsed.nsecsElapsed();result.updatesAfter=updateCount;result.realUpdatesAfter=realUpdateCount;result.rowsAfter=rowChanges;result.syncAfter=projections;result.clocksAfter=clockSnapshot();
     };
     phase("quiet-home-cached",2500);
     pulse.start();phase("home-live-cached-details-hidden",3500);
@@ -182,7 +197,10 @@ static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
     check("all-frame-and-update-records-fit-fixed-buffers",!frameOverflow&&!updateOverflow&&!scrollOverflow);
     QJsonArray phaseJson,rawFrames,updates,scrollObservations;
     const auto resourceJson=[](const Resources &value){return QJsonObject{{"cpuMs",value.cpuMs},{"privateBytes",qint64(value.privateBytes)},{"workingSetBytes",qint64(value.workingSet)}};};
-    for(int index=0;index<phaseCount;++index){const auto &value=phases[index];QJsonArray changes,syncs;for(int table=0;table<4;++table){changes.append(value.rowsAfter[table]-value.rowsBefore[table]);syncs.append(value.syncAfter[table]-value.syncBefore[table]);}const double wall=(value.end-value.start)/1000000.0,cpu=value.after.cpuMs-value.before.cpuMs;phaseJson.append(QJsonObject{{"name",value.name},{"startMs",value.start/1000000.0},{"endMs",value.end/1000000.0},{"wallMs",wall},{"processCpuMs",cpu},{"oneCoreCpuPercent",wall>0?cpu/wall*100:0},{"before",resourceJson(value.before)},{"after",resourceJson(value.after)},{"modelUpdates",value.updatesAfter-value.updatesBefore},{"realUpdates",value.realUpdatesAfter-value.realUpdatesBefore},{"dataPulseActive",value.dataPulseActive},{"rowsNotifications",changes},{"modelProjectionSignals",syncs}});}
+    const auto clockJson=[&](const Clocks &value){QJsonArray cardStates;for(int index=0;index<int(cards.size());++index)cardStates.append(QJsonObject{{"name",cardNames[index]},{"present",value.cardPresent[index]},{"lift",value.cardLift[index]},{"hovered",value.cardHovered[index]},{"focused",value.cardFocused[index]}});
+        return QJsonObject{{"weavePresent",value.weavePresent},{"weaveProgress",value.weaveProgress},{"weaveRelease",value.weaveRelease},{"weaveMoving",value.weaveMoving},{"weaveActive",value.weaveActive},{"weavePresentationActive",value.weavePresentationActive},{"registryActive",value.registryActive},{"cards",cardStates}};};
+    for(int index=0;index<phaseCount;++index){const auto &value=phases[index];QJsonArray changes,syncs;for(int table=0;table<4;++table){changes.append(value.rowsAfter[table]-value.rowsBefore[table]);syncs.append(value.syncAfter[table]-value.syncBefore[table]);}const double wall=(value.end-value.start)/1000000.0,cpu=value.after.cpuMs-value.before.cpuMs;
+        phaseJson.append(QJsonObject{{"name",value.name},{"startMs",value.start/1000000.0},{"endMs",value.end/1000000.0},{"wallMs",wall},{"processCpuMs",cpu},{"oneCoreCpuPercent",wall>0?cpu/wall*100:0},{"before",resourceJson(value.before)},{"after",resourceJson(value.after)},{"clocksBefore",clockJson(value.clocksBefore)},{"clocksAfter",clockJson(value.clocksAfter)},{"modelUpdates",value.updatesAfter-value.updatesBefore},{"realUpdates",value.realUpdatesAfter-value.realUpdatesBefore},{"dataPulseActive",value.dataPulseActive},{"rowsNotifications",changes},{"modelProjectionSignals",syncs}});}
     for(size_t index=0;index<frameCount;++index){const auto &frame=frames[index];rawFrames.append(QJsonObject{{"timeMs",frame.ns/1000000.0},{"phase",frame.phase},{"cycle",frame.cycle},{"kind",frame.kind},{"progress",frame.progress},{"moving",frame.moving},{"opened",frame.opened},{"destination",frame.destination},{"active",frame.active},{"exposed",frame.exposed},{"visible",frame.visible},{"visibility",frame.visibility}});}
     for(int index=0;index<updateCount;++index){const auto &value=updateSamples[index];updates.append(QJsonObject{{"index",index},{"timeMs",value.start/1000000.0},{"ingestStartMs",value.ingestStart/1000000.0},{"ingestEndMs",value.end/1000000.0},{"phase",value.phase},{"prepareMs",prepareTimes[index]},{"ingestMs",ingestTimes[index]},{"identicalHeartbeat",index%3==2},{"fixtureChanged",value.fixtureChanged},{"uploadTotal",value.uploadTotal},{"downloadTotal",value.downloadTotal},{"revisionBefore",value.revisionBefore},{"revisionAfter",value.revisionAfter}});}
     for(size_t index=0;index<scrollCount;++index){const auto &value=scrollSamples[index];scrollObservations.append(QJsonObject{{"timeMs",value.ns/1000000.0},{"phase",value.phase},{"before",value.before},{"requested",value.requested},{"after",value.after},{"progress",value.progress},{"moving",value.moving},{"opened",value.opened},{"returning",value.returning},{"bodyOpacity",value.bodyOpacity},{"effectiveOpacity",value.effectiveOpacity},{"visibleRect",QJsonObject{{"x",value.visibleRect.x()},{"y",value.visibleRect.y()},{"width",value.visibleRect.width()},{"height",value.visibleRect.height()}}},{"visibleInWindow",value.presented},{"dataPulseActive",value.pulseActive}});}

@@ -624,8 +624,13 @@ jobs:
               $excludedTests += '|system-proxy-recovery|system-proxy-state|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network'
             }
             $exclude = "^swirl-($excludedTests)$"
-            ctest --test-dir build/swirl-quick -C Release -E $exclude --output-on-failure --no-tests=error --output-junit build-evidence/full-regression.xml
-            if ($LASTEXITCODE -ne 0) { throw "Full regression checks failed ($LASTEXITCODE)." }
+            # CTest changes directory for --test-dir. Keep the report in the
+            # workspace evidence directory that the artifact step uploads.
+            $junit = Join-Path $env:GITHUB_WORKSPACE 'build-evidence/full-regression.xml'
+            ctest --test-dir build/swirl-quick -C Release -E $exclude --output-on-failure --no-tests=error --output-junit $junit
+            $testExit = $LASTEXITCODE
+            if (-not (Test-Path -LiteralPath $junit -PathType Leaf)) { throw 'Full regression JUnit evidence is missing.' }
+            if ($testExit -ne 0) { throw "Full regression checks failed ($testExit)." }
             $regression = 'passed'
           } finally {
             $delivery = Get-Content -LiteralPath 'out/delivery.json' -Raw | ConvertFrom-Json
@@ -718,8 +723,11 @@ jobs:
           # job failed. Successful runs retain their existing regression order.
           # Run the registered drivers with their original environments and
           # timeouts; do not repeat critical checks or write delivery success.
-          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(activity-layout|activity-details|activity-perf-600|activity-perf-2000|window-shadow|policy-ui|liquid-glass)$" --output-on-failure --no-tests=error --output-junit build-evidence/activity-diagnostic-regression.xml
-          if ($LASTEXITCODE -ne 0) { throw "Independent activity diagnostic regression failed ($LASTEXITCODE)." }
+          $junit = Join-Path $env:GITHUB_WORKSPACE 'build-evidence/activity-diagnostic-regression.xml'
+          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(activity-layout|activity-details|activity-perf-600|activity-perf-2000|window-shadow|policy-ui|liquid-glass)$" --output-on-failure --no-tests=error --output-junit $junit
+          $testExit = $LASTEXITCODE
+          if (-not (Test-Path -LiteralPath $junit -PathType Leaf)) { throw 'Independent activity JUnit evidence is missing.' }
+          if ($testExit -ne 0) { throw "Independent activity diagnostic regression failed ($testExit)." }
       - name: Diagnose D3D11 queue latency after an early UI failure
         if: ${{ !cancelled() && failure() && (steps.critical_ui.outcome == 'failure' || steps.overview_input.outcome == 'failure') }}
         shell: pwsh

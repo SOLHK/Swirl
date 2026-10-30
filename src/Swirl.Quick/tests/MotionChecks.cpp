@@ -11,6 +11,7 @@
 #include <QQmlComponent>
 #include <QQmlIncubator>
 #include <QQmlProperty>
+#include <QQmlListReference>
 #include "engine/SystemProxySession.h"
 #include "engine/EngineController.h"
 #include <QDateTime>
@@ -178,30 +179,34 @@ void checkActivityWeaveLayers(QQuickWindow *window,QQuickItem *weave,const QStri
         }
     }
     hideFlight.reset();
-    // Exercise different layer origins without breaking the production anchor
-    // bindings. The copies must remain coincident in window space.
+    // A temporary transform changes the actual scene origin without competing
+    // with anchors.fill's x/y ownership or replacing any existing transforms.
+    // The copies must remain coincident in window space.
     QQmlComponent offsetComponent(qmlEngine(window));
-    offsetComponent.setData(R"(
-        import QtQuick
-        QtObject {
-            required property var layer
-            required property real offsetX
-            required property real offsetY
-            property Binding xOffset: Binding { target: layer; property: "x"; value: offsetX; restoreMode: Binding.RestoreBindingOrValue }
-            property Binding yOffset: Binding { target: layer; property: "y"; value: offsetY; restoreMode: Binding.RestoreBindingOrValue }
-        }
-    )",QUrl());
+    offsetComponent.setData("import QtQuick; Translate {}",QUrl());
     const QPointF originalBackPosition=behind->position();
-    const QPointF offsetBackPosition=originalBackPosition+QPointF(17.25,11.5);
+    const QPointF originalBackOrigin=behind->mapToScene(QPointF());
+    const QPointF offsetBackOrigin=behind->mapToScene(QPointF(17.25,11.5));
+    QQmlListReference backTransforms(behind,"transform");
+    const qsizetype originalTransformCount=backTransforms.count();
     std::unique_ptr<QObject> offset(offsetComponent.createWithInitialProperties(
-        {{"layer",QVariant::fromValue(behind)},{"offsetX",offsetBackPosition.x()},{"offsetY",offsetBackPosition.y()}},qmlContext(window)));
+        {{"x",17.25},{"y",11.5}},qmlContext(window)));
     check("weave-offset-layer-fixture-created",offset!=nullptr);
-    if(offset){
+    const bool offsetAttached=offset&&backTransforms.canAppend()&&backTransforms.append(offset.get());
+    check("weave-offset-transform-attaches-without-replacing-existing-transforms",offsetAttached&&backTransforms.count()==originalTransformCount+1);
+    if(offsetAttached){
         eval("updateGeometry(true)");
-        check("weave-back-layer-really-moves-to-distinct-origin",QLineF(behind->position(),offsetBackPosition).length()<0.001);
+        const auto actualOrigin=behind->mapToScene(QPointF());
+        samples.append(QJsonObject{{"kind","weave-offset-origin"},
+            {"originalX",originalBackOrigin.x()},{"originalY",originalBackOrigin.y()},
+            {"expectedX",offsetBackOrigin.x()},{"expectedY",offsetBackOrigin.y()},
+            {"actualX",actualOrigin.x()},{"actualY",actualOrigin.y()},{"transformsBefore",qint64(originalTransformCount)},
+            {"transformsDuring",qint64(backTransforms.count())}});
+        check("weave-back-layer-really-moves-to-distinct-origin",QLineF(actualOrigin,offsetBackOrigin).length()<0.001);
         check("weave-copies-align-with-distinct-back-layer-origin",matchingCopies());
         offset.reset();eval("updateGeometry(true)");
-        check("weave-back-layer-original-position-restored",QLineF(behind->position(),originalBackPosition).length()<0.001);
+        check("weave-back-layer-original-position-restored",QLineF(behind->position(),originalBackPosition).length()<0.001
+            &&QLineF(behind->mapToScene(QPointF()),originalBackOrigin).length()<0.001&&backTransforms.count()==originalTransformCount);
     }
     eval("previewAt(0.999999,0)");
     QList<QList<QPointF>> before;
@@ -243,7 +248,10 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     struct RestorePolicy{MotionPolicy *policy;~RestorePolicy(){policy->setSystemReducedMotionOverrideForTest(-1);}} restore{policy};
     const auto hostProxyBefore=SystemProxySession::snapshot();
     eval("Theme.reduceMotion=false;Theme.followSystemMotion=false;AppState.navigate('activity')");
-    const QSize initialSize=window->size();window->resize(1100,760);window->requestActivate();activityWait(650);
+    const QSize initialSize=window->size();window->resize(1100,760);window->requestActivate();
+    // Resting layout excludes the accepted hover lift. Use the same neutral
+    // pointer position as ActivityLayoutChecks within the existing settlement.
+    QTest::mouseMove(window,QPoint(1,1));activityWait(650);
     auto *page=activityVisual(window->contentItem(),"activityScroll");page=page?page->parentItem():nullptr;
     auto *transition=activityVisual(window->contentItem(),"activityDetailTransition");
     auto *surface=activityVisual(window->contentItem(),"activityDetailSurface");
@@ -274,6 +282,15 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     auto *statusOverview=activityVisual(window->contentItem(),activityDetailCards[4]);
     check("overview-five-card-grid-is-present",sourceOverview&&diagnosticOverview&&trafficOverview&&connectionOverview&&statusOverview);
     if(sourceOverview&&diagnosticOverview&&trafficOverview&&connectionOverview&&statusOverview){
+        QJsonArray restingCards;
+        for(auto *card:{statusOverview,trafficOverview,sourceOverview,diagnosticOverview,connectionOverview}){
+            const auto rect=bounds(card);
+            restingCards.append(QJsonObject{{"name",card->objectName()},{"x",rect.x()},{"y",rect.y()},
+                {"width",rect.width()},{"height",rect.height()},{"lift",card->property("lift").toDouble()},
+                {"hovered",card->property("hovered").toBool()},{"focused",card->property("focused").toBool()},
+                {"keyboardFocus",card->property("keyboardFocus").toBool()}});
+        }
+        dataSamples.append(QJsonObject{{"phase","overview-grid-resting-baseline"},{"cards",restingCards}});
         const auto source=bounds(sourceOverview),diagnostic=bounds(diagnosticOverview),traffic=bounds(trafficOverview),connections=bounds(connectionOverview),status=bounds(statusOverview);
         check("overview-grid-keeps-top-row-bottom-stack-and-outer-edges-aligned",
             qAbs(status.top()-traffic.top())<1&&qAbs(status.height()-traffic.height())<1
@@ -571,14 +588,30 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
             auto *viewport=table?activityVisual(table,"tableRowsViewport"):nullptr;
             if(!viewport)return false;
             evalOn(table,"positionRow("+quoted(key)+")");
-            QQuickItem *row=nullptr;
+            QPointer<QQuickItem> row;
+            QString candidateKey;int expectedIndex=-1,candidateIndex=-1,rejectedIdentities=0;
             const bool ready=QTest::qWaitFor([&]{
-                const int index=evalOn(table,"rowForKey("+quoted(key)+")").toInt();
-                row=index>=0?qvariant_cast<QQuickItem *>(evalOn(viewport,QString("itemAtIndex(%1)").arg(index))):nullptr;
-                return row&&!visibleBounds(row).isEmpty();
+                expectedIndex=evalOn(table,"rowForKey("+quoted(key)+")").toInt();
+                row=expectedIndex>=0?qvariant_cast<QQuickItem *>(evalOn(viewport,QString("itemAtIndex(%1)").arg(expectedIndex))):nullptr;
+                if(!row)return false;
+                // After a model replacement itemAtIndex can still return an
+                // outgoing delegate until the queued ListView layout runs.
+                // Its presentationKey may already use the new model index;
+                // require the actual record and delegate context to agree.
+                candidateKey=evalOn(row,"String(record && record.id!==undefined ? record.id : '')").toString();
+                candidateIndex=evalOn(row,"index").toInt();
+                const bool identity=candidateKey==key&&candidateIndex==expectedIndex;
+                if(!identity)++rejectedIdentities;
+                return identity&&!row->property("pooled").toBool()&&row->isEnabled()&&!visibleBounds(row).isEmpty();
             },1500);
+            const auto visible=row?visibleBounds(row):QRectF();
+            dataSamples.append(QJsonObject{{"phase","real-record-click-preparation"},{"table",table->objectName()},
+                {"requestedKey",key},{"candidateKey",candidateKey},{"modelIndex",expectedIndex},{"delegateIndex",candidateIndex},
+                {"ready",ready},{"rejectedIdentities",rejectedIdentities},{"pooled",row&&row->property("pooled").toBool()},
+                {"enabled",row&&row->isEnabled()},{"projectionGeneration",table->property("projectionGeneration").toInt()},
+                {"visibleX",visible.x()},{"visibleY",visible.y()},{"visibleWidth",visible.width()},{"visibleHeight",visible.height()}});
             if(!ready)return false;
-            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,visibleBounds(row).center().toPoint());
+            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,visible.center().toPoint());
             return true;
         };
         const auto recordText=[&](QQuickItem *scope,const QString &expected,const QString &model,const QString &phase){
