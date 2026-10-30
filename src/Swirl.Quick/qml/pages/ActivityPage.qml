@@ -14,6 +14,7 @@ Item {
     property Item ribbonBack: page
     property Item ribbonFront: page
     property Item proxyAnchor: null
+    property var toolbarItems: []
     property Item sidebarAnchor: null
     property var wingScene: null
     property bool sceneSettled: true
@@ -69,6 +70,17 @@ Item {
     readonly property bool diagnosticWarning: diagnosticFailures.length > 0
     readonly property string diagnosticSummary: diagnosticWarning ? diagnosticFailures[0] : internetMeasured ? qsTr("HTTPS 完整请求") : telemetry.measurementState || qsTr("尚未检测")
 
+    function preparePreviewState(state) {
+        if (!previewCaptureMode) return
+        const parts = state.split(":")
+        if (parts.length !== 3 || parts[0] !== "weave") return
+        const phase = Number(parts[1]), removal = Number(parts[2])
+        if (!Number.isFinite(phase) || !Number.isFinite(removal)) return
+        // Existing isolated capture mode: inspect artwork without starting a core
+        // or changing any proxy state. Finish the window entrance before posing.
+        if (wingScene) wingScene.finishEntrance()
+        statusWeave.previewAt(Math.max(0,Math.min(1,phase)),Math.max(0,Math.min(1,removal)))
+    }
     function dismissDetail() { return details.closeDetail() }
     function openCard(card, key, title) {
         if (details.activeDetail) return
@@ -429,6 +441,7 @@ Item {
                 cardViewport: scroll
                 behindCards: page.ribbonBack; frontLayer: page.ribbonFront
                 proxyAnchor: page.proxyAnchor; sidebarAnchor: page.sidebarAnchor; wingScene: page.wingScene
+                toolbarItems: page.toolbarItems
                 wide: page.wide; gap: content.gap
                 active: page.proxyOwned && page.runtimeHealthy && !page.engineController.systemProxyStopping
                 presentationActive: page.overviewActive

@@ -13,10 +13,10 @@ Item {
     property real ribbonStrength: 1
     readonly property Item mainWingItem: visual
     function mapWingPoint(target, x, y) { return visual.mapMasterPoint(target, x, y) }
-    function ribbonWaypoints(target, side) {
+    function ribbonWaypoints(target, side, lane) {
         const source = side === "right" ? echo : visual
-        return [source.routePoint(target, "root"), source.routePoint(target, "shoulder"),
-            source.routePoint(target, "tip"), source.routePoint(target, "gap")]
+        return [source.routePoint(target, "root", lane), source.routePoint(target, "shoulder", lane),
+            source.routePoint(target, "tip", lane), source.routePoint(target, "gap", lane)]
     }
     readonly property Item decorationSource: decoration
     // Kept for callers which inspect the material, but the clear sidebar never
@@ -35,6 +35,12 @@ Item {
     property bool firstFramePresented: false
     property real progress: 0
 
+    function finishEntrance() {
+        visibleDelay.stop()
+        entrance.stop()
+        entranceConsumed = true
+        progress = 1
+    }
     function startEntrance() {
         if (!presenting || entranceConsumed) return
         entranceConsumed = true

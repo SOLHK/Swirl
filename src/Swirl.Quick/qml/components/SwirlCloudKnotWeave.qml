@@ -15,6 +15,7 @@ Item {
     required property Item knotTarget
     required property Item cardViewport
     property Item proxyAnchor: null
+    property var toolbarItems: []
     property Item sidebarAnchor: null
     property var wingScene: null
     property bool active: false
@@ -31,39 +32,52 @@ Item {
     readonly property bool moving: flight.running || withdrawal.running
     // Fit the visible cloud, not the old 1024px asset's transparent margins.
     // These coordinates never depend on animation progress.
-    readonly property real pathScale: Math.min(knotRect.width * 0.86 / 718, knotRect.height * 0.76 / 548)
+    readonly property real pathScale: Math.min(knotRect.width * 0.86 / 742, knotRect.height * 0.76 / 572)
     readonly property real pathX: knotRect.x + knotRect.width / 2 - 487 * pathScale
     readonly property real pathY: knotRect.y + knotRect.height / 2 - 544 * pathScale
-    readonly property real strokeWidth: 32 * pathScale
-    readonly property real flightWidth: 25 * pathScale
-    readonly property var cardItems: [connectionItem, transferItem, sourcesItem]
+    readonly property real strokeWidth: 56 * pathScale
+    readonly property real flightWidth: 50 * pathScale
+    readonly property real releaseOpacity: 1 - Knot.phaseEase(0.62,1,release)
+    readonly property var cardItems: [connectionItem, transferItem, sourcesItem, connectionsItem]
     Accessible.ignored: true
 
     function rectFor(item) {
         const p = item.mapToItem(behindCards, 0, 0);
         return Qt.rect(p.x,p.y,item.width,item.height);
     }
+    function titleRectFor(card) {
+        const title = card.titleItem;
+        const p = title.mapToItem(behindCards, title.leftPadding, title.topPadding);
+        return Qt.rect(p.x,p.y,Math.min(title.contentWidth,title.width),title.contentHeight);
+    }
     function updateGeometry() {
         if (!initialized) return;
         knotRect = rectFor(knotTarget);
         viewportRect = rectFor(cardViewport);
-        const cards = {connection:rectFor(connectionItem), traffic:rectFor(transferItem), sources:rectFor(sourcesItem)};
-        const title = transferItem.titleItem;
-        const titleOrigin = title.mapToItem(behindCards, title.leftPadding, title.topPadding);
+        const cards = {connection:rectFor(connectionItem), traffic:rectFor(transferItem), sources:rectFor(sourcesItem), connections:rectFor(connectionsItem)};
         const scene = {
             proxy: proxyAnchor ? rectFor(proxyAnchor) : Qt.rect(cards.connection.x,0,Theme.dp(130),Theme.dp(30)),
             sidebar: sidebarAnchor ? rectFor(sidebarAnchor) : Qt.rect(0,0,Math.max(0,cards.connection.x-gap),behindCards.height),
             viewport: viewportRect,
-            trafficTitle: Qt.rect(titleOrigin.x, titleOrigin.y, Math.min(title.contentWidth, title.width), title.contentHeight),
-            leftWing: wingScene ? wingScene.ribbonWaypoints(behindCards) : [Qt.point(0,height*0.5),Qt.point(gap,height*0.6),Qt.point(gap*2,height*0.5),Qt.point(gap,height*0.4)],
-            rightWing: wingScene ? wingScene.ribbonWaypoints(behindCards, "right") : [Qt.point(width-gap,0),Qt.point(width-gap*2,gap),Qt.point(width-gap*3,gap),Qt.point(width-gap*4,gap)]
+            trafficTitle: titleRectFor(transferItem),
+            sourcesTitle: titleRectFor(sourcesItem),
+            connectionsTitle: titleRectFor(connectionsItem),
+            toolbar: toolbarItems.map(item => rectFor(item))
         };
         const next = {};
         for (let i=0;i<Knot.passages.length;++i) {
             const passage=Knot.passages[i];
+            const right = passage.card === "connection" || passage.card === "diagnostics";
+            const lane = {connections:0,traffic:1,sources:2,connection:0,diagnostics:1}[passage.card];
+            scene.wing = wingScene ? wingScene.ribbonWaypoints(behindCards,right?"right":"left",lane)
+                : [Qt.point(right?width-gap:gap,height*0.5),Qt.point(right?width-gap*2:gap*2,height*0.45),Qt.point(right?width-gap*3:gap*3,height*0.4),Qt.point(right?width-gap*4:gap*4,height*0.35)];
             next[passage.card]=Knot.route(passage,cards,knotRect,Knot.point(pathX,pathY),pathScale,wide,gap,scene);
         }
         routes=next;
+    }
+    function previewAt(phase, removal) {
+        flight.stop(); withdrawal.stop(); updateGeometry();
+        progress=phase; release=removal;
     }
     function settleHidden() {
         flight.stop(); withdrawal.stop();
@@ -79,11 +93,11 @@ Item {
         }
         if (active) {
             withdrawal.to=0; withdrawal.duration=180; withdrawal.start();
-            if (progress<1) { flight.from=progress; flight.to=1; flight.duration=Math.max(1,SwirlMotion.ms(4800*(1-progress))); flight.start(); }
+            if (progress<1) { flight.from=progress; flight.to=1; flight.duration=Math.max(1,SwirlMotion.ms(6000*(1-progress))); flight.start(); }
         } else {
             // Freeze route position and locally release each visible strand.
             // Turning off never races backwards through the whole scene.
-            withdrawal.to=1; withdrawal.duration=180; withdrawal.start();
+            withdrawal.to=1; withdrawal.duration=SwirlMotion.ms(740); withdrawal.start();
         }
     }
     onActiveChanged: retarget()
@@ -103,12 +117,19 @@ Item {
     Component.onCompleted: { initialized=true; settleHidden(); Qt.callLater(updateGeometry); }
     Connections { target: SwirlMotion; function onReducedChanged() { if (SwirlMotion.reduced) weave.retarget(); } }
     Connections { target: Theme; function onUiScaleChanged() { Qt.callLater(weave.updateGeometry); } }
-    Connections {
-        target: weave.transferItem.titleItem
-        function onContentWidthChanged() { Qt.callLater(weave.updateGeometry); }
-        function onContentHeightChanged() { Qt.callLater(weave.updateGeometry); }
-        function onXChanged() { Qt.callLater(weave.updateGeometry); }
-        function onYChanged() { Qt.callLater(weave.updateGeometry); }
+    Repeater {
+        model: weave.toolbarItems
+        delegate: Item {
+            id: toolbarObserver
+            required property var modelData
+            Connections {
+                target: toolbarObserver.modelData
+                function onXChanged() { Qt.callLater(weave.updateGeometry); }
+                function onYChanged() { Qt.callLater(weave.updateGeometry); }
+                function onWidthChanged() { Qt.callLater(weave.updateGeometry); }
+                function onHeightChanged() { Qt.callLater(weave.updateGeometry); }
+            }
+        }
     }
     Connections { target: weave.behindCards; function onWidthChanged() { Qt.callLater(weave.updateGeometry); } function onHeightChanged() { Qt.callLater(weave.updateGeometry); } }
     Connections {
@@ -135,6 +156,13 @@ Item {
                 function onXChanged() { Qt.callLater(weave.updateGeometry); }
                 function onYChanged() { Qt.callLater(weave.updateGeometry); }
             }
+            Connections {
+                target: observer.modelData.titleItem
+                function onContentWidthChanged() { Qt.callLater(weave.updateGeometry); }
+                function onContentHeightChanged() { Qt.callLater(weave.updateGeometry); }
+                function onXChanged() { Qt.callLater(weave.updateGeometry); }
+                function onYChanged() { Qt.callLater(weave.updateGeometry); }
+            }
         }
     }
     NumberAnimation {
@@ -150,7 +178,7 @@ Item {
         id: backView; parent: weave.behindCards
         width: parent.width; height: parent.height
         visible: weave.visible && weave.release<1
-        opacity: weave.opacity*(1-weave.release)
+        opacity: weave.opacity*weave.releaseOpacity
     }
     Item {
         id: frontView; parent: weave.frontLayer
@@ -171,9 +199,9 @@ Item {
             id: strand
             required property var modelData
             readonly property var route: weave.routes[modelData.card] || null
-            readonly property real head: route ? Knot.head(weave.progress,modelData.card,route) : 0
-            readonly property real baseTail: route ? Knot.tail(weave.progress,modelData.card,route,head) : 0
-            readonly property real tail: baseTail+(head-baseTail)*weave.release*0.75
+            readonly property real baseHead: route ? Knot.head(weave.progress,modelData.card,route) : 0
+            readonly property real tail: route ? Knot.tail(weave.progress,modelData.card,route,baseHead) : 0
+            readonly property real head: baseHead-(baseHead-tail)*Knot.closePhase(weave.release,modelData.card)
             readonly property color ink: Theme.increaseContrast?Theme.text:modelData.ink
             readonly property rect aperture: route ? Qt.rect(route.aperture.x,route.aperture.y,route.aperture.width,route.aperture.height) : Qt.rect(0,0,0,0)
             RibbonStroke {
@@ -181,8 +209,9 @@ Item {
                 parent: backView; width: parent.width; height: parent.height
                 guide: strand.route?strand.route.guide:""; ink: strand.ink; ribbonWidth: weave.flightWidth
                 trimStart: strand.tail; trimEnd: strand.route ? Math.min(strand.head, strand.route.join) : 0
-                broadening: 0.18
-                settlement: 0.65
+                broadening: 0.35 * (1-Knot.phaseEase(0.12,0.30,weave.progress))
+                settlement: 0.3 + 0.35*Knot.phaseEase(0.09,0.23,weave.progress)
+                featherTexture: Theme.increaseContrast?0:1; textureOrigin: strand.route?strand.route.join:0
             }
             Item {
                 parent: frontView
@@ -196,7 +225,8 @@ Item {
                     width: backView.width; height: backView.height
                     guide: strand.route?strand.route.guide:""; ink: strand.ink; ribbonWidth: weave.flightWidth
                     trimStart: strand.tail; trimEnd: strand.route ? Math.min(strand.head, strand.route.join) : 0
-                    broadening: 0.18; settlement: 0.65
+                    broadening: 0; settlement: 0.65
+                    featherTexture: Theme.increaseContrast?0:1; textureOrigin: strand.route?strand.route.join:0
                 }
             }
             RibbonStroke {
@@ -208,6 +238,8 @@ Item {
                 ribbonWidth: weave.strokeWidth
                 trimStart: strand.tail; trimEnd: strand.head
                 settlement: 1
+                featherTexture: Theme.increaseContrast?0:1
+                textureOrigin: strand.route?strand.route.join:0
             }
         }
     }
@@ -219,14 +251,15 @@ Item {
             required property var modelData
             readonly property var passage: Knot.passages[modelData.passage]
             readonly property var route: weave.routes[passage.card] || null
-            readonly property real head: route?Knot.head(weave.progress,passage.card,route):0
-            readonly property real baseTail: route?Knot.tail(weave.progress,passage.card,route,head):0
-            readonly property real start: route?Math.max(route.join+modelData.start*(1-route.join),baseTail+(head-baseTail)*weave.release*0.75):0
+            readonly property real baseHead: route?Knot.head(weave.progress,passage.card,route):0
+            readonly property real baseTail: route?Knot.tail(weave.progress,passage.card,route,baseHead):0
+            readonly property real head: baseHead-(baseHead-baseTail)*Knot.closePhase(weave.release,passage.card)
+            readonly property real start: route?Math.max(route.join+modelData.start*(1-route.join),baseTail):0
             readonly property real end: route?Math.min(route.join+modelData.end*(1-route.join),head):0
             x: -weave.knotRect.x; y: -weave.knotRect.y
             width: frontView.width; height: frontView.height; visible:end>start
             RibbonStroke { anchors.fill:parent; guide:crossing.route?crossing.route.guide:""; ribbonWidth:weave.strokeWidth * 1.5; ink:Theme.independentCard; trimStart:crossing.start; trimEnd:crossing.end; settlement:1 }
-            RibbonStroke { anchors.fill:parent; guide:crossing.route?crossing.route.guide:""; ribbonWidth:weave.strokeWidth; ink:Theme.increaseContrast?Theme.text:crossing.passage.ink; trimStart:crossing.start; trimEnd:crossing.end; settlement:1 }
+            RibbonStroke { anchors.fill:parent; guide:crossing.route?crossing.route.guide:""; ribbonWidth:weave.strokeWidth; ink:Theme.increaseContrast?Theme.text:crossing.passage.ink; trimStart:crossing.start; trimEnd:crossing.end; settlement:1; featherTexture:Theme.increaseContrast?0:1; textureOrigin:crossing.route?crossing.route.join:0; capStart:crossing.baseTail; capEnd:crossing.head }
         }
     }
 }
