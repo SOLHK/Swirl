@@ -503,6 +503,13 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
   set_tests_properties(swirl-policy-ui PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE
    ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;SWIRL_TEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/policy-ui-store"
    ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  # Cover the existing cross-theme five-card and native window-state driver,
+  # which otherwise remains reachable only through an environment flag.
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/liquid-glass-store")
+  add_test(NAME swirl-liquid-glass COMMAND Swirl --motion-test --motion-output=liquid-glass-evidence)
+  set_tests_properties(swirl-liquid-glass PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE
+   ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;SWIRL_LIQUID_GLASS_CHECKS=1;SWIRL_TEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/liquid-glass-store"
+   ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
   add_test(NAME swirl-apec-glass COMMAND Swirl --motion-test --motion-output=apec-glass-report.json)
   set_tests_properties(swirl-apec-glass PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE
    ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;SWIRL_APEC_GLASS_CHECKS=1"

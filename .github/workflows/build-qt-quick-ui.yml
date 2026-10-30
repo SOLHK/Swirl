@@ -94,6 +94,9 @@ jobs:
           python tools/tests/test_openssl_runtime.py --scratch-root "$env:RUNNER_TEMP/swirl-openssl-boundary-tests"
           if ($LASTEXITCODE -ne 0) { throw 'TLS source/receipt boundary checks failed.' }
           ./scripts/tests/Test-RustProductPackagePolicy.ps1
+      - name: Check package path policy with Windows PowerShell 5.1
+        shell: powershell
+        run: ./scripts/tests/Test-RustProductPackagePolicy.ps1
       - name: Restore isolated Qt 6.12 SDK archives
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
@@ -172,6 +175,19 @@ jobs:
         run: |
           . ./scripts/BuildInputTimes.ps1
           Sync-SwirlBuildInputTimes -RepositoryRoot $env:GITHUB_WORKSPACE -BuildDirectory (Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick') -Restore
+      - name: Discard restored test evidence before compiling this checkout
+        shell: pwsh
+        run: |
+          # Compiler caches can include captures and logs from their source run.
+          # Clear these before configure/build, so even a compiler failure cannot
+          # upload old tests as evidence for the current source identity.
+          foreach ($directory in @('hero-evidence','navigation-evidence','settings-material-evidence','policy-evidence','activity-layout','liquid-glass-evidence')) {
+            Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $directory) -Recurse -Force -ErrorAction SilentlyContinue
+          }
+          foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt')) {
+            Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $file) -Force -ErrorAction SilentlyContinue
+          }
+          Get-ChildItem -Path 'build/swirl-quick/*-report.json','build/swirl-quick/activity-feather-*.png','build/swirl-quick/Release/Swirl-*.txt' -File -ErrorAction SilentlyContinue | Remove-Item -Force
       - name: Configure Qt UI independently
         shell: pwsh
         run: |
@@ -256,13 +272,6 @@ jobs:
       - name: Critical UI startup, rendering and interaction checks
         shell: pwsh
         run: |
-          # Compiler caches contain binaries and may also contain old test
-          # captures. Remove evidence before execution so every uploaded image
-          # and report belongs to this checkout, including on failure paths.
-          foreach ($directory in @('hero-evidence','navigation-evidence','settings-material-evidence','policy-evidence','activity-layout')) {
-            Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $directory) -Recurse -Force -ErrorAction SilentlyContinue
-          }
-          Get-ChildItem -Path 'build/swirl-quick/*-report.json','build/swirl-quick/activity-feather-*.png','build/swirl-quick/Release/Swirl-*.txt' -File -ErrorAction SilentlyContinue | Remove-Item -Force
           # Run affected UI checks before packaging. The remaining registered suite
           # runs after the test installer is uploaded; these names are excluded there
           # so a required check is never repeated just to change stage ordering.
@@ -638,6 +647,7 @@ jobs:
             build/swirl-quick/activity-feather-*.png
             build/swirl-quick/activity-layout/
             build/swirl-quick/policy-evidence/
+            build/swirl-quick/liquid-glass-evidence/
             build-evidence/production-ui/
             build/swirl-quick/hero-evidence/
             build/swirl-quick/navigation-evidence/

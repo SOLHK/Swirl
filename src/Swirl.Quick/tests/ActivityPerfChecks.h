@@ -94,7 +94,18 @@ static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
     pulse.stop();phase("quiet-home-after-live",2500);
     QObject::disconnect(frameConnection);watchdog.stop();
     const auto finalResources=resources();
-    check("home-device-count-preserved",eval(window,"pageLoader.item.activeDeviceCount===64").toBool());
+    // The five-card page reads its native telemetry directly. Verify the
+    // service and the visible fact instead of the removed page-level alias.
+    auto *connectionsCard=activityVisual(window->contentItem(),"activityConnectionsCard");
+    QQuickItem *deviceFact=nullptr;int deviceFacts=0;
+    if(connectionsCard)for(auto *candidate:connectionsCard->findChildren<QObject *>()){
+        if(candidate->property("caption").toString()==QStringLiteral("非本机来源")){
+            deviceFact=qobject_cast<QQuickItem *>(candidate);++deviceFacts;
+        }
+    }
+    check("home-device-count-preserved",telemetry->activeDevices()==64&&deviceFacts==1&&deviceFact
+        &&deviceFact->isVisible()&&deviceFact->opacity()>0&&deviceFact->property("value").isValid()
+        &&deviceFact->property("value").toString()==QStringLiteral("64"));
     open(0);activityWait(350);
     auto *sourcePage=tables[0]?tables[0]->parent():nullptr;while(sourcePage&&sourcePage->metaObject()->indexOfProperty("sourceRows")<0)sourcePage=sourcePage->parent();
     double sourceTotal=0;for(const auto &value:telemetry->ranking("apps",0,0))sourceTotal+=value.toMap().value("total").toDouble();

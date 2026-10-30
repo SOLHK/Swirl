@@ -322,14 +322,20 @@ Item {
     const auto wingState=[&](QQuickItem *visual){
         QVariantList state;
         if(!visual)return state;
+        bool visualTransformValid=false;
+        const auto visualTransform=visual->itemTransform(window->contentItem(),&visualTransformValid);
+        if(!visualTransformValid)return state;
         state.append(visual->opacity());state.append(visual->scale());state.append(visual->rotation());
         state.append(visual->property("progress"));
-        state.append(QVariant::fromValue(visual->itemTransform(window->contentItem(), nullptr)));
+        state.append(QVariant::fromValue(visualTransform));
         for(int i=0;i<visual->property("featherCount").toInt();++i){
             auto *feather=findVisual(visual,"wingFeather"+QString::number(i));
             if(!feather)return QVariantList();
+            bool featherTransformValid=false;
+            const auto featherTransform=feather->itemTransform(visual,&featherTransformValid);
+            if(!featherTransformValid)return QVariantList();
             state.append(feather->opacity());state.append(feather->property("reveal"));
-            state.append(QVariant::fromValue(feather->itemTransform(visual, nullptr)));
+            state.append(QVariant::fromValue(featherTransform));
         }
         return state;
     };
@@ -339,8 +345,10 @@ Item {
         if(count<=0)return false;
         for(int i=0;i<count;++i){
             auto *feather=findVisual(visual,"wingFeather"+QString::number(i));
-            if(!feather||feather->property("reveal").toDouble()!=1||feather->opacity()!=1
-                ||!feather->itemTransform(feather->parentItem(), nullptr).isIdentity())return false;
+            if(!feather||feather->property("reveal").toDouble()!=1||feather->opacity()!=1)return false;
+            bool localTransformValid=false;
+            const auto localTransform=feather->itemTransform(feather->parentItem(),&localTransformValid);
+            if(!localTransformValid||!localTransform.isIdentity())return false;
             int gradients=0;
             for(auto *object:feather->findChildren<QObject *>()){
                 auto *gradient=object->property("fillGradient").value<QObject *>();
