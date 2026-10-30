@@ -270,6 +270,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $testFontDir | Out-Null
           Get-ChildItem -LiteralPath $fontDir -File | Copy-Item -Destination $testFontDir -Force
       - name: Critical UI startup, rendering and interaction checks
+        id: critical_ui
         shell: pwsh
         run: |
           # Run affected UI checks before packaging. The remaining registered suite
@@ -286,6 +287,7 @@ jobs:
           }
       - name: Overview input checks against deployed Qt runtime
         id: overview_input
+        if: ${{ !cancelled() && (success() || steps.critical_ui.outcome == 'failure') }}
         shell: pwsh
         run: |
           $env:QT_QPA_PLATFORM = "offscreen"
@@ -708,16 +710,30 @@ jobs:
             $delivery | Add-Member -NotePropertyName activity_dpr_simulation -NotePropertyValue $matrixResult -Force
             $delivery | ConvertTo-Json | Set-Content -LiteralPath 'out/delivery.json' -Encoding utf8
           }
-      - name: Preserve independent activity regression after overview input failure
-        if: ${{ failure() && steps.overview_input.outcome == 'failure' }}
+      - name: Preserve independent activity regression after an early UI failure
+        if: ${{ !cancelled() && failure() && (steps.critical_ui.outcome == 'failure' || steps.overview_input.outcome == 'failure') }}
         shell: pwsh
         run: |
-          # Diagnostic coverage only: the earlier failed input check keeps this
+          # Diagnostic coverage only: the earlier failed UI check keeps this
           # job failed. Successful runs retain their existing regression order.
           # Run the registered drivers with their original environments and
           # timeouts; do not repeat critical checks or write delivery success.
           ctest --test-dir build/swirl-quick -C Release -R "^swirl-(activity-layout|activity-details|activity-perf-600|activity-perf-2000|window-shadow|policy-ui|liquid-glass)$" --output-on-failure --no-tests=error --output-junit build-evidence/activity-diagnostic-regression.xml
           if ($LASTEXITCODE -ne 0) { throw "Independent activity diagnostic regression failed ($LASTEXITCODE)." }
+      - name: Diagnose D3D11 queue latency after an early UI failure
+        if: ${{ !cancelled() && failure() && (steps.critical_ui.outcome == 'failure' || steps.overview_input.outcome == 'failure') }}
+        shell: pwsh
+        run: |
+          # Both isolated cold-cache cases retain every original Appearance
+          # assertion. Neither result replaces the failed critical gate.
+          ./scripts/Test-QtD3D11FrameLatency.ps1 `
+            -RepositoryRoot "$env:GITHUB_WORKSPACE" `
+            -RuntimeDirectory 'dist' `
+            -ReferenceExecutable 'build/swirl-quick/Release/Swirl.exe' `
+            -OutputDirectory 'build-evidence/d3d11-frame-latency' `
+            -ScratchRoot "$env:RUNNER_TEMP" `
+            -WorkflowSha "$env:GITHUB_SHA" `
+            -PullRequestHeadSha '${{ github.event.pull_request.head.sha }}'
       - name: Upload engine and scoped regression evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -728,6 +744,7 @@ jobs:
             build-evidence/full-regression.xml
             build-evidence/overview-input.log
             build-evidence/activity-diagnostic-regression.xml
+            build-evidence/d3d11-frame-latency/
             build/swirl-quick/engine-contract.txt
             build/swirl-quick/engine-real.txt
             build/swirl-quick/node-chain.txt

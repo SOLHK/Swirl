@@ -33,6 +33,77 @@
 #include <chrono>
 #include <functional>
 #include <memory>
+#include <QSGRendererInterface>
+#ifdef Q_OS_WIN
+#include <private/qrhid3d11_p.h>
+#endif
+
+static QJsonObject appearanceSwapChainProbe(QQuickWindow *window) {
+    QJsonObject result{{"scope","read-only normal-frame barrier before timed input"}};
+#ifdef Q_OS_WIN
+    result.insert("platformSupported",true);
+    auto *renderer=window->rendererInterface();
+    result.insert("rendererInterfacePresent",renderer!=nullptr);
+    if(!renderer)return result;
+    result.insert("graphicsApi",int(renderer->graphicsApi()));
+    const bool d3d11=renderer->graphicsApi()==QSGRendererInterface::Direct3D11;
+    result.insert("d3d11",d3d11);
+    if(!d3d11)return result;
+    // Qt 6.12 QRhiSwapChain has no nativeHandles() API. Reuse the same
+    // version-locked GuiPrivate backend type as the existing Hero checks.
+    // The caller runs on the render thread; retain only values, not pointers.
+    auto *rhiChain=static_cast<QRhiSwapChain *>(renderer->getResource(window,QSGRendererInterface::RhiSwapchainResource));
+    result.insert("rhiSwapchainPresent",rhiChain!=nullptr);
+    if(!rhiChain)return result;
+    auto *chain=static_cast<QD3D11SwapChain *>(rhiChain);
+    result.insert("qtSwapInterval",qint64(chain->swapInterval));
+    result.insert("qtSwapchainFlags",qint64(chain->swapChainFlags));
+    result.insert("qtFrameLatencyWaitableObjectPresent",chain->frameLatencyWaitableObject!=nullptr);
+    result.insert("dxgiSwapchainPresent",chain->swapChain!=nullptr);
+    if(!chain->swapChain)return result;
+    const auto hresult=[](HRESULT value){
+        return QJsonObject{{"hresult",QStringLiteral("0x")+QString::number(quint32(value),16).rightJustified(8,QLatin1Char('0'))},
+            {"succeeded",SUCCEEDED(value)}};
+    };
+    DXGI_SWAP_CHAIN_DESC desc{};
+    const HRESULT descStatus=chain->swapChain->GetDesc(&desc);
+    auto description=hresult(descStatus);
+    if(SUCCEEDED(descStatus)){
+        description.insert("flags",qint64(desc.Flags));
+        description.insert("bufferCount",qint64(desc.BufferCount));
+        description.insert("swapEffect",int(desc.SwapEffect));
+        description.insert("frameLatencyWaitableFlag",bool(desc.Flags&DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT));
+    }
+    result.insert("getDesc",description);
+    IDXGISwapChain2 *queriedChain=nullptr;
+    const HRESULT interfaceStatus=chain->swapChain->QueryInterface(__uuidof(IDXGISwapChain2),reinterpret_cast<void **>(&queriedChain));
+    auto release=[](IDXGISwapChain2 *value){if(value)value->Release();};
+    const std::unique_ptr<IDXGISwapChain2,decltype(release)> nativeChain(queriedChain,release);
+    auto query=hresult(interfaceStatus);
+    query.insert("interfacePresent",nativeChain!=nullptr);
+    result.insert("queryInterfaceSwapChain2",query);
+    if(FAILED(interfaceStatus)||!nativeChain)return result;
+    UINT maximumFrameLatency=0;
+    const HRESULT latencyStatus=nativeChain->GetMaximumFrameLatency(&maximumFrameLatency);
+    auto latency=hresult(latencyStatus);
+    if(SUCCEEDED(latencyStatus))latency.insert("frames",qint64(maximumFrameLatency));
+    result.insert("getMaximumFrameLatency",latency);
+    DXGI_SWAP_CHAIN_DESC1 desc1{};
+    const HRESULT desc1Status=nativeChain->GetDesc1(&desc1);
+    auto description1=hresult(desc1Status);
+    if(SUCCEEDED(desc1Status)){
+        description1.insert("flags",qint64(desc1.Flags));
+        description1.insert("bufferCount",qint64(desc1.BufferCount));
+        description1.insert("swapEffect",int(desc1.SwapEffect));
+        description1.insert("frameLatencyWaitableFlag",bool(desc1.Flags&DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT));
+    }
+    result.insert("getDesc1",description1);
+#else
+    Q_UNUSED(window);
+    result.insert("platformSupported",false);
+#endif
+    return result;
+}
 
 int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
     if(!window)return 2;
@@ -181,16 +252,18 @@ Item {
                             bool armed=false,pending=false,retired=false;
                             quint64 frame=0,ignoredSwaps=0;
                             qreal synchronizedMs=-1,swappedMs=-1;
+                            QJsonObject swapchainProbe;
                         };
                         auto normalFrame=std::make_shared<NormalFrameBarrier>();
                         bool readbackRetired=false;
                         {
                             QObject readbackContext;
-                            const auto readbackSync=QObject::connect(window,&QQuickWindow::beforeSynchronizing,&readbackContext,[normalFrame]{
+                            const auto readbackSync=QObject::connect(window,&QQuickWindow::beforeSynchronizing,&readbackContext,[normalFrame,window]{
                                 QMutexLocker lock(&normalFrame->mutex);
                                 if(!normalFrame->armed||normalFrame->retired)return;
                                 ++normalFrame->frame;normalFrame->pending=true;
                                 normalFrame->synchronizedMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-normalFrame->start).count();
+                                if(normalFrame->swapchainProbe.isEmpty())normalFrame->swapchainProbe=appearanceSwapChainProbe(window);
                             },Qt::DirectConnection);
                             const auto readbackFrame=QObject::connect(window,&QQuickWindow::frameSwapped,&readbackContext,[normalFrame]{
                                 QMutexLocker lock(&normalFrame->mutex);
@@ -211,7 +284,8 @@ Item {
                             qInfo().noquote()<<"CONTROL_PRESS_NORMAL_FRAME"<<theme<<name<<QJsonDocument(QJsonObject{
                                 {"retired",normalFrame->retired},{"frame",qint64(normalFrame->frame)},
                                 {"ignoredUnpairedSwaps",qint64(normalFrame->ignoredSwaps)},
-                                {"synchronizedMs",normalFrame->synchronizedMs},{"swappedMs",normalFrame->swappedMs}}).toJson(QJsonDocument::Compact);
+                                {"synchronizedMs",normalFrame->synchronizedMs},{"swappedMs",normalFrame->swappedMs},
+                                {"swapchainProbe",normalFrame->swapchainProbe}}).toJson(QJsonDocument::Compact);
                         }
                         const auto at=control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint();
                         const auto hovered=paint->property("color").value<QColor>();

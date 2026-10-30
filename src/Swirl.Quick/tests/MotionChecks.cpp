@@ -32,6 +32,7 @@
 #include <QSGRendererInterface>
 #include <QScreen>
 #include <QKeyEvent>
+#include <QHostAddress>
 #include <QWheelEvent>
 #include <algorithm>
 #include <functional>
@@ -531,28 +532,101 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     if(controller){
         // Reserved-address records enter the actual isolated model. They are
         // controlled rendering/filter fixtures, never measured network results.
+        const QString ipv6Source=QStringLiteral("2001:db8:abcd:0012:0000:0000:0000:0042");
+        const QString ipv6Target=QStringLiteral("2001:db8:85a3:0000:0000:8a2e:0370:7334");
+        const QString canonicalIpv6Target=QHostAddress(ipv6Target).toString();
+        const QString longPolicy=QString::fromUtf8("活动详情受控长策略 — a deliberately long regional policy label retained through telemetry aggregation, filtering and selection");
+        const QString longProxyNode=QString::fromUtf8("新加坡实验性 IEPL 专线 — a deliberately long recorded proxy node name that must survive telemetry selection and detail rendering intact");
         ProxyEngine::Status fixture;fixture.processAlive=true;fixture.apiHealthy=true;fixture.processId=1;
         fixture.connectionsAt=fixture.trafficAt=QDateTime::currentMSecsSinceEpoch();
         for(int row=0;row<600;++row){
             const int down=row==1?1024*1024:row==2?950*1024:1000+row;
             const int up=10+row;
             fixture.uploadTotal+=up;fixture.downloadTotal+=down;
-            fixture.connections.append(QVariantMap{{"id",QString("activity-fixture-%1").arg(row)},{"host",QString("source-%1.example.test").arg(row,4,10,QChar('0'))},
-                {"process",QString("fixture-%1.exe").arg(row,4,10,QChar('0'))},{"ip","198.51.100.8"},{"port",443},{"sourceIp","192.0.2.10"},{"sourcePort",40000+row},
+            QVariantMap record{{"id",QString("activity-fixture-%1").arg(row)},{"host",QString("source-%1.example.test").arg(row,4,10,QChar('0'))},
+                {"process",QString("fixture-%1.exe").arg(row,4,10,QChar('0'))},{"ip",row<2?ipv6Target:QStringLiteral("198.51.100.8")},{"port",443},{"sourceIp",row<2?ipv6Source:QStringLiteral("192.0.2.10")},{"sourcePort",40000+row},
                 {"protocol",row%2?"tcp":"udp"},{"category",row%2?"proxy":"direct"},{"policy",row%2?"fixture-proxy":"DIRECT"},
-                {"uploadBytes",up},{"downloadBytes",down},{"time",QDateTime::fromMSecsSinceEpoch(fixture.connectionsAt).toString(Qt::ISODateWithMs)}});
+                {"uploadBytes",up},{"downloadBytes",down},{"time",QDateTime::fromMSecsSinceEpoch(fixture.connectionsAt).toString(Qt::ISODateWithMs)}};
+            if(row==0)record["route"]=QVariantMap{{"mode","direct"},{"tier",0},{"leaf_node_id","SWIRL_V2_DIRECT"},
+                {"chosen_ip",ipv6Target},{"revision","1"},{"generation","1"}};
+            if(row==1){record["policy"]=longPolicy;record["proxyNode"]=longProxyNode;record["rule"]="MATCH";record["outbound"]="PROXY";}
+            fixture.connections.append(record);
         }
         controller->telemetry()->ingest(fixture);
-        check("visible-home-counts-follow-initial-native-data",homeCountsMatch(600,600,1));
+        check("visible-home-counts-follow-initial-native-data",homeCountsMatch(600,600,2));
         click(activityDetailButtons[0]);settled();activityWait(350);
         const auto owner=[&](QObject *control,const char *property){while(control&&control->metaObject()->indexOfProperty(property)<0)control=control->parent();return control;};
         const auto evalOn=[&](QObject *target,const QString &code){if(!target)return QVariant();QQmlExpression expression(qmlContext(target),target,code);auto result=expression.evaluate();if(expression.hasError()){qWarning()<<expression.error();check("detail-expression: "+expression.error().toString(),false);}return result;};
+        const auto quoted=[](const QString &text){const auto json=QString::fromUtf8(QJsonDocument(QJsonArray{text}).toJson(QJsonDocument::Compact));return json.mid(1,json.size()-2);};
+        const auto visibleBounds=[&](QQuickItem *item){
+            if(!item||!window->isVisible()||!window->isExposed())return QRectF();
+            auto visible=bounds(item).intersected(QRectF(QPointF(),window->size()));
+            for(auto *ancestor=item;ancestor;ancestor=ancestor->parentItem()){
+                if(!ancestor->isVisible()||ancestor->opacity()<=0)return QRectF();
+                if(ancestor->clip())visible=visible.intersected(bounds(ancestor));
+            }
+            return visible;
+        };
+        const auto selectRecord=[&](QQuickItem *table,const QString &key){
+            auto *viewport=table?activityVisual(table,"tableRowsViewport"):nullptr;
+            if(!viewport)return false;
+            evalOn(table,"positionRow("+quoted(key)+")");
+            QQuickItem *row=nullptr;
+            const bool ready=QTest::qWaitFor([&]{
+                const int index=evalOn(table,"rowForKey("+quoted(key)+")").toInt();
+                row=index>=0?qvariant_cast<QQuickItem *>(evalOn(viewport,QString("itemAtIndex(%1)").arg(index))):nullptr;
+                return row&&!visibleBounds(row).isEmpty();
+            },1500);
+            if(!ready)return false;
+            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,visibleBounds(row).center().toPoint());
+            return true;
+        };
+        const auto recordText=[&](QQuickItem *scope,const QString &expected,const QString &model,const QString &phase){
+            QPointer<QQuickItem> text=scope?activityVisual(scope,"activitySourceSelectedName"):nullptr;
+            if(text&&text->property("text").toString()!=expected)text=nullptr;
+            if(!text&&scope)for(auto *candidate:scope->findChildren<QQuickItem *>()){
+                if(candidate->metaObject()->indexOfProperty("truncated")>=0&&candidate->property("text").toString()==expected){text=candidate;break;}
+            }
+            if(text)for(auto *ancestor=text->parentItem();ancestor;ancestor=ancestor->parentItem()){
+                if(ancestor->metaObject()->indexOfProperty("contentY")<0||ancestor->metaObject()->indexOfProperty("contentHeight")<0)continue;
+                const double first=ancestor->property("originY").toDouble();
+                const double last=first+qMax(0.0,ancestor->property("contentHeight").toDouble()-ancestor->height());
+                const double position=ancestor->property("contentY").toDouble()+text->mapToItem(ancestor,QPointF()).y();
+                ancestor->setProperty("contentY",qBound(first,position-qMax(0.0,(ancestor->height()-text->height())/2),last));
+            }
+            const bool shown=text&&QTest::qWaitFor([&]{return text&&!visibleBounds(text).isEmpty();},1500);
+            const auto rect=text?bounds(text):QRectF(),visible=text?visibleBounds(text):QRectF();
+            const auto geometry=[](const QRectF &value){return QJsonObject{{"x",value.x()},{"y",value.y()},{"width",value.width()},{"height",value.height()}};};
+            const bool complete=shown&&text&&!text->property("truncated").toBool()&&visible.width()+1>=rect.width();
+            dataSamples.append(QJsonObject{{"phase",phase},{"expected",expected},{"model",model},
+                {"displayed",text?text->property("text").toString():QString()},{"bounds",geometry(rect)},
+                {"visibleBounds",geometry(visible)},{"fullyReadableHorizontally",complete},{"visible",shown},
+                {"truncated",text?text->property("truncated").toBool():true}});
+            return complete&&model==expected&&text->property("text").toString()==expected;
+        };
         auto *sourceSearch=activityVisual(window->contentItem(),"activitySourcesSearch");
         auto *sourceSort=activityVisual(window->contentItem(),"activitySourcesSort");
         auto *sources=owner(sourceSearch,"kindIndex");
         auto *sourceTable=activityVisual(window->contentItem(),"activitySourcesTable");
         check("sources-search-sort-and-reused-table-present",sourceSearch&&sourceSort&&sources&&sourceTable);
         if(sourceSearch&&sourceSort&&sources&&sourceTable){
+            sources->setProperty("kindIndex",1);sources->setProperty("period",0);sources->setProperty("proxyOnly",false);
+            sourceSearch->setProperty("text",ipv6Source);QMetaObject::invokeMethod(sources,"refreshSnapshot");
+            check("ipv6-device-source-retains-two-real-connections-and-byte-totals",evalOn(sources,
+                "visibleRows.length===1 && visibleRows[0].name==="+quoted(ipv6Source)+" && visibleRows[0].connections===2 && visibleRows[0].uploadBytes===21 && visibleRows[0].downloadBytes===1049576").toBool());
+            check("ipv6-device-source-is-selected-through-its-real-row",selectRecord(sourceTable,"devices:"+ipv6Source)
+                &&sources->property("selectedId").toString()=="devices:"+ipv6Source);
+            check("ipv6-device-source-selected-text-matches-native-model",recordText(qobject_cast<QQuickItem *>(sources),ipv6Source,
+                evalOn(sources,"selected ? selected.displayName : ''").toString(),"ipv6-source-selected-text"));
+            sources->setProperty("kindIndex",3);sourceSearch->setProperty("text",longPolicy);QMetaObject::invokeMethod(sources,"refreshSnapshot");
+            check("long-policy-source-retains-real-connection-and-byte-totals",evalOn(sources,
+                "visibleRows.length===1 && visibleRows[0].name==="+quoted(longPolicy)+" && visibleRows[0].connections===1 && visibleRows[0].uploadBytes===11 && visibleRows[0].downloadBytes===1048576").toBool());
+            check("long-policy-source-is-selected-through-its-real-row",selectRecord(sourceTable,"nodes:"+longPolicy)
+                &&sources->property("selectedId").toString()=="nodes:"+longPolicy);
+            check("long-policy-source-selected-text-matches-native-model",recordText(qobject_cast<QQuickItem *>(sources),longPolicy,
+                evalOn(sources,"selected ? selected.displayName : ''").toString(),"long-policy-source-selected-text"));
+            sources->setProperty("selectedId",QString());sources->setProperty("pendingSelectionId",QString());
+            sourceSearch->setProperty("text",QString());evalOn(sourceTable,"scrollToBeginning()");
             sources->setProperty("kindIndex",2);sources->setProperty("period",0);sources->setProperty("proxyOnly",false);QMetaObject::invokeMethod(sources,"refreshSnapshot");activityWait(100);
             check("sources-details-preserve-all-retained-classifications-and-overflow",evalOn(sources,"sourceRows.length===129 && visibleRows.length===129 && sourceRows.some(row=>row.name==='其他（分类上限）' && row.connections===472)").toBool());
             sourceSearch->setProperty("text","source-0001");
@@ -601,10 +675,10 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
         auto otherDevice=countFixture.connections[598].toMap();otherDevice["sourceIp"]="192.0.2.11";countFixture.connections[598]=otherDevice;
         countFixture.connectionsAt+=1000;countFixture.trafficAt=countFixture.connectionsAt;controller->telemetry()->ingest(countFixture);activityWait(350);
         close();
-        check("return-refreshes-native-connection-process-device-counts",homeCountsMatch(599,599,2));
+        check("return-refreshes-native-connection-process-device-counts",homeCountsMatch(599,599,3));
         check("return-refreshes-overview-summary",qAbs(eval("pageLoader.item.totals.total").toDouble()-double(fixture.uploadTotal+fixture.downloadTotal))<0.01);
         fixture.connectionsAt=countFixture.connectionsAt+1;fixture.trafficAt=fixture.connectionsAt;controller->telemetry()->ingest(fixture);
-        check("visible-home-counts-follow-reopened-connection",homeCountsMatch(600,600,1));
+        check("visible-home-counts-follow-reopened-connection",homeCountsMatch(600,600,2));
         click(activityDetailButtons[3]);settled();
         auto *connectionSearch=activityVisual(window->contentItem(),"activityConnectionSearch");
         auto *connectionSort=activityVisual(window->contentItem(),"activityConnectionSort");
@@ -615,7 +689,9 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
         check("connection-search-protocol-status-sort-and-table-present",connectionSearch&&connectionSort&&connectionProtocol&&connectionStatus&&connectionPage&&connectionTable);
         if(connectionSearch&&connectionSort&&connectionProtocol&&connectionStatus&&connectionPage&&connectionTable){
             connectionSearch->setProperty("text","192.0.2.10");
-            check("connections-searches-source-address",evalOn(connectionPage,"visibleRows.length===600").toBool());
+            check("connections-searches-source-address",evalOn(connectionPage,"visibleRows.length===598").toBool());
+            connectionSearch->setProperty("text",ipv6Source);
+            check("connections-searches-real-ipv6-source-address",evalOn(connectionPage,"visibleRows.length===2 && visibleRows.every(row=>row.sourceIp==="+quoted(ipv6Source)+")").toBool());
             connectionSearch->setProperty("text","fixture-0002.exe");
             check("connections-searches-process",evalOn(connectionPage,"visibleRows.length===1 && visibleRows[0].id==='activity-fixture-2'").toBool());
             connectionSearch->setProperty("text",QString());connectionSort->setProperty("currentIndex",2);
@@ -628,6 +704,41 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
             check("connections-status-filter-uses-actual-field",evalOn(connectionPage,"visibleRows.length===600 && visibleRows.every(row=>row.status==='活动')").toBool());
             connectionStatus->setProperty("currentIndex",0);activityWait(80);
             check("large-connection-table-virtualizes-delegates",connectionTable->property("renderedRows").toInt()>0&&connectionTable->property("renderedRows").toInt()<80&&connectionTable->property("incrementalRows").toBool());
+            QQuickItem *lastSelectedDetail=nullptr;
+            for(int row=0;row<2;++row){
+                const QString id=QString("activity-fixture-%1").arg(row);
+                QVariantMap nativeRecord;for(const auto &value:controller->telemetry()->connections())if(value.toMap().value("id").toString()==id){nativeRecord=value.toMap();break;}
+                check("ipv6-connection-native-record-preserves-fixture-"+QString::number(row),nativeRecord.value("sourceIp").toString()==ipv6Source
+                    &&nativeRecord.value("ip").toString()==ipv6Target&&(row?nativeRecord.value("proxyNode").toString()==longProxyNode:
+                        nativeRecord.value("route").toMap().value("chosen_ip").toString()==canonicalIpv6Target));
+                connectionSearch->setProperty("text",QString("fixture-%1.exe").arg(row,4,10,QChar('0')));
+                check("ipv6-connection-is-selected-through-its-real-row-"+QString::number(row),selectRecord(connectionTable,id)
+                    &&connectionPage->property("selectedId").toString()==id);
+                QQuickItem *detail=nullptr;
+                for(auto *candidate:connectionPage->findChildren<QQuickItem *>())if(candidate->metaObject()->indexOfProperty("detailOpen")>=0
+                    &&qvariant_cast<QQuickItem *>(candidate->property("sourceViewport"))==connectionTable){detail=candidate;break;}
+                lastSelectedDetail=detail;
+                const bool ready=detail&&QTest::qWaitFor([&]{return detail->property("detailOpen").toBool()&&!detail->property("moving").toBool()&&!visibleBounds(detail).isEmpty();},2000);
+                check("ipv6-connection-selected-detail-is-visible-"+QString::number(row),ready);
+                dataSamples.append(QJsonObject{{"phase","ipv6-selected-native-record-"+QString::number(row)},
+                    {"expectedRecord",QJsonObject::fromVariantMap(fixture.connections[row].toMap())},
+                    {"telemetryRecord",QJsonObject::fromVariantMap(nativeRecord)},
+                    {"selectedViewRecord",QJsonDocument::fromJson(evalOn(connectionPage,"JSON.stringify(selected||{})").toString().toUtf8()).object()},
+                    {"detailVisible",ready}});
+                const auto field=[&](const QString &label){return evalOn(connectionPage,"(connectionDetailRows.find(row=>row[0]==="+quoted(label)+")||[])[1]").toString();};
+                const auto target=row?ipv6Target:canonicalIpv6Target;
+                check("ipv6-connection-source-text-matches-native-model-"+QString::number(row),recordText(detail,ipv6Source,field(QStringLiteral("来源地址")),"ipv6-connection-source-"+QString::number(row)));
+                check("ipv6-connection-target-text-matches-native-model-"+QString::number(row),recordText(detail,target,field(QStringLiteral("目标")),"ipv6-connection-target-"+QString::number(row)));
+                if(row){
+                    check("long-policy-connection-text-matches-native-model",nativeRecord.value("policy").toString()==longPolicy
+                        &&recordText(detail,longPolicy,field(QStringLiteral("匹配策略")),"long-policy-connection-detail"));
+                    check("long-proxy-node-connection-text-matches-native-model",recordText(detail,longProxyNode,field(QStringLiteral("代理节点")),"long-proxy-node-connection-detail"));
+                }
+            }
+            eval("AppState.detailOpen=false");
+            check("ipv6-connection-detail-releases-before-card-return",lastSelectedDetail
+                &&QTest::qWaitFor([&]{return !lastSelectedDetail->property("moving").toBool()&&!lastSelectedDetail->property("detailOpen").toBool();},2000));
+            connectionSearch->setProperty("text",QString());connectionPage->setProperty("selectedId",QString());
         }
         close();
         controller->telemetry()->ingest({});
@@ -1412,16 +1523,23 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             const double progressAfterReverse=activityTransition->property("progress").toDouble();
             const bool openedAfterReverse=activityTransition->property("opened").toBool();
             const bool movingAfterReverse=activityTransition->property("moving").toBool();
-            check("activity-transfer-escape-preserves-the-in-flight-geometry",partial>0&&partial<1
+            // Capture the assertion now, but keep the diagnostic file's
+            // synchronous open/write/close outside the response sample.
+            const bool escapeGeometryContinuous=partial>0&&partial<1
                 &&!activityTransition->property("opened").toBool()&&activityTransition->property("moving").toBool()
                 &&QLineF(beforeReverse.topLeft(),afterReverse.topLeft()).length()<.01
-                &&qAbs(beforeReverse.width()-afterReverse.width())<.01&&qAbs(beforeReverse.height()-afterReverse.height())<.01);
+                &&qAbs(beforeReverse.width()-afterReverse.width())<.01&&qAbs(beforeReverse.height()-afterReverse.height())<.01;
             QKeyEvent escapeRelease(QEvent::KeyRelease,Qt::Key_Escape,Qt::NoModifier);
             escapeRelease.setAccepted(false);
             const bool escapeReleaseDelivered=QCoreApplication::sendEvent(window,&escapeRelease);
+            const auto reverseWaitStartedNs=escapeDispatch.nsecsElapsed();
             wait(25);
-            check("activity-transfer-escape-reverses-live-progress",activityTransition->property("progress").toDouble()<partial
-                &&activityTransition->property("progress").toDouble()>0&&activityTransition->property("moving").toBool());
+            const auto reverseWaitFinishedNs=escapeDispatch.nsecsElapsed();
+            const double observedProgress=activityTransition->property("progress").toDouble();
+            const bool observedMoving=activityTransition->property("moving").toBool();
+            const bool observedOpened=activityTransition->property("opened").toBool();
+            check("activity-transfer-escape-preserves-the-in-flight-geometry",escapeGeometryContinuous);
+            check("activity-transfer-escape-reverses-live-progress",observedProgress<partial&&observedProgress>0&&observedMoving);
             check("activity-transfer-return-restores-scroll-and-focus",QTest::qWaitFor([&]{return !activityTransition->property("moving").toBool();},2000)
                 &&item()==activity&&!activityTransition->isVisible()&&trafficCard->hasActiveFocus()
                 &&qAbs(activityScroll->property("contentY").toDouble()-activityScrollBefore)<1);
@@ -1431,9 +1549,12 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
                 {"progressBefore",partial},{"progressAfter",progressAfterReverse},
                 {"openedBefore",openedBeforeReverse},{"openedAfter",openedAfterReverse},
                 {"movingBefore",movingBeforeReverse},{"movingAfter",movingAfterReverse},
+                {"observedProgress",observedProgress},{"observedMoving",observedMoving},{"observedOpened",observedOpened},
+                {"actualWaitMs",(reverseWaitFinishedNs-reverseWaitStartedNs)/1000000.0},{"msSinceEscapePress",reverseWaitFinishedNs/1000000.0},
                 {"topLeftDistance",QLineF(beforeReverse.topLeft(),afterReverse.topLeft()).length()},
                 {"widthDifference",afterReverse.width()-beforeReverse.width()},{"heightDifference",afterReverse.height()-beforeReverse.height()},
                 {"dispatchMs",escapeDispatchMs},{"sendEventReturned",escapeDelivered},{"sendEventAccepted",escapePress.isAccepted()},
+                {"qsgRenderLoopEnvironment",QString::fromUtf8(qgetenv("QSG_RENDER_LOOP"))},
                 {"releaseSendEventReturned",escapeReleaseDelivered},{"releaseAccepted",escapeRelease.isAccepted()},
                 {"method","Geometry sampled in one GUI call stack across synchronous Escape KeyPress delivery to the actual QQuickWindow and its event filters; the paired KeyRelease follows the geometry sample."}};
             qInfo().noquote()<<"MOTION_ACTIVITY_ESCAPE_CONTINUITY"<<QJsonDocument(activityEscapeContinuity).toJson(QJsonDocument::Compact);
