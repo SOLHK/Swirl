@@ -25,6 +25,12 @@ Item {
     property bool errorDetailsRequested: false
     property string errorDetailsText: ""
     readonly property bool detailOpen: details.activeDetail
+    readonly property bool overviewActive: visible && !detailOpen
+    onOverviewActiveChanged: if (overviewActive) {
+        snapshotDirty = true
+        refreshSnapshot()
+        network = systemProvider.currentNetwork()
+    }
     property var visitedDetails: ({})
     property var pendingSourceRow: null
     function dismissDetail() { return details.closeDetail() }
@@ -46,18 +52,11 @@ Item {
     readonly property bool internetMeasured: /^\d+ ms$/.test(internetLatency)
     readonly property string emptyRanksText: trafficKind === 1 && !proxyRanksAvailable
         ? "此时段的代理来源尚无可核验的分类记录" : "暂无已采集的流量来源"
-    readonly property int activeDeviceCount: {
-        const addresses = new Set()
-        for (const row of telemetry.connections) {
-            if (row.status !== "活动" || !row.sourceIp || row.sourceIp === "127.0.0.1" || row.sourceIp === "::1") continue
-            addresses.add(row.sourceIp)
-        }
-        return addresses.size
-    }
+    readonly property int activeDeviceCount: telemetry.activeDevices
     readonly property int dhcpDeviceCount: gatewayProvider.devices.filter(row => row.status === "租用中").length
 
     function refreshSnapshot() {
-        if (!visible) return
+        if (!overviewActive) return
         const range = period === 0 ? 0 : 3
         totals = telemetry.summary(range)
         distribution = telemetry.distribution(range)
@@ -108,8 +107,8 @@ Item {
     onRankingKindChanged: { snapshotDirty = true; refreshSnapshot() }
     Component.onCompleted: refreshSnapshot()
     Connections { target: page.telemetry; function onChanged() { page.snapshotDirty = true } }
-    Timer { interval: 300; running: page.visible && page.snapshotDirty; repeat: true; onTriggered: page.refreshSnapshot() }
-    Timer { interval: 10000; running: page.visible; repeat: true; onTriggered: page.network = page.systemProvider.currentNetwork() }
+    Timer { interval: 300; running: page.overviewActive && page.snapshotDirty; repeat: true; onTriggered: page.refreshSnapshot() }
+    Timer { interval: 10000; running: page.overviewActive; repeat: true; onTriggered: page.network = page.systemProvider.currentNetwork() }
 
     readonly property bool proxyOwned: engineController.systemProxy.owned && engineController.systemProxy.enabled && engineController.processAlive
     readonly property string proxyError: engineController.systemProxy.stateReadError || engineController.systemProxy.error || engineController.routingError || engineController.policyError || (engineController.errorCode !== "None" ? engineController.error : "")
@@ -332,6 +331,7 @@ Item {
                         id: sourcesSection; objectName: "activitySourceSection"
                         anchors.fill: parent; anchors.margins: Theme.dp(14); spacing: Theme.dp(8)
                         GridLayout {
+                            z: 1
                             Layout.fillWidth: true; columns: page.compact ? 1 : 2; columnSpacing: Theme.dp(8); rowSpacing: Theme.dp(6)
                             Item {
                                 Layout.fillWidth: true; Layout.minimumWidth: sourcesHeading.implicitWidth

@@ -13,13 +13,16 @@ Item {
     readonly property var telemetry: engineController.telemetry
     property var network: ({})
     readonly property bool measuring: telemetry.measurementState === "正在测量"
-    readonly property var internet: telemetry.internetDiagnostic
-    readonly property var proxy: telemetry.proxyDiagnostic
+    property bool componentReady: false
+    property var diagnosticSnapshot: ({internet: {}, proxy: {}, latencies: {}})
+    property string diagnosticSignature: ""
+    readonly property var internet: diagnosticSnapshot.internet
+    readonly property var proxy: diagnosticSnapshot.proxy
     readonly property var checks: [
-        {name: qsTr("HTTPS 请求"), key: "internet", description: qsTr("包含连接、TLS 与目标响应的完整请求耗时"), result: internet},
-        {name: qsTr("默认网关"), key: "router", description: qsTr("网关 ICMP 响应耗时；未响应不等同于无法联网"), result: ({})},
-        {name: qsTr("DNS 查询"), key: "dns", description: qsTr("系统解析器的实际 DNS 查询耗时"), result: ({})},
-        {name: qsTr("代理请求"), key: "proxy", description: qsTr("当前 Rust 出站至响应首部；与完整 HTTPS 请求分别采样"), result: proxy}
+        {name: qsTr("HTTPS 请求"), key: "internet", description: qsTr("包含连接、TLS 与目标响应的完整请求耗时")},
+        {name: qsTr("默认网关"), key: "router", description: qsTr("网关 ICMP 响应耗时；未响应不等同于无法联网")},
+        {name: qsTr("DNS 查询"), key: "dns", description: qsTr("系统解析器的实际 DNS 查询耗时")},
+        {name: qsTr("代理请求"), key: "proxy", description: qsTr("当前 Rust 出站至响应首部；与完整 HTTPS 请求分别采样")}
     ]
     readonly property var detailFacts: {
         const rows = []
@@ -47,7 +50,7 @@ Item {
         if (key === "metricType" && value === "http_headers") return qsTr("至 HTTP 响应首部")
         return String(value)
     }
-    function valueFor(key) { return telemetry.latencies[key] || qsTr("尚未测量") }
+    function valueFor(key) { return diagnosticSnapshot.latencies[key] || qsTr("尚未测量") }
     function phaseFor(key, result) {
         const value = valueFor(key)
         if (result.code === "measuring" || value === "测量中" || value === "正在检测" || value.includes("进行中")) return "pending"
@@ -63,8 +66,17 @@ Item {
         return valueFor(key)
     }
     function refreshNetwork() { network = systemProvider.currentNetwork() }
-    onVisibleChanged: if (visible) refreshNetwork()
-    Component.onCompleted: refreshNetwork()
+    function refreshSnapshot() {
+        if (!componentReady || !visible) return
+        const snapshot = {internet: telemetry.internetDiagnostic, proxy: telemetry.proxyDiagnostic, latencies: telemetry.latencies}
+        const signature = JSON.stringify(snapshot)
+        if (signature === diagnosticSignature) return
+        diagnosticSignature = signature
+        diagnosticSnapshot = snapshot
+    }
+    onVisibleChanged: if (visible) { refreshNetwork(); refreshSnapshot() }
+    Component.onCompleted: { componentReady = true; refreshNetwork(); refreshSnapshot() }
+    Connections { target: page.telemetry; function onChanged() { page.refreshSnapshot() } }
     Timer { interval: 10000; running: page.visible; repeat: true; onTriggered: page.refreshNetwork() }
 
     ScrollView {
@@ -100,7 +112,8 @@ Item {
                     SwirlGlassPanel {
                         id: checkCard
                         required property var modelData
-                        readonly property string phase: page.phaseFor(modelData.key, modelData.result)
+                        readonly property var result: modelData.key === "internet" ? page.internet : modelData.key === "proxy" ? page.proxy : ({})
+                        readonly property string phase: page.phaseFor(modelData.key, result)
                         Layout.fillWidth: true; Layout.minimumWidth: 0
                         Layout.preferredHeight: checkContent.implicitHeight + Theme.dp(28)
                         cornerRadius: Theme.dp(22)
@@ -111,7 +124,7 @@ Item {
                                 Layout.fillWidth: true
                                 SwirlText { text: checkCard.modelData.name; font.pixelSize: Theme.fontSize(14); font.weight: Font.DemiBold; color: Theme.text; Layout.fillWidth: true }
                                 SwirlStatusBadge {
-                                    label: page.statusLabel(checkCard.modelData.key, checkCard.modelData.result)
+                                    label: page.statusLabel(checkCard.modelData.key, checkCard.result)
                                     tone: checkCard.phase === "pending" ? "accent" : checkCard.phase
                                     busy: checkCard.phase === "pending"
                                 }

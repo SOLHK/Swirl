@@ -343,6 +343,34 @@ private slots:
   proxy.close();model.m_measurements=1;model.measureHttp("internet",QUrl("http://fixture.invalid/proxy"),true);
   QTRY_COMPARE(model.m_measurements,0);QCOMPARE(model.internetDiagnostic().value("code").toString(),QString("proxy-port"));
  }
+ void periodCacheSurvivesStatusOnlyUpdatesAndExpiresWithHistory(){
+  QTemporaryDir temp;TelemetryService model(temp.filePath("cache-lifetime.json"),false);
+  auto status=sample(QDateTime::currentMSecsSinceEpoch(),10,20);model.ingest(status);
+  for(int period=0;period<4;++period)model.summary(period);
+  const auto cached=model.m_periodCache;QCOMPARE(cached.size(),4);
+  QSignalSpy changed(&model,&TelemetryService::changed);
+  model.ingest(status);QCOMPARE(changed.size(),1);QCOMPARE(model.m_periodCache,cached);
+  model.recordInternetResult(QNetworkReply::NoError,204,false,25);model.publish();
+  QCOMPARE(changed.size(),2);QCOMPARE(model.m_periodCache,cached);
+  QVERIFY(model.internetDiagnostic().value("success").toBool());QCOMPARE(model.summary().value("total").toInt(),30);
+  status.trafficAt=QDateTime::currentMSecsSinceEpoch()-7000;model.ingest(status);
+  QVERIFY(!model.sampled());QCOMPARE(model.m_periodCache,cached);QCOMPARE(model.summary().value("total").toInt(),30);
+  status=sample(status.connectionsAt+1000,20,40);model.ingest(status);
+  QVERIFY(model.m_periodCache.isEmpty());QCOMPARE(model.summary().value("total").toInt(),60);
+  const auto current=model.m_periodCache;
+  status.processAlive=false;status.apiHealthy=false;model.ingest(status);
+  QVERIFY(!model.sampled());QCOMPARE(model.m_periodCache,current);QCOMPARE(model.summary().value("total").toInt(),60);
+  QCOMPARE(model.ranking("apps").first().toMap().value("speed").toDouble(),0.0);
+ }
+ void periodCacheRebuildsAtDateBoundary(){
+  QTemporaryDir temp;TelemetryService model(temp.filePath("cache-date.json"),false);
+  model.ingest(sample(QDateTime::currentMSecsSinceEpoch(),10,20));
+  model.summary(0);model.summary(3);QCOMPARE(model.m_periodCache.size(),2);
+  model.m_periodCacheDate=QDate::currentDate().addDays(-1);
+  model.m_periodCache[0]=QJsonObject{{"sampled",true},{"up",9999}};
+  QCOMPARE(model.summary().value("total").toInt(),30);
+  QCOMPARE(model.m_periodCacheDate,QDate::currentDate());QCOMPARE(model.m_periodCache.size(),1);
+ }
  void cachedPeriodInvalidatesWithoutErasingHistory(){
   QTemporaryDir temp;TelemetryService model(temp.filePath("cache.json"),false);
   auto status=sample(QDateTime::currentMSecsSinceEpoch(),10,20);model.ingest(status);
@@ -353,6 +381,32 @@ private slots:
   status.processAlive=false;status.apiHealthy=false;model.ingest(status);
   QVERIFY(!model.sampled());QCOMPARE(model.summary().value("total").toInt(),60);
   QCOMPARE(model.ranking("apps").first().toMap().value("speed").toDouble(),0.0);
+ }
+ void activeDevicesCountUniqueObservedAddressesWithExactLoopbackExclusions(){
+  QTemporaryDir temp;TelemetryService model(temp.filePath("device-addresses.json"),false);
+  auto status=sample(QDateTime::currentMSecsSinceEpoch(),0,0);const auto base=status.connections.first().toMap();status.connections.clear();
+  const auto append=[&](const QString &id,const QString &address,bool closed=false){auto row=base;row["id"]=id;row["sourceIp"]=address;row["closed"]=closed;status.connections.append(row);};
+  append("peer-a1","192.0.2.10");append("peer-a2","192.0.2.10");append("peer-b","2001:db8::8");
+  append("loopback-v4","127.0.0.1");append("loopback-v6","::1");append("empty",QString());
+  auto missing=base;missing["id"]="missing";status.connections.append(missing);
+  append("closed","192.0.2.20",true);append("closed-duplicate","192.0.2.10",true);
+  append("other-local-address","127.0.0.2");append("mapped-address","::ffff:127.0.0.1");
+  model.ingest(status);QCOMPARE(model.activeDevices(),4);QCOMPARE(model.property("activeDevices").toInt(),4);
+  for(auto &value:status.connections){auto row=value.toMap();if(row.value("id")=="peer-a1"||row.value("id")=="peer-a2"){row["closed"]=true;value=row;}}
+  ++status.connectionsAt;model.ingest(status);QCOMPARE(model.activeDevices(),3);
+ }
+ void activeDevicesFollowObservedSamplingInterruptionAndSessionChanges(){
+  QTemporaryDir temp;TelemetryService model(temp.filePath("device-lifecycle.json"),false);
+  auto status=sample(QDateTime::currentMSecsSinceEpoch(),0,0);auto first=status.connections.first().toMap();first["sourceIp"]="192.0.2.10";status.connections={first};
+  auto second=first;second["id"]="connection-b";second["sourceIp"]="192.0.2.20";status.connections.append(second);
+  model.ingest(status);QCOMPARE(model.activeDevices(),2);QVERIFY(model.connectionsSampled());
+  const auto liveTimestamp=status.connectionsAt;status.connectionsAt=QDateTime::currentMSecsSinceEpoch()-7000;model.ingest(status);
+  QVERIFY(!model.connectionsSampled());QCOMPARE(model.activeDevices(),2);
+  status.apiHealthy=false;model.ingest(status);QCOMPARE(model.activeDevices(),0);
+  status.apiHealthy=true;status.connectionsAt=liveTimestamp+1;model.ingest(status);QCOMPARE(model.activeDevices(),2);
+  status.processAlive=false;status.apiHealthy=false;model.ingest(status);QCOMPARE(model.activeDevices(),0);
+  status=sample(liveTimestamp+2,0,0);status.processId=2;first["sourceIp"]="192.0.2.30";status.connections={first};
+  model.ingest(status);QCOMPARE(model.activeDevices(),1);
  }
  void closedSnapshotsAreNotActiveAndControlFailureIsNotClosure(){
   QTemporaryDir temp;TelemetryService model(temp.filePath("activity-state.json"),false);

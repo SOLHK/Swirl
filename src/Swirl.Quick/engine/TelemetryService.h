@@ -18,6 +18,7 @@ class TelemetryService final : public QObject {
  Q_PROPERTY(double uploadRate READ uploadRate NOTIFY changed)
  Q_PROPERTY(int activeConnections READ activeConnections NOTIFY changed)
  Q_PROPERTY(int activeProcesses READ activeProcesses NOTIFY changed)
+ Q_PROPERTY(int activeDevices READ activeDevices NOTIFY changed)
  Q_PROPERTY(QVariantList connections READ connections NOTIFY changed)
  Q_PROPERTY(QVariantMap latencies READ latencies NOTIFY changed)
  Q_PROPERTY(QString externalIp READ externalIp NOTIFY changed)
@@ -37,6 +38,7 @@ public:
  double uploadRate() const { return m_status.uploadRate; }
  int activeConnections() const;
  int activeProcesses() const;
+ int activeDevices() const;
  QVariantList connections() const;
  QVariantMap latencies() const { return m_latencies; }
  QString externalIp() const { return m_externalIp; }

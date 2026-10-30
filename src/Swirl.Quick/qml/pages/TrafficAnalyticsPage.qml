@@ -9,6 +9,7 @@ Item {
  property bool embedded:false
  readonly property Item motionTitle:heading.titleItem
  property var rankingRows:[]
+ property string rankingSignature:""
  readonly property var telemetry:engineController.telemetry
  property int period:AppState.trafficPeriod
  readonly property var motionSurfaces:({totalTraffic:totalSurface,uploadRate:uploadSurface,downloadRate:downloadSurface})
@@ -22,15 +23,20 @@ Item {
  property var totals:({sampled:false})
  property var distribution:[]
  property var historyRows:[]
+ property string historySignature:""
  property bool snapshotDirty:true
  property bool componentReady:false
  function refreshSnapshot() {
   if(!componentReady||!visible)return
   totals=telemetry.summary(period)
   distribution=telemetry.distribution(period)
-  rankingRows=telemetry.ranking(kind,period,0)
+  const ranking=telemetry.ranking(kind,period,0)
+  const nextRankingSignature=JSON.stringify(ranking)
+  if(nextRankingSignature!==rankingSignature){rankingRows=ranking;rankingSignature=nextRankingSignature}
   const verified=!historyProxyOnly||telemetry.proxyRankingAvailable(historyPeriod)
-  historyRows=telemetry.periodTraffic(historyPeriod,historyProxyOnly).map(row=>({id:String(row.time),time:Qt.formatDateTime(new Date(row.time),historyPeriod===0?"HH:mm":"MM-dd"),value:row.sampled&&verified?telemetry.formatBytes(row.value):"—",state:!row.sampled?qsTr("未采集"):verified?qsTr("已采集"):qsTr("代理分类记录不完整")}))
+  const history=telemetry.periodTraffic(historyPeriod,historyProxyOnly).map(row=>({id:String(row.time),time:Qt.formatDateTime(new Date(row.time),historyPeriod===0?"HH:mm":"MM-dd"),value:row.sampled&&verified?telemetry.formatBytes(row.value):"—",state:!row.sampled?qsTr("未采集"):verified?qsTr("已采集"):qsTr("代理分类记录不完整")}))
+  const nextHistorySignature=JSON.stringify(history)
+  if(nextHistorySignature!==historySignature){historyRows=history;historySignature=nextHistorySignature}
   snapshotDirty=false
  }
  function refresh() {snapshotDirty=true;refreshSnapshot()}

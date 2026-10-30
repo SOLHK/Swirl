@@ -7,7 +7,12 @@ ListModel {
     signal aboutToSync()
     signal synced()
     function sync() {
-        aboutToSync()
+        let changed=false
+        function beginChange() {
+            if(changed)return
+            changed=true
+            aboutToSync()
+        }
         // Small editable draft lists use incremental operations so Qt can move
         // existing delegates. Large network tables keep their original model.
         const rows=source || []
@@ -21,6 +26,7 @@ ListModel {
                 if(incoming.has(get(last).motionKey)){--last;continue}
                 const end=last
                 while(last>=0&&!incoming.has(get(last).motionKey))--last
+                beginChange()
                 remove(last+1,end-last)
             }
         }
@@ -37,14 +43,14 @@ ListModel {
                 if(keys===null){keys=[];for(let j=0;j<count;++j)keys.push(get(j).motionKey)}
                 found=keys.indexOf(key,i+1)
             }
-            if(found<0){insert(i,{motionKey:key,motionSignature:signature,entry:rows[i]});keys.splice(i,0,key)}
+            if(found<0){beginChange();insert(i,{motionKey:key,motionSignature:signature,entry:rows[i]});keys.splice(i,0,key)}
             else {
-                if(found!==i){move(found,i,1);keys.splice(i,0,keys.splice(found,1)[0])}
-                if(get(i).motionSignature!==signature){setProperty(i,"entry",rows[i]);setProperty(i,"motionSignature",signature)}
+                if(found!==i){beginChange();move(found,i,1);keys.splice(i,0,keys.splice(found,1)[0])}
+                if(get(i).motionSignature!==signature){beginChange();setProperty(i,"entry",rows[i]);setProperty(i,"motionSignature",signature)}
             }
         }
-        if(count>rows.length)remove(rows.length,count-rows.length)
-        synced()
+        if(count>rows.length){beginChange();remove(rows.length,count-rows.length)}
+        if(changed)synced()
     }
     onSourceChanged:sync()
     Component.onCompleted:sync()

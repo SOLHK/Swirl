@@ -55,7 +55,12 @@ Item {
     readonly property var protocolOptions:[qsTr("全部协议")].concat(Array.from(new Set(connectionRows.map(row=>row.protocol||"").concat([protocolFilter]).filter(value=>value.length))).sort())
     function refreshSnapshot() {
         if(!visible)return
-        connectionRows=engineController.connections
+        // The controller returns QVariantList value snapshots, not mutable JS aliases.
+        const rows=engineController.connections
+        let changed=rows.length!==connectionRows.length
+        for(let i=0;!changed&&i<rows.length;++i)
+            changed=JSON.stringify(rows[i])!==JSON.stringify(connectionRows[i])
+        if(changed)connectionRows=rows
         snapshotDirty=false
     }
     onVisibleChanged:if(visible)refreshSnapshot()
@@ -71,12 +76,12 @@ Item {
         const state=status.currentIndex
         const selectedProtocol=protocolFilter
         var rows=connectionRows.filter(function(r){
+            if((state!==0&&r.status!==status.currentText)||(selectedProtocol&&r.protocol!==selectedProtocol))return false
+            if(!q.length)return true
             const route=r.route||{}
             const searchable=[r.host,r.process,r.ip,r.port,r.sourceIp,r.sourcePort,r.protocol,r.status,r.transportState,r.policy,r.proxyNode,route.rule_id,route.service_policy_id,route.chosen_ip]
                 .map(value=>value===undefined||value===null?"":String(value)).join(" ").toLowerCase()
-            return searchable.indexOf(q)>=0 &&
-                   (state===0||r.status===status.currentText) &&
-                   (!selectedProtocol||r.protocol===selectedProtocol)
+            return searchable.indexOf(q)>=0
         })
         rows.sort(function(a,b){
             let order=0

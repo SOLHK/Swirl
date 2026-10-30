@@ -14,6 +14,7 @@ Item {
     property bool proxyOnly: false
     property string selectedId: ""
     property var sourceRows: []
+    property string sourceSignature: ""
     property bool snapshotDirty: true
     property bool componentReady: false
     readonly property string kind: ["apps", "devices", "domains", "nodes"][kindIndex]
@@ -52,7 +53,11 @@ Item {
             id: kind + ":" + row.id,
             displayName: displayName(row)
         }))
-        if (JSON.stringify(rows) !== JSON.stringify(sourceRows)) sourceRows = rows
+        const signature = JSON.stringify(rows)
+        if (signature !== sourceSignature) {
+            sourceSignature = signature
+            sourceRows = rows
+        }
         snapshotDirty = false
     }
     function refresh() { snapshotDirty = true; refreshSnapshot() }

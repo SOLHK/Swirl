@@ -316,7 +316,7 @@ void WindowsBackdrop::destroyCompatibilityShadow() {
 #ifdef Q_OS_WIN
     if (m_shadowHandle) DestroyWindow(reinterpret_cast<HWND>(m_shadowHandle));
 #endif
-    m_shadowHandle = 0; m_shadowSize = {}; m_shadowVisible = false;
+    m_shadowHandle = 0; m_shadowSize = {}; m_shadowOffset = {}; m_shadowVisible = false;
 }
 
 void WindowsBackdrop::updateCompatibilityShadow() {
@@ -338,6 +338,7 @@ void WindowsBackdrop::updateCompatibilityShadow() {
     const qreal dpr = m_window->devicePixelRatio(), radius = m_cornerRadius * dpr;
     const bool active = m_window->isActive();
     const int padding = qCeil(20 * dpr);
+    m_shadowOffset = QPoint(-padding, -padding);
     if (!m_shadowHandle) {
         m_shadowHandle = reinterpret_cast<quintptr>(createShadowWindow());
         m_shadowSize = {};
@@ -371,7 +372,7 @@ void WindowsBackdrop::updateCompatibilityShadow() {
         ++m_shadowBuildCount;
         m_shadowSize = body; m_shadowRadius = radius; m_shadowDpr = dpr; m_shadowActive = active;
     }
-    if (m_initialPresentationPending || m_restoreSettling || !m_window->isVisible()) {
+    if (m_initialPresentationPending || m_restoreSettling || !m_window->isVisible() || !IsWindowVisible(target)) {
         ShowWindow(shadow, SW_HIDE);
         setVisible(false); return;
     }
@@ -386,7 +387,7 @@ void WindowsBackdrop::destroyBackdropBlur() {
 #ifdef Q_OS_WIN
     if(m_blurHandle)DestroyWindow(reinterpret_cast<HWND>(m_blurHandle));
 #endif
-    m_blurHandle=0;m_blurRegionSize={};m_blurRegionRadius=-1;
+    m_blurHandle=0;m_blurRegionSize={};m_blurRegionRadius=-1;m_blurOffset={};
     if(m_blurActive || m_micaActive || m_translucent){m_blurActive=false;m_micaActive=false;m_translucent=false;emit changed();}
 }
 void WindowsBackdrop::updateBackdropBlur() {
@@ -441,6 +442,7 @@ void WindowsBackdrop::updateBackdropBlur() {
     if(m_window->visibility()==QWindow::Minimized){ShowWindow(blur,SW_HIDE);return;}
     const HWND shell=reinterpret_cast<HWND>(m_window->winId());RECT bounds{};
     if(!GetWindowRect(shell,&bounds)){opaqueFallback();return;}
+    const QPoint shellOrigin(bounds.left,bounds.top);
     const bool rectangular=m_window->visibility()==QWindow::Maximized || m_window->visibility()==QWindow::FullScreen;
     if(rectangular){
         // The maximized HWND includes Windows' invisible resize border.
@@ -472,10 +474,28 @@ void WindowsBackdrop::updateBackdropBlur() {
     // One compositor-only surface covers the entire shell. Sidebar and
     // workspace share the same native backdrop, with one neutral tint above.
     // No desktop capture, CPU blur, foreground texture or timer is involved.
-    const auto visibility = m_initialPresentationPending || m_restoreSettling || !m_window->isVisible() ? SWP_HIDEWINDOW : SWP_SHOWWINDOW;
+    m_blurOffset=QPoint(bounds.left+inset,bounds.top+inset)-shellOrigin;
+    const auto visibility = m_initialPresentationPending || m_restoreSettling || !m_window->isVisible() || !IsWindowVisible(shell) ? SWP_HIDEWINDOW : SWP_SHOWWINDOW;
     if(!SetWindowPos(blur,shell,bounds.left+inset,bounds.top+inset,
         body.width(),body.height(),
         SWP_NOACTIVATE|SWP_NOOWNERZORDER|visibility))opaqueFallback();
+#endif
+}
+void WindowsBackdrop::syncNativeHelperPositions() {
+#ifdef Q_OS_WIN
+    if (!m_handle) return;
+    const HWND shell = reinterpret_cast<HWND>(m_handle);
+    RECT bounds{};
+    if (!IsWindowVisible(shell) || IsIconic(shell) || !GetWindowRect(shell, &bounds)) return;
+    // Native move/size loops need placement now, before queued Qt work runs.
+    // Keep helper size, material, visibility, z order and cached shadow intact.
+    constexpr UINT flags = SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER;
+    if (m_blurHandle)
+        SetWindowPos(reinterpret_cast<HWND>(m_blurHandle), nullptr,
+            bounds.left + m_blurOffset.x(), bounds.top + m_blurOffset.y(), 0, 0, flags);
+    if (m_shadowHandle)
+        SetWindowPos(reinterpret_cast<HWND>(m_shadowHandle), nullptr,
+            bounds.left + m_shadowOffset.x(), bounds.top + m_shadowOffset.y(), 0, 0, flags);
 #endif
 }
 void WindowsBackdrop::scheduleCornerUpdate() {
@@ -518,7 +538,10 @@ bool WindowsBackdrop::nativeEventFilter(const QByteArray &, void *message, qintp
     const auto *msg = static_cast<MSG *>(message);
     if (msg->hwnd != reinterpret_cast<HWND>(m_handle)) return false;
     switch (msg->message) {
-    case WM_SIZE: case WM_DPICHANGED: case WM_WINDOWPOSCHANGED:
+    case WM_WINDOWPOSCHANGED:
+        syncNativeHelperPositions();
+        scheduleCornerUpdate(); break;
+    case WM_SIZE: case WM_DPICHANGED:
         scheduleCornerUpdate(); break;
     case WM_NCACTIVATE:
         // DefWindowProc can paint a classic caption into DWM's restore

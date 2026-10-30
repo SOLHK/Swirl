@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QPointer>
 #include <QSize>
+#include <QPoint>
 #include <QRectF>
 #include <QTimer>
 #include <QAbstractNativeEventFilter>
@@ -66,6 +67,7 @@ private:
     bool m_micaActive = false;
     bool m_materialEligible = false, m_materialAttempted = false;
     quintptr m_blurHandle = 0;
+    QPoint m_blurOffset;
     QSize m_blurRegionSize;
     qreal m_blurRegionRadius = -1;
     void updateBackdropBlur();
@@ -76,6 +78,7 @@ private:
     qreal m_regionDpr = 0;
     bool m_cornerUpdateQueued = false;
     quintptr m_shadowHandle = 0;
+    QPoint m_shadowOffset;
     bool m_shadowVisible = false, m_shadowActive = false;
     QSize m_shadowSize;
     qreal m_shadowRadius = 0, m_shadowDpr = 0;
@@ -85,6 +88,7 @@ private:
     void refresh();
     void updateCornerMask();
     void scheduleCornerUpdate();
+    void syncNativeHelperPositions();
     void updateCompatibilityShadow();
     void destroyCompatibilityShadow();
 };

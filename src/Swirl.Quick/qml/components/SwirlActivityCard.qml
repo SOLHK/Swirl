@@ -11,7 +11,7 @@ SwirlGlassPanel {
     hovered: cardHover.hovered
     pressed: hit.pressed
     focused: activeFocus
-    border.color: focused ? Theme.focusBorder : hovered ? Theme.cardHoverBorder : Theme.border
+    border.color: hovered ? Theme.cardHoverBorder : Theme.border
     // Keep the opaque white face; hover changes its edge and contact shadow.
     color: Theme.independentCard
     activeFocusOnTab: true

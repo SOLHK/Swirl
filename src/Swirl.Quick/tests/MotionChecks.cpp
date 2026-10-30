@@ -80,6 +80,18 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     const auto settled=[&]{return QTest::qWaitFor([&]{return !transition->property("moving").toBool();},2000);};
     const auto close=[&]{QMetaObject::invokeMethod(transition,"closeDetail");settled();};
     const auto click=[&](const QString &name){auto *button=activityVisual(window->contentItem(),name);if(!button||!button->isVisible()||!button->isEnabled())return false;QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,button->mapToScene(QPointF(button->width()/2,button->height()/2)).toPoint());return true;};
+    const auto homeCountsMatch=[&](int connectionCount,int processCount,int deviceCount){
+        auto *section=activityVisual(window->contentItem(),"activityConnections");
+        auto *connectionValue=section?section->property("motionTitle").value<QQuickItem *>():nullptr;
+        int processes=-1,devices=-1;
+        if(section)for(auto *row:section->findChildren<QObject *>()){
+            auto *value=row->property("valueItem").value<QQuickItem *>();if(!value)continue;
+            const auto caption=row->property("caption").toString();
+            if(caption==QStringLiteral("进程"))processes=value->property("text").toString().toInt();
+            else if(caption==QStringLiteral("设备"))devices=value->property("text").toString().toInt();
+        }
+        return connectionValue&&connectionValue->property("text").toString().toInt()==connectionCount&&processes==processCount&&devices==deviceCount;
+    };
     const auto snapshot=[&](const QString &key,const QString &phase){const auto rect=bounds(surface);samples.append(QJsonObject{{"key",key},{"phase",phase},{"progress",transition->property("progress").toDouble()},{"x",rect.x()},{"y",rect.y()},{"width",rect.width()},{"height",rect.height()},{"radius",surface->property("radius").toDouble()}});return rect;};
     auto *sourceOverview=activityVisual(window->contentItem(),activityDetailCards[0]);
     auto *diagnosticOverview=activityVisual(window->contentItem(),activityDetailCards[1]);
@@ -101,7 +113,7 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     for(int i=0;i<activityDetailKeys.size();++i){
         const auto key=activityDetailKeys[i];auto *card=activityVisual(window->contentItem(),activityDetailCards[i]);
         check(key+"-opaque-origin-card-present",card&&card->isVisible()&&card->property("color").value<QColor>().alpha()==255);if(!card)continue;
-        const auto source=bounds(card);
+        const auto source=bounds(card);const auto normalBorderWidth=QQmlProperty::read(card,"border.width").toDouble();
         originObserved=false;check(key+"-title-click-opens",click(activityDetailButtons[i]));
         const auto start=snapshot(key,"open-start");
         const auto storedOrigin=transition->mapRectToItem(window->contentItem(),transition->property("origin").toRectF());
@@ -122,6 +134,10 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
         check(key+"-escape-geometrically-contracts",transition->property("moving").toBool()&&transition->property("progress").toDouble()>0&&transition->property("progress").toDouble()<1&&reverse.width()<full.width()-2&&reverse.height()<full.height()-2);
         check(key+"-return-restores-corner-curvature-continuously",surface->property("radius").toDouble()>originRadius&&surface->property("radius").toDouble()<targetRadius);
         check(key+"-returns-cleanly",settled()&&!transition->property("opened").toBool()&&transition->property("progress").toDouble()==0&&!transition->isVisible());
+        QTest::mouseMove(window,QPoint(1,1));activityWait(150);
+        check(key+"-return-keeps-keyboard-focus",card->hasActiveFocus());
+        check(key+"-return-has-no-persistent-click-outline",QQmlProperty::read(card,"border.color").value<QColor>()==eval("Theme.border").value<QColor>()
+            &&normalBorderWidth>0&&qAbs(QQmlProperty::read(card,"border.width").toDouble()-normalBorderWidth)<0.001);
         check(key+"-preserves-main-route-and-history",eval("AppState.currentPage==='activity'").toBool()&&eval("AppState.historyIndex").toInt()==historyIndex);
     }
     if(auto *sourceCard=activityVisual(window->contentItem(),"activitySourcesCard")){
@@ -178,7 +194,9 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
                 {"protocol",row%2?"tcp":"udp"},{"category",row%2?"proxy":"direct"},{"policy",row%2?"fixture-proxy":"DIRECT"},
                 {"uploadBytes",up},{"downloadBytes",down},{"time",QDateTime::fromMSecsSinceEpoch(fixture.connectionsAt).toString(Qt::ISODateWithMs)}});
         }
-        controller->telemetry()->ingest(fixture);click(activityDetailButtons[0]);settled();activityWait(350);
+        controller->telemetry()->ingest(fixture);
+        check("visible-home-counts-follow-initial-native-data",homeCountsMatch(600,600,1));
+        click(activityDetailButtons[0]);settled();activityWait(350);
         const auto owner=[&](QObject *control,const char *property){while(control&&control->metaObject()->indexOfProperty(property)<0)control=control->parent();return control;};
         const auto evalOn=[&](QObject *target,const QString &code){if(!target)return QVariant();QQmlExpression expression(qmlContext(target),target,code);auto result=expression.evaluate();if(expression.hasError()){qWarning()<<expression.error();check("detail-expression: "+expression.error().toString(),false);}return result;};
         auto *sourceSearch=activityVisual(window->contentItem(),"activitySourcesSearch");
@@ -198,13 +216,48 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
             sourceTable->setProperty("scrollPosition",500);activityWait(80);
             const auto sourceScroll=sourceTable->property("scrollPosition").toDouble();
             const auto selected=evalOn(sources,"visibleRows[20].id").toString();sources->setProperty("selectedId",selected);
+            const auto sourceState=[&](const QString &phase){
+                auto *view=activityVisual(sourceTable,"tableRowsViewport");
+                auto *name=activityVisual(qobject_cast<QQuickItem *>(sources),"activitySourceSelectedName");
+                auto *facts=name?name->parentItem():nullptr;
+                const int top=view?evalOn(view,"indexAt(1,contentY+1)").toInt():-1;
+                QJsonObject state{{"phase",phase},{"expectedSort",5},{"sort",sourceSort->property("currentIndex").toInt()},{"expectedSelected",selected},{"selected",sources->property("selectedId").toString()},
+                    {"expectedScroll",sourceScroll},{"scroll",sourceTable->property("scrollPosition").toDouble()},{"tableWidth",sourceTable->width()},{"tableHeight",sourceTable->height()},{"rows",evalOn(sourceTable,"rows.length").toInt()},
+                    {"renderedRows",sourceTable->property("renderedRows").toInt()},{"selectedFactsHeight",facts?facts->height():-1},{"selectedFactsVisible",facts&&facts->isVisible()},{"sourceVisible",sources->property("visible").toBool()},
+                    {"anchorKey",sourceTable->property("anchorKey").toString()},{"anchorOffset",sourceTable->property("anchorOffset").toDouble()},{"projectionGeneration",sourceTable->property("projectionGeneration").toInt()},
+                    {"viewHeight",view?view->height():-1},{"contentHeight",view?view->property("contentHeight").toDouble():-1},{"originY",view?view->property("originY").toDouble():-1},{"currentIndex",view?view->property("currentIndex").toInt():-1},
+                    {"topIndex",top},{"topId",top>=0?evalOn(sourceTable,QString("recordAt(%1) ? String(recordAt(%1).id) : ''").arg(top)).toString():QString()},
+                    {"topItemPresent",view&&top>=0&&evalOn(view,QString("itemAtIndex(%1)!==null").arg(top)).toBool()},
+                    {"topOffset",view&&top>=0?evalOn(view,QString("itemAtIndex(%1) ? itemAtIndex(%1).y-contentY : null").arg(top)).toDouble():0}};
+                dataSamples.append(state);qInfo().noquote()<<"ACTIVITY_SOURCE_STATE"<<QJsonDocument(state).toJson(QJsonDocument::Compact);
+            };
             auto last=fixture.connections.last().toMap();last["downloadBytes"]=last.value("downloadBytes").toLongLong()+1024;fixture.connections.last()=last;
             fixture.connectionsAt+=1000;fixture.trafficAt=fixture.connectionsAt;fixture.downloadTotal+=1024;controller->telemetry()->ingest(fixture);activityWait(380);
             check("source-refresh-retains-scroll-and-selection",qAbs(sourceTable->property("scrollPosition").toDouble()-sourceScroll)<1&&sources->property("selectedId").toString()==selected);
-            close();click(activityDetailButtons[0]);settled();
+            const auto sourceClickGeometry=[&](const QString &phase){
+                const auto itemGeometry=[&](QQuickItem *item){const auto rect=bounds(item);return QJsonObject{{"name",item->objectName()},{"x",rect.x()},{"y",rect.y()},{"width",rect.width()},{"height",rect.height()},{"visible",item->isVisible()},{"enabled",item->isEnabled()}};};
+                QJsonArray ranks;for(int i=0;i<8;++i)if(auto *rank=activityVisual(window->contentItem(),"activitySourceRow-"+QString::number(i)))ranks.append(itemGeometry(rank));
+                auto *heading=activityVisual(window->contentItem(),activityDetailButtons[0]);
+                QJsonObject state{{"phase",phase},{"title",heading?itemGeometry(heading):QJsonObject()},{"ranks",ranks}};
+                dataSamples.append(state);qInfo().noquote()<<"ACTIVITY_SOURCE_CLICK_GEOMETRY"<<QJsonDocument(state).toJson(QJsonDocument::Compact);
+            };
+            sourceState("source-before-close");close();sourceState("source-after-close");sourceClickGeometry("source-title-before-rapid-click");
+            click(activityDetailButtons[0]);sourceState("source-reopen-dispatched");sourceClickGeometry("source-title-after-rapid-click");
+            check("source-rapid-reentry-keeps-selection-during-layout",sources->property("selectedId").toString()==selected);
+            settled();sourceState("source-reentry-settled");
             check("source-reentry-retains-sort-selection-and-scroll",sourceSort->property("currentIndex").toInt()==5&&sources->property("selectedId").toString()==selected&&qAbs(sourceTable->property("scrollPosition").toDouble()-sourceScroll)<1);
+            activityWait(30);sourceState("source-reentry-after-event-loop");
         }
-        close();click(activityDetailButtons[3]);settled();
+        auto first=fixture.connections.first().toMap();first["downloadBytes"]=first.value("downloadBytes").toLongLong()+256;fixture.connections.first()=first;fixture.downloadTotal+=256;
+        auto countFixture=fixture;auto ended=countFixture.connections.last().toMap();ended["closed"]=true;countFixture.connections.last()=ended;
+        auto otherDevice=countFixture.connections[598].toMap();otherDevice["sourceIp"]="192.0.2.11";countFixture.connections[598]=otherDevice;
+        countFixture.connectionsAt+=1000;countFixture.trafficAt=countFixture.connectionsAt;controller->telemetry()->ingest(countFixture);activityWait(350);
+        close();
+        check("return-refreshes-native-connection-process-device-counts",homeCountsMatch(599,599,2));
+        check("return-refreshes-overview-summary",qAbs(eval("pageLoader.item.totals.total").toDouble()-double(fixture.uploadTotal+fixture.downloadTotal))<0.01);
+        fixture.connectionsAt=countFixture.connectionsAt+1;fixture.trafficAt=fixture.connectionsAt;controller->telemetry()->ingest(fixture);
+        check("visible-home-counts-follow-reopened-connection",homeCountsMatch(600,600,1));
+        click(activityDetailButtons[3]);settled();
         auto *connectionSearch=activityVisual(window->contentItem(),"activityConnectionSearch");
         auto *connectionSort=activityVisual(window->contentItem(),"activityConnectionSort");
         auto *connectionProtocol=activityVisual(window->contentItem(),"activityConnectionProtocol");
@@ -438,7 +491,9 @@ int runMotionVisualChecks(QQuickWindow *window, const QString &directory) {
 }
 #include "ScrollBench.h"
 #include "SixAChecks.h"
+#include "ActivityPerfChecks.h"
 int runMotionChecks(QQuickWindow *window, const QString &output) {
+    if(qEnvironmentVariableIsSet("SWIRL_ACTIVITY_PERF_CHECKS"))return runActivityPerfChecks(window,output);
     if(qEnvironmentVariableIsSet("SWIRL_ACTIVITY_DETAIL_CHECKS"))return runActivityDetailChecks(window,output);
     if(qEnvironmentVariableIsSet("SWIRL_APEC_GLASS_CHECKS")) {
         extern int runApecGlassChecks(QQuickWindow *,const QString &);

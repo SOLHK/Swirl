@@ -45,13 +45,22 @@ TelemetryService::TelemetryService(QString path,bool networkMeasurements,QObject
 TelemetryService::~TelemetryService(){flush();}
 bool TelemetryService::sampled() const{return m_status.apiHealthy&&m_status.trafficAt>0&&nowMs()-m_status.trafficAt<6000;}
 bool TelemetryService::connectionsSampled() const{return m_status.apiHealthy&&m_status.connectionsAt>0&&nowMs()-m_status.connectionsAt<6000;}
-void TelemetryService::publish(){m_publishedSampled=sampled();m_publishedConnectionsSampled=connectionsSampled();m_periodCache.clear();++m_revision;emit changed();}
+void TelemetryService::publish(){m_publishedSampled=sampled();m_publishedConnectionsSampled=connectionsSampled();++m_revision;emit changed();}
 QString TelemetryService::formatBytes(double bytes) const {
  const QStringList units={"B","KB","MB","GB","TB"};int i=0;while(bytes>=1024&&i<4){bytes/=1024;++i;}
  return QString::number(bytes,'f',i?1:0)+" "+units[i];
 }
 int TelemetryService::activeConnections() const {int count=0;for(const auto &r:m_status.connections)if(!r.toMap().value("closed").toBool())++count;return count;}
 int TelemetryService::activeProcesses() const {QSet<QString> names;for(const auto &r:m_status.connections){const auto row=r.toMap();if(row.value("closed").toBool())continue;const auto name=row.value("process").toString();if(!name.isEmpty()&&name!="未知进程")names.insert(name);}return names.size();}
+int TelemetryService::activeDevices() const {
+ QSet<QString> addresses;
+ for(const auto &row:m_seen){
+  if(row.value("status").toString()!=QStringLiteral("活动"))continue;
+  const auto address=row.value("sourceIp").toString();
+  if(!address.isEmpty()&&address!=QStringLiteral("127.0.0.1")&&address!=QStringLiteral("::1"))addresses.insert(address);
+ }
+ return addresses.size();
+}
 void TelemetryService::ingest(const ProxyEngine::Status &status){
  const auto epoch=QString::number(status.processId)+"/"+status.sessionId;
  if(status.processAlive&&m_epoch!=epoch){m_epoch=epoch;m_seen.clear();m_lastConnections=0;m_lastTraffic=0;m_lastUp=0;m_lastDown=0;m_externalIp.clear();m_latencies.clear();}
@@ -116,7 +125,7 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
   for(auto it=m_seen.begin();it!=m_seen.end();++it)if(!active.contains(it.key()))(*it)["status"]="已结束";
   while(m_seen.size()>2000){auto oldest=m_seen.end();for(auto it=m_seen.begin();it!=m_seen.end();++it)if(!active.contains(it.key())&&(oldest==m_seen.end()||it->value("lastSeen").toLongLong()<oldest->value("lastSeen").toLongLong()))oldest=it;if(oldest==m_seen.end())break;m_seen.erase(oldest);}
   buckets[bucketKey]=bucket;day["buckets"]=buckets;
-  m_days[date]=day;const auto oldest=QDate::currentDate().addDays(-31).toString(Qt::ISODate);for(const auto &key:m_days.keys())if(key<oldest)m_days.remove(key);while(m_days.size()>32)m_days.remove(m_days.keys().first());m_dirty=true;
+  m_days[date]=day;m_periodCache.clear();const auto oldest=QDate::currentDate().addDays(-31).toString(Qt::ISODate);for(const auto &key:m_days.keys())if(key<oldest)m_days.remove(key);while(m_days.size()>32)m_days.remove(m_days.keys().first());m_dirty=true;
  }
  if(status.trafficAt>m_lastTraffic){m_lastTraffic=status.trafficAt;m_history.append(QVariantMap{{"time",status.trafficAt},{"down",status.downloadRate},{"up",status.uploadRate}});while(m_history.size()>3600)m_history.removeFirst();m_dirty=true;}
  publish();
