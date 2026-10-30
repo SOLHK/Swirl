@@ -121,12 +121,23 @@ pub enum Value {
     },
 }
 
+/// Validate an OS state, including a snapshot that must be restored exactly.
+/// Windows NlMtuBytes has a u32 range; the adapter's existing value is not a
+/// request to send a packet of that size. Keep the smaller installation limit
+/// separate so journal recovery never clamps or rejects a legal prior state.
+/// See Microsoft Set-NetIPInterface, -NlMtuBytes.
 pub(crate) fn validate_value(resource: &Resource, value: &Option<Value>) -> io::Result<()> {
     match (resource, value) {
         (_, None) => Ok(()),
-        (Resource::Mtu { ipv6 }, Some(Value::Mtu { mtu }))
-            if (if *ipv6 { 1280 } else { 576 }..=65535).contains(mtu) =>
-        {
+        (Resource::Mtu { ipv6 }, Some(Value::Mtu { mtu })) => {
+            let minimum = if *ipv6 { 1280 } else { 576 };
+            if *mtu < minimum {
+                return Err(invalid(format!(
+                    "invalid IPv{} OS MTU {mtu}; resource={resource:?}, value={value:?}, field=mtu; expected {minimum}..={}",
+                    if *ipv6 { 6 } else { 4 },
+                    u32::MAX
+                )));
+            }
             Ok(())
         }
         (Resource::Address { address }, Some(Value::Address { prefix_len, .. }))
@@ -160,8 +171,26 @@ pub(crate) fn validate_value(resource: &Resource, value: &Option<Value>) -> io::
         {
             Ok(())
         }
-        _ => Err(invalid("resource and value mismatch")),
+        _ => Err(invalid(format!(
+            "resource and value mismatch: resource={resource:?}, value={value:?}"
+        ))),
     }
+}
+
+/// Values Swirl installs retain the packet-size limit, independently of the
+/// full Windows state range needed for exact restoration of `before` values.
+fn validate_install_value(resource: &Resource, value: &Option<Value>) -> io::Result<()> {
+    validate_value(resource, value)?;
+    if let (Resource::Mtu { ipv6 }, Some(Value::Mtu { mtu })) = (resource, value)
+        && *mtu > 65535
+    {
+        let minimum = if *ipv6 { 1280 } else { 576 };
+        return Err(invalid(format!(
+            "invalid IPv{} installed MTU {mtu}; resource={resource:?}, value={value:?}, field=mtu; expected {minimum}..=65535",
+            if *ipv6 { 6 } else { 4 }
+        )));
+    }
+    Ok(())
 }
 
 pub trait NetworkBackend {
@@ -226,8 +255,12 @@ impl Journal {
             if !keys.insert(&change.resource) {
                 return Err(invalid("duplicate network journal resource"));
             }
-            validate_value(&change.resource, &change.before)?;
-            validate_value(&change.resource, &change.after)?;
+            validate_value(&change.resource, &change.before).map_err(|error| {
+                io::Error::new(error.kind(), format!("journal before validation: {error}"))
+            })?;
+            validate_install_value(&change.resource, &change.after).map_err(|error| {
+                io::Error::new(error.kind(), format!("journal after validation: {error}"))
+            })?;
             if let Resource::DnsGuard { name } = &change.resource {
                 let Some(Value::DnsGuard {
                     protocol, owner, ..
@@ -257,8 +290,20 @@ impl Journal {
         interface.validate()?;
         let mut changes = Vec::with_capacity(desired.len());
         for (resource, after) in desired {
-            validate_value(&resource, &after)?;
-            let before = backend.read(&interface, &resource)?;
+            validate_install_value(&resource, &after).map_err(|error| {
+                io::Error::new(error.kind(), format!("requested state validation: {error}"))
+            })?;
+            let before = backend.read(&interface, &resource).map_err(|error| {
+                io::Error::new(
+                    error.kind(),
+                    format!(
+                        "snapshot read: interface={interface:?}, resource={resource:?}: {error}"
+                    ),
+                )
+            })?;
+            validate_value(&resource, &before).map_err(|error| {
+                io::Error::new(error.kind(), format!("captured state validation: {error}"))
+            })?;
             if before.is_some() && !matches!(resource, Resource::Dns | Resource::Mtu { .. }) {
                 return Err(io::Error::new(
                     io::ErrorKind::AlreadyExists,
@@ -687,6 +732,10 @@ mod tests {
             expected: &Option<Value>,
             desired: &Option<Value>,
         ) -> io::Result<()> {
+            // Match the Windows backend's bidirectional state validation:
+            // desired may be the captured OS value during journal recovery.
+            validate_value(key, expected)?;
+            validate_value(key, desired)?;
             self.writes += 1;
             if self.fail_write == Some(self.writes) {
                 return Err(io::Error::other("injected OS failure"));
@@ -738,6 +787,322 @@ mod tests {
             .unwrap(),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn large_os_mtu_snapshots_survive_disk_reopen_and_exact_dual_stack_restore() {
+        let directory = std::env::temp_dir().join(format!(
+            "swirl-network-mtu-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        for original in [65536, u32::MAX] {
+            let initial = HashMap::from([
+                (Resource::Mtu { ipv6: false }, Value::Mtu { mtu: original }),
+                (Resource::Mtu { ipv6: true }, Value::Mtu { mtu: original }),
+            ]);
+            let mut backend = MockNetwork {
+                values: initial.clone(),
+                ..Default::default()
+            };
+            let mut journal = Journal::prepare(
+                &mut backend,
+                InterfaceIdentity::new(71, 1),
+                "a".repeat(32),
+                [false, true]
+                    .into_iter()
+                    .map(|ipv6| (Resource::Mtu { ipv6 }, Some(Value::Mtu { mtu: 1500 })))
+                    .collect(),
+            )
+            .unwrap();
+            assert!(
+                journal
+                    .changes
+                    .iter()
+                    .all(|change| change.before == Some(Value::Mtu { mtu: original }))
+            );
+            let path = directory.join(format!("{original}.json"));
+            let mut store = FileJournalStore::create_new(&path).unwrap();
+            apply(&mut backend, &mut store, &mut journal).unwrap();
+            assert!(
+                backend
+                    .values
+                    .values()
+                    .all(|value| value == &Value::Mtu { mtu: 1500 })
+            );
+            drop(store);
+            let (mut store, mut restored) = FileJournalStore::open_existing(&path).unwrap();
+            assert_eq!(restored, journal);
+            let report = recover(&mut backend, &mut store, &mut restored).unwrap();
+            assert_eq!(report.restored, 2);
+            assert!(report.conflicts.is_empty());
+            assert!(restored.is_restored());
+            assert_eq!(backend.values, initial);
+            assert_eq!(backend.writes, 4);
+            drop(store);
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn oversized_installed_mtu_is_rejected_before_writes_and_in_loaded_journals() {
+        for ipv6 in [false, true] {
+            for mtu in [65536, u32::MAX] {
+                let mut backend = MockNetwork::default();
+                let desired = vec![(Resource::Mtu { ipv6 }, Some(Value::Mtu { mtu }))];
+                let error = Journal::prepare(
+                    &mut backend,
+                    InterfaceIdentity::new(71, 1),
+                    "a".repeat(32),
+                    desired,
+                )
+                .unwrap_err();
+                assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+                assert!(error.to_string().contains(&mtu.to_string()));
+                assert!(error.to_string().contains("..=65535"));
+                assert_eq!(backend.writes, 0);
+                let journal = Journal {
+                    version: 1,
+                    owner: "a".repeat(32),
+                    interface: InterfaceIdentity::new(71, 1),
+                    changes: vec![Change {
+                        resource: Resource::Mtu { ipv6 },
+                        before: Some(Value::Mtu { mtu: u32::MAX }),
+                        after: Some(Value::Mtu { mtu }),
+                        state: ChangeState::Applying,
+                    }],
+                };
+                let loaded: Journal =
+                    serde_json::from_slice(&serde_json::to_vec(&journal).unwrap()).unwrap();
+                assert!(loaded.validate().is_err());
+            }
+        }
+    }
+
+    #[test]
+    fn os_mtu_snapshots_below_family_minimum_remain_invalid() {
+        for (ipv6, minimum) in [(false, 576), (true, 1280)] {
+            for mtu in [0, minimum - 1] {
+                let mut backend = MockNetwork {
+                    values: HashMap::from([(Resource::Mtu { ipv6 }, Value::Mtu { mtu })]),
+                    ..Default::default()
+                };
+                let error = Journal::prepare(
+                    &mut backend,
+                    InterfaceIdentity::new(71, 1),
+                    "a".repeat(32),
+                    vec![(Resource::Mtu { ipv6 }, Some(Value::Mtu { mtu: 1500 }))],
+                )
+                .unwrap_err();
+                assert!(error.to_string().contains(&mtu.to_string()));
+                assert!(
+                    error
+                        .to_string()
+                        .contains(&format!("{minimum}..={}", u32::MAX))
+                );
+                assert_eq!(backend.writes, 0);
+            }
+        }
+    }
+
+    #[test]
+    fn installed_mtu_family_boundaries_apply_and_restore_exact_originals() {
+        for (ipv6, minimum) in [(false, 576), (true, 1280)] {
+            for mtu in [minimum, 1500, 65535] {
+                let resource = Resource::Mtu { ipv6 };
+                let initial = HashMap::from([(resource.clone(), Value::Mtu { mtu: u32::MAX })]);
+                let mut backend = MockNetwork {
+                    values: initial.clone(),
+                    ..Default::default()
+                };
+                let mut journal = Journal::prepare(
+                    &mut backend,
+                    InterfaceIdentity::new(71, 1),
+                    "a".repeat(32),
+                    vec![(resource.clone(), Some(Value::Mtu { mtu }))],
+                )
+                .unwrap();
+                let mut store = MemoryJournal::default();
+                apply(&mut backend, &mut store, &mut journal).unwrap();
+                assert_eq!(backend.values.get(&resource), Some(&Value::Mtu { mtu }));
+                let report = recover(&mut backend, &mut store, &mut journal).unwrap();
+                assert_eq!(report.restored, 1);
+                assert!(report.conflicts.is_empty());
+                assert_eq!(backend.values, initial);
+                assert!(journal.is_restored());
+            }
+            for mtu in [0, minimum - 1] {
+                let mut backend = MockNetwork::default();
+                let error = Journal::prepare(
+                    &mut backend,
+                    InterfaceIdentity::new(71, 1),
+                    "a".repeat(32),
+                    vec![(Resource::Mtu { ipv6 }, Some(Value::Mtu { mtu }))],
+                )
+                .unwrap_err();
+                assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+                assert!(error.to_string().contains("requested state validation"));
+                assert_eq!(backend.writes, 0);
+            }
+        }
+    }
+
+    #[test]
+    fn partial_apply_failure_restores_large_mtu_without_clamping() {
+        for first_ipv6 in [false, true] {
+            for original in [65536, u32::MAX] {
+                let initial = HashMap::from([
+                    (Resource::Mtu { ipv6: false }, Value::Mtu { mtu: original }),
+                    (Resource::Mtu { ipv6: true }, Value::Mtu { mtu: original }),
+                ]);
+                let mut backend = MockNetwork {
+                    values: initial.clone(),
+                    fail_write: Some(2),
+                    ..Default::default()
+                };
+                let mut journal = Journal::prepare(
+                    &mut backend,
+                    InterfaceIdentity::new(71, 1),
+                    "a".repeat(32),
+                    [first_ipv6, !first_ipv6]
+                        .into_iter()
+                        .map(|ipv6| (Resource::Mtu { ipv6 }, Some(Value::Mtu { mtu: 1500 })))
+                        .collect(),
+                )
+                .unwrap();
+                let error =
+                    apply(&mut backend, &mut MemoryJournal::default(), &mut journal).unwrap_err();
+                assert_eq!(error.cause.to_string(), "injected OS failure");
+                let report = error.recovery.unwrap();
+                assert_eq!(report.restored, 1);
+                assert_eq!(report.already_restored, 1);
+                assert!(report.conflicts.is_empty());
+                assert_eq!(backend.values, initial);
+                assert_eq!(backend.writes, 3);
+                assert!(journal.is_restored());
+            }
+        }
+    }
+
+    #[test]
+    fn large_mtu_recovery_preserves_later_external_change_and_reports_conflict() {
+        for changed_ipv6 in [false, true] {
+            let initial = HashMap::from([
+                (Resource::Mtu { ipv6: false }, Value::Mtu { mtu: 65536 }),
+                (Resource::Mtu { ipv6: true }, Value::Mtu { mtu: u32::MAX }),
+            ]);
+            for external_mtu in [1400, 262144] {
+                let mut backend = MockNetwork {
+                    values: initial.clone(),
+                    ..Default::default()
+                };
+                let mut journal = Journal::prepare(
+                    &mut backend,
+                    InterfaceIdentity::new(71, 1),
+                    "a".repeat(32),
+                    [false, true]
+                        .into_iter()
+                        .map(|ipv6| (Resource::Mtu { ipv6 }, Some(Value::Mtu { mtu: 1500 })))
+                        .collect(),
+                )
+                .unwrap();
+                let mut store = MemoryJournal::default();
+                apply(&mut backend, &mut store, &mut journal).unwrap();
+                let changed = Resource::Mtu { ipv6: changed_ipv6 };
+                backend
+                    .values
+                    .insert(changed.clone(), Value::Mtu { mtu: external_mtu });
+                let report = recover(&mut backend, &mut store, &mut journal).unwrap();
+                assert_eq!(report.restored, 1);
+                assert_eq!(report.conflicts, vec![usize::from(changed_ipv6)]);
+                assert!(!journal.is_restored());
+                let mut expected = initial.clone();
+                expected.insert(changed, Value::Mtu { mtu: external_mtu });
+                assert_eq!(backend.values, expected);
+                assert_eq!(backend.writes, 3);
+                let again = recover(&mut backend, &mut store, &mut journal).unwrap();
+                assert_eq!(again.restored, 0);
+                assert_eq!(again.conflicts, report.conflicts);
+                assert_eq!(backend.values, expected);
+                assert_eq!(backend.writes, 3);
+            }
+        }
+    }
+
+    #[test]
+    fn snapshot_validation_errors_identify_stage_resource_field_and_value() {
+        let resource = Resource::Mtu { ipv6: true };
+        let mut backend = MockNetwork {
+            values: HashMap::from([(resource.clone(), Value::Mtu { mtu: 1279 })]),
+            ..Default::default()
+        };
+        let error = Journal::prepare(
+            &mut backend,
+            InterfaceIdentity::new(71, 1),
+            "a".repeat(32),
+            vec![(resource.clone(), Some(Value::Mtu { mtu: 1500 }))],
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+        let message = error.to_string();
+        for expected in [
+            "captured state validation",
+            "resource=Mtu { ipv6: true }",
+            "value=Some(Mtu { mtu: 1279 })",
+            "field=mtu",
+        ] {
+            assert!(message.contains(expected), "{message}");
+        }
+        let mut journal = Journal {
+            version: 1,
+            owner: "a".repeat(32),
+            interface: InterfaceIdentity::new(71, 1),
+            changes: vec![Change {
+                resource,
+                before: Some(Value::Mtu { mtu: 1279 }),
+                after: Some(Value::Mtu { mtu: 1500 }),
+                state: ChangeState::Pending,
+            }],
+        };
+        assert!(
+            journal
+                .validate()
+                .unwrap_err()
+                .to_string()
+                .contains("journal before validation")
+        );
+        journal.changes[0].before = Some(Value::Mtu { mtu: u32::MAX });
+        journal.changes[0].after = Some(Value::Mtu { mtu: 65536 });
+        let message = journal.validate().unwrap_err().to_string();
+        assert!(message.contains("journal after validation"));
+        assert!(message.contains("65536"));
+        assert_eq!(backend.writes, 0);
+    }
+
+    #[test]
+    fn snapshot_type_mismatch_identifies_the_returned_resource_and_value() {
+        let resource = Resource::Mtu { ipv6: false };
+        let mut backend = MockNetwork {
+            values: HashMap::from([(resource.clone(), Value::Route { metric: 5 })]),
+            ..Default::default()
+        };
+        let error = Journal::prepare(
+            &mut backend,
+            InterfaceIdentity::new(71, 1),
+            "a".repeat(32),
+            vec![(resource, Some(Value::Mtu { mtu: 1500 }))],
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+        let message = error.to_string();
+        assert!(message.contains("captured state validation"));
+        assert!(message.contains("resource=Mtu { ipv6: false }"));
+        assert!(message.contains("value=Some(Route { metric: 5 })"));
+        assert_eq!(backend.writes, 0);
     }
 
     #[test]

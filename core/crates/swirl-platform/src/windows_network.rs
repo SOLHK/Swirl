@@ -127,7 +127,10 @@ impl WindowsNetworkBackend {
         if identity != &self.owned {
             return Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
-                "interface is not owned by this TUN helper",
+                format!(
+                    "interface ownership mismatch: expected {:?}, received {identity:?}",
+                    self.owned
+                ),
             ));
         }
         Ok(())
@@ -190,8 +193,22 @@ impl NetworkBackend for WindowsNetworkBackend {
     ) -> io::Result<()> {
         self.check_identity(interface)?;
         self.check_resource(resource)?;
-        crate::network_transaction::validate_value(resource, expected)?;
-        crate::network_transaction::validate_value(resource, desired)?;
+        // This primitive serves both installation and journal recovery.
+        // Validate the full OS state range here: recovery's desired MTU may be
+        // a captured value larger than the MTU Swirl is allowed to install.
+        // Journal::prepare/validate separately constrain every after value.
+        crate::network_transaction::validate_value(resource, expected).map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!("compare_exchange expected validation: {error}"),
+            )
+        })?;
+        crate::network_transaction::validate_value(resource, desired).map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!("compare_exchange desired validation: {error}"),
+            )
+        })?;
         for value in [expected, desired] {
             if let (
                 Resource::DnsGuard { name },
@@ -218,12 +235,12 @@ impl NetworkBackend for WindowsNetworkBackend {
     }
 }
 
-fn run_json<T: DeserializeOwned>(script: &'static str, input: &serde_json::Value) -> io::Result<T> {
+fn run_json<T: DeserializeOwned>(script: &str, input: &serde_json::Value) -> io::Result<T> {
     run_json_with_timeout(script, input, COMMAND_TIMEOUT)
 }
 
 fn run_json_with_timeout<T: DeserializeOwned>(
-    script: &'static str,
+    script: &str,
     input: &serde_json::Value,
     timeout: Duration,
 ) -> io::Result<T> {
@@ -387,7 +404,11 @@ try {
         $family = if ($p.resource.ipv6) { 'IPv6' } else { 'IPv4' }
         $rows = @(Get-NetIPInterface -InterfaceIndex $index -AddressFamily $family -PolicyStore ActiveStore -ErrorAction Stop)
         if ($rows.Count -ne 1) { throw 'Ambiguous MTU ownership' }
-        return @{kind='mtu';mtu=[uint32]$rows[0].NlMtuBytes}
+        # NlMtuBytes is the Set-NetIPInterface parameter. Its CIM result exposes
+        # NlMtu; casting a missing property to uint32 would silently invent zero.
+        $mtuProperty = $rows[0].PSObject.Properties['NlMtu']
+        if ($null -eq $mtuProperty -or $null -eq $mtuProperty.Value) { throw 'Windows MTU snapshot missing NlMtu property or value' }
+        return @{kind='mtu';mtu=[uint32]$mtuProperty.Value}
       }
       'address' {
         $rows = @(Get-NetIPAddress -InterfaceIndex $index -PolicyStore ActiveStore -ErrorAction Stop | Where-Object { $_.IPAddress -eq $p.resource.address })
@@ -611,6 +632,32 @@ mod tests {
     use super::*;
 
     #[test]
+    fn different_interface_guid_or_index_is_rejected_before_network_commands() {
+        let owned = InterfaceIdentity::new(71, 1);
+        let mut backend = WindowsNetworkBackend::for_owned_interface(owned).unwrap();
+        // These valid but unowned identities must fail in Rust before a
+        // PowerShell child can query or mutate any actual network adapter.
+        for unowned in [InterfaceIdentity::new(71, 2), InterfaceIdentity::new(72, 1)] {
+            for ipv6 in [false, true] {
+                let resource = Resource::Mtu { ipv6 };
+                let error = backend.read(&unowned, &resource).unwrap_err();
+                assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+                assert!(error.to_string().contains("interface ownership mismatch"));
+                let error = backend
+                    .compare_exchange(
+                        &unowned,
+                        &resource,
+                        &Some(Value::Mtu { mtu: 1500 }),
+                        &Some(Value::Mtu { mtu: u32::MAX }),
+                    )
+                    .unwrap_err();
+                assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+                assert!(error.to_string().contains("interface ownership mismatch"));
+            }
+        }
+    }
+
+    #[test]
     fn unread_stdin_cannot_block_the_control_deadline() {
         // A 60 KiB request exceeds the redirected pipe capacity. This actual
         // PowerShell child intentionally never reads it and would otherwise
@@ -629,6 +676,82 @@ mod tests {
             start.elapsed() < Duration::from_secs(15),
             "control timeout did not close the blocked pipes"
         );
+    }
+
+    fn read_mtu_from_mock_cim_row(row: &str, ipv6: bool) -> io::Result<Option<Value>> {
+        // Only test code provides this prefix. Execute the complete production
+        // RESOURCE_SCRIPT and its normal JSON input/output on system PowerShell.
+        let mocks = format!(
+            r#"
+function Get-NetAdapter {{
+  [CmdletBinding()]
+  param([switch]$IncludeHidden)
+  [pscustomobject]@{{InterfaceGuid=[guid]'00000000-0000-0000-0000-000000000001';ifIndex=71;HardwareInterface=$false}}
+}}
+function Get-NetIPInterface {{
+  [CmdletBinding()]
+  param([uint32]$InterfaceIndex,[string]$AddressFamily,[string]$PolicyStore)
+  if ($InterfaceIndex -ne 71 -or $AddressFamily -notin @('IPv4','IPv6') -or $PolicyStore -ne 'ActiveStore') {{ throw 'Wrong MTU query scope' }}
+  [pscustomobject]@{{{row}}}
+}}
+"#
+        );
+        run_json(
+            &format!("{mocks}\n{RESOURCE_SCRIPT}"),
+            &json!({
+                "mode":"read",
+                "interface":InterfaceIdentity::new(71, 1),
+                "resource":Resource::Mtu { ipv6 },
+            }),
+        )
+    }
+
+    #[test]
+    fn mtu_snapshot_reads_cim_nlmtu_instead_of_cmdlet_parameter_name() {
+        for (ipv6, mtu) in [(false, 1500), (true, 65535), (true, u32::MAX)] {
+            let actual = read_mtu_from_mock_cim_row(
+                &format!("NlMtu=[uint32]{mtu};NlMtuBytes=[uint32]0"),
+                ipv6,
+            )
+            .unwrap();
+            assert_eq!(actual, Some(Value::Mtu { mtu }));
+        }
+    }
+
+    #[test]
+    fn mtu_snapshot_rejects_missing_or_null_cim_property_without_inventing_zero() {
+        for row in [
+            "NlMtuBytes=[uint32]1500",
+            "NlMtu=$null;NlMtuBytes=[uint32]1500",
+        ] {
+            let error = read_mtu_from_mock_cim_row(row, false).unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains("Windows MTU snapshot missing NlMtu property or value"),
+                "{error}"
+            );
+        }
+    }
+
+    #[test]
+    fn real_net_ip_interface_exposes_non_null_cim_nlmtu_read_only() {
+        // Verify the actual Windows provider schema, without changing any
+        // adapter, route or MTU. Missing fields must fail, never cast to zero.
+        const READ_SCHEMA: &str = r#"
+$ErrorActionPreference='Stop'
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+$rows = @(Get-NetIPInterface -PolicyStore ActiveStore -ErrorAction Stop)
+if ($rows.Count -eq 0) { throw 'No real IP interfaces to verify' }
+$values = @($rows | ForEach-Object {
+  $property = $_.PSObject.Properties['NlMtu']
+  if ($null -eq $property -or $null -eq $property.Value) { throw 'Windows provider did not expose NlMtu' }
+  [uint32]$property.Value
+})
+ConvertTo-Json -InputObject $values -Compress
+"#;
+        let values: Vec<u32> = run_json(READ_SCHEMA, &json!({})).unwrap();
+        assert!(!values.is_empty());
     }
 
     #[test]
