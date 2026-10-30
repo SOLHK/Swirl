@@ -6,6 +6,7 @@
 #include "engine/EngineController.h"
 #include <QColor>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QImage>
 #include <QJsonArray>
@@ -29,7 +30,7 @@
 
 int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QString &directory) {
     if(!window||!controller)return 1;
-    QJsonArray checks,captures;QJsonObject minimumDefaultPicker;int failures=0;
+    QJsonArray checks,captures;QJsonObject minimumDefaultPicker,minimumAdvancedFocus;int failures=0;
     const auto check=[&](bool passed,const QString &name){checks.append(QJsonObject{{"name",name},{"passed",passed}});if(!passed)++failures;qInfo()<<(passed?"PASS":"FAIL")<<name;return passed;};
     std::function<QQuickItem *(QQuickItem *,const QString &)> find;
     find=[&](QQuickItem *parent,const QString &name)->QQuickItem *{if(parent->objectName()==name&&parent->isVisible())return parent;for(auto *child:parent->childItems())if(auto *found=find(child,name))return found;return nullptr;};
@@ -71,7 +72,7 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     };
     const auto fill=[&](const QString &name,const QString &text){auto *field=item(name);if(!check(field!=nullptr,QStringLiteral("Field exists: ")+name))return false;if(!check(std::all_of(text.cbegin(),text.cend(),[](QChar character){return character.unicode()<128;}),QStringLiteral("Keyboard fixture contains only ASCII input")))return false;field->forceActiveFocus();QTest::qWait(45);QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);for(const auto character:text)QTest::keyClick(window,character.toLatin1());return true;};
     auto *proxyBackend=dynamic_cast<PolicySystemProxyBackend *>(controller->systemProxy()->backend());
-    const auto finish=[&]{controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->policyBusy();},10000),QStringLiteral("Owned runtime and transaction finish before cleanup"));if(proxyBackend)check(!proxyBackend->current().owned&&proxyBackend->current().systemEnabled,QStringLiteral("Cleanup preserves the isolated external proxy after releasing only Swirl ownership"));if(!directory.isEmpty()){QDir().mkpath(directory);QFile report(directory+"/policy-ui.json");if(!report.open(QIODevice::WriteOnly))return 3;const QJsonObject proxyEvidence{{"backend",proxyBackend?"per-instance-memory":"missing"},{"takeovers",proxyBackend?proxyBackend->takeoverCalls:0},{"restores",proxyBackend?proxyBackend->restoreCalls:0},{"last_port",proxyBackend?proxyBackend->lastPort:0},{"last_pid",proxyBackend?double(proxyBackend->lastPid):0}};report.write(QJsonDocument(QJsonObject{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"checks",checks},{"captures",captures},{"minimum_default_picker",minimumDefaultPicker},{"system_proxy",proxyEvidence},{"failures",failures},{"scope","Isolated real Qt input, committed policy receipts, Rust runtime and controlled loopback peers. System-proxy ownership uses a per-instance in-memory adapter. No private-provider, host proxy, TUN or DNS mutations."}}).toJson());}return failures?2:0;};
+    const auto finish=[&]{controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->policyBusy();},10000),QStringLiteral("Owned runtime and transaction finish before cleanup"));if(proxyBackend)check(!proxyBackend->current().owned&&proxyBackend->current().systemEnabled,QStringLiteral("Cleanup preserves the isolated external proxy after releasing only Swirl ownership"));if(!directory.isEmpty()){QDir().mkpath(directory);QFile report(directory+"/policy-ui.json");if(!report.open(QIODevice::WriteOnly))return 3;const QJsonObject proxyEvidence{{"backend",proxyBackend?"per-instance-memory":"missing"},{"takeovers",proxyBackend?proxyBackend->takeoverCalls:0},{"restores",proxyBackend?proxyBackend->restoreCalls:0},{"last_port",proxyBackend?proxyBackend->lastPort:0},{"last_pid",proxyBackend?double(proxyBackend->lastPid):0}};report.write(QJsonDocument(QJsonObject{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"checks",checks},{"captures",captures},{"minimum_default_picker",minimumDefaultPicker},{"minimum_advanced_focus",minimumAdvancedFocus},{"system_proxy",proxyEvidence},{"failures",failures},{"scope","Isolated real Qt input, committed policy receipts, Rust runtime and controlled loopback peers. System-proxy ownership uses a per-instance in-memory adapter. No private-provider, host proxy, TUN or DNS mutations."}}).toJson());}return failures?2:0;};
     if(!check(proxyBackend!=nullptr,QStringLiteral("Policy UI acceptance has a per-instance system-proxy adapter before any user action")))return finish();
     check(proxyBackend->current().systemEnabled&&!proxyBackend->current().owned&&!controller->processAlive(),QStringLiteral("An external proxy starts enabled while Swirl remains stopped and unowned"));
     eval("Theme.reduceMotion=false;Theme.followSystemMotion=false");
@@ -467,7 +468,53 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     for(int strategy=1;strategy<=3;++strategy){
         click("addPolicyGroup");fill("policyGroupName",QString("Automatic fixture %1").arg(strategy));setCombo("policyGroupType",strategy);click("addPolicyGroupMember");chooseTarget("node",nodeA);click("policyGroupAdvanced");
         check(item("policyProbeFailureThreshold")&&item("policyProbeFailureThreshold")->property("text").toString()=="2",QStringLiteral("Advanced failure threshold exposes the core default"));
-        if(strategy==1){window->resize(window->minimumWidth(),window->minimumHeight());if(auto *field=item("policyProbeTolerance"))field->forceActiveFocus();QTest::qWait(120);check(reachable(item("policyProbeTolerance")),QStringLiteral("Keyboard focus reveals the last advanced field at minimum window size"));}
+        if(strategy==1){
+            const auto rectEvidence=[](const QRectF &rect){return QJsonObject{{"x",rect.x()},{"y",rect.y()},{"width",rect.width()},{"height",rect.height()}};};
+            const auto focusEvidence=[&]{
+                QJsonObject evidence{{"windowWidth",window->width()},{"windowHeight",window->height()},
+                    {"minimumWidth",window->minimumWidth()},{"minimumHeight",window->minimumHeight()},
+                    {"activeFocusName",window->activeFocusItem()?window->activeFocusItem()->objectName():QString()}};
+                auto *field=item("policyProbeTolerance");
+                evidence.insert("fieldPresent",field!=nullptr);
+                if(field){
+                    const auto center=field->mapToScene(QPointF(field->width()/2,field->height()/2));
+                    QJsonArray ancestors;qreal opacity=1;
+                    for(auto *ancestor=field;ancestor;ancestor=ancestor->parentItem()){
+                        const QRectF clipRect(ancestor->mapToScene(QPointF()),ancestor->size());
+                        opacity*=ancestor->opacity();
+                        ancestors.append(QJsonObject{{"objectName",ancestor->objectName()},
+                            {"type",QString::fromLatin1(ancestor->metaObject()->className())},{"clip",ancestor->clip()},
+                            {"opacity",ancestor->opacity()},{"sceneRect",rectEvidence(clipRect)},
+                            {"containsFieldCenter",clipRect.contains(center)}});
+                    }
+                    evidence.insert("field",QJsonObject{{"sceneRect",rectEvidence(QRectF(field->mapToScene(QPointF()),field->size()))},
+                        {"visible",field->isVisible()},{"enabled",field->isEnabled()},{"activeFocus",field->hasActiveFocus()},
+                        {"effectiveOpacity",opacity},{"sameWindow",field->window()==window},
+                        {"centerX",center.x()},{"centerY",center.y()},{"ancestors",ancestors}});
+                }
+                if(auto *form=item("policyGroupForm")){
+                    auto *viewport=qvariant_cast<QQuickItem *>(form->property("viewport"));
+                    auto *body=qvariant_cast<QQuickItem *>(form->property("formBody"));
+                    evidence.insert("form",QJsonObject{{"sceneRect",rectEvidence(QRectF(form->mapToScene(QPointF()),form->size()))},
+                        {"contentHeight",form->property("contentHeight").toReal()},{"availableHeight",form->property("availableHeight").toReal()},
+                        {"viewportPresent",viewport!=nullptr},{"viewportHeight",viewport?viewport->height():-1},
+                        {"contentY",viewport?viewport->property("contentY").toReal():-1},
+                        {"bodyPresent",body!=nullptr},{"bodyHeight",body?body->height():-1},{"bodyImplicitHeight",body?body->implicitHeight():-1}});
+                }
+                return evidence;
+            };
+            minimumAdvancedFocus.insert("beforeResize",focusEvidence());
+            window->resize(window->minimumWidth(),window->minimumHeight());
+            if(auto *field=item("policyProbeTolerance"))field->forceActiveFocus();
+            QElapsedTimer focusWait;focusWait.start();QTest::qWait(120);
+            const qreal actualWaitMs=focusWait.nsecsElapsed()/1000000.0;
+            const bool focusReachable=reachable(item("policyProbeTolerance"));
+            minimumAdvancedFocus.insert("afterWait",focusEvidence());
+            minimumAdvancedFocus.insert("requestedWaitMs",120);minimumAdvancedFocus.insert("actualWaitMs",actualWaitMs);
+            minimumAdvancedFocus.insert("reachable",focusReachable);
+            qInfo().noquote()<<"POLICY_MINIMUM_ADVANCED_FOCUS"<<QJsonDocument(minimumAdvancedFocus).toJson(QJsonDocument::Compact);
+            check(focusReachable,QStringLiteral("Keyboard focus reveals the last advanced field at minimum window size"));
+        }
         click("savePolicyGroup");awaitSaved(QStringLiteral("Automatic strategy and advanced values are saved offline"));
         const auto group=recordNamed(controller->strategyGroups(),QString("Automatic fixture %1").arg(strategy)),probe=group.value("probe").toMap();
         check(group.value("strategy")==QStringList{"manual","url_test","fallback","load_balance"}[strategy]&&probe.value("failure_threshold").toInt()==2&&probe.value("tolerance_ms").toInt()==(strategy==1?50:0),QStringLiteral("Committed strategy and probe values match the selected type"));

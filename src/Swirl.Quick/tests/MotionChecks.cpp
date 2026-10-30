@@ -2,6 +2,7 @@
 #include "ActivityPerfTrace.h"
 #include "RouteBench.h"
 #include "app/MotionPolicy.h"
+#include "app/SwirlConnectionRows.h"
 #include <QQuickWindow>
 #include <QAccessible>
 #include <QGuiApplication>
@@ -768,6 +769,36 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
             check("connections-status-filter-uses-actual-field",evalOn(connectionPage,"visibleRows.length===600 && visibleRows.every(row=>row.status==='活动')").toBool());
             connectionStatus->setProperty("currentIndex",0);activityWait(80);
             check("large-connection-table-virtualizes-delegates",connectionTable->property("renderedRows").toInt()>0&&connectionTable->property("renderedRows").toInt()<80&&connectionTable->property("incrementalRows").toBool());
+            const QPointer<SwirlConnectionRows> nativeConnectionRows=qobject_cast<SwirlConnectionRows *>(
+                qvariant_cast<QObject *>(evalOn(connectionTable,"externalModel")));
+            auto *connectionViewport=activityVisual(connectionTable,"tableRowsViewport");
+            const bool nativeModelBound=nativeConnectionRows&&connectionViewport
+                &&qvariant_cast<QObject *>(evalOn(connectionViewport,"model"))==nativeConnectionRows.data();
+            const int sourceRowCount=evalOn(connectionPage,"connectionRows.length").toInt();
+            const int visibleRowCount=evalOn(connectionPage,"visibleRows.length").toInt();
+            const int telemetryRowCount=int(controller->telemetry()->connections().size());
+            const bool completeEntries=nativeConnectionRows&&evalOn(connectionTable,
+                "rows.length===externalModel.count && rows.every((row,index)=>"
+                "JSON.stringify(externalModel.get(index))===JSON.stringify(row))").toBool();
+            const bool reuseDisabled=connectionViewport&&connectionTable->property("disableReuseForExternalRows").toBool()
+                &&!connectionViewport->property("reuseItems").toBool();
+            dataSamples.append(QJsonObject{{"phase","native-connection-model"},
+                {"modelClass",nativeConnectionRows?QString::fromLatin1(nativeConnectionRows->metaObject()->className()):QString()},
+                {"modelCount",nativeConnectionRows?nativeConnectionRows->count():-1},
+                {"modelError",nativeConnectionRows?nativeConnectionRows->error():QStringLiteral("native model missing")},
+                {"fixtureRows",int(fixture.connections.size())},{"telemetryRows",telemetryRowCount},
+                {"sourceRows",sourceRowCount},{"visibleRows",visibleRowCount},
+                {"listViewUsesNativeModel",nativeModelBound},{"completeEntriesMatch",completeEntries},
+                {"reuseExplicitlyDisabled",reuseDisabled},{"projectionEvents",connectionTable->property("externalProjectionEvents").toBool()}});
+            check("connection-table-listview-uses-real-native-model",nativeModelBound);
+            check("native-connection-model-retains-all-real-fixture-rows",nativeConnectionRows
+                &&nativeConnectionRows->count()==int(fixture.connections.size())
+                &&nativeConnectionRows->count()==telemetryRowCount
+                &&nativeConnectionRows->count()==sourceRowCount&&nativeConnectionRows->count()==visibleRowCount);
+            check("native-connection-model-preserves-complete-visible-records",completeEntries);
+            check("native-connection-model-reports-no-input-error",nativeConnectionRows&&nativeConnectionRows->error().isEmpty());
+            check("native-connection-model-keeps-detail-source-delegates-unreused",reuseDisabled
+                &&connectionTable->property("externalProjectionEvents").toBool());
             QQuickItem *lastSelectedDetail=nullptr;
             for(int row=0;row<2;++row){
                 const QString id=QString("activity-fixture-%1").arg(row);

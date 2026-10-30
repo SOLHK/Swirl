@@ -7,6 +7,8 @@ Item {
     property var columns:[{key:"name",label:"名称",w:220}]
     property var rows:[]
     property var externalModel:null
+    property bool externalProjectionEvents:false
+    property bool disableReuseForExternalRows:false
     property QtObject performanceObserver:null
     property bool incrementalRows:false
     property bool sectioned:false
@@ -98,7 +100,7 @@ Item {
         })
     }
     Connections {target:stableRows;function onAboutToSync(){table.beginProjection()}function onSynced(){table.endProjection()}}
-    Connections {target:table.sectioned?table.externalModel:null;ignoreUnknownSignals:true;function onAboutToSync(){table.beginProjection()}function onSynced(){table.endProjection()}}
+    Connections {target:table.sectioned||table.externalProjectionEvents?table.externalModel:null;ignoreUnknownSignals:true;function onAboutToSync(){table.beginProjection()}function onSynced(){table.endProjection()}}
     property bool managedSelection:false
     property bool animateRowChanges:false
     property bool animateLatency:false
@@ -114,7 +116,7 @@ Item {
     }
     function focusRowAt(index){const row=list.itemAtIndex(index);if(row){list.currentIndex=index;chooseRow(row,false)}}
     readonly property int renderedRows:list.contentItem.children.length
-    SwirlAnimatedModel{id:stableRows;source:table.incrementalRows?table.rows:[];keyRole:"id";performanceObserver:table.performanceObserver}
+    SwirlAnimatedModel{id:stableRows;source:table.externalModel===null&&table.incrementalRows?table.rows:[];keyRole:"id";performanceObserver:table.performanceObserver}
     property string selectedId:""
     property Item selectedItem:null
     property int itemHeight:Theme.tableRowHeight
@@ -206,7 +208,7 @@ Item {
                 height:Math.max(0,horizontal.height-table.headerHeight-(horizontal.contentWidth>horizontal.width?Theme.dp(10):0))
                 clip:true
                 model:table.externalModel!==null?table.externalModel:table.incrementalRows?stableRows:table.rows
-                reuseItems:table.externalModel!==null
+                reuseItems:table.externalModel!==null&&!table.disableReuseForExternalRows
                 boundsBehavior:Flickable.StopAtBounds
                 pixelAligned:false
                 activeFocusOnTab:true

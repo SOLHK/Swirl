@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import queue
+import select
 import socket
 import ssl
 import sys
@@ -84,10 +85,28 @@ def serve(directory):
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(directory / "leaf-chain.pem", directory / "leaf-key.pem")
     context.set_alpn_protocols(["h2", "http/1.1"])
-    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    listener.bind(("127.0.0.1", 0))
-    listener.listen(8)
-    listener.settimeout(0.2)
+    # The advertised TLS hostname is localhost, whose native resolution may
+    # prefer either loopback family. Serve both on the same port without ever
+    # listening on a wildcard address or depending on client fallback behavior.
+    listeners = []
+    port = 0
+    try:
+        for family, address in ((socket.AF_INET, "127.0.0.1"), (socket.AF_INET6, "::1")):
+            listener = socket.socket(family, socket.SOCK_STREAM)
+            listeners.append(listener)
+            if family == socket.AF_INET6:
+                listener.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+            listener.bind((address, port))
+            port = listener.getsockname()[1]
+            listener.listen(8)
+            listener.settimeout(0.2)
+        resolved = sorted({(family.name, address[0]) for family, _, _, _, address in
+                           socket.getaddrinfo("localhost", port, type=socket.SOCK_STREAM,
+                                              proto=socket.IPPROTO_TCP)})
+    except Exception:
+        for listener in listeners:
+            listener.close()
+        raise
     stopping = threading.Event()
     output_lock, state_lock = threading.Lock(), threading.Lock()
     responses = {}
@@ -167,20 +186,32 @@ def serve(directory):
         identifier = 0
         while not stopping.is_set():
             try:
-                raw, _ = listener.accept()
-            except socket.timeout:
-                continue
-            except OSError:
-                break
-            identifier += 1
-            worker = threading.Thread(target=connection, args=(raw, identifier), daemon=True)
-            workers.append(worker)
-            worker.start()
+                readable, _, _ = select.select(listeners, [], [], 0.2)
+            except (OSError, ValueError):
+                if stopping.is_set():
+                    break
+                raise
+            for listener in readable:
+                try:
+                    raw, _ = listener.accept()
+                except socket.timeout:
+                    continue
+                except OSError:
+                    if stopping.is_set():
+                        return
+                    raise
+                identifier += 1
+                worker = threading.Thread(target=connection, args=(raw, identifier), daemon=True)
+                workers.append(worker)
+                worker.start()
 
     accept_thread = threading.Thread(target=accept, daemon=True)
     accept_thread.start()
-    emit("ready", port=listener.getsockname()[1], tls=ssl.OPENSSL_VERSION,
-         bound=list(listener.getsockname()), family="AF_INET", python=sys.version.split()[0],
+    emit("ready", port=port, tls=ssl.OPENSSL_VERSION,
+         listeners=[{"bound": list(listener.getsockname()), "family": listener.family.name}
+                    for listener in listeners],
+         localhost_resolution=[{"family": family, "address": address} for family, address in resolved],
+         python=sys.version.split()[0],
          executable=sys.executable, observed_utc=datetime.now(timezone.utc).isoformat())
     try:
         for line in sys.stdin:
@@ -194,7 +225,8 @@ def serve(directory):
             pending.put_nowait(message)
     finally:
         stopping.set()
-        listener.close()
+        for listener in listeners:
+            listener.close()
         accept_thread.join(timeout=1)
         with state_lock:
             pending_responses = list(responses.values())

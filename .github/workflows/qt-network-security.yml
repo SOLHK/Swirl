@@ -204,6 +204,7 @@ jobs:
           path: |
             build/qt-product/subscription-security.xml
             build/qt-product/qt-network-policy.xml
+            build/qt-product/swirl-telemetry-accounting.xml
             build/qt-product/Testing/Temporary/LastTest.log
             build/qt-product/Release/Swirl-diagnostics.txt
           if-no-files-found: error

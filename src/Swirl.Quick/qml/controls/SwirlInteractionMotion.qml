@@ -7,6 +7,8 @@ Item {
     property bool pressed:false
     property bool focused:false
     property bool controlEnabled:true
+    property Item pressSurfaceTarget:null
+    property Item pressContentTarget:null
     property real hover:0
     property real contact:0
     property real focusAmount:0
@@ -49,6 +51,9 @@ Item {
         window:feedback.Window.window
         to:1
         duration:SwirlMotion.pressDuration
+        surfaceTarget:feedback.pressSurfaceTarget
+        contentTarget:feedback.pressContentTarget
+        minimumScale:SwirlMotion.pressScale
         // The press clock and release spring are mutually exclusive. Keep
         // contact writable so reversing either phase preserves its last pose.
         onValueChanged:feedback.contact=pressTravel.value

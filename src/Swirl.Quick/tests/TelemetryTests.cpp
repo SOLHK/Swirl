@@ -93,8 +93,15 @@ private slots:
      QCOMPARE(row.value("uploadBytes").toDouble(),entry.value("up").toDouble());QCOMPARE(row.value("downloadBytes").toDouble(),entry.value("down").toDouble());QCOMPARE(row.value("connections").toDouble(),entry.value("count").toDouble());
     }
    }
-   model.flush();QFile saved(path);QVERIFY(saved.open(QIODevice::ReadOnly));const auto document=QJsonDocument::fromJson(saved.readAll()).object();
-   QCOMPARE(document.value("days").toObject(),expected);QCOMPARE(document.value("history").toArray(),QJsonArray::fromVariantList(history));
+   model.flush();QFile saved(path);QVERIFY(saved.open(QIODevice::ReadOnly));const auto savedBytes=saved.readAll();
+   const auto expectedBytes=QJsonDocument(QJsonObject{{"schema",1},{"days",expected},{"history",QJsonArray::fromVariantList(history)}}).toJson(QJsonDocument::Compact);
+   QCOMPARE(savedBytes,expectedBytes);
+   // Qt parses the exact 2^53+6 JSON number as an integer although the
+   // arithmetic reference holds a double. Compare equally parsed documents;
+   // the byte comparison above still requires the entire exact stored payload.
+   const auto document=QJsonDocument::fromJson(savedBytes).object();
+   const auto persistedExpected=QJsonDocument::fromJson(expectedBytes).object();
+   QCOMPARE(document.value("days").toObject(),persistedExpected.value("days").toObject());QCOMPARE(document.value("history").toArray(),persistedExpected.value("history").toArray());
   };
   const auto yesterday=QDate::currentDate().addDays(-1);const auto firstTime=QDateTime(yesterday,QTime(12,0)).toMSecsSinceEpoch();
   const auto firstDay=yesterday.toString(Qt::ISODate);model.m_days[firstDay]=QJsonObject{{"devices",QJsonObject{}}};
@@ -144,7 +151,11 @@ private slots:
   advance(todayTime+6000);
   const auto countedOverflow=model.m_days.value(today).toObject().value("apps").toObject().value(overflowKey).toObject();
   QCOMPARE(countedOverflow.value("count").toDouble(),1.0);QCOMPARE(countedOverflow.value("extra").toObject(),retainedMetadata);
-  TelemetryService restored(path,false);QCOMPARE(restored.m_days,model.m_days);QCOMPARE(restored.m_history,model.m_history);
+  TelemetryService restored(path,false);
+  const auto originalDays=QJsonDocument(model.m_days).toJson(QJsonDocument::Compact);
+  QCOMPARE(restored.m_days,QJsonDocument::fromJson(originalDays).object());
+  QCOMPARE(QJsonDocument(restored.m_days).toJson(QJsonDocument::Compact),originalDays);
+  QCOMPARE(restored.m_history,model.m_history);
   for(int period=0;period<4;++period){QCOMPARE(restored.summary(period),model.summary(period));QCOMPARE(restored.distribution(period),model.distribution(period));}
  }
  void completeSourceRankingKeepsRecordedRowsAndNumericBytes(){

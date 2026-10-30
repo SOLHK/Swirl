@@ -131,6 +131,13 @@ Item {
         } finally {if(observer)observer.mark(6,false)}
         return rows
     }
+    SwirlConnectionRows {
+        id:connectionRowsModel
+        objectName:"activityConnectionRowsModel"
+        sourceRows:page.visibleRows
+        performanceObserver:page.performanceObserver
+        onErrorChanged:if(error.length)console.error("Connection rows rejected:",error)
+    }
     ColumnLayout {
         anchors.fill:parent;anchors.margins:page.embedded?0:Theme.pagePadding;spacing:Theme.dp(16)
         Item {id:connectionSummary;visible:!page.embedded;property color color:Theme.material("content");Layout.fillWidth:true;implicitHeight:heading.implicitHeight
@@ -154,6 +161,11 @@ Item {
         GridLayout {Layout.fillWidth:true;Layout.fillHeight:true;columns:page.compact?1:2;columnSpacing:Theme.sectionGap;rowSpacing:Theme.sectionGap
             Item {Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:Theme.dp(100)
                 SwirlDataTable {id:connectionTable;objectName:"connectionTable";anchors.fill:parent;incrementalRows:true;animateRowChanges:false;rows:page.visibleRows;selectedId:page.selected?page.selected.id:"";minimal:true
+                    externalModel:connectionRowsModel
+                    externalProjectionEvents:true
+                    // Detail return owns the live source delegate; a pooled row
+                    // must never be retargeted to a different connection.
+                    disableReuseForExternalRows:true
                     performanceObserver:page.performanceObserver
                     columns:[{key:"host",label:qsTr("域名"),w:220,min:160},{key:"ip",label:qsTr("IP 地址"),w:125,min:120},{key:"process",label:qsTr("进程"),w:115,min:100},{key:"protocol",label:qsTr("协议"),w:80,min:70},{key:"policy",label:qsTr("策略"),w:119,min:100},{key:"up",label:qsTr("上传"),w:89,min:86},{key:"down",label:qsTr("下载"),w:100,min:86},{key:"latency",label:qsTr("耗时"),w:95,min:84},{key:"time",label:qsTr("建立时间"),w:108,min:110},{key:"status",label:qsTr("状态"),w:88,min:80}]
                     onRowSelected:function(record){

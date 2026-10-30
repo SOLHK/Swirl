@@ -5,6 +5,7 @@
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QElapsedTimer>
+#include <QHostInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -74,6 +75,11 @@ public:
         evidence.insert("qt", QString::fromLatin1(qVersion()));
         evidence.insert("tlsBackend", QSslSocket::activeBackend());
         evidence.insert("tlsLibrary", QSslSocket::sslLibraryVersionString());
+        const auto localhost = QHostInfo::fromName(QStringLiteral("localhost"));
+        QJsonArray addresses;
+        for (const auto &address : localhost.addresses()) addresses.append(address.toString());
+        evidence.insert("localhostResolution", QJsonObject{{"addresses", addresses},
+            {"error", int(localhost.error())}, {"errorString", localhost.errorString()}});
         qWarning().noquote() << "HTTP_POLICY_FAILURE" << QJsonDocument(evidence).toJson(QJsonDocument::Compact);
     }
 private:
@@ -105,6 +111,10 @@ public:
         });
     }
     ~Origin() override {
+        // Scope teardown follows the original assertions. Preserve the actual
+        // accepted loopback family on success as well as on a failure path.
+        if (secure && tlsPort)
+            qInfo().noquote() << "TLS_FIXTURE_SUMMARY" << QJsonDocument(evidence()).toJson(QJsonDocument::Compact);
         if (tlsProcess.state() != QProcess::NotRunning) {
             send({{"command", "quit"}});
             tlsProcess.closeWriteChannel();

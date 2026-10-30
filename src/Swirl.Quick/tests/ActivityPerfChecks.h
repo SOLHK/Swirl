@@ -84,7 +84,13 @@ static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
         tables[index]=activityVisual(window->contentItem(),tableNames[index]);check("table-present-"+tableNames[index],tables[index]!=nullptr);
         if(!tables[index])continue;
         auto rowsTap=std::make_unique<RouteBenchSignalTap>();rowsTap->callback=[&,index]{++rowChanges[index];};QQmlProperty(tables[index],"rows").connectNotifySignal(rowsTap.get(),SLOT(record()));taps.push_back(std::move(rowsTap));
-        for(auto *model:tables[index]->findChildren<QObject *>())if(model->metaObject()->indexOfSignal("synced()")>=0){auto tap=std::make_unique<RouteBenchSignalTap>();tap->callback=[&,index]{++projections[index];};QObject::connect(model,SIGNAL(synced()),tap.get(),SLOT(record()));taps.push_back(std::move(tap));break;}
+        // External native rows are owned by the page, not by the table. Observe
+        // the model actually displayed before falling back to its internal one.
+        QObject *model=invoke(tables[index],"externalModel").value<QObject *>();
+        if(!model)for(auto *candidate:tables[index]->findChildren<QObject *>())if(candidate->metaObject()->indexOfSignal("synced()")>=0){model=candidate;break;}
+        bool projectionObserverAttached=false;
+        if(model&&model->metaObject()->indexOfSignal("synced()")>=0){auto tap=std::make_unique<RouteBenchSignalTap>();tap->callback=[&,index]{++projections[index];};projectionObserverAttached=bool(QObject::connect(model,SIGNAL(synced()),tap.get(),SLOT(record())));taps.push_back(std::move(tap));}
+        check("model-projection-observer-attached-"+tableNames[index],projectionObserverAttached);
     }
     check("real-model-retains-all-connections",telemetry->connections().size()==rowCount);
     auto *scrollViewport=tables[1]?activityVisual(tables[1],"tableRowsViewport"):nullptr;

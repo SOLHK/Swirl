@@ -18,6 +18,7 @@
 #include <QFontMetricsF>
 #include <QFontDatabase>
 #include <QCursor>
+#include <QMouseEvent>
 #include <QElapsedTimer>
 #include <QDateTime>
 #include <QFileInfo>
@@ -34,9 +35,17 @@
 #include <functional>
 #include <memory>
 #include <QSGRendererInterface>
+#include <QSGTransformNode>
+#include <private/qquickitem_p.h>
 #ifdef Q_OS_WIN
 #include <private/qrhid3d11_p.h>
 #endif
+
+static QJsonArray appearanceMatrixValues(const QMatrix4x4 &matrix) {
+    QJsonArray values;
+    for(int row=0;row<4;++row)for(int column=0;column<4;++column)values.append(matrix(row,column));
+    return values;
+}
 
 static QJsonObject appearanceSwapChainProbe(QQuickWindow *window) {
     QJsonObject result{{"scope","read-only normal-frame barrier before timed input"}};
@@ -315,6 +324,11 @@ Item {
                             qreal renderEndMs=-1;
                             qreal surfaceScale=1;
                             qreal contentScale=1;
+                            qreal surfaceScaleY=1,contentScaleY=1;
+                            qreal surfacePropertyScale=1,contentPropertyScale=1;
+                            qreal geometryCapturedMs=-1;
+                            QMatrix4x4 surfaceMatrix,contentMatrix;
+                            bool hasSceneGraphNodes=false,geometryValid=false;
                             bool hasContent=false;
                             QJsonArray frames;
                         };
@@ -330,11 +344,12 @@ Item {
                                 ?std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count():-1;
                         },Qt::DirectConnection);
                         // Qt 6.12 advances GUI animations after its sync wait.
-                        // A queued frameSwapped handler can therefore read the next
-                        // frame's item values. Capture only public item scale getters
-                        // while the GUI thread is blocked for synchronization, then
-                        // timestamp that exact frame queued for presentation on the rendering
-                        // thread. This is not a physical display scan-out timestamp.
+                        // A queued frameSwapped handler can read the next frame's
+                        // values, and itemTransform() can recompute a matrix that was
+                        // never adopted by the scene graph. Keep GUI scale as a
+                        // diagnostic, but capture the actual existing SG nodes after
+                        // sync, then pair those matrices with this frame's submission.
+                        // This is not a physical display scan-out timestamp.
                         const auto pressSync=QObject::connect(window,&QQuickWindow::beforeSynchronizing,&pressContext,[presented,paint,content]{
                             QMutexLocker lock(&presented->mutex);
                             if(!presented->armed)return;
@@ -343,11 +358,35 @@ Item {
                             presented->synchronizedMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
                             presented->renderStartMs=-1;
                             presented->renderEndMs=-1;
-                            presented->surfaceScale=paint->scale();
+                            presented->surfacePropertyScale=paint->scale();
                             presented->hasContent=content!=nullptr;
-                            presented->contentScale=content?content->scale():0;
+                            presented->contentPropertyScale=content?content->scale():0;
+                            presented->geometryCapturedMs=-1;
+                            presented->hasSceneGraphNodes=false;presented->geometryValid=false;
                             ++presented->frame;
                             presented->pending=true;
+                        },Qt::DirectConnection);
+                        const auto pressGeometry=QObject::connect(window,&QQuickWindow::afterSynchronizing,&pressContext,[presented,paint,content]{
+                            QMutexLocker lock(&presented->mutex);
+                            if(!presented->armed||!presented->pending)return;
+                            // Qt6.12's itemNodeInstance is the already-created node.
+                            // Calling itemNode() here would create a missing node and
+                            // turn this observation into a scene-graph mutation.
+                            const auto *surfaceNode=QQuickItemPrivate::get(paint)->itemNodeInstance;
+                            const auto *contentNode=content?QQuickItemPrivate::get(content)->itemNodeInstance:nullptr;
+                            presented->geometryCapturedMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
+                            presented->hasSceneGraphNodes=surfaceNode&&contentNode;
+                            if(!presented->hasSceneGraphNodes)return;
+                            presented->surfaceMatrix=surfaceNode->matrix();presented->contentMatrix=contentNode->matrix();
+                            bool finite=true;
+                            for(int row=0;row<4;++row)for(int column=0;column<4;++column)
+                                finite=finite&&qIsFinite(presented->surfaceMatrix(row,column))&&qIsFinite(presented->contentMatrix(row,column));
+                            const auto scaleX=[](const QMatrix4x4 &matrix){return qSqrt(qreal(matrix(0,0))*matrix(0,0)+qreal(matrix(1,0))*matrix(1,0));};
+                            const auto scaleY=[](const QMatrix4x4 &matrix){return qSqrt(qreal(matrix(0,1))*matrix(0,1)+qreal(matrix(1,1))*matrix(1,1));};
+                            presented->surfaceScale=scaleX(presented->surfaceMatrix);presented->surfaceScaleY=scaleY(presented->surfaceMatrix);
+                            presented->contentScale=scaleX(presented->contentMatrix);presented->contentScaleY=scaleY(presented->contentMatrix);
+                            presented->geometryValid=finite&&presented->surfaceScale>0&&presented->surfaceScaleY>0
+                                &&presented->contentScale>0&&presented->contentScaleY>0;
                         },Qt::DirectConnection);
                         const auto pressRenderStart=QObject::connect(window,&QQuickWindow::beforeRendering,&pressContext,[presented]{
                             QMutexLocker lock(&presented->mutex);
@@ -368,7 +407,13 @@ Item {
                                 {"synchronizedMs",presented->synchronizedMs},{"swappedMs",elapsed},
                                 {"renderStartMs",presented->renderStartMs},{"renderEndMs",presented->renderEndMs},
                                 {"down",presented->inputDown},{"surfaceScale",presented->surfaceScale},
-                                {"contentScale",presented->contentScale},{"hasContent",presented->hasContent}});
+                                {"contentScale",presented->contentScale},{"hasContent",presented->hasContent},
+                                {"surfaceScaleY",presented->surfaceScaleY},{"contentScaleY",presented->contentScaleY},
+                                {"surfacePropertyScale",presented->surfacePropertyScale},{"contentPropertyScale",presented->contentPropertyScale},
+                                {"geometryCapturedMs",presented->geometryCapturedMs},{"hasSceneGraphNodes",presented->hasSceneGraphNodes},
+                                {"geometryValid",presented->geometryValid},
+                                {"surfaceMatrix",appearanceMatrixValues(presented->surfaceMatrix)},
+                                {"contentMatrix",appearanceMatrixValues(presented->contentMatrix)}});
                             presented->pending=false;
                         },Qt::DirectConnection);
                         // QTest::qWait polls with sleeps of up to10ms, which can
@@ -376,16 +421,24 @@ Item {
                         QEventLoop pressObservation;
                         QTimer pressDeadline;pressDeadline.setTimerType(Qt::PreciseTimer);pressDeadline.setSingleShot(true);
                         QObject::connect(&pressDeadline,&QTimer::timeout,&pressObservation,&QEventLoop::quit);
+                        const QPointF globalAt=window->mapToGlobal(at);
+                        QMouseEvent pressEvent(QEvent::MouseButtonPress,QPointF(at),globalAt,
+                            Qt::LeftButton,Qt::LeftButton,Qt::NoModifier);
                         {
                             QMutexLocker lock(&presented->mutex);
                             presented->start=std::chrono::steady_clock::now();
+                            presented->armed=true;
                         }
                         pressClock.start();pressDeadline.start(40);
-                        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at);samplePress("inputDelivered");
+                        // Qt 6.12's QTest mouse helper drains processEvents after
+                        // delivery. Send the same-stack press before entering the
+                        // observation loop so its first frame cannot escape arming.
+                        const bool pressDelivered=QCoreApplication::sendEvent(window,&pressEvent);
+                        samplePress("inputDelivered");
+                        const bool pressDown=control->property("down").toBool();
                         {
                             QMutexLocker lock(&presented->mutex);
-                            presented->inputDown=control->property("down").toBool();
-                            presented->armed=true;
+                            presented->inputDown=pressDown;
                         }
                         pressObservation.exec();
                         samplePress("deadlineObservation");
@@ -400,27 +453,38 @@ Item {
                             presented->armed=false;
                             presentedFrames=presented->frames;
                         }
-                        QObject::disconnect(pressFrameBegin);QObject::disconnect(pressSync);QObject::disconnect(pressRenderStart);
+                        QObject::disconnect(pressFrameBegin);QObject::disconnect(pressSync);QObject::disconnect(pressGeometry);QObject::disconnect(pressRenderStart);
                         QObject::disconnect(pressRenderEnd);QObject::disconnect(pressSwap);
+                        check(pressDelivered&&pressDown,"same-stack timed press reaches the actual control");
                         bool contractedWithin40ms=false;
+                        bool submittedGeometryPresent=!presentedFrames.isEmpty();
                         for(const auto &frame:presentedFrames){
                             const auto sample=frame.toObject();
+                            submittedGeometryPresent=submittedGeometryPresent&&sample.value("hasSceneGraphNodes").toBool()&&sample.value("geometryValid").toBool();
                             if(sample.value("swappedMs").toDouble()<=40&&sample.value("down").toBool()
+                                &&sample.value("hasSceneGraphNodes").toBool()&&sample.value("geometryValid").toBool()
                                 &&sample.value("surfaceScale").toDouble()<.995&&sample.value("hasContent").toBool()
-                                &&qAbs(sample.value("contentScale").toDouble()-sample.value("surfaceScale").toDouble())<.001)
+                                &&sample.value("surfaceScaleY").toDouble()<.995
+                                &&qAbs(sample.value("contentScale").toDouble()-sample.value("surfaceScale").toDouble())<.001
+                                &&qAbs(sample.value("contentScaleY").toDouble()-sample.value("surfaceScaleY").toDouble())<.001)
                                 contractedWithin40ms=true;
                         }
                         qInfo().noquote()<<"CONTROL_PRESS_FRAMES"<<theme<<name<<QJsonDocument(pressFrames).toJson(QJsonDocument::Compact);
                         qInfo().noquote()<<"CONTROL_PRESS_SUBMITTED_FRAMES"<<theme<<name
                             <<"legacyObservedWithin40ms"<<legacyObservedWithin40ms<<QJsonDocument(presentedFrames).toJson(QJsonDocument::Compact);
+                        check(submittedGeometryPresent,"submitted press frames contain finite scene-graph transforms for surface and label");
                         check(contractedWithin40ms,"a short press contracts both the surface and its label within the first40ms");
                         QObject::disconnect(pressAnimation);QObject::disconnect(pressDelivery);
                         QTest::qWait(100);
                         check(control->property("down").toBool()&&paint->property("color").value<QColor>()!=hovered,"shared button provides a distinct pressed surface");
                         check(QQmlProperty(paint,"border.width").read().toReal()==0,"press feedback does not introduce an outline stroke");
-                        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,at);
+                        QMouseEvent releaseEvent(QEvent::MouseButtonRelease,QPointF(at),globalAt,
+                            Qt::LeftButton,Qt::NoButton,Qt::NoModifier);
+                        const bool releaseDelivered=QCoreApplication::sendEvent(window,&releaseEvent);
+                        const bool released=!control->property("down").toBool();
                         QTest::qWait(30);
                         check(paint->scale()<.999,"release continues from the pressed frame through a spring return");
+                        check(releaseDelivered&&released,"same-stack timed release reaches the actual control");
                         check(QTest::qWaitFor([&]{return qAbs(paint->scale()-1)<.001;},1400),"released button springs back to its resting scale");
                     }
                     control->setEnabled(false);

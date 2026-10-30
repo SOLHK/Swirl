@@ -236,7 +236,7 @@ qt_add_qml_module(Swirl
     RESOURCE_PREFIX /qt/qml
     NO_GENERATE_EXTRA_QMLDIRS
     QML_FILES ${SWIRL_QML_FILES}
-    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp app/WindowEdge.h app/WindowEdge.cpp app/RibbonStroke.h app/RibbonStroke.cpp app/WholeFeatherItem.h app/WholeFeatherItem.cpp app/SwirlPressClock.h app/SwirlPressClock.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp app/NodeViewModel.h app/NodeViewModel.cpp app/NodeSectionModel.h app/NodeSectionModel.cpp
+    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp app/WindowEdge.h app/WindowEdge.cpp app/RibbonStroke.h app/RibbonStroke.cpp app/WholeFeatherItem.h app/WholeFeatherItem.cpp app/SwirlPressClock.h app/SwirlPressClock.cpp app/SwirlConnectionRows.h app/SwirlConnectionRows.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp app/NodeViewModel.h app/NodeViewModel.cpp app/NodeSectionModel.h app/NodeSectionModel.cpp
 )
 set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 file(GLOB SWIRL_UI_ICONS CONFIGURE_DEPENDS "${SWIRL_ASSET_PATH}/icons/ui/*.svg")
@@ -302,6 +302,20 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  target_include_directories(SwirlNodeSectionModelTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
  add_test(NAME swirl-node-section-model COMMAND SwirlNodeSectionModelTests)
  set_tests_properties(swirl-node-section-model PROPERTIES TIMEOUT 60)
+ qt_add_executable(SwirlConnectionRowsTests tests/ConnectionRowsTests.cpp app/SwirlConnectionRows.h app/SwirlConnectionRows.cpp)
+ target_link_libraries(SwirlConnectionRowsTests PRIVATE Qt6::Qml Qt6::Gui Qt6::Test)
+ target_include_directories(SwirlConnectionRowsTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+ if(MSVC)
+  target_compile_options(SwirlConnectionRowsTests PRIVATE /utf-8)
+ endif()
+ if(WIN32)
+  add_custom_command(TARGET SwirlConnectionRowsTests POST_BUILD
+   COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:SwirlConnectionRowsTests> $<TARGET_FILE_DIR:SwirlConnectionRowsTests>
+   COMMAND_EXPAND_LISTS)
+ endif()
+ add_test(NAME swirl-connection-rows COMMAND SwirlConnectionRowsTests
+  -o "${CMAKE_CURRENT_BINARY_DIR}/connection-rows.xml,xml" -o -,txt)
+ set_tests_properties(swirl-connection-rows PROPERTIES TIMEOUT 60)
  qt_add_executable(SwirlPolicyConfigurationTests tests/PolicyConfigurationTests.cpp)
  target_link_libraries(SwirlPolicyConfigurationTests PRIVATE SwirlEngine Qt6::Test)
  target_include_directories(SwirlPolicyConfigurationTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -375,7 +389,8 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  if(MSVC)
   target_compile_options(SwirlTelemetryTests PRIVATE /utf-8)
  endif()
- add_test(NAME swirl-telemetry-accounting COMMAND SwirlTelemetryTests)
+ add_test(NAME swirl-telemetry-accounting COMMAND SwirlTelemetryTests
+  -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-telemetry-accounting.xml,xml" -o -,txt)
  add_executable(SwirlDiagnosticTests tests/DiagnosticTests.cpp)
  target_link_libraries(SwirlDiagnosticTests PRIVATE SwirlEngine Qt6::Test)
  if(MSVC)
@@ -470,6 +485,7 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  # Opt-in timing is compiled only for this QA profile; production has no
  # telemetry timing properties or test observer class.
  target_compile_definitions(SwirlEngine PRIVATE SWIRL_ACTIVITY_PERF_TRACE)
+ target_compile_definitions(Swirl PRIVATE SWIRL_ACTIVITY_PERF_TRACE)
  target_compile_definitions(Swirl PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
  add_test(NAME swirl-node-ui COMMAND Swirl --node-self-test)
  set_tests_properties(swirl-node-ui PROPERTIES TIMEOUT 180 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
