@@ -24,6 +24,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QJSValue>
 #include <QFile>
 #include <QFileInfo>
 #include <QLineF>
@@ -808,6 +809,59 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
             check("ipv6-connection-detail-releases-before-card-return",lastSelectedDetail
                 &&QTest::qWaitFor([&]{return !lastSelectedDetail->property("moving").toBool()&&!lastSelectedDetail->property("detailOpen").toBool();},2000));
             connectionSearch->setProperty("text",QString());connectionPage->setProperty("selectedId",QString());
+
+            // Keep the actual JS rows alive across a native telemetry notification.
+            // No event loop runs between ingest and the old-snapshot observation:
+            // the page's 300 ms timer must not mix new route fields with old IPs.
+            QMetaObject::invokeMethod(connectionPage,"refreshSnapshot");
+            const QString captureSnapshot=QStringLiteral(
+                "(function(){const rows=connectionRows,visible=visibleRows;"
+                "const pick=function(list){const row=list.find(r=>r.id==='activity-fixture-0');"
+                "return row?{id:row.id,host:row.host,ip:row.ip,route:row.route}:null};"
+                "return function(){return JSON.stringify({rows:pick(rows),visible:pick(visible)})}})()");
+            auto retainedSnapshot=evalOn(connectionPage,captureSnapshot).value<QJSValue>();
+            const auto readSnapshot=[&](QJSValue &reader){
+                const auto result=reader.call();
+                check("connection-snapshot-reader-is-callable-and-valid",reader.isCallable()&&!result.isError()&&result.isString());
+                QJsonParseError error;const auto document=QJsonDocument::fromJson(result.toString().toUtf8(),&error);
+                check("connection-snapshot-reader-returns-json-object",error.error==QJsonParseError::NoError&&document.isObject());
+                return document.object();
+            };
+            const auto beforeSnapshot=readSnapshot(retainedSnapshot);
+            const auto recordMatches=[&](const QJsonObject &snapshot,const QString &host,const QString &ip,const QString &revision){
+                for(const auto &key:{QStringLiteral("rows"),QStringLiteral("visible")}){
+                    const auto record=snapshot.value(key).toObject(),route=record.value("route").toObject();
+                    if(record.value("id")!="activity-fixture-0"||record.value("host")!=host||record.value("ip")!=ip
+                        ||route.value("chosen_ip")!=ip||route.value("revision")!=revision)return false;
+                }
+                return true;
+            };
+            const QString oldHost=fixture.connections.first().toMap().value("host").toString();
+            check("connection-snapshot-baseline-matches-native-fields",recordMatches(beforeSnapshot,oldHost,canonicalIpv6Target,"1")
+                &&!connectionPage->property("snapshotDirty").toBool());
+            auto updatedFixture=fixture;auto updatedRecord=updatedFixture.connections.first().toMap();
+            auto updatedRoute=updatedRecord.value("route").toMap();
+            const QString updatedHost=QStringLiteral("snapshot-update.example.test"),updatedIp=QStringLiteral("2001:db8::1234");
+            updatedRecord["host"]=updatedHost;updatedRecord["ip"]=updatedIp;
+            updatedRoute["chosen_ip"]=updatedIp;updatedRoute["revision"]="2";updatedRecord["route"]=updatedRoute;
+            updatedFixture.connections.first()=updatedRecord;
+            ++updatedFixture.connectionsAt;updatedFixture.trafficAt=updatedFixture.connectionsAt;
+            controller->telemetry()->ingest(updatedFixture);
+            const auto afterNotifySnapshot=readSnapshot(retainedSnapshot);
+            check("connection-snapshot-notify-marks-pending-refresh",connectionPage->property("snapshotDirty").toBool());
+            check("connection-snapshot-notify-preserves-nested-route-and-normalized-ip",afterNotifySnapshot==beforeSnapshot);
+            QMetaObject::invokeMethod(connectionPage,"refreshSnapshot");
+            auto refreshedReader=evalOn(connectionPage,captureSnapshot).value<QJSValue>();
+            const auto refreshedSnapshot=readSnapshot(refreshedReader);
+            check("connection-snapshot-refresh-publishes-consistent-native-fields",recordMatches(refreshedSnapshot,updatedHost,updatedIp,"2")
+                &&!connectionPage->property("snapshotDirty").toBool());
+            check("connection-snapshot-replacement-keeps-retained-values-independent",readSnapshot(retainedSnapshot)==beforeSnapshot);
+            dataSamples.append(QJsonObject{{"phase","native-connection-snapshot-isolation"},{"before",beforeSnapshot},
+                {"afterNotifyBeforeRefresh",afterNotifySnapshot},{"afterRefresh",refreshedSnapshot}});
+            fixture.connectionsAt=updatedFixture.connectionsAt+1;fixture.trafficAt=fixture.connectionsAt;
+            controller->telemetry()->ingest(fixture);QMetaObject::invokeMethod(connectionPage,"refreshSnapshot");
+            auto restoredReader=evalOn(connectionPage,captureSnapshot).value<QJSValue>();
+            check("connection-snapshot-restores-real-fixture",recordMatches(readSnapshot(restoredReader),oldHost,canonicalIpv6Target,"1"));
         }
         close();
         controller->telemetry()->ingest({});

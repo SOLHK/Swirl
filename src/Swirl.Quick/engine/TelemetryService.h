@@ -40,6 +40,9 @@ public:
  int activeProcesses() const;
  int activeDevices() const;
  QVariantList connections() const;
+ // Method return values own their QML sequence data; property references can
+ // otherwise refresh nested route maps inside an already retained JS snapshot.
+ Q_INVOKABLE QVariantList connectionSnapshot() const { return connections(); }
  QVariantMap latencies() const { return m_latencies; }
  QString externalIp() const { return m_externalIp; }
  QString measurementState() const { return m_measurementState; }

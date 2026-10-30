@@ -65,8 +65,9 @@ Item {
             let rows
             if(observer)observer.mark(2,true)
             try {
-                // The controller returns QVariantList value snapshots, not mutable JS aliases.
-                rows=engineController.connections.map(row=>Object.assign({},row,{
+                // A method return owns its QVariantList data. Reading the property
+                // here retains nested route references that can change before refresh.
+                rows=engineController.telemetry.connectionSnapshot().map(row=>Object.assign({},row,{
                     host:observed(row.host),ip:observed((row.route||{}).chosen_ip||row.ip),
                     process:observed(row.process),protocol:observed(row.protocol),latency:observed(row.latency)
                 }))
