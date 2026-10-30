@@ -1,7 +1,7 @@
 .pragma library
 
 // Original cloud loops, with short tucked ends extended through the crossings.
-// Each passage keeps one card identity from the lead to the finished knot.
+// Each continuous guide ends in the permanent cloud geometry.
 var passages = [
     {
         "key": "warm",
@@ -79,14 +79,15 @@ var passages = [
 // Positions are arc-length fractions on the centre lines above.
 var crossings = [
     { passage: 0, start: 0.595, end: 0.677 }, // orange over cyan
-    { passage: 1, start: 0.000, end: 0.091 }, // green over purple
+    { passage: 1, start: 0.000, end: 0.091 }, // coral over purple
     { passage: 2, start: 0.918, end: 1.000 }, // cyan over purple
     { passage: 3, start: 0.112, end: 0.193 }  // purple over coral
 ];
 
-// Cue values are time fractions of a 3.7-second tour, with overlapping arrivals.
-var timing = { connection: [0, 0.70, 0.92], traffic: [0.09, 0.73, 0.93],
-    sources: [0.16, 0.75, 0.94], diagnostics: [0.25, 0.78, 0.95], connections: [0.13, 0.80, 0.95] };
+// One 4.8s handoff: warm wing to cloud, crown answer, lower loop, right curl, heart.
+// Most of the interval belongs to the weave, with overlapping arrivals.
+var timing = { connections: [0.02, 0.34, 0.74], connection: [0.10, 0.43, 0.84],
+    traffic: [0.16, 0.49, 0.89], sources: [0.22, 0.55, 0.95], diagnostics: [0.32, 0.67, 0.99] };
 function point(x, y) { return { x: x, y: y } }
 function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y) }
 function mix(a, b, t) { return point(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t) }
@@ -96,71 +97,49 @@ function cubicPoint(a, b, c, d, t) {
     return mix(mix(ab, bc, t), mix(bc, cd, t), t);
 }
 
-// World coordinates: the same flight is hidden naturally by opaque cards and
-// controls. Only its birth edge and emblem get a small foreground aperture.
+// The wing hands off into the sidebar gutter. One broad arc follows the
+// space below the connection card, disappears behind its round corner, then
+// emerges inside the reserved emblem area. All five guides share that flow.
 function route(passage, cards, emblem, origin, scale, wide, gap, scene) {
-    const card = passage.card, source = cards[card], status = cards.connection;
-    const proxy = scene.proxy, sidebar = scene.sidebar, wing = scene.wing;
+    const card = passage.card, status = cards.connection, wing = scene.wing;
     const entry = point(origin.x + passage.start[0] * scale, origin.y + passage.start[1] * scale);
-    const approach = point(entry.x - passage.tangent[0] * scale, entry.y - passage.tangent[1] * scale);
-    const sidebarRight = sidebar.x + sidebar.width;
-    const gutter = sidebarRight + gap * 0.5;
-    const top = Math.max(gap * 0.35, proxy.y - gap * 0.35);
-    const rowGap = status.y + status.height + gap * 0.5;
-    const returnGate = point(status.x + status.width + gap * 0.5, emblem.y + emblem.height * 0.65);
-    let start, points, aperture;
-    if (card === "connection") {
-        const r = proxy.height * 0.5;
-        start = point(source.x + source.width * 0.82, source.y + gap * 0.2);
-        points = [start, point(start.x + gap, source.y - gap * 0.35),
-            point(proxy.x + proxy.width - r, proxy.y + proxy.height + gap * 0.25),
-            point(proxy.x + proxy.width + gap * 0.25, proxy.y + r),
-            point(proxy.x + proxy.width - r, top),
-            point(sidebarRight - Math.min(sidebar.width * 0.2, gap * 1.8), top),
-            point(gutter, sidebar.y + gap * 1.8), point(gutter, wing[0].y - gap),
-            wing[0], wing[1], wing[2], wing[3],
-            point(gutter + gap, rowGap), point(returnGate.x, rowGap), returnGate];
-        aperture = {x:start.x-gap, y:source.y-gap, width:gap*2.5, height:gap*1.4};
-    } else if (card === "traffic") {
-        start = point(source.x + gap * 2.2, source.y + gap * 0.2);
-        points = [start, point(source.x + gap * 0.5, source.y - gap * 0.35),
-            point(source.x - gap * 0.4, source.y + gap), point(source.x - gap * 0.5, rowGap),
-            point(gutter + gap, rowGap), wing[2], point(gutter + gap, rowGap + gap),
-            point(returnGate.x + gap * 0.25, rowGap), returnGate];
-        aperture = {x:start.x-gap, y:source.y-gap, width:gap*2, height:gap*1.4};
-    } else if (card === "sources") {
-        start = point(source.x + gap * 0.2, source.y + gap * 2.5);
-        points = [start, point(source.x-gap*0.4, start.y-gap), point(gutter, start.y-gap*2),
-            wing[0], wing[1], wing[2], point(gutter + gap, rowGap), point(returnGate.x, rowGap), returnGate];
-        aperture = {x:source.x-gap, y:start.y-gap, width:gap*1.4, height:gap*2};
-    } else if (card === "diagnostics") {
-        start = point(source.x+gap*0.2, source.y+source.height*0.5);
-        points = [start, point(source.x-gap*0.6,start.y-gap*0.5),point(source.x-gap*0.5,rowGap),
-            point(returnGate.x,rowGap),point(returnGate.x+gap*0.4,emblem.y+emblem.height),returnGate];
-        aperture = {x:source.x-gap,y:start.y-gap,width:gap*1.4,height:gap*2};
-    } else {
-        start = point(source.x+gap*2.2,source.y+gap*0.2);
-        points = [start,point(source.x+gap*0.4,source.y-gap*0.5),point(source.x-gap*0.5,source.y+gap),
-            point(source.x-gap*0.5,rowGap),point(returnGate.x+gap*0.25,rowGap),returnGate];
-        aperture = {x:start.x-gap,y:source.y-gap,width:gap*2,height:gap*1.4};
-    }
-    if (!wide && card !== "connection" && card !== "sources") {
-        const outside = status.x + status.width + gap * 0.5;
-        points = [start, points[1], point(outside,source.y-gap*0.5),point(outside,emblem.y+emblem.height),returnGate];
-    }
-    points.push(approach, entry);
-    let guide = "M" + command(points[0]), leadLength = 0;
-    const wayLengths = [0];
-    for (let i = 0; i < points.length - 1; ++i) {
-        const a = points[i], d = points[i + 1], before = points[Math.max(0, i - 1)], after = points[Math.min(points.length - 1, i + 2)];
-        const handle = Math.min(distance(a, d), i ? distance(before, a) : distance(a, d), distance(d, after) || distance(a, d)) * 0.26;
-        const tangentA = distance(before, d) || 1, tangentD = distance(a, after) || 1;
-        const b = point(a.x + (d.x - before.x) / tangentA * handle, a.y + (d.y - before.y) / tangentA * handle);
-        const c = i === points.length - 2 ? approach : point(d.x - (after.x - a.x) / tangentD * handle, d.y - (after.y - a.y) / tangentD * handle);
-        guide += " C" + command(b) + " " + command(c) + " " + command(d);
-        let previous = a;
-        for (let n = 1; n <= 40; ++n) { const p = cubicPoint(a, b, c, d, n / 40); leadLength += distance(previous, p); previous = p; }
-        wayLengths.push(leadLength);
+    const tangent = point(passage.tangent[0], passage.tangent[1]);
+    const tangentLength = Math.hypot(tangent.x, tangent.y);
+    const approach = point(entry.x - tangent.x / tangentLength * gap,
+                           entry.y - tangent.y / tangentLength * gap);
+    const lane = {connections: 0, connection: 1, traffic: 2, sources: 3, diagnostics: 4}[card];
+    const drift = lane * gap * 0.10;
+    const start = mix(wing[0], wing[1], 0.44 + lane * 0.09);
+    const shoulder = point(wing[1].x + drift, wing[1].y - drift);
+    const gutter = scene.sidebar.x + scene.sidebar.width + gap * 0.5;
+    const rowY = status.y + status.height + gap * 0.5;
+    const lift = point(gutter, wing[2].y - gap * 1.2);
+    const sweep = point(gutter + gap, rowY);
+    const corner = point(status.x + status.width - gap * 0.75, rowY);
+    const gate = point(emblem.x + emblem.width * 0.72, emblem.y + emblem.height - gap * 0.25);
+    // Explicit cubic handles keep the two open-space turns broad, instead of
+    // interpolating a list of rectangular card corners.
+    const curves = [
+        [start, shoulder, point(wing[2].x, wing[2].y + gap), point(wing[2].x, wing[2].y)],
+        [point(wing[2].x, wing[2].y), point(wing[2].x, wing[2].y - gap),
+            point(lift.x, lift.y + gap), lift],
+        [lift, point(gutter, lift.y - Math.max(gap, (lift.y-rowY)*0.5)),
+            point(gutter - gap * 2, rowY), sweep],
+        [sweep, point(sweep.x + (corner.x-sweep.x)*0.36, rowY),
+            point(corner.x-gap*1.7, rowY), corner],
+        [corner, point(corner.x+gap*1.7, rowY),
+            point(gate.x+gap*1.8, gate.y+gap*0.9), gate],
+        [gate, point(gate.x-gap*1.8, gate.y-gap*0.9), approach, entry]
+    ];
+    let guide = "M" + command(start), leadLength = 0;
+    for (let j=0; j<curves.length; ++j) {
+        const curve = curves[j];
+        guide += " C" + command(curve[1]) + " " + command(curve[2]) + " " + command(curve[3]);
+        let previous = curve[0];
+        for (let n=1; n<=40; ++n) {
+            const p=cubicPoint(curve[0],curve[1],curve[2],curve[3],n/40);
+            leadLength+=distance(previous,p); previous=p;
+        }
     }
     const tokens = passage.guide.match(/[MC]|[-+]?\d*\.?\d+/g);
     let i = 3, previous = entry, knotLength = 0;
@@ -175,11 +154,8 @@ function route(passage, cards, emblem, origin, scale, wide, gap, scene) {
     }
     const total = leadLength + knotLength;
     const times = timing[card];
-    const cues = card === "connection" ? [
-        [0,0], [0.18,wayLengths[4]/total], [0.37,wayLengths[7]/total],
-        [0.59,wayLengths[11]/total], [times[1],leadLength/total], [times[2],1]
-    ] : [[times[0],0], [times[1],leadLength/total], [times[2],1]];
-    return {guide:guide, join:leadLength/total, span:(card === "connection" ? 150 : 100)*gap/16/total, aperture:aperture, cues:cues};
+    const cues = [[times[0],0], [times[1],leadLength/total], [times[2],1]];
+    return {guide:guide, join:leadLength/total, span:(card === "connections" ? 140 : 105)*gap/16/total, cues:cues};
 }
 function hermite(t, a, b, startSlope, endSlope, duration) {
     return (2*t*t*t-3*t*t+1)*a + (t*t*t-2*t*t+t)*startSlope*duration

@@ -321,7 +321,7 @@ ApplicationWindow {
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+4"; onActivated:AppState.navigate("inspector") }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+,"; onActivated:AppState.navigate("settings") }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+B"; onActivated:AppState.sidebarCollapsed=!AppState.sidebarCollapsed }
-        Component { id:activity; ActivityPage { engineController:window.engineControllerContext; systemProvider:window.systemProviderContext; ribbonBack: ribbonBackLayer; ribbonFront: ribbonFrontLayer; proxyAnchor: proxyCapsule; sidebarAnchor: sidebar.glassSurface; wingScene: appSceneBackdrop; sceneRevision: window.width + window.height + window.actualSidebarWidth } }
+        Component { id:activity; ActivityPage { engineController:window.engineControllerContext; systemProvider:window.systemProviderContext; ribbonBack: ribbonBackLayer; ribbonFront: ribbonFrontLayer; proxyAnchor: proxyCapsule; sidebarAnchor: sidebar.glassSurface; wingScene: appSceneBackdrop; sceneRevision: window.width + window.height + window.actualSidebarWidth; sceneSettled: AppState.currentPage === "activity" && !pageLoader.moving && !pageLoader.pendingGrab } }
         Component { id:overview; OverviewPage { engineController:window.engineControllerContext; systemProvider:window.systemProviderContext } }
     Component { id:capturePage; CapturePage { captureProvider:window.captureProviderContext } }
     Component { id:externalTools; ExternalToolsPage {} }

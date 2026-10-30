@@ -16,7 +16,9 @@ Item {
     property Item proxyAnchor: null
     property Item sidebarAnchor: null
     property var wingScene: null
+    property bool sceneSettled: true
     property real sceneRevision: 0
+    onSceneSettledChanged: if (sceneSettled) Qt.callLater(updateLayoutOrigin)
     readonly property real ribbonTourProgress: overviewActive && statusWeave.release < 1 ? statusWeave.progress : 1
     readonly property real ribbonTourStrength: overviewActive ? 1 - statusWeave.release : 0
     onSceneRevisionChanged: Qt.callLater(updateLayoutOrigin)
@@ -196,7 +198,15 @@ Item {
                         title: qsTr("连接状态"); titleItem: statusTitle
                         opacity: details.activeDetail && details.sourceCard === statusCard ? 0 : 1
                         onActivated: page.openCard(statusCard, "connection", title)
-                        Item { id: statusEmblem; objectName: "activityStatusEmblem"; x: statusCard.width - width - page.cardInset; y: Theme.dp(44); width: Theme.dp(80); height: Theme.dp(80); Accessible.ignored: true }
+                        Item {
+                            id: statusEmblem; objectName: "activityStatusEmblem"
+                            // The title spans the card; everything below shares a
+                            // permanent text/art split, even while disconnected.
+                            x: statusCard.width - width; y: Theme.dp(52)
+                            width: Math.min(Theme.dp(160), statusCard.width * 0.44)
+                            height: statusCard.height - y - page.cardInset
+                            Accessible.ignored: true
+                        }
                         ColumnLayout {
                             id: statusBody; objectName: "activityStatusBody"
                             anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: page.cardInset; spacing: page.moduleGap
@@ -210,19 +220,20 @@ Item {
                             ColumnLayout {
                                 objectName: "activityNodeSection"
                                 Layout.fillWidth: true; Layout.minimumWidth: 0
-                                Layout.rightMargin: statusWeave.active || statusWeave.moving || statusWeave.progress > 0 ? statusEmblem.width + Theme.dp(6) : 0
+                                Layout.rightMargin: statusEmblem.width - page.cardInset + Theme.dp(6)
                                 Layout.minimumHeight: Theme.dp(64); Layout.preferredHeight: Theme.dp(64); Layout.maximumHeight: Theme.dp(64); spacing: Theme.dp(3)
                                 SwirlText { text: page.engineController.activeNodeId.length ? qsTr("当前节点") : qsTr("当前出口"); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
                                 SwirlText { id: currentNode; objectName: "activityCurrentNode"; text: page.currentNodeName; textFormat: Text.PlainText; Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.fillHeight: true; color: Theme.text; font.pixelSize: Theme.fontSize(16); font.weight: Font.DemiBold; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight;  }
                             }
                             ColumnLayout {
                                 objectName: "activityIpSection"; Layout.fillWidth: true; spacing: Theme.dp(2)
+                                Layout.rightMargin: statusEmblem.width - page.cardInset + Theme.dp(6)
                                 SwirlText { text: qsTr("出口 IP"); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
                                 SwirlText { id: exitIp; objectName: "activityExitIpValue"; text: page.telemetry.externalIp || qsTr("尚未测量"); textFormat: Text.PlainText; tabularFigures: true; Layout.fillWidth: true; Layout.minimumWidth: 0; color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.Medium; elide: Text.ElideRight;  }
                             }
-                            Fact { objectName: "activityNetworkFact"; caption: qsTr("网络"); value: page.network.type || qsTr("未连接") }
-                            Fact { objectName: "activityProfileFact"; caption: qsTr("配置"); value: extensionsProvider.profileName || qsTr("未提供") }
-                            Fact { objectName: "activityPolicyFact"; caption: qsTr("默认策略"); value: page.defaultTargetName }
+                            Fact { objectName: "activityNetworkFact"; Layout.rightMargin: statusEmblem.width - page.cardInset + Theme.dp(6); caption: qsTr("网络"); value: page.network.type || qsTr("未连接") }
+                            Fact { objectName: "activityProfileFact"; Layout.rightMargin: statusEmblem.width - page.cardInset + Theme.dp(6); caption: qsTr("配置"); value: extensionsProvider.profileName || qsTr("未提供") }
+                            Fact { objectName: "activityPolicyFact"; Layout.rightMargin: statusEmblem.width - page.cardInset + Theme.dp(6); caption: qsTr("默认策略"); value: page.defaultTargetName }
                         }
                     }
                 }
@@ -410,6 +421,7 @@ Item {
                 id: statusWeave
                 objectName: "activityCloudKnotWeave"
                 anchors.fill: parent
+                visible: page.sceneSettled
                 z: 2
                 connectionItem: statusCard; transferItem: trafficCard; sourcesItem: sourcesCard
                 diagnosticItem: diagnosticCard; connectionsItem: connectionsCard

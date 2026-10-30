@@ -10,10 +10,12 @@ Item {
     property real ribbonProgress: 0
     property real ribbonStrength: 1
     property bool largeWing: false
+    property bool echoWing: false
     property bool silhouette: false
-    readonly property int featherCount: largeWing ? Master.feathers.length : smallPaths.length
-    readonly property real artWidth: largeWing ? Master.width : 96
-    readonly property real artHeight: largeWing ? Master.height : 48
+    readonly property var masterFeathers: echoWing ? Master.echoFeathers : Master.feathers
+    readonly property int featherCount: largeWing ? masterFeathers.length : smallPaths.length
+    readonly property real artWidth: largeWing ? (echoWing ? Master.echoWidth : Master.width) : 96
+    readonly property real artHeight: largeWing ? (echoWing ? Master.echoHeight : Master.height) : 48
     readonly property real fit: Math.min(width / artWidth, height / artHeight)
     readonly property var smallRoots: [Qt.point(5, 39), Qt.point(10, 42), Qt.point(18, 44), Qt.point(30, 45)]
     readonly property var smallPaths: [
@@ -33,16 +35,16 @@ Item {
         return mapMasterPoint(target, p[0], p[1])
     }
     function featherProgress(index) {
-        const order = largeWing ? Master.feathers[index].order : index
-        const delay = largeWing ? order * 50 / 1240 : index * 0.2
-        const duration = largeWing ? 390 / 1240 : 0.4
+        const order = largeWing ? masterFeathers[index].order : index
+        const delay = largeWing ? order * 0.065 : index * 0.2
+        const duration = largeWing ? 0.65 : 0.4
         const t = Math.max(0, Math.min(1, (progress - delay) / duration))
         return t * t * (3 - 2 * t)
     }
     function passageResponse(index) {
-        if (!largeWing || index > 2 || SwirlMotion.reduced) return 0
-        const centre = 0.38 + index * 0.075
-        const t = Math.max(0, 1 - Math.abs(ribbonProgress - centre) / 0.075)
+        if (!largeWing || echoWing || (index !== 10 && index !== 7) || SwirlMotion.reduced) return 0
+        const centre = index === 10 ? 0.045 : 0.085
+        const t = Math.max(0, 1 - Math.abs(ribbonProgress - centre) / 0.05)
         return t * t * (3 - 2 * t) * ribbonStrength
     }
 
@@ -58,7 +60,7 @@ Item {
                 id: feather
                 required property int index
                 objectName: "wingFeather" + index
-                readonly property var record: wing.largeWing ? Master.feathers[index] : null
+                readonly property var record: wing.largeWing ? wing.masterFeathers[index] : null
                 readonly property real reveal: wing.featherProgress(index)
                 readonly property real response: wing.passageResponse(index)
                 readonly property point rootPoint: record ? Qt.point(record.root[0], record.root[1]) : wing.smallRoots[index]
@@ -66,12 +68,13 @@ Item {
                 readonly property real axisLength: Math.hypot(tipPoint.x-rootPoint.x, tipPoint.y-rootPoint.y)
                 readonly property real axisX: (tipPoint.x-rootPoint.x)/axisLength
                 readonly property real axisY: (tipPoint.y-rootPoint.y)/axisLength
-                readonly property real along: 0.18 + 0.82 * reveal
-                readonly property real across: 0.70 + 0.30 * reveal
+                readonly property real along: wing.largeWing ? 0.86 + 0.14 * reveal : 0.18 + 0.82 * reveal
+                readonly property real across: wing.largeWing ? 0.94 + 0.06 * reveal : 0.70 + 0.30 * reveal
                 readonly property real mxx: across + (along-across)*axisX*axisX
                 readonly property real mxy: (along-across)*axisX*axisY
                 readonly property real myy: across + (along-across)*axisY*axisY
                 readonly property color featherColor: record ? record.color : Theme.wingSmallMid
+                readonly property color rootColor: record && record.rootColor ? record.rootColor : featherColor
                 width: wing.artWidth; height: wing.artHeight
                 visible: reveal > 0
                 opacity: wing.largeWing ? Math.min(1, reveal * 5) : Math.min(1, reveal * 8) * (1-index*0.18)
@@ -85,7 +88,7 @@ Item {
                     },
                     Rotation {
                         origin.x: feather.rootPoint.x; origin.y: feather.rootPoint.y
-                        angle: wing.largeWing ? (1-feather.reveal)*3 - feather.response*2.4 : (1-feather.reveal)*8
+                        angle: wing.largeWing ? (1-feather.reveal)*1.5 : (1-feather.reveal)*8
                     }
                 ]
                 Shape {
@@ -98,10 +101,10 @@ Item {
                         fillGradient: LinearGradient {
                             x1: feather.rootPoint.x; y1: feather.rootPoint.y
                             x2: feather.tipPoint.x; y2: feather.tipPoint.y
-                            GradientStop { position: 0; color: wing.silhouette ? Theme.text : wing.largeWing ? Theme.withAlpha(feather.featherColor, 0.025) : Theme.wingSmallStart }
-                            GradientStop { position: 0.28; color: wing.silhouette ? Theme.text : wing.largeWing ? Theme.withAlpha(feather.featherColor, 0.10) : Theme.wingSmallMid }
-                            GradientStop { position: 0.65; color: wing.silhouette ? Theme.text : wing.largeWing ? Theme.withAlpha(feather.featherColor, 0.16+feather.response*0.045) : Theme.wingSmallMid }
-                            GradientStop { position: 1; color: wing.silhouette ? Theme.text : wing.largeWing ? Theme.withAlpha(feather.featherColor, 0.18+feather.response*0.035) : Theme.wingSmallEnd }
+                            GradientStop { position: 0; color: wing.silhouette ? Theme.text : wing.largeWing ? Theme.withAlpha(feather.rootColor, 0.20) : Theme.wingSmallStart }
+                            GradientStop { position: 0.28; color: wing.silhouette ? Theme.text : wing.largeWing ? Theme.withAlpha(feather.featherColor, 0.21) : Theme.wingSmallMid }
+                            GradientStop { position: 0.65; color: wing.silhouette ? Theme.text : wing.largeWing ? Theme.withAlpha(feather.featherColor, 0.28+feather.response*0.06) : Theme.wingSmallMid }
+                            GradientStop { position: 1; color: wing.silhouette ? Theme.text : wing.largeWing ? Theme.withAlpha(feather.featherColor, 0.30+feather.response*0.045) : Theme.wingSmallEnd }
                         }
                         PathSvg { path: feather.record ? feather.record.path : wing.smallPaths[feather.index] }
                     }

@@ -86,15 +86,14 @@ Item {
         Item {
             id: footprint
             objectName: "apecWingFootprint"
-            // Fit the whole shoulder and first long tips inside the glass/sidebar
-            // corridor. The remaining feathers continue into the bottom margin.
-            // Avoid scaling the entire master until only middle bands are visible.
+            // The rising outer shoulders remain visible through the clear sidebar;
+            // the curved spine continues beneath the lower card row.
             readonly property real corridor: canvas.glassSurface ? canvas.glassBounds.x + canvas.glassBounds.width : Theme.sidebarWidth
-            width: Math.min(canvas.width * 0.48, canvas.height * 0.62,
-                Math.max(Theme.dp(235), corridor * 1.65))
-            height: width * 780 / 760
-            x: -Theme.dp(12)
-            y: canvas.height - height - Theme.dp(8)
+            width: Math.min(canvas.width * 0.40, canvas.height * 0.65,
+                Math.max(Theme.dp(280), corridor * 1.48))
+            height: width * 580 / 880
+            x: -Theme.dp(8)
+            y: canvas.height - height + Theme.dp(4)
             SwirlWingAnimation {
                 id: visual
                 objectName: "apecWingVisual"
@@ -108,14 +107,14 @@ Item {
         }
         SwirlWingAnimation {
             objectName: "workspaceWingEcho"
-            width: Math.min(Theme.dp(185), canvas.width * 0.20)
-            height: width * 780 / 760
-            x: canvas.width - width + Theme.dp(12)
-            y: -height * 0.52
-            rotation: 166
+            width: Math.min(Theme.dp(260), canvas.width * 0.27)
+            height: width * 130 / 540
+            x: canvas.width - width + Theme.dp(2)
+            y: 0
             largeWing: true
+            echoWing: true
             progress: canvas.progress
-            opacity: Theme.dark ? 0.75 : 0.70
+            opacity: Theme.dark ? 0.62 : 0.56
         }
     }
 }
