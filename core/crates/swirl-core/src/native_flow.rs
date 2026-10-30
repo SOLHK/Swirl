@@ -200,13 +200,15 @@ impl FlowDispatcher {
         // installing plaintext/system DNS. A lifecycle controller may retain
         // that constraint while rebuilding a paused packet bridge.
         if self.shared.native_tun_leases.load(Ordering::Acquire) == 0
-            && (!sessions.is_empty() || !self.probe.quiescent())
+            && (!sessions.is_empty() || !self.probe.quiescent() || !live.plan.policies.quiescent())
         {
             return Err("TunRequiresQuiescentCore");
         }
         // live + sessions remain locked across this increment. Even if the
         // previous owner concurrently drops the last old lease, no downgrade,
-        // new session or probe can enter that brief interval.
+        // new session or manual probe can enter that brief interval. Automatic
+        // health jobs register before IO; the Windows controller has already
+        // suspended egress, so later jobs cannot create old unbound sockets.
         self.shared.native_tun_leases.fetch_add(1, Ordering::AcqRel);
         Ok(NativeTunLease {
             shared: self.shared.clone(),

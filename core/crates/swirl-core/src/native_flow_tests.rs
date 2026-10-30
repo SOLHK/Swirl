@@ -2,8 +2,11 @@ use super::*;
 use crate::v2::{Core, RuntimeConfig};
 use std::collections::BTreeMap;
 use swirl_subscription::{
-    Dns, DnsTlsServer, Limits, Tls,
-    v2::{ClassificationDns, DEFAULT_POLICY_ID, DefaultPolicy, Mode, PolicyDocument, Target},
+    Dns, DnsTlsServer, Limits, PolicyStrategy, Tls,
+    v2::{
+        ClassificationDns, DEFAULT_POLICY_ID, DefaultPolicy, Group, Mode, PolicyDocument, Probe,
+        Target,
+    },
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -730,6 +733,150 @@ fn native_start_waits_for_running_probe_socket_to_be_released() {
     let lease = core.prepare_native_tun().unwrap();
     drop(accepted);
     drop(lease);
+    core.stop();
+}
+
+fn automatic_health_config(proxy: SocketAddr) -> RuntimeConfig {
+    let mut candidate = config();
+    candidate.nodes[0].outbound = Outbound::HttpConnect {
+        host: proxy.ip().to_string(),
+        port: proxy.port(),
+        auth: None,
+        tls: None,
+    };
+    let group = "d0000000-0000-4000-8000-000000000001";
+    candidate.policy.mode = Mode::Global;
+    candidate.policy.default_policy.target = Target::Group { id: group.into() };
+    candidate.policy.groups.push(Group {
+        id: group.into(),
+        name: "Native lease health lifetime".into(),
+        strategy: PolicyStrategy::Fallback,
+        members: vec![Target::Node {
+            id: candidate.nodes[0].id.clone(),
+        }],
+        selected: None,
+        probe: Some(Probe {
+            url: "http://health.fixture.invalid/check".into(),
+            interval_ms: 300_000,
+            timeout_ms: 10_000,
+            expected_status: 204,
+            tolerance_ms: 0,
+            tls: None,
+            success_threshold: 1,
+            failure_threshold: 1,
+            switch_cooldown_ms: 0,
+        }),
+    });
+    candidate
+}
+
+fn blocked_automatic_health() -> (Core, tokio::runtime::Runtime, tokio::net::TcpStream) {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let core = start(automatic_health_config(address));
+    let runtime = runtime();
+    let accepted = runtime.block_on(async {
+        timeout(Duration::from_secs(3), async {
+            let listener = tokio::net::TcpListener::from_std(listener).unwrap();
+            let (mut stream, source) = listener.accept().await.unwrap();
+            assert!(source.ip().is_loopback());
+            let mut request = Vec::new();
+            while !request.ends_with(b"\r\n\r\n") {
+                assert!(request.len() < 8192);
+                request.push(stream.read_u8().await.unwrap());
+            }
+            assert_eq!(
+                request,
+                b"CONNECT health.fixture.invalid:80 HTTP/1.1\r\nHost: health.fixture.invalid:80\r\n\r\n"
+            );
+            stream
+        })
+        .await
+        .unwrap()
+    });
+    // The automatic policy's real connection is held in proxy negotiation.
+    // Neither ordinary admissions nor the manual probe runtime owns it.
+    assert_eq!(core.snapshot().unwrap()["active"], 0);
+    assert!(core.probe.quiescent());
+    assert!(matches!(
+        core.prepare_native_tun(),
+        Err("TunRequiresQuiescentCore")
+    ));
+    (core, runtime, accepted)
+}
+
+async fn wait_for_first_native_lease(core: &Core) -> NativeTunLease {
+    timeout(Duration::from_secs(3), async {
+        loop {
+            match core.prepare_native_tun() {
+                Ok(lease) => break lease,
+                Err("TunRequiresQuiescentCore") => tokio::task::yield_now().await,
+                Err(error) => panic!("unexpected lease result: {error}"),
+            }
+        }
+    })
+    .await
+    .unwrap()
+}
+
+#[test]
+fn native_start_waits_for_automatic_policy_health_socket_to_be_released() {
+    let (mut core, runtime, mut accepted) = blocked_automatic_health();
+    runtime.block_on(async {
+        accepted
+            .write_all(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n")
+            .await
+            .unwrap();
+        drop(wait_for_first_native_lease(&core).await);
+    });
+    drop(accepted);
+    core.stop();
+}
+
+#[test]
+fn successful_automatic_health_releases_native_admission_after_response() {
+    let (mut core, runtime, mut accepted) = blocked_automatic_health();
+    runtime.block_on(async {
+        accepted
+            .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+            .await
+            .unwrap();
+        let request = timeout(Duration::from_secs(3), async {
+            let mut request = Vec::new();
+            while !request.ends_with(b"\r\n\r\n") {
+                assert!(request.len() < 8192);
+                request.push(accepted.read_u8().await.unwrap());
+            }
+            request
+        })
+        .await
+        .unwrap();
+        assert!(request.starts_with(b"GET /check HTTP/1.1\r\n"));
+        assert!(matches!(
+            core.prepare_native_tun(),
+            Err("TunRequiresQuiescentCore")
+        ));
+        accepted
+            .write_all(b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n")
+            .await
+            .unwrap();
+        drop(wait_for_first_native_lease(&core).await);
+    });
+    drop(accepted);
+    core.stop();
+}
+
+#[test]
+fn cancelled_automatic_health_releases_native_admission_after_task_drop() {
+    let (mut core, runtime, accepted) = blocked_automatic_health();
+    let policies = core.shared.live.lock().unwrap().plan.policies.clone();
+    // Exercise the existing task-abort path. stop() returning alone does not
+    // prove that the JoinSet's socket-owning futures have been dropped yet.
+    policies.stop();
+    drop(runtime.block_on(wait_for_first_native_lease(&core)));
+    assert!(policies.quiescent());
+    drop(accepted);
     core.stop();
 }
 
