@@ -451,6 +451,74 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
             close();
             check("detail-return-keeps-current-completed-knot",weave->property("progress").toDouble()==1
                 &&weave->property("release").toDouble()==0);
+
+            // Exercise real route hiding, not only the detail's opacity fade.
+            // PageHost retains these two routes below its existing cache limit;
+            // leaving a page resets its detail and settles the hidden weave.
+            const auto routeReady=[&](const QString &route){
+                return QTest::qWaitFor([&]{return eval(QStringLiteral(
+                    "AppState.currentPage==='%1' && pageLoader.activeLoader && "
+                    "pageLoader.activeLoader.routeId==='%1' && pageLoader.activeLoader.status===Loader.Ready && "
+                    "pageLoader.item!==null && !pageLoader.pendingGrab && !pageLoader.moving && "
+                    "motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").arg(route)).toBool();},2000);
+            };
+            const auto recordRouteState=[&](const char *phase){
+                auto state=QJsonDocument::fromJson(eval(QStringLiteral(
+                    "JSON.stringify({route:AppState.currentPage,activeRoute:pageLoader.activeLoader?"
+                    "pageLoader.activeLoader.routeId:'',loaderStatus:pageLoader.activeLoader?"
+                    "pageLoader.activeLoader.status:-1,pendingGrab:pageLoader.pendingGrab,hostMoving:pageLoader.moving,"
+                    "grabCount:motionPolicy.activeGrabCount,transitionCount:SwirlTransitionRegistry.activeCount,"
+                    "historyIndex:AppState.historyIndex,cachedPages:pageLoader.cachedPageCount,cacheLimit:pageLoader.maximumCachedPages})"
+                )).toString().toUtf8()).object();
+                state.insert("phase",QString::fromLatin1(phase));
+                state.insert("activityVisible",page->isVisible());
+                state.insert("overviewActive",page->property("overviewActive").toBool());
+                state.insert("detailOpened",transition->property("opened").toBool());
+                state.insert("detailMoving",transition->property("moving").toBool());
+                state.insert("detailActive",transition->property("activeDetail").toBool());
+                state.insert("detailProgress",transition->property("progress").toDouble());
+                state.insert("weaveActive",weave->property("active").toBool());
+                state.insert("weaveMoving",weave->property("moving").toBool());
+                state.insert("weaveProgress",weave->property("progress").toDouble());
+                state.insert("weaveRelease",weave->property("release").toDouble());
+                dataSamples.append(state);
+                qInfo().noquote()<<"ACTIVITY_ROUTE_HIDE_STATE"<<QJsonDocument(state).toJson(QJsonDocument::Compact);
+            };
+            const auto detailReset=[&]{return !transition->property("opened").toBool()
+                &&!transition->property("activeDetail").toBool()&&!transition->property("moving").toBool()
+                &&transition->property("progress").toDouble()==0&&!transition->isVisible();};
+            const auto activeKnotSettled=[&]{return weave->property("active").toBool()
+                &&weave->property("progress").toDouble()==1&&weave->property("release").toDouble()==0
+                &&!weave->property("moving").toBool();};
+            pose.evaluate();
+            check("route-hide-starts-real-weave-and-detail",!pose.hasError()&&weave->property("moving").toBool()
+                &&click(activityDetailButtons[1]));
+            activityWait(90);recordRouteState("route-hide-detail-opening");
+            check("route-hide-is-requested-during-detail-expansion",transition->property("moving").toBool()
+                &&transition->property("progress").toDouble()>0&&transition->property("progress").toDouble()<1);
+            eval("AppState.navigate('overview')");
+            check("route-hide-reaches-ready-overview-with-no-transient-owners",routeReady("overview"));
+            recordRouteState("route-hide-activity-hidden");
+            check("route-hide-retires-detail-and-settles-current-knot",!page->isVisible()&&detailReset()&&activeKnotSettled());
+            check("route-hide-retains-activity-within-page-cache-contract",eval(
+                "pageLoader.pages.activity && pageLoader.cachedPageCount<=pageLoader.maximumCachedPages").toBool()
+                &&qvariant_cast<QObject *>(eval("pageLoader.pages.activity.item"))==page);
+            eval("AppState.goBack()");
+            check("route-restore-reaches-ready-activity-with-no-transient-owners",routeReady("activity"));
+            recordRouteState("route-restore-activity-visible");
+            check("route-restore-reuses-clean-cached-activity",qvariant_cast<QObject *>(eval("pageLoader.item"))==page
+                &&activityVisual(window->contentItem(),"activityDetailTransition")==transition
+                &&activityVisual(window->contentItem(),"activityCloudKnotWeave")==weave
+                &&page->isVisible()&&page->isEnabled()&&page->property("overviewActive").toBool()
+                &&detailReset()&&activeKnotSettled()&&eval("AppState.historyIndex").toInt()==historyIndex);
+            check("route-restored-card-opens-detail-again",click(activityDetailButtons[1])&&settled()
+                &&transition->property("opened").toBool()&&transition->property("progress").toDouble()==1
+                &&transition->property("detailKey").toString()==activityDetailKeys[1]);
+            QTest::keyClick(window,Qt::Key_Escape);
+            check("route-restored-detail-escape-releases-all-transient-state",settled()&&detailReset()
+                &&QTest::qWaitFor(activeKnotSettled,1500)
+                &&eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").toBool());
+            recordRouteState("route-restore-detail-returned");
             activeOverride.reset();
             check("weave-original-proxy-state-binding-restored",weave->property("active").toBool()
                 ==(page->property("proxyOwned").toBool()&&page->property("runtimeHealthy").toBool()));
@@ -593,13 +661,19 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     }
     qmlEngine(window)->collectGarbage();activityWait(100);const auto memoryBefore=privateBytes();
     QList<double> frameIntervals;QElapsedTimer delivery;delivery.start();qint64 previousFrame=0;
-    const auto frameConnection=QObject::connect(window,&QQuickWindow::frameSwapped,window,[&]{
-        const auto now=delivery.nsecsElapsed();
-        if(previousFrame&&transition->property("moving").toBool())frameIntervals.append((now-previousFrame)/1000000.0);
-        previousFrame=now;
-    });
-    for(int cycle=0;cycle<8;++cycle){click(activityDetailButtons[cycle%activityDetailKeys.size()]);activityWait(470);QTest::keyClick(window,Qt::Key_Escape);activityWait(410);}
-    QObject::disconnect(frameConnection);qmlEngine(window)->collectGarbage();activityWait(100);
+    {
+        // Disconnecting does not remove already queued deliveries. Destroy this
+        // receiver before the GC wait/report snapshot and before its captures.
+        QObject frameReceiver;
+        const auto frameConnection=QObject::connect(window,&QQuickWindow::frameSwapped,&frameReceiver,[&]{
+            const auto now=delivery.nsecsElapsed();
+            if(previousFrame&&transition->property("moving").toBool())frameIntervals.append((now-previousFrame)/1000000.0);
+            previousFrame=now;
+        },Qt::QueuedConnection);
+        for(int cycle=0;cycle<8;++cycle){click(activityDetailButtons[cycle%activityDetailKeys.size()]);activityWait(470);QTest::keyClick(window,Qt::Key_Escape);activityWait(410);}
+        QObject::disconnect(frameConnection);
+    }
+    qmlEngine(window)->collectGarbage();activityWait(100);
     const auto memoryAfter=privateBytes();std::sort(frameIntervals.begin(),frameIntervals.end());
     check("repeated-details-release-transient-input-and-grab-state",!transition->isVisible()&&!transition->property("moving").toBool()&&eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").toBool());
     check("repeated-details-private-memory-growth-below-24MiB",memoryBefore>0&&memoryAfter-memoryBefore<24*1024*1024);
