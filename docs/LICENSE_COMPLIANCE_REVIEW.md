@@ -89,9 +89,13 @@ GPL/LGPL 的具体义务以仓库保留的完整许可证原文为准。
 文档规则也不能保证外部 AI 系统服从，不能作为实际授权完成的证据。
 
 基线 `.github/workflows/guard-production-release.yml` 只接受同仓库
-`test → main` 且符合既有批准流程的 PR。本次按要求从独立工作分支创建
-目标为 `main` 的文档审查 PR，因此不满足该现有晋级门禁；未修改工作流，
-也未提交到 `main` 或 `test`。创建 PR 不代表门禁已通过或允许合并。
+`test → main` 且符合既有批准流程的生产晋级 PR。此前目标为 `main` 时，
+[production-gate](https://github.com/SOLHK/Swirl/actions/runs/41054115078)
+因来源不是 `test` 而失败。按维护者后续指示，文档审查 PR 现改投 `test`，
+来源仍为独立分支 `work/swirl-license-authorization`；该生产门禁不适用于
+当前目标，不代表此前失败转为通过。未修改工作流，未直接提交到 `main`
+或 `test`，未合并 PR。官方商业登记的信任来源仍为 `main` 当前版本，
+不会因 PR 改投 `test` 而改变；上述权属和分发义务缺口仍待解决。
 
 ## 本次验收范围
 
