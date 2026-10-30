@@ -1,4 +1,5 @@
 #include "WindowsBackdrop.h"
+#include "SwirlContour.h"
 #include <QQuickWindow>
 #include <QGuiApplication>
 #include <QEvent>
@@ -22,7 +23,7 @@ namespace {
 // Evaluate the reference corner at physical pixel centres. Mirroring each row
 // makes all four curves identical at fractional DPI, without rounding the
 // design radius to a logical pixel or allocating a whole-window texture.
-HRGN roundedWindowRegion(int width, int height, qreal radius, qreal coverageFringe = 0, qreal power = 2.5) {
+HRGN roundedWindowRegion(int width, int height, qreal radius, qreal coverageFringe = 0) {
     radius = qBound<qreal>(0, radius, qMin(width, height) / 2.0);
     const int rows = qCeil(radius);
     const HRGN region = CreateRectRgn(0, rows, width, height - rows);
@@ -31,7 +32,7 @@ HRGN roundedWindowRegion(int width, int height, qreal radius, qreal coverageFrin
         const qreal dy = qMax<qreal>(0, radius - y - 0.5);
         const qreal coverageRadius=radius+coverageFringe;
         const int inset = qMax(0, qCeil(radius - std::pow(qMax<qreal>(0,
-            std::pow(coverageRadius, power) - std::pow(dy, power)), 1 / power) - 0.5));
+            std::pow(coverageRadius, SwirlContour::power) - std::pow(dy, SwirlContour::power)), 1 / SwirlContour::power) - 0.5));
         const HRGN top = CreateRectRgn(inset, y, width - inset, y + 1);
         const HRGN bottom = CreateRectRgn(inset, height - y - 1, width - inset, height - y);
         if (top) { CombineRgn(region, region, top, RGN_OR); DeleteObject(top); }
@@ -244,7 +245,7 @@ void WindowsBackdrop::updateCornerMask() {
         // WindowEdge owns the visible contour; only the inset blur helper is
         // region-clipped. The software fallback still needs a native region.
         const bool useRegion = !rectangular && software;
-        const HRGN region = useRegion ? roundedWindowRegion(physicalSize.width(), physicalSize.height(), radius * dpr,0,2.5) : nullptr;
+        const HRGN region = useRegion ? roundedWindowRegion(physicalSize.width(), physicalSize.height(), radius * dpr,0) : nullptr;
         if (useRegion && !region) return;
         // Windows takes ownership only after a successful SetWindowRgn.
         if (!SetWindowRgn(hwnd, region, FALSE)) {
@@ -463,7 +464,7 @@ void WindowsBackdrop::updateBackdropBlur() {
     if(body!=m_blurRegionSize || !qFuzzyCompare(radius+1,m_blurRegionRadius+1)){
         // Keep the compositor blur's hard edge inside fully covered shell
         // pixels. A system preset radius here leaks beyond the custom curve.
-        const HRGN region=rectangular?nullptr:roundedWindowRegion(body.width(),body.height(),radius,0,2.5);
+        const HRGN region=rectangular?nullptr:roundedWindowRegion(body.width(),body.height(),radius,0);
         if(!rectangular&&!region){opaqueFallback();return;}
         if(!SetWindowRgn(blur,region,FALSE)){
             if(region)DeleteObject(region);

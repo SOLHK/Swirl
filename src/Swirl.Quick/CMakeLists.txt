@@ -160,7 +160,7 @@ target_sources(Swirl PRIVATE network/GatewayService.h network/GatewayService.cpp
 target_link_libraries(Swirl PRIVATE SwirlEngine SwirlHttp2 SwirlExtensions)
 add_dependencies(Swirl SwirlScriptRunner)
 set(SWIRL_QML_FILES
- qml/components/SwirlLiquidGlass.qml qml/components/SwirlWorkspaceBackdrop.qml qml/controls/SwirlWingAnimation.qml qml/SwirlProxyWingMotion.qml
+ qml/components/SwirlLiquidGlass.qml qml/components/SwirlWorkspaceBackdrop.qml qml/controls/SwirlWingAnimation.qml qml/controls/SwirlWingMaster.js qml/SwirlProxyWingMotion.qml
  qml/controls/SwirlArcMotion.qml qml/controls/SwirlInteractionMotion.qml qml/controls/SwirlFlow.qml qml/controls/SwirlPopupMotion.qml
  qml/controls/SwirlControlSurface.qml qml/controls/SwirlSlider.qml qml/controls/SwirlRadioButton.qml
  qml/components/SwirlPageHeader.qml qml/components/SwirlSectionTitle.qml
@@ -187,7 +187,7 @@ set(SWIRL_QML_FILES
  qml/controls/SwirlClickLight.qml qml/controls/SwirlActivityIndicator.qml qml/controls/SwirlExpander.qml
  qml/controls/SwirlPressMotion.qml qml/controls/SwirlAnimatedModel.qml qml/controls/SwirlMotionButton.qml qml/controls/SwirlSpring.qml qml/controls/SwirlPageHost.qml
  qml/pages/FeatureHubPage.qml qml/pages/FeatureModulePage.qml qml/components/SwirlBrandIcon.qml
- qml/components/SwirlCloudKnotWeave.qml qml/components/SwirlCloudKnotPaths.js qml/components/SwirlSilkRope.qml
+ qml/components/SwirlCloudKnotWeave.qml qml/components/SwirlCloudKnotPaths.js
  qml/components/SwirlActivityCard.qml qml/components/SwirlCardSurface.qml qml/controls/ActivityDetailTransition.qml
  qml/pages/ActivitySourcesDetail.qml qml/pages/ActivityDiagnosticsDetail.qml qml/pages/ActivityConnectionDetail.qml
  qml/controls/SwirlPillSurface.qml qml/controls/SwirlIconButton.qml qml/controls/SwirlButton.qml qml/controls/SwirlSegmentedControl.qml qml/controls/SwirlToggle.qml
@@ -234,7 +234,7 @@ qt_add_qml_module(Swirl
     RESOURCE_PREFIX /qt/qml
     NO_GENERATE_EXTRA_QMLDIRS
     QML_FILES ${SWIRL_QML_FILES}
-    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp app/WindowEdge.h app/WindowEdge.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp app/NodeViewModel.h app/NodeViewModel.cpp app/NodeSectionModel.h app/NodeSectionModel.cpp
+    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp app/WindowEdge.h app/WindowEdge.cpp app/RibbonStroke.h app/RibbonStroke.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp app/NodeViewModel.h app/NodeViewModel.cpp app/NodeSectionModel.h app/NodeSectionModel.cpp
 )
 set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 file(GLOB SWIRL_UI_ICONS CONFIGURE_DEPENDS "${SWIRL_ASSET_PATH}/icons/ui/*.svg")

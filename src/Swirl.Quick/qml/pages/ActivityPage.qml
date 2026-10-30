@@ -11,6 +11,15 @@ Item {
     objectName: "activityPage"
     required property var engineController
     required property var systemProvider
+    property Item ribbonBack: page
+    property Item ribbonFront: page
+    property Item proxyAnchor: null
+    property Item sidebarAnchor: null
+    property var wingScene: null
+    property real sceneRevision: 0
+    readonly property real ribbonTourProgress: overviewActive && statusWeave.release < 1 ? statusWeave.progress : 1
+    readonly property real ribbonTourStrength: overviewActive ? 1 - statusWeave.release : 0
+    onSceneRevisionChanged: Qt.callLater(updateLayoutOrigin)
     readonly property var telemetry: engineController.telemetry
     readonly property real contentLogicalWidth: content.width
     readonly property real dualColumnMinimumWidth: Theme.dp(736)
@@ -158,7 +167,7 @@ Item {
         contentWidth: width; contentHeight: content.height + Theme.dp(16)
         interactive: contentHeight > height + 1
         flickableDirection: Flickable.VerticalFlick; boundsBehavior: Flickable.StopAtBounds
-        onContentYChanged: if (details.activeDetail) Qt.callLater(details.updateOrigin)
+        onContentYChanged: { if (details.activeDetail) Qt.callLater(details.updateOrigin); Qt.callLater(statusWeave.updateGeometry) }
         clip: true; ScrollBar.vertical: SwirlScrollBar {}
         Item {
             id: content
@@ -187,7 +196,7 @@ Item {
                         title: qsTr("连接状态"); titleItem: statusTitle
                         opacity: details.activeDetail && details.sourceCard === statusCard ? 0 : 1
                         onActivated: page.openCard(statusCard, "connection", title)
-                        Item { id: statusEmblem; objectName: "activityStatusEmblem"; x: statusCard.width - width - page.cardInset; y: Theme.dp(46); width: Theme.dp(80); height: Theme.dp(70); Accessible.ignored: true }
+                        Item { id: statusEmblem; objectName: "activityStatusEmblem"; x: statusCard.width - width - page.cardInset; y: Theme.dp(44); width: Theme.dp(80); height: Theme.dp(80); Accessible.ignored: true }
                         ColumnLayout {
                             id: statusBody; objectName: "activityStatusBody"
                             anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: page.cardInset; spacing: page.moduleGap
@@ -397,13 +406,6 @@ Item {
                 ParentChange { target: diagnosticCard; parent: diagnosticNarrowSlot }
                 ParentChange { target: connectionsCard; parent: connectionsNarrowSlot }
             }
-            Item {
-                id: weaveBehind
-                anchors.fill: parent
-                z: -1
-                opacity: statusWeave.opacity
-                visible: statusWeave.visible
-            }
             SwirlCloudKnotWeave {
                 id: statusWeave
                 objectName: "activityCloudKnotWeave"
@@ -412,13 +414,13 @@ Item {
                 connectionItem: statusCard; transferItem: trafficCard; sourcesItem: sourcesCard
                 diagnosticItem: diagnosticCard; connectionsItem: connectionsCard
                 knotTarget: statusEmblem
-                behindCards: weaveBehind
+                behindCards: page.ribbonBack; frontLayer: page.ribbonFront
+                proxyAnchor: page.proxyAnchor; sidebarAnchor: page.sidebarAnchor; wingScene: page.wingScene
                 wide: page.wide; gap: content.gap
-                active: page.proxyOwned && !page.engineController.systemProxyStopping
+                active: page.proxyOwned && page.runtimeHealthy && !page.engineController.systemProxyStopping
                 presentationActive: page.overviewActive
-                // Share the overview's existing fade; hide the emblem with its
-                // source card while the connection detail surface takes over.
-                opacity: details.activeDetail && details.sourceCard === statusCard ? 0 : 1
+                // Global decorative views follow the overview's detail fade.
+                opacity: 1 - details.progress
             }
         }
     }

@@ -1,4 +1,6 @@
 #version 440
+#extension GL_GOOGLE_include_directive : require
+#include "swirl-contour.glsl"
 layout(location=0) in vec2 qt_TexCoord0;
 layout(location=0) out vec4 fragColor;
 layout(std140,binding=0) uniform buf {
@@ -13,12 +15,7 @@ layout(std140,binding=0) uniform buf {
     vec4 reflectionColor;
     float darkAppearance;
 };
-float distanceToSurface(vec2 p) {
-    float r=min(cornerRadius,min(surfaceSize.x,surfaceSize.y)*0.5);
-    vec2 q=abs(p-surfaceSize*0.5)-surfaceSize*0.5+r;
-    vec2 c=max(q,vec2(0));
-    return pow(pow(c.x,2.5)+pow(c.y,2.5),0.4)+min(max(q.x,q.y),0.0)-r;
-}
+float distanceToSurface(vec2 p) { return swirlSurfaceDistance(p-surfaceSize*0.5, surfaceSize, cornerRadius); }
 void main() {
     vec2 p=qt_TexCoord0*surfaceSize;
     float d=distanceToSurface(p);
@@ -26,7 +23,7 @@ void main() {
     // Only a 1.5-physical-pixel bevel catches light. The pane interior is
     // exactly transparent, including while hovering, focusing or pressing.
     float rim=smoothstep(-pixelWidth*1.5-aa*0.5,-pixelWidth*1.5+aa*0.5,d)
-        *(1.0-smoothstep(-aa,0.0,d));
+        *swirlCoverage(d);
     if(rim<=0.0) { fragColor=vec4(0); return; }
     vec2 normal=normalize(vec2(distanceToSurface(p+vec2(0.5,0))-distanceToSurface(p-vec2(0.5,0)),
         distanceToSurface(p+vec2(0,0.5))-distanceToSurface(p-vec2(0,0.5)))+vec2(0.00001));

@@ -11,18 +11,25 @@ Item {
     required property Item diagnosticItem
     required property Item connectionsItem
     required property Item behindCards
+    required property Item frontLayer
     required property Item knotTarget
+    property Item proxyAnchor: null
+    property Item sidebarAnchor: null
+    property var wingScene: null
     property bool active: false
     property bool presentationActive: true
     property bool wide: true
     property real gap: Theme.dp(16)
-    property real markSize: Theme.dp(100)
+    property real markSize: Theme.dp(104)
     property real progress: 0
+    property real release: 1
     property bool initialized: false
+    property bool reducedSettlePending: false
     property rect knotRect: Qt.rect(0, 0, 0, 0)
     property var routes: ({})
     readonly property bool windowVisible: !Window.window || (Window.window.visible && Window.window.visibility !== Window.Minimized)
-    readonly property bool moving: flight.running
+    readonly property bool moving: flight.running || withdrawal.running
+    readonly property real settledScale: 1 - 0.48 * smooth(0.95, 1, progress)
     readonly property real markX: knotRect.x + (knotRect.width - markSize) / 2
     readonly property real markY: knotRect.y + (knotRect.height - markSize) / 2
     readonly property real pathScale: markSize / 1024 * 1.016216216
@@ -30,59 +37,77 @@ Item {
     readonly property real pathY: markY + markSize / 1024 * (225.43 - 263 * 1.016216216)
     readonly property var cardItems: [connectionItem, transferItem, sourcesItem, diagnosticItem, connectionsItem]
     Accessible.ignored: true
-    // This item deliberately has no input handlers or card-sized clip.
 
-    function reveal(passage) {
-        const route = routes[passage.card];
-        if (!route) return 0;
-        return Math.max(0, (Knot.head(progress, passage.card, route.join) - route.join) / (1 - route.join));
+    function smooth(start, end, value) {
+        const t = Math.max(0,Math.min(1,(value-start)/(end-start)));
+        return t*t*(3-2*t);
     }
     function rectFor(item) {
-        const p = item.mapToItem(weave, 0, 0)
-        return Qt.rect(p.x, p.y, item.width, item.height)
+        const p = item.mapToItem(behindCards, 0, 0);
+        return Qt.rect(p.x,p.y,item.width,item.height);
     }
     function updateGeometry() {
-        if (!initialized) return
-        knotRect = rectFor(knotTarget)
-        const cards = { connection: rectFor(connectionItem), traffic: rectFor(transferItem),
-            sources: rectFor(sourcesItem), diagnostics: rectFor(diagnosticItem), connections: rectFor(connectionsItem) }
-        const next = {}
-        for (let i = 0; i < Knot.passages.length; ++i) {
-            const passage = Knot.passages[i]
-            next[passage.card] = Knot.route(passage, cards, knotRect, Knot.point(pathX, pathY), pathScale, wide, gap);
+        if (!initialized) return;
+        knotRect = rectFor(knotTarget);
+        const cards = {connection:rectFor(connectionItem),traffic:rectFor(transferItem),sources:rectFor(sourcesItem),diagnostics:rectFor(diagnosticItem),connections:rectFor(connectionsItem)};
+        const scene = {
+            proxy: proxyAnchor ? rectFor(proxyAnchor) : Qt.rect(cards.connection.x,0,Theme.dp(130),Theme.dp(30)),
+            sidebar: sidebarAnchor ? rectFor(sidebarAnchor) : Qt.rect(0,0,Math.max(0,cards.connection.x-gap),behindCards.height),
+            wing: wingScene ? wingScene.ribbonWaypoints(behindCards) : [Qt.point(0,height*0.5),Qt.point(gap,height*0.6),Qt.point(gap*2,height*0.5),Qt.point(gap,height*0.4)]
+        };
+        const next = {};
+        for (let i=0;i<Knot.passages.length;++i) {
+            const passage=Knot.passages[i];
+            next[passage.card]=Knot.route(passage,cards,knotRect,Knot.point(pathX,pathY),pathScale,wide,gap,scene);
         }
-        routes = next
+        routes=next;
+    }
+    function settleHidden() {
+        flight.stop(); withdrawal.stop();
+        reducedSettlePending=false;
+        progress=active?1:0; release=active?0:1;
     }
     function retarget() {
-        if (!initialized) return
-        flight.stop()
-        const destination = active ? 1 : 0
-        if (!visible || !windowVisible || !presentationActive || SwirlMotion.reduced) {
-            progress = destination
-            return
+        if (!initialized) return;
+        flight.stop(); withdrawal.stop();
+        reducedSettlePending=false;
+        if (!visible || !windowVisible || !presentationActive) { settleHidden(); return; }
+        if (SwirlMotion.reduced) {
+            if (active && progress<1 && release<1) {
+                reducedSettlePending=true;
+                withdrawal.to=1; withdrawal.duration=80;
+            } else {
+                if (active) progress=1;
+                withdrawal.to=active?0:1; withdrawal.duration=160;
+            }
+            withdrawal.start();
+            return;
         }
-        if (progress === destination) return
-        flight.from = progress
-        flight.to = destination
-        // Departure, arrival and winding have separate per-strand cues on one clock.
-        flight.duration = SwirlMotion.ms(Math.max(1, Math.round((active ? 1900 : 1100) * Math.abs(destination - progress))))
-        flight.start()
+        if (active) {
+            withdrawal.to=0; withdrawal.duration=180; withdrawal.start();
+            if (progress<1) { flight.from=progress; flight.to=1; flight.duration=Math.max(1,Math.round(3700*(1-progress))); flight.start(); }
+        } else {
+            // Freeze route position and locally release each visible strand.
+            // Turning off never races backwards through the whole scene.
+            withdrawal.to=1; withdrawal.duration=560; withdrawal.start();
+        }
     }
     onActiveChanged: retarget()
-    onVisibleChanged: if (!visible) retarget()
+    onVisibleChanged: if (!visible && initialized) settleHidden()
     onWidthChanged: Qt.callLater(updateGeometry)
     onHeightChanged: Qt.callLater(updateGeometry)
     onWideChanged: Qt.callLater(updateGeometry)
     onMarkSizeChanged: Qt.callLater(updateGeometry)
-    Component.onCompleted: { initialized = true; progress = active ? 1 : 0; Qt.callLater(updateGeometry) }
-    Connections { target: SwirlMotion; function onReducedChanged() { if (SwirlMotion.reduced) weave.retarget() } }
-    Connections { target: Theme; function onUiScaleChanged() { Qt.callLater(weave.updateGeometry) } }
+    Component.onCompleted: { initialized=true; settleHidden(); Qt.callLater(updateGeometry); }
+    Connections { target: SwirlMotion; function onReducedChanged() { if (SwirlMotion.reduced) weave.retarget(); } }
+    Connections { target: Theme; function onUiScaleChanged() { Qt.callLater(weave.updateGeometry); } }
+    Connections { target: weave.behindCards; function onWidthChanged() { Qt.callLater(weave.updateGeometry); } function onHeightChanged() { Qt.callLater(weave.updateGeometry); } }
     Connections {
         target: weave.knotTarget
-        function onXChanged() { Qt.callLater(weave.updateGeometry) }
-        function onYChanged() { Qt.callLater(weave.updateGeometry) }
-        function onWidthChanged() { Qt.callLater(weave.updateGeometry) }
-        function onHeightChanged() { Qt.callLater(weave.updateGeometry) }
+        function onXChanged() { Qt.callLater(weave.updateGeometry); }
+        function onYChanged() { Qt.callLater(weave.updateGeometry); }
+        function onWidthChanged() { Qt.callLater(weave.updateGeometry); }
+        function onHeightChanged() { Qt.callLater(weave.updateGeometry); }
     }
     Repeater {
         model: weave.cardItems
@@ -91,24 +116,49 @@ Item {
             required property var modelData
             Connections {
                 target: observer.modelData
-                function onWidthChanged() { Qt.callLater(weave.updateGeometry) }
-                function onHeightChanged() { Qt.callLater(weave.updateGeometry) }
-                function onParentChanged() { Qt.callLater(weave.updateGeometry) }
-                function onLiftChanged() { Qt.callLater(weave.updateGeometry) }
+                function onWidthChanged() { Qt.callLater(weave.updateGeometry); }
+                function onHeightChanged() { Qt.callLater(weave.updateGeometry); }
+                function onParentChanged() { Qt.callLater(weave.updateGeometry); }
+                function onLiftChanged() { Qt.callLater(weave.updateGeometry); }
             }
             Connections {
                 target: observer.modelData.parent
-                function onXChanged() { Qt.callLater(weave.updateGeometry) }
-                function onYChanged() { Qt.callLater(weave.updateGeometry) }
+                function onXChanged() { Qt.callLater(weave.updateGeometry); }
+                function onYChanged() { Qt.callLater(weave.updateGeometry); }
             }
         }
     }
     NumberAnimation {
-        id: flight
-        target: weave; property: "progress"
-        easing.type: Easing.Linear
-        // Retain the exact position during a detail visit; never replay on return.
+        id: flight; target: weave; property: "progress"; easing.type: Easing.Linear
         paused: running && (!weave.presentationActive || !weave.windowVisible)
+    }
+    NumberAnimation {
+        id: withdrawal; target: weave; property: "release"; easing.type: Easing.InOutSine
+        paused: running && (!weave.presentationActive || !weave.windowVisible)
+        onFinished: {
+            if (weave.reducedSettlePending && weave.active) {
+                weave.reducedSettlePending=false; weave.progress=1;
+                withdrawal.to=0; withdrawal.duration=80; withdrawal.start();
+            } else if (!weave.active && weave.release===1) weave.progress=0;
+        }
+    }
+    Item {
+        id: backView; parent: weave.behindCards
+        width: parent.width; height: parent.height
+        visible: weave.visible && weave.release<1
+        opacity: weave.opacity*(1-weave.release)
+    }
+    Item {
+        id: frontView; parent: weave.frontLayer
+        width: parent.width; height: parent.height
+        visible: backView.visible; opacity: backView.opacity
+    }
+    Item {
+        id: knotView; parent: frontView
+        x: weave.knotRect.x; y: weave.knotRect.y
+        width: weave.knotRect.width; height: weave.knotRect.height
+        clip: true
+        scale: weave.settledScale
     }
     Repeater {
         model: Knot.passages
@@ -116,76 +166,59 @@ Item {
             id: strand
             required property var modelData
             readonly property var route: weave.routes[modelData.card] || null
-            readonly property real head: route ? Knot.head(weave.progress, modelData.card, route.join) : 0
-            readonly property real tail: route ? Knot.tail(weave.progress, modelData.card, route, head) : 0
-            readonly property color ink: Theme.increaseContrast ? Theme.text : modelData.ink
-            readonly property rect aperture: route ? Qt.rect(route.aperture.x, route.aperture.y, route.aperture.width, route.aperture.height) : Qt.rect(0,0,0,0)
-            width: weave.width; height: weave.height
-            // A single continuous guide contains both approach and knot. Three
-            // views expose it behind cards, at its launch, and inside the emblem.
-            SwirlSilkRope {
+            readonly property real head: route ? Knot.head(weave.progress,modelData.card,route) : 0
+            readonly property real baseTail: route ? Knot.tail(weave.progress,modelData.card,route,head) : 0
+            readonly property real tail: baseTail+(head-baseTail)*weave.release*0.75
+            readonly property color ink: Theme.increaseContrast?Theme.text:modelData.ink
+            readonly property rect aperture: route?Qt.rect(route.aperture.x,route.aperture.y,route.aperture.width,route.aperture.height):Qt.rect(0,0,0,0)
+            RibbonStroke {
                 objectName: "knotFlight-" + strand.modelData.card
-                parent: weave.behindCards
-                width: weave.width; height: weave.height
-                guide: strand.route ? strand.route.guide : ""
-                flatInk: strand.ink; ropeWidth: weave.pathScale * 36
+                parent: backView; width: parent.width; height: parent.height
+                guide: strand.route?strand.route.guide:""; ink: strand.ink; ribbonWidth: Theme.dp(3.4)
                 trimStart: strand.tail; trimEnd: strand.head
+                broadening: weave.smooth(0.40,0.48,weave.progress)*(1-weave.smooth(0.57,0.64,weave.progress))
+                settlement: weave.smooth(0.70,0.95,weave.progress)
             }
             Item {
+                parent: frontView
                 x: strand.aperture.x; y: strand.aperture.y
-                width: strand.aperture.width; height: strand.aperture.height
-                clip: true
-                // The local strand is already exposed by the emblem view.
-                visible: strand.modelData.card !== "connection"
-                SwirlSilkRope {
-                    x: -parent.x; y: -parent.y; width: weave.width; height: weave.height
-                    guide: strand.route ? strand.route.guide : ""
-                    flatInk: strand.ink; ropeWidth: weave.pathScale * 36
+                width: strand.aperture.width; height: strand.aperture.height; clip: true
+                RibbonStroke {
+                    objectName: "knotEntry-" + strand.modelData.key
+                    x: -parent.x; y: -parent.y; width: frontView.width; height: frontView.height
+                    guide: strand.route?strand.route.guide:""; ink: strand.ink; ribbonWidth: Theme.dp(3.4)
                     trimStart: strand.tail; trimEnd: strand.head
+                    settlement: weave.smooth(0.70,0.95,weave.progress)
                 }
             }
-            Item {
-                x: weave.knotRect.x; y: weave.knotRect.y
-                width: weave.knotRect.width; height: weave.knotRect.height
-                clip: true
-                SwirlSilkRope {
-                    objectName: "knotRope-" + strand.modelData.key
-                    x: -parent.x; y: -parent.y; width: weave.width; height: weave.height
-                    guide: strand.route ? strand.route.guide : ""
-                    flatInk: strand.ink; ropeWidth: weave.pathScale * 36
-                    trimStart: strand.tail; trimEnd: strand.head
-                }
+            RibbonStroke {
+                objectName: "knotRope-" + strand.modelData.key
+                parent: knotView
+                x: -weave.knotRect.x; y: -weave.knotRect.y
+                width: frontView.width; height: frontView.height
+                guide: strand.route?strand.route.guide:""; ink: strand.ink
+                ribbonWidth: Theme.dp(3.4)/weave.settledScale
+                trimStart: strand.tail; trimEnd: strand.head
+                settlement: weave.smooth(0.70,0.95,weave.progress)
             }
         }
     }
-    Item {
-        x: weave.pathX; y: weave.pathY
-        width: 1024; height: 1024
-        scale: weave.pathScale; transformOrigin: Item.TopLeft
-        Repeater {
-            model: Knot.crossings
-            delegate: Item {
-                id: crossing
-                required property var modelData
-                readonly property var passage: Knot.passages[modelData.passage]
-                readonly property real revealed: Math.min(modelData.end, weave.reveal(passage))
-                width: 1024; height: 1024
-                visible: revealed > modelData.start
-                // A local surface-coloured clearance exposes the underpass, then
-                // the same growing strand is redrawn above it. No image swap.
-                SwirlSilkRope {
-                    anchors.fill: parent
-                    guide: crossing.passage.guide; ropeWidth: 48
-                    flatInk: Theme.independentCard
-                    trimStart: crossing.modelData.start; trimEnd: crossing.revealed
-                }
-                SwirlSilkRope {
-                    anchors.fill: parent
-                    guide: crossing.passage.guide; ropeWidth: 36
-                    flatInk: Theme.increaseContrast ? Theme.text : crossing.passage.ink
-                    trimStart: crossing.modelData.start; trimEnd: crossing.revealed
-                }
-            }
+    Repeater {
+        model: Knot.crossings
+        delegate: Item {
+            id: crossing
+            required property var modelData
+            readonly property var passage: Knot.passages[modelData.passage]
+            readonly property var route: weave.routes[passage.card] || null
+            readonly property real head: route?Knot.head(weave.progress,passage.card,route):0
+            readonly property real baseTail: route?Knot.tail(weave.progress,passage.card,route,head):0
+            readonly property real start: route?Math.max(route.join+modelData.start*(1-route.join),baseTail+(head-baseTail)*weave.release*0.75):0
+            readonly property real end: route?Math.min(route.join+modelData.end*(1-route.join),head):0
+            parent: knotView
+            x: -weave.knotRect.x; y: -weave.knotRect.y
+            width: frontView.width; height: frontView.height; visible:end>start
+            RibbonStroke { anchors.fill:parent; guide:crossing.route?crossing.route.guide:""; ribbonWidth:Theme.dp(4.7)/weave.settledScale; ink:Theme.independentCard; trimStart:crossing.start; trimEnd:crossing.end; settlement:1 }
+            RibbonStroke { anchors.fill:parent; guide:crossing.route?crossing.route.guide:""; ribbonWidth:Theme.dp(3.4)/weave.settledScale; ink:Theme.increaseContrast?Theme.text:crossing.passage.ink; trimStart:crossing.start; trimEnd:crossing.end; settlement:1 }
         }
     }
 }

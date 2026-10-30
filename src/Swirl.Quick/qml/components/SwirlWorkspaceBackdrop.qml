@@ -9,6 +9,14 @@ Item {
     property var composition: backdrop
     property Item glassSurface: null
     property bool glassSampled: false
+    property real ribbonProgress: 0
+    property real ribbonStrength: 1
+    readonly property Item mainWingItem: visual
+    function mapWingPoint(target, x, y) { return visual.mapMasterPoint(target, x, y) }
+    function ribbonWaypoints(target) {
+        return [visual.routePoint(target, "root"), visual.routePoint(target, "shoulder"),
+            visual.routePoint(target, "tip"), visual.routePoint(target, "gap")]
+    }
     readonly property Item decorationSource: decoration
     // Kept for callers which inspect the material, but the clear sidebar never
     // replaces any part of the original vector scene with a captured texture.
@@ -64,7 +72,7 @@ Item {
         property: "progress"
         from: 0
         to: 1
-        duration: SwirlMotion.ms(2100)
+        duration: SwirlMotion.ms(1240)
         paused: entrance.running && !canvas.presenting
     }
 
@@ -78,30 +86,36 @@ Item {
         Item {
             id: footprint
             objectName: "apecWingFootprint"
-            // Keep the fan near its lower-left root, outside the reading centre.
-            width: Math.max(Theme.dp(420), Math.min(canvas.width * 0.72, canvas.height * 0.96))
-            height: width * 0.76
-            x: -width * 0.08
-            y: canvas.height - height * 0.76
+            // Fit the whole shoulder and first long tips inside the glass/sidebar
+            // corridor. The remaining feathers continue into the bottom margin.
+            // Avoid scaling the entire master until only middle bands are visible.
+            readonly property real corridor: canvas.glassSurface ? canvas.glassBounds.x + canvas.glassBounds.width : Theme.sidebarWidth
+            width: Math.min(canvas.width * 0.48, canvas.height * 0.62,
+                Math.max(Theme.dp(235), corridor * 1.65))
+            height: width * 780 / 760
+            x: -Theme.dp(12)
+            y: canvas.height - height - Theme.dp(8)
             SwirlWingAnimation {
                 id: visual
                 objectName: "apecWingVisual"
                 anchors.fill: parent
                 largeWing: true
                 progress: canvas.progress
-                opacity: Theme.dark ? 0.62 : 0.82
+                ribbonProgress: canvas.presenting ? canvas.ribbonProgress : 0
+                ribbonStrength: canvas.ribbonStrength
+                opacity: 1
             }
         }
         SwirlWingAnimation {
             objectName: "workspaceWingEcho"
-            width: Math.min(Theme.dp(280), canvas.width * 0.25)
-            height: width * 0.76
-            x: canvas.width - width * 0.72
-            y: -height * 0.38
-            rotation: 180
+            width: Math.min(Theme.dp(185), canvas.width * 0.20)
+            height: width * 780 / 760
+            x: canvas.width - width + Theme.dp(12)
+            y: -height * 0.52
+            rotation: 166
             largeWing: true
             progress: canvas.progress
-            opacity: Theme.dark ? 0.22 : 0.30
+            opacity: Theme.dark ? 0.75 : 0.70
         }
     }
 }

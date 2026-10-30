@@ -1,4 +1,6 @@
 #version 440
+#extension GL_GOOGLE_include_directive : require
+#include "swirl-contour.glsl"
 layout(location=0) in vec2 qt_TexCoord0;
 layout(location=0) out vec4 fragColor;
 layout(std140,binding=0) uniform buf {
@@ -11,17 +13,12 @@ layout(std140,binding=0) uniform buf {
     float softness;
     vec4 shadowColor;
 };
-float distanceToSurface(vec2 p) {
-    float r=min(cornerRadius,min(surfaceSize.x,surfaceSize.y)*0.5);
-    vec2 q=abs(p)-surfaceSize*0.5+r;
-    vec2 corner=max(q,vec2(0));
-    return pow(pow(corner.x,2.5)+pow(corner.y,2.5),0.4)+min(max(q.x,q.y),0.0)-r;
-}
+float distanceToSurface(vec2 p) { return swirlSurfaceDistance(p, surfaceSize, cornerRadius); }
 void main() {
     vec2 p=(qt_TexCoord0-0.5)*(surfaceSize+2.0*padding);
     float edge=distanceToSurface(p);
     float aa=max(fwidth(edge),0.001);
-    float outside=smoothstep(-aa,aa,edge);
+    float outside=1.0-swirlCoverage(edge);
     float d=max(distanceToSurface(p-shadowOffset),0.0)/max(softness,0.001);
     // Exterior-only shadow: never darken the transparent pane's interior.
     fragColor=shadowColor*(exp(-0.5*d*d)*outside*qt_Opacity);

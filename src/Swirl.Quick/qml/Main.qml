@@ -97,7 +97,12 @@ ApplicationWindow {
             id:appSceneBackdrop
             anchors.fill:parent;targetWindow:window
             glassSurface:sidebar.glassSurface;glassSampled:sidebar.glassSampled
+            ribbonProgress: pageLoader.item && pageLoader.item.ribbonTourProgress !== undefined ? pageLoader.item.ribbonTourProgress : 1
+            ribbonStrength: pageLoader.item && pageLoader.item.ribbonTourStrength !== undefined ? pageLoader.item.ribbonTourStrength : 0
         }
+
+        Item { id: ribbonBackLayer; anchors.fill: parent; Accessible.ignored: true }
+        Item { id: ribbonFrontLayer; anchors.fill: parent; z: 80; Accessible.ignored: true }
 
         Binding { target: SwirlProxyWingMotion; property: "windowVisible"; value: window.visible && window.visibility !== Window.Minimized }
 
@@ -316,7 +321,7 @@ ApplicationWindow {
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+4"; onActivated:AppState.navigate("inspector") }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+,"; onActivated:AppState.navigate("settings") }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+B"; onActivated:AppState.sidebarCollapsed=!AppState.sidebarCollapsed }
-        Component { id:activity; ActivityPage { engineController:window.engineControllerContext; systemProvider:window.systemProviderContext } }
+        Component { id:activity; ActivityPage { engineController:window.engineControllerContext; systemProvider:window.systemProviderContext; ribbonBack: ribbonBackLayer; ribbonFront: ribbonFrontLayer; proxyAnchor: proxyCapsule; sidebarAnchor: sidebar.glassSurface; wingScene: appSceneBackdrop; sceneRevision: window.width + window.height + window.actualSidebarWidth } }
         Component { id:overview; OverviewPage { engineController:window.engineControllerContext; systemProvider:window.systemProviderContext } }
     Component { id:capturePage; CapturePage { captureProvider:window.captureProviderContext } }
     Component { id:externalTools; ExternalToolsPage {} }
