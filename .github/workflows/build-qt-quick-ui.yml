@@ -502,6 +502,9 @@ jobs:
         run: |
           $regression = 'failed'
           try {
+            # Compiler caches may contain an older report. Only this run's
+            # layout result can be reused by the focused DPR matrix below.
+            Remove-Item -LiteralPath 'build/swirl-quick/activity-layout/activity-layout-report.json' -ErrorAction SilentlyContinue
             # Critical tests have already passed before packaging. Exclude only
             # those exact tests here to avoid paying for a second execution.
             $excludedTests = 'appearance-ui|node-ui|engine-ui|overview-input|all-pages|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|capture-network'
@@ -521,6 +524,81 @@ jobs:
           } finally {
             $delivery = Get-Content -LiteralPath 'out/delivery.json' -Raw | ConvertFrom-Json
             $delivery | Add-Member -NotePropertyName scoped_full_regression -NotePropertyValue $regression -Force
+            $delivery | ConvertTo-Json | Set-Content -LiteralPath 'out/delivery.json' -Encoding utf8
+          }
+      - name: Verify activity layout and ESC at five effective DPR values
+        shell: pwsh
+        run: |
+          # Reuse the current unscaled layout result, then run only this focused
+          # driver at missing DPR values. QT_SCALE_FACTOR multiplies native DPR;
+          # these are Qt simulations, not physical display-setting acceptance.
+          $env:QT_QPA_PLATFORM = 'windows'
+          $env:QSG_RHI_BACKEND = 'd3d11'
+          Remove-Item Env:QT_QUICK_BACKEND,Env:QT_SCREEN_SCALE_FACTORS,Env:QT_SCALE_FACTOR,Env:SWIRL_LAYOUT_EXPECTED_DPR -ErrorAction SilentlyContinue
+          $exe = (Resolve-Path 'build/swirl-quick/Release/Swirl.exe').Path
+          $root = Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick/activity-layout'
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+          $baselinePath = Join-Path $root 'activity-layout-report.json'
+          $diagnostic = Join-Path (Split-Path $exe) 'Swirl-diagnostics.txt'
+          $culture = [Globalization.CultureInfo]::InvariantCulture
+          function Invoke-ActivityLayout([string]$output, [string]$scaleFactor = '', [double]$expectedDpr = 0) {
+            New-Item -ItemType Directory -Force -Path $output | Out-Null
+            $reportPath = Join-Path $output 'activity-layout-report.json'
+            Remove-Item -LiteralPath $reportPath,$diagnostic -ErrorAction SilentlyContinue
+            $env:SWIRL_TEST_ROOT = Join-Path $env:RUNNER_TEMP ('swirl-layout-dpr-' + [guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path $env:SWIRL_TEST_ROOT | Out-Null
+            if ($scaleFactor) { $env:QT_SCALE_FACTOR = $scaleFactor } else { Remove-Item Env:QT_SCALE_FACTOR -ErrorAction SilentlyContinue }
+            if ($expectedDpr -gt 0) { $env:SWIRL_LAYOUT_EXPECTED_DPR = $expectedDpr.ToString('R', $culture) } else { Remove-Item Env:SWIRL_LAYOUT_EXPECTED_DPR -ErrorAction SilentlyContinue }
+            $process = $null
+            try {
+              $arguments = @('--activity-layout-test', '--preview-page=activity', '--preview-size=1013x672', ('--activity-layout-output="' + $output + '"'))
+              $process = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory $env:SWIRL_TEST_ROOT -PassThru
+              if (-not $process.WaitForExit(120000)) { throw 'Activity layout exceeded its existing 120-second CTest deadline.' }
+              if ($process.ExitCode -ne 0) { throw "Activity layout failed at scale factor $scaleFactor with exit code $($process.ExitCode)." }
+              if (-not (Test-Path -LiteralPath $reportPath -PathType Leaf)) { throw 'Activity layout did not produce a current report.' }
+              $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
+              if ($report.success -ne $true -or $report.failures -ne 0) { throw 'Activity layout reported failed checks.' }
+              return $report
+            } finally {
+              if ($null -ne $process) {
+                if (-not $process.HasExited) { $process.Kill(); $null = $process.WaitForExit(5000) }
+                $process.Dispose()
+              }
+              if (Test-Path -LiteralPath $diagnostic -PathType Leaf) { Copy-Item -LiteralPath $diagnostic -Destination (Join-Path $output 'qt-diagnostics.txt') }
+            }
+          }
+          $samples = @()
+          $matrixResult = 'failed'
+          $nativeDpr = 0.0
+          try {
+            if (-not (Test-Path -LiteralPath $baselinePath -PathType Leaf)) {
+              # Keep this gate active if a future UI-only scope omits the
+              # baseline from CTest; never interpret missing evidence as green.
+              $baseline = Invoke-ActivityLayout $root
+            } else { $baseline = Get-Content -LiteralPath $baselinePath -Raw | ConvertFrom-Json }
+            $nativeDpr = [double]$baseline.devicePixelRatio
+            if ($baseline.success -ne $true -or $baseline.failures -ne 0 -or $baseline.nativeD3D11 -ne $true -or $baseline.scaleFactorEnvironment -or -not [double]::IsFinite($nativeDpr) -or $nativeDpr -le 0) { throw 'The current native-DPR baseline is missing, scaled or unsuccessful.' }
+            foreach ($percent in @(100, 125, 150, 175, 200)) {
+              $target = $percent / 100.0
+              if ([Math]::Abs($nativeDpr - $target) -le 0.01) {
+                $report = $baseline
+                $factor = ''
+                $relativeReport = 'activity-layout-report.json'
+              } else {
+                $factor = ($target / $nativeDpr).ToString('R', $culture)
+                $output = Join-Path $root ('dpi-' + $percent)
+                $report = Invoke-ActivityLayout $output $factor $target
+                $relativeReport = 'dpi-' + $percent + '/activity-layout-report.json'
+              }
+              if ([Math]::Abs([double]$report.devicePixelRatio - $target) -gt 0.01 -or $report.nativeD3D11 -ne $true) { throw "The $percent percent layout did not run at the requested DPR and renderer." }
+              $samples += [ordered]@{ percent=$percent; expectedDpr=$target; actualDpr=$report.devicePixelRatio; qtScaleFactor=$factor; reusedNativeBaseline=($factor -eq ''); report=$relativeReport; passed=$true }
+            }
+            if ($samples.Count -ne 5) { throw 'The activity DPR matrix is incomplete.' }
+            $matrixResult = 'passed'
+          } finally {
+            [ordered]@{ source_sha=$env:GITHUB_SHA; nativeBaselineDpr=$nativeDpr; result=$matrixResult; samples=$samples; method='Actual QQuickWindow DPR, five-card layout, ESC, interruption and resize checks using Qt scale-factor simulation'; physical_windows11_display_scaling='not-run'; cross_monitor_dpi='not-run'; physical_gpu_presentation='not-run' } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $root 'dpi-matrix.json') -Encoding utf8
+            $delivery = Get-Content -LiteralPath 'out/delivery.json' -Raw | ConvertFrom-Json
+            $delivery | Add-Member -NotePropertyName activity_dpr_simulation -NotePropertyValue $matrixResult -Force
             $delivery | ConvertTo-Json | Set-Content -LiteralPath 'out/delivery.json' -Encoding utf8
           }
       - name: Upload engine and scoped regression evidence
