@@ -157,7 +157,6 @@ SwirlToolbarButton {
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
         travelOrigin: Qt.point(0, -Theme.dp(12))
         contentItem: Column {
-            implicitWidth: Theme.dp(240)
             spacing: Theme.dp(6)
             ListView {
                 width: modeMenu.availableWidth; height: contentHeight
