@@ -97,7 +97,8 @@ mod windows {
     use swirl_dns::tun::{DNS_IPV4, DNS_IPV6, FakeIpStore, TunDns, TunLookup};
     use swirl_platform::{
         network_transaction::{
-            self as transaction, FileJournalStore, InterfaceIdentity, Journal, Resource, Value,
+            self as transaction, FileJournalStore, InterfaceIdentity, Journal, NetworkBackend,
+            Resource, Value,
         },
         windows_network::{self, SystemRoute, WindowsNetworkBackend},
         wintun_device::{WintunConfig, WintunDevice, official_driver_sha256},
@@ -362,6 +363,16 @@ mod windows {
             }
             // No DNS, firewall, default route, split default, or physical
             // interface mutation is expressible by this desired plan.
+            // Capture the actual Windows values before Journal::prepare can
+            // reject them. These reads are limited to this temporary adapter;
+            // they do not dump physical-network or user configuration.
+            for (resource, requested) in &desired {
+                let observed = backend.read(&identity, resource)?;
+                eprintln!(
+                    "Wintun smoke: pre-validation snapshot {}",
+                    json!({"resource": resource, "observed": observed, "requested": requested})
+                );
+            }
             let journal = Journal::prepare(&mut backend, identity.clone(), owner, desired)
                 .map_err(|error| {
                     io::Error::other(format!("snapshot owned test resources: {error}"))
