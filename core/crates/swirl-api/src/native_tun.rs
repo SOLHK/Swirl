@@ -158,9 +158,26 @@ async fn tcp(flow: TcpFlow, dispatcher: FlowDispatcher, dns: TunDns) -> Result<(
     };
     let mut stream = flow.stream;
     loop {
-        let size = match timeout(DNS_IDLE, stream.read_u16()).await {
-            Ok(Ok(size)) if (12..=4096).contains(&size) => size,
-            Ok(Err(error)) if error.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(()),
+        let prefix = timeout(DNS_IDLE, async {
+            let mut bytes = [0; 2];
+            if stream.read(&mut bytes[..1]).await? == 0 {
+                return Ok::<_, std::io::Error>(None);
+            }
+            stream.read_exact(&mut bytes[1..]).await?;
+            Ok(Some(u16::from_be_bytes(bytes)))
+        })
+        .await;
+        let size = match prefix {
+            Ok(Ok(Some(size))) if (12..=4096).contains(&size) => size,
+            Ok(Ok(None)) => {
+                // Only EOF before the next length prefix is orderly. Explicit
+                // shutdown drains replies and emits FIN; dropping TunTcpStream
+                // without it intentionally aborts malformed/cancelled flows.
+                return timeout(Duration::from_secs(5), stream.shutdown())
+                    .await
+                    .map_err(|_| "TunDnsTcpTimeout")?
+                    .map_err(|_| "TunDnsTcpWrite");
+            }
             _ => return Err("TunDnsTcpFrame"),
         };
         let mut request = vec![0; usize::from(size)];

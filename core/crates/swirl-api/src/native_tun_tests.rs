@@ -14,7 +14,7 @@ use std::{
     time::Duration,
 };
 use swirl_core::v2::{Core, RuntimeConfig};
-use swirl_dns::tun::{DNS_IPV4, DNS_IPV6, FakeIpStore, TunDns};
+use swirl_dns::tun::{ANSWER_TTL, DNS_IPV4, DNS_IPV6, FakeIpStore, TunDns};
 use swirl_subscription::{
     Dns, DnsTlsServer, HostMapping, Limits, Matcher, Node, Outbound, Tls,
     v2::{
@@ -499,6 +499,167 @@ fn packet_bridge_ipv4_dns_fake_ip_tcp_half_close_reaches_real_core_socket() {
 #[test]
 fn packet_bridge_ipv6_dns_fake_ip_tcp_half_close_reaches_real_core_socket() {
     tcp_roundtrip(true);
+}
+
+fn dns_tcp_framing(v6: bool) {
+    let name = "tcp-dns.packet.fixture.invalid";
+    let mut config = runtime_config();
+    config.dns.hosts.push(HostMapping {
+        name: name.into(),
+        address: if v6 { "::1" } else { "127.0.0.1" }.parse().unwrap(),
+    });
+    let mut core = start(config);
+    let dispatcher = core.flow_dispatcher().unwrap();
+    let runtime = dispatcher.runtime_handle();
+    runtime.block_on(async {
+        let mut bridge = spawn(
+            dispatcher,
+            TunDns::new(FakeIpStore::memory(8).unwrap()),
+            TunConfig::default(),
+        )
+        .unwrap();
+        let fake = fake_address(&mut bridge, name, v6).await;
+        let query = dns_query(name, v6);
+        let mut second_query = query.clone();
+        second_query[..2].copy_from_slice(&[0x12, 0x34]);
+        let queries = [query, second_query];
+        let mut complete = Vec::new();
+        for query in &queries {
+            complete.extend_from_slice(&(query.len() as u16).to_be_bytes());
+            complete.extend_from_slice(query);
+        }
+        let mut truncated = (queries[0].len() as u16).to_be_bytes().to_vec();
+        truncated.extend_from_slice(&queries[0][..queries[0].len() - 1]);
+
+        for (case, request) in [complete, vec![0], truncated].into_iter().enumerate() {
+            let valid = case == 0;
+            let origin = source(v6, 44000 + case as u16);
+            let destination =
+                SocketAddr::new(if v6 { DNS_IPV6.into() } else { DNS_IPV4.into() }, 53);
+            let mut server_next = handshake(&mut bridge, origin, destination).await;
+            bridge
+                .input
+                .send(tcp_packet(
+                    origin,
+                    destination,
+                    101,
+                    Some(server_next),
+                    TcpControl::Psh,
+                    &request,
+                ))
+                .await
+                .unwrap();
+            let client_fin = 101 + request.len() as i32;
+            bridge
+                .input
+                .send(tcp_packet(
+                    origin,
+                    destination,
+                    client_fin,
+                    Some(server_next),
+                    TcpControl::Fin,
+                    &[],
+                ))
+                .await
+                .unwrap();
+            let mut response = Vec::new();
+            loop {
+                let segment = next_tcp(&mut bridge).await;
+                assert_eq!((segment.source, segment.destination), (destination, origin));
+                if segment.control == TcpControl::Rst {
+                    assert!(
+                        !valid,
+                        "complete DNS frames plus FIN must receive FIN, not RST"
+                    );
+                    assert!(response.is_empty());
+                    assert!(segment.payload.is_empty());
+                    break;
+                }
+                if !segment.payload.is_empty() {
+                    assert!(valid, "a truncated DNS request must not produce a response");
+                    assert_eq!(segment.sequence, server_next);
+                    server_next = server_next.wrapping_add(segment.payload.len() as i32);
+                    response.extend_from_slice(&segment.payload);
+                }
+                let finished = segment.control == TcpControl::Fin;
+                if finished {
+                    assert!(
+                        valid,
+                        "partial DNS prefix/payload must reset, not finish cleanly"
+                    );
+                    server_next = server_next.wrapping_add(1);
+                }
+                bridge
+                    .input
+                    .send(tcp_packet(
+                        origin,
+                        destination,
+                        client_fin + 1,
+                        Some(server_next),
+                        TcpControl::None,
+                        &[],
+                    ))
+                    .await
+                    .unwrap();
+                if finished {
+                    break;
+                }
+            }
+            if valid {
+                let mut remaining = response.as_slice();
+                for query in &queries {
+                    assert!(remaining.len() >= 2);
+                    let length = usize::from(u16::from_be_bytes([remaining[0], remaining[1]]));
+                    let address: Vec<u8> = match fake {
+                        IpAddr::V4(ip) => ip.octets().to_vec(),
+                        IpAddr::V6(ip) => ip.octets().to_vec(),
+                    };
+                    assert_eq!(length, query.len() + 12 + address.len());
+                    assert!(remaining.len() >= length + 2);
+                    let answer = &remaining[2..length + 2];
+                    assert_eq!(&answer[..2], &query[..2]);
+                    assert_eq!(answer[2] & 0x80, 0x80);
+                    assert_eq!(answer[3] & 15, 0);
+                    assert_eq!(&answer[4..12], &[0, 1, 0, 1, 0, 0, 0, 0]);
+                    assert_eq!(&answer[12..query.len()], &query[12..]);
+                    let record = &answer[query.len()..];
+                    assert_eq!(&record[..2], &[0xc0, 0x0c]);
+                    assert_eq!(&record[2..6], &query[query.len() - 4..]);
+                    assert_eq!(&record[6..10], &ANSWER_TTL.to_be_bytes());
+                    assert_eq!(&record[10..12], &(address.len() as u16).to_be_bytes());
+                    assert_eq!(&record[12..], &address);
+                    remaining = &remaining[length + 2..];
+                }
+                assert!(
+                    remaining.is_empty(),
+                    "exactly two DNS responses are required"
+                );
+            }
+            until(|| {
+                bridge
+                    .bridge_stats
+                    .tcp_failures
+                    .load(std::sync::atomic::Ordering::Relaxed)
+                    == case as u64
+                    && bridge.stats.snapshot().active_tcp_flows == 0
+            })
+            .await;
+        }
+        assert_eq!(bridge.stats.snapshot().malformed_packets, 0);
+        assert_eq!(core.snapshot().unwrap()["failed"], 0);
+        bridge.control.shutdown().await.unwrap();
+    });
+    core.stop();
+}
+
+#[test]
+fn packet_bridge_ipv4_tcp_dns_frames_finish_and_truncation_resets() {
+    dns_tcp_framing(false);
+}
+
+#[test]
+fn packet_bridge_ipv6_tcp_dns_frames_finish_and_truncation_resets() {
+    dns_tcp_framing(true);
 }
 
 fn udp_roundtrip(v6: bool) {
