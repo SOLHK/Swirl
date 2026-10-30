@@ -31,7 +31,7 @@ Item {
 
     function mapMasterPoint(target, x, y) { return artwork.mapToItem(target, x, y) }
     function routePoint(target, name) {
-        const p = Master.route[name]
+        const p = (echoWing ? Master.echoRoute : Master.route)[name]
         return mapMasterPoint(target, p[0], p[1])
     }
     function featherProgress(index) {
@@ -42,9 +42,9 @@ Item {
         return t * t * (3 - 2 * t)
     }
     function passageResponse(index) {
-        if (!largeWing || echoWing || (index !== 10 && index !== 7) || SwirlMotion.reduced) return 0
-        const centre = index === 10 ? 0.045 : 0.085
-        const t = Math.max(0, 1 - Math.abs(ribbonProgress - centre) / 0.05)
+        if (!largeWing || SwirlMotion.reduced) return 0
+        if (echoWing ? (index !== 0 && index !== 5) : (index !== 10 && index !== 7)) return 0
+        const t = Math.max(0, 1 - Math.abs(ribbonProgress - 0.05) / 0.045)
         return t * t * (3 - 2 * t) * ribbonStrength
     }
 

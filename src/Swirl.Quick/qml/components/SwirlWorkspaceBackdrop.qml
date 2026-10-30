@@ -13,9 +13,10 @@ Item {
     property real ribbonStrength: 1
     readonly property Item mainWingItem: visual
     function mapWingPoint(target, x, y) { return visual.mapMasterPoint(target, x, y) }
-    function ribbonWaypoints(target) {
-        return [visual.routePoint(target, "root"), visual.routePoint(target, "shoulder"),
-            visual.routePoint(target, "tip"), visual.routePoint(target, "gap")]
+    function ribbonWaypoints(target, side) {
+        const source = side === "right" ? echo : visual
+        return [source.routePoint(target, "root"), source.routePoint(target, "shoulder"),
+            source.routePoint(target, "tip"), source.routePoint(target, "gap")]
     }
     readonly property Item decorationSource: decoration
     // Kept for callers which inspect the material, but the clear sidebar never
@@ -106,6 +107,7 @@ Item {
             }
         }
         SwirlWingAnimation {
+            id: echo
             objectName: "workspaceWingEcho"
             width: Math.min(Theme.dp(260), canvas.width * 0.27)
             height: width * 130 / 540
@@ -114,6 +116,8 @@ Item {
             largeWing: true
             echoWing: true
             progress: canvas.progress
+            ribbonProgress: canvas.presenting ? canvas.ribbonProgress : 0
+            ribbonStrength: canvas.ribbonStrength
             opacity: Theme.dark ? 0.62 : 0.56
         }
     }

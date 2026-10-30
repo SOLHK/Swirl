@@ -40,3 +40,12 @@ var route = {
     gap: [255,168],
     exit: [212,126]
 };
+
+// Exit left along the echo's lower carrier, below the caption-button symbols.
+// Interpolating root -> shoulder gives separate launch points on the same arc.
+var echoRoute = {
+    root: [350,110],
+    shoulder: [250,121],
+    tip: [150,126],
+    gap: [60,119]
+};
