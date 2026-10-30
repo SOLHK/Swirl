@@ -26,6 +26,7 @@ use swirl_dns::Resolver;
 use swirl_subscription::{Tuic, uuid_bytes, valid_host};
 use swirl_transport::{
     BoxStream,
+    egress::EgressToken,
     quic::{self, Session, TlsOptions},
 };
 use tokio::{
@@ -56,7 +57,7 @@ impl Drop for Client {
         self.heartbeat.abort();
     }
 }
-type Pool = VecDeque<((tokio::runtime::Id, [u8; 32]), Weak<Client>)>;
+type Pool = VecDeque<((tokio::runtime::Id, EgressToken, [u8; 32]), Weak<Client>)>;
 static TCP_SESSIONS: LazyLock<Mutex<Pool>> = LazyLock::new(|| Mutex::new(VecDeque::new()));
 
 /// Validate credentials and certificate material before resolving the proxy.
@@ -206,45 +207,61 @@ async fn new_client(
     Ok(Arc::new(Client { session, heartbeat }))
 }
 
-async fn tcp_client(config: &Tuic, resolver: &Resolver, deadline: Instant) -> Result<Arc<Client>> {
+async fn tcp_client(
+    config: &Tuic,
+    resolver: &Resolver,
+    deadline: Instant,
+) -> Result<(Arc<Client>, EgressToken)> {
     let addresses = resolve(config, resolver, deadline).await?;
+    let egress = EgressToken::capture(&addresses).map_err(|_| "TuicEgressUnavailable")?;
     let key = (
         tokio::runtime::Handle::current().id(),
+        egress,
         cache_key(config, &addresses),
     );
-    {
-        let mut pool = TCP_SESSIONS.lock().map_err(|_| "TuicSessionState")?;
-        pool.retain(|(_, client)| client.strong_count() != 0);
-        if let Some(client) = pool
-            .iter()
-            .find(|(other, _)| other == &key)
-            .and_then(|(_, client)| client.upgrade())
-            && client.session.connection.close_reason().is_none()
-        {
-            timing::reused_quic_connection();
-            return Ok(client);
-        }
+    let cached = egress
+        .with_current(|| {
+            let mut pool = TCP_SESSIONS.lock().map_err(|_| "TuicSessionState")?;
+            pool.retain(|(_, client)| client.strong_count() != 0);
+            Ok::<_, &'static str>(
+                pool.iter()
+                    .find(|(other, _)| other == &key)
+                    .and_then(|(_, client)| client.upgrade())
+                    .filter(|client| client.session.connection.close_reason().is_none()),
+            )
+        })
+        .map_err(|_| "TuicEgressChanged")??;
+    if let Some(client) = cached {
+        timing::reused_quic_connection();
+        return Ok((client, egress));
     }
     let client = new_client(config, &addresses, deadline).await?;
-    let mut pool = TCP_SESSIONS.lock().map_err(|_| "TuicSessionState")?;
-    pool.retain(|(_, client)| client.strong_count() != 0);
-    // Weak entries own neither sockets nor tasks. Race duplicates are dropped
-    // and no global mutex is held during DNS/QUIC/authentication.
-    if let Some(existing) = pool
-        .iter()
-        .find(|(other, _)| other == &key)
-        .and_then(|(_, client)| client.upgrade())
-        && existing.session.connection.close_reason().is_none()
-    {
-        timing::reused_quic_connection();
-        return Ok(existing);
-    }
-    pool.retain(|(other, _)| other != &key);
-    if pool.len() == 64 {
-        pool.pop_front();
-    }
-    pool.push_back((key, Arc::downgrade(&client)));
-    Ok(client)
+    // A network switch may finish while QUIC/authentication is awaiting IO.
+    // Check and publish under the same epoch lock; a stale client is dropped,
+    // never returned or inserted into the pool under a newer network identity.
+    egress
+        .with_current(|| {
+            let mut pool = TCP_SESSIONS.lock().map_err(|_| "TuicSessionState")?;
+            pool.retain(|(_, client)| client.strong_count() != 0);
+            // Weak entries own neither sockets nor tasks. Race duplicates are
+            // dropped and neither lock is held during DNS/QUIC/authentication.
+            if let Some(existing) = pool
+                .iter()
+                .find(|(other, _)| other == &key)
+                .and_then(|(_, client)| client.upgrade())
+                && existing.session.connection.close_reason().is_none()
+            {
+                timing::reused_quic_connection();
+                return Ok((existing, egress));
+            }
+            pool.retain(|(other, _)| other != &key);
+            if pool.len() == 64 {
+                pool.pop_front();
+            }
+            pool.push_back((key, Arc::downgrade(&client)));
+            Ok((client, egress))
+        })
+        .map_err(|_| "TuicEgressChanged")?
 }
 
 pub async fn connect(
@@ -262,12 +279,15 @@ pub async fn connect(
     .await?;
     let deadline =
         Instant::now() + handshake_limit.min(Duration::from_millis(config.request_timeout_ms));
-    let client = tcp_client(config, resolver, deadline).await?;
+    let (client, egress) = tcp_client(config, resolver, deadline).await?;
     let (send, recv) = timing::measure(Phase::RequestEncodeWrite, async {
         let (mut send, recv) = timeout_at(deadline, client.session.connection.open_bi())
             .await
             .map_err(|_| "TuicConnectTimeout")?
             .map_err(|_| "TuicConnectStream")?;
+        egress
+            .with_current(|| ())
+            .map_err(|_| "TuicEgressChanged")?;
         timeout_at(deadline, send.write_all(&request))
             .await
             .map_err(|_| "TuicConnectTimeout")?
@@ -275,10 +295,14 @@ pub async fn connect(
         Ok::<_, &'static str>((send, recv))
     })
     .await?;
-    Ok(Box::new(Stream {
-        inner: quic::Stream::new(client.session.clone(), send, recv),
-        _client: client,
-    }))
+    egress
+        .with_current(|| {
+            Box::new(Stream {
+                inner: quic::Stream::new(client.session.clone(), send, recv),
+                _client: client,
+            }) as BoxStream
+        })
+        .map_err(|_| "TuicEgressChanged")
 }
 
 struct Stream {
