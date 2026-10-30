@@ -324,12 +324,12 @@ Item {
         if(!visual)return state;
         state.append(visual->opacity());state.append(visual->scale());state.append(visual->rotation());
         state.append(visual->property("progress"));
-        state.append(QVariant::fromValue(visual->itemTransform(window->contentItem())));
+        state.append(QVariant::fromValue(visual->itemTransform(window->contentItem(), nullptr)));
         for(int i=0;i<visual->property("featherCount").toInt();++i){
             auto *feather=findVisual(visual,"wingFeather"+QString::number(i));
             if(!feather)return QVariantList();
             state.append(feather->opacity());state.append(feather->property("reveal"));
-            state.append(QVariant::fromValue(feather->itemTransform(visual)));
+            state.append(QVariant::fromValue(feather->itemTransform(visual, nullptr)));
         }
         return state;
     };
@@ -340,7 +340,7 @@ Item {
         for(int i=0;i<count;++i){
             auto *feather=findVisual(visual,"wingFeather"+QString::number(i));
             if(!feather||feather->property("reveal").toDouble()!=1||feather->opacity()!=1
-                ||!feather->itemTransform(feather->parentItem()).isIdentity())return false;
+                ||!feather->itemTransform(feather->parentItem(), nullptr).isIdentity())return false;
             int gradients=0;
             for(auto *object:feather->findChildren<QObject *>()){
                 auto *gradient=object->property("fillGradient").value<QObject *>();
