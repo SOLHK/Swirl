@@ -1127,7 +1127,17 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
                 &&statusCard->size()==cardSize&&value->width()>0&&insideSurface(value,statusCard)
                 &&emblem&&valueBounds.right()<=emblem->x()+1);
         }
-        QTest::mouseMove(window,QPoint(1,1));wait(180);
+        QTest::mouseMove(window,QPoint(1,1));
+        // Layout proportions describe resting cards; returning from a detail
+        // deliberately restores keyboard focus and its visual lift.
+        activity->forceActiveFocus(Qt::OtherFocusReason);wait(180);
+        bool restingCards=true;
+        for(const auto &name:activityDetailCards){
+            auto *card=findVisual(activity,name);
+            restingCards=restingCards&&card&&!card->property("focused").toBool()
+                &&!card->property("hovered").toBool()&&qAbs(card->property("lift").toDouble())<0.01;
+        }
+        check("activity-layout-samples-five-resting-cards",restingCards);
         const auto diagnosticAt=diagnostic->mapToItem(activity,0,0),trafficAt=trafficCard->mapToItem(activity,0,0);
         const auto sourceAt=sourceCard?sourceCard->mapToItem(activity,0,0):QPointF();
         const auto statusAt=statusCard?statusCard->mapToItem(activity,0,0):QPointF();
@@ -1167,6 +1177,27 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             const auto bounds=region->mapRectToItem(activityScroll,QRectF(QPointF(),region->size()));
             return bounds.left()>=-1&&bounds.top()>=-1&&bounds.right()<=activityScroll->width()+1&&bounds.bottom()<=activityScroll->height()+1;
         };
+        for(auto *card:{statusCard,trafficCard}){
+            if(!card)continue;
+            const auto restingPosition=card->mapToItem(activity,QPointF());
+            const auto restingSize=card->size();
+            const double restingScroll=activityScroll->property("contentY").toDouble();
+            card->forceActiveFocus(Qt::TabFocusReason);wait(180);
+            const auto focusedBounds=card->mapRectToItem(activityScroll,QRectF(QPointF(),card->size()));
+            check(card->objectName()+"-keyboard-lift-stays-fully-inside-scroll-clip",card->hasActiveFocus()
+                &&card->property("focused").toBool()&&card->property("lift").toDouble()<0&&activityScroll->clip()
+                &&focusedBounds.left()>=0&&focusedBounds.top()>=0
+                &&focusedBounds.right()<=activityScroll->width()&&focusedBounds.bottom()<=activityScroll->height());
+            activityLayoutSamples.append(QJsonObject{{"phase","keyboard-focus"},{"card",card->objectName()},
+                {"lift",card->property("lift").toDouble()},{"clipLeft",focusedBounds.left()},{"clipTop",focusedBounds.top()},
+                {"clipRight",focusedBounds.right()},{"clipBottom",focusedBounds.bottom()},
+                {"scrollWidth",activityScroll->width()},{"scrollHeight",activityScroll->height()}});
+            activity->forceActiveFocus(Qt::OtherFocusReason);wait(180);
+            check(card->objectName()+"-focus-return-preserves-resting-layout-and-scroll",!card->property("focused").toBool()
+                &&qAbs(card->property("lift").toDouble())<0.01&&card->size()==restingSize
+                &&QLineF(card->mapToItem(activity,QPointF()),restingPosition).length()<0.01
+                &&qAbs(activityScroll->property("contentY").toDouble()-restingScroll)<0.01);
+        }
         const auto actualRanks=activity->property("ranks");
         // Geometry-only rows stay out of the real telemetry store. The compact
         // overview is bounded; the retained source detail owns the full table.

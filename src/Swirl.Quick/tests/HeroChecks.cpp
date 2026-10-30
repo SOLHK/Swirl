@@ -19,6 +19,9 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QFile>
+#include <QFileInfo>
+#include <QCryptographicHash>
+#include <QDateTime>
 #include <QDir>
 #include <QSet>
 #include <QPainter>
@@ -26,9 +29,12 @@
 #include <QCursor>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QList>
+#include <QPair>
 #include <functional>
 #include <algorithm>
 #include <atomic>
+#include <memory>
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <psapi.h>
@@ -45,8 +51,9 @@ static QJsonObject heroProcessResources(){
 }
 int runHeroChecks(QQuickWindow *window,EngineController *controller,const QString &directory) {
  if(!window||!controller)return 3;QDir().mkpath(directory);
+ const auto heroStartedUtc=QDateTime::currentDateTimeUtc();
  auto wait=[](int milliseconds){QEventLoop loop;QTimer timer;timer.setTimerType(Qt::PreciseTimer);timer.setSingleShot(true);QObject::connect(&timer,&QTimer::timeout,&loop,&QEventLoop::quit);timer.start(milliseconds);loop.exec();};
- QJsonArray checks;int failures=0;QJsonArray nodeClickMs;QJsonArray settingsRetargetSamples;
+ QJsonArray checks;int failures=0;QJsonArray nodeClickMs;QJsonArray settingsRetargetSamples;QJsonObject navigationPrerequisite;
  auto check=[&](bool value,const QString &name){checks.append(QJsonObject{{"name",name},{"passed",value}});if(!value)++failures;qInfo()<<"HERO_CHECK"<<name<<value;};
  auto eval=[&](const QString &code){QQmlExpression expression(qmlContext(window),window,code);auto result=expression.evaluate();if(expression.hasError()){++failures;qWarning()<<expression.error();}return result;};
  auto *policy=qobject_cast<MotionPolicy *>(qmlContext(window)->contextProperty("motionPolicy").value<QObject *>());
@@ -60,6 +67,11 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  auto item=[&](const QString &name,QQuickWindow *owner=nullptr){return find((owner?owner:window)->contentItem(),name);};
  auto click=[&](const QString &name,QQuickWindow *owner=nullptr){auto control=item(name,owner);if(!control){check(false,"input exists: "+name);return;}QTest::mouseClick(owner?owner:window,Qt::LeftButton,Qt::NoModifier,control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint());};
  auto route=[&](const QString &name){eval("AppState.navigate('"+name+"')");wait(350);};
+ auto routeReady=[&](const QString &name){
+  const bool ready=eval("AppState.currentPage==='"+name+"' && pageLoader.item && pageLoader.activeLoader && pageLoader.activeLoader.routeId==='"+name+"' && pageLoader.activeLoader.status===Loader.Ready && !pageLoader.pendingGrab && !pageLoader.preparing && !pageLoader.moving").toBool();
+  if(!ready)qInfo()<<"HERO_COLD_ROUTE_STATE"<<name<<eval("JSON.stringify({route:AppState.currentPage,activeRoute:pageLoader.activeLoader?pageLoader.activeLoader.routeId:'',status:pageLoader.activeLoader?pageLoader.activeLoader.status:-1,hasItem:pageLoader.item!==null,pending:pageLoader.pendingGrab,preparing:pageLoader.preparing,moving:pageLoader.moving,progress:pageLoader.position})").toString();
+  return ready;
+ };
  const bool recording=!QCoreApplication::arguments().contains("--hero-no-recording")&&!qEnvironmentVariableIsSet("SWIRL_QA_NO_RECORDING");
  auto snapshot=[&](const QString &name,QQuickWindow *sheet=nullptr){if(!recording)return true;auto image=window->grabWindow();QPainter painter(&image);if(sheet&&sheet->isVisible())painter.drawImage(sheet->position()-window->position(),sheet->grabWindow());painter.end();return image.save(directory+"/"+name+".png");};
  auto record=[&](const QString &name,QQuickWindow *sheet=nullptr){if(!recording)return;QDir().mkpath(directory+"/"+name);QElapsedTimer clock;clock.start();QJsonArray timestamps;for(int frame=0;frame<26;++frame){const auto file=QString("%1.png").arg(frame,3,10,QChar('0'));const auto start=clock.nsecsElapsed()/1000000.0;snapshot(name+"/"+file.chopped(4),sheet);timestamps.append(QJsonObject{{"file",file},{"captureStartMs",start},{"captureEndMs",clock.nsecsElapsed()/1000000.0}});wait(10);}QFile output(directory+"/"+name+"/frame-timestamps.json");if(output.open(QIODevice::WriteOnly))output.write(QJsonDocument(QJsonObject{{"frames",timestamps},{"durationMs",clock.nsecsElapsed()/1000000.0},{"method","Actual monotonic readback times; requested 10ms waits are not an assumed frame rate. Qt window readbacks do not capture the final DWM desktop contour."}}).toJson());};
@@ -173,20 +185,91 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  check(item("settings-proxies")&&item("settings-subscriptions")&&!item("settings-license"),"More has direct node/subscription entries and no paid license entry");
  QString yaml="proxies:\n";for(int i=0;i<180;++i)yaml+=QString("  - {name: 'Fixture node %1', type: socks5, server: 127.0.0.1, port: %2}\n").arg(i,3,10,QChar('0')).arg(10000+i);
  controller->imports()->importText(yaml);check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->nodes().size()==180,"180 synthetic node records imported by the real importer for rendering stress only");
- failures+=runNavigationChecks(window,controller,directory);
+ if(qEnvironmentVariableIsSet("SWIRL_HERO_NAVIGATION_REPORT")){
+  // CTest runs the complete navigation suite as a mandatory fixture. Only
+  // reuse its finished evidence from this executable and this CI invocation;
+  // direct --hero-test keeps the full in-process navigation path below.
+  const QString reportPath=qEnvironmentVariable("SWIRL_HERO_NAVIGATION_REPORT");
+  QFile navigationReport(reportPath),executable(QCoreApplication::applicationFilePath());
+  QCryptographicHash executableHash(QCryptographicHash::Sha256);
+  const bool executableHashed=executable.open(QIODevice::ReadOnly)&&executableHash.addData(&executable);
+  const QString executableSha256=executableHashed?QString::fromLatin1(executableHash.result().toHex()):QString();
+  const bool readable=!reportPath.isEmpty()&&navigationReport.open(QIODevice::ReadOnly);
+  QJsonParseError parseError;
+  const auto document=QJsonDocument::fromJson(readable?navigationReport.readAll():QByteArray(),&parseError);
+  const auto report=document.object();
+  const auto navigationChecks=report.value("checks").toArray();
+  bool allChecksPassed=!navigationChecks.isEmpty();
+  for(const auto entry:navigationChecks){
+   const auto passed=entry.toObject().value("passed");
+   allChecksPassed=allChecksPassed&&entry.isObject()&&passed.isBool()&&passed.toBool();
+  }
+  const auto completedUtc=QDateTime::fromString(report.value("completedUtc").toString(),Qt::ISODateWithMs);
+  const auto ageMs=completedUtc.msecsTo(heroStartedUtc);
+  const bool fresh=completedUtc.isValid()&&completedUtc.offsetFromUtc()==0&&ageMs>=0&&ageMs<=10*60*1000;
+  const bool sameExecutable=executableHashed&&executableSha256.size()==64
+      &&report.value("executableSha256").toString()==executableSha256;
+  bool sameInvocation=true;QJsonObject invocation;
+  for(const auto &field:QList<QPair<const char *,const char *>>{{"GITHUB_RUN_ID","githubRunId"},{"GITHUB_RUN_ATTEMPT","githubRunAttempt"},{"GITHUB_SHA","githubSha"}}){
+   const QString actual=qEnvironmentVariable(field.first),recorded=report.value(field.second).toString();
+   const bool matches=!qEnvironmentVariableIsSet(field.first)||(!actual.isEmpty()&&recorded==actual);
+   sameInvocation=sameInvocation&&matches;
+   invocation.insert(QString::fromLatin1(field.second),QJsonObject{{"actual",actual},{"recorded",recorded},{"matched",matches}});
+  }
+  const bool noFailures=report.value("failures").isDouble()&&report.value("failures").toDouble()==0;
+  const bool valid=readable&&parseError.error==QJsonParseError::NoError&&document.isObject()
+      &&report.value("test").toString()=="swirl-navigation-ui"&&sameExecutable&&sameInvocation&&fresh&&noFailures&&allChecksPassed;
+  navigationPrerequisite={{"mode","ctest-fixture"},{"report",QFileInfo(reportPath).absoluteFilePath()},{"valid",valid},
+      {"readable",readable},{"parseError",parseError.errorString()},{"executableSha256",executableSha256},{"recordedExecutableSha256",report.value("executableSha256")},
+      {"sameExecutable",sameExecutable},{"sameInvocation",sameInvocation},{"invocation",invocation},
+      {"completedUtc",report.value("completedUtc")},{"ageAtHeroStartMs",double(ageMs)},{"fresh",fresh},
+      {"checks",navigationChecks.size()},{"allChecksPassed",allChecksPassed},{"noFailures",noFailures}};
+  check(valid,"CTest navigation prerequisite is complete, current and source-identical");
+  qInfo().noquote()<<"HERO_NAVIGATION_PREREQUISITE"<<QJsonDocument(navigationPrerequisite).toJson(QJsonDocument::Compact);
+  if(!valid){
+   QFile reportFile(directory+"/hero-report.json");
+   if(!reportFile.open(QIODevice::WriteOnly))return 3;
+   reportFile.write(QJsonDocument(QJsonObject{{"checks",checks},{"failures",failures},{"navigationPrerequisite",navigationPrerequisite}}).toJson());
+   return 2;
+  }
+ }else{
+  const int navigationFailures=runNavigationChecks(window,controller,directory);
+  failures+=navigationFailures;
+  navigationPrerequisite={{"mode","in-process"},{"report",QFileInfo(directory+"/navigation-report.json").absoluteFilePath()},{"failures",navigationFailures}};
+ }
  // Synthetic metadata stays in the application's isolated DPAPI test store.
  // No fixture is connected and no measured network result is fabricated.
  check(controller->imports()->saveSubscription("","Animation fixture",QUrl("https://fixture.invalid/subscription"),360,false),"subscription metadata saved by the actual encrypted store");
  const auto subscriptionId=controller->imports()->providers().first().toMap().value("id").toString();
- route("subscriptions");auto card=item("subscriptionCard-"+subscriptionId);const double collapsed=card?card->height():0;
+ route("subscriptions");
+ check(routeReady("subscriptions"),"subscription route is loaded and settled before the first card sample");
+ auto card=item("subscriptionCard-"+subscriptionId);const double collapsed=card?card->height():0;
+ QQuickItem *subscriptionClock=nullptr;int subscriptionClocks=0;
+ if(card)for(auto *child:card->childItems()){
+  if(child->property("progress").isValid()&&child->property("destination").isValid()
+      &&child->property("moving").isValid()&&child->property("generation").isValid()){
+   subscriptionClock=child;++subscriptionClocks;
+  }
+ }
+ check(subscriptionClocks==1,"subscription expansion exposes one actual transition clock");
+ const auto subscriptionSettled=[&]{
+  if(!card||subscriptionClocks!=1||!subscriptionClock)return false;
+  const double destination=card->property("expanded").toBool()?1:0;
+  return !subscriptionClock->property("moving").toBool()
+      &&subscriptionClock->property("progress").toDouble()==destination
+      &&subscriptionClock->property("destination").toDouble()==destination
+      &&card->property("reveal").toDouble()==destination;
+ };
  click("expandSubscription-"+subscriptionId);wait(50);
  check(card&&card->height()>collapsed&&card->property("reveal").toDouble()>0,"subscription expands its actual boundary immediately");
  record("subscription-open");check(card&&card==item("subscriptionCard-"+subscriptionId)&&card->property("expanded").toBool(),"expanded subscription keeps the same delegate and stable ID");
- click("expandSubscription-"+subscriptionId);record("subscription-return");check(QTest::qWaitFor([&]{return card&&!card->property("moving").toBool()&&qAbs(card->height()-collapsed)<0.5;},1000),"subscription returns to its original boundary");
+ click("expandSubscription-"+subscriptionId);record("subscription-return");check(QTest::qWaitFor([&]{return subscriptionSettled()&&qAbs(card->height()-collapsed)<0.5;},1000),"subscription returns to its original boundary");
  for(int i=0;i<8;++i){click("expandSubscription-"+subscriptionId);wait(15);}wait(350);
- check(card&&card==item("subscriptionCard-"+subscriptionId)&&!card->property("moving").toBool(),"rapid subscription reversals settle without replacement or a stuck clock");
- eval("Theme.reduceMotion=true");click("expandSubscription-"+subscriptionId);check(card&&!card->property("moving").toBool()&&card->property("reveal").toDouble()==1,"reduced motion commits final geometry directly");eval("Theme.reduceMotion=false");
- route("proxies");auto table=item("realNodeTable");
+ check(card&&card==item("subscriptionCard-"+subscriptionId)&&subscriptionSettled(),"rapid subscription reversals settle without replacement or a stuck clock");
+ eval("Theme.reduceMotion=true");click("expandSubscription-"+subscriptionId);check(subscriptionSettled()&&card->property("reveal").toDouble()==1,"reduced motion commits final geometry directly");eval("Theme.reduceMotion=false");
+ route("proxies");
+ check(routeReady("proxies"),"node route is loaded and settled before the first row sample");
+ auto table=item("realNodeTable");
  if(table)QMetaObject::invokeMethod(table,"scrollToBeginning");wait(35);
  auto *nodeModel=window->findChild<NodeViewModel *>("nodeViewModel");
  check(table&&nodeModel&&nodeModel->rowCount()==180,"node list exposes all 180 records");
@@ -284,18 +367,27 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
 #endif
  };
  const double performanceStart=qpcMs();QJsonArray animationWindows,refreshPhases;
- QList<double> intervals;QMutex mutex;QElapsedTimer elapsed;elapsed.start();qint64 previous=0;
  struct Presentation {double qpcMs;quint32 count,refresh,sync;double syncQpcMs;int hz;};
- QList<Presentation> presentations;std::atomic_int presentationHz{qRound(window->screen()->refreshRate())};quint32 previousPresent=0;int statisticsErrors=0;
- auto frameConnection=QObject::connect(window,&QQuickWindow::frameSwapped,window,[&]{const auto now=elapsed.nsecsElapsed();QMutexLocker guard(&mutex);if(previous){const double ms=(now-previous)/1000000.0;if(ms<100)intervals.append(ms);}previous=now;
+ struct DeliveryState {
+  QMutex mutex;bool armed=true;QElapsedTimer elapsed;qint64 previous=0;
+  QList<double> intervals;QList<Presentation> presentations;
+  std::atomic_int presentationHz{0};quint32 previousPresent=0;int statisticsErrors=0;
+ };
+ auto delivery=std::make_shared<DeliveryState>();delivery->elapsed.start();delivery->presentationHz=qRound(window->screen()->refreshRate());
+ // frameSwapped runs on the rendering thread. Its state must outlive a
+ // concurrently disconnected callback; no callback may retain stack references.
+ auto frameConnection=QObject::connect(window,&QQuickWindow::frameSwapped,window,[delivery,window]{
+  QMutexLocker guard(&delivery->mutex);if(!delivery->armed)return;
+  const auto now=delivery->elapsed.nsecsElapsed();
+  if(delivery->previous){const double ms=(now-delivery->previous)/1000000.0;if(ms<100)delivery->intervals.append(ms);}delivery->previous=now;
 #ifdef Q_OS_WIN
   if(window->rendererInterface()->graphicsApi()==QSGRendererInterface::Direct3D11){
    auto chain=static_cast<QD3D11SwapChain *>(window->rendererInterface()->getResource(window,QSGRendererInterface::RhiSwapchainResource));
    DXGI_FRAME_STATISTICS stats{};
    if(chain&&chain->swapChain&&SUCCEEDED(chain->swapChain->GetFrameStatistics(&stats))&&stats.PresentCount&&stats.SyncQPCTime.QuadPart){
-    if(stats.PresentCount!=previousPresent){LARGE_INTEGER frequency;QueryPerformanceFrequency(&frequency);const auto syncMs=double(stats.SyncQPCTime.QuadPart)*1000/frequency.QuadPart;const int hz=presentationHz.load();
-     presentations.append({syncMs+qint32(stats.PresentRefreshCount-stats.SyncRefreshCount)*1000.0/qMax(1,hz),stats.PresentCount,stats.PresentRefreshCount,stats.SyncRefreshCount,syncMs,hz});previousPresent=stats.PresentCount;}
-   }else ++statisticsErrors;
+    if(stats.PresentCount!=delivery->previousPresent){LARGE_INTEGER frequency;QueryPerformanceFrequency(&frequency);const auto syncMs=double(stats.SyncQPCTime.QuadPart)*1000/frequency.QuadPart;const int hz=delivery->presentationHz.load();
+     delivery->presentations.append({syncMs+qint32(stats.PresentRefreshCount-stats.SyncRefreshCount)*1000.0/qMax(1,hz),stats.PresentCount,stats.PresentRefreshCount,stats.SyncRefreshCount,syncMs,hz});delivery->previousPresent=stats.PresentCount;}
+   }else ++delivery->statisticsErrors;
   }
 #endif
  },Qt::DirectConnection);
@@ -329,7 +421,7 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
   }
 #endif
   const auto phaseStart=qpcMs();
-  presentationHz=hz?hz:qRound(window->screen()->refreshRate());
+  delivery->presentationHz=hz?hz:qRound(window->screen()->refreshRate());
   const int phaseCycles=sweep?(qApp->arguments().contains("--hero-performance-quick")?24:180):30;
   for(int i=0;i<phaseCycles;++i){
    const auto pageStart=qpcMs();route(i%2?"proxies":"subscriptions");
@@ -340,6 +432,13 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
   refreshPhases.append(QJsonObject{{"requestedHz",hz},{"available",true},{"qtRefreshHz",window->screen()->refreshRate()},{"startQpcMs",phaseStart},{"endQpcMs",qpcMs()},{"resources",resources()}});
  }
  const double performanceEnd=qpcMs();
+ QList<double> intervals;QList<Presentation> presentations;int statisticsErrors=0;
+ {
+  // Waiting for this lock drains any current callback; later callbacks see
+  // armed=false before touching the window. Only immutable copies leave here.
+  QMutexLocker guard(&delivery->mutex);delivery->armed=false;
+  intervals=delivery->intervals;presentations=delivery->presentations;statisticsErrors=delivery->statisticsErrors;
+ }
  QObject::disconnect(frameConnection);std::sort(intervals.begin(),intervals.end());double mean=0;for(double ms:intervals)mean+=ms;if(!intervals.isEmpty())mean/=intervals.size();
  QJsonArray displaySamples;for(const auto &frame:presentations)displaySamples.append(QJsonObject{{"displayQpcMs",frame.qpcMs},{"presentCount",int(frame.count)},{"presentRefreshCount",int(frame.refresh)},{"syncRefreshCount",int(frame.sync)},{"syncQpcMs",frame.syncQpcMs},{"hz",frame.hz}});
  QJsonObject background;
@@ -348,6 +447,6 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  policy->setSystemReducedMotionOverrideForTest(-1);
  check(policy->systemReducedMotion()==actualSystemReducedMotion,"hero fixture restores the actual Windows accessibility policy");
  QFile report(directory+"/hero-report.json");if(!report.open(QIODevice::WriteOnly))return 3;
- report.write(QJsonDocument(QJsonObject{{"actualSystemReducedMotion",actualSystemReducedMotion},{"animatedSystemPolicyFixture",0},{"systemReducedPolicyFixture",1},{"restoredSystemPolicy",policy->systemReducedMotion()==actualSystemReducedMotion},{"settingsRetargetSamples",settingsRetargetSamples},{"nodeClickDispatchMs",nodeClickMs},{"checks",checks},{"failures",failures},{"dxgiPresentations",displaySamples},{"dxgiStatisticsErrors",statisticsErrors},{"animationWindows",animationWindows},{"refreshPhases",refreshPhases},{"resourceBefore",resourceBefore},{"resourceAfter",resources()},{"minimizedIdle",background},{"performanceStartQpcMs",performanceStart},{"performanceEndQpcMs",performanceEnd},{"reportedRefreshHz",window->screen()->refreshRate()},{"nativeDpr",window->devicePixelRatio()},{"sampleCount",intervals.size()},{"meanFrameDeliveryMs",mean},{"p95FrameDeliveryMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.95))]},{"p99FrameDeliveryMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.99))]},{"method","Passive Qt frameSwapped delivery during native interaction, excluding screenshot readback. These intervals are not hardware display presentation FPS; use external PresentMon data for presentation evidence."}}).toJson());
+ report.write(QJsonDocument(QJsonObject{{"actualSystemReducedMotion",actualSystemReducedMotion},{"animatedSystemPolicyFixture",0},{"systemReducedPolicyFixture",1},{"restoredSystemPolicy",policy->systemReducedMotion()==actualSystemReducedMotion},{"settingsRetargetSamples",settingsRetargetSamples},{"nodeClickDispatchMs",nodeClickMs},{"checks",checks},{"failures",failures},{"navigationPrerequisite",navigationPrerequisite},{"dxgiPresentations",displaySamples},{"dxgiStatisticsErrors",statisticsErrors},{"animationWindows",animationWindows},{"refreshPhases",refreshPhases},{"resourceBefore",resourceBefore},{"resourceAfter",resources()},{"minimizedIdle",background},{"performanceStartQpcMs",performanceStart},{"performanceEndQpcMs",performanceEnd},{"reportedRefreshHz",window->screen()->refreshRate()},{"nativeDpr",window->devicePixelRatio()},{"sampleCount",intervals.size()},{"meanFrameDeliveryMs",mean},{"p95FrameDeliveryMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.95))]},{"p99FrameDeliveryMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.99))]},{"method","Passive Qt frameSwapped delivery during native interaction, excluding screenshot readback. These intervals are not hardware display presentation FPS; use external PresentMon data for presentation evidence."}}).toJson());
  return failures?2:0;
 }

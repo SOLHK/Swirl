@@ -27,6 +27,7 @@ Item {
     readonly property real contentLogicalWidth: content.width
     readonly property real dualColumnMinimumWidth: Theme.dp(736)
     readonly property bool wide: contentLogicalWidth >= dualColumnMinimumWidth
+    readonly property real cardLiftInset: Theme.dp(1.5)
     readonly property real cardInset: Theme.dp(14)
     readonly property real moduleGap: Theme.dp(5)
     readonly property real sourceRowHeight: Theme.dp(32)
@@ -173,11 +174,13 @@ Item {
 
     Flickable {
         id: scroll; objectName: "activityScroll"
-        anchors.fill: parent; anchors.topMargin: Theme.dp(52)
+        // Extend the clip for the cards' existing hover/focus lift. Compensate
+        // the content origin and layout height so resting geometry stays fixed.
+        anchors.fill: parent; anchors.topMargin: Theme.dp(52) - page.cardLiftInset
         opacity: 1 - details.progress
         // Keep the existing knot instance and its weave position across navigation.
         enabled: !details.activeDetail
-        contentWidth: width; contentHeight: content.height + Theme.dp(16)
+        contentWidth: width; contentHeight: content.y + content.height + Theme.dp(16)
         interactive: contentHeight > height + 1
         flickableDirection: Flickable.VerticalFlick; boundsBehavior: Flickable.StopAtBounds
         onContentYChanged: { if (details.activeDetail) Qt.callLater(details.updateOrigin); Qt.callLater(statusWeave.updateGeometry) }
@@ -188,11 +191,11 @@ Item {
             readonly property real gap: Theme.dp(16)
             readonly property real smallWidth: (width - gap) * 5 / 12
             readonly property real largeWidth: (width - gap) * 7 / 12
-            readonly property real availableRowsHeight: Math.max(Theme.dp(564), scroll.height - Theme.dp(16) - gap)
+            readonly property real availableRowsHeight: Math.max(Theme.dp(564), scroll.height - page.cardLiftInset - Theme.dp(16) - gap)
             readonly property real topHeight: page.wide ? Math.max(Theme.dp(238), availableRowsHeight * 0.38) : Theme.dp(238)
             readonly property real bottomHeight: page.wide ? availableRowsHeight - topHeight : Theme.dp(326)
             readonly property real auxiliaryHeight: (bottomHeight - gap) / 2
-            x: Theme.pagePadding; width: scroll.width - 2 * Theme.pagePadding
+            x: Theme.pagePadding; y: page.cardLiftInset; width: scroll.width - 2 * Theme.pagePadding
             height: page.wide ? topHeight + gap + bottomHeight : narrowColumn.implicitHeight
 
             RowLayout {

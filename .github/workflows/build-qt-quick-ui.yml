@@ -657,6 +657,7 @@ jobs:
             build/swirl-quick/Release/Swirl-motion-diagnostics.txt
             build/swirl-quick/Release/Swirl-policy-ui-diagnostics.txt
             build/swirl-quick/Release/Swirl-hero-diagnostics.txt
+            build/swirl-quick/Release/Swirl-hero-material-diagnostics.txt
           if-no-files-found: warn
       - name: Save reusable compiler outputs
         if: ${{ !cancelled() && steps.ui_build.outcome == 'success' && steps.build_cache.outputs.cache-hit != 'true' }}

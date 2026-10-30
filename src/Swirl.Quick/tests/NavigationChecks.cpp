@@ -14,6 +14,10 @@
 #include <QQmlEngine>
 #include <QTest>
 #include <QFile>
+#include <QSaveFile>
+#include <QCryptographicHash>
+#include <QDateTime>
+#include <QCoreApplication>
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -658,6 +662,20 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
   auto percentile=[&](double fraction){return intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*fraction))];};
   performance={{"cycles",18},{"samples",intervals.size()},{"reportedRefreshHz",refresh},{"p50Ms",percentile(0.50)},{"p95Ms",percentile(0.95)},{"p99Ms",percentile(0.99)},{"maxMs",intervals.isEmpty()?0:intervals.last()},{"over1_5Budgets",overBudget},{"over2_5Budgets",overDouble},{"allDeliverySamples",allIntervals.size()},{"allDeliveryP95Ms",allIntervals.isEmpty()?0:allIntervals[qMin(allIntervals.size()-1,qsizetype(allIntervals.size()*0.95))]},{"method","Passive Qt frameSwapped intervals during 36 warm forward/reverse transitions driven by a normal QEventLoop; no QTest sleep polling, screenshot readback or per-frame expression polling. Active samples cover 20 ms through duration minus 20 ms; all-delivery statistics additionally retain the stationary commit tail. Delivery intervals are not physical display presentation FPS."}};
  }
- QFile file(directory+"/navigation-report.json");if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"checks",checks},{"nativeMotionPolicy",nativeMotionPolicy},{"endpointSamples",endpointSamples},{"buttonSamples",buttonSamples},{"buttonAuditScope","Actual production page controls; canceled pointer releases invoke no commands. Process detail uses one page-local geometry row, never accounting data. Empty-source refresh-all is verified disabled."},{"performance",performance},{"failures",failures},{"nativeHandleUnchanged",window->winId()==handle},{"dpr",window->devicePixelRatio()}}).toJson());
+ // CTest can use this completed suite as Hero's prerequisite. Stream the
+ // executable rather than trusting a build label or loading the EXE into RAM.
+ QFile executable(QCoreApplication::applicationFilePath());
+ QCryptographicHash executableHash(QCryptographicHash::Sha256);
+ const bool executableHashed=executable.open(QIODevice::ReadOnly)&&executableHash.addData(&executable);
+ const QString executableSha256=executableHashed?QString::fromLatin1(executableHash.result().toHex()):QString();
+ check(executableHashed&&!executableSha256.isEmpty(),"completed navigation evidence identifies the actual executable");
+ QSaveFile file(directory+"/navigation-report.json");
+ const auto report=QJsonDocument(QJsonObject{{"test","swirl-navigation-ui"},{"executableSha256",executableSha256},
+     {"completedUtc",QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
+     {"githubRunId",qEnvironmentVariable("GITHUB_RUN_ID")},{"githubRunAttempt",qEnvironmentVariable("GITHUB_RUN_ATTEMPT")},{"githubSha",qEnvironmentVariable("GITHUB_SHA")},
+     {"checks",checks},{"nativeMotionPolicy",nativeMotionPolicy},{"endpointSamples",endpointSamples},{"buttonSamples",buttonSamples},{"buttonAuditScope","Actual production page controls; canceled pointer releases invoke no commands. Process detail uses one page-local geometry row, never accounting data. Empty-source refresh-all is verified disabled."},{"performance",performance},{"failures",failures},{"nativeHandleUnchanged",window->winId()==handle},{"dpr",window->devicePixelRatio()}}).toJson();
+ if(!file.open(QIODevice::WriteOnly)||file.write(report)!=report.size()||!file.commit()){
+  qWarning()<<"NAVIGATION_REPORT_WRITE_FAILED"<<file.errorString();return failures+1;
+ }
  return failures;
 }

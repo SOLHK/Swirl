@@ -234,7 +234,7 @@ qt_add_qml_module(Swirl
     RESOURCE_PREFIX /qt/qml
     NO_GENERATE_EXTRA_QMLDIRS
     QML_FILES ${SWIRL_QML_FILES}
-    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp app/WindowEdge.h app/WindowEdge.cpp app/RibbonStroke.h app/RibbonStroke.cpp app/WholeFeatherItem.h app/WholeFeatherItem.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp app/NodeViewModel.h app/NodeViewModel.cpp app/NodeSectionModel.h app/NodeSectionModel.cpp
+    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp app/WindowEdge.h app/WindowEdge.cpp app/RibbonStroke.h app/RibbonStroke.cpp app/WholeFeatherItem.h app/WholeFeatherItem.cpp app/SwirlPressClock.h app/SwirlPressClock.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp app/NodeViewModel.h app/NodeViewModel.cpp app/NodeSectionModel.h app/NodeSectionModel.cpp
 )
 set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 file(GLOB SWIRL_UI_ICONS CONFIGURE_DEPENDS "${SWIRL_ASSET_PATH}/icons/ui/*.svg")
@@ -328,7 +328,7 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  # 15s restoration process and glass readbacks. Per-input 40ms checks stay strict.
  set_tests_properties(swirl-appearance-ui PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
  qt_add_resources(Swirl material_tests PREFIX "/tests" BASE "${CMAKE_CURRENT_SOURCE_DIR}/tests" FILES tests/MaterialBench.qml)
- target_link_libraries(Swirl PRIVATE Qt6::Test)
+ target_link_libraries(Swirl PRIVATE Qt6::Test Qt6::QmlPrivate Qt6::QuickPrivate)
  target_compile_definitions(Swirl PRIVATE SWIRL_UI_TESTS)
  endif()
  enable_testing()
@@ -520,8 +520,11 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
   add_test(NAME swirl-navigation-ui COMMAND Swirl --navigation-test --navigation-output=navigation-evidence --hero-no-recording)
   # Includes canceled native input, focus and pixels for ordinary page controls,
   # the flat toolbar and each of the five activity cards.
-  set_tests_properties(swirl-navigation-ui PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
-  set_tests_properties(swirl-hero PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  set_tests_properties(swirl-navigation-ui PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE FIXTURES_SETUP swirl_native_navigation ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  # CTest always schedules the complete navigation audit before Hero, including
+  # when selecting only Hero with -R. Reuse its verified same-executable report
+  # instead of executing the same 600+ assertions twice inside Hero's deadline.
+  set_tests_properties(swirl-hero PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE FIXTURES_REQUIRED swirl_native_navigation ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:;SWIRL_HERO_NAVIGATION_REPORT=set:${CMAKE_CURRENT_BINARY_DIR}/navigation-evidence/navigation-report.json")
  endif()
  set_tests_properties(swirl-motion PROPERTIES TIMEOUT 120
   ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
