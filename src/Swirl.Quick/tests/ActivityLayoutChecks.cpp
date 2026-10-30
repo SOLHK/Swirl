@@ -20,10 +20,21 @@
 #include <QQuickWindow>
 #include <QScreen>
 #include <QSGRendererInterface>
+#include <QSysInfo>
 #include <QTest>
+#include <QtMath>
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#ifdef Q_OS_WIN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
 
 namespace {
 QQuickItem *visual(QQuickItem *root, const QString &name) {
@@ -35,6 +46,9 @@ QQuickItem *visual(QQuickItem *root, const QString &name) {
 QJsonObject rectangle(const QRectF &rect) {
     return {{"x", rect.x()}, {"y", rect.y()}, {"width", rect.width()}, {"height", rect.height()}};
 }
+QJsonObject dimensions(const QSize &size) {
+    return {{"width", size.width()}, {"height", size.height()}};
+}
 bool near(qreal a, qreal b, qreal tolerance = 1.1) { return std::abs(a - b) <= tolerance; }
 bool nearRect(const QRectF &a, const QRectF &b, qreal tolerance = 2) {
     return near(a.x(), b.x(), tolerance) && near(a.y(), b.y(), tolerance)
@@ -45,7 +59,7 @@ bool nearRect(const QRectF &a, const QRectF &b, qreal tolerance = 2) {
 int runActivityLayoutChecks(QQuickWindow *window, const QString &outputDirectory) {
     QDir directory(outputDirectory);
     if (!QDir().mkpath(directory.absolutePath())) return 2;
-    QJsonArray checks, layouts, travel;
+    QJsonArray checks, layouts, travel, nativeViewportSamples;
     int failures = 0;
     const auto check = [&](const QString &name, bool success) {
         checks.append(QJsonObject{{"name", name}, {"passed", success}});
@@ -91,8 +105,73 @@ int runActivityLayoutChecks(QQuickWindow *window, const QString &outputDirectory
         cards.append(item);
     }
     const auto rect = [&](QQuickItem *item) { return item->mapRectToItem(page, QRectF(QPointF(), item->size())); };
+    QSize requestedViewport = window->size();
+    const bool renderOnlyViewport = window->property("swirlViewportTest").toBool();
+    const auto requestViewport = [&](const QSize &size) {
+        requestedViewport = size;
+        window->resize(size);
+    };
     const auto screenshot = [&](const QString &name) {
         const auto image = window->grabWindow();
+        const QSize actualLogical = window->size();
+        const qreal actualDpr = window->devicePixelRatio();
+        const QSize expectedPixels(qRound(actualLogical.width() * actualDpr), qRound(actualLogical.height() * actualDpr));
+        check(name + "-requested-logical-viewport-reached", actualLogical == requestedViewport);
+        check(name + "-render-image-matches-logical-size-times-actual-DPR", !image.isNull() && image.size() == expectedPixels);
+        QJsonObject nativeSample{{"case", name}, {"requestedLogicalSize", dimensions(requestedViewport)},
+            {"actualLogicalSize", dimensions(actualLogical)}, {"actualDevicePixelRatio", actualDpr},
+            {"expectedPixelSize", dimensions(expectedPixels)}, {"imagePixelSize", dimensions(image.size())},
+            {"renderOnlyViewport", renderOnlyViewport}, {"physicalWindows11Acceptance", "not-run"}};
+        if (const auto *screen = window->screen()) {
+            nativeSample.insert("screenName", screen->name());
+            nativeSample.insert("screenGeometry", rectangle(screen->geometry()));
+            nativeSample.insert("screenAvailableGeometry", rectangle(screen->availableGeometry()));
+        }
+#ifdef Q_OS_WIN
+        // Read the actual HWND client after the native render. Enlarging the
+        // test track limit must not turn a truncated native window into a pass.
+        const HWND hwnd = reinterpret_cast<HWND>(window->winId());
+        RECT nativeClient{}, nativeWindow{};
+        POINT clientOrigin{};
+        MONITORINFO monitor{sizeof(MONITORINFO)};
+        const bool clientRead = hwnd && GetClientRect(hwnd, &nativeClient);
+        const bool windowRead = hwnd && GetWindowRect(hwnd, &nativeWindow);
+        const bool clientOriginRead = hwnd && ClientToScreen(hwnd, &clientOrigin);
+        const bool monitorRead = hwnd && GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &monitor);
+        const auto fromNative = [](const RECT &value) {
+            return QRect(value.left, value.top, value.right - value.left, value.bottom - value.top);
+        };
+        const QSize clientPixels(nativeClient.right - nativeClient.left, nativeClient.bottom - nativeClient.top);
+        const QRect clientBounds(QPoint(clientOrigin.x, clientOrigin.y), clientPixels);
+        const QRect desktopBounds(GetSystemMetrics(SM_XVIRTUALSCREEN), GetSystemMetrics(SM_YVIRTUALSCREEN),
+            GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN));
+        const bool desktopRead = desktopBounds.width() > 0 && desktopBounds.height() > 0;
+        check(name + "-native-HWND-client-size-readable", clientRead);
+        check(name + "-native-client-matches-logical-size-times-actual-DPR", clientRead && clientPixels == expectedPixels);
+        check(name + "-render-image-matches-native-client-pixels", clientRead && !image.isNull() && image.size() == clientPixels);
+        check(name + "-native-window-monitor-and-desktop-bounds-readable", windowRead && clientOriginRead && monitorRead && desktopRead);
+        nativeSample.insert("nativeClientRead", clientRead);
+        nativeSample.insert("nativeClientPixelSize", dimensions(clientPixels));
+        nativeSample.insert("nativeWindowRead", windowRead);
+        nativeSample.insert("nativeMonitorRead", monitorRead);
+        nativeSample.insert("nativeClientOriginRead", clientOriginRead);
+        nativeSample.insert("nativeVirtualDesktopRead", desktopRead);
+        nativeSample.insert("nativeWindowBoundsPixels", rectangle(fromNative(nativeWindow)));
+        nativeSample.insert("nativeClientBoundsPixels", rectangle(clientBounds));
+        nativeSample.insert("nativeMonitorBoundsPixels", rectangle(fromNative(monitor.rcMonitor)));
+        nativeSample.insert("nativeMonitorWorkAreaPixels", rectangle(fromNative(monitor.rcWork)));
+        nativeSample.insert("nativeVirtualDesktopBoundsPixels", rectangle(desktopBounds));
+        nativeSample.insert("windowOutsideNativeDesktop", windowRead && desktopRead
+            ? QJsonValue(!desktopBounds.contains(fromNative(nativeWindow))) : QJsonValue(QJsonValue::Null));
+        nativeSample.insert("clientOutsideNativeDesktop", clientRead && clientOriginRead && desktopRead
+            ? QJsonValue(!desktopBounds.contains(clientBounds)) : QJsonValue(QJsonValue::Null));
+        nativeSample.insert("clientOutsideNativeMonitor", clientRead && clientOriginRead && monitorRead
+            ? QJsonValue(!fromNative(monitor.rcMonitor).contains(clientBounds)) : QJsonValue(QJsonValue::Null));
+#else
+        check(name + "-native-HWND-client-evidence-requires-Windows", false);
+        nativeSample.insert("nativeClientRead", false);
+#endif
+        nativeViewportSamples.append(nativeSample);
         check(name + "-native-render-image-saved", !image.isNull() && image.save(directory.filePath(name + ".png")));
     };
     const auto settle = [&] {
@@ -121,10 +200,12 @@ int runActivityLayoutChecks(QQuickWindow *window, const QString &outputDirectory
         QTest::mouseMove(window, QPoint(1, 1));
         scroll->setProperty("contentY", 0);
         QTest::qWait(200);
+        check(caseName + "-actual-logical-size-equals-requested-case", window->size() == requestedViewport);
         const qreal contentWidth = page->property("contentLogicalWidth").toDouble();
         const qreal breakpoint = page->property("dualColumnMinimumWidth").toDouble();
         const bool wide = page->property("wide").toBool();
         QJsonObject sample{{"case", caseName}, {"logicalWidth", window->width()}, {"logicalHeight", window->height()},
+            {"requestedLogicalSize", dimensions(requestedViewport)}, {"renderOnlyViewport", renderOnlyViewport},
             {"physicalWidth", window->width() * window->devicePixelRatio()}, {"physicalHeight", window->height() * window->devicePixelRatio()},
             {"devicePixelRatio", window->devicePixelRatio()}, {"contentLogicalWidth", contentWidth},
             {"dualColumnMinimumWidth", breakpoint}, {"wide", wide},
@@ -194,21 +275,36 @@ int runActivityLayoutChecks(QQuickWindow *window, const QString &outputDirectory
         screenshot(caseName);
     };
     const QSize initialSize = window->size();
+    QString previewSizeArgument;
+    for (const auto &argument : QCoreApplication::arguments())
+        if (argument.startsWith("--preview-size=")) previewSizeArgument = argument.mid(QStringLiteral("--preview-size=").size());
+    if (!previewSizeArgument.isEmpty()) {
+        const auto parts = previewSizeArgument.split('x');
+        bool widthValid = false, heightValid = false;
+        const int width = parts.size() == 2 ? parts[0].toInt(&widthValid) : 0;
+        const int height = parts.size() == 2 ? parts[1].toInt(&heightValid) : 0;
+        const bool valid = widthValid && heightValid && width > 0 && height > 0;
+        check("initial-CLI-preview-size-is-valid", valid);
+        if (valid) requestedViewport = QSize(width, height);
+        check("initial-CLI-preview-size-equals-actual-logical-window", valid && initialSize == requestedViewport);
+    }
+    if (qEnvironmentVariableIsSet("SWIRL_LAYOUT_EXPECTED_DPR"))
+        check("controlled-DPR-case-has-explicit-initial-CLI-viewport", !previewSizeArgument.isEmpty());
     captureLayout("current-physical-window");
     if (near(window->width() * window->devicePixelRatio(), 1520, 20) && near(window->devicePixelRatio(), 1.5, 0.05))
         check("current-1520px-at150pct-is-dual-column", page->property("wide").toBool());
-    window->resize(1100, 760);
+    requestViewport(QSize(1100, 760));
     captureLayout("wide-1100x760");
     check("wide-1100-window-is-dual-column", page->property("wide").toBool());
-    window->resize(1030, 672);
+    requestViewport(QSize(1030, 672));
     captureLayout("reference-1030x672");
     check("reference-1030-window-is-dual-column", page->property("wide").toBool());
-    window->resize(1100, window->minimumHeight());
+    requestViewport(QSize(1100, window->minimumHeight()));
     captureLayout("short-window");
-    window->resize(760, window->minimumHeight());
+    requestViewport(QSize(760, window->minimumHeight()));
     captureLayout("narrow-window");
     check("narrow-760-window-is-single-column", !page->property("wide").toBool());
-    window->resize(1100, 760);
+    requestViewport(QSize(1100, 760));
     QTest::qWait(200);
     const int routeHistory = eval("AppState.historyIndex").toInt();
     for (int index = 0; index < cards.size(); ++index) {
@@ -266,14 +362,16 @@ int runActivityLayoutChecks(QQuickWindow *window, const QString &outputDirectory
     check("interrupted-expansion-releases-shield", settle() && !transition->isVisible());
     clickCard(cards[2]);
     check("resize-case-opens", settle() && transition->property("opened").toBool());
-    window->resize(760, window->minimumHeight());
+    requestViewport(QSize(760, window->minimumHeight()));
     QTest::qWait(200);
+    check("resize-while-open-reaches-requested-logical-viewport", window->size() == requestedViewport);
     QTest::keyClick(window, Qt::Key_Escape);
     check("resize-while-open-returns-without-shield", settle() && !transition->isVisible());
     const auto resizedOrigin = transition->mapRectToItem(page, transition->property("origin").toRectF());
     check("resize-while-open-returns-to-new-single-column-position", nearRect(resizedOrigin, rect(cards[2]), 4));
-    window->resize(1100, 760);
+    requestViewport(QSize(1100, 760));
     QTest::qWait(200);
+    check("back-button-case-reaches-requested-logical-viewport", window->size() == requestedViewport);
     clickCard(cards[3]);
     check("back-button-case-opens", settle());
     if (auto *back = find("activityDetailBack"))
@@ -288,13 +386,27 @@ int runActivityLayoutChecks(QQuickWindow *window, const QString &outputDirectory
     close();
     check("main-route-and-history-preserved", eval("AppState.currentPage==='activity'").toBool() && eval("AppState.historyIndex").toInt() == routeHistory);
     check("host-system-proxy-unchanged", hostProxyBefore == SystemProxySession::snapshot());
-    window->resize(initialSize);
+    requestViewport(initialSize);
+    check("original-logical-viewport-restored", window->size() == initialSize);
     const auto *screen = window->screen();
-    const QJsonObject report{{"schema", 1}, {"source", "live ActivityPage.qml QObject/QQuickItem geometry"},
+    QJsonArray screens;
+    for (const auto *display : QGuiApplication::screens())
+        screens.append(QJsonObject{{"name", display->name()}, {"geometry", rectangle(display->geometry())},
+            {"availableGeometry", rectangle(display->availableGeometry())}, {"devicePixelRatio", display->devicePixelRatio()},
+            {"logicalDpi", display->logicalDotsPerInch()}});
+    const QJsonObject report{{"schema", 2}, {"source", "live ActivityPage.qml QObject/QQuickItem geometry"},
         {"qtVersion", QString::fromLatin1(qVersion())}, {"renderer", int(window->rendererInterface()->graphicsApi())},
         {"nativeD3D11", window->rendererInterface()->graphicsApi() == QSGRendererInterface::Direct3D11},
         {"dpiMode", nativeDpi ? "Actual Windows display scaling; no Qt scale overrides" : "Qt scale-factor simulation on the current Windows screen"},
         {"scaleFactorEnvironment", QString::fromUtf8(qgetenv("QT_SCALE_FACTOR"))},
+        {"initialPreviewSizeArgument", previewSizeArgument}, {"initialActualLogicalSize", dimensions(initialSize)},
+        {"renderOnlyViewport", renderOnlyViewport}, {"operatingSystem", QSysInfo::prettyProductName()},
+        {"screens", screens}, {"nativeViewportSamples", nativeViewportSamples},
+        {"physicalWindows11Acceptance", "not-run"}, {"hardwarePresentationAcceptance", "not-run"},
+        {"limitations", QJsonArray{
+            "Render-only viewport mode keeps the real HWND and Qt scene, but permits its client to extend beyond the available desktop.",
+            "Win32 client dimensions and native QImage pixels establish the rendered viewport, not physical monitor coverage or hardware scan-out.",
+            "The original QTest event input and application animation clocks remain in use; physical Windows 11 interaction and cross-monitor DPI acceptance were not run."}},
         {"screenLogicalDpi", screen ? screen->logicalDotsPerInch() : 0},
         {"screenDevicePixelRatio", screen ? screen->devicePixelRatio() : 0}, {"devicePixelRatio", window->devicePixelRatio()},
         {"startedAtUtc", QDateTime::currentDateTimeUtc().toString(Qt::ISODate)}, {"checks", checks},

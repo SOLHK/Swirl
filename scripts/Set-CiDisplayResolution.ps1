@@ -1,6 +1,6 @@
 param(
-    [int]$MinimumWidth = 2400,
-    [int]$MinimumHeight = 1600,
+    [int]$MinimumWidth = 1920,
+    [int]$MinimumHeight = 1080,
     [string]$EvidencePath = 'build-evidence/ci-display.json'
 )
 
@@ -12,6 +12,8 @@ if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hoste
 # Use only modes advertised by the current display driver. The UI tests still
 # create real native windows and inspect their actual DPR and rendered pixels.
 # No registry update, custom display driver or Qt geometry override is used.
+# The higher-DPR matrix separately uses the repository's existing render-only
+# viewport fixture and verifies its full native client and RHI image dimensions.
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
@@ -86,7 +88,7 @@ try {
         }
     }
     if ($null -eq $after -or $after.width -lt $MinimumWidth -or $after.height -lt $MinimumHeight) {
-        throw "The native virtual display cannot fit the existing 1100x760 tests at 200% DPR. See $EvidencePath for supported modes; tests have not been narrowed."
+        throw "The runner cannot provide the required native UI desktop. See $EvidencePath for supported modes; UI test cases have not been narrowed."
     }
     $result = 'passed'
     Write-Host "Native CI display: $($before.width)x$($before.height) -> $($after.width)x$($after.height). Physical Windows 11 display acceptance remains unverified."

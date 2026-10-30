@@ -65,7 +65,7 @@ jobs:
         run: ./tools/tests/Test-CodexProxyLauncher.ps1
       - name: Check cloud-knot path geometry from the production JavaScript
         run: node scripts/tests/Test-CloudKnotGeometry.cjs
-      - name: Prepare native Windows display for full-size UI and DPR checks
+      - name: Prepare supported native Windows display for UI checks
         shell: pwsh
         run: ./scripts/Set-CiDisplayResolution.ps1
       - name: Install Rust MSVC tools
@@ -540,8 +540,11 @@ jobs:
         shell: pwsh
         run: |
           # Reuse the current unscaled layout result, then run only this focused
-          # driver at missing DPR values. QT_SCALE_FACTOR multiplies native DPR;
-          # these are Qt simulations, not physical display-setting acceptance.
+          # driver at missing DPR values. QT_SCALE_FACTOR multiplies native DPR.
+          # The existing test-only viewport permits a real HWND / swapchain to
+          # extend beyond this hosted desktop; the driver independently checks
+          # native client pixels and complete RHI readback dimensions. These are
+          # Qt rendering/input simulations, not physical display acceptance.
           $env:QT_QPA_PLATFORM = 'windows'
           $env:QSG_RHI_BACKEND = 'd3d11'
           Remove-Item Env:QT_QUICK_BACKEND,Env:QT_SCREEN_SCALE_FACTORS,Env:QT_SCALE_FACTOR,Env:SWIRL_LAYOUT_EXPECTED_DPR -ErrorAction SilentlyContinue
@@ -606,7 +609,7 @@ jobs:
             if ($samples.Count -ne 5) { throw 'The activity DPR matrix is incomplete.' }
             $matrixResult = 'passed'
           } finally {
-            [ordered]@{ source_sha=$env:GITHUB_SHA; nativeBaselineDpr=$nativeDpr; result=$matrixResult; samples=$samples; method='Actual QQuickWindow DPR, five-card layout, ESC, interruption and resize checks using Qt scale-factor simulation'; physical_windows11_display_scaling='not-run'; cross_monitor_dpi='not-run'; physical_gpu_presentation='not-run' } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $root 'dpi-matrix.json') -Encoding utf8
+            [ordered]@{ source_sha=$env:GITHUB_SHA; nativeBaselineDpr=$nativeDpr; result=$matrixResult; samples=$samples; method='Actual QQuickWindow DPR, Win32 client and full RHI readback; unchanged five-card layout, ESC, interruption and resize checks using Qt scale-factor simulation. The test HWND may extend beyond the hosted desktop.'; physical_windows11_display_scaling='not-run'; cross_monitor_dpi='not-run'; physical_gpu_presentation='not-run' } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $root 'dpi-matrix.json') -Encoding utf8
             $delivery = Get-Content -LiteralPath 'out/delivery.json' -Raw | ConvertFrom-Json
             $delivery | Add-Member -NotePropertyName activity_dpr_simulation -NotePropertyValue $matrixResult -Force
             $delivery | ConvertTo-Json | Set-Content -LiteralPath 'out/delivery.json' -Encoding utf8

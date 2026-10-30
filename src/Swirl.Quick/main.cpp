@@ -390,6 +390,16 @@ int main(int argc, char *argv[])
     if (engine.rootObjects().isEmpty())
         return 1;
     auto *rootWindow = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
+#ifdef SWIRL_UI_TESTS
+    if(rootWindow && activityLayoutTest && qEnvironmentVariableIsSet("SWIRL_LAYOUT_EXPECTED_DPR")) {
+        // Reuse the existing render-only native viewport fixture before the
+        // first explicit preview resize. High-DPR cases keep their full HWND
+        // and swapchain even when the hosted desktop is smaller. The driver
+        // verifies Win32 client pixels and RHI readback; physical presentation
+        // remains a separate, unexecuted Windows 11 acceptance requirement.
+        rootWindow->setProperty("swirlViewportTest",true);
+    }
+#endif
     if(rootWindow){
         // Keep animated and antialiased damage inside this HWND. The native
         // outer shadow remains in its own window.
