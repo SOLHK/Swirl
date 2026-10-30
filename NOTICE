@@ -1,0 +1,69 @@
+Swirl — 版权、来源与许可证通知
+
+Required Notice: Copyright (c) 2026 SOLHK.
+Required Notice: Original project: Swirl (https://github.com/SOLHK/Swirl).
+
+原项目：Swirl
+原作者及维护者标识：SOLHK (https://github.com/SOLHK)
+官方仓库：https://github.com/SOLHK/Swirl
+
+许可证范围
+
+根目录 LICENSE 为未经修改的 PolyForm Noncommercial License 1.0.0 官方原文。
+该许可证适用于 SOLHK 有权以此许可证提供的 Swirl 原创材料，自首次纳入
+该许可证的修订起提供相应许可；它不改变第三方材料、已有单独许可的材料
+或权属尚未核实的他人贡献的法律地位。具体权属缺口见
+docs/LICENSE_COMPLIANCE_REVIEW.md；本通知不证明 SOLHK 拥有仓库内全部版权。
+
+LICENSE 允许其范围内的非商业使用、修改、二次开发和分发。允许用途应按
+LICENSE 全文判断，包括 Personal Uses、Noncommercial Organizations 和
+Fair Use；不得用本通知或授权管理文档缩减这些权限或法定权利。超出已有
+许可及法定权利范围、需要 SOLHK 另行许可的商业使用，必须取得额外商业授权。
+
+PolyForm Noncommercial 1.0.0 是附非商业用途限制的源码可用许可证，
+不是 OSI 认可的开源许可证；公开源码本身不等于允许任意商业使用。
+
+分发通知
+
+按 LICENSE 的 Notices 条款，任何人从你处获得软件任意部分的副本时，
+必须同时获得 LICENSE 条款的副本或下列官方网址，以及本文件中上述两行
+以 Required Notice: 开头的完整纯文本通知：
+https://polyformproject.org/licenses/noncommercial/1.0.0
+
+保留所分发材料已有的适用版权、来源、许可及修改通知。第三方许可证另有
+要求的，还须分别履行；本通知不替代它们。建议随源码或二进制一起提供
+LICENSE 和 NOTICE；本次文档变更未修改安装程序，不能据此认定安装包已
+包含这些文件或已经满足所有第三方分发义务。
+
+第三方和已有许可
+
+第三方代码、库、字体、图标、数据及工具保留各自的许可证与权利人声明，
+不因根目录 LICENSE 或 SOLHK 商业授权而改用 PolyForm 或失去商业使用权。
+尤其保留以下材料的独立条款及相应义务：
+
+- core/vendor/rustls/ 的 Apache-2.0 OR ISC OR MIT 许可，包含
+  SWIRL-PATCH.md 已明确按相同许可提供的 Swirl 补丁。
+- src/Swirl.Quick/third_party/ 中的 fkYAML、nghttp2 等第三方代码，
+  以及测试用 RenderDoc 头文件自身的 MIT 许可。
+- Qt 的 LGPLv3 权利，包括适用的替换、重新链接和为调试库修改而逆向工程
+  的权利；它们不受 Swirl 的非商业限制或商业登记制度约束。
+- src/Swirl.Quick/packaging/rules/ 的 GPLv3 规则数据及其对应源码义务。
+- HarmonyOS Sans 的专用字体协议及其他第三方资产已有的许可通知。
+
+第三方通知入口：src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt、
+src/Swirl.Quick/packaging/licenses/、src/Swirl.Quick/packaging/rules/LICENSE、
+src/Swirl.Quick/assets/fonts/LICENSE_HarmonyOS_Sans.txt，以及材料自身的文件头。
+core/DEPENDENCIES.json 是历史依赖清单，存在与当前锁文件不一致的缺口，
+不能单凭它认定依赖许可或分发通知完整。详细审查及限制见
+docs/LICENSE_COMPLIANCE_REVIEW.md。
+
+额外商业授权
+
+COMMERCIAL_AUTHORIZATIONS.md 是唯一官方公开商业授权登记表，其有效版本
+仅为 https://github.com/SOLHK/Swirl 的 main 分支当前版本。登记与真实、
+有效的腾讯电子签合同须共同核验，详见该表及 AI_AUTHORIZATION_POLICY.md。
+这些文件仅管理额外商业授权，不修改 LICENSE，也不为非商业开发新增审批条件。
+
+本次变更不撤回或追溯限制已有效授予的旧版本权利，不替代既有有效合同。
+历史授权、贡献者权属及第三方义务未查清时，应明确标记待核实，不得声明
+已完成全部授权清理或据此授予无权授予的商业权利。
