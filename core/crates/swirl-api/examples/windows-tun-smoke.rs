@@ -1186,7 +1186,7 @@ mod windows {
                     runtime,
                     config.clone(),
                     fake[index],
-                    trap.try_clone()?,
+                    clone_listener_for_tokio(&trap)?,
                 )?;
                 no_tcp_accept(&trap)?;
                 config.policy.mode = if case == "reject" {
@@ -1225,7 +1225,7 @@ mod windows {
                 } else {
                     Some(proxy_peer(
                         runtime,
-                        proxy.try_clone()?,
+                        clone_listener_for_tokio(&proxy)?,
                         host,
                         port,
                         case == "proxy_rejected",
