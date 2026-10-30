@@ -12,14 +12,16 @@ SwirlCardSurface {
     hovered: cardHover.hovered
     pressed: false
     focused: activeFocus && keyboardFocus
-    property real lift: hovered ? -Theme.dp(1.5) : 0
+    property real lift: hovered || focused ? -Theme.dp(1.5) : 0
     Behavior on lift { enabled: !SwirlMotion.reduced; NumberAnimation { duration: SwirlMotion.ms(150); easing.type: Easing.OutCubic } }
     activeFocusOnTab: true
     Accessible.role: Accessible.Button
     Accessible.name: qsTr("%1详情").arg(title)
     Accessible.onPressAction: activated()
     onActiveFocusChanged: {
-        if (activeFocus) keyboardFocus = !hit.containsMouse
+        // A parked pointer must not hide focus reached with Tab. Pointer
+        // activation clears this after taking focus, in the same event turn.
+        if (activeFocus) keyboardFocus = true
         else keyboardPressed = false
     }
     Keys.onPressed: event => {
@@ -47,7 +49,7 @@ SwirlCardSurface {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: { card.keyboardFocus = false; card.forceActiveFocus(); card.activated() }
+        onClicked: { card.forceActiveFocus(Qt.MouseFocusReason); card.keyboardFocus = false; card.activated() }
     }
     Item { id: body; anchors.fill: parent }
 }

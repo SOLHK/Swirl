@@ -23,7 +23,7 @@ SwirlContinuousSurface {
         property vector2d shadowOffset: Qt.vector2d(0, Theme.dp(surface.pressed ? 2 : 3))
         property real softness: Theme.dp(surface.pressed ? 5 : 8)
         property color shadowColor: Theme.withAlpha("#000000",
-            (Theme.dark ? 0.16 : 0.065) * (surface.pressed ? 0.65 : surface.hovered ? 1.12 : 1))
+            (Theme.dark ? 0.16 : 0.065) * (surface.pressed ? 0.65 : (surface.hovered || surface.focused) ? 1.12 : 1))
         fragmentShader: "qrc:/swirl/shaders/card-shadow.frag.qsb"
         Behavior on softness { enabled: !SwirlMotion.reduced; NumberAnimation { duration: SwirlMotion.hoverDuration } }
         Behavior on shadowColor { enabled: !SwirlMotion.reduced; ColorAnimation { duration: SwirlMotion.hoverDuration } }

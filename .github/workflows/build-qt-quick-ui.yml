@@ -63,6 +63,8 @@ jobs:
       - name: Validate scoped Codex proxy launcher
         shell: pwsh
         run: ./tools/tests/Test-CodexProxyLauncher.ps1
+      - name: Check cloud-knot path geometry from the production JavaScript
+        run: node scripts/tests/Test-CloudKnotGeometry.cjs
       - name: Install Rust MSVC tools
         run: rustup toolchain install stable --profile minimal --target x86_64-pc-windows-msvc
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
@@ -392,6 +394,72 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Production build failed.' }
           ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/swirl-product -Destination installer-bin -OpenSslRoot $env:SWIRL_OPENSSL_ROOT
           New-Item -ItemType Directory -Force -Path out | Out-Null
+      - name: Start the production Release UI with cold and warm QML caches
+        shell: pwsh
+        env:
+          SWIRL_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          SWIRL_PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+        run: |
+          # The production smoke/font-review combination waits for each actual
+          # route's Loader.Ready and transition settlement, rejects QML warnings
+          # and uses isolated storage. A
+          # plain launch does not honor SWIRL_TEST_ROOT, so do not claim this is
+          # a normal user-session or physical Windows 11 desktop acceptance.
+          $env:QT_QPA_PLATFORM = 'windows'
+          $env:QSG_RHI_BACKEND = 'd3d11'
+          Remove-Item Env:QT_QUICK_BACKEND,Env:QT_SCALE_FACTOR,Env:QT_SCREEN_SCALE_FACTORS -ErrorAction SilentlyContinue
+          $exe = (Resolve-Path 'installer-bin/Swirl.exe').Path
+          $manifest = Get-Content -LiteralPath 'installer-bin/package-manifest.json' -Raw | ConvertFrom-Json
+          $source = (& git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $source -cne $env:GITHUB_SHA -or $manifest.source_sha -cne $source) { throw 'Production UI source identity differs from the tested checkout.' }
+          $evidence = Join-Path $env:GITHUB_WORKSPACE 'build-evidence/production-ui'
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          $env:SWIRL_TEST_ROOT = Join-Path $env:RUNNER_TEMP ('swirl-production-ui-' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $env:SWIRL_TEST_ROOT | Out-Null
+          $diagnostic = Join-Path (Split-Path $exe) 'Swirl-diagnostics.txt'
+          $launches = @()
+          try {
+            foreach ($phase in @('cold-qml-cache', 'warm-same-qml-cache')) {
+              $result = [ordered]@{ phase=$phase; exited=$false; exitCode=$null; diagnosticsPresent=$false; warningsOrErrors=$false; completedPages=0; readyPages=0; passed=$false }
+              $process = $null
+              try {
+                if (Test-Path -LiteralPath $diagnostic) { Remove-Item -LiteralPath $diagnostic }
+                $process = Start-Process -FilePath $exe -ArgumentList @('--smoke-test', '--font-review') -WorkingDirectory $env:SWIRL_TEST_ROOT -PassThru
+                $result.exited = $process.WaitForExit(60000)
+                if (-not $result.exited) { throw "Production UI $phase exceeded the existing 60-second smoke deadline." }
+                $result.exitCode = $process.ExitCode
+                if ($process.ExitCode -ne 0) { throw "Production UI $phase failed: $($process.ExitCode)" }
+                $result.diagnosticsPresent = Test-Path -LiteralPath $diagnostic -PathType Leaf
+                if (-not $result.diagnosticsPresent) { throw "Production UI $phase did not emit its startup diagnostics." }
+                $result.warningsOrErrors = [bool](Select-String -LiteralPath $diagnostic -Pattern '^[123]:' -Quiet)
+                if ($result.warningsOrErrors) { throw "Production UI $phase emitted Qt warnings or errors." }
+                $completed = @(Select-String -LiteralPath $diagnostic -Pattern '^4:\s+SMOKE_PAGES\s+(\d+)\s*$')
+                $ready = @(Select-String -LiteralPath $diagnostic -Pattern '^4:\s+FONT_SMOKE_ROUTE_READY\s+(\S+)\s+(\S+)\s*$')
+                if ($completed.Count -ne 1) { throw "Production UI $phase lacks an unambiguous all-pages completion marker." }
+                $result.completedPages = [int]$completed[0].Matches[0].Groups[1].Value
+                $result.readyPages = $ready.Count
+                if ($result.completedPages -le 0 -or $result.readyPages -ne $result.completedPages) { throw "Production UI $phase did not confirm every traversed route was ready." }
+                foreach ($route in $ready) {
+                  $requested = $route.Matches[0].Groups[1].Value.Trim('"')
+                  $actual = $route.Matches[0].Groups[2].Value.Trim('"')
+                  $expected = if ($requested -in @('requestlogs', 'dashboard')) { 'activity' } else { $requested }
+                  if ($actual -cne $expected) { throw "Production UI $phase confirmed a different route: $requested -> $actual" }
+                }
+                $result.passed = $true
+              } finally {
+                if ($null -ne $process) {
+                  if (-not $process.HasExited) { $process.Kill(); $null = $process.WaitForExit(5000) }
+                  $process.Dispose()
+                }
+                if (Test-Path -LiteralPath $diagnostic -PathType Leaf) {
+                  Copy-Item -LiteralPath $diagnostic -Destination (Join-Path $evidence ($phase + '.log'))
+                }
+                $launches += $result
+              }
+            }
+          } finally {
+            [ordered]@{ source_sha=$source; pr_head_sha=$env:SWIRL_PR_HEAD_SHA; pr_base_sha=$env:SWIRL_PR_BASE_SHA; application_sha256=(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant(); ui_tests_compiled=$false; qpa='windows'; requested_rhi='d3d11'; launches=$launches; ordinary_user_session_verified=$false; physical_windows11_dpi_gpu_acceptance='not-run' } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $evidence 'startup.json') -Encoding utf8
+          }
       - name: Install NSIS packaging tools
         shell: pwsh
         run: |
@@ -473,6 +541,10 @@ jobs:
             build/swirl-quick/Release/Swirl-appearance.txt
             build/swirl-quick/Release/Swirl-appearance-restore.txt
             build/swirl-quick/motion-report.json
+            build/swirl-quick/activity-details-report.json
+            build/swirl-quick/activity-perf-*-report.json
+            build/swirl-quick/activity-layout/
+            build-evidence/production-ui/
             build/swirl-quick/hero-evidence/
             build/swirl-quick/navigation-evidence/
             build/swirl-quick/settings-material-evidence/

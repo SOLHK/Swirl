@@ -2,6 +2,7 @@
 #include "RouteBench.h"
 #include "app/MotionPolicy.h"
 #include <QQuickWindow>
+#include <QAccessible>
 #include <QGuiApplication>
 #include <QQuickItem>
 #include <QQuickItemGrabResult>
@@ -120,7 +121,7 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     auto *sourceCategory=activityVisual(window->contentItem(),"activitySourceFilter");
     auto *sourceHeading=activityVisual(window->contentItem(),activityDetailButtons[0]);
     check("source-category-control-sits-below-title-at-shared-left-inset",sourceCategory&&sourceOverview&&sourceHeading
-        &&qAbs(sourceCategory->mapToItem(sourceOverview,0,0).x()-eval("Theme.dp(12)").toDouble())<1
+        &&qAbs(sourceCategory->mapToItem(sourceOverview,0,0).x()-page->property("cardInset").toDouble())<1
         &&bounds(sourceCategory).top()>=bounds(sourceHeading).bottom());
     const int historyIndex=eval("AppState.historyIndex").toInt();
     auto *homeScroll=activityVisual(window->contentItem(),"activityScroll");
@@ -151,8 +152,11 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
         check(key+"-returns-cleanly",settled()&&!transition->property("opened").toBool()&&transition->property("progress").toDouble()==0&&!transition->isVisible());
         QTest::mouseMove(window,QPoint(1,1));activityWait(150);
         check(key+"-return-keeps-keyboard-focus",card->hasActiveFocus());
-        check(key+"-return-has-no-persistent-click-outline",QQmlProperty::read(card,"border.color").value<QColor>()==eval("Theme.border").value<QColor>()
-            &&normalBorderWidth>0&&qAbs(QQmlProperty::read(card,"border.width").toDouble()-normalBorderWidth)<0.001);
+        // The accepted 0.2.30 surface intentionally removed ordinary outlines.
+        // Preserve the no-persistent-click-state check against that contract;
+        // do not restore an obsolete border merely to satisfy an older test.
+        check(key+"-return-has-no-persistent-click-outline",normalBorderWidth==eval("Theme.increaseContrast ? Theme.dp(2) : 0").toDouble()
+            &&QQmlProperty::read(card,"border.width").toDouble()==normalBorderWidth);
         check(key+"-preserves-main-route-and-history",eval("AppState.currentPage==='activity'").toBool()&&eval("AppState.historyIndex").toInt()==historyIndex);
     }
     if(auto *sourceCard=activityVisual(window->contentItem(),"activitySourcesCard")){
@@ -161,9 +165,37 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
         QTest::mouseMove(window,blank);activityWait(150);const auto hover=bounds(sourceCard);
         check("card-hover-has-a-gentle-continuous-lift",sourceCard->property("hovered").toBool()&&hover.y()<rest.y()-0.3&&rest.y()-hover.y()<4);
         QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,blank);activityWait(55);const auto press=bounds(sourceCard);
-        check("card-press-continues-from-hover-without-scale-jump",sourceCard->property("pressed").toBool()&&press.y()>hover.y()&&qAbs(press.width()-hover.width())<0.1);
+        check("card-press-keeps-accepted-hover-without-extra-offset-or-scale",!sourceCard->property("pressed").toBool()
+            &&qAbs(press.y()-hover.y())<0.1&&qAbs(press.width()-hover.width())<0.1);
         QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,blank);activityWait(50);
         check("card-blank-area-opens-same-source-detail",transition->property("opened").toBool()&&transition->property("detailKey").toString()=="sources");close();
+    }
+    if(auto *sourceCard=activityVisual(window->contentItem(),"activitySourcesCard")){
+        // Tab must remain visible even if the pointer was already resting on
+        // this card; mouse position cannot identify the input that gave focus.
+        const auto blank=sourceCard->mapToScene(QPointF(sourceCard->width()*0.65,sourceCard->height()*0.55)).toPoint();
+        QTest::mouseMove(window,blank);
+        auto *previous=sourceCard->nextItemInFocusChain(false);
+        check("source-card-has-preceding-keyboard-focus-target",previous&&previous!=sourceCard);
+        if(previous&&previous!=sourceCard){
+            previous->forceActiveFocus(Qt::TabFocusReason);
+            QTest::keyClick(window,Qt::Key_Tab);activityWait(180);
+            check("tab-focus-is-recognized-with-pointer-over-card",sourceCard->hasActiveFocus()&&sourceCard->property("keyboardFocus").toBool());
+            QTest::mouseMove(window,QPoint(1,1));activityWait(180);
+            check("card-keyboard-focus-retains-visible-lift-without-click-outline",sourceCard->property("focused").toBool()
+                &&sourceCard->property("lift").toDouble()<-.3&&sourceCard->property("lift").toDouble()>-4
+                &&QQmlProperty::read(sourceCard,"border.width").toDouble()==eval("Theme.increaseContrast ? Theme.dp(2) : 0").toDouble());
+            QSignalSpy activations(sourceCard,SIGNAL(activated()));
+            QTest::keyClick(window,Qt::Key_Return);
+            check("card-enter-activates-exactly-once",activations.count()==1&&settled()
+                &&transition->property("detailKey").toString()=="sources"&&transition->property("opened").toBool());
+            close();
+            check("card-enter-return-restores-keyboard-focus-state",sourceCard->hasActiveFocus()&&sourceCard->property("keyboardFocus").toBool());
+            QTest::keyClick(window,Qt::Key_Space);
+            check("card-space-activates-exactly-once",activations.count()==2&&settled()
+                &&transition->property("detailKey").toString()=="sources"&&transition->property("opened").toBool());
+            close();
+        }
     }
     check("source-segment-click-does-not-open-detail",click("activitySourceFilter")&&!transition->property("opened").toBool()&&transition->property("progress").toDouble()==0);
     check("traffic-segment-click-does-not-open-detail",click("activityTrafficFilter")&&!transition->property("opened").toBool()&&transition->property("progress").toDouble()==0);
@@ -196,6 +228,62 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     QTest::keyClick(window,Qt::Key_Escape);activityWait(30);
     check("reduced-motion-return-releases-overlay",!transition->isVisible()&&transition->property("progress").toDouble()==0);
     eval("Theme.reduceMotion=false");
+    // Exercise the real page-owned weave and its real detail-opacity binding.
+    // A temporary Binding restores the original active binding on destruction;
+    // this never changes the system proxy or the controller's network state.
+    auto *weave=activityVisual(window->contentItem(),"activityCloudKnotWeave");
+    check("activity-weave-present-for-detail-pause-regression",weave!=nullptr);
+    if(weave){
+        QQmlComponent bindingComponent(qmlEngine(window));
+        bindingComponent.setData(R"(
+            import QtQuick
+            Binding {
+                required property var targetWeave
+                property bool requestedActive: true
+                target: targetWeave
+                property: "active"
+                value: requestedActive
+                restoreMode: Binding.RestoreBindingOrValue
+            }
+        )",QUrl());
+        std::unique_ptr<QObject> activeOverride(bindingComponent.createWithInitialProperties(
+            {{"targetWeave",QVariant::fromValue(weave)}},qmlContext(window)));
+        check("weave-test-override-created-with-binding-restoration",activeOverride!=nullptr);
+        if(activeOverride){
+            QQmlExpression pose(qmlContext(weave),weave,"previewAt(0.4,0);retarget()");
+            pose.evaluate();
+            check("weave-continues-real-flight-from-controlled-intermediate-phase",!pose.hasError()
+                &&weave->property("moving").toBool()&&weave->property("progress").toDouble()<1);
+            check("weave-pause-case-opens-detail",click(activityDetailButtons[1]));
+            const double pausedProgress=weave->property("progress").toDouble();
+            const double pausedRelease=weave->property("release").toDouble();
+            check("weave-pauses-at-intermediate-phase-on-detail-entry",pausedProgress>0&&pausedProgress<1
+                &&!weave->property("presentationActive").toBool()&&!weave->property("moving").toBool());
+            check("weave-pause-case-reaches-fully-open-detail",settled()&&transition->property("progress").toDouble()==1);
+            activityWait(120);
+            check("fully-transparent-overview-preserves-paused-weave-state",weave->opacity()==0
+                &&qAbs(weave->property("progress").toDouble()-pausedProgress)<0.001
+                &&qAbs(weave->property("release").toDouble()-pausedRelease)<0.001);
+            close();activityWait(100);
+            const double resumedProgress=weave->property("progress").toDouble();
+            check("detail-return-resumes-weaving-from-paused-phase",weave->property("presentationActive").toBool()
+                &&weave->property("moving").toBool()&&resumedProgress>pausedProgress&&resumedProgress<1);
+            check("weave-hidden-state-change-case-opens-detail",click(activityDetailButtons[1])&&settled());
+            activeOverride->setProperty("requestedActive",false);
+            check("proxy-state-change-while-detail-open-settles-latest-inactive-state",weave->property("progress").toDouble()==0
+                &&weave->property("release").toDouble()==1&&!weave->property("moving").toBool());
+            activeOverride->setProperty("requestedActive",true);
+            check("proxy-state-change-while-detail-open-settles-latest-active-state",weave->property("progress").toDouble()==1
+                &&weave->property("release").toDouble()==0&&!weave->property("moving").toBool());
+            close();
+            check("detail-return-keeps-current-completed-knot",weave->property("progress").toDouble()==1
+                &&weave->property("release").toDouble()==0);
+            activeOverride.reset();
+            check("weave-original-proxy-state-binding-restored",weave->property("active").toBool()
+                ==(page->property("proxyOwned").toBool()&&page->property("runtimeHealthy").toBool()));
+            check("weave-restoration-stops-transient-animation",QTest::qWaitFor([&]{return !weave->property("moving").toBool();},1500));
+        }
+    }
     auto *controller=qobject_cast<EngineController *>(qmlContext(window)->contextProperty("engineController").value<QObject *>());
     check("real-telemetry-model-present",controller!=nullptr);
     if(controller){
@@ -763,131 +851,195 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     check("sidebar-selection-reaches-last-click",eval("AppState.currentPage==='activity'").toBool());
     route("activity");
     auto *activity=qobject_cast<QQuickItem *>(item());
-    auto *upload=findVisual(activity,"activityUpload");
+    auto *upload=findVisual(activity,"activityUploadRateValue");
     auto *activityScroll=findVisual(activity,"activityScroll");
-    auto *connections=findVisual(activity,"activityConnections"),*total=findVisual(activity,"activityTotal");
-    auto *diagnostic=findVisual(activity,"internetDiagnosticCard"),*trafficCard=findVisual(activity,"activityTrafficCard");
+    auto *connections=findVisual(activity,"activityConnectionCount"),*total=findVisual(activity,"activityTotal");
+    auto *diagnostic=findVisual(activity,"activityDiagnosticCard"),*trafficCard=findVisual(activity,"activityTrafficCard");
     auto *trafficFilter=findVisual(activity,"activityTrafficFilter"),*sourceFilter=findVisual(activity,"activitySourceFilter");
     auto *periodFilter=findVisual(activity,"activityPeriodFilter"),*trafficChart=findVisual(activity,"activityTrafficChart");
-    check("activity-apec-status-transfer-diagnostics-and-detail-origins-present",activity&&activityScroll&&diagnostic&&trafficCard&&upload&&connections&&total);
-    if(activity&&activityScroll&&diagnostic&&trafficCard&&upload&&connections&&total){
+    auto *activityTransition=findVisual(activity,"activityDetailTransition");
+    auto *activitySurface=findVisual(activity,"activityDetailSurface");
+    check("activity-apec-status-transfer-diagnostics-and-detail-origins-present",activity&&activityScroll&&diagnostic&&trafficCard&&upload&&connections&&total&&activityTransition&&activitySurface);
+    if(activity&&activityScroll&&diagnostic&&trafficCard&&upload&&connections&&total&&activityTransition&&activitySurface){
         const auto originalSize=window->size();
-        const QSize normalSize(qRound(eval("Theme.dp(914)").toDouble()),qRound(eval("Theme.dp(672)").toDouble()));
+        // The five-card layout has a 736dp *content* breakpoint. 1030dp keeps
+        // the expanded sidebar and both page paddings in the normal-width case.
+        const QSize normalSize(qRound(eval("Theme.dp(1030)").toDouble()),qRound(eval("Theme.dp(672)").toDouble()));
         window->resize(normalSize);wait(250);
         auto *sourceCard=findVisual(activity,"activitySourcesCard");
-        auto *policyEntry=findVisual(activity,"activityPolicyShortcut");
-        auto *policyValue=findVisual(activity,"activityPolicyValue");
-        auto *diagnosticEntry=findVisual(activity,"networkDiagnosticDetails");
-        auto *connectionsEntry=findVisual(activity,"activityConnectionsDetails");
-        const auto controlHeight=eval("Theme.controlHeight").toDouble();
-        for(auto *entry:{diagnosticEntry,connectionsEntry}){
-            auto *contents=entry?entry->property("contentItem").value<QQuickItem *>():nullptr;
-            check("activity-detail-heading-has-padded-full-height-hit-area",entry&&contents&&entry->height()>=controlHeight
-                &&entry->property("leftPadding").toDouble()>=eval("Theme.dp(8)").toDouble()
-                &&entry->property("rightPadding").toDouble()>=eval("Theme.dp(12)").toDouble()
-                &&contents->width()+entry->property("leftPadding").toDouble()+entry->property("rightPadding").toDouble()<=entry->width()+1);
-        }
-        if(policyEntry&&policyValue){
-            QTest::mouseMove(window,QPoint(1,1));wait(200);
-            const auto before=policyEntry->size();
-            auto *contents=policyEntry->property("contentItem").value<QQuickItem *>();
-            auto *footer=findVisual(activity,"activityStatusFooter");
-            auto *surface=policyEntry->property("background").value<QQuickItem *>();
-            const auto originalName=policyValue->property("text");
-            policyValue->setProperty("text",QString::fromUtf8("新加坡实验性 IEPL 专线 — a deliberately long regional node name that must elide without moving other facts"));wait(80);
-            const auto valueBounds=contents?policyValue->mapRectToItem(contents,QRectF(QPointF(),policyValue->size())):QRectF();
-            const auto contentsInFooter=contents&&footer?contents->mapRectToItem(footer,QRectF(QPointF(),contents->size())):QRectF();
-            check("activity-long-policy-name-elides-inside-padded-stable-selector",policyValue->property("truncated").toBool()
-                &&policyValue->property("lineCount").toInt()==1&&policyEntry->size()==before&&policyValue->width()>0
-                &&qAbs(policyEntry->height()-eval("Theme.dp(28)").toDouble())<0.5
-                &&policyEntry->property("leftPadding").toDouble()>=eval("Theme.dp(8)").toDouble()
-                &&policyEntry->property("rightPadding").toDouble()>=eval("Theme.dp(8)").toDouble()
-                &&contents&&footer&&surface&&qAbs(surface->property("radius").toDouble()-surface->height()/2)<0.5
-                &&valueBounds.left()>=-0.5&&valueBounds.right()<=contents->width()+0.5
-                &&QRectF(QPointF(),footer->size()).adjusted(-0.5,-0.5,0.5,0.5).contains(contentsInFooter)
-                &&contents->width()+policyEntry->property("leftPadding").toDouble()+policyEntry->property("rightPadding").toDouble()<=policyEntry->width()+0.5);
-            policyValue->setProperty("text",originalName);
-        }else check("activity-policy-value-is-present",false);
-        auto *diagnosticSurface=findVisual(activity,"activityDiagnosticCard");
+        auto *statusCard=findVisual(activity,"activityStatusCard");
         auto *connectionsSurface=findVisual(activity,"activityConnectionsCard");
-        const auto diagnosticAt=diagnosticSurface?diagnosticSurface->mapToItem(activity,0,0):QPointF(),trafficAt=trafficCard->mapToItem(activity,0,0);
-        const auto sourceAt=sourceCard?sourceCard->mapToItem(activity,0,0):QPointF();
-        const auto uploadAt=upload->mapToItem(activity,0,0),connectionsAt=connections->mapToItem(activity,0,0),totalAt=total->mapToItem(activity,0,0);
-        std::function<int(QQuickItem *)> panelCount=[&](QQuickItem *root){
-            int count=root->isVisible()&&root->property("independentCard").toBool()?1:0;
-            for(auto *child:root->childItems())count+=panelCount(child);
-            return count;
-        };
-        check("activity-five-opaque-cards-retain-source-and-transfer-proportions",panelCount(activity)==5&&sourceCard&&diagnosticSurface&&connectionsSurface&&diagnosticSurface->isVisible()&&trafficCard->isVisible()
-            &&diagnosticSurface->parentItem()==trafficCard->parentItem()&&qAbs(diagnosticAt.y()-sourceAt.y())<2
-            &&trafficAt.y()>=sourceAt.y()+sourceCard->height()
-            &&sourceCard->height()>trafficCard->height()
-            &&diagnosticAt.x()>=trafficAt.x()+trafficCard->width()&&trafficCard->width()>diagnosticSurface->width());
         const auto insideSurface=[](QQuickItem *section,QQuickItem *surface){return section&&surface&&QRectF(QPointF(),surface->size()).adjusted(-1,-1,1,1).contains(section->mapRectToItem(surface,QRectF(QPointF(),section->size())));};
-        check("activity-detail-data-stays-in-its-own-opaque-reading-card",upload->parentItem()==total->parentItem()
-            &&insideSurface(upload,trafficCard)&&insideSurface(total,trafficCard)&&insideSurface(connections,connectionsSurface)
-            &&uploadAt.y()>trafficAt.y()&&totalAt.y()>uploadAt.y()&&connectionsAt.y()>=trafficAt.y());
-        const double contentHeight=activityScroll->property("contentHeight").toDouble();
-        qInfo()<<"ACTIVITY_APEC_NORMAL_GEOMETRY"<<window->size()<<activityScroll->size()<<contentHeight
-               <<diagnostic->size()<<trafficCard->size()<<upload->size()<<connections->size()<<total->size();
-        check("activity-apec-normal-viewport-retains-bounded-vertical-reading",window->size()==normalSize&&eval("pageLoader.item.wide").toBool()
-            &&contentHeight>0&&activityScroll->property("contentWidth").toDouble()<=activityScroll->width()+1
-            &&trafficAt.x()>=0&&diagnosticAt.x()+diagnostic->width()<=activity->width()+1);
-        const auto inside=[&](QQuickItem *region){
-            if(!region||!region->isVisible()||region->width()<=0||region->height()<=0)return false;
-            const auto bounds=region->mapRectToItem(activityScroll,QRectF(QPointF(),region->size()));
-            return bounds.left()>=-1 && bounds.top()>=-1 && bounds.right()<=activityScroll->width()+1 && bounds.bottom()<=activityScroll->height()+1;
-        };
-        auto *sourceSection=findVisual(activity,"activitySourceSection");
-        const auto actualRanks=activity->property("ranks");
-        // Geometry-only rows exercise the populated layout without publishing
-        // measured traffic or inserting records into the real telemetry store.
-        eval("pageLoader.item.ranks=Array.from({length:8},(_,i)=>({name:'Long source name for layout and full-name tooltip verification — regional service '+i,value:'123.4 GiB',upload:'23.4 GiB',download:'100 GiB',kind:'domains'}))");
-        for(const auto size:{QSize(760,672),QSize(914,672),QSize(1100,760)}){
-            window->resize(qRound(eval(QString("Theme.dp(%1)").arg(size.width())).toDouble()),qRound(eval(QString("Theme.dp(%1)").arg(size.height())).toDouble()));wait(180);
-            check("activity-one-screen-"+QString::number(size.width()),activityScroll->property("contentHeight").toDouble()<=activityScroll->height()+1
-                &&inside(trafficCard)&&inside(diagnostic)&&inside(sourceSection)&&inside(connections));
-            qInfo()<<"ACTIVITY_FEEDBACK_VIEWPORT"<<window->size()<<activityScroll->size()<<activityScroll->property("contentHeight")
-                   <<trafficCard->size()<<diagnostic->size()<<(sourceSection?sourceSection->size():QSizeF())<<connections->size();
-        }
-        auto *sourceList=findVisual(activity,"activitySourceList");
-        auto *sourceRow=findVisual(activity,"activitySourceRow-0");
-        check("long-source-list-scrolls-within-primary-card",sourceList&&sourceRow&&sourceList->property("interactive").toBool()
-            &&sourceList->property("contentHeight").toDouble()>sourceList->height()&&sourceRow->width()<=sourceList->width());
-        if(sourceRow){
-            sourceRow->forceActiveFocus();wait(80);
-            check("source-full-name-available-to-keyboard-users",sourceRow->hasActiveFocus()
-                &&sourceRow->property("displayName").toString().contains("tooltip verification"));
-        }
-        check("source-direct-id-has-readable-name",eval("pageLoader.item.sourceName({kind:'nodes',name:'SWIRL_V2_DIRECT'})==='直连'").toBool());
-        if(!output.isEmpty())window->grabWindow().save(QFileInfo(output).absolutePath()+"/activity-long-sources.png");
-        activity->setProperty("ranks",actualRanks);
-        window->resize(normalSize);wait(180);
-        const auto revealControl=[&](QQuickItem *control){
-            if(!control)return false;
-            const auto top=control->mapToItem(activityScroll,0,0).y(),bottom=top+control->height();
-            auto position=activityScroll->property("contentY").toDouble();
-            if(top<0)position+=top-8;else if(bottom>activityScroll->height())position+=bottom-activityScroll->height()+8;
-            activityScroll->setProperty("contentY",qBound(0.0,position,qMax(0.0,contentHeight-activityScroll->height())));wait(40);
-            return control->isVisible()&&control->isEnabled()&&control->width()>0&&control->height()>0;
-        };
+        const auto settleDetail=[&]{return QTest::qWaitFor([&]{return !activityTransition->property("moving").toBool();},2000);};
+        const auto closeDetail=[&]{QTest::keyClick(window,Qt::Key_Escape);return settleDetail()&&!activityTransition->isVisible();};
         const auto visibleControl=[&](QQuickItem *control){
             return control&&control->isVisible()&&control->isEnabled()&&control->width()>0&&control->height()>0
                 &&control->mapToItem(activityScroll,0,0).y()>=-1
                 &&control->mapToItem(activityScroll,0,control->height()).y()<=activityScroll->height()+1;
         };
+        const auto revealControl=[&](QQuickItem *control){
+            if(!control)return false;
+            const auto top=control->mapToItem(activityScroll,0,0).y(),bottom=top+control->height();
+            auto position=activityScroll->property("contentY").toDouble();
+            if(top<0)position+=top-8;else if(bottom>activityScroll->height())position+=bottom-activityScroll->height()+8;
+            const auto currentHeight=activityScroll->property("contentHeight").toDouble();
+            activityScroll->setProperty("contentY",qBound(0.0,position,qMax(0.0,currentHeight-activityScroll->height())));wait(40);
+            return visibleControl(control);
+        };
+        for(int i=0;i<activityDetailButtons.size();++i){
+            auto *entry=findVisual(activity,activityDetailButtons[i]);
+            auto *card=findVisual(activity,activityDetailCards[i]);
+            check("activity-detail-heading-has-full-card-hit-area-"+activityDetailKeys[i],entry&&card
+                &&card->isEnabled()&&card->width()>=240&&card->height()>=130&&insideSurface(entry,card)
+                &&entry->width()>=60&&QQmlProperty::read(card,"Accessible.role").toInt()==int(QAccessible::Button));
+            if(!entry||!card)continue;
+            check("activity-detail-heading-is-reachable-"+activityDetailKeys[i],revealControl(entry));
+            const auto before=card->mapRectToItem(activity,QRectF(QPointF(),card->size()));
+            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,entry->mapToScene(QPointF(entry->width()/2,entry->height()/2)).toPoint());
+            const auto origin=activityTransition->property("origin").toRectF();
+            check("activity-detail-heading-opens-from-live-card-"+activityDetailKeys[i],activityTransition->property("opened").toBool()
+                &&activityTransition->property("detailKey").toString()==activityDetailKeys[i]
+                &&qAbs(origin.x()-before.x())<4&&qAbs(origin.y()-before.y())<4
+                &&qAbs(origin.width()-before.width())<1&&qAbs(origin.height()-before.height())<1);
+            check("activity-detail-heading-settles-and-esc-returns-"+activityDetailKeys[i],settleDetail()&&closeDetail());
+        }
+        // Keep the original long-policy-name regression, and cover the long
+        // node and IPv6 fields sharing its permanently reserved artwork space.
+        // Temporary QML Bindings restore each original data binding afterwards.
+        struct LongTextCase {const char *name;QString text;int maxLines;};
+        const QList<LongTextCase> longTexts={
+            {"activityPolicyFactValue",QString::fromUtf8("新加坡实验性 IEPL 专线 — a deliberately long regional policy name that must elide without moving other facts"),1},
+            {"activityCurrentNode",QString::fromUtf8("新加坡实验性 IEPL 专线 — a deliberately long regional node name that must remain inside the text region beside the cloud knot"),2},
+            {"activityExitIpValue",QStringLiteral("2001:db8:85a3:0000:0000:8a2e:0370:7334"),1}};
+        QQmlComponent textBinding(qmlEngine(window));
+        textBinding.setData(R"(
+            import QtQuick
+            Binding {
+                required property var targetText
+                required property string testText
+                target: targetText
+                property: "text"
+                value: testText
+                restoreMode: Binding.RestoreBindingOrValue
+            }
+        )",QUrl());
+        for(const auto &sample:longTexts){
+            auto *value=findVisual(activity,QString::fromLatin1(sample.name));
+            check(QString::fromLatin1(sample.name)+"-present",value&&statusCard);
+            if(!value||!statusCard)continue;
+            const auto cardSize=statusCard->size();
+            std::unique_ptr<QObject> override(textBinding.createWithInitialProperties(
+                {{"targetText",QVariant::fromValue(value)},{"testText",sample.text}},qmlContext(window)));
+            check(QString::fromLatin1(sample.name)+"-long-text-fixture-bound",override!=nullptr);
+            if(!override)continue;
+            wait(80);
+            auto *emblem=findVisual(activity,"activityStatusEmblem");
+            const auto valueBounds=value->mapRectToItem(statusCard,QRectF(QPointF(),value->size()));
+            check(QString::fromLatin1(sample.name)+"-long-text-elides-in-stable-text-region",value->property("truncated").toBool()
+                &&value->property("lineCount").toInt()>0&&value->property("lineCount").toInt()<=sample.maxLines
+                &&statusCard->size()==cardSize&&value->width()>0&&insideSurface(value,statusCard)
+                &&emblem&&valueBounds.right()<=emblem->x()+1);
+        }
+        QTest::mouseMove(window,QPoint(1,1));wait(180);
+        const auto diagnosticAt=diagnostic->mapToItem(activity,0,0),trafficAt=trafficCard->mapToItem(activity,0,0);
+        const auto sourceAt=sourceCard?sourceCard->mapToItem(activity,0,0):QPointF();
+        const auto statusAt=statusCard?statusCard->mapToItem(activity,0,0):QPointF();
+        const auto connectionsAt=connectionsSurface?connectionsSurface->mapToItem(activity,0,0):QPointF();
+        const auto uploadAt=upload->mapToItem(activity,0,0),totalAt=total->mapToItem(activity,0,0);
+        std::function<int(QQuickItem *)> panelCount=[&](QQuickItem *root){
+            int count=activityDetailCards.contains(root->objectName())?1:0;
+            for(auto *child:root->childItems())count+=panelCount(child);
+            return count;
+        };
+        bool opaque=true;
+        for(const auto &name:activityDetailCards){
+            auto *card=findVisual(activity,name);
+            opaque=opaque&&card&&card->property("color").value<QColor>().alpha()==255;
+        }
+        check("activity-five-opaque-cards-retain-source-and-transfer-proportions",panelCount(activity)==5&&opaque&&sourceCard&&statusCard&&connectionsSurface
+            &&qAbs(statusAt.y()-trafficAt.y())<1&&qAbs(statusCard->height()-trafficCard->height())<1
+            &&qAbs(diagnosticAt.y()-sourceAt.y())<1&&sourceAt.y()>=trafficAt.y()+trafficCard->height()
+            &&qAbs(sourceAt.y()+sourceCard->height()-connectionsAt.y()-connectionsSurface->height())<1
+            &&qAbs(diagnosticAt.x()-connectionsAt.x())<1&&qAbs(diagnostic->width()-connectionsSurface->width())<1
+            &&qAbs(statusCard->width()/(statusCard->width()+trafficCard->width())-5.0/12)<0.03
+            &&qAbs(sourceCard->width()/(sourceCard->width()+diagnostic->width())-7.0/12)<0.03);
+        check("activity-detail-data-stays-in-its-own-opaque-reading-card",
+            insideSurface(upload,trafficCard)&&insideSurface(total,trafficCard)&&insideSurface(connections,connectionsSurface)
+            &&uploadAt.y()>trafficAt.y()&&totalAt.y()>uploadAt.y());
+        const double contentHeight=activityScroll->property("contentHeight").toDouble();
+        check("activity-apec-normal-viewport-retains-bounded-vertical-reading",window->size()==normalSize&&activity->property("wide").toBool()
+            &&contentHeight>0&&activityScroll->property("contentWidth").toDouble()<=activityScroll->width()+1
+            &&trafficAt.x()>=0&&diagnosticAt.x()+diagnostic->width()<=activity->width()+1);
+        const auto inside=[&](QQuickItem *region){
+            if(!region||!region->isVisible()||region->width()<=0||region->height()<=0)return false;
+            const auto bounds=region->mapRectToItem(activityScroll,QRectF(QPointF(),region->size()));
+            return bounds.left()>=-1&&bounds.top()>=-1&&bounds.right()<=activityScroll->width()+1&&bounds.bottom()<=activityScroll->height()+1;
+        };
+        const auto actualRanks=activity->property("ranks");
+        // Geometry-only rows stay out of the real telemetry store. The compact
+        // overview is bounded; the retained source detail owns the full table.
+        eval("pageLoader.item.ranks=Array.from({length:8},(_,i)=>({id:'layout-'+i,name:'Long source name for full-name accessibility verification — regional service '+i,value:'123.4 GiB',upload:'23.4 GiB',download:'100 GiB',kind:'domains'}))");
+        for(const auto size:{QSize(760,672),QSize(914,672),QSize(1100,760)}){
+            window->resize(qRound(eval(QString("Theme.dp(%1)").arg(size.width())).toDouble()),qRound(eval(QString("Theme.dp(%1)").arg(size.height())).toDouble()));wait(180);
+            activityScroll->setProperty("contentY",0);wait(30);
+            const bool wide=activity->property("wide").toBool();
+            check("activity-responsive-breakpoint-"+QString::number(size.width()),wide==
+                (activity->property("contentLogicalWidth").toDouble()>=activity->property("dualColumnMinimumWidth").toDouble()));
+            if(wide){
+                check("activity-wide-one-screen-"+QString::number(size.width()),activityScroll->property("contentHeight").toDouble()<=activityScroll->height()+1
+                    &&inside(statusCard)&&inside(trafficCard)&&inside(sourceCard)&&inside(diagnostic)&&inside(connectionsSurface));
+            }else{
+                QList<QQuickItem *> ordered={statusCard,trafficCard,sourceCard,diagnostic,connectionsSurface};
+                bool aligned=true;
+                for(int i=0;i<ordered.size();++i){
+                    if(!ordered[i]){aligned=false;continue;}
+                    const auto rect=ordered[i]->mapRectToItem(activity,QRectF(QPointF(),ordered[i]->size()));
+                    aligned=aligned&&rect.width()>=240&&rect.left()>=0&&rect.right()<=activity->width()+1;
+                    if(i>0&&ordered[i-1]){
+                        const auto previous=ordered[i-1]->mapRectToItem(activity,QRectF(QPointF(),ordered[i-1]->size()));
+                        aligned=aligned&&rect.top()>previous.bottom()&&qAbs(rect.left()-previous.left())<1&&qAbs(rect.width()-previous.width())<1;
+                    }
+                }
+                check("activity-narrow-scroll-retains-five-ordered-readable-cards-"+QString::number(size.width()),aligned
+                    &&activityScroll->property("contentHeight").toDouble()>activityScroll->height()
+                    &&revealControl(connectionsSurface));
+            }
+        }
+        auto *sourceList=findVisual(activity,"activitySourceList");
+        auto *sourceRow=findVisual(activity,"activitySourceRow-0");
+        const auto previewCount=activity->property("previewRows").toInt();
+        auto *lastSourceRow=findVisual(activity,"activitySourceRow-"+QString::number(previewCount-1));
+        check("long-source-preview-is-bounded-with-all-visible-rows-inside-card",sourceList&&sourceRow&&lastSourceRow
+            &&previewCount>=5&&previewCount<=7&&insideSurface(sourceRow,sourceList)&&insideSurface(lastSourceRow,sourceList));
+        if(sourceRow){
+            sourceRow->forceActiveFocus();wait(80);
+            const auto fullName=sourceRow->property("displayName").toString();
+            check("source-full-name-available-to-keyboard-users",sourceRow->hasActiveFocus()
+                &&fullName.contains("accessibility verification")
+                &&QQmlProperty::read(sourceRow,"Accessible.name",qmlContext(sourceRow)).toString().contains(fullName));
+        }
+        check("source-direct-id-has-readable-name",eval("pageLoader.item.sourceName({kind:'nodes',name:'SWIRL_V2_DIRECT'})==='直连'").toBool());
+        if(!output.isEmpty())window->grabWindow().save(QFileInfo(output).absolutePath()+"/activity-long-sources.png");
+        activity->setProperty("ranks",actualRanks);
+        window->resize(normalSize);wait(180);
         check("activity-apec-filters-remain-reachable",revealControl(trafficFilter)&&visibleControl(trafficFilter)&&revealControl(sourceFilter)&&visibleControl(sourceFilter)&&revealControl(periodFilter)&&visibleControl(periodFilter)&&trafficChart&&trafficChart->isVisible());
         const auto clickSegment=[&](QQuickItem *control,int index,int count){
             const auto point=control->mapToScene(QPointF(control->width()*(index+0.5)/count,control->height()/2)).toPoint();
             QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point);wait(100);
         };
         if(revealControl(trafficFilter)&&visibleControl(trafficFilter)&&trafficChart){
-            clickSegment(trafficFilter,1,2);
-            check("activity-v7-proxy-filter-switches-chart",eval("pageLoader.item.trafficKind===1").toBool()
-                &&trafficFilter->property("currentIndex").toInt()==1&&trafficChart->property("proxyOnly").toBool());
-            clickSegment(trafficFilter,0,2);
-            check("activity-v7-all-filter-restores-chart",eval("pageLoader.item.trafficKind===0").toBool()
-                &&trafficFilter->property("currentIndex").toInt()==0&&!trafficChart->property("proxyOnly").toBool());
+            const auto chooseTrafficScope=[&](int index){
+                trafficFilter->forceActiveFocus();
+                QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,trafficFilter->mapToScene(QPointF(trafficFilter->width()/2,trafficFilter->height()/2)).toPoint());wait(100);
+                QTest::keyClick(window,index==0?Qt::Key_Home:Qt::Key_End);
+                QTest::keyClick(window,Qt::Key_Return);wait(100);
+            };
+            chooseTrafficScope(1);
+            check("activity-proxy-scope-filters-sources-without-relabeling-total-rate",activity->property("trafficKind").toInt()==1
+                &&trafficFilter->property("currentIndex").toInt()==1&&trafficChart->property("series").toString()=="total");
+            chooseTrafficScope(0);
+            check("activity-all-scope-restores-source-range",activity->property("trafficKind").toInt()==0
+                &&trafficFilter->property("currentIndex").toInt()==0&&trafficChart->property("series").toString()=="total");
         }
         if(revealControl(sourceFilter)&&visibleControl(sourceFilter)){
             clickSegment(sourceFilter,1,3);
@@ -903,17 +1055,20 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             clickSegment(periodFilter,0,2);
             check("activity-v7-today-filter-restores-period",eval("pageLoader.item.period===0").toBool()&&periodFilter->property("currentIndex").toInt()==0);
         }
-        auto *policyLink=findVisual(activity,"activityPolicyShortcut");
-        check("activity-policy-entry-is-visible",policyLink&&inside(policyLink)&&policyLink->isEnabled());
-        if(policyLink){
-            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,policyLink->mapToScene(QPointF(policyLink->width()/2,policyLink->height()/2)).toPoint());wait(85);
-            auto *title=window->findChild<QObject *>("pageHeroTitle");
-            check("activity-policy-title-follows-wing-trajectory",eval("AppState.currentPage==='policies'").toBool()&&title&&title->property("moving").toBool()&&title->property("arcOffset").toDouble()<-.01);
-            eval("AppState.goBack()");settle();
-            check("activity-policy-return-restores-page",item()==activity);
-            policyLink->forceActiveFocus();QTest::keyClick(window,Qt::Key_Space);settle();
-            check("activity-policy-entry-supports-keyboard",eval("AppState.currentPage==='policies'").toBool());
-            eval("AppState.goBack()");settle();
+        // Policy facts now live in the connection card/detail. Preserve keyboard
+        // reachability and spatial continuity through that accepted destination.
+        check("activity-policy-fact-is-visible",statusCard&&findVisual(activity,"activityPolicyFactValue")&&revealControl(statusCard));
+        if(statusCard){
+            const auto before=statusCard->mapRectToItem(activity,QRectF(QPointF(),statusCard->size()));
+            statusCard->forceActiveFocus(Qt::TabFocusReason);
+            QTest::keyClick(window,Qt::Key_Space);wait(85);
+            const auto origin=activityTransition->property("origin").toRectF();
+            check("activity-policy-detail-keyboard-entry-follows-card-transition",activityTransition->property("detailKey").toString()=="connection"
+                &&activityTransition->property("moving").toBool()&&activityTransition->property("progress").toDouble()>0
+                &&activityTransition->property("progress").toDouble()<1
+                &&qAbs(origin.x()-before.x())<4&&qAbs(origin.y()-before.y())<4);
+            check("activity-policy-detail-return-restores-page-and-focus",settleDetail()&&closeDetail()
+                &&item()==activity&&statusCard->hasActiveFocus());
         }
         window->resize(originalSize);wait(250);
     }

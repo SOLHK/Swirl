@@ -480,6 +480,21 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  set_tests_properties(swirl-apec-motion PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE
   ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;SWIRL_APEC_MOTION_CHECKS=1;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
  if(WIN32)
+  # These focused drivers are selected before the generic motion suite. Register
+  # them explicitly so a green motion check cannot leave detail/data regressions
+  # or the bounded live-update workloads unexecuted.
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/activity-details-store")
+  add_test(NAME swirl-activity-details COMMAND Swirl --motion-test --motion-output=activity-details-report.json)
+  set_tests_properties(swirl-activity-details PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE
+   ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;SWIRL_ACTIVITY_DETAIL_CHECKS=1;SWIRL_TEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/activity-details-store"
+   ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  foreach(activity_rows 600 2000)
+   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/activity-perf-${activity_rows}-store")
+   add_test(NAME swirl-activity-perf-${activity_rows} COMMAND Swirl --motion-test --motion-output=activity-perf-${activity_rows}-report.json)
+   set_tests_properties(swirl-activity-perf-${activity_rows} PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE
+    ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;SWIRL_ACTIVITY_PERF_CHECKS=1;SWIRL_ACTIVITY_PERF_ROWS=${activity_rows};SWIRL_TEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/activity-perf-${activity_rows}-store"
+    ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  endforeach()
   add_test(NAME swirl-apec-glass COMMAND Swirl --motion-test --motion-output=apec-glass-report.json)
   set_tests_properties(swirl-apec-glass PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE
    ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;SWIRL_APEC_GLASS_CHECKS=1"

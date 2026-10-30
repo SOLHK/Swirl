@@ -87,7 +87,9 @@ Item {
     onVisibleChanged:if(!visible && initialized)settleHidden()
     onWindowVisibleChanged:if(!windowVisible && initialized)settleHidden()
     onPresentationActiveChanged:{if(!initialized)return;if(presentationActive)retarget();else{flight.stop();withdrawal.stop();}}
-    onOpacityChanged:if(opacity===0 && initialized)settleHidden()
+    // Detail navigation fades the overview to zero after pausing it. Opacity is
+    // only presentation: settling here discards the interrupted weave position.
+    // Actual page/window hiding and hidden proxy changes still settle above.
     onWidthChanged:Qt.callLater(updateGeometry)
     onHeightChanged:Qt.callLater(updateGeometry)
     onWideChanged:Qt.callLater(updateGeometry)
@@ -95,7 +97,19 @@ Item {
     Connections {target:SwirlMotion;function onReducedChanged(){if(SwirlMotion.reduced)weave.retarget();}}
     Connections {target:Theme;function onUiScaleChanged(){Qt.callLater(weave.updateGeometry);}}
     Connections {target:weave.behindCards;function onWidthChanged(){Qt.callLater(weave.updateGeometry);}function onHeightChanged(){Qt.callLater(weave.updateGeometry);}}
-    Connections {target:weave.knotTarget;function onWidthChanged(){Qt.callLater(weave.updateGeometry);}function onHeightChanged(){Qt.callLater(weave.updateGeometry);}}
+    Connections {
+        target:weave.knotTarget
+        function onXChanged(){Qt.callLater(weave.updateGeometry);}
+        function onYChanged(){Qt.callLater(weave.updateGeometry);}
+        function onWidthChanged(){Qt.callLater(weave.updateGeometry);}
+        function onHeightChanged(){Qt.callLater(weave.updateGeometry);}
+    }
+    Connections {
+        target:weave.connectionItem
+        // SwirlActivityCard supplies lift; plain Item hosts need no hover hook.
+        ignoreUnknownSignals:true
+        function onLiftChanged(){Qt.callLater(weave.updateGeometry);}
+    }
     NumberAnimation {id:flight;target:weave;property:"progress";easing.type:Easing.Linear;paused:running && (!weave.presentationActive || !weave.windowVisible)}
     NumberAnimation {id:withdrawal;target:weave;property:"release";easing.type:Easing.InOutSine;paused:running && (!weave.presentationActive || !weave.windowVisible);onFinished:if(!weave.active && weave.release===1)weave.progress=0}
 
