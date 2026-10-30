@@ -16,7 +16,7 @@
   "raw_job_log": {
     "sha256": "9d4077aa8f4eb84532355a5e4b0797c66ac8ce35b25433bf4b28efe4d99b7858",
     "bytes": 1095854,
-    "preservation": "Complete downloaded log is identified by this digest. This record preserves the relevant original lines and links the complete GitHub job, plus digest-verified test/package artifacts."
+    "preservation": "The complete decoded GitHub job text was retained locally with CRLF normalized to LF; its stored UTF-8 digest is recorded here. This record preserves the relevant original lines and links the complete GitHub job and digest-verified test/package ZIP artifacts."
   },
   "observed_lines": [
     "2026-10-30T02:41:50.4732883Z Cache not found for input keys: apec-qt612-msvc-Windows-59b4e3306e3d2b0956c30227f2b07b0bad7a34b0c9b7b0d7abb39c76e370419d-4f0dafbcc6775f26ceaee6224d42f12ebd5d41fadcf3e7df3e33c1690e95cf74-2b7b95bbb2e517bf4f75638de04aae5229068629, apec-qt612-msvc-Windows-59b4e3306e3d2b0956c30227f2b07b0bad7a34b0c9b7b0d7abb39c76e370419d-4f0dafbcc6775f26ceaee6224d42f12ebd5d41fadcf3e7df3e33c1690e95cf74-\r",

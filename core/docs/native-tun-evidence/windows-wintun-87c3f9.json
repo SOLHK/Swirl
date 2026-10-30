@@ -25,7 +25,7 @@
     "file": "windows-wintun-87c3f9-job.log",
     "sha256": "74ebdcd5f2300fea93582630ce45f2709284899176051474d0a60189d0d7e463",
     "bytes": 133314,
-    "preservation": "Complete downloaded job log, copied byte-for-byte including timestamps, BOM and ANSI sequences."
+    "preservation": "Complete decoded GitHub job text. Windows CRLF is normalized to LF for repository text storage; all entries, values, timestamps, BOM and ANSI sequences are retained. SHA-256 and byte length refer to the stored UTF-8 text, not an HTTP archive or pre-normalization byte stream."
   },
   "commands": {
     "fmt": "cargo fmt --all -- --check",

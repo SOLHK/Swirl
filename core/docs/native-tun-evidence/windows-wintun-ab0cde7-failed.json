@@ -14,7 +14,8 @@
   "raw_log": {
     "file": "windows-wintun-ab0cde7-failed-job.log",
     "sha256": "06f5ecd2c8fef19aa0cb1c68254f89f13cfcb907d0f9bc5de615b00f9ad1bc2a",
-    "bytes": 135546
+    "bytes": 135546,
+    "preservation": "Complete decoded GitHub job text. Windows CRLF is normalized to LF for repository text storage; all entries, values, timestamps, BOM and ANSI sequences are retained. SHA-256 and byte length refer to the stored UTF-8 text, not an HTTP archive or pre-normalization byte stream."
   },
   "selected_package_test_totals": {
     "passed": 592,

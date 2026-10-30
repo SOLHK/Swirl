@@ -186,6 +186,9 @@ Server 2025 Datacenter `10.0.26100`, image `windows-2025-vs2026`, Rust `1.99.1`
 and the MSVC toolchain. The complete original
 [job log](native-tun-evidence/windows-wintun-87c3f9-job.log) has SHA-256
 `74ebdcd5f2300fea93582630ce45f2709284899176051474d0a60189d0d7e463`.
+The archived complete decoded text normalizes Windows CRLF to LF; this digest
+identifies the stored UTF-8 text. Entries, values, timestamps, BOM and ANSI
+sequences are retained.
 The [structured evidence](native-tun-evidence/windows-wintun-87c3f9.json)
 retains the final executable JSON and the original snapshot/recovery values.
 
