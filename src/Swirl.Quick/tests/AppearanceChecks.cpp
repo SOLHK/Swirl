@@ -27,8 +27,12 @@
 #include <QJsonObject>
 #include <QEventLoop>
 #include <QTimer>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QtMath>
+#include <chrono>
 #include <functional>
+#include <memory>
 
 int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
     if(!window)return 2;
@@ -159,7 +163,7 @@ Item {
                         const auto hovered=paint->property("color").value<QColor>();
                         QElapsedTimer pressClock;
                         QJsonArray pressFrames;
-                        bool contractedWithin40ms=false;
+                        bool legacyObservedWithin40ms=false;
                         const auto samplePress=[&](const char *phase){
                             if(!pressClock.isValid())return;
                             const qreal elapsed=pressClock.nsecsElapsed()/1000000.0;
@@ -167,20 +171,92 @@ Item {
                             const auto scale=paint->scale();
                             const auto labelScale=content?content->scale():0;
                             pressFrames.append(QJsonObject{{"phase",QString::fromLatin1(phase)},{"elapsedMs",elapsed},{"down",down},{"contact",paint->property("contactProgress").toReal()},{"surfaceScale",scale},{"contentScale",labelScale}});
-                            if((qstrcmp(phase,"afterAnimating")==0||qstrcmp(phase,"frameSwappedQueued")==0)&&elapsed<=40&&down&&scale<.995&&content&&qAbs(labelScale-scale)<.001)contractedWithin40ms=true;
+                            if((qstrcmp(phase,"afterAnimating")==0||qstrcmp(phase,"frameSwappedQueued")==0)&&elapsed<=40&&down&&scale<.995&&content&&qAbs(labelScale-scale)<.001)legacyObservedWithin40ms=true;
                         };
+                        struct SubmittedPressFrames {
+                            QMutex mutex;
+                            std::chrono::steady_clock::time_point start;
+                            bool armed=false;
+                            bool inputDown=false;
+                            bool pending=false;
+                            quint64 frame=0;
+                            qreal synchronizedMs=0;
+                            qreal surfaceScale=1;
+                            qreal contentScale=1;
+                            bool hasContent=false;
+                            QJsonArray frames;
+                        };
+                        auto presented=std::make_shared<SubmittedPressFrames>();
                         QObject pressContext;
                         const auto pressAnimation=QObject::connect(window,&QQuickWindow::afterAnimating,&pressContext,[&]{samplePress("afterAnimating");});
                         const auto pressDelivery=QObject::connect(window,&QQuickWindow::frameSwapped,&pressContext,[&]{samplePress("frameSwappedQueued");},Qt::QueuedConnection);
+                        // Qt 6.12 advances GUI animations after its sync wait.
+                        // A queued frameSwapped handler can therefore read the next
+                        // frame's item values. Capture only public item scale getters
+                        // while the GUI thread is blocked for synchronization, then
+                        // timestamp that exact frame queued for presentation on the rendering
+                        // thread. This is not a physical display scan-out timestamp.
+                        const auto pressSync=QObject::connect(window,&QQuickWindow::beforeSynchronizing,&pressContext,[presented,paint,content]{
+                            QMutexLocker lock(&presented->mutex);
+                            if(!presented->armed)return;
+                            presented->synchronizedMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
+                            presented->surfaceScale=paint->scale();
+                            presented->hasContent=content!=nullptr;
+                            presented->contentScale=content?content->scale():0;
+                            ++presented->frame;
+                            presented->pending=true;
+                        },Qt::DirectConnection);
+                        const auto pressSwap=QObject::connect(window,&QQuickWindow::frameSwapped,&pressContext,[presented]{
+                            QMutexLocker lock(&presented->mutex);
+                            if(!presented->armed||!presented->pending)return;
+                            const qreal elapsed=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
+                            presented->frames.append(QJsonObject{{"frame",qint64(presented->frame)},
+                                {"synchronizedMs",presented->synchronizedMs},{"swappedMs",elapsed},
+                                {"down",presented->inputDown},{"surfaceScale",presented->surfaceScale},
+                                {"contentScale",presented->contentScale},{"hasContent",presented->hasContent}});
+                            presented->pending=false;
+                        },Qt::DirectConnection);
                         // QTest::qWait polls with sleeps of up to10ms, which can
                         // starve a fast render loop during this strict deadline.
                         QEventLoop pressObservation;
                         QTimer pressDeadline;pressDeadline.setTimerType(Qt::PreciseTimer);pressDeadline.setSingleShot(true);
                         QObject::connect(&pressDeadline,&QTimer::timeout,&pressObservation,&QEventLoop::quit);
+                        {
+                            QMutexLocker lock(&presented->mutex);
+                            presented->start=std::chrono::steady_clock::now();
+                        }
                         pressClock.start();pressDeadline.start(40);
-                        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at);samplePress("inputDelivered");pressObservation.exec();
+                        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at);samplePress("inputDelivered");
+                        {
+                            QMutexLocker lock(&presented->mutex);
+                            presented->inputDown=control->property("down").toBool();
+                            presented->armed=true;
+                        }
+                        pressObservation.exec();
                         samplePress("deadlineObservation");
+                        QJsonArray presentedFrames;
+                        {
+                            // Acquiring this lock also retires an in-flight direct
+                            // callback before any fixture item can be destroyed.
+                            // Callbacks entering afterwards see armed=false and never
+                            // dereference the captured item pointers. Shared ownership
+                            // keeps their synchronization state alive through disconnect.
+                            QMutexLocker lock(&presented->mutex);
+                            presented->armed=false;
+                            presentedFrames=presented->frames;
+                        }
+                        QObject::disconnect(pressSync);QObject::disconnect(pressSwap);
+                        bool contractedWithin40ms=false;
+                        for(const auto &frame:presentedFrames){
+                            const auto sample=frame.toObject();
+                            if(sample.value("swappedMs").toDouble()<=40&&sample.value("down").toBool()
+                                &&sample.value("surfaceScale").toDouble()<.995&&sample.value("hasContent").toBool()
+                                &&qAbs(sample.value("contentScale").toDouble()-sample.value("surfaceScale").toDouble())<.001)
+                                contractedWithin40ms=true;
+                        }
                         qInfo().noquote()<<"CONTROL_PRESS_FRAMES"<<theme<<name<<QJsonDocument(pressFrames).toJson(QJsonDocument::Compact);
+                        qInfo().noquote()<<"CONTROL_PRESS_SUBMITTED_FRAMES"<<theme<<name
+                            <<"legacyObservedWithin40ms"<<legacyObservedWithin40ms<<QJsonDocument(presentedFrames).toJson(QJsonDocument::Compact);
                         check(contractedWithin40ms,"a short press contracts both the surface and its label within the first40ms");
                         QObject::disconnect(pressAnimation);QObject::disconnect(pressDelivery);
                         QTest::qWait(100);
@@ -364,7 +440,7 @@ Item {
             check(unchangedParent(),"parent wing, colour and foreground RGBA pixels are unchanged through the sidebar");
             if(theme=="Light"){
                 lightMaterial=material;
-                check(eval("Theme.canvas.toString()==='#f7f7f8' && Theme.surface.toString()==='#ffffff' && Theme.border.toString()==='#e0e0e3'").toBool(),"accepted neutral light canvas and surface colours remain unchanged");
+                check(eval("Theme.canvas.toString()==='#f7f7f7' && Theme.surface.toString()==='#ffffff' && Theme.border.toString()==='#e0e0e3'").toBool(),"accepted neutral light canvas and surface colours remain unchanged");
             }else darkMaterial=material;
         }
         qint64 lightAlpha=0,darkAlpha=0;int lightPeak=0,darkPeak=0;

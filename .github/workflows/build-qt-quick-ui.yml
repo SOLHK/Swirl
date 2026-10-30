@@ -65,6 +65,9 @@ jobs:
         run: ./tools/tests/Test-CodexProxyLauncher.ps1
       - name: Check cloud-knot path geometry from the production JavaScript
         run: node scripts/tests/Test-CloudKnotGeometry.cjs
+      - name: Prepare native Windows display for full-size UI and DPR checks
+        shell: pwsh
+        run: ./scripts/Set-CiDisplayResolution.ps1
       - name: Install Rust MSVC tools
         run: rustup toolchain install stable --profile minimal --target x86_64-pc-windows-msvc
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
@@ -253,6 +256,13 @@ jobs:
       - name: Critical UI startup, rendering and interaction checks
         shell: pwsh
         run: |
+          # Compiler caches contain binaries and may also contain old test
+          # captures. Remove evidence before execution so every uploaded image
+          # and report belongs to this checkout, including on failure paths.
+          foreach ($directory in @('hero-evidence','navigation-evidence','settings-material-evidence','policy-evidence','activity-layout')) {
+            Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $directory) -Recurse -Force -ErrorAction SilentlyContinue
+          }
+          Get-ChildItem -Path 'build/swirl-quick/*-report.json','build/swirl-quick/activity-feather-*.png','build/swirl-quick/Release/Swirl-*.txt' -File -ErrorAction SilentlyContinue | Remove-Item -Force
           # Run affected UI checks before packaging. The remaining registered suite
           # runs after the test installer is uploaded; these names are excluded there
           # so a required check is never repeated just to change stage ordering.
@@ -619,9 +629,12 @@ jobs:
             build/swirl-quick/Release/Swirl-appearance.txt
             build/swirl-quick/Release/Swirl-appearance-restore.txt
             build/swirl-quick/motion-report.json
+            build/swirl-quick/apec-*-report.json
             build/swirl-quick/activity-details-report.json
             build/swirl-quick/activity-perf-*-report.json
+            build/swirl-quick/activity-feather-*.png
             build/swirl-quick/activity-layout/
+            build/swirl-quick/policy-evidence/
             build-evidence/production-ui/
             build/swirl-quick/hero-evidence/
             build/swirl-quick/navigation-evidence/
@@ -629,6 +642,7 @@ jobs:
             build/swirl-quick/Release/Swirl-diagnostics.txt
             build/swirl-quick/Release/Swirl-node-ui-diagnostics.txt
             build/swirl-quick/Release/Swirl-motion-diagnostics.txt
+            build/swirl-quick/Release/Swirl-policy-ui-diagnostics.txt
             build/swirl-quick/Release/Swirl-hero-diagnostics.txt
           if-no-files-found: warn
       - name: Save reusable compiler outputs

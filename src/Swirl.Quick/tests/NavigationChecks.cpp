@@ -424,28 +424,166 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
     check(await([&]{return window->isActive()&&control->hasActiveFocus()&&control->property("visualFocus").toBool()&&control->property("focusReason").toInt()==Qt::TabFocusReason;},600),"marked button exposes keyboard focus: "+key);
     wait(170);snapshot("focus");sample("focus");
    }
-   if(key==QStringLiteral("activityPolicyShortcut")){
-    auto *arrow=item("activityPolicyArrow"),*arc=item("activityPolicyMotion");
-    const auto centerY=[](QQuickItem *target){return target->mapToScene(QPointF(target->width()/2,target->height()/2)).y();};
-    auto *contents=control->property("contentItem").value<QQuickItem *>();
-    auto *caption=control->property("motionTitle").value<QQuickItem *>(),*value=item("activityPolicyValue");
-    // The compact footer uses one baseline-aligned row inside a taller hit
-    // surface. Keep the strict pixel tolerance on that row and its arrow.
-    const bool centered=await([&]{return arrow&&arc&&contents&&arrow->isVisible()&&arrow->height()>0&&!arc->property("moving").toBool()&&!surface->property("moving").toBool()&&qAbs(centerY(arrow)-centerY(contents))*window->devicePixelRatio()<=.5;},1000);
-    check(centered,"Activity policy arrow remains centered in the compact footer content row");
-    check(caption&&value&&qAbs(caption->mapToScene(QPointF(0,caption->baselineOffset())).y()-value->mapToScene(QPointF(0,value->baselineOffset())).y())*window->devicePixelRatio()<=.5,
-          "Activity policy caption and current target share the same rendered baseline");
-    check(qAbs(control->height()-eval("Theme.dp(28)").toDouble())<.001&&qAbs(surface->property("radius").toDouble()-surface->height()/2)<.001,
-          "Activity policy hover surface keeps a complete 28dp capsule around the footer row");
-    const auto geometry=[](QQuickItem *target){
-     if(!target)return QJsonObject();
-     const auto origin=target->mapToScene(QPointF()),center=target->mapToScene(QPointF(target->width()/2,target->height()/2));
-     return QJsonObject{{"x",target->x()},{"y",target->y()},{"width",target->width()},{"height",target->height()},{"implicitWidth",target->implicitWidth()},{"implicitHeight",target->implicitHeight()},{"scale",target->scale()},{"sceneX",origin.x()},{"sceneY",origin.y()},{"sceneCenterX",center.x()},{"sceneCenterY",center.y()}};
-    };
-    QJsonObject controlSpacing;for(const auto *name:{"leftInset","rightInset","topInset","bottomInset","leftPadding","rightPadding","topPadding","bottomPadding","availableHeight"})controlSpacing[name]=control->property(name).toDouble();
-    buttonSamples.append(QJsonObject{{"button",key},{"phase","policy-arrow-alignment"},{"arrowCenterSceneY",arrow?QJsonValue(centerY(arrow)):QJsonValue()},{"surfaceCenterSceneY",centerY(surface)},{"centerDeltaPhysicalPx",arrow&&contents?QJsonValue(qAbs(centerY(arrow)-centerY(contents))*window->devicePixelRatio()):QJsonValue()},{"arcMoving",arc?arc->property("moving").toBool():false},{"surfaceMoving",surface->property("moving").toBool()},{"centered",centered},{"controlGeometry",geometry(control)},{"backgroundGeometry",geometry(surface)},{"contentGeometry",geometry(control->property("contentItem").value<QQuickItem *>())},{"rightCellGeometry",geometry(arrow?arrow->parentItem():nullptr)},{"arrowGeometry",geometry(arrow)},{"controlSpacing",controlSpacing}});
-   }
    check(clicked.isValid()&&clicked.count()==0&&control->size()==size&&control->position()==position,"marked button feedback preserves layout and invokes no action: "+key);
+  };
+  // The accepted flat toolbar and Activity cards have different feedback
+  // contracts from ordinary motion buttons. Observe their rendered geometry,
+  // not inherited motion getters whose transforms the toolbar does not use.
+  const auto sceneRect=[](QQuickItem *control){return control?control->mapRectToScene(control->boundingRect()):QRectF();};
+  const auto sameSceneRect=[&](const QRectF &first,const QRectF &second){
+   const auto dpr=window->devicePixelRatio();
+   return qAbs(first.x()-second.x())*dpr<=.5&&qAbs(first.y()-second.y())*dpr<=.5
+       &&qAbs(first.width()-second.width())*dpr<=.5&&qAbs(first.height()-second.height())*dpr<=.5;
+  };
+  const auto geometryEvidence=[&](QQuickItem *control){
+   if(!control)return QJsonObject();const auto rect=sceneRect(control);
+   return QJsonObject{{"x",control->x()},{"y",control->y()},{"width",control->width()},{"height",control->height()},
+       {"sceneX",rect.x()},{"sceneY",rect.y()},{"sceneWidth",rect.width()},{"sceneHeight",rect.height()},{"scale",control->scale()}};
+  };
+  const auto savePixels=[&](QQuickItem *control,const QString &key,const QString &phase){
+   const auto image=window->grabWindow();const auto rect=sceneRect(control).adjusted(-5,-5,5,5);const auto dpr=window->devicePixelRatio();
+   const QRect pixels(qFloor(rect.x()*dpr),qFloor(rect.y()*dpr),qCeil(rect.width()*dpr),qCeil(rect.height()*dpr));
+   const auto crop=image.copy(pixels.intersected(image.rect()));
+   check(!crop.isNull()&&crop.save(evidence+"/"+key+"-"+phase+".png"),"actual marked-button pixels saved: "+key+"/"+phase);return crop;
+  };
+  const auto pointerFits=[&](QQuickItem *control,const QPoint &point,const QString &key){
+   const bool inside=control&&control->isVisible()&&QRectF(QPointF(),window->size()).contains(point);
+   check(inside,"marked page control is visible inside the native window: "+key);
+   const bool onScreen=inside&&window->screen()->availableGeometry().contains(window->mapToGlobal(point));
+   check(onScreen,"marked page control native pointer target fits the actual screen: "+key);return onScreen;
+  };
+  const auto colorDistance=[](const QColor &first,const QColor &second){return std::max({qAbs(first.redF()-second.redF()),qAbs(first.greenF()-second.greenF()),qAbs(first.blueF()-second.blueF()),qAbs(first.alphaF()-second.alphaF())});};
+  const auto auditFlatToolbar=[&](QQuickItem *control,const QString &key){
+   check(control!=nullptr,"marked flat toolbar button exists: "+key);if(!control)return;
+   reveal(control);movePointer(park(),170);
+   auto *surface=control->property("background").value<QQuickItem *>(),*contents=control->property("contentItem").value<QQuickItem *>();
+   check(surface&&contents,"flat toolbar owns a real background and content group: "+key);if(!surface||!contents)return;
+   const auto size=control->size();const auto position=control->position();
+   const auto point=control->mapToScene(QPointF(size.width()/2,size.height()/2)).toPoint();
+   if(!pointerFits(control,point,key))return;
+   const auto controlRect=sceneRect(control),surfaceRect=sceneRect(surface),contentRect=sceneRect(contents);
+   check(qAbs(control->height()-eval("Theme.toolbarHeight").toDouble())<.001
+       &&qAbs(surface->property("radius").toDouble()-surface->height()/2)<.001
+       &&QQmlExpression(qmlContext(surface),surface,"border.width===0").evaluate().toBool(),"flat toolbar keeps the common height and unframed pill surface: "+key);
+   const auto geometryStable=[&]{return sameSceneRect(sceneRect(control),controlRect)&&sameSceneRect(sceneRect(surface),surfaceRect)&&sameSceneRect(sceneRect(contents),contentRect)
+       &&qAbs(control->scale()-1)<.001&&qAbs(surface->scale()-1)<.001&&qAbs(contents->scale()-1)<.001;};
+   const auto currentColor=[&]{return surface->property("color").value<QColor>();};
+   const auto idleColor=eval("Theme.dark ? '#292929' : '#EEEEEE'").toString();
+   const auto hoverColor=QColor(eval("Theme.dark ? '#323232' : '#E8E8E8'").toString());
+   const auto pressedColor=QColor(eval("Theme.dark ? '#383838' : '#E3E3E3'").toString());
+   const auto between=[&](const QColor &first,const QColor &second){const auto color=currentColor();return color.isValid()&&colorDistance(color,first)>.001&&colorDistance(color,second)>.001;};
+   const auto sample=[&](const QString &phase){buttonSamples.append(QJsonObject{{"button",key},{"kind","flat-toolbar"},{"phase",phase},{"windowActive",window->isActive()},{"activeFocus",control->hasActiveFocus()},{"visualFocus",control->property("visualFocus").toBool()},{"hover",surface->property("hoverProgress").toDouble()},{"contact",surface->property("contactProgress").toDouble()},{"surfaceColor",currentColor().name(QColor::HexArgb)},{"controlGeometry",geometryEvidence(control)},{"backgroundGeometry",geometryEvidence(surface)},{"contentGeometry",geometryEvidence(contents)}});};
+   QSignalSpy clicked(control,SIGNAL(clicked()));const bool enabled=control->isEnabled();
+   bool stableGeometry=true,intermediateHover=false,intermediateContact=false,stableHover=false;
+   QTimer sampler;sampler.setTimerType(Qt::PreciseTimer);
+   QObject::connect(&sampler,&QTimer::timeout,window,[&]{
+    stableGeometry&=geometryStable();
+    const auto contact=surface->property("contactProgress").toDouble();
+    intermediateContact|=control->property("down").toBool()&&contact>0&&contact<1&&between(hoverColor,pressedColor);
+   });
+   sampler.start(4);QImage idle,hover;
+   for(int attempt=0;attempt<(enabled?3:1);++attempt){
+    movePointer(park());await([&]{return !control->property("hovered").toBool()&&surface->property("hoverProgress").toDouble()<.01&&colorDistance(currentColor(),QColor(idleColor))<.001;},600);
+    idle=savePixels(control,key,"idle");sample("idle");movePointer(point);
+    if(enabled){
+     intermediateHover|=await([&]{const auto progress=surface->property("hoverProgress").toDouble();return control->property("hovered").toBool()&&progress>0&&progress<1&&between(QColor(idleColor),hoverColor);},350);
+     sample("hover-intermediate");
+     if(!await([&]{return control->property("hovered").toBool()&&surface->property("hoverProgress").toDouble()>.95&&colorDistance(currentColor(),hoverColor)<.001;},600)){sample("hover-interrupted");continue;}
+    }else wait(150);
+    hover=savePixels(control,key,"hover");sample("hover");
+    stableHover=!enabled||(control->property("hovered").toBool()&&surface->property("hoverProgress").toDouble()>.5);
+    if(stableHover)break;sample("hover-interrupted");
+   }
+   if(enabled){
+    check(intermediateHover,"flat toolbar hover traverses actual intermediate surface colors: "+key);
+    check(stableHover&&!hover.isNull()&&hover!=idle,"flat toolbar hover visibly changes its real pixels: "+key);
+   }
+   QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,point);wait(70);const auto pressed=savePixels(control,key,"pressed");sample("pressed");
+   if(enabled)check(control->property("down").toBool()&&intermediateContact&&surface->property("contactProgress").toDouble()>.95&&pressed!=hover&&geometryStable(),"flat toolbar gives continuous contact color and real pixel feedback without a pressed scale or lift: "+key);
+   else check(!control->property("down").toBool()&&qAbs(surface->property("contactProgress").toDouble())<.001&&surface->property("hoverProgress").toDouble()<.001&&geometryStable(),"disabled flat toolbar has no misleading hover or press feedback: "+key);
+   movePointer(park());QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,park());wait(30);sample("release-intermediate");
+   if(enabled)check(surface->property("contactProgress").toDouble()>.05&&geometryStable(),"flat toolbar canceled release continues its contact feedback without moving the surface: "+key);
+   check(await([&]{return !control->property("down").toBool()&&qAbs(surface->property("contactProgress").toDouble())<.001&&surface->property("hoverProgress").toDouble()<.01&&colorDistance(currentColor(),QColor(idleColor))<.001;},1800),"flat toolbar returns completely after canceled release: "+key);
+   savePixels(control,key,"released");sample("released");
+   if(enabled){
+    control->setFocus(false);window->contentItem()->forceActiveFocus(Qt::OtherFocusReason);QCoreApplication::processEvents();control->forceActiveFocus(Qt::TabFocusReason);
+    check(await([&]{return window->isActive()&&control->hasActiveFocus()&&control->property("visualFocus").toBool()&&control->property("focusReason").toInt()==Qt::TabFocusReason;},600),"flat toolbar exposes keyboard focus: "+key);
+    wait(170);const auto focused=savePixels(control,key,"focus");sample("focus");
+    check(focused!=idle&&geometryStable(),"flat toolbar keyboard focus changes pixels without moving or scaling content: "+key);
+   }
+   sampler.stop();
+   check(clicked.isValid()&&clicked.count()==0&&stableGeometry&&control->size()==size&&control->position()==position,"flat toolbar feedback preserves actual scene geometry and invokes no action: "+key);
+  };
+  const auto auditActivityCard=[&](const QString &key,const QString &detailKey){
+   auto *control=item(key);check(control!=nullptr,"actual Activity card exists: "+key);if(!control)return;
+   reveal(control);control->setFocus(false);window->contentItem()->forceActiveFocus(Qt::OtherFocusReason);movePointer(park(),170);
+   const auto size=control->size();const auto position=control->position();const auto idleRect=sceneRect(control);
+   // The reserved card inset is part of its real hit surface and does not
+   // overlap the embedded chart filters, source rows or diagnostic refresh.
+   const auto point=control->mapToScene(QPointF(size.width()/2,eval("pageLoader.item.cardInset/2").toDouble())).toPoint();
+   if(!pointerFits(control,point,key))return;
+   QQuickItem *hit=nullptr;for(auto *child:control->childItems())if(child->property("acceptedButtons").isValid()&&child->property("pressed").isValid()){hit=child;break;}
+   check(hit!=nullptr,"Activity card exposes its actual pointer hit surface: "+key);if(!hit)return;
+   const auto fullLift=eval("Theme.dp(1.5)").toDouble();
+   const auto unframed=[&]{return QQmlExpression(qmlContext(control),control,"border.width===0").evaluate().toBool();};
+   check(control->property("color").value<QColor>().alphaF()==1&&qAbs(control->property("radius").toDouble()-eval("Theme.cardRadius").toDouble())<.001&&unframed(),"Activity card retains its opaque surface and shared unframed curvature: "+key);
+   const auto followsLift=[&]{return sameSceneRect(sceneRect(control),idleRect.translated(0,control->property("lift").toDouble()))&&qAbs(control->scale()-1)<.001;};
+   const auto sample=[&](const QString &phase){buttonSamples.append(QJsonObject{{"button",key},{"kind","activity-card"},{"phase",phase},{"activeFocus",control->hasActiveFocus()},{"keyboardFocus",control->property("keyboardFocus").toBool()},{"hovered",control->property("hovered").toBool()},{"pointerPressed",hit->property("pressed").toBool()},{"lift",control->property("lift").toDouble()},{"controlGeometry",geometryEvidence(control)}});};
+   QSignalSpy activated(control,SIGNAL(activated()));bool stableGeometry=true,intermediate=false,stableHover=false;
+   QTimer sampler;sampler.setTimerType(Qt::PreciseTimer);QObject::connect(&sampler,&QTimer::timeout,window,[&]{stableGeometry&=followsLift();});sampler.start(4);
+   QImage idle,hover;
+   for(int attempt=0;attempt<3;++attempt){
+    movePointer(park());await([&]{return !control->property("hovered").toBool()&&qAbs(control->property("lift").toDouble())<.01;},600);
+    idle=savePixels(control,key,"idle");sample("idle");movePointer(point);
+    intermediate|=await([&]{const auto lift=control->property("lift").toDouble();return control->property("hovered").toBool()&&lift<0&&lift>-fullLift&&followsLift();},350);sample("hover-intermediate");
+    if(!await([&]{return control->property("hovered").toBool()&&control->property("lift").toDouble()<-fullLift*.95;},600)){sample("hover-interrupted");continue;}
+    hover=savePixels(control,key,"hover");sample("hover");stableHover=control->property("hovered").toBool()&&control->property("lift").toDouble()<-fullLift*.5;
+    if(stableHover)break;sample("hover-interrupted");
+   }
+   check(intermediate,"Activity card hover passes through an actual intermediate 1.5dp scene lift: "+key);
+   check(stableHover&&!hover.isNull()&&hover!=idle,"Activity card hover visibly changes its real pixels: "+key);
+   QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,point);wait(70);savePixels(control,key,"pressed");sample("pressed");
+   check(hit->property("pressed").toBool()&&!control->property("pressed").toBool()&&qAbs(control->property("lift").toDouble()+fullLift)<.001&&followsLift()&&unframed(),"Activity card accepts the pointer press without an additional scale, border or press lift: "+key);
+   movePointer(park());QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,park());wait(30);sample("release-intermediate");
+   check(control->property("lift").toDouble()<0&&followsLift(),"Activity card canceled release continues from its current scene lift: "+key);
+   check(await([&]{return !hit->property("pressed").toBool()&&!control->property("hovered").toBool()&&qAbs(control->property("lift").toDouble())<.01;},1800),"Activity card returns completely after canceled release: "+key);
+   savePixels(control,key,"released");sample("released");
+   control->setFocus(false);window->contentItem()->forceActiveFocus(Qt::OtherFocusReason);QCoreApplication::processEvents();control->forceActiveFocus(Qt::TabFocusReason);
+   check(await([&]{return window->isActive()&&control->hasActiveFocus()&&control->property("keyboardFocus").toBool()&&control->property("focused").toBool()&&qAbs(control->property("lift").toDouble()+fullLift)<.001;},600),"Activity card exposes keyboard focus through the same complete scene lift: "+key);
+   wait(170);savePixels(control,key,"focus");sample("focus");sampler.stop();
+   check(activated.isValid()&&activated.count()==0&&stableGeometry&&control->size()==size&&control->position()==position&&!eval("pageLoader.item.detailOpen").toBool(),"Activity card canceled feedback preserves layout and never activates a detail: "+key);
+   QTest::keyClick(window,Qt::Key_Return);
+   check(await([&]{
+    auto *detail=item("activityDetailTransition");if(!detail||detail->property("detailKey").toString()!=detailKey||detail->property("progress").toDouble()!=1||detail->property("moving").toBool()||!item("activityDetailBack"))return false;
+    auto *body=detail->property("bodyItem").value<QQuickItem *>();if(!body||!body->isEnabled())return false;
+    for(auto *loader:body->childItems())if(loader->isVisible()&&loader->property("active").toBool()&&loader->property("status").toInt()==1&&loader->property("item").value<QObject *>())return true;
+    return false;
+   },4000)&&activated.count()==1,"Activity card keyboard activation reaches its loaded functional detail and return control: "+key);
+   QTest::keyClick(window,Qt::Key_Escape);
+   check(await([&]{return !eval("pageLoader.item.detailOpen").toBool()&&control->hasActiveFocus()&&control->property("keyboardFocus").toBool();},4000),"Activity detail Escape returns keyboard focus to the same source card: "+key);
+  };
+  const auto auditActivityStatusGeometry=[&]{
+   auto *card=item("activityStatusCard"),*fact=item("activityPolicyFact"),*value=item("activityPolicyFactValue"),*emblem=item("activityStatusEmblem"),*header=item("activityStatusHeader");
+   QQuickItem *caption=nullptr,*arrow=nullptr;
+   if(fact)for(auto *child:fact->childItems())if(child!=value&&child->property("text").toString()==fact->property("caption").toString()){caption=child;break;}
+   if(header)for(auto *child:header->childItems())if(child->property("name").toString()=="chevron-right"){arrow=child;break;}
+   const auto dpr=window->devicePixelRatio();
+   const bool centered=await([&]{return arrow&&header&&arrow->isVisible()&&arrow->height()>0&&qAbs(sceneRect(arrow).center().y()-sceneRect(header).center().y())*dpr<=.5;},1000);
+   check(centered,"Activity status title arrow stays centered in the real card header");
+   check(caption&&value&&qAbs(caption->mapToScene(QPointF(0,caption->baselineOffset())).y()-value->mapToScene(QPointF(0,value->baselineOffset())).y())*dpr<=.5
+       &&caption->property("text").toString()==QStringLiteral("默认策略")&&value->property("text").toString()==eval("pageLoader.item.defaultTargetName").toString()&&!caption->property("truncated").toBool()&&!value->property("truncated").toBool(),
+       "Activity default-policy caption and actual target remain complete on the same rendered baseline");
+   bool contained=card&&fact&&emblem&&header&&arrow;
+   if(contained){
+    const auto cardBounds=QRectF(QPointF(),card->size()),emblemBounds=emblem->mapRectToItem(card,emblem->boundingRect());
+    contained&=cardBounds.contains(emblemBounds)&&cardBounds.contains(header->mapRectToItem(card,header->boundingRect()))&&header->boundingRect().contains(arrow->mapRectToItem(header,arrow->boundingRect()));
+    for(const auto &name:QStringList{"activityNodeSection","activityIpSection","activityNetworkFact","activityProfileFact","activityPolicyFact"}){
+     auto *section=item(name);const auto rect=section?section->mapRectToItem(card,section->boundingRect()):QRectF();
+     contained&=section&&cardBounds.contains(rect)&&(rect.right()-emblemBounds.left())*dpr<=.5;
+    }
+   }
+   check(contained,"Activity status text and policy facts remain inside the opaque card and outside the reserved feather area");
+   buttonSamples.append(QJsonObject{{"button","activityStatusCard"},{"phase","status-policy-alignment"},{"arrowCentered",centered},{"textContained",contained},{"card",geometryEvidence(card)},{"header",geometryEvidence(header)},{"arrow",geometryEvidence(arrow)},{"policyCaption",geometryEvidence(caption)},{"policyValue",geometryEvidence(value)},{"brandArea",geometryEvidence(emblem)}});
   };
   check(route("processes"),"marked process-page audit settles");
   auto *processPage=qobject_cast<QQuickItem *>(eval("pageLoader.item").value<QObject *>());
@@ -460,7 +598,10 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
   }
   check(route("dns"),"marked DNS-page audit settles");audit(byText(qobject_cast<QQuickItem *>(eval("pageLoader.item").value<QObject *>()),QStringLiteral("添加映射")),"dns-add-mapping");
   check(route("activity"),"marked Activity-page audit settles");
-  for(const auto &name:QStringList{"activityOutboundMode","activityPolicyShortcut","networkDiagnosticDetails","activityConnectionsDetails","proxyCapsule","tunCapsule","nav-external"})audit(item(name),name);
+  for(const auto &name:QStringList{"activityOutboundMode","proxyCapsule","tunCapsule"})auditFlatToolbar(item(name),name);
+  auditActivityStatusGeometry();
+  for(const auto &spec:QList<QPair<QString,QString>>{{"activityStatusCard","connection"},{"activityTrafficCard","traffic"},{"activitySourcesCard","sources"},{"activityDiagnosticCard","diagnostics"},{"activityConnectionsCard","connections"}})auditActivityCard(spec.first,spec.second);
+  audit(item("nav-external"),"nav-external");
   check(route("scripts"),"rapid hover audit returns to the actual script action");
   auto *rapid=item("scriptAddButton");
   if(rapid){

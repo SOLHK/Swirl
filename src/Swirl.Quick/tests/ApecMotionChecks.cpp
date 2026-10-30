@@ -6,6 +6,7 @@
 #include <QQmlContext>
 #include <QQmlComponent>
 #include <QQmlExpression>
+#include <QQmlListReference>
 #include <QQmlProperty>
 #include <QTest>
 #include <QJsonDocument>
@@ -20,6 +21,7 @@
 #include <QTimer>
 #include <QSGRendererInterface>
 #include <QColor>
+#include <QTransform>
 #include <QtMath>
 #include <memory>
 #include <functional>
@@ -314,14 +316,58 @@ Item {
     }
     eval("Theme.reduceMotion=false;Theme.transparency=true;AppState.navigate('activity')");wait(80);
     auto *wing=window->findChild<QQuickItem *>("apecWingVisual");
+    // The accepted whole-feather master puts transparency in each painted
+    // gradient. Its container stays opaque; multiplying the retired global
+    // wingOpacity here would incorrectly dim the current artwork a second time.
+    const auto wingState=[&](QQuickItem *visual){
+        QVariantList state;
+        if(!visual)return state;
+        state.append(visual->opacity());state.append(visual->scale());state.append(visual->rotation());
+        state.append(visual->property("progress"));
+        state.append(QVariant::fromValue(visual->itemTransform(window->contentItem())));
+        for(int i=0;i<visual->property("featherCount").toInt();++i){
+            auto *feather=findVisual(visual,"wingFeather"+QString::number(i));
+            if(!feather)return QVariantList();
+            state.append(feather->opacity());state.append(feather->property("reveal"));
+            state.append(QVariant::fromValue(feather->itemTransform(visual)));
+        }
+        return state;
+    };
+    const auto settledFeathers=[&](QQuickItem *visual){
+        if(!visual||visual->property("progress").toDouble()!=1||visual->opacity()!=1)return false;
+        const int count=visual->property("featherCount").toInt();
+        if(count<=0)return false;
+        for(int i=0;i<count;++i){
+            auto *feather=findVisual(visual,"wingFeather"+QString::number(i));
+            if(!feather||feather->property("reveal").toDouble()!=1||feather->opacity()!=1
+                ||!feather->itemTransform(feather->parentItem()).isIdentity())return false;
+            int gradients=0;
+            for(auto *object:feather->findChildren<QObject *>()){
+                auto *gradient=object->property("fillGradient").value<QObject *>();
+                if(!gradient)continue;
+                ++gradients;
+                const QQmlListReference stops(gradient,"stops");
+                if(!stops.isReadable()||stops.count()<2)return false;
+                for(qsizetype stop=0;stop<stops.count();++stop){
+                    auto *entry=stops.at(stop);
+                    const auto color=entry?entry->property("color").value<QColor>():QColor();
+                    if(!color.isValid()||color.alphaF()<=0||color.alphaF()>=1)return false;
+                }
+            }
+            if(gradients!=1)return false;
+        }
+        return true;
+    };
     check("production-wing-entry-already-consumed",wing && eval("appSceneBackdrop.entranceConsumed").toBool());
+    check("production-wing-settles-every-feather-with-painted-transparency",settledFeathers(wing));
+    const auto restingWing=wingState(wing);
     eval("AppState.navigate('overview')");wait(35);
     check("wing-persists-off-home",wing && !eval("appSceneBackdrop.entering").toBool()
         && eval("appSceneBackdrop.progress===1").toBool()
-        && qAbs(wing->opacity()-eval("Theme.wingOpacity").toDouble())<0.001);
+        && !restingWing.isEmpty() && wingState(wing)==restingWing);
     eval("AppState.navigate('activity')");wait(80);
     check("wing-does-not-replay-on-navigation",wing && !eval("appSceneBackdrop.entering").toBool()
-        && qAbs(wing->opacity()-eval("Theme.wingOpacity").toDouble())<0.001);
+        && !restingWing.isEmpty() && wingState(wing)==restingWing);
     window->showMinimized();wait(40);
     check("wing-minimize-stops-render-motion",!eval("appSceneBackdrop.presenting").toBool() && !eval("appSceneBackdrop.entering").toBool());
     window->showNormal();wait(80);
@@ -344,7 +390,7 @@ Item {
         eval("Theme.reduceMotion=true");wait(40);
         check("reduced-motion-settles-unfolding",visual && !entry->property("entering").toBool()
             && visual->scale()==1 && visual->rotation()==0 && visual->y()==0
-            && qAbs(visual->opacity()-eval("Theme.wingOpacity").toDouble())<0.001);
+            && settledFeathers(visual));
         eval("Theme.reduceMotion=false;apecEntry.visible=false");wait(40);
         eval("apecEntry.visible=true");wait(100);
         check("consumed-opening-stays-static-on-return",!entry->property("entering").toBool() && visual && visual->rotation()==0 && visual->scale()==1);

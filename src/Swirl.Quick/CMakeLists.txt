@@ -495,6 +495,14 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
     ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;SWIRL_ACTIVITY_PERF_CHECKS=1;SWIRL_ACTIVITY_PERF_ROWS=${activity_rows};SWIRL_TEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/activity-perf-${activity_rows}-store"
     ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
   endforeach()
+  # This existing driver exercises the toolbar state machine with a per-process
+  # in-memory system-proxy backend and real Rust loopback peers. Keep it isolated
+  # from the user's settings and register it instead of leaving it CLI-only.
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/policy-ui-store")
+  add_test(NAME swirl-policy-ui COMMAND Swirl --policy-self-test --policy-output=policy-evidence)
+  set_tests_properties(swirl-policy-ui PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE
+   ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;SWIRL_TEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/policy-ui-store"
+   ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
   add_test(NAME swirl-apec-glass COMMAND Swirl --motion-test --motion-output=apec-glass-report.json)
   set_tests_properties(swirl-apec-glass PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE
    ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;SWIRL_APEC_GLASS_CHECKS=1"
@@ -503,7 +511,8 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
   add_test(NAME swirl-settings-material COMMAND Swirl --hero-test --hero-material-only --hero-output=settings-material-evidence)
   set_tests_properties(swirl-settings-material PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
   add_test(NAME swirl-navigation-ui COMMAND Swirl --navigation-test --navigation-output=navigation-evidence --hero-no-recording)
-  # Includes canceled native input, focus and pixel evidence for 17 page controls.
+  # Includes canceled native input, focus and pixels for ordinary page controls,
+  # the flat toolbar and each of the five activity cards.
   set_tests_properties(swirl-navigation-ui PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
   set_tests_properties(swirl-hero PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
  endif()

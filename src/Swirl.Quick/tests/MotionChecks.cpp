@@ -23,6 +23,8 @@
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QFile>
+#include <QFileInfo>
+#include <QLineF>
 #include <QDebug>
 #include <QElapsedTimer>
 #include <QEventLoop>
@@ -58,6 +60,176 @@ void activityWait(int milliseconds) {
 const QStringList activityDetailKeys={"sources","diagnostics","traffic","connections","connection"};
 const QStringList activityDetailButtons={"activitySourcesDetails","networkDiagnosticDetails","activityTrafficDetails","activityConnectionsDetails","activityConnectionDetails"};
 const QStringList activityDetailCards={"activitySourcesCard","activityDiagnosticCard","activityTrafficCard","activityConnectionsCard","activityStatusCard"};
+
+void checkActivityWeaveLayers(QQuickWindow *window,QQuickItem *weave,const QString &output,
+    const std::function<void(const QString &,bool)> &check,QJsonArray &samples) {
+    const auto eval=[&](const QString &code){
+        QQmlExpression expression(qmlContext(weave),weave,code);
+        const auto result=expression.evaluate();
+        check("weave-layer-expression: "+code.left(70),!expression.hasError());
+        if(expression.hasError())qWarning()<<expression.error();
+        return result;
+    };
+    const auto find=[&](const QString &name){return activityVisual(window->contentItem(),name);};
+    auto *back=find("cloudKnotBackFlight"),*front=find("cloudKnotFrontFlight"),*rest=find("cloudKnotRest");
+    auto *behind=weave->property("behindCards").value<QQuickItem *>();
+    auto *frontLayer=weave->property("frontLayer").value<QQuickItem *>();
+    auto *target=weave->property("knotTarget").value<QQuickItem *>();
+    auto *sourceFilter=find("activitySourceFilter");
+    check("weave-shares-page-back-front-and-local-rest-layers",back&&front&&rest&&behind&&frontLayer&&target&&sourceFilter
+        &&back->parentItem()==behind&&front->parentItem()==frontLayer&&rest->parentItem()==target);
+    if(!back||!front||!rest||!behind||!frontLayer||!target||!sourceFilter)return;
+    const auto behindItem=[](QQuickItem *lower,QQuickItem *upper){
+        QList<QQuickItem *> a,b;
+        for(auto *item=lower;item;item=item->parentItem())a.prepend(item);
+        for(auto *item=upper;item;item=item->parentItem())b.prepend(item);
+        int i=0;while(i<a.size()&&i<b.size()&&a[i]==b[i])++i;
+        if(i==0||i==a.size()||i==b.size())return false;
+        if(a[i]->z()!=b[i]->z())return a[i]->z()<b[i]->z();
+        const auto siblings=a[i-1]->childItems();
+        return siblings.indexOf(a[i])<siblings.indexOf(b[i]);
+    };
+    check("weave-flight-stacks-behind-real-source-controls",behindItem(back,sourceFilter));
+    const QList<QPointF> corners={QPointF(),QPointF(target->width(),0),QPointF(0,target->height()),QPointF(target->width(),target->height())};
+    bool sameClip=front->clip()&&front->size()==target->size();
+    for(const auto &point:corners)sameClip=sameClip&&QLineF(front->mapToScene(point),target->mapToScene(point)).length()<0.01;
+    check("weave-foreground-clip-follows-live-reserved-knot-rectangle",sameClip);
+    const QStringList keys={"warm","return","crown","forward","heart"};
+    const QList<QPointF> probes={QPointF(),QPointF(1024,0),QPointF(0,1024)};
+    const auto matchingCopies=[&]{
+        bool same=true;
+        for(const auto &key:keys){
+            auto *piece=find("cloudFeather-"+key),*copy=find("cloudFeatherFront-"+key);
+            if(!piece||!copy){same=false;continue;}
+            same=same&&piece->property("sourcePath")==copy->property("sourcePath")
+                &&piece->property("targetPath")==copy->property("targetPath")
+                &&piece->property("morphProgress")==copy->property("morphProgress");
+            for(const auto &point:probes)same=same&&QLineF(piece->mapToScene(point),copy->mapToScene(point)).length()<0.01;
+        }
+        return same;
+    };
+    // Reach the reported obstruction through the actual animation clock, then
+    // freeze that observed frame for deterministic native-render comparisons.
+    QTest::mouseMove(window,QPoint(1,1));activityWait(180);
+    eval("previewAt(0.44,0);retarget()");
+    check("weave-layer-regression-runs-real-flight-clock",QTest::qWaitFor([&]{return weave->property("progress").toDouble()>=0.472;},1500));
+    const double sampledProgress=weave->property("progress").toDouble();
+    check("weave-obstruction-frame-is-intermediate-flight",sampledProgress>=0.472&&sampledProgress<0.55&&weave->property("moving").toBool());
+    eval(QString("previewAt(%1,0)").arg(sampledProgress,0,'g',17));
+    check("weave-front-and-back-copies-share-global-pose",matchingCopies());
+    window->update();activityWait(80);
+    const QImage withFlight=window->grabWindow();
+    QQmlComponent opacityComponent(qmlEngine(window));
+    opacityComponent.setData(R"(
+        import QtQuick
+        Binding {
+            required property var targetWeave
+            target: targetWeave
+            property: "opacity"
+            value: 0
+            restoreMode: Binding.RestoreBindingOrValue
+        }
+    )",QUrl());
+    std::unique_ptr<QObject> hideFlight(opacityComponent.createWithInitialProperties(
+        {{"targetWeave",QVariant::fromValue(weave)}},qmlContext(window)));
+    check("weave-pixel-reference-hides-only-decorative-opacity",hideFlight!=nullptr);
+    window->update();activityWait(80);
+    const QImage withoutFlight=window->grabWindow();
+    check("weave-control-pixel-comparison-has-real-window-images",!withFlight.isNull()&&!withoutFlight.isNull()
+        &&withFlight.size()==withoutFlight.size());
+    if(!withFlight.isNull()&&!withoutFlight.isNull()&&withFlight.size()==withoutFlight.size()){
+        QJsonArray controls;
+        for(const auto &name:QStringList{"activitySourceFilter","activityTrafficFilter","activitySourcesDetails","activityInternetValue","activityCurrentNode","proxyCapsule"}){
+            auto *control=find(name);
+            check(name+"-present-for-weave-pixel-regression",control!=nullptr);
+            if(!control)continue;
+            QList<QQuickItem *> regions={control};
+            // The toolbar capsule has intentionally transparent rounded corners.
+            // Its real label and status accessory must remain fully unobstructed;
+            // legal artwork visible outside the capsule is not a text overlap.
+            if(name=="proxyCapsule")regions={activityVisual(control,"statusCapsuleLabel"),activityVisual(control,"statusCapsuleAccessory")};
+            for(int regionIndex=0;regionIndex<regions.size();++regionIndex){
+                auto *region=regions[regionIndex];
+                const QString regionName=region?region->objectName():name+"-missing-region-"+QString::number(regionIndex);
+                const bool readable=control->isVisible()&&region&&region->isVisible()&&region->width()>2&&region->height()>2;
+                check(name+"-visible-content-region-"+regionName,readable);
+                if(!readable)continue;
+                const auto local=QRectF(QPointF(),region->size());
+                const auto logical=region->mapRectToScene(name=="proxyCapsule"?local:local.adjusted(1,1,-1,-1));
+                const double sx=double(withFlight.width())/window->width(),sy=double(withFlight.height())/window->height();
+                const QRect pixels=QRectF(logical.x()*sx,logical.y()*sy,logical.width()*sx,logical.height()*sy).toAlignedRect().intersected(withFlight.rect());
+                const auto a=withFlight.copy(pixels).convertToFormat(QImage::Format_ARGB32);
+                const auto b=withoutFlight.copy(pixels).convertToFormat(QImage::Format_ARGB32);
+                int changed=0;
+                for(int y=0;y<a.height();++y)for(int x=0;x<a.width();++x)if(a.pixel(x,y)!=b.pixel(x,y))++changed;
+                check(name+"-pixels-unchanged-by-passing-feathers-"+regionName,!pixels.isEmpty()&&changed==0);
+                controls.append(QJsonObject{{"control",name},{"region",regionName},{"pixelWidth",pixels.width()},{"pixelHeight",pixels.height()},{"changedPixels",changed}});
+            }
+        }
+        samples.append(QJsonObject{{"kind","weave-control-occlusion"},{"observedProgress",sampledProgress},
+            {"devicePixelRatio",window->devicePixelRatio()},{"controls",controls}});
+        if(!output.isEmpty()){
+            const auto directory=QFileInfo(output).absolutePath();
+            check("weave-render-evidence-directory-created",QDir().mkpath(directory));
+            check("weave-obstruction-frame-saved",withFlight.save(directory+"/activity-feather-flight.png"));
+            check("weave-control-reference-frame-saved",withoutFlight.save(directory+"/activity-feather-hidden-reference.png"));
+        }
+    }
+    hideFlight.reset();
+    // Exercise different layer origins without breaking the production anchor
+    // bindings. The copies must remain coincident in window space.
+    QQmlComponent offsetComponent(qmlEngine(window));
+    offsetComponent.setData(R"(
+        import QtQuick
+        QtObject {
+            required property var layer
+            required property real offsetX
+            required property real offsetY
+            property Binding xOffset: Binding { target: layer; property: "x"; value: offsetX; restoreMode: Binding.RestoreBindingOrValue }
+            property Binding yOffset: Binding { target: layer; property: "y"; value: offsetY; restoreMode: Binding.RestoreBindingOrValue }
+        }
+    )",QUrl());
+    const QPointF originalBackPosition=behind->position();
+    const QPointF offsetBackPosition=originalBackPosition+QPointF(17.25,11.5);
+    std::unique_ptr<QObject> offset(offsetComponent.createWithInitialProperties(
+        {{"layer",QVariant::fromValue(behind)},{"offsetX",offsetBackPosition.x()},{"offsetY",offsetBackPosition.y()}},qmlContext(window)));
+    check("weave-offset-layer-fixture-created",offset!=nullptr);
+    if(offset){
+        eval("updateGeometry(true)");
+        check("weave-back-layer-really-moves-to-distinct-origin",QLineF(behind->position(),offsetBackPosition).length()<0.001);
+        check("weave-copies-align-with-distinct-back-layer-origin",matchingCopies());
+        offset.reset();eval("updateGeometry(true)");
+        check("weave-back-layer-original-position-restored",QLineF(behind->position(),originalBackPosition).length()<0.001);
+    }
+    eval("previewAt(0.999999,0)");
+    QList<QList<QPointF>> before;
+    for(const auto &key:keys){
+        auto *piece=find("cloudFeather-"+key);QList<QPointF> points;
+        if(piece)for(const auto &point:probes)points.append(piece->mapToScene(point));
+        before.append(points);
+    }
+    eval("previewAt(1,0)");
+    bool continuous=!front->isVisible();
+    for(int i=0;i<keys.size();++i){
+        auto *piece=find("cloudFeather-"+keys[i]);
+        continuous=continuous&&piece&&piece->parentItem()==rest&&before[i].size()==probes.size();
+        if(piece&&before[i].size()==probes.size())for(int p=0;p<probes.size();++p)
+            continuous=continuous&&QLineF(before[i][p],piece->mapToScene(probes[p])).length()<0.01;
+    }
+    check("weave-final-frame-reparents-without-geometry-or-scale-jump",continuous);
+    std::function<int(QQuickItem *)> countFeathers=[&](QQuickItem *item){
+        int count=item->inherits("WholeFeatherItem")?1:0;
+        for(auto *child:item->childItems())count+=countFeathers(child);
+        return count;
+    };
+    const int featherCount=countFeathers(window->contentItem());
+    bool bounded=featherCount>=10;
+    for(int cycle=0;cycle<4;++cycle)for(const auto &state:QStringList{"0.12,0","0.472,0","0.98,0","1,0","1,0.5","1,1"}){
+        eval("previewAt("+state+")");
+        bounded=bounded&&countFeathers(window->contentItem())==featherCount;
+    }
+    check("weave-repeated-flight-and-withdrawal-keeps-native-feather-count-bounded",bounded);
+}
 
 int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     QJsonArray checks,samples,dataSamples;int failures=0;
@@ -250,6 +422,7 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
             {{"targetWeave",QVariant::fromValue(weave)}},qmlContext(window)));
         check("weave-test-override-created-with-binding-restoration",activeOverride!=nullptr);
         if(activeOverride){
+            checkActivityWeaveLayers(window,weave,output,check,dataSamples);
             QQmlExpression pose(qmlContext(weave),weave,"previewAt(0.4,0);retarget()");
             pose.evaluate();
             check("weave-continues-real-flight-from-controlled-intermediate-phase",!pose.hasError()
@@ -652,7 +825,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         timer.setSingleShot(true);QObject::connect(&timer,&QTimer::timeout,&loop,&QEventLoop::quit);
         timer.start(milliseconds);loop.exec();
     };
-    QJsonArray checks;
+    QJsonArray checks,activityLayoutSamples;
     int failures=0;
     auto check=[&](const QString &name,bool passed) {
         checks<<QJsonObject{{"name",name},{"passed",passed}};
@@ -869,6 +1042,18 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         auto *sourceCard=findVisual(activity,"activitySourcesCard");
         auto *statusCard=findVisual(activity,"activityStatusCard");
         auto *connectionsSurface=findVisual(activity,"activityConnectionsCard");
+        const auto cardGeometry=[&]{
+            QJsonArray cards;
+            for(const auto &name:activityDetailCards){
+                auto *card=findVisual(activity,name);
+                if(!card){cards.append(QJsonObject{{"name",name},{"present",false}});continue;}
+                const auto rect=card->mapRectToItem(activity,QRectF(QPointF(),card->size()));
+                cards.append(QJsonObject{{"name",name},{"x",rect.x()},{"y",rect.y()},{"width",rect.width()},{"height",rect.height()},
+                    {"alpha",card->property("color").value<QColor>().alpha()},{"hovered",card->property("hovered").toBool()},
+                    {"focused",card->property("focused").toBool()},{"lift",card->property("lift").toDouble()}});
+            }
+            return cards;
+        };
         const auto insideSurface=[](QQuickItem *section,QQuickItem *surface){return section&&surface&&QRectF(QPointF(),surface->size()).adjusted(-1,-1,1,1).contains(section->mapRectToItem(surface,QRectF(QPointF(),section->size())));};
         const auto settleDetail=[&]{return QTest::qWaitFor([&]{return !activityTransition->property("moving").toBool();},2000);};
         const auto closeDetail=[&]{QTest::keyClick(window,Qt::Key_Escape);return settleDetail()&&!activityTransition->isVisible();};
@@ -889,9 +1074,11 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         for(int i=0;i<activityDetailButtons.size();++i){
             auto *entry=findVisual(activity,activityDetailButtons[i]);
             auto *card=findVisual(activity,activityDetailCards[i]);
+            // Attached properties require the card's QML import context.
+            const auto accessibleRole=card?QQmlProperty::read(card,"Accessible.role",qmlContext(card)):QVariant();
             check("activity-detail-heading-has-full-card-hit-area-"+activityDetailKeys[i],entry&&card
                 &&card->isEnabled()&&card->width()>=240&&card->height()>=130&&insideSurface(entry,card)
-                &&entry->width()>=60&&QQmlProperty::read(card,"Accessible.role").toInt()==int(QAccessible::Button));
+                &&entry->width()>=60&&accessibleRole.isValid()&&accessibleRole.toInt()==int(QAccessible::Button));
             if(!entry||!card)continue;
             check("activity-detail-heading-is-reachable-"+activityDetailKeys[i],revealControl(entry));
             const auto before=card->mapRectToItem(activity,QRectF(QPointF(),card->size()));
@@ -963,6 +1150,11 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             &&qAbs(diagnosticAt.x()-connectionsAt.x())<1&&qAbs(diagnostic->width()-connectionsSurface->width())<1
             &&qAbs(statusCard->width()/(statusCard->width()+trafficCard->width())-5.0/12)<0.03
             &&qAbs(sourceCard->width()/(sourceCard->width()+diagnostic->width())-7.0/12)<0.03);
+        const QJsonObject normalLayout{{"phase","normal"},
+            {"windowWidth",window->width()},{"windowHeight",window->height()},{"panelCount",panelCount(activity)},
+            {"contentLogicalWidth",activity->property("contentLogicalWidth").toDouble()},{"cards",cardGeometry()}};
+        activityLayoutSamples.append(normalLayout);
+        qInfo().noquote()<<"MOTION_ACTIVITY_LAYOUT"<<QJsonDocument(normalLayout).toJson(QJsonDocument::Compact);
         check("activity-detail-data-stays-in-its-own-opaque-reading-card",
             insideSurface(upload,trafficCard)&&insideSurface(total,trafficCard)&&insideSurface(connections,connectionsSurface)
             &&uploadAt.y()>trafficAt.y()&&totalAt.y()>uploadAt.y());
@@ -983,6 +1175,13 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             window->resize(qRound(eval(QString("Theme.dp(%1)").arg(size.width())).toDouble()),qRound(eval(QString("Theme.dp(%1)").arg(size.height())).toDouble()));wait(180);
             activityScroll->setProperty("contentY",0);wait(30);
             const bool wide=activity->property("wide").toBool();
+            const QJsonObject responsiveLayout{{"phase","responsive"},
+                {"requestedWidth",size.width()},{"requestedHeight",size.height()},
+                {"windowWidth",window->width()},{"windowHeight",window->height()},{"wide",wide},
+                {"scrollWidth",activityScroll->width()},{"scrollHeight",activityScroll->height()},
+                {"contentHeight",activityScroll->property("contentHeight").toDouble()},{"cards",cardGeometry()}};
+            activityLayoutSamples.append(responsiveLayout);
+            qInfo().noquote()<<"MOTION_ACTIVITY_LAYOUT"<<QJsonDocument(responsiveLayout).toJson(QJsonDocument::Compact);
             check("activity-responsive-breakpoint-"+QString::number(size.width()),wide==
                 (activity->property("contentLogicalWidth").toDouble()>=activity->property("dualColumnMinimumWidth").toDouble()));
             if(wide){
@@ -1074,21 +1273,83 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     }
     const double activityScrollBefore=activityScroll?qMax(0.0,qMin(20.0,activityScroll->property("contentHeight").toDouble()-activityScroll->height())):0.0;
     if(activityScroll)activityScroll->setProperty("contentY",activityScrollBefore);
-    if(upload){
-        qmlEngine(window)->rootContext()->setContextProperty("motionTestOrigin",upload);
-        eval("SwirlMotion.navigateFrom(motionTestOrigin,'traffic','uploadRate')");
-        QElapsedTimer metricReady;metricReady.start();
-        while(host->property("sourceSurface").value<QObject *>()!=upload&&metricReady.elapsed()<1500)wait(5);
-        wait(35);
-        check("metric-shares-matching-surface",host->property("heroData").isValid() && host->property("sourceSurface").value<QObject *>()==upload);
-        const auto partial=host->property("progress").toDouble();
-        eval("SwirlMotion.returnToHub(null)");wait(25);
-        check("immediate-return-reverses-live-transition",item()==activity && partial>0 && partial<1 && host->property("moving").toBool());
-        eval("SwirlMotion.navigateFrom(motionTestOrigin,'traffic','uploadRate')");wait(25);
-        check("reopen-keeps-latest-route",eval("AppState.currentPage==='traffic'").toBool());
-        settle();eval("SwirlMotion.returnToHub(null)");wait(25);settle();
-        check("activity-return-preserves-scroll",item()==activity&&activityScroll&&qAbs(activityScroll->property("contentY").toDouble()-activityScrollBefore)<1);
-        check("shared-surfaces-restored",!upload->property("surfaceHidden").toBool()&&host->property("sourceSurface").value<QObject *>()==nullptr);
+    if(trafficCard&&activityTransition&&activitySurface&&activityScroll){
+        // This is the actual activity entry: the whole transfer card expands
+        // locally. The old numerical upload label is now plain reading text.
+        auto *entry=findVisual(activity,"activityTrafficDetails");
+        check("activity-transfer-entry-is-present",entry&&entry->isVisible()&&entry->isEnabled());
+        if(entry){
+            const auto cardOrigin=trafficCard->mapRectToItem(activity,QRectF(QPointF(),trafficCard->size()));
+            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,entry->mapToScene(QPointF(entry->width()/2,entry->height()/2)).toPoint());
+            wait(35);
+            const auto origin=activityTransition->property("origin").toRectF();
+            check("activity-transfer-click-expands-its-own-live-surface",item()==activity
+                &&activityTransition->property("sourceCard").value<QObject *>()==trafficCard
+                &&activityTransition->property("detailKey").toString()=="traffic"&&activityTransition->property("opened").toBool()
+                &&qAbs(origin.x()-cardOrigin.x())<4&&qAbs(origin.y()-cardOrigin.y())<4
+                &&qAbs(origin.width()-cardOrigin.width())<1&&qAbs(origin.height()-cardOrigin.height())<1);
+            const auto partial=activityTransition->property("progress").toDouble();
+            const auto beforeReverse=activitySurface->mapRectToItem(activity,QRectF(QPointF(),activitySurface->size()));
+            QTest::keyClick(window,Qt::Key_Escape);
+            const auto afterReverse=activitySurface->mapRectToItem(activity,QRectF(QPointF(),activitySurface->size()));
+            check("activity-transfer-escape-preserves-the-in-flight-geometry",partial>0&&partial<1
+                &&!activityTransition->property("opened").toBool()&&activityTransition->property("moving").toBool()
+                &&QLineF(beforeReverse.topLeft(),afterReverse.topLeft()).length()<.01
+                &&qAbs(beforeReverse.width()-afterReverse.width())<.01&&qAbs(beforeReverse.height()-afterReverse.height())<.01);
+            wait(25);
+            check("activity-transfer-escape-reverses-live-progress",activityTransition->property("progress").toDouble()<partial
+                &&activityTransition->property("progress").toDouble()>0&&activityTransition->property("moving").toBool());
+            check("activity-transfer-return-restores-scroll-and-focus",QTest::qWaitFor([&]{return !activityTransition->property("moving").toBool();},2000)
+                &&item()==activity&&!activityTransition->isVisible()&&trafficCard->hasActiveFocus()
+                &&qAbs(activityScroll->property("contentY").toDouble()-activityScrollBefore)<1);
+        }
+    }
+    if(upload&&activity){
+        // Retain the separate SwirlPageHost rapid return/reopen regression with
+        // a real production surface/title component. It is a component fixture,
+        // not an activity-page affordance, and displays the real upload value.
+        QQmlComponent metricComponent(qmlEngine(window));
+        metricComponent.setData(R"(
+            import QtQuick
+            import SwirlQuick
+            SwirlGlassPanel {
+                required property Item valueSource
+                readonly property Item motionTitle: metricText
+                x: Theme.pagePadding; y: Theme.dp(52)
+                width: Theme.dp(240); height: Theme.dp(130); z: 100
+                SwirlText {
+                    id: metricText
+                    anchors.fill: parent; anchors.margins: Theme.cardPadding
+                    text: valueSource.text
+                    font.pixelSize: valueSource.font.pixelSize
+                    color: Theme.text
+                }
+            }
+        )",QUrl("qrc:/qt/qml/SwirlQuick/MotionSharedMetricFixture.qml"));
+        std::unique_ptr<QQuickItem> metric(qobject_cast<QQuickItem *>(metricComponent.createWithInitialProperties(
+            {{"valueSource",QVariant::fromValue(upload)}},qmlContext(window))));
+        check("shared-metric-production-surface-fixture-created",metric!=nullptr);
+        if(!metric)qWarning()<<metricComponent.errors();
+        if(metric){
+            metric->setParentItem(activity);wait(25);
+            qmlEngine(window)->rootContext()->setContextProperty("motionTestOrigin",metric.get());
+            eval("SwirlMotion.navigateFrom(motionTestOrigin,'traffic','uploadRate')");
+            QElapsedTimer metricReady;metricReady.start();
+            while(host->property("sourceSurface").value<QObject *>()!=metric.get()&&metricReady.elapsed()<1500)wait(5);
+            wait(35);
+            check("metric-shares-matching-surface",host->property("heroData").isValid() && host->property("sourceSurface").value<QObject *>()==metric.get()
+                &&host->property("surfaceKind").toString()=="uploadRate");
+            const auto partial=host->property("progress").toDouble();
+            eval("SwirlMotion.returnToHub(null)");wait(25);
+            check("immediate-return-reverses-live-transition",item()==activity && partial>0 && partial<1 && host->property("moving").toBool());
+            eval("SwirlMotion.navigateFrom(motionTestOrigin,'traffic','uploadRate')");wait(25);
+            check("reopen-keeps-latest-route",eval("AppState.currentPage==='traffic'").toBool());
+            settle();eval("SwirlMotion.returnToHub(null)");wait(25);settle();
+            check("activity-return-preserves-scroll",item()==activity&&activityScroll&&qAbs(activityScroll->property("contentY").toDouble()-activityScrollBefore)<1);
+            check("shared-surfaces-restored",!metric->property("surfaceHidden").toBool()&&host->property("sourceSurface").value<QObject *>()==nullptr);
+            eval("SwirlMotion.shared=null;SwirlMotion.returnShared=null");
+            qmlEngine(window)->rootContext()->setContextProperty("motionTestOrigin",QVariant::fromValue<QObject *>(nullptr));
+        }
     }
     route("activity");
     auto *capsule=findVisual(window->contentItem(),"proxyCapsule");
@@ -1140,14 +1401,18 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
             check("proxy-toggle-test-state-present",fakeProxy!=nullptr);
             const auto proxyState=[&](bool enabled,bool owned,bool systemEnabled,const QString &tone,const QString &phase,const QString &detailToken){
                 const auto label=capsule->property("label").toString(),detail=capsule->property("detail").toString();
+                const auto accessibleName=QQmlProperty::read(capsule,QStringLiteral("Accessible.name"),qmlContext(capsule));
+                const auto accessibleDescription=QQmlProperty::read(capsule,QStringLiteral("Accessible.description"),qmlContext(capsule));
+                // Qt Accessible names reflect the visible label; descriptions
+                // retain the complete state and action detail without repetition.
                 return fakeProxy&&fakeProxy->property("systemEnabled").toBool()==systemEnabled
                     &&fakeProxy->property("owned").toBool()==owned&&fakeProxy->property("enabled").toBool()==owned
                     &&capsule->isEnabled()&&label==QStringLiteral("系统代理")
                     &&capsule->property("proxyEnabled").toBool()==enabled&&capsule->property("proxyOwned").toBool()==owned
                     &&capsule->property("tone").toString()==tone&&capsule->property("activityPhase").toString()==phase
                     &&detail.contains(detailToken)
-                    &&QQmlProperty::read(capsule,QStringLiteral("Accessible.description"),qmlContext(capsule)).toString()==detail
-                    &&QQmlProperty::read(capsule,QStringLiteral("Accessible.name"),qmlContext(capsule)).toString()==label+QStringLiteral("，")+detail;
+                    &&accessibleDescription.isValid()&&accessibleDescription.toString()==detail
+                    &&accessibleName.isValid()&&accessibleName.toString()==label;
             };
             check("proxy-off-offers-enable",proxyState(false,false,false,"neutral","idle",QStringLiteral("点击启动已保存策略")));
             clickProxy();
@@ -1376,7 +1641,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         {"cachedPages",host->property("cachedPageCount").toInt()},
         {"memoryBytes",memory()},{"revisitGrowthBytes",growth},{"idleFrames",idleFrames}};
     QJsonObject report{{"checks",checks},{"failures",failures},{"performance",performance},
-        {"frameTimeline",frameTimeline},{"frameProbe",frameProbe},
+        {"frameTimeline",frameTimeline},{"frameProbe",frameProbe},{"activityLayout",activityLayoutSamples},
         {"diagnostics",QJsonDocument::fromJson(eval("JSON.stringify(systemProvider.logs())").toString().toUtf8()).array()}};
     if(!output.isEmpty()) {
         QDir().mkpath(QFileInfo(output).absolutePath());QFile file(output);
