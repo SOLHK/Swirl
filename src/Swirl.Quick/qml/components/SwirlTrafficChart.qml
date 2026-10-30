@@ -6,6 +6,9 @@ import SwirlQuick
 Item {
     id: graph
     property bool updatesEnabled: true
+    property bool subdued: false
+    readonly property color gridColor: subdued && !Theme.increaseContrast ? Theme.withAlpha(Theme.text, 0.055) : Theme.chartGrid
+    readonly property color axisColor: subdued && !Theme.increaseContrast ? Theme.withAlpha(Theme.text, Theme.dark ? 0.56 : 0.50) : Theme.muted
     property bool showUpload: false
     property bool showDownload: true
     property string series: showDownload ? "down" : "up"
@@ -65,6 +68,8 @@ Item {
     onRangeIndexChanged: refresh()
     onPointsChanged: repaint()
     onSeriesColorChanged: repaint()
+    onGridColorChanged: repaint()
+    onSubduedChanged: repaint()
     Component.onCompleted: { componentReady = true; refresh() }
     Timer { interval: 1000; running: graph.visible && graph.updatesEnabled; repeat: true; onTriggered: graph.refresh() }
     Connections { target: Theme; function onDarkChanged() { graph.repaint() } function onIncreaseContrastChanged() { graph.repaint() } }
@@ -82,7 +87,7 @@ Item {
             x: 0; y: plot.y + index * (plot.height - Theme.dp(1)) / 3 - implicitHeight / 2
             width: Math.max(0, graph.axisWidth - Theme.dp(10))
             text: graph.axisLabels[index]
-            tabularFigures: true; color: Theme.muted; font.pixelSize: graph.axisFontSize
+            tabularFigures: true; color: graph.axisColor; font.pixelSize: graph.axisFontSize
             horizontalAlignment: Text.AlignRight
         }
     }
@@ -97,15 +102,15 @@ Item {
             const context = getContext("2d")
             context.reset()
             const w = width, h = Math.max(0, height - Theme.dp(1)), points = graph.points
-            context.strokeStyle = Theme.chartGrid
-            context.lineWidth = Theme.dp(1)
+            context.strokeStyle = graph.gridColor
+            context.lineWidth = graph.subdued ? 1 / Screen.devicePixelRatio : Theme.dp(1)
             for (let row = 0; row < 4; ++row) {
                 context.beginPath(); context.moveTo(0, row * h / 3); context.lineTo(w, row * h / 3); context.stroke()
             }
             if (!points.length) return
             const fill = context.createLinearGradient(0, 0, 0, h)
-            fill.addColorStop(0, Theme.withAlpha(graph.seriesColor, 0.22))
-            fill.addColorStop(1, Theme.withAlpha(graph.seriesColor, 0.03))
+            fill.addColorStop(0, Theme.withAlpha(graph.seriesColor, graph.subdued ? 0.12 : 0.22))
+            fill.addColorStop(1, Theme.withAlpha(graph.seriesColor, graph.subdued ? 0.01 : 0.03))
             function trace(first, last) {
                 context.moveTo(graph.pointX(first), graph.pointY(first))
                 for (let index = first + 1; index <= last; ++index)
@@ -166,7 +171,7 @@ Item {
             x: plot.x + Math.max(0, Math.min(plot.width - implicitWidth,
                 index * plot.width / (graph.timeTicks - 1) - implicitWidth / 2))
             y: plot.y + plot.height + Theme.dp(7)
-            color: Theme.muted; font.pixelSize: graph.axisFontSize
+            color: graph.axisColor; font.pixelSize: graph.axisFontSize
         }
     }
 }

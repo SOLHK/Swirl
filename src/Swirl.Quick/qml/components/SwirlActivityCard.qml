@@ -1,7 +1,7 @@
 import QtQuick
 import SwirlQuick
 
-SwirlGlassPanel {
+SwirlActivitySurface {
     id: card
     property Item titleItem: null
     property string title: ""
@@ -9,13 +9,11 @@ SwirlGlassPanel {
     property bool keyboardFocus: false
     signal activated()
     default property alias contents: body.data
-    interactive: true
     hovered: cardHover.hovered
     pressed: hit.pressed || keyboardPressed
     focused: activeFocus && keyboardFocus
-    border.color: focused ? Theme.focusBorder : hovered ? Theme.cardHoverBorder : Theme.border
-    // Keep the opaque white face; hover changes its edge and contact shadow.
-    color: Theme.independentCard
+    property real lift: pressed ? Theme.dp(1) : hovered || focused ? -Theme.dp(1.5) : 0
+    Behavior on lift { enabled: !SwirlMotion.reduced; NumberAnimation { duration: SwirlMotion.ms(card.pressed ? 90 : 150); easing.type: Easing.OutCubic } }
     activeFocusOnTab: true
     Accessible.role: Accessible.Button
     Accessible.name: qsTr("%1详情").arg(title)
@@ -41,8 +39,7 @@ SwirlGlassPanel {
         event.accepted = true
     }
     transform: Translate {
-        y: card.pressed ? Theme.dp(1) : card.hovered || card.focused ? -Theme.dp(1.5) : 0
-        Behavior on y { NumberAnimation { duration: SwirlMotion.ms(card.pressed ? 90 : 150); easing.type: Easing.OutCubic } }
+        y: card.lift
     }
     HoverHandler { id: cardHover }
     MouseArea {

@@ -12,7 +12,8 @@ Item {
     property var gradient: [0, 0, 1, 0]
     property real trimStart: 0
     property real trimEnd: 1
-    readonly property var fiberPaths: Geometry.build(guide, ropeWidth)
+    property color flatInk: "transparent"
+    readonly property var fiberPaths: flatInk.a > 0 ? [] : Geometry.build(guide, ropeWidth)
     readonly property int geometryPointCount: fiberPaths.length ? fiberPaths[0].count * fiberPaths.length : 0
     readonly property bool hasLength: trimEnd > trimStart && guide.length > 0
     Accessible.ignored: true
@@ -22,6 +23,7 @@ Item {
             : { position: index ? 1 : 0, light: "transparent", dark: "transparent" }
     }
     function stopColor(index, shade) {
+        if (flatInk.a > 0) return flatInk
         if (Theme.increaseContrast) return Theme.text
         const stop = stopAt(index)
         const color = Theme.dark ? stop.dark : stop.light
@@ -44,7 +46,7 @@ Item {
         readonly property var geometry: rope.fiberPaths[lane]
         objectName: "silkFiberPath-" + lane
         fillColor: "transparent"
-        strokeWidth: rope.hasLength && !Theme.increaseContrast ? rope.ropeWidth * (lane === 1 ? 0.038 : 0.046) : -1
+        strokeWidth: rope.hasLength && rope.flatInk.a === 0 && !Theme.increaseContrast ? rope.ropeWidth * (lane === 1 ? 0.038 : 0.046) : -1
         capStyle: ShapePath.RoundCap
         joinStyle: ShapePath.RoundJoin
         // Both ends refer to the same base-curve arclength as the main rope.
