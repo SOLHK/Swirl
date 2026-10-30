@@ -187,7 +187,7 @@ jobs:
           foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt')) {
             Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $file) -Force -ErrorAction SilentlyContinue
           }
-          Get-ChildItem -Path 'build/swirl-quick/*-report.json','build/swirl-quick/activity-feather-*.png','build/swirl-quick/Release/Swirl-*.txt' -File -ErrorAction SilentlyContinue | Remove-Item -Force
+          Get-ChildItem -Path 'build/swirl-quick/*-report.json','build/swirl-quick/activity-feather-*.png','build/swirl-quick/font-*.xml','build/swirl-quick/Release/Swirl-*.txt' -File -ErrorAction SilentlyContinue | Remove-Item -Force
       - name: Configure Qt UI independently
         shell: pwsh
         run: |
@@ -411,8 +411,32 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Production configure failed.' }
           cmake --build build/swirl-product --config Release --target Swirl --parallel 4
           if ($LASTEXITCODE -ne 0) { throw 'Production build failed.' }
-          ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/swirl-product -Destination installer-bin -OpenSslRoot $env:SWIRL_OPENSSL_ROOT
-          New-Item -ItemType Directory -Force -Path out | Out-Null
+          $productionBuild = (Resolve-Path -LiteralPath 'build/swirl-product').Path
+          $tlsReport = Join-Path $productionBuild ('tls-runtime-' + $env:GITHUB_SHA + '.json')
+          $runtimeEvidence = Join-Path $env:GITHUB_WORKSPACE 'out/package-evidence'
+          if (Test-Path -LiteralPath 'installer-bin') { throw 'Production staging requires a fresh destination.' }
+          # A restored compiler cache can contain this exact SHA's earlier report.
+          # Remove only this build's report before invoking the real self-tests.
+          if (Test-Path -LiteralPath $tlsReport) { Remove-Item -LiteralPath $tlsReport -Force }
+          New-Item -ItemType Directory -Force -Path $runtimeEvidence | Out-Null
+          $runtimeReports = @(
+            @{ source=$tlsReport; name='production-tls-runtime.json' },
+            @{ source=(Join-Path $env:GITHUB_WORKSPACE 'installer-bin/rust-self-test.json'); name='production-rust-self-test.json' }
+          )
+          foreach ($report in $runtimeReports) {
+            $saved = Join-Path $runtimeEvidence $report.name
+            if (Test-Path -LiteralPath $saved) { Remove-Item -LiteralPath $saved -Force }
+          }
+          try {
+            ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/swirl-product -Destination installer-bin -OpenSslRoot $env:SWIRL_OPENSSL_ROOT
+          } finally {
+            # Preserve genuinely new diagnostics even when staging rejects them.
+            foreach ($report in $runtimeReports) {
+              if (Test-Path -LiteralPath $report.source -PathType Leaf) {
+                Copy-Item -LiteralPath $report.source -Destination (Join-Path $runtimeEvidence $report.name)
+              }
+            }
+          }
       - name: Start the production Release UI with cold and warm QML caches
         shell: pwsh
         env:
@@ -435,16 +459,46 @@ jobs:
           New-Item -ItemType Directory -Force -Path $evidence | Out-Null
           $env:SWIRL_TEST_ROOT = Join-Path $env:RUNNER_TEMP ('swirl-production-ui-' + [guid]::NewGuid().ToString('N'))
           New-Item -ItemType Directory -Path $env:SWIRL_TEST_ROOT | Out-Null
+          $qmlCacheRoot = [IO.Path]::GetFullPath((Join-Path $env:SWIRL_TEST_ROOT 'cache/qmlcache')).TrimEnd('\','/')
+          function Get-QmlCacheSnapshot {
+            $exists = Test-Path -LiteralPath $qmlCacheRoot -PathType Container
+            $files = @()
+            $directories = @()
+            [long]$totalBytes = 0
+            if ($exists) {
+              $directories = @(Get-ChildItem -LiteralPath $qmlCacheRoot -Directory -Recurse -Force | Sort-Object FullName | ForEach-Object { $_.FullName.Substring($qmlCacheRoot.Length + 1).Replace('\','/') })
+              $files = @(Get-ChildItem -LiteralPath $qmlCacheRoot -File -Recurse -Force | Sort-Object FullName | ForEach-Object {
+                $totalBytes += $_.Length
+                [ordered]@{ path=$_.FullName.Substring($qmlCacheRoot.Length + 1).Replace('\','/'); size=$_.Length; sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); lastWriteUtc=$_.LastWriteTimeUtc.ToString('o') }
+              })
+            }
+            return [ordered]@{ capturedUtc=[DateTime]::UtcNow.ToString('o'); root=$qmlCacheRoot; exists=$exists; directories=$directories; fileCount=$files.Count; totalBytes=$totalBytes; files=$files }
+          }
           $diagnostic = Join-Path (Split-Path $exe) 'Swirl-diagnostics.txt'
           $launches = @()
+          $previousCacheAfter = $null
+          $previousCacheIdentity = $null
           try {
             foreach ($phase in @('cold-qml-cache', 'warm-same-qml-cache')) {
-              $result = [ordered]@{ phase=$phase; exited=$false; exitCode=$null; diagnosticsPresent=$false; warningsOrErrors=$false; completedPages=0; readyPages=0; passed=$false }
+              $before = Get-QmlCacheSnapshot
+              $handoff = $null
+              if ($null -ne $previousCacheAfter) {
+                $previousFiles = ConvertTo-Json -InputObject @($previousCacheAfter.files) -Depth 5 -Compress
+                $currentFiles = ConvertTo-Json -InputObject @($before.files) -Depth 5 -Compress
+                $handoff = [ordered]@{ previousAfterUtc=$previousCacheAfter.capturedUtc; currentBeforeUtc=$before.capturedUtc; sameFileInventory=($previousFiles -ceq $currentFiles); sameRuntimeCachePath=$null }
+              }
+              $result = [ordered]@{ phase=$phase; startedUtc=$null; finishedUtc=$null; durationMs=$null; exited=$false; exitCode=$null; diagnosticsPresent=$false; warningsOrErrors=$false; completedPages=0; readyPages=0; cacheIdentity=$null; cacheBefore=$before; cacheAfter=$null; cacheHandoff=$handoff; cacheHitVerified=$false; cacheObservation='not-observed'; cacheEvidenceError=$null; passed=$false }
               $process = $null
+              $duration = [Diagnostics.Stopwatch]::new()
               try {
                 if (Test-Path -LiteralPath $diagnostic) { Remove-Item -LiteralPath $diagnostic }
+                $result.startedUtc = [DateTime]::UtcNow.ToString('o')
+                $duration.Start()
                 $process = Start-Process -FilePath $exe -ArgumentList @('--smoke-test', '--font-review') -WorkingDirectory $env:SWIRL_TEST_ROOT -PassThru
                 $result.exited = $process.WaitForExit(60000)
+                $duration.Stop()
+                $result.finishedUtc = [DateTime]::UtcNow.ToString('o')
+                $result.durationMs = $duration.Elapsed.TotalMilliseconds
                 if (-not $result.exited) { throw "Production UI $phase exceeded the existing 60-second smoke deadline." }
                 $result.exitCode = $process.ExitCode
                 if ($process.ExitCode -ne 0) { throw "Production UI $phase failed: $($process.ExitCode)" }
@@ -452,6 +506,12 @@ jobs:
                 if (-not $result.diagnosticsPresent) { throw "Production UI $phase did not emit its startup diagnostics." }
                 $result.warningsOrErrors = [bool](Select-String -LiteralPath $diagnostic -Pattern '^[123]:' -Quiet)
                 if ($result.warningsOrErrors) { throw "Production UI $phase emitted Qt warnings or errors." }
+                $cacheMarkers = @(Select-String -LiteralPath $diagnostic -Pattern '^4:\s+QML_CACHE_EVIDENCE\s+(\{.*\})\s*$')
+                if ($cacheMarkers.Count -ne 1) { throw "Production UI $phase lacks its actual QML cache identity." }
+                $result.cacheIdentity = $cacheMarkers[0].Matches[0].Groups[1].Value | ConvertFrom-Json
+                $cachePath = [IO.Path]::GetFullPath([string]$result.cacheIdentity.path).TrimEnd('\','/')
+                if (-not $cachePath.StartsWith($qmlCacheRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'The observed QML cache escaped the isolated cache root.' }
+                if ($null -ne $handoff) { $handoff.sameRuntimeCachePath = $cachePath.Equals([IO.Path]::GetFullPath([string]$previousCacheIdentity.path).TrimEnd('\','/'), [StringComparison]::OrdinalIgnoreCase) }
                 $completed = @(Select-String -LiteralPath $diagnostic -Pattern '^4:\s+SMOKE_PAGES\s+(\d+)\s*$')
                 $ready = @(Select-String -LiteralPath $diagnostic -Pattern '^4:\s+FONT_SMOKE_ROUTE_READY\s+(\S+)\s+(\S+)\s*$')
                 if ($completed.Count -ne 1) { throw "Production UI $phase lacks an unambiguous all-pages completion marker." }
@@ -470,14 +530,30 @@ jobs:
                   if (-not $process.HasExited) { $process.Kill(); $null = $process.WaitForExit(5000) }
                   $process.Dispose()
                 }
-                if (Test-Path -LiteralPath $diagnostic -PathType Leaf) {
-                  Copy-Item -LiteralPath $diagnostic -Destination (Join-Path $evidence ($phase + '.log'))
+                if ($duration.IsRunning) { $duration.Stop() }
+                if ($null -eq $result.finishedUtc) {
+                  $result.finishedUtc = [DateTime]::UtcNow.ToString('o')
+                  $result.durationMs = $duration.Elapsed.TotalMilliseconds
                 }
-                $launches += $result
+                try {
+                  $result.cacheAfter = Get-QmlCacheSnapshot
+                  $result.cacheObservation = if ($result.cacheAfter.fileCount -gt 0) { 'disk-cache-files-observed; cache-hits-not-measured' } else { 'no-runtime-disk-cache-files-observed; AOT-or-no-disk-write-not-distinguished' }
+                  $previousCacheAfter = $result.cacheAfter
+                  $previousCacheIdentity = $result.cacheIdentity
+                } catch {
+                  $result.cacheEvidenceError = $_.Exception.Message
+                  $result.passed = $false
+                  throw
+                } finally {
+                  if (Test-Path -LiteralPath $diagnostic -PathType Leaf) {
+                    Copy-Item -LiteralPath $diagnostic -Destination (Join-Path $evidence ($phase + '.log'))
+                  }
+                  $launches += $result
+                }
               }
             }
           } finally {
-            [ordered]@{ source_sha=$source; pr_head_sha=$env:SWIRL_PR_HEAD_SHA; pr_base_sha=$env:SWIRL_PR_BASE_SHA; application_sha256=(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant(); ui_tests_compiled=$false; qpa='windows'; requested_rhi='d3d11'; launches=$launches; ordinary_user_session_verified=$false; physical_windows11_dpi_gpu_acceptance='not-run' } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $evidence 'startup.json') -Encoding utf8
+            [ordered]@{ source_sha=$source; pr_head_sha=$env:SWIRL_PR_HEAD_SHA; pr_base_sha=$env:SWIRL_PR_BASE_SHA; application_sha256=(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant(); ui_tests_compiled=$false; qpa='windows'; requested_rhi='d3d11'; launches=$launches; cacheEvidenceScope='Actual process-reported QML cache identity and before/after file inventories under its isolated root. Reusing a directory or observing files does not prove cache hits; QML AOT may produce no runtime disk-cache files. Startup duration excludes inventory hashing and is not a benchmark.'; ordinary_user_session_verified=$false; physical_windows11_dpi_gpu_acceptance='not-run' } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $evidence 'startup.json') -Encoding utf8
           }
       - name: Install NSIS packaging tools
         shell: pwsh
@@ -655,6 +731,14 @@ jobs:
             build/swirl-quick/Release/Swirl-diagnostics.txt
             build/swirl-quick/Release/Swirl-node-ui-diagnostics.txt
             build/swirl-quick/Release/Swirl-motion-diagnostics.txt
+            build/swirl-quick/Release/Swirl-activity-*-diagnostics.txt
+            build/swirl-quick/Release/Swirl-apec-*-diagnostics.txt
+            build/swirl-quick/Release/Swirl-route-bench-diagnostics.txt
+            build/swirl-quick/Release/Swirl-u2-diagnostics.txt
+            build/swirl-quick/Release/Swirl-liquid-glass-diagnostics.txt
+            build/swirl-quick/Release/Swirl-6a-diagnostics.txt
+            build/swirl-quick/Release/Swirl-record-interactions-diagnostics.txt
+            build/swirl-quick/Release/Swirl-scroll-bench-diagnostics.txt
             build/swirl-quick/Release/Swirl-policy-ui-diagnostics.txt
             build/swirl-quick/Release/Swirl-hero-diagnostics.txt
             build/swirl-quick/Release/Swirl-hero-material-diagnostics.txt

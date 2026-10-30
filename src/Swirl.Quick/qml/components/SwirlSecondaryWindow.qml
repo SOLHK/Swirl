@@ -16,9 +16,11 @@ Window {
     onVisibleChanged: if (visible) composition.apply(shell, Theme.transparency, Theme.dark)
     Connections {
         target: Theme
-        function onTransparencyChanged() { shell.composition.apply(shell, Theme.transparency, Theme.dark) }
-        function onDarkChanged() { shell.composition.apply(shell, Theme.transparency, Theme.dark) }
-        function onUiScaleChanged() { shell.composition.apply(shell, Theme.transparency, Theme.dark) }
+        // First show applies the latest theme. Applying while hidden would
+        // create a native HWND and shadow resources through winId().
+        function onTransparencyChanged() { if (shell.visible) shell.composition.apply(shell, Theme.transparency, Theme.dark) }
+        function onDarkChanged() { if (shell.visible) shell.composition.apply(shell, Theme.transparency, Theme.dark) }
+        function onUiScaleChanged() { if (shell.visible) shell.composition.apply(shell, Theme.transparency, Theme.dark) }
     }
     SwirlWorkspaceBackdrop { anchors.fill: parent; targetWindow: shell; composition: shell.composition }
     SwirlWindowTitleBar { id: titleBar; anchors.left:parent.left; anchors.right:parent.right; targetWindow:shell }

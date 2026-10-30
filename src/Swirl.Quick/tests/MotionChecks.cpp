@@ -31,6 +31,7 @@
 #include <QTimer>
 #include <QSGRendererInterface>
 #include <QScreen>
+#include <QKeyEvent>
 #include <QWheelEvent>
 #include <algorithm>
 #include <functional>
@@ -900,6 +901,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         timer.start(milliseconds);loop.exec();
     };
     QJsonArray checks,activityLayoutSamples;
+    QJsonObject activityEscapeContinuity;
     int failures=0;
     auto check=[&](const QString &name,bool passed) {
         checks<<QJsonObject{{"name",name},{"passed",passed}};
@@ -1394,19 +1396,47 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
                 &&qAbs(origin.x()-cardOrigin.x())<4&&qAbs(origin.y()-cardOrigin.y())<4
                 &&qAbs(origin.width()-cardOrigin.width())<1&&qAbs(origin.height()-cardOrigin.height())<1);
             const auto partial=activityTransition->property("progress").toDouble();
+            const bool openedBeforeReverse=activityTransition->property("opened").toBool();
+            const bool movingBeforeReverse=activityTransition->property("moving").toBool();
             const auto beforeReverse=activitySurface->mapRectToItem(activity,QRectF(QPointF(),activitySurface->size()));
-            QTest::keyClick(window,Qt::Key_Escape);
+            // QTest::keyClick processes events after both press and release,
+            // so its two outer samples may include a normal animation tick.
+            // Send the real window key event synchronously to measure only
+            // the reversal handler, including the global Escape filter.
+            QKeyEvent escapePress(QEvent::KeyPress,Qt::Key_Escape,Qt::NoModifier);
+            escapePress.setAccepted(false);
+            QElapsedTimer escapeDispatch;escapeDispatch.start();
+            const bool escapeDelivered=QCoreApplication::sendEvent(window,&escapePress);
+            const double escapeDispatchMs=escapeDispatch.nsecsElapsed()/1000000.0;
             const auto afterReverse=activitySurface->mapRectToItem(activity,QRectF(QPointF(),activitySurface->size()));
+            const double progressAfterReverse=activityTransition->property("progress").toDouble();
+            const bool openedAfterReverse=activityTransition->property("opened").toBool();
+            const bool movingAfterReverse=activityTransition->property("moving").toBool();
             check("activity-transfer-escape-preserves-the-in-flight-geometry",partial>0&&partial<1
                 &&!activityTransition->property("opened").toBool()&&activityTransition->property("moving").toBool()
                 &&QLineF(beforeReverse.topLeft(),afterReverse.topLeft()).length()<.01
                 &&qAbs(beforeReverse.width()-afterReverse.width())<.01&&qAbs(beforeReverse.height()-afterReverse.height())<.01);
+            QKeyEvent escapeRelease(QEvent::KeyRelease,Qt::Key_Escape,Qt::NoModifier);
+            escapeRelease.setAccepted(false);
+            const bool escapeReleaseDelivered=QCoreApplication::sendEvent(window,&escapeRelease);
             wait(25);
             check("activity-transfer-escape-reverses-live-progress",activityTransition->property("progress").toDouble()<partial
                 &&activityTransition->property("progress").toDouble()>0&&activityTransition->property("moving").toBool());
             check("activity-transfer-return-restores-scroll-and-focus",QTest::qWaitFor([&]{return !activityTransition->property("moving").toBool();},2000)
                 &&item()==activity&&!activityTransition->isVisible()&&trafficCard->hasActiveFocus()
                 &&qAbs(activityScroll->property("contentY").toDouble()-activityScrollBefore)<1);
+            check("activity-transfer-escape-key-press-is-accepted",escapeDelivered&&escapePress.isAccepted());
+            const auto rectangle=[](const QRectF &value){return QJsonObject{{"x",value.x()},{"y",value.y()},{"width",value.width()},{"height",value.height()}};};
+            activityEscapeContinuity={{"before",rectangle(beforeReverse)},{"after",rectangle(afterReverse)},
+                {"progressBefore",partial},{"progressAfter",progressAfterReverse},
+                {"openedBefore",openedBeforeReverse},{"openedAfter",openedAfterReverse},
+                {"movingBefore",movingBeforeReverse},{"movingAfter",movingAfterReverse},
+                {"topLeftDistance",QLineF(beforeReverse.topLeft(),afterReverse.topLeft()).length()},
+                {"widthDifference",afterReverse.width()-beforeReverse.width()},{"heightDifference",afterReverse.height()-beforeReverse.height()},
+                {"dispatchMs",escapeDispatchMs},{"sendEventReturned",escapeDelivered},{"sendEventAccepted",escapePress.isAccepted()},
+                {"releaseSendEventReturned",escapeReleaseDelivered},{"releaseAccepted",escapeRelease.isAccepted()},
+                {"method","Geometry sampled in one GUI call stack across synchronous Escape KeyPress delivery to the actual QQuickWindow and its event filters; the paired KeyRelease follows the geometry sample."}};
+            qInfo().noquote()<<"MOTION_ACTIVITY_ESCAPE_CONTINUITY"<<QJsonDocument(activityEscapeContinuity).toJson(QJsonDocument::Compact);
         }
     }
     if(upload&&activity){
@@ -1746,7 +1776,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         {"cachedPages",host->property("cachedPageCount").toInt()},
         {"memoryBytes",memory()},{"revisitGrowthBytes",growth},{"idleFrames",idleFrames}};
     QJsonObject report{{"checks",checks},{"failures",failures},{"performance",performance},
-        {"frameTimeline",frameTimeline},{"frameProbe",frameProbe},{"activityLayout",activityLayoutSamples},
+        {"frameTimeline",frameTimeline},{"frameProbe",frameProbe},{"activityLayout",activityLayoutSamples},{"activityEscapeContinuity",activityEscapeContinuity},
         {"diagnostics",QJsonDocument::fromJson(eval("JSON.stringify(systemProvider.logs())").toString().toUtf8()).array()}};
     if(!output.isEmpty()) {
         QDir().mkpath(QFileInfo(output).absolutePath());QFile file(output);

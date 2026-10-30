@@ -424,7 +424,28 @@ int main(int argc, char *argv[])
         if(uiQualityTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-ui-quality.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-ui-quality.txt");}
         if(appearanceTest){const QString file=app.arguments().contains("--appearance-restore-test")?"Swirl-appearance-restore.txt":"Swirl-appearance.txt";app.setProperty("qtDiagnosticFile",file);QFile::remove(QCoreApplication::applicationDirPath()+"/"+file);}
         if(heroTest){const QString file=app.arguments().contains("--hero-material-only")?"Swirl-hero-material-diagnostics.txt":"Swirl-hero-diagnostics.txt";app.setProperty("qtDiagnosticFile",file);QFile::remove(QCoreApplication::applicationDirPath()+"/"+file);}
-        else if(motionTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-motion-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-motion-diagnostics.txt");}
+        else if(motionTest){
+            // Match runMotionChecks' existing dispatch order without letting
+            // a later mode overwrite an earlier mode's failure diagnostics.
+            QString file=QStringLiteral("Swirl-motion-diagnostics.txt");
+            if(qEnvironmentVariableIsSet("SWIRL_ACTIVITY_PERF_CHECKS")){
+                const int rows=qEnvironmentVariableIsSet("SWIRL_ACTIVITY_PERF_ROWS")?qEnvironmentVariableIntValue("SWIRL_ACTIVITY_PERF_ROWS"):600;
+                file=rows==600?QStringLiteral("Swirl-activity-perf-600-diagnostics.txt"):
+                     rows==2000?QStringLiteral("Swirl-activity-perf-2000-diagnostics.txt"):
+                                QStringLiteral("Swirl-activity-perf-invalid-diagnostics.txt");
+            }
+            else if(qEnvironmentVariableIsSet("SWIRL_ACTIVITY_DETAIL_CHECKS"))file=QStringLiteral("Swirl-activity-details-diagnostics.txt");
+            else if(qEnvironmentVariableIsSet("SWIRL_APEC_GLASS_CHECKS"))file=QStringLiteral("Swirl-apec-glass-diagnostics.txt");
+            else if(qEnvironmentVariableIsSet("SWIRL_APEC_MOTION_CHECKS"))file=QStringLiteral("Swirl-apec-motion-diagnostics.txt");
+            else if(qEnvironmentVariableIsSet("SWIRL_ROUTE_BENCH"))file=QStringLiteral("Swirl-route-bench-diagnostics.txt");
+            else if(qEnvironmentVariableIsSet("SWIRL_U2_CHECKS"))file=QStringLiteral("Swirl-u2-diagnostics.txt");
+            else if(qEnvironmentVariableIsSet("SWIRL_LIQUID_GLASS_CHECKS"))file=QStringLiteral("Swirl-liquid-glass-diagnostics.txt");
+            else if(qEnvironmentVariableIsSet("SWIRL_6A_CHECKS"))file=QStringLiteral("Swirl-6a-diagnostics.txt");
+            else if(qEnvironmentVariableIsSet("SWIRL_RECORD_INTERACTIONS"))file=QStringLiteral("Swirl-record-interactions-diagnostics.txt");
+            else if(qEnvironmentVariableIsSet("SWIRL_SCROLL_BENCH"))file=QStringLiteral("Swirl-scroll-bench-diagnostics.txt");
+            app.setProperty("qtDiagnosticFile",file);
+            QFile::remove(QCoreApplication::applicationDirPath()+"/"+file);
+        }
         if(nodeTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-node-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-node-ui-diagnostics.txt");}
         if(policyTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-policy-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-policy-ui-diagnostics.txt");}
         else if(interaction){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-input-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-input-diagnostics.txt");}
@@ -434,6 +455,14 @@ int main(int argc, char *argv[])
         qInstallMessageHandler(recordQtDiagnostic);
         qInfo()<<"Font rendering"<<qgetenv("QT_QPA_PLATFORM")<<fontManager.currentFamily()
                <<"NativeRendering / FullHinting";
+        if(smoke && fontReview) {
+            qInfo().noquote()<<"QML_CACHE_EVIDENCE"<<QJsonDocument(QJsonObject{
+                {"path",qEnvironmentVariable("QML_DISK_CACHE_PATH")},
+                {"revision",QStringLiteral(SWIRL_QML_CACHE_REVISION)},
+                {"flavor",qmlCacheFlavor},{"qtVersion",QString::fromLatin1(qVersion())},
+                {"diskCacheDisabledEnvironment",qEnvironmentVariable("QML_DISABLE_DISK_CACHE")}
+            }).toJson(QJsonDocument::Compact);
+        }
     }
     engine.rootContext()->setContextProperty("previewPage", previewPage);
     engine.rootContext()->setContextProperty("previewCaptureMode", previewMode && !interactivePreview);

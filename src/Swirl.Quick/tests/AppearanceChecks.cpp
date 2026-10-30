@@ -81,8 +81,28 @@ Item {
                 for(auto *child:parent->childItems())if(auto *match=visualItem(child,name))return match;
                 return nullptr;
             };
+            const auto windowInventory=[&](const char *phase,const QString &theme,const QString &control=QString()){
+                QJsonArray windows;
+                for(auto *candidate:QGuiApplication::allWindows()){
+                    auto *quick=qobject_cast<QQuickWindow *>(candidate);
+                    const auto geometry=candidate->geometry();
+                    // handle() only observes platform-window creation. Do not
+                    // call winId(), which would create the hidden panel's HWND.
+                    windows.append(QJsonObject{{"address",QStringLiteral("0x")+QString::number(reinterpret_cast<quintptr>(candidate),16)},
+                        {"objectName",candidate->objectName()},{"className",QString::fromLatin1(candidate->metaObject()->className())},
+                        {"title",candidate->title()},{"main",candidate==window},{"visible",candidate->isVisible()},
+                        {"exposed",candidate->isExposed()},{"active",candidate->isActive()},{"visibility",int(candidate->visibility())},
+                        {"flags",QStringLiteral("0x")+QString::number(candidate->flags().toInt(),16)},
+                        {"hasPlatformWindow",candidate->handle()!=nullptr},{"quickWindow",quick!=nullptr},
+                        {"sceneGraphInitialized",quick&&quick->isSceneGraphInitialized()},{"dpr",candidate->devicePixelRatio()},
+                        {"geometry",QJsonObject{{"x",geometry.x()},{"y",geometry.y()},{"width",geometry.width()},{"height",geometry.height()}}}});
+                }
+                qInfo().noquote()<<"APPEARANCE_WINDOW_INVENTORY"<<phase<<theme<<control<<QJsonDocument(windows).toJson(QJsonDocument::Compact);
+            };
             for(const auto &theme:QStringList{"Light","Dark"}){
+                windowInventory("before-theme",theme);
                 eval("Theme.mode='"+theme+"';Theme.reduceMotion=false;Theme.followSystemMotion=false;Theme.increaseContrast=false");QTest::qWait(160);
+                windowInventory("after-theme",theme);
                 for(const auto &name:QStringList{"reviewButton","reviewIcon","reviewCombo","reviewAction","reviewNavigation"}){
                     auto *control=fixture->findChild<QQuickItem *>(name);auto *paint=surface(control);
                     check(paint&&qAbs(paint->property("radius").toReal()-(name=="reviewNavigation"?eval("Theme.sidebarRowRadius").toReal():paint->height()/2))<0.01,"shared surfaces retain the requested capsule or navigation curve");
@@ -151,14 +171,48 @@ Item {
                     const auto focusedPixels=window->grabWindow();
                     check(!focusedPixels.isNull()&&focusedPixels.copy(pixelRect)!=hoveredPixels.copy(pixelRect),"keyboard focus visibly tints the actual rendered button pixels");
                     if(name!="reviewCombo"){
-                        // A grab performs synchronous render-thread readback. Start the
-                        // input deadline only after its next normal frame is delivered.
+                        windowInventory("before-press",theme,name);
+                        // grabWindow() already blocks until readback completes. Pair a
+                        // subsequent normal sync and swap so an older in-flight frame
+                        // cannot satisfy this barrier. This does not drain DXGI's queue.
+                        struct NormalFrameBarrier {
+                            QMutex mutex;
+                            std::chrono::steady_clock::time_point start;
+                            bool armed=false,pending=false,retired=false;
+                            quint64 frame=0,ignoredSwaps=0;
+                            qreal synchronizedMs=-1,swappedMs=-1;
+                        };
+                        auto normalFrame=std::make_shared<NormalFrameBarrier>();
                         bool readbackRetired=false;
-                        QObject readbackContext;
-                        const auto readbackFrame=QObject::connect(window,&QQuickWindow::frameSwapped,&readbackContext,[&]{readbackRetired=true;},Qt::QueuedConnection);
-                        window->update();
-                        check(QTest::qWaitFor([&]{return readbackRetired;},1000),"a normal frame retires screenshot readback before timed input");
-                        QObject::disconnect(readbackFrame);
+                        {
+                            QObject readbackContext;
+                            const auto readbackSync=QObject::connect(window,&QQuickWindow::beforeSynchronizing,&readbackContext,[normalFrame]{
+                                QMutexLocker lock(&normalFrame->mutex);
+                                if(!normalFrame->armed||normalFrame->retired)return;
+                                ++normalFrame->frame;normalFrame->pending=true;
+                                normalFrame->synchronizedMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-normalFrame->start).count();
+                            },Qt::DirectConnection);
+                            const auto readbackFrame=QObject::connect(window,&QQuickWindow::frameSwapped,&readbackContext,[normalFrame]{
+                                QMutexLocker lock(&normalFrame->mutex);
+                                if(!normalFrame->armed||normalFrame->retired)return;
+                                if(!normalFrame->pending){++normalFrame->ignoredSwaps;return;}
+                                normalFrame->swappedMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-normalFrame->start).count();
+                                normalFrame->pending=false;normalFrame->retired=true;
+                            },Qt::DirectConnection);
+                            {QMutexLocker lock(&normalFrame->mutex);normalFrame->start=std::chrono::steady_clock::now();normalFrame->armed=true;}
+                            window->update();
+                            readbackRetired=QTest::qWaitFor([normalFrame]{QMutexLocker lock(&normalFrame->mutex);return normalFrame->retired;},1000);
+                            {QMutexLocker lock(&normalFrame->mutex);normalFrame->armed=false;}
+                            QObject::disconnect(readbackSync);QObject::disconnect(readbackFrame);
+                        }
+                        check(readbackRetired,"a normal frame retires screenshot readback before timed input");
+                        {
+                            QMutexLocker lock(&normalFrame->mutex);
+                            qInfo().noquote()<<"CONTROL_PRESS_NORMAL_FRAME"<<theme<<name<<QJsonDocument(QJsonObject{
+                                {"retired",normalFrame->retired},{"frame",qint64(normalFrame->frame)},
+                                {"ignoredUnpairedSwaps",qint64(normalFrame->ignoredSwaps)},
+                                {"synchronizedMs",normalFrame->synchronizedMs},{"swappedMs",normalFrame->swappedMs}}).toJson(QJsonDocument::Compact);
+                        }
                         const auto at=control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint();
                         const auto hovered=paint->property("color").value<QColor>();
                         QElapsedTimer pressClock;
@@ -180,6 +234,8 @@ Item {
                             bool inputDown=false;
                             bool pending=false;
                             quint64 frame=0;
+                            qreal latestFrameBeginMs=-1;
+                            qreal frameBeginMs=-1;
                             qreal synchronizedMs=0;
                             qreal renderStartMs=-1;
                             qreal renderEndMs=-1;
@@ -192,6 +248,13 @@ Item {
                         QObject pressContext;
                         const auto pressAnimation=QObject::connect(window,&QQuickWindow::afterAnimating,&pressContext,[&]{samplePress("afterAnimating");});
                         const auto pressDelivery=QObject::connect(window,&QQuickWindow::frameSwapped,&pressContext,[&]{samplePress("frameSwappedQueued");},Qt::QueuedConnection);
+                        const auto pressFrameBegin=QObject::connect(window,&QQuickWindow::beforeFrameBegin,&pressContext,[presented]{
+                            QMutexLocker lock(&presented->mutex);
+                            // A frame may have begun before input armed this probe.
+                            // Keep that boundary unknown instead of inventing a time.
+                            presented->latestFrameBeginMs=presented->armed
+                                ?std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count():-1;
+                        },Qt::DirectConnection);
                         // Qt 6.12 advances GUI animations after its sync wait.
                         // A queued frameSwapped handler can therefore read the next
                         // frame's item values. Capture only public item scale getters
@@ -201,6 +264,8 @@ Item {
                         const auto pressSync=QObject::connect(window,&QQuickWindow::beforeSynchronizing,&pressContext,[presented,paint,content]{
                             QMutexLocker lock(&presented->mutex);
                             if(!presented->armed)return;
+                            presented->frameBeginMs=presented->latestFrameBeginMs;
+                            presented->latestFrameBeginMs=-1;
                             presented->synchronizedMs=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
                             presented->renderStartMs=-1;
                             presented->renderEndMs=-1;
@@ -225,6 +290,7 @@ Item {
                             if(!presented->armed||!presented->pending)return;
                             const qreal elapsed=std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count();
                             presented->frames.append(QJsonObject{{"frame",qint64(presented->frame)},
+                                {"frameBeginMs",presented->frameBeginMs},
                                 {"synchronizedMs",presented->synchronizedMs},{"swappedMs",elapsed},
                                 {"renderStartMs",presented->renderStartMs},{"renderEndMs",presented->renderEndMs},
                                 {"down",presented->inputDown},{"surfaceScale",presented->surfaceScale},
@@ -260,7 +326,7 @@ Item {
                             presented->armed=false;
                             presentedFrames=presented->frames;
                         }
-                        QObject::disconnect(pressSync);QObject::disconnect(pressRenderStart);
+                        QObject::disconnect(pressFrameBegin);QObject::disconnect(pressSync);QObject::disconnect(pressRenderStart);
                         QObject::disconnect(pressRenderEnd);QObject::disconnect(pressSwap);
                         bool contractedWithin40ms=false;
                         for(const auto &frame:presentedFrames){
