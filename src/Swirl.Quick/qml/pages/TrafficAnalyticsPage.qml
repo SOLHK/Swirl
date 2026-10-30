@@ -7,6 +7,7 @@ import "../controls"
 Item {
  id:page
  property bool embedded:false
+ property bool updatesEnabled:true
  readonly property Item motionTitle:heading.titleItem
  property var rankingRows:[]
  property string rankingSignature:""
@@ -27,7 +28,7 @@ Item {
  property bool snapshotDirty:true
  property bool componentReady:false
  function refreshSnapshot() {
-  if(!componentReady||!visible)return
+  if(!componentReady||!visible||!updatesEnabled)return
   totals=telemetry.summary(period)
   distribution=telemetry.distribution(period)
   const ranking=telemetry.ranking(kind,period,0)
@@ -45,9 +46,10 @@ Item {
  onHistoryPeriodChanged:refresh()
  onHistoryProxyOnlyChanged:refresh()
  onVisibleChanged:if(visible)refresh()
+ onUpdatesEnabledChanged:if(updatesEnabled)refresh()
  Component.onCompleted:{componentReady=true;refresh()}
  Connections {target:page.telemetry;function onChanged(){page.snapshotDirty=true}}
- Timer {interval:300;running:page.visible&&page.snapshotDirty;repeat:true;onTriggered:page.refreshSnapshot()}
+ Timer {interval:300;running:page.visible&&page.updatesEnabled&&page.snapshotDirty;repeat:true;onTriggered:page.refreshSnapshot()}
  ScrollView {id:scroll;anchors.fill:parent;anchors.margins:page.embedded?0:Theme.pagePadding;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
   ColumnLayout {width:scroll.availableWidth;spacing:Theme.sectionGap
    SwirlPageHeader {id:heading;visible:!page.embedded;Layout.fillWidth:true;title:qsTr("流量分析");description:qsTr("仅统计经过 Swirl 的流量。排行来自已采集连接，短连接可能无法归属。");metadata:qsTr("历史保留 32 天；期间累计与实时速率分别显示。")
@@ -88,7 +90,7 @@ Item {
     SwirlSegmentedControl {objectName:"activityTransferSeries";Layout.preferredWidth:Theme.dp(240);options:[qsTr("下载"),qsTr("上传"),qsTr("合计")];currentIndex:page.chartSeries;onActivated:index=>page.chartSeries=index}
     SwirlComboBox {objectName:"activityTransferRange";Layout.alignment:Qt.AlignRight;model:[qsTr("最近 1 分钟"),qsTr("最近 5 分钟"),qsTr("最近 1 小时")];currentIndex:page.chartRange;onActivated:page.chartRange=currentIndex;Accessible.name:qsTr("速率历史范围")}
    }
-   SwirlTrafficChart {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(220);rangeIndex:page.chartRange+1;series:["down","up","total"][page.chartSeries]}
+   SwirlTrafficChart {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(220);updatesEnabled:page.updatesEnabled;rangeIndex:page.chartRange+1;series:["down","up","total"][page.chartSeries]}
    SwirlSectionTitle {Layout.fillWidth:true;Layout.topMargin:Theme.dp(8);title:qsTr("累计历史");description:qsTr("今日按半小时记录，本月按天记录；未采集时段保留为空。")}
    GridLayout {Layout.fillWidth:true;columns:width<Theme.dp(520)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap
     SwirlSegmentedControl {objectName:"activityTransferHistoryPeriod";Layout.preferredWidth:Theme.dp(180);options:[qsTr("今日"),qsTr("本月")];currentIndex:page.historyPeriod===0?0:1;onActivated:index=>page.historyPeriod=index===0?0:3}

@@ -8,11 +8,13 @@ import "../controls"
 Item {
     id: page
     required property var engineController
+    property bool updatesEnabled: true
     readonly property var telemetry: engineController.telemetry
     property int kindIndex: 0
     property int period: 0
     property bool proxyOnly: false
     property string selectedId: ""
+    property string pendingSelectionId: ""
     property var sourceRows: []
     property string sourceSignature: ""
     property bool snapshotDirty: true
@@ -47,7 +49,7 @@ Item {
         return option ? option.name : row.name
     }
     function refreshSnapshot() {
-        if (!componentReady || !visible) return
+        if (!componentReady || !visible || !updatesEnabled) return
         proxyAvailable = telemetry.proxyRankingAvailable(period)
         const rows = telemetry.ranking(kind, period, 0, proxyOnly).map(row => Object.assign({}, row, {
             id: kind + ":" + row.id,
@@ -59,22 +61,32 @@ Item {
             sourceRows = rows
         }
         snapshotDirty = false
+        locateSelection()
     }
     function refresh() { snapshotDirty = true; refreshSnapshot() }
     function selectSource(row) {
         const index = ["apps", "devices", "domains", "nodes"].indexOf(row.kind)
         if (index < 0) return
         kindIndex = index
-        refreshSnapshot()
         selectedId = row.kind + ":" + (row.id || row.name)
+        pendingSelectionId = selectedId
+        search.text = ""
+        refresh()
+    }
+    function locateSelection() {
+        if (!pendingSelectionId.length) return
+        const key = pendingSelectionId
+        pendingSelectionId = ""
+        Qt.callLater(function() { sourceTable.positionRow(key) })
     }
     onKindIndexChanged: refresh()
     onPeriodChanged: refresh()
     onProxyOnlyChanged: refresh()
     onVisibleChanged: if (visible) refresh()
+    onUpdatesEnabledChanged: if (updatesEnabled) refresh()
     Component.onCompleted: { componentReady = true; refresh() }
     Connections { target: page.telemetry; function onChanged() { page.snapshotDirty = true } }
-    Timer { interval: 300; running: page.visible && page.snapshotDirty; repeat: true; onTriggered: page.refreshSnapshot() }
+    Timer { interval: 300; running: page.visible && page.updatesEnabled && page.snapshotDirty; repeat: true; onTriggered: page.refreshSnapshot() }
 
     ColumnLayout {
         anchors.fill: parent
@@ -136,12 +148,12 @@ Item {
                 rows: page.visibleRows; selectedId: page.selectedId
                 incrementalRows: true; animateRowChanges: false; minimal: true
                 columns: [
-                    {key: "displayName", label: qsTr("来源"), w: 260},
-                    {key: "value", label: qsTr("总流量"), w: 120},
-                    {key: "upload", label: qsTr("上传"), w: 112},
-                    {key: "download", label: qsTr("下载"), w: 112},
-                    {key: "connections", label: qsTr("连接次数"), w: 100},
-                    {key: "percent", label: qsTr("占比"), w: 86}
+                    {key: "displayName", label: qsTr("来源"), w: 260, min: 160},
+                    {key: "value", label: qsTr("总流量"), w: 120, min: 90},
+                    {key: "upload", label: qsTr("上传"), w: 112, min: 90},
+                    {key: "download", label: qsTr("下载"), w: 112, min: 90},
+                    {key: "connections", label: qsTr("连接次数"), w: 100, min: 80},
+                    {key: "percent", label: qsTr("占比"), w: 86, min: 70}
                 ]
                 onRowSelected: record => page.selectedId = record.id
             }
@@ -162,7 +174,7 @@ Item {
                 Layout.fillWidth: true
                 text: page.selected ? page.selected.displayName : ""
                 textFormat: Text.PlainText; color: Theme.text
-                font.pixelSize: Theme.fontSize(17); font.weight: Font.DemiBold; elide: Text.ElideRight
+                font.pixelSize: Theme.fontSize(17); font.weight: Font.DemiBold; wrapMode: Text.WrapAnywhere
             }
             GridLayout {
                 Layout.fillWidth: true

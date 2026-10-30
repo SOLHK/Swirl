@@ -120,13 +120,43 @@ ApplicationWindow {
         Item {
             id:mainArea; x:window.actualSidebarWidth+window.sidebarGutter; width:parent.width-x-(AppState.currentPage==="activity"?0:Theme.dp(12)); height:parent.height
             RowLayout {
-                id:toolbar; z:1; visible:AppState.currentPage==="activity"; x:Theme.pagePadding+Theme.dp(7); y:Theme.dp(9); width:parent.width-x-windowControls.width-Theme.dp(16); height:Theme.dp(32); spacing:Theme.dp(8)
-                SwirlStatusCapsule { objectName:"eventsCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.dp(28); label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"暂无事件";tone:systemProvider.eventCount>0?"success":"neutral";detail:"查看事件与活动记录"; onClicked:AppState.navigate("logs") }
-                Item {Layout.fillWidth:true}
-                SwirlSystemProxyCapsule {id:proxyCapsule;objectName:"proxyCapsule";Layout.preferredWidth:implicitWidth;Layout.preferredHeight:Theme.dp(28);controller:engineController}
-
-                SwirlStatusCapsule { objectName:"tunCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.dp(28); label:engineController.tunEnabled?"TUN · 已开":"TUN · 未开启";detail:engineController.routingError||(engineController.tunEnabled?"TUN 模式已开启，点击关闭":"当前 Rust Core 暂不支持 TUN 模式"); tone:engineController.tunEnabled?"success":"neutral"; enabled:!engineController.busy; onClicked:{if(!engineController.setTunEnabled(!engineController.tunRequested))AppState.notice(engineController.routingError||engineController.networkConfigurationError)} }
-
+                id: toolbar
+                z: 1; visible: AppState.currentPage === "activity"
+                x: Theme.pagePadding; y: Theme.dp(9)
+                width: parent.width - x - windowControls.width - Theme.dp(20)
+                height: Theme.dp(32); spacing: Theme.dp(10)
+                SwirlStatusCapsule {
+                    objectName: "eventsCapsule"
+                    visible: toolbar.width >= Theme.dp(530)
+                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.dp(30)
+                    label: systemProvider.eventCount > 0 ? qsTr("%1 个事件").arg(systemProvider.eventCount) : qsTr("暂无事件")
+                    tone: systemProvider.eventCount > 0 ? "success" : "neutral"
+                    detail: qsTr("查看事件与活动记录")
+                    onClicked: AppState.navigate("logs")
+                }
+                Item { Layout.fillWidth: true; Layout.minimumWidth: Theme.dp(16) }
+                SwirlSystemProxyCapsule {
+                    id: proxyCapsule; objectName: "proxyCapsule"
+                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.dp(30)
+                    controller: engineController
+                }
+                SwirlStatusCapsule {
+                    objectName: "tunCapsule"
+                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.dp(30)
+                    label: engineController.tunEnabled ? qsTr("TUN · 已开") : qsTr("TUN · 未开启")
+                    detail: engineController.routingError || (engineController.tunEnabled
+                        ? qsTr("TUN 模式已开启，点击关闭") : qsTr("当前 Rust Core 暂不支持 TUN 模式"))
+                    tone: engineController.tunEnabled ? "success" : "neutral"
+                    enabled: !engineController.busy
+                    onClicked: {
+                        if (!engineController.setTunEnabled(!engineController.tunRequested))
+                            AppState.notice(engineController.routingError || engineController.networkConfigurationError)
+                    }
+                }
+                OutboundModeControl {
+                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.dp(30)
+                    engineController: window.engineControllerContext
+                }
             }
             SwirlButton {
                 id:settingsBack

@@ -10,6 +10,7 @@ Item {
     id: page
     required property var engineController
     required property var systemProvider
+    property bool updatesEnabled: true
     readonly property var telemetry: engineController.telemetry
     property var network: ({})
     readonly property bool measuring: telemetry.measurementState === "正在测量"
@@ -65,9 +66,9 @@ Item {
         if (phase === "warning") return qsTr("需检查")
         return valueFor(key)
     }
-    function refreshNetwork() { network = systemProvider.currentNetwork() }
+    function refreshNetwork() { if (visible && updatesEnabled) network = systemProvider.currentNetwork() }
     function refreshSnapshot() {
-        if (!componentReady || !visible) return
+        if (!componentReady || !visible || !updatesEnabled) return
         const snapshot = {internet: telemetry.internetDiagnostic, proxy: telemetry.proxyDiagnostic, latencies: telemetry.latencies}
         const signature = JSON.stringify(snapshot)
         if (signature === diagnosticSignature) return
@@ -75,9 +76,10 @@ Item {
         diagnosticSnapshot = snapshot
     }
     onVisibleChanged: if (visible) { refreshNetwork(); refreshSnapshot() }
+    onUpdatesEnabledChanged: if (updatesEnabled) { refreshNetwork(); refreshSnapshot() }
     Component.onCompleted: { componentReady = true; refreshNetwork(); refreshSnapshot() }
     Connections { target: page.telemetry; function onChanged() { page.refreshSnapshot() } }
-    Timer { interval: 10000; running: page.visible; repeat: true; onTriggered: page.refreshNetwork() }
+    Timer { interval: 10000; running: page.visible && page.updatesEnabled; repeat: true; onTriggered: page.refreshNetwork() }
 
     ScrollView {
         id: scroll
@@ -103,6 +105,7 @@ Item {
                 }
             }
             SwirlText { Layout.fillWidth: true; text: qsTr("出口 IP：%1").arg(page.telemetry.externalIp || qsTr("尚未测量")); color: Theme.muted; font.pixelSize: Theme.fontSize(12); tabularFigures: true; wrapMode: Text.Wrap }
+            SwirlText { Layout.fillWidth: true; text: qsTr("各项耗时来自独立检测，不能相加。网关与 DNS 地址暂未提供。"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); wrapMode: Text.Wrap }
             GridLayout {
                 Layout.fillWidth: true
                 columns: page.width < Theme.dp(620) ? 1 : 2

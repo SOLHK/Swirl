@@ -7,6 +7,7 @@ import "../controls"
 Item {
     id:page
     property bool embedded:false
+    property bool updatesEnabled:true
     readonly property Item motionTitle:heading.titleItem
     readonly property bool compact:width<Theme.dp(620)
     property string selectedId:""
@@ -44,6 +45,7 @@ Item {
         [qsTr("域名"),observed(selected.host)],[qsTr("目标"),observed(observedRoute.chosen_ip||selected.ip)],
         [qsTr("目标端口"),observed(selected.port)],
         [qsTr("来源地址"),observed(selected.sourceIp)],[qsTr("来源端口"),observed(selected.sourcePort)],
+        [qsTr("设备名称"),observed(selected.device)],
         [qsTr("应用程序"),observed(selected.process)],[qsTr("协议"),observed(selected.protocol)]].concat(routingDetailRows,[
         [qsTr("连接状态"),observed(selected.status)],
         [qsTr("传输状态"),observed(selected.transportState)],[qsTr("上传"),observed(selected.up)],
@@ -54,9 +56,12 @@ Item {
     readonly property var motionSurfaces:({activeConnections:connectionSummary})
     readonly property var protocolOptions:[qsTr("全部协议")].concat(Array.from(new Set(connectionRows.map(row=>row.protocol||"").concat([protocolFilter]).filter(value=>value.length))).sort())
     function refreshSnapshot() {
-        if(!visible)return
+        if(!visible||!updatesEnabled)return
         // The controller returns QVariantList value snapshots, not mutable JS aliases.
-        const rows=engineController.connections
+        const rows=engineController.connections.map(row=>Object.assign({},row,{
+            host:observed(row.host),ip:observed((row.route||{}).chosen_ip||row.ip),
+            process:observed(row.process),protocol:observed(row.protocol),latency:observed(row.latency)
+        }))
         let changed=rows.length!==connectionRows.length
         for(let i=0;!changed&&i<rows.length;++i)
             changed=JSON.stringify(rows[i])!==JSON.stringify(connectionRows[i])
@@ -64,9 +69,10 @@ Item {
         snapshotDirty=false
     }
     onVisibleChanged:if(visible)refreshSnapshot()
+    onUpdatesEnabledChanged:if(updatesEnabled)refreshSnapshot()
     Component.onCompleted:refreshSnapshot()
     Connections {target:engineController.telemetry;function onChanged(){page.snapshotDirty=true}}
-    Timer {interval:300;running:page.visible&&page.snapshotDirty;repeat:true;onTriggered:page.refreshSnapshot()}
+    Timer {interval:300;running:page.visible&&page.updatesEnabled&&page.snapshotDirty;repeat:true;onTriggered:page.refreshSnapshot()}
     function latencyValue(record) {
         const value=String(record.latency||"")
         return /^\d+(\.\d+)?( ms)?$/.test(value)?parseFloat(value):Number.POSITIVE_INFINITY
@@ -123,8 +129,12 @@ Item {
         GridLayout {Layout.fillWidth:true;Layout.fillHeight:true;columns:page.compact?1:2;columnSpacing:Theme.sectionGap;rowSpacing:Theme.sectionGap
             Item {Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:Theme.dp(100)
                 SwirlDataTable {id:connectionTable;objectName:"connectionTable";anchors.fill:parent;incrementalRows:true;animateRowChanges:false;rows:page.visibleRows;selectedId:page.selected?page.selected.id:"";minimal:true
-                    columns:[{key:"host",label:qsTr("域名"),w:220},{key:"ip",label:qsTr("IP 地址"),w:125},{key:"process",label:qsTr("进程"),w:115},{key:"protocol",label:qsTr("协议"),w:80},{key:"policy",label:qsTr("策略"),w:119},{key:"up",label:qsTr("上传"),w:89},{key:"down",label:qsTr("下载"),w:100},{key:"latency",label:qsTr("耗时"),w:95},{key:"time",label:qsTr("建立时间"),w:108},{key:"status",label:qsTr("状态"),w:88}]
-                    onRowSelected:function(record){page.selectedId=String(record.id);AppState.detailOpen=true;connectionDetail.present(connectionTable.selectedItem)}
+                    columns:[{key:"host",label:qsTr("域名"),w:220,min:160},{key:"ip",label:qsTr("IP 地址"),w:125,min:120},{key:"process",label:qsTr("进程"),w:115,min:100},{key:"protocol",label:qsTr("协议"),w:80,min:70},{key:"policy",label:qsTr("策略"),w:119,min:100},{key:"up",label:qsTr("上传"),w:89,min:86},{key:"down",label:qsTr("下载"),w:100,min:86},{key:"latency",label:qsTr("耗时"),w:95,min:84},{key:"time",label:qsTr("建立时间"),w:108,min:110},{key:"status",label:qsTr("状态"),w:88,min:80}]
+                    onRowSelected:function(record){
+                        page.selectedId=String(record.id)
+                        if(AppState.detailOpen)connectionDetail.present(connectionTable.selectedItem)
+                        else{connectionDetail.sourceRow=connectionTable.selectedItem;AppState.detailOpen=true}
+                    }
                 }
                 SwirlEmptyState {visible:page.visibleRows.length===0;anchors.centerIn:parent;width:Math.max(0,parent.width-Theme.dp(24));headline:qsTr("没有匹配的连接");detail:qsTr("连接经过 Swirl 后会显示在这里，也可调整搜索或状态筛选。")}
             }
@@ -137,7 +147,7 @@ Item {
                         ColumnLayout {
                     width:detailScroll0.availableWidth; spacing:Theme.dp(15)
                     SwirlText { text:AppState.zh("Connection details"); color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
-                    SwirlStatusBadge { label:page.selected?page.selected.status.toUpperCase():"尚未选择"; tone:page.selected&&page.selected.status==="活动"?"success":"neutral" }
+                    SwirlStatusBadge { label:page.selected?page.observed(page.selected.status):qsTr("尚未选择"); tone:page.selected&&page.selected.status==="活动"?"success":"neutral" }
                     Repeater {
                         model:page.connectionDetailRows
                         ColumnLayout {

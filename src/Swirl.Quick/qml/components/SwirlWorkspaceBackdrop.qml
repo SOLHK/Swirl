@@ -77,22 +77,30 @@ Item {
         Item {
             id: footprint
             objectName: "apecWingFootprint"
-            // A single right-facing fan enters from beyond the lower-left edge.
-            // Its fixed artboard is uniformly scaled; the window crops the root.
-            width: Math.max(canvas.width * 1.08, canvas.height * 1.52)
-            height: width * 0.625
-            x: canvas.width - width - Theme.dp(20)
-            y: canvas.height - height + Theme.dp(8)
+            // Keep the fan near its lower-left root, outside the reading centre.
+            width: Math.max(Theme.dp(480), Math.min(canvas.width * 0.74, canvas.height * 1.06))
+            height: width * 0.76
+            x: -width * 0.14
+            y: canvas.height - height + width * 0.06
             SwirlWingAnimation {
                 id: visual
                 objectName: "apecWingVisual"
                 anchors.fill: parent
                 largeWing: true
                 progress: canvas.progress
-                // The gradient already carries per-colour alpha. Keep the
-                // original vector equally legible inside and outside the pane.
-                opacity: Theme.wingOpacity
+                opacity: Theme.dark ? 0.62 : 0.82
             }
+        }
+        SwirlWingAnimation {
+            objectName: "workspaceWingEcho"
+            width: Math.min(Theme.dp(280), canvas.width * 0.25)
+            height: width * 0.76
+            x: canvas.width - width * 0.82
+            y: -height * 0.32
+            rotation: 180
+            largeWing: true
+            progress: canvas.progress
+            opacity: Theme.dark ? 0.22 : 0.30
         }
     }
 }

@@ -86,6 +86,13 @@ Item {
     property bool minimal:false
     property alias scrollPosition:list.contentY
     function scrollToBeginning(){anchorKey="";list.positionViewAtBeginning()}
+    function positionRow(key) {
+        Qt.callLater(function() {
+            list.forceLayout()
+            const index = table.rowForKey(key)
+            if (index >= 0) list.positionViewAtIndex(index, ListView.Contain)
+        })
+    }
     function focusRowAt(index){const row=list.itemAtIndex(index);if(row){list.currentIndex=index;chooseRow(row,false)}}
     readonly property int renderedRows:list.contentItem.children.length
     SwirlAnimatedModel{id:stableRows;source:table.incrementalRows?table.rows:[];keyRole:"id"}
