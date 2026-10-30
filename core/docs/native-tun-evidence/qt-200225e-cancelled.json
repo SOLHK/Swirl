@@ -1,0 +1,132 @@
+{
+  "schema": 1,
+  "source_head": "200225ebf44374e2e5a4156b67be3cf73993c63e",
+  "checked_out_source_sha": "2b7b95bbb2e517bf4f75638de04aae5229068629",
+  "ci": {
+    "run_id": 40992587728,
+    "job_id": 123859804295,
+    "run_url": "https://github.com/SOLHK/Swirl/actions/runs/40992587728",
+    "job_url": "https://github.com/SOLHK/Swirl/actions/runs/40992587728/job/123859804295",
+    "status": "completed",
+    "conclusion": "cancelled",
+    "started_at": "2026-10-30T02:40:42Z",
+    "completed_at": "2026-10-30T03:35:51Z",
+    "configured_timeout_minutes": 55
+  },
+  "raw_job_log": {
+    "sha256": "9d4077aa8f4eb84532355a5e4b0797c66ac8ce35b25433bf4b28efe4d99b7858",
+    "bytes": 1095854,
+    "preservation": "Complete downloaded log is identified by this digest. This record preserves the relevant original lines and links the complete GitHub job, plus digest-verified test/package artifacts."
+  },
+  "observed_lines": [
+    "2026-10-30T02:41:50.4732883Z Cache not found for input keys: apec-qt612-msvc-Windows-59b4e3306e3d2b0956c30227f2b07b0bad7a34b0c9b7b0d7abb39c76e370419d-4f0dafbcc6775f26ceaee6224d42f12ebd5d41fadcf3e7df3e33c1690e95cf74-2b7b95bbb2e517bf4f75638de04aae5229068629, apec-qt612-msvc-Windows-59b4e3306e3d2b0956c30227f2b07b0bad7a34b0c9b7b0d7abb39c76e370419d-4f0dafbcc6775f26ceaee6224d42f12ebd5d41fadcf3e7df3e33c1690e95cf74-\r",
+    "2026-10-30T03:13:57.4045127Z 100% tests passed, 0 tests failed out of 9\r",
+    "2026-10-30T03:15:55.6053225Z 100% tests passed, 0 tests failed out of 10\r",
+    "2026-10-30T03:15:55.6590490Z Critical UI exit code: 0; network required: True; network exit code: 0\r",
+    "2026-10-30T03:35:45.4117166Z ##[error]The operation was canceled.\r"
+  ],
+  "steps": [
+    {
+      "name": "Restore Qt 6.12 compiler outputs",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 19,
+      "started_at": "2026-10-30T02:41:49Z",
+      "completed_at": "2026-10-30T02:41:50Z"
+    },
+    {
+      "name": "Build UI",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 22,
+      "started_at": "2026-10-30T02:42:26Z",
+      "completed_at": "2026-10-30T03:07:52Z"
+    },
+    {
+      "name": "Critical UI and network regression checks",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 25,
+      "started_at": "2026-10-30T03:07:58Z",
+      "completed_at": "2026-10-30T03:15:55Z"
+    },
+    {
+      "name": "Build and verify independent production files",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 33,
+      "started_at": "2026-10-30T03:16:50Z",
+      "completed_at": "2026-10-30T03:33:25Z"
+    },
+    {
+      "name": "Build Chinese Swirl installer EXE",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 35,
+      "started_at": "2026-10-30T03:33:30Z",
+      "completed_at": "2026-10-30T03:35:03Z"
+    },
+    {
+      "name": "Upload critical-test Windows installer",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 36,
+      "started_at": "2026-10-30T03:35:03Z",
+      "completed_at": "2026-10-30T03:35:07Z"
+    },
+    {
+      "name": "Remaining in-scope regression suite after installer is available",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "number": 37,
+      "started_at": "2026-10-30T03:35:07Z",
+      "completed_at": "2026-10-30T03:35:45Z"
+    },
+    {
+      "name": "Save reusable compiler outputs",
+      "status": "completed",
+      "conclusion": "skipped",
+      "number": 39,
+      "started_at": "2026-10-30T03:35:47Z",
+      "completed_at": "2026-10-30T03:35:47Z"
+    },
+    {
+      "name": "Cache compiled Qt and Rust outputs",
+      "status": "completed",
+      "conclusion": "skipped",
+      "number": 40,
+      "started_at": "2026-10-30T03:35:47Z",
+      "completed_at": "2026-10-30T03:35:47Z"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 12952511107,
+      "name": "Swirl-Engine-Test-Evidence",
+      "bytes": 14539355,
+      "digest": "sha256:8708b1125e41a6bbff63d36f19beda906a2779d2291d233bb2bd097a65b1bcd0",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/40992587728/artifacts/12952511107"
+    },
+    {
+      "id": 12952381918,
+      "name": "Swirl-Qt612-Package-Evidence",
+      "bytes": 73305,
+      "digest": "sha256:ed295659fe8d111ef12ce1cf171f7efc60c786b61e7eea792a4d2b628f9b7b83",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/40992587728/artifacts/12952381918"
+    }
+  ],
+  "analysis": {
+    "observed": "The compiler identity matched the earlier successful run; the changed Cargo.lock hash had no matching cache. UI compilation took 25m26s; production compilation took 16m35s. Nine UI and ten network checks passed. The remaining suite was interrupted at 55m03s and the late compiler-cache save steps were skipped.",
+    "inference": "The interruption matches the configured whole-job time limit. GitHub reports conclusion=cancelled, not a completed regression pass or an observed test assertion failure.",
+    "correction": "Keep exact/current-lock cache priority, then permit a fallback only for the identical compiler identity. Existing per-file content verification, CMake reconfiguration, unconditional locked Cargo build, and exact source/build/DLL staging validation remain. Only this isolated branch supersedes its own stale jobs; other branches retain queued behavior.",
+    "unchanged": [
+      "All registered tests, commands and assertions",
+      "55-minute job limit",
+      "Compiler identity (Rust/MSVC/linker/CMake/SDK/Qt/workspace)",
+      "Current-source hash verification before restoring input timestamps",
+      "Locked Cargo compilation and product source/build identity checks",
+      "All UI/QML and visual resources"
+    ],
+    "acceptance": "The cancelled run remains incomplete. A successful new exact-source Qt run is required."
+  }
+}

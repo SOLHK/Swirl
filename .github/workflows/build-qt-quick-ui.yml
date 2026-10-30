@@ -16,9 +16,9 @@ env:
 
 concurrency:
   group: swirl-quick-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  # Finish the current verified stage so first-time Qt compilation can save its
-  # cache and installer evidence before the next stage starts.
-  cancel-in-progress: false
+  # Keep product branches queued so they can finish their cache and installer
+  # evidence. Only the isolated TUN branch replaces its own stale PR runs.
+  cancel-in-progress: ${{ (github.head_ref || github.ref_name) == 'work/native-tun-windows-20261030-isolated' }}
 
 jobs:
   build-qt-ui:
@@ -160,8 +160,11 @@ jobs:
             build/swirl-quick
             build/swirl-product
           key: apec-qt612-msvc-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-${{ github.sha }}
+          # Reuse unchanged C++ inputs across lockfile updates only with the same
+          # compiler identity. Content hashes, CMake and locked Cargo still rebuild changes.
           restore-keys: |
             apec-qt612-msvc-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-
+            apec-qt612-msvc-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-
       - name: Restore content-verified input timestamps
         shell: pwsh
         run: |
