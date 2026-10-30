@@ -91,11 +91,12 @@ GPL/LGPL 的具体义务以仓库保留的完整许可证原文为准。
 基线 `.github/workflows/guard-production-release.yml` 只接受同仓库
 `test → main` 且符合既有批准流程的生产晋级 PR。此前目标为 `main` 时，
 [production-gate](https://github.com/SOLHK/Swirl/actions/runs/41054115078)
-因来源不是 `test` 而失败。按维护者后续指示，文档审查 PR 现改投 `test`，
-来源仍为独立分支 `work/swirl-license-authorization`；该生产门禁不适用于
-当前目标，不代表此前失败转为通过。未修改工作流，未直接提交到 `main`
-或 `test`，未合并 PR。官方商业登记的信任来源仍为 `main` 当前版本，
-不会因 PR 改投 `test` 而改变；上述权属和分发义务缺口仍待解决。
+因来源不是 `test` 而失败。维护者随后要求先改投 `test`，并明确授权将
+本次文档变更推进至 `main`。交付通过独立工作分支的审查 PR 合入 `test`，
+再按现有必需检查及批准流程通过 `test → main` PR 晋级，不修改或绕过
+工作流、分支保护及测试断言。原失败记录不因此成为通过；实际合并状态和
+检查结果以 GitHub 对应 PR、提交及工作流记录为准。官方商业登记的信任
+来源仍为 `main` 当前版本；上述权属和分发义务缺口不会因合并而解决。
 
 ## 本次验收范围
 
