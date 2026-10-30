@@ -1,0 +1,298 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-30T03:05:46.190988+00:00",
+  "branch_head": "87c3f900b2628bac6040d670b458b727bda31a6b",
+  "checked_out_source_sha": "11852ebc49d4b51582583f42f94c39748200376b",
+  "checkout_basis": "The original job log identifies the checked-out GitHub PR merge as Merge 87c3f900b2628bac6040d670b458b727bda31a6b into 9d35542e092474056f6c154af351dbd84bf7fff4. source_sha in the executable JSON is this merge SHA, not the branch head.",
+  "ci": {
+    "run_id": 40994211698,
+    "job_id": 123863856692,
+    "run_url": "https://github.com/SOLHK/Swirl/actions/runs/40994211698",
+    "job_url": "https://github.com/SOLHK/Swirl/actions/runs/40994211698/job/123863856692",
+    "conclusion": "success",
+    "conclusion_basis": "Root queried the completed GitHub run/job; this archived original job log also contains the successful final smoke JSON and post-step artifact upload."
+  },
+  "environment": {
+    "os": "Microsoft Windows Server 2025 Datacenter",
+    "os_version": "10.0.26100",
+    "runner_image": "windows-2025-vs2026",
+    "runner_image_version": "20261021.278.1",
+    "rustc": "1.99.1 (58cf8f9c3 2026-10-13)",
+    "target": "x86_64-pc-windows-msvc",
+    "disposable_runner": true
+  },
+  "raw_log": {
+    "file": "windows-wintun-87c3f9-job.log",
+    "sha256": "74ebdcd5f2300fea93582630ce45f2709284899176051474d0a60189d0d7e463",
+    "bytes": 133314,
+    "preservation": "Complete downloaded job log, copied byte-for-byte including timestamps, BOM and ANSI sequences."
+  },
+  "commands": {
+    "fmt": "cargo fmt --all -- --check",
+    "clippy": "cargo clippy --locked -p swirl-tun -p swirl-platform -p swirl-dns -p swirl-transport -p swirl-protocol -p swirl-core -p swirl-api --all-targets -- -D warnings",
+    "tests": "cargo test --locked -p swirl-tun -p swirl-platform -p swirl-dns -p swirl-transport -p swirl-protocol -p swirl-core -p swirl-api",
+    "release": "cargo build --locked -p swirl-api --lib --bin swirl-tun-helper --release",
+    "driver": "cargo run --locked --release -p swirl-api --example windows-tun-smoke -- --disposable-network --wintun <verified-official-amd64-DLL>"
+  },
+  "selected_package_test_result_groups": 34,
+  "selected_package_test_totals": {
+    "passed": 592,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered": 0
+  },
+  "pre_validation_resources": [
+    {
+      "observed": {
+        "kind": "mtu",
+        "mtu": 65535
+      },
+      "requested": {
+        "kind": "mtu",
+        "mtu": 1500
+      },
+      "resource": {
+        "ipv6": false,
+        "kind": "mtu"
+      }
+    },
+    {
+      "observed": {
+        "kind": "mtu",
+        "mtu": 65535
+      },
+      "requested": {
+        "kind": "mtu",
+        "mtu": 1500
+      },
+      "resource": {
+        "ipv6": true,
+        "kind": "mtu"
+      }
+    },
+    {
+      "observed": null,
+      "requested": {
+        "kind": "address",
+        "prefix_len": 30,
+        "skip_as_source": false
+      },
+      "resource": {
+        "address": "198.18.0.1",
+        "kind": "address"
+      }
+    },
+    {
+      "observed": null,
+      "requested": {
+        "kind": "address",
+        "prefix_len": 126,
+        "skip_as_source": false
+      },
+      "resource": {
+        "address": "fd53:7769:726c::1",
+        "kind": "address"
+      }
+    },
+    {
+      "observed": null,
+      "requested": {
+        "kind": "route",
+        "metric": 5
+      },
+      "resource": {
+        "destination": "198.18.1.0/32",
+        "kind": "route",
+        "next_hop": "0.0.0.0"
+      }
+    },
+    {
+      "observed": null,
+      "requested": {
+        "kind": "route",
+        "metric": 5
+      },
+      "resource": {
+        "destination": "fd53:7769:726c::101/128",
+        "kind": "route",
+        "next_hop": "::"
+      }
+    }
+  ],
+  "recovery_report": {
+    "already_restored": 0,
+    "conflicts": [],
+    "restored": 6
+  },
+  "restored_resources": [
+    {
+      "before": {
+        "kind": "mtu",
+        "mtu": 65535
+      },
+      "exact": true,
+      "observed": {
+        "kind": "mtu",
+        "mtu": 65535
+      },
+      "resource": {
+        "ipv6": false,
+        "kind": "mtu"
+      },
+      "state": "restored"
+    },
+    {
+      "before": {
+        "kind": "mtu",
+        "mtu": 65535
+      },
+      "exact": true,
+      "observed": {
+        "kind": "mtu",
+        "mtu": 65535
+      },
+      "resource": {
+        "ipv6": true,
+        "kind": "mtu"
+      },
+      "state": "restored"
+    },
+    {
+      "before": null,
+      "exact": true,
+      "observed": null,
+      "resource": {
+        "address": "198.18.0.1",
+        "kind": "address"
+      },
+      "state": "restored"
+    },
+    {
+      "before": null,
+      "exact": true,
+      "observed": null,
+      "resource": {
+        "address": "fd53:7769:726c::1",
+        "kind": "address"
+      },
+      "state": "restored"
+    },
+    {
+      "before": null,
+      "exact": true,
+      "observed": null,
+      "resource": {
+        "destination": "198.18.1.0/32",
+        "kind": "route",
+        "next_hop": "0.0.0.0"
+      },
+      "state": "restored"
+    },
+    {
+      "before": null,
+      "exact": true,
+      "observed": null,
+      "resource": {
+        "destination": "fd53:7769:726c::101/128",
+        "kind": "route",
+        "next_hop": "::"
+      },
+      "state": "restored"
+    }
+  ],
+  "network_configuration_comparison": {
+    "adapters_after": 8,
+    "adapters_before": 8,
+    "adapters_equal": true,
+    "all_routes_equal": true,
+    "routes_after": 26,
+    "routes_before": 26
+  },
+  "driver_result": {
+    "adapter_removed": true,
+    "additional_cases": {
+      "direct_trap_controls_before_and_after": true,
+      "dns_tcp_ipv4": true,
+      "dns_tcp_ipv6": true,
+      "dns_ttl": 30,
+      "fake_ip_persisted_reopen": true,
+      "long_duration_soak_acceptance": false,
+      "native_http_connect_ipv4": true,
+      "native_http_connect_ipv6": true,
+      "original_network_configuration_exact": true,
+      "proxy_failure_cases": [
+        "http_403_rejected",
+        "connection_refused"
+      ],
+      "proxy_failure_no_direct_ipv4": true,
+      "proxy_failure_no_direct_ipv6": true,
+      "reject_tcp_ipv4": true,
+      "reject_tcp_ipv6": true,
+      "tcp_reuse_payload_bytes_each_round": 4096,
+      "tcp_reuse_rounds_each_family": 64,
+      "verified_dot_fixture": true,
+      "windows_tcp_rst_ipv4": true,
+      "windows_tcp_rst_ipv6": true
+    },
+    "default_routes_unchanged": true,
+    "dns_a": true,
+    "dns_aaaa": true,
+    "driver_sha256": "e5da8447dc2c320edc0fc52fa01885c103de8c118481f683643cacc3220dafce",
+    "driver_version": "0.14.1",
+    "evidence": "Windows Wintun scoped loopback smoke",
+    "firewall_modified": false,
+    "interface_index": 20,
+    "ok": true,
+    "owned_network_state_restored": true,
+    "physical_dns_modified": false,
+    "source_sha": "11852ebc49d4b51582583f42f94c39748200376b",
+    "tcp_ipv4": true,
+    "tcp_ipv6": true,
+    "tcp_payload_bytes_each_family": 262144,
+    "tcp_reply_after_client_fin": true,
+    "udp_ipv4": true,
+    "udp_ipv6": true,
+    "udp_payload_lengths": [
+      0,
+      1200
+    ],
+    "windows_11_application_acceptance": false,
+    "wintun_received_packets": 1952,
+    "wintun_sent_packets": 1719
+  },
+  "pass_markers": [
+    "2026-10-30T03:00:29.8148707Z Wintun smoke: PASS durable dual-stack Fake-IP close/reopen identity",
+    "2026-10-30T03:00:57.8896495Z Wintun smoke: PASS IPv4 UDP DNS identity and TTL",
+    "2026-10-30T03:00:57.9164571Z Wintun smoke: PASS IPv4 TCP DNS framing, identity and TTL",
+    "2026-10-30T03:00:57.9203664Z Wintun smoke: PASS IPv4 TCP payload and half-close",
+    "2026-10-30T03:00:58.3129153Z Wintun smoke: PASS IPv4 exact Windows SO_LINGER=0 RST tuple and independent flow cleanup",
+    "2026-10-30T03:00:58.7030976Z Wintun smoke: PASS IPv4 64 rounds on one TCP connection across a second connection reset",
+    "2026-10-30T03:00:58.7045010Z Wintun smoke: PASS IPv4 empty and full UDP datagrams",
+    "2026-10-30T03:00:58.7067033Z Wintun smoke: PASS IPv6 UDP DNS identity and TTL",
+    "2026-10-30T03:00:58.7337193Z Wintun smoke: PASS IPv6 TCP DNS framing, identity and TTL",
+    "2026-10-30T03:00:58.7517437Z Wintun smoke: PASS IPv6 TCP payload and half-close",
+    "2026-10-30T03:00:59.0965994Z Wintun smoke: PASS IPv6 exact Windows SO_LINGER=0 RST tuple and independent flow cleanup",
+    "2026-10-30T03:00:59.4529715Z Wintun smoke: PASS IPv6 64 rounds on one TCP connection across a second connection reset",
+    "2026-10-30T03:00:59.4536307Z Wintun smoke: PASS IPv6 empty and full UDP datagrams",
+    "2026-10-30T03:00:59.4677239Z Wintun smoke: PASS verified DoT A/AAAA resolver fixture",
+    "2026-10-30T03:00:59.5098786Z Wintun smoke: PASS IPv4 proxy, exact Core outcome and reachable DIRECT trap controls",
+    "2026-10-30T03:00:59.6083664Z Wintun smoke: PASS IPv4 reject, exact Core outcome and reachable DIRECT trap controls",
+    "2026-10-30T03:00:59.6272937Z Wintun smoke: PASS IPv4 proxy_rejected, exact Core outcome and reachable DIRECT trap controls",
+    "2026-10-30T03:01:03.6559772Z Wintun smoke: PASS IPv4 proxy_unavailable, exact Core outcome and reachable DIRECT trap controls",
+    "2026-10-30T03:01:03.6763235Z Wintun smoke: PASS IPv6 proxy, exact Core outcome and reachable DIRECT trap controls",
+    "2026-10-30T03:01:03.7693945Z Wintun smoke: PASS IPv6 reject, exact Core outcome and reachable DIRECT trap controls",
+    "2026-10-30T03:01:03.7891466Z Wintun smoke: PASS IPv6 proxy_rejected, exact Core outcome and reachable DIRECT trap controls",
+    "2026-10-30T03:01:07.8402603Z Wintun smoke: PASS IPv6 proxy_unavailable, exact Core outcome and reachable DIRECT trap controls",
+    "2026-10-30T03:01:35.7828578Z Wintun smoke: PASS packet resources released",
+    "2026-10-30T03:01:36.9316696Z Wintun smoke: PASS default/split-default routes unchanged",
+    "2026-10-30T03:01:36.9319231Z Wintun smoke: PASS owned Wintun adapter removed"
+  ],
+  "scope_notes": [
+    "Actual Windows sockets traversed Wintun and the shared Core; upstream peers and verified DoT fixture were real loopback sockets, not public internet targets.",
+    "This recorded driver source covers TCP PROXY/REJECT/HTTP-403/connection-refused policy cases with reachable DIRECT traps. Later UDP policy smoke extensions are excluded.",
+    "The temporary adapter used exact test routes. Physical DNS and firewall were not modified; production port-53 guard and full-capture leakage were not tested.",
+    "The full configuration comparison retains all original adapters, ordered DNS and all ActiveStore routes, excluding time-decaying fields. It is an exact comparison of that schema, not every conceivable Windows setting.",
+    "Windows 11 applications, full physical egress/rebuild, crash recovery and long-duration soak acceptance remain untested."
+  ]
+}
