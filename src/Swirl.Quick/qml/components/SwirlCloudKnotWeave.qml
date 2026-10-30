@@ -30,6 +30,9 @@ Item {
     property rect knotRect: Qt.rect(0,0,0,0)
     property rect viewportRect: Qt.rect(0,0,0,0)
     property var routes: ({})
+    property matrix4x4 backLayerTransform: Qt.matrix4x4(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)
+    property matrix4x4 knotLayerTransform: Qt.matrix4x4(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)
+    property matrix4x4 frontToKnotTransform: Qt.matrix4x4(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)
     readonly property var materials: Knot.materials(Wings.feathers,Wings.echoFeathers)
     readonly property bool windowVisible: !Window.window || (Window.window.visible && Window.window.visibility !== Window.Minimized)
     readonly property bool moving: flight.running || withdrawal.running
@@ -37,15 +40,29 @@ Item {
     readonly property real artScale: Math.min(knotTarget.width*.90/820,knotTarget.height*.85/640)
     readonly property point localOrigin: Qt.point(knotTarget.width/2-487*artScale,knotTarget.height/2-544*artScale)
     readonly property real releaseOpacity: 1-Knot.phaseEase(.25,1,release)
+    // Every depth view consumes the same pose objects and the same clock. A
+    // foreground clip changes occlusion only, never the feather's trajectory.
+    readonly property var poses: {
+        const origin=freeFlight?Qt.point(knotRect.x+localOrigin.x,knotRect.y+localOrigin.y):localOrigin;
+        const guides=routes,phase=progress,removal=release,scale=artScale,spacing=gap;
+        return materials.map(material=>Knot.pose(material,guides[material.key] || null,phase,removal,origin,scale,spacing));
+    }
     Accessible.ignored: true
 
     function rectFor(item) {
         const p=item.mapToItem(frontLayer,0,0);
         return Qt.rect(p.x,p.y,item.width,item.height);
     }
+    function layerTransform(source,target) {
+        const p=source.mapToItem(target,0,0),x=source.mapToItem(target,1,0),y=source.mapToItem(target,0,1);
+        return Qt.matrix4x4(x.x-p.x,y.x-p.x,0,p.x,x.y-p.y,y.y-p.y,0,p.y,0,0,1,0,0,0,0,1);
+    }
     function updateGeometry(force) {
         if(!initialized || (!force && !freeFlight && !previewing))return;
         knotRect=rectFor(knotTarget); viewportRect=rectFor(cardViewport);
+        backLayerTransform=layerTransform(frontLayer,behindCards);
+        knotLayerTransform=layerTransform(knotTarget,frontLayer);
+        frontToKnotTransform=layerTransform(frontLayer,knotTarget);
         if(!force && !flight.running && !previewing)return;
         if(!wingScene)return;
         const scene={sidebar:rectFor(sidebarAnchor),viewport:viewportRect,
@@ -96,7 +113,24 @@ Item {
     Component.onCompleted:{initialized=true;settleHidden();}
     Connections {target:SwirlMotion;function onReducedChanged(){if(SwirlMotion.reduced)weave.retarget();}}
     Connections {target:Theme;function onUiScaleChanged(){Qt.callLater(weave.updateGeometry);}}
-    Connections {target:weave.behindCards;function onWidthChanged(){Qt.callLater(weave.updateGeometry);}function onHeightChanged(){Qt.callLater(weave.updateGeometry);}}
+    Connections {
+        target:weave.behindCards
+        function onXChanged(){Qt.callLater(weave.updateGeometry);}
+        function onYChanged(){Qt.callLater(weave.updateGeometry);}
+        function onScaleChanged(){Qt.callLater(weave.updateGeometry);}
+        function onRotationChanged(){Qt.callLater(weave.updateGeometry);}
+        function onWidthChanged(){Qt.callLater(weave.updateGeometry);}
+        function onHeightChanged(){Qt.callLater(weave.updateGeometry);}
+    }
+    Connections {
+        target:weave.frontLayer
+        function onXChanged(){Qt.callLater(weave.updateGeometry);}
+        function onYChanged(){Qt.callLater(weave.updateGeometry);}
+        function onScaleChanged(){Qt.callLater(weave.updateGeometry);}
+        function onRotationChanged(){Qt.callLater(weave.updateGeometry);}
+        function onWidthChanged(){Qt.callLater(weave.updateGeometry);}
+        function onHeightChanged(){Qt.callLater(weave.updateGeometry);}
+    }
     Connections {
         target:weave.knotTarget
         function onXChanged(){Qt.callLater(weave.updateGeometry);}
@@ -114,44 +148,76 @@ Item {
     NumberAnimation {id:withdrawal;target:weave;property:"release";easing.type:Easing.InOutSine;paused:running && (!weave.presentationActive || !weave.windowVisible);onFinished:if(!weave.active && weave.release===1)weave.progress=0}
 
     Item {
-        id:flightView;parent:weave.frontLayer
-        width:parent.width;height:parent.height
-        visible:weave.visible && weave.release<1
+        id:flightView;objectName:"cloudKnotBackFlight";parent:weave.behindCards
+        width:weave.frontLayer.width;height:weave.frontLayer.height
+        visible:weave.visible && weave.freeFlight
         opacity:weave.opacity*weave.releaseOpacity
+        transform:Matrix4x4 {matrix:weave.backLayerTransform}
         Accessible.ignored:true
     }
+    // Card and toolbar surfaces naturally hide the travelling bodies. Only
+    // the reserved brand area opens a foreground window onto that same scene.
+    // Mapping both directions also works when the two host layers are offset
+    // or scaled; no shared-parent/origin assumption is needed.
     Item {
-        id:restView;parent:weave.knotTarget
+        id:frontView;objectName:"cloudKnotFrontFlight";parent:weave.frontLayer
+        width:weave.knotTarget.width;height:weave.knotTarget.height
+        visible:weave.visible && weave.freeFlight
+        opacity:weave.opacity*weave.releaseOpacity
+        clip:true
+        transform:Matrix4x4 {matrix:weave.knotLayerTransform}
+        Accessible.ignored:true
+        Item {
+            id:frontGeometry;objectName:"cloudKnotFrontGeometry"
+            width:weave.frontLayer.width;height:weave.frontLayer.height
+            transform:Matrix4x4 {matrix:weave.frontToKnotTransform}
+            Accessible.ignored:true
+        }
+    }
+    Item {
+        id:restView;objectName:"cloudKnotRest";parent:weave.knotTarget
         anchors.fill:parent
         visible:weave.visible && weave.release<1
         Accessible.ignored:true
     }
-    Repeater {
-        parent:restView
-        model:weave.materials
-        delegate:WholeFeatherItem {
+    component FeatherBody: WholeFeatherItem {
             id:piece
-            required property var modelData
-            objectName:"cloudFeather-"+modelData.key
-            z:modelData.index
-            parent:weave.freeFlight?flightView:restView
+            required property var material
             width:1024;height:1024
-            readonly property var route:weave.routes[modelData.key] || null
-            readonly property point origin:weave.freeFlight?Qt.point(weave.knotRect.x+weave.localOrigin.x,weave.knotRect.y+weave.localOrigin.y):weave.localOrigin
-            readonly property var pose:Knot.pose(modelData,route,weave.progress,weave.release,origin,weave.artScale,weave.gap)
-            readonly property color sourceInk:modelData.record.color
-            readonly property color finalInk:modelData.ink
+            readonly property var pose:weave.poses[material.index]
+            readonly property color sourceInk:material.record.color
+            readonly property color finalInk:material.ink
             readonly property real tint:Knot.phaseEase(.08,.65,weave.progress)
-            sourcePath:modelData.record.path
-            sourceRoot:Qt.point(modelData.sourceRoot.x,modelData.sourceRoot.y)
-            sourceTip:Qt.point(modelData.sourceTip.x,modelData.sourceTip.y)
-            targetPath:modelData.targetPath
-            targetRoot:Qt.point(modelData.targetRoot.x,modelData.targetRoot.y)
-            targetTip:Qt.point(modelData.targetTip.x,modelData.targetTip.y)
+            sourcePath:material.record.path
+            sourceRoot:Qt.point(material.sourceRoot.x,material.sourceRoot.y)
+            sourceTip:Qt.point(material.sourceTip.x,material.sourceTip.y)
+            targetPath:material.targetPath
+            targetRoot:Qt.point(material.targetRoot.x,material.targetRoot.y)
+            targetTip:Qt.point(material.targetTip.x,material.targetTip.y)
             morphProgress:pose.morph
             ink:Theme.increaseContrast?Theme.text:Qt.rgba(sourceInk.r+(finalInk.r-sourceInk.r)*tint,sourceInk.g+(finalInk.g-sourceInk.g)*tint,sourceInk.b+(finalInk.b-sourceInk.b)*tint,1)
             opacity:pose.opacity
             transform:Matrix4x4 {matrix:Qt.matrix4x4(piece.pose.a,piece.pose.c,0,piece.pose.tx,piece.pose.b,piece.pose.d,0,piece.pose.ty,0,0,1,0,0,0,0,1)}
+    }
+    Repeater {
+        parent:restView
+        model:weave.materials
+        delegate:FeatherBody {
+            required property var modelData
+            material:modelData
+            objectName:"cloudFeather-"+modelData.key
+            z:modelData.index
+            parent:weave.freeFlight?flightView:restView
+        }
+    }
+    Repeater {
+        parent:frontGeometry
+        model:weave.materials
+        delegate:FeatherBody {
+            required property var modelData
+            material:modelData
+            objectName:"cloudFeatherFront-"+modelData.key
+            z:modelData.index
         }
     }
     // Local copies change only depth where completed feather bodies cross.
@@ -165,8 +231,8 @@ Item {
             readonly property var material:weave.materials[modelData.part]
             readonly property real blend:Knot.phaseEase(.94,.98,weave.progress)*(1-Knot.phaseEase(0,.25,weave.release))
             readonly property point origin:weave.freeFlight?Qt.point(weave.knotRect.x+weave.localOrigin.x,weave.knotRect.y+weave.localOrigin.y):weave.localOrigin
-            readonly property var pose:Knot.pose(material,weave.routes[material.key] || null,weave.progress,weave.release,origin,weave.artScale,weave.gap)
-            parent:weave.freeFlight?flightView:restView
+            readonly property var pose:weave.poses[modelData.part]
+            parent:weave.freeFlight?frontGeometry:restView
             z:20+modelData.part
             visible:blend>0
             opacity:blend
