@@ -285,15 +285,24 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Critical network/security checks failed ($LASTEXITCODE)." }
           }
       - name: Overview input checks against deployed Qt runtime
+        id: overview_input
         shell: pwsh
         run: |
           $env:QT_QPA_PLATFORM = "offscreen"
           $env:QT_QUICK_BACKEND = "software"
           $exe = (Resolve-Path "dist/Swirl.exe").Path
-          $process = Start-Process -FilePath $exe -ArgumentList "--interaction-test" -Wait -PassThru -NoNewWindow
-          if ($process.ExitCode -ne 0) {
-            Get-Content "dist/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
-            throw "Overview input checks failed: $($process.ExitCode)"
+          $diagnostic = Join-Path (Split-Path $exe) 'Swirl-input-diagnostics.txt'
+          if (Test-Path -LiteralPath $diagnostic) { Remove-Item -LiteralPath $diagnostic -Force }
+          try {
+            $process = Start-Process -FilePath $exe -ArgumentList "--interaction-test" -Wait -PassThru -NoNewWindow
+            if ($process.ExitCode -ne 0) {
+              Get-Content -LiteralPath $diagnostic -ErrorAction SilentlyContinue
+              throw "Overview input checks failed: $($process.ExitCode)"
+            }
+          } finally {
+            if (Test-Path -LiteralPath $diagnostic -PathType Leaf) {
+              Copy-Item -LiteralPath $diagnostic -Destination 'build-evidence/overview-input.log' -Force
+            }
           }
       - name: Loopback HTTP capture checks against deployed Qt runtime
         shell: pwsh
@@ -699,6 +708,16 @@ jobs:
             $delivery | Add-Member -NotePropertyName activity_dpr_simulation -NotePropertyValue $matrixResult -Force
             $delivery | ConvertTo-Json | Set-Content -LiteralPath 'out/delivery.json' -Encoding utf8
           }
+      - name: Preserve independent activity regression after overview input failure
+        if: ${{ failure() && steps.overview_input.outcome == 'failure' }}
+        shell: pwsh
+        run: |
+          # Diagnostic coverage only: the earlier failed input check keeps this
+          # job failed. Successful runs retain their existing regression order.
+          # Run the registered drivers with their original environments and
+          # timeouts; do not repeat critical checks or write delivery success.
+          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(activity-layout|activity-details|activity-perf-600|activity-perf-2000|window-shadow|policy-ui|liquid-glass)$" --output-on-failure --no-tests=error --output-junit build-evidence/activity-diagnostic-regression.xml
+          if ($LASTEXITCODE -ne 0) { throw "Independent activity diagnostic regression failed ($LASTEXITCODE)." }
       - name: Upload engine and scoped regression evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -707,6 +726,8 @@ jobs:
           path: |
             build/swirl-quick/Testing/Temporary/LastTest.log
             build-evidence/full-regression.xml
+            build-evidence/overview-input.log
+            build-evidence/activity-diagnostic-regression.xml
             build/swirl-quick/engine-contract.txt
             build/swirl-quick/engine-real.txt
             build/swirl-quick/node-chain.txt
