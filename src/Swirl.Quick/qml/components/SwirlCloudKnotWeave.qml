@@ -13,6 +13,7 @@ Item {
     required property Item behindCards
     required property Item frontLayer
     required property Item knotTarget
+    required property Item cardViewport
     property Item proxyAnchor: null
     property Item sidebarAnchor: null
     property var wingScene: null
@@ -26,6 +27,7 @@ Item {
     property bool initialized: false
     property bool reducedSettlePending: false
     property rect knotRect: Qt.rect(0, 0, 0, 0)
+    property rect viewportRect: Qt.rect(0, 0, 0, 0)
     property var routes: ({})
     readonly property bool windowVisible: !Window.window || (Window.window.visible && Window.window.visibility !== Window.Minimized)
     readonly property bool moving: flight.running || withdrawal.running
@@ -49,6 +51,7 @@ Item {
     function updateGeometry() {
         if (!initialized) return;
         knotRect = rectFor(knotTarget);
+        viewportRect = rectFor(cardViewport);
         const cards = {connection:rectFor(connectionItem),traffic:rectFor(transferItem),sources:rectFor(sourcesItem),diagnostics:rectFor(diagnosticItem),connections:rectFor(connectionsItem)};
         const scene = {
             proxy: proxyAnchor ? rectFor(proxyAnchor) : Qt.rect(cards.connection.x,0,Theme.dp(130),Theme.dp(30)),
@@ -150,12 +153,14 @@ Item {
     }
     Item {
         id: frontView; parent: weave.frontLayer
-        width: parent.width; height: parent.height
+        x: weave.viewportRect.x; y: weave.viewportRect.y
+        width: weave.viewportRect.width; height: weave.viewportRect.height
+        clip: true
         visible: backView.visible; opacity: backView.opacity
     }
     Item {
         id: knotView; parent: frontView
-        x: weave.knotRect.x; y: weave.knotRect.y
+        x: weave.knotRect.x - weave.viewportRect.x; y: weave.knotRect.y - weave.viewportRect.y
         width: weave.knotRect.width; height: weave.knotRect.height
         clip: true
         scale: weave.settledScale
@@ -175,17 +180,17 @@ Item {
                 objectName: "knotFlight-" + strand.modelData.card
                 parent: backView; width: parent.width; height: parent.height
                 guide: strand.route?strand.route.guide:""; ink: strand.ink; ribbonWidth: Theme.dp(3.4)
-                trimStart: strand.tail; trimEnd: strand.head
+                trimStart: strand.tail; trimEnd: strand.route ? Math.min(strand.head, strand.route.join) : 0
                 broadening: weave.phaseEase(0.40,0.48,weave.progress)*(1-weave.phaseEase(0.57,0.64,weave.progress))
                 settlement: weave.phaseEase(0.70,0.95,weave.progress)
             }
             Item {
                 parent: frontView
-                x: strand.aperture.x; y: strand.aperture.y
+                x: strand.aperture.x - weave.viewportRect.x; y: strand.aperture.y - weave.viewportRect.y
                 width: strand.aperture.width; height: strand.aperture.height; clip: true
                 RibbonStroke {
                     objectName: "knotEntry-" + strand.modelData.key
-                    x: -parent.x; y: -parent.y; width: frontView.width; height: frontView.height
+                    x: -strand.aperture.x; y: -strand.aperture.y; width: backView.width; height: backView.height
                     guide: strand.route?strand.route.guide:""; ink: strand.ink; ribbonWidth: Theme.dp(3.4)
                     trimStart: strand.tail; trimEnd: strand.head
                     settlement: weave.phaseEase(0.70,0.95,weave.progress)

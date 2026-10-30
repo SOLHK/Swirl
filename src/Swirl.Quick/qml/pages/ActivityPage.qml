@@ -414,6 +414,7 @@ Item {
                 connectionItem: statusCard; transferItem: trafficCard; sourcesItem: sourcesCard
                 diagnosticItem: diagnosticCard; connectionsItem: connectionsCard
                 knotTarget: statusEmblem
+                cardViewport: scroll
                 behindCards: page.ribbonBack; frontLayer: page.ribbonFront
                 proxyAnchor: page.proxyAnchor; sidebarAnchor: page.sidebarAnchor; wingScene: page.wingScene
                 wide: page.wide; gap: content.gap
