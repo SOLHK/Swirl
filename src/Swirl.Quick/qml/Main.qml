@@ -128,7 +128,7 @@ ApplicationWindow {
                 SwirlStatusCapsule {
                     objectName: "eventsCapsule"
                     visible: toolbar.width >= Theme.dp(530)
-                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.dp(30)
+                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.toolbarHeight
                     label: systemProvider.eventCount > 0 ? qsTr("%1 个事件").arg(systemProvider.eventCount) : qsTr("暂无事件")
                     tone: systemProvider.eventCount > 0 ? "success" : "neutral"
                     detail: qsTr("查看事件与活动记录")
@@ -137,12 +137,12 @@ ApplicationWindow {
                 Item { Layout.fillWidth: true; Layout.minimumWidth: Theme.dp(16) }
                 SwirlSystemProxyCapsule {
                     id: proxyCapsule; objectName: "proxyCapsule"
-                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.dp(30)
+                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.toolbarHeight
                     controller: engineController
                 }
                 SwirlStatusCapsule {
                     objectName: "tunCapsule"
-                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.dp(30)
+                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.toolbarHeight
                     label: engineController.tunEnabled ? qsTr("TUN · 已开") : qsTr("TUN · 未开启")
                     detail: engineController.routingError || (engineController.tunEnabled
                         ? qsTr("TUN 模式已开启，点击关闭") : qsTr("当前 Rust Core 暂不支持 TUN 模式"))
@@ -154,7 +154,7 @@ ApplicationWindow {
                     }
                 }
                 OutboundModeControl {
-                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.dp(30)
+                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.toolbarHeight
                     engineController: window.engineControllerContext
                 }
             }

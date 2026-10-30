@@ -1,7 +1,7 @@
 import QtQuick
 import SwirlQuick
 
-SwirlActivitySurface {
+SwirlCardSurface {
     id: card
     property Item titleItem: null
     property string title: ""
@@ -10,10 +10,10 @@ SwirlActivitySurface {
     signal activated()
     default property alias contents: body.data
     hovered: cardHover.hovered
-    pressed: hit.pressed || keyboardPressed
+    pressed: false
     focused: activeFocus && keyboardFocus
-    property real lift: pressed ? Theme.dp(1) : hovered || focused ? -Theme.dp(1.5) : 0
-    Behavior on lift { enabled: !SwirlMotion.reduced; NumberAnimation { duration: SwirlMotion.ms(card.pressed ? 90 : 150); easing.type: Easing.OutCubic } }
+    property real lift: hovered ? -Theme.dp(1.5) : 0
+    Behavior on lift { enabled: !SwirlMotion.reduced; NumberAnimation { duration: SwirlMotion.ms(150); easing.type: Easing.OutCubic } }
     activeFocusOnTab: true
     Accessible.role: Accessible.Button
     Accessible.name: qsTr("%1详情").arg(title)

@@ -86,7 +86,7 @@ Item {
                 iconName: row.record.canCancel ? "dismiss" : "refresh-source"
                 enabled: row.record.canCancel || row.refreshable
                 Accessible.name: row.record.canCancel ? (row.record.queued ? qsTr("取消排队 %1").arg(row.record.name) : qsTr("取消更新 %1").arg(row.record.name)) : qsTr("更新 %1").arg(row.record.name)
-                tooltip: Accessible.name; tooltipEnabled: !moreMenu.visible
+                tooltip: Accessible.name
                 onClicked: row.refreshRequested()
             }
             SubscriptionAction {
@@ -95,7 +95,7 @@ Item {
                 iconName: "ellipsis"; enabled: row.editable
                 Layout.preferredWidth: Theme.dp(44); Layout.preferredHeight: Theme.dp(44)
                 Accessible.name: qsTr("%1 的更多操作").arg(row.record.name)
-                tooltip: Accessible.name; tooltipEnabled: !moreMenu.visible
+                tooltip: Accessible.name
                 onClicked: moreMenu.showAt()
             }
         }

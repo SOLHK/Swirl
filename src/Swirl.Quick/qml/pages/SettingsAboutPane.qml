@@ -25,8 +25,8 @@ ColumnLayout {
         Layout.fillWidth: true
         spacing: Theme.compactGap
         SwirlButton { text: qsTr("项目主页"); onClicked: Qt.openUrlExternally("https://github.com/SOLHK/Swirl") }
-        SwirlButton { id: officialChannelButton; objectName: "officialChannelButton"; text: qsTr("官方频道"); Accessible.description: qsTr("通过默认浏览器打开 Swirl 官方频道（Telegram）"); onClicked: Qt.openUrlExternally("https://t.me/SwirlUpdates"); SwirlToolTip { parent: officialChannelButton; visible: officialChannelButton.hovered || officialChannelButton.activeFocus; delay: 500; text: qsTr("Swirl 官方频道 · https://t.me/SwirlUpdates") } }
-        SwirlButton { id: communityGroupButton; objectName: "communityGroupButton"; text: qsTr("用户交流群"); Accessible.description: qsTr("通过默认浏览器打开 Swirl 交流群（Telegram）"); onClicked: Qt.openUrlExternally("https://t.me/SwirlHQ"); SwirlToolTip { parent: communityGroupButton; visible: communityGroupButton.hovered || communityGroupButton.activeFocus; delay: 500; text: qsTr("Swirl 交流群 · https://t.me/SwirlHQ") } }
+        SwirlButton { id: officialChannelButton; objectName: "officialChannelButton"; text: qsTr("官方频道"); Accessible.description: qsTr("通过默认浏览器打开 Swirl 官方频道（Telegram）"); onClicked: Qt.openUrlExternally("https://t.me/SwirlUpdates");  }
+        SwirlButton { id: communityGroupButton; objectName: "communityGroupButton"; text: qsTr("用户交流群"); Accessible.description: qsTr("通过默认浏览器打开 Swirl 交流群（Telegram）"); onClicked: Qt.openUrlExternally("https://t.me/SwirlHQ");  }
     }
     Item { Layout.preferredHeight: Theme.dp(16) }
     SwirlSectionTitle { Layout.fillWidth: true; title: qsTr("字体与许可") }

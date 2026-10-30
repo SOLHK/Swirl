@@ -6,6 +6,7 @@ import "../controls"
 Item {
     id: canvas
     property var targetWindow: Window.window
+    property var composition: backdrop
     property Item glassSurface: null
     property bool glassSampled: false
     readonly property Item decorationSource: decoration
@@ -67,7 +68,7 @@ Item {
         paused: entrance.running && !canvas.presenting
     }
 
-    SwirlGlassMaterial { anchors.fill: parent; targetWindow: canvas.targetWindow }
+    SwirlGlassMaterial { anchors.fill: parent; targetWindow: canvas.targetWindow; composition: canvas.composition }
     Item {
         id: decoration
         objectName: "workspaceWingDecoration"
@@ -78,10 +79,10 @@ Item {
             id: footprint
             objectName: "apecWingFootprint"
             // Keep the fan near its lower-left root, outside the reading centre.
-            width: Math.max(Theme.dp(480), Math.min(canvas.width * 0.74, canvas.height * 1.06))
+            width: Math.max(Theme.dp(420), Math.min(canvas.width * 0.72, canvas.height * 0.96))
             height: width * 0.76
-            x: -width * 0.14
-            y: canvas.height - height + width * 0.06
+            x: -width * 0.08
+            y: canvas.height - height * 0.76
             SwirlWingAnimation {
                 id: visual
                 objectName: "apecWingVisual"
@@ -95,8 +96,8 @@ Item {
             objectName: "workspaceWingEcho"
             width: Math.min(Theme.dp(280), canvas.width * 0.25)
             height: width * 0.76
-            x: canvas.width - width * 0.82
-            y: -height * 0.32
+            x: canvas.width - width * 0.72
+            y: -height * 0.38
             rotation: 180
             largeWing: true
             progress: canvas.progress

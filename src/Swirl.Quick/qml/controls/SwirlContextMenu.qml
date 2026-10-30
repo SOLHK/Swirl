@@ -3,10 +3,12 @@ import QtQuick
 import QtQml.Models
 import QtQuick.Controls.Basic
 import SwirlQuick
+import "../components"
 Menu {
     id: contextMenu
     popupType:Popup.Item
     objectName:"swirlContextMenu"
+    property point travelOrigin: Qt.point(-SwirlMotion.popupDistance*0.25,-SwirlMotion.popupDistance*0.5)
     property bool presentationReady:false
     Component.onCompleted:presentationReady=true
     Component.onDestruction:presentationReady=false
@@ -32,17 +34,14 @@ Menu {
     opacity:reveal.alpha
     onAboutToShow: {
         dismissals.push(contextMenu,parent?parent.Window.window:null)
-        reveal.prepare(Qt.point(-SwirlMotion.popupDistance*0.25,-SwirlMotion.popupDistance*0.5))
+        reveal.prepare(travelOrigin)
     }
     onClosed:{dismissals.pop(contextMenu);reveal.reset()}
     enter:reveal.enterTransition
     exit:reveal.exitTransition
-    background: Rectangle {
-        transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
-        color: Theme.material("floating")
-        radius:Theme.menuRadius; antialiasing:true
-        border.width:Theme.dp(1)
-        border.color: Theme.glassRim
+    background: SwirlCardSurface {
+        transform: Translate { x: reveal.xOffset; y: reveal.yOffset }
+        cornerRadius: Theme.menuRadius
     }
     Instantiator {
         model: contextMenu.items

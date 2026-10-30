@@ -180,15 +180,15 @@ set(SWIRL_QML_FILES
  qml/components/SwirlWindowTitleBar.qml
  qml/controls/RewriteRulesDialog.qml
  qml/components/ReferenceSection.qml qml/components/ReferenceOutline.qml qml/components/ReferenceCheckBox.qml qml/pages/CaptureInspectorPage.qml
- qml/controls/SwirlStatusCapsule.qml qml/controls/SwirlSystemProxyCapsule.qml qml/controls/SwirlScrollBar.qml qml/pages/ProcessesPage.qml
+ qml/controls/SwirlStatusCapsule.qml qml/controls/SwirlToolbarButton.qml qml/controls/SwirlSystemProxyCapsule.qml qml/controls/SwirlScrollBar.qml qml/pages/ProcessesPage.qml
  qml/Main.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml qml/SwirlMotion.qml qml/SwirlTransitionRegistry.qml
  qml/controls/SwirlTransitionCoordinator.qml qml/controls/SwirlHeroCard.qml qml/controls/SwirlHeroTitle.qml
  qml/components/SwirlContinuousSurface.qml qml/components/SwirlShellOutline.qml qml/components/SwirlBlurLayer.qml qml/components/SwirlGlassMaterial.qml qml/components/SwirlWindowControls.qml qml/components/SwirlDailyTrafficChart.qml
  qml/controls/SwirlClickLight.qml qml/controls/SwirlActivityIndicator.qml qml/controls/SwirlExpander.qml
  qml/controls/SwirlPressMotion.qml qml/controls/SwirlAnimatedModel.qml qml/controls/SwirlMotionButton.qml qml/controls/SwirlSpring.qml qml/controls/SwirlPageHost.qml
  qml/pages/FeatureHubPage.qml qml/pages/FeatureModulePage.qml qml/components/SwirlBrandIcon.qml
- qml/components/SwirlCloudKnotWeave.qml qml/components/SwirlCloudKnotPaths.js qml/components/SwirlSilkRope.qml qml/components/SwirlSilkRopeGeometry.js qml/components/SwirlKnotLead.qml
- qml/components/SwirlActivityCard.qml qml/components/SwirlActivitySurface.qml qml/controls/ActivityDetailTransition.qml
+ qml/components/SwirlCloudKnotWeave.qml qml/components/SwirlCloudKnotPaths.js qml/components/SwirlSilkRope.qml
+ qml/components/SwirlActivityCard.qml qml/components/SwirlCardSurface.qml qml/controls/ActivityDetailTransition.qml
  qml/pages/ActivitySourcesDetail.qml qml/pages/ActivityDiagnosticsDetail.qml qml/pages/ActivityConnectionDetail.qml
  qml/controls/SwirlPillSurface.qml qml/controls/SwirlIconButton.qml qml/controls/SwirlButton.qml qml/controls/SwirlSegmentedControl.qml qml/controls/SwirlToggle.qml
  qml/controls/SwirlSearchField.qml qml/controls/SwirlTextField.qml

@@ -20,7 +20,7 @@ Window {
         function onDarkChanged() { shell.composition.apply(shell, Theme.transparency, Theme.dark) }
         function onUiScaleChanged() { shell.composition.apply(shell, Theme.transparency, Theme.dark) }
     }
-    SwirlGlassMaterial { targetWindow: shell; composition: shell.composition }
+    SwirlWorkspaceBackdrop { anchors.fill: parent; targetWindow: shell; composition: shell.composition }
     SwirlWindowTitleBar { id: titleBar; anchors.left:parent.left; anchors.right:parent.right; targetWindow:shell }
     Item { id:bodyItem; anchors.left:parent.left;anchors.right:parent.right;anchors.top:titleBar.bottom;anchors.bottom:parent.bottom;clip:true }
     SwirlShellOutline {

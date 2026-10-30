@@ -158,7 +158,7 @@ ColumnLayout {
                         onToggled: { const requested = checked; checked = Qt.binding(function() { return Boolean(row.record.enabled) }); assignments.enabledRequested(row.record.id, requested) }
                         indicator.x: (width - indicator.width) / 2
                     }
-                    SubscriptionAction { id: more; objectName: "servicePolicyMore-" + row.record.id; iconName: "ellipsis"; Layout.preferredWidth: Theme.dp(36); Layout.preferredHeight: Theme.dp(44); enabled: assignments.editable; Accessible.name: qsTr("%1 的更多操作").arg(row.record.name || ""); tooltip: Accessible.name; tooltipEnabled: !moreMenu.visible; onClicked: moreMenu.showAt() }
+                    SubscriptionAction { id: more; objectName: "servicePolicyMore-" + row.record.id; iconName: "ellipsis"; Layout.preferredWidth: Theme.dp(36); Layout.preferredHeight: Theme.dp(44); enabled: assignments.editable; Accessible.name: qsTr("%1 的更多操作").arg(row.record.name || ""); tooltip: Accessible.name; onClicked: moreMenu.showAt() }
                 }
                 Rectangle { visible: !row.headerRow; anchors.bottom: parent.bottom; width: parent.width; height: Theme.borderWidth; color: Theme.border }
                 SwirlContextMenu {

@@ -9,9 +9,9 @@ SwirlContinuousSurface {
     property real cornerRadius: Theme.cardRadius
     radius: Math.min(cornerRadius, width / 2, height / 2)
     color: Theme.dark ? Theme.independentCard : "#FFFFFF"
-    // Ordinary cards have no rim. Explicit accessibility focus stays visible.
-    border.width: focused ? Theme.dp(1.5) : Theme.increaseContrast ? Theme.dp(2) : 0
-    border.color: focused ? Theme.focusBorder : Theme.text
+    // Ordinary cards never acquire an outline from pointer or keyboard focus.
+    border.width: Theme.increaseContrast ? Theme.dp(2) : 0
+    border.color: Theme.text
 
     ShaderEffect {
         x: -padding; y: -padding; z: -1

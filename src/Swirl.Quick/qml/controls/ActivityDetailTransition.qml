@@ -103,7 +103,7 @@ Item {
     SwirlTransitionCoordinator { id: clock }
     // The shield is present for the whole return, including interrupted travel.
     MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; onWheel: wheel => wheel.accepted = true }
-    SwirlActivitySurface {
+    SwirlCardSurface {
         id: surface
         objectName: "activityDetailSurface"
         x: transition.geometryFrom.x + (transition.geometryTo.x - transition.geometryFrom.x) * transition.geometryProgress

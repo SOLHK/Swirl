@@ -22,7 +22,7 @@ namespace {
 // Evaluate the reference corner at physical pixel centres. Mirroring each row
 // makes all four curves identical at fractional DPI, without rounding the
 // design radius to a logical pixel or allocating a whole-window texture.
-HRGN roundedWindowRegion(int width, int height, qreal radius, qreal coverageFringe = 0, qreal power = 2) {
+HRGN roundedWindowRegion(int width, int height, qreal radius, qreal coverageFringe = 0, qreal power = 2.5) {
     radius = qBound<qreal>(0, radius, qMin(width, height) / 2.0);
     const int rows = qCeil(radius);
     const HRGN region = CreateRectRgn(0, rows, width, height - rows);
