@@ -8,6 +8,8 @@ Item {
     id:page
     property bool embedded:false
     property bool updatesEnabled:true
+    // Null in production; the native performance test supplies a fixed-buffer observer.
+    property QtObject performanceObserver:null
     readonly property Item motionTitle:heading.titleItem
     readonly property bool compact:width<Theme.dp(620)
     property string selectedId:""
@@ -57,16 +59,30 @@ Item {
     readonly property var protocolOptions:[qsTr("全部协议")].concat(Array.from(new Set(connectionRows.map(row=>row.protocol||"").concat([protocolFilter]).filter(value=>value.length))).sort())
     function refreshSnapshot() {
         if(!visible||!updatesEnabled)return
-        // The controller returns QVariantList value snapshots, not mutable JS aliases.
-        const rows=engineController.connections.map(row=>Object.assign({},row,{
-            host:observed(row.host),ip:observed((row.route||{}).chosen_ip||row.ip),
-            process:observed(row.process),protocol:observed(row.protocol),latency:observed(row.latency)
-        }))
-        let changed=rows.length!==connectionRows.length
-        for(let i=0;!changed&&i<rows.length;++i)
-            changed=JSON.stringify(rows[i])!==JSON.stringify(connectionRows[i])
-        if(changed)connectionRows=rows
-        snapshotDirty=false
+        const observer=performanceObserver
+        if(observer)observer.mark(1,true)
+        try {
+            let rows
+            if(observer)observer.mark(2,true)
+            try {
+                // The controller returns QVariantList value snapshots, not mutable JS aliases.
+                rows=engineController.connections.map(row=>Object.assign({},row,{
+                    host:observed(row.host),ip:observed((row.route||{}).chosen_ip||row.ip),
+                    process:observed(row.process),protocol:observed(row.protocol),latency:observed(row.latency)
+                }))
+            } finally {if(observer)observer.mark(2,false)}
+            let changed
+            if(observer)observer.mark(3,true)
+            try {
+                changed=rows.length!==connectionRows.length
+                for(let i=0;!changed&&i<rows.length;++i)
+                    changed=JSON.stringify(rows[i])!==JSON.stringify(connectionRows[i])
+            } finally {if(observer)observer.mark(3,false)}
+            if(observer)observer.mark(4,true)
+            try {if(changed)connectionRows=rows}
+            finally {if(observer)observer.mark(4,false)}
+            snapshotDirty=false
+        } finally {if(observer)observer.mark(1,false)}
     }
     onVisibleChanged:if(visible)refreshSnapshot()
     onUpdatesEnabledChanged:if(updatesEnabled)refreshSnapshot()
@@ -78,32 +94,40 @@ Item {
         return /^\d+(\.\d+)?( ms)?$/.test(value)?parseFloat(value):Number.POSITIVE_INFINITY
     }
     property var visibleRows:{
-        const q=search.text.trim().toLowerCase()
-        const state=status.currentIndex
-        const selectedProtocol=protocolFilter
-        var rows=connectionRows.filter(function(r){
-            if((state!==0&&r.status!==status.currentText)||(selectedProtocol&&r.protocol!==selectedProtocol))return false
-            if(!q.length)return true
-            const route=r.route||{}
-            const searchable=[r.host,r.process,r.ip,r.port,r.sourceIp,r.sourcePort,r.protocol,r.status,r.transportState,r.policy,r.proxyNode,route.rule_id,route.service_policy_id,route.chosen_ip]
-                .map(value=>value===undefined||value===null?"":String(value)).join(" ").toLowerCase()
-            return searchable.indexOf(q)>=0
-        })
-        rows.sort(function(a,b){
-            let order=0
-            if(sort.currentIndex===1) {
-                const av=page.latencyValue(a),bv=page.latencyValue(b)
-                order=av===bv?0:av<bv?-1:1
-            } else if(sort.currentIndex===2||sort.currentIndex===4) {
-                const key=sort.currentIndex===2?"downloadBytes":"uploadBytes"
-                order=Number(b[key]||0)-Number(a[key]||0)
-            } else if(sort.currentIndex===5) order=Number(b.lastSeen||0)-Number(a.lastSeen||0)
-            else {
-                const key=sort.currentIndex===0?"host":"process"
-                order=String(a[key]||"").localeCompare(String(b[key]||""),undefined,{numeric:true})
-            }
-            return order||String(a.id).localeCompare(String(b.id),undefined,{numeric:true})
-        })
+        const observer=performanceObserver
+        let rows
+        if(observer)observer.mark(5,true)
+        try {
+            const q=search.text.trim().toLowerCase()
+            const state=status.currentIndex
+            const selectedProtocol=protocolFilter
+            rows=connectionRows.filter(function(r){
+                if((state!==0&&r.status!==status.currentText)||(selectedProtocol&&r.protocol!==selectedProtocol))return false
+                if(!q.length)return true
+                const route=r.route||{}
+                const searchable=[r.host,r.process,r.ip,r.port,r.sourceIp,r.sourcePort,r.protocol,r.status,r.transportState,r.policy,r.proxyNode,route.rule_id,route.service_policy_id,route.chosen_ip]
+                    .map(value=>value===undefined||value===null?"":String(value)).join(" ").toLowerCase()
+                return searchable.indexOf(q)>=0
+            })
+        } finally {if(observer)observer.mark(5,false)}
+        if(observer)observer.mark(6,true)
+        try {
+            rows.sort(function(a,b){
+                let order=0
+                if(sort.currentIndex===1) {
+                    const av=page.latencyValue(a),bv=page.latencyValue(b)
+                    order=av===bv?0:av<bv?-1:1
+                } else if(sort.currentIndex===2||sort.currentIndex===4) {
+                    const key=sort.currentIndex===2?"downloadBytes":"uploadBytes"
+                    order=Number(b[key]||0)-Number(a[key]||0)
+                } else if(sort.currentIndex===5) order=Number(b.lastSeen||0)-Number(a.lastSeen||0)
+                else {
+                    const key=sort.currentIndex===0?"host":"process"
+                    order=String(a[key]||"").localeCompare(String(b[key]||""),undefined,{numeric:true})
+                }
+                return order||String(a.id).localeCompare(String(b.id),undefined,{numeric:true})
+            })
+        } finally {if(observer)observer.mark(6,false)}
         return rows
     }
     ColumnLayout {
@@ -129,6 +153,7 @@ Item {
         GridLayout {Layout.fillWidth:true;Layout.fillHeight:true;columns:page.compact?1:2;columnSpacing:Theme.sectionGap;rowSpacing:Theme.sectionGap
             Item {Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumHeight:Theme.dp(100)
                 SwirlDataTable {id:connectionTable;objectName:"connectionTable";anchors.fill:parent;incrementalRows:true;animateRowChanges:false;rows:page.visibleRows;selectedId:page.selected?page.selected.id:"";minimal:true
+                    performanceObserver:page.performanceObserver
                     columns:[{key:"host",label:qsTr("域名"),w:220,min:160},{key:"ip",label:qsTr("IP 地址"),w:125,min:120},{key:"process",label:qsTr("进程"),w:115,min:100},{key:"protocol",label:qsTr("协议"),w:80,min:70},{key:"policy",label:qsTr("策略"),w:119,min:100},{key:"up",label:qsTr("上传"),w:89,min:86},{key:"down",label:qsTr("下载"),w:100,min:86},{key:"latency",label:qsTr("耗时"),w:95,min:84},{key:"time",label:qsTr("建立时间"),w:108,min:110},{key:"status",label:qsTr("状态"),w:88,min:80}]
                     onRowSelected:function(record){
                         page.selectedId=String(record.id)

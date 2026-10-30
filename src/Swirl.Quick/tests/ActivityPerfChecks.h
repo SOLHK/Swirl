@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <cmath>
 #include <vector>
 #include <QDateTime>
 
@@ -8,8 +9,14 @@ static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
     struct Resources {double cpuMs=0;quint64 privateBytes=0,workingSet=0;};
     struct Clocks {double weaveProgress=-1,weaveRelease=-1;int registryActive=-1;bool weavePresent=false,weaveMoving=false,weaveActive=false,weavePresentationActive=false;std::array<double,5> cardLift{};std::array<bool,5> cardPresent{},cardHovered{},cardFocused{};};
     struct Phase {QString name; qint64 start=0,end=0;Resources before,after;Clocks clocksBefore,clocksAfter;int updatesBefore=0,updatesAfter=0,realUpdatesBefore=0,realUpdatesAfter=0;bool dataPulseActive=false;std::array<int,4> rowsBefore{},rowsAfter{},syncBefore{},syncAfter{};};
-    struct Update {qint64 start=0,ingestStart=0,end=0,uploadTotal=0,downloadTotal=0;int phase=-1,revisionBefore=0,revisionAfter=0;bool fixtureChanged=false;};
+    struct Update {qint64 start=0,ingestStart=0,end=0,uploadTotal=0,downloadTotal=0;double accountingMs=-1,publishMs=-1;int phase=-1,revisionBefore=0,revisionAfter=0;bool fixtureChanged=false,splitValid=false,splitContained=false;};
     struct Scroll {qint64 ns=0;double before=0,requested=0,after=0,progress=0,bodyOpacity=0,effectiveOpacity=0;QRectF visibleRect;int phase=-1;bool moving=false,opened=false,returning=false,presented=false,pulseActive=false;};
+    struct RenderMark {qint64 ns=0,collectorNs=0;quintptr threadId=0;int stage=0;};
+    struct RenderTrace {
+        QMutex mutex;std::vector<RenderMark> marks;size_t count=0;quint64 dropped=0;
+        qint64 armedNs=0,stoppedNs=0;bool armed=false,overflow=false;
+        explicit RenderTrace(size_t capacity):marks(capacity){}
+    };
     const int rowCount=qEnvironmentVariableIsSet("SWIRL_ACTIVITY_PERF_ROWS")?qEnvironmentVariableIntValue("SWIRL_ACTIVITY_PERF_ROWS"):600;
     if(rowCount!=600&&rowCount!=2000)return 2;
     QJsonArray checks;int failures=0;
@@ -51,6 +58,24 @@ static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
     };
     const auto close=[&]{QMetaObject::invokeMethod(transition,"closeDetail");return QTest::qWaitFor([&]{return !transition->property("moving").toBool()&&transition->property("progress").toDouble()==0;},2500);};
     for(int index=0;index<4;++index){check("warm-open-settles-"+QString::number(index),open(index));activityWait(80);check("warm-return-settles-"+QString::number(index),close());}
+    ActivityPerfTrace guiTrace;
+    QQmlEngine::setObjectOwnership(&guiTrace,QQmlEngine::CppOwnership);
+    auto *profileTable=activityVisual(window->contentItem(),"connectionTable");
+    QObject *profilePage=profileTable;
+    while(profilePage&&profilePage->metaObject()->indexOfProperty("connectionRows")<0)profilePage=profilePage->parent();
+    struct RestoreProfiling {
+        QPointer<QObject> page,telemetry;QVariant previousPageObserver,previousFlag,previousObserver;bool attached=true;
+        void detach(){if(!attached)return;attached=false;if(page)page->setProperty("performanceObserver",previousPageObserver);if(telemetry){telemetry->setProperty("_swirlProfileIngest",previousFlag);telemetry->setProperty("_swirlPerformanceObserver",previousObserver);}}
+        ~RestoreProfiling(){detach();}
+    } profiling{profilePage,telemetry,profilePage?profilePage->property("performanceObserver"):QVariant(),telemetry->property("_swirlProfileIngest"),telemetry->property("_swirlPerformanceObserver")};
+    const bool observerAttached=profilePage&&profilePage->setProperty("performanceObserver",QVariant::fromValue<QObject *>(&guiTrace))
+        &&profilePage->property("performanceObserver").value<QObject *>()==&guiTrace;
+    check("stage-observer-attaches-to-real-connections-page",observerAttached);
+    telemetry->setProperty("_swirlProfileIngest",true);
+    telemetry->setProperty("_swirlPerformanceObserver",QVariant::fromValue<QObject *>(&guiTrace));
+    check("stage-observer-attaches-to-native-telemetry-getter",telemetry->property("_swirlPerformanceObserver").value<QObject *>()==&guiTrace);
+    // Installing the nullable observer can reevaluate a QML binding. Use the
+    // existing final warmup wait before arming either measurement collector.
     fixture.connectionsAt=fixture.trafficAt=QDateTime::currentMSecsSinceEpoch();telemetry->ingest(fixture);activityWait(350);
     const QStringList tableNames={"activitySourcesTable","connectionTable","activityTransferHistoryTable","trafficRankingTable"};
     std::array<QQuickItem *,4> tables{};std::array<int,4> rowChanges{},projections{};
@@ -83,12 +108,37 @@ static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
     std::array<Phase,12> phases;int phaseCount=0;
     std::array<double,128> ingestTimes{},prepareTimes{};std::array<Update,128> updateSamples{};int updateCount=0,realUpdateCount=0,heartbeatCount=0;bool updateOverflow=false;
     std::array<Scroll,128> scrollSamples{};size_t scrollCount=0;bool scrollOverflow=false,returningWithScroll=false;
+    const auto renderTrace=std::make_shared<RenderTrace>(140000);
+    const quintptr guiThreadId=reinterpret_cast<quintptr>(QThread::currentThreadId());
     QElapsedTimer elapsed;elapsed.start();bool timedOut=false;
     const auto sample=[&](int kind){if(frameCount>=frames.size()){frameOverflow=true;return;}auto &frame=frames[frameCount++];frame.ns=elapsed.nsecsElapsed();frame.phase=currentPhase;frame.cycle=currentCycle;frame.kind=kind;frame.progress=transition->property("progress").toDouble();frame.moving=transition->property("moving").toBool();frame.opened=transition->property("opened").toBool();frame.destination=clock?int(clock->property("destination").toDouble()):-1;frame.active=window->isActive();frame.exposed=window->isExposed();frame.visible=window->isVisible();frame.visibility=int(window->visibility());};
     {
     // A local receiver removes queued frame deliveries before the later reentry
     // checks and before any of the captured measurement storage is destroyed.
     QObject measurementContext;
+    const QElapsedTimer renderEpoch=elapsed;
+    const auto renderSample=[renderTrace,renderEpoch](int stage){
+        const qint64 started=renderEpoch.nsecsElapsed();
+        QMutexLocker lock(&renderTrace->mutex);
+        if(!renderTrace->armed||started<renderTrace->armedNs)return;
+        if(renderTrace->count>=renderTrace->marks.size()){renderTrace->overflow=true;++renderTrace->dropped;return;}
+        auto &mark=renderTrace->marks[renderTrace->count++];mark.ns=started;mark.stage=stage;
+        mark.threadId=reinterpret_cast<quintptr>(QThread::currentThreadId());
+        // Includes mutex acquisition, but excludes final assignment/unlock and
+        // Qt signal dispatch. No GUI state or QML property is read here.
+        mark.collectorNs=renderEpoch.nsecsElapsed()-started;
+    };
+    const std::array<QMetaObject::Connection,7> renderConnections={
+        QObject::connect(window,&QQuickWindow::beforeFrameBegin,&measurementContext,[renderSample]{renderSample(0);},Qt::DirectConnection),
+        QObject::connect(window,&QQuickWindow::beforeSynchronizing,&measurementContext,[renderSample]{renderSample(1);},Qt::DirectConnection),
+        QObject::connect(window,&QQuickWindow::afterSynchronizing,&measurementContext,[renderSample]{renderSample(2);},Qt::DirectConnection),
+        QObject::connect(window,&QQuickWindow::beforeRendering,&measurementContext,[renderSample]{renderSample(3);},Qt::DirectConnection),
+        QObject::connect(window,&QQuickWindow::afterRendering,&measurementContext,[renderSample]{renderSample(4);},Qt::DirectConnection),
+        QObject::connect(window,&QQuickWindow::frameSwapped,&measurementContext,[renderSample]{renderSample(5);},Qt::DirectConnection),
+        QObject::connect(window,&QQuickWindow::afterFrameEnd,&measurementContext,[renderSample]{renderSample(6);},Qt::DirectConnection)
+    };
+    guiTrace.arm(elapsed);
+    {QMutexLocker lock(&renderTrace->mutex);renderTrace->armedNs=elapsed.nsecsElapsed();renderTrace->armed=true;}
     QTimer watchdog;watchdog.setSingleShot(true);QObject::connect(&watchdog,&QTimer::timeout,&measurementContext,[&]{timedOut=true;qApp->exit(5);});watchdog.start(45000);
     const auto frameConnection=QObject::connect(window,&QQuickWindow::frameSwapped,&measurementContext,[&]{sample(0);},Qt::QueuedConnection);
     QTimer pulse;pulse.setTimerType(Qt::PreciseTimer);pulse.setInterval(500);
@@ -107,6 +157,12 @@ static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
         observation.revisionBefore=telemetry->revision();observation.ingestStart=elapsed.nsecsElapsed();
         QElapsedTimer ingestion;ingestion.start();telemetry->ingest(fixture);ingestTimes[updateCount]=ingestion.nsecsElapsed()/1000000.0;
         observation.end=elapsed.nsecsElapsed();observation.revisionAfter=telemetry->revision();
+        bool accountingOk=false,publishOk=false;
+        observation.accountingMs=telemetry->property("_swirlLastIngestAccountingMs").toDouble(&accountingOk);
+        observation.publishMs=telemetry->property("_swirlLastIngestPublishMs").toDouble(&publishOk);
+        observation.splitValid=accountingOk&&publishOk&&std::isfinite(observation.accountingMs)&&std::isfinite(observation.publishMs)
+            &&observation.accountingMs>=0&&observation.publishMs>=0&&telemetry->property("_swirlProfileIngest").toBool();
+        observation.splitContained=observation.splitValid&&observation.accountingMs+observation.publishMs<=ingestTimes[updateCount];
         if(observation.fixtureChanged&&observation.revisionAfter>observation.revisionBefore)++realUpdateCount;
         ++updateCount;
     });
@@ -155,14 +211,27 @@ static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
     phase("shared-card-animation-live",0,[&]{for(int cycle=0;cycle<8&&!timedOut;++cycle){currentCycle=cycle;sample(3);check("measured-open-settles-"+QString::number(cycle),open(cycle%4));sample(4);activityWait(80);sample(5);check("measured-return-settles-"+QString::number(cycle),close());sample(6);activityWait(80);}currentCycle=-1;});
     phase("home-live-after-animation-details-hidden",4000);
     pulse.stop();phase("quiet-home-after-live",2500);
+    guiTrace.stop();
+    {QMutexLocker lock(&renderTrace->mutex);renderTrace->armed=false;renderTrace->stoppedNs=elapsed.nsecsElapsed();}
+    for(const auto &connection:renderConnections)QObject::disconnect(connection);
     QObject::disconnect(frameConnection);watchdog.stop();
     }
     const auto finalResources=resources();
+    // Direct callbacks may already be in flight when disconnected. They own
+    // shared storage only; disarming under its mutex prevents any later write.
+    std::vector<RenderMark> renderMarks;quint64 renderDropped=0;bool renderOverflow=false;
+    qint64 renderArmedNs=0,renderStoppedNs=0;
+    {QMutexLocker lock(&renderTrace->mutex);renderMarks.assign(renderTrace->marks.begin(),renderTrace->marks.begin()+renderTrace->count);
+        renderDropped=renderTrace->dropped;renderOverflow=renderTrace->overflow;renderArmedNs=renderTrace->armedNs;renderStoppedNs=renderTrace->stoppedNs;}
+    profiling.detach();
     bool chronologicalUpdates=updateCount>0,allUpdatesPublished=true,expectedFixtureChanges=true;
+    bool allIngestSplitsValid=updateCount>0,allIngestSplitsContained=updateCount>0;
     qint64 previousUpdate=-1;
-    for(int index=0;index<updateCount;++index){const auto &value=updateSamples[index];chronologicalUpdates=chronologicalUpdates&&value.start>previousUpdate&&value.ingestStart>=value.start&&value.end>=value.ingestStart;previousUpdate=value.start;allUpdatesPublished=allUpdatesPublished&&value.revisionAfter>value.revisionBefore;expectedFixtureChanges=expectedFixtureChanges&&value.fixtureChanged==(index%3!=2);}
+    for(int index=0;index<updateCount;++index){const auto &value=updateSamples[index];chronologicalUpdates=chronologicalUpdates&&value.start>previousUpdate&&value.ingestStart>=value.start&&value.end>=value.ingestStart;previousUpdate=value.start;allUpdatesPublished=allUpdatesPublished&&value.revisionAfter>value.revisionBefore;expectedFixtureChanges=expectedFixtureChanges&&value.fixtureChanged==(index%3!=2);allIngestSplitsValid=allIngestSplitsValid&&value.splitValid;allIngestSplitsContained=allIngestSplitsContained&&value.splitContained;}
     check("real-update-and-identical-heartbeat-ingestions-occur",realUpdateCount>0&&heartbeatCount>0&&allUpdatesPublished&&expectedFixtureChanges);
     check("update-observations-have-monotonic-ingestion-timestamps",chronologicalUpdates);
+    check("ingestion-accounting-and-publish-durations-are-valid",allIngestSplitsValid);
+    check("ingestion-split-is-contained-in-original-outer-measurement",allIngestSplitsContained);
     for(int index=0;index<phaseCount;++index){const auto &value=phases[index];if(value.dataPulseActive&&value.name!="connections-scroll-return-live")check("real-updates-observed-in-"+value.name,value.realUpdatesAfter>value.realUpdatesBefore);}
     int visibleScrollSteps=0,returnScrollSteps=0;double visibleScrollDistance=0,returnScrollDistance=0;bool returnScrollPulseActive=true;
     for(size_t index=0;index<scrollCount;++index){const auto &value=scrollSamples[index];const double distance=qAbs(value.after-value.before);if(value.presented&&distance>0){++visibleScrollSteps;visibleScrollDistance+=distance;if(value.returning&&value.moving&&!value.opened){++returnScrollSteps;returnScrollDistance+=distance;returnScrollPulseActive=returnScrollPulseActive&&value.pulseActive;}}}
@@ -202,10 +271,83 @@ static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
     for(int index=0;index<phaseCount;++index){const auto &value=phases[index];QJsonArray changes,syncs;for(int table=0;table<4;++table){changes.append(value.rowsAfter[table]-value.rowsBefore[table]);syncs.append(value.syncAfter[table]-value.syncBefore[table]);}const double wall=(value.end-value.start)/1000000.0,cpu=value.after.cpuMs-value.before.cpuMs;
         phaseJson.append(QJsonObject{{"name",value.name},{"startMs",value.start/1000000.0},{"endMs",value.end/1000000.0},{"wallMs",wall},{"processCpuMs",cpu},{"oneCoreCpuPercent",wall>0?cpu/wall*100:0},{"before",resourceJson(value.before)},{"after",resourceJson(value.after)},{"clocksBefore",clockJson(value.clocksBefore)},{"clocksAfter",clockJson(value.clocksAfter)},{"modelUpdates",value.updatesAfter-value.updatesBefore},{"realUpdates",value.realUpdatesAfter-value.realUpdatesBefore},{"dataPulseActive",value.dataPulseActive},{"rowsNotifications",changes},{"modelProjectionSignals",syncs}});}
     for(size_t index=0;index<frameCount;++index){const auto &frame=frames[index];rawFrames.append(QJsonObject{{"timeMs",frame.ns/1000000.0},{"phase",frame.phase},{"cycle",frame.cycle},{"kind",frame.kind},{"progress",frame.progress},{"moving",frame.moving},{"opened",frame.opened},{"destination",frame.destination},{"active",frame.active},{"exposed",frame.exposed},{"visible",frame.visible},{"visibility",frame.visibility}});}
-    for(int index=0;index<updateCount;++index){const auto &value=updateSamples[index];updates.append(QJsonObject{{"index",index},{"timeMs",value.start/1000000.0},{"ingestStartMs",value.ingestStart/1000000.0},{"ingestEndMs",value.end/1000000.0},{"phase",value.phase},{"prepareMs",prepareTimes[index]},{"ingestMs",ingestTimes[index]},{"identicalHeartbeat",index%3==2},{"fixtureChanged",value.fixtureChanged},{"uploadTotal",value.uploadTotal},{"downloadTotal",value.downloadTotal},{"revisionBefore",value.revisionBefore},{"revisionAfter",value.revisionAfter}});}
+    for(int index=0;index<updateCount;++index){const auto &value=updateSamples[index];updates.append(QJsonObject{{"index",index},{"timeMs",value.start/1000000.0},{"ingestStartMs",value.ingestStart/1000000.0},{"ingestEndMs",value.end/1000000.0},{"phase",value.phase},{"prepareMs",prepareTimes[index]},{"ingestMs",ingestTimes[index]},{"accountingMs",value.accountingMs},{"publishMs",value.publishMs},{"splitValid",value.splitValid},{"splitContained",value.splitContained},{"identicalHeartbeat",index%3==2},{"fixtureChanged",value.fixtureChanged},{"uploadTotal",value.uploadTotal},{"downloadTotal",value.downloadTotal},{"revisionBefore",value.revisionBefore},{"revisionAfter",value.revisionAfter}});}
     for(size_t index=0;index<scrollCount;++index){const auto &value=scrollSamples[index];scrollObservations.append(QJsonObject{{"timeMs",value.ns/1000000.0},{"phase",value.phase},{"before",value.before},{"requested",value.requested},{"after",value.after},{"progress",value.progress},{"moving",value.moving},{"opened",value.opened},{"returning",value.returning},{"bodyOpacity",value.bodyOpacity},{"effectiveOpacity",value.effectiveOpacity},{"visibleRect",QJsonObject{{"x",value.visibleRect.x()},{"y",value.visibleRect.y()},{"width",value.visibleRect.width()},{"height",value.visibleRect.height()}}},{"visibleInWindow",value.presented},{"dataPulseActive",value.pulseActive}});}
     QJsonObject scrolling{{"visibleSteps",visibleScrollSteps},{"visibleDistance",visibleScrollDistance},{"returnVisibleSteps",returnScrollSteps},{"returnVisibleDistance",returnScrollDistance},{"observations",scrollObservations}};
+    const auto phaseAt=[&](qint64 ns){for(int index=0;index<phaseCount;++index)if(ns>=phases[index].start&&ns<=phases[index].end)return index;return -1;};
+    const QStringList stageNames={"invalid","snapshot.total","snapshot.fetchNormalize","snapshot.compare","snapshot.assign",
+        "visibleRows.filter","visibleRows.sort","model.sync","table.forceLayout","table.restoreViewport",
+        "table.restoreViewport.deferred","table.endProjection.deferred","telemetry.connections"};
+    std::array<int,13> stageBegins{},stageEnds{},stagePairs{};
+    std::array<qint64,13> stageTotalNs{},stageMaxNs{};
+    struct PendingStage {int stage; qint64 ns;};std::vector<PendingStage> pendingStages;pendingStages.reserve(guiTrace.count());
+    QJsonArray guiMarks,stageCoverage;int unmatchedStageEnds=0;
+    qint64 previousGuiNs=-1,guiCollectorTotalNs=0,guiCollectorMaxNs=0;bool guiChronological=true;
+    for(size_t index=0;index<guiTrace.count();++index){const auto &mark=guiTrace.marks()[index];
+        guiChronological=guiChronological&&mark.ns>=previousGuiNs;previousGuiNs=mark.ns;
+        guiCollectorTotalNs+=mark.collectorNs;guiCollectorMaxNs=qMax(guiCollectorMaxNs,mark.collectorNs);
+        if(mark.stage>0&&mark.stage<int(stageNames.size())){
+            if(mark.entering){++stageBegins[mark.stage];pendingStages.push_back({mark.stage,mark.ns});}
+            else{++stageEnds[mark.stage];if(!pendingStages.empty()&&pendingStages.back().stage==mark.stage){
+                const qint64 duration=mark.ns-pendingStages.back().ns;pendingStages.pop_back();++stagePairs[mark.stage];
+                stageTotalNs[mark.stage]+=duration;stageMaxNs[mark.stage]=qMax(stageMaxNs[mark.stage],duration);
+            }else ++unmatchedStageEnds;}
+        }
+        guiMarks.append(QJsonObject{{"timeMs",mark.ns/1000000.0},{"stage",mark.stage},{"entering",mark.entering},
+            {"phase",phaseAt(mark.ns)},{"collectorNs",mark.collectorNs}});
+    }
+    for(int stage=1;stage<int(stageNames.size());++stage)stageCoverage.append(QJsonObject{{"stage",stage},{"name",stageNames[stage]},
+        {"begins",stageBegins[stage]},{"ends",stageEnds[stage]},{"matchedPairs",stagePairs[stage]},
+        {"inclusiveTotalMs",stageTotalNs[stage]/1000000.0},{"inclusiveMaxMs",stageMaxNs[stage]/1000000.0}});
+    const bool stagesBalanced=pendingStages.empty()&&unmatchedStageEnds==0;
+    check("gui-stage-trace-is-monotonic-balanced-and-on-gui-thread",guiTrace.count()>0&&guiChronological&&stagesBalanced
+        &&guiTrace.wrongThread()==0&&guiTrace.invalidStage()==0);
+    bool connectionStagesObserved=true;for(int stage=1;stage<=7;++stage)connectionStagesObserved=connectionStagesObserved&&stagePairs[stage]>0;
+    check("gui-stage-trace-observes-connection-snapshot-and-projection",connectionStagesObserved);
+    check("gui-stage-trace-observes-native-telemetry-getter",stagePairs[12]>0);
+    QJsonObject guiTraceJson{{"schema",1},{"armedMs",guiTrace.armedNs()/1000000.0},{"stoppedMs",guiTrace.stoppedNs()/1000000.0},
+        {"capacity",qint64(guiTrace.marks().size())},{"count",qint64(guiTrace.count())},{"overflow",guiTrace.overflow()},
+        {"droppedMarks",qint64(guiTrace.dropped())},{"wrongThreadCalls",qint64(guiTrace.wrongThread())},{"invalidStages",qint64(guiTrace.invalidStage())},
+        {"chronological",guiChronological},{"balanced",stagesBalanced},{"unclosedBegins",qint64(pendingStages.size())},{"unmatchedEnds",unmatchedStageEnds},
+        {"collectorTotalNs",guiCollectorTotalNs},{"collectorMaxNs",guiCollectorMaxNs},{"coverage",stageCoverage},{"marks",guiMarks},
+        {"method","GUI boundary marks share the original elapsed epoch. Nested durations are inclusive and must not be summed. Deferred marks cover execution, not queue waiting. Stage 12 measures native connection copying/sorting before return; QVariant-to-JavaScript conversion is outside it. Collector costs are lower bounds excluding QML/native dispatch and return; observation overhead is nonzero."}};
+    const QStringList renderNames={"beforeFrameBegin","beforeSynchronizing","afterSynchronizing","beforeRendering","afterRendering","frameSwapped","afterFrameEnd"};
+    std::array<int,7> renderCounts{};QJsonArray renderEvents,renderCoverage;
+    qint64 previousRenderNs=-1,renderCollectorTotalNs=0,renderCollectorMaxNs=0;
+    int renderFrame=-1,nextRenderFrame=0,renderMask=0,lastRenderStage=-1,renderOrphans=0,renderPartials=0,renderComplete=0,renderDuplicates=0,renderOutOfOrder=0,renderInvalidStages=0;
+    bool renderChronological=true;
+    for(const auto &mark:renderMarks){
+        renderChronological=renderChronological&&mark.ns>=previousRenderNs;previousRenderNs=mark.ns;
+        renderCollectorTotalNs+=mark.collectorNs;renderCollectorMaxNs=qMax(renderCollectorMaxNs,mark.collectorNs);
+        const bool validStage=mark.stage>=0&&mark.stage<int(renderNames.size());
+        if(!validStage)++renderInvalidStages;else ++renderCounts[mark.stage];
+        if(mark.stage==0){if(renderFrame>=0)++renderPartials;renderFrame=nextRenderFrame++;renderMask=0;lastRenderStage=-1;}
+        const bool orphan=renderFrame<0,duplicate=validStage&&!orphan&&(renderMask&(1<<mark.stage));
+        const bool outOfOrder=validStage&&!orphan&&mark.stage<lastRenderStage;
+        if(orphan)++renderOrphans;if(duplicate)++renderDuplicates;if(outOfOrder)++renderOutOfOrder;
+        renderEvents.append(QJsonObject{{"timeMs",mark.ns/1000000.0},{"stage",mark.stage},{"phase",phaseAt(mark.ns)},
+            {"beginFrameSequence",renderFrame},{"orphan",orphan},{"duplicateStage",duplicate},{"outOfOrder",outOfOrder},
+            {"threadId",QString::number(qulonglong(mark.threadId),16)},{"onGuiThread",mark.threadId==guiThreadId},{"collectorNs",mark.collectorNs}});
+        if(validStage&&!orphan){renderMask|=1<<mark.stage;lastRenderStage=mark.stage;}
+        if(mark.stage==6&&renderFrame>=0){if(renderMask==127)++renderComplete;else ++renderPartials;renderFrame=-1;renderMask=0;lastRenderStage=-1;}
+    }
+    if(renderFrame>=0)++renderPartials;
+    bool allRenderStagesObserved=true;
+    for(int stage=0;stage<int(renderNames.size());++stage){allRenderStagesObserved=allRenderStagesObserved&&renderCounts[stage]>0;
+        renderCoverage.append(QJsonObject{{"stage",stage},{"signal",renderNames[stage]},{"count",renderCounts[stage]}});}
+    check("direct-render-trace-observes-all-seven-window-signals",allRenderStagesObserved);
+    check("direct-render-trace-has-monotonic-known-signal-events",renderChronological&&renderInvalidStages==0);
+    check("gui-and-direct-render-traces-fit-fixed-buffers",!guiTrace.overflow()&&guiTrace.dropped()==0&&!renderOverflow&&renderDropped==0);
+    QJsonObject renderTraceJson{{"schema",1},{"armedMs",renderArmedNs/1000000.0},{"stoppedMs",renderStoppedNs/1000000.0},
+        {"capacity",140000},{"count",qint64(renderMarks.size())},{"overflow",renderOverflow},{"droppedEvents",qint64(renderDropped)},
+        {"chronological",renderChronological},{"invalidStages",renderInvalidStages},{"completeFrames",renderComplete},
+        {"partialFrames",renderPartials},{"orphanEvents",renderOrphans},{"duplicateStages",renderDuplicates},{"outOfOrderStages",renderOutOfOrder},
+        {"guiThreadId",QString::number(qulonglong(guiThreadId),16)},{"collectorTotalNs",renderCollectorTotalNs},{"collectorMaxNs",renderCollectorMaxNs},
+        {"coverage",renderCoverage},{"events",renderEvents},
+        {"method","Direct QQuickWindow signal entry timestamps share the original elapsed epoch and read no GUI/QML state. Phase/frame labels are derived only after disarm and disconnect; every orphan, partial and duplicate is retained. frameSwapped is a Qt callback, not physical scan-out. Collector costs include mutex acquisition but exclude final unlock/Qt dispatch and are lower bounds; existing queued GUI frames remain a separate stream."}};
     QJsonObject report{{"rows",rowCount},{"checks",checks},{"failures",failures},{"qt",qVersion()},{"renderer",int(window->rendererInterface()->graphicsApi())},{"dpr",window->devicePixelRatio()},{"refreshHz",window->screen()?window->screen()->refreshRate():0},{"phases",phaseJson},{"frames",rawFrames},{"updates",updates},{"realUpdates",realUpdateCount},{"identicalHeartbeats",heartbeatCount},{"scrolling",scrolling},{"tableNames",QJsonArray::fromStringList(tableNames)},{"finalResources",resourceJson(finalResources)},{"methods",QJsonArray{"Same deterministic authenticated-adapter-shaped records enter the actual isolated TelemetryService, without starting a proxy or network engine.","500ms pulses alternate two real byte/timestamp changes with one identical heartbeat. Fixture preparation and ingestion durations, monotonic observation timestamps and actual service revisions are recorded separately.","Frame completion callbacks capture GUI-side motion/exposure context; they are not exact render-time or hardware-presentation observations. Every observed frame/event remains in the raw record.","Quiet/static phases and active transitions must be analyzed separately, retaining boundaries and inactive/exposure changes.","The existing connection-detail return runs with the scroll and data timers still active. Scroll observations require a live list viewport with positive effective opacity and a positive intersection through every ancestor clip and the native window; hidden lists are not scrolled. These are GUI-state observations, not hardware-presentation measurements.","Detail model projection and new input intentionally pause during transition. Continued visible scrolling does not require a model refresh or a 500ms data pulse inside the shorter return animation; real ingestion is asserted in the preceding sustained live phase.","Frame, update and scroll storage is fixed and initialized before measurement. JSON serialization and screenshots are excluded from timing. Model row notifications/projection signals are counted without per-event allocation.","CPU is process user+kernel time, expressed as a percentage of one CPU core; private commit and working set are separate. Finite measurements are not unlimited leak proof."}}};
+    report.insert("guiStageTrace",guiTraceJson);report.insert("renderTrace",renderTraceJson);
+    report.insert("ingestionSplitMethod","Accounting excludes synchronous publish intervals; publish includes synchronous signal fan-out. Both are measured by the test-compiled TelemetryService. The existing outer ingest duration also includes profiler completion/property recording.");
     QDir().mkpath(QFileInfo(output).absolutePath());QFile file(output);if(!file.open(QIODevice::WriteOnly))return 2;file.write(QJsonDocument(report).toJson());
     qInfo()<<"ACTIVITY_PERF_RESULT"<<rowCount<<failures<<"updates"<<updateCount<<"frames"<<frameCount;return failures?1:0;
 }

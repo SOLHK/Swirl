@@ -20,6 +20,9 @@
 #include <cmath>
 #include <algorithm>
 #include <array>
+#ifdef SWIRL_ACTIVITY_PERF_TRACE
+#include <QThread>
+#endif
 #ifdef Q_OS_WIN
 #include <winsock2.h>
 #include <windows.h>
@@ -27,6 +30,59 @@
 #include <icmpapi.h>
 #endif
 namespace {
+#ifdef SWIRL_ACTIVITY_PERF_TRACE
+// Test-only, opt-in timings. Keep synchronous signal fan-out separate from
+// accounting without changing the service layout or any publication path.
+struct TelemetryIngestProfile;
+thread_local TelemetryIngestProfile *activeTelemetryIngestProfile=nullptr;
+struct TelemetryIngestProfile {
+ QPointer<QObject> owner;
+ TelemetryIngestProfile *previous;
+ QElapsedTimer clock;
+ qint64 publishNs=0;
+ int publishDepth=0;
+ bool enabled;
+ explicit TelemetryIngestProfile(QObject *service)
+  :owner(service),previous(activeTelemetryIngestProfile),enabled(service->property("_swirlProfileIngest").toBool()){
+  if(enabled){activeTelemetryIngestProfile=this;clock.start();}
+ }
+ ~TelemetryIngestProfile(){
+  if(!enabled)return;
+  const auto totalNs=clock.nsecsElapsed();
+  activeTelemetryIngestProfile=previous;
+  // Dynamic-property writes happen after the measured interval, never per row.
+  if(owner)owner->setProperty("_swirlLastIngestAccountingMs",double(totalNs-publishNs)/1000000.0);
+  if(owner)owner->setProperty("_swirlLastIngestPublishMs",double(publishNs)/1000000.0);
+ }
+};
+struct TelemetryPublishProfile {
+ TelemetryIngestProfile *ingest;
+ qint64 startedNs=0;
+ bool outermost=false;
+ explicit TelemetryPublishProfile(QObject *service)
+  :ingest(activeTelemetryIngestProfile&&activeTelemetryIngestProfile->owner==service?activeTelemetryIngestProfile:nullptr){
+  if(ingest){outermost=ingest->publishDepth++==0;if(outermost)startedNs=ingest->clock.nsecsElapsed();}
+ }
+ ~TelemetryPublishProfile(){
+  if(!ingest)return;
+  if(outermost)ingest->publishNs+=ingest->clock.nsecsElapsed()-startedNs;
+  --ingest->publishDepth;
+ }
+};
+struct TelemetryConnectionsProfile {
+ QPointer<QObject> observer;
+ explicit TelemetryConnectionsProfile(const QObject *service)
+  :observer(service->property("_swirlPerformanceObserver").value<QObject *>()){
+  if(!observer)return;
+  const auto thread=QThread::currentThread();
+  if(service->thread()!=thread||observer->thread()!=thread){observer.clear();return;}
+  if(!QMetaObject::invokeMethod(observer.data(),"mark",Qt::DirectConnection,Q_ARG(int,12),Q_ARG(bool,true)))observer.clear();
+ }
+ ~TelemetryConnectionsProfile(){
+  if(observer)QMetaObject::invokeMethod(observer.data(),"mark",Qt::DirectConnection,Q_ARG(int,12),Q_ARG(bool,false));
+ }
+};
+#endif
 qint64 nowMs(){return QDateTime::currentMSecsSinceEpoch();}
 void add(QJsonObject &o,const QString &key,double value){o[key]=o.value(key).toDouble()+value;}
 void aggregate(QJsonObject &group,QString key,double up,double down,bool count){
@@ -46,7 +102,12 @@ TelemetryService::TelemetryService(QString path,bool networkMeasurements,QObject
 TelemetryService::~TelemetryService(){flush();}
 bool TelemetryService::sampled() const{return m_status.apiHealthy&&m_status.trafficAt>0&&nowMs()-m_status.trafficAt<6000;}
 bool TelemetryService::connectionsSampled() const{return m_status.apiHealthy&&m_status.connectionsAt>0&&nowMs()-m_status.connectionsAt<6000;}
-void TelemetryService::publish(){m_publishedSampled=sampled();m_publishedConnectionsSampled=connectionsSampled();++m_revision;emit changed();}
+void TelemetryService::publish(){
+#ifdef SWIRL_ACTIVITY_PERF_TRACE
+ TelemetryPublishProfile profile(this);
+#endif
+ m_publishedSampled=sampled();m_publishedConnectionsSampled=connectionsSampled();++m_revision;emit changed();
+}
 QString TelemetryService::formatBytes(double bytes) const {
  const QStringList units={"B","KB","MB","GB","TB"};int i=0;while(bytes>=1024&&i<4){bytes/=1024;++i;}
  return QString::number(bytes,'f',i?1:0)+" "+units[i];
@@ -63,6 +124,9 @@ int TelemetryService::activeDevices() const {
  return addresses.size();
 }
 void TelemetryService::ingest(const ProxyEngine::Status &status){
+#ifdef SWIRL_ACTIVITY_PERF_TRACE
+ TelemetryIngestProfile profile(this);
+#endif
  const auto epoch=QString::number(status.processId)+"/"+status.sessionId;
  if(status.processAlive&&m_epoch!=epoch){m_epoch=epoch;m_seen.clear();m_lastConnections=0;m_lastTraffic=0;m_lastUp=0;m_lastDown=0;m_externalIp.clear();m_latencies.clear();}
  const auto route=epoch+"/"+status.selectedNodeId+"/"+status.mode+"/"+QString::number(status.proxyPort)+"/"+QString::number(status.processAlive)+"/"+QString::number(status.apiHealthy)+"/"+QString::number(status.directSession)+"/"+status.configurationReceipt.value("applied_revision").toString()+"/"+status.configurationReceipt.value("generation").toString();
@@ -139,7 +203,14 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
  if(status.trafficAt>m_lastTraffic){m_lastTraffic=status.trafficAt;m_history.append(QVariantMap{{"time",status.trafficAt},{"down",status.downloadRate},{"up",status.uploadRate}});while(m_history.size()>3600)m_history.removeFirst();m_dirty=true;}
  publish();
 }
-QVariantList TelemetryService::connections() const {QVariantList rows;for(const auto &r:m_seen)rows.append(r);std::sort(rows.begin(),rows.end(),[](const QVariant &a,const QVariant &b){return a.toMap().value("lastSeen").toLongLong()>b.toMap().value("lastSeen").toLongLong();});return rows;}
+QVariantList TelemetryService::connections() const {
+#ifdef SWIRL_ACTIVITY_PERF_TRACE
+ // This ends after native return-value construction; QVariant-to-JS conversion
+ // happens in the caller and is included only in the page's fetch/normalize span.
+ TelemetryConnectionsProfile profile(this);
+#endif
+ QVariantList rows;for(const auto &r:m_seen)rows.append(r);std::sort(rows.begin(),rows.end(),[](const QVariant &a,const QVariant &b){return a.toMap().value("lastSeen").toLongLong()>b.toMap().value("lastSeen").toLongLong();});return rows;
+}
 QJsonObject TelemetryService::periodData(int period) const {
  if(period<0||period>3)period=0;
  const auto today=QDate::currentDate();

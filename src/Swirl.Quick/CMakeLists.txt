@@ -19,6 +19,8 @@ option(SWIRL_XRAY_UI_TESTS "Build the isolated JSON import acceptance profile in
 # This path deliberately precedes third_party and all application/core targets.
 function(swirl_add_font_tests)
  add_executable(SwirlFontTests tests/FontTests.cpp app/FontManager.h app/FontManager.cpp app/FontAxisPolicy.h app/FontAxisPolicy.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp)
+ # Source-loaded shared controls use the same native press clock as the app.
+ target_sources(SwirlFontTests PRIVATE app/SwirlPressClock.h app/SwirlPressClock.cpp)
  target_include_directories(SwirlFontTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
  target_compile_definitions(SwirlFontTests PRIVATE SWIRL_UI_TESTS SWIRL_QML_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/qml")
  # QRhi is Qt's documented texture-upload API, supplied by GuiPrivate.
@@ -464,6 +466,10 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  set_tests_properties(swirl-node-real-chain PROPERTIES TIMEOUT 180)
  if(SWIRL_BUILD_UI_TESTS)
  target_sources(Swirl PRIVATE tests/EngineUiChecks.cpp tests/EngineUiChecks.h tests/NodeUiChecks.cpp tests/NodeUiChecks.h tests/PolicyUiChecks.cpp tests/PolicyUiChecks.h tests/MotionChecks.cpp tests/MotionChecks.h tests/ApecMotionChecks.cpp tests/ApecGlassChecks.cpp tests/RouteBench.cpp tests/RouteBench.h tests/LiquidGlassChecks.cpp tests/U2Checks.cpp)
+ target_sources(Swirl PRIVATE tests/ActivityPerfTrace.h)
+ # Opt-in timing is compiled only for this QA profile; production has no
+ # telemetry timing properties or test observer class.
+ target_compile_definitions(SwirlEngine PRIVATE SWIRL_ACTIVITY_PERF_TRACE)
  target_compile_definitions(Swirl PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
  add_test(NAME swirl-node-ui COMMAND Swirl --node-self-test)
  set_tests_properties(swirl-node-ui PROPERTIES TIMEOUT 180 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")

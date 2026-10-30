@@ -181,13 +181,14 @@ jobs:
           # Compiler caches can include captures and logs from their source run.
           # Clear these before configure/build, so even a compiler failure cannot
           # upload old tests as evidence for the current source identity.
+          Remove-Item -LiteralPath 'build-evidence/ctest-inventory.json' -Force -ErrorAction SilentlyContinue
           foreach ($directory in @('hero-evidence','navigation-evidence','settings-material-evidence','policy-evidence','activity-layout','liquid-glass-evidence')) {
             Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $directory) -Recurse -Force -ErrorAction SilentlyContinue
           }
           foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt')) {
             Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $file) -Force -ErrorAction SilentlyContinue
           }
-          Get-ChildItem -Path 'build/swirl-quick/*-report.json','build/swirl-quick/activity-feather-*.png','build/swirl-quick/font-*.xml','build/swirl-quick/Release/Swirl-*.txt' -File -ErrorAction SilentlyContinue | Remove-Item -Force
+          Get-ChildItem -Path 'build/swirl-quick/*-report.json','build/swirl-quick/activity-feather-*.png','build/swirl-quick/activity-data-*.png','build/swirl-quick/font-*.xml','build/swirl-quick/Release/Swirl-*.txt' -File -ErrorAction SilentlyContinue | Remove-Item -Force
       - name: Configure Qt UI independently
         shell: pwsh
         run: |
@@ -273,6 +274,13 @@ jobs:
         id: critical_ui
         shell: pwsh
         run: |
+          # Preserve the actual configured test inventory so the staged runs
+          # can be audited for complete coverage without executing them twice.
+          $inventoryJson = ctest --test-dir build/swirl-quick -C Release --show-only=json-v1
+          if ($LASTEXITCODE -ne 0) { throw 'Configured CTest inventory could not be read.' }
+          $inventory = ($inventoryJson -join [Environment]::NewLine) | ConvertFrom-Json
+          if ($null -eq $inventory.tests -or @($inventory.tests).Count -eq 0) { throw 'Configured CTest inventory is empty.' }
+          [ordered]@{source_sha=$env:GITHUB_SHA; inventory=$inventory} | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath 'build-evidence/ctest-inventory.json' -Encoding utf8
           # Run affected UI checks before packaging. The remaining registered suite
           # runs after the test installer is uploaded; these names are excluded there
           # so a required check is never repeated just to change stage ordering.
@@ -751,6 +759,7 @@ jobs:
             build/swirl-quick/Testing/Temporary/LastTest.log
             build-evidence/full-regression.xml
             build-evidence/overview-input.log
+            build-evidence/ctest-inventory.json
             build-evidence/activity-diagnostic-regression.xml
             build-evidence/d3d11-frame-latency/
             build/swirl-quick/engine-contract.txt
@@ -767,6 +776,7 @@ jobs:
             build/swirl-quick/activity-details-report.json
             build/swirl-quick/activity-perf-*-report.json
             build/swirl-quick/activity-feather-*.png
+            build/swirl-quick/activity-data-*.png
             build/swirl-quick/activity-layout/
             build/swirl-quick/policy-evidence/
             build/swirl-quick/liquid-glass-evidence/

@@ -1,4 +1,5 @@
 #include "MotionChecks.h"
+#include "ActivityPerfTrace.h"
 #include "RouteBench.h"
 #include "app/MotionPolicy.h"
 #include <QQuickWindow>
@@ -614,27 +615,56 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
             QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,visible.center().toPoint());
             return true;
         };
-        const auto recordText=[&](QQuickItem *scope,const QString &expected,const QString &model,const QString &phase){
-            QPointer<QQuickItem> text=scope?activityVisual(scope,"activitySourceSelectedName"):nullptr;
-            if(text&&text->property("text").toString()!=expected)text=nullptr;
-            if(!text&&scope)for(auto *candidate:scope->findChildren<QQuickItem *>()){
-                if(candidate->metaObject()->indexOfProperty("truncated")>=0&&candidate->property("text").toString()==expected){text=candidate;break;}
-            }
-            if(text)for(auto *ancestor=text->parentItem();ancestor;ancestor=ancestor->parentItem()){
-                if(ancestor->metaObject()->indexOfProperty("contentY")<0||ancestor->metaObject()->indexOfProperty("contentHeight")<0)continue;
-                const double first=ancestor->property("originY").toDouble();
-                const double last=first+qMax(0.0,ancestor->property("contentHeight").toDouble()-ancestor->height());
-                const double position=ancestor->property("contentY").toDouble()+text->mapToItem(ancestor,QPointF()).y();
-                ancestor->setProperty("contentY",qBound(first,position-qMax(0.0,(ancestor->height()-text->height())/2),last));
-            }
-            const bool shown=text&&QTest::qWaitFor([&]{return text&&!visibleBounds(text).isEmpty();},1500);
+        const auto recordText=[&](QQuickItem *scope,const QString &expected,const QString &model,const QString &phase,
+                                  QQuickItem *expectedSource=nullptr,const QString &expectedId=QString()){
+            QPointer<QQuickItem> text,searchRoot;
+            bool scopeMatches=false;int visualItemsExamined=0;
+            const bool shown=QTest::qWaitFor([&]{
+                text=nullptr;searchRoot=nullptr;visualItemsExamined=0;
+                if(!scope)return false;
+                if(expectedSource){
+                    searchRoot=qvariant_cast<QQuickItem *>(scope->property("motionSurface"));
+                    auto *layer=qvariant_cast<QQuickItem *>(scope->property("animationLayer"));
+                    scopeMatches=qvariant_cast<QQuickItem *>(scope->property("sourceViewport"))==expectedSource
+                        &&expectedSource->property("selectedId").toString()==expectedId
+                        &&scope->property("detailOpen").toBool()&&!scope->property("moving").toBool()
+                        &&searchRoot&&layer&&searchRoot->parentItem()==layer&&searchRoot->window()==window;
+                    if(!scopeMatches)return false;
+                    // Repeater delegates have a visual parent but need not be
+                    // QObject descendants of the detail slot. Stay inside this
+                    // selected detail's actual surface, excluding table cells.
+                    const auto findText=[&](auto &&self,QQuickItem *item)->QQuickItem *{
+                        ++visualItemsExamined;
+                        if(item->metaObject()->indexOfProperty("truncated")>=0&&item->property("text").toString()==expected)return item;
+                        for(auto *child:item->childItems())if(auto *found=self(self,child))return found;
+                        return nullptr;
+                    };
+                    text=findText(findText,searchRoot);
+                }else{
+                    searchRoot=scope;text=activityVisual(scope,"activitySourceSelectedName");
+                    scopeMatches=text&&text->property("text").toString()==expected;
+                    if(!scopeMatches){text=nullptr;return false;}
+                }
+                if(!text)return false;
+                for(auto *ancestor=text->parentItem();ancestor&&ancestor!=searchRoot;ancestor=ancestor->parentItem()){
+                    if(ancestor->metaObject()->indexOfProperty("contentY")<0||ancestor->metaObject()->indexOfProperty("contentHeight")<0)continue;
+                    const double first=ancestor->property("originY").toDouble();
+                    const double last=first+qMax(0.0,ancestor->property("contentHeight").toDouble()-ancestor->height());
+                    const double position=ancestor->property("contentY").toDouble()+text->mapToItem(ancestor,QPointF()).y();
+                    ancestor->setProperty("contentY",qBound(first,position-qMax(0.0,(ancestor->height()-text->height())/2),last));
+                }
+                return text&&!visibleBounds(text).isEmpty();
+            },1500);
             const auto rect=text?bounds(text):QRectF(),visible=text?visibleBounds(text):QRectF();
             const auto geometry=[](const QRectF &value){return QJsonObject{{"x",value.x()},{"y",value.y()},{"width",value.width()},{"height",value.height()}};};
             const bool complete=shown&&text&&!text->property("truncated").toBool()&&visible.width()+1>=rect.width();
             dataSamples.append(QJsonObject{{"phase",phase},{"expected",expected},{"model",model},
                 {"displayed",text?text->property("text").toString():QString()},{"bounds",geometry(rect)},
                 {"visibleBounds",geometry(visible)},{"fullyReadableHorizontally",complete},{"visible",shown},
-                {"truncated",text?text->property("truncated").toBool():true}});
+                {"truncated",text?text->property("truncated").toBool():true},{"scopeMatches",scopeMatches},
+                {"locator",expectedSource?"selected-detail-surface-visual-tree":"named-source-selection-label"},
+                {"expectedSelectedId",expectedId},{"sourceViewport",expectedSource?expectedSource->objectName():QString()},
+                {"visualItemsExamined",visualItemsExamined}});
             return complete&&model==expected&&text->property("text").toString()==expected;
         };
         auto *sourceSearch=activityVisual(window->contentItem(),"activitySourcesSearch");
@@ -760,12 +790,18 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
                     {"detailVisible",ready}});
                 const auto field=[&](const QString &label){return evalOn(connectionPage,"(connectionDetailRows.find(row=>row[0]==="+quoted(label)+")||[])[1]").toString();};
                 const auto target=row?ipv6Target:canonicalIpv6Target;
-                check("ipv6-connection-source-text-matches-native-model-"+QString::number(row),recordText(detail,ipv6Source,field(QStringLiteral("来源地址")),"ipv6-connection-source-"+QString::number(row)));
-                check("ipv6-connection-target-text-matches-native-model-"+QString::number(row),recordText(detail,target,field(QStringLiteral("目标")),"ipv6-connection-target-"+QString::number(row)));
+                check("ipv6-connection-source-text-matches-native-model-"+QString::number(row),recordText(detail,ipv6Source,field(QStringLiteral("来源地址")),"ipv6-connection-source-"+QString::number(row),connectionTable,id));
+                check("ipv6-connection-target-text-matches-native-model-"+QString::number(row),recordText(detail,target,field(QStringLiteral("目标")),"ipv6-connection-target-"+QString::number(row),connectionTable,id));
                 if(row){
                     check("long-policy-connection-text-matches-native-model",nativeRecord.value("policy").toString()==longPolicy
-                        &&recordText(detail,longPolicy,field(QStringLiteral("匹配策略")),"long-policy-connection-detail"));
-                    check("long-proxy-node-connection-text-matches-native-model",recordText(detail,longProxyNode,field(QStringLiteral("代理节点")),"long-proxy-node-connection-detail"));
+                        &&recordText(detail,longPolicy,field(QStringLiteral("匹配策略")),"long-policy-connection-detail",connectionTable,id));
+                    check("long-proxy-node-connection-text-matches-native-model",recordText(detail,longProxyNode,field(QStringLiteral("代理节点")),"long-proxy-node-connection-detail",connectionTable,id));
+                }
+                if(!output.isEmpty()){
+                    const QString directory=QFileInfo(output).absolutePath(),name=QString("activity-data-connection-%1.png").arg(row);
+                    const auto image=window->grabWindow();
+                    check("selected-connection-data-screenshot-"+QString::number(row),QDir().mkpath(directory)&&!image.isNull()&&image.save(directory+"/"+name));
+                    dataSamples.append(QJsonObject{{"phase","selected-connection-data-screenshot"},{"selectedId",id},{"file",name}});
                 }
             }
             eval("AppState.detailOpen=false");

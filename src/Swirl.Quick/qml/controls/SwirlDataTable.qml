@@ -7,6 +7,7 @@ Item {
     property var columns:[{key:"name",label:"名称",w:220}]
     property var rows:[]
     property var externalModel:null
+    property QtObject performanceObserver:null
     property bool incrementalRows:false
     property bool sectioned:false
     property real sectionHeight:Theme.dp(32)
@@ -52,17 +53,25 @@ Item {
         visiblePositions={}
     }
     function restoreViewport() {
-        const generation=projectionGeneration
-        if(followTail&&wasAtEnd){list.positionViewAtEnd();animateVisibleRows();return}
-        const index=anchorKey.length?rowForKey(anchorKey):-1
-        if(index<0){animateVisibleRows();return}
-        list.positionViewAtIndex(index,ListView.Beginning)
-        Qt.callLater(function(){
-            if(generation!==table.projectionGeneration)return
-            const item=list.itemAtIndex(index)
-            if(item)list.contentY=Math.max(list.originY,Math.min(item.y-table.anchorOffset,list.originY+Math.max(0,list.contentHeight-list.height)))
-            table.animateVisibleRows()
-        })
+        const observer=performanceObserver
+        if(observer)observer.mark(9,true)
+        try {
+            const generation=projectionGeneration
+            if(followTail&&wasAtEnd){list.positionViewAtEnd();animateVisibleRows();return}
+            const index=anchorKey.length?rowForKey(anchorKey):-1
+            if(index<0){animateVisibleRows();return}
+            list.positionViewAtIndex(index,ListView.Beginning)
+            Qt.callLater(function(){
+                const deferredObserver=table.performanceObserver
+                if(deferredObserver)deferredObserver.mark(10,true)
+                try {
+                    if(generation!==table.projectionGeneration)return
+                    const item=list.itemAtIndex(index)
+                    if(item)list.contentY=Math.max(list.originY,Math.min(item.y-table.anchorOffset,list.originY+Math.max(0,list.contentHeight-list.height)))
+                    table.animateVisibleRows()
+                } finally {if(deferredObserver)deferredObserver.mark(10,false)}
+            })
+        } finally {if(observer)observer.mark(9,false)}
     }
     function beginProjection() {
         ++projectionGeneration
@@ -76,7 +85,17 @@ Item {
     }
     function endProjection() {
         const generation=projectionGeneration
-        Qt.callLater(function(){if(generation===table.projectionGeneration){list.forceLayout();table.restoreViewport()}})
+        Qt.callLater(function(){
+            const observer=table.performanceObserver
+            if(observer)observer.mark(11,true)
+            try {
+                if(generation!==table.projectionGeneration)return
+                if(observer)observer.mark(8,true)
+                try {list.forceLayout()}
+                finally {if(observer)observer.mark(8,false)}
+                table.restoreViewport()
+            } finally {if(observer)observer.mark(11,false)}
+        })
     }
     Connections {target:stableRows;function onAboutToSync(){table.beginProjection()}function onSynced(){table.endProjection()}}
     Connections {target:table.sectioned?table.externalModel:null;ignoreUnknownSignals:true;function onAboutToSync(){table.beginProjection()}function onSynced(){table.endProjection()}}
@@ -95,7 +114,7 @@ Item {
     }
     function focusRowAt(index){const row=list.itemAtIndex(index);if(row){list.currentIndex=index;chooseRow(row,false)}}
     readonly property int renderedRows:list.contentItem.children.length
-    SwirlAnimatedModel{id:stableRows;source:table.incrementalRows?table.rows:[];keyRole:"id"}
+    SwirlAnimatedModel{id:stableRows;source:table.incrementalRows?table.rows:[];keyRole:"id";performanceObserver:table.performanceObserver}
     property string selectedId:""
     property Item selectedItem:null
     property int itemHeight:Theme.tableRowHeight
