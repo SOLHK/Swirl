@@ -49,10 +49,10 @@ QJsonObject rectangle(const QRectF &rect) {
 QJsonObject dimensions(const QSize &size) {
     return {{"width", size.width()}, {"height", size.height()}};
 }
-bool near(qreal a, qreal b, qreal tolerance = 1.1) { return std::abs(a - b) <= tolerance; }
+bool nearScalar(qreal a, qreal b, qreal tolerance = 1.1) { return std::abs(a - b) <= tolerance; }
 bool nearRect(const QRectF &a, const QRectF &b, qreal tolerance = 2) {
-    return near(a.x(), b.x(), tolerance) && near(a.y(), b.y(), tolerance)
-        && near(a.width(), b.width(), tolerance) && near(a.height(), b.height(), tolerance);
+    return nearScalar(a.x(), b.x(), tolerance) && nearScalar(a.y(), b.y(), tolerance)
+        && nearScalar(a.width(), b.width(), tolerance) && nearScalar(a.height(), b.height(), tolerance);
 }
 }
 
@@ -79,7 +79,7 @@ int runActivityLayoutChecks(QQuickWindow *window, const QString &outputDirectory
     const auto hostProxyBefore = SystemProxySession::snapshot();
     const bool nativeDpi = qEnvironmentVariableIsEmpty("QT_SCALE_FACTOR") && qEnvironmentVariableIsEmpty("QT_SCREEN_SCALE_FACTORS");
     if (qEnvironmentVariableIsSet("SWIRL_LAYOUT_EXPECTED_DPR"))
-        check("window-DPR-matches-requested-Windows-scale", near(window->devicePixelRatio(), qEnvironmentVariable("SWIRL_LAYOUT_EXPECTED_DPR").toDouble(), 0.01));
+        check("window-DPR-matches-requested-Windows-scale", nearScalar(window->devicePixelRatio(), qEnvironmentVariable("SWIRL_LAYOUT_EXPECTED_DPR").toDouble(), 0.01));
     policy->setSystemReducedMotionOverrideForTest(0);
     struct PolicyRestore {
         MotionPolicy *policy;
@@ -244,17 +244,17 @@ int runActivityLayoutChecks(QQuickWindow *window, const QString &outputDirectory
             const qreal bottomRatio = sources.width() / (sources.width() + diagnosis.width());
             sample.insert("topWidthRatio", topRatio);
             sample.insert("bottomWidthRatio", bottomRatio);
-            check(caseName + "-top-row-aligned", near(status.top(), traffic.top()) && near(status.height(), traffic.height()));
+            check(caseName + "-top-row-aligned", nearScalar(status.top(), traffic.top()) && nearScalar(status.height(), traffic.height()));
             check(caseName + "-top-ratio-five-seven", std::abs(topRatio - 5.0 / 12) < 0.03);
             check(caseName + "-bottom-ratio-seven-five", std::abs(bottomRatio - 7.0 / 12) < 0.03);
-            check(caseName + "-bottom-stack-matches-source", near(sources.top(), diagnosis.top())
-                && near(sources.bottom(), connections.bottom()) && near(diagnosis.x(), connections.x())
-                && near(diagnosis.width(), connections.width()));
+            check(caseName + "-bottom-stack-matches-source", nearScalar(sources.top(), diagnosis.top())
+                && nearScalar(sources.bottom(), connections.bottom()) && nearScalar(diagnosis.x(), connections.x())
+                && nearScalar(diagnosis.width(), connections.width()));
             const qreal gap = traffic.left() - status.right();
             check(caseName + "-consistent-gaps", gap > 8 && gap < 25
-                && near(diagnosis.left() - sources.right(), gap) && near(connections.top() - diagnosis.bottom(), gap)
-                && near(sources.top() - status.bottom(), gap));
-            check(caseName + "-same-page-outer-edges", near(status.left(), sources.left()) && near(traffic.right(), diagnosis.right()));
+                && nearScalar(diagnosis.left() - sources.right(), gap) && nearScalar(connections.top() - diagnosis.bottom(), gap)
+                && nearScalar(sources.top() - status.bottom(), gap));
+            check(caseName + "-same-page-outer-edges", nearScalar(status.left(), sources.left()) && nearScalar(traffic.right(), diagnosis.right()));
             check(caseName + "-status-row-has-no-excess-vertical-empty-space", status.height() <= std::max(290.0, scroll->height() * 0.47));
             check(caseName + "-source-reserves-summary-records", sources.height() >= 326);
             if (scroll->height() >= 596) {
@@ -266,7 +266,7 @@ int runActivityLayoutChecks(QQuickWindow *window, const QString &outputDirectory
         } else {
             for (int index = 1; index < bounds.size(); ++index)
                 check(caseName + "-single-column-order-" + keys[index], bounds[index].top() > bounds[index - 1].bottom()
-                    && near(bounds[index].left(), bounds[0].left()) && near(bounds[index].width(), bounds[0].width()));
+                    && nearScalar(bounds[index].left(), bounds[0].left()) && nearScalar(bounds[index].width(), bounds[0].width()));
             check(caseName + "-single-column-scrolls", scroll->property("contentHeight").toDouble() > scroll->height());
         }
         check(caseName + "-content-height-encloses-last-card", scroll->property("contentHeight").toDouble() + rect(scroll).top() >= bounds[4].bottom() - 1);
@@ -291,7 +291,7 @@ int runActivityLayoutChecks(QQuickWindow *window, const QString &outputDirectory
     if (qEnvironmentVariableIsSet("SWIRL_LAYOUT_EXPECTED_DPR"))
         check("controlled-DPR-case-has-explicit-initial-CLI-viewport", !previewSizeArgument.isEmpty());
     captureLayout("current-physical-window");
-    if (near(window->width() * window->devicePixelRatio(), 1520, 20) && near(window->devicePixelRatio(), 1.5, 0.05))
+    if (nearScalar(window->width() * window->devicePixelRatio(), 1520, 20) && nearScalar(window->devicePixelRatio(), 1.5, 0.05))
         check("current-1520px-at150pct-is-dual-column", page->property("wide").toBool());
     requestViewport(QSize(1100, 760));
     captureLayout("wide-1100x760");
