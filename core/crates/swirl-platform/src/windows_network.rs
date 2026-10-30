@@ -436,12 +436,43 @@ fn run_json_with_timeout<T: DeserializeOwned>(
         )));
     }
     let stdout = stdout.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(&stdout);
+    decode_json(stdout)
+}
+
+fn decode_json<T: DeserializeOwned>(stdout: &[u8]) -> io::Result<T> {
     serde_json::from_slice(stdout).map_err(|error| {
+        // Report exact null field locations without printing addresses, adapter
+        // names or other system configuration. Keep the original strict type
+        // error; missing provider values must not become invented defaults.
+        let mut null_fields = Vec::new();
+        if let Ok(value) = serde_json::from_slice::<serde_json::Value>(stdout) {
+            let mut pending = vec![(String::new(), &value)];
+            while let Some((path, value)) = pending.pop() {
+                match value {
+                    serde_json::Value::Null => null_fields.push(path),
+                    serde_json::Value::Object(fields) => {
+                        for (key, value) in fields {
+                            let key = key.replace('~', "~0").replace('/', "~1");
+                            pending.push((format!("{path}/{key}"), value));
+                        }
+                    }
+                    serde_json::Value::Array(values) => {
+                        for (index, value) in values.iter().enumerate() {
+                            pending.push((format!("{path}/{index}"), value));
+                        }
+                    }
+                    _ => {}
+                }
+                if null_fields.len() == 32 {
+                    break;
+                }
+            }
+        }
         io::Error::new(
             io::ErrorKind::InvalidData,
             format!(
-                "Windows network helper returned invalid JSON ({} bytes): {error}",
-                stdout.len()
+                "Windows network helper returned invalid JSON ({} bytes): {error}; raw null field pointers (up to 32): {}",
+                stdout.len(), json!(null_fields)
             ),
         )
     })
@@ -948,6 +979,18 @@ ConvertTo-Json -InputObject $true
         let bytes = serde_json::to_vec(&snapshot).unwrap();
         let decoded: NetworkConfigurationSnapshot = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(snapshot, decoded);
+    }
+
+    #[test]
+    fn invalid_json_reports_raw_null_location_without_network_values() {
+        let input = br#"{"private/~field":["do-not-log-this-value",null]}"#;
+        let error =
+            decode_json::<std::collections::BTreeMap<String, Vec<String>>>(input).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        let message = error.to_string();
+        assert!(message.contains("expected a string"));
+        assert!(message.contains("/private~1~0field/1"));
+        assert!(!message.contains("do-not-log-this-value"));
     }
 
     #[test]

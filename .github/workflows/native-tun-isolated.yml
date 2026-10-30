@@ -38,6 +38,7 @@ jobs:
         with:
           workspaces: core
           key: native-tun-isolated
+          cache-on-failure: true
       - name: Source formatting
         run: cargo fmt --all -- --check
       - name: Stage exact locked dependency notices
