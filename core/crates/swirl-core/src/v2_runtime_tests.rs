@@ -1053,6 +1053,7 @@ fn dns_transport_roundtrip(native_ingress: bool) {
                 &plan,
                 "classified.fixture.invalid",
                 443,
+                None,
             ))
         };
         if trusted_name {

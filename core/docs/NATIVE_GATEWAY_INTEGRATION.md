@@ -9,6 +9,8 @@ continues to use its own listener lifecycle without requiring TUN.
 - Target `test`: `56948e4d6044154f1c5d91c6d817099d1c01a87f` when rechecked.
 - LAN PR [#46](https://github.com/SOLHK/Swirl/pull/46), dependency
   `5c3ae925528b3064a552d2a01e98d4333ca8ce04` at initial integration.
+  Subsequent integration parent `8a808c18c08187e09faeca8acaadbb707828748c`
+  includes the independent LAN DNS-target regressions and strict CI fixes.
 - TUN PR [#42](https://github.com/SOLHK/Swirl/pull/42), dependency
   `930c3f5fc2cbcfb99de4769c44f1682f4fc2e01d`, still Draft and unmerged.
 - TUN/test merge base: `4ad8a23b7fd59f0f8c09f1e3547548b16baaf4e9`.
@@ -45,6 +47,13 @@ DoH/DoT service through the already selected outbound and pinned to an admitted
 literal destination. Missing encrypted DNS returns
 `GatewayTargetDnsPolicyRequired`; no local-system or DIRECT fallback is added.
 Native host TUN behavior remains unchanged. See NATIVE_LAN_PROXY.md.
+
+Gateway ingress uses the same scoped Resolver boundary for classification,
+mandatory-rule and DIRECT lookups, and proxy-hostname bootstrap. Configured
+DNS endpoint refusals occur before I/O and shared failure-cache writes; ordinary
+host/system-DNS behavior is preserved. IPv4-only LAN AAAA requests return NODATA
+before upstream resolution or IPv6 Fake-IP allocation; native host dual-stack
+DNS remains unchanged.
 
 Windows IPv4 forwarding alone is not evidence that a packet entered Rust.
 `windows_gateway` verifies a dedicated, already statically configured private
@@ -153,15 +162,34 @@ conflict probe on the confirmed dedicated LAN before any server is attached.
 The formal Qt Gateway start path remains closed. End-to-end Qt helper orchestration
 and real client DHCP broadcast/renewal tests are not yet accepted. Saving a Gateway
 configuration neither starts DHCP nor changes interface addresses or forwarding.
+The GUI DLL and helper have separate Controller handle maps. Product integration
+must select one helper-hosted Core transport before starting it; passing an
+existing DLL handle to the helper is invalid. Live Core/session migration,
+administrative launch and helper/driver product packaging are not implemented.
 
 ## Evidence and remaining gates
 
-At initial submission all added Gateway Rust and Windows code awaits candidate
-CI. Local Rust/Qt tools are unavailable. Local whitespace/YAML/Python syntax checks
-are separate from compilation. The ancestor LAN snapshot `24f7e7ee` passed Linux,
-macOS and Windows fmt/check/Clippy/workspace/independent ABI CI; that evidence must
-not be relabeled as Gateway acceptance. Initial LAN Qt MSVC missing SDK declaration
-errors were fixed in `5c3ae925`; its Qt rebuild is separately tracked.
+Local Rust/Qt tools are unavailable. Actual candidate evidence is recorded below
+by source revision, independently of local whitespace/YAML/Python checks and
+the ancestor LAN evidence in NATIVE_LAN_PROXY.md.
+
+| Source | Run | Actual observation |
+| --- | --- | --- |
+| `6101cd2bbde5d304805f15e231201de01f3b917d` | [Native LAN candidate 41193986434](https://github.com/SOLHK/Swirl/actions/runs/41193986434) | Linux/macOS strict Rust and ABI gates passed. Windows fmt/check/Clippy/workspace/LAN+Gateway ABI passed; the real UDP67 attestation/replay fixture passed. The WFP fixture failed and kept the job red. |
+| Same source | [Windows WFP job 124516336234](https://github.com/SOLHK/Swirl/actions/runs/41193986434/job/124516336234) | BFE returned `PERSISTENT | INDEXED` (`0x41`) for a requested `PERSISTENT` (`0x1`) filter. The exact flags comparison rejected the engine indexing bit. The correction accepts only that additional bit; disabled/unknown flags and all other ownership fields remain checked. Its actual fixture rerun must pass before this issue is considered closed. |
+| Same source; tested merge `8b613d80063860f49c30f16f9fd9ce2016436b8f` | [Native TUN 41193989282](https://github.com/SOLHK/Swirl/actions/runs/41193989282) | Linux and Windows jobs passed. The merge tree is source-identical to the branch commit. Windows Server 2025 actually executed the Wintun TCP/UDP/DNS smoke, not just compilation. |
+
+The successful scoped Wintun run recorded 1,986 received and 1,735 sent driver
+packets, IPv4/IPv6 TCP and UDP, DNS A/AAAA and TCP, native HTTP CONNECT and SOCKS5
+UDP, rejection/upstream-failure cases without DIRECT fallback, and 64 rounds of
+4,096-byte TCP payloads per family. Six network resources were restored with no
+conflicts and exact readbacks; the original eight adapters and 26 routes remained
+equal and the temporary adapter was removed. The
+[backend artifact](https://github.com/SOLHK/Swirl/actions/runs/41193989282/artifacts/13040780474)
+contains the actual helper/library and driver log. It is not a Qt installer.
+The test explicitly reports Windows 11 and long-duration acceptance as false.
+It does not exercise physical LAN ingress, LAN return-interface metadata or
+the new Gateway DHCP/WFP transaction together.
 
 The additive candidate CI runs all requested locked workspace gates, independent
 LAN/Gateway ctypes checks, and two explicitly scoped Windows fixtures: persistent

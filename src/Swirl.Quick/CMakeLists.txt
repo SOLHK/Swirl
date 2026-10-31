@@ -293,6 +293,21 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  endif()
  add_test(NAME swirl-lan-proxy-control COMMAND SwirlLanProxyTests -o "${CMAKE_CURRENT_BINARY_DIR}/lan-proxy-control.xml,xml" -o "-,txt")
  set_tests_properties(swirl-lan-proxy-control PROPERTIES TIMEOUT 60)
+ if(WIN32)
+  # Compile the internal COM fixture seam only into this dedicated executable,
+  # never into SwirlEngine/Swirl. It is deliberately absent from normal CTest;
+  # CI must opt in explicitly before creating its disabled loopback-only rules.
+  qt_add_executable(SwirlLanFirewallTests tests/LanFirewallTests.cpp network/LanFirewall.cpp network/LanFirewall.h)
+  target_include_directories(SwirlLanFirewallTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+  target_compile_definitions(SwirlLanFirewallTests PRIVATE SWIRL_LAN_FIREWALL_TESTS)
+  target_link_libraries(SwirlLanFirewallTests PRIVATE Qt6::Core Qt6::Network Qt6::Test advapi32 ws2_32 iphlpapi crypt32 ole32 oleaut32 uuid)
+  if(MSVC)
+   target_compile_options(SwirlLanFirewallTests PRIVATE /utf-8)
+  endif()
+  add_custom_command(TARGET SwirlLanFirewallTests POST_BUILD
+   COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:SwirlLanFirewallTests> $<TARGET_FILE_DIR:SwirlLanFirewallTests>
+   COMMAND_EXPAND_LISTS)
+ endif()
  qt_add_executable(SwirlWindowShadowTests tests/WindowShadowRendererTests.cpp app/WindowShadowRenderer.cpp app/WindowShadowRenderer.h)
  target_link_libraries(SwirlWindowShadowTests PRIVATE Qt6::Gui Qt6::Test)
  target_include_directories(SwirlWindowShadowTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -580,10 +595,13 @@ if(WIN32)
  add_custom_command(
   OUTPUT "${SWIRL_GENERATED_ICON}"
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/brand"
-  COMMAND $<TARGET_FILE:SwirlIconBuilder>
-          "${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
-          "${SWIRL_GENERATED_ICON}"
+  COMMAND "${CMAKE_COMMAND}"
+          "-DSWIRL_ICON_BUILDER=$<TARGET_FILE:SwirlIconBuilder>"
+          "-DSWIRL_ICON_SOURCE=${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
+          "-DSWIRL_ICON_OUTPUT=${SWIRL_GENERATED_ICON}"
+          -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildWindowsIcon.cmake"
   DEPENDS SwirlIconBuilder app/BrandRaster.h "${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
+          "${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildWindowsIcon.cmake"
   COMMENT "Generate Windows ICO from Swirl SVG"
   VERBATIM
  )

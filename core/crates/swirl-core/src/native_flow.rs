@@ -1,7 +1,8 @@
 //! Native ingress for packet-stack adapters. Protocol implementations, policy
 //! transactions and accounting remain owned by the existing V2 runtime.
 use super::{
-    NetworkTarget, Outbound, PolicyDnsTransport, RegisteredSession, Result, Routed, Shared,
+    GuardPreparation, IngressBoundary, NetworkTarget, Node, Outbound, PolicyDnsTransport,
+    RegisteredSession, Resolver, Result, Routed, Shared,
     cancelled, connect_routed_tcp, pin_proxy_target, route, route_flow,
 };
 use crate::socks5_udp::ProxyAssociation;
@@ -34,6 +35,33 @@ struct GatewayAdmission {
     protected_hosts: BTreeSet<IpAddr>,
     #[cfg(test)]
     fixture_endpoints: BTreeSet<SocketAddr>,
+}
+
+struct GatewayBoundary<'a> {
+    admission: &'a Arc<GatewayAdmission>,
+    source: SocketAddr,
+}
+
+impl IngressBoundary for GatewayBoundary<'_> {
+    fn resolver(&self, resolver: &Arc<Resolver>) -> Arc<Resolver> {
+        let admission = self.admission.clone();
+        let source = self.source;
+        Arc::new(resolver.as_ref().clone().with_endpoint_guard(move |address| {
+            admission.target(source, &NetworkTarget {
+                host: address.ip().to_string(),
+                port: address.port(),
+            }).is_ok()
+        }))
+    }
+
+    fn prepare_proxy_endpoint<'a>(
+        &'a self,
+        node: &'a Node,
+        resolver: &'a mut Arc<Resolver>,
+        limit: Duration,
+    ) -> GuardPreparation<'a> {
+        Box::pin(self.admission.prepare_proxy_endpoint(self.source, node, resolver, limit))
+    }
 }
 
 impl GatewayAdmission {
@@ -79,16 +107,17 @@ impl GatewayAdmission {
         Ok(true)
     }
 
-    async fn prepare_outbound(
+    async fn prepare_proxy_endpoint(
         self: &Arc<Self>,
         source: SocketAddr,
-        routed: &mut Routed,
-        pin_target: bool,
+        node: &Node,
+        resolver: &mut Arc<Resolver>,
+        limit: Duration,
     ) -> Result<()> {
         if !self.is_lan(source)? {
             return Ok(());
         }
-        let (host, port) = match &routed.node.outbound {
+        let (host, port) = match &node.outbound {
             Outbound::Direct {} | Outbound::Reject {} => return Ok(()),
             Outbound::Vmess { host, port, .. }
             | Outbound::Vless { host, port, .. }
@@ -108,7 +137,7 @@ impl GatewayAdmission {
                 port,
             },
         )?;
-        let addresses = timeout(routed.limit, routed.resolver.resolve(&host, port))
+        let addresses = timeout(limit, resolver.resolve(&host, port))
             .await
             .map_err(|_| "GatewayOutboundDnsTimeout")??;
         if addresses.is_empty() || addresses.len() > 16 {
@@ -124,9 +153,8 @@ impl GatewayAdmission {
             )?;
         }
         let guard = self.clone();
-        routed.resolver = Arc::new(
-            routed
-                .resolver
+        *resolver = Arc::new(
+            resolver
                 .with_pinned_addresses(
                     &host,
                     addresses.into_iter().map(|address| address.ip()).collect(),
@@ -143,6 +171,20 @@ impl GatewayAdmission {
                         .is_ok()
                 }),
         );
+        Ok(())
+    }
+
+    async fn prepare_outbound(
+        self: &Arc<Self>,
+        source: SocketAddr,
+        routed: &mut Routed,
+        pin_target: bool,
+    ) -> Result<()> {
+        if !self.is_lan(source)? {
+            return Ok(());
+        }
+        self.prepare_proxy_endpoint(source, &routed.node, &mut routed.resolver, routed.limit)
+            .await?;
         if pin_target {
             // Fake-IP reverse mapping restores the domain for policy routing.
             // Do not delegate a second, unvalidated domain resolution to the
@@ -317,8 +359,17 @@ impl FlowDispatcher {
             let counters = Arc::new(Counters::default());
             let work = async {
                 gateway_target(&gateway, source, &target)?;
-                let mut routed =
-                    route_flow(&shared, id, source, &target, counters.clone(), true).await?;
+                let boundary = gateway.as_ref().map(|admission| GatewayBoundary { admission, source });
+                let mut routed = route_flow(
+                    &shared,
+                    id,
+                    source,
+                    &target,
+                    counters.clone(),
+                    true,
+                    boundary.as_ref().map(|boundary| boundary as &dyn IngressBoundary),
+                )
+                .await?;
                 if let Some(gateway) = &gateway {
                     mark_gateway_record(&shared, id, gateway, source, None)?;
                 }
@@ -415,6 +466,7 @@ impl FlowDispatcher {
                 }
                 let (plan, generation) = shared.admit().await?;
                 validate_tun_dns(&plan.prepared.runtime)?;
+                let boundary = gateway.as_ref().map(|admission| GatewayBoundary { admission, source });
                 let mut routed = route(
                     plan.clone(),
                     NetworkTarget {
@@ -423,6 +475,7 @@ impl FlowDispatcher {
                     },
                     source.ip(),
                     generation,
+                    boundary.as_ref().map(|boundary| boundary as &dyn IngressBoundary),
                 )
                 .await?;
                 if let Some(gateway) = &gateway {
@@ -878,7 +931,17 @@ async fn run_udp(
     let counters = Arc::new(Counters::default());
     let setup = async {
         gateway_target(&gateway, source, &target)?;
-        let mut routed = route_flow(&shared, id, source, &target, counters.clone(), true).await?;
+        let boundary = gateway.as_ref().map(|admission| GatewayBoundary { admission, source });
+        let mut routed = route_flow(
+            &shared,
+            id,
+            source,
+            &target,
+            counters.clone(),
+            true,
+            boundary.as_ref().map(|boundary| boundary as &dyn IngressBoundary),
+        )
+        .await?;
         if let Some(gateway) = &gateway {
             mark_gateway_record(&shared, id, gateway, source, None)?;
         }

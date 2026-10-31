@@ -1180,6 +1180,7 @@ impl Core {
                 target,
                 "127.0.0.1".parse().map_err(|_| failed("ProbeSource"))?,
                 generation,
+                None,
             )
             .await
             .map_err(failed)?;
@@ -1359,13 +1360,66 @@ async fn pin_proxy_target(
     Ok(())
 }
 
-async fn classify(plan: &Plan, host: &str, port: u16) -> Result<Vec<SocketAddr>> {
+// Routing DNS may perform I/O before the final outbound is prepared. Keep its
+// configured servers and classification proxy inside the ingress boundary.
+// Ordinary host requests supply no boundary and retain their existing behavior.
+type GuardPreparation<'a> =
+    std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>>;
+trait IngressBoundary: Sync {
+    fn resolver(&self, resolver: &Arc<Resolver>) -> Arc<Resolver>;
+    fn prepare_proxy_endpoint<'a>(
+        &'a self,
+        node: &'a Node,
+        resolver: &'a mut Arc<Resolver>,
+        limit: Duration,
+    ) -> GuardPreparation<'a>;
+}
+
+struct ClassificationDnsTransport<'a> {
+    transport: PolicyDnsTransport,
+    boundary: Option<&'a dyn IngressBoundary>,
+}
+impl swirl_dns::QueryTransport for ClassificationDnsTransport<'_> {
+    fn connect(
+        &self,
+        address: SocketAddr,
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<swirl_transport::BoxStream>> + Send + '_>,
+    > {
+        Box::pin(async move {
+            let mut bootstrap = self.transport.bootstrap.clone();
+            if let Some(boundary) = self.boundary {
+                // Run only when Resolver actually needs a DNS connection.
+                // A cached classification answer must not trigger proxy
+                // hostname bootstrap or consume another lookup budget.
+                boundary.prepare_proxy_endpoint(&self.transport.node, &mut bootstrap, self.transport.limit)
+                    .await
+                    .map_err(|_| "DnsEndpointForbidden")?;
+            }
+            let transport = PolicyDnsTransport {
+                node: self.transport.node.clone(),
+                transport: self.transport.transport.clone(),
+                bootstrap,
+                limit: self.transport.limit,
+            };
+            swirl_dns::QueryTransport::connect(&transport, address).await
+        })
+    }
+}
+
+async fn classify(
+    plan: &Plan,
+    host: &str,
+    port: u16,
+    boundary: Option<&dyn IngressBoundary>,
+) -> Result<Vec<SocketAddr>> {
     let resolver = plan
         .prepared
         .classification
         .as_ref()
         .ok_or("ClassificationDnsUnavailable")?;
-    if plan.prepared.runtime.policy.classification_dns == ClassificationDns::ViaDefaultPolicy {
+    let resolver = boundary.map_or_else(|| resolver.clone(), |boundary| boundary.resolver(resolver));
+    let result = if plan.prepared.runtime.policy.classification_dns == ClassificationDns::ViaDefaultPolicy {
         let selected = plan.policies.resolve(
             &plan.prepared.runtime.policy.default_policy.target,
             "policy:default",
@@ -1379,30 +1433,45 @@ async fn classify(plan: &Plan, host: &str, port: u16) -> Result<Vec<SocketAddr>>
             .find(|node| node.id == selected.leaf)
             .ok_or("MissingTarget")?
             .clone();
-        let transport = PolicyDnsTransport {
-            transport: plan.prepared.runtime.transports.get(&node.id).cloned(),
-            node,
-            bootstrap: plan.prepared.resolver.clone(),
-            limit: Duration::from_millis(plan.prepared.runtime.limits.handshake_timeout_ms),
+        let limit = Duration::from_millis(plan.prepared.runtime.limits.handshake_timeout_ms);
+        let bootstrap = boundary.map_or_else(
+            || plan.prepared.resolver.clone(),
+            |boundary| boundary.resolver(&plan.prepared.resolver),
+        );
+        let transport = ClassificationDnsTransport {
+            transport: PolicyDnsTransport {
+                transport: plan.prepared.runtime.transports.get(&node.id).cloned(),
+                node,
+                bootstrap,
+                limit,
+            },
+            boundary,
         };
         resolver
             .resolve_with_transport(host, port, &transport)
             .await
     } else {
         resolver.resolve(host, port).await
-    }
+    };
+    result.map_err(|error| match error {
+        "DnsEndpointForbidden" => "ClassificationIngressDenied",
+        _ => error,
+    })
 }
 async fn route(
     plan: Arc<Plan>,
     target: NetworkTarget,
     source: IpAddr,
     generation: u64,
+    boundary: Option<&dyn IngressBoundary>,
 ) -> Result<Routed> {
     let runtime = &plan.prepared.runtime;
     let policy = &runtime.policy;
-    let mut known = plan
-        .prepared
-        .resolver
+    let resolver = boundary.map_or_else(
+        || plan.prepared.resolver.clone(),
+        |boundary| boundary.resolver(&plan.prepared.resolver),
+    );
+    let mut known = resolver
         .mapped_host(&target.host)
         .or_else(|| target.host.parse().ok());
     let mut classification_attempted = false;
@@ -1451,12 +1520,9 @@ async fn route(
         }
         let resolution = async {
             if classification_attempted {
-                classify(&plan, &target.host, target.port).await
+                classify(&plan, &target.host, target.port, boundary).await
             } else {
-                plan.prepared
-                    .resolver
-                    .resolve(&target.host, target.port)
-                    .await
+                resolver.resolve(&target.host, target.port).await
             }
         };
         match timeout(
@@ -1473,6 +1539,10 @@ async fn route(
                     configured_path
                 };
             }
+            // A denied ingress endpoint is a security boundary, not an
+            // optional classification lookup failure that may be bypassed.
+            Ok(Err("ClassificationIngressDenied")) => return Err("ClassificationIngressDenied"),
+            Ok(Err("DnsEndpointForbidden")) => return Err("DnsEndpointForbidden"),
             _ if classification_attempted => {}
             _ => return Err("MandatoryRuleDnsUnavailable"),
         }
@@ -1517,11 +1587,7 @@ async fn route(
         routed.host = ip.to_string();
     } else if matches!(node.outbound, Outbound::Direct {}) {
         dns_path = configured_path;
-        let addresses = plan
-            .prepared
-            .resolver
-            .resolve(&target.host, target.port)
-            .await?;
+        let addresses = resolver.resolve(&target.host, target.port).await?;
         let address = addresses.first().ok_or("RouteDnsEmpty")?;
         if swirl_routing::v2::forbidden_ip(address.ip()) {
             return Err("InvalidTarget");
@@ -1534,7 +1600,7 @@ async fn route(
         transport: runtime.transports.get(&node.id).cloned(),
         node,
         target: routed,
-        resolver: plan.prepared.resolver.clone(),
+        resolver,
         trace,
         generation,
         limit: Duration::from_millis(runtime.limits.handshake_timeout_ms),
@@ -1554,6 +1620,7 @@ async fn route_flow(
     target: &NetworkTarget,
     counters: Arc<Counters>,
     native: bool,
+    boundary: Option<&dyn IngressBoundary>,
 ) -> Result<Routed> {
     if target.port == 0 || !swirl_subscription::valid_host(&target.host) {
         return Err("InvalidTarget");
@@ -1562,7 +1629,7 @@ async fn route_flow(
     if native || shared.native_tun_leases.load(Ordering::Acquire) > 0 {
         native_flow::validate_tun_dns(&plan.prepared.runtime)?;
     }
-    let routed = route(plan, target.clone(), peer.ip(), generation).await?;
+    let routed = route(plan, target.clone(), peer.ip(), generation, boundary).await?;
     if routed.target.port == shared.address.port()
         && routed
             .target
@@ -1663,8 +1730,17 @@ async fn session(
         if let Some(ingress) = &lan {
             ingress.check_target(&request.target)?;
         }
-        let mut routed =
-            route_flow(&shared, id, peer, &request.target, counters.clone(), false).await?;
+        let boundary = lan.as_ref().map(|ingress| ingress.boundary(shared.address));
+        let mut routed = route_flow(
+            &shared,
+            id,
+            peer,
+            &request.target,
+            counters.clone(),
+            false,
+            boundary.as_ref().map(|boundary| boundary as &dyn IngressBoundary),
+        )
+        .await?;
         if let Some(ingress) = &lan {
             ingress.check_target(&routed.target)?;
             ingress
@@ -1825,7 +1901,15 @@ async fn prepare_udp(
             ingress.check_target(&target)?;
         }
         let (plan, generation) = shared.admit().await?;
-        let mut routed = route(plan, target.clone(), peer, generation).await?;
+        let boundary = lan.as_ref().map(|ingress| ingress.boundary(shared.address));
+        let mut routed = route(
+            plan,
+            target.clone(),
+            peer,
+            generation,
+            boundary.as_ref().map(|boundary| boundary as &dyn IngressBoundary),
+        )
+        .await?;
         if let Some(ingress) = &lan {
             ingress.check_target(&routed.target)?;
             ingress

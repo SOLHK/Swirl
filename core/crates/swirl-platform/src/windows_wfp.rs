@@ -533,11 +533,21 @@ fn same_condition(a: &FWPM_FILTER_CONDITION0, b: &FWPM_FILTER_CONDITION0) -> boo
         }
     }
 }
+
+fn same_filter_flags(actual: u32, expected: u32) -> bool {
+    // BFE readback adds INDEXED (0x40) to a requested PERSISTENT (0x01)
+    // filter on Windows Server 2025. Microsoft documents INDEXED solely as
+    // a classification lookup optimization. Accept that addition only: never
+    // normalize DISABLED, action rights, provider context, persistence, or an
+    // unknown bit. All other filter ownership fields are compared separately.
+    actual == expected || actual == (expected | FWPM_FILTER_FLAG_INDEXED)
+}
+
 fn same_filter(actual: &FWPM_FILTER0, expected: &FWPM_FILTER0) -> bool {
     if !same_guid(&actual.filterKey, &expected.filterKey)
         || !same_guid(&actual.layerKey, &expected.layerKey)
         || !same_guid(&actual.subLayerKey, &expected.subLayerKey)
-        || actual.flags != expected.flags
+        || !same_filter_flags(actual.flags, expected.flags)
         || !actual.providerKey.is_null()
         || !same_blob(&actual.providerData, &expected.providerData)
         || actual.action.r#type != expected.action.r#type
@@ -580,7 +590,7 @@ fn filter_difference(actual: &FWPM_FILTER0, expected: &FWPM_FILTER0) -> String {
             differences.push(format!("{field} differs"));
         }
     }
-    if actual.flags != expected.flags {
+    if !same_filter_flags(actual.flags, expected.flags) {
         differences.push(format!(
             "flags actual={:#x} expected={:#x}",
             actual.flags, expected.flags
@@ -802,6 +812,37 @@ pub(crate) fn remove(policy: &GatewayIsolationPolicy) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn readback_allows_only_engine_indexing_and_preserves_foreign_object_rejection() {
+        let policy = crate::gateway_policy::fixture();
+        let rule = rules(&policy).remove(0);
+        let native = NativeRule::new(&policy, &rule).unwrap();
+        let mut indexed = native.raw;
+        indexed.flags |= FWPM_FILTER_FLAG_INDEXED;
+        assert!(same_filter(&indexed, &native.raw));
+        assert!(filter_difference(&indexed, &native.raw).is_empty());
+        for bit in 0..u32::BITS {
+            let flag = 1u32 << bit;
+            if flag == FWPM_FILTER_FLAG_INDEXED {
+                continue;
+            }
+            let mut changed = indexed;
+            changed.flags ^= flag;
+            assert!(!same_filter(&changed, &native.raw), "changed flag {flag:#x}");
+        }
+        let mut foreign_provider = GUID::from_u128(99);
+        let mut changed = indexed;
+        changed.providerKey = &mut foreign_provider;
+        assert!(!same_filter(&changed, &native.raw));
+        let mut changed = indexed;
+        changed.action.r#type = FWP_ACTION_PERMIT;
+        assert!(!same_filter(&changed, &native.raw));
+        let mut foreign_data = [0u8; 32];
+        let mut changed = indexed;
+        changed.providerData.data = foreign_data.as_mut_ptr();
+        assert!(!same_filter(&changed, &native.raw));
+    }
 
     #[test]
     fn rejected_readback_reports_metadata_without_weakening_ownership() {

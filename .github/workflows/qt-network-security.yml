@@ -180,7 +180,7 @@ jobs:
       - name: Configure product with existing regression drivers
         run: cmake -S src/Swirl.Quick -B build/qt-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON
       - name: Build product and network regression targets
-        run: cmake --build build/qt-product --config Release --target Swirl SwirlImportTests SwirlTelemetryTests SwirlQtNetworkPolicyTests SwirlLanProxyTests --parallel 2
+        run: cmake --build build/qt-product --config Release --target Swirl SwirlImportTests SwirlTelemetryTests SwirlQtNetworkPolicyTests SwirlLanProxyTests SwirlLanFirewallTests --parallel 2
       - name: Deploy actual Qt product runtime
         shell: pwsh
         run: |
@@ -221,6 +221,35 @@ jobs:
               assert not function.findall('Skip')
               assert not any(message.get('type') == 'skip' for message in function.findall('Message'))
           print('Qt 6.12 LAN control: all required validation and lifecycle cases executed; native firewall mutation is not claimed')
+      - name: Verify native Windows firewall COM ownership with disabled rules
+        shell: pwsh
+        env:
+          SWIRL_LAN_FIREWALL_TEST: '1'
+        run: |
+          & build/qt-product/Release/SwirlLanFirewallTests.exe -o build/qt-product/lan-firewall-native.xml,xml -o -,txt
+          if ($LASTEXITCODE -ne 0) { throw 'The native COM firewall fixture failed; this is not a skipped or simulated result.' }
+      - name: Require native firewall roundtrip and conflict evidence without skips
+        shell: python
+        run: |
+          import xml.etree.ElementTree as ET
+          report = ET.parse('build/qt-product/lan-firewall-native.xml').getroot()
+          assert report.tag == 'TestCase' and report.get('name') == 'LanFirewallTests'
+          assert report.findtext('Environment/QtVersion') == '6.12.0'
+          functions = report.findall('TestFunction')
+          mandatory = {
+              'disabledTcpAndUdpRoundtripAndOwnedRemoval',
+              'externalEditPreservesRulesAndEncryptedJournal',
+              'ownedCleanupLeavesIndependentFixtureUntouched',
+          }
+          assert mandatory.issubset({function.get('name') for function in functions})
+          for function in functions:
+              incidents = function.findall('Incident')
+              assert incidents and all(incident.get('type') == 'pass' for incident in incidents)
+              assert not function.findall('Skip')
+              assert not any(message.get('type') == 'skip' for message in function.findall('Message'))
+          print('Actual Windows COM firewall: disabled loopback TCP/UDP rules, DPAPI journal, conflict preservation and exact owned removal executed; no live LAN or Windows 11 acceptance claimed')
+      - name: Verify isolated gateway DHCP socket and lease regressions
+        run: ctest --test-dir build/qt-product -C Release -R "^swirl-gateway-network$" --output-on-failure --no-tests=error --output-junit "${{ github.workspace }}/build/qt-product/gateway-network.xml"
       - name: Verify Windows DPAPI subscription refresh and redirects
         shell: pwsh
         run: |
@@ -236,6 +265,8 @@ jobs:
           path: |
             build/qt-product/subscription-security.xml
             build/qt-product/lan-proxy-control.xml
+            build/qt-product/lan-firewall-native.xml
+            build/qt-product/gateway-network.xml
             build/qt-product/qt-network-policy.xml
             build/qt-product/swirl-telemetry-accounting.xml
             build/qt-product/Testing/Temporary/LastTest.log

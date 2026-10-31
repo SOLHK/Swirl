@@ -84,3 +84,35 @@ async fn invalid_policy_dns_target_is_rejected_before_transport() {
     );
     assert!(transport.seen.lock().unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn policy_endpoint_denial_survives_dot_doh_without_failover_or_shared_failure_cache() {
+    struct Denied(Mutex<usize>);
+    impl QueryTransport for Denied {
+        fn connect(&self, _: SocketAddr) -> Pin<Box<dyn Future<Output = Result<BoxStream, &'static str>> + Send + '_>> {
+            *self.0.lock().unwrap() += 1;
+            Box::pin(async { Err("DnsEndpointForbidden") })
+        }
+    }
+    for https_path in [None, Some("/dns-query".into())] {
+        let first = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let second = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        first.set_nonblocking(true).unwrap();
+        second.set_nonblocking(true).unwrap();
+        let resolver = Resolver::default().with_config(&Dns {
+            tls_servers: [first.local_addr().unwrap(), second.local_addr().unwrap()].into_iter().map(|address| DnsTlsServer {
+                address,
+                tls: Tls { server_name: "dns.fixture.invalid".into(), alpn: vec![], ca_der_base64: None },
+                https_path: https_path.clone(),
+            }).collect(),
+            use_system_hosts: false,
+            ..Dns::default()
+        }).unwrap();
+        let transport = Denied(Mutex::new(0));
+        assert_eq!(resolver.resolve_with_transport("denied-policy.fixture.invalid", 443, &transport).await, Err("DnsEndpointForbidden"));
+        assert_eq!(*transport.0.lock().unwrap(), 1, "a boundary denial is not retryable DNS failover");
+        assert!(resolver.cache.lock().unwrap().is_empty());
+        assert_eq!(first.accept().unwrap_err().kind(), std::io::ErrorKind::WouldBlock);
+        assert_eq!(second.accept().unwrap_err().kind(), std::io::ErrorKind::WouldBlock);
+    }
+}
