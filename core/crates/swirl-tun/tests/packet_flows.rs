@@ -24,9 +24,14 @@ fn gateway_config() -> TunConfig {
             lan_subnet: "192.168.77.0/24".parse().unwrap(),
             gateway: "192.168.77.1".parse().unwrap(),
             allowed_sources: vec!["192.168.77.0/25".parse().unwrap()],
-            local_sources: vec!["192.168.77.1".parse().unwrap(), "198.18.0.1".parse().unwrap()],
+            local_sources: vec![
+                "192.168.77.1".parse().unwrap(),
+                "198.18.0.1".parse().unwrap(),
+            ],
             protected_hosts: vec!["192.168.77.1".parse().unwrap(), "10.1.2.3".parse().unwrap()],
-            max_tcp_per_client: 1, max_udp_per_client: 8, max_dns_per_client: 2,
+            max_tcp_per_client: 1,
+            max_udp_per_client: 8,
+            max_dns_per_client: 2,
         }),
         ..TunConfig::default()
     }
@@ -38,18 +43,37 @@ async fn gateway_udp_preserves_each_client_endpoint_in_both_directions() {
     let destination: SocketAddr = "203.0.113.20:443".parse().unwrap();
     for address in ["192.168.77.10:50000", "192.168.77.11:50000"] {
         let client: SocketAddr = address.parse().unwrap();
-        stack.ingress.send(udp_packet(client, destination, address.as_bytes())).await.unwrap();
+        stack
+            .ingress
+            .send(udp_packet(client, destination, address.as_bytes()))
+            .await
+            .unwrap();
         let datagram = timeout(WAIT, stack.udp.recv()).await.unwrap().unwrap();
-        assert_eq!((datagram.source, datagram.destination), (client, destination));
+        assert_eq!(
+            (datagram.source, datagram.destination),
+            (client, destination)
+        );
         assert_eq!(datagram.payload, address.as_bytes());
-        stack.udp_reply.send(UdpDatagram {
-            source: destination, destination: client, payload: datagram.payload,
-        }).await.unwrap();
+        stack
+            .udp_reply
+            .send(UdpDatagram {
+                source: destination,
+                destination: client,
+                payload: datagram.payload,
+            })
+            .await
+            .unwrap();
         let bytes = timeout(WAIT, stack.egress.recv()).await.unwrap().unwrap();
         let (src, dst, protocol, payload) = ip_payload(&bytes);
-        assert_eq!((src, dst, protocol), (destination.ip(), client.ip(), IpProtocol::Udp));
+        assert_eq!(
+            (src, dst, protocol),
+            (destination.ip(), client.ip(), IpProtocol::Udp)
+        );
         let packet = UdpPacket::new_checked(payload).unwrap();
-        assert_eq!((packet.src_port(), packet.dst_port()), (destination.port(), client.port()));
+        assert_eq!(
+            (packet.src_port(), packet.dst_port()),
+            (destination.port(), client.port())
+        );
         assert_eq!(packet.payload(), address.as_bytes());
     }
     stack.shutdown().await.unwrap();
@@ -66,7 +90,15 @@ async fn gateway_rejects_untrusted_sources_host_services_and_ipv6_before_allocat
         ("[fd00::10]:50000", "[2001:db8::20]:443"),
     ];
     for (source, destination) in attempts {
-        stack.ingress.send(udp_packet(source.parse().unwrap(), destination.parse().unwrap(), b"denied")).await.unwrap();
+        stack
+            .ingress
+            .send(udp_packet(
+                source.parse().unwrap(),
+                destination.parse().unwrap(),
+                b"denied",
+            ))
+            .await
+            .unwrap();
     }
     wait_received(&stack, attempts.len() as u64).await;
     let stats = stack.stats.snapshot();
@@ -81,15 +113,39 @@ async fn gateway_rejects_untrusted_sources_host_services_and_ipv6_before_allocat
 async fn gateway_tcp_limit_applies_per_client_without_disconnecting_other_devices() {
     let mut stack = spawn(gateway_config()).unwrap();
     let destination: SocketAddr = "203.0.113.20:443".parse().unwrap();
-    let (first, _) = handshake(&mut stack, "192.168.77.10:50000".parse().unwrap(), destination).await;
+    let (first, _) = handshake(
+        &mut stack,
+        "192.168.77.10:50000".parse().unwrap(),
+        destination,
+    )
+    .await;
     let rejected: SocketAddr = "192.168.77.10:50001".parse().unwrap();
-    stack.ingress.send(tcp_packet(rejected, destination, 100, None, TcpControl::Syn, &[])).await.unwrap();
+    stack
+        .ingress
+        .send(tcp_packet(
+            rejected,
+            destination,
+            100,
+            None,
+            TcpControl::Syn,
+            &[],
+        ))
+        .await
+        .unwrap();
     loop {
         let segment = next_tcp(&mut stack).await;
-        if segment.destination == rejected { assert_eq!(segment.control, TcpControl::Rst); break; }
+        if segment.destination == rejected {
+            assert_eq!(segment.control, TcpControl::Rst);
+            break;
+        }
     }
     assert_eq!(stack.stats.snapshot().active_tcp_flows, 1);
-    let (second, _) = handshake(&mut stack, "192.168.77.11:50000".parse().unwrap(), destination).await;
+    let (second, _) = handshake(
+        &mut stack,
+        "192.168.77.11:50000".parse().unwrap(),
+        destination,
+    )
+    .await;
     assert_eq!(stack.stats.snapshot().active_tcp_flows, 2);
     assert_eq!(stack.stats.snapshot().denied_gateway_packets, 1);
     drop((first, second));
@@ -105,14 +161,40 @@ async fn gateway_udp_client_limit_precedes_shared_endpoint_buffer_allocation() {
     let second: SocketAddr = "192.168.77.11:50000".parse().unwrap();
     let first_target: SocketAddr = "203.0.113.20:443".parse().unwrap();
     let second_target: SocketAddr = "203.0.113.21:443".parse().unwrap();
-    stack.ingress.send(udp_packet(first, first_target, b"first")).await.unwrap();
-    assert_eq!(timeout(WAIT, stack.udp.recv()).await.unwrap().unwrap().source, first);
-    stack.ingress.send(udp_packet(first, second_target, b"over limit")).await.unwrap();
+    stack
+        .ingress
+        .send(udp_packet(first, first_target, b"first"))
+        .await
+        .unwrap();
+    assert_eq!(
+        timeout(WAIT, stack.udp.recv())
+            .await
+            .unwrap()
+            .unwrap()
+            .source,
+        first
+    );
+    stack
+        .ingress
+        .send(udp_packet(first, second_target, b"over limit"))
+        .await
+        .unwrap();
     wait_received(&stack, 2).await;
     assert_eq!(stack.stats.snapshot().active_udp_endpoints, 1);
     assert_eq!(stack.stats.snapshot().denied_gateway_packets, 1);
-    stack.ingress.send(udp_packet(second, second_target, b"second device")).await.unwrap();
-    assert_eq!(timeout(WAIT, stack.udp.recv()).await.unwrap().unwrap().source, second);
+    stack
+        .ingress
+        .send(udp_packet(second, second_target, b"second device"))
+        .await
+        .unwrap();
+    assert_eq!(
+        timeout(WAIT, stack.udp.recv())
+            .await
+            .unwrap()
+            .unwrap()
+            .source,
+        second
+    );
     assert_eq!(stack.stats.snapshot().active_udp_endpoints, 2);
     stack.shutdown().await.unwrap();
 }
@@ -851,18 +933,44 @@ async fn gateway_tcp_payload_and_dns_reply_return_to_original_client_tuple() {
     let source: SocketAddr = "192.168.77.10:50000".parse().unwrap();
     let target: SocketAddr = "203.0.113.20:443".parse().unwrap();
     let (mut stream, server_next) = handshake(&mut stack, source, target).await;
-    stack.ingress.send(tcp_packet(source, target, 101, Some(server_next), TcpControl::Psh, b"gateway-data")).await.unwrap();
+    stack
+        .ingress
+        .send(tcp_packet(
+            source,
+            target,
+            101,
+            Some(server_next),
+            TcpControl::Psh,
+            b"gateway-data",
+        ))
+        .await
+        .unwrap();
     let mut data = [0; 12];
-    timeout(WAIT, stream.read_exact(&mut data)).await.unwrap().unwrap();
+    timeout(WAIT, stream.read_exact(&mut data))
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(&data, b"gateway-data");
     stream.write_all(b"return-path").await.unwrap();
     loop {
         let packet = next_tcp(&mut stack).await;
-        if packet.payload.is_empty() { continue; }
+        if packet.payload.is_empty() {
+            continue;
+        }
         assert_eq!((packet.source, packet.destination), (target, source));
         assert_eq!(packet.payload, b"return-path");
-        stack.ingress.send(tcp_packet(source, target, 113,
-            Some(packet.sequence.wrapping_add(packet.payload.len() as i32)), TcpControl::None, &[])).await.unwrap();
+        stack
+            .ingress
+            .send(tcp_packet(
+                source,
+                target,
+                113,
+                Some(packet.sequence.wrapping_add(packet.payload.len() as i32)),
+                TcpControl::None,
+                &[],
+            ))
+            .await
+            .unwrap();
         break;
     }
     // The synthetic DNS endpoint is captured by TUN but is not an assigned
@@ -870,21 +978,40 @@ async fn gateway_tcp_payload_and_dns_reply_return_to_original_client_tuple() {
     let dns: SocketAddr = "198.18.0.2:53".parse().unwrap();
     for (source, identifier) in [("192.168.77.10:50100", 0x11), ("192.168.77.11:50100", 0x22)] {
         let source: SocketAddr = source.parse().unwrap();
-        let query = [0, identifier, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, b'a', 0, 0, 1, 0, 1];
-        stack.ingress.send(udp_packet(source, dns, &query)).await.unwrap();
+        let query = [
+            0, identifier, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, b'a', 0, 0, 1, 0, 1,
+        ];
+        stack
+            .ingress
+            .send(udp_packet(source, dns, &query))
+            .await
+            .unwrap();
         let packet = timeout(WAIT, stack.udp.recv()).await.unwrap().unwrap();
         assert_eq!((packet.source, packet.destination), (source, dns));
         assert_eq!(packet.payload, query);
         let mut answer = packet.payload;
         answer[2] = 0x81;
         answer[3] = 0x80;
-        stack.udp_reply.send(UdpDatagram { source: dns, destination: source, payload: answer.clone() }).await.unwrap();
+        stack
+            .udp_reply
+            .send(UdpDatagram {
+                source: dns,
+                destination: source,
+                payload: answer.clone(),
+            })
+            .await
+            .unwrap();
         loop {
             let bytes = timeout(WAIT, stack.egress.recv()).await.unwrap().unwrap();
             let (src, dst, protocol, payload) = ip_payload(&bytes);
-            if protocol != IpProtocol::Udp { continue; }
+            if protocol != IpProtocol::Udp {
+                continue;
+            }
             let packet = UdpPacket::new_checked(payload).unwrap();
-            assert_eq!((src, dst, packet.src_port(), packet.dst_port()), (dns.ip(), source.ip(), 53, source.port()));
+            assert_eq!(
+                (src, dst, packet.src_port(), packet.dst_port()),
+                (dns.ip(), source.ip(), 53, source.port())
+            );
             assert_eq!(packet.payload(), answer);
             break;
         }
@@ -896,13 +1023,22 @@ async fn gateway_tcp_payload_and_dns_reply_return_to_original_client_tuple() {
 #[tokio::test]
 async fn gateway_cannot_emit_unsolicited_udp_reply_to_unadmitted_client() {
     let mut stack = spawn(gateway_config()).unwrap();
-    stack.udp_reply.send(UdpDatagram {
-        source: "203.0.113.20:443".parse().unwrap(),
-        destination: "192.168.77.10:50000".parse().unwrap(), payload: b"unsolicited".to_vec(),
-    }).await.unwrap();
+    stack
+        .udp_reply
+        .send(UdpDatagram {
+            source: "203.0.113.20:443".parse().unwrap(),
+            destination: "192.168.77.10:50000".parse().unwrap(),
+            payload: b"unsolicited".to_vec(),
+        })
+        .await
+        .unwrap();
     timeout(WAIT, async {
-        while stack.stats.snapshot().denied_gateway_packets == 0 { tokio::task::yield_now().await; }
-    }).await.unwrap();
+        while stack.stats.snapshot().denied_gateway_packets == 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
     assert_eq!(stack.stats.snapshot().active_udp_endpoints, 0);
     assert!(stack.egress.try_recv().is_err());
     stack.shutdown().await.unwrap();

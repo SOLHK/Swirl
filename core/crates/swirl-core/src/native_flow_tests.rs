@@ -90,10 +90,20 @@ async fn until(mut condition: impl FnMut() -> bool) {
 }
 
 fn gateway(dispatcher: &FlowDispatcher) -> FlowDispatcher {
-    dispatcher.with_gateway_admission(
-        vec!["192.168.77.1".parse().unwrap(), "192.168.1.20".parse().unwrap(), "fd00::5".parse().unwrap()],
-        vec!["192.168.77.1".parse().unwrap(), "192.168.1.20".parse().unwrap(), "fd00::5".parse().unwrap()],
-    ).unwrap()
+    dispatcher
+        .with_gateway_admission(
+            vec![
+                "192.168.77.1".parse().unwrap(),
+                "192.168.1.20".parse().unwrap(),
+                "fd00::5".parse().unwrap(),
+            ],
+            vec![
+                "192.168.77.1".parse().unwrap(),
+                "192.168.1.20".parse().unwrap(),
+                "fd00::5".parse().unwrap(),
+            ],
+        )
+        .unwrap()
 }
 
 #[test]
@@ -101,16 +111,72 @@ fn gateway_address_boundary_normalizes_aliases_without_restricting_outbound_fami
     let guard = GatewayAdmission::new(
         vec!["192.168.77.1".parse().unwrap(), "fd00::5".parse().unwrap()],
         vec!["192.168.1.20".parse().unwrap()],
-    ).unwrap();
+    )
+    .unwrap();
     let lan = "192.168.77.12:50000".parse().unwrap();
-    for host in ["localhost", "x.localhost", "127.0.0.2", "::ffff:127.0.0.1", "::1", "192.168.77.1", "192.168.1.20", "fd00::5", "169.254.169.254", "fe80::1234", "224.0.0.1", "ff02::1", "0.0.0.0", "::", "255.255.255.255"] {
-        assert_eq!(guard.target(lan, &NetworkTarget { host: host.into(), port: 443 }), Err("GatewayHostAccessDenied"), "{host}");
+    for host in [
+        "localhost",
+        "x.localhost",
+        "127.0.0.2",
+        "::ffff:127.0.0.1",
+        "::1",
+        "192.168.77.1",
+        "192.168.1.20",
+        "fd00::5",
+        "169.254.169.254",
+        "fe80::1234",
+        "224.0.0.1",
+        "ff02::1",
+        "0.0.0.0",
+        "::",
+        "255.255.255.255",
+    ] {
+        assert_eq!(
+            guard.target(
+                lan,
+                &NetworkTarget {
+                    host: host.into(),
+                    port: 443
+                }
+            ),
+            Err("GatewayHostAccessDenied"),
+            "{host}"
+        );
     }
-    for host in ["target.fixture.invalid", "203.0.113.8", "192.168.77.20", "2001:db8::8"] {
-        assert!(guard.target(lan, &NetworkTarget { host: host.into(), port: 443 }).is_ok(), "{host}");
+    for host in [
+        "target.fixture.invalid",
+        "203.0.113.8",
+        "192.168.77.20",
+        "2001:db8::8",
+    ] {
+        assert!(
+            guard
+                .target(
+                    lan,
+                    &NetworkTarget {
+                        host: host.into(),
+                        port: 443
+                    }
+                )
+                .is_ok(),
+            "{host}"
+        );
     }
-    assert_eq!(guard.target("192.0.2.5:50000".parse().unwrap(), &target("203.0.113.8:443".parse().unwrap())), Err("GatewaySourceDenied"));
-    assert!(guard.target("[fd00::5]:50000".parse().unwrap(), &target("[::1]:443".parse().unwrap())).is_ok());
+    assert_eq!(
+        guard.target(
+            "192.0.2.5:50000".parse().unwrap(),
+            &target("203.0.113.8:443".parse().unwrap())
+        ),
+        Err("GatewaySourceDenied")
+    );
+    assert!(
+        guard
+            .target(
+                "[fd00::5]:50000".parse().unwrap(),
+                &target("[::1]:443".parse().unwrap())
+            )
+            .is_ok()
+    );
 }
 
 #[test]
@@ -123,7 +189,10 @@ fn gateway_final_route_blocks_hosts_rebinding_before_tcp_udp_or_dns_delivery() {
         ("v6host.fixture.invalid", "fd00::5"),
         ("link.fixture.invalid", "169.254.169.254"),
     ] {
-        candidate.dns.hosts.push(swirl_subscription::HostMapping { name: name.into(), address: ip.parse().unwrap() });
+        candidate.dns.hosts.push(swirl_subscription::HostMapping {
+            name: name.into(),
+            address: ip.parse().unwrap(),
+        });
     }
     let mut core = start(candidate);
     let dispatcher = gateway(&core.flow_dispatcher().unwrap());
@@ -133,14 +202,38 @@ fn gateway_final_route_blocks_hosts_rebinding_before_tcp_udp_or_dns_delivery() {
         let source = "192.168.77.12:50000".parse().unwrap();
         // These names model the domain handed to native ingress after the
         // packet adapter reverses a Fake-IP. No new DNS implementation is used.
-        for host in ["loop.fixture.invalid", "mapped.fixture.invalid", "wan.fixture.invalid", "v6host.fixture.invalid", "link.fixture.invalid"] {
+        for host in [
+            "loop.fixture.invalid",
+            "mapped.fixture.invalid",
+            "wan.fixture.invalid",
+            "v6host.fixture.invalid",
+            "link.fixture.invalid",
+        ] {
             let (_client, inbound) = tokio::io::duplex(64);
-            let destination = NetworkTarget { host: host.into(), port };
-            assert_eq!(dispatcher.relay_tcp(inbound, source, destination.clone()).await, Err("GatewayHostAccessDenied"));
-            assert_eq!(dispatcher.open_udp(source, destination).await.err(), Some("GatewayHostAccessDenied"));
-            assert_eq!(dispatcher.resolve_dns(host, port, source).await, Err("GatewayHostAccessDenied"));
+            let destination = NetworkTarget {
+                host: host.into(),
+                port,
+            };
+            assert_eq!(
+                dispatcher
+                    .relay_tcp(inbound, source, destination.clone())
+                    .await,
+                Err("GatewayHostAccessDenied")
+            );
+            assert_eq!(
+                dispatcher.open_udp(source, destination).await.err(),
+                Some("GatewayHostAccessDenied")
+            );
+            assert_eq!(
+                dispatcher.resolve_dns(host, port, source).await,
+                Err("GatewayHostAccessDenied")
+            );
         }
-        assert!(timeout(Duration::from_millis(100), listener.accept()).await.is_err());
+        assert!(
+            timeout(Duration::from_millis(100), listener.accept())
+                .await
+                .is_err()
+        );
         until(|| core.snapshot().unwrap()["active"] == 0).await;
     });
     let snapshot = core.snapshot().unwrap();
@@ -155,51 +248,121 @@ fn gateway_clone_preserves_host_flows_and_does_not_mutate_original_dispatcher() 
     let mut core = start(config());
     let original = core.flow_dispatcher().unwrap();
     let restricted = gateway(&original);
-    assert!(matches!(restricted.with_gateway_admission(vec!["192.168.77.1".parse().unwrap()], vec!["192.168.77.1".parse().unwrap()]), Err("GatewayAdmissionAlreadySet")));
+    assert!(matches!(
+        restricted.with_gateway_admission(
+            vec!["192.168.77.1".parse().unwrap()],
+            vec!["192.168.77.1".parse().unwrap()]
+        ),
+        Err("GatewayAdmissionAlreadySet")
+    ));
     runtime().block_on(async {
         for (dispatcher, source) in [
-            (restricted, "192.168.77.1:50000".parse::<SocketAddr>().unwrap()),
-            (original, "192.168.77.12:50000".parse::<SocketAddr>().unwrap()),
+            (
+                restricted,
+                "192.168.77.1:50000".parse::<SocketAddr>().unwrap(),
+            ),
+            (
+                original,
+                "192.168.77.12:50000".parse::<SocketAddr>().unwrap(),
+            ),
         ] {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let address = listener.local_addr().unwrap();
             let server = tokio::spawn(async move {
                 let (mut stream, _) = listener.accept().await.unwrap();
-                let mut request = [0;4]; stream.read_exact(&mut request).await.unwrap(); assert_eq!(&request, b"host");
-                stream.write_all(b"okay").await.unwrap(); stream.shutdown().await.unwrap();
+                let mut request = [0; 4];
+                stream.read_exact(&mut request).await.unwrap();
+                assert_eq!(&request, b"host");
+                stream.write_all(b"okay").await.unwrap();
+                stream.shutdown().await.unwrap();
             });
             let (mut client, inbound) = tokio::io::duplex(64);
-            let relay = tokio::spawn({ let dispatcher = dispatcher.clone(); async move { dispatcher.relay_tcp(inbound, source, target(address)).await } });
-            client.write_all(b"host").await.unwrap(); client.shutdown().await.unwrap();
-            let mut response=Vec::new(); timeout(Duration::from_secs(3),client.read_to_end(&mut response)).await.unwrap().unwrap(); assert_eq!(response,b"okay");
-            relay.await.unwrap().unwrap();server.await.unwrap();
-            let socket=UdpSocket::bind("127.0.0.1:0").await.unwrap();let address=socket.local_addr().unwrap();
-            let server=tokio::spawn(async move {let mut bytes=[0;32];let (n,peer)=socket.recv_from(&mut bytes).await.unwrap();socket.send_to(&bytes[..n],peer).await.unwrap();});
-            let mut flow=dispatcher.open_udp(source,target(address)).await.unwrap();flow.send(b"host-udp").await.unwrap();
-            let mut reply=[0;32];let size=timeout(Duration::from_secs(3),flow.recv(&mut reply)).await.unwrap().unwrap();assert_eq!(&reply[..size],b"host-udp");drop(flow);server.await.unwrap();
+            let relay = tokio::spawn({
+                let dispatcher = dispatcher.clone();
+                async move { dispatcher.relay_tcp(inbound, source, target(address)).await }
+            });
+            client.write_all(b"host").await.unwrap();
+            client.shutdown().await.unwrap();
+            let mut response = Vec::new();
+            timeout(Duration::from_secs(3), client.read_to_end(&mut response))
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(response, b"okay");
+            relay.await.unwrap().unwrap();
+            server.await.unwrap();
+            let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+            let address = socket.local_addr().unwrap();
+            let server = tokio::spawn(async move {
+                let mut bytes = [0; 32];
+                let (n, peer) = socket.recv_from(&mut bytes).await.unwrap();
+                socket.send_to(&bytes[..n], peer).await.unwrap();
+            });
+            let mut flow = dispatcher.open_udp(source, target(address)).await.unwrap();
+            flow.send(b"host-udp").await.unwrap();
+            let mut reply = [0; 32];
+            let size = timeout(Duration::from_secs(3), flow.recv(&mut reply))
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(&reply[..size], b"host-udp");
+            drop(flow);
+            server.await.unwrap();
         }
-        until(||core.snapshot().unwrap()["active"]==0).await;
+        until(|| core.snapshot().unwrap()["active"] == 0).await;
     });
     core.stop();
 }
 
 #[test]
 fn gateway_dns_allows_remote_ipv6_answers_but_rejects_unknown_ipv6_sources() {
-    let mut candidate=config();
-    candidate.dns.hosts.push(swirl_subscription::HostMapping{name:"remote6.fixture.invalid".into(),address:"2001:db8::8".parse().unwrap()});
-    let mut core=start(candidate);let dispatcher=gateway(&core.flow_dispatcher().unwrap());
+    let mut candidate = config();
+    candidate.dns.hosts.push(swirl_subscription::HostMapping {
+        name: "remote6.fixture.invalid".into(),
+        address: "2001:db8::8".parse().unwrap(),
+    });
+    let mut core = start(candidate);
+    let dispatcher = gateway(&core.flow_dispatcher().unwrap());
     runtime().block_on(async {
-        assert_eq!(dispatcher.resolve_dns("remote6.fixture.invalid",443,"192.168.77.12:50000".parse().unwrap()).await.unwrap(),vec!["[2001:db8::8]:443".parse::<SocketAddr>().unwrap()]);
-        assert_eq!(dispatcher.resolve_dns("remote6.fixture.invalid",443,"[fd00::12]:50000".parse().unwrap()).await,Err("GatewaySourceDenied"));
+        assert_eq!(
+            dispatcher
+                .resolve_dns(
+                    "remote6.fixture.invalid",
+                    443,
+                    "192.168.77.12:50000".parse().unwrap()
+                )
+                .await
+                .unwrap(),
+            vec!["[2001:db8::8]:443".parse::<SocketAddr>().unwrap()]
+        );
+        assert_eq!(
+            dispatcher
+                .resolve_dns(
+                    "remote6.fixture.invalid",
+                    443,
+                    "[fd00::12]:50000".parse().unwrap()
+                )
+                .await,
+            Err("GatewaySourceDenied")
+        );
     });
     core.stop();
 }
 
 #[test]
 fn gateway_admission_requires_bounded_explicit_host_inventory() {
-    assert!(matches!(GatewayAdmission::new(vec![],vec!["192.168.77.1".parse().unwrap()]),Err("GatewayAddressInventory")));
-    for host in ["0.0.0.0","::","224.0.0.1","255.255.255.255"] {
-        assert!(matches!(GatewayAdmission::new(vec![host.parse().unwrap()],vec!["192.168.77.1".parse().unwrap()]),Err("GatewayAddressInventory")));
+    assert!(matches!(
+        GatewayAdmission::new(vec![], vec!["192.168.77.1".parse().unwrap()]),
+        Err("GatewayAddressInventory")
+    ));
+    for host in ["0.0.0.0", "::", "224.0.0.1", "255.255.255.255"] {
+        assert!(matches!(
+            GatewayAdmission::new(
+                vec![host.parse().unwrap()],
+                vec!["192.168.77.1".parse().unwrap()]
+            ),
+            Err("GatewayAddressInventory")
+        ));
     }
 }
 
@@ -1049,7 +1212,9 @@ fn gateway_lan_flows_exchange_real_bytes_and_record_source_without_another_runti
         let mut dispatcher = gateway(&core.flow_dispatcher().unwrap());
         // A private cfg(test) exception permits only these two ephemeral echo
         // endpoints. The production gateway rejects all loopback host services.
-        Arc::get_mut(dispatcher.gateway.as_mut().unwrap()).unwrap().fixture_endpoints
+        Arc::get_mut(dispatcher.gateway.as_mut().unwrap())
+            .unwrap()
+            .fixture_endpoints
             .extend([tcp_address, udp_address]);
         let tcp_peer = tokio::spawn(async move {
             let (mut peer, _) = listener.accept().await.unwrap();
@@ -1068,19 +1233,32 @@ fn gateway_lan_flows_exchange_real_bytes_and_record_source_without_another_runti
         let (mut client, inbound) = tokio::io::duplex(128);
         let tcp_flow = tokio::spawn({
             let dispatcher = dispatcher.clone();
-            async move { dispatcher.relay_tcp(inbound, source, target(tcp_address)).await }
+            async move {
+                dispatcher
+                    .relay_tcp(inbound, source, target(tcp_address))
+                    .await
+            }
         });
         client.write_all(b"gateway-tcp").await.unwrap();
         client.shutdown().await.unwrap();
         let mut response = Vec::new();
-        timeout(Duration::from_secs(3), client.read_to_end(&mut response)).await.unwrap().unwrap();
+        timeout(Duration::from_secs(3), client.read_to_end(&mut response))
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(response, b"tcp-reply");
         tcp_flow.await.unwrap().unwrap();
         tcp_peer.await.unwrap();
-        let mut flow = dispatcher.open_udp(source, target(udp_address)).await.unwrap();
+        let mut flow = dispatcher
+            .open_udp(source, target(udp_address))
+            .await
+            .unwrap();
         flow.send(b"gateway-udp").await.unwrap();
         let mut bytes = [0; 64];
-        let length = timeout(Duration::from_secs(3), flow.recv(&mut bytes)).await.unwrap().unwrap();
+        let length = timeout(Duration::from_secs(3), flow.recv(&mut bytes))
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(&bytes[..length], b"gateway-udp");
         drop(flow);
         udp_peer.await.unwrap();
@@ -1092,7 +1270,8 @@ fn gateway_lan_flows_exchange_real_bytes_and_record_source_without_another_runti
     let records = snapshot["connections"].as_array().unwrap();
     assert_eq!(records.len(), 2);
     assert!(records.iter().all(|record| record["ingress"] == "gateway"
-        && record["source_ip"] == "192.168.77.12" && record["ended"] == true));
+        && record["source_ip"] == "192.168.77.12"
+        && record["ended"] == true));
     core.stop();
 }
 
@@ -1101,7 +1280,8 @@ fn gateway_upstream_host_inventory_blocks_proxy_hop_rebinding_before_handshake()
     let mut candidate = config();
     candidate.policy.mode = Mode::Global;
     candidate.dns.hosts.push(swirl_subscription::HostMapping {
-        name: "upstream.fixture.invalid".into(), address: "127.0.0.1".parse().unwrap(),
+        name: "upstream.fixture.invalid".into(),
+        address: "127.0.0.1".parse().unwrap(),
     });
     if let Outbound::HttpConnect { host, .. } = &mut candidate.nodes[0].outbound {
         *host = "upstream.fixture.invalid".into();
@@ -1110,9 +1290,19 @@ fn gateway_upstream_host_inventory_blocks_proxy_hop_rebinding_before_handshake()
     let dispatcher = gateway(&core.flow_dispatcher().unwrap());
     runtime().block_on(async {
         let (_client, stream) = tokio::io::duplex(128);
-        assert_eq!(dispatcher.relay_tcp(stream, "192.168.77.12:50000".parse().unwrap(),
-            NetworkTarget { host: "remote.fixture.invalid".into(), port: 443 }).await,
-            Err("GatewayHostAccessDenied"));
+        assert_eq!(
+            dispatcher
+                .relay_tcp(
+                    stream,
+                    "192.168.77.12:50000".parse().unwrap(),
+                    NetworkTarget {
+                        host: "remote.fixture.invalid".into(),
+                        port: 443
+                    }
+                )
+                .await,
+            Err("GatewayHostAccessDenied")
+        );
         until(|| core.snapshot().unwrap()["active"] == 0).await;
     });
     assert_eq!(core.snapshot().unwrap()["upload"], 0);

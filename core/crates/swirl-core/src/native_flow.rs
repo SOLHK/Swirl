@@ -37,23 +37,31 @@ struct GatewayAdmission {
 
 impl GatewayAdmission {
     fn new(local_sources: Vec<IpAddr>, protected_hosts: Vec<IpAddr>) -> Result<Self> {
-        if local_sources.is_empty() || local_sources.len() > 256
-            || protected_hosts.is_empty() || protected_hosts.len() > 256
+        if local_sources.is_empty()
+            || local_sources.len() > 256
+            || protected_hosts.is_empty()
+            || protected_hosts.len() > 256
         {
             return Err("GatewayAddressInventory");
         }
         let normalize = swirl_routing::v2::normalize_ip;
         let local_sources: BTreeSet<_> = local_sources.into_iter().map(normalize).collect();
         let mut protected_hosts: BTreeSet<_> = protected_hosts.into_iter().map(normalize).collect();
-        if local_sources.iter().chain(protected_hosts.iter()).any(|ip| {
-            ip.is_unspecified() || ip.is_multicast()
-                || *ip == IpAddr::V4(std::net::Ipv4Addr::BROADCAST)
-        }) {
+        if local_sources
+            .iter()
+            .chain(protected_hosts.iter())
+            .any(|ip| {
+                ip.is_unspecified()
+                    || ip.is_multicast()
+                    || *ip == IpAddr::V4(std::net::Ipv4Addr::BROADCAST)
+            })
+        {
             return Err("GatewayAddressInventory");
         }
         protected_hosts.extend(local_sources.iter().copied());
         Ok(Self {
-            local_sources, protected_hosts,
+            local_sources,
+            protected_hosts,
             #[cfg(test)]
             fixture_endpoints: BTreeSet::new(),
         })
@@ -70,38 +78,78 @@ impl GatewayAdmission {
         Ok(true)
     }
 
-    async fn prepare_outbound(self: &Arc<Self>, source: SocketAddr, routed: &mut Routed) -> Result<()> {
-        if !self.is_lan(source)? { return Ok(()); }
+    async fn prepare_outbound(
+        self: &Arc<Self>,
+        source: SocketAddr,
+        routed: &mut Routed,
+    ) -> Result<()> {
+        if !self.is_lan(source)? {
+            return Ok(());
+        }
         let (host, port) = match &routed.node.outbound {
             Outbound::Direct {} | Outbound::Reject {} => return Ok(()),
-            Outbound::Vmess { host, port, .. } | Outbound::Vless { host, port, .. }
-            | Outbound::Shadowsocks { host, port, .. } | Outbound::Socks4 { host, port, .. }
-            | Outbound::Socks5 { host, port, .. } | Outbound::HttpConnect { host, port, .. }
+            Outbound::Vmess { host, port, .. }
+            | Outbound::Vless { host, port, .. }
+            | Outbound::Shadowsocks { host, port, .. }
+            | Outbound::Socks4 { host, port, .. }
+            | Outbound::Socks5 { host, port, .. }
+            | Outbound::HttpConnect { host, port, .. }
             | Outbound::Trojan { host, port, .. } => (host.as_str(), *port),
             Outbound::Hysteria2(config) => (config.host.as_str(), config.port),
             Outbound::Tuic(config) => (config.host.as_str(), config.port),
         };
         let host = host.to_owned();
-        self.target(source, &NetworkTarget { host: host.clone(), port })?;
+        self.target(
+            source,
+            &NetworkTarget {
+                host: host.clone(),
+                port,
+            },
+        )?;
         let addresses = timeout(routed.limit, routed.resolver.resolve(&host, port))
-            .await.map_err(|_| "GatewayOutboundDnsTimeout")??;
-        if addresses.is_empty() || addresses.len() > 16 { return Err("GatewayOutboundDnsAnswers"); }
+            .await
+            .map_err(|_| "GatewayOutboundDnsTimeout")??;
+        if addresses.is_empty() || addresses.len() > 16 {
+            return Err("GatewayOutboundDnsAnswers");
+        }
         for address in &addresses {
-            self.target(source, &NetworkTarget { host: address.ip().to_string(), port: address.port() })?;
+            self.target(
+                source,
+                &NetworkTarget {
+                    host: address.ip().to_string(),
+                    port: address.port(),
+                },
+            )?;
         }
         let guard = self.clone();
-        routed.resolver = Arc::new(routed.resolver.with_pinned_addresses(
-            &host, addresses.into_iter().map(|address| address.ip()).collect(),
-        ).with_endpoint_guard(move |address| guard.target(source, &NetworkTarget {
-            host: address.ip().to_string(), port: address.port(),
-        }).is_ok()));
+        routed.resolver = Arc::new(
+            routed
+                .resolver
+                .with_pinned_addresses(
+                    &host,
+                    addresses.into_iter().map(|address| address.ip()).collect(),
+                )
+                .with_endpoint_guard(move |address| {
+                    guard
+                        .target(
+                            source,
+                            &NetworkTarget {
+                                host: address.ip().to_string(),
+                                port: address.port(),
+                            },
+                        )
+                        .is_ok()
+                }),
+        );
         Ok(())
     }
 
     fn target(&self, source: SocketAddr, target: &NetworkTarget) -> Result<()> {
         #[cfg(test)]
         if let Ok(ip) = target.host.parse::<IpAddr>()
-            && self.fixture_endpoints.contains(&SocketAddr::new(ip, target.port))
+            && self
+                .fixture_endpoints
+                .contains(&SocketAddr::new(ip, target.port))
         {
             self.is_lan(source)?;
             return Ok(());
@@ -114,20 +162,38 @@ impl GatewayAdmission {
     }
 
     fn host(&self, source: SocketAddr, host: &str) -> Result<()> {
-        if !self.is_lan(source)? { return Ok(()); }
+        if !self.is_lan(source)? {
+            return Ok(());
+        }
         let host = host.trim_end_matches('.');
-        if host.eq_ignore_ascii_case("localhost") || host.to_ascii_lowercase().ends_with(".localhost") {
+        if host.eq_ignore_ascii_case("localhost")
+            || host.to_ascii_lowercase().ends_with(".localhost")
+        {
             return Err("GatewayHostAccessDenied");
         }
-        let Ok(ip) = host.parse::<IpAddr>() else { return Ok(()) };
+        let Ok(ip) = host.parse::<IpAddr>() else {
+            return Ok(());
+        };
         let ip = swirl_routing::v2::normalize_ip(ip);
         let unsafe_ip = match ip {
-            IpAddr::V4(ip) => ip.is_loopback() || ip.is_unspecified() || ip.is_link_local()
-                || ip.is_multicast() || ip.is_broadcast() || ip.octets()[0] == 0 || ip.octets()[0] >= 240
-                || ip == std::net::Ipv4Addr::new(100, 100, 100, 200)
-                || ip == std::net::Ipv4Addr::new(168, 63, 129, 16),
-            IpAddr::V6(ip) => ip.is_loopback() || ip.is_unspecified() || ip.is_multicast()
-                || ip.is_unicast_link_local() || ip.segments()[..6] == [0; 6],
+            IpAddr::V4(ip) => {
+                ip.is_loopback()
+                    || ip.is_unspecified()
+                    || ip.is_link_local()
+                    || ip.is_multicast()
+                    || ip.is_broadcast()
+                    || ip.octets()[0] == 0
+                    || ip.octets()[0] >= 240
+                    || ip == std::net::Ipv4Addr::new(100, 100, 100, 200)
+                    || ip == std::net::Ipv4Addr::new(168, 63, 129, 16)
+            }
+            IpAddr::V6(ip) => {
+                ip.is_loopback()
+                    || ip.is_unspecified()
+                    || ip.is_multicast()
+                    || ip.is_unicast_link_local()
+                    || ip.segments()[..6] == [0; 6]
+            }
         };
         if unsafe_ip || self.protected_hosts.contains(&ip) {
             return Err("GatewayHostAccessDenied");
@@ -139,17 +205,32 @@ impl GatewayAdmission {
     }
 }
 
-fn mark_gateway_record(shared: &Shared, id: u64, admission: &GatewayAdmission, source: SocketAddr) -> Result<()> {
+fn mark_gateway_record(
+    shared: &Shared,
+    id: u64,
+    admission: &GatewayAdmission,
+    source: SocketAddr,
+) -> Result<()> {
     if admission.is_lan(source)?
-        && let Some(record) = shared.records.lock().map_err(|_| "StatsState")?.get_mut(&id)
+        && let Some(record) = shared
+            .records
+            .lock()
+            .map_err(|_| "StatsState")?
+            .get_mut(&id)
     {
         record.ingress = "gateway";
     }
     Ok(())
 }
 
-fn gateway_target(admission: &Option<Arc<GatewayAdmission>>, source: SocketAddr, target: &NetworkTarget) -> Result<()> {
-    if let Some(admission) = admission { admission.target(source, target)?; }
+fn gateway_target(
+    admission: &Option<Arc<GatewayAdmission>>,
+    source: SocketAddr,
+    target: &NetworkTarget,
+) -> Result<()> {
+    if let Some(admission) = admission {
+        admission.target(source, target)?;
+    }
     Ok(())
 }
 
@@ -182,9 +263,14 @@ impl FlowDispatcher {
         local_sources: Vec<IpAddr>,
         protected_hosts: Vec<IpAddr>,
     ) -> Result<Self> {
-        if self.gateway.is_some() { return Err("GatewayAdmissionAlreadySet"); }
+        if self.gateway.is_some() {
+            return Err("GatewayAdmissionAlreadySet");
+        }
         let mut dispatcher = self.clone();
-        dispatcher.gateway = Some(Arc::new(GatewayAdmission::new(local_sources, protected_hosts)?));
+        dispatcher.gateway = Some(Arc::new(GatewayAdmission::new(
+            local_sources,
+            protected_hosts,
+        )?));
         Ok(dispatcher)
     }
 
@@ -212,8 +298,11 @@ impl FlowDispatcher {
             let counters = Arc::new(Counters::default());
             let work = async {
                 gateway_target(&gateway, source, &target)?;
-                let mut routed = route_flow(&shared, id, source, &target, counters.clone(), true).await?;
-                if let Some(gateway) = &gateway { mark_gateway_record(&shared, id, gateway, source)?; }
+                let mut routed =
+                    route_flow(&shared, id, source, &target, counters.clone(), true).await?;
+                if let Some(gateway) = &gateway {
+                    mark_gateway_record(&shared, id, gateway, source)?;
+                }
                 // Fake-IP has already been reversed by the packet adapter.
                 // Check the route's existing hosts/DNS result before any
                 // outbound socket or protocol handshake is created.
@@ -301,7 +390,9 @@ impl FlowDispatcher {
             let id = registered.guard.id;
             let mut cancellation = registered.cancellation.clone();
             let work = async {
-                if let Some(gateway) = &gateway { gateway.dns_host(source, &host)?; }
+                if let Some(gateway) = &gateway {
+                    gateway.dns_host(source, &host)?;
+                }
                 let (plan, generation) = shared.admit().await?;
                 validate_tun_dns(&plan.prepared.runtime)?;
                 let mut routed = route(
@@ -333,7 +424,9 @@ impl FlowDispatcher {
                     .resolve_with_transport(&host, port, &transport)
                     .await?;
                 if let Some(gateway) = &gateway {
-                    for address in &addresses { gateway.dns_host(source, &address.ip().to_string())?; }
+                    for address in &addresses {
+                        gateway.dns_host(source, &address.ip().to_string())?;
+                    }
                 }
                 Ok(addresses)
             };
@@ -763,7 +856,9 @@ async fn run_udp(
     let setup = async {
         gateway_target(&gateway, source, &target)?;
         let mut routed = route_flow(&shared, id, source, &target, counters.clone(), true).await?;
-        if let Some(gateway) = &gateway { mark_gateway_record(&shared, id, gateway, source)?; }
+        if let Some(gateway) = &gateway {
+            mark_gateway_record(&shared, id, gateway, source)?;
+        }
         gateway_target(&gateway, source, &routed.target)?;
         if let Some(gateway) = &gateway {
             gateway.prepare_outbound(source, &mut routed).await?;

@@ -81,7 +81,10 @@ impl GatewayIngress {
             || address == self.lan_subnet.network()
             || address == self.lan_subnet.broadcast()
             || self.protected_hosts.contains(&address.into())
-            || !self.allowed_sources.iter().any(|net| net.contains(&address))
+            || !self
+                .allowed_sources
+                .iter()
+                .any(|net| net.contains(&address))
         {
             return None;
         }
@@ -92,7 +95,9 @@ impl GatewayIngress {
         match self.source(source) {
             Some(SourceKind::Host) => true,
             Some(SourceKind::Lan) => {
-                let IpAddr::V4(address) = destination else { return false };
+                let IpAddr::V4(address) = destination else {
+                    return false;
+                };
                 !address.is_loopback()
                     && !address.is_unspecified()
                     && !address.is_multicast()
@@ -209,7 +214,10 @@ mod tests {
             gateway: "192.168.137.1".parse().unwrap(),
             allowed_sources: vec!["192.168.137.128/25".parse().unwrap()],
             local_sources: vec!["192.168.137.1".parse().unwrap(), "fd00::1".parse().unwrap()],
-            protected_hosts: vec!["192.168.137.1".parse().unwrap(), "192.168.1.2".parse().unwrap()],
+            protected_hosts: vec![
+                "192.168.137.1".parse().unwrap(),
+                "192.168.1.2".parse().unwrap(),
+            ],
             max_tcp_per_client: 1,
             max_udp_per_client: 1,
             max_dns_per_client: 1,
@@ -224,8 +232,21 @@ mod tests {
         for source in ["192.168.137.2", "192.168.137.255", "203.0.113.2", "fd00::2"] {
             assert!(!p.permits(source.parse().unwrap(), destination));
         }
-        for destination in ["127.0.0.1", "192.168.137.1", "192.168.1.2", "ff02::1", "169.254.169.254", "100.100.100.200", "0.1.2.3", "240.0.0.1", "192.168.137.255"] {
-            assert!(!p.permits("192.168.137.129".parse().unwrap(), destination.parse().unwrap()));
+        for destination in [
+            "127.0.0.1",
+            "192.168.137.1",
+            "192.168.1.2",
+            "ff02::1",
+            "169.254.169.254",
+            "100.100.100.200",
+            "0.1.2.3",
+            "240.0.0.1",
+            "192.168.137.255",
+        ] {
+            assert!(!p.permits(
+                "192.168.137.129".parse().unwrap(),
+                destination.parse().unwrap()
+            ));
         }
         assert!(p.permits("fd00::1".parse().unwrap(), "2001:db8::1".parse().unwrap()));
     }
@@ -235,13 +256,32 @@ mod tests {
         let budget = ClientBudget::default();
         let source = "192.168.137.129".parse().unwrap();
         let destination = "203.0.113.1".parse().unwrap();
-        let first = budget.acquire(&p, source, destination, FlowClass::Udp).unwrap();
-        assert!(budget.acquire(&p, source, destination, FlowClass::Udp).is_err());
-        let other = budget.acquire(&p, "192.168.137.130".parse().unwrap(), destination, FlowClass::Udp).unwrap();
-        let dns = budget.acquire(&p, source, destination, FlowClass::Dns).unwrap();
+        let first = budget
+            .acquire(&p, source, destination, FlowClass::Udp)
+            .unwrap();
+        assert!(
+            budget
+                .acquire(&p, source, destination, FlowClass::Udp)
+                .is_err()
+        );
+        let other = budget
+            .acquire(
+                &p,
+                "192.168.137.130".parse().unwrap(),
+                destination,
+                FlowClass::Udp,
+            )
+            .unwrap();
+        let dns = budget
+            .acquire(&p, source, destination, FlowClass::Dns)
+            .unwrap();
         drop((first, other, dns));
         assert!(budget.0.lock().unwrap().is_empty());
-        assert!(budget.acquire(&p, source, destination, FlowClass::Udp).is_ok());
+        assert!(
+            budget
+                .acquire(&p, source, destination, FlowClass::Udp)
+                .is_ok()
+        );
     }
     #[test]
     fn public_or_wider_network_and_missing_host_inventory_are_rejected() {

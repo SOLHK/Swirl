@@ -15,7 +15,7 @@ use swirl_dns::tun::{TunDns, TunLookup};
 use swirl_protocol::Target;
 use swirl_tun::{
     PacketSender, TcpFlow, TunConfig, TunControl, TunStats, UdpDatagram, UdpReplySender,
-    gateway::{ClientBudget, ClientPermit, FlowClass},
+    gateway::{ClientBudget, ClientPermit, FlowClass, SourceKind},
 };
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -94,7 +94,10 @@ impl Drop for BridgeControl {
 pub fn spawn(dispatcher: FlowDispatcher, dns: TunDns, config: TunConfig) -> Result<PacketBridge> {
     config.validate().map_err(|_| "TunLimits")?;
     let dispatcher = if let Some(gateway) = &config.gateway {
-        dispatcher.with_gateway_admission(gateway.local_sources.clone(), gateway.protected_hosts.clone())?
+        dispatcher.with_gateway_admission(
+            gateway.local_sources.clone(),
+            gateway.protected_hosts.clone(),
+        )?
     } else {
         dispatcher
     };
@@ -131,8 +134,13 @@ pub fn spawn(dispatcher: FlowDispatcher, dns: TunDns, config: TunConfig) -> Resu
 struct Lookup {
     dispatcher: FlowDispatcher,
     source: SocketAddr,
+    allow_ipv6: bool,
 }
 impl TunLookup for Lookup {
+    fn allow_ipv6(&self) -> bool {
+        self.allow_ipv6
+    }
+
     fn lookup<'a>(
         &'a self,
         name: &'a str,
@@ -146,7 +154,13 @@ impl TunLookup for Lookup {
     }
 }
 
-async fn tcp(flow: TcpFlow, dispatcher: FlowDispatcher, dns: TunDns) -> Result<()> {
+fn dns_allows_ipv6(config: &TunConfig, source: IpAddr) -> bool {
+    config.gateway.as_ref().is_none_or(|gateway| {
+        gateway.source(source) == Some(SourceKind::Host)
+    })
+}
+
+async fn tcp(flow: TcpFlow, dispatcher: FlowDispatcher, dns: TunDns, allow_ipv6: bool) -> Result<()> {
     if flow.destination.port() != 53 {
         let host = dns.target_host(flow.destination.ip()).await?;
         return dispatcher
@@ -163,6 +177,7 @@ async fn tcp(flow: TcpFlow, dispatcher: FlowDispatcher, dns: TunDns) -> Result<(
     let lookup = Lookup {
         dispatcher,
         source: flow.source,
+        allow_ipv6,
     };
     let mut stream = flow.stream;
     loop {
@@ -308,9 +323,10 @@ async fn run(
                 let dispatcher = dispatcher.clone();
                 let dns = dns.clone();
                 let stats = stats.clone();
+                let allow_ipv6 = dns_allows_ipv6(&config, flow.source.ip());
                 jobs.spawn(async move {
                     let _gateway_permit = gateway_permit;
-                    if tcp(flow, dispatcher, dns).await.is_err() { stats.tcp_failures.fetch_add(1, Ordering::Relaxed); }
+                    if tcp(flow, dispatcher, dns, allow_ipv6).await.is_err() { stats.tcp_failures.fetch_add(1, Ordering::Relaxed); }
                     None
                 });
             },
@@ -331,7 +347,11 @@ async fn run(
                         continue;
                     };
                     if jobs.len() >= max_jobs { stats.udp_dropped.fetch_add(1, Ordering::Relaxed); continue; }
-                    let lookup = Lookup { dispatcher: dispatcher.clone(), source: packet.source };
+                    let lookup = Lookup {
+                        dispatcher: dispatcher.clone(),
+                        source: packet.source,
+                        allow_ipv6: dns_allows_ipv6(&config, packet.source.ip()),
+                    };
                     let dns = dns.clone();
                     let replies = replies.clone();
                     let stats = stats.clone();

@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    fs::{File, OpenOptions},
+    fs::File,
     future::Future,
     io::{Read, Seek, SeekFrom, Write},
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
@@ -31,6 +31,13 @@ type Result<T> = std::result::Result<T, &'static str>;
 
 /// Implemented by the V2 FlowDispatcher adapter; no system DNS fallback here.
 pub trait TunLookup: Send + Sync {
+    /// Address families the admitted client can send through this ingress.
+    /// Native host TUN flows remain dual stack; an IPv4-only gateway must not
+    /// advertise synthetic IPv6 destinations that it will reject afterwards.
+    fn allow_ipv6(&self) -> bool {
+        true
+    }
+
     fn lookup<'a>(
         &'a self,
         name: &'a str,
@@ -90,15 +97,10 @@ impl FakeIpStore {
         if std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
             return Err("FakeIpJournalSymlink");
         }
-        let mut options = OpenOptions::new();
+        let mut options = swirl_platform::owner_private_open_options();
         // Windows append-only handles cannot truncate a torn final record.
         // The exclusive lock below owns this read/write handle until drop.
         options.read(true).write(true).create(true).truncate(false);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600);
-        }
         let mut journal = options.open(path).map_err(|_| "FakeIpJournalOpen")?;
         journal.try_lock().map_err(|_| "FakeIpJournalOwned")?;
         let size = journal.metadata().map_err(|_| "FakeIpJournalRead")?.len();
@@ -443,6 +445,12 @@ impl TunDns {
 
     pub async fn answer(&self, request: &[u8], resolver: &dyn TunLookup) -> Result<Vec<u8>> {
         let query = question(request)?;
+        // Scope this to the admitted source, not the shared fake-IP store.
+        // NODATA requires neither an upstream lookup nor a durable allocation;
+        // host/native clients may still use the same name's IPv6 identity.
+        if query.kind == 28 && !resolver.allow_ipv6() {
+            return Ok(response(&query, 0, None));
+        }
         let Ok(permit) = self.queries.clone().try_acquire_owned() else {
             return Ok(response(&query, 2, None));
         };

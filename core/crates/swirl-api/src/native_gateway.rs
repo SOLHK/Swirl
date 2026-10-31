@@ -39,7 +39,9 @@ fn archive(path: &Path, journal: &Journal) -> Result<()> {
     if !journal.is_restored() {
         return Err("GatewayRecoveryConflict");
     }
-    let name = path.file_name().and_then(|value| value.to_str())
+    let name = path
+        .file_name()
+        .and_then(|value| value.to_str())
         .ok_or("GatewayJournalPath")?;
     let restored = path.with_file_name(format!("{name}.{}.restored", journal.owner));
     if restored.exists() {
@@ -83,7 +85,9 @@ impl GatewayState {
             return Err("GatewayRecoveryRequired");
         }
         let mut random = [0u8; 16];
-        SystemRandom::new().fill(&mut random).map_err(|_| "GatewayRandom")?;
+        SystemRandom::new()
+            .fill(&mut random)
+            .map_err(|_| "GatewayRandom")?;
         let owner = random.iter().map(|byte| format!("{byte:02x}")).collect();
         let policy = windows_gateway::preflight(&config.lan, tun, owner).map_err(code)?;
         let mut backend = WindowsGatewayBackend::for_policy(policy.clone()).map_err(code)?;
@@ -92,15 +96,26 @@ impl GatewayState {
             policy.lan.clone(),
             policy.owner.clone(),
             windows_gateway::desired_resources(&policy).map_err(code)?,
-        ).map_err(code)?;
+        )
+        .map_err(code)?;
         let mut store = FileJournalStore::create_new(&path).map_err(code)?;
         store.save(&journal).map_err(|_| "GatewayJournalWrite")?;
         let mut state = Self {
-            policy, backend, store, journal, path,
-            prepared_at: Instant::now(), next_verification: Instant::now(),
-            dhcp: None, forwarding: false, isolation: false, restored: false,
+            policy,
+            backend,
+            store,
+            journal,
+            path,
+            prepared_at: Instant::now(),
+            next_verification: Instant::now(),
+            dhcp: None,
+            forwarding: false,
+            isolation: false,
+            restored: false,
         };
-        if transaction::apply_prefix(&mut state.backend, &mut state.store, &mut state.journal, 1).is_err() {
+        if transaction::apply_prefix(&mut state.backend, &mut state.store, &mut state.journal, 1)
+            .is_err()
+        {
             // No TUN routes have been applied. A fully owned preparation may
             // therefore be restored immediately; conflicting state survives.
             let _ = state.finish();
@@ -120,7 +135,9 @@ impl GatewayState {
         // synthetic DNS address is intentionally not a host-owned address.
         hosts.extend([
             "198.18.0.1".parse().map_err(|_| "GatewayTunAddress")?,
-            "fd53:7769:726c::1".parse().map_err(|_| "GatewayTunAddress")?,
+            "fd53:7769:726c::1"
+                .parse()
+                .map_err(|_| "GatewayTunAddress")?,
         ]);
         hosts.sort();
         hosts.dedup();
@@ -134,7 +151,9 @@ impl GatewayState {
             max_udp_per_client: config.max_udp_per_client,
             max_dns_per_client: config.max_dns_per_client,
         };
-        ingress.validate().map_err(|_| "GatewayIngressConfiguration")?;
+        ingress
+            .validate()
+            .map_err(|_| "GatewayIngressConfiguration")?;
         Ok(ingress)
     }
 
@@ -157,9 +176,13 @@ impl GatewayState {
             (true, Some(attachment)) => {
                 attachment.validate()?;
                 windows_gateway::attest_dhcp_socket(
-                    &self.policy, attachment.owner_pid, &attachment.owner_creation,
-                    attachment.target_helper_pid, &attachment.protocol_info_base64,
-                ).map_err(|_| "GatewayDhcpAttachmentNotVerified")?;
+                    &self.policy,
+                    attachment.owner_pid,
+                    &attachment.owner_creation,
+                    attachment.target_helper_pid,
+                    &attachment.protocol_info_base64,
+                )
+                .map_err(|_| "GatewayDhcpAttachmentNotVerified")?;
             }
             (true, None) => return Err("GatewayDhcpAttachmentRequired"),
             (false, Some(_)) => return Err("GatewayUnexpectedDhcpAttachment"),
@@ -180,11 +203,15 @@ impl GatewayState {
     }
 
     pub fn failure(&mut self) -> Option<&'static str> {
-        if self.restored { return None; }
+        if self.restored {
+            return None;
+        }
         if !self.forwarding && self.prepared_at.elapsed() > PREPARATION_WINDOW {
             return Some("GatewayPreparationExpired");
         }
-        if Instant::now() < self.next_verification { return None; }
+        if Instant::now() < self.next_verification {
+            return None;
+        }
         self.next_verification = Instant::now() + Duration::from_secs(1);
         self.verify().err()
     }
@@ -195,8 +222,11 @@ impl GatewayState {
         }
         if let Some(attachment) = &self.dhcp
             && windows_gateway::verify_dhcp_attachment(
-                &self.policy, attachment.owner_pid, &attachment.owner_creation,
-            ).is_err()
+                &self.policy,
+                attachment.owner_pid,
+                &attachment.owner_creation,
+            )
+            .is_err()
         {
             return Err("GatewayDhcpAttachmentLost");
         }
@@ -207,14 +237,19 @@ impl GatewayState {
     /// A missing interface is safe; a foreign true forwarding bit is not ours
     /// to change and leaves the guard/journal in recovery_required.
     pub fn quiesce(&mut self) -> Result<()> {
-        if self.restored { return Ok(()); }
-        let report = transaction::recover_suffix(
-            &mut self.backend, &mut self.store, &mut self.journal, 1,
-        ).map_err(|_| "GatewayQuiesceFailed")?;
+        if self.restored {
+            return Ok(());
+        }
+        let report =
+            transaction::recover_suffix(&mut self.backend, &mut self.store, &mut self.journal, 1)
+                .map_err(|_| "GatewayQuiesceFailed")?;
         if !report.conflicts.is_empty() {
             return Err("GatewayQuiesceConflict");
         }
-        match self.backend.read(&self.policy.lan, &Resource::Forwarding { ipv6: false }) {
+        match self
+            .backend
+            .read(&self.policy.lan, &Resource::Forwarding { ipv6: false })
+        {
             Ok(None | Some(NetworkValue::Forwarding { enabled: false })) => {}
             _ => return Err("GatewayForwardingStillEnabled"),
         }
@@ -226,7 +261,9 @@ impl GatewayState {
     /// Only the coordinator may call this after dependent TUN resources have
     /// been restored, or during a preparation failure before TUN applied them.
     pub fn finish(&mut self) -> Result<()> {
-        if self.restored { return Ok(()); }
+        if self.restored {
+            return Ok(());
+        }
         self.quiesce()?;
         let report = transaction::recover(&mut self.backend, &mut self.store, &mut self.journal)
             .map_err(|_| "GatewayRecoveryFailed")?;
@@ -259,7 +296,9 @@ pub(crate) struct RecoveryBatch {
 }
 
 impl RecoveryBatch {
-    pub fn is_empty(&self) -> bool { self.states.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.states.is_empty()
+    }
 
     pub fn quiesce_all(directory: &Path) -> Result<Self> {
         let mut batch = Self { states: Vec::new() };
@@ -267,29 +306,48 @@ impl RecoveryBatch {
         for entry in std::fs::read_dir(directory).map_err(|_| "GatewayJournalDirectory")? {
             let entry = entry.map_err(|_| "GatewayJournalDirectory")?;
             let name = entry.file_name();
-            let Some(stem) = name.to_str().and_then(|name| name.strip_suffix(".gateway.json")) else { continue };
-            if stem.len() != 32 || !stem.bytes().all(|byte| byte.is_ascii_hexdigit()) { continue; }
+            let Some(stem) = name
+                .to_str()
+                .and_then(|name| name.strip_suffix(".gateway.json"))
+            else {
+                continue;
+            };
+            if stem.len() != 32 || !stem.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                continue;
+            }
             let path = entry.path();
             let (store, journal) = match FileJournalStore::open_existing(&path) {
                 Ok(value) => value,
                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                    active_owner = true; continue;
+                    active_owner = true;
+                    continue;
                 }
                 Err(_) => return Err("GatewayRecoveryJournalInvalid"),
             };
             if journal.interface.guid.replace('-', "") != stem {
                 return Err("GatewayRecoveryJournalIdentity");
             }
-            let Some(NetworkValue::GatewayIsolation { policy }) = journal.changes.first()
-                .and_then(|change| change.after.as_ref()) else {
+            let Some(NetworkValue::GatewayIsolation { policy }) = journal
+                .changes
+                .first()
+                .and_then(|change| change.after.as_ref())
+            else {
                 return Err("GatewayRecoveryJournalInvalid");
             };
             let policy = policy.clone();
             let backend = WindowsGatewayBackend::for_policy(policy.clone()).map_err(code)?;
             let mut state = GatewayState {
-                policy, backend, store, journal, path,
-                prepared_at: Instant::now(), next_verification: Instant::now(),
-                dhcp: None, forwarding: true, isolation: true, restored: false,
+                policy,
+                backend,
+                store,
+                journal,
+                path,
+                prepared_at: Instant::now(),
+                next_verification: Instant::now(),
+                dhcp: None,
+                forwarding: true,
+                isolation: true,
+                restored: false,
             };
             state.quiesce()?;
             batch.states.push(state);
@@ -303,7 +361,9 @@ impl RecoveryBatch {
     }
 
     pub fn finish(mut self) -> Result<usize> {
-        for state in &mut self.states { state.finish()?; }
+        for state in &mut self.states {
+            state.finish()?;
+        }
         Ok(self.states.len())
     }
 }

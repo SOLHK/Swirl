@@ -11,9 +11,9 @@ use swirl_subscription::Config;
 
 mod control_v2;
 mod import_ffi;
-pub mod native_gateway_control;
 #[cfg(windows)]
 mod native_gateway;
+pub mod native_gateway_control;
 pub mod native_tun;
 pub mod native_tun_control;
 #[cfg(windows)]

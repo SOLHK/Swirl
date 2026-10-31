@@ -242,7 +242,10 @@ impl WindowsNetworkBackend {
 
     fn check_resource(&self, resource: &Resource) -> io::Result<()> {
         if matches!(resource, Resource::GatewayIsolation { .. }) {
-            return Err(io::Error::new(io::ErrorKind::PermissionDenied, "physical gateway isolation requires its dedicated backend"));
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "physical gateway isolation requires its dedicated backend",
+            ));
         }
         if let Resource::DnsGuard { name } = resource {
             let prefix = format!("Swirl.NativeTun.DNS.{}.", self.owned.guid);
@@ -346,7 +349,10 @@ impl NetworkBackend for WindowsNetworkBackend {
     }
 }
 
-pub(crate) fn run_json<T: DeserializeOwned>(script: &str, input: &serde_json::Value) -> io::Result<T> {
+pub(crate) fn run_json<T: DeserializeOwned>(
+    script: &str,
+    input: &serde_json::Value,
+) -> io::Result<T> {
     run_json_with_timeout(script, input, COMMAND_TIMEOUT)
 }
 

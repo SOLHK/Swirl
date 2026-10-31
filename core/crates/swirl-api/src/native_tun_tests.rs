@@ -332,6 +332,116 @@ fn dns_query(name: &str, v6: bool) -> Vec<u8> {
     query
 }
 
+#[test]
+fn gateway_dns_families_follow_admitted_source_and_preserve_shared_fake_ip() {
+    let name_v4 = "v4.gateway-dns.fixture.invalid";
+    let name_v6 = "v6.gateway-dns.fixture.invalid";
+    let mut config = runtime_config();
+    config.dns.hosts.extend([
+        HostMapping { name: name_v4.into(), address: "203.0.113.7".parse().unwrap() },
+        HostMapping { name: name_v6.into(), address: "2001:db8::7".parse().unwrap() },
+    ]);
+    let mut core = start(config);
+    let dispatcher = core.flow_dispatcher().unwrap();
+    let runtime = dispatcher.runtime_handle();
+    runtime.block_on(async {
+        let lan: SocketAddr = "192.168.77.10:41053".parse().unwrap();
+        let host = source(false, 41054);
+        let gateway: IpAddr = "192.168.77.1".parse().unwrap();
+        let destination = SocketAddr::new(DNS_IPV4.into(), 53);
+        let stack_config = TunConfig {
+            gateway: Some(swirl_tun::gateway::GatewayIngress {
+                lan_subnet: "192.168.77.0/24".parse().unwrap(),
+                gateway: "192.168.77.1".parse().unwrap(),
+                allowed_sources: vec!["192.168.77.0/24".parse().unwrap()],
+                local_sources: vec![gateway, host.ip()],
+                protected_hosts: vec![gateway, host.ip()],
+                max_tcp_per_client: 8,
+                max_udp_per_client: 8,
+                max_dns_per_client: 4,
+            }),
+            ..TunConfig::default()
+        };
+        let dns = TunDns::new(FakeIpStore::memory(8).unwrap());
+        let mut bridge = spawn(dispatcher, dns.clone(), stack_config).unwrap();
+        let mut shared_v4 = None;
+        for (origin, name, ipv6) in [
+            (lan, name_v6, true),
+            (host, name_v6, true),
+            (lan, name_v4, false),
+            (host, name_v4, false),
+        ] {
+            let query = dns_query(name, ipv6);
+            bridge.input.send(udp_packet(origin, destination, &query)).await.unwrap();
+            let (from, to, answer) = next_udp(&mut bridge).await;
+            assert_eq!((from, to), (destination, origin));
+            assert_eq!(&answer[..2], &query[..2]);
+            assert_eq!(answer[3] & 15, 0);
+            assert_eq!(&answer[12..query.len()], &query[12..]);
+            if origin == lan && ipv6 {
+                assert_eq!(&answer[4..12], &[0, 1, 0, 0, 0, 0, 0, 0]);
+                assert_eq!(answer.len(), query.len());
+                assert_eq!(core.snapshot().unwrap()["accepted"], 0,
+                    "LAN AAAA NODATA must not perform a Core DNS lookup");
+                continue;
+            }
+            assert_eq!(&answer[4..12], &[0, 1, 0, 1, 0, 0, 0, 0]);
+            let data = &answer[query.len() + 12..];
+            let fake = if ipv6 {
+                IpAddr::V6(std::net::Ipv6Addr::from(<[u8; 16]>::try_from(data).unwrap()))
+            } else {
+                IpAddr::V4(std::net::Ipv4Addr::from(<[u8; 4]>::try_from(data).unwrap()))
+            };
+            assert_eq!(dns.target_host(fake).await.unwrap(), name);
+            if !ipv6 {
+                match shared_v4 {
+                    Some(previous) => assert_eq!(fake, previous, "one name keeps one shared A identity"),
+                    None => shared_v4 = Some(fake),
+                }
+            }
+        }
+
+        // The framed TCP DNS path must use the same source policy as UDP.
+        let origin = SocketAddr::new(lan.ip(), 42053);
+        let query = dns_query(name_v6, true);
+        let mut request = (query.len() as u16).to_be_bytes().to_vec();
+        request.extend_from_slice(&query);
+        let mut server_next = handshake(&mut bridge, origin, destination).await;
+        bridge.input.send(tcp_packet(origin, destination, 101, Some(server_next),
+            TcpControl::Psh, &request)).await.unwrap();
+        let client_fin = 101 + request.len() as i32;
+        bridge.input.send(tcp_packet(origin, destination, client_fin, Some(server_next),
+            TcpControl::Fin, &[])).await.unwrap();
+        let mut response = Vec::new();
+        loop {
+            let segment = next_tcp(&mut bridge).await;
+            assert_eq!((segment.source, segment.destination), (destination, origin));
+            assert_ne!(segment.control, TcpControl::Rst);
+            if !segment.payload.is_empty() {
+                assert_eq!(segment.sequence, server_next);
+                server_next = server_next.wrapping_add(segment.payload.len() as i32);
+                response.extend_from_slice(&segment.payload);
+            }
+            let finished = segment.control == TcpControl::Fin;
+            if finished { server_next = server_next.wrapping_add(1); }
+            bridge.input.send(tcp_packet(origin, destination, client_fin + 1, Some(server_next),
+                TcpControl::None, &[])).await.unwrap();
+            if finished { break; }
+        }
+        assert_eq!(&response[..2], &(query.len() as u16).to_be_bytes());
+        let answer = &response[2..];
+        assert_eq!(answer.len(), query.len());
+        assert_eq!(&answer[..2], &query[..2]);
+        assert_eq!(&answer[4..12], &[0, 1, 0, 0, 0, 0, 0, 0]);
+        assert_eq!(&answer[12..], &query[12..]);
+        assert_eq!(answer[3] & 15, 0);
+        assert_eq!(bridge.stats.snapshot().malformed_packets, 0);
+        assert_eq!(core.snapshot().unwrap()["failed"], 0);
+        bridge.control.shutdown().await.unwrap();
+    });
+    core.stop();
+}
+
 async fn fake_address(bridge: &mut PacketBridge, name: &str, v6: bool) -> IpAddr {
     let origin = source(v6, 41053);
     let destination = SocketAddr::new(if v6 { DNS_IPV6.into() } else { DNS_IPV4.into() }, 53);

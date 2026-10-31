@@ -62,8 +62,14 @@ pub(crate) fn responding_server(
     if !matches!(options.kind.as_slice(), [2 | 5 | 6]) || options.server.len() != 4 {
         return None;
     }
-    let address = Ipv4Addr::new(options.server[0], options.server[1], options.server[2], options.server[3]);
-    (!address.is_unspecified() && !address.is_multicast() && !address.is_broadcast()).then_some(address)
+    let address = Ipv4Addr::new(
+        options.server[0],
+        options.server[1],
+        options.server[2],
+        options.server[3],
+    );
+    (!address.is_unspecified() && !address.is_multicast() && !address.is_broadcast())
+        .then_some(address)
 }
 
 #[derive(Default)]
@@ -95,11 +101,15 @@ impl ProbeOptions {
                     }
                 }
                 53 => {
-                    if self.kind.len() + value.len() > 1 { return None; }
+                    if self.kind.len() + value.len() > 1 {
+                        return None;
+                    }
                     self.kind.extend_from_slice(value);
                 }
                 54 => {
-                    if self.server.len() + value.len() > 4 { return None; }
+                    if self.server.len() + value.len() > 4 {
+                        return None;
+                    }
                     self.server.extend_from_slice(value);
                 }
                 // RFC 3396 permits repeated option fragments. Only the fields
@@ -162,7 +172,13 @@ mod tests {
     fn physical_mac_parser_rejects_non_ethernet_and_non_unicast_values() {
         assert_eq!(hardware_address("02-00-00-00-00-01"), Some(MAC));
         assert_eq!(hardware_address("02:00:00:00:00:01"), Some(MAC));
-        for invalid in ["", "00-00-00-00-00-00", "ff-ff-ff-ff-ff-ff", "010000000001", "02000000000g"] {
+        for invalid in [
+            "",
+            "00-00-00-00-00-00",
+            "ff-ff-ff-ff-ff-ff",
+            "010000000001",
+            "02000000000g",
+        ] {
             assert_eq!(hardware_address(invalid), None);
         }
     }

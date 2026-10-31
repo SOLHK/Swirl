@@ -301,22 +301,35 @@ impl Journal {
                 }
             }
             if let Resource::GatewayIsolation { .. } = &change.resource {
-                let Some(Value::GatewayIsolation { policy }) = change.after.as_ref().or(change.before.as_ref()) else {
+                let Some(Value::GatewayIsolation { policy }) =
+                    change.after.as_ref().or(change.before.as_ref())
+                else {
                     return Err(invalid("gateway guard has no ownership value"));
                 };
-                if policy.owner != self.owner || policy.lan != self.interface || change.before.is_some() {
+                if policy.owner != self.owner
+                    || policy.lan != self.interface
+                    || change.before.is_some()
+                {
                     return Err(invalid("gateway guard does not belong to journal owner"));
                 }
             }
         }
-        if self.changes.iter().any(|change| matches!(change.resource, Resource::GatewayIsolation { .. }))
+        if self
+            .changes
+            .iter()
+            .any(|change| matches!(change.resource, Resource::GatewayIsolation { .. }))
             && (self.changes.len() != 2
                 || !matches!(self.changes[0].resource, Resource::GatewayIsolation { .. })
-                || !matches!(self.changes[1].resource, Resource::Forwarding { ipv6: false })
+                || !matches!(
+                    self.changes[1].resource,
+                    Resource::Forwarding { ipv6: false }
+                )
                 || self.changes[1].after != Some(Value::Forwarding { enabled: true })
                 || self.changes[1].before != Some(Value::Forwarding { enabled: false }))
         {
-            return Err(invalid("gateway isolation must precede the dedicated IPv4 forwarding change"));
+            return Err(invalid(
+                "gateway isolation must precede the dedicated IPv4 forwarding change",
+            ));
         }
         Ok(())
     }
@@ -347,7 +360,12 @@ impl Journal {
             validate_value(&resource, &before).map_err(|error| {
                 io::Error::new(error.kind(), format!("captured state validation: {error}"))
             })?;
-            if before.is_some() && !matches!(resource, Resource::Dns | Resource::Mtu { .. } | Resource::Forwarding { .. }) {
+            if before.is_some()
+                && !matches!(
+                    resource,
+                    Resource::Dns | Resource::Mtu { .. } | Resource::Forwarding { .. }
+                )
+            {
                 return Err(io::Error::new(
                     io::ErrorKind::AlreadyExists,
                     "TUN address, route or firewall rule already exists; refusing ownership takeover",
@@ -511,7 +529,11 @@ pub fn apply(
     store: &mut impl JournalStore,
     journal: &mut Journal,
 ) -> Result<(), ApplyError> {
-    if journal.changes.iter().any(|change| change.state != ChangeState::Pending) {
+    if journal
+        .changes
+        .iter()
+        .any(|change| change.state != ChangeState::Pending)
+    {
         return Err(ApplyError {
             cause: invalid("only a fresh plan can be applied; recover existing sessions first"),
             recovery: Ok(RecoveryReport::default()),
@@ -541,12 +563,19 @@ pub fn apply_prefix(
         if through == 0 || through > journal.changes.len() {
             return Err(invalid("invalid transaction prefix"));
         }
-        let first_pending = journal.changes.iter()
+        let first_pending = journal
+            .changes
+            .iter()
             .position(|change| change.state != ChangeState::Applied)
             .unwrap_or(journal.changes.len());
-        if first_pending > through || journal.changes[first_pending..].iter()
-            .any(|change| change.state != ChangeState::Pending) {
-            return Err(invalid("only an Applied prefix and Pending suffix may be resumed"));
+        if first_pending > through
+            || journal.changes[first_pending..]
+                .iter()
+                .any(|change| change.state != ChangeState::Pending)
+        {
+            return Err(invalid(
+                "only an Applied prefix and Pending suffix may be resumed",
+            ));
         }
         rollback_from = first_pending;
         durable = first_pending > 0;
@@ -554,8 +583,10 @@ pub fn apply_prefix(
         durable = true;
         for change in &journal.changes[..first_pending] {
             if backend.read(&journal.interface, &change.resource)? != change.after {
-                return Err(io::Error::new(io::ErrorKind::AlreadyExists,
-                    "applied transaction prefix changed before resumption"));
+                return Err(io::Error::new(
+                    io::ErrorKind::AlreadyExists,
+                    "applied transaction prefix changed before resumption",
+                ));
             }
         }
         for index in first_pending..through {
@@ -627,15 +658,25 @@ pub fn recover_suffix(
     // Routes were installed last. Remove captures before addresses/DNS.
     for index in (from..journal.changes.len()).rev() {
         let change = &journal.changes[index];
-        let owns_guard = matches!(change.state,
-            ChangeState::Applying | ChangeState::Applied | ChangeState::Conflict | ChangeState::NotOwned);
-        let gateway_forwarding_unresolved = matches!(change.resource, Resource::GatewayIsolation { .. })
-            && owns_guard
-            && report.conflicts.is_empty()
-            && !matches!(backend.read(&journal.interface, &Resource::Forwarding { ipv6: false }),
-                Ok(None) | Ok(Some(Value::Forwarding { enabled: false })));
-        if matches!(change.resource, Resource::DnsGuard { .. } | Resource::GatewayIsolation { .. })
-            && owns_guard
+        let owns_guard = matches!(
+            change.state,
+            ChangeState::Applying
+                | ChangeState::Applied
+                | ChangeState::Conflict
+                | ChangeState::NotOwned
+        );
+        let gateway_forwarding_unresolved =
+            matches!(change.resource, Resource::GatewayIsolation { .. })
+                && owns_guard
+                && report.conflicts.is_empty()
+                && !matches!(
+                    backend.read(&journal.interface, &Resource::Forwarding { ipv6: false }),
+                    Ok(None) | Ok(Some(Value::Forwarding { enabled: false }))
+                );
+        if matches!(
+            change.resource,
+            Resource::DnsGuard { .. } | Resource::GatewayIsolation { .. }
+        ) && owns_guard
             && (!report.conflicts.is_empty() || gateway_forwarding_unresolved)
         {
             // Do not reopen a physical DNS escape path while capture recovery
@@ -662,7 +703,10 @@ pub fn recover_suffix(
                 let current = backend.read(&journal.interface, &change.resource)?;
                 if current == change.before
                     || (current.is_none()
-                        && matches!(change.resource, Resource::Dns | Resource::Mtu { .. } | Resource::Forwarding { .. }))
+                        && matches!(
+                            change.resource,
+                            Resource::Dns | Resource::Mtu { .. } | Resource::Forwarding { .. }
+                        ))
                 {
                     return Ok(false);
                 }
@@ -676,7 +720,10 @@ pub fn recover_suffix(
                         && matches!(change.resource, Resource::Forwarding { .. }))
                     || current != change.after
                 {
-                    return Err(io::Error::new(io::ErrorKind::AlreadyExists, "resource no longer owned"));
+                    return Err(io::Error::new(
+                        io::ErrorKind::AlreadyExists,
+                        "resource no longer owned",
+                    ));
                 }
                 backend.compare_exchange(
                     &journal.interface,
@@ -699,11 +746,12 @@ pub fn recover_suffix(
                     journal.changes[index].state = ChangeState::Restored;
                 }
                 Err(error) => {
-                    journal.changes[index].state = if ownership_lost || error.kind() == io::ErrorKind::AlreadyExists {
-                        ChangeState::NotOwned
-                    } else {
-                        ChangeState::Conflict
-                    };
+                    journal.changes[index].state =
+                        if ownership_lost || error.kind() == io::ErrorKind::AlreadyExists {
+                            ChangeState::NotOwned
+                        } else {
+                            ChangeState::Conflict
+                        };
                     report.conflicts.push(index);
                 }
             }
@@ -862,7 +910,10 @@ mod tests {
                 return Err(io::Error::other("injected OS failure"));
             }
             if self.values.get(key) != expected.as_ref() {
-                return Err(io::Error::new(io::ErrorKind::AlreadyExists, "concurrent external change"));
+                return Err(io::Error::new(
+                    io::ErrorKind::AlreadyExists,
+                    "concurrent external change",
+                ));
             }
             match desired {
                 Some(value) => {
@@ -1502,11 +1553,24 @@ mod tests {
     fn gateway_plan(backend: &mut MockNetwork) -> Journal {
         let policy = crate::gateway_policy::fixture();
         let forwarding = Resource::Forwarding { ipv6: false };
-        backend.values.insert(forwarding.clone(), Value::Forwarding { enabled: false });
-        Journal::prepare(backend, policy.lan.clone(), policy.owner.clone(), vec![
-            (Resource::GatewayIsolation { name: policy.name() }, Some(Value::GatewayIsolation { policy })),
-            (forwarding, Some(Value::Forwarding { enabled: true })),
-        ]).unwrap()
+        backend
+            .values
+            .insert(forwarding.clone(), Value::Forwarding { enabled: false });
+        Journal::prepare(
+            backend,
+            policy.lan.clone(),
+            policy.owner.clone(),
+            vec![
+                (
+                    Resource::GatewayIsolation {
+                        name: policy.name(),
+                    },
+                    Some(Value::GatewayIsolation { policy }),
+                ),
+                (forwarding, Some(Value::Forwarding { enabled: true })),
+            ],
+        )
+        .unwrap()
     }
 
     #[test]
@@ -1519,12 +1583,23 @@ mod tests {
         let report = recover(&mut backend, &mut store, &mut journal).unwrap();
         assert_eq!(report.conflicts, vec![1, 0]);
         assert!(backend.values.contains_key(&journal.changes[0].resource));
-        assert_eq!(backend.values[&journal.changes[1].resource], Value::Forwarding { enabled: true });
+        assert_eq!(
+            backend.values[&journal.changes[1].resource],
+            Value::Forwarding { enabled: true }
+        );
         backend.fail_write = None;
-        assert!(recover(&mut backend, &mut store, &mut journal).unwrap().conflicts.is_empty());
+        assert!(
+            recover(&mut backend, &mut store, &mut journal)
+                .unwrap()
+                .conflicts
+                .is_empty()
+        );
         assert!(journal.is_restored());
         assert!(!backend.values.contains_key(&journal.changes[0].resource));
-        assert_eq!(backend.values[&journal.changes[1].resource], Value::Forwarding { enabled: false });
+        assert_eq!(
+            backend.values[&journal.changes[1].resource],
+            Value::Forwarding { enabled: false }
+        );
     }
 
     #[test]
@@ -1536,16 +1611,28 @@ mod tests {
         let forwarding = journal.changes[1].resource.clone();
         apply_prefix(&mut backend, &mut store, &mut journal, 1).unwrap();
         assert!(backend.values.contains_key(&guard));
-        assert_eq!(backend.values[&forwarding], Value::Forwarding { enabled: false });
+        assert_eq!(
+            backend.values[&forwarding],
+            Value::Forwarding { enabled: false }
+        );
         assert_eq!(journal.changes[1].state, ChangeState::Pending);
         assert_eq!(backend.writes, 1);
         apply_prefix(&mut backend, &mut store, &mut journal, 2).unwrap();
-        assert_eq!(backend.values[&forwarding], Value::Forwarding { enabled: true });
+        assert_eq!(
+            backend.values[&forwarding],
+            Value::Forwarding { enabled: true }
+        );
         assert_eq!(backend.writes, 2);
         let report = recover_suffix(&mut backend, &mut store, &mut journal, 1).unwrap();
         assert!(report.conflicts.is_empty());
-        assert_eq!(backend.values[&forwarding], Value::Forwarding { enabled: false });
-        assert!(backend.values.contains_key(&guard), "TUN teardown still depends on isolation");
+        assert_eq!(
+            backend.values[&forwarding],
+            Value::Forwarding { enabled: false }
+        );
+        assert!(
+            backend.values.contains_key(&guard),
+            "TUN teardown still depends on isolation"
+        );
         assert!(!journal.is_restored());
         recover(&mut backend, &mut store, &mut journal).unwrap();
         assert!(journal.is_restored());
@@ -1563,7 +1650,10 @@ mod tests {
         assert!(failure.recovery.unwrap().conflicts.is_empty());
         assert_eq!(journal.changes[0].state, ChangeState::Applied);
         assert!(backend.values.contains_key(&journal.changes[0].resource));
-        assert_eq!(backend.values[&journal.changes[1].resource], Value::Forwarding { enabled: false });
+        assert_eq!(
+            backend.values[&journal.changes[1].resource],
+            Value::Forwarding { enabled: false }
+        );
         backend.fail_write = None;
         recover(&mut backend, &mut store, &mut journal).unwrap();
         assert!(journal.is_restored());
@@ -1579,8 +1669,14 @@ mod tests {
         let writes = backend.writes;
         assert!(apply_prefix(&mut backend, &mut store, &mut journal, 2).is_err());
         assert_eq!(backend.writes, writes);
-        assert_eq!(backend.values[&journal.changes[1].resource], Value::Forwarding { enabled: false });
-        assert!(!journal.is_restored(), "caller still owns preparation teardown");
+        assert_eq!(
+            backend.values[&journal.changes[1].resource],
+            Value::Forwarding { enabled: false }
+        );
+        assert!(
+            !journal.is_restored(),
+            "caller still owns preparation teardown"
+        );
     }
 
     #[test]
@@ -1590,7 +1686,9 @@ mod tests {
         let mut store = MemoryJournal::default();
         apply_prefix(&mut backend, &mut store, &mut journal, 1).unwrap();
         let forwarding = journal.changes[1].resource.clone();
-        backend.values.insert(forwarding.clone(), Value::Forwarding { enabled: true });
+        backend
+            .values
+            .insert(forwarding.clone(), Value::Forwarding { enabled: true });
         let writes = backend.writes;
         // Pending is not ownership. The coordinator's explicit forwarding
         // readback rejects this state; whole-plan recovery retains the guard.
@@ -1598,7 +1696,10 @@ mod tests {
         let report = recover(&mut backend, &mut store, &mut journal).unwrap();
         assert_eq!(report.conflicts, vec![0]);
         assert_eq!(backend.writes, writes);
-        assert_eq!(backend.values[&forwarding], Value::Forwarding { enabled: true });
+        assert_eq!(
+            backend.values[&forwarding],
+            Value::Forwarding { enabled: true }
+        );
         assert!(backend.values.contains_key(&journal.changes[0].resource));
     }
 
@@ -1619,7 +1720,9 @@ mod tests {
         let forwarding = journal.changes[1].resource.clone();
         // Another actor enables Forwarding after our snapshot. It happens to
         // match the desired value, but our compare must reject without writing.
-        backend.values.insert(forwarding.clone(), Value::Forwarding { enabled: true });
+        backend
+            .values
+            .insert(forwarding.clone(), Value::Forwarding { enabled: true });
         let mut store = MemoryJournal::default();
         let failure = apply(&mut backend, &mut store, &mut journal).unwrap_err();
         assert_eq!(failure.cause.kind(), io::ErrorKind::AlreadyExists);
@@ -1629,11 +1732,21 @@ mod tests {
         let report = recover(&mut backend, &mut store, &mut journal).unwrap();
         assert_eq!(report.conflicts, vec![1, 0]);
         assert_eq!(backend.writes, writes);
-        assert_eq!(backend.values[&forwarding], Value::Forwarding { enabled: true });
+        assert_eq!(
+            backend.values[&forwarding],
+            Value::Forwarding { enabled: true }
+        );
         // The administrator explicitly restores the original value. Recovery
         // now relinquishes our guard without modifying that interface setting.
-        backend.values.insert(forwarding.clone(), Value::Forwarding { enabled: false });
-        assert!(recover(&mut backend, &mut store, &mut journal).unwrap().conflicts.is_empty());
+        backend
+            .values
+            .insert(forwarding.clone(), Value::Forwarding { enabled: false });
+        assert!(
+            recover(&mut backend, &mut store, &mut journal)
+                .unwrap()
+                .conflicts
+                .is_empty()
+        );
         assert!(journal.is_restored());
         assert_eq!(backend.values.len(), 1);
     }
@@ -1643,10 +1756,15 @@ mod tests {
         let mut backend = MockNetwork::default();
         let mut journal = gateway_plan(&mut backend);
         let forwarding = journal.changes[1].resource.clone();
-        backend.values.insert(forwarding.clone(), Value::Forwarding { enabled: true });
+        backend
+            .values
+            .insert(forwarding.clone(), Value::Forwarding { enabled: true });
         // Pending, guard Applying/Applied and forwarding Applying persist.
         // NotOwned and every subsequent save fail, then the process dies.
-        let mut store = MemoryJournal { fail_save: Some(5), ..Default::default() };
+        let mut store = MemoryJournal {
+            fail_save: Some(5),
+            ..Default::default()
+        };
         assert!(apply(&mut backend, &mut store, &mut journal).is_err());
         let mut persisted = store.saved.last().unwrap().clone();
         assert_eq!(persisted.changes[1].state, ChangeState::Applying);
@@ -1654,7 +1772,10 @@ mod tests {
         let report = recover(&mut backend, &mut MemoryJournal::default(), &mut persisted).unwrap();
         assert_eq!(report.conflicts, vec![1, 0]);
         assert_eq!(backend.writes, writes);
-        assert_eq!(backend.values[&forwarding], Value::Forwarding { enabled: true });
+        assert_eq!(
+            backend.values[&forwarding],
+            Value::Forwarding { enabled: true }
+        );
         assert!(backend.values.contains_key(&persisted.changes[0].resource));
     }
 
@@ -1664,20 +1785,31 @@ mod tests {
             let mut backend = MockNetwork::default();
             let mut journal = gateway_plan(&mut backend);
             let guard = journal.changes[0].resource.clone();
-            backend.values.insert(guard.clone(), journal.changes[0].after.clone().unwrap());
+            backend
+                .values
+                .insert(guard.clone(), journal.changes[0].after.clone().unwrap());
             journal.changes[0].state = ChangeState::Applied;
             journal.changes[1].state = state;
             let forwarding = journal.changes[1].resource.clone();
             // Foreign change before our write, or after our restore. Neither
             // case grants ownership over this shared Windows boolean.
-            backend.values.insert(forwarding.clone(), Value::Forwarding { enabled: true });
+            backend
+                .values
+                .insert(forwarding.clone(), Value::Forwarding { enabled: true });
             let mut store = MemoryJournal::default();
             let report = recover(&mut backend, &mut store, &mut journal).unwrap();
             assert_eq!(report.conflicts, vec![0]);
             assert_eq!(backend.writes, 0);
             assert!(backend.values.contains_key(&guard));
-            backend.values.insert(forwarding, Value::Forwarding { enabled: false });
-            assert!(recover(&mut backend, &mut store, &mut journal).unwrap().conflicts.is_empty());
+            backend
+                .values
+                .insert(forwarding, Value::Forwarding { enabled: false });
+            assert!(
+                recover(&mut backend, &mut store, &mut journal)
+                    .unwrap()
+                    .conflicts
+                    .is_empty()
+            );
             assert!(journal.is_restored());
             assert_eq!(backend.writes, 1);
         }

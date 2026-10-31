@@ -16,18 +16,26 @@ use std::{
 /// exit and is never shared with the Windows DHCP client or another process.
 pub(crate) fn observe(policy: &GatewayIsolationPolicy, hardware: &str) -> io::Result<()> {
     let mac = dhcp_probe::hardware_address(hardware).ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidInput, "DHCP requires a verified Ethernet hardware address")
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "DHCP requires a verified Ethernet hardware address",
+        )
     })?;
     let digest = Sha256::digest(format!("Swirl.DhcpInform.v1.{}", policy.owner).as_bytes());
     let transaction = [digest[0], digest[1], digest[2], digest[3]];
     let packet = dhcp_probe::inform(transaction, mac, policy.gateway);
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
     constrain(&socket, policy.lan.index)?;
-    socket.bind(&SocketAddr::from((policy.gateway, 68)).into()).map_err(|error| {
-        io::Error::new(error.kind(), "dedicated LAN DHCP conflict probe cannot exclusively bind UDP/68")
-    })?;
+    socket
+        .bind(&SocketAddr::from((policy.gateway, 68)).into())
+        .map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                "dedicated LAN DHCP conflict probe cannot exclusively bind UDP/68",
+            )
+        })?;
     socket.set_broadcast(true)?;
-    socket.set_send_timeout(Some(Duration::from_secs(1)))?;
+    socket.set_write_timeout(Some(Duration::from_secs(1)))?;
     let socket: UdpSocket = socket.into();
     let mut buffer = [0; 1501];
     for _ in 0..2 {
@@ -41,17 +49,32 @@ pub(crate) fn observe(policy: &GatewayIsolationPolicy, hardware: &str) -> io::Re
                 break;
             }
             if received >= 256 {
-                return Err(io::Error::other("DHCP conflict probe receive limit reached"));
+                return Err(io::Error::other(
+                    "DHCP conflict probe receive limit reached",
+                ));
             }
             socket.set_read_timeout(Some(remaining))?;
             match socket.recv_from(&mut buffer) {
                 Ok((size, peer)) => {
                     received += 1;
-                    if peer.port() == 67 && dhcp_probe::responding_server(&buffer[..size], transaction, mac).is_some() {
-                        return Err(io::Error::new(io::ErrorKind::AlreadyExists, "another DHCP server responded on the dedicated LAN"));
+                    if peer.port() == 67
+                        && dhcp_probe::responding_server(&buffer[..size], transaction, mac)
+                            .is_some()
+                    {
+                        return Err(io::Error::new(
+                            io::ErrorKind::AlreadyExists,
+                            "another DHCP server responded on the dedicated LAN",
+                        ));
                     }
                 }
-                Err(error) if matches!(error.kind(), io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock) => break,
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock
+                    ) =>
+                {
+                    break;
+                }
                 Err(error) => return Err(error),
             }
         }
@@ -62,8 +85,8 @@ pub(crate) fn observe(policy: &GatewayIsolationPolicy, hardware: &str) -> io::Re
 #[allow(unsafe_code)]
 fn constrain(socket: &Socket, interface_index: u32) -> io::Result<()> {
     use windows_sys::Win32::Networking::WinSock::{
-        IP_ADD_IFLIST, IP_IFLIST, IPPROTO_IP, SOCKET_ERROR, SOL_SOCKET,
-        SO_EXCLUSIVEADDRUSE, WSAGetLastError, setsockopt,
+        IP_ADD_IFLIST, IP_IFLIST, IPPROTO_IP, SO_EXCLUSIVEADDRUSE, SOCKET_ERROR, SOL_SOCKET,
+        WSAGetLastError, setsockopt,
     };
     // The exclusive setting must precede bind. IP_IFLIST rejects datagrams
     // received on any other interface, including with weak-host reception.
@@ -75,8 +98,13 @@ fn constrain(socket: &Socket, interface_index: u32) -> io::Result<()> {
         // SAFETY: socket owns a live handle; WinSock reads this DWORD only for
         // the call. These documented options take a DWORD and retain no pointer.
         let result = unsafe {
-            setsockopt(socket.as_raw_socket() as usize, level, option,
-                (&value as *const u32).cast(), std::mem::size_of::<u32>() as i32)
+            setsockopt(
+                socket.as_raw_socket() as usize,
+                level,
+                option,
+                (&value as *const u32).cast(),
+                std::mem::size_of::<u32>() as i32,
+            )
         };
         if result == SOCKET_ERROR {
             return Err(io::Error::from_raw_os_error(unsafe { WSAGetLastError() }));
@@ -88,7 +116,12 @@ fn constrain(socket: &Socket, interface_index: u32) -> io::Result<()> {
 }
 
 #[allow(unsafe_code)]
-fn send_inform(socket: &UdpSocket, source: Ipv4Addr, interface: u32, packet: &[u8]) -> io::Result<usize> {
+fn send_inform(
+    socket: &UdpSocket,
+    source: Ipv4Addr,
+    interface: u32,
+    packet: &[u8],
+) -> io::Result<usize> {
     use windows_sys::Win32::Networking::WinSock::{CMSGHDR, IN_PKTINFO, IP_PKTINFO, IPPROTO_IP};
     // WSACMSGHDR is SIZE_T + INT + INT; IN_PKTINFO is IN_ADDR + ULONG.
     // Aligned, initialized machine-word storage avoids reading struct padding.
@@ -96,14 +129,16 @@ fn send_inform(socket: &UdpSocket, source: Ipv4Addr, interface: u32, packet: &[u
     const HEADER: usize = std::mem::size_of::<CMSGHDR>();
     const LENGTH: usize = HEADER + std::mem::size_of::<IN_PKTINFO>();
     const WORDS: usize = LENGTH.div_ceil(WORD);
-    const { assert!(HEADER == WORD + 8); assert!(std::mem::size_of::<IN_PKTINFO>() == 8); };
+    const {
+        assert!(HEADER == WORD + 8);
+        assert!(std::mem::size_of::<IN_PKTINFO>() == 8);
+    };
     let mut storage = [0usize; WORDS];
     // SAFETY: every byte of this aligned machine-word array is initialized and
     // the bounded slice does not outlive storage. It remains borrowed until the
     // synchronous WSASendMsg wrapper returns, with no overlapped I/O retained.
-    let control = unsafe {
-        std::slice::from_raw_parts_mut(storage.as_mut_ptr().cast::<u8>(), WORDS * WORD)
-    };
+    let control =
+        unsafe { std::slice::from_raw_parts_mut(storage.as_mut_ptr().cast::<u8>(), WORDS * WORD) };
     control[..WORD].copy_from_slice(&LENGTH.to_ne_bytes());
     control[WORD..WORD + 4].copy_from_slice(&IPPROTO_IP.to_ne_bytes());
     control[WORD + 4..HEADER].copy_from_slice(&IP_PKTINFO.to_ne_bytes());
@@ -111,9 +146,11 @@ fn send_inform(socket: &UdpSocket, source: Ipv4Addr, interface: u32, packet: &[u
     control[HEADER + 4..LENGTH].copy_from_slice(&interface.to_ne_bytes());
     let destination = SocketAddr::from((Ipv4Addr::BROADCAST, 67)).into();
     let buffers = [io::IoSlice::new(packet)];
-    let message = MsgHdr::new().with_addr(&destination).with_buffers(&buffers).with_control(control);
+    let message = MsgHdr::new()
+        .with_addr(&destination)
+        .with_buffers(&buffers)
+        .with_control(control);
     // RFC 2131 uses the limited broadcast address. IP_UNICAST_IF alone does not
     // constrain broadcasts; IN_PKTINFO supplies both the source and LAN index.
     SockRef::from(socket).sendmsg(&message, 0)
 }
-

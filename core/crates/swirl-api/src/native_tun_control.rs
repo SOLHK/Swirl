@@ -270,7 +270,7 @@ mod tests {
         json!({"native_tun_schema":1,"request_id":"60000000-0000-4000-8000-000000000001","op":op})
     }
     fn config() -> Value {
-        json!({"driver_path":"C:\\Swirl\\wintun.dll","adapter_guid":"70000000-0000-4000-8000-000000000001","adapter_name":"Swirl Native TUN"})
+        json!({"driver_path":"C:\\Swirl\\fixture-driver.dll","adapter_guid":"70000000-0000-4000-8000-000000000001","adapter_name":"Swirl Native TUN"})
     }
     #[test]
     fn validation_is_offline_and_gui_cannot_start_or_recover_network() {

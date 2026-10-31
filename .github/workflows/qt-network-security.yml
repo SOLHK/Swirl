@@ -180,7 +180,7 @@ jobs:
       - name: Configure product with existing regression drivers
         run: cmake -S src/Swirl.Quick -B build/qt-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON
       - name: Build product and network regression targets
-        run: cmake --build build/qt-product --config Release --target Swirl SwirlImportTests SwirlTelemetryTests SwirlQtNetworkPolicyTests --parallel 2
+        run: cmake --build build/qt-product --config Release --target Swirl SwirlImportTests SwirlTelemetryTests SwirlQtNetworkPolicyTests SwirlLanProxyTests --parallel 2
       - name: Deploy actual Qt product runtime
         shell: pwsh
         run: |
@@ -189,6 +189,38 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath 'build/qt-product/Release/platforms/qoffscreen.dll')) { throw 'The isolated offscreen test runtime is incomplete.' }
           & build/qt-product/Release/Swirl.exe --tls-runtime-self-test build/qt-product/tls-runtime.json
           if ($LASTEXITCODE -ne 0) { throw 'The product TLS runtime is incomplete or borrowed from PATH.' }
+      - name: Verify native LAN control lifecycle and owned recovery boundaries
+        run: ctest --test-dir build/qt-product -C Release -R "^swirl-lan-proxy-control$" --output-on-failure --no-tests=error
+      - name: Require Qt 6.12 LAN control cases without skipped evidence
+        shell: python
+        run: |
+          import xml.etree.ElementTree as ET
+          report = ET.parse('build/qt-product/lan-proxy-control.xml').getroot()
+          assert report.tag == 'TestCase' and report.get('name') == 'LanProxyTests'
+          assert report.findtext('Environment/QtVersion') == '6.12.0'
+          functions = report.findall('TestFunction')
+          mandatory = {
+              'listenerConfigurationRejectsPublicWildcardAndIpv6',
+              'authenticationAndBoundsFailClosed',
+              'clientAclCannotCoverPublicSpace',
+              'recoveryRequiresExactOwnershipAndScope',
+              'hostInventoryProtectsIpv6AndRejectsAmbiguousEntries',
+              'lostCommandReceiptsHaveBoundedRecoveryAndNeverFakeStoppedStatus',
+              'stoppedRuntimeCancellationNeverMutatesSystemOrCore',
+              'listenerReceiptsOwnRunningStateAndMainRuntimeSurvives',
+              'refusedListenerRollsBackOnlyPreparedFirewall',
+              'cancellationDuringFirewallPreparationNeverStartsListener',
+              'mainRuntimeStopRecoversEvenWhenItsEpochDropsTheLanReply',
+              'failedStopOrExternalRuleEditCannotBecomeFalseSuccess',
+              'badConfigurationAndPendingRecoveryNeverOpenListeners',
+          }
+          assert mandatory.issubset({function.get('name') for function in functions})
+          for function in functions:
+              incidents = function.findall('Incident')
+              assert incidents and all(incident.get('type') == 'pass' for incident in incidents)
+              assert not function.findall('Skip')
+              assert not any(message.get('type') == 'skip' for message in function.findall('Message'))
+          print('Qt 6.12 LAN control: all required validation and lifecycle cases executed; native firewall mutation is not claimed')
       - name: Verify Windows DPAPI subscription refresh and redirects
         shell: pwsh
         run: |
@@ -203,6 +235,7 @@ jobs:
           name: qt-network-product-windows-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             build/qt-product/subscription-security.xml
+            build/qt-product/lan-proxy-control.xml
             build/qt-product/qt-network-policy.xml
             build/qt-product/swirl-telemetry-accounting.xml
             build/qt-product/Testing/Temporary/LastTest.log

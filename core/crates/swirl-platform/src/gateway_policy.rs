@@ -4,7 +4,11 @@
 use crate::network_transaction::InterfaceIdentity;
 use ipnet::Ipv4Net;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, io, net::{IpAddr, Ipv4Addr}};
+use std::{
+    collections::HashSet,
+    io,
+    net::{IpAddr, Ipv4Addr},
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -20,14 +24,24 @@ pub struct GatewayRequest {
 impl GatewayRequest {
     pub fn validate(&self) -> io::Result<()> {
         self.lan.validate()?;
-        if !self.dedicated_lan_confirmed || self.subnet.addr() != self.subnet.network()
-            || self.subnet.prefix_len() > 30 || !private_subnet(self.subnet)
-            || !self.subnet.contains(&self.gateway) || self.gateway == self.subnet.network()
-            || self.gateway == self.subnet.broadcast() || self.allowed_sources.is_empty()
+        if !self.dedicated_lan_confirmed
+            || self.subnet.addr() != self.subnet.network()
+            || self.subnet.prefix_len() > 30
+            || !private_subnet(self.subnet)
+            || !self.subnet.contains(&self.gateway)
+            || self.gateway == self.subnet.network()
+            || self.gateway == self.subnet.broadcast()
+            || self.allowed_sources.is_empty()
             || self.allowed_sources.len() > 64
-            || self.allowed_sources.iter().any(|net| net.addr() != net.network() || !self.subnet.contains(net))
+            || self
+                .allowed_sources
+                .iter()
+                .any(|net| net.addr() != net.network() || !self.subnet.contains(net))
         {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid dedicated-LAN request"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid dedicated-LAN request",
+            ));
         }
         Ok(())
     }
@@ -38,7 +52,9 @@ fn private_subnet(subnet: Ipv4Net) -> bool {
         Ipv4Net::new(Ipv4Addr::new(10, 0, 0, 0), 8).expect("constant subnet"),
         Ipv4Net::new(Ipv4Addr::new(172, 16, 0, 0), 12).expect("constant subnet"),
         Ipv4Net::new(Ipv4Addr::new(192, 168, 0, 0), 16).expect("constant subnet"),
-    ].iter().any(|net| net.contains(&subnet))
+    ]
+    .iter()
+    .any(|net| net.contains(&subnet))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -69,49 +85,89 @@ impl GatewayIsolationPolicy {
     pub fn validate(&self) -> io::Result<()> {
         self.lan.validate()?;
         self.tun.validate()?;
-        if self.version != 1 || self.owner.len() != 32
-            || !self.owner.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-            || self.lan == self.tun || self.lan.index == self.tun.index
-            || self.lan_luid == 0 || self.tun_luid == 0 || self.lan_luid == self.tun_luid
-            || self.subnet.addr() != self.subnet.network() || self.subnet.prefix_len() > 30
+        if self.version != 1
+            || self.owner.len() != 32
+            || !self
+                .owner
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            || self.lan == self.tun
+            || self.lan.index == self.tun.index
+            || self.lan_luid == 0
+            || self.tun_luid == 0
+            || self.lan_luid == self.tun_luid
+            || self.subnet.addr() != self.subnet.network()
+            || self.subnet.prefix_len() > 30
             || !private_subnet(self.subnet)
             || !self.subnet.contains(&self.gateway)
-            || self.gateway == self.subnet.network() || self.gateway == self.subnet.broadcast()
-            || self.allowed_sources.is_empty() || self.allowed_sources.len() > 64
-            || self.allowed_sources.iter().any(|net| net.addr() != net.network() || !self.subnet.contains(net))
-            || self.host_addresses.is_empty() || self.host_addresses.len() > 256
+            || self.gateway == self.subnet.network()
+            || self.gateway == self.subnet.broadcast()
+            || self.allowed_sources.is_empty()
+            || self.allowed_sources.len() > 64
+            || self
+                .allowed_sources
+                .iter()
+                .any(|net| net.addr() != net.network() || !self.subnet.contains(net))
+            || self.host_addresses.is_empty()
+            || self.host_addresses.len() > 256
             || !self.host_addresses.contains(&IpAddr::V4(self.gateway))
-            || self.host_addresses.iter().any(|ip| ip.is_unspecified() || ip.is_multicast())
+            || self
+                .host_addresses
+                .iter()
+                .any(|ip| ip.is_unspecified() || ip.is_multicast())
             || self.host_addresses.iter().collect::<HashSet<_>>().len() != self.host_addresses.len()
         {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid dedicated-LAN isolation policy"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid dedicated-LAN isolation policy",
+            ));
         }
         Ok(())
     }
 
     fn permits_client_address(&self, address: Ipv4Addr) -> bool {
-        address != self.subnet.network() && address != self.subnet.broadcast()
+        address != self.subnet.network()
+            && address != self.subnet.broadcast()
             && !self.host_addresses.contains(&IpAddr::V4(address))
-            && self.allowed_sources.iter().any(|net| net.contains(&address))
+            && self
+                .allowed_sources
+                .iter()
+                .any(|net| net.contains(&address))
     }
 
     /// Reference policy for forwarded packets, independent of WFP's compiled
     /// condition layout. Host-local connections do not traverse IPFORWARD.
     /// Return traffic must enter from the owned TUN and target an allowed LAN
     /// client. All IPv6 forwarding in either direction of this LAN is denied.
-    pub fn permits_forward(&self, source: IpAddr, destination: IpAddr, incoming_luid: u64, outgoing_luid: u64, private_profile: bool) -> bool {
+    pub fn permits_forward(
+        &self,
+        source: IpAddr,
+        destination: IpAddr,
+        incoming_luid: u64,
+        outgoing_luid: u64,
+        private_profile: bool,
+    ) -> bool {
         if incoming_luid == self.lan_luid {
-            let (IpAddr::V4(source), IpAddr::V4(_)) = (source, destination) else { return false };
-            return outgoing_luid == self.tun_luid && private_profile && self.permits_client_address(source);
+            let (IpAddr::V4(source), IpAddr::V4(_)) = (source, destination) else {
+                return false;
+            };
+            return outgoing_luid == self.tun_luid
+                && private_profile
+                && self.permits_client_address(source);
         }
-        if outgoing_luid == self.tun_luid { return false; }
+        if outgoing_luid == self.tun_luid {
+            return false;
+        }
         if outgoing_luid == self.lan_luid {
-            let (IpAddr::V4(_), IpAddr::V4(destination)) = (source, destination) else { return false };
-            return incoming_luid == self.tun_luid && private_profile && self.permits_client_address(destination);
+            let (IpAddr::V4(_), IpAddr::V4(destination)) = (source, destination) else {
+                return false;
+            };
+            return incoming_luid == self.tun_luid
+                && private_profile
+                && self.permits_client_address(destination);
         }
         true
     }
-
 }
 
 #[cfg(test)]
@@ -119,12 +175,17 @@ pub(crate) fn fixture() -> GatewayIsolationPolicy {
     GatewayIsolationPolicy {
         version: 1,
         owner: "a".repeat(32),
-        lan: InterfaceIdentity::new(11, 1), lan_luid: 110,
-        tun: InterfaceIdentity::new(12, 2), tun_luid: 120,
+        lan: InterfaceIdentity::new(11, 1),
+        lan_luid: 110,
+        tun: InterfaceIdentity::new(12, 2),
+        tun_luid: 120,
         subnet: "192.168.77.0/24".parse().unwrap(),
         gateway: "192.168.77.1".parse().unwrap(),
         allowed_sources: vec!["192.168.77.0/25".parse().unwrap()],
-        host_addresses: vec!["192.168.77.1".parse().unwrap(), "127.0.0.1".parse().unwrap()],
+        host_addresses: vec![
+            "192.168.77.1".parse().unwrap(),
+            "127.0.0.1".parse().unwrap(),
+        ],
         dhcp: false,
     }
 }
@@ -137,14 +198,41 @@ mod tests {
     fn forwarding_is_confined_to_authorized_clients_and_tun() {
         let policy = fixture();
         policy.validate().unwrap();
-        let check = |ip: &str, dest| policy.permits_forward(ip.parse().unwrap(), "203.0.113.1".parse().unwrap(), 110, dest, true);
+        let check = |ip: &str, dest| {
+            policy.permits_forward(
+                ip.parse().unwrap(),
+                "203.0.113.1".parse().unwrap(),
+                110,
+                dest,
+                true,
+            )
+        };
         assert!(check("192.168.77.10", 120));
-        for ip in ["192.168.77.1", "192.168.77.0", "192.168.77.255", "192.168.77.200", "203.0.113.4", "fd00::1"] {
+        for ip in [
+            "192.168.77.1",
+            "192.168.77.0",
+            "192.168.77.255",
+            "192.168.77.200",
+            "203.0.113.4",
+            "fd00::1",
+        ] {
             assert!(!check(ip, 120), "source {ip}");
         }
         assert!(!check("192.168.77.10", 130));
-        assert!(!policy.permits_forward("fd00::1".parse().unwrap(), "fd00::2".parse().unwrap(), 130, 120, true));
-        assert!(policy.permits_forward("fd00::1".parse().unwrap(), "fd00::2".parse().unwrap(), 130, 140, true));
+        assert!(!policy.permits_forward(
+            "fd00::1".parse().unwrap(),
+            "fd00::2".parse().unwrap(),
+            130,
+            120,
+            true
+        ));
+        assert!(policy.permits_forward(
+            "fd00::1".parse().unwrap(),
+            "fd00::2".parse().unwrap(),
+            130,
+            140,
+            true
+        ));
     }
 
     #[test]
@@ -156,10 +244,22 @@ mod tests {
         assert!(!policy.permits_forward(remote, client, 130, 110, true));
         assert!(!policy.permits_forward(remote, client, 120, 110, false));
         assert!(!policy.permits_forward(client, remote, 110, 120, false));
-        for address in ["192.168.77.1", "192.168.77.0", "192.168.77.255", "192.168.77.200", "fd00::1"] {
+        for address in [
+            "192.168.77.1",
+            "192.168.77.0",
+            "192.168.77.255",
+            "192.168.77.200",
+            "fd00::1",
+        ] {
             assert!(!policy.permits_forward(remote, address.parse().unwrap(), 120, 110, true));
         }
-        assert!(!policy.permits_forward("fd00::1".parse().unwrap(), "fd00::2".parse().unwrap(), 120, 110, true));
+        assert!(!policy.permits_forward(
+            "fd00::1".parse().unwrap(),
+            "fd00::2".parse().unwrap(),
+            120,
+            110,
+            true
+        ));
     }
 
     #[test]

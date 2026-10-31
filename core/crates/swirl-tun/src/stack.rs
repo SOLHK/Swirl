@@ -218,9 +218,12 @@ impl Driver {
                 .fetch_add(1, Ordering::Relaxed);
             return;
         };
-        if self.config.gateway.as_ref().is_some_and(|gateway| {
-            !gateway.permits(metadata.source, metadata.destination)
-        }) {
+        if self
+            .config
+            .gateway
+            .as_ref()
+            .is_some_and(|gateway| !gateway.permits(metadata.source, metadata.destination))
+        {
             self.counters
                 .denied_gateway_packets
                 .fetch_add(1, Ordering::Relaxed);
@@ -251,7 +254,11 @@ impl Driver {
     fn admit_tcp(&mut self, key: FlowKey) {
         if self.config.gateway.as_ref().is_some_and(|gateway| {
             gateway.source(key.0.ip()) == Some(crate::gateway::SourceKind::Lan)
-                && self.tcp.keys().filter(|flow| flow.0.ip() == key.0.ip()).count()
+                && self
+                    .tcp
+                    .keys()
+                    .filter(|flow| flow.0.ip() == key.0.ip())
+                    .count()
                     >= gateway.max_tcp_per_client
         }) {
             self.counters
@@ -308,21 +315,36 @@ impl Driver {
     }
 
     fn admit_udp(&mut self, source: IpAddr, destination: SocketAddr) -> Option<SocketHandle> {
-        let lan = self.config.gateway.as_ref().is_some_and(|gateway| {
-            gateway.source(source) == Some(crate::gateway::SourceKind::Lan)
-        });
+        let lan =
+            self.config.gateway.as_ref().is_some_and(|gateway| {
+                gateway.source(source) == Some(crate::gateway::SourceKind::Lan)
+            });
         if lan && !self.gateway_udp.contains_key(&(source, destination)) {
-            let gateway = self.config.gateway.as_ref().expect("LAN admission configuration");
+            let gateway = self
+                .config
+                .gateway
+                .as_ref()
+                .expect("LAN admission configuration");
             if self.gateway_udp.len() >= self.config.max_udp_endpoints.saturating_mul(8).min(4096)
-                || self.gateway_udp.keys().filter(|(client, _)| *client == source).count() >= gateway.max_udp_per_client
+                || self
+                    .gateway_udp
+                    .keys()
+                    .filter(|(client, _)| *client == source)
+                    .count()
+                    >= gateway.max_udp_per_client
             {
-                self.counters.denied_gateway_packets.fetch_add(1, Ordering::Relaxed);
+                self.counters
+                    .denied_gateway_packets
+                    .fetch_add(1, Ordering::Relaxed);
                 return None;
             }
         }
         if let Some(entry) = self.udp.get_mut(&destination) {
             entry.activity = Instant::now();
-            if lan { self.gateway_udp.insert((source, destination), entry.activity); }
+            if lan {
+                self.gateway_udp
+                    .insert((source, destination), entry.activity);
+            }
             return Some(entry.handle);
         }
         if self.udp.len() >= self.config.max_udp_endpoints {
@@ -350,7 +372,10 @@ impl Driver {
                 activity: Instant::now(),
             },
         );
-        if lan { self.gateway_udp.insert((source, destination), Instant::now()); }
+        if lan {
+            self.gateway_udp
+                .insert((source, destination), Instant::now());
+        }
         self.counters
             .active_udp_endpoints
             .store(self.udp.len(), Ordering::Relaxed);
@@ -449,7 +474,9 @@ impl Driver {
                 || (gateway.source(client) == Some(crate::gateway::SourceKind::Lan)
                     && !self.gateway_udp.contains_key(&(client, datagram.source)))
             {
-                self.counters.denied_gateway_packets.fetch_add(1, Ordering::Relaxed);
+                self.counters
+                    .denied_gateway_packets
+                    .fetch_add(1, Ordering::Relaxed);
                 return;
             }
         }
