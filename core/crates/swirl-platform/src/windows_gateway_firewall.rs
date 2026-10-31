@@ -185,6 +185,20 @@ try {
   function Make-Scope([string]$image,[string]$alias,[bool]$enabled) {
     return @{owner=[string]$policy.owner;lan=$policy.lan;interface_alias=$alias;program=$image;gateway=[string]$policy.gateway;subnet=[string]$policy.subnet;allowed_sources=@($policy.allowed_sources);enabled=$enabled}
   }
+  function Filter-Diagnostic($filter,[string]$field) {
+    # Read only fixed non-path fields. Never stringify an entire CIM filter or
+    # echo an arbitrary value from a foreign rule into helper/CI diagnostics.
+    if($null -eq $filter){return 'not_single_filter'}
+    $property=$filter.PSObject.Properties[$field]
+    if($null -eq $property){return 'missing_property'}
+    $value=$property.Value
+    if($null -eq $value){return 'null'}
+    if($value -isnot [string]){return 'non_string'}
+    if($value.Length -eq 0){return 'empty_string'}
+    if($value -cin @('Any','None','All','NotConfigured','NotRequired','*')){return ('keyword:'+ $value)}
+    if($value.Length -le 184 -and $value -cmatch '^S-[0-9]+(-[0-9]{1,10}){1,15}$'){return ('sid:'+ $value)}
+    return ('redacted_string_length:'+ [string]$value.Length)
+  }
   function Read-State([string]$store) {
     try{$rules=@(Get-NetFirewallRule -Name $name -PolicyStore $store -ErrorAction Stop)}
     catch{if($_.CategoryInfo.Category -eq [Management.Automation.ErrorCategory]::ObjectNotFound){return $null}else{throw}}
@@ -198,7 +212,11 @@ try {
     if($addresses.Count -ne 1 -or -not (Same-Addresses @($addresses[0].LocalAddress) @($p.local_addresses)) -or -not (Same-Addresses @($addresses[0].RemoteAddress) @($p.remote_addresses))){throw 'DHCP firewall address scope changed'}
     $apps=@($rule | Get-NetFirewallApplicationFilter -ErrorAction Stop)
     $services=@($rule | Get-NetFirewallServiceFilter -ErrorAction Stop)
-    if($apps.Count -ne 1 -or [string]$apps[0].Package -ne 'Any' -or $services.Count -ne 1 -or [string]$services[0].Service -ne 'Any'){throw 'DHCP firewall application scope changed'}
+    if($apps.Count -ne 1 -or [string]$apps[0].Package -ne 'Any' -or $services.Count -ne 1 -or [string]$services[0].Service -ne 'Any'){
+      $app=if($apps.Count -eq 1){$apps[0]}else{$null}
+      $service=if($services.Count -eq 1){$services[0]}else{$null}
+      throw ('DHCP firewall application scope changed; application_count={0}; service_count={1}; package={2}; service={3}; service_name={4}' -f $apps.Count,$services.Count,(Filter-Diagnostic $app 'Package'),(Filter-Diagnostic $service 'Service'),(Filter-Diagnostic $service 'ServiceName'))
+    }
     $interfaces=@($rule | Get-NetFirewallInterfaceFilter -ErrorAction Stop)
     $types=@($rule | Get-NetFirewallInterfaceTypeFilter -ErrorAction Stop)
     if($interfaces.Count -ne 1 -or @($interfaces[0].InterfaceAlias).Count -ne 1 -or $types.Count -ne 1 -or [string]$types[0].InterfaceType -ne 'Wired'){throw 'DHCP firewall interface scope changed'}
@@ -289,10 +307,11 @@ function Remove-NetFirewallRule {throw 'Unexpected network mutation in read-only
         Ok(observed)
     }
 
-    #[test]
-    fn dhcp_firewall_readback_rejects_each_foreign_scope_change_without_network_writes() {
-        let (policy, scope) = fixture();
-        let valid = json!({
+    fn readback_fixture(
+        policy: &GatewayIsolationPolicy,
+        scope: &GatewayDhcpFirewallScope,
+    ) -> serde_json::Value {
+        json!({
             "rule":{"Name":scope.name(),"DisplayName":scope.name(),"Group":"Swirl Native Gateway DHCP",
                 "Description":format!("Swirl native gateway DHCP owner {}",policy.owner),"Direction":"Inbound","Action":"Allow",
                 "Enabled":"False","Profile":"Private","EdgeTraversalPolicy":"Block","LooseSourceMapping":false,"LocalOnlyMapping":false,"Owner":"","Platform":[]},
@@ -301,7 +320,13 @@ function Remove-NetFirewallRule {throw 'Unexpected network mutation in read-only
             "application":{"Program":scope.program,"Package":"Any"},"service":{"Service":"Any"},
             "interface":{"InterfaceAlias":[scope.interface_alias]},"interface_type":{"InterfaceType":"Wired"},
             "security":{"Authentication":"NotRequired","Encryption":"NotRequired","OverrideBlockRules":false,"LocalUser":"Any","RemoteUser":"Any","RemoteMachine":"Any"}
-        });
+        })
+    }
+
+    #[test]
+    fn dhcp_firewall_readback_rejects_each_foreign_scope_change_without_network_writes() {
+        let (policy, scope) = fixture();
+        let valid = readback_fixture(&policy, &scope);
         assert_eq!(mocked_read(&policy, &valid).unwrap(), Some(scope.clone()));
         for (object, field, value) in [
             ("rule", "Description", json!("foreign owner")),
@@ -345,6 +370,70 @@ function Remove-NetFirewallRule {throw 'Unexpected network mutation in read-only
                 Some(scope.clone()),
                 "{object}.{field}"
             );
+        }
+    }
+
+    #[test]
+    fn dhcp_firewall_application_diagnostics_are_bounded_without_loosening_scope() {
+        let (policy, scope) = fixture();
+        let valid = readback_fixture(&policy, &scope);
+        let secret = "credential-must-not-be-logged";
+        let cases = [
+            (json!(null), "package=null"),
+            (json!(""), "package=empty_string"),
+            (json!("None"), "package=keyword:None"),
+            (json!("S-1-15-2-1"), "package=sid:S-1-15-2-1"),
+            (json!(secret.repeat(100)), "package=redacted_string_length:"),
+            (json!({"secret":secret}), "package=non_string"),
+        ];
+        for (package, expected) in cases {
+            let mut changed = valid.clone();
+            changed["application"]["Package"] = package;
+            let error = mocked_read(&policy, &changed).unwrap_err().to_string();
+            assert!(error.contains("application_count=1; service_count=1"));
+            assert!(error.contains(expected), "{error}");
+            assert!(error.contains("service=keyword:Any"));
+            assert!(!error.contains(&scope.program));
+            assert!(!error.contains(secret));
+            assert!(error.len() < 768);
+        }
+        for (field, replacement, expected) in [
+            (
+                "application",
+                json!({"Program":scope.program}),
+                "package=missing_property",
+            ),
+            ("application", json!([]), "application_count=0"),
+            (
+                "application",
+                json!([valid["application"],valid["application"]]),
+                "application_count=2",
+            ),
+            (
+                "service",
+                json!({"ServiceName":"Any"}),
+                "service=missing_property; service_name=keyword:Any",
+            ),
+            ("service", json!({"Service":null}), "service=null"),
+            ("service", json!({"Service":""}), "service=empty_string"),
+            (
+                "service",
+                json!({"Service":secret}),
+                "service=redacted_string_length:",
+            ),
+            (
+                "service",
+                json!([valid["service"],valid["service"]]),
+                "service_count=2",
+            ),
+        ] {
+            let mut changed = valid.clone();
+            changed[field] = replacement;
+            let error = mocked_read(&policy, &changed).unwrap_err().to_string();
+            assert!(error.contains(expected), "{error}");
+            assert!(!error.contains(&scope.program));
+            assert!(!error.contains(secret));
+            assert!(error.len() < 768);
         }
     }
 
