@@ -216,6 +216,7 @@ jobs:
               'disabledTcpAndUdpRoundtripAndOwnedRemoval',
               'externalEditPreservesRulesAndEncryptedJournal',
               'ownedCleanupLeavesIndependentFixtureUntouched',
+              'deadOwnerRecoveryRejectsForeignRulesAndPreservesJournals',
           }
           assert mandatory.issubset({function.get('name') for function in functions})
           for function in functions:
@@ -288,4 +289,3 @@ jobs:
             build/qt-product/Testing/Temporary/LastTest.log
             build/qt-product/Release/Swirl-diagnostics.txt
           if-no-files-found: error
-

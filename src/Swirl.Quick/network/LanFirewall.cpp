@@ -385,7 +385,12 @@ bool applyRule(INetFwRules *rules, const QJsonObject &record, QString *error) {
     string("name", "INetFwRule::put_Name", &INetFwRule::put_Name);
     string("description", "INetFwRule::put_Description", &INetFwRule::put_Description);
     string("group", "INetFwRule::put_Grouping", &INetFwRule::put_Grouping);
-    string("application", "INetFwRule::put_ApplicationName", &INetFwRule::put_ApplicationName);
+    // Journals and snapshots use Qt's canonical separators. The Windows
+    // firewall validates the executable path when Add commits the rule.
+    const String application(QDir::toNativeSeparators(record.value("application").toString()));
+    property("INetFwRule::put_ApplicationName", [&]() {
+        return application.value ? rule->put_ApplicationName(application) : E_OUTOFMEMORY;
+    });
     property("INetFwRule::put_Protocol", [&]() { return rule->put_Protocol(record.value("protocol").toInt()); });
     string("local_ports", "INetFwRule::put_LocalPorts", &INetFwRule::put_LocalPorts);
     string("remote_ports", "INetFwRule::put_RemotePorts", &INetFwRule::put_RemotePorts);
@@ -756,6 +761,8 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
     struct Fixture { QString path; QJsonObject record; };
     QList<Fixture> fixtures;
     QSet<QString> scriptedEdits;
+    QJsonObject recoveryEvidence;
+    bool preserveRecoveryEvidence = false;
     const auto check = [&](bool ok, const QString &message) {
         if (!ok && result.error.isEmpty()) result.error = message;
         return ok;
@@ -780,13 +787,13 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
         QFile file(path);
         return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
     };
-    const auto add = [&]() {
+    const auto add = [&](bool productionNames = false) {
         const auto session = QUuid::createUuid().toString(QUuid::Id128);
         QJsonArray desired;
         for (int index = 0; index < 2; ++index) desired.append(QJsonObject{
-            {"name", "SwirlLanTest-" + session + (index ? "-udp" : "-tcp")},
-            {"description", "Swirl disabled native firewall fixture " + session},
-            {"group", "Swirl disabled test " + session}, {"application", application.toLower()},
+            {"name", (productionNames ? "SwirlLan-" : "SwirlLanTest-") + session + (index ? "-udp" : "-tcp")},
+            {"description", (productionNames ? "Swirl native LAN session " : "Swirl disabled native firewall fixture ") + session},
+            {"group", (productionNames ? "Swirl LAN " : "Swirl disabled test ") + session}, {"application", application.toLower()},
             {"local_addresses", "127.0.0.1"}, {"remote_addresses", "127.0.0.1/32"},
             {"local_ports", index ? "49174-49175" : "49173"}, {"remote_ports", "*"},
             {"interface_types", "All"}, {"service", ""}, {"interfaces", QJsonArray{alias}},
@@ -802,7 +809,8 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
         if (!check(readRecord(fixture.path) == fixture.record, "The DPAPI fixture journal did not roundtrip.")) return false;
         const auto encrypted = bytes(fixture.path);
         if (!check(!encrypted.isEmpty() && !encrypted.contains(session.toUtf8())
-                   && !encrypted.contains("SwirlLanTest-"), "The recovery fixture journal was not encrypted.")) return false;
+                   && !encrypted.contains(productionNames ? "SwirlLan-" : "SwirlLanTest-"),
+                   "The recovery fixture journal was not encrypted.")) return false;
         for (const auto &value : desired)
             if (!applyRule(rules.value, value.toObject(), &result.error)) return false;
         return exact(fixture);
@@ -856,6 +864,107 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
                 && check(bytes(second.path) == retainedBytes && readRecord(second.path) == second.record,
                          "Cleaning one owned session changed another fixture or journal.");
         }
+        if (scenario == FixtureCase::CrashRecoveryConflict) {
+            // Keep an exited process handle alive until the assertions finish,
+            // preventing PID reuse from turning this into a synthetic dead PID.
+            struct OwnerProcess {
+                QProcess process;
+                HANDLE handle = nullptr;
+                ~OwnerProcess() {
+                    if (process.state() != QProcess::NotRunning) {
+                        process.kill();
+                        process.waitForFinished(5000);
+                    }
+                    if (handle) CloseHandle(handle);
+                }
+            } owner;
+            const auto ownerReady = directory.filePath("fixture-owner.ready");
+            owner.process.start(application, {"--fixture-owner", ownerReady});
+            if (!check(owner.process.waitForStarted(5000), "The real fixture owner process did not start.")) return false;
+            const auto ownerPid = owner.process.processId();
+            bool ready = false;
+            for (int attempt = 0; attempt < 50; ++attempt) {
+                ready = bytes(ownerReady) == QByteArray::number(ownerPid);
+                if (ready || owner.process.waitForFinished(100)) break;
+            }
+            if (!check(ready && owner.process.state() == QProcess::Running,
+                       "The real fixture owner did not acknowledge its identity while alive.")) return false;
+            owner.handle = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, DWORD(ownerPid));
+            if (!check(owner.handle && WaitForSingleObject(owner.handle, 0) == WAIT_TIMEOUT
+                       && processPath(owner.handle).compare(application, Qt::CaseInsensitive) == 0,
+                       "The fixture child process identity could not be verified.")) return false;
+            const auto stamp = processStamp(owner.handle);
+            if (!check(!stamp.isEmpty(), "The fixture child creation timestamp is unavailable.")) return false;
+
+            // The actual rules keep production names/identity but remain
+            // disabled and loopback-only. Only the encrypted expected journal
+            // describes an enabled RFC1918 session; it is NEVER applied.
+            if (!add(true)) return false;
+            const auto foreign = fixtures.last();
+            const auto session = foreign.record.value("session").toString();
+            QJsonArray expectedRules;
+            for (const auto &value : foreign.record.value("rules").toArray()) {
+                auto expected = value.toObject();
+                expected.insert("enabled", true);
+                expected.insert("local_addresses", "192.168.254.1");
+                expected.insert("remote_addresses", "192.168.254.0/24");
+                expectedRules.append(expected);
+            }
+            const QJsonObject journal{
+                {"schema", 1}, {"session", session}, {"owner_pid", double(ownerPid)}, {"owner_creation", stamp},
+                {"listen_ip", "192.168.254.1"}, {"prefix", 24}, {"interface_index", 1},
+                {"interface_guid", QUuid::createUuid().toString()}, {"interface_name", alias}, {"profile", 2},
+                {"application", application}, {"phase", "active"}, {"rules", expectedRules},
+                {"host_addresses", QJsonArray{"192.168.254.1"}}};
+            if (!check(validateJournal(journal), "The recovery safety test must pass the unmodified production journal validator."))
+                return false;
+            recoveryEvidence.insert("production_journal_valid", true);
+            const auto recoveryPath = directory.filePath("dead-owner-recovery.dpapi");
+            if (!check(writeRecord(recoveryPath, journal), "Cannot write the real recovery-path DPAPI journal.")) return false;
+            preserveRecoveryEvidence = true;
+            const auto originalJournal = bytes(recoveryPath);
+            const auto independentJournal = bytes(first.path);
+            const auto foreignJournal = bytes(foreign.path);
+            const auto unchanged = [&]() {
+                return check(!originalJournal.isEmpty() && bytes(recoveryPath) == originalJournal
+                             && readRecord(recoveryPath) == journal,
+                             "Refused recovery changed the production-format DPAPI journal.")
+                    && exact(foreign) && exact(first)
+                    && check(bytes(first.path) == independentJournal && readRecord(first.path) == first.record
+                             && bytes(foreign.path) == foreignJournal && readRecord(foreign.path) == foreign.record,
+                             "Refused recovery changed another fixture's encrypted ownership record.");
+            };
+            if (!check(ownerAlive(journal), "The production owner check did not recognize the live fixture child.")) return false;
+            const auto active = recover(recoveryPath, session, true);
+            const auto ownershipError = QStringLiteral("LAN 恢复记录属于另一个活动会话，未清理它的规则。");
+            if (!check(!active.ok && active.error == ownershipError && active.record == journal,
+                       "Production recovery did not reject the still-live owner at the ownership gate.") || !unchanged()) return false;
+            recoveryEvidence.insert("live_owner_rejected", true);
+            const auto wrongSession = recover(recoveryPath, QUuid::createUuid().toString(QUuid::Id128), false);
+            if (!check(!wrongSession.ok && wrongSession.error == ownershipError && wrongSession.record == journal,
+                       "Production recovery did not reject the wrong session at the ownership gate.") || !unchanged()) return false;
+            recoveryEvidence.insert("wrong_session_rejected", true);
+
+            owner.process.kill();
+            if (!check(owner.process.waitForFinished(5000) && WaitForSingleObject(owner.handle, 0) == WAIT_OBJECT_0
+                       && processStamp(owner.handle) == stamp && !ownerAlive(journal),
+                       "The fixture owner exit was not proved by both Windows and the production owner check.")) return false;
+            recoveryEvidence.insert("dead_owner", true);
+            const auto refused = recover(recoveryPath, session, true);
+            if (!check(!refused.ok && refused.record == journal
+                       && refused.error == QStringLiteral("LAN 防火墙规则被外部修改或无法读取，未覆盖它；恢复记录已保留。"),
+                       "Dead-owner recovery did not reach and reject the non-owned rule snapshot.") || !unchanged()) return false;
+            recoveryEvidence.insert("recovery_refused", true);
+            recoveryEvidence.insert("foreign_rules_preserved", true);
+            recoveryEvidence.insert("independent_rules_preserved", true);
+            recoveryEvidence.insert("recovery_journal_unchanged", true);
+            // Only remove this synthetic expected journal after every real
+            // recovery assertion succeeded. Actual rules are cleaned below
+            // using their separately recorded exact disabled snapshots.
+            if (!check(QFile::remove(recoveryPath), "Cannot remove the verified test-only recovery journal.")) return false;
+            preserveRecoveryEvidence = false;
+            return true;
+        }
         return check(false, "Unknown native fixture scenario.");
     };
     result.ok = exercise();
@@ -888,6 +997,7 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
         if (!restored.ok) { cleanupComplete = false; check(false, restored.error + " Journal: " + it->path); }
         else if (!absent(*it)) cleanupComplete = false;
     }
+    if (preserveRecoveryEvidence) cleanupComplete = false;
     if (cleanupComplete) cleanupComplete = directory.remove();
     result.ok = result.ok && cleanupComplete;
     if (!cleanupComplete && result.error.isEmpty()) result.error = "The isolated native fixture directory could not be removed.";
@@ -895,6 +1005,8 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
     result.record = {{"native_com", true}, {"enabled", false}, {"local_address", "127.0.0.1"},
                      {"remote_addresses", "127.0.0.1/32"}, {"tcp_and_udp", true},
                      {"cleanup_complete", cleanupComplete}};
+    for (auto it = recoveryEvidence.begin(); it != recoveryEvidence.end(); ++it)
+        result.record.insert(it.key(), it.value());
 #else
     Q_UNUSED(scenario);
     result.error = "The native COM firewall fixture requires Windows.";
@@ -902,4 +1014,3 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
     return result;
 }
 #endif
-

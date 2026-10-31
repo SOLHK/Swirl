@@ -28,7 +28,7 @@ int guard(const QString &path);
 #ifdef SWIRL_LAN_FIREWALL_TESTS
 // Built only into the separately opted-in Windows fixture executable. The
 // production library never exposes synthetic rules or bypasses validation.
-enum class FixtureCase { RoundTrip, ExternalEdit, IndependentOwnership };
+enum class FixtureCase { RoundTrip, ExternalEdit, IndependentOwnership, CrashRecoveryConflict };
 Result exerciseNativeFixture(FixtureCase scenario);
 #endif
 }
