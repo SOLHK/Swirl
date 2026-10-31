@@ -567,14 +567,20 @@ if(WIN32)
  # Generate the Windows-only ICO from its optical SVG before RC compilation.
  add_executable(SwirlIconBuilder tools/BuildWindowsIcon.cpp)
  target_link_libraries(SwirlIconBuilder PRIVATE Qt6::Gui Qt6::Svg)
+ # Test targets stage Qt DLLs in the application directory during parallel
+ # builds. Keep this build-time executable away from those mutable copies.
+ set_target_properties(SwirlIconBuilder PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/icon-tools/$<CONFIG>")
  set(SWIRL_GENERATED_ICON "${CMAKE_CURRENT_BINARY_DIR}/brand/Swirl.ico")
  add_custom_command(
   OUTPUT "${SWIRL_GENERATED_ICON}"
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/brand"
-  COMMAND $<TARGET_FILE:SwirlIconBuilder>
+  COMMAND "${CMAKE_COMMAND}" -E env "PATH=$<TARGET_FILE_DIR:Qt6::Core>;$ENV{PATH}"
+          $<TARGET_FILE:SwirlIconBuilder>
           "${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
           "${SWIRL_GENERATED_ICON}"
   DEPENDS SwirlIconBuilder app/BrandRaster.h "${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
+  WORKING_DIRECTORY "$<TARGET_FILE_DIR:SwirlIconBuilder>"
   COMMENT "Generate Windows ICO from Swirl SVG"
   VERBATIM
  )
