@@ -7,7 +7,7 @@ pub mod quic;
 pub mod reality;
 mod udp;
 pub mod xhttp;
-pub use udp::bind_udp;
+pub use udp::{bind_udp, bind_udp_inbound, reserve_datagram_buffers};
 
 use std::{
     io,

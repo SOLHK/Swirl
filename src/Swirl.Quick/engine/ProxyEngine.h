@@ -31,7 +31,8 @@ struct EngineStartOptions {
     bool gatewayForwarding=false;
     bool allowLan=false;
     QString lanUsername,lanPassword;
-    QString lanBindAddress = QStringLiteral("*");
+    QString lanBindAddress = QStringLiteral("127.0.0.1");
+    QVariantMap lanConfiguration;
     bool lanSkipLocalAuthentication = true;
     QVariantMap dnsConfig;
     QStringList customRules;
@@ -93,6 +94,7 @@ public:
         bool gatewayForwarding=false;
         bool directSession=false;
         bool tunEnabled=false,allowLan=false;
+        QJsonObject lan;
         QJsonObject configurationReceipt;
     };
     using QObject::QObject;
@@ -112,6 +114,9 @@ public:
     virtual void configurationCommand(const QJsonObject &command) {
         emit configurationCommandFinished(command.value("request_id").toString(),QJsonObject{{"ok",false},{"code","UnsupportedCapability"},{"phase","prepare"}});
     }
+    virtual void lanCommand(const QJsonObject &command) {
+        emit lanCommandFinished(command.value("request_id").toString(), QJsonObject{{"ok",false},{"code","UnsupportedCapability"}});
+    }
     virtual Status status() const = 0;
     virtual QString configurationSummary() const = 0;
     virtual QVariantList routingRules() const { return {}; }
@@ -122,5 +127,6 @@ signals:
     void statusChanged();
     void diagnostic(const QString &module,const QString &code,const QString &message);
     void probeRequestRejected(quint64 tag,const QString &code);
+    void lanCommandFinished(const QString &requestId,const QJsonObject &response);
     void configurationCommandFinished(const QString &requestId,const QJsonObject &response);
 };

@@ -52,7 +52,17 @@ uint32_t swirl_core_abi_version(void);
  * A 4096-byte buffer is sufficient. No configuration or credentials are included. */
 intptr_t swirl_core_build_info(uint8_t *output, size_t output_capacity);
 /* Existing lifecycle ABI: output_capacity must be at least 1 MiB; serialize
- * lifecycle calls and stop all handles before unloading the shared library. */
+ * lifecycle calls and stop all handles before unloading the shared library.
+ * Optional native LAN control uses this same ABI, control_schema=2, UUID
+ * request_id, and canonical decimal-string handle + engine_epoch. Commands:
+ * lan_validate(config), lan_start(config), lan_stop, lan_status. lan_validate
+ * does not require handle/engine_epoch and has no network side effects; success
+ * validates syntax/security bounds, not interface ownership or port availability.
+ * Require capabilities.optional.lan_proxy=true and lan_proxy_control_schema=1
+ * before using them. Snapshot includes actual bound addresses, clients and byte
+ * counts, never credentials. The system-proxy listener remains loopback-only.
+ * LAN credentials are input-only; callers must not log command buffers.
+ * HTTP Basic/SOCKS5 password authentication does not encrypt the transport. */
 intptr_t swirl_core_command(const uint8_t *input, size_t input_len,
                            uint8_t *output, size_t output_capacity);
 

@@ -9,7 +9,7 @@ use tokio::net::UdpSocket;
 // buffer minimum, independent of the Core's bounded queues and payload limits.
 const BUFFER_MINIMUM: usize = 65_536;
 
-fn reserve_datagram_buffers(socket: &UdpSocket) -> io::Result<()> {
+pub fn reserve_datagram_buffers(socket: &UdpSocket) -> io::Result<()> {
     let socket = SockRef::from(socket);
     if socket.send_buffer_size()? < BUFFER_MINIMUM {
         socket.set_send_buffer_size(BUFFER_MINIMUM)?;
@@ -30,6 +30,14 @@ fn reserve_datagram_buffers(socket: &UdpSocket) -> io::Result<()> {
 /// Bind a native UDP forwarding socket, returning buffer setup errors to the
 /// caller. This changes only this socket; system-wide network limits are intact.
 pub async fn bind_udp(address: SocketAddr) -> io::Result<UdpSocket> {
+    let socket = UdpSocket::bind(address).await?;
+    reserve_datagram_buffers(&socket)?;
+    Ok(socket)
+}
+
+/// Bind an inbound proxy relay on its explicit local interface. This must not
+/// inherit an outbound physical-interface constraint when Native TUN is active.
+pub async fn bind_udp_inbound(address: SocketAddr) -> io::Result<UdpSocket> {
     let socket = UdpSocket::bind(address).await?;
     reserve_datagram_buffers(&socket)?;
     Ok(socket)
@@ -88,5 +96,19 @@ mod tests {
         reserve_datagram_buffers(&socket).unwrap();
         assert_eq!(options.send_buffer_size().unwrap(), previous.0);
         assert_eq!(options.recv_buffer_size().unwrap(), previous.1);
+    }
+
+    #[tokio::test]
+    async fn inbound_relay_retains_full_datagrams_on_its_local_address() {
+        let address = SocketAddr::from(([127, 0, 0, 1], 0));
+        let relay = bind_udp_inbound(address).await.unwrap();
+        let client = bind_udp(address).await.unwrap();
+        let payload = vec![0x53; 65_507];
+        relay.send_to(&payload, client.local_addr().unwrap()).await.unwrap();
+        let mut bytes = vec![0; 65_536];
+        let (length, source) = timeout(Duration::from_secs(3), client.recv_from(&mut bytes))
+            .await.unwrap().unwrap();
+        assert_eq!(source, relay.local_addr().unwrap());
+        assert_eq!(&bytes[..length], &payload);
     }
 }

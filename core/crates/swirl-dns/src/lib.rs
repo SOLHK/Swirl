@@ -43,7 +43,8 @@ mod query_transport_tests;
 const FAILURE_TTL: Duration = Duration::from_secs(1);
 pub struct Resolver {
     query_family: DnsQueryFamily,
-    cache: Mutex<Cache>,
+    cache: Arc<Mutex<Cache>>,
+    pinned: Option<(String, Vec<IpAddr>)>,
     permits: Arc<Semaphore>,
     hosts: HashMap<String, IpAddr>,
     servers: Vec<SocketAddr>,
@@ -54,7 +55,8 @@ impl Default for Resolver {
     fn default() -> Self {
         Self {
             query_family: DnsQueryFamily::Dual,
-            cache: Mutex::new(HashMap::new()),
+            cache: Arc::new(Mutex::new(HashMap::new())),
+            pinned: None,
             permits: Arc::new(Semaphore::new(8)),
             hosts: HashMap::new(),
             servers: Vec::new(),
@@ -80,6 +82,9 @@ impl Resolver {
         }
         if let Ok(ip) = host.parse() {
             return Ok(vec![SocketAddr::new(ip, port)]);
+        }
+        if let Some(addresses) = self.pinned_addresses(host, port) {
+            return Ok(addresses);
         }
         if let Some(ip) = self.mapped_host(host) {
             return Ok(vec![SocketAddr::new(ip, port)]);
@@ -166,7 +171,8 @@ impl Resolver {
     pub fn with_hosts(&self, hosts: &[swirl_subscription::HostMapping]) -> Self {
         Self {
             query_family: DnsQueryFamily::Dual,
-            cache: Mutex::new(HashMap::new()),
+            cache: Arc::new(Mutex::new(HashMap::new())),
+            pinned: None,
             permits: self.permits.clone(),
             hosts: hosts
                 .iter()
@@ -189,6 +195,25 @@ impl Resolver {
         }
         Ok(result)
     }
+    /// Preserve the configured DNS policy, cache and shared lookup budget while
+    /// freezing an already validated endpoint answer for one outbound flow.
+    /// Protocols keep the original hostname for SNI and certificate checks.
+    pub fn with_pinned_addresses(&self, host: &str, addresses: Vec<IpAddr>) -> Self {
+        Self {
+            query_family: self.query_family,
+            cache: self.cache.clone(),
+            pinned: Some((host.to_ascii_lowercase(), addresses)),
+            permits: self.permits.clone(),
+            hosts: self.hosts.clone(),
+            servers: self.servers.clone(),
+            tls_servers: self.tls_servers.clone(),
+            system_hosts: self.system_hosts.clone(),
+        }
+    }
+    fn pinned_addresses(&self, host: &str, port: u16) -> Option<Vec<SocketAddr>> {
+        self.pinned.as_ref().filter(|(name, _)| name.eq_ignore_ascii_case(host))
+            .map(|(_, addresses)| addresses.iter().map(|ip| SocketAddr::new(*ip, port)).collect())
+    }
     pub fn mapped_host(&self, host: &str) -> Option<IpAddr> {
         self.hosts.get(&host.to_ascii_lowercase()).copied()
     }
@@ -198,6 +223,9 @@ impl Resolver {
         }
         if let Ok(ip) = host.parse() {
             return Ok(vec![SocketAddr::new(ip, port)]);
+        }
+        if let Some(addresses) = self.pinned_addresses(host, port) {
+            return Ok(addresses);
         }
         if let Some(ip) = self.mapped_host(host) {
             return Ok(vec![SocketAddr::new(ip, port)]);
@@ -321,6 +349,28 @@ fn parse_hosts(data: &[u8]) -> Result<HashMap<String, IpAddr>, &'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn pinned_endpoint_preserves_policy_budget_and_cannot_rebind() {
+        let root = Resolver::default();
+        let dns = swirl_subscription::Dns {
+            hosts: vec![swirl_subscription::HostMapping {
+                name: "endpoint.fixture.invalid".into(), address: "127.0.0.1".parse().unwrap(),
+            }],
+            servers: vec!["127.0.0.1:5353".parse().unwrap()],
+            use_system_hosts: false,
+            ..Default::default()
+        };
+        let resolver = root.with_config(&dns).unwrap();
+        let approved = vec!["203.0.113.1".parse().unwrap(), "2001:db8::1".parse().unwrap()];
+        let pinned = resolver.with_pinned_addresses("endpoint.fixture.invalid", approved.clone());
+        assert!(Arc::ptr_eq(&resolver.cache, &pinned.cache));
+        assert!(Arc::ptr_eq(&resolver.permits, &pinned.permits));
+        assert_eq!(resolver.servers, pinned.servers);
+        assert_eq!(pinned.resolve("ENDPOINT.fixture.invalid", 443).await.unwrap(),
+            approved.iter().map(|ip| SocketAddr::new(*ip, 443)).collect::<Vec<_>>());
+        assert_eq!(resolver.resolve("endpoint.fixture.invalid", 443).await.unwrap(),
+            vec!["127.0.0.1:443".parse().unwrap()]);
+    }
     #[tokio::test]
     async fn ipv4_query_policy_preserves_literal_and_static_ipv6_without_os_fallback() {
         use swirl_subscription::{Dns, HostMapping};

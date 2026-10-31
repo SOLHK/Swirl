@@ -183,6 +183,32 @@ async fn http_header(stream: &mut TcpStream, mut data: Vec<u8>) -> Result<(Vec<u
     }
 }
 
+fn credential_matches(expected: &[u8], candidate: &[u8]) -> bool {
+    // This key is a domain separator, not a stored password or a KDF. Hashing
+    // allows bounded variable-length credentials to use ring's verified
+    // constant-time comparison of fixed-size authentication tags.
+    let key = ring::hmac::Key::new(
+        ring::hmac::HMAC_SHA256,
+        b"Swirl inbound credential comparison v1",
+    );
+    let expected = ring::hmac::sign(&key, expected);
+    ring::hmac::verify(&key, candidate, expected.as_ref()).is_ok()
+}
+
+#[cfg(test)]
+mod credential_comparison_tests {
+    use super::credential_matches;
+
+    #[test]
+    fn exact_credentials_are_required_including_length_and_suffix() {
+        let expected = b"fixture-secret-123";
+        assert!(credential_matches(expected, expected));
+        for candidate in [b"".as_slice(), b"fixture-secret-12", b"fixture-secret-1234", b"fixture-secret-124", b"Fixture-secret-123"] {
+            assert!(!credential_matches(expected, candidate));
+        }
+    }
+}
+
 pub async fn accept(stream: &mut TcpStream, auth: &Option<Credentials>) -> Result<Inbound> {
     let first = stream.read_u8().await.map_err(|_| "InboundClosed")?;
     if first == 4 {
@@ -250,7 +276,11 @@ async fn accept_socks(stream: &mut TcpStream, auth: &Option<Credentials>) -> Res
             .read_exact(&mut pass)
             .await
             .map_err(|_| "InboundAuthentication")?;
-        let ok = user == auth.username.as_bytes() && pass == auth.password.as_bytes();
+        // Evaluate both credentials and use ring's constant-time tag
+        // verification, without prefix-sensitive byte/string comparisons.
+        let user_ok = credential_matches(auth.username.as_bytes(), &user);
+        let pass_ok = credential_matches(auth.password.as_bytes(), &pass);
+        let ok = user_ok & pass_ok;
         stream
             .write_all(&[1, if ok { 0 } else { 1 }])
             .await
@@ -358,7 +388,7 @@ async fn accept_http(
             "Basic {}",
             STANDARD.encode(format!("{}:{}", auth.username, auth.password))
         );
-        if authorization != Some(expected.as_bytes()) {
+        if !authorization.is_some_and(|value| credential_matches(expected.as_bytes(), value)) {
             stream.write_all(b"HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=\"Swirl\"\r\nConnection: close\r\nContent-Length: 0\r\n\r\n").await.map_err(|_|"HttpWrite")?;
             // Return a distinct marker; caller must not emit a second response.
             return Err("InboundAuthentication");

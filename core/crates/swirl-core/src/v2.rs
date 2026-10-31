@@ -39,6 +39,9 @@ use tokio::{
 };
 type Result<T> = std::result::Result<T, &'static str>;
 
+#[path = "v2_lan.rs"]
+mod lan_runtime;
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RuntimeConfig {
@@ -219,6 +222,7 @@ struct Shared {
     waiting: AtomicUsize,
     stopped: AtomicBool,
     sessions: Mutex<BTreeMap<u64, SessionControl>>,
+    connection_slots: Arc<Semaphore>,
     sessions_changed: Notify,
     records: Mutex<BTreeMap<u64, Record>>,
     accepted: AtomicU64,
@@ -237,6 +241,7 @@ impl Drop for Waiting<'_> {
 }
 struct Record {
     peer: SocketAddr,
+    ingress: &'static str,
     target: NetworkTarget,
     trace: Value,
     node: String,
@@ -456,6 +461,7 @@ pub struct Core {
     store_id: String,
     epoch: u64,
     address: SocketAddr,
+    lan: Option<lan_runtime::LanRuntime>,
 }
 impl Core {
     pub fn start(
@@ -494,6 +500,7 @@ impl Core {
             waiting: AtomicUsize::new(0),
             stopped: AtomicBool::new(false),
             sessions: Mutex::new(BTreeMap::new()),
+            connection_slots: Arc::new(Semaphore::new(capacity)),
             sessions_changed: Notify::new(),
             records: Mutex::new(BTreeMap::new()),
             accepted: AtomicU64::new(0),
@@ -505,7 +512,7 @@ impl Core {
             address,
         });
         let (stop, mut stopped) = watch::channel(false);
-        let task=runtime.spawn({let shared=shared.clone();async move{let permits=Arc::new(Semaphore::new(capacity));let mut sessions=JoinSet::new();loop{tokio::select!{biased;_=stopped.changed()=>break,Some(_)=sessions.join_next(),if !sessions.is_empty()=>{},accepted=listener.accept()=>{let Ok((socket,peer))=accepted else{break};let Ok(permit)=permits.clone().try_acquire_owned()else{shared.rejected.fetch_add(1,Ordering::Relaxed);continue};let id=shared.accepted.fetch_add(1,Ordering::Relaxed)+1;let(cancel,cancelled)=watch::channel(false);if let Ok(mut registry)=shared.sessions.lock(){registry.insert(id,SessionControl{cancel,nodes:BTreeSet::new(),preparing:1});}else{break}shared.active.fetch_add(1,Ordering::Relaxed);let shared=shared.clone();sessions.spawn(async move{let _permit=permit;let _guard=SessionGuard{shared:shared.clone(),id};if let Err(error)=session(socket,peer,shared.clone(),id,cancelled).await{shared.failed.fetch_add(1,Ordering::Relaxed);if let Ok(mut last)=shared.last_error.lock(){*last=error;}
+        let task=runtime.spawn({let shared=shared.clone();async move{let permits=shared.connection_slots.clone();let mut sessions=JoinSet::new();loop{tokio::select!{biased;_=stopped.changed()=>break,Some(_)=sessions.join_next(),if !sessions.is_empty()=>{},accepted=listener.accept()=>{let Ok((socket,peer))=accepted else{break};let Ok(permit)=permits.clone().try_acquire_owned()else{shared.rejected.fetch_add(1,Ordering::Relaxed);continue};let id=shared.accepted.fetch_add(1,Ordering::Relaxed)+1;let(cancel,cancelled)=watch::channel(false);if let Ok(mut registry)=shared.sessions.lock(){registry.insert(id,SessionControl{cancel,nodes:BTreeSet::new(),preparing:1});}else{break}shared.active.fetch_add(1,Ordering::Relaxed);let shared=shared.clone();sessions.spawn(async move{let _permit=permit;let _guard=SessionGuard{shared:shared.clone(),id};if let Err(error)=session(socket,peer,shared.clone(),id,cancelled,None).await{shared.failed.fetch_add(1,Ordering::Relaxed);if let Ok(mut last)=shared.last_error.lock(){*last=error;}
 if let Ok(mut records)=shared.records.lock()&& let Some(record)=records.get_mut(&id){record.error=error;}}});}}}if let Ok(registry)=shared.sessions.lock(){for session in registry.values(){let _=session.cancel.send(true);}}while sessions.join_next().await.is_some(){}}});
         let transactions = Arc::new(Mutex::new(Transactions {
             pending: None,
@@ -534,7 +541,39 @@ if let Ok(mut records)=shared.records.lock()&& let Some(record)=records.get_mut(
             store_id,
             epoch,
             address,
+            lan: None,
         })
+    }
+    pub fn lan_start(&mut self, config: crate::lan::LanConfig) -> Result<Value> {
+        if self.shared.stopped.load(Ordering::Acquire) {
+            return Err("CoreStopped");
+        }
+        if self.lan.as_ref().is_some_and(|lan| lan.running()) {
+            return Err("LanAlreadyRunning");
+        }
+        let lan = lan_runtime::LanRuntime::start(
+            self.runtime.as_ref().ok_or("CoreStopped")?, self.shared.clone(), config,
+        )?;
+        let status = lan.snapshot()?;
+        self.lan = Some(lan);
+        Ok(status)
+    }
+    pub fn lan_stop(&mut self) -> Result<Value> {
+        if let Some(lan) = self.lan.as_mut() {
+            lan.stop(self.runtime.as_ref().ok_or("CoreStopped")?)
+        } else {
+            self.lan_status()
+        }
+    }
+    pub fn lan_status(&self) -> Result<Value> {
+        match &self.lan {
+            Some(lan) => lan.snapshot(),
+            None => Ok(json!({"running":false,"ipv4_only":true,"ipv6_targets":true,"encrypted_transport":false,
+                "listen_ip":null,"http_port":null,"socks_port":null,
+                "udp_port_start":null,"udp_port_end":null,"active_connections":0,
+                "accepted":0,"rejected":0,"auth_failures":0,"uploaded":0,"downloaded":0,
+                "clients":[],"last_error":""})),
+        }
     }
     pub fn epoch(&self) -> u64 {
         self.epoch
@@ -942,12 +981,13 @@ if let Ok(mut records)=shared.records.lock()&& let Some(record)=records.get_mut(
         let generation = live.generation.to_string();
         drop(live);
         let records = self.shared.records.lock().map_err(|_| "StatsState")?;
-        let connections:Vec<_>=records.iter().rev().take(128).map(|(id,r)|json!({"id":id,"source_ip":r.peer.ip().to_string(),"source_port":r.peer.port(),"host":r.target.host,"port":r.target.port,"node":r.node,"matched_rule":r.trace["rule_id"],"route":r.trace,"category":r.category,"transport_state":if r.ended{"closed"}else{"active"},"ended":r.ended,"error":r.error,"failure_stage":swirl_protocol::failure_stage(r.error),"upload":r.counters.upload.load(Ordering::Relaxed),"download":r.counters.download.load(Ordering::Relaxed),"elapsed_ms":r.started.elapsed().as_millis().min(u128::from(u64::MAX))as u64})).collect();
+        let connections:Vec<_>=records.iter().rev().take(128).map(|(id,r)|json!({"id":id,"source_ip":r.peer.ip().to_string(),"source_port":r.peer.port(),"ingress":r.ingress,"host":r.target.host,"port":r.target.port,"node":r.node,"matched_rule":r.trace["rule_id"],"route":r.trace,"category":r.category,"transport_state":if r.ended{"closed"}else{"active"},"ended":r.ended,"error":r.error,"failure_stage":swirl_protocol::failure_stage(r.error),"upload":r.counters.upload.load(Ordering::Relaxed),"download":r.counters.download.load(Ordering::Relaxed),"elapsed_ms":r.started.elapsed().as_millis().min(u128::from(u64::MAX))as u64})).collect();
         Ok(
-            json!({"schema":2,"engine":"swirl-rust","address":self.address,"generation":generation,"selected":selected,"selectors":{},"policies":policies,"configuration":configuration,"running":self.task.as_ref().is_some_and(|t|!t.is_finished()),"active":self.shared.active.load(Ordering::Relaxed),"accepted":self.shared.accepted.load(Ordering::Relaxed),"failed":self.shared.failed.load(Ordering::Relaxed),"rejected":self.shared.rejected.load(Ordering::Relaxed),"upload":self.shared.totals.upload.load(Ordering::Relaxed),"download":self.shared.totals.download.load(Ordering::Relaxed),"udp_dropped":self.shared.totals.udp_dropped.load(Ordering::Relaxed),"last_error":*self.shared.last_error.lock().map_err(|_|"StatsState")?,"connections":connections,"connection_records_total":records.len(),"connections_truncated":records.len()>128}),
+            json!({"schema":2,"engine":"swirl-rust","address":self.address,"generation":generation,"selected":selected,"selectors":{},"policies":policies,"configuration":configuration,"lan":self.lan_status()?,"running":self.task.as_ref().is_some_and(|t|!t.is_finished()),"active":self.shared.active.load(Ordering::Relaxed),"accepted":self.shared.accepted.load(Ordering::Relaxed),"failed":self.shared.failed.load(Ordering::Relaxed),"rejected":self.shared.rejected.load(Ordering::Relaxed),"upload":self.shared.totals.upload.load(Ordering::Relaxed),"download":self.shared.totals.download.load(Ordering::Relaxed),"udp_dropped":self.shared.totals.udp_dropped.load(Ordering::Relaxed),"last_error":*self.shared.last_error.lock().map_err(|_|"StatsState")?,"connections":connections,"connection_records_total":records.len(),"connections_truncated":records.len()>128}),
         )
     }
     pub fn stop(&mut self) {
+        let _ = self.lan_stop();
         self.shared.stopped.store(true, Ordering::Release);
         self.shared.notify.notify_waiters();
         let _ = self.probe.invalidate();
@@ -1338,24 +1378,39 @@ async fn session(
     shared: Arc<Shared>,
     id: u64,
     mut cancellation: watch::Receiver<bool>,
+    lan: Option<lan_runtime::Ingress>,
 ) -> Result<()> {
     inbound.set_nodelay(true).map_err(|_| "SocketOptions")?;
     let (auth, limit) = {
         let live = shared.live.lock().map_err(|_| "ConfigState")?;
         (
-            live.plan.prepared.runtime.inbound_auth.clone(),
+            lan.as_ref().map(|ingress| ingress.config.auth.clone()).or_else(|| live.plan.prepared.runtime.inbound_auth.clone()),
             Duration::from_millis(live.plan.prepared.runtime.limits.handshake_timeout_ms),
         )
     };
-    let request = tokio::select! {biased;_=cancelled(&mut cancellation)=>return Err("SessionRevoked"),request=timeout(limit,swirl_protocol::accept(&mut inbound,&auth))=>request.map_err(|_|"HandshakeTimeout")??};
+    let handshake = async {
+        if let Some(ingress) = &lan { ingress.check_protocol(&inbound).await?; }
+        swirl_protocol::accept(&mut inbound, &auth).await
+    };
+    let request = tokio::select! {biased;_=cancelled(&mut cancellation)=>return Err("SessionRevoked"),request=timeout(limit,handshake)=>request.map_err(|_|"HandshakeTimeout")??};
     drop(auth);
+    if let Some(ingress) = &lan { ingress.authenticated(); }
     if request.udp {
-        return udp_associate(inbound, peer, request, shared, id, cancellation).await;
+        return udp_associate(inbound, peer, request, shared, id, cancellation, lan).await;
     }
-    let counters = Arc::new(Counters::default());
+    let counters = lan.as_ref().map_or_else(|| Arc::new(Counters::default()), |ingress| ingress.counters.clone());
+    let mut established = false;
     let work = async {
+        if let Some(ingress) = &lan { ingress.check_target(&request.target)?; }
         let (plan, generation) = shared.admit().await?;
-        let routed = route(plan, request.target.clone(), peer.ip(), generation).await?;
+        let mut routed = route(plan, request.target.clone(), peer.ip(), generation).await?;
+        // The final DIRECT address comes from the existing resolver, after
+        // policy evaluation. Checking here blocks static-host/DNS rebinding
+        // without adding any separate DNS lookup or leaking proxy domains.
+        if let Some(ingress) = &lan {
+            ingress.check_target(&routed.target)?;
+            ingress.prepare_outbound(&mut routed, shared.address).await?;
+        }
         if routed.target.port == shared.address.port()
             && routed
                 .target
@@ -1371,6 +1426,7 @@ async fn session(
             id,
             Record {
                 peer,
+                ingress: if lan.is_some() { "lan" } else { "loopback" },
                 target: request.target.clone(),
                 trace: routed.trace.clone(),
                 node: routed.node.id.clone(),
@@ -1407,6 +1463,7 @@ async fn session(
         };
         drop(routed);
         swirl_protocol::reply(&mut inbound, request.kind, true).await?;
+        established = true;
         if matches!(request.kind, swirl_protocol::InboundKind::HttpForward) {
             return Box::pin(swirl_protocol::http_single::forward(
                 &mut inbound,
@@ -1438,7 +1495,16 @@ async fn session(
             .await
             .map_err(|error| super::stream_failure_code(&error))
     };
-    tokio::select! {biased;_=cancelled(&mut cancellation)=>Err("SessionRevoked"),result=work=>result}
+    let result = tokio::select! {
+        biased;
+        _ = cancelled(&mut cancellation) => Err("SessionRevoked"),
+        _ = lan_runtime::idle(&lan) => Err("LanIdleTimeout"),
+        result = work => result,
+    };
+    if lan.is_some() && result.is_err() && !established && !matches!(result, Err("SessionRevoked" | "CoreStopped")) {
+        let _ = timeout(limit, swirl_protocol::reply(&mut inbound, request.kind, false)).await;
+    }
+    result
 }
 
 struct PreparationGuard {
@@ -1510,6 +1576,7 @@ struct UdpPrepared {
     permit: OwnedSemaphorePermit,
     payload_len: usize,
 }
+#[allow(clippy::too_many_arguments)]
 async fn prepare_udp(
     shared: Arc<Shared>,
     id: u64,
@@ -1518,6 +1585,7 @@ async fn prepare_udp(
     payload: Vec<u8>,
     existing: Option<Arc<UdpFlow>>,
     permit: OwnedSemaphorePermit,
+    lan: Option<lan_runtime::Ingress>,
 ) -> Result<UdpPrepared> {
     let key = target.authority();
     let flow = if let Some(flow) = existing {
@@ -1528,8 +1596,13 @@ async fn prepare_udp(
             id,
             active: true,
         };
+        if let Some(ingress) = &lan { ingress.check_target(&target)?; }
         let (plan, generation) = shared.admit().await?;
-        let routed = route(plan, target.clone(), peer, generation).await?;
+        let mut routed = route(plan, target.clone(), peer, generation).await?;
+        if let Some(ingress) = &lan {
+            ingress.check_target(&routed.target)?;
+            ingress.prepare_outbound(&mut routed, shared.address).await?;
+        }
         if routed.target.port == shared.address.port()
             && routed
                 .target
@@ -1599,6 +1672,7 @@ async fn prepare_udp(
         payload_len,
     })
 }
+#[allow(clippy::too_many_arguments)]
 async fn udp_associate(
     mut control: TcpStream,
     peer: SocketAddr,
@@ -1606,6 +1680,7 @@ async fn udp_associate(
     shared: Arc<Shared>,
     id: u64,
     mut cancellation: watch::Receiver<bool>,
+    lan: Option<lan_runtime::Ingress>,
 ) -> Result<()> {
     shared.end_preparation(id);
     let requested: IpAddr = request
@@ -1616,15 +1691,28 @@ async fn udp_associate(
     if !requested.is_unspecified() && requested != peer.ip() {
         return Err("UdpClientAddress");
     }
-    let relay = swirl_transport::bind_udp(SocketAddr::new(peer.ip(), 0))
-        .await
-        .map_err(|_| "UdpBind")?;
+    let local_ip = control.local_addr().map_err(|_| "UdpLocalAddress")?.ip();
+    let lan_relay = match lan.as_ref().map(|ingress| ingress.bind_udp()).transpose() {
+        Ok(relay) => relay,
+        Err(error) => {
+            let _ = swirl_protocol::reply(&mut control, request.kind, false).await;
+            return Err(error);
+        }
+    };
+    let local_relay = if lan_relay.is_none() {
+        // An inbound relay binds the accepted local address, never the remote
+        // peer address and never an outbound physical-interface constraint.
+        Some(swirl_transport::bind_udp_inbound(SocketAddr::new(local_ip, 0)).await.map_err(|_| "UdpBind")?)
+    } else { None };
+    let relay = lan_relay.as_ref().map(|lease| lease.socket())
+        .or(local_relay.as_ref()).ok_or("UdpBind")?;
     let v4 = swirl_transport::bind_udp(SocketAddr::from(([0, 0, 0, 0], 0)))
         .await
         .map_err(|_| "UdpBind")?;
+    // IPv4 ingress does not restrict IPv6 destinations. Preserve the existing
+    // outbound family sockets; IPv6 listener exposure remains disabled.
     let v6 = swirl_transport::bind_udp(SocketAddr::from(([0u16; 8], 0)))
-        .await
-        .map_err(|_| "UdpBindV6")?;
+        .await.map_err(|_| "UdpBindV6")?;
     let address = relay.local_addr().map_err(|_| "UdpBind")?;
     let mut response = vec![5, 0, 0];
     NetworkTarget {
@@ -1633,11 +1721,12 @@ async fn udp_associate(
     }
     .encode(&mut response)?;
     control.write_all(&response).await.map_err(|_| "UdpReply")?;
-    let counters = Arc::new(Counters::default());
+    let counters = lan.as_ref().map_or_else(|| Arc::new(Counters::default()), |ingress| ingress.counters.clone());
     shared.records.lock().map_err(|_| "StatsState")?.insert(
         id,
         Record {
             peer,
+            ingress: if lan.is_some() { "lan" } else { "loopback" },
             target: request.target.clone(),
             trace: json!({"rule_id":"per_datagram","mode":"pending"}),
             node: String::new(),
@@ -1655,11 +1744,14 @@ async fn udp_associate(
     let mut pending: JoinSet<Result<UdpPrepared>> = JoinSet::new();
     let slots = Arc::new(Semaphore::new(4));
     let mut pool = socks5_udp::Pool::dynamic(counters.clone(), shared.totals.clone());
-    let (mut incoming, mut from_v4, mut from_v6) = ([0u8; 65535], [0u8; 65535], [0u8; 65535]);
+    let (mut incoming, mut from_v4, mut from_v6) = (vec![0u8; 65535], vec![0u8; 65535], vec![0u8; 65535]);
     let mut closed = [0u8; 1];
+    let idle = lan_runtime::idle(&lan);
+    tokio::pin!(idle);
     let outcome = loop {
         tokio::select! {biased;
                     _=cancelled(&mut cancellation)=>break Err("SessionRevoked"),
+                    _= &mut idle=>break Err("LanIdleTimeout"),
                     _=control.read(&mut closed)=>break Ok(()),
                     Some(prepared)=pending.join_next(),if !pending.is_empty()=>{
                         let prepared=match prepared{Ok(Ok(prepared))=>prepared,_=>{super::udp_drop(&counters,&shared.totals);continue}};flows.retain(|_,(at,_)|at.elapsed()<Duration::from_secs(30));if flows.len()>=64&&!flows.contains_key(&prepared.key){super::udp_drop(&counters,&shared.totals);continue}
@@ -1669,13 +1761,13 @@ async fn udp_associate(
                             UdpPacket::Datagram(address,packet)=>{destinations.retain(|_,(at,_)|at.elapsed()<Duration::from_secs(30));if(destinations.len()>=64&&!destinations.contains_key(&address))||destinations.get(&address).is_some_and(|(_,old)|old.routed.node.id!=prepared.flow.routed.node.id||old.routed.generation!=prepared.flow.routed.generation){super::udp_drop(&counters,&shared.totals);continue}let socket=if address.is_ipv4(){&v4}else{&v6};let sent=tokio::select!{biased;_=cancelled(&mut cancellation)=>break Err("SessionRevoked"),sent=socket.send_to(&packet,address)=>sent};if sent.is_err(){super::udp_drop(&counters,&shared.totals);continue}destinations.insert(address,(Instant::now(),prepared.flow));counters.upload.fetch_add(prepared.payload_len as u64,Ordering::Relaxed);shared.totals.upload.fetch_add(prepared.payload_len as u64,Ordering::Relaxed);drop(prepared.permit);}
                         }
                     },
-                    Some(reply)=pool.next_reply()=>{if let Some(client)=client{let sent=tokio::select!{biased;_=cancelled(&mut cancellation)=>break Err("SessionRevoked"),_=control.read(&mut closed)=>break Ok(()),sent=reply.send_to(&relay,client)=>sent};match sent{Ok(size)=>{counters.download.fetch_add(size as u64,Ordering::Relaxed);shared.totals.download.fetch_add(size as u64,Ordering::Relaxed);},Err(())=>super::udp_drop(&counters,&shared.totals)}}},
+                    Some(reply)=pool.next_reply()=>{if let Some(client)=client{let sent=tokio::select!{biased;_=cancelled(&mut cancellation)=>break Err("SessionRevoked"),_=control.read(&mut closed)=>break Ok(()),sent=reply.send_to(relay,client)=>sent};match sent{Ok(size)=>{counters.download.fetch_add(size as u64,Ordering::Relaxed);shared.totals.download.fetch_add(size as u64,Ordering::Relaxed);},Err(())=>super::udp_drop(&counters,&shared.totals)}}},
                     received=relay.recv_from(&mut incoming)=>{
                         let(n,source)=match received{Ok(packet)=>packet,Err(error)if super::transient_udp(&error)=>{super::udp_drop(&counters,&shared.totals);continue},Err(_)=>break Err("UdpReceive")};if source.ip()!=peer.ip()||client.is_some_and(|client|client!=source)||n<4||incoming[..3]!=[0,0,0]{continue}let mut cursor=&incoming[3..n];let Ok(target)=swirl_protocol::read_target(&mut cursor,false).await else{continue};client=Some(source);let Ok(permit)=slots.clone().try_acquire_owned()else{super::udp_drop(&counters,&shared.totals);continue};flows.retain(|_,(at,_)|at.elapsed()<Duration::from_secs(30));let existing=flows.get(&target.authority()).map(|(_,flow)|flow.clone());if existing.is_none(){if flows.len()>=64{super::udp_drop(&counters,&shared.totals);continue}
-        if shared.begin_preparation(id).is_err(){break Err("SessionRevoked")}}pending.spawn(prepare_udp(shared.clone(),id,peer.ip(),target,cursor.to_vec(),existing,permit));
+        if shared.begin_preparation(id).is_err(){break Err("SessionRevoked")}}pending.spawn(prepare_udp(shared.clone(),id,peer.ip(),target,cursor.to_vec(),existing,permit,lan.clone()));
                     },
-                    received=v4.recv_from(&mut from_v4)=>{if let Ok((n,source))=received&& let Err(code)=udp_response(&relay,client,source,&from_v4[..n],&destinations,&counters,&shared.totals).await{break Err(code)}},
-                    received=v6.recv_from(&mut from_v6)=>{if let Ok((n,source))=received&& let Err(code)=udp_response(&relay,client,source,&from_v6[..n],&destinations,&counters,&shared.totals).await{break Err(code)}}
+                    received=v4.recv_from(&mut from_v4)=>{if let Ok((n,source))=received{let response=tokio::select!{biased;_=cancelled(&mut cancellation)=>break Err("SessionRevoked"),_=control.read(&mut closed)=>break Ok(()),result=timeout(Duration::from_secs(3),udp_response(relay,client,source,&from_v4[..n],&destinations,&counters,&shared.totals))=>result.map_err(|_|"UdpSendTimeout")};match response{Ok(Ok(()))=>{},Ok(Err(code))|Err(code)=>break Err(code)}}},
+                    received=v6.recv_from(&mut from_v6)=>{if let Ok((n,source))=received{let response=tokio::select!{biased;_=cancelled(&mut cancellation)=>break Err("SessionRevoked"),_=control.read(&mut closed)=>break Ok(()),result=timeout(Duration::from_secs(3),udp_response(relay,client,source,&from_v6[..n],&destinations,&counters,&shared.totals))=>result.map_err(|_|"UdpSendTimeout")};match response{Ok(Ok(()))=>{},Ok(Err(code))|Err(code)=>break Err(code)}}}
                 }
     };
     pending.abort_all();

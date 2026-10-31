@@ -270,7 +270,7 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
  if(o.proxyPort==0&&!o.internalProbeListener)return "本机代理端口无效，请设置 1 至 65535 之间的端口。";
  if(o.internalProbeListener&&o.proxyPort!=0)return "内部节点检测监听必须由 Rust 自动分配端口。";
  if(o.tunEnabled||o.gatewayForwarding)return "当前会话要求增强模式或网关转发，但 Rust 版尚未支持。请在“概览”关闭增强模式后重试。";
- if(o.allowLan)return "当前会话要求局域网代理，但 Rust 版尚未支持。请在“概览”关闭局域网代理后重试。";
+ if(o.allowLan)return "旧版 allowLan 选项不能扩大本机监听范围；请使用独立的原生局域网代理入口。";
  if(o.meteredNetwork)return "当前会话要求计费网络模式，但 Rust 版尚未支持。请在“设置”关闭计费网络模式后重试。";
  if(o.routingMode!="global"&&o.routingMode!="rule"&&o.routingMode!="direct")return "Rust 路由模式无效。";
  QJsonObject dns;const auto dnsError=dnsConfiguration(o,&dns);if(!dnsError.isEmpty())return dnsError;
@@ -536,7 +536,7 @@ void RustCoreEngine::retainPublicNodeIdentities(){
  QList<ProxyNode> identities;identities.reserve(m_options.nodes.size());
  for(const auto &node:m_options.nodes){ProxyNode identity;identity.id=node.id;identity.name=node.name;identities.append(std::move(identity));}
  m_options.nodes=std::move(identities);m_options.dnsConfig.clear();m_options.customRules.clear();m_options.customGroups.clear();
- m_options.inboundUsername.clear();m_options.inboundPassword.clear();m_options.lanUsername.clear();m_options.lanPassword.clear();
+ m_options.inboundUsername.clear();m_options.inboundPassword.clear();m_options.lanUsername.clear();m_options.lanPassword.clear();m_options.lanConfiguration.clear();
 }
 void RustCoreEngine::configurationCommand(const QJsonObject &input){
  auto request=input;const auto requestId=request.value("request_id").toString(),op=request.value("op").toString();
@@ -565,6 +565,26 @@ void RustCoreEngine::configurationCommand(const QJsonObject &input){
  }
  emit configurationCommandFinished(requestId,result);emit statusChanged();
 }
+void RustCoreEngine::lanCommand(const QJsonObject &input){
+ const auto requestId=input.value("request_id").toString(),op=input.value("op").toString();
+ if(op=="lan_capabilities"){
+  // Library/source identity and optional-schema negotiation run on the engine
+  // worker even when no policy listener is running. Capability discovery must
+  // not require enabling system proxy or starting a network session first.
+  const bool loaded=m_library.load();if(loaded)m_command=m_library.command();
+  emit lanCommandFinished(requestId,{{"ok",loaded},{"request_id",requestId},{"available",loaded&&m_library.supportsLanProxy()}});
+  emit statusChanged();return;
+ }
+ if(!QStringList{"lan_start","lan_stop","lan_status"}.contains(op)||!m_handle||!m_v2||!m_library.supportsLanProxy()){
+  emit lanCommandFinished(requestId,{{"ok",false},{"request_id",requestId},{"code",!m_library.supportsLanProxy()?"UnsupportedCapability":"CoreUnavailable"}});return;
+ }
+ auto request=input;request.insert("control_schema",2);request.insert("handle",QString::number(m_handle));request.insert("engine_epoch",m_engineEpoch);
+ const auto response=call(request);m_lanTracked=true;
+ if(response.value("ok").toBool()&&response.value("lan").isObject()){
+  m_status.lan=response.value("lan").toObject();m_status.allowLan=m_status.lan.value("running").toBool();
+ }
+ emit lanCommandFinished(requestId,response);emit statusChanged();
+}
 void RustCoreEngine::stop(){
  m_poll.stop();cancelProbe();
  if(m_handle){
@@ -577,7 +597,7 @@ void RustCoreEngine::stop(){
   }
   m_handle=0;
  }
- m_v2=false;m_engineEpoch.clear();m_status.configurationReceipt={};m_preparedPolicy={};m_previousPolicy={};m_configurationRollback=false;
+ m_v2=false;m_lanTracked=false;m_status.allowLan=false;m_status.lan={{"running",false}};m_engineEpoch.clear();m_status.configurationReceipt={};m_preparedPolicy={};m_previousPolicy={};m_configurationRollback=false;
  m_status.state=State::Stopped;m_status.processAlive=false;m_status.apiHealthy=false;m_status.nodeBusy=false;m_status.proxyPort=0;m_status.connections.clear();emit statusChanged();
 }
 void RustCoreEngine::refresh(){
@@ -587,6 +607,13 @@ void RustCoreEngine::refresh(){
  const auto state=response["status"].toObject();const auto elapsed=m_rateClock.restart();
  if(m_v2)ingestConfigurationReceipt(state.value("configuration").toObject());
  recordForwardingFailures(state);
+ if(m_v2&&m_lanTracked&&m_library.supportsLanProxy()){
+  const auto lan=call({{"control_schema",2},{"op","lan_status"},{"request_id",QUuid::createUuid().toString(QUuid::WithoutBraces)},
+    {"handle",QString::number(m_handle)},{"engine_epoch",m_engineEpoch}});
+  if(lan.value("ok").toBool()&&lan.value("lan").isObject()){
+   m_status.lan=lan.value("lan").toObject();m_status.allowLan=m_status.lan.value("running").toBool();
+  }else m_status.lan.insert("health_error","LanStatusUnconfirmed");
+ }
  const auto up=state["upload"].toInteger(),down=state["download"].toInteger();
  m_status.uploadRate=elapsed>0?double(up-m_status.uploadTotal)*1000/elapsed:0;m_status.downloadRate=elapsed>0?double(down-m_status.downloadTotal)*1000/elapsed:0;
  m_status.uploadTotal=up;m_status.downloadTotal=down;
