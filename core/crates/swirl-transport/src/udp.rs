@@ -38,7 +38,7 @@ pub async fn bind_udp(address: SocketAddr) -> io::Result<UdpSocket> {
 /// Bind an inbound proxy relay on its explicit local interface. This must not
 /// inherit an outbound physical-interface constraint when Native TUN is active.
 pub async fn bind_udp_inbound(address: SocketAddr) -> io::Result<UdpSocket> {
-    let socket = UdpSocket::bind(address).await?;
+    let socket = UdpSocket::from_std(crate::inbound::bind_udp_std(address)?)?;
     reserve_datagram_buffers(&socket)?;
     Ok(socket)
 }
