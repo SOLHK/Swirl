@@ -23,7 +23,9 @@ concurrency:
 jobs:
   build-qt-ui:
     runs-on: windows-2022
-    timeout-minutes: 55
+    # Cold UI + independent production compilation takes about 38 minutes.
+    # Leave time for the complete regression, DPR checks and compiler cache.
+    timeout-minutes: 75
     permissions:
       contents: read
     steps:
@@ -63,6 +65,11 @@ jobs:
       - name: Validate scoped Codex proxy launcher
         shell: pwsh
         run: ./tools/tests/Test-CodexProxyLauncher.ps1
+      - name: Check cloud-knot path geometry from the production JavaScript
+        run: node scripts/tests/Test-CloudKnotGeometry.cjs
+      - name: Prepare supported native Windows display for UI checks
+        shell: pwsh
+        run: ./scripts/Set-CiDisplayResolution.ps1
       - name: Install Rust MSVC tools
         run: rustup toolchain install stable --profile minimal --target x86_64-pc-windows-msvc
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
@@ -89,6 +96,9 @@ jobs:
           python tools/tests/test_openssl_runtime.py --scratch-root "$env:RUNNER_TEMP/swirl-openssl-boundary-tests"
           if ($LASTEXITCODE -ne 0) { throw 'TLS source/receipt boundary checks failed.' }
           ./scripts/tests/Test-RustProductPackagePolicy.ps1
+      - name: Check package path policy with Windows PowerShell 5.1
+        shell: powershell
+        run: ./scripts/tests/Test-RustProductPackagePolicy.ps1
       - name: Restore isolated Qt 6.12 SDK archives
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
@@ -167,6 +177,20 @@ jobs:
         run: |
           . ./scripts/BuildInputTimes.ps1
           Sync-SwirlBuildInputTimes -RepositoryRoot $env:GITHUB_WORKSPACE -BuildDirectory (Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick') -Restore
+      - name: Discard restored test evidence before compiling this checkout
+        shell: pwsh
+        run: |
+          # Compiler caches can include captures and logs from their source run.
+          # Clear these before configure/build, so even a compiler failure cannot
+          # upload old tests as evidence for the current source identity.
+          Remove-Item -LiteralPath 'build-evidence/ctest-inventory.json' -Force -ErrorAction SilentlyContinue
+          foreach ($directory in @('hero-evidence','navigation-evidence','settings-material-evidence','policy-evidence','activity-layout','liquid-glass-evidence')) {
+            Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $directory) -Recurse -Force -ErrorAction SilentlyContinue
+          }
+          foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt','connection-rows.xml','swirl-telemetry-accounting.xml')) {
+            Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $file) -Force -ErrorAction SilentlyContinue
+          }
+          Get-ChildItem -Path 'build/swirl-quick/*-report.json','build/swirl-quick/activity-feather-*.png','build/swirl-quick/activity-data-*.png','build/swirl-quick/font-*.xml','build/swirl-quick/Release/Swirl-*.txt' -File -ErrorAction SilentlyContinue | Remove-Item -Force
       - name: Configure Qt UI independently
         shell: pwsh
         run: |
@@ -249,8 +273,16 @@ jobs:
           New-Item -ItemType Directory -Force -Path $testFontDir | Out-Null
           Get-ChildItem -LiteralPath $fontDir -File | Copy-Item -Destination $testFontDir -Force
       - name: Critical UI startup, rendering and interaction checks
+        id: critical_ui
         shell: pwsh
         run: |
+          # Preserve the actual configured test inventory so the staged runs
+          # can be audited for complete coverage without executing them twice.
+          $inventoryJson = ctest --test-dir build/swirl-quick -C Release --show-only=json-v1
+          if ($LASTEXITCODE -ne 0) { throw 'Configured CTest inventory could not be read.' }
+          $inventory = ($inventoryJson -join [Environment]::NewLine) | ConvertFrom-Json
+          if ($null -eq $inventory.tests -or @($inventory.tests).Count -eq 0) { throw 'Configured CTest inventory is empty.' }
+          [ordered]@{source_sha=$env:GITHUB_SHA; inventory=$inventory} | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath 'build-evidence/ctest-inventory.json' -Encoding utf8
           # Run affected UI checks before packaging. The remaining registered suite
           # runs after the test installer is uploaded; these names are excluded there
           # so a required check is never repeated just to change stage ordering.
@@ -264,15 +296,25 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Critical network/security checks failed ($LASTEXITCODE)." }
           }
       - name: Overview input checks against deployed Qt runtime
+        id: overview_input
+        if: ${{ !cancelled() && (success() || steps.critical_ui.outcome == 'failure') }}
         shell: pwsh
         run: |
           $env:QT_QPA_PLATFORM = "offscreen"
           $env:QT_QUICK_BACKEND = "software"
           $exe = (Resolve-Path "dist/Swirl.exe").Path
-          $process = Start-Process -FilePath $exe -ArgumentList "--interaction-test" -Wait -PassThru -NoNewWindow
-          if ($process.ExitCode -ne 0) {
-            Get-Content "dist/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
-            throw "Overview input checks failed: $($process.ExitCode)"
+          $diagnostic = Join-Path (Split-Path $exe) 'Swirl-input-diagnostics.txt'
+          if (Test-Path -LiteralPath $diagnostic) { Remove-Item -LiteralPath $diagnostic -Force }
+          try {
+            $process = Start-Process -FilePath $exe -ArgumentList "--interaction-test" -Wait -PassThru -NoNewWindow
+            if ($process.ExitCode -ne 0) {
+              Get-Content -LiteralPath $diagnostic -ErrorAction SilentlyContinue
+              throw "Overview input checks failed: $($process.ExitCode)"
+            }
+          } finally {
+            if (Test-Path -LiteralPath $diagnostic -PathType Leaf) {
+              Copy-Item -LiteralPath $diagnostic -Destination 'build-evidence/overview-input.log' -Force
+            }
           }
       - name: Loopback HTTP capture checks against deployed Qt runtime
         shell: pwsh
@@ -390,8 +432,169 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Production configure failed.' }
           cmake --build build/swirl-product --config Release --target Swirl --parallel 4
           if ($LASTEXITCODE -ne 0) { throw 'Production build failed.' }
-          ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/swirl-product -Destination installer-bin -OpenSslRoot $env:SWIRL_OPENSSL_ROOT
-          New-Item -ItemType Directory -Force -Path out | Out-Null
+          $productionBuild = (Resolve-Path -LiteralPath 'build/swirl-product').Path
+          $tlsReport = Join-Path $productionBuild ('tls-runtime-' + $env:GITHUB_SHA + '.json')
+          $runtimeEvidence = Join-Path $env:GITHUB_WORKSPACE 'out/package-evidence'
+          if (Test-Path -LiteralPath 'installer-bin') { throw 'Production staging requires a fresh destination.' }
+          # A restored compiler cache can contain this exact SHA's earlier report.
+          # Remove only this build's report before invoking the real self-tests.
+          if (Test-Path -LiteralPath $tlsReport) { Remove-Item -LiteralPath $tlsReport -Force }
+          New-Item -ItemType Directory -Force -Path $runtimeEvidence | Out-Null
+          $runtimeReports = @(
+            @{ source=$tlsReport; name='production-tls-runtime.json' },
+            @{ source=(Join-Path $env:GITHUB_WORKSPACE 'installer-bin/rust-self-test.json'); name='production-rust-self-test.json' }
+          )
+          foreach ($report in $runtimeReports) {
+            $saved = Join-Path $runtimeEvidence $report.name
+            if (Test-Path -LiteralPath $saved) { Remove-Item -LiteralPath $saved -Force }
+          }
+          try {
+            ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/swirl-product -Destination installer-bin -OpenSslRoot $env:SWIRL_OPENSSL_ROOT
+          } finally {
+            # Preserve genuinely new diagnostics even when staging rejects them.
+            foreach ($report in $runtimeReports) {
+              if (Test-Path -LiteralPath $report.source -PathType Leaf) {
+                Copy-Item -LiteralPath $report.source -Destination (Join-Path $runtimeEvidence $report.name)
+              }
+            }
+          }
+      # Retain successful compiler work before downstream tests can time out.
+      # Restored test evidence is still discarded before every build above.
+      - name: Save reusable compiler outputs
+        if: ${{ !cancelled() && steps.ui_build.outcome == 'success' && steps.build_cache.outputs.cache-hit != 'true' }}
+        shell: pwsh
+        run: |
+          . ./scripts/BuildInputTimes.ps1
+          Sync-SwirlBuildInputTimes -RepositoryRoot $env:GITHUB_WORKSPACE -BuildDirectory (Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick')
+      - name: Cache compiled Qt and Rust outputs
+        if: ${{ !cancelled() && steps.ui_build.outcome == 'success' && steps.build_cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+            build/swirl-quick
+            build/swirl-product
+          key: ${{ steps.build_cache.outputs.cache-primary-key }}
+      - name: Start the production Release UI with cold and warm QML caches
+        shell: pwsh
+        env:
+          SWIRL_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          SWIRL_PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+        run: |
+          # The production smoke/font-review combination waits for each actual
+          # route's Loader.Ready and transition settlement, rejects QML warnings
+          # and uses isolated storage. A
+          # plain launch does not honor SWIRL_TEST_ROOT, so do not claim this is
+          # a normal user-session or physical Windows 11 desktop acceptance.
+          $env:QT_QPA_PLATFORM = 'windows'
+          $env:QSG_RHI_BACKEND = 'd3d11'
+          Remove-Item Env:QT_QUICK_BACKEND,Env:QT_SCALE_FACTOR,Env:QT_SCREEN_SCALE_FACTORS -ErrorAction SilentlyContinue
+          $exe = (Resolve-Path 'installer-bin/Swirl.exe').Path
+          $manifest = Get-Content -LiteralPath 'installer-bin/package-manifest.json' -Raw | ConvertFrom-Json
+          $source = (& git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $source -cne $env:GITHUB_SHA -or $manifest.source_sha -cne $source) { throw 'Production UI source identity differs from the tested checkout.' }
+          $evidence = Join-Path $env:GITHUB_WORKSPACE 'build-evidence/production-ui'
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          $env:SWIRL_TEST_ROOT = Join-Path $env:RUNNER_TEMP ('swirl-production-ui-' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $env:SWIRL_TEST_ROOT | Out-Null
+          $qmlCacheRoot = [IO.Path]::GetFullPath((Join-Path $env:SWIRL_TEST_ROOT 'cache/qmlcache')).TrimEnd('\','/')
+          function Get-QmlCacheSnapshot {
+            $exists = Test-Path -LiteralPath $qmlCacheRoot -PathType Container
+            $files = @()
+            $directories = @()
+            [long]$totalBytes = 0
+            if ($exists) {
+              $directories = @(Get-ChildItem -LiteralPath $qmlCacheRoot -Directory -Recurse -Force | Sort-Object FullName | ForEach-Object { $_.FullName.Substring($qmlCacheRoot.Length + 1).Replace('\','/') })
+              $files = @(Get-ChildItem -LiteralPath $qmlCacheRoot -File -Recurse -Force | Sort-Object FullName | ForEach-Object {
+                $totalBytes += $_.Length
+                [ordered]@{ path=$_.FullName.Substring($qmlCacheRoot.Length + 1).Replace('\','/'); size=$_.Length; sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); lastWriteUtc=$_.LastWriteTimeUtc.ToString('o') }
+              })
+            }
+            return [ordered]@{ capturedUtc=[DateTime]::UtcNow.ToString('o'); root=$qmlCacheRoot; exists=$exists; directories=$directories; fileCount=$files.Count; totalBytes=$totalBytes; files=$files }
+          }
+          $diagnostic = Join-Path (Split-Path $exe) 'Swirl-diagnostics.txt'
+          $launches = @()
+          $previousCacheAfter = $null
+          $previousCacheIdentity = $null
+          try {
+            foreach ($phase in @('cold-qml-cache', 'warm-same-qml-cache')) {
+              $before = Get-QmlCacheSnapshot
+              $handoff = $null
+              if ($null -ne $previousCacheAfter) {
+                $previousFiles = ConvertTo-Json -InputObject @($previousCacheAfter.files) -Depth 5 -Compress
+                $currentFiles = ConvertTo-Json -InputObject @($before.files) -Depth 5 -Compress
+                $handoff = [ordered]@{ previousAfterUtc=$previousCacheAfter.capturedUtc; currentBeforeUtc=$before.capturedUtc; sameFileInventory=($previousFiles -ceq $currentFiles); sameRuntimeCachePath=$null }
+              }
+              $result = [ordered]@{ phase=$phase; startedUtc=$null; finishedUtc=$null; durationMs=$null; exited=$false; exitCode=$null; diagnosticsPresent=$false; warningsOrErrors=$false; completedPages=0; readyPages=0; cacheIdentity=$null; cacheBefore=$before; cacheAfter=$null; cacheHandoff=$handoff; cacheHitVerified=$false; cacheObservation='not-observed'; cacheEvidenceError=$null; passed=$false }
+              $process = $null
+              $duration = [Diagnostics.Stopwatch]::new()
+              try {
+                if (Test-Path -LiteralPath $diagnostic) { Remove-Item -LiteralPath $diagnostic }
+                $result.startedUtc = [DateTime]::UtcNow.ToString('o')
+                $duration.Start()
+                $process = Start-Process -FilePath $exe -ArgumentList @('--smoke-test', '--font-review') -WorkingDirectory $env:SWIRL_TEST_ROOT -PassThru
+                $result.exited = $process.WaitForExit(60000)
+                $duration.Stop()
+                $result.finishedUtc = [DateTime]::UtcNow.ToString('o')
+                $result.durationMs = $duration.Elapsed.TotalMilliseconds
+                if (-not $result.exited) { throw "Production UI $phase exceeded the existing 60-second smoke deadline." }
+                $result.exitCode = $process.ExitCode
+                if ($process.ExitCode -ne 0) { throw "Production UI $phase failed: $($process.ExitCode)" }
+                $result.diagnosticsPresent = Test-Path -LiteralPath $diagnostic -PathType Leaf
+                if (-not $result.diagnosticsPresent) { throw "Production UI $phase did not emit its startup diagnostics." }
+                $result.warningsOrErrors = [bool](Select-String -LiteralPath $diagnostic -Pattern '^[123]:' -Quiet)
+                if ($result.warningsOrErrors) { throw "Production UI $phase emitted Qt warnings or errors." }
+                $cacheMarkers = @(Select-String -LiteralPath $diagnostic -Pattern '^4:\s+QML_CACHE_EVIDENCE\s+(\{.*\})\s*$')
+                if ($cacheMarkers.Count -ne 1) { throw "Production UI $phase lacks its actual QML cache identity." }
+                $result.cacheIdentity = $cacheMarkers[0].Matches[0].Groups[1].Value | ConvertFrom-Json
+                $cachePath = [IO.Path]::GetFullPath([string]$result.cacheIdentity.path).TrimEnd('\','/')
+                if (-not $cachePath.StartsWith($qmlCacheRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'The observed QML cache escaped the isolated cache root.' }
+                if ($null -ne $handoff) { $handoff.sameRuntimeCachePath = $cachePath.Equals([IO.Path]::GetFullPath([string]$previousCacheIdentity.path).TrimEnd('\','/'), [StringComparison]::OrdinalIgnoreCase) }
+                $completed = @(Select-String -LiteralPath $diagnostic -Pattern '^4:\s+SMOKE_PAGES\s+(\d+)\s*$')
+                $ready = @(Select-String -LiteralPath $diagnostic -Pattern '^4:\s+FONT_SMOKE_ROUTE_READY\s+(\S+)\s+(\S+)\s*$')
+                if ($completed.Count -ne 1) { throw "Production UI $phase lacks an unambiguous all-pages completion marker." }
+                $result.completedPages = [int]$completed[0].Matches[0].Groups[1].Value
+                $result.readyPages = $ready.Count
+                if ($result.completedPages -le 0 -or $result.readyPages -ne $result.completedPages) { throw "Production UI $phase did not confirm every traversed route was ready." }
+                foreach ($route in $ready) {
+                  $requested = $route.Matches[0].Groups[1].Value.Trim('"')
+                  $actual = $route.Matches[0].Groups[2].Value.Trim('"')
+                  $expected = if ($requested -in @('requestlogs', 'dashboard')) { 'activity' } else { $requested }
+                  if ($actual -cne $expected) { throw "Production UI $phase confirmed a different route: $requested -> $actual" }
+                }
+                $result.passed = $true
+              } finally {
+                if ($null -ne $process) {
+                  if (-not $process.HasExited) { $process.Kill(); $null = $process.WaitForExit(5000) }
+                  $process.Dispose()
+                }
+                if ($duration.IsRunning) { $duration.Stop() }
+                if ($null -eq $result.finishedUtc) {
+                  $result.finishedUtc = [DateTime]::UtcNow.ToString('o')
+                  $result.durationMs = $duration.Elapsed.TotalMilliseconds
+                }
+                try {
+                  $result.cacheAfter = Get-QmlCacheSnapshot
+                  $result.cacheObservation = if ($result.cacheAfter.fileCount -gt 0) { 'disk-cache-files-observed; cache-hits-not-measured' } else { 'no-runtime-disk-cache-files-observed; AOT-or-no-disk-write-not-distinguished' }
+                  $previousCacheAfter = $result.cacheAfter
+                  $previousCacheIdentity = $result.cacheIdentity
+                } catch {
+                  $result.cacheEvidenceError = $_.Exception.Message
+                  $result.passed = $false
+                  throw
+                } finally {
+                  if (Test-Path -LiteralPath $diagnostic -PathType Leaf) {
+                    Copy-Item -LiteralPath $diagnostic -Destination (Join-Path $evidence ($phase + '.log'))
+                  }
+                  $launches += $result
+                }
+              }
+            }
+          } finally {
+            [ordered]@{ source_sha=$source; pr_head_sha=$env:SWIRL_PR_HEAD_SHA; pr_base_sha=$env:SWIRL_PR_BASE_SHA; application_sha256=(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant(); ui_tests_compiled=$false; qpa='windows'; requested_rhi='d3d11'; launches=$launches; cacheEvidenceScope='Actual process-reported QML cache identity and before/after file inventories under its isolated root. Reusing a directory or observing files does not prove cache hits; QML AOT may produce no runtime disk-cache files. Startup duration excludes inventory hashing and is not a benchmark.'; ordinary_user_session_verified=$false; physical_windows11_dpi_gpu_acceptance='not-run' } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $evidence 'startup.json') -Encoding utf8
+          }
       - name: Install NSIS packaging tools
         shell: pwsh
         run: |
@@ -434,6 +637,9 @@ jobs:
         run: |
           $regression = 'failed'
           try {
+            # Compiler caches may contain an older report. Only this run's
+            # layout result can be reused by the focused DPR matrix below.
+            Remove-Item -LiteralPath 'build/swirl-quick/activity-layout/activity-layout-report.json' -ErrorAction SilentlyContinue
             # Critical tests have already passed before packaging. Exclude only
             # those exact tests here to avoid paying for a second execution.
             $excludedTests = 'appearance-ui|node-ui|engine-ui|overview-input|all-pages|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|capture-network'
@@ -447,14 +653,124 @@ jobs:
               $excludedTests += '|system-proxy-recovery|system-proxy-state|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network'
             }
             $exclude = "^swirl-($excludedTests)$"
-            ctest --test-dir build/swirl-quick -C Release -E $exclude --output-on-failure --no-tests=error --output-junit build-evidence/full-regression.xml
-            if ($LASTEXITCODE -ne 0) { throw "Full regression checks failed ($LASTEXITCODE)." }
+            # CTest changes directory for --test-dir. Keep the report in the
+            # workspace evidence directory that the artifact step uploads.
+            $junit = Join-Path $env:GITHUB_WORKSPACE 'build-evidence/full-regression.xml'
+            ctest --test-dir build/swirl-quick -C Release -E $exclude --output-on-failure --no-tests=error --output-junit $junit
+            $testExit = $LASTEXITCODE
+            if (-not (Test-Path -LiteralPath $junit -PathType Leaf)) { throw 'Full regression JUnit evidence is missing.' }
+            if ($testExit -ne 0) { throw "Full regression checks failed ($testExit)." }
             $regression = 'passed'
           } finally {
             $delivery = Get-Content -LiteralPath 'out/delivery.json' -Raw | ConvertFrom-Json
             $delivery | Add-Member -NotePropertyName scoped_full_regression -NotePropertyValue $regression -Force
             $delivery | ConvertTo-Json | Set-Content -LiteralPath 'out/delivery.json' -Encoding utf8
           }
+      - name: Verify activity layout and ESC at five effective DPR values
+        shell: pwsh
+        run: |
+          # Reuse the current unscaled layout result, then run only this focused
+          # driver at missing DPR values. QT_SCALE_FACTOR multiplies native DPR.
+          # The existing test-only viewport permits a real HWND / swapchain to
+          # extend beyond this hosted desktop; the driver independently checks
+          # native client pixels and complete RHI readback dimensions. These are
+          # Qt rendering/input simulations, not physical display acceptance.
+          $env:QT_QPA_PLATFORM = 'windows'
+          $env:QSG_RHI_BACKEND = 'd3d11'
+          Remove-Item Env:QT_QUICK_BACKEND,Env:QT_SCREEN_SCALE_FACTORS,Env:QT_SCALE_FACTOR,Env:SWIRL_LAYOUT_EXPECTED_DPR -ErrorAction SilentlyContinue
+          $exe = (Resolve-Path 'build/swirl-quick/Release/Swirl.exe').Path
+          $root = Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick/activity-layout'
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+          $baselinePath = Join-Path $root 'activity-layout-report.json'
+          $diagnostic = Join-Path (Split-Path $exe) 'Swirl-diagnostics.txt'
+          $culture = [Globalization.CultureInfo]::InvariantCulture
+          function Invoke-ActivityLayout([string]$output, [string]$scaleFactor = '', [double]$expectedDpr = 0) {
+            New-Item -ItemType Directory -Force -Path $output | Out-Null
+            $reportPath = Join-Path $output 'activity-layout-report.json'
+            Remove-Item -LiteralPath $reportPath,$diagnostic -ErrorAction SilentlyContinue
+            $env:SWIRL_TEST_ROOT = Join-Path $env:RUNNER_TEMP ('swirl-layout-dpr-' + [guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path $env:SWIRL_TEST_ROOT | Out-Null
+            if ($scaleFactor) { $env:QT_SCALE_FACTOR = $scaleFactor } else { Remove-Item Env:QT_SCALE_FACTOR -ErrorAction SilentlyContinue }
+            if ($expectedDpr -gt 0) { $env:SWIRL_LAYOUT_EXPECTED_DPR = $expectedDpr.ToString('R', $culture) } else { Remove-Item Env:SWIRL_LAYOUT_EXPECTED_DPR -ErrorAction SilentlyContinue }
+            $process = $null
+            try {
+              $arguments = @('--activity-layout-test', '--preview-page=activity', '--preview-size=1013x672', ('--activity-layout-output="' + $output + '"'))
+              $process = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory $env:SWIRL_TEST_ROOT -PassThru
+              if (-not $process.WaitForExit(120000)) { throw 'Activity layout exceeded its existing 120-second CTest deadline.' }
+              if ($process.ExitCode -ne 0) { throw "Activity layout failed at scale factor $scaleFactor with exit code $($process.ExitCode)." }
+              if (-not (Test-Path -LiteralPath $reportPath -PathType Leaf)) { throw 'Activity layout did not produce a current report.' }
+              $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
+              if ($report.success -ne $true -or $report.failures -ne 0) { throw 'Activity layout reported failed checks.' }
+              return $report
+            } finally {
+              if ($null -ne $process) {
+                if (-not $process.HasExited) { $process.Kill(); $null = $process.WaitForExit(5000) }
+                $process.Dispose()
+              }
+              if (Test-Path -LiteralPath $diagnostic -PathType Leaf) { Copy-Item -LiteralPath $diagnostic -Destination (Join-Path $output 'qt-diagnostics.txt') }
+            }
+          }
+          $samples = @()
+          $matrixResult = 'failed'
+          $nativeDpr = 0.0
+          try {
+            if (-not (Test-Path -LiteralPath $baselinePath -PathType Leaf)) {
+              # Keep this gate active if a future UI-only scope omits the
+              # baseline from CTest; never interpret missing evidence as green.
+              $baseline = Invoke-ActivityLayout $root
+            } else { $baseline = Get-Content -LiteralPath $baselinePath -Raw | ConvertFrom-Json }
+            $nativeDpr = [double]$baseline.devicePixelRatio
+            if ($baseline.success -ne $true -or $baseline.failures -ne 0 -or $baseline.nativeD3D11 -ne $true -or $baseline.scaleFactorEnvironment -or -not [double]::IsFinite($nativeDpr) -or $nativeDpr -le 0) { throw 'The current native-DPR baseline is missing, scaled or unsuccessful.' }
+            foreach ($percent in @(100, 125, 150, 175, 200)) {
+              $target = $percent / 100.0
+              if ([Math]::Abs($nativeDpr - $target) -le 0.01) {
+                $report = $baseline
+                $factor = ''
+                $relativeReport = 'activity-layout-report.json'
+              } else {
+                $factor = ($target / $nativeDpr).ToString('R', $culture)
+                $output = Join-Path $root ('dpi-' + $percent)
+                $report = Invoke-ActivityLayout $output $factor $target
+                $relativeReport = 'dpi-' + $percent + '/activity-layout-report.json'
+              }
+              if ([Math]::Abs([double]$report.devicePixelRatio - $target) -gt 0.01 -or $report.nativeD3D11 -ne $true) { throw "The $percent percent layout did not run at the requested DPR and renderer." }
+              $samples += [ordered]@{ percent=$percent; expectedDpr=$target; actualDpr=$report.devicePixelRatio; qtScaleFactor=$factor; reusedNativeBaseline=($factor -eq ''); report=$relativeReport; passed=$true }
+            }
+            if ($samples.Count -ne 5) { throw 'The activity DPR matrix is incomplete.' }
+            $matrixResult = 'passed'
+          } finally {
+            [ordered]@{ source_sha=$env:GITHUB_SHA; nativeBaselineDpr=$nativeDpr; result=$matrixResult; samples=$samples; method='Actual QQuickWindow DPR, Win32 client and full RHI readback; unchanged five-card layout, ESC, interruption and resize checks using Qt scale-factor simulation. The test HWND may extend beyond the hosted desktop.'; physical_windows11_display_scaling='not-run'; cross_monitor_dpi='not-run'; physical_gpu_presentation='not-run' } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $root 'dpi-matrix.json') -Encoding utf8
+            $delivery = Get-Content -LiteralPath 'out/delivery.json' -Raw | ConvertFrom-Json
+            $delivery | Add-Member -NotePropertyName activity_dpr_simulation -NotePropertyValue $matrixResult -Force
+            $delivery | ConvertTo-Json | Set-Content -LiteralPath 'out/delivery.json' -Encoding utf8
+          }
+      - name: Preserve independent activity regression after an early UI failure
+        if: ${{ !cancelled() && failure() && (steps.critical_ui.outcome == 'failure' || steps.overview_input.outcome == 'failure') }}
+        shell: pwsh
+        run: |
+          # Diagnostic coverage only: the earlier failed UI check keeps this
+          # job failed. Successful runs retain their existing regression order.
+          # Run the registered drivers with their original environments and
+          # timeouts; do not repeat critical checks or write delivery success.
+          $junit = Join-Path $env:GITHUB_WORKSPACE 'build-evidence/activity-diagnostic-regression.xml'
+          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(activity-layout|activity-details|activity-perf-600|activity-perf-2000|window-shadow|policy-ui|liquid-glass)$" --output-on-failure --no-tests=error --output-junit $junit
+          $testExit = $LASTEXITCODE
+          if (-not (Test-Path -LiteralPath $junit -PathType Leaf)) { throw 'Independent activity JUnit evidence is missing.' }
+          if ($testExit -ne 0) { throw "Independent activity diagnostic regression failed ($testExit)." }
+      - name: Diagnose D3D11 queue latency after an early UI failure
+        if: ${{ !cancelled() && failure() && (steps.critical_ui.outcome == 'failure' || steps.overview_input.outcome == 'failure') }}
+        shell: pwsh
+        run: |
+          # Both isolated cold-cache cases retain every original Appearance
+          # assertion. Neither result replaces the failed critical gate.
+          ./scripts/Test-QtD3D11FrameLatency.ps1 `
+            -RepositoryRoot "$env:GITHUB_WORKSPACE" `
+            -RuntimeDirectory 'dist' `
+            -ReferenceExecutable 'build/swirl-quick/Release/Swirl.exe' `
+            -OutputDirectory 'build-evidence/d3d11-frame-latency' `
+            -ScratchRoot "$env:RUNNER_TEMP" `
+            -WorkflowSha "$env:GITHUB_SHA" `
+            -PullRequestHeadSha '${{ github.event.pull_request.head.sha }}'
       - name: Upload engine and scoped regression evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -463,6 +779,12 @@ jobs:
           path: |
             build/swirl-quick/Testing/Temporary/LastTest.log
             build-evidence/full-regression.xml
+            build-evidence/overview-input.log
+            build-evidence/ctest-inventory.json
+            build-evidence/activity-diagnostic-regression.xml
+            build/swirl-quick/connection-rows.xml
+            build/swirl-quick/swirl-telemetry-accounting.xml
+            build-evidence/d3d11-frame-latency/
             build/swirl-quick/engine-contract.txt
             build/swirl-quick/engine-real.txt
             build/swirl-quick/node-chain.txt
@@ -473,31 +795,33 @@ jobs:
             build/swirl-quick/Release/Swirl-appearance.txt
             build/swirl-quick/Release/Swirl-appearance-restore.txt
             build/swirl-quick/motion-report.json
+            build/swirl-quick/apec-*-report.json
+            build/swirl-quick/activity-details-report.json
+            build/swirl-quick/activity-perf-*-report.json
+            build/swirl-quick/activity-feather-*.png
+            build/swirl-quick/activity-data-*.png
+            build/swirl-quick/activity-layout/
+            build/swirl-quick/policy-evidence/
+            build/swirl-quick/liquid-glass-evidence/
+            build-evidence/production-ui/
             build/swirl-quick/hero-evidence/
             build/swirl-quick/navigation-evidence/
             build/swirl-quick/settings-material-evidence/
             build/swirl-quick/Release/Swirl-diagnostics.txt
             build/swirl-quick/Release/Swirl-node-ui-diagnostics.txt
             build/swirl-quick/Release/Swirl-motion-diagnostics.txt
+            build/swirl-quick/Release/Swirl-activity-*-diagnostics.txt
+            build/swirl-quick/Release/Swirl-apec-*-diagnostics.txt
+            build/swirl-quick/Release/Swirl-route-bench-diagnostics.txt
+            build/swirl-quick/Release/Swirl-u2-diagnostics.txt
+            build/swirl-quick/Release/Swirl-liquid-glass-diagnostics.txt
+            build/swirl-quick/Release/Swirl-6a-diagnostics.txt
+            build/swirl-quick/Release/Swirl-record-interactions-diagnostics.txt
+            build/swirl-quick/Release/Swirl-scroll-bench-diagnostics.txt
+            build/swirl-quick/Release/Swirl-policy-ui-diagnostics.txt
             build/swirl-quick/Release/Swirl-hero-diagnostics.txt
+            build/swirl-quick/Release/Swirl-hero-material-diagnostics.txt
           if-no-files-found: warn
-      - name: Save reusable compiler outputs
-        if: ${{ !cancelled() && steps.ui_build.outcome == 'success' && steps.build_cache.outputs.cache-hit != 'true' }}
-        shell: pwsh
-        run: |
-          . ./scripts/BuildInputTimes.ps1
-          Sync-SwirlBuildInputTimes -RepositoryRoot $env:GITHUB_WORKSPACE -BuildDirectory (Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick')
-      - name: Cache compiled Qt and Rust outputs
-        if: ${{ !cancelled() && steps.ui_build.outcome == 'success' && steps.build_cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            core/target
-            build/swirl-quick
-            build/swirl-product
-          key: ${{ steps.build_cache.outputs.cache-primary-key }}
       - name: Preserve SDK and exact-package identity evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

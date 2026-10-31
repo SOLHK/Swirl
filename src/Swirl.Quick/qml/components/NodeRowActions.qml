@@ -25,7 +25,7 @@ Item {
             iconName: actions.record.favorite ? "star-filled" : "star"
             Accessible.name: (actions.record.favorite ? qsTr("取消收藏 %1") : qsTr("收藏 %1")).arg(actions.record.name)
             Accessible.role: Accessible.CheckBox; Accessible.checked: !!actions.record.favorite
-            tooltip: Accessible.name; tooltipEnabled: !menu.visible
+            tooltip: Accessible.name
             onClicked: actions.favoriteRequested()
         }
         SubscriptionAction {
@@ -34,7 +34,7 @@ Item {
             Layout.preferredWidth: Theme.dp(44); Layout.fillHeight: true
             iconName: "ellipsis"
             Accessible.name: qsTr("%1 的更多操作").arg(actions.record.name)
-            tooltip: Accessible.name; tooltipEnabled: !menu.visible
+            tooltip: Accessible.name
             onClicked: actions.openMenu()
         }
     }

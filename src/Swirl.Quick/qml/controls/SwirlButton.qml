@@ -61,9 +61,5 @@ SwirlMotionButton {
         }
     }
     Accessible.name: text
-    SwirlToolTip {
-        parent:control
-        visible:(control.hovered || control.visualFocus) && label.truncated && !previewCaptureMode
-        text:label.text
-    }
+
 }

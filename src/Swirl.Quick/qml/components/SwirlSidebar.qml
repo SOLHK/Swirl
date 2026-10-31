@@ -61,11 +61,17 @@ Item {
  }
  property bool compactByWindow:false
  readonly property bool effectivelyCollapsed:AppState.sidebarCollapsed || compactByWindow
+ readonly property bool presenting:visible && (!Window.window || (Window.window.visible && Window.window.visibility!==Window.Minimized))
  readonly property real expansion:widthClock.progress
  readonly property real animatedWidth:Theme.sidebarCollapsedWidth+(Theme.sidebarWidth-Theme.sidebarCollapsedWidth)*expansion
  property bool initialized:false
  SwirlTransitionCoordinator {id:widthClock;progress:1;destination:1;duration:SwirlMotion.expandDuration}
- onEffectivelyCollapsedChanged:if(initialized)widthClock.moveTo(effectivelyCollapsed?0:1)
+ onEffectivelyCollapsedChanged:{
+  if(!initialized)return
+  widthClock.moveTo(effectivelyCollapsed?0:1)
+  if(!presenting)widthClock.finish()
+ }
+ onPresentingChanged:if(initialized && !presenting)widthClock.finish()
  Component.onCompleted:{widthClock.progress=effectivelyCollapsed?0:1;widthClock.destination=widthClock.progress;initialized=true}
  SwirlIconButton {
   objectName:"sidebarCollapseButton";x:sidebar.effectivelyCollapsed?Theme.dp(24):sidebar.width-width-Theme.dp(24);y:sidebar.effectivelyCollapsed?Theme.dp(57):Theme.dp(29)

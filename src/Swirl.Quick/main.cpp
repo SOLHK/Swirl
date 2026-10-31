@@ -12,6 +12,10 @@
 #include <QQmlApplicationEngine>
 #ifdef SWIRL_UI_TESTS
 #include <QQmlDebuggingEnabler>
+#include <QtQml/private/qqmlengine_p.h>
+#include <QtQuickTemplates2/private/qquickcontrol_p_p.h>
+#include <QJsonArray>
+#include <QSet>
 #endif
 #include <QQmlContext>
 #include <QQmlError>
@@ -71,10 +75,12 @@
 #include "tests/PolicyUiChecks.h"
 #include "tests/PolicySystemProxyBackend.h"
 #include "tests/MotionChecks.h"
+#include "tests/ActivityLayoutChecks.h"
 #include "tests/MaterialChecks.h"
 #include "tests/HeroChecks.h"
 #include "tests/NavigationChecks.h"
 #include "tests/AppearanceChecks.h"
+#include "tests/ActivityPerfTrace.h"
 #include <QSslSocket>
 #endif
 #include "app/SystemDataProvider.h"
@@ -87,6 +93,79 @@
 #include "network/GatewayService.h"
 #include "engine/ThreadedEngine.h"
 #include "engine/EngineController.h"
+
+#ifdef SWIRL_UI_TESTS
+class SwirlTestApplication final : public QGuiApplication {
+public:
+    using QGuiApplication::QGuiApplication;
+    bool notify(QObject *receiver,QEvent *event) override {
+        ActivityPerfTrace::DispatchScope dispatch(int(event->type()));
+        return QGuiApplication::notify(receiver,event);
+    }
+};
+
+static void recordQmlCreationLifecycle(QQmlApplicationEngine &engine, const char *phase)
+{
+    // The public controller counts incubators, while the engine also counts
+    // synchronous and Qt Controls deferred creation. Observe both without
+    // completing, cancelling or reading any deferred QML property.
+    auto *engineState=QQmlEnginePrivate::get(&engine);
+    const int inProgressBefore=engineState->inProgressCreations;
+    auto *controller=engine.incubationController();
+    QJsonArray pendingControls;
+    QSet<QObject *> visited;
+    QList<QObject *> pending=engine.rootObjects();
+    int controlCount=0;
+    int pendingControlCount=0;
+    constexpr int maximumObjects=8192;
+    constexpr int maximumReportedControls=128;
+    const auto flags=[](const QQuickUntypedDeferredPointer &pointer){
+        return QJsonObject{{"hasDeferredState",pointer.deferredState()!=nullptr},
+                           {"executing",pointer.isExecuting()},
+                           {"executed",pointer.wasExecuted()}};
+    };
+    while(!pending.isEmpty() && visited.size()<maximumObjects) {
+        auto *object=pending.takeLast();
+        if(!object || visited.contains(object))continue;
+        visited.insert(object);
+        for(auto *child:object->children())pending.append(child);
+        if(auto *item=qobject_cast<QQuickItem *>(object))
+            for(auto *child:item->childItems())pending.append(child);
+        if(auto *control=qobject_cast<QQuickControl *>(object)) {
+            ++controlCount;
+            auto *state=QQuickControlPrivate::get(control);
+            // These are raw deferred-pointer flags. Calling background() or
+            // contentItem(), including through QObject::property(), would
+            // itself create the objects this diagnostic is trying to locate.
+            if(!state->background.deferredState() && !state->contentItem.deferredState())continue;
+            ++pendingControlCount;
+            if(pendingControls.size()>=maximumReportedControls)continue;
+            auto *context=qmlContext(control);
+            pendingControls.append(QJsonObject{
+                {"objectName",control->objectName()},
+                {"type",QString::fromLatin1(control->metaObject()->className())},
+                {"parentName",control->parent()?control->parent()->objectName():QString()},
+                {"contextUrl",context?context->baseUrl().toString():QString()},
+                {"background",flags(state->background)},
+                {"contentItem",flags(state->contentItem)}});
+        }
+    }
+    qInfo().noquote()<<"QML_CREATION_LIFECYCLE"<<QJsonDocument(QJsonObject{
+        {"phase",QString::fromLatin1(phase)},
+        {"inProgressCreations",inProgressBefore},
+        {"inProgressAfterObservation",engineState->inProgressCreations},
+        {"controllerPresent",controller!=nullptr},
+        {"publicIncubators",controller?controller->incubatingObjectCount():0},
+        {"visitedObjects",static_cast<int>(visited.size())},
+        {"traversalTruncated",!pending.isEmpty()},
+        {"controls",controlCount},
+        {"pendingControlCount",pendingControlCount},
+        {"pendingControls",pendingControls},
+        {"pendingControlsTruncated",pendingControlCount>maximumReportedControls},
+        {"scope",QStringLiteral("Root QObject/visual trees; raw Control background/contentItem flags only. Other deferred properties and engine-owned singletons are not enumerated.")}
+    }).toJson(QJsonDocument::Compact);
+}
+#endif
 
 #ifdef Q_OS_WIN
 static void configureTaskbarIdentity(QQuickWindow *window)
@@ -145,6 +224,11 @@ int main(int argc, char *argv[])
     }
 #ifdef Q_OS_WIN
     SetCurrentProcessExplicitAppUserModelID(L"SOLHK.Swirl.Desktop");
+    // Keep at most one frame queued for this interactive desktop UI. Qt's
+    // D3D11 backend applies this before creating its waitable swapchain;
+    // vsync and double buffering remain enabled. Honour an explicit override.
+    if (!qEnvironmentVariableIsSet("QT_D3D_MAX_FRAME_LATENCY"))
+        qputenv("QT_D3D_MAX_FRAME_LATENCY", "1");
 #endif
     configureSwirlFontRendering();
     // Keep fractional Windows monitor scale factors (125%, 150%, 175%) intact;
@@ -152,7 +236,11 @@ int main(int argc, char *argv[])
     QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
     QQuickWindow::setDefaultAlphaBuffer(true);
     QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
+#ifdef SWIRL_UI_TESTS
+    SwirlTestApplication app(argc, argv);
+#else
     QGuiApplication app(argc, argv);
+#endif
     app.setApplicationName(QStringLiteral("Swirl"));
     app.setOrganizationName(QStringLiteral("SOLHK"));
     app.setOrganizationDomain(QStringLiteral("solhk.dev"));
@@ -197,6 +285,10 @@ int main(int argc, char *argv[])
     // Swirl draws its own visual controls, so explicitly use the customizable style.
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     const bool motionTest=app.arguments().contains("--motion-test");
+    const bool activityLayoutTest=app.arguments().contains("--activity-layout-test");
+#ifndef SWIRL_UI_TESTS
+    if(activityLayoutTest)return 4;
+#endif
 #ifdef SWIRL_UI_TESTS
     // Opt-in tracing in the isolated test executable only. No debugger in packages.
     if(motionTest && qEnvironmentVariableIsSet("SWIRL_QML_PROFILE")) {
@@ -247,7 +339,7 @@ int main(int argc, char *argv[])
 #ifdef SWIRL_UI_TESTS
     lifecycleTest=app.arguments().contains("--lifecycle-test");
 #endif
-    const bool isolatedRun=xrayUiTest||appearanceTest||lifecycleTest||realAcceptance||heroTest||navigationTest||radiusTest||nodeTest||policyTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
+    const bool isolatedRun=xrayUiTest||appearanceTest||lifecycleTest||realAcceptance||heroTest||navigationTest||radiusTest||nodeTest||policyTest||motionTest||activityLayoutTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
     SingleInstance instance;
     if(lifecycleTest || (!isolatedRun && !appearanceTest)) {
         const auto ownership=instance.acquire(lifecycleTest?QStringLiteral("isolated-lifecycle-test"):QStringLiteral("production"));
@@ -347,11 +439,32 @@ int main(int argc, char *argv[])
         qCritical()<<"Preview font unavailable:"<<previewFont;return 2;
     }
     const QString previewState = argumentValue(QStringLiteral("--preview-state="));
-    if (xrayUiTest || appearanceTest || heroTest || navigationTest || radiusTest || nodeTest || policyTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
+    if (xrayUiTest || appearanceTest || heroTest || navigationTest || radiusTest || nodeTest || policyTest || motionTest || activityLayoutTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
         if(uiQualityTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-ui-quality.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-ui-quality.txt");}
         if(appearanceTest){const QString file=app.arguments().contains("--appearance-restore-test")?"Swirl-appearance-restore.txt":"Swirl-appearance.txt";app.setProperty("qtDiagnosticFile",file);QFile::remove(QCoreApplication::applicationDirPath()+"/"+file);}
-        if(heroTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-hero-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-hero-diagnostics.txt");}
-        else if(motionTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-motion-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-motion-diagnostics.txt");}
+        if(heroTest){const QString file=app.arguments().contains("--hero-material-only")?"Swirl-hero-material-diagnostics.txt":"Swirl-hero-diagnostics.txt";app.setProperty("qtDiagnosticFile",file);QFile::remove(QCoreApplication::applicationDirPath()+"/"+file);}
+        else if(motionTest){
+            // Match runMotionChecks' existing dispatch order without letting
+            // a later mode overwrite an earlier mode's failure diagnostics.
+            QString file=QStringLiteral("Swirl-motion-diagnostics.txt");
+            if(qEnvironmentVariableIsSet("SWIRL_ACTIVITY_PERF_CHECKS")){
+                const int rows=qEnvironmentVariableIsSet("SWIRL_ACTIVITY_PERF_ROWS")?qEnvironmentVariableIntValue("SWIRL_ACTIVITY_PERF_ROWS"):600;
+                file=rows==600?QStringLiteral("Swirl-activity-perf-600-diagnostics.txt"):
+                     rows==2000?QStringLiteral("Swirl-activity-perf-2000-diagnostics.txt"):
+                                QStringLiteral("Swirl-activity-perf-invalid-diagnostics.txt");
+            }
+            else if(qEnvironmentVariableIsSet("SWIRL_ACTIVITY_DETAIL_CHECKS"))file=QStringLiteral("Swirl-activity-details-diagnostics.txt");
+            else if(qEnvironmentVariableIsSet("SWIRL_APEC_GLASS_CHECKS"))file=QStringLiteral("Swirl-apec-glass-diagnostics.txt");
+            else if(qEnvironmentVariableIsSet("SWIRL_APEC_MOTION_CHECKS"))file=QStringLiteral("Swirl-apec-motion-diagnostics.txt");
+            else if(qEnvironmentVariableIsSet("SWIRL_ROUTE_BENCH"))file=QStringLiteral("Swirl-route-bench-diagnostics.txt");
+            else if(qEnvironmentVariableIsSet("SWIRL_U2_CHECKS"))file=QStringLiteral("Swirl-u2-diagnostics.txt");
+            else if(qEnvironmentVariableIsSet("SWIRL_LIQUID_GLASS_CHECKS"))file=QStringLiteral("Swirl-liquid-glass-diagnostics.txt");
+            else if(qEnvironmentVariableIsSet("SWIRL_6A_CHECKS"))file=QStringLiteral("Swirl-6a-diagnostics.txt");
+            else if(qEnvironmentVariableIsSet("SWIRL_RECORD_INTERACTIONS"))file=QStringLiteral("Swirl-record-interactions-diagnostics.txt");
+            else if(qEnvironmentVariableIsSet("SWIRL_SCROLL_BENCH"))file=QStringLiteral("Swirl-scroll-bench-diagnostics.txt");
+            app.setProperty("qtDiagnosticFile",file);
+            QFile::remove(QCoreApplication::applicationDirPath()+"/"+file);
+        }
         if(nodeTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-node-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-node-ui-diagnostics.txt");}
         if(policyTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-policy-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-policy-ui-diagnostics.txt");}
         else if(interaction){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-input-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-input-diagnostics.txt");}
@@ -361,6 +474,14 @@ int main(int argc, char *argv[])
         qInstallMessageHandler(recordQtDiagnostic);
         qInfo()<<"Font rendering"<<qgetenv("QT_QPA_PLATFORM")<<fontManager.currentFamily()
                <<"NativeRendering / FullHinting";
+        if(smoke && fontReview) {
+            qInfo().noquote()<<"QML_CACHE_EVIDENCE"<<QJsonDocument(QJsonObject{
+                {"path",qEnvironmentVariable("QML_DISK_CACHE_PATH")},
+                {"revision",QStringLiteral(SWIRL_QML_CACHE_REVISION)},
+                {"flavor",qmlCacheFlavor},{"qtVersion",QString::fromLatin1(qVersion())},
+                {"diskCacheDisabledEnvironment",qEnvironmentVariable("QML_DISABLE_DISK_CACHE")}
+            }).toJson(QJsonDocument::Compact);
+        }
     }
     engine.rootContext()->setContextProperty("previewPage", previewPage);
     engine.rootContext()->setContextProperty("previewCaptureMode", previewMode && !interactivePreview);
@@ -382,9 +503,22 @@ int main(int argc, char *argv[])
     if(hdrTest)return runHdrChecks();
 #endif
     engine.loadFromModule("SwirlQuick", "Main");
+#ifdef SWIRL_UI_TESTS
+    recordQmlCreationLifecycle(engine,"after-main-load");
+#endif
     if (engine.rootObjects().isEmpty())
         return 1;
     auto *rootWindow = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
+#ifdef SWIRL_UI_TESTS
+    if(rootWindow && activityLayoutTest && qEnvironmentVariableIsSet("SWIRL_LAYOUT_EXPECTED_DPR")) {
+        // Reuse the existing render-only native viewport fixture before the
+        // first explicit preview resize. High-DPR cases keep their full HWND
+        // and swapchain even when the hosted desktop is smaller. The driver
+        // verifies Win32 client pixels and RHI readback; physical presentation
+        // remains a separate, unexecuted Windows 11 acceptance requirement.
+        rootWindow->setProperty("swirlViewportTest",true);
+    }
+#endif
     if(rootWindow){
         // Keep animated and antialiased damage inside this HWND. The native
         // outer shadow remains in its own window.
@@ -485,6 +619,10 @@ int main(int argc, char *argv[])
 #endif
 #ifdef SWIRL_UI_TESTS
     if(realAcceptance&&rootWindow)startRuntimeEvidence(rootWindow,&engineController,&systemData,&diagnostics,runtimeCommands,runtimeState);
+    if(activityLayoutTest) {
+        const auto output=argumentValue(QStringLiteral("--activity-layout-output="));
+        QTimer::singleShot(450,&app,[&app,rootWindow,output]{app.exit(runActivityLayoutChecks(rootWindow,output));});
+    }
 #endif
     hdrOutput.attach(rootWindow);
 #if defined(SWIRL_UI_TESTS) && defined(Q_OS_WIN)
@@ -770,11 +908,17 @@ int main(int argc, char *argv[])
             QTimer::singleShot(0, &app, &QCoreApplication::quit);
     }
     const int result = app.exec();
+#ifdef SWIRL_UI_TESTS
+    recordQmlCreationLifecycle(engine,"after-event-loop");
+#endif
     // Drain any lazy Qt Controls creation before the engine is destroyed.
     // This also keeps scripted page-navigation shutdown free of incubation warnings.
     if (auto *controller = engine.incubationController())
         controller->incubateFor(100);
-    const int finalResult=(xrayUiTest || heroTest || radiusTest || nodeTest || policyTest || motionTest || previewMode || engineTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
+#ifdef SWIRL_UI_TESTS
+    recordQmlCreationLifecycle(engine,"after-existing-incubation-drain");
+#endif
+    const int finalResult=(xrayUiTest || heroTest || radiusTest || nodeTest || policyTest || motionTest || activityLayoutTest || previewMode || engineTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
     if(xrayUiTest) {
         if(!xrayUiCompleted||xrayUiTimedOut)return finalResult==0?3:finalResult;
         if(finalResult==0)qInfo()<<"XRAY_UI_PASS";

@@ -6,6 +6,7 @@
 #include "engine/EngineController.h"
 #include <QColor>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QImage>
 #include <QJsonArray>
@@ -23,12 +24,13 @@
 #include <QTest>
 #include <QTimer>
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <memory>
 
 int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QString &directory) {
     if(!window||!controller)return 1;
-    QJsonArray checks,captures;int failures=0;
+    QJsonArray checks,captures;QJsonObject minimumDefaultPicker,minimumAdvancedFocus;int failures=0;
     const auto check=[&](bool passed,const QString &name){checks.append(QJsonObject{{"name",name},{"passed",passed}});if(!passed)++failures;qInfo()<<(passed?"PASS":"FAIL")<<name;return passed;};
     std::function<QQuickItem *(QQuickItem *,const QString &)> find;
     find=[&](QQuickItem *parent,const QString &name)->QQuickItem *{if(parent->objectName()==name&&parent->isVisible())return parent;for(auto *child:parent->childItems())if(auto *found=find(child,name))return found;return nullptr;};
@@ -70,7 +72,7 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     };
     const auto fill=[&](const QString &name,const QString &text){auto *field=item(name);if(!check(field!=nullptr,QStringLiteral("Field exists: ")+name))return false;if(!check(std::all_of(text.cbegin(),text.cend(),[](QChar character){return character.unicode()<128;}),QStringLiteral("Keyboard fixture contains only ASCII input")))return false;field->forceActiveFocus();QTest::qWait(45);QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);for(const auto character:text)QTest::keyClick(window,character.toLatin1());return true;};
     auto *proxyBackend=dynamic_cast<PolicySystemProxyBackend *>(controller->systemProxy()->backend());
-    const auto finish=[&]{controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->policyBusy();},10000),QStringLiteral("Owned runtime and transaction finish before cleanup"));if(proxyBackend)check(!proxyBackend->current().owned&&proxyBackend->current().systemEnabled,QStringLiteral("Cleanup preserves the isolated external proxy after releasing only Swirl ownership"));if(!directory.isEmpty()){QDir().mkpath(directory);QFile report(directory+"/policy-ui.json");if(!report.open(QIODevice::WriteOnly))return 3;const QJsonObject proxyEvidence{{"backend",proxyBackend?"per-instance-memory":"missing"},{"takeovers",proxyBackend?proxyBackend->takeoverCalls:0},{"restores",proxyBackend?proxyBackend->restoreCalls:0},{"last_port",proxyBackend?proxyBackend->lastPort:0},{"last_pid",proxyBackend?double(proxyBackend->lastPid):0}};report.write(QJsonDocument(QJsonObject{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"checks",checks},{"captures",captures},{"system_proxy",proxyEvidence},{"failures",failures},{"scope","Isolated real Qt input, committed policy receipts, Rust runtime and controlled loopback peers. System-proxy ownership uses a per-instance in-memory adapter. No private-provider, host proxy, TUN or DNS mutations."}}).toJson());}return failures?2:0;};
+    const auto finish=[&]{controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->policyBusy();},10000),QStringLiteral("Owned runtime and transaction finish before cleanup"));if(proxyBackend)check(!proxyBackend->current().owned&&proxyBackend->current().systemEnabled,QStringLiteral("Cleanup preserves the isolated external proxy after releasing only Swirl ownership"));if(!directory.isEmpty()){QDir().mkpath(directory);QFile report(directory+"/policy-ui.json");if(!report.open(QIODevice::WriteOnly))return 3;const QJsonObject proxyEvidence{{"backend",proxyBackend?"per-instance-memory":"missing"},{"takeovers",proxyBackend?proxyBackend->takeoverCalls:0},{"restores",proxyBackend?proxyBackend->restoreCalls:0},{"last_port",proxyBackend?proxyBackend->lastPort:0},{"last_pid",proxyBackend?double(proxyBackend->lastPid):0}};report.write(QJsonDocument(QJsonObject{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"checks",checks},{"captures",captures},{"minimum_default_picker",minimumDefaultPicker},{"minimum_advanced_focus",minimumAdvancedFocus},{"system_proxy",proxyEvidence},{"failures",failures},{"scope","Isolated real Qt input, committed policy receipts, Rust runtime and controlled loopback peers. System-proxy ownership uses a per-instance in-memory adapter. No private-provider, host proxy, TUN or DNS mutations."}}).toJson());}return failures?2:0;};
     if(!check(proxyBackend!=nullptr,QStringLiteral("Policy UI acceptance has a per-instance system-proxy adapter before any user action")))return finish();
     check(proxyBackend->current().systemEnabled&&!proxyBackend->current().owned&&!controller->processAlive(),QStringLiteral("An external proxy starts enabled while Swirl remains stopped and unowned"));
     eval("Theme.reduceMotion=false;Theme.followSystemMotion=false");
@@ -196,8 +198,48 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
         };
         if(choose)inspect(choose);
         const auto contained=[&](QQuickItem *child){return choose&&reachable(child)&&QRectF(QPointF(),choose->size()).adjusted(-0.5,-0.5,0.5,0.5).contains(child->mapRectToItem(choose,QRectF(QPointF(),child->size())));};
-        check(contained(hint)&&!hint->property("truncated").toBool()&&hint->width()+0.5>=hint->implicitWidth()
-              &&contained(chevron)&&chevron->width()>=eval("Theme.cardRadius").toReal(),QStringLiteral("Minimum-size default picker keeps its complete change-exit hint and clear downward arrow inside the clickable row"));
+        // cff01e6 specified a 16dp legibility floor for this 18dp icon.
+        // 39a1b91 accidentally replaced it with the unrelated card-corner token.
+        // Retain that floor and verify the accepted icon's exact square size.
+        const qreal minimumChevron=eval("Theme.dp(16)").toReal(),expectedChevron=eval("Theme.dp(18)").toReal();
+        const bool hintComplete=hint&&hint->property("text").toString()==QStringLiteral("更换出口");
+        const bool hintContained=contained(hint),hintUntruncated=hint&&!hint->property("truncated").toBool();
+        const bool hintWidthFits=hint&&hint->width()+0.5>=hint->implicitWidth();
+        const bool chevronContained=contained(chevron);
+        const bool chevronPointsDown=chevron&&qAbs(chevron->rotation()-90)<0.5;
+        const bool chevronLegible=chevron&&chevron->width()>=minimumChevron;
+        const bool chevronExactSize=chevron&&chevron->width()==expectedChevron&&chevron->height()==expectedChevron;
+        const auto rectEvidence=[](const QRectF &rect){return QJsonObject{{"x",rect.x()},{"y",rect.y()},{"width",rect.width()},{"height",rect.height()}};};
+        const auto geometryEvidence=[&](QQuickItem *candidate){
+            QJsonObject result{{"present",candidate!=nullptr}};
+            if(!candidate)return result;
+            const auto sceneRect=candidate->mapRectToScene(QRectF(QPointF(),candidate->size()));
+            qreal effectiveOpacity=1;QJsonArray ancestorClips;
+            for(auto *ancestor=candidate;ancestor;ancestor=ancestor->parentItem()){
+                effectiveOpacity*=ancestor->opacity();
+                if(ancestor->clip())ancestorClips.append(QJsonObject{{"objectName",ancestor->objectName()},
+                    {"sceneRect",rectEvidence(ancestor->mapRectToScene(QRectF(QPointF(),ancestor->size())))}});
+            }
+            result.insert("width",candidate->width());result.insert("height",candidate->height());
+            result.insert("implicitWidth",candidate->implicitWidth());result.insert("implicitHeight",candidate->implicitHeight());
+            result.insert("rotation",candidate->rotation());result.insert("scale",candidate->scale());
+            result.insert("visible",candidate->isVisible());result.insert("enabled",candidate->isEnabled());
+            result.insert("effectiveOpacity",effectiveOpacity);result.insert("reachable",reachable(candidate));
+            result.insert("sceneRect",rectEvidence(sceneRect));result.insert("ancestorClips",ancestorClips);
+            if(choose)result.insert("rowRect",rectEvidence(candidate->mapRectToItem(choose,QRectF(QPointF(),candidate->size()))));
+            return result;
+        };
+        auto hintEvidence=geometryEvidence(hint);
+        if(hint){hintEvidence.insert("text",hint->property("text").toString());hintEvidence.insert("truncated",hint->property("truncated").toBool());}
+        minimumDefaultPicker={{"windowWidth",window->width()},{"windowHeight",window->height()},{"dpr",window->devicePixelRatio()},
+            {"minimumChevronDp",minimumChevron},{"expectedChevronDp",expectedChevron},{"row",geometryEvidence(choose)},
+            {"hint",hintEvidence},{"chevron",geometryEvidence(chevron)},
+            {"conditions",QJsonObject{{"hintComplete",hintComplete},{"hintContained",hintContained},{"hintUntruncated",hintUntruncated},
+                {"hintWidthFits",hintWidthFits},{"chevronContained",chevronContained},{"chevronPointsDown",chevronPointsDown},
+                {"chevronLegible",chevronLegible},{"chevronExactSize",chevronExactSize}}}};
+        qInfo().noquote()<<"POLICY_MINIMUM_DEFAULT_PICKER"<<QJsonDocument(minimumDefaultPicker).toJson(QJsonDocument::Compact);
+        check(hintComplete&&hintContained&&hintUntruncated&&hintWidthFits&&chevronContained&&chevronPointsDown&&chevronLegible&&chevronExactSize,
+              QStringLiteral("Minimum-size default picker keeps its complete change-exit hint and clear downward arrow inside the clickable row"));
         QTest::mouseMove(window,QPoint(window->width()-10,10));QTest::qWait(150);
         auto *surface=choose?choose->property("background").value<QQuickItem *>():nullptr;
         check(choose&&!choose->property("hovered").toBool()&&surface&&surface->property("color").value<QColor>().alphaF()>0.95,
@@ -223,16 +265,51 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     if(!navigate("activity"))return finish();
     const auto activityKnotSettled=[&](bool active){
         auto *weave=item("activityCloudKnotWeave");
-        if(!weave||weave->property("active").toBool()!=active||weave->property("progress").toDouble()!=(active?1:0)||weave->property("moving").toBool())return false;
+        if(!weave||weave->property("active").toBool()!=active||weave->property("progress").toDouble()!=(active?1:0)
+            ||weave->property("release").toDouble()!=(active?0:1)||weave->property("moving").toBool()||weave->property("freeFlight").toBool())return false;
+        auto *target=weave->property("knotTarget").value<QQuickItem *>();
+        if(!target)return false;
+        // Whole feathers move between flight and resting visual parents. At
+        // either settled endpoint all five must return to this card's target,
+        // including the hidden objects that the visible-only finder omits.
+        QList<QQuickItem *> feathers;
+        std::function<void(QQuickItem *)> collect=[&](QQuickItem *parent){
+            for(auto *child:parent->childItems()){
+                if(child->objectName().startsWith("cloudFeather-"))feathers.append(child);
+                collect(child);
+            }
+        };
+        collect(target);
+        if(feathers.size()!=5)return false;
+        auto *frontLayer=weave->property("frontLayer").value<QQuickItem *>();
+        if(!frontLayer)return false;
+        QList<QQuickItem *> frontFeathers;
+        std::function<void(QQuickItem *)> collectFront=[&](QQuickItem *parent){
+            for(auto *child:parent->childItems()){
+                if(child->objectName().startsWith("cloudFeatherFront-"))frontFeathers.append(child);
+                collectFront(child);
+            }
+        };
+        collectFront(frontLayer);
+        if(frontFeathers.size()!=5)return false;
         for(const auto &key:QStringList{"warm","return","crown","forward","heart"}){
-            auto *strand=find(weave,"knotStrand-"+key);
-            if(!strand||strand->property("amount").toDouble()!=(active?1:0)||find(strand,"knotEntry-"+key))return false;
-            if(bool(find(strand,"knotRope-"+key))!=active)return false;
+            const auto matches=std::count_if(feathers.cbegin(),feathers.cend(),[&](QQuickItem *feather){
+                return feather->objectName()=="cloudFeather-"+key
+                    &&!feather->property("sourcePath").toString().isEmpty()&&!feather->property("targetPath").toString().isEmpty()
+                    &&feather->property("morphProgress").toDouble()==(active?1:0)
+                    &&feather->isVisible()==active&&feather->opacity()==(active?1:0);
+            });
+            if(matches!=1)return false;
+            if(std::count_if(frontFeathers.cbegin(),frontFeathers.cend(),[&](QQuickItem *feather){
+                return feather->objectName()=="cloudFeatherFront-"+key&&!feather->isVisible();
+            })!=1)return false;
         }
         return true;
     };
-    check(QTest::qWaitFor([&]{return activityKnotSettled(false);},1000),QStringLiteral("An external proxy leaves the Activity cloud knot inactive with all five ropes empty"));
-    check(item("proxyCapsule")&&item("proxyCapsule")->property("label").toString()==QStringLiteral("系统代理 · 外部"),QStringLiteral("Activity offers to start Swirl even when another proxy is already enabled"));
+    check(QTest::qWaitFor([&]{return activityKnotSettled(false);},1000),QStringLiteral("An external proxy leaves all five complete Activity feathers hidden, unmorphed and idle"));
+    check(item("proxyCapsule")&&item("proxyCapsule")->property("label").toString()==QStringLiteral("系统代理")
+        &&item("proxyCapsule")->property("detail").toString().contains(QStringLiteral("其他应用的系统代理已开启"))&&reachable(item("proxyCapsule")),
+        QStringLiteral("Activity keeps the complete proxy action and external ownership explanation available before starting Swirl"));
     {
         auto *value=item("activityInternetValue"),*unit=item("activityInternetUnit"),*caption=item("activityInternetCaption");
         const auto originalUnit=unit?unit->property("text").toString():QString();
@@ -253,11 +330,11 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
         check(overrides&&value&&unit&&caption,QStringLiteral("Temporary geometry-only metric fixture binds to the actual Activity text items"));
         const auto originalSize=window->size();window->resize(window->minimumWidth(),window->minimumHeight());QTest::qWait(180);
         check(sameBaseline(value,unit),QStringLiteral("Geometry fixture 176 and ms share an actual text baseline at minimum window size"));
-        auto *diagnostic=item("internetDiagnosticCard");
+        auto *diagnostic=item("activityDiagnosticCard");
         const auto bounds=caption&&diagnostic?caption->mapRectToItem(diagnostic,QRectF(QPointF(),caption->size())):QRectF();
         check(caption&&diagnostic&&QRectF(QPointF(),diagnostic->size()).adjusted(-0.5,-0.5,0.5,0.5).contains(bounds)
             &&caption->property("contentWidth").toReal()<=caption->width()+0.5&&!caption->property("truncated").toBool(),
-            QStringLiteral("Geometry-only INTERNET and Chinese caption wraps within the actual minimum-width diagnostic rail"));
+            QStringLiteral("Geometry-only INTERNET and Chinese caption wraps within the actual minimum-width diagnostic card"));
         capture("minimum-metric-geometry-fixture");if(overrides)overrides->setProperty("active",false);QTest::qWait(30);
         check(unit&&unit->property("text").toString()==originalUnit,QStringLiteral("Removing metric geometry fixtures restores the production text binding"));
         overrides.reset();
@@ -267,24 +344,44 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     auto *proxyLabel=proxyCapsule?find(proxyCapsule,"statusCapsuleLabel"):nullptr;
     auto *proxyGroup=proxyCapsule?find(proxyCapsule,"statusCapsuleContentGroup"):nullptr;
     auto *proxyContent=proxyCapsule?proxyCapsule->property("contentItem").value<QQuickItem *>():nullptr;
+    auto *proxyAccessory=proxyCapsule?find(proxyCapsule,"statusCapsuleAccessory"):nullptr;
+    QQuickItem *proxyIndicator=nullptr;
+    if(proxyAccessory)for(auto *child:proxyAccessory->childItems())if(child->property("color").isValid()){proxyIndicator=child;break;}
     const auto shellRect=[&]{return proxyCapsule?proxyCapsule->mapRectToScene(QRectF(QPointF(),proxyCapsule->size())):QRectF();};
     const auto centered=[&](QQuickItem *child){return child&&proxyCapsule&&QLineF(child->mapToScene(QPointF(child->width()/2,child->height()/2)),shellRect().center()).length()<0.5;};
-    check(centered(proxyLabel)&&proxyContent&&proxyContent->property("accessoryExtent").toReal()==0,
-          QStringLiteral("External proxy label is centered horizontally and vertically without an empty wing slot"));
+    const auto capsuleContentsFit=[&]{
+        if(!proxyCapsule||!proxyContent||!proxyGroup||!proxyLabel||!proxyIndicator)return false;
+        const auto expectedWidth=std::ceil(proxyGroup->implicitWidth()+proxyCapsule->property("leftPadding").toReal()+proxyCapsule->property("rightPadding").toReal());
+        return centered(proxyGroup)&&qAbs(proxyCapsule->width()-expectedWidth)<0.5
+            &&proxyLabel->width()+0.5>=proxyLabel->implicitWidth()&&!proxyLabel->property("truncated").toBool()
+            &&QRectF(QPointF(),proxyContent->size()).adjusted(-0.5,-0.5,0.5,0.5).contains(proxyGroup->mapRectToItem(proxyContent,QRectF(QPointF(),proxyGroup->size())))
+            &&qAbs(proxyIndicator->width()-proxyIndicator->height())<0.5&&qAbs(proxyIndicator->property("radius").toReal()-proxyIndicator->height()/2)<0.5;
+    };
+    const auto neutralIndicator=eval("Theme.muted").value<QColor>(),activeIndicator=eval("Theme.successText").value<QColor>();
+    const auto colorDistance=[](const QColor &first,const QColor &second){return std::max({qAbs(first.redF()-second.redF()),qAbs(first.greenF()-second.greenF()),qAbs(first.blueF()-second.blueF()),qAbs(first.alphaF()-second.alphaF())});};
+    const auto indicatorColor=[&]{return proxyIndicator?proxyIndicator->property("color").value<QColor>():QColor();};
+    check(capsuleContentsFit()&&colorDistance(indicatorColor(),neutralIndicator)<0.001,
+          QStringLiteral("External proxy status dot and complete label form one centered, contained toolbar group"));
     const auto stableProxyRect=shellRect();
-    const auto fullAccessory=proxyCapsule?proxyCapsule->property("accessoryWidth").toReal()+proxyCapsule->property("accessorySpacing").toReal():0;
-    bool shellStable=true,intermediateOpen=false,intermediateClose=false,smoothAccessory=true; qreal priorExtent=0;
+    const auto settledProxyGeometry=[&]{const auto current=shellRect();return QLineF(current.topLeft(),stableProxyRect.topLeft()).length()<0.5&&qAbs(current.width()-stableProxyRect.width())<0.5&&qAbs(current.height()-stableProxyRect.height())<0.5;};
+    const auto fullColorDistance=colorDistance(neutralIndicator,activeIndicator);
+    bool shellStable=true,intermediateOpen=false,intermediateClose=false,smoothIndicator=true,closingProxy=false;
+    auto priorIndicator=indicatorColor();
     QTimer capsuleSampler;
     QObject::connect(&capsuleSampler,&QTimer::timeout,window,[&]{
         const auto current=shellRect();
-        shellStable=shellStable&&QLineF(current.topLeft(),stableProxyRect.topLeft()).length()<0.5
-            &&qAbs(current.width()-stableProxyRect.width())<0.5&&qAbs(current.height()-stableProxyRect.height())<0.5;
-        const auto extent=proxyContent?proxyContent->property("accessoryExtent").toReal():0;
-        const bool intermediate=extent>0.01&&extent<fullAccessory-0.01;
-        intermediateOpen=intermediateOpen||(intermediate&&extent>priorExtent);
-        intermediateClose=intermediateClose||(intermediate&&extent<priorExtent);
-        smoothAccessory=smoothAccessory&&qAbs(extent-priorExtent)<fullAccessory-0.01;
-        priorExtent=extent;
+        // Busy text intentionally grows to explain the operation. It may use
+        // additional width to the left, but must not scale, move the trailing
+        // controls or change the shared toolbar height.
+        shellStable=shellStable&&QLineF(current.topRight(),stableProxyRect.topRight()).length()<0.5
+            &&qAbs(current.height()-stableProxyRect.height())<0.5&&proxyCapsule&&proxyCapsule->scale()==1
+            &&proxyCapsule->property("motionScale").toReal()==1&&centered(proxyGroup);
+        const auto color=indicatorColor();
+        const bool intermediate=colorDistance(color,neutralIndicator)>0.001&&colorDistance(color,activeIndicator)>0.001;
+        intermediateOpen=intermediateOpen||(!closingProxy&&intermediate);
+        intermediateClose=intermediateClose||(closingProxy&&intermediate);
+        smoothIndicator=smoothIndicator&&color.isValid()&&fullColorDistance>0.01&&colorDistance(color,priorIndicator)<fullColorDistance-0.001;
+        priorIndicator=color;
     });
     capsuleSampler.start(5);
     if(!click("proxyCapsule"))return finish();
@@ -292,12 +389,14 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     check(proxyBackend->takeoverCalls==1&&proxyBackend->lastPid==controller->processId().toLongLong()&&proxyBackend->lastPort>0,QStringLiteral("Activity takeover follows the healthy live Rust listener rather than a host proxy flag"));
     check(QTest::qWaitFor([&]{return eval("SwirlProxyWingMotion.active && SwirlProxyWingMotion.progress===1 && !SwirlProxyWingMotion.moving").toBool();},3000),QStringLiteral("Actual proxy ownership finishes the shared small-wing expansion"));
     check(QTest::qWaitFor([&]{return activityKnotSettled(true);},6000)
-        &&item("diagnosticProxyWing")&&item("diagnosticProxyWing")->property("progress").toDouble()==1,
-        QStringLiteral("Actual proxy ownership completes all five Activity knot ropes while diagnostics retain their shared small wing"));
+        &&item("activityRuntimeCapsule")&&item("activityRuntimeCapsule")->property("tone").toString()=="success"
+        &&item("activityRuntimeCapsule")->property("label").toString()==QStringLiteral("运行中"),
+        QStringLiteral("Actual proxy ownership completes all five whole feathers and agrees with the live Activity runtime status"));
     capsuleSampler.stop();
-    check(shellStable&&intermediateOpen&&smoothAccessory&&centered(proxyGroup)
-        &&proxyContent&&qAbs(proxyContent->property("accessoryExtent").toReal()-fullAccessory)<0.5,
-        QStringLiteral("Actual proxy startup keeps the capsule shell fixed and smoothly centers its wing and label as one group"));
+    check(shellStable&&intermediateOpen&&smoothIndicator&&capsuleContentsFit()&&settledProxyGeometry()
+        &&colorDistance(indicatorColor(),activeIndicator)<0.001&&proxyCapsule->property("label").toString()==QStringLiteral("系统代理")
+        &&proxyCapsule->property("detail").toString().contains(QStringLiteral("Swirl 已接管系统代理")),
+        QStringLiteral("Actual startup continuously colors the status dot, preserves toolbar geometry and exposes complete ownership details"));
     if(!navigate("policies"))return finish();
     check(item("policyOperationFlow")&&item("policyOperationFlow")->property("progress").toDouble()==1,QStringLiteral("Policy wing preserves the Activity proxy animation state"));
     const auto liveEpoch=controller->policyReceipt().value("engine_epoch").toString();
@@ -351,22 +450,71 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     check(QTest::qWaitFor([&]{return !popup("deletePolicyDialog");},4000),QStringLiteral("Cancelled deletion releases its modal grab before the connection control"));
     capture("populated-groups");
     if(!navigate("activity"))return finish();
-    priorExtent=proxyContent?proxyContent->property("accessoryExtent").toReal():0;capsuleSampler.start(5);
+    priorIndicator=indicatorColor();closingProxy=true;capsuleSampler.start(5);
     if(!click("proxyCapsule"))return finish();
     check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->systemProxy()->owned()&&!controller->systemProxyBusy();},10000),QStringLiteral("Activity master switch stops its owned Rust runtime and releases its proxy ownership"));
     check(proxyBackend->restoreCalls==1&&proxyBackend->current().systemEnabled&&!proxyBackend->current().owned,QStringLiteral("Stopping Swirl restores the pre-existing isolated external proxy instead of turning it off"));
     QTest::qWait(200);check(!controller->processAlive()&&!controller->systemProxy()->owned()&&proxyBackend->takeoverCalls==1,QStringLiteral("Queued event processing leaves Swirl stopped without a second proxy takeover"));
     check(QTest::qWaitFor([&]{return eval("!SwirlProxyWingMotion.active && SwirlProxyWingMotion.progress===0 && !SwirlProxyWingMotion.moving").toBool();},2000),QStringLiteral("Actual proxy shutdown fully retires the last small feather"));
-    check(QTest::qWaitFor([&]{return activityKnotSettled(false);},4500),QStringLiteral("Actual proxy shutdown withdraws every Activity knot rope and leaves the card empty"));
+    check(QTest::qWaitFor([&]{return activityKnotSettled(false);},4500),QStringLiteral("Actual proxy shutdown hides and resets all five complete Activity feathers without residual flight"));
     QTest::qWait(150);capsuleSampler.stop();
-    check(shellStable&&intermediateClose&&smoothAccessory&&centered(proxyLabel)&&proxyContent&&proxyContent->property("accessoryExtent").toReal()==0,
-          QStringLiteral("Actual shutdown restores centered external-proxy text through partial positions without moving or resizing the capsule"));
+    check(shellStable&&intermediateClose&&smoothIndicator&&capsuleContentsFit()&&settledProxyGeometry()
+        &&colorDistance(indicatorColor(),neutralIndicator)<0.001&&activityKnotSettled(false)
+        &&proxyCapsule->property("label").toString()==QStringLiteral("系统代理")
+        &&proxyCapsule->property("detail").toString().contains(QStringLiteral("其他应用的系统代理已开启")),
+          QStringLiteral("Actual shutdown continuously restores the neutral dot and centered external-proxy action, then remains idle"));
     capture("proxy-off-wing-hidden");
     if(!navigate("policies"))return finish();
     for(int strategy=1;strategy<=3;++strategy){
         click("addPolicyGroup");fill("policyGroupName",QString("Automatic fixture %1").arg(strategy));setCombo("policyGroupType",strategy);click("addPolicyGroupMember");chooseTarget("node",nodeA);click("policyGroupAdvanced");
         check(item("policyProbeFailureThreshold")&&item("policyProbeFailureThreshold")->property("text").toString()=="2",QStringLiteral("Advanced failure threshold exposes the core default"));
-        if(strategy==1){window->resize(window->minimumWidth(),window->minimumHeight());if(auto *field=item("policyProbeTolerance"))field->forceActiveFocus();QTest::qWait(120);check(reachable(item("policyProbeTolerance")),QStringLiteral("Keyboard focus reveals the last advanced field at minimum window size"));}
+        if(strategy==1){
+            const auto rectEvidence=[](const QRectF &rect){return QJsonObject{{"x",rect.x()},{"y",rect.y()},{"width",rect.width()},{"height",rect.height()}};};
+            const auto focusEvidence=[&]{
+                QJsonObject evidence{{"windowWidth",window->width()},{"windowHeight",window->height()},
+                    {"minimumWidth",window->minimumWidth()},{"minimumHeight",window->minimumHeight()},
+                    {"activeFocusName",window->activeFocusItem()?window->activeFocusItem()->objectName():QString()}};
+                auto *field=item("policyProbeTolerance");
+                evidence.insert("fieldPresent",field!=nullptr);
+                if(field){
+                    const auto center=field->mapToScene(QPointF(field->width()/2,field->height()/2));
+                    QJsonArray ancestors;qreal opacity=1;
+                    for(auto *ancestor=field;ancestor;ancestor=ancestor->parentItem()){
+                        const QRectF clipRect(ancestor->mapToScene(QPointF()),ancestor->size());
+                        opacity*=ancestor->opacity();
+                        ancestors.append(QJsonObject{{"objectName",ancestor->objectName()},
+                            {"type",QString::fromLatin1(ancestor->metaObject()->className())},{"clip",ancestor->clip()},
+                            {"opacity",ancestor->opacity()},{"sceneRect",rectEvidence(clipRect)},
+                            {"containsFieldCenter",clipRect.contains(center)}});
+                    }
+                    evidence.insert("field",QJsonObject{{"sceneRect",rectEvidence(QRectF(field->mapToScene(QPointF()),field->size()))},
+                        {"visible",field->isVisible()},{"enabled",field->isEnabled()},{"activeFocus",field->hasActiveFocus()},
+                        {"effectiveOpacity",opacity},{"sameWindow",field->window()==window},
+                        {"centerX",center.x()},{"centerY",center.y()},{"ancestors",ancestors}});
+                }
+                if(auto *form=item("policyGroupForm")){
+                    auto *viewport=qvariant_cast<QQuickItem *>(form->property("viewport"));
+                    auto *body=qvariant_cast<QQuickItem *>(form->property("formBody"));
+                    evidence.insert("form",QJsonObject{{"sceneRect",rectEvidence(QRectF(form->mapToScene(QPointF()),form->size()))},
+                        {"contentHeight",form->property("contentHeight").toReal()},{"availableHeight",form->property("availableHeight").toReal()},
+                        {"viewportPresent",viewport!=nullptr},{"viewportHeight",viewport?viewport->height():-1},
+                        {"contentY",viewport?viewport->property("contentY").toReal():-1},
+                        {"bodyPresent",body!=nullptr},{"bodyHeight",body?body->height():-1},{"bodyImplicitHeight",body?body->implicitHeight():-1}});
+                }
+                return evidence;
+            };
+            minimumAdvancedFocus.insert("beforeResize",focusEvidence());
+            window->resize(window->minimumWidth(),window->minimumHeight());
+            if(auto *field=item("policyProbeTolerance"))field->forceActiveFocus();
+            QElapsedTimer focusWait;focusWait.start();QTest::qWait(120);
+            const qreal actualWaitMs=focusWait.nsecsElapsed()/1000000.0;
+            const bool focusReachable=reachable(item("policyProbeTolerance"));
+            minimumAdvancedFocus.insert("afterWait",focusEvidence());
+            minimumAdvancedFocus.insert("requestedWaitMs",120);minimumAdvancedFocus.insert("actualWaitMs",actualWaitMs);
+            minimumAdvancedFocus.insert("reachable",focusReachable);
+            qInfo().noquote()<<"POLICY_MINIMUM_ADVANCED_FOCUS"<<QJsonDocument(minimumAdvancedFocus).toJson(QJsonDocument::Compact);
+            check(focusReachable,QStringLiteral("Keyboard focus reveals the last advanced field at minimum window size"));
+        }
         click("savePolicyGroup");awaitSaved(QStringLiteral("Automatic strategy and advanced values are saved offline"));
         const auto group=recordNamed(controller->strategyGroups(),QString("Automatic fixture %1").arg(strategy)),probe=group.value("probe").toMap();
         check(group.value("strategy")==QStringList{"manual","url_test","fallback","load_balance"}[strategy]&&probe.value("failure_threshold").toInt()==2&&probe.value("tolerance_ms").toInt()==(strategy==1?50:0),QStringLiteral("Committed strategy and probe values match the selected type"));
@@ -385,7 +533,11 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     if(!check(QTest::qWaitFor([&]{return item("activityOutboundMode")&&!host->property("moving").toBool();},5000),QStringLiteral("Activity mode is reachable after policy edits")))return finish();
     auto *activityMode=item("activityOutboundMode");
     auto *modeText=item("activityOutboundModeText");
-    check(modeText&&qAbs(activityMode->width()-modeText->implicitWidth()-eval("Theme.dp(24)").toReal())<=2,QStringLiteral("The mode value is one compact capsule without an adjacent button"));
+    auto *modeContent=activityMode->property("contentItem").value<QQuickItem *>();
+    check(modeText&&modeContent&&modeContent->childItems().size()==3&&reachable(activityMode)
+        &&qAbs(activityMode->width()-std::ceil(modeContent->implicitWidth())-activityMode->property("leftPadding").toReal()-activityMode->property("rightPadding").toReal())<0.5
+        &&qAbs(activityMode->height()-eval("Theme.toolbarHeight").toReal())<0.5,
+        QStringLiteral("The complete mode label, leading icon and menu indicator share one reachable toolbar control with common padding and height"));
     check(modeText&&modeText->width()+0.5>=modeText->implicitWidth()&&!modeText->property("truncated").toBool(),QStringLiteral("The complete mode name remains visible without style padding or elision"));
     const auto originalMode=controller->routingMode();
     check(activityMode->property("displayMode")==originalMode,QStringLiteral("Activity value starts from the controller's acknowledged mode"));
@@ -397,10 +549,10 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     }
     QTest::keyClick(window,Qt::Key_Escape);
     check(QTest::qWaitFor([&]{return !popup("activityOutboundModeMenu");},2000)&&activityMode->hasActiveFocus()&&controller->routingMode()==originalMode,QStringLiteral("Esc closes the mode menu, restores focus and changes no route"));
-    auto *modeSurface=item("activityOutboundModeSurface");
+    auto *modeSurface=activityMode->property("background").value<QQuickItem *>();
     check(modeSurface&&QQmlProperty(modeSurface,"border.width").read().toReal()==0
           &&qAbs(modeSurface->property("radius").toReal()-modeSurface->height()/2)<0.5,
-          QStringLiteral("Focused mode value keeps the event capsule shape without a blue frame"));
+          QStringLiteral("Focused mode value keeps the shared flat toolbar surface and pill curvature without a blue frame"));
     bool busyObserved=false,pendingValueStable=true;
     const auto modeObservation=QObject::connect(controller,&EngineController::policyChanged,window,[&]{
         if(controller->policyBusy()){busyObserved=true;pendingValueStable=pendingValueStable&&activityMode->property("displayMode")==originalMode;}
@@ -416,11 +568,13 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
     check(activityMode->property("displayMode")=="rule",QStringLiteral("Activity return choice follows the committed controller mode"));
     check(QTest::qWaitFor([&]{return !popup("activityOutboundModeMenu");},2000),QStringLiteral("Mode selection releases the menu before returning to the activity facts"));
     const auto cardRadius=eval("Theme.cardRadius").toReal();
-    auto *transfer=item("activityTrafficCard"),*diagnostics=item("internetDiagnosticCard");
+    auto *transfer=item("activityTrafficCard"),*diagnostics=item("activityDiagnosticCard");
     check(transfer&&qAbs(transfer->property("cornerRadius").toReal()-cardRadius)<0.5&&qAbs(transfer->property("radius").toReal()-cardRadius)<0.5,
           QStringLiteral("Activity transfer uses its independently sized content surface"));
-    check(diagnostics&&!diagnostics->property("independentCard").isValid(),QStringLiteral("Activity diagnostics remain an open reading rail"));
-    check(eval("Theme.dark || Theme.increaseContrast || (Theme.canvas.toString()==='#f7f7f8' && Theme.surface.toString()==='#ffffff' && Theme.text.toString()==='#202023')").toBool(),
+    check(diagnostics&&diagnostics->property("color").value<QColor>().alphaF()==1
+        &&qAbs(diagnostics->property("cornerRadius").toReal()-cardRadius)<0.5&&qAbs(diagnostics->property("radius").toReal()-cardRadius)<0.5,
+        QStringLiteral("Activity diagnostics retain an opaque independent card with the shared five-card curvature"));
+    check(eval("Theme.dark || Theme.increaseContrast || (Theme.canvas.toString()==='#f7f7f7' && Theme.surface.toString()==='#ffffff' && Theme.text.toString()==='#202023')").toBool(),
           QStringLiteral("Light mode uses the shared neutral white canvas and readable card palette"));
     QTest::qWait(200);
     if(!directory.isEmpty())window->grabWindow().save(directory+"/activity-mode.png");
@@ -440,7 +594,7 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
         }
         controller->setSystemProxy(false);
         check(QTest::qWaitFor([&]{return !controller->processAlive()&&!controller->systemProxyBusy()&&eval("SwirlProxyWingMotion.progress===0 && !SwirlProxyWingMotion.moving").toBool();},10000),QStringLiteral("Rapid repeated reversal settles closed without a stuck animation"));
-        check(QTest::qWaitFor([&]{return activityKnotSettled(false);},4500),QStringLiteral("Rapid actual proxy reversal finishes with every Activity knot rope withdrawn"));
+        check(QTest::qWaitFor([&]{return activityKnotSettled(false);},4500),QStringLiteral("Rapid actual proxy reversal resets all five whole Activity feathers and stops their animation"));
         capture("rapid-proxy-final-wing-hidden");
     }
     return finish();

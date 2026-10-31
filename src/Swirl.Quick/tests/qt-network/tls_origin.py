@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import queue
+import select
 import socket
 import ssl
 import sys
@@ -20,6 +21,7 @@ import threading
 
 
 def prepare(directory):
+    import cryptography
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
@@ -66,6 +68,13 @@ def prepare(directory):
         key_path.chmod(0o600)
     print(json.dumps({"event": "prepared", "tls": ssl.OPENSSL_VERSION, "leaf_days": 2,
                       "ca_sha256": ca.fingerprint(hashes.SHA256()).hex(),
+                      "leaf_sha256": leaf.fingerprint(hashes.SHA256()).hex(),
+                      "prepared_utc": now.isoformat(), "python": sys.version.split()[0],
+                      "cryptography": cryptography.__version__,
+                      "ca_not_before_utc": ca.not_valid_before_utc.isoformat(),
+                      "ca_not_after_utc": ca.not_valid_after_utc.isoformat(),
+                      "leaf_not_before_utc": leaf.not_valid_before_utc.isoformat(),
+                      "leaf_not_after_utc": leaf.not_valid_after_utc.isoformat(),
                       "chain_certificates": 2}), flush=True)
 
 
@@ -76,10 +85,28 @@ def serve(directory):
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(directory / "leaf-chain.pem", directory / "leaf-key.pem")
     context.set_alpn_protocols(["h2", "http/1.1"])
-    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    listener.bind(("127.0.0.1", 0))
-    listener.listen(8)
-    listener.settimeout(0.2)
+    # The advertised TLS hostname is localhost, whose native resolution may
+    # prefer either loopback family. Serve both on the same port without ever
+    # listening on a wildcard address or depending on client fallback behavior.
+    listeners = []
+    port = 0
+    try:
+        for family, address in ((socket.AF_INET, "127.0.0.1"), (socket.AF_INET6, "::1")):
+            listener = socket.socket(family, socket.SOCK_STREAM)
+            listeners.append(listener)
+            if family == socket.AF_INET6:
+                listener.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+            listener.bind((address, port))
+            port = listener.getsockname()[1]
+            listener.listen(8)
+            listener.settimeout(0.2)
+        resolved = sorted({(family.name, address[0]) for family, _, _, _, address in
+                           socket.getaddrinfo("localhost", port, type=socket.SOCK_STREAM,
+                                              proto=socket.IPPROTO_TCP)})
+    except Exception:
+        for listener in listeners:
+            listener.close()
+        raise
     stopping = threading.Event()
     output_lock, state_lock = threading.Lock(), threading.Lock()
     responses = {}
@@ -91,13 +118,24 @@ def serve(directory):
 
     def connection(raw, identifier):
         tls = None
+        stage = "accepted"
         try:
+            addresses = {}
+            for name, reader in (("local", raw.getsockname), ("peer", raw.getpeername)):
+                try:
+                    addresses[name] = list(reader())
+                except OSError as error:
+                    addresses[name + "_observation_error"] = str(error)
+            emit("accepted", id=identifier, **addresses,
+                 observed_utc=datetime.now(timezone.utc).isoformat())
             raw.settimeout(5)
+            stage = "tls-handshake"
             tls = context.wrap_socket(raw, server_side=True)
             protocol = tls.selected_alpn_protocol() or ""
             emit("protocol", id=identifier, value=protocol)
             if protocol == "h2":
                 return
+            stage = "http-request-headers"
             headers = bytearray()
             while b"\r\n\r\n" not in headers:
                 data = tls.recv(4096)
@@ -111,6 +149,7 @@ def serve(directory):
             with state_lock:
                 responses[identifier] = pending
             emit("request", id=identifier, headers=base64.b64encode(headers).decode("ascii"))
+            stage = "awaiting-fixture-response"
             response = pending.get(timeout=10)
             if response.get("hanging"):
                 tls.settimeout(0.2)
@@ -121,6 +160,7 @@ def serve(directory):
                     except socket.timeout:
                         continue
             else:
+                stage = "http-response"
                 body = base64.b64decode(response["body"], validate=True)
                 location = response.get("location", "").encode("ascii")
                 if b"\r" in location or b"\n" in location:
@@ -131,7 +171,8 @@ def serve(directory):
                 wire += b"Content-Type: application/yaml\r\nConnection: close\r\nContent-Length: "
                 tls.sendall(wire + str(len(body)).encode("ascii") + b"\r\n\r\n" + body)
         except (OSError, RuntimeError, ValueError, queue.Empty) as error:
-            emit("error", id=identifier, message=f"{type(error).__name__}: {error}")
+            emit("error", id=identifier, message=f"{type(error).__name__}: {error}", stage=stage,
+                 observed_utc=datetime.now(timezone.utc).isoformat())
         finally:
             with state_lock:
                 responses.pop(identifier, None)
@@ -145,19 +186,33 @@ def serve(directory):
         identifier = 0
         while not stopping.is_set():
             try:
-                raw, _ = listener.accept()
-            except socket.timeout:
-                continue
-            except OSError:
-                break
-            identifier += 1
-            worker = threading.Thread(target=connection, args=(raw, identifier), daemon=True)
-            workers.append(worker)
-            worker.start()
+                readable, _, _ = select.select(listeners, [], [], 0.2)
+            except (OSError, ValueError):
+                if stopping.is_set():
+                    break
+                raise
+            for listener in readable:
+                try:
+                    raw, _ = listener.accept()
+                except socket.timeout:
+                    continue
+                except OSError:
+                    if stopping.is_set():
+                        return
+                    raise
+                identifier += 1
+                worker = threading.Thread(target=connection, args=(raw, identifier), daemon=True)
+                workers.append(worker)
+                worker.start()
 
     accept_thread = threading.Thread(target=accept, daemon=True)
     accept_thread.start()
-    emit("ready", port=listener.getsockname()[1], tls=ssl.OPENSSL_VERSION)
+    emit("ready", port=port, tls=ssl.OPENSSL_VERSION,
+         listeners=[{"bound": list(listener.getsockname()), "family": listener.family.name}
+                    for listener in listeners],
+         localhost_resolution=[{"family": family, "address": address} for family, address in resolved],
+         python=sys.version.split()[0],
+         executable=sys.executable, observed_utc=datetime.now(timezone.utc).isoformat())
     try:
         for line in sys.stdin:
             message = json.loads(line)
@@ -170,7 +225,8 @@ def serve(directory):
             pending.put_nowait(message)
     finally:
         stopping.set()
-        listener.close()
+        for listener in listeners:
+            listener.close()
         accept_thread.join(timeout=1)
         with state_lock:
             pending_responses = list(responses.values())

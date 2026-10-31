@@ -12,12 +12,14 @@
 class TelemetryService final : public QObject {
  Q_OBJECT
  Q_PROPERTY(int revision READ revision NOTIFY changed)
+ Q_PROPERTY(quint64 connectionRevision READ connectionRevision NOTIFY changed)
  Q_PROPERTY(bool sampled READ sampled NOTIFY changed)
  Q_PROPERTY(bool connectionsSampled READ connectionsSampled NOTIFY changed)
  Q_PROPERTY(double downloadRate READ downloadRate NOTIFY changed)
  Q_PROPERTY(double uploadRate READ uploadRate NOTIFY changed)
  Q_PROPERTY(int activeConnections READ activeConnections NOTIFY changed)
  Q_PROPERTY(int activeProcesses READ activeProcesses NOTIFY changed)
+ Q_PROPERTY(int activeDevices READ activeDevices NOTIFY changed)
  Q_PROPERTY(QVariantList connections READ connections NOTIFY changed)
  Q_PROPERTY(QVariantMap latencies READ latencies NOTIFY changed)
  Q_PROPERTY(QString externalIp READ externalIp NOTIFY changed)
@@ -31,13 +33,18 @@ public:
  void ingest(const ProxyEngine::Status &);
  void rejectNativeProbe(quint64 tag,const QString &code);
  int revision() const { return m_revision; }
+ quint64 connectionRevision() const { return m_connectionRevision; }
  bool sampled() const;
  bool connectionsSampled() const;
  double downloadRate() const { return m_status.downloadRate; }
  double uploadRate() const { return m_status.uploadRate; }
  int activeConnections() const;
  int activeProcesses() const;
+ int activeDevices() const;
  QVariantList connections() const;
+ // Method return values own their QML sequence data; property references can
+ // otherwise refresh nested route maps inside an already retained JS snapshot.
+ Q_INVOKABLE QVariantList connectionSnapshot() const { return connections(); }
  QVariantMap latencies() const { return m_latencies; }
  QString externalIp() const { return m_externalIp; }
  QString measurementState() const { return m_measurementState; }
@@ -45,6 +52,7 @@ public:
  QVariantMap proxyDiagnostic() const { return m_proxyDiagnostic; }
  QString storageError() const { return m_storageError; }
  Q_INVOKABLE QVariantMap summary(int period=0) const;
+ // A zero limit exposes every recorded source to the virtualized detail view.
  Q_INVOKABLE QVariantList ranking(const QString &kind,int period=0,int limit=50,bool proxyOnly=false) const;
  Q_INVOKABLE bool proxyRankingAvailable(int period=0) const;
  Q_INVOKABLE QVariantList distribution(int period=0) const;
@@ -73,6 +81,7 @@ private:
  void finishMeasurement(quint64 generation);
  QString m_path,m_epoch,m_routeEpoch,m_storageError,m_externalIp,m_measurementState;
  int m_revision=0,m_measurements=0;
+ quint64 m_connectionRevision=0;
  bool m_networkEnabled=true,m_dirty=false;
  bool m_publishedSampled=false,m_publishedConnectionsSampled=false;
  qint64 m_lastConnections=0,m_lastTraffic=0,m_lastUp=0,m_lastDown=0;

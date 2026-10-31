@@ -15,6 +15,11 @@
 #include <QImage>
 #include <QElapsedTimer>
 #include <QQuickItem>
+#include <QSignalSpy>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <functional>
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -22,8 +27,130 @@
 #include <psapi.h>
 #endif
 
+#ifdef Q_OS_WIN
+static int runNativeWindowMoveChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QString &directory)
+{
+    QJsonArray checks, samples;
+    int failures=0;
+    const auto check=[&](const QString &name,bool passed){checks.append(QJsonObject{{"name",name},{"passed",passed}});if(!passed)++failures;qInfo()<<"NATIVE_MOVE_CHECK"<<name<<passed;};
+    const auto visibleRoot=[](HWND handle){DWORD cloaked=0;return IsWindowVisible(handle)&&SUCCEEDED(DwmGetWindowAttribute(handle,DWMWA_CLOAKED,&cloaked,sizeof(cloaked)))&&!cloaked;};
+    const auto rectJson=[](const RECT &rect){return QJsonObject{{"left",int(rect.left)},{"top",int(rect.top)},{"right",int(rect.right)},{"bottom",int(rect.bottom)}};};
+    const auto offsets=[](const RECT &rect,const RECT &root){return RECT{rect.left-root.left,rect.top-root.top,rect.right-root.right,rect.bottom-root.bottom};};
+    const auto drift=[](const RECT &actual,const RECT &expected){return qMax(qMax(qAbs(actual.left-expected.left),qAbs(actual.top-expected.top)),qMax(qAbs(actual.right-expected.right),qAbs(actual.bottom-expected.bottom)));};
+    const auto equal=[](const RECT &a,const RECT &b){return a.left==b.left&&a.top==b.top&&a.right==b.right&&a.bottom==b.bottom;};
+    window->showNormal();
+    const HWND root=reinterpret_cast<HWND>(window->winId());
+    QSignalSpy frames(window,&QQuickWindow::frameSwapped);
+    ShowWindow(root,SW_SHOWNORMAL);window->requestActivate();window->update();
+    const bool ready=QTest::qWaitFor([&]{return !frames.isEmpty()&&visibleRoot(root)
+        &&IsWindowVisible(reinterpret_cast<HWND>(backdrop->materialWindowHandle()))
+        &&IsWindowVisible(reinterpret_cast<HWND>(backdrop->compatibilityShadowHandle()));},5000);
+    QTest::qWait(100);
+    const HWND material=reinterpret_cast<HWND>(backdrop->materialWindowHandle());
+    const HWND shadow=reinterpret_cast<HWND>(backdrop->compatibilityShadowHandle());
+    const auto normalRoot=[&]{return visibleRoot(root)&&!IsIconic(root)&&!IsZoomed(root)&&!(GetWindowLongPtrW(root,GWL_EXSTYLE)&WS_EX_TOPMOST);};
+    check("initial-native-frame-presented",!frames.isEmpty());
+    check("initial-root-visible-uncloaked-normal-and-not-topmost",normalRoot());
+    check("initial-material-and-shadow-native-windows-visible",material&&shadow&&IsWindowVisible(material)&&IsWindowVisible(shadow));
+    RECT initialRoot{},initialMaterial{},initialShadow{};
+    const bool initialBounds=GetWindowRect(root,&initialRoot)&&GetWindowRect(material,&initialMaterial)&&GetWindowRect(shadow,&initialShadow);
+    check("initial-three-native-window-bounds-known",initialBounds);
+    const auto materialOffset=offsets(initialMaterial,initialRoot),shadowOffset=offsets(initialShadow,initialRoot);
+    check("initial-native-material-inset-within-shell",initialBounds&&materialOffset.left>0&&materialOffset.top>0&&materialOffset.right<0&&materialOffset.bottom<0);
+    check("initial-native-shadow-envelope-outside-shell",initialBounds&&shadowOffset.left<0&&shadowOffset.top<0&&shadowOffset.right>0&&shadowOffset.bottom>0);
+    const auto buildsBefore=backdrop->compatibilityShadowBuildCount();
+    const auto initialStyle=GetWindowLongPtrW(root,GWL_EXSTYLE);
+    MONITORINFO monitor{sizeof(MONITORINFO)};
+    const bool monitorKnown=GetMonitorInfoW(MonitorFromWindow(root,MONITOR_DEFAULTTONEAREST),&monitor);
+    const LONG width=initialRoot.right-initialRoot.left,height=initialRoot.bottom-initialRoot.top;
+    const LONG minimumX=monitorKnown?monitor.rcWork.left:initialRoot.left-100;
+    const LONG minimumY=monitorKnown?monitor.rcWork.top:initialRoot.top-100;
+    const LONG maximumX=monitorKnown?qMax(minimumX,monitor.rcWork.right-width):initialRoot.left+100;
+    const LONG maximumY=monitorKnown?qMax(minimumY,monitor.rcWork.bottom-height):initialRoot.top+100;
+    LONG maximumMaterialDrift=0,maximumShadowDrift=0;
+    bool everyMove=true,everyBounds=true,everySize=true,everyVisible=true;
+    int movedSamples=0;
+    RECT previousRoot=initialRoot;
+    QElapsedTimer burst;burst.start();
+    if(initialBounds&&material&&shadow)for(int index=0;index<64;++index){
+        LONG targetX=qBound(minimumX,initialRoot.left+(index%2?1:-1)*(24+(index*17)%80),maximumX);
+        LONG targetY=qBound(minimumY,initialRoot.top+(index%3?1:-1)*(12+(index*11)%48),maximumY);
+        if(targetX==previousRoot.left&&targetY==previousRoot.top){
+            targetX=previousRoot.left==minimumX?maximumX:minimumX;
+            if(targetX==previousRoot.left)targetY=previousRoot.top==minimumY?maximumY:minimumY;
+        }
+        const bool moved=SetWindowPos(root,nullptr,targetX,targetY,0,0,SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOOWNERZORDER);
+        // Read all native rectangles before any Qt event pumping or wait. The
+        // deferred helper update is deliberately not allowed to catch up here.
+        RECT shellRect{},materialRect{},shadowRect{};
+        const bool known=GetWindowRect(root,&shellRect)&&GetWindowRect(material,&materialRect)&&GetWindowRect(shadow,&shadowRect);
+        const auto currentMaterial=offsets(materialRect,shellRect),currentShadow=offsets(shadowRect,shellRect);
+        const auto materialDrift=drift(currentMaterial,materialOffset),shadowDrift=drift(currentShadow,shadowOffset);
+        const bool helpersVisible=IsWindowVisible(material)&&IsWindowVisible(shadow)&&normalRoot();
+        const bool sameSize=shellRect.right-shellRect.left==width&&shellRect.bottom-shellRect.top==height
+            &&materialRect.right-materialRect.left==initialMaterial.right-initialMaterial.left
+            &&materialRect.bottom-materialRect.top==initialMaterial.bottom-initialMaterial.top
+            &&shadowRect.right-shadowRect.left==initialShadow.right-initialShadow.left
+            &&shadowRect.bottom-shadowRect.top==initialShadow.bottom-initialShadow.top;
+        everyMove=everyMove&&moved;everyBounds=everyBounds&&known;everySize=everySize&&sameSize;everyVisible=everyVisible&&helpersVisible;
+        movedSamples+=known&&(shellRect.left!=previousRoot.left||shellRect.top!=previousRoot.top);
+        previousRoot=shellRect;
+        maximumMaterialDrift=qMax(maximumMaterialDrift,materialDrift);maximumShadowDrift=qMax(maximumShadowDrift,shadowDrift);
+        samples.append(QJsonObject{{"index",index},{"setWindowPosSucceeded",moved},{"boundsKnown",known},{"root",rectJson(shellRect)},
+            {"material",rectJson(materialRect)},{"shadow",rectJson(shadowRect)},
+            {"materialOffset",rectJson(currentMaterial)},{"shadowOffset",rectJson(currentShadow)},
+            {"materialDriftPx",int(materialDrift)},{"shadowDriftPx",int(shadowDrift)},{"allVisibleNormal",helpersVisible},{"sameSizes",sameSize}});
+    }
+    const auto elapsedNs=burst.nsecsElapsed();
+    const auto buildsAfter=backdrop->compatibilityShadowBuildCount();
+    check("all-64-immediate-native-samples-recorded",samples.size()==64);
+    check("all-native-move-calls-succeeded",everyMove&&samples.size()==64);
+    check("all-native-helper-bounds-readable",everyBounds&&samples.size()==64);
+    check("trace-exercises-64-nontrivial-native-moves",movedSamples==64);
+    check("move-only-burst-preserves-shell-and-helper-sizes",everySize&&samples.size()==64);
+    check("shell-and-both-helpers-stay-visible-normal-through-burst",everyVisible&&samples.size()==64);
+    check("material-follows-shell-synchronously-with-zero-native-drift",samples.size()==64&&maximumMaterialDrift==0);
+    check("shadow-follows-shell-synchronously-with-zero-native-drift",samples.size()==64&&maximumShadowDrift==0);
+    check("move-only-burst-does-not-rebuild-cached-shadow-pixels",buildsAfter==buildsBefore);
+    const bool restored=SetWindowPos(root,nullptr,initialRoot.left,initialRoot.top,0,0,SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOOWNERZORDER);
+    check("initial-native-position-restoration-call-succeeded",restored);
+    QTest::qWait(150);
+    RECT restoredRoot{},restoredMaterial{},restoredShadow{};
+    const bool restoredBounds=GetWindowRect(root,&restoredRoot)&&GetWindowRect(material,&restoredMaterial)&&GetWindowRect(shadow,&restoredShadow);
+    check("initial-native-root-rectangle-restored",restoredBounds&&equal(restoredRoot,initialRoot));
+    check("helpers-aligned-after-restoration-and-event-drain",restoredBounds&&equal(offsets(restoredMaterial,restoredRoot),materialOffset)&&equal(offsets(restoredShadow,restoredRoot),shadowOffset));
+    check("restored-shell-remains-visible-uncloaked-normal-not-topmost",normalRoot()&&GetWindowLongPtrW(root,GWL_EXSTYLE)==initialStyle);
+    QDir().mkpath(directory);
+    const QJsonObject report{{"checks",checks},{"failures",failures},{"mode","Normal"},{"qt",qVersion()},
+        {"dpr",window->devicePixelRatio()},{"renderer",int(window->rendererInterface()->graphicsApi())},{"initialReadyWithinDeadline",ready},
+        {"rootHandle",QString::number(quintptr(root))},{"materialHandle",QString::number(quintptr(material))},{"shadowHandle",QString::number(quintptr(shadow))},
+        {"initialRoot",rectJson(initialRoot)},{"initialMaterial",rectJson(initialMaterial)},{"initialShadow",rectJson(initialShadow)},
+        {"initialMaterialOffset",rectJson(materialOffset)},{"initialShadowOffset",rectJson(shadowOffset)},
+        {"maxMaterialDriftPx",int(maximumMaterialDrift)},{"maxShadowDriftPx",int(maximumShadowDrift)},
+        {"shadowBuildsBefore",qint64(buildsBefore)},{"shadowBuildsAfter",qint64(buildsAfter)},
+        {"burstElapsedNs",elapsedNs},{"samples",samples},
+        {"methods",QJsonArray{"Ordinary normal native HWND; no capture fixture or topmost promotion.",
+            "64 move-only SetWindowPos calls; every helper GetWindowRect sample is taken immediately before any Qt event pumping or wait.",
+            "Offsets and maximum drift use physical native window rectangles, not delayed QWindow geometry.",
+            "Native rectangle alignment proves synchronous positioning at API return; it is not compositor-pixel or hardware-presentation proof.",
+            "Original rectangle is restored and queued events drain only after the move burst."}}};
+    QFile output(QDir(directory).filePath("native-move.json"));
+    const auto bytes=QJsonDocument(report).toJson(QJsonDocument::Indented);
+    if(!output.open(QIODevice::WriteOnly)||output.write(bytes)!=bytes.size()){qCritical()<<"Cannot write native move report"<<output.errorString();return 2;}
+    qInfo()<<"NATIVE_MOVE_CHECKS"<<checks.size()<<"checks"<<failures<<"failures"<<"material drift"<<maximumMaterialDrift<<"shadow drift"<<maximumShadowDrift;
+    return failures?1:0;
+}
+#endif
+
 int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QString &directory)
 {
+    if(qEnvironmentVariableIsSet("SWIRL_WINDOW_MOVE_CHECKS")){
+#ifdef Q_OS_WIN
+        return runNativeWindowMoveChecks(window,backdrop,directory);
+#else
+        qCritical()<<"Native move checks require Windows";return 3;
+#endif
+    }
     qInfo()<<"WINDOW_RENDER_DPR"<<window->devicePixelRatio()<<"graphics_api"<<window->rendererInterface()->graphicsApi();
     int failures=0,checks=0;
     const auto check=[&](bool ok,const char *name){++checks;if(!ok)++failures;qInfo()<< (ok?"PASS":"FAIL") <<name;};
@@ -85,8 +212,8 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     check(backdrop->nativeCorners() || normalCorner.second>=5,"system manages the final contour or fallback has antialiased corners");
     state("Theme.setScalePercent(125)");QTest::qWait(150);
     check(qAbs(state("Theme.windowRadius").toReal()-14.0)<0.001
-          && qAbs(state("Theme.sidebarRadius").toReal()-state("Theme.dp(24)").toReal())<0.001,
-          "approved 14dp shell stays fixed while 24dp sidebar follows manual content zoom");
+          && qAbs(state("Theme.sidebarRadius").toReal()-state("Theme.dp(14)").toReal())<0.001,
+          "approved 14dp shell stays fixed while 14dp sidebar follows manual content zoom");
     state("Theme.resetScale()");QTest::qWait(150);
     // Increasing the minimum geometry for manual UI zoom can enlarge the
     // window. Restore the capture bounds so the bottom corners remain on the
