@@ -74,8 +74,8 @@ Item {
   }
   Rectangle {Layout.fillWidth:true;Layout.preferredHeight:Theme.borderWidth;color:Theme.separator}
   RowLayout {Layout.fillWidth:true;spacing:Theme.dp(16)
-   ColumnLayout {Layout.fillWidth:true;spacing:Theme.dp(5);SwirlText {text:qsTr("网关模式");color:Theme.text;font.pixelSize:Theme.fontSize(14);font.weight:Font.DemiBold}SwirlText {text:gatewayProvider.error||qsTr("当前不支持 TUN 网关转发；配置与恢复记录保持保留。");color:gatewayProvider.error.length?Theme.red:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}}
-   SwirlToggle {objectName:"gatewayToggle";enabled:!gatewayProvider.busy&&gatewayProvider.running;checked:gatewayProvider.running;onToggled:{const wanted=checked;if(wanted)AppState.notice("Rust Core 暂不支持 TUN 网关转发");else gatewayProvider.stop();checked=Qt.binding(()=>gatewayProvider.running)}Accessible.name:qsTr("网关模式")}
+   ColumnLayout {Layout.fillWidth:true;spacing:Theme.dp(5);SwirlText {text:qsTr("网关模式");color:Theme.text;font.pixelSize:Theme.fontSize(14);font.weight:Font.DemiBold}SwirlText {text:gatewayProvider.error||qsTr("IPv4 透明网关仍待 Windows 11 联网与恢复验收；配置与恢复记录已保留。");color:gatewayProvider.error.length?Theme.red:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}}
+   SwirlToggle {objectName:"gatewayToggle";enabled:!gatewayProvider.busy&&gatewayProvider.running;checked:gatewayProvider.running;onToggled:{const wanted=checked;if(wanted)AppState.notice("透明网关仍待 Windows 11 联网与恢复验收");else gatewayProvider.stop();checked=Qt.binding(()=>gatewayProvider.running)}Accessible.name:qsTr("网关模式")}
   }
  }
  SwirlContextMenu{id:gatewayMenu;objectName:"gatewayMenu";items:[];popupType:Popup.Item;padding:Theme.dp(5);implicitWidth:Theme.dp(215)
@@ -92,17 +92,17 @@ Item {
  SwirlDialog{id:gatewayDialog;ownerItem:page;title:"网关模式";width:Theme.dp(560);height:Math.min(Theme.dp(600),parent?parent.height-Theme.dp(32):Theme.dp(600))
   contentItem:ScrollView {id:gatewayConfigScroll;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
   ColumnLayout{width:gatewayConfigScroll.availableWidth;spacing:Theme.dp(12)
-   SwirlText {text:"当前 Rust Core 构建尚不支持 TUN 网关转发。网关配置可以保留，但无法启用。";Layout.fillWidth:true;color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.WordWrap}
+   SwirlText {text:"IPv4 透明网关集成候选尚未完成 Windows 11 联网、DNS 与恢复验收。可保留配置，当前未开放启动。";Layout.fillWidth:true;color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.WordWrap}
    SwirlComboBox{id:lanInterface;objectName:"gatewayInterface";Layout.fillWidth:true;model:gatewayProvider.interfaces;textRole:"label";onActivated:{const entry=gatewayProvider.interfaces[currentIndex];gatewayIp.text=entry.ip;prefix.text=String(entry.prefix)}}
    SwirlText {visible:gatewayProvider.interfaces.length===0;text:"当前没有可用的专用 LAN 接口。请接入网卡并设置静态 IPv4 地址。";Layout.fillWidth:true;color:Theme.orange;font.pixelSize:Theme.fontSize(12);wrapMode:Text.WordWrap}
    RowLayout{SwirlText {text:"网关 IP";color:Theme.text;Layout.preferredWidth:Theme.dp(82)}SwirlTextField{id:gatewayIp;Layout.fillWidth:true;text:gatewayProvider.configuration.gateway||""}}
    RowLayout{SwirlText {text:"子网前缀";color:Theme.text;Layout.preferredWidth:Theme.dp(82)}SwirlTextField{id:prefix;Layout.fillWidth:true;text:String(gatewayProvider.configuration.prefix||24);validator:IntValidator{bottom:8;top:30}}}
    RowLayout{SwirlText {text:"地址池开始";color:Theme.text;Layout.preferredWidth:Theme.dp(82)}SwirlTextField{id:firstAddress;Layout.fillWidth:true;text:gatewayProvider.configuration.first||"";placeholderText:"例如 192.168.137.100"}}
    RowLayout{SwirlText {text:"地址池结束";color:Theme.text;Layout.preferredWidth:Theme.dp(82)}SwirlTextField{id:lastAddress;Layout.fillWidth:true;text:gatewayProvider.configuration.last||"";placeholderText:"例如 192.168.137.200"}}
-   RowLayout{SwirlText {text:"DNS";color:Theme.text;Layout.preferredWidth:Theme.dp(82)}SwirlTextField{id:gatewayDns;Layout.fillWidth:true;text:gatewayProvider.configuration.dns||"1.1.1.1"}}
+   RowLayout{SwirlText {text:"DNS";color:Theme.text;Layout.preferredWidth:Theme.dp(82)}SwirlTextField{id:gatewayDns;Layout.fillWidth:true;text:"198.18.0.2";readOnly:true}}
    ReferenceCheckBox{id:dedicatedLan;text:"该接口用于专用 LAN，且已关闭该网络的其他 DHCP 服务"}
    SwirlText {text:gatewayProvider.error;Layout.fillWidth:true;color:Theme.orange;font.pixelSize:Theme.fontSize(12);wrapMode:Text.WordWrap}
-   RowLayout{Layout.alignment:Qt.AlignRight;SwirlButton{text:"取消";onClicked:gatewayDialog.close()}SwirlButton{text:"保存";primary:true;enabled:dedicatedLan.checked&&lanInterface.currentIndex>=0&&gatewayProvider.interfaces.length>0;onClicked:{if(gatewayProvider.configure({interfaceIndex:gatewayProvider.interfaces[lanInterface.currentIndex].index,gateway:gatewayIp.text,prefix:Number(prefix.text),first:firstAddress.text,last:lastAddress.text,dns:gatewayDns.text,leaseSeconds:3600,dedicatedLan:true}))gatewayDialog.close()}}}
+   RowLayout{Layout.alignment:Qt.AlignRight;SwirlButton{text:"取消";onClicked:gatewayDialog.close()}SwirlButton{text:"保存";primary:true;enabled:dedicatedLan.checked&&lanInterface.currentIndex>=0&&gatewayProvider.interfaces.length>0;onClicked:{if(gatewayProvider.configure({interfaceIndex:gatewayProvider.interfaces[lanInterface.currentIndex].index,interfaceGuid:gatewayProvider.interfaces[lanInterface.currentIndex].guid,gateway:gatewayIp.text,prefix:Number(prefix.text),first:firstAddress.text,last:lastAddress.text,dns:gatewayDns.text,leaseSeconds:3600,dedicatedLan:true}))gatewayDialog.close()}}}
   }
   }
  }

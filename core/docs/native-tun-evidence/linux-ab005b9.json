@@ -1,0 +1,470 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-30T03:06:16.769404+00:00",
+  "source_commit": "ab005b90670953e43ace45ff7f708730f40a7fd1",
+  "source_identity_basis": "The executing root froze 87c3f9 plus the added smoke file hash in the original source manifest, verified that hash before and after the four commands, and created remote commit object ab005b9 from that exact source. The branch ref had not yet moved when this evidence was archived. The documentation agent verified the source manifest and frozen file hash; the new commit object was not yet in the local Git object store.",
+  "source_manifest": {
+    "file": "linux-ab005b9-source.json",
+    "sha256": "20497b4c12960b80040cb79e4c7911a961174d1e230429e615082d891d987be4",
+    "content": {
+      "base_head": "87c3f900b2628bac6040d670b458b727bda31a6b",
+      "additional_smoke_sha256": "a450d009468f1dbd38fcd0f762ae7d9b837ef932c9308fdbd4594d8a0bd2fa18"
+    }
+  },
+  "environment": {
+    "host": "x86_64-unknown-linux-gnu",
+    "network": "Real local IPv4/IPv6 loopback sockets and synthetic L3 packet tests; no host route, DNS, firewall or driver changes.",
+    "cargo_executable": "/tmp/swirl-cargo/bin/cargo",
+    "variables": {
+      "CARGO_HOME": "/tmp/swirl-cargo",
+      "RUSTUP_HOME": "/tmp/swirl-rustup",
+      "CARGO_TARGET_DIR": "/tmp/swirl-core-validation",
+      "CARGO_INCREMENTAL": "0"
+    },
+    "socket_permission": "The execution script ran with approval for real loopback sockets; the default sandbox rejects socket creation."
+  },
+  "working_directory": "core",
+  "commands": {
+    "fmt": {
+      "normalized_reproduction_command": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "log": {
+        "file": "linux-ab005b9-fmt.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      }
+    },
+    "check": {
+      "normalized_reproduction_command": "cargo check --offline --locked --workspace --all-targets",
+      "exit_code": 0,
+      "log": {
+        "file": "linux-ab005b9-check.log",
+        "sha256": "c268c15bb77284af75da795263ee1a9be5efc28e702053fe46dc74153c206774",
+        "bytes": 360
+      }
+    },
+    "clippy": {
+      "normalized_reproduction_command": "cargo clippy --offline --locked --workspace --all-targets -- -D warnings",
+      "exit_code": 0,
+      "log": {
+        "file": "linux-ab005b9-clippy.log",
+        "sha256": "52b8dc72c1d10400c91b24d1c3a7c4315e18dac11bab9e68212155e7d939e3d1",
+        "bytes": 360
+      }
+    },
+    "tests": {
+      "normalized_reproduction_command": "cargo test --offline --locked --workspace --all-targets",
+      "exit_code": 0,
+      "log": {
+        "file": "linux-ab005b9-tests.log",
+        "sha256": "ce21af40a768d152f9c8aad5790691f4791136a95ae5b80da0fe984e480e725e",
+        "bytes": 87556
+      }
+    }
+  },
+  "command": "cargo test --offline --locked --workspace --all-targets",
+  "exit_code": 0,
+  "totals": {
+    "passed": 890,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered": 0
+  },
+  "test_target_count": 48,
+  "test_targets": [
+    {
+      "target": "Running unittests src/lib.rs (/tmp/swirl-core-validation/debug/deps/swirl_api-426684ea21090e67)",
+      "passed": 52,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests src/main.rs (/tmp/swirl-core-validation/debug/deps/swirl_api-bd03197c9c65d2ba)",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests src/bin/swirl-diagnose.rs (/tmp/swirl-core-validation/debug/deps/swirl_diagnose-368c1154764faac8)",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests src/bin/swirl-inspect.rs (/tmp/swirl-core-validation/debug/deps/swirl_inspect-2111ef278b598ff6)",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests src/bin/swirl-tun-helper.rs (/tmp/swirl-core-validation/debug/deps/swirl_tun_helper-8de41164957fbc1d)",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/xray_boundary.rs (/tmp/swirl-core-validation/debug/deps/xray_boundary-cbbafe28e8738a15)",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/xray_cli.rs (/tmp/swirl-core-validation/debug/deps/xray_cli-529e52bab6565132)",
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests examples/windows-tun-smoke.rs (/tmp/swirl-core-validation/debug/examples/windows_tun_smoke-9fa3ff1da3f7d97a)",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests src/lib.rs (/tmp/swirl-core-validation/debug/deps/swirl_core-065f95485466834b)",
+      "passed": 67,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/china_rules.rs (/tmp/swirl-core-validation/debug/deps/china_rules-be41d98afae1a58e)",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/network.rs (/tmp/swirl-core-validation/debug/deps/network-ca20e70a0b6048a8)",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/socks5_udp.rs (/tmp/swirl-core-validation/debug/deps/socks5_udp-35245916f407e2a6)",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/xray_import.rs (/tmp/swirl-core-validation/debug/deps/xray_import-3c7abda33287303e)",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests examples/transport-runtime.rs (/tmp/swirl-core-validation/debug/examples/transport_runtime-82778a88fc9e7241)",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests src/lib.rs (/tmp/swirl-core-validation/debug/deps/swirl_dns-5b4cf5cc74ae43dd)",
+      "passed": 27,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests src/lib.rs (/tmp/swirl-core-validation/debug/deps/swirl_platform-f3da1f6165522819)",
+      "passed": 20,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests src/lib.rs (/tmp/swirl-core-validation/debug/deps/swirl_protocol-8362561c1aa41f73)",
+      "passed": 127,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/quic_preflight.rs (/tmp/swirl-core-validation/debug/deps/quic_preflight-99ee9af4ad1f43de)",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/socks5_egress.rs (/tmp/swirl-core-validation/debug/deps/socks5_egress-72de33814a4b5b6d)",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/ss2022_egress.rs (/tmp/swirl-core-validation/debug/deps/ss2022_egress-2bad3b843c5c7cad)",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/tuic_egress.rs (/tmp/swirl-core-validation/debug/deps/tuic_egress-7097db414b8dd599)",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/vision.rs (/tmp/swirl-core-validation/debug/deps/vision-efdeb379e533e739)",
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/vision_record.rs (/tmp/swirl-core-validation/debug/deps/vision_record-c27416654b6be5ea)",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/vision_stream.rs (/tmp/swirl-core-validation/debug/deps/vision_stream-a647359a56898987)",
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/vision_tls.rs (/tmp/swirl-core-validation/debug/deps/vision_tls-7db6e6b4aece1273)",
+      "passed": 26,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests examples/hysteria2-client.rs (/tmp/swirl-core-validation/debug/examples/hysteria2_client-8413ae73a59eb720)",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests examples/hysteria2-lifecycle.rs (/tmp/swirl-core-validation/debug/examples/hysteria2_lifecycle-c8df0567ed163426)",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests examples/ss2022-client.rs (/tmp/swirl-core-validation/debug/examples/ss2022_client-86a863dd61b23a74)",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests examples/transport-client.rs (/tmp/swirl-core-validation/debug/examples/transport_client-86dd95598f188ba0)",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests examples/tuic-client.rs (/tmp/swirl-core-validation/debug/examples/tuic_client-83d1f4825bfe14ac)",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests examples/vision-client.rs (/tmp/swirl-core-validation/debug/examples/vision_client-18562e35bac00155)",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests src/lib.rs (/tmp/swirl-core-validation/debug/deps/swirl_routing-e10e8c9ddfe9fa71)",
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests src/lib.rs (/tmp/swirl-core-validation/debug/deps/swirl_subscription-8dd2d592b3febcfe)",
+      "passed": 160,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/xray_adversarial.rs (/tmp/swirl-core-validation/debug/deps/xray_adversarial-433ffe0422fe1fce)",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/xray_conversion.rs (/tmp/swirl-core-validation/debug/deps/xray_conversion-949626aab44960bb)",
+      "passed": 18,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/xray_conversion_auth.rs (/tmp/swirl-core-validation/debug/deps/xray_conversion_auth-11ad419afa4d7620)",
+      "passed": 19,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/xray_conversion_password.rs (/tmp/swirl-core-validation/debug/deps/xray_conversion_password-355869ed3c2d170e)",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/xray_conversion_security.rs (/tmp/swirl-core-validation/debug/deps/xray_conversion_security-2d7b5489d7ddef0e)",
+      "passed": 27,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/xray_native.rs (/tmp/swirl-core-validation/debug/deps/xray_native-327993910f6b9966)",
+      "passed": 23,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/xray_native_selection.rs (/tmp/swirl-core-validation/debug/deps/xray_native_selection-511b19641cf60921)",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/xray_native_transports.rs (/tmp/swirl-core-validation/debug/deps/xray_native_transports-15dd231c8de076f1)",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/xray_structure.rs (/tmp/swirl-core-validation/debug/deps/xray_structure-ad7b35c47045f84f)",
+      "passed": 27,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests src/lib.rs (/tmp/swirl-core-validation/debug/deps/swirl_transport-2b0b08542b5a58cf)",
+      "passed": 123,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/client_hello_customizer.rs (/tmp/swirl-core-validation/debug/deps/client_hello_customizer-344026226a6bea31)",
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests examples/reality-client.rs (/tmp/swirl-core-validation/debug/examples/reality_client-f9809014dd40b2fd)",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests examples/reality-hello.rs (/tmp/swirl-core-validation/debug/examples/reality_hello-778baba909207f52)",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running unittests src/lib.rs (/tmp/swirl-core-validation/debug/deps/swirl_tun-457ed9389d24520c)",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "Running tests/packet_flows.rs (/tmp/swirl-core-validation/debug/deps/packet_flows-6ccf4d3a3b0cd9f5)",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    }
+  ],
+  "cargo_lock_sha256": "1c539260d5bfdcbc332ea217a81a113257918b129c06cf8a1afdbe3029c8dd42",
+  "scope_notes": [
+    "Original stdout/stderr logs copied byte-for-byte; execution completion and exact command argv were confirmed by the executing root.",
+    "The Windows-only main of windows-tun-smoke is not executed by Linux cargo test. New UDP policy driver cases need their own exact-source Windows CI execution.",
+    "This complete local run follows SS2022/SOCKS5 UDP guard, automatic health admission and nullable address InstanceID fixes; it is distinct from the historical 200225e and ffea437 evidence.",
+    "Windows Server driver success at 87c3f9 is recorded separately and must not be relabeled as execution of the added ab005b9 UDP policy cases."
+  ],
+  "source_tree": "29248ca2d8ac37514181db148d1acdc03fc499a7",
+  "source_tree_basis": "The executing root returned this tree from GitHub create_tree for ab005b9, parent 87c3f9; exact local object import will be checked by root before push."
+}

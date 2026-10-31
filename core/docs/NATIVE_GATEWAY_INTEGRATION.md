@@ -1,0 +1,174 @@
+# Native Gateway integration candidate
+
+This branch contains runtime integration, not an accepted Windows 11 gateway.
+The product Gateway switch stays disabled. Native LAN Proxy is independent and
+continues to use its own listener lifecycle without requiring TUN.
+
+## Exact ancestry and review boundary
+
+- Target `test`: `56948e4d6044154f1c5d91c6d817099d1c01a87f` when rechecked.
+- LAN PR [#46](https://github.com/SOLHK/Swirl/pull/46), dependency
+  `5c3ae925528b3064a552d2a01e98d4333ca8ce04` at initial integration.
+- TUN PR [#42](https://github.com/SOLHK/Swirl/pull/42), dependency
+  `930c3f5fc2cbcfb99de4769c44f1682f4fc2e01d`, still Draft and unmerged.
+- TUN/test merge base: `4ad8a23b7fd59f0f8c09f1e3547548b16baaf4e9`.
+- The Gateway integration commit has the LAN and TUN commits as parents.
+  Neither dependency branch is rewritten; `test` and `main` are not modified.
+
+The merge preserves newer test workflow/UI regression changes. Conflicts in
+`build-qt-quick-ui.yml` retain the critical UI and network checks as independent
+gates and diagnostics. Core conflicts use one shared connection semaphore and
+session registry for loopback, LAN and native TUN. Transport conflicts preserve
+physical egress constraints for outbound sockets while keeping LAN UDP listener
+binding independent. After both prerequisite PRs are accepted, merge the current
+test branch into this candidate normally and rerun all gates; do not force-push
+or silently treat the original TUN PR as production ready.
+
+## Runtime path
+
+The existing Wintun device and `swirl-tun` TCP/UDP stack deliver flows to the
+existing `FlowDispatcher`. Its policy snapshots, MRS/custom rules, resolver,
+Fake-IP identity, native protocol outbounds, connection records and traffic
+counters remain the only data plane. No second node selector, proxy kernel or
+NAT service is added. The existing stack retains original client TCP tuples and
+UDP association keys and reconstructs replies to the original client.
+
+`GatewayIngress` admits only IPv4 clients from the configured private subnet and
+allowlist. It excludes subnet/broadcast, spoofed host addresses and protected
+destinations, rejects unauthorized DNS destinations and bounds TCP, UDP and DNS
+work per client. Local host flows retain their existing path. Shared global
+admission spans LAN and TUN; stopping the explicit LAN listener does not stop an
+established native flow. Direct destination resolution and actual locally dialed
+proxy/UDP relay endpoints are checked and pinned. Remote proxy DNS stays with
+the selected proxy protocol, so its remote-side DNS/target enforcement remains
+the proxy server's responsibility, as described in NATIVE_LAN_PROXY.md.
+
+Windows IPv4 forwarding alone is not evidence that a packet entered Rust.
+`windows_gateway` verifies a dedicated, already statically configured private
+LAN, selected physical WAN and separately owned TUN. Persistent WFP objects
+restrict authorized LAN forwarding to that TUN, return forwarding to authorized
+LAN clients, local host access and IPv6 traffic. Owned object names, provider,
+sublayer, exact compiled conditions and policy digest are checked before removal.
+The TUN IPv4 interface also enables forwarding for packets injected back toward
+the LAN. Every outbound socket retains the original TUN physical egress lease.
+
+The actual LAN NIC -> WFP -> Windows route -> Wintun packet path and its return
+path still require an independent-client Windows network trial. Packet-stack
+tests and WFP API readback are narrower evidence, not substitutes.
+
+## Helper control and lifecycle
+
+The existing C ABI version stays at 1. A separate JSON envelope uses
+`native_gateway_schema: 1`, a UUID `request_id`, and these operations:
+
+| Operation | Effect |
+| --- | --- |
+| `gateway_validate` | Pure typed validation; returns `network_preflight_required: true`. |
+| `gateway_prepare` | Helper-only; validates Core handle/epoch, prepares persistent LAN isolation, starts the existing TUN, and returns an expiring preparation identity and actual helper worker PID. LAN forwarding remains off. |
+| `gateway_activate` | Helper-only; rechecks capture, topology and optional real DHCP socket ownership; enables LAN forwarding last. |
+| `gateway_status` | Actual observed state, identities, IPv4-only scope and preparation/running/recovery information. |
+| `gateway_stop` | Quiesces LAN forwarding before restoring capture/routes/DNS; removes isolation only after dependent restoration succeeds. |
+| `gateway_recover` | Helper-only; locks and quiesces all stale Gateway journals before restoring TUN journals, then removes fully owned guards. |
+
+Mutation uses the existing private-stdio `swirl-tun-helper --serve` controller.
+The ordinary GUI/DLL controller rejects mutation with `GatewayHelperRequired`.
+This adds no network RPC endpoint, shell-command parameter or automatic UAC.
+Core creation/policy publication still use existing schema 2 commands on the
+same helper controller; there is no separate Gateway policy configuration.
+
+Gateway configuration contains `tun` (the existing NativeTunConfig) and `lan`:
+
+```json
+{
+  "lan": {"index": 11, "guid": "70000000-0000-4000-8000-000000000002"},
+  "subnet": "192.168.77.0/24",
+  "gateway": "192.168.77.1",
+  "allowed_sources": ["192.168.77.0/24"],
+  "dedicated_lan_confirmed": true,
+  "dhcp": false
+}
+```
+
+These are documentation values, not usable interface identities. Preflight must
+observe the real GUID/index/static address and safe topology. A successful pure
+validation does not authorize an arbitrary home, public-Wi-Fi or WAN interface.
+Manual static clients are supported by the native coordinator without DHCP.
+Clients use the existing intercepted DNS address `198.18.0.2`.
+
+## Transaction and failure semantics
+
+Gateway `.gateway.json` and TUN `.network.json` journals stay locked under the
+existing protected helper journal directory. Journaled prefix application installs
+isolation before capture and defers LAN forwarding until activation. An operation
+is durably marked Applying before its OS mutation and checked after application.
+Stopping first restores the forwarding suffix; capture stays alive on a conflict.
+Recovery never resets the whole Windows network or deletes foreign VPN routes.
+
+Changed GUID/LUID, host addresses, network profile, routes, forwarding, physical
+egress or DHCP ownership cause a controlled stop and retained error/recovery state.
+Gateway does not inherit the TUN-only autonomous restart path: each new activation
+requires a fresh dedicated-LAN preflight. The monitor provides bounded reactive
+verification, not a claim that every OS topology change is observed instantaneously.
+
+An ambiguous crash between a shared Forwarding-bit write and its durable receipt
+cannot prove exclusive ownership. Such a journal retains isolation and reports a
+conflict rather than overwriting an indistinguishable external change. A failed
+restore similarly retains records and guards. Legacy Qt schema-1 journals carry
+only interface indices/aliases; they are preserved for ownership review and never
+used as authority to modify potentially recycled interfaces.
+
+Helper supervision and next-helper-start recovery are implemented. There is no
+installed boot-time recovery service or scheduled task. Simultaneous helper crash,
+machine restart, adapter recreation and unattended boot recovery are open product
+gates. Persistent WFP objects alone do not establish those gates.
+
+## DHCP integration
+
+The existing Qt DHCP parser/server is reused. Real socket fixtures cover
+DISCOVER/OFFER, REQUEST/ACK, renewal, release, conflicting reservations, malformed
+options and client identifiers. Lease and decline-quarantine storage is atomic;
+invalid persisted times/identities fail closed. Rediscovery does not shorten a
+committed lease. Per-MAC/global request limits and pool/lease counts are bounded.
+
+On Windows a production UDP67 socket is exclusive. Before binding its wildcard
+broadcast address, it enables `IP_IFLIST` with exactly the dedicated LAN index and
+sets `IP_UNICAST_IF`; readback, receive packet-info and explicit outgoing
+interface/source address enforce the same constraint. This is needed for initial
+DHCP broadcasts from clients without an address. Unsupported constraints fail
+closed. Isolated tests bind only an ephemeral loopback port.
+
+`DhcpServer::ownerReceipt(helperWorkerPid)` produces a one-use
+`WSADuplicateSocketW` token. The helper validates process PID/start time and the
+sibling product image, imports the token once, checks the actual socket protocol,
+UDP67 endpoint, exclusivity and exact receive/send interface constraints, then
+closes its duplicate without receiving, sending or changing notification state.
+Only stable process identity is retained for periodic UDP67 ownership checks; the
+opaque socket token is not persisted or logged. A caller-supplied ready boolean
+does not satisfy activation. Native preflight performs a bounded DHCP-server
+conflict probe on the confirmed dedicated LAN before any server is attached.
+
+The formal Qt Gateway start path remains closed. End-to-end Qt helper orchestration
+and real client DHCP broadcast/renewal tests are not yet accepted. Saving a Gateway
+configuration neither starts DHCP nor changes interface addresses or forwarding.
+
+## Evidence and remaining gates
+
+At initial submission all added Gateway Rust and Windows code awaits candidate
+CI. Local Rust/Qt tools are unavailable. Local whitespace/YAML/Python syntax checks
+are separate from compilation. The ancestor LAN snapshot `24f7e7ee` passed Linux,
+macOS and Windows fmt/check/Clippy/workspace/independent ABI CI; that evidence must
+not be relabeled as Gateway acceptance. Initial LAN Qt MSVC missing SDK declaration
+errors were fixed in `5c3ae925`; its Qt rebuild is separately tracked.
+
+The additive candidate CI runs all requested locked workspace gates, independent
+LAN/Gateway ctypes checks, and two explicitly scoped Windows fixtures: persistent
+WFP install/readback/ownership-preserving removal on absent synthetic interface
+IDs, and loopback UDP67 socket attestation. The existing isolated TUN workflow
+retains its real scoped Wintun TCP/UDP/DNS smoke. No original test gate is removed.
+
+Still required: actual LAN NIC ingress and return packets, independent Windows 11
+Android/iPhone/Windows clients, concurrent TCP/UDP and DNS/Fake-IP policy switching,
+no direct leak during node failure/teardown, DHCP conflict/renewal on a dedicated
+network, interface/profile changes, normal/failed/crash/reboot recovery, and a
+source-identical Windows product/installer build. Windows Server CI is not Windows
+11 hardware acceptance; neither PR should be merged merely because CI is green.

@@ -16,9 +16,9 @@ env:
 
 concurrency:
   group: swirl-quick-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  # Finish the current verified stage so first-time Qt compilation can save its
-  # cache and installer evidence before the next stage starts.
-  cancel-in-progress: false
+  # Keep product branches queued so they can finish their cache and installer
+  # evidence. Only the isolated TUN branch replaces its own stale PR runs.
+  cancel-in-progress: ${{ (github.head_ref || github.ref_name) == 'work/native-tun-windows-20261030-isolated' }}
 
 jobs:
   build-qt-ui:
@@ -168,8 +168,11 @@ jobs:
             build/swirl-quick
             build/swirl-product
           key: apec-qt612-msvc-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-${{ github.sha }}
+          # Reuse unchanged C++ inputs across lockfile updates only with the same
+          # compiler identity. Content hashes, CMake and locked Cargo still rebuild changes.
           restore-keys: |
             apec-qt612-msvc-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-
+            apec-qt612-msvc-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-
       - name: Restore content-verified input timestamps
         shell: pwsh
         run: |
@@ -270,7 +273,7 @@ jobs:
           $testFontDir = 'build/swirl-quick/Release/lib/fonts'
           New-Item -ItemType Directory -Force -Path $testFontDir | Out-Null
           Get-ChildItem -LiteralPath $fontDir -File | Copy-Item -Destination $testFontDir -Force
-      - name: Critical UI startup, rendering and interaction checks
+      - name: Critical UI and network regression checks
         id: critical_ui
         shell: pwsh
         run: |
@@ -284,14 +287,26 @@ jobs:
           # Run affected UI checks before packaging. The remaining registered suite
           # runs after the test installer is uploaded; these names are excluded there
           # so a required check is never repeated just to change stage ordering.
-          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(appearance-ui|node-ui|engine-ui|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui)$" --output-on-failure --no-tests=error
-          if ($LASTEXITCODE -ne 0) {
+          # Collect both independent results before failing the gate: a UI failure
+          # must not conceal system-proxy recovery and network/security evidence.
+          $PSNativeCommandUseErrorActionPreference = $false
+          $criticalEvidence = Join-Path $env:GITHUB_WORKSPACE 'build-evidence'
+          New-Item -ItemType Directory -Force -Path $criticalEvidence | Out-Null
+          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(appearance-ui|node-ui|engine-ui|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui)$" --output-on-failure --no-tests=error --output-log "$criticalEvidence/critical-ui.log" --output-junit "$criticalEvidence/critical-ui.xml"
+          $criticalUiExit = $LASTEXITCODE
+          if ($criticalUiExit -ne 0) {
             Get-Content build/swirl-quick/engine-contract.txt, build/swirl-quick/engine-real.txt -ErrorAction SilentlyContinue
-            throw "Critical UI checks failed"
           }
-          if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') {
-            ctest --test-dir build/swirl-quick -C Release -R "^swirl-(system-proxy-state|system-proxy-recovery|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network)$" --output-on-failure --no-tests=error
-            if ($LASTEXITCODE -ne 0) { throw "Critical network/security checks failed ($LASTEXITCODE)." }
+          $criticalNetworkRequired = $env:SWIRL_CI_NETWORK_CHANGE -eq 'true'
+          $criticalNetworkExit = $null
+          if ($criticalNetworkRequired) {
+            ctest --test-dir build/swirl-quick -C Release -R "^swirl-(system-proxy-state|system-proxy-recovery|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network)$" --output-on-failure --no-tests=error --output-log "$criticalEvidence/critical-network.log" --output-junit "$criticalEvidence/critical-network.xml"
+            $criticalNetworkExit = $LASTEXITCODE
+          }
+          [ordered]@{source_sha=$env:GITHUB_SHA;ui_exit_code=$criticalUiExit;network_required=$criticalNetworkRequired;network_exit_code=$criticalNetworkExit} | ConvertTo-Json | Set-Content -LiteralPath "$criticalEvidence/critical-checks.json" -Encoding utf8
+          Write-Host "Critical UI exit code: $criticalUiExit; network required: $criticalNetworkRequired; network exit code: $criticalNetworkExit"
+          if ($criticalUiExit -ne 0 -or ($criticalNetworkRequired -and $criticalNetworkExit -ne 0)) {
+            throw "Critical checks failed: UI exit code $criticalUiExit; network exit code $criticalNetworkExit. Packaging remains blocked."
           }
       - name: Overview input checks against deployed Qt runtime
         id: overview_input
@@ -757,6 +772,11 @@ jobs:
           name: Swirl-Engine-Test-Evidence
           path: |
             build/swirl-quick/Testing/Temporary/LastTest.log
+            build-evidence/critical-checks.json
+            build-evidence/critical-ui.log
+            build-evidence/critical-ui.xml
+            build-evidence/critical-network.log
+            build-evidence/critical-network.xml
             build-evidence/full-regression.xml
             build-evidence/overview-input.log
             build-evidence/ctest-inventory.json

@@ -1163,3 +1163,59 @@ fn simultaneous_udp_clients_have_distinct_relays_and_cannot_cross_associations()
     }
     core.stop();
 }
+
+#[test]
+fn lan_and_native_tun_share_admission_and_stopping_lan_preserves_native_flow() {
+    let peer = Peer::new(b'A');
+    let mut candidate = config(vec![peer.node(A)], A);
+    candidate.limits.max_connections = 1;
+    candidate.dns.tls_servers.push(swirl_subscription::DnsTlsServer {
+        address: "192.0.2.1:853".parse().unwrap(),
+        tls: swirl_subscription::Tls {
+            server_name: "dns.fixture.invalid".into(), alpn: vec![], ca_der_base64: None,
+        },
+        https_path: None,
+    });
+    let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+    let lan = lan_config(false);
+    start_fixture(&mut core, &lan);
+    let (mut local_client, response) = http_connect(&lan, true, "target.fixture.invalid");
+    assert!(response.starts_with(b"HTTP/1.1 200"));
+    exchange(&mut local_client, b'A');
+    let dispatcher = core.flow_dispatcher().unwrap();
+    let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().unwrap();
+    runtime.block_on(async {
+        assert_eq!(dispatcher.open_udp("192.168.77.12:50000".parse().unwrap(), NetworkTarget {
+            host: "203.0.113.8".into(), port: 443,
+        }).await.err(), Some("ConnectionLimit"));
+    });
+    drop(local_client);
+    wait(|| core.lan_status().unwrap()["active_connections"] == 0);
+    let (mut client, inbound) = tokio::io::duplex(64);
+    let native = runtime.spawn(async move {
+        dispatcher.relay_tcp(inbound, "192.168.77.12:50000".parse().unwrap(), NetworkTarget {
+            host: "target.fixture.invalid".into(), port: 443,
+        }).await
+    });
+    runtime.block_on(async {
+        client.write_all(b"ping").await.unwrap();
+        let mut response = [0; 5];
+        timeout(Duration::from_secs(3), client.read_exact(&mut response)).await.unwrap().unwrap();
+        assert_eq!(&response, b"Aping");
+    });
+    let mut rejected = stream(SocketAddr::new(lan.listen_ip, lan.http_port));
+    let mut byte = [0];
+    assert!(rejected.read(&mut byte).map_or(true, |count| count == 0));
+    core.lan_stop().unwrap();
+    runtime.block_on(async {
+        client.write_all(b"pong").await.unwrap();
+        let mut response = [0; 5];
+        timeout(Duration::from_secs(3), client.read_exact(&mut response)).await.unwrap().unwrap();
+        assert_eq!(&response, b"Apong");
+        client.shutdown().await.unwrap();
+        native.await.unwrap().unwrap();
+    });
+    wait(|| core.shared.active.load(Ordering::Acquire) == 0);
+    assert_eq!(core.shared.connection_slots.available_permits(), 1);
+    core.stop();
+}

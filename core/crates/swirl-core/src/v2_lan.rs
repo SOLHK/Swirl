@@ -548,30 +548,32 @@ impl LanRuntime {
                         state.error("LanConnectionLimit");
                         continue;
                     };
-                    let Ok(global_permit) = shared.connection_slots.clone().try_acquire_owned() else {
-                        state.rejected.fetch_add(1, Ordering::Relaxed);
-                        shared.rejected.fetch_add(1, Ordering::Relaxed);
-                        state.error("CoreConnectionLimit");
-                        continue;
+                    let registered = match shared.register() {
+                        Ok(registered) => registered,
+                        Err(error) => {
+                            state.rejected.fetch_add(1, Ordering::Relaxed);
+                            state.error(if error == "ConnectionLimit" { "CoreConnectionLimit" } else { error });
+                            continue;
+                        }
                     };
-                    let id = shared.accepted.fetch_add(1, Ordering::Relaxed) + 1;
+                    let id = registered.guard.id;
                     let lease = match state.admit(peer.ip(), id) {
                         Ok(lease) => lease,
-                        Err(error) => { state.rejected.fetch_add(1, Ordering::Relaxed); shared.rejected.fetch_add(1, Ordering::Relaxed); state.error(error); continue; }
+                        Err(error) => {
+                            state.rejected.fetch_add(1, Ordering::Relaxed);
+                            shared.rejected.fetch_add(1, Ordering::Relaxed);
+                            state.error(error);
+                            continue;
+                        }
                     };
-                    let (cancel, cancelled) = watch::channel(false);
-                    if let Ok(mut registry) = shared.sessions.lock() {
-                        registry.insert(id, SessionControl { cancel, nodes: BTreeSet::new(), preparing: 1 });
-                    } else { state.error("SessionState"); break; }
-                    shared.active.fetch_add(1, Ordering::Relaxed);
+                    let cancelled = registered.cancellation.clone();
                     let shared = shared.clone();
                     let state = state.clone();
                     let ingress = Ingress { config: config.clone(), counters: lease.counters.clone(), pool: pool.clone(), state: state.clone(), peer: peer.ip(), id, protocol };
                     sessions.spawn(async move {
                         let _permit = permit;
-                        let _global_permit = global_permit;
                         let _lease = lease;
-                        let _guard = SessionGuard { shared: shared.clone(), id };
+                        let _registered = registered;
                         let result = session(socket, peer, shared.clone(), id, cancelled, Some(ingress)).await;
                         if let Err(error) = result {
                             if matches!(error, "InboundAuthentication" | "HandshakeTimeout") {

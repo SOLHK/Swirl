@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-30T04:03:44.107310+00:00",
+  "branch_head": "2bf61c4fe8ca8a6948f64f34caab7379169890d8",
+  "checked_out_source_sha": "2bf61c4fe8ca8a6948f64f34caab7379169890d8",
+  "source_basis": "Native Protocols push workflow checks out github.sha explicitly; complete log identifies the exact branch source and SWIRL_SOURCE_SHA.",
+  "ci": {
+    "run_id": 41000188895,
+    "job_id": 123882541130,
+    "run_url": "https://github.com/SOLHK/Swirl/actions/runs/41000188895",
+    "job_url": "https://github.com/SOLHK/Swirl/actions/runs/41000188895/job/123882541130",
+    "workflow": "Swirl Native Protocols X14",
+    "job_name": "native-protocols (windows-latest)",
+    "conclusion": "failure",
+    "failed_step": "Unit and local network tests",
+    "command": "cargo test --workspace --locked"
+  },
+  "raw_log": {
+    "file": "windows-fixture-sockets-2bf61c4-failed-job.log",
+    "sha256": "bce965751f37cc521993998d9195e01a5c909ff4167f38e39960aedc95e54923",
+    "bytes": 64696,
+    "normalization": "Complete GitHub integration decoded job log. CRLF converted to LF only; initial UTF-8 BOM, timestamps, ANSI sequences and every log line retained.",
+    "crlf_pairs_normalized": 883,
+    "decoded_original_utf8_sha256": "f566fb9028d8bb874beceeb5a964216d7b42165936aff1d5799f46b7a67aef9f",
+    "decoded_original_utf8_bytes": 65579
+  },
+  "regression": {
+    "binary": "windows_fixture_sockets",
+    "passed": 2,
+    "failed": 2,
+    "ignored": 0,
+    "filtered": 0,
+    "udp_ipv4": "passed",
+    "udp_ipv6": "passed",
+    "tcp_ipv4": "failed at empty cloned-listener accept",
+    "tcp_ipv6": "failed at empty cloned-listener accept",
+    "observations": [
+      {
+        "family": 6,
+        "probe": "cloned TCP listener empty accept",
+        "original_listener_set_nonblocking_succeeded": true,
+        "original_listener_would_block_assertion_passed": true,
+        "clone_operation": "TcpListener::try_clone (shared fixture helper, no post-clone mode change)",
+        "result": "Ok(()) only after the owned wake connection",
+        "elapsed": "2.0018731s",
+        "wake_used": true,
+        "wake_error": null,
+        "accepted_stream_read_probe_executed": false,
+        "original_log_message": "::1 cloned TCP listener empty accept: expected WouldBlock from the actual socket; result=Ok(()), elapsed=2.0018731s, wake_used=true, wake_error=None"
+      },
+      {
+        "family": 4,
+        "probe": "cloned TCP listener empty accept",
+        "original_listener_set_nonblocking_succeeded": true,
+        "original_listener_would_block_assertion_passed": true,
+        "clone_operation": "TcpListener::try_clone (shared fixture helper, no post-clone mode change)",
+        "result": "Ok(()) only after the owned wake connection",
+        "elapsed": "2.0152516s",
+        "wake_used": true,
+        "wake_error": null,
+        "accepted_stream_read_probe_executed": false,
+        "original_log_message": "127.0.0.1 cloned TCP listener empty accept: expected WouldBlock from the actual socket; result=Ok(()), elapsed=2.0152516s, wake_used=true, wake_error=None"
+      }
+    ]
+  },
+  "findings": {
+    "observed": "On this Windows runner, cloned TCP listeners blocked in empty accept despite the original listener having just returned WouldBlock. Both blocked calls returned only after the test issued its owned loopback wake connection.",
+    "not_observed": "Accepted TCP stream read probes were not reached because each TCP test failed at its earlier cloned-listener accept assertion. UDP clone probes passed; no claim that every socket clone loses nonblocking mode.",
+    "runtime_implication": "Passing these blocking TCP clones to Tokio violates from_std nonblocking preconditions. Their accept/read work can block a Core runtime worker instead of yielding.",
+    "relation_to_prior_driver_failure": "This supplies a concrete fixture defect and a plausible shared-worker starvation mechanism for the earlier IPv6 UDP timeout. The prior ab0cde7 driver log lacked per-stage information, so the exact blocked syscall in that earlier run is not retrospectively proven."
+  },
+  "fix_under_test": "Restore nonblocking mode on each cloned TCP listener before Tokio handoff, use that helper at every smoke TCP clone-to-Tokio entry, and rerun the four unchanged Windows probes and complete Wintun driver cases. No timeout or assertion is relaxed.",
+  "scope_notes": [
+    "No driver or host network configuration changes occur in these four probes.",
+    "This failed workspace command stopped at the socket integration binary and is not a completed full-workspace pass.",
+    "a87a80e diagnostic-only Wintun success is recorded separately and is not itself a behavioral fix."
+  ]
+}

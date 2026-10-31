@@ -31,6 +31,7 @@ pub fn reserve_datagram_buffers(socket: &UdpSocket) -> io::Result<()> {
 /// caller. This changes only this socket; system-wide network limits are intact.
 pub async fn bind_udp(address: SocketAddr) -> io::Result<UdpSocket> {
     let socket = UdpSocket::bind(address).await?;
+    crate::egress::pin_udp(&socket, address)?;
     reserve_datagram_buffers(&socket)?;
     Ok(socket)
 }
@@ -104,15 +105,10 @@ mod tests {
         let relay = bind_udp_inbound(address).await.unwrap();
         let client = bind_udp(address).await.unwrap();
         let payload = vec![0x53; 65_507];
-        relay
-            .send_to(&payload, client.local_addr().unwrap())
-            .await
-            .unwrap();
+        relay.send_to(&payload, client.local_addr().unwrap()).await.unwrap();
         let mut bytes = vec![0; 65_536];
         let (length, source) = timeout(Duration::from_secs(3), client.recv_from(&mut bytes))
-            .await
-            .unwrap()
-            .unwrap();
+            .await.unwrap().unwrap();
         assert_eq!(source, relay.local_addr().unwrap());
         assert_eq!(&bytes[..length], &payload);
     }

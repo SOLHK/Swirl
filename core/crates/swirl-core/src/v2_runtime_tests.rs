@@ -907,6 +907,15 @@ fn udp_new_destination_waits_for_receipt_old_destination_stays_pinned_and_catalo
 
 #[test]
 fn classification_dns_uses_default_proxy_then_verified_tls_without_direct_or_plaintext_fallback() {
+    dns_transport_roundtrip(false);
+}
+
+#[test]
+fn native_dns_uses_selected_proxy_verified_tls_without_direct_or_plaintext_fallback() {
+    dns_transport_roundtrip(true);
+}
+
+fn dns_transport_roundtrip(native_ingress: bool) {
     use base64::Engine;
     use swirl_subscription::{DnsQueryFamily, DnsTlsServer, Tls};
     use tokio_rustls::{
@@ -1028,12 +1037,24 @@ fn classification_dns_uses_default_proxy_then_verified_tls_without_direct_or_pla
             }],
         };
         let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
-        let plan = core.shared.live.lock().unwrap().plan.clone();
-        let resolved = core.runtime.as_ref().unwrap().block_on(classify(
-            &plan,
-            "classified.fixture.invalid",
-            443,
-        ));
+        let resolved = if native_ingress {
+            let dispatcher = core.flow_dispatcher().unwrap();
+            core.runtime
+                .as_ref()
+                .unwrap()
+                .block_on(dispatcher.resolve_dns(
+                    "classified.fixture.invalid",
+                    443,
+                    "192.0.2.2:12000".parse().unwrap(),
+                ))
+        } else {
+            let plan = core.shared.live.lock().unwrap().plan.clone();
+            core.runtime.as_ref().unwrap().block_on(classify(
+                &plan,
+                "classified.fixture.invalid",
+                443,
+            ))
+        };
         if trusted_name {
             assert_eq!(resolved.unwrap(), vec!["203.0.113.9:443".parse().unwrap()]);
             assert_eq!(observed.load(Ordering::Acquire), 1);
@@ -1052,4 +1073,138 @@ fn classification_dns_uses_default_proxy_then_verified_tls_without_direct_or_pla
         peer.join().unwrap();
         core.stop();
     }
+}
+
+fn native_dns_fixture(mut candidate: RuntimeConfig) -> RuntimeConfig {
+    candidate.dns.tls_servers = vec![swirl_subscription::DnsTlsServer {
+        address: "192.0.2.1:853".parse().unwrap(),
+        tls: swirl_subscription::Tls {
+            server_name: "dns.fixture.invalid".into(),
+            alpn: vec![],
+            ca_der_base64: None,
+        },
+        https_path: None,
+    }];
+    candidate
+}
+
+#[test]
+fn native_tcp_reuses_proxy_policy_admission_pinning_and_catalogue_revocation() {
+    let a = Peer::new(b'A');
+    let b = Peer::new(b'B');
+    let initial = native_dns_fixture(config(&a, &b, A, true));
+    let candidate = native_dns_fixture(config(&a, &b, B, false));
+    let mut core = Core::start(initial, STORE.into(), 1, START.into()).unwrap();
+    let dispatcher = core.flow_dispatcher().unwrap();
+    let runtime = Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+    let open = |dispatcher: FlowDispatcher| async move {
+        let (mut client, incoming) = tokio::io::duplex(1024);
+        let relay = tokio::spawn(async move {
+            dispatcher
+                .relay_tcp(
+                    incoming,
+                    "192.0.2.2:12000".parse().unwrap(),
+                    NetworkTarget {
+                        host: "target.fixture.invalid".into(),
+                        port: 80,
+                    },
+                )
+                .await
+        });
+        client.write_all(b"ping").await.unwrap();
+        (client, relay)
+    };
+    let (mut old_client, old_relay) = runtime.block_on(open(dispatcher.clone()));
+    runtime.block_on(async {
+        let mut response = [0; 6];
+        old_client.read_exact(&mut response).await.unwrap();
+        assert_eq!(&response, b"A:ping");
+    });
+    let plan = prepared(&core, candidate.clone(), REQUEST, 1, 2, 1, vec![]);
+    activated(&core, &plan, REQUEST, 1, 2);
+    let (mut new_client, new_relay) = runtime.block_on(open(dispatcher));
+    wait(|| core.shared.waiting.load(Ordering::Acquire) == 1);
+    assert_eq!(b.requests.load(Ordering::Acquire), 0);
+    finished(&core, &plan, REQUEST, 2);
+    runtime.block_on(async {
+        let mut response = [0; 6];
+        new_client.read_exact(&mut response).await.unwrap();
+        assert_eq!(&response, b"B:ping");
+        old_client.write_all(b"old1").await.unwrap();
+        old_client.read_exact(&mut response).await.unwrap();
+        assert_eq!(&response, b"A:old1");
+    });
+    let revoke = prepared(&core, candidate, REQUEST3, 2, 3, 2, vec![A.into()]);
+    activated(&core, &revoke, REQUEST3, 2, 3);
+    finished(&core, &revoke, REQUEST3, 3);
+    runtime.block_on(async {
+        assert_eq!(old_client.read(&mut [0; 1]).await.unwrap(), 0);
+        assert_eq!(old_relay.await.unwrap(), Err("SessionRevoked"));
+        let mut response = [0; 6];
+        new_client.write_all(b"new2").await.unwrap();
+        new_client.read_exact(&mut response).await.unwrap();
+        assert_eq!(&response, b"B:new2");
+        drop(new_client);
+        new_relay.await.unwrap().unwrap();
+    });
+    assert_eq!(a.requests.load(Ordering::Acquire), 2);
+    assert_eq!(b.requests.load(Ordering::Acquire), 2);
+    core.stop();
+}
+
+#[test]
+fn native_udp_reuses_shadowsocks_outbound_and_revokes_an_idle_session() {
+    let a = DatagramPeer::new(b'A');
+    let b = DatagramPeer::new(b'B');
+    let dummy_a = Peer::new(b'A');
+    let dummy_b = Peer::new(b'B');
+    let mut initial = native_dns_fixture(config(&dummy_a, &dummy_b, A, true));
+    initial.nodes = vec![a.node(A), b.node(B)];
+    let mut candidate = initial.clone();
+    candidate.nodes = vec![b.node(B)];
+    candidate.policy.default_policy.target = Target::Node { id: B.into() };
+    let mut core = Core::start(initial, STORE.into(), 1, START.into()).unwrap();
+    let dispatcher = core.flow_dispatcher().unwrap();
+    let runtime = Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+    let mut flow = runtime.block_on(async {
+        let mut flow = dispatcher
+            .open_udp(
+                "192.0.2.2:12000".parse().unwrap(),
+                NetworkTarget {
+                    host: "target.fixture.invalid".into(),
+                    port: 80,
+                },
+            )
+            .await
+            .unwrap();
+        flow.send(b"udp1").await.unwrap();
+        let mut response = [0; 64];
+        let size = timeout(Duration::from_secs(3), flow.recv(&mut response))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(&response[..size], b"A:udp1");
+        flow
+    });
+    let plan = prepared(&core, candidate, REQUEST, 1, 2, 1, vec![A.into()]);
+    activated(&core, &plan, REQUEST, 1, 2);
+    // No send/recv future is polled by the caller here: the owned worker must
+    // observe cancellation itself and release the real revocation barrier.
+    finished(&core, &plan, REQUEST, 2);
+    assert_eq!(core.snapshot().unwrap()["active"], 0);
+    runtime.block_on(async {
+        assert_eq!(flow.recv(&mut [0; 64]).await, Err("SessionRevoked"));
+        assert_eq!(flow.send(b"must-not-replay").await, Err("SessionRevoked"));
+    });
+    assert_eq!(a.packets.load(Ordering::Acquire), 1);
+    assert_eq!(b.packets.load(Ordering::Acquire), 0);
+    core.stop();
 }

@@ -22,7 +22,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use swirl_dns::Resolver;
-use swirl_transport::BoxStream;
+use swirl_transport::{BoxStream, bind_udp};
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf},
     net::UdpSocket,
@@ -735,14 +735,20 @@ impl UdpAssociation {
             let addresses = resolver.resolve(host, port).await?;
             for address in addresses {
                 let local = SocketAddr::new(
-                    if address.is_ipv4() {
+                    if address.is_ipv4() && address.ip().is_loopback() {
+                        IpAddr::V4(Ipv4Addr::LOCALHOST)
+                    } else if address.ip().is_loopback() {
+                        IpAddr::V6(Ipv6Addr::LOCALHOST)
+                    } else if address.is_ipv4() {
                         IpAddr::V4(Ipv4Addr::UNSPECIFIED)
                     } else {
                         IpAddr::V6(Ipv6Addr::UNSPECIFIED)
                     },
                     0,
                 );
-                let Ok(socket) = UdpSocket::bind(local).await else {
+                // Every non-loopback proxy socket must pass the common egress
+                // guard and buffer setup; UDP connect alone applies no binding.
+                let Ok(socket) = bind_udp(local).await else {
                     continue;
                 };
                 if socket.connect(address).await.is_ok() {
