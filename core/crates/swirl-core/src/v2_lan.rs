@@ -19,6 +19,10 @@ enum Access {
     Private(Vec<Cidr>),
     #[cfg(test)]
     LoopbackFixture,
+    // Admits a real loopback client while retaining production endpoint ACLs.
+    // Individual peer sockets can be explicitly authorized by test fixtures.
+    #[cfg(test)]
+    StrictLoopbackFixture,
 }
 
 impl Access {
@@ -26,7 +30,7 @@ impl Access {
         match self {
             Self::Private(cidrs) => cidrs.iter().any(|cidr| cidr.contains(ip)),
             #[cfg(test)]
-            Self::LoopbackFixture => ip.is_loopback(),
+            Self::LoopbackFixture | Self::StrictLoopbackFixture => ip.is_loopback(),
         }
     }
 }
@@ -296,6 +300,30 @@ pub(super) struct Ingress {
     protocol: Protocol,
 }
 
+pub(super) struct Boundary<'a> {
+    ingress: &'a Ingress,
+    local: SocketAddr,
+}
+
+impl IngressBoundary for Boundary<'_> {
+    fn resolver(&self, resolver: &Arc<Resolver>) -> Arc<Resolver> {
+        let ingress = self.ingress.clone();
+        let local = self.local;
+        Arc::new(resolver.as_ref().clone().with_endpoint_guard(move |address| {
+            ingress.check_proxy_endpoint(address, local).is_ok()
+        }))
+    }
+
+    fn prepare_proxy_endpoint<'a>(
+        &'a self,
+        node: &'a Node,
+        resolver: &'a mut Arc<Resolver>,
+        limit: Duration,
+    ) -> GuardPreparation<'a> {
+        Box::pin(self.ingress.prepare_proxy_endpoint(node, resolver, limit, self.local))
+    }
+}
+
 impl Ingress {
     pub(super) fn check_target(&self, target: &NetworkTarget) -> Result<()> {
         #[cfg(test)]
@@ -312,12 +340,38 @@ impl Ingress {
         self.config.check_target(&target.host)
     }
 
-    pub(super) async fn prepare_outbound(
+    pub(super) fn boundary(&self, local: SocketAddr) -> Boundary<'_> {
+        Boundary { ingress: self, local }
+    }
+
+    fn check_proxy_endpoint(&self, address: SocketAddr, local: SocketAddr) -> Result<()> {
+        if (address.port() == local.port()
+            && (address.ip().is_loopback() || address.ip() == local.ip()))
+            || ([self.config.http_port, self.config.socks_port].contains(&address.port())
+                && (address.ip() == self.config.listen_ip
+                    || self.config.host_addresses.contains(&address.ip())))
+        {
+            return Err("LanOutboundProxyLoop");
+        }
+        #[cfg(test)]
+        if matches!(self.state.access, Access::LoopbackFixture) && address.ip().is_loopback() {
+            return Ok(());
+        }
+        self.check_target(&NetworkTarget {
+            host: address.ip().to_string(),
+            port: address.port(),
+        })
+        .map_err(|_| "LanOutboundHostAccessDenied")
+    }
+
+    async fn prepare_proxy_endpoint(
         &self,
-        routed: &mut Routed,
+        node: &Node,
+        resolver: &mut Arc<Resolver>,
+        limit: Duration,
         local: SocketAddr,
     ) -> Result<()> {
-        let (host, port) = match &routed.node.outbound {
+        let (host, port) = match &node.outbound {
             Outbound::Direct {} | Outbound::Reject {} => return Ok(()),
             Outbound::Vmess { host, port, .. }
             | Outbound::Vless { host, port, .. }
@@ -335,60 +389,44 @@ impl Ingress {
         } else {
             host.parse::<IpAddr>()
                 .ok()
-                .or_else(|| routed.resolver.mapped_host(&host))
+                .or_else(|| resolver.mapped_host(&host))
         };
-        if known.is_some_and(|ip| {
-            (port == local.port() && (ip.is_loopback() || ip == local.ip()))
-                || ([self.config.http_port, self.config.socks_port].contains(&port)
-                    && (ip == self.config.listen_ip || self.config.host_addresses.contains(&ip)))
-        }) {
-            return Err("LanOutboundProxyLoop");
+        if let Some(ip) = known {
+            self.check_proxy_endpoint(SocketAddr::new(ip, port), local)?;
         }
         // Resolve the configured endpoint through the existing DNS subsystem,
         // validate every candidate, then freeze those answers for the dial.
-        // This removes the check/dial DNS-rebinding window while retaining the
-        // original hostname for TLS verification and all approved address
-        // candidates for the existing connection scheduler.
-        let addresses = timeout(routed.limit, routed.resolver.resolve(&host, port))
+        // The same preparation protects an earlier classification DNS tunnel.
+        let addresses = timeout(limit, resolver.resolve(&host, port))
             .await
             .map_err(|_| "LanOutboundDnsTimeout")??;
         if addresses.is_empty() || addresses.len() > 16 {
             return Err("LanOutboundDnsAnswers");
         }
         for address in &addresses {
-            if (address.port() == local.port()
-                && (address.ip().is_loopback() || address.ip() == local.ip()))
-                || ([self.config.http_port, self.config.socks_port].contains(&address.port())
-                    && (address.ip() == self.config.listen_ip
-                        || self.config.host_addresses.contains(&address.ip())))
-            {
-                return Err("LanOutboundProxyLoop");
-            }
-            #[cfg(test)]
-            if matches!(self.state.access, Access::LoopbackFixture) && address.ip().is_loopback() {
-                continue;
-            }
-            self.config
-                .check_target(&address.ip().to_string())
-                .map_err(|_| "LanOutboundHostAccessDenied")?;
+            self.check_proxy_endpoint(*address, local)?;
         }
-        let config = self.config.clone();
-        #[cfg(test)]
-        let fixture = matches!(self.state.access, Access::LoopbackFixture);
-        let resolver = routed
-            .resolver
-            .with_pinned_addresses(
-                &host,
-                addresses.into_iter().map(|address| address.ip()).collect(),
-            )
-            .with_endpoint_guard(move |address| {
-                #[cfg(test)]
-                if fixture && address.ip().is_loopback() {
-                    return true;
-                }
-                config.check_target(&address.ip().to_string()).is_ok()
-            });
-        routed.resolver = Arc::new(resolver);
+        let ingress = self.clone();
+        *resolver = Arc::new(
+            resolver
+                .with_pinned_addresses(
+                    &host,
+                    addresses.into_iter().map(|address| address.ip()).collect(),
+                )
+                .with_endpoint_guard(move |address| {
+                    ingress.check_proxy_endpoint(address, local).is_ok()
+                }),
+        );
+        Ok(())
+    }
+
+    pub(super) async fn prepare_outbound(
+        &self,
+        routed: &mut Routed,
+        local: SocketAddr,
+    ) -> Result<()> {
+        self.prepare_proxy_endpoint(&routed.node, &mut routed.resolver, routed.limit, local)
+            .await?;
         // The target is also an address boundary. Delegating a domain to even
         // an approved proxy would let that proxy resolve it back to this host.
         // Resolve over the selected outbound's encrypted DNS path, validate

@@ -233,6 +233,28 @@ fn start_fixture(core: &mut Core, config: &LanConfig) {
     assert_eq!(core.lan_status().unwrap()["running"], true);
 }
 
+fn start_strict_fixture(core: &mut Core, config: &LanConfig, endpoints: &[SocketAddr]) {
+    config.validate_common().unwrap();
+    core.lan = Some(
+        LanRuntime::start_bound(
+            core.runtime.as_ref().unwrap(),
+            core.shared.clone(),
+            config.clone(),
+            Access::StrictLoopbackFixture,
+        )
+        .unwrap(),
+    );
+    core.lan
+        .as_ref()
+        .unwrap()
+        .state
+        .fixture_targets
+        .lock()
+        .unwrap()
+        .extend(endpoints.iter().copied());
+    assert_eq!(core.lan_status().unwrap()["running"], true);
+}
+
 fn http_connect(config: &LanConfig, authenticated: bool, host: &str) -> (StdStream, Vec<u8>) {
     let mut client = stream(SocketAddr::new(config.listen_ip, config.http_port));
     let authorization = if authenticated {
@@ -858,6 +880,10 @@ struct DnsPeer {
 
 impl DnsPeer {
     fn new(answers: Vec<std::net::Ipv4Addr>) -> Self {
+        Self::with_ttl(answers, 0)
+    }
+
+    fn with_ttl(answers: Vec<std::net::Ipv4Addr>, ttl: u32) -> Self {
         let socket = StdUdpSocket::bind("127.0.0.1:0").unwrap();
         socket
             .set_read_timeout(Some(Duration::from_millis(50)))
@@ -896,9 +922,11 @@ impl DnsPeer {
                     let answer = answers[index.min(answers.len() - 1)];
                     let mut reply = query[..end].to_vec();
                     reply[2..12].copy_from_slice(&[0x81, 0x80, 0, 1, 0, 1, 0, 0, 0, 0]);
-                    // TTL=0 deliberately prevents a cache hit masking a second
-                    // DNS resolution between address validation and dialing.
-                    reply.extend([0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 0, 0, 4]);
+                    // Default TTL=0 exposes validation/dial re-resolution;
+                    // cache-preservation cases explicitly opt into a lifetime.
+                    reply.extend([0xc0, 0x0c, 0, 1, 0, 1]);
+                    reply.extend(ttl.to_be_bytes());
+                    reply.extend([0, 4]);
                     reply.extend(answer.octets());
                     socket.send_to(&reply, peer).unwrap();
                 }
@@ -946,6 +974,10 @@ struct EncryptedDnsProxy {
 
 impl EncryptedDnsProxy {
     fn new(answers: Vec<std::net::Ipv4Addr>, malformed: bool) -> Self {
+        Self::with_ttl(answers, malformed, 0)
+    }
+
+    fn with_ttl(answers: Vec<std::net::Ipv4Addr>, malformed: bool, ttl: u32) -> Self {
         use tokio_rustls::rustls::{
             ServerConfig,
             pki_types::{CertificateDer, PrivatePkcs8KeyDer},
@@ -1035,8 +1067,11 @@ impl EncryptedDnsProxy {
                             reply[2..4].copy_from_slice(&[0x81, 0x80]);
                             reply[6..8].copy_from_slice(&(answers.len() as u16).to_be_bytes());
                             for answer in answers {
-                                // Zero TTL makes any second resolution visible.
-                                reply.extend([0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 0, 0, 4]);
+                                // Default zero TTL exposes a second lookup;
+                                // the classification cache test opts into 60s.
+                                reply.extend([0xc0, 0x0c, 0, 1, 0, 1]);
+                                reply.extend(ttl.to_be_bytes());
+                                reply.extend([0, 4]);
                                 reply.extend(answer.octets());
                             }
                             if malformed { reply[0] ^= 1; }
@@ -1287,6 +1322,234 @@ fn proxy_domain_rebinding_and_malformed_encrypted_dns_cannot_delegate_a_target()
         drop(client);
         core.stop();
     }
+}
+
+fn require_rule_dns(candidate: &mut RuntimeConfig) {
+    candidate.policy.mode = Mode::Rule;
+    candidate.policy.explicit_direct_rules.push(swirl_subscription::v2::PolicyRule {
+        id: "60000000-0000-4000-8000-000000000009".into(),
+        name: "configured DNS boundary fixture".into(),
+        enabled: true,
+        priority: 1,
+        matcher: swirl_subscription::Matcher::Cidr {
+            value: "198.51.100.0/24".parse().unwrap(),
+            resolve: true,
+        },
+        target: Target::Direct {},
+    });
+}
+
+#[test]
+fn configured_dns_guard_precedes_direct_mandatory_rule_and_proxy_bootstrap_io() {
+    for protocol in ["udp", "dot", "doh"] {
+        for path in ["direct", "mandatory", "bootstrap"] {
+            let proxy = EncryptedDnsProxy::new(vec!["203.0.113.80".parse().unwrap()], false);
+            let dns = DnsPeer::new(vec!["203.0.113.80".parse().unwrap()]);
+            let mut candidate = proxy.config();
+            match protocol {
+                "udp" => dns.configure(&mut candidate),
+                "doh" => candidate.dns.tls_servers[0].https_path = Some("/dns-query".into()),
+                _ => {}
+            }
+            match path {
+                "direct" => candidate.policy.mode = Mode::Direct,
+                "mandatory" => require_rule_dns(&mut candidate),
+                "bootstrap" => {
+                    let Outbound::HttpConnect { host, .. } = &mut candidate.nodes[0].outbound else {
+                        unreachable!();
+                    };
+                    *host = "guarded-bootstrap.fixture.invalid".into();
+                }
+                _ => unreachable!(),
+            }
+            let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+            let lan = lan_config(false);
+            start_strict_fixture(&mut core, &lan, &[proxy.address]);
+            let host = if path == "bootstrap" { "target.fixture.invalid" } else { "configured-dns.fixture.invalid" };
+            let (client, response) = http_connect(&lan, true, host);
+            assert!(!response.starts_with(b"HTTP/1.1 200"), "{protocol}/{path}");
+            wait(|| core.lan_status().unwrap()["active_connections"] == 0);
+            assert_eq!(core.lan_status().unwrap()["last_error"], "DnsEndpointForbidden", "{protocol}/{path}");
+            assert_eq!(dns.queries.load(Ordering::Acquire), 0);
+            assert_eq!(proxy.accepted.load(Ordering::Acquire), 0);
+            assert_eq!(proxy.queries.load(Ordering::Acquire), 0);
+            proxy.assert_no_direct_dns();
+            drop(client);
+            core.stop();
+        }
+    }
+}
+
+#[test]
+fn permitted_configured_dns_keeps_mandatory_routing_bootstrap_and_shared_cache() {
+    for bootstrap in [false, true] {
+        let peer = Peer::new(b'A');
+        let address = if bootstrap { "127.0.0.1" } else { "203.0.113.80" };
+        let dns = DnsPeer::with_ttl(vec![address.parse().unwrap()], 60);
+        let mut candidate = config(vec![peer.node(A)], A);
+        dns.configure(&mut candidate);
+        if bootstrap {
+            let Outbound::HttpConnect { host, .. } = &mut candidate.nodes[0].outbound else {
+                unreachable!();
+            };
+            *host = "permitted-bootstrap.fixture.invalid".into();
+        } else {
+            require_rule_dns(&mut candidate);
+        }
+        let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+        let lan = lan_config(false);
+        start_strict_fixture(&mut core, &lan, &[peer.address, dns.address]);
+        let host = if bootstrap { "target.fixture.invalid" } else { "permitted-rule.fixture.invalid" };
+        for _ in 0..2 {
+            let (mut client, response) = http_connect(&lan, true, host);
+            assert!(response.starts_with(b"HTTP/1.1 200"), "{response:?}");
+            exchange(&mut client, b'A');
+        }
+        wait(|| core.lan_status().unwrap()["active_connections"] == 0);
+        assert_eq!(dns.queries.load(Ordering::Acquire), 1, "the guarded view retains the original cache");
+        assert_eq!(peer.requests.load(Ordering::Acquire), 2);
+        let records = core.shared.records.lock().unwrap();
+        assert_eq!(records.len(), 2);
+        assert!(records.values().all(|record| record.node == A && record.trace["chosen_ip"] == "203.0.113.80"));
+        drop(records);
+        core.stop();
+    }
+}
+
+#[test]
+fn classification_cannot_dial_a_protected_default_proxy_before_lan_outbound_preparation() {
+    for mapped_hostname in [false, true] {
+        let proxy = EncryptedDnsProxy::new(vec!["203.0.113.80".parse().unwrap()], false);
+        let mut candidate = proxy.config();
+        candidate.policy.mode = Mode::Rule;
+        candidate.policy.classification_dns = ClassificationDns::ViaDefaultPolicy;
+        // An allowed DNS address isolates the selected physical proxy check.
+        // Neither address is dialled because the protected proxy is denied.
+        candidate.dns.tls_servers[0].address = "203.0.113.53:853".parse().unwrap();
+        if mapped_hostname {
+            let Outbound::HttpConnect { host, .. } = &mut candidate.nodes[0].outbound else {
+                unreachable!();
+            };
+            *host = "protected-proxy.fixture.invalid".into();
+            candidate.dns.hosts.push(swirl_subscription::HostMapping {
+                name: host.clone(),
+                address: proxy.address.ip(),
+            });
+        }
+        let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+        let lan = lan_config(false);
+        start_strict_fixture(&mut core, &lan, &[]);
+        let (client, response) = http_connect(&lan, true, "classified-protected.fixture.invalid");
+        assert!(!response.starts_with(b"HTTP/1.1 200"));
+        wait(|| core.lan_status().unwrap()["active_connections"] == 0);
+        assert_eq!(core.lan_status().unwrap()["last_error"], "ClassificationIngressDenied");
+        assert_eq!(proxy.accepted.load(Ordering::Acquire), 0);
+        assert_eq!(proxy.queries.load(Ordering::Acquire), 0);
+        proxy.assert_no_direct_dns();
+        drop(client);
+        core.stop();
+    }
+}
+
+#[test]
+fn classification_checks_dot_and_doh_endpoints_before_proxy_hostname_bootstrap() {
+    for https_path in [None, Some("/dns-query".into())] {
+        let proxy = EncryptedDnsProxy::new(vec!["203.0.113.80".parse().unwrap()], false);
+        let mut candidate = proxy.config();
+        candidate.policy.mode = Mode::Rule;
+        candidate.policy.classification_dns = ClassificationDns::ViaDefaultPolicy;
+        candidate.dns.tls_servers[0].https_path = https_path;
+        let Outbound::HttpConnect { host, .. } = &mut candidate.nodes[0].outbound else {
+            unreachable!();
+        };
+        *host = "unresolved-proxy.fixture.invalid".into();
+        let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+        let lan = lan_config(false);
+        // The selected proxy fixture would be allowed, but its hostname must
+        // not bootstrap through the unapproved host-owned encrypted DNS socket.
+        start_strict_fixture(&mut core, &lan, &[proxy.address]);
+        let (client, response) = http_connect(&lan, true, "classified-dns-pivot.fixture.invalid");
+        assert!(!response.starts_with(b"HTTP/1.1 200"));
+        wait(|| core.lan_status().unwrap()["active_connections"] == 0);
+        assert_eq!(core.lan_status().unwrap()["last_error"], "ClassificationIngressDenied");
+        assert_eq!(proxy.accepted.load(Ordering::Acquire), 0);
+        assert_eq!(proxy.queries.load(Ordering::Acquire), 0);
+        proxy.assert_no_direct_dns();
+        drop(client);
+        core.stop();
+    }
+}
+
+#[test]
+fn udp_classification_cannot_open_a_protected_default_proxy_after_authentication() {
+    let proxy = EncryptedDnsProxy::new(vec!["203.0.113.80".parse().unwrap()], false);
+    let mut candidate = proxy.config();
+    candidate.policy.mode = Mode::Rule;
+    candidate.policy.classification_dns = ClassificationDns::ViaDefaultPolicy;
+    candidate.dns.tls_servers[0].address = "203.0.113.53:853".parse().unwrap();
+    let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+    let lan = lan_config(false);
+    start_strict_fixture(&mut core, &lan, &[]);
+    let (mut control, authenticated) = socks_auth(&lan, &lan.auth.password);
+    assert_eq!(authenticated, [1, 0]);
+    let client = StdUdpSocket::bind(SocketAddr::new(control.local_addr().unwrap().ip(), 0)).unwrap();
+    client.set_read_timeout(Some(Duration::from_millis(150))).unwrap();
+    let mut request = vec![5, 3, 0, 1, 0, 0, 0, 0];
+    request.extend(client.local_addr().unwrap().port().to_be_bytes());
+    control.write_all(&request).unwrap();
+    let mut response = [0; 10];
+    control.read_exact(&mut response).unwrap();
+    assert_eq!(&response[..4], &[5, 0, 0, 1]);
+    let relay = SocketAddr::new(lan.listen_ip, u16::from_be_bytes([response[8], response[9]]));
+    let host = b"udp-classification.fixture.invalid";
+    let mut datagram = vec![0, 0, 0, 3, host.len() as u8];
+    datagram.extend(host);
+    datagram.extend(443u16.to_be_bytes());
+    datagram.extend(b"blocked-classification");
+    client.send_to(&datagram, relay).unwrap();
+    wait(|| core.lan_status().unwrap()["last_error"] == "ClassificationIngressDenied");
+    assert!(client.recv_from(&mut [0; 512]).is_err());
+    assert_eq!(proxy.accepted.load(Ordering::Acquire), 0);
+    assert_eq!(proxy.queries.load(Ordering::Acquire), 0);
+    proxy.assert_no_direct_dns();
+    drop(control);
+    wait(|| core.lan_status().unwrap()["active_connections"] == 0);
+    core.stop();
+}
+
+#[test]
+fn classification_keeps_selected_proxy_dns_cache_and_unused_nodes_for_authenticated_lan() {
+    let proxy = EncryptedDnsProxy::with_ttl(vec!["203.0.113.80".parse().unwrap()], false, 60);
+    let unused = Peer::new(b'B');
+    let mut candidate = proxy.config();
+    candidate.nodes.push(unused.node(B));
+    candidate.policy.mode = Mode::Rule;
+    candidate.policy.classification_dns = ClassificationDns::ViaDefaultPolicy;
+    let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+    let lan = lan_config(false);
+    // Only the actual selected node and its declared DNS socket are authorized
+    // fixtures. An unrelated, unused loopback node must not invalidate routing.
+    start_strict_fixture(&mut core, &lan, &[proxy.address, proxy.direct_dns.local_addr().unwrap()]);
+    for _ in 0..2 {
+        let (mut client, response) = http_connect(&lan, true, "classification-cache.fixture.invalid");
+        assert!(response.starts_with(b"HTTP/1.1 200"), "{response:?}");
+        exchange(&mut client, b'P');
+    }
+    wait(|| core.lan_status().unwrap()["active_connections"] == 0);
+    assert_eq!(proxy.queries.load(Ordering::Acquire), 1, "classification keeps its existing cache");
+    assert_eq!(proxy.accepted.load(Ordering::Acquire), 3);
+    assert_eq!(*proxy.targets.lock().unwrap(), vec!["203.0.113.80:80", "203.0.113.80:80"]);
+    assert_eq!(unused.requests.load(Ordering::Acquire), 0);
+    let records = core.shared.records.lock().unwrap();
+    assert!(records.values().any(|record| record.ingress == "lan"
+        && record.target.host == "classification-cache.fixture.invalid"
+        && record.trace["leaf_node_id"] == A
+        && record.trace["chosen_ip"] == "203.0.113.80"
+        && record.trace["dns_profile"] == "classification"
+        && record.trace["classification_dns_path"] == "via_default_policy"));
+    drop(records);
+    proxy.assert_no_direct_dns();
+    core.stop();
 }
 
 #[test]

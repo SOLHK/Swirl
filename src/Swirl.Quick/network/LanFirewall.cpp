@@ -20,6 +20,11 @@
 #include <limits>
 #include <iterator>
 
+#ifdef SWIRL_LAN_FIREWALL_TESTS
+#include <QNetworkInterface>
+#include <QTemporaryDir>
+#endif
+
 #ifdef Q_OS_WIN
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -394,7 +399,9 @@ bool applyRule(INetFwRules *rules, const QJsonObject &record, QString *error) {
     }
     if (SUCCEEDED(hr)) hr = rule->put_Interfaces(interfaces);
     VariantClear(&interfaces);
-    if (SUCCEEDED(hr)) hr = rule->put_Enabled(VARIANT_TRUE);
+    // Production journals require enabled=true. The separately compiled test
+    // fixture exercises the identical COM path with permanently disabled rules.
+    if (SUCCEEDED(hr)) hr = rule->put_Enabled(record.value("enabled").toBool() ? VARIANT_TRUE : VARIANT_FALSE);
     if (SUCCEEDED(hr)) hr = rules->Add(rule.value);
     if (FAILED(hr)) return reject(error, hrError("防火墙规则应用", hr));
     Com<INetFwRule> observed;
@@ -695,3 +702,189 @@ int LanFirewall::guard(const QString &path) {
     Q_UNUSED(path); return 2;
 #endif
 }
+
+#ifdef SWIRL_LAN_FIREWALL_TESTS
+LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
+    Result result;
+#ifdef Q_OS_WIN
+    // This entry point is not linked into SwirlEngine or the product. Requiring
+    // both the dedicated executable and explicit opt-in keeps a normal CTest
+    // invocation from changing even disabled Windows firewall rules.
+    if (qEnvironmentVariable("SWIRL_LAN_FIREWALL_TEST") != "1"
+        || QFileInfo(QCoreApplication::applicationFilePath()).fileName()
+               .compare("SwirlLanFirewallTests.exe", Qt::CaseInsensitive) != 0) {
+        result.error = "The dedicated native firewall fixture requires explicit opt-in.";
+        return result;
+    }
+    Apartment apartment;
+    if (FAILED(apartment.result)) { result.error = hrError("fixture COM", apartment.result); return result; }
+    Com<INetFwPolicy2> policy; Com<INetFwRules> rules;
+    if (!firewall(policy, rules, &result.error)) return result;
+    QString alias;
+    for (const auto &iface : QNetworkInterface::allInterfaces()) {
+        if (iface.flags().testFlag(QNetworkInterface::IsUp)
+            && !iface.flags().testFlag(QNetworkInterface::IsLoopBack)
+            && !iface.humanReadableName().isEmpty()) {
+            alias = iface.humanReadableName();
+            break;
+        }
+    }
+    if (alias.isEmpty()) { result.error = "No existing interface alias is available for the disabled fixture."; return result; }
+    const auto application = QDir::fromNativeSeparators(
+        QFileInfo(QCoreApplication::applicationFilePath()).canonicalFilePath());
+    if (application.isEmpty()) { result.error = "The fixture executable identity is unavailable."; return result; }
+    QTemporaryDir directory(QDir::tempPath() + "/swirl-lan-firewall-test-XXXXXX");
+    if (!directory.isValid()) { result.error = "Cannot create the isolated fixture journal directory."; return result; }
+    // Preserve the encrypted journal if a real external edit prevents cleanup.
+    // Disabled rules cannot admit traffic, including after an interrupted test.
+    directory.setAutoRemove(false);
+    if (!secureDirectory(directory.path())) { result.error = "Cannot secure the isolated fixture directory."; return result; }
+    struct Fixture { QString path; QJsonObject record; };
+    QList<Fixture> fixtures;
+    QSet<QString> scriptedEdits;
+    const auto check = [&](bool ok, const QString &message) {
+        if (!ok && result.error.isEmpty()) result.error = message;
+        return ok;
+    };
+    const auto observed = [&](const QJsonObject &expected, QJsonObject *snapshot) {
+        const String name(expected.value("name").toString());
+        Com<INetFwRule> rule;
+        const auto hr = name.value ? rules->Item(name, rule.out()) : E_OUTOFMEMORY;
+        if (FAILED(hr)) return check(false, hrError("fixture rule read", hr));
+        *snapshot = ruleSnapshot(rule.value);
+        return check(!snapshot->isEmpty(), "Cannot read every native firewall rule property.");
+    };
+    const auto exact = [&](const Fixture &fixture) {
+        for (const auto &value : fixture.record.value("rules").toArray()) {
+            QJsonObject actual;
+            if (!observed(value.toObject(), &actual)
+                || !check(actual == value.toObject(), "Native rule readback differs from the exact fixture scope.")) return false;
+        }
+        return true;
+    };
+    const auto bytes = [](const QString &path) {
+        QFile file(path);
+        return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+    };
+    const auto add = [&]() {
+        const auto session = QUuid::createUuid().toString(QUuid::Id128);
+        QJsonArray desired;
+        for (int index = 0; index < 2; ++index) desired.append(QJsonObject{
+            {"name", "SwirlLanTest-" + session + (index ? "-udp" : "-tcp")},
+            {"description", "Swirl disabled native firewall fixture " + session},
+            {"group", "Swirl disabled test " + session}, {"application", application.toLower()},
+            {"local_addresses", "127.0.0.1"}, {"remote_addresses", "127.0.0.1/32"},
+            {"local_ports", index ? "49174-49175" : "49173"}, {"remote_ports", "*"},
+            {"interface_types", "All"}, {"service", ""}, {"interfaces", QJsonArray{alias}},
+            {"profiles", 2}, {"protocol", index ? 17 : 6}, {"direction", 1}, {"action", 1},
+            {"enabled", false}, {"edge_traversal", false}});
+        Fixture fixture{directory.filePath(session + ".dpapi"),
+            {{"fixture_schema", 1}, {"session", session}, {"application", application},
+             {"owner_pid", double(QCoreApplication::applicationPid())},
+             {"owner_creation", processStamp(GetCurrentProcess())}, {"rules", desired}}};
+        if (!check(!validateJournal(fixture.record), "A test fixture must never validate as a production journal.")
+            || !check(writeRecord(fixture.path, fixture.record), "Cannot write the fixture DPAPI recovery record.")) return false;
+        fixtures.append(fixture);
+        if (!check(readRecord(fixture.path) == fixture.record, "The DPAPI fixture journal did not roundtrip.")) return false;
+        const auto encrypted = bytes(fixture.path);
+        if (!check(!encrypted.isEmpty() && !encrypted.contains(session.toUtf8())
+                   && !encrypted.contains("SwirlLanTest-"), "The recovery fixture journal was not encrypted.")) return false;
+        for (const auto &value : desired)
+            if (!applyRule(rules.value, value.toObject(), &result.error)) return false;
+        return exact(fixture);
+    };
+    const auto absent = [&](const Fixture &fixture) {
+        for (const auto &value : fixture.record.value("rules").toArray()) {
+            const String name(value.toObject().value("name").toString());
+            Com<INetFwRule> rule;
+            if (!check(name.value && rules->Item(name, rule.out()) == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
+                       "The native fixture rule still exists after owned cleanup.")) return false;
+        }
+        return check(!QFileInfo::exists(fixture.path), "The recovered fixture journal still exists.");
+    };
+    const auto exercise = [&]() {
+        if (!add()) return false;
+        const auto first = fixtures.first();
+        if (scenario == FixtureCase::RoundTrip) {
+            QString duplicateError;
+            if (!check(!applyRule(rules.value, first.record.value("rules").toArray().first().toObject(), &duplicateError)
+                       && !duplicateError.isEmpty(), "Duplicate native rule creation was not refused.") || !exact(first)) return false;
+            const auto restored = cleanupLocked(first.path, first.record);
+            return check(restored.ok, restored.error) && absent(first);
+        }
+        if (scenario == FixtureCase::ExternalEdit) {
+            const auto originalBytes = bytes(first.path);
+            const auto expected = first.record.value("rules").toArray().last().toObject();
+            auto edited = expected;
+            edited.insert("description", expected.value("description").toString() + " [fixture external edit]");
+            const String name(expected.value("name").toString()), description(edited.value("description").toString());
+            Com<INetFwRule> rule;
+            auto hr = name.value ? rules->Item(name, rule.out()) : E_OUTOFMEMORY;
+            if (SUCCEEDED(hr)) hr = description.value ? rule->put_Description(description) : E_OUTOFMEMORY;
+            if (!check(SUCCEEDED(hr), hrError("fixture external edit", hr))) return false;
+            scriptedEdits.insert(expected.value("name").toString());
+            QJsonObject actual;
+            if (!observed(expected, &actual) || !check(actual == edited, "The deliberate external edit was not observed.")) return false;
+            const auto refused = cleanupLocked(first.path, first.record);
+            if (!check(!refused.ok && !refused.error.isEmpty(), "Owned cleanup did not reject an external rule edit.")
+                || !check(bytes(first.path) == originalBytes && readRecord(first.path) == first.record,
+                          "A recovery conflict changed or removed its encrypted journal.")) return false;
+            if (!observed(expected, &actual) || !check(actual == edited, "Conflict recovery modified the external edit.")) return false;
+            const auto tcp = first.record.value("rules").toArray().first().toObject();
+            return observed(tcp, &actual) && check(actual == tcp, "Reverse recovery did not stop at the edited UDP rule.");
+        }
+        if (scenario == FixtureCase::IndependentOwnership) {
+            if (!add()) return false;
+            const auto second = fixtures.last();
+            const auto retainedBytes = bytes(second.path);
+            const auto restored = cleanupLocked(first.path, first.record);
+            return check(restored.ok, restored.error) && absent(first) && exact(second)
+                && check(bytes(second.path) == retainedBytes && readRecord(second.path) == second.record,
+                         "Cleaning one owned session changed another fixture or journal.");
+        }
+        return check(false, "Unknown native fixture scenario.");
+    };
+    result.ok = exercise();
+    bool cleanupComplete = true;
+    for (auto it = fixtures.crbegin(); it != fixtures.crend(); ++it) {
+        if (!QFileInfo::exists(it->path)) continue;
+        if (readRecord(it->path) != it->record) {
+            cleanupComplete = false;
+            check(false, "The fixture journal changed unexpectedly; evidence is retained at " + it->path);
+            continue;
+        }
+        // Undo only the exact edit this fixture just made. If any other property
+        // changed, production cleanupLocked preserves the rule and the journal.
+        for (const auto &value : it->record.value("rules").toArray()) {
+            const auto expected = value.toObject();
+            if (!scriptedEdits.contains(expected.value("name").toString())) continue;
+            auto edited = expected;
+            edited.insert("description", expected.value("description").toString() + " [fixture external edit]");
+            const String name(expected.value("name").toString());
+            Com<INetFwRule> rule;
+            if (name.value && SUCCEEDED(rules->Item(name, rule.out())) && ruleSnapshot(rule.value) == edited) {
+                const String description(expected.value("description").toString());
+                if (!description.value || FAILED(rule->put_Description(description)) || ruleSnapshot(rule.value) != expected) {
+                    cleanupComplete = false;
+                    check(false, "Cannot restore the fixture's exact deliberate edit; the journal is retained.");
+                }
+            }
+        }
+        const auto restored = cleanupLocked(it->path, it->record);
+        if (!restored.ok) { cleanupComplete = false; check(false, restored.error + " Journal: " + it->path); }
+        else if (!absent(*it)) cleanupComplete = false;
+    }
+    if (cleanupComplete) cleanupComplete = directory.remove();
+    result.ok = result.ok && cleanupComplete;
+    if (!cleanupComplete && result.error.isEmpty()) result.error = "The isolated native fixture directory could not be removed.";
+    if (!cleanupComplete) result.error += " Evidence directory: " + directory.path();
+    result.record = {{"native_com", true}, {"enabled", false}, {"local_address", "127.0.0.1"},
+                     {"remote_addresses", "127.0.0.1/32"}, {"tcp_and_udp", true},
+                     {"cleanup_complete", cleanupComplete}};
+#else
+    Q_UNUSED(scenario);
+    result.error = "The native COM firewall fixture requires Windows.";
+#endif
+    return result;
+}
+#endif

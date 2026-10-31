@@ -108,6 +108,16 @@ and never authorizes DIRECT fallback. Literal targets and authorized DIRECT
 routing retain their existing behavior. Core policy updates and existing
 sessions keep their original lifecycle.
 
+Ingress restrictions also apply before routing-time classification, mandatory
+IP-rule resolution and proxy-hostname bootstrap. A scoped view of the same
+Resolver shares its cache and query budget; it checks configured UDP/DoT/DoH
+server addresses only before actual network I/O. Literal, static-host and
+cached answers do not cause an extra lookup. A denied endpoint is not a
+classification failure eligible for fallback and is never written to the
+shared negative cache. Ordinary host requests retain their original resolver
+and system-DNS policy. Only the selected classification proxy is prepared;
+an unused node cannot make an otherwise valid request fail.
+
 ## Evidence and acceptance
 
 The new `Swirl Native LAN` workflow executes the unchanged strict commands on
@@ -129,11 +139,28 @@ ownership and lifecycle fault handling; injected firewall backends are not
 evidence of real Windows firewall mutation. The existing full Qt workflow
 builds the application and runs the new registered test alongside prior tests.
 
-At initial source submission, this cloud environment has no Rust/Qt toolchain.
-Only source/static checks and Python syntax checks have run locally. Compile,
-Clippy, Rust sockets, DLL and Qt results must be read from their actual Actions
-run at the submitted commit. Formatting diagnostics never override a failed
-format gate; the formatter patch requires a new source commit and rerun.
+The development container has no Rust/Qt toolchain. Compilation and runtime
+results below come from actual GitHub Actions logs, not local execution or
+configuration flags. Each row identifies the source revision it verifies;
+subsequent changes require their own run.
+
+| Source | Evidence | Observed result |
+| --- | --- | --- |
+| `8a808c18c08187e09faeca8acaadbb707828748c` | [Native LAN run 41193987404](https://github.com/SOLHK/Swirl/actions/runs/41193987404) | All four strict Rust gates, real socket workspace tests and six independent ABI checks passed on Windows, Linux and macOS. |
+| `81bd69128122d02f791d9173ed470c8872770555` | [Native LAN run 41193550079](https://github.com/SOLHK/Swirl/actions/runs/41193550079) | All five added encrypted-DNS/target-pinning socket regressions passed on all three systems. Workspace totals: Windows 838, Linux 837, macOS 836; zero failures or ignored Rust tests. This run still failed formatting; `8a808c18` applies its exact rustfmt patch and reruns the gates. |
+| `5c3ae925528b3064a552d2a01e98d4333ca8ce04` | [Original Rust Core run 41191607693](https://github.com/SOLHK/Swirl/actions/runs/41191607693) | The original Windows, Linux and macOS jobs passed, including the Windows Qt-to-Rust integration. Platform-specific skipped public-network cases remain skipped, not accepted evidence. |
+| `5c3ae925528b3064a552d2a01e98d4333ca8ce04` | [Qt security run 41191607821](https://github.com/SOLHK/Swirl/actions/runs/41191607821) | All seven jobs passed, including the actual Qt 6.12 Windows application build, deployment checks, DPAPI checks and existing product regressions. The tested PR merge tree was source-identical to this commit. This is a regression build with UI tests enabled, not a production installer. |
+
+The additional Qt LAN lifecycle and real scoped Windows firewall fixtures are
+separate gates; the older Qt success above does not establish their results.
+The latter compiles the same COM rule and DPAPI cleanup primitives into a
+separate test executable. Its unique rules are disabled, limited to that
+executable and loopback addresses, and never open a listener. Tests verify
+readback, duplicate refusal, retained external edits and independent-session
+ownership. The test-only entry point is absent from the product. It does not
+establish live-LAN firewall admission, guard-crash or reboot acceptance.
+Formatting diagnostics never override a failed format gate: a formatter patch
+is committed as source and all requested checks run again.
 
 The following remain distinct release gates:
 
