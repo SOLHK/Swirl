@@ -17,6 +17,7 @@
 #include "engine/SystemProxySession.h"
 #include "engine/EngineController.h"
 #include <QDateTime>
+#include <QCursor>
 #include <memory>
 #include <QTest>
 #include <QSignalSpy>
@@ -249,13 +250,19 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     auto *policy=qobject_cast<MotionPolicy *>(qmlContext(window)->contextProperty("motionPolicy").value<QObject *>());
     check("motion-policy-present",policy!=nullptr);if(!policy)return 1;
     policy->setSystemReducedMotionOverrideForTest(0);
-    struct RestorePolicy{MotionPolicy *policy;~RestorePolicy(){policy->setSystemReducedMotionOverrideForTest(-1);}} restore{policy};
+    struct RestorePolicy{MotionPolicy *policy;QPoint cursor;~RestorePolicy(){QCursor::setPos(cursor);policy->setSystemReducedMotionOverrideForTest(-1);}} restore{policy,QCursor::pos()};
     const auto hostProxyBefore=SystemProxySession::snapshot();
     eval("Theme.reduceMotion=false;Theme.followSystemMotion=false;AppState.navigate('activity')");
     const QSize initialSize=window->size();window->resize(1100,760);window->requestActivate();
-    // Resting layout excludes the accepted hover lift. Use the same neutral
-    // pointer position as ActivityLayoutChecks within the existing settlement.
+    // Resting layout excludes hover lift. Park the native cursor as well as
+    // the Qt test pointer within the existing settlement, then restore it.
+    QCursor::setPos(window->mapToGlobal(QPoint(1,1)));
     QTest::mouseMove(window,QPoint(1,1));activityWait(650);
+    const auto parkedCursorGlobal=QCursor::pos(),parkedCursorScene=window->mapFromGlobal(parkedCursorGlobal);
+    dataSamples.append(QJsonObject{{"phase","overview-pointer-baseline"},
+        {"originalGlobal",QJsonArray{restore.cursor.x(),restore.cursor.y()}},
+        {"actualGlobal",QJsonArray{parkedCursorGlobal.x(),parkedCursorGlobal.y()}},
+        {"actualScene",QJsonArray{parkedCursorScene.x(),parkedCursorScene.y()}}});
     auto *page=activityVisual(window->contentItem(),"activityScroll");page=page?page->parentItem():nullptr;
     auto *transition=activityVisual(window->contentItem(),"activityDetailTransition");
     auto *surface=activityVisual(window->contentItem(),"activityDetailSurface");
