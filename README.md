@@ -10,14 +10,17 @@ Swirl 是面向 Windows 的网络工具，桌面界面使用 **C++23、Qt 6 Quic
 
 [![Windows Qt 构建与测试](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml/badge.svg?branch=main)](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml) · [测试构建与安装包](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml?query=branch%3Atest) · [测试分支](https://github.com/SOLHK/Swirl/tree/test) · [Windows 构建说明](src/Swirl.Quick/BUILDING.md)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/apec-activity-dark.png">
-  <img src="docs/screenshots/apec-activity-light.png" alt="Swirl APEC 网络活动界面，隔离空配置、未连接状态" width="1280">
-</picture>
+**浅色活动页**
+
+<img src="docs/screenshots/apec-activity-light.png" alt="Swirl 浅色活动页，五卡布局，隔离空配置、未连接状态" width="1280">
+
+**深色活动页**
+
+<img src="docs/screenshots/apec-activity-dark.png" alt="Swirl 深色活动页，五卡布局，隔离空配置、未连接状态" width="1280">
 
 [浅色界面](docs/screenshots/apec-activity-light.png) · [深色界面](docs/screenshots/apec-activity-dark.png) · [截图来源与历史索引](docs/screenshots/README.md)
 
-截图来自同一当前构建的真实 Windows 程序，使用隔离空配置，未连接代理。未添加演示节点、出口 IP、延迟或流量；运行中的祥云结也不会出现在未连接状态。截图展示界面，不代表真实远端网络或私有订阅已通过验收。
+两张截图来自同一份 0.2.32 真实 Windows 构建，使用隔离空配置，未连接代理。未添加演示节点、出口 IP、延迟或流量；运行中的祥云结也不会出现在未连接状态。截图展示界面，不代表真实远端网络或私有订阅已通过验收。
 
 ## 界面与交互
 

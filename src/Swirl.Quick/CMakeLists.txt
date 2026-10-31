@@ -575,11 +575,14 @@ if(WIN32)
  add_custom_command(
   OUTPUT "${SWIRL_GENERATED_ICON}"
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/brand"
-  COMMAND "${CMAKE_COMMAND}" -E env "PATH=$<TARGET_FILE_DIR:Qt6::Core>;$ENV{PATH}"
-          $<TARGET_FILE:SwirlIconBuilder>
+  COMMAND "${CMAKE_COMMAND}"
+          "-DSWIRL_ICON_BUILDER=$<TARGET_FILE:SwirlIconBuilder>"
+          "-DSWIRL_QT_BINARY_DIR=$<TARGET_FILE_DIR:Qt6::Core>"
+          "-DSWIRL_ICON_SOURCE=${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
+          "-DSWIRL_ICON_OUTPUT=${SWIRL_GENERATED_ICON}"
+          -P "${CMAKE_CURRENT_SOURCE_DIR}/tools/BuildWindowsIcon.cmake"
+  DEPENDS SwirlIconBuilder app/BrandRaster.h tools/BuildWindowsIcon.cmake
           "${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
-          "${SWIRL_GENERATED_ICON}"
-  DEPENDS SwirlIconBuilder app/BrandRaster.h "${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
   WORKING_DIRECTORY "$<TARGET_FILE_DIR:SwirlIconBuilder>"
   COMMENT "Generate Windows ICO from Swirl SVG"
   VERBATIM
