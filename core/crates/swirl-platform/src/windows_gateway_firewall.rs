@@ -222,7 +222,12 @@ try {
     $apps=@($rule | Get-NetFirewallApplicationFilter -ErrorAction Stop)
     $script:gatewayFirewallStage='read-service'
     $services=@($rule | Get-NetFirewallServiceFilter -ErrorAction Stop)
-    if($apps.Count -ne 1 -or [string]$apps[0].Package -ne 'Any' -or $services.Count -ne 1 -or [string]$services[0].Service -ne 'Any'){
+    # New-NetFirewallRule omits Package for this ordinary program rule. The
+    # actual NetSecurity provider returns a present, null Package property;
+    # it is not a missing filter/property or an empty/foreign package SID.
+    $package=if($apps.Count -eq 1){$apps[0].PSObject.Properties['Package']}else{$null}
+    $unrestrictedPackage=$null -ne $package -and ($null -eq $package.Value -or ($package.Value -is [string] -and $package.Value -eq 'Any'))
+    if($apps.Count -ne 1 -or -not $unrestrictedPackage -or $services.Count -ne 1 -or [string]$services[0].Service -ne 'Any'){
       $app=if($apps.Count -eq 1){$apps[0]}else{$null}
       $service=if($services.Count -eq 1){$services[0]}else{$null}
       throw ('DHCP firewall application scope changed; application_count={0}; service_count={1}; package={2}; service={3}; service_name={4}' -f $apps.Count,$services.Count,(Filter-Diagnostic $app 'Package'),(Filter-Diagnostic $service 'Service'),(Filter-Diagnostic $service 'ServiceName'))
@@ -340,7 +345,7 @@ function Remove-NetFirewallRule {throw 'Unexpected network mutation in read-only
                 "Enabled":"False","Profile":"Private","EdgeTraversalPolicy":"Block","LooseSourceMapping":false,"LocalOnlyMapping":false,"Owner":"","Platform":[]},
             "ports":{"Protocol":"UDP","LocalPort":"67","RemotePort":"68","DynamicTarget":"Any"},
             "addresses":{"LocalAddress":["192.168.77.1/32","192.168.77.255","255.255.255.255"],"RemoteAddress":["0.0.0.0","192.168.77.0/255.255.255.128"]},
-            "application":{"Program":scope.program,"Package":"Any"},"service":{"Service":"Any"},
+            "application":{"Program":scope.program,"Package":null},"service":{"Service":"Any","ServiceName":null},
             "interface":{"InterfaceAlias":[scope.interface_alias]},"interface_type":{"InterfaceType":"Wired"},
             "security":{"Authentication":"NotRequired","Encryption":"NotRequired","OverrideBlockRules":false,"LocalUser":"Any","RemoteUser":"Any","RemoteMachine":"Any"}
         })
@@ -402,7 +407,6 @@ function Remove-NetFirewallRule {throw 'Unexpected network mutation in read-only
         let valid = readback_fixture(&policy, &scope);
         let secret = "credential-must-not-be-logged";
         let cases = [
-            (json!(null), "package=null"),
             (json!(""), "package=empty_string"),
             (json!("None"), "package=keyword:None"),
             (json!("S-1-15-2-1"), "package=sid:S-1-15-2-1"),
@@ -458,6 +462,40 @@ function Remove-NetFirewallRule {throw 'Unexpected network mutation in read-only
             assert!(!error.contains(secret));
             assert!(error.len() < 768);
         }
+    }
+
+    #[test]
+    fn dhcp_firewall_readback_accepts_only_present_null_or_any_package_scope() {
+        let (policy, scope) = fixture();
+        let mut actual = readback_fixture(&policy, &scope);
+        // Real Windows job 124527768135 returned Package=null, Service=Any,
+        // ServiceName=null after creating the exact ordinary program rule.
+        actual["application"]["Package"] = json!(null);
+        actual["service"]["ServiceName"] = json!(null);
+        assert_eq!(mocked_read(&policy, &actual).unwrap(), Some(scope.clone()));
+        actual["application"]["Package"] = json!("Any");
+        assert_eq!(mocked_read(&policy, &actual).unwrap(), Some(scope.clone()));
+
+        for package in [
+            json!(""),
+            json!(" "),
+            json!("S-1-15-2-1"),
+            json!([null]),
+            json!(["Any"]),
+            json!({"Package":null}),
+            json!(false),
+        ] {
+            actual["application"]["Package"] = package;
+            assert!(mocked_read(&policy, &actual).is_err());
+        }
+        actual["application"]
+            .as_object_mut()
+            .unwrap()
+            .remove("Package");
+        let error = mocked_read(&policy, &actual).unwrap_err().to_string();
+        assert!(error.contains("package=missing_property"));
+        actual["application"] = json!(null);
+        assert!(mocked_read(&policy, &actual).is_err());
     }
 
     #[test]

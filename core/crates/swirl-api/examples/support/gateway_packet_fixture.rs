@@ -3,17 +3,25 @@
 use smoltcp::{
     phy::ChecksumCapabilities,
     wire::{
-        IpProtocol, Ipv4Packet, Ipv4Repr, TcpControl, TcpPacket, TcpRepr, TcpSeqNumber,
-        UdpPacket, UdpRepr,
+        IpProtocol, Ipv4Packet, Ipv4Repr, TcpControl, TcpPacket, TcpRepr, TcpSeqNumber, UdpPacket,
+        UdpRepr,
     },
 };
-use std::{io, net::{Ipv4Addr, SocketAddrV4}};
+use std::{
+    io,
+    net::{Ipv4Addr, SocketAddrV4},
+};
 
 fn invalid(reason: impl ToString) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, reason.to_string())
 }
 
-fn ip_packet(source: Ipv4Addr, destination: Ipv4Addr, protocol: IpProtocol, payload: &[u8]) -> Vec<u8> {
+fn ip_packet(
+    source: Ipv4Addr,
+    destination: Ipv4Addr,
+    protocol: IpProtocol,
+    payload: &[u8],
+) -> Vec<u8> {
     let mut bytes = vec![0; 20 + payload.len()];
     Ipv4Repr {
         src_addr: source,
@@ -32,7 +40,11 @@ fn ip_packet(source: Ipv4Addr, destination: Ipv4Addr, protocol: IpProtocol, payl
 
 pub fn udp_packet(source: SocketAddrV4, destination: SocketAddrV4, data: &[u8]) -> Vec<u8> {
     let mut bytes = vec![0; 8 + data.len()];
-    UdpRepr { src_port: source.port(), dst_port: destination.port() }.emit(
+    UdpRepr {
+        src_port: source.port(),
+        dst_port: destination.port(),
+    }
+    .emit(
         &mut UdpPacket::new_unchecked(&mut bytes[..]),
         &(*source.ip()).into(),
         &(*destination.ip()).into(),
@@ -133,7 +145,8 @@ pub fn tcp_segment(bytes: &[u8]) -> io::Result<Option<Segment>> {
         &ip.source.into(),
         &ip.destination.into(),
         &ChecksumCapabilities::default(),
-    ).map_err(invalid)?;
+    )
+    .map_err(invalid)?;
     Ok(Some(Segment {
         source: SocketAddrV4::new(ip.source, repr.src_port),
         destination: SocketAddrV4::new(ip.destination, repr.dst_port),
@@ -157,7 +170,8 @@ pub fn udp_datagram(bytes: &[u8]) -> io::Result<Option<Datagram>> {
         &ip.source.into(),
         &ip.destination.into(),
         &ChecksumCapabilities::default(),
-    ).map_err(invalid)?;
+    )
+    .map_err(invalid)?;
     Ok(Some((
         SocketAddrV4::new(ip.source, repr.src_port),
         SocketAddrV4::new(ip.destination, repr.dst_port),

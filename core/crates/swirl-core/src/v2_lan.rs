@@ -531,15 +531,14 @@ impl LanRuntime {
         access: Access,
     ) -> Result<Self> {
         let (http, socks) = runtime.block_on(async {
-            let http = bind_tcp(SocketAddr::new(config.listen_ip, config.http_port)).map_err(
-                |error| {
+            let http =
+                bind_tcp(SocketAddr::new(config.listen_ip, config.http_port)).map_err(|error| {
                     if error.kind() == std::io::ErrorKind::AddrInUse {
                         "LanHttpPortInUse"
                     } else {
                         "LanHttpBind"
                     }
-                },
-            )?;
+                })?;
             let socks = if config.socks_port != config.http_port {
                 Some(
                     bind_tcp(SocketAddr::new(config.listen_ip, config.socks_port)).map_err(

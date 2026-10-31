@@ -4,6 +4,10 @@ use socket2::{Domain, Protocol, Socket, Type};
 use std::{io, net::SocketAddr};
 use tokio::net::TcpListener;
 
+#[cfg(windows)]
+#[path = "inbound_windows.rs"]
+mod windows;
+
 fn bound_socket(address: SocketAddr, kind: Type, protocol: Protocol) -> io::Result<Socket> {
     if address.ip().is_unspecified() || address.ip().is_multicast() {
         return Err(io::Error::new(
@@ -16,12 +20,7 @@ fn bound_socket(address: SocketAddr, kind: Type, protocol: Protocol) -> io::Resu
     // opts into SO_REUSEADDR. This must be set BEFORE bind; a firewall rule
     // and a successful bind do not themselves confer exclusive ownership.
     #[cfg(windows)]
-    {
-        socket.set_exclusive_address(true)?;
-        if !socket.exclusive_address()? {
-            return Err(io::Error::other("ingress socket is not exclusive"));
-        }
-    }
+    windows::require_exclusive(&socket)?;
     // Match Tokio's Unix TCP restart behavior. Do not enable UDP reuse or
     // SO_REUSEPORT, and never translate this option to Winsock SO_REUSEADDR.
     #[cfg(unix)]
@@ -109,8 +108,14 @@ mod tests {
         }
         for address in ["0.0.0.0:0", "[::]:0", "224.0.0.1:0", "[ff02::1]:0"] {
             let address = address.parse().unwrap();
-            assert_eq!(bind_tcp(address).unwrap_err().kind(), io::ErrorKind::InvalidInput);
-            assert_eq!(bind_udp_std(address).unwrap_err().kind(), io::ErrorKind::InvalidInput);
+            assert_eq!(
+                bind_tcp(address).unwrap_err().kind(),
+                io::ErrorKind::InvalidInput
+            );
+            assert_eq!(
+                bind_udp_std(address).unwrap_err().kind(),
+                io::ErrorKind::InvalidInput
+            );
         }
     }
 
@@ -125,7 +130,10 @@ mod tests {
                 let mut bytes = vec![0; 65_536];
                 for payload in [b"".as_slice(), payload.as_slice()] {
                     for (sender, receiver) in [(&client, &ingress), (&ingress, &client)] {
-                        sender.send_to(payload, receiver.local_addr().unwrap()).await.unwrap();
+                        sender
+                            .send_to(payload, receiver.local_addr().unwrap())
+                            .await
+                            .unwrap();
                         let (length, source) = receiver.recv_from(&mut bytes).await.unwrap();
                         assert_eq!(source, sender.local_addr().unwrap());
                         assert_eq!(&bytes[..length], payload);
@@ -157,25 +165,30 @@ mod tests {
             // our own ephemeral loopback socket only. No external port, rule
             // or interface is touched by this fixture.
             for (kind, protocol) in [(Type::STREAM, Protocol::TCP), (Type::DGRAM, Protocol::UDP)] {
-                let ordinary = Socket::new(Domain::for_address(address), kind, Some(protocol)).unwrap();
+                let ordinary =
+                    Socket::new(Domain::for_address(address), kind, Some(protocol)).unwrap();
                 ordinary.bind(&address.into()).unwrap();
                 if kind == Type::STREAM {
                     ordinary.listen(1).unwrap();
                 }
-                let other = Socket::new(Domain::for_address(address), kind, Some(protocol)).unwrap();
+                let other =
+                    Socket::new(Domain::for_address(address), kind, Some(protocol)).unwrap();
                 other.set_reuse_address(true).unwrap();
                 other.bind(&ordinary.local_addr().unwrap()).unwrap();
             }
             let listener = bind_tcp(address).unwrap();
-            let options = SockRef::from(&listener);
-            assert!(options.exclusive_address().unwrap());
-            assert!(!options.reuse_address().unwrap());
+            assert!(windows::exclusive(&listener).unwrap());
+            assert!(!SockRef::from(&listener).reuse_address().unwrap());
             assert_reuse_cannot_steal(listener.local_addr().unwrap(), Type::STREAM, Protocol::TCP);
             let reservation = bind_udp_std(address).unwrap();
-            assert!(SockRef::from(&reservation).exclusive_address().unwrap());
-            assert_reuse_cannot_steal(reservation.local_addr().unwrap(), Type::DGRAM, Protocol::UDP);
+            assert!(windows::exclusive(&reservation).unwrap());
+            assert_reuse_cannot_steal(
+                reservation.local_addr().unwrap(),
+                Type::DGRAM,
+                Protocol::UDP,
+            );
             let relay = crate::bind_udp_inbound(address).await.unwrap();
-            assert!(SockRef::from(&relay).exclusive_address().unwrap());
+            assert!(windows::exclusive(&relay).unwrap());
             assert_reuse_cannot_steal(relay.local_addr().unwrap(), Type::DGRAM, Protocol::UDP);
         }
     }
