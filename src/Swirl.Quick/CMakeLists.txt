@@ -589,6 +589,9 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
 endif()
 if(WIN32)
  # Generate the Windows-only ICO from its optical SVG before RC compilation.
+ if(NOT TARGET Qt6::QOffscreenIntegrationPlugin)
+  message(FATAL_ERROR "The selected Qt SDK must provide its offscreen platform plugin for the icon build tool")
+ endif()
  add_executable(SwirlIconBuilder tools/BuildWindowsIcon.cpp)
  target_link_libraries(SwirlIconBuilder PRIVATE Qt6::Gui Qt6::Svg)
  set(SWIRL_GENERATED_ICON "${CMAKE_CURRENT_BINARY_DIR}/brand/Swirl.ico")
@@ -597,6 +600,7 @@ if(WIN32)
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/brand"
   COMMAND "${CMAKE_COMMAND}"
           "-DSWIRL_ICON_BUILDER=$<TARGET_FILE:SwirlIconBuilder>"
+          "-DSWIRL_ICON_PLATFORM_PLUGIN=$<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin>"
           "-DSWIRL_ICON_SOURCE=${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
           "-DSWIRL_ICON_OUTPUT=${SWIRL_GENERATED_ICON}"
           -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildWindowsIcon.cmake"

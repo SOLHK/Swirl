@@ -11,7 +11,7 @@ bytes.workspace = true
 serde.workspace = true
 httparse.workspace = true
 url.workspace = true
-socket2.workspace = true
+socket2 = { workspace = true, features = ["all"] }
 tokio-rustls.workspace = true
 webpki-roots.workspace = true
 swirl-subscription.workspace = true

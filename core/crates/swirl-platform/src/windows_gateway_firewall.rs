@@ -134,19 +134,24 @@ const SCRIPT: &str = r#"
 $ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'
 [Console]::InputEncoding=New-Object Text.UTF8Encoding($false)
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
+$script:gatewayFirewallStage='scope'
 try {
   $p=[Console]::In.ReadToEnd() | ConvertFrom-Json
   $policy=$p.policy; $name=[string]$p.name
   function Owned-Adapter {
+    $script:gatewayFirewallStage='preflight-adapter'
     $adapters=@(Get-NetAdapter -IncludeHidden -ErrorAction Stop | Where-Object {([guid]$_.InterfaceGuid) -eq ([guid]$policy.lan.guid)})
     if($adapters.Count -ne 1 -or $adapters[0].ifIndex -ne $policy.lan.index -or -not $adapters[0].HardwareInterface){throw 'DHCP firewall LAN identity changed'}
     return $adapters[0]
   }
   function Check-Profile {
+    $script:gatewayFirewallStage='preflight-connection-profile'
     $profiles=@(Get-NetConnectionProfile -InterfaceIndex ([uint32]$policy.lan.index) -ErrorAction Stop)
     if($profiles.Count -ne 1 -or [string]$profiles[0].NetworkCategory -ne 'Private'){throw 'DHCP firewall requires the dedicated Private LAN'}
+    $script:gatewayFirewallStage='preflight-firewall-profile'
     $firewall=@(Get-NetFirewallProfile -Name Private -PolicyStore ActiveStore -ErrorAction Stop)
     if($firewall.Count -ne 1 -or [string]$firewall[0].Enabled -ne 'True' -or [string]$firewall[0].AllowLocalFirewallRules -eq 'False' -or [string]$firewall[0].AllowInboundRules -eq 'False'){throw 'Private firewall policy does not admit local inbound exceptions'}
+    $script:gatewayFirewallStage='preflight-filtering-services'
     foreach($service in @('BFE','mpssvc')){if((Get-Service -Name $service -ErrorAction Stop).Status -ne 'Running'){throw 'Windows filtering services are unavailable'}}
   }
   function IPv4-Number([string]$text) {
@@ -200,27 +205,35 @@ try {
     return ('redacted_string_length:'+ [string]$value.Length)
   }
   function Read-State([string]$store) {
+    $script:gatewayFirewallStage='read-rule'
     try{$rules=@(Get-NetFirewallRule -Name $name -PolicyStore $store -ErrorAction Stop)}
     catch{if($_.CategoryInfo.Category -eq [Management.Automation.ErrorCategory]::ObjectNotFound){return $null}else{throw}}
     if($rules.Count -ne 1){throw 'DHCP firewall rule identity is ambiguous'}
     $rule=$rules[0]
     if([string]$rule.Name -cne $name -or [string]$rule.DisplayName -cne $name -or [string]$rule.Group -cne 'Swirl Native Gateway DHCP' -or [string]$rule.Description -cne ('Swirl native gateway DHCP owner '+[string]$policy.owner)){throw 'DHCP firewall ownership metadata changed'}
     if([string]$rule.Direction -ne 'Inbound' -or [string]$rule.Action -ne 'Allow' -or [string]$rule.Enabled -notin @('True','False') -or [string]$rule.Profile -ne 'Private' -or [string]$rule.EdgeTraversalPolicy -ne 'Block' -or [string]$rule.LooseSourceMapping -ne 'False' -or [string]$rule.LocalOnlyMapping -ne 'False' -or -not [string]::IsNullOrEmpty([string]$rule.Owner) -or @($rule.Platform | Where-Object {-not [string]::IsNullOrEmpty([string]$_)}).Count -ne 0){throw 'DHCP firewall rule scope changed'}
+    $script:gatewayFirewallStage='read-port'
     $ports=@($rule | Get-NetFirewallPortFilter -ErrorAction Stop)
     if($ports.Count -ne 1 -or [string]$ports[0].Protocol -notin @('17','UDP') -or [string]$ports[0].LocalPort -ne '67' -or [string]$ports[0].RemotePort -ne '68' -or [string]$ports[0].DynamicTarget -ne 'Any'){throw 'DHCP firewall port scope changed'}
+    $script:gatewayFirewallStage='read-address'
     $addresses=@($rule | Get-NetFirewallAddressFilter -ErrorAction Stop)
     if($addresses.Count -ne 1 -or -not (Same-Addresses @($addresses[0].LocalAddress) @($p.local_addresses)) -or -not (Same-Addresses @($addresses[0].RemoteAddress) @($p.remote_addresses))){throw 'DHCP firewall address scope changed'}
+    $script:gatewayFirewallStage='read-app'
     $apps=@($rule | Get-NetFirewallApplicationFilter -ErrorAction Stop)
+    $script:gatewayFirewallStage='read-service'
     $services=@($rule | Get-NetFirewallServiceFilter -ErrorAction Stop)
     if($apps.Count -ne 1 -or [string]$apps[0].Package -ne 'Any' -or $services.Count -ne 1 -or [string]$services[0].Service -ne 'Any'){
       $app=if($apps.Count -eq 1){$apps[0]}else{$null}
       $service=if($services.Count -eq 1){$services[0]}else{$null}
       throw ('DHCP firewall application scope changed; application_count={0}; service_count={1}; package={2}; service={3}; service_name={4}' -f $apps.Count,$services.Count,(Filter-Diagnostic $app 'Package'),(Filter-Diagnostic $service 'Service'),(Filter-Diagnostic $service 'ServiceName'))
     }
+    $script:gatewayFirewallStage='read-interface'
     $interfaces=@($rule | Get-NetFirewallInterfaceFilter -ErrorAction Stop)
+    $script:gatewayFirewallStage='read-type'
     $types=@($rule | Get-NetFirewallInterfaceTypeFilter -ErrorAction Stop)
     if($interfaces.Count -ne 1 -or @($interfaces[0].InterfaceAlias).Count -ne 1 -or $types.Count -ne 1 -or [string]$types[0].InterfaceType -ne 'Wired'){throw 'DHCP firewall interface scope changed'}
     $aliases=@($interfaces[0].InterfaceAlias)
+    $script:gatewayFirewallStage='read-security'
     $security=@($rule | Get-NetFirewallSecurityFilter -ErrorAction Stop)
     if($security.Count -ne 1 -or [string]$security[0].Authentication -ne 'NotRequired' -or [string]$security[0].Encryption -ne 'NotRequired' -or [string]$security[0].OverrideBlockRules -ne 'False' -or [string]$security[0].LocalUser -ne 'Any' -or [string]$security[0].RemoteUser -ne 'Any' -or [string]$security[0].RemoteMachine -ne 'Any'){throw 'DHCP firewall security scope changed'}
     return (Make-Scope ([string]$apps[0].Program) ([string]$aliases[0]) ([string]$rule.Enabled -eq 'True'))
@@ -245,6 +258,7 @@ try {
       if(-not (Same-Scope $current $p.expected)){throw 'DHCP firewall changed after snapshot; refusing overwrite'}
       if($null -eq $p.desired){
         if($null -eq $current){throw 'DHCP firewall removal lacks an owned rule'}
+        $script:gatewayFirewallStage='delete'
         Remove-NetFirewallRule -Name $name -PolicyStore PersistentStore -Confirm:$false -ErrorAction Stop
       }else{
         if($null -ne $current){throw 'DHCP firewall replacement is forbidden'}
@@ -252,6 +266,7 @@ try {
         if([string]$adapter.Name -cne [string]$p.desired.interface_alias){throw 'DHCP firewall interface alias changed before installation'}
         if($p.desired.enabled){Check-Profile}
         $enabled=if($p.desired.enabled){'True'}else{'False'}
+        $script:gatewayFirewallStage='create'
         New-NetFirewallRule -Name $name -DisplayName $name -Group 'Swirl Native Gateway DHCP' -Description ('Swirl native gateway DHCP owner '+[string]$policy.owner) -Direction Inbound -Action Allow -Enabled $enabled -Profile Private -Protocol UDP -LocalPort 67 -RemotePort 68 -LocalAddress ([string[]]$p.local_addresses) -RemoteAddress ([string[]]$p.remote_addresses) -Program ([string]$p.desired.program) -Service Any -InterfaceAlias ([string]$p.desired.interface_alias) -InterfaceType Wired -EdgeTraversalPolicy Block -LooseSourceMapping $false -LocalOnlyMapping $false -Authentication NotRequired -Encryption NotRequired -OverrideBlockRules $false -PolicyStore PersistentStore -ErrorAction Stop | Out-Null
       }
       $current=Read-State 'PersistentStore'
@@ -261,7 +276,7 @@ try {
     $result=$current
   }else{throw 'Unsupported DHCP firewall operation'}
   if($null -eq $result){[Console]::Out.WriteLine('null')}else{ConvertTo-Json -InputObject $result -Compress -Depth 10}
-}catch{[Console]::Error.WriteLine($_.Exception.Message);exit 1}
+}catch{[Console]::Error.WriteLine(($_.Exception.Message+'; stage='+$script:gatewayFirewallStage));exit 1}
 "#;
 
 #[cfg(test)]
@@ -293,18 +308,26 @@ function New-NetFirewallRule {throw 'Unexpected network mutation in read-only fi
 function Remove-NetFirewallRule {throw 'Unexpected network mutation in read-only fixture'}
 "#;
 
-    fn mocked_read(
+    fn mocked_read_with(
         policy: &GatewayIsolationPolicy,
         fixture: &serde_json::Value,
+        overrides: &str,
     ) -> io::Result<Option<GatewayDhcpFirewallScope>> {
         let mut request = input(policy, "read");
         request["fixture"] = fixture.clone();
         let observed: Option<GatewayDhcpFirewallScope> =
-            run_json(&(MOCKS.to_owned() + SCRIPT), &request)?;
+            run_json(&(MOCKS.to_owned() + overrides + SCRIPT), &request)?;
         if let Some(scope) = &observed {
             scope.validate()?;
         }
         Ok(observed)
+    }
+
+    fn mocked_read(
+        policy: &GatewayIsolationPolicy,
+        fixture: &serde_json::Value,
+    ) -> io::Result<Option<GatewayDhcpFirewallScope>> {
+        mocked_read_with(policy, fixture, "")
     }
 
     fn readback_fixture(
@@ -406,7 +429,7 @@ function Remove-NetFirewallRule {throw 'Unexpected network mutation in read-only
             ("application", json!([]), "application_count=0"),
             (
                 "application",
-                json!([valid["application"],valid["application"]]),
+                json!([valid["application"], valid["application"]]),
                 "application_count=2",
             ),
             (
@@ -423,7 +446,7 @@ function Remove-NetFirewallRule {throw 'Unexpected network mutation in read-only
             ),
             (
                 "service",
-                json!([valid["service"],valid["service"]]),
+                json!([valid["service"], valid["service"]]),
                 "service_count=2",
             ),
         ] {
@@ -434,6 +457,33 @@ function Remove-NetFirewallRule {throw 'Unexpected network mutation in read-only
             assert!(!error.contains(&scope.program));
             assert!(!error.contains(secret));
             assert!(error.len() < 768);
+        }
+    }
+
+    #[test]
+    fn dhcp_firewall_cmdlet_failure_reports_its_fixed_stage_without_scope_data() {
+        let (policy, scope) = fixture();
+        let valid = readback_fixture(&policy, &scope);
+        for (command, stage) in [
+            ("Get-NetFirewallPortFilter", "read-port"),
+            ("Get-NetFirewallAddressFilter", "read-address"),
+            ("Get-NetFirewallApplicationFilter", "read-app"),
+            ("Get-NetFirewallServiceFilter", "read-service"),
+            ("Get-NetFirewallInterfaceFilter", "read-interface"),
+            ("Get-NetFirewallInterfaceTypeFilter", "read-type"),
+            ("Get-NetFirewallSecurityFilter", "read-security"),
+        ] {
+            let overrides = format!(
+                "\nfunction {command} {{param([Parameter(ValueFromPipeline=$true)]$InputObject);process{{throw 'fixture-cmdlet-failure'}}}}\n"
+            );
+            let error = mocked_read_with(&policy, &valid, &overrides)
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains("fixture-cmdlet-failure"), "{error}");
+            assert!(error.ends_with(&format!("stage={stage}")), "{error}");
+            assert!(!error.contains(&scope.program));
+            assert!(!error.contains(&scope.interface_alias));
+            assert!(error.len() < 256);
         }
     }
 
@@ -454,6 +504,19 @@ if($a.Count -ne 1){throw 'A physical Ethernet adapter is required for this disab
 ConvertTo-Json -InputObject @{identity=@{index=[uint32]$a[0].ifIndex;guid=([guid]$a[0].InterfaceGuid).ToString('D').ToLowerInvariant()};alias=[string]$a[0].Name} -Compress -Depth 4
 }catch{[Console]::Error.WriteLine($_.Exception.Message);exit 1}
 "#,&json!({})).unwrap();
+        // Safe selection evidence for a real NetSecurity failure: retain no
+        // program path or adapter alias in CI, but make the bound NIC and alias
+        // identity distinguishable across runner images.
+        let alias_digest = <sha2::Sha256 as sha2::Digest>::digest(adapter.alias.as_bytes());
+        eprintln!(
+            "Gateway DHCP firewall fixture selected interface {}",
+            json!({
+                "interface_index":adapter.identity.index,
+                "interface_guid":adapter.identity.guid,
+                "alias_utf16_length":adapter.alias.encode_utf16().count(),
+                "alias_sha256_utf8":format!("{alias_digest:x}"),
+            })
+        );
         let (mut policy, mut scope) = fixture();
         policy.lan = adapter.identity;
         policy.tun = InterfaceIdentity::new(u32::MAX, u128::MAX);

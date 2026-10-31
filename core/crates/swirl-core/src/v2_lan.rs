@@ -2,7 +2,9 @@
 //! selector. This module owns only listeners, admission and LAN accounting.
 use super::*;
 use crate::lan::{Cidr, LanConfig};
+#[cfg(test)]
 use std::net::UdpSocket as StdUdpSocket;
+use swirl_transport::inbound::{bind_tcp, bind_udp_std};
 use tokio::net::UdpSocket;
 
 const CLIENT_HISTORY_LIMIT: usize = 512;
@@ -269,12 +271,11 @@ impl UdpPool {
             if leased.contains(&port) {
                 continue;
             }
-            let socket = match StdUdpSocket::bind(SocketAddr::new(self.address, port)) {
+            let socket = match bind_udp_std(SocketAddr::new(self.address, port)) {
                 Ok(socket) => socket,
                 Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => continue,
                 Err(_) => return Err("LanUdpBind"),
             };
-            socket.set_nonblocking(true).map_err(|_| "LanUdpSocket")?;
             let socket = UdpSocket::from_std(socket).map_err(|_| "LanUdpSocket")?;
             swirl_transport::reserve_datagram_buffers(&socket)
                 .map_err(|_| "LanUdpSocketBuffers")?;
@@ -530,26 +531,26 @@ impl LanRuntime {
         access: Access,
     ) -> Result<Self> {
         let (http, socks) = runtime.block_on(async {
-            let http = TcpListener::bind(SocketAddr::new(config.listen_ip, config.http_port))
-                .await
-                .map_err(|error| {
+            let http = bind_tcp(SocketAddr::new(config.listen_ip, config.http_port)).map_err(
+                |error| {
                     if error.kind() == std::io::ErrorKind::AddrInUse {
                         "LanHttpPortInUse"
                     } else {
                         "LanHttpBind"
                     }
-                })?;
+                },
+            )?;
             let socks = if config.socks_port != config.http_port {
                 Some(
-                    TcpListener::bind(SocketAddr::new(config.listen_ip, config.socks_port))
-                        .await
-                        .map_err(|error| {
+                    bind_tcp(SocketAddr::new(config.listen_ip, config.socks_port)).map_err(
+                        |error| {
                             if error.kind() == std::io::ErrorKind::AddrInUse {
                                 "LanSocksPortInUse"
                             } else {
                                 "LanSocksBind"
                             }
-                        })?,
+                        },
+                    )?,
                 )
             } else {
                 None
@@ -560,7 +561,7 @@ impl LanRuntime {
             let mut probe = Vec::new();
             for port in config.udp_port_start..=config.udp_port_end {
                 probe.push(
-                    StdUdpSocket::bind(SocketAddr::new(config.listen_ip, port))
+                    bind_udp_std(SocketAddr::new(config.listen_ip, port))
                         .map_err(|_| "LanUdpPortInUseOrUnavailable")?,
                 );
             }

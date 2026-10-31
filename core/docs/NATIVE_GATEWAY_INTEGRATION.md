@@ -9,9 +9,12 @@ continues to use its own listener lifecycle without requiring TUN.
 - Target `test`: `56948e4d6044154f1c5d91c6d817099d1c01a87f` when rechecked.
 - LAN PR [#46](https://github.com/SOLHK/Swirl/pull/46), dependency
   `5c3ae925528b3064a552d2a01e98d4333ca8ce04` at initial integration.
-  Subsequent integration parent `c162e7d8697fd50ffac175f149069e36a376e2e0`
-  includes independent LAN DNS-target, configured-resolver/classification
-  regressions and the strict CI fixes. Its three-platform LAN gates passed.
+  Subsequent integration includes `c162e7d8697fd50ffac175f149069e36a376e2e0`,
+  whose three-platform strict LAN gates passed, and the independently added
+  exclusive-socket commit `3e9d58f7dd4dd439e19956c795ce33886284548c`.
+  The latter was fetched and preserved before applying the Qt SDK platform
+  plugin fix `daa16f56bc0b63a686136f7dee7d905236e79d3b`. These newer changes
+  require their own CI results; ancestor passes are recorded separately.
 - TUN PR [#42](https://github.com/SOLHK/Swirl/pull/42), dependency
   `930c3f5fc2cbcfb99de4769c44f1682f4fc2e01d`, still Draft and unmerged.
 - TUN/test merge base: `4ad8a23b7fd59f0f8c09f1e3547548b16baaf4e9`.
@@ -68,6 +71,25 @@ the LAN. Every outbound socket retains the original TUN physical egress lease.
 The actual LAN NIC -> WFP -> Windows route -> Wintun packet path and its return
 path still require an independent-client Windows network trial. Packet-stack
 tests and WFP API readback are narrower evidence, not substitutes.
+
+The separate `windows-gateway-forward-smoke` example adds an explicitly
+disposable Windows routing mechanism test. Two temporary owned Wintun adapters
+stand in for ingress A and Core capture B. A client IPv4 address is deliberately
+not assigned to Windows. Injection into A must emerge from B's real driver read
+before it enters the existing `PacketBridge` and `FlowDispatcher`; responses must
+travel from B through Windows back to A. Each hop checks the complete IP packet
+identity, allowing only the router's TTL decrement and corresponding header
+checksum update. Forwarding-disabled negative controls run before and after.
+
+This fixture uses exact test `/32` routes, existing durable network transactions
+and forwarding only on its two new adapters. It checks DNS UDP/TCP, shared
+persisted Fake-IP identities, IPv4-only AAAA NODATA, and protected-target TCP/UDP
+refusal with live host traps. It does not modify physical forwarding, default
+routes, DNS settings, firewall rules or DHCP. Restoration requires individual
+before-value readbacks and the original complete adapter/route inventories.
+The fixture is committed for actual Windows execution; its existence alone is
+not a passing result. Even a pass would leave physical LAN, production WFP
+interface metadata and positive external TCP/UDP acceptance open.
 
 ## Helper control and lifecycle
 

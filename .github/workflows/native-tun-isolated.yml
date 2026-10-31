@@ -79,6 +79,19 @@ jobs:
           $smokeDriver = Join-Path $smokeDirectory 'wintun/bin/amd64/wintun.dll'
           cargo run --locked --release -p swirl-api --example windows-tun-smoke -- --disposable-network --wintun $smokeDriver 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'swirl-wintun-smoke.log')
           if ($LASTEXITCODE -ne 0) { throw "Scoped Wintun smoke failed with exit code $LASTEXITCODE" }
+      - name: Real Windows forwarding between two owned Wintun interfaces
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $packetTests = & cargo test --locked -p swirl-api --example windows-gateway-forward-smoke 2>&1
+          $packetExit = $LASTEXITCODE
+          $packetTests | Write-Output
+          if ($packetExit -ne 0 -or (($packetTests | Out-String) -notmatch '1 passed; 0 failed; 0 ignored;')) {
+            throw 'The Gateway packet evidence test must execute and pass.'
+          }
+          $smokeDriver = Join-Path $env:RUNNER_TEMP 'swirl-wintun-smoke/wintun/bin/amd64/wintun.dll'
+          cargo run --locked --release -p swirl-api --example windows-gateway-forward-smoke -- --disposable-network --wintun $smokeDriver 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'swirl-gateway-forward-smoke.log')
+          if ($LASTEXITCODE -ne 0) { throw "Scoped Gateway forwarding smoke failed with exit code $LASTEXITCODE" }
       - name: Preserve native backend build
         uses: actions/upload-artifact@v4
         with:
@@ -90,6 +103,7 @@ jobs:
             core/target/release/swirl-tun-helper
             ${{ runner.temp }}/swirl-native-notices/
             ${{ runner.temp }}/swirl-wintun-smoke.log
+            ${{ runner.temp }}/swirl-gateway-forward-smoke.log
           if-no-files-found: error
           retention-days: 7
 
@@ -98,10 +112,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: native-tun-driver-failure-${{ github.sha }}
-          path: ${{ runner.temp }}/swirl-wintun-smoke.log
+          path: |
+            ${{ runner.temp }}/swirl-wintun-smoke.log
+            ${{ runner.temp }}/swirl-gateway-forward-smoke.log
           if-no-files-found: warn
 
   # The explicit Windows-only smoke owns one temporary adapter and only exact
   # test-destination routes. It never changes physical DNS, firewall rules or
   # default/capture routes. This is real driver evidence on Windows Server,
   # separate from Windows 11 full-tunnel/application/recovery acceptance.
+  # The Gateway fixture adds two owned virtual interfaces, enables forwarding
+  # only on those interfaces and exercises actual Windows ingress/return paths.
+  # It does not establish physical LAN, DHCP or external TCP/UDP acceptance.
