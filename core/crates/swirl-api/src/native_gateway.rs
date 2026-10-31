@@ -198,15 +198,24 @@ impl GatewayState {
             transaction::apply_prefix(&mut self.backend, &mut self.store, &mut self.journal, 2)
                 .map_err(|_| "GatewayDhcpFirewallApplyFailed")?;
             let attachment = dhcp.as_ref().ok_or("GatewayDhcpAttachmentRequired")?;
-            windows_gateway::verify_dhcp_attachment(&self.policy, attachment.owner_pid, &attachment.owner_creation)
-                .map_err(|_| "GatewayDhcpAttachmentLost")?;
+            windows_gateway::verify_dhcp_attachment(
+                &self.policy,
+                attachment.owner_pid,
+                &attachment.owner_creation,
+            )
+            .map_err(|_| "GatewayDhcpAttachmentLost")?;
         }
         // Earlier stages remain owned if forwarding activation fails. Reverse
         // recovery disables forwarding, removes the owned DHCP exception, then
         // allows TUN teardown while persistent WFP isolation remains installed.
         let through = self.journal.changes.len();
-        transaction::apply_prefix(&mut self.backend, &mut self.store, &mut self.journal, through)
-            .map_err(|_| "GatewayForwardingApplyFailed")?;
+        transaction::apply_prefix(
+            &mut self.backend,
+            &mut self.store,
+            &mut self.journal,
+            through,
+        )
+        .map_err(|_| "GatewayForwardingApplyFailed")?;
         self.forwarding = true;
         windows_gateway::verify(&self.policy, true).map_err(|_| "GatewayActivationChanged")?;
         self.dhcp = dhcp.map(|attachment| VerifiedDhcpOwner {

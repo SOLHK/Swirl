@@ -6,8 +6,7 @@ pub use crate::gateway_policy::GatewayRequest;
 use crate::{
     gateway_policy::GatewayIsolationPolicy,
     network_transaction::{InterfaceIdentity, NetworkBackend, Resource, Value, validate_value},
-    windows_dhcp_attachment, windows_dhcp_probe,
-    windows_gateway_firewall,
+    windows_dhcp_attachment, windows_dhcp_probe, windows_gateway_firewall,
     windows_network::{SystemRoute, run_json},
     windows_wfp,
 };
@@ -192,16 +191,14 @@ pub fn desired_resources(
     policy: &GatewayIsolationPolicy,
 ) -> io::Result<Vec<(Resource, Option<Value>)>> {
     policy.validate()?;
-    let mut resources = vec![
-        (
-            Resource::GatewayIsolation {
-                name: policy.name(),
-            },
-            Some(Value::GatewayIsolation {
-                policy: policy.clone(),
-            }),
-        ),
-    ];
+    let mut resources = vec![(
+        Resource::GatewayIsolation {
+            name: policy.name(),
+        },
+        Some(Value::GatewayIsolation {
+            policy: policy.clone(),
+        }),
+    )];
     if policy.dhcp {
         let scope = windows_gateway_firewall::scope(policy)?;
         resources.push((
@@ -209,7 +206,10 @@ pub fn desired_resources(
             Some(Value::GatewayDhcpFirewall { scope }),
         ));
     }
-    resources.push((Resource::Forwarding { ipv6: false }, Some(Value::Forwarding { enabled: true })));
+    resources.push((
+        Resource::Forwarding { ipv6: false },
+        Some(Value::Forwarding { enabled: true }),
+    ));
     Ok(resources)
 }
 
@@ -227,7 +227,9 @@ impl WindowsGatewayBackend {
         if interface != &self.policy.lan
             || !matches!(
                 resource,
-                Resource::Forwarding { ipv6: false } | Resource::GatewayIsolation { .. } | Resource::GatewayDhcpFirewall { .. }
+                Resource::Forwarding { ipv6: false }
+                    | Resource::GatewayIsolation { .. }
+                    | Resource::GatewayDhcpFirewall { .. }
             )
         {
             return Err(io::Error::new(
@@ -244,9 +246,17 @@ impl WindowsGatewayBackend {
             ));
         }
         if let Resource::GatewayDhcpFirewall { name } = resource
-            && (!self.policy.dhcp || name != &format!("Swirl.NativeGateway.DHCP.{}.{}", self.policy.lan.guid, self.policy.owner))
+            && (!self.policy.dhcp
+                || name
+                    != &format!(
+                        "Swirl.NativeGateway.DHCP.{}.{}",
+                        self.policy.lan.guid, self.policy.owner
+                    ))
         {
-            return Err(io::Error::new(io::ErrorKind::PermissionDenied, "gateway DHCP firewall ownership mismatch"));
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "gateway DHCP firewall ownership mismatch",
+            ));
         }
         Ok(())
     }
@@ -264,7 +274,10 @@ impl NetworkBackend for WindowsGatewayBackend {
                     policy: self.policy.clone(),
                 },
             )),
-            Resource::GatewayDhcpFirewall { .. } => Ok(windows_gateway_firewall::read(&self.policy)?.map(|scope| Value::GatewayDhcpFirewall { scope })),
+            Resource::GatewayDhcpFirewall { .. } => {
+                Ok(windows_gateway_firewall::read(&self.policy)?
+                    .map(|scope| Value::GatewayDhcpFirewall { scope }))
+            }
             Resource::Forwarding { .. } => {
                 run_json(FORWARDING, &json!({"mode":"read","policy":self.policy}))
             }
@@ -295,9 +308,16 @@ impl NetworkBackend for WindowsGatewayBackend {
                     _ => unreachable!("validated DHCP firewall value"),
                 };
                 let desired = match desired {
-                    Some(Value::GatewayDhcpFirewall { scope }) if scope.enabled => Some(scope.clone()),
+                    Some(Value::GatewayDhcpFirewall { scope }) if scope.enabled => {
+                        Some(scope.clone())
+                    }
                     None => None,
-                    _ => return Err(io::Error::new(io::ErrorKind::PermissionDenied, "runtime DHCP exception must be enabled")),
+                    _ => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::PermissionDenied,
+                            "runtime DHCP exception must be enabled",
+                        ));
+                    }
                 };
                 // The coordinator calls this only after socket attestation.
                 // Verify that isolation still exists and forwarding is still
@@ -305,9 +325,15 @@ impl NetworkBackend for WindowsGatewayBackend {
                 if desired.is_some() {
                     verify(&self.policy, false)?;
                 } else {
-                    let forwarding: Option<Value> = run_json(FORWARDING, &json!({"mode":"read","policy":self.policy}))?;
-                    if !matches!(forwarding, None | Some(Value::Forwarding { enabled: false })) {
-                        return Err(io::Error::other("LAN forwarding must be quiesced before restoring its DHCP exception"));
+                    let forwarding: Option<Value> =
+                        run_json(FORWARDING, &json!({"mode":"read","policy":self.policy}))?;
+                    if !matches!(
+                        forwarding,
+                        None | Some(Value::Forwarding { enabled: false })
+                    ) {
+                        return Err(io::Error::other(
+                            "LAN forwarding must be quiesced before restoring its DHCP exception",
+                        ));
                     }
                 }
                 windows_gateway_firewall::compare_exchange(&self.policy, &expected, &desired)?;
@@ -331,7 +357,9 @@ impl NetworkBackend for WindowsGatewayBackend {
                         ));
                     }
                     if self.policy.dhcp && windows_gateway_firewall::read(&self.policy)?.is_some() {
-                        return Err(io::Error::other("DHCP exception still exists; gateway isolation retained"));
+                        return Err(io::Error::other(
+                            "DHCP exception still exists; gateway isolation retained",
+                        ));
                     }
                     windows_wfp::remove(policy)?;
                 }

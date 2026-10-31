@@ -10,13 +10,17 @@ use std::{io, path::PathBuf};
 
 pub(crate) fn installed_dhcp_image() -> io::Result<PathBuf> {
     let executable = std::env::current_exe()?;
-    let parent = executable.parent().ok_or_else(|| io::Error::other("helper installation path is unavailable"))?;
+    let parent = executable
+        .parent()
+        .ok_or_else(|| io::Error::other("helper installation path is unavailable"))?;
     parent.join("Swirl.exe").canonicalize()
 }
 
 fn program() -> io::Result<String> {
     let image = installed_dhcp_image()?;
-    let image = image.to_str().ok_or_else(|| io::Error::other("DHCP image path is not Unicode"))?;
+    let image = image
+        .to_str()
+        .ok_or_else(|| io::Error::other("DHCP image path is not Unicode"))?;
     Ok(image.strip_prefix(r"\\?\").unwrap_or(image).to_owned())
 }
 
@@ -44,19 +48,26 @@ fn input(policy: &GatewayIsolationPolicy, mode: &str) -> serde_json::Value {
 pub(crate) fn scope(policy: &GatewayIsolationPolicy) -> io::Result<GatewayDhcpFirewallScope> {
     policy.validate()?;
     if !policy.dhcp {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "DHCP is not enabled for this gateway"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "DHCP is not enabled for this gateway",
+        ));
     }
     let mut request = input(policy, "scope");
     request["program"] = json!(program()?);
     let scope: GatewayDhcpFirewallScope = run_json(SCRIPT, &request)?;
     scope.validate()?;
     if !scope.enabled || !scope.matches_policy(policy) {
-        return Err(io::Error::other("DHCP firewall snapshot differs from gateway policy"));
+        return Err(io::Error::other(
+            "DHCP firewall snapshot differs from gateway policy",
+        ));
     }
     Ok(scope)
 }
 
-pub(crate) fn read(policy: &GatewayIsolationPolicy) -> io::Result<Option<GatewayDhcpFirewallScope>> {
+pub(crate) fn read(
+    policy: &GatewayIsolationPolicy,
+) -> io::Result<Option<GatewayDhcpFirewallScope>> {
     policy.validate()?;
     let observed: Option<GatewayDhcpFirewallScope> = run_json(SCRIPT, &input(policy, "read"))?;
     if let Some(scope) = &observed {
@@ -89,11 +100,17 @@ pub(crate) fn compare_exchange(
     for scope in expected.iter().chain(desired.iter()) {
         scope.validate()?;
         if !scope.matches_policy(policy) {
-            return Err(io::Error::new(io::ErrorKind::PermissionDenied, "DHCP firewall scope is outside the owned gateway"));
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "DHCP firewall scope is outside the owned gateway",
+            ));
         }
     }
     if !matches!((expected, desired), (None, Some(_)) | (Some(_), None)) {
-        return Err(io::Error::new(io::ErrorKind::PermissionDenied, "DHCP firewall rules cannot be adopted or replaced"));
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "DHCP firewall rules cannot be adopted or replaced",
+        ));
     }
     let mut request = input(policy, "compare_exchange");
     request["expected"] = json!(expected);
@@ -247,22 +264,28 @@ mod tests {
 
     const MOCKS: &str = r#"
 function Get-NetFirewallRule {param($Name,$PolicyStore,$ErrorAction);return $p.fixture.rule}
-function Get-NetFirewallPortFilter {param([Parameter(ValueFromPipeline=$true)]$InputObject,$ErrorAction);process{return $p.fixture.ports}}
-function Get-NetFirewallAddressFilter {param([Parameter(ValueFromPipeline=$true)]$InputObject,$ErrorAction);process{return $p.fixture.addresses}}
-function Get-NetFirewallApplicationFilter {param([Parameter(ValueFromPipeline=$true)]$InputObject,$ErrorAction);process{return $p.fixture.application}}
-function Get-NetFirewallServiceFilter {param([Parameter(ValueFromPipeline=$true)]$InputObject,$ErrorAction);process{return $p.fixture.service}}
-function Get-NetFirewallInterfaceFilter {param([Parameter(ValueFromPipeline=$true)]$InputObject,$ErrorAction);process{return $p.fixture.interface}}
-function Get-NetFirewallInterfaceTypeFilter {param([Parameter(ValueFromPipeline=$true)]$InputObject,$ErrorAction);process{return $p.fixture.interface_type}}
-function Get-NetFirewallSecurityFilter {param([Parameter(ValueFromPipeline=$true)]$InputObject,$ErrorAction);process{return $p.fixture.security}}
+function Get-NetFirewallPortFilter {param([Parameter(ValueFromPipeline=$true)]$InputObject);process{return $p.fixture.ports}}
+function Get-NetFirewallAddressFilter {param([Parameter(ValueFromPipeline=$true)]$InputObject);process{return $p.fixture.addresses}}
+function Get-NetFirewallApplicationFilter {param([Parameter(ValueFromPipeline=$true)]$InputObject);process{return $p.fixture.application}}
+function Get-NetFirewallServiceFilter {param([Parameter(ValueFromPipeline=$true)]$InputObject);process{return $p.fixture.service}}
+function Get-NetFirewallInterfaceFilter {param([Parameter(ValueFromPipeline=$true)]$InputObject);process{return $p.fixture.interface}}
+function Get-NetFirewallInterfaceTypeFilter {param([Parameter(ValueFromPipeline=$true)]$InputObject);process{return $p.fixture.interface_type}}
+function Get-NetFirewallSecurityFilter {param([Parameter(ValueFromPipeline=$true)]$InputObject);process{return $p.fixture.security}}
 function New-NetFirewallRule {throw 'Unexpected network mutation in read-only fixture'}
 function Remove-NetFirewallRule {throw 'Unexpected network mutation in read-only fixture'}
 "#;
 
-    fn mocked_read(policy: &GatewayIsolationPolicy, fixture: &serde_json::Value) -> io::Result<Option<GatewayDhcpFirewallScope>> {
+    fn mocked_read(
+        policy: &GatewayIsolationPolicy,
+        fixture: &serde_json::Value,
+    ) -> io::Result<Option<GatewayDhcpFirewallScope>> {
         let mut request = input(policy, "read");
         request["fixture"] = fixture.clone();
-        let observed: Option<GatewayDhcpFirewallScope> = run_json(&(MOCKS.to_owned()+SCRIPT), &request)?;
-        if let Some(scope) = &observed { scope.validate()?; }
+        let observed: Option<GatewayDhcpFirewallScope> =
+            run_json(&(MOCKS.to_owned() + SCRIPT), &request)?;
+        if let Some(scope) = &observed {
+            scope.validate()?;
+        }
         Ok(observed)
     }
 
@@ -279,32 +302,49 @@ function Remove-NetFirewallRule {throw 'Unexpected network mutation in read-only
             "interface":{"InterfaceAlias":[scope.interface_alias]},"interface_type":{"InterfaceType":"Wired"},
             "security":{"Authentication":"NotRequired","Encryption":"NotRequired","OverrideBlockRules":false,"LocalUser":"Any","RemoteUser":"Any","RemoteMachine":"Any"}
         });
-        assert_eq!(mocked_read(&policy,&valid).unwrap(),Some(scope.clone()));
-        for (object,field,value) in [
-            ("rule","Description",json!("foreign owner")),
-            ("rule","Enabled",json!("True")),
-            ("rule","Profile",json!("Any")),
-            ("rule","EdgeTraversalPolicy",json!("Allow")),
-            ("rule","LooseSourceMapping",json!(true)),
-            ("rule","LocalOnlyMapping",json!(true)),
-            ("rule","Owner",json!("S-1-5-18")),
-            ("rule","Platform",json!(["6.1+"])),
-            ("ports","Protocol",json!("TCP")),
-            ("ports","LocalPort",json!("Any")),
-            ("ports","RemotePort",json!("Any")),
-            ("ports","DynamicTarget",json!("WifiDirectDevices")),
-            ("addresses","LocalAddress",json!(["Any"])),
-            ("addresses","RemoteAddress",json!(["0.0.0.0/0","192.168.77.0/25"])),
-            ("addresses","RemoteAddress",json!(["0.0.0.0/32","192.168.77.0/24"])),
-            ("application","Program",json!(r"C:\Other\Swirl.exe")),
-            ("application","Package",json!("S-1-15-2-1")),
-            ("interface","InterfaceAlias",json!(["WAN"])),
-            ("interface","InterfaceAlias",json!(["Dedicated LAN","WAN"])),
-            ("interface_type","InterfaceType",json!("Any")),
-            ("security","OverrideBlockRules",json!(true)),
+        assert_eq!(mocked_read(&policy, &valid).unwrap(), Some(scope.clone()));
+        for (object, field, value) in [
+            ("rule", "Description", json!("foreign owner")),
+            ("rule", "Enabled", json!("True")),
+            ("rule", "Profile", json!("Any")),
+            ("rule", "EdgeTraversalPolicy", json!("Allow")),
+            ("rule", "LooseSourceMapping", json!(true)),
+            ("rule", "LocalOnlyMapping", json!(true)),
+            ("rule", "Owner", json!("S-1-5-18")),
+            ("rule", "Platform", json!(["6.1+"])),
+            ("ports", "Protocol", json!("TCP")),
+            ("ports", "LocalPort", json!("Any")),
+            ("ports", "RemotePort", json!("Any")),
+            ("ports", "DynamicTarget", json!("WifiDirectDevices")),
+            ("addresses", "LocalAddress", json!(["Any"])),
+            (
+                "addresses",
+                "RemoteAddress",
+                json!(["0.0.0.0/0", "192.168.77.0/25"]),
+            ),
+            (
+                "addresses",
+                "RemoteAddress",
+                json!(["0.0.0.0/32", "192.168.77.0/24"]),
+            ),
+            ("application", "Program", json!(r"C:\Other\Swirl.exe")),
+            ("application", "Package", json!("S-1-15-2-1")),
+            ("interface", "InterfaceAlias", json!(["WAN"])),
+            (
+                "interface",
+                "InterfaceAlias",
+                json!(["Dedicated LAN", "WAN"]),
+            ),
+            ("interface_type", "InterfaceType", json!("Any")),
+            ("security", "OverrideBlockRules", json!(true)),
         ] {
-            let mut changed=valid.clone(); changed[object][field]=value;
-            assert_ne!(mocked_read(&policy,&changed).ok().flatten(),Some(scope.clone()),"{object}.{field}");
+            let mut changed = valid.clone();
+            changed[object][field] = value;
+            assert_ne!(
+                mocked_read(&policy, &changed).ok().flatten(),
+                Some(scope.clone()),
+                "{object}.{field}"
+            );
         }
     }
 
@@ -314,7 +354,10 @@ function Remove-NetFirewallRule {throw 'Unexpected network mutation in read-only
     #[ignore = "creates one disabled firewall exception; run explicitly on a disposable elevated Windows runner"]
     fn disabled_dhcp_firewall_fixture_verifies_scope_and_preserves_foreign_edits() {
         #[derive(Deserialize)]
-        struct Adapter { identity: InterfaceIdentity, alias: String }
+        struct Adapter {
+            identity: InterfaceIdentity,
+            alias: String,
+        }
         let adapter: Adapter = run_json(r#"
 $ErrorActionPreference='Stop';[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 try{$a=@(Get-NetAdapter -IncludeHidden -ErrorAction Stop | Where-Object {$_.HardwareInterface -and [uint32]$_.InterfaceType -eq 6} | Select-Object -First 1)
@@ -322,27 +365,44 @@ if($a.Count -ne 1){throw 'A physical Ethernet adapter is required for this disab
 ConvertTo-Json -InputObject @{identity=@{index=[uint32]$a[0].ifIndex;guid=([guid]$a[0].InterfaceGuid).ToString('D').ToLowerInvariant()};alias=[string]$a[0].Name} -Compress -Depth 4
 }catch{[Console]::Error.WriteLine($_.Exception.Message);exit 1}
 "#,&json!({})).unwrap();
-        let (mut policy,mut scope)=fixture();
-        policy.lan=adapter.identity;
-        policy.tun=InterfaceIdentity::new(u32::MAX, u128::MAX);
-        policy.owner=format!("{:032x}",std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos() ^ (u128::from(std::process::id()) << 64));
-        scope.lan=policy.lan.clone();scope.owner=policy.owner.clone();scope.interface_alias=adapter.alias;
-        policy.validate().unwrap();scope.validate().unwrap();
+        let (mut policy, mut scope) = fixture();
+        policy.lan = adapter.identity;
+        policy.tun = InterfaceIdentity::new(u32::MAX, u128::MAX);
+        policy.owner = format!(
+            "{:032x}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+                ^ (u128::from(std::process::id()) << 64)
+        );
+        scope.lan = policy.lan.clone();
+        scope.owner = policy.owner.clone();
+        scope.interface_alias = adapter.alias;
+        policy.validate().unwrap();
+        scope.validate().unwrap();
         assert!(!scope.enabled);
-        assert_eq!(read(&policy).unwrap(),None);
-        struct Cleanup { policy: GatewayIsolationPolicy, scope: GatewayDhcpFirewallScope }
+        assert_eq!(read(&policy).unwrap(), None);
+        struct Cleanup {
+            policy: GatewayIsolationPolicy,
+            scope: GatewayDhcpFirewallScope,
+        }
         impl Drop for Cleanup {
             fn drop(&mut self) {
-                if read(&self.policy).ok().flatten().as_ref()==Some(&self.scope) {
-                    let _=compare_exchange(&self.policy,&Some(self.scope.clone()),&None);
+                if read(&self.policy).ok().flatten().as_ref() == Some(&self.scope) {
+                    let _ = compare_exchange(&self.policy, &Some(self.scope.clone()), &None);
                 }
             }
         }
-        let cleanup=Cleanup{policy:policy.clone(),scope:scope.clone()};
-        compare_exchange(&policy,&None,&Some(scope.clone())).unwrap();
-        assert_eq!(read(&policy).unwrap(),Some(scope.clone()));
-        let mut foreign=scope.clone();foreign.program=r"C:\Swirl Firewall Fixture Foreign\Swirl.exe".into();
-        let edit = |before:&GatewayDhcpFirewallScope,after:&GatewayDhcpFirewallScope| {
+        let cleanup = Cleanup {
+            policy: policy.clone(),
+            scope: scope.clone(),
+        };
+        compare_exchange(&policy, &None, &Some(scope.clone())).unwrap();
+        assert_eq!(read(&policy).unwrap(), Some(scope.clone()));
+        let mut foreign = scope.clone();
+        foreign.program = r"C:\Swirl Firewall Fixture Foreign\Swirl.exe".into();
+        let edit = |before: &GatewayDhcpFirewallScope, after: &GatewayDhcpFirewallScope| {
             let changed:bool=run_json(r#"
 $ErrorActionPreference='Stop';[Console]::InputEncoding=New-Object Text.UTF8Encoding($false);[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 try{$p=[Console]::In.ReadToEnd()|ConvertFrom-Json
@@ -356,16 +416,25 @@ $app[0]|Set-NetFirewallApplicationFilter -Program ([string]$p.after) -ErrorActio
 "#,&json!({"name":scope.name(),"owner":policy.owner,"before":before.program,"after":after.program})).unwrap();
             assert!(changed);
         };
-        edit(&scope,&foreign);
-        assert_eq!(read(&policy).unwrap(),Some(foreign.clone()));
-        assert_eq!(compare_exchange(&policy,&Some(scope.clone()),&None).unwrap_err().kind(),io::ErrorKind::AlreadyExists);
-        assert_eq!(read(&policy).unwrap(),Some(foreign.clone()),"foreign edits must survive refused recovery");
+        edit(&scope, &foreign);
+        assert_eq!(read(&policy).unwrap(), Some(foreign.clone()));
+        assert_eq!(
+            compare_exchange(&policy, &Some(scope.clone()), &None)
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::AlreadyExists
+        );
+        assert_eq!(
+            read(&policy).unwrap(),
+            Some(foreign.clone()),
+            "foreign edits must survive refused recovery"
+        );
         // This explicit fixture mutation is reverted only if its exact known
         // disabled object remains. Production recovery never makes this edit.
-        edit(&foreign,&scope);
-        assert_eq!(read(&policy).unwrap(),Some(scope.clone()));
-        compare_exchange(&policy,&Some(scope),&None).unwrap();
-        assert_eq!(read(&policy).unwrap(),None);
+        edit(&foreign, &scope);
+        assert_eq!(read(&policy).unwrap(), Some(scope.clone()));
+        compare_exchange(&policy, &Some(scope), &None).unwrap();
+        assert_eq!(read(&policy).unwrap(), None);
         drop(cleanup);
     }
 }

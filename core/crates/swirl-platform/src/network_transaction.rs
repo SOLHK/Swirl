@@ -327,10 +327,18 @@ impl Journal {
                 }
             }
         }
-        let gateway = self.changes.iter().any(|change| matches!(change.resource, Resource::GatewayIsolation { .. }));
-        let dhcp = self.changes.iter().any(|change| matches!(change.resource, Resource::GatewayDhcpFirewall { .. }));
+        let gateway = self
+            .changes
+            .iter()
+            .any(|change| matches!(change.resource, Resource::GatewayIsolation { .. }));
+        let dhcp = self
+            .changes
+            .iter()
+            .any(|change| matches!(change.resource, Resource::GatewayDhcpFirewall { .. }));
         if dhcp && !gateway || self.version == 2 && !dhcp || self.version == 1 && dhcp {
-            return Err(invalid("gateway DHCP exception requires a version 2 gateway journal"));
+            return Err(invalid(
+                "gateway DHCP exception requires a version 2 gateway journal",
+            ));
         }
         if gateway {
             let forwarding = self.changes.last().expect("validated nonempty journal");
@@ -341,10 +349,13 @@ impl Journal {
                 || forwarding.after != Some(Value::Forwarding { enabled: true })
                 || forwarding.before != Some(Value::Forwarding { enabled: false })
             {
-                return Err(invalid("gateway isolation and DHCP exception must precede IPv4 forwarding"));
+                return Err(invalid(
+                    "gateway isolation and DHCP exception must precede IPv4 forwarding",
+                ));
             }
             if dhcp {
-                let Some(Value::GatewayIsolation { policy }) = self.changes[0].after.as_ref() else {
+                let Some(Value::GatewayIsolation { policy }) = self.changes[0].after.as_ref()
+                else {
                     return Err(invalid("gateway isolation has no installation policy"));
                 };
                 let change = &self.changes[1];
@@ -356,7 +367,9 @@ impl Journal {
                     || !scope.enabled
                     || !scope.matches_policy(policy)
                 {
-                    return Err(invalid("gateway DHCP exception does not belong to its isolation policy"));
+                    return Err(invalid(
+                        "gateway DHCP exception does not belong to its isolation policy",
+                    ));
                 }
             }
         }
@@ -407,7 +420,14 @@ impl Journal {
                 state: ChangeState::Pending,
             });
         }
-        let version = if changes.iter().any(|change| matches!(change.resource, Resource::GatewayDhcpFirewall { .. })) { 2 } else { 1 };
+        let version = if changes
+            .iter()
+            .any(|change| matches!(change.resource, Resource::GatewayDhcpFirewall { .. }))
+        {
+            2
+        } else {
+            1
+        };
         let journal = Self {
             version,
             owner,
@@ -695,14 +715,15 @@ pub fn recover_suffix(
                 | ChangeState::Conflict
                 | ChangeState::NotOwned
         );
-        let gateway_forwarding_unresolved =
-            matches!(change.resource, Resource::GatewayIsolation { .. } | Resource::GatewayDhcpFirewall { .. })
-                && owns_guard
-                && report.conflicts.is_empty()
-                && !matches!(
-                    backend.read(&journal.interface, &Resource::Forwarding { ipv6: false }),
-                    Ok(None) | Ok(Some(Value::Forwarding { enabled: false }))
-                );
+        let gateway_forwarding_unresolved = matches!(
+            change.resource,
+            Resource::GatewayIsolation { .. } | Resource::GatewayDhcpFirewall { .. }
+        ) && owns_guard
+            && report.conflicts.is_empty()
+            && !matches!(
+                backend.read(&journal.interface, &Resource::Forwarding { ipv6: false }),
+                Ok(None) | Ok(Some(Value::Forwarding { enabled: false }))
+            );
         let gateway_dhcp_unresolved = matches!(change.resource, Resource::GatewayIsolation { .. })
             && owns_guard
             && report.conflicts.is_empty()
@@ -712,9 +733,13 @@ pub fn recover_suffix(
             });
         if matches!(
             change.resource,
-            Resource::DnsGuard { .. } | Resource::GatewayIsolation { .. } | Resource::GatewayDhcpFirewall { .. }
+            Resource::DnsGuard { .. }
+                | Resource::GatewayIsolation { .. }
+                | Resource::GatewayDhcpFirewall { .. }
         ) && owns_guard
-            && (!report.conflicts.is_empty() || gateway_forwarding_unresolved || gateway_dhcp_unresolved)
+            && (!report.conflicts.is_empty()
+                || gateway_forwarding_unresolved
+                || gateway_dhcp_unresolved)
         {
             // Do not reopen a physical DNS escape path while capture recovery
             // is unresolved. Gateway Forwarding can also change while Pending
@@ -1626,12 +1651,28 @@ mod tests {
             enabled: true,
         };
         let forwarding = Resource::Forwarding { ipv6: false };
-        backend.values.insert(forwarding.clone(), Value::Forwarding { enabled: false });
-        Journal::prepare(backend, policy.lan.clone(), policy.owner.clone(), vec![
-            (Resource::GatewayIsolation { name: policy.name() }, Some(Value::GatewayIsolation { policy })),
-            (Resource::GatewayDhcpFirewall { name: scope.name() }, Some(Value::GatewayDhcpFirewall { scope })),
-            (forwarding, Some(Value::Forwarding { enabled: true })),
-        ]).unwrap()
+        backend
+            .values
+            .insert(forwarding.clone(), Value::Forwarding { enabled: false });
+        Journal::prepare(
+            backend,
+            policy.lan.clone(),
+            policy.owner.clone(),
+            vec![
+                (
+                    Resource::GatewayIsolation {
+                        name: policy.name(),
+                    },
+                    Some(Value::GatewayIsolation { policy }),
+                ),
+                (
+                    Resource::GatewayDhcpFirewall { name: scope.name() },
+                    Some(Value::GatewayDhcpFirewall { scope }),
+                ),
+                (forwarding, Some(Value::Forwarding { enabled: true })),
+            ],
+        )
+        .unwrap()
     }
 
     #[test]
@@ -1644,14 +1685,26 @@ mod tests {
         let firewall = journal.changes[1].resource.clone();
         let forwarding = journal.changes[2].resource.clone();
         apply_prefix(&mut backend, &mut store, &mut journal, 1).unwrap();
-        assert!(!backend.values.contains_key(&firewall), "no exception before socket attestation");
+        assert!(
+            !backend.values.contains_key(&firewall),
+            "no exception before socket attestation"
+        );
         apply_prefix(&mut backend, &mut store, &mut journal, 2).unwrap();
-        assert_eq!(backend.values[&forwarding], Value::Forwarding { enabled: false });
+        assert_eq!(
+            backend.values[&forwarding],
+            Value::Forwarding { enabled: false }
+        );
         apply_prefix(&mut backend, &mut store, &mut journal, 3).unwrap();
         recover_suffix(&mut backend, &mut store, &mut journal, 1).unwrap();
-        assert_eq!(&backend.write_order[3..], &[forwarding.clone(), firewall.clone()]);
+        assert_eq!(
+            &backend.write_order[3..],
+            &[forwarding.clone(), firewall.clone()]
+        );
         assert!(!backend.values.contains_key(&firewall));
-        assert!(backend.values.contains_key(&guard), "TUN still owns capture teardown");
+        assert!(
+            backend.values.contains_key(&guard),
+            "TUN still owns capture teardown"
+        );
         recover(&mut backend, &mut store, &mut journal).unwrap();
         assert_eq!(backend.write_order.last(), Some(&guard));
         assert!(journal.is_restored());
@@ -1665,7 +1718,10 @@ mod tests {
         apply_prefix(&mut backend, &mut store, &mut journal, 1).unwrap();
         backend.fail_write = Some(2);
         assert!(apply_prefix(&mut backend, &mut store, &mut journal, 2).is_err());
-        assert_eq!(backend.values[&journal.changes[2].resource], Value::Forwarding { enabled: false });
+        assert_eq!(
+            backend.values[&journal.changes[2].resource],
+            Value::Forwarding { enabled: false }
+        );
         assert!(backend.values.contains_key(&journal.changes[0].resource));
 
         let mut backend = MockNetwork::default();
@@ -1676,7 +1732,10 @@ mod tests {
         let writes = backend.writes;
         assert!(apply_prefix(&mut backend, &mut store, &mut journal, 3).is_err());
         assert_eq!(backend.writes, writes);
-        assert_eq!(backend.values[&journal.changes[2].resource], Value::Forwarding { enabled: false });
+        assert_eq!(
+            backend.values[&journal.changes[2].resource],
+            Value::Forwarding { enabled: false }
+        );
     }
 
     #[test]
@@ -1686,20 +1745,45 @@ mod tests {
         let mut store = MemoryJournal::default();
         apply(&mut backend, &mut store, &mut journal).unwrap();
         backend.fail_write = Some(4);
-        assert_eq!(recover(&mut backend, &mut store, &mut journal).unwrap().conflicts, vec![2,1,0]);
+        assert_eq!(
+            recover(&mut backend, &mut store, &mut journal)
+                .unwrap()
+                .conflicts,
+            vec![2, 1, 0]
+        );
         assert!(backend.values.contains_key(&journal.changes[1].resource));
         assert!(backend.values.contains_key(&journal.changes[0].resource));
         backend.fail_write = None;
         let firewall = journal.changes[1].resource.clone();
-        let Some(Value::GatewayDhcpFirewall { scope }) = backend.values.get_mut(&firewall) else { panic!("expected DHCP exception") };
+        let Some(Value::GatewayDhcpFirewall { scope }) = backend.values.get_mut(&firewall) else {
+            panic!("expected DHCP exception")
+        };
         scope.program = r"C:\Other\Swirl.exe".into();
-        assert_eq!(recover(&mut backend, &mut store, &mut journal).unwrap().conflicts, vec![1,0]);
-        assert_eq!(backend.values[&journal.changes[2].resource], Value::Forwarding { enabled: false });
+        assert_eq!(
+            recover(&mut backend, &mut store, &mut journal)
+                .unwrap()
+                .conflicts,
+            vec![1, 0]
+        );
+        assert_eq!(
+            backend.values[&journal.changes[2].resource],
+            Value::Forwarding { enabled: false }
+        );
         assert_eq!(journal.changes[1].state, ChangeState::NotOwned);
-        backend.values.insert(firewall.clone(), journal.changes[1].after.clone().unwrap());
+        backend
+            .values
+            .insert(firewall.clone(), journal.changes[1].after.clone().unwrap());
         let writes = backend.writes;
-        assert_eq!(recover(&mut backend, &mut store, &mut journal).unwrap().conflicts, vec![1,0]);
-        assert_eq!(backend.writes, writes, "an identical later value does not restore ownership");
+        assert_eq!(
+            recover(&mut backend, &mut store, &mut journal)
+                .unwrap()
+                .conflicts,
+            vec![1, 0]
+        );
+        assert_eq!(
+            backend.writes, writes,
+            "an identical later value does not restore ownership"
+        );
     }
 
     #[test]
@@ -1709,12 +1793,20 @@ mod tests {
         let mut store = MemoryJournal::default();
         apply_prefix(&mut backend, &mut store, &mut journal, 2).unwrap();
         journal.changes[1].state = ChangeState::Applying;
-        let mut reopened: Journal = serde_json::from_slice(&serde_json::to_vec(&journal).unwrap()).unwrap();
+        let mut reopened: Journal =
+            serde_json::from_slice(&serde_json::to_vec(&journal).unwrap()).unwrap();
         reopened.validate().unwrap();
-        assert!(recover(&mut backend, &mut store, &mut reopened).unwrap().conflicts.is_empty());
+        assert!(
+            recover(&mut backend, &mut store, &mut reopened)
+                .unwrap()
+                .conflicts
+                .is_empty()
+        );
         assert!(reopened.is_restored());
         let mut legacy = gateway_plan(&mut MockNetwork::default());
-        let Some(Value::GatewayIsolation { policy }) = &mut legacy.changes[0].after else { panic!("expected isolation") };
+        let Some(Value::GatewayIsolation { policy }) = &mut legacy.changes[0].after else {
+            panic!("expected isolation")
+        };
         policy.dhcp = true;
         assert_eq!(legacy.version, 1);
         legacy.validate().unwrap();
@@ -1722,10 +1814,12 @@ mod tests {
         invalid.version = 1;
         assert!(invalid.validate().is_err());
         invalid = journal.clone();
-        invalid.changes.swap(1,2);
+        invalid.changes.swap(1, 2);
         assert!(invalid.validate().is_err());
         invalid = journal;
-        let Some(Value::GatewayDhcpFirewall { scope }) = &mut invalid.changes[1].after else { panic!("expected exception") };
+        let Some(Value::GatewayDhcpFirewall { scope }) = &mut invalid.changes[1].after else {
+            panic!("expected exception")
+        };
         scope.allowed_sources = vec!["192.168.77.0/24".parse().unwrap()];
         assert!(invalid.validate().is_err());
     }
@@ -1738,9 +1832,16 @@ mod tests {
         apply(&mut backend, &mut store, &mut journal).unwrap();
         recover_suffix(&mut backend, &mut store, &mut journal, 1).unwrap();
         let firewall = journal.changes[1].resource.clone();
-        backend.values.insert(firewall, journal.changes[1].after.clone().unwrap());
+        backend
+            .values
+            .insert(firewall, journal.changes[1].after.clone().unwrap());
         let writes = backend.writes;
-        assert_eq!(recover(&mut backend, &mut store, &mut journal).unwrap().conflicts, vec![0]);
+        assert_eq!(
+            recover(&mut backend, &mut store, &mut journal)
+                .unwrap()
+                .conflicts,
+            vec![0]
+        );
         assert_eq!(backend.writes, writes);
         assert!(backend.values.contains_key(&journal.changes[0].resource));
     }

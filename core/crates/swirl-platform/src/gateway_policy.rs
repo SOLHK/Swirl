@@ -204,20 +204,38 @@ impl GatewayDhcpFirewallScope {
         .validate()?;
         let path = self.program.as_bytes();
         if self.owner.len() != 32
-            || !self.owner.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            || !self
+                .owner
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
             || self.interface_alias.is_empty()
             || self.interface_alias.encode_utf16().count() > 256
-            || self.interface_alias.contains(['\0', '*', '?', '[', ']', '`'])
+            || self
+                .interface_alias
+                .contains(['\0', '*', '?', '[', ']', '`'])
             || path.len() < 12
             || self.program.encode_utf16().count() > 32767
             || !path[0].is_ascii_alphabetic()
             || path[1..3] != *b":\\"
-            || self.program.contains(['\0', '\r', '\n', '*', '?', '"', '%', '/'])
+            || self
+                .program
+                .contains(['\0', '\r', '\n', '*', '?', '"', '%', '/'])
             || self.program[2..].contains(':')
-            || self.program.split('\\').skip(1).any(|part| part.is_empty() || part.ends_with(['.', ' ']))
-            || !self.program.rsplit('\\').next().is_some_and(|name| name.eq_ignore_ascii_case("Swirl.exe"))
+            || self
+                .program
+                .split('\\')
+                .skip(1)
+                .any(|part| part.is_empty() || part.ends_with(['.', ' ']))
+            || !self
+                .program
+                .rsplit('\\')
+                .next()
+                .is_some_and(|name| name.eq_ignore_ascii_case("Swirl.exe"))
         {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid gateway DHCP firewall scope"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid gateway DHCP firewall scope",
+            ));
         }
         Ok(())
     }
@@ -287,14 +305,38 @@ mod tests {
             enabled: true,
         };
         scope.validate().unwrap();
-        assert_eq!(scope.local_addresses(), ["192.168.77.1", "192.168.77.255", "255.255.255.255"].map(|ip| ip.parse::<Ipv4Addr>().unwrap()));
+        assert_eq!(
+            scope.local_addresses(),
+            ["192.168.77.1", "192.168.77.255", "255.255.255.255"]
+                .map(|ip| ip.parse::<Ipv4Addr>().unwrap())
+        );
         let remote = scope.remote_addresses();
-        assert!(remote.iter().any(|net| net.contains(&Ipv4Addr::UNSPECIFIED)));
-        assert!(remote.iter().any(|net| net.contains(&Ipv4Addr::new(192,168,77,20))));
-        for address in [Ipv4Addr::new(192,168,77,200), Ipv4Addr::new(203,0,113,8), Ipv4Addr::new(127,0,0,1)] {
+        assert!(
+            remote
+                .iter()
+                .any(|net| net.contains(&Ipv4Addr::UNSPECIFIED))
+        );
+        assert!(
+            remote
+                .iter()
+                .any(|net| net.contains(&Ipv4Addr::new(192, 168, 77, 20)))
+        );
+        for address in [
+            Ipv4Addr::new(192, 168, 77, 200),
+            Ipv4Addr::new(203, 0, 113, 8),
+            Ipv4Addr::new(127, 0, 0, 1),
+        ] {
             assert!(!remote.iter().any(|net| net.contains(&address)));
         }
-        for program in [r"Swirl.exe", r"\\host\share\Swirl.exe", r"C:\*\Swirl.exe", r"C:\%TEMP%\Swirl.exe", r"C:\Swirl\..\Swirl.exe", r"C:\Swirl\Swirl.exe:stream", r"C:\Swirl\Other.exe"] {
+        for program in [
+            r"Swirl.exe",
+            r"\\host\share\Swirl.exe",
+            r"C:\*\Swirl.exe",
+            r"C:\%TEMP%\Swirl.exe",
+            r"C:\Swirl\..\Swirl.exe",
+            r"C:\Swirl\Swirl.exe:stream",
+            r"C:\Swirl\Other.exe",
+        ] {
             let mut changed = scope.clone();
             changed.program = program.into();
             assert!(changed.validate().is_err(), "program {program}");
@@ -302,7 +344,10 @@ mod tests {
         let mut changed = scope.clone();
         changed.interface_alias = "Ethernet*".into();
         assert!(changed.validate().is_err());
-        assert!(!scope.matches_policy(&policy), "disabled DHCP cannot acquire an exception");
+        assert!(
+            !scope.matches_policy(&policy),
+            "disabled DHCP cannot acquire an exception"
+        );
         let mut dhcp_policy = policy;
         dhcp_policy.dhcp = true;
         assert!(scope.matches_policy(&dhcp_policy));
