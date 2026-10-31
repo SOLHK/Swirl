@@ -17,7 +17,9 @@ permissions:
 
 concurrency:
   group: qt-network-security-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/work/subscription-unified-integration-20261023' }}
+  # Only these development branches replace their own obsolete product builds;
+  # the newest source still runs every original and additive security gate.
+  cancel-in-progress: ${{ github.ref == 'refs/heads/work/subscription-unified-integration-20261023' || contains(fromJSON('["work/native-lan-proxy-20261031", "work/native-lan-gateway-20261031"]'), github.head_ref || github.ref_name) }}
 
 jobs:
   downloader:

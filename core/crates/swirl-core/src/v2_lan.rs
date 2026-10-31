@@ -309,9 +309,14 @@ impl IngressBoundary for Boundary<'_> {
     fn resolver(&self, resolver: &Arc<Resolver>) -> Arc<Resolver> {
         let ingress = self.ingress.clone();
         let local = self.local;
-        Arc::new(resolver.as_ref().clone().with_endpoint_guard(move |address| {
-            ingress.check_proxy_endpoint(address, local).is_ok()
-        }))
+        Arc::new(
+            resolver
+                .as_ref()
+                .clone()
+                .with_endpoint_guard(move |address| {
+                    ingress.check_proxy_endpoint(address, local).is_ok()
+                }),
+        )
     }
 
     fn prepare_proxy_endpoint<'a>(
@@ -320,7 +325,10 @@ impl IngressBoundary for Boundary<'_> {
         resolver: &'a mut Arc<Resolver>,
         limit: Duration,
     ) -> GuardPreparation<'a> {
-        Box::pin(self.ingress.prepare_proxy_endpoint(node, resolver, limit, self.local))
+        Box::pin(
+            self.ingress
+                .prepare_proxy_endpoint(node, resolver, limit, self.local),
+        )
     }
 }
 
@@ -341,7 +349,10 @@ impl Ingress {
     }
 
     pub(super) fn boundary(&self, local: SocketAddr) -> Boundary<'_> {
-        Boundary { ingress: self, local }
+        Boundary {
+            ingress: self,
+            local,
+        }
     }
 
     fn check_proxy_endpoint(&self, address: SocketAddr, local: SocketAddr) -> Result<()> {

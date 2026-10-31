@@ -461,17 +461,35 @@ mod tests {
             }
             let original = Resolver::default().with_config(&config).unwrap();
             let guarded = original.clone().with_endpoint_guard(|_| false);
-            assert_eq!(guarded.resolve("protected.fixture.invalid", 443).await, Err("DnsEndpointForbidden"));
+            assert_eq!(
+                guarded.resolve("protected.fixture.invalid", 443).await,
+                Err("DnsEndpointForbidden")
+            );
             if protocol != "udp" {
                 assert_eq!(
-                    guarded.resolve_with_transport("transport.fixture.invalid", 443, &DirectQueryTransport).await,
+                    guarded
+                        .resolve_with_transport(
+                            "transport.fixture.invalid",
+                            443,
+                            &DirectQueryTransport
+                        )
+                        .await,
                     Err("DnsEndpointForbidden")
                 );
             }
-            assert!(original.cache.lock().unwrap().is_empty(), "an ingress denial must not poison the shared cache");
+            assert!(
+                original.cache.lock().unwrap().is_empty(),
+                "an ingress denial must not poison the shared cache"
+            );
             assert_eq!(original.permits.available_permits(), 8);
-            assert_eq!(udp.recv_from(&mut [0; 512]).unwrap_err().kind(), std::io::ErrorKind::WouldBlock);
-            assert_eq!(tcp.accept().unwrap_err().kind(), std::io::ErrorKind::WouldBlock);
+            assert_eq!(
+                udp.recv_from(&mut [0; 512]).unwrap_err().kind(),
+                std::io::ErrorKind::WouldBlock
+            );
+            assert_eq!(
+                tcp.accept().unwrap_err().kind(),
+                std::io::ErrorKind::WouldBlock
+            );
         }
     }
 
@@ -482,7 +500,10 @@ mod tests {
         let worker = tokio::spawn(async move {
             for _ in 0..2 {
                 let mut query = [0; 512];
-                let (length, client) = timeout(Duration::from_secs(4), peer.recv_from(&mut query)).await.unwrap().unwrap();
+                let (length, client) = timeout(Duration::from_secs(4), peer.recv_from(&mut query))
+                    .await
+                    .unwrap()
+                    .unwrap();
                 assert_eq!(&query[length - 4..length], &[0, 1, 0, 1]);
                 let mut reply = query[..length].to_vec();
                 reply[2..4].copy_from_slice(&[0x81, 0x80]);
@@ -491,28 +512,65 @@ mod tests {
                 peer.send_to(&reply, client).await.unwrap();
             }
         });
-        let original = Resolver::default().with_config(&swirl_subscription::Dns {
-            query_family: DnsQueryFamily::Ipv4Only,
-            use_system_hosts: false,
-            servers: vec![address],
-            hosts: vec![swirl_subscription::HostMapping {
-                name: "static.fixture.invalid".into(),
-                address: "203.0.113.9".parse().unwrap(),
-            }],
-            ..Default::default()
-        }).unwrap();
+        let original = Resolver::default()
+            .with_config(&swirl_subscription::Dns {
+                query_family: DnsQueryFamily::Ipv4Only,
+                use_system_hosts: false,
+                servers: vec![address],
+                hosts: vec![swirl_subscription::HostMapping {
+                    name: "static.fixture.invalid".into(),
+                    address: "203.0.113.9".parse().unwrap(),
+                }],
+                ..Default::default()
+            })
+            .unwrap();
         let guarded = original.clone().with_endpoint_guard(|_| false);
         assert!(Arc::ptr_eq(&original.cache, &guarded.cache));
         assert!(Arc::ptr_eq(&original.permits, &guarded.permits));
-        assert_eq!(original.resolve("cached.fixture.invalid", 80).await.unwrap(), vec!["203.0.113.8:80".parse().unwrap()]);
-        assert_eq!(guarded.resolve("cached.fixture.invalid", 443).await.unwrap(), vec!["203.0.113.8:443".parse().unwrap()]);
-        assert_eq!(guarded.resolve("static.fixture.invalid", 443).await.unwrap(), vec!["203.0.113.9:443".parse().unwrap()]);
-        assert_eq!(guarded.resolve("2001:db8::1", 443).await.unwrap(), vec!["[2001:db8::1]:443".parse().unwrap()]);
-        assert_eq!(guarded.resolve("uncached.fixture.invalid", 443).await, Err("DnsEndpointForbidden"));
-        assert!(original.cached("uncached.fixture.invalid", 443).unwrap().is_none());
+        assert_eq!(
+            original
+                .resolve("cached.fixture.invalid", 80)
+                .await
+                .unwrap(),
+            vec!["203.0.113.8:80".parse().unwrap()]
+        );
+        assert_eq!(
+            guarded
+                .resolve("cached.fixture.invalid", 443)
+                .await
+                .unwrap(),
+            vec!["203.0.113.8:443".parse().unwrap()]
+        );
+        assert_eq!(
+            guarded
+                .resolve("static.fixture.invalid", 443)
+                .await
+                .unwrap(),
+            vec!["203.0.113.9:443".parse().unwrap()]
+        );
+        assert_eq!(
+            guarded.resolve("2001:db8::1", 443).await.unwrap(),
+            vec!["[2001:db8::1]:443".parse().unwrap()]
+        );
+        assert_eq!(
+            guarded.resolve("uncached.fixture.invalid", 443).await,
+            Err("DnsEndpointForbidden")
+        );
+        assert!(
+            original
+                .cached("uncached.fixture.invalid", 443)
+                .unwrap()
+                .is_none()
+        );
         // The restricted view has not modified the ordinary host resolver or
         // inserted a shared failure: its next real query must still succeed.
-        assert_eq!(original.resolve("uncached.fixture.invalid", 443).await.unwrap(), vec!["203.0.113.8:443".parse().unwrap()]);
+        assert_eq!(
+            original
+                .resolve("uncached.fixture.invalid", 443)
+                .await
+                .unwrap(),
+            vec!["203.0.113.8:443".parse().unwrap()]
+        );
         worker.await.unwrap();
     }
 
