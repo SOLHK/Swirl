@@ -16,9 +16,9 @@ fn bound_socket(address: SocketAddr, kind: Type, protocol: Protocol) -> io::Resu
         ));
     }
     let socket = Socket::new(Domain::for_address(address), kind, Some(protocol))?;
-    // Winsock's default bind can be stolen by another same-user socket that
-    // opts into SO_REUSEADDR. This must be set BEFORE bind; a firewall rule
-    // and a successful bind do not themselves confer exclusive ownership.
+    // Establish and verify explicit ownership BEFORE bind. Enhanced Windows
+    // defaults already reject sharing the same specific address; this is
+    // defense in depth, not a claim that that default was exploitable.
     #[cfg(windows)]
     windows::require_exclusive(&socket)?;
     // Match Tokio's Unix TCP restart behavior. Do not enable UDP reuse or
@@ -161,20 +161,35 @@ mod tests {
     async fn windows_ingress_rejects_reuseaddr_takeover_for_tcp_and_udp() {
         use socket2::SockRef;
         for address in addresses() {
-            // Positive control: reproduce same-user default bind sharing, on
-            // our own ephemeral loopback socket only. No external port, rule
-            // or interface is touched by this fixture.
+            // Server 2003+ enhanced socket security rejects default-specific
+            // -> REUSEADDR-specific. The original failing positive control
+            // applied the pre-XP matrix; keep the observed refusal asserted.
+            // Explicit first-socket sharing is the separate positive control.
+            // All cases touch only their own ephemeral loopback sockets.
             for (kind, protocol) in [(Type::STREAM, Protocol::TCP), (Type::DGRAM, Protocol::UDP)] {
-                let ordinary =
-                    Socket::new(Domain::for_address(address), kind, Some(protocol)).unwrap();
-                ordinary.bind(&address.into()).unwrap();
-                if kind == Type::STREAM {
-                    ordinary.listen(1).unwrap();
+                for shared in [false, true] {
+                    let ordinary =
+                        Socket::new(Domain::for_address(address), kind, Some(protocol)).unwrap();
+                    if shared {
+                        ordinary.set_reuse_address(true).unwrap();
+                    }
+                    assert!(!windows::exclusive(&ordinary).unwrap());
+                    assert_eq!(ordinary.reuse_address().unwrap(), shared);
+                    ordinary.bind(&address.into()).unwrap();
+                    if kind == Type::STREAM {
+                        ordinary.listen(1).unwrap();
+                    }
+                    let local = ordinary.local_addr().unwrap();
+                    if shared {
+                        let other =
+                            Socket::new(Domain::for_address(address), kind, Some(protocol)).unwrap();
+                        other.set_reuse_address(true).unwrap();
+                        other.bind(&local).expect("explicit sharing positive control");
+                        assert_eq!(other.local_addr().unwrap(), local);
+                    } else {
+                        assert_reuse_cannot_steal(local.as_socket().unwrap(), kind, protocol);
+                    }
                 }
-                let other =
-                    Socket::new(Domain::for_address(address), kind, Some(protocol)).unwrap();
-                other.set_reuse_address(true).unwrap();
-                other.bind(&ordinary.local_addr().unwrap()).unwrap();
             }
             let listener = bind_tcp(address).unwrap();
             assert!(windows::exclusive(&listener).unwrap());
