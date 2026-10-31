@@ -122,6 +122,8 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     // Runtime acceptance counts explicit requests. Its own periodic probes
     // would add unrelated Rust connections and corrupt per-request deltas.
     : QObject(parent), m_engine(std::move(engine)), m_store(storePath),m_imports(&m_store,this),m_systemProxy(this,{},std::move(proxyBackend)),m_telemetry(storePath.isEmpty()?QString():storePath+".telemetry",storePath.isEmpty()&&!realAcceptance) {
+    m_lanSession=std::make_unique<LanProxySession>(m_engine.get(),storePath.isEmpty()?QString():storePath+".lan-firewall/session.dpapi",this);
+    connect(m_lanSession.get(),&LanProxySession::changed,this,[this]{m_networkError=m_lanSession->error();emit optionsChanged();emit statusChanged();});
     const auto retainedNodeConfiguration=[this](const QString &sourceId,bool nodesOnly) {
         auto retained=m_store.networkConfiguration();
         if(nodesOnly && !sourceId.isEmpty() && retained.contains("importedConfiguration") &&
@@ -252,7 +254,10 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             m_modeBeforeMetered=configuration.value("modeBeforeMetered").toString("rule");
             m_options.lanUsername=configuration.value("lanUsername").toString();
             m_options.lanPassword=QString::fromUtf8(protectLanPassword(QByteArray::fromBase64(configuration.value("lanPasswordProtected").toString().toLatin1()),true));
-            m_options.allowLan=configuration.value("allowLan").toBool(false)&&lanConfigured();
+            // LAN exposure always needs a fresh explicit user action and current
+            // interface/profile/firewall validation. A saved switch is not authority.
+            m_options.allowLan=false;
+            m_options.lanConfiguration=configuration.value("lanConfiguration").toObject().toVariantMap();
             m_options.dnsConfig=configuration.value("dns").toObject().toVariantMap();
             for(const auto &rule:configuration.value("rules").toArray())m_options.customRules.append(rule.toString());
             m_options.customGroups=configuration.value("groups").toArray().toVariantList();
@@ -396,6 +401,9 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     });
     connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this,[this]{shutdown();});
     initializePolicyConfiguration();
+    QTimer::singleShot(0,this,[this]{
+        if(!m_shuttingDown)m_engine->lanCommand({{"op","lan_capabilities"},{"request_id",QUuid::createUuid().toString(QUuid::WithoutBraces)}});
+    });
     auto *interfaces=new QTimer(this);interfaces->setInterval(15000);
     connect(interfaces,&QTimer::timeout,this,&EngineController::refreshLanAddresses);interfaces->start();
     QTimer::singleShot(0,this,&EngineController::refreshLanAddresses);
@@ -447,6 +455,7 @@ bool EngineController::busy() const {
 }
 void EngineController::start() { if(canStart())startConfiguredSession(); }
 void EngineController::stop() {
+    if(m_lanSession)m_lanSession->stop();
     m_proxyRequested=false;m_connectionRequested=false;m_restartPending=false;cancelSystemProxyCheck();m_systemProxy.disable();
     if(m_policyBusy){
         m_stopAfterPolicy=true;
@@ -461,6 +470,7 @@ void EngineController::shutdown() {
     rollbackPendingSelection(QStringLiteral("节点切换已取消，保留原选择。"));
     m_shuttingDown=true;m_connectionRequested=false;m_restartPending=false;m_proxyRequested=false;
     cancelSystemProxyCheck();
+    if(m_lanSession)m_lanSession->stop();
     m_imports.shutdown();m_tests.cancel();m_systemProxy.disable();m_engine->stop();
 }
 void EngineController::refresh() { m_engine->refresh(); }
@@ -820,13 +830,14 @@ bool EngineController::replaceNetworkConfiguration(const QVariantMap &input) {
     m_options.dnsConfig=canonical.value("dns").toMap();m_options.customRules=canonical.value("rules").toStringList();m_options.customGroups=canonical.value("groups").toList();
     if(saveNetworkConfiguration()){updateRoutingFlags();return true;}m_options.dnsConfig=previous.value("dns").toMap();m_options.customRules=previous.value("rules").toStringList();m_options.customGroups=previous.value("groups").toList();emit optionsChanged();return false;
 }
-QJsonObject EngineController::serializedNetworkConfiguration() {
-    const auto protectedPassword=m_options.lanPassword.isEmpty()?QByteArray():protectLanPassword(m_options.lanPassword.toUtf8(),false);
-    if(!m_options.lanPassword.isEmpty()&&protectedPassword.isEmpty()){m_networkError=QStringLiteral("无法加密局域网代理密码。");return {};}
-    auto snapshot=QJsonObject{{"schema",1},{"metered",m_options.meteredNetwork},{"meteredAllowlist",QJsonArray::fromStringList(m_options.meteredAllowlist)},{"tunBeforeMetered",m_tunBeforeMetered},{"modeBeforeMetered",m_modeBeforeMetered},{"allowLan",m_options.allowLan},{"lanUsername",m_options.lanUsername},{"lanPasswordProtected",QString::fromLatin1(protectedPassword.toBase64())},{"tun",m_options.tunEnabled},{"dns",QJsonObject::fromVariantMap(m_options.dnsConfig)},
-        {"rules",QJsonArray::fromStringList(m_options.customRules)},{"groups",QJsonArray::fromVariantList(m_options.customGroups)}};
+QJsonObject EngineController::serializedNetworkConfiguration(const EngineStartOptions *candidate) {
+    const auto &options=candidate?*candidate:m_options;
+    const auto protectedPassword=options.lanPassword.isEmpty()?QByteArray():protectLanPassword(options.lanPassword.toUtf8(),false);
+    if(!options.lanPassword.isEmpty()&&protectedPassword.isEmpty()){m_networkError=QStringLiteral("无法加密局域网代理密码。");return {};}
+    auto snapshot=QJsonObject{{"schema",1},{"metered",options.meteredNetwork},{"meteredAllowlist",QJsonArray::fromStringList(options.meteredAllowlist)},{"tunBeforeMetered",m_tunBeforeMetered},{"modeBeforeMetered",m_modeBeforeMetered},{"allowLan",false},{"lanConfiguration",QJsonObject::fromVariantMap(options.lanConfiguration)},{"lanUsername",options.lanUsername},{"lanPasswordProtected",QString::fromLatin1(protectedPassword.toBase64())},{"tun",options.tunEnabled},{"dns",QJsonObject::fromVariantMap(options.dnsConfig)},
+        {"rules",QJsonArray::fromStringList(options.customRules)},{"groups",QJsonArray::fromVariantList(options.customGroups)}};
     if(m_nativeDocumentRouting)snapshot.insert("nativeDocumentRouting",true);
-    if(!m_options.policyDocument.isEmpty())snapshot.insert("policyDocumentV2",m_options.policyDocument);
+    if(!options.policyDocument.isEmpty())snapshot.insert("policyDocumentV2",options.policyDocument);
     const auto original=m_store.networkConfiguration().value("importedConfiguration");
     if(!original.isUndefined())snapshot.insert("importedConfiguration",original);
     const auto outcomes=m_store.networkConfiguration().value("subscriptionImportResults");
@@ -1133,7 +1144,7 @@ void EngineController::refreshLanAddresses(){
     connect(watcher,&QFutureWatcher<QList<QNetworkInterface>>::finished,this,[this,watcher]{
         m_interfaces=watcher->result();watcher->deleteLater();m_lanScanPending=false;
         QStringList addresses;for(const auto &iface:m_interfaces)for(const auto &entry:iface.addressEntries()){const auto address=entry.ip();if(address.protocol()==QAbstractSocket::IPv4Protocol&&!address.isLoopback()&&!address.isNull())addresses.append(address.toString());}
-        if(addresses!=m_lanAddresses){m_lanAddresses=addresses;emit lanAddressesChanged();}
+        m_lanAddresses=addresses;emit lanAddressesChanged();
         emit interfacesChanged();
     });
     watcher->setFuture(promise->future());
@@ -1141,22 +1152,100 @@ void EngineController::refreshLanAddresses(){
         promise->start();promise->addResult(QNetworkInterface::allInterfaces());promise->finish();
     });
 }
-bool EngineController::configureLan(const QString &username,const QString &password) {
-    if(!networkEditAllowed())return false;
-    if(!QRegularExpression("^[A-Za-z0-9_.-]{1,64}$").match(username).hasMatch()||password.size()<8||password.size()>128||password.contains(QRegularExpression("[:\\r\\n]"))){
-        m_networkError=QStringLiteral("用户名仅支持字母、数字、点和横线；密码需为 8 至 128 字符且不能包含冒号或换行。");emit optionsChanged();return false;
+bool EngineController::lanSupported() const {
+#ifdef Q_OS_WIN
+    return RustCoreLibrary::instance().supportsLanProxy();
+#else
+    return false;
+#endif
+}
+QVariantMap EngineController::lanConfiguration() const {
+    if(!m_options.lanConfiguration.isEmpty()){auto value=m_options.lanConfiguration;for(const auto &key:{"auth","username","password","host_addresses"})value.remove(QLatin1String(key));return value;}
+    return {{"listen_ip",""},{"http_port",7899},{"socks_port",7899},{"udp_port_start",7900},{"udp_port_end",7915},
+        {"allowed_cidrs",QStringList{}},{"max_connections",128},{"max_connections_per_client",16},{"auth_failures_per_minute",10},{"idle_timeout_secs",300}};
+}
+QVariantMap EngineController::lanStatus() const {
+    auto status=m_engine->status().lan.toVariantMap();
+    status.insert("status_confirmed",processAlive()&&apiHealthy()&&m_engine->status().lan.value("health_error").toString().isEmpty());
+    status.insert("phase",m_lanSession?m_lanSession->phase():QStringLiteral("idle"));
+    status.insert("firewall_recovery_needed",lanRecoveryNeeded());
+    status.insert("error",m_lanSession?m_lanSession->error():QString());
+    return status;
+}
+QVariantList EngineController::lanInterfaces() const {
+    QVariantList rows;
+    for(const auto &iface:m_interfaces){
+        if(!iface.flags().testFlag(QNetworkInterface::IsUp)||iface.flags().testFlag(QNetworkInterface::IsLoopBack))continue;
+        for(const auto &entry:iface.addressEntries()){
+            const auto ip=entry.ip().toString();if(!LanFirewall::privateIpv4(ip)||entry.prefixLength()<1)continue;
+            const auto subnet=QHostAddress::parseSubnet(ip+'/'+QString::number(entry.prefixLength()));
+            rows.append(QVariantMap{{"index",iface.index()},{"ip",ip},{"prefix",entry.prefixLength()},
+                {"cidr",subnet.first.toString()+'/'+QString::number(subnet.second)},{"name",iface.humanReadableName()},
+                {"label",iface.humanReadableName()+" · "+ip}});
+        }
     }
-    const auto oldUser=m_options.lanUsername,oldPassword=m_options.lanPassword;m_options.lanUsername=username;m_options.lanPassword=password;
-    if(saveNetworkConfiguration())return true;m_options.lanUsername=oldUser;m_options.lanPassword=oldPassword;emit optionsChanged();return false;
+    return rows;
+}
+bool EngineController::configureLan(const QString &username,const QString &password) {
+    auto configuration=lanConfiguration();configuration.insert("username",username);configuration.insert("password",password);
+    return configureLanAccess(configuration);
+}
+bool EngineController::configureLanAccess(const QVariantMap &input) {
+    if(lanBusy()||lanEnabled()||m_policyBusy||m_imports.busy()){
+        m_networkError=QStringLiteral("请先停止局域网代理，并等待配置事务结束；现有本机连接保持运行。");emit optionsChanged();return false;
+    }
+    auto values=QJsonObject::fromVariantMap(input);
+    const auto username=values.take("username").toString();
+    const auto provided=values.take("password").toString();
+    const auto password=provided.isEmpty()?m_options.lanPassword:provided;
+    values.insert("auth",QJsonObject{{"username",username},{"password",password}});
+    values.remove("host_addresses"); // The native preflight supplies fresh OS identities.
+    QJsonObject canonical;
+    if(!LanFirewall::validateConfiguration(values,&canonical,&m_networkError)){emit optionsChanged();return false;}
+    bool assigned=false;
+    for(const auto &entry:lanInterfaces())if(entry.toMap().value("ip").toString()==canonical.value("listen_ip").toString())assigned=true;
+    if(!assigned){m_networkError=QStringLiteral("请选择当前存在且已启用的局域网 IPv4 接口。");emit optionsChanged();return false;}
+    canonical.remove("auth");
+    if(m_store.configurationV2()){
+        // Use the existing durable V2 transaction for preferences as well.
+        // The runtime plan is identical and established flows stay alive; no
+        // direct NodeStore write bypasses its receipt/recovery barrier.
+        auto candidate=m_options;candidate.lanConfiguration=canonical.toVariantMap();
+        candidate.lanUsername=username;candidate.lanPassword=password;candidate.allowLan=false;
+        const bool accepted=applyPolicyConfiguration(m_policyDocument,candidate);
+        m_networkError=accepted?QString():m_policyError;emit optionsChanged();return accepted;
+    }
+    const auto previous=m_options.lanConfiguration;const auto oldUser=m_options.lanUsername,oldPassword=m_options.lanPassword;
+    m_options.lanConfiguration=canonical.toVariantMap();m_options.lanUsername=username;m_options.lanPassword=password;
+    m_options.allowLan=false;m_networkError.clear();
+    if(saveNetworkConfiguration()){emit statusChanged();return true;}
+    m_options.lanConfiguration=previous;m_options.lanUsername=oldUser;m_options.lanPassword=oldPassword;emit optionsChanged();return false;
 }
 bool EngineController::setLanEnabled(bool enabled) {
     m_networkError.clear();
-    if(enabled){m_networkError=QStringLiteral("Rust Core 暂不支持局域网代理；地址和认证配置保持不变。");emit optionsChanged();return false;}
-    if(enabled&&!lanConfigured()){m_networkError=QStringLiteral("请先设置局域网代理用户名和密码。");emit optionsChanged();return false;}
-    if(busy()||nodeBusy()||routingBusy()){m_networkError=QStringLiteral("请先选择代理节点，并等待当前操作结束。");emit optionsChanged();return false;}
-    const bool previous=m_options.allowLan;m_options.allowLan=enabled;if(!saveNetworkConfiguration()){m_options.allowLan=previous;return false;}
-    if(enabled||processAlive())startConfiguredSession();
+    if(!enabled)return m_lanSession->stop();
+    if(!lanSupported()){m_networkError=QStringLiteral("当前构建或平台未提供原生局域网代理安全集成；未开启监听。");emit optionsChanged();return false;}
+    if(!elevated()){m_networkError=QStringLiteral("局域网代理需要管理员权限，以创建和恢复精确的 Windows 防火墙规则。");emit optionsChanged();return false;}
+    if(!m_store.configurationV2()){m_networkError=QStringLiteral("请先完成现有策略迁移，再启用局域网代理；未改变已有连接。");emit optionsChanged();return false;}
+    if(!lanConfigured()){m_networkError=QStringLiteral("请先配置局域网接口、端口、允许的客户端 CIDR 和认证。");emit optionsChanged();return false;}
+    if(m_policyBusy||routingBusy()||busy()||m_imports.busy()){
+        m_networkError=QStringLiteral("请等待当前内核或配置操作完成后，再启用局域网代理。");emit optionsChanged();return false;
+    }
+    const bool startCore=!processAlive();
+    if(startCore&&!canStart()){m_networkError=QStringLiteral("Rust Core 当前无法启动，未开启局域网代理。");emit optionsChanged();return false;}
+    auto configuration=QJsonObject::fromVariantMap(m_options.lanConfiguration);
+    configuration.insert("auth",QJsonObject{{"username",m_options.lanUsername},{"password",m_options.lanPassword}});
+    if(!m_lanSession->start(configuration)){m_networkError=m_lanSession->error();emit optionsChanged();return false;}
+    // This starts only the existing policy runtime. It never requests WinINET
+    // ownership, enables TUN, or changes the user's selected outbound.
+    if(startCore){startConfiguredSession();if(!processAlive()&&!busy()){
+        m_lanSession->stop();m_networkError=!m_policyError.isEmpty()?m_policyError:!m_nodeError.isEmpty()?m_nodeError:QStringLiteral("Rust Core 无法启动，未开启局域网代理。");emit optionsChanged();return false;
+    }}
     emit statusChanged();return true;
+}
+bool EngineController::recoverLan(){
+    if(!elevated()){m_networkError=QStringLiteral("恢复 LAN 防火墙规则需要管理员权限。");emit optionsChanged();return false;}
+    return m_lanSession->recover();
 }
 
 bool EngineController::setGatewayForwarding(bool enabled) {
@@ -1522,7 +1611,7 @@ bool EngineController::applyPolicyConfiguration(const QJsonObject &document,cons
     QJsonObject candidate;const auto error=RustCoreEngine::configurationV2(options,document,&candidate);
     if(!error.isEmpty())return reject(error);
     const auto revision=m_store.issueConfigurationRevision();if(revision.isEmpty())return reject(m_store.error());
-    auto network=m_policyCatalog?m_policyCandidateNetwork:serializedNetworkConfiguration();if(network.isEmpty())return reject(m_networkError);
+    auto network=m_policyCatalog?m_policyCandidateNetwork:serializedNetworkConfiguration(&options);if(network.isEmpty())return reject(m_networkError);
     network.insert("policyDocumentV2",document);network.insert("dns",QJsonObject::fromVariantMap(options.dnsConfig));network.insert("proxyPort",int(options.proxyPort));
     if(!m_store.reserveConfigurationLease())return reject(m_store.error());
     m_policyBusy=true;m_policyOnline=processAlive();m_policyRollingBack=false;m_stopAfterPolicy=false;m_policyRecoveryAttempts=0;m_policyIntentDurable=false;

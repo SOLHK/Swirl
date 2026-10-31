@@ -17,6 +17,7 @@ public:
  void selectNode(const QString &) override;
  void setRoutingMode(const QString &) override;
  void configurationCommand(const QJsonObject &) override;
+ void lanCommand(const QJsonObject &) override;
  void probeNode(const QUrl &) override;
  Status status() const override {return m_status;}
  QString probeFailureStage() const override {return m_probeFailureStage;}
@@ -55,7 +56,7 @@ private:
  qint64 m_probeOutboundConnectMs=-1,m_probeOriginTlsMs=-1;
  QSet<quint64> m_reportedForwardingFailures;
  bool m_forwardingFailureLimitReported=false;
- bool m_v2=false;
+ bool m_v2=false,m_lanTracked=false;
  QString m_engineEpoch;
  QJsonObject m_preparedPolicy,m_previousPolicy;
  bool m_configurationRollback=false;

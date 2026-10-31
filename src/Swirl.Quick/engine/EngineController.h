@@ -9,6 +9,7 @@
 #include "TelemetryService.h"
 #include "NodeTestService.h"
 #include "ConnectionDiagnostics.h"
+#include "../network/LanProxySession.h"
 #include <memory>
 #include <QJsonArray>
 #include <optional>
@@ -64,6 +65,12 @@ class EngineController final : public QObject {
     Q_PROPERTY(bool meteredEnabled READ meteredEnabled NOTIFY statusChanged)
     Q_PROPERTY(QStringList meteredAllowlist READ meteredAllowlist NOTIFY optionsChanged)
     Q_PROPERTY(bool lanEnabled READ lanEnabled NOTIFY statusChanged)
+    Q_PROPERTY(bool lanSupported READ lanSupported NOTIFY statusChanged)
+    Q_PROPERTY(bool lanBusy READ lanBusy NOTIFY statusChanged)
+    Q_PROPERTY(bool lanRecoveryNeeded READ lanRecoveryNeeded NOTIFY statusChanged)
+    Q_PROPERTY(QVariantMap lanConfiguration READ lanConfiguration NOTIFY optionsChanged)
+    Q_PROPERTY(QVariantMap lanStatus READ lanStatus NOTIFY statusChanged)
+    Q_PROPERTY(QVariantList lanInterfaces READ lanInterfaces NOTIFY lanAddressesChanged)
     Q_PROPERTY(bool lanConfigured READ lanConfigured NOTIFY optionsChanged)
     Q_PROPERTY(QString lanUsername READ lanUsername NOTIFY optionsChanged)
     Q_PROPERTY(QStringList lanAddresses READ lanAddresses NOTIFY lanAddressesChanged)
@@ -174,8 +181,18 @@ public:
     QStringList meteredAllowlist() const { return m_options.meteredAllowlist; }
     Q_INVOKABLE bool setMeteredEnabled(bool enabled);
     Q_INVOKABLE bool configureMeteredAllowlist(const QStringList &processes);
-    bool lanEnabled() const { return m_engine->status().allowLan && processAlive() && apiHealthy(); }
-    bool lanConfigured() const { return !m_options.lanUsername.isEmpty() && !m_options.lanPassword.isEmpty(); }
+    // Retain the last positive Rust receipt until a stopped receipt arrives.
+    // Loss of API health is an unconfirmed state, never proof of a closed port.
+    bool lanEnabled() const { return m_engine->status().allowLan; }
+    bool lanSupported() const;
+    bool lanBusy() const { return m_lanSession && m_lanSession->busy(); }
+    bool lanRecoveryNeeded() const { return m_lanSession && m_lanSession->recoveryNeeded(); }
+    bool lanConfigured() const { return !m_options.lanUsername.isEmpty() && !m_options.lanPassword.isEmpty() && !m_options.lanConfiguration.isEmpty(); }
+    QVariantMap lanConfiguration() const;
+    QVariantMap lanStatus() const;
+    QVariantList lanInterfaces() const;
+    Q_INVOKABLE bool configureLanAccess(const QVariantMap &configuration);
+    Q_INVOKABLE bool recoverLan();
     QString lanUsername() const { return m_options.lanUsername; }
     QStringList lanAddresses() const;
     QList<QNetworkInterface> networkInterfaces() const { return m_interfaces; }
@@ -249,6 +266,7 @@ private:
     bool m_meteredPending=false,m_meteredOldTun=false;
     QString m_meteredOldMode;
     std::unique_ptr<ProxyEngine> m_engine;
+    std::unique_ptr<LanProxySession> m_lanSession;
     EngineStartOptions m_options;
     NodeStore m_store;
     NodeImportService m_imports;
@@ -259,7 +277,7 @@ private:
     QString m_previousProxyState;
     QVariantList m_previousNodePresentation;
     ProxyEngine::State m_previousEngineState=ProxyEngine::State::Stopped;
-    QJsonObject serializedNetworkConfiguration();
+    QJsonObject serializedNetworkConfiguration(const EngineStartOptions *candidate=nullptr);
     bool saveNetworkConfiguration();
     bool commitRoutingConfiguration(const QStringList &rules,const QVariantList &groups);
     bool networkEditAllowed();

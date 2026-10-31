@@ -2,6 +2,7 @@
 use super::Controller;
 use serde::Deserialize;
 use serde_json::{Value, json};
+use swirl_core::lan::LanConfig;
 use swirl_core::v2::{Core, DurableReceipt, RuntimeConfig, decimal, identity_uuid};
 #[derive(Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
@@ -67,6 +68,30 @@ enum Command {
         handle: String,
         engine_epoch: String,
     },
+    LanValidate {
+        control_schema: u32,
+        request_id: String,
+        config: LanConfig,
+    },
+    LanStart {
+        control_schema: u32,
+        request_id: String,
+        handle: String,
+        engine_epoch: String,
+        config: LanConfig,
+    },
+    LanStop {
+        control_schema: u32,
+        request_id: String,
+        handle: String,
+        engine_epoch: String,
+    },
+    LanStatus {
+        control_schema: u32,
+        request_id: String,
+        handle: String,
+        engine_epoch: String,
+    },
 }
 impl Command {
     fn online_handle(&self) -> Option<&str> {
@@ -75,7 +100,10 @@ impl Command {
             | Self::ActivateConfigurationV2 { handle, .. }
             | Self::FinishConfigurationV2 { handle, .. }
             | Self::RollbackConfigurationV2 { handle, .. }
-            | Self::ConfigurationStatusV2 { handle, .. } => Some(handle),
+            | Self::ConfigurationStatusV2 { handle, .. }
+            | Self::LanStart { handle, .. }
+            | Self::LanStop { handle, .. }
+            | Self::LanStatus { handle, .. } => Some(handle),
             _ => None,
         }
     }
@@ -130,6 +158,26 @@ impl Command {
                 request_id,
                 ..
             } => (*control_schema, request_id, "status"),
+            Self::LanValidate {
+                control_schema,
+                request_id,
+                ..
+            } => (*control_schema, request_id, "lan_validate"),
+            Self::LanStart {
+                control_schema,
+                request_id,
+                ..
+            } => (*control_schema, request_id, "lan_start"),
+            Self::LanStop {
+                control_schema,
+                request_id,
+                ..
+            } => (*control_schema, request_id, "lan_stop"),
+            Self::LanStatus {
+                control_schema,
+                request_id,
+                ..
+            } => (*control_schema, request_id, "lan_status"),
         }
     }
     fn execute(self, controller: &mut Controller) -> Result<Value, &'static str> {
@@ -257,8 +305,69 @@ impl Command {
                 engine_epoch,
                 ..
             } => checked_core(controller, &handle, &engine_epoch)?.status(&request_id),
+            Self::LanValidate {
+                request_id, config, ..
+            } => {
+                config.validate()?;
+                // Syntax and security bounds only. Actual interface ownership,
+                // firewall admission and socket availability are checked at start.
+                Ok(
+                    json!({"ok":true,"request_id":request_id,"lan_control_schema":1,"validation":{"valid":true,"network_preflight_required":true}}),
+                )
+            }
+            Self::LanStart {
+                request_id,
+                handle,
+                engine_epoch,
+                config,
+                ..
+            } => {
+                let core = checked_core_mut(controller, &handle, &engine_epoch)?;
+                let status = core.lan_start(config)?;
+                Ok(
+                    json!({"ok":true,"request_id":request_id,"engine_epoch":core.epoch().to_string(),"lan":status}),
+                )
+            }
+            Self::LanStop {
+                request_id,
+                handle,
+                engine_epoch,
+                ..
+            } => {
+                let core = checked_core_mut(controller, &handle, &engine_epoch)?;
+                let status = core.lan_stop()?;
+                Ok(
+                    json!({"ok":true,"request_id":request_id,"engine_epoch":core.epoch().to_string(),"lan":status}),
+                )
+            }
+            Self::LanStatus {
+                request_id,
+                handle,
+                engine_epoch,
+                ..
+            } => {
+                let core = checked_core(controller, &handle, &engine_epoch)?;
+                let status = core.lan_status()?;
+                Ok(
+                    json!({"ok":true,"request_id":request_id,"engine_epoch":core.epoch().to_string(),"lan":status}),
+                )
+            }
         }
     }
+}
+fn checked_core_mut<'a>(
+    controller: &'a mut Controller,
+    handle: &str,
+    epoch: &str,
+) -> Result<&'a mut Core, &'static str> {
+    let core = controller
+        .cores_v2
+        .get_mut(&decimal(handle)?)
+        .ok_or("UnknownV2Handle")?;
+    if core.epoch() != decimal(epoch)? {
+        return Err("EngineEpochMismatch");
+    }
+    Ok(core)
 }
 fn checked_core<'a>(
     controller: &'a Controller,
@@ -313,7 +422,7 @@ pub(super) fn dispatch(controller: &mut Controller, input: &[u8]) -> Value {
     }
 }
 pub(super) fn capabilities() -> Value {
-    json!({"required":["config_transactions_v1","stable_policy_ids_v1","routing_tiers_v1"],"optional":{"tun":false,"process_matching":false,"application_or_domain_matching":false,"nested_policy_groups_v1":true,"service_affinity_v1":true,"classification_via_default_policy":true}})
+    json!({"required":["config_transactions_v1","stable_policy_ids_v1","routing_tiers_v1"],"optional":{"tun":false,"lan_proxy":true,"lan_proxy_control_schema":1,"lan_proxy_ipv6":false,"lan_proxy_ipv6_listener":false,"lan_proxy_ipv6_targets":true,"gateway":false,"process_matching":false,"application_or_domain_matching":false,"nested_policy_groups_v1":true,"service_affinity_v1":true,"classification_via_default_policy":true}})
 }
 
 #[cfg(test)]

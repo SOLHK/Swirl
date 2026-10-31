@@ -25,5 +25,7 @@ x509-cert.workspace = true
 der.workspace = true
 [dev-dependencies]
 serde_json.workspace = true
-[lints]
-workspace = true
+# The private Windows borrowed-socket option shim is the only FFI exception.
+# No protocol, TLS, relay or routing code may introduce unsafe operations.
+[lints.rust]
+unsafe_code = "deny"

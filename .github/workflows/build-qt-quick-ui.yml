@@ -16,9 +16,10 @@ env:
 
 concurrency:
   group: swirl-quick-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  # Finish the current verified stage so first-time Qt compilation can save its
-  # cache and installer evidence before the next stage starts.
-  cancel-in-progress: false
+  # The LAN/Gateway development PRs replace only their own obsolete builds.
+  # An old icon-tool stall must not keep the corrected installer queued. Other
+  # product branches still finish their cache and installer evidence unchanged.
+  cancel-in-progress: ${{ contains(fromJSON('["work/native-lan-proxy-20261031", "work/native-lan-gateway-20261031"]'), github.head_ref || github.ref_name) }}
 
 jobs:
   build-qt-ui:

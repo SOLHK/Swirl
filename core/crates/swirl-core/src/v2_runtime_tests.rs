@@ -1033,6 +1033,7 @@ fn classification_dns_uses_default_proxy_then_verified_tls_without_direct_or_pla
             &plan,
             "classified.fixture.invalid",
             443,
+            None,
         ));
         if trusted_name {
             assert_eq!(resolved.unwrap(), vec!["203.0.113.9:443".parse().unwrap()]);

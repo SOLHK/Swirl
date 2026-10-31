@@ -160,6 +160,9 @@ impl UdpAssociation {
         if !valid_relay(address) {
             return Err("Socks5UdpRelayAddress");
         }
+        if !resolver.endpoint_allowed(address) {
+            return Err("Socks5UdpRelayForbidden");
+        }
         let socket = within(deadline, "UpstreamProtocolTimeout", async {
             let socket = bind_udp(if address.is_ipv4() {
                 SocketAddr::from(([0, 0, 0, 0], 0))
