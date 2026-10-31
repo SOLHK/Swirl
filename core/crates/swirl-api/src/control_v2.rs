@@ -311,7 +311,9 @@ impl Command {
                 config.validate()?;
                 // Syntax and security bounds only. Actual interface ownership,
                 // firewall admission and socket availability are checked at start.
-                Ok(json!({"ok":true,"request_id":request_id,"lan_control_schema":1,"validation":{"valid":true,"network_preflight_required":true}}))
+                Ok(
+                    json!({"ok":true,"request_id":request_id,"lan_control_schema":1,"validation":{"valid":true,"network_preflight_required":true}}),
+                )
             }
             Self::LanStart {
                 request_id,
@@ -322,7 +324,9 @@ impl Command {
             } => {
                 let core = checked_core_mut(controller, &handle, &engine_epoch)?;
                 let status = core.lan_start(config)?;
-                Ok(json!({"ok":true,"request_id":request_id,"engine_epoch":core.epoch().to_string(),"lan":status}))
+                Ok(
+                    json!({"ok":true,"request_id":request_id,"engine_epoch":core.epoch().to_string(),"lan":status}),
+                )
             }
             Self::LanStop {
                 request_id,
@@ -332,7 +336,9 @@ impl Command {
             } => {
                 let core = checked_core_mut(controller, &handle, &engine_epoch)?;
                 let status = core.lan_stop()?;
-                Ok(json!({"ok":true,"request_id":request_id,"engine_epoch":core.epoch().to_string(),"lan":status}))
+                Ok(
+                    json!({"ok":true,"request_id":request_id,"engine_epoch":core.epoch().to_string(),"lan":status}),
+                )
             }
             Self::LanStatus {
                 request_id,
@@ -342,7 +348,9 @@ impl Command {
             } => {
                 let core = checked_core(controller, &handle, &engine_epoch)?;
                 let status = core.lan_status()?;
-                Ok(json!({"ok":true,"request_id":request_id,"engine_epoch":core.epoch().to_string(),"lan":status}))
+                Ok(
+                    json!({"ok":true,"request_id":request_id,"engine_epoch":core.epoch().to_string(),"lan":status}),
+                )
             }
         }
     }

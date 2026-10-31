@@ -1,6 +1,6 @@
 //! Rust-owned runtime, sockets, scheduling, statistics and immutable session plans.
-mod policy;
 pub mod lan;
+mod policy;
 mod policy_v2;
 mod probe;
 mod socks5_udp;

@@ -552,7 +552,9 @@ if let Ok(mut records)=shared.records.lock()&& let Some(record)=records.get_mut(
             return Err("LanAlreadyRunning");
         }
         let lan = lan_runtime::LanRuntime::start(
-            self.runtime.as_ref().ok_or("CoreStopped")?, self.shared.clone(), config,
+            self.runtime.as_ref().ok_or("CoreStopped")?,
+            self.shared.clone(),
+            config,
         )?;
         let status = lan.snapshot()?;
         self.lan = Some(lan);
@@ -568,11 +570,13 @@ if let Ok(mut records)=shared.records.lock()&& let Some(record)=records.get_mut(
     pub fn lan_status(&self) -> Result<Value> {
         match &self.lan {
             Some(lan) => lan.snapshot(),
-            None => Ok(json!({"running":false,"ipv4_only":true,"ipv6_targets":true,"encrypted_transport":false,
+            None => Ok(
+                json!({"running":false,"ipv4_only":true,"ipv6_targets":true,"encrypted_transport":false,
                 "listen_ip":null,"http_port":null,"socks_port":null,
                 "udp_port_start":null,"udp_port_end":null,"active_connections":0,
                 "accepted":0,"rejected":0,"auth_failures":0,"uploaded":0,"downloaded":0,
-                "clients":[],"last_error":""})),
+                "clients":[],"last_error":""}),
+            ),
         }
     }
     pub fn epoch(&self) -> u64 {
@@ -1384,24 +1388,35 @@ async fn session(
     let (auth, limit) = {
         let live = shared.live.lock().map_err(|_| "ConfigState")?;
         (
-            lan.as_ref().map(|ingress| ingress.config.auth.clone()).or_else(|| live.plan.prepared.runtime.inbound_auth.clone()),
+            lan.as_ref()
+                .map(|ingress| ingress.config.auth.clone())
+                .or_else(|| live.plan.prepared.runtime.inbound_auth.clone()),
             Duration::from_millis(live.plan.prepared.runtime.limits.handshake_timeout_ms),
         )
     };
     let handshake = async {
-        if let Some(ingress) = &lan { ingress.check_protocol(&inbound).await?; }
+        if let Some(ingress) = &lan {
+            ingress.check_protocol(&inbound).await?;
+        }
         swirl_protocol::accept(&mut inbound, &auth).await
     };
     let request = tokio::select! {biased;_=cancelled(&mut cancellation)=>return Err("SessionRevoked"),request=timeout(limit,handshake)=>request.map_err(|_|"HandshakeTimeout")??};
     drop(auth);
-    if let Some(ingress) = &lan { ingress.authenticated(); }
+    if let Some(ingress) = &lan {
+        ingress.authenticated();
+    }
     if request.udp {
         return udp_associate(inbound, peer, request, shared, id, cancellation, lan).await;
     }
-    let counters = lan.as_ref().map_or_else(|| Arc::new(Counters::default()), |ingress| ingress.counters.clone());
+    let counters = lan.as_ref().map_or_else(
+        || Arc::new(Counters::default()),
+        |ingress| ingress.counters.clone(),
+    );
     let mut established = false;
     let work = async {
-        if let Some(ingress) = &lan { ingress.check_target(&request.target)?; }
+        if let Some(ingress) = &lan {
+            ingress.check_target(&request.target)?;
+        }
         let (plan, generation) = shared.admit().await?;
         let mut routed = route(plan, request.target.clone(), peer.ip(), generation).await?;
         // The final DIRECT address comes from the existing resolver, after
@@ -1409,7 +1424,9 @@ async fn session(
         // without adding any separate DNS lookup or leaking proxy domains.
         if let Some(ingress) = &lan {
             ingress.check_target(&routed.target)?;
-            ingress.prepare_outbound(&mut routed, shared.address).await?;
+            ingress
+                .prepare_outbound(&mut routed, shared.address)
+                .await?;
         }
         if routed.target.port == shared.address.port()
             && routed
@@ -1501,8 +1518,16 @@ async fn session(
         _ = lan_runtime::idle(&lan) => Err("LanIdleTimeout"),
         result = work => result,
     };
-    if lan.is_some() && result.is_err() && !established && !matches!(result, Err("SessionRevoked" | "CoreStopped")) {
-        let _ = timeout(limit, swirl_protocol::reply(&mut inbound, request.kind, false)).await;
+    if lan.is_some()
+        && result.is_err()
+        && !established
+        && !matches!(result, Err("SessionRevoked" | "CoreStopped"))
+    {
+        let _ = timeout(
+            limit,
+            swirl_protocol::reply(&mut inbound, request.kind, false),
+        )
+        .await;
     }
     result
 }
@@ -1596,12 +1621,16 @@ async fn prepare_udp(
             id,
             active: true,
         };
-        if let Some(ingress) = &lan { ingress.check_target(&target)?; }
+        if let Some(ingress) = &lan {
+            ingress.check_target(&target)?;
+        }
         let (plan, generation) = shared.admit().await?;
         let mut routed = route(plan, target.clone(), peer, generation).await?;
         if let Some(ingress) = &lan {
             ingress.check_target(&routed.target)?;
-            ingress.prepare_outbound(&mut routed, shared.address).await?;
+            ingress
+                .prepare_outbound(&mut routed, shared.address)
+                .await?;
         }
         if routed.target.port == shared.address.port()
             && routed
@@ -1702,17 +1731,27 @@ async fn udp_associate(
     let local_relay = if lan_relay.is_none() {
         // An inbound relay binds the accepted local address, never the remote
         // peer address and never an outbound physical-interface constraint.
-        Some(swirl_transport::bind_udp_inbound(SocketAddr::new(local_ip, 0)).await.map_err(|_| "UdpBind")?)
-    } else { None };
-    let relay = lan_relay.as_ref().map(|lease| lease.socket())
-        .or(local_relay.as_ref()).ok_or("UdpBind")?;
+        Some(
+            swirl_transport::bind_udp_inbound(SocketAddr::new(local_ip, 0))
+                .await
+                .map_err(|_| "UdpBind")?,
+        )
+    } else {
+        None
+    };
+    let relay = lan_relay
+        .as_ref()
+        .map(|lease| lease.socket())
+        .or(local_relay.as_ref())
+        .ok_or("UdpBind")?;
     let v4 = swirl_transport::bind_udp(SocketAddr::from(([0, 0, 0, 0], 0)))
         .await
         .map_err(|_| "UdpBind")?;
     // IPv4 ingress does not restrict IPv6 destinations. Preserve the existing
     // outbound family sockets; IPv6 listener exposure remains disabled.
     let v6 = swirl_transport::bind_udp(SocketAddr::from(([0u16; 8], 0)))
-        .await.map_err(|_| "UdpBindV6")?;
+        .await
+        .map_err(|_| "UdpBindV6")?;
     let address = relay.local_addr().map_err(|_| "UdpBind")?;
     let mut response = vec![5, 0, 0];
     NetworkTarget {
@@ -1721,7 +1760,10 @@ async fn udp_associate(
     }
     .encode(&mut response)?;
     control.write_all(&response).await.map_err(|_| "UdpReply")?;
-    let counters = lan.as_ref().map_or_else(|| Arc::new(Counters::default()), |ingress| ingress.counters.clone());
+    let counters = lan.as_ref().map_or_else(
+        || Arc::new(Counters::default()),
+        |ingress| ingress.counters.clone(),
+    );
     shared.records.lock().map_err(|_| "StatsState")?.insert(
         id,
         Record {
@@ -1744,7 +1786,8 @@ async fn udp_associate(
     let mut pending: JoinSet<Result<UdpPrepared>> = JoinSet::new();
     let slots = Arc::new(Semaphore::new(4));
     let mut pool = socks5_udp::Pool::dynamic(counters.clone(), shared.totals.clone());
-    let (mut incoming, mut from_v4, mut from_v6) = (vec![0u8; 65535], vec![0u8; 65535], vec![0u8; 65535]);
+    let (mut incoming, mut from_v4, mut from_v6) =
+        (vec![0u8; 65535], vec![0u8; 65535], vec![0u8; 65535]);
     let mut closed = [0u8; 1];
     let idle = lan_runtime::idle(&lan);
     tokio::pin!(idle);

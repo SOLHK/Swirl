@@ -214,14 +214,24 @@ fn relay_advertises_accepted_local_address_not_control_peer_address() {
     let mut candidate = config(9);
     candidate.selected = "direct".into();
     let core = Core::start(candidate).unwrap();
-    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
     let mut control = runtime.block_on(async {
         let socket = tokio::net::TcpSocket::new_v4().unwrap();
         socket.bind("127.0.0.2:0".parse().unwrap()).unwrap();
-        socket.connect(core.address()).await.unwrap().into_std().unwrap()
+        socket
+            .connect(core.address())
+            .await
+            .unwrap()
+            .into_std()
+            .unwrap()
     });
     control.set_nonblocking(false).unwrap();
-    control.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+    control
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
     assert_eq!(control.local_addr().unwrap().ip().to_string(), "127.0.0.2");
     control.write_all(&[5, 1, 0]).unwrap();
     let mut greeting = [0; 2];
@@ -231,12 +241,19 @@ fn relay_advertises_accepted_local_address_not_control_peer_address() {
     let mut response = [0; 10];
     control.read_exact(&mut response).unwrap();
     assert_eq!(&response[..8], &[5, 0, 0, 1, 127, 0, 0, 1]);
-    let relay = SocketAddr::from(([127, 0, 0, 1], u16::from_be_bytes([response[8], response[9]])));
+    let relay = SocketAddr::from((
+        [127, 0, 0, 1],
+        u16::from_be_bytes([response[8], response[9]]),
+    ));
     let origin = UdpSocket::bind("127.0.0.1:0").unwrap();
-    origin.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+    origin
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
     let destination = origin.local_addr().unwrap();
     let client = UdpSocket::bind("127.0.0.2:0").unwrap();
-    client.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+    client
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
     let expected = packet("127.0.0.1", destination.port(), b"distinct-client");
     client.send_to(&expected, relay).unwrap();
     let mut bytes = [0; 128];

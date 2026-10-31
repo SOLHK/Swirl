@@ -203,7 +203,13 @@ mod credential_comparison_tests {
     fn exact_credentials_are_required_including_length_and_suffix() {
         let expected = b"fixture-secret-123";
         assert!(credential_matches(expected, expected));
-        for candidate in [b"".as_slice(), b"fixture-secret-12", b"fixture-secret-1234", b"fixture-secret-124", b"Fixture-secret-123"] {
+        for candidate in [
+            b"".as_slice(),
+            b"fixture-secret-12",
+            b"fixture-secret-1234",
+            b"fixture-secret-124",
+            b"Fixture-secret-123",
+        ] {
             assert!(!credential_matches(expected, candidate));
         }
     }

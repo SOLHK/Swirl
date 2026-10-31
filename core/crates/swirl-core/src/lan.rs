@@ -46,20 +46,27 @@ impl Cidr {
         if !Ipv4Addr::from(network).is_private() || !Ipv4Addr::from(last).is_private() {
             return Err("LanClientCidrNotPrivate");
         }
-        Ok(Self { network, mask, prefix })
+        Ok(Self {
+            network,
+            mask,
+            prefix,
+        })
     }
 
     pub(crate) fn contains(self, ip: IpAddr) -> bool {
         let IpAddr::V4(ip) = ip else { return false };
         let value = u32::from(ip);
         value & self.mask == self.network
-            && (self.prefix >= 31 || (value != self.network && value != (self.network | !self.mask)))
+            && (self.prefix >= 31
+                || (value != self.network && value != (self.network | !self.mask)))
     }
 }
 
 impl LanConfig {
     pub fn validate(&self) -> Result<()> {
-        let IpAddr::V4(ip) = self.listen_ip else { return Err("LanIpv6NotValidated") };
+        let IpAddr::V4(ip) = self.listen_ip else {
+            return Err("LanIpv6NotValidated");
+        };
         if !ip.is_private() {
             return Err("LanPrivateAddressRequired");
         }
@@ -85,7 +92,12 @@ impl LanConfig {
             || self.auth.username.len() > 255
             || self.auth.username.contains(':')
             || !(12..=255).contains(&self.auth.password.len())
-            || self.auth.username.chars().chain(self.auth.password.chars()).any(char::is_control)
+            || self
+                .auth
+                .username
+                .chars()
+                .chain(self.auth.password.chars())
+                .any(char::is_control)
         {
             return Err("LanCredentials");
         }
@@ -107,7 +119,10 @@ impl LanConfig {
     }
 
     pub(crate) fn cidrs(&self) -> Result<Vec<Cidr>> {
-        self.allowed_cidrs.iter().map(|value| Cidr::parse(value)).collect()
+        self.allowed_cidrs
+            .iter()
+            .map(|value| Cidr::parse(value))
+            .collect()
     }
 
     pub(crate) fn check_target(&self, host: &str) -> Result<()> {
@@ -117,28 +132,37 @@ impl LanConfig {
         {
             return Err("LanHostAccessDenied");
         }
-        let Ok(ip) = host.parse::<IpAddr>() else { return Ok(()) };
+        let Ok(ip) = host.parse::<IpAddr>() else {
+            return Ok(());
+        };
         let ip = normalize_ip(ip);
         let unsafe_ip = match ip {
-            IpAddr::V4(v4) => v4.is_loopback()
-                || v4.is_unspecified()
-                || v4.is_link_local()
-                || v4.is_multicast()
-                || v4.is_broadcast()
-                || v4.octets()[0] == 0
-                || v4.octets()[0] >= 240
-                || v4 == Ipv4Addr::new(100, 100, 100, 200)
-                || v4 == Ipv4Addr::new(168, 63, 129, 16),
-            IpAddr::V6(v6) => v6.is_loopback()
+            IpAddr::V4(v4) => {
+                v4.is_loopback()
+                    || v4.is_unspecified()
+                    || v4.is_link_local()
+                    || v4.is_multicast()
+                    || v4.is_broadcast()
+                    || v4.octets()[0] == 0
+                    || v4.octets()[0] >= 240
+                    || v4 == Ipv4Addr::new(100, 100, 100, 200)
+                    || v4 == Ipv4Addr::new(168, 63, 129, 16)
+            }
+            IpAddr::V6(v6) => {
+                v6.is_loopback()
                 || v6.is_unspecified()
                 || v6.is_multicast()
                 || v6.is_unicast_link_local()
                 // Reject deprecated IPv4-compatible forms as well as scoped
                 // link-local targets. IPv4-mapped addresses are checked above.
-                || v6.segments()[..6] == [0; 6],
+                || v6.segments()[..6] == [0; 6]
+            }
         };
         if unsafe_ip
-            || self.host_addresses.iter().any(|address| normalize_ip(*address) == ip)
+            || self
+                .host_addresses
+                .iter()
+                .any(|address| normalize_ip(*address) == ip)
             || ip == normalize_ip(self.listen_ip)
         {
             return Err("LanHostAccessDenied");
@@ -166,7 +190,10 @@ mod tests {
             udp_port_start: 7900,
             udp_port_end: 7915,
             allowed_cidrs: vec!["192.168.50.0/24".into()],
-            auth: Credentials { username: "fixture".into(), password: "fixture-secret-123".into() },
+            auth: Credentials {
+                username: "fixture".into(),
+                password: "fixture-secret-123".into(),
+            },
             max_connections: 128,
             max_connections_per_client: 16,
             auth_failures_per_minute: 5,
@@ -179,12 +206,27 @@ mod tests {
     fn listener_and_allowlist_fail_closed() {
         let good = config();
         assert!(good.validate().is_ok());
-        for address in ["0.0.0.0", "127.0.0.1", "169.254.0.1", "8.8.8.8", "::", "::1", "fd00::1"] {
+        for address in [
+            "0.0.0.0",
+            "127.0.0.1",
+            "169.254.0.1",
+            "8.8.8.8",
+            "::",
+            "::1",
+            "fd00::1",
+        ] {
             let mut bad = good.clone();
             bad.listen_ip = address.parse().unwrap();
             assert!(bad.validate().is_err(), "accepted {address}");
         }
-        for cidr in ["0.0.0.0/0", "10.0.0.0/7", "192.168.0.0/15", "127.0.0.1", "192.168.0.0/33", "::/0"] {
+        for cidr in [
+            "0.0.0.0/0",
+            "10.0.0.0/7",
+            "192.168.0.0/15",
+            "127.0.0.1",
+            "192.168.0.0/33",
+            "::/0",
+        ] {
             let mut bad = good.clone();
             bad.allowed_cidrs = vec![cidr.into()];
             assert!(bad.validate().is_err(), "accepted {cidr}");
@@ -199,8 +241,30 @@ mod tests {
     #[test]
     fn host_and_special_destinations_are_never_proxy_targets() {
         let config = config();
-        for host in ["localhost", "LOCALHOST", "a.localhost", "127.0.0.8", "0.1.2.3", "169.254.169.254", "192.168.50.1", "224.0.0.1", "255.255.255.255", "::ffff:127.0.0.1", "::ffff:192.168.50.1", "fe80::1", "ff02::1", "100.100.100.200", "168.63.129.16", "localhost.", "example.localhost."] {
-            assert_eq!(config.check_target(host), Err("LanHostAccessDenied"), "{host}");
+        for host in [
+            "localhost",
+            "LOCALHOST",
+            "a.localhost",
+            "127.0.0.8",
+            "0.1.2.3",
+            "169.254.169.254",
+            "192.168.50.1",
+            "224.0.0.1",
+            "255.255.255.255",
+            "::ffff:127.0.0.1",
+            "::ffff:192.168.50.1",
+            "fe80::1",
+            "ff02::1",
+            "100.100.100.200",
+            "168.63.129.16",
+            "localhost.",
+            "example.localhost.",
+        ] {
+            assert_eq!(
+                config.check_target(host),
+                Err("LanHostAccessDenied"),
+                "{host}"
+            );
         }
         assert!(config.check_target("example.com").is_ok());
         assert!(config.check_target("8.8.8.8").is_ok());

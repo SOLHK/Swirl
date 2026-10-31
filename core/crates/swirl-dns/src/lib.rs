@@ -37,6 +37,7 @@ impl QueryTransport for DirectQueryTransport {
 
 type Cache = HashMap<String, (Instant, wire::Outcome)>;
 type Lookup = Result<Vec<SocketAddr>, &'static str>;
+type EndpointGuard = Arc<dyn Fn(SocketAddr) -> bool + Send + Sync>;
 #[cfg(test)]
 #[path = "query_transport_tests.rs"]
 mod query_transport_tests;
@@ -45,6 +46,7 @@ pub struct Resolver {
     query_family: DnsQueryFamily,
     cache: Arc<Mutex<Cache>>,
     pinned: Option<(String, Vec<IpAddr>)>,
+    endpoint_guard: Option<EndpointGuard>,
     permits: Arc<Semaphore>,
     hosts: HashMap<String, IpAddr>,
     servers: Vec<SocketAddr>,
@@ -57,6 +59,7 @@ impl Default for Resolver {
             query_family: DnsQueryFamily::Dual,
             cache: Arc::new(Mutex::new(HashMap::new())),
             pinned: None,
+            endpoint_guard: None,
             permits: Arc::new(Semaphore::new(8)),
             hosts: HashMap::new(),
             servers: Vec::new(),
@@ -173,6 +176,7 @@ impl Resolver {
             query_family: DnsQueryFamily::Dual,
             cache: Arc::new(Mutex::new(HashMap::new())),
             pinned: None,
+            endpoint_guard: None,
             permits: self.permits.clone(),
             hosts: hosts
                 .iter()
@@ -203,6 +207,7 @@ impl Resolver {
             query_family: self.query_family,
             cache: self.cache.clone(),
             pinned: Some((host.to_ascii_lowercase(), addresses)),
+            endpoint_guard: self.endpoint_guard.clone(),
             permits: self.permits.clone(),
             hosts: self.hosts.clone(),
             servers: self.servers.clone(),
@@ -210,9 +215,29 @@ impl Resolver {
             system_hosts: self.system_hosts.clone(),
         }
     }
+    /// Attach an ingress-owned endpoint policy to this immutable resolver view.
+    /// Protocols that learn a second physical endpoint (SOCKS5 UDP BND.ADDR)
+    /// must consult it after resolution and before sending any packet.
+    pub fn with_endpoint_guard(
+        mut self,
+        guard: impl Fn(SocketAddr) -> bool + Send + Sync + 'static,
+    ) -> Self {
+        self.endpoint_guard = Some(Arc::new(guard));
+        self
+    }
+    pub fn endpoint_allowed(&self, address: SocketAddr) -> bool {
+        self.endpoint_guard.as_ref().is_none_or(|guard| guard(address))
+    }
     fn pinned_addresses(&self, host: &str, port: u16) -> Option<Vec<SocketAddr>> {
-        self.pinned.as_ref().filter(|(name, _)| name.eq_ignore_ascii_case(host))
-            .map(|(_, addresses)| addresses.iter().map(|ip| SocketAddr::new(*ip, port)).collect())
+        self.pinned
+            .as_ref()
+            .filter(|(name, _)| name.eq_ignore_ascii_case(host))
+            .map(|(_, addresses)| {
+                addresses
+                    .iter()
+                    .map(|ip| SocketAddr::new(*ip, port))
+                    .collect()
+            })
     }
     pub fn mapped_host(&self, host: &str) -> Option<IpAddr> {
         self.hosts.get(&host.to_ascii_lowercase()).copied()
@@ -354,22 +379,39 @@ mod tests {
         let root = Resolver::default();
         let dns = swirl_subscription::Dns {
             hosts: vec![swirl_subscription::HostMapping {
-                name: "endpoint.fixture.invalid".into(), address: "127.0.0.1".parse().unwrap(),
+                name: "endpoint.fixture.invalid".into(),
+                address: "127.0.0.1".parse().unwrap(),
             }],
             servers: vec!["127.0.0.1:5353".parse().unwrap()],
             use_system_hosts: false,
             ..Default::default()
         };
         let resolver = root.with_config(&dns).unwrap();
-        let approved = vec!["203.0.113.1".parse().unwrap(), "2001:db8::1".parse().unwrap()];
+        let approved = vec![
+            "203.0.113.1".parse().unwrap(),
+            "2001:db8::1".parse().unwrap(),
+        ];
         let pinned = resolver.with_pinned_addresses("endpoint.fixture.invalid", approved.clone());
         assert!(Arc::ptr_eq(&resolver.cache, &pinned.cache));
         assert!(Arc::ptr_eq(&resolver.permits, &pinned.permits));
         assert_eq!(resolver.servers, pinned.servers);
-        assert_eq!(pinned.resolve("ENDPOINT.fixture.invalid", 443).await.unwrap(),
-            approved.iter().map(|ip| SocketAddr::new(*ip, 443)).collect::<Vec<_>>());
-        assert_eq!(resolver.resolve("endpoint.fixture.invalid", 443).await.unwrap(),
-            vec!["127.0.0.1:443".parse().unwrap()]);
+        assert_eq!(
+            pinned
+                .resolve("ENDPOINT.fixture.invalid", 443)
+                .await
+                .unwrap(),
+            approved
+                .iter()
+                .map(|ip| SocketAddr::new(*ip, 443))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            resolver
+                .resolve("endpoint.fixture.invalid", 443)
+                .await
+                .unwrap(),
+            vec!["127.0.0.1:443".parse().unwrap()]
+        );
     }
     #[tokio::test]
     async fn ipv4_query_policy_preserves_literal_and_static_ipv6_without_os_fallback() {

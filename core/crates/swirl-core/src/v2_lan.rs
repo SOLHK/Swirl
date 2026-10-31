@@ -61,9 +61,16 @@ struct State {
 
 impl State {
     fn session_ids(&self) -> Vec<u64> {
-        self.accounting.lock().map(|accounting| {
-            accounting.clients.values().flat_map(|client| client.sessions.keys().copied()).collect()
-        }).unwrap_or_default()
+        self.accounting
+            .lock()
+            .map(|accounting| {
+                accounting
+                    .clients
+                    .values()
+                    .flat_map(|client| client.sessions.keys().copied())
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     fn error(&self, code: &'static str) {
@@ -77,25 +84,42 @@ impl State {
             return Err("LanClientDenied");
         }
         let mut accounting = self.accounting.lock().map_err(|_| "LanState")?;
-        if !accounting.clients.contains_key(&peer) && accounting.clients.len() >= CLIENT_HISTORY_LIMIT {
+        if !accounting.clients.contains_key(&peer)
+            && accounting.clients.len() >= CLIENT_HISTORY_LIMIT
+        {
             // Never evict an active client or an unexpired authentication
             // penalty; otherwise an attacker could rotate addresses to reset it.
-            let oldest = accounting.clients.iter()
-                .filter(|(_, client)| client.sessions.is_empty() && client.auth_window.elapsed() >= AUTH_WINDOW)
+            let oldest = accounting
+                .clients
+                .iter()
+                .filter(|(_, client)| {
+                    client.sessions.is_empty() && client.auth_window.elapsed() >= AUTH_WINDOW
+                })
                 .min_by_key(|(_, client)| client.last_seen)
                 .map(|(ip, _)| *ip);
-            let Some(oldest) = oldest else { return Err("LanClientTableFull") };
+            let Some(oldest) = oldest else {
+                return Err("LanClientTableFull");
+            };
             accounting.clients.remove(&oldest);
         }
         let client = accounting.clients.entry(peer).or_insert_with(|| Client {
-            sessions: BTreeMap::new(), unauthenticated: BTreeSet::new(), uploaded: 0, downloaded: 0,
-            auth_window: Instant::now(), failures: 0, last_seen: Instant::now(),
+            sessions: BTreeMap::new(),
+            unauthenticated: BTreeSet::new(),
+            uploaded: 0,
+            downloaded: 0,
+            auth_window: Instant::now(),
+            failures: 0,
+            last_seen: Instant::now(),
         });
         if client.auth_window.elapsed() >= AUTH_WINDOW {
             client.failures = 0;
             client.auth_window = Instant::now();
         }
-        if client.failures.saturating_add(client.unauthenticated.len() as u32) >= self.config.auth_failures_per_minute {
+        if client
+            .failures
+            .saturating_add(client.unauthenticated.len() as u32)
+            >= self.config.auth_failures_per_minute
+        {
             return Err("LanAuthenticationRateLimit");
         }
         if client.sessions.len() >= self.config.max_connections_per_client {
@@ -106,7 +130,12 @@ impl State {
         client.unauthenticated.insert(id);
         client.last_seen = Instant::now();
         self.accepted.fetch_add(1, Ordering::Relaxed);
-        Ok(ClientLease { state: self.clone(), peer, id, counters })
+        Ok(ClientLease {
+            state: self.clone(),
+            peer,
+            id,
+            counters,
+        })
     }
 
     fn authenticated(&self, peer: IpAddr, id: u64) {
@@ -135,17 +164,30 @@ impl State {
         let mut active = 0usize;
         let mut uploaded = accounting.completed_upload;
         let mut downloaded = accounting.completed_download;
-        let clients: Vec<_> = accounting.clients.iter().map(|(ip, client)| {
-            let current_upload = client.sessions.values().map(|c| c.upload.load(Ordering::Relaxed)).sum::<u64>();
-            let current_download = client.sessions.values().map(|c| c.download.load(Ordering::Relaxed)).sum::<u64>();
-            active += client.sessions.len();
-            uploaded = uploaded.saturating_add(current_upload);
-            downloaded = downloaded.saturating_add(current_download);
-            json!({"ip":ip.to_string(),"active_connections":client.sessions.len(),
+        let clients: Vec<_> = accounting
+            .clients
+            .iter()
+            .map(|(ip, client)| {
+                let current_upload = client
+                    .sessions
+                    .values()
+                    .map(|c| c.upload.load(Ordering::Relaxed))
+                    .sum::<u64>();
+                let current_download = client
+                    .sessions
+                    .values()
+                    .map(|c| c.download.load(Ordering::Relaxed))
+                    .sum::<u64>();
+                active += client.sessions.len();
+                uploaded = uploaded.saturating_add(current_upload);
+                downloaded = downloaded.saturating_add(current_download);
+                json!({"ip":ip.to_string(),"active_connections":client.sessions.len(),
                 "uploaded":client.uploaded.saturating_add(current_upload),
                 "downloaded":client.downloaded.saturating_add(current_download)})
-        }).collect();
-        Ok(json!({"running":running,"ipv4_only":true,"ipv6_targets":true,"encrypted_transport":false,
+            })
+            .collect();
+        Ok(
+            json!({"running":running,"ipv4_only":true,"ipv6_targets":true,"encrypted_transport":false,
             "listen_ip":self.config.listen_ip,"http_port":self.config.http_port,
             "socks_port":self.config.socks_port,"udp_port_start":self.config.udp_port_start,
             "udp_port_end":self.config.udp_port_end,"active_connections":active,
@@ -154,7 +196,8 @@ impl State {
             "auth_failures":self.auth_failures.load(Ordering::Relaxed),
             "uploaded":uploaded,"downloaded":downloaded,"clients":clients,
             "client_history_limit":CLIENT_HISTORY_LIMIT,
-            "last_error":*self.last_error.lock().map_err(|_|"LanState")?}))
+            "last_error":*self.last_error.lock().map_err(|_|"LanState")?}),
+        )
     }
 }
 
@@ -198,7 +241,9 @@ pub(super) struct UdpLease {
 
 impl UdpLease {
     pub(super) fn socket(&self) -> &UdpSocket {
-        self.socket.as_ref().expect("live UDP lease owns its socket")
+        self.socket
+            .as_ref()
+            .expect("live UDP lease owns its socket")
     }
 }
 
@@ -217,7 +262,9 @@ impl UdpPool {
     fn bind(self: &Arc<Self>) -> Result<UdpLease> {
         let mut leased = self.leased.lock().map_err(|_| "LanUdpState")?;
         for port in self.first..=self.last {
-            if leased.contains(&port) { continue; }
+            if leased.contains(&port) {
+                continue;
+            }
             let socket = match StdUdpSocket::bind(SocketAddr::new(self.address, port)) {
                 Ok(socket) => socket,
                 Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => continue,
@@ -225,9 +272,14 @@ impl UdpPool {
             };
             socket.set_nonblocking(true).map_err(|_| "LanUdpSocket")?;
             let socket = UdpSocket::from_std(socket).map_err(|_| "LanUdpSocket")?;
-            swirl_transport::reserve_datagram_buffers(&socket).map_err(|_| "LanUdpSocketBuffers")?;
+            swirl_transport::reserve_datagram_buffers(&socket)
+                .map_err(|_| "LanUdpSocketBuffers")?;
             leased.insert(port);
-            return Ok(UdpLease { socket: Some(socket), pool: self.clone(), port });
+            return Ok(UdpLease {
+                socket: Some(socket),
+                pool: self.clone(),
+                port,
+            });
         }
         Err("LanUdpPoolExhaustedOrBusy")
     }
@@ -248,7 +300,11 @@ impl Ingress {
     pub(super) fn check_target(&self, target: &NetworkTarget) -> Result<()> {
         #[cfg(test)]
         if let Ok(ip) = target.host.parse::<IpAddr>()
-            && self.state.fixture_targets.lock().map_err(|_| "LanState")?
+            && self
+                .state
+                .fixture_targets
+                .lock()
+                .map_err(|_| "LanState")?
                 .contains(&SocketAddr::new(ip, target.port))
         {
             return Ok(());
@@ -256,7 +312,11 @@ impl Ingress {
         self.config.check_target(&target.host)
     }
 
-    pub(super) async fn prepare_outbound(&self, routed: &mut Routed, local: SocketAddr) -> Result<()> {
+    pub(super) async fn prepare_outbound(
+        &self,
+        routed: &mut Routed,
+        local: SocketAddr,
+    ) -> Result<()> {
         let (host, port) = match &routed.node.outbound {
             Outbound::Direct {} | Outbound::Reject {} => return Ok(()),
             Outbound::Vmess { host, port, .. }
@@ -273,7 +333,9 @@ impl Ingress {
         let known = if host.eq_ignore_ascii_case("localhost") {
             Some(IpAddr::V4(std::net::Ipv4Addr::LOCALHOST))
         } else {
-            host.parse::<IpAddr>().ok().or_else(|| routed.resolver.mapped_host(&host))
+            host.parse::<IpAddr>()
+                .ok()
+                .or_else(|| routed.resolver.mapped_host(&host))
         };
         if known.is_some_and(|ip| {
             (port == local.port() && (ip.is_loopback() || ip == local.ip()))
@@ -288,14 +350,17 @@ impl Ingress {
         // original hostname for TLS verification and all approved address
         // candidates for the existing connection scheduler.
         let addresses = timeout(routed.limit, routed.resolver.resolve(&host, port))
-            .await.map_err(|_| "LanOutboundDnsTimeout")??;
+            .await
+            .map_err(|_| "LanOutboundDnsTimeout")??;
         if addresses.is_empty() || addresses.len() > 16 {
             return Err("LanOutboundDnsAnswers");
         }
         for address in &addresses {
-            if (address.port() == local.port() && (address.ip().is_loopback() || address.ip() == local.ip()))
+            if (address.port() == local.port()
+                && (address.ip().is_loopback() || address.ip() == local.ip()))
                 || ([self.config.http_port, self.config.socks_port].contains(&address.port())
-                    && (address.ip() == self.config.listen_ip || self.config.host_addresses.contains(&address.ip())))
+                    && (address.ip() == self.config.listen_ip
+                        || self.config.host_addresses.contains(&address.ip())))
             {
                 return Err("LanOutboundProxyLoop");
             }
@@ -303,12 +368,27 @@ impl Ingress {
             if matches!(self.state.access, Access::LoopbackFixture) && address.ip().is_loopback() {
                 continue;
             }
-            self.config.check_target(&address.ip().to_string())
+            self.config
+                .check_target(&address.ip().to_string())
                 .map_err(|_| "LanOutboundHostAccessDenied")?;
         }
-        routed.resolver = Arc::new(routed.resolver.with_pinned_addresses(
-            &host, addresses.into_iter().map(|address| address.ip()).collect(),
-        ));
+        let config = self.config.clone();
+        #[cfg(test)]
+        let fixture = matches!(self.state.access, Access::LoopbackFixture);
+        let resolver = routed
+            .resolver
+            .with_pinned_addresses(
+                &host,
+                addresses.into_iter().map(|address| address.ip()).collect(),
+            )
+            .with_endpoint_guard(move |address| {
+                #[cfg(test)]
+                if fixture && address.ip().is_loopback() {
+                    return true;
+                }
+                config.check_target(&address.ip().to_string()).is_ok()
+            });
+        routed.resolver = Arc::new(resolver);
         Ok(())
     }
 
@@ -322,12 +402,20 @@ impl Ingress {
             Protocol::Http => first[0] != 4 && first[0] != 5,
             Protocol::Socks => first[0] == 5,
         };
-        if permitted { Ok(()) } else { Err("LanIngressProtocol") }
+        if permitted {
+            Ok(())
+        } else {
+            Err("LanIngressProtocol")
+        }
     }
 
-    pub(super) fn authenticated(&self) { self.state.authenticated(self.peer, self.id); }
+    pub(super) fn authenticated(&self) {
+        self.state.authenticated(self.peer, self.id);
+    }
 
-    pub(super) fn bind_udp(&self) -> Result<UdpLease> { self.pool.bind() }
+    pub(super) fn bind_udp(&self) -> Result<UdpLease> {
+        self.pool.bind()
+    }
 
     pub(super) async fn idle(&self) {
         let limit = Duration::from_secs(self.config.idle_timeout_secs);
@@ -335,16 +423,27 @@ impl Ingress {
         let mut previous = (0, 0);
         loop {
             tokio::time::sleep(Duration::from_secs(1).min(limit)).await;
-            let current = (self.counters.upload.load(Ordering::Relaxed), self.counters.download.load(Ordering::Relaxed));
-            if current != previous { previous = current; last = Instant::now(); }
-            if last.elapsed() >= limit { return; }
+            let current = (
+                self.counters.upload.load(Ordering::Relaxed),
+                self.counters.download.load(Ordering::Relaxed),
+            );
+            if current != previous {
+                previous = current;
+                last = Instant::now();
+            }
+            if last.elapsed() >= limit {
+                return;
+            }
         }
     }
 }
 
 pub(super) async fn idle(ingress: &Option<Ingress>) {
-    if let Some(ingress) = ingress { ingress.idle().await; }
-    else { std::future::pending::<()>().await; }
+    if let Some(ingress) = ingress {
+        ingress.idle().await;
+    } else {
+        std::future::pending::<()>().await;
+    }
 }
 
 pub(super) struct LanRuntime {
@@ -360,35 +459,71 @@ impl LanRuntime {
         Self::start_bound(runtime, shared, config, access)
     }
 
-    fn start_bound(runtime: &Runtime, shared: Arc<Shared>, config: LanConfig, access: Access) -> Result<Self> {
+    fn start_bound(
+        runtime: &Runtime,
+        shared: Arc<Shared>,
+        config: LanConfig,
+        access: Access,
+    ) -> Result<Self> {
         let (http, socks) = runtime.block_on(async {
-            let http = TcpListener::bind(SocketAddr::new(config.listen_ip, config.http_port)).await
-                .map_err(|error| if error.kind() == std::io::ErrorKind::AddrInUse { "LanHttpPortInUse" } else { "LanHttpBind" })?;
+            let http = TcpListener::bind(SocketAddr::new(config.listen_ip, config.http_port))
+                .await
+                .map_err(|error| {
+                    if error.kind() == std::io::ErrorKind::AddrInUse {
+                        "LanHttpPortInUse"
+                    } else {
+                        "LanHttpBind"
+                    }
+                })?;
             let socks = if config.socks_port != config.http_port {
-                Some(TcpListener::bind(SocketAddr::new(config.listen_ip, config.socks_port)).await
-                    .map_err(|error| if error.kind() == std::io::ErrorKind::AddrInUse { "LanSocksPortInUse" } else { "LanSocksBind" })?)
-            } else { None };
+                Some(
+                    TcpListener::bind(SocketAddr::new(config.listen_ip, config.socks_port))
+                        .await
+                        .map_err(|error| {
+                            if error.kind() == std::io::ErrorKind::AddrInUse {
+                                "LanSocksPortInUse"
+                            } else {
+                                "LanSocksBind"
+                            }
+                        })?,
+                )
+            } else {
+                None
+            };
             // Detect an occupied configured range before publishing running.
             // Actual association bind remains authoritative if an external
             // program takes a port after this preflight.
             let mut probe = Vec::new();
             for port in config.udp_port_start..=config.udp_port_end {
-                probe.push(StdUdpSocket::bind(SocketAddr::new(config.listen_ip, port))
-                    .map_err(|_| "LanUdpPortInUseOrUnavailable")?);
+                probe.push(
+                    StdUdpSocket::bind(SocketAddr::new(config.listen_ip, port))
+                        .map_err(|_| "LanUdpPortInUseOrUnavailable")?,
+                );
             }
             Ok::<_, &'static str>((http, socks))
         })?;
         let config = Arc::new(config);
         let state = Arc::new(State {
-            config: config.clone(), access,
-            accounting: Mutex::new(Accounting { clients: BTreeMap::new(), completed_upload: 0, completed_download: 0 }),
-            accepted: AtomicU64::new(0), rejected: AtomicU64::new(0), auth_failures: AtomicU64::new(0),
+            config: config.clone(),
+            access,
+            accounting: Mutex::new(Accounting {
+                clients: BTreeMap::new(),
+                completed_upload: 0,
+                completed_download: 0,
+            }),
+            accepted: AtomicU64::new(0),
+            rejected: AtomicU64::new(0),
+            auth_failures: AtomicU64::new(0),
             last_error: Mutex::new(""),
             #[cfg(test)]
             fixture_targets: Mutex::new(BTreeSet::new()),
         });
-        let pool = Arc::new(UdpPool { address: config.listen_ip, first: config.udp_port_start,
-            last: config.udp_port_end, leased: Mutex::new(BTreeSet::new()) });
+        let pool = Arc::new(UdpPool {
+            address: config.listen_ip,
+            first: config.udp_port_start,
+            last: config.udp_port_end,
+            leased: Mutex::new(BTreeSet::new()),
+        });
         let (stop, mut stopped) = watch::channel(false);
         let task = runtime.spawn({
             let state = state.clone();
@@ -464,7 +599,11 @@ impl LanRuntime {
                 while sessions.join_next().await.is_some() {}
             }
         });
-        Ok(Self { stop, task: Some(task), state })
+        Ok(Self {
+            stop,
+            task: Some(task),
+            state,
+        })
     }
 
     pub(super) fn running(&self) -> bool {
@@ -478,7 +617,9 @@ impl LanRuntime {
     pub(super) fn stop(&mut self, runtime: &Runtime) -> Result<Value> {
         let _ = self.stop.send(true);
         if let Some(task) = self.task.take() {
-            runtime.block_on(async { let _ = task.await; });
+            runtime.block_on(async {
+                let _ = task.await;
+            });
         }
         self.state.snapshot(false)
     }
