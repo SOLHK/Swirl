@@ -181,10 +181,12 @@ mod tests {
                     }
                     let local = ordinary.local_addr().unwrap();
                     if shared {
-                        let other =
-                            Socket::new(Domain::for_address(address), kind, Some(protocol)).unwrap();
+                        let other = Socket::new(Domain::for_address(address), kind, Some(protocol))
+                            .unwrap();
                         other.set_reuse_address(true).unwrap();
-                        other.bind(&local).expect("explicit sharing positive control");
+                        other
+                            .bind(&local)
+                            .expect("explicit sharing positive control");
                         assert_eq!(other.local_addr().unwrap(), local);
                     } else {
                         assert_reuse_cannot_steal(local.as_socket().unwrap(), kind, protocol);
