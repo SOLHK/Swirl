@@ -73,9 +73,7 @@ impl DhcpAttachment {
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 enum Command {
     #[serde(rename = "gateway_validate")]
-    Validate {
-        config: NativeGatewayConfig,
-    },
+    Validate { config: NativeGatewayConfig },
     #[serde(rename = "gateway_prepare")]
     Prepare {
         handle: String,

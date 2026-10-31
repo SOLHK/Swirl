@@ -495,6 +495,7 @@ impl TunDns {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::OpenOptions;
     struct Lookup(Result<Vec<IpAddr>>);
     impl TunLookup for Lookup {
         fn lookup<'a>(

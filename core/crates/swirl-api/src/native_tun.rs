@@ -155,12 +155,18 @@ impl TunLookup for Lookup {
 }
 
 fn dns_allows_ipv6(config: &TunConfig, source: IpAddr) -> bool {
-    config.gateway.as_ref().is_none_or(|gateway| {
-        gateway.source(source) == Some(SourceKind::Host)
-    })
+    config
+        .gateway
+        .as_ref()
+        .is_none_or(|gateway| gateway.source(source) == Some(SourceKind::Host))
 }
 
-async fn tcp(flow: TcpFlow, dispatcher: FlowDispatcher, dns: TunDns, allow_ipv6: bool) -> Result<()> {
+async fn tcp(
+    flow: TcpFlow,
+    dispatcher: FlowDispatcher,
+    dns: TunDns,
+    allow_ipv6: bool,
+) -> Result<()> {
     if flow.destination.port() != 53 {
         let host = dns.target_host(flow.destination.ip()).await?;
         return dispatcher

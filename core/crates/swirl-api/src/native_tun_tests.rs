@@ -338,8 +338,14 @@ fn gateway_dns_families_follow_admitted_source_and_preserve_shared_fake_ip() {
     let name_v6 = "v6.gateway-dns.fixture.invalid";
     let mut config = runtime_config();
     config.dns.hosts.extend([
-        HostMapping { name: name_v4.into(), address: "203.0.113.7".parse().unwrap() },
-        HostMapping { name: name_v6.into(), address: "2001:db8::7".parse().unwrap() },
+        HostMapping {
+            name: name_v4.into(),
+            address: "203.0.113.7".parse().unwrap(),
+        },
+        HostMapping {
+            name: name_v6.into(),
+            address: "2001:db8::7".parse().unwrap(),
+        },
     ]);
     let mut core = start(config);
     let dispatcher = core.flow_dispatcher().unwrap();
@@ -372,7 +378,11 @@ fn gateway_dns_families_follow_admitted_source_and_preserve_shared_fake_ip() {
             (host, name_v4, false),
         ] {
             let query = dns_query(name, ipv6);
-            bridge.input.send(udp_packet(origin, destination, &query)).await.unwrap();
+            bridge
+                .input
+                .send(udp_packet(origin, destination, &query))
+                .await
+                .unwrap();
             let (from, to, answer) = next_udp(&mut bridge).await;
             assert_eq!((from, to), (destination, origin));
             assert_eq!(&answer[..2], &query[..2]);
@@ -381,21 +391,28 @@ fn gateway_dns_families_follow_admitted_source_and_preserve_shared_fake_ip() {
             if origin == lan && ipv6 {
                 assert_eq!(&answer[4..12], &[0, 1, 0, 0, 0, 0, 0, 0]);
                 assert_eq!(answer.len(), query.len());
-                assert_eq!(core.snapshot().unwrap()["accepted"], 0,
-                    "LAN AAAA NODATA must not perform a Core DNS lookup");
+                assert_eq!(
+                    core.snapshot().unwrap()["accepted"],
+                    0,
+                    "LAN AAAA NODATA must not perform a Core DNS lookup"
+                );
                 continue;
             }
             assert_eq!(&answer[4..12], &[0, 1, 0, 1, 0, 0, 0, 0]);
             let data = &answer[query.len() + 12..];
             let fake = if ipv6 {
-                IpAddr::V6(std::net::Ipv6Addr::from(<[u8; 16]>::try_from(data).unwrap()))
+                IpAddr::V6(std::net::Ipv6Addr::from(
+                    <[u8; 16]>::try_from(data).unwrap(),
+                ))
             } else {
                 IpAddr::V4(std::net::Ipv4Addr::from(<[u8; 4]>::try_from(data).unwrap()))
             };
             assert_eq!(dns.target_host(fake).await.unwrap(), name);
             if !ipv6 {
                 match shared_v4 {
-                    Some(previous) => assert_eq!(fake, previous, "one name keeps one shared A identity"),
+                    Some(previous) => {
+                        assert_eq!(fake, previous, "one name keeps one shared A identity")
+                    }
                     None => shared_v4 = Some(fake),
                 }
             }
@@ -407,11 +424,31 @@ fn gateway_dns_families_follow_admitted_source_and_preserve_shared_fake_ip() {
         let mut request = (query.len() as u16).to_be_bytes().to_vec();
         request.extend_from_slice(&query);
         let mut server_next = handshake(&mut bridge, origin, destination).await;
-        bridge.input.send(tcp_packet(origin, destination, 101, Some(server_next),
-            TcpControl::Psh, &request)).await.unwrap();
+        bridge
+            .input
+            .send(tcp_packet(
+                origin,
+                destination,
+                101,
+                Some(server_next),
+                TcpControl::Psh,
+                &request,
+            ))
+            .await
+            .unwrap();
         let client_fin = 101 + request.len() as i32;
-        bridge.input.send(tcp_packet(origin, destination, client_fin, Some(server_next),
-            TcpControl::Fin, &[])).await.unwrap();
+        bridge
+            .input
+            .send(tcp_packet(
+                origin,
+                destination,
+                client_fin,
+                Some(server_next),
+                TcpControl::Fin,
+                &[],
+            ))
+            .await
+            .unwrap();
         let mut response = Vec::new();
         loop {
             let segment = next_tcp(&mut bridge).await;
@@ -423,10 +460,24 @@ fn gateway_dns_families_follow_admitted_source_and_preserve_shared_fake_ip() {
                 response.extend_from_slice(&segment.payload);
             }
             let finished = segment.control == TcpControl::Fin;
-            if finished { server_next = server_next.wrapping_add(1); }
-            bridge.input.send(tcp_packet(origin, destination, client_fin + 1, Some(server_next),
-                TcpControl::None, &[])).await.unwrap();
-            if finished { break; }
+            if finished {
+                server_next = server_next.wrapping_add(1);
+            }
+            bridge
+                .input
+                .send(tcp_packet(
+                    origin,
+                    destination,
+                    client_fin + 1,
+                    Some(server_next),
+                    TcpControl::None,
+                    &[],
+                ))
+                .await
+                .unwrap();
+            if finished {
+                break;
+            }
         }
         assert_eq!(&response[..2], &(query.len() as u16).to_be_bytes());
         let answer = &response[2..];

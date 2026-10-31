@@ -6,6 +6,7 @@ use ring::rand::{SecureRandom, SystemRandom};
 use serde_json::{Value, json};
 use std::{
     io,
+    net::IpAddr,
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
@@ -134,9 +135,9 @@ impl GatewayState {
         // These are assigned after the topology snapshot. The adjacent .2
         // synthetic DNS address is intentionally not a host-owned address.
         hosts.extend([
-            "198.18.0.1".parse().map_err(|_| "GatewayTunAddress")?,
+            "198.18.0.1".parse::<IpAddr>().map_err(|_| "GatewayTunAddress")?,
             "fd53:7769:726c::1"
-                .parse()
+                .parse::<IpAddr>()
                 .map_err(|_| "GatewayTunAddress")?,
         ]);
         hosts.sort();
