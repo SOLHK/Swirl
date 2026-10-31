@@ -2,8 +2,8 @@
 //! transactions and accounting remain owned by the existing V2 runtime.
 use super::{
     GuardPreparation, IngressBoundary, NetworkTarget, Node, Outbound, PolicyDnsTransport,
-    RegisteredSession, Resolver, Result, Routed, Shared,
-    cancelled, connect_routed_tcp, pin_proxy_target, route, route_flow,
+    RegisteredSession, Resolver, Result, Routed, Shared, cancelled, connect_routed_tcp,
+    pin_proxy_target, route, route_flow,
 };
 use crate::socks5_udp::ProxyAssociation;
 use serde_json::Value;
@@ -46,12 +46,22 @@ impl IngressBoundary for GatewayBoundary<'_> {
     fn resolver(&self, resolver: &Arc<Resolver>) -> Arc<Resolver> {
         let admission = self.admission.clone();
         let source = self.source;
-        Arc::new(resolver.as_ref().clone().with_endpoint_guard(move |address| {
-            admission.target(source, &NetworkTarget {
-                host: address.ip().to_string(),
-                port: address.port(),
-            }).is_ok()
-        }))
+        Arc::new(
+            resolver
+                .as_ref()
+                .clone()
+                .with_endpoint_guard(move |address| {
+                    admission
+                        .target(
+                            source,
+                            &NetworkTarget {
+                                host: address.ip().to_string(),
+                                port: address.port(),
+                            },
+                        )
+                        .is_ok()
+                }),
+        )
     }
 
     fn prepare_proxy_endpoint<'a>(
@@ -60,7 +70,10 @@ impl IngressBoundary for GatewayBoundary<'_> {
         resolver: &'a mut Arc<Resolver>,
         limit: Duration,
     ) -> GuardPreparation<'a> {
-        Box::pin(self.admission.prepare_proxy_endpoint(self.source, node, resolver, limit))
+        Box::pin(
+            self.admission
+                .prepare_proxy_endpoint(self.source, node, resolver, limit),
+        )
     }
 }
 
@@ -359,7 +372,9 @@ impl FlowDispatcher {
             let counters = Arc::new(Counters::default());
             let work = async {
                 gateway_target(&gateway, source, &target)?;
-                let boundary = gateway.as_ref().map(|admission| GatewayBoundary { admission, source });
+                let boundary = gateway
+                    .as_ref()
+                    .map(|admission| GatewayBoundary { admission, source });
                 let mut routed = route_flow(
                     &shared,
                     id,
@@ -367,7 +382,9 @@ impl FlowDispatcher {
                     &target,
                     counters.clone(),
                     true,
-                    boundary.as_ref().map(|boundary| boundary as &dyn IngressBoundary),
+                    boundary
+                        .as_ref()
+                        .map(|boundary| boundary as &dyn IngressBoundary),
                 )
                 .await?;
                 if let Some(gateway) = &gateway {
@@ -466,7 +483,9 @@ impl FlowDispatcher {
                 }
                 let (plan, generation) = shared.admit().await?;
                 validate_tun_dns(&plan.prepared.runtime)?;
-                let boundary = gateway.as_ref().map(|admission| GatewayBoundary { admission, source });
+                let boundary = gateway
+                    .as_ref()
+                    .map(|admission| GatewayBoundary { admission, source });
                 let mut routed = route(
                     plan.clone(),
                     NetworkTarget {
@@ -475,7 +494,9 @@ impl FlowDispatcher {
                     },
                     source.ip(),
                     generation,
-                    boundary.as_ref().map(|boundary| boundary as &dyn IngressBoundary),
+                    boundary
+                        .as_ref()
+                        .map(|boundary| boundary as &dyn IngressBoundary),
                 )
                 .await?;
                 if let Some(gateway) = &gateway {
@@ -931,7 +952,9 @@ async fn run_udp(
     let counters = Arc::new(Counters::default());
     let setup = async {
         gateway_target(&gateway, source, &target)?;
-        let boundary = gateway.as_ref().map(|admission| GatewayBoundary { admission, source });
+        let boundary = gateway
+            .as_ref()
+            .map(|admission| GatewayBoundary { admission, source });
         let mut routed = route_flow(
             &shared,
             id,
@@ -939,7 +962,9 @@ async fn run_udp(
             &target,
             counters.clone(),
             true,
-            boundary.as_ref().map(|boundary| boundary as &dyn IngressBoundary),
+            boundary
+                .as_ref()
+                .map(|boundary| boundary as &dyn IngressBoundary),
         )
         .await?;
         if let Some(gateway) = &gateway {

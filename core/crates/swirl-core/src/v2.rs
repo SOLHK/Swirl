@@ -1392,7 +1392,12 @@ impl swirl_dns::QueryTransport for ClassificationDnsTransport<'_> {
                 // Run only when Resolver actually needs a DNS connection.
                 // A cached classification answer must not trigger proxy
                 // hostname bootstrap or consume another lookup budget.
-                boundary.prepare_proxy_endpoint(&self.transport.node, &mut bootstrap, self.transport.limit)
+                boundary
+                    .prepare_proxy_endpoint(
+                        &self.transport.node,
+                        &mut bootstrap,
+                        self.transport.limit,
+                    )
                     .await
                     .map_err(|_| "DnsEndpointForbidden")?;
             }
@@ -1418,41 +1423,43 @@ async fn classify(
         .classification
         .as_ref()
         .ok_or("ClassificationDnsUnavailable")?;
-    let resolver = boundary.map_or_else(|| resolver.clone(), |boundary| boundary.resolver(resolver));
-    let result = if plan.prepared.runtime.policy.classification_dns == ClassificationDns::ViaDefaultPolicy {
-        let selected = plan.policies.resolve(
-            &plan.prepared.runtime.policy.default_policy.target,
-            "policy:default",
-            "classification-dns",
-        )?;
-        let node = plan
-            .prepared
-            .base
-            .nodes
-            .iter()
-            .find(|node| node.id == selected.leaf)
-            .ok_or("MissingTarget")?
-            .clone();
-        let limit = Duration::from_millis(plan.prepared.runtime.limits.handshake_timeout_ms);
-        let bootstrap = boundary.map_or_else(
-            || plan.prepared.resolver.clone(),
-            |boundary| boundary.resolver(&plan.prepared.resolver),
-        );
-        let transport = ClassificationDnsTransport {
-            transport: PolicyDnsTransport {
-                transport: plan.prepared.runtime.transports.get(&node.id).cloned(),
-                node,
-                bootstrap,
-                limit,
-            },
-            boundary,
+    let resolver =
+        boundary.map_or_else(|| resolver.clone(), |boundary| boundary.resolver(resolver));
+    let result =
+        if plan.prepared.runtime.policy.classification_dns == ClassificationDns::ViaDefaultPolicy {
+            let selected = plan.policies.resolve(
+                &plan.prepared.runtime.policy.default_policy.target,
+                "policy:default",
+                "classification-dns",
+            )?;
+            let node = plan
+                .prepared
+                .base
+                .nodes
+                .iter()
+                .find(|node| node.id == selected.leaf)
+                .ok_or("MissingTarget")?
+                .clone();
+            let limit = Duration::from_millis(plan.prepared.runtime.limits.handshake_timeout_ms);
+            let bootstrap = boundary.map_or_else(
+                || plan.prepared.resolver.clone(),
+                |boundary| boundary.resolver(&plan.prepared.resolver),
+            );
+            let transport = ClassificationDnsTransport {
+                transport: PolicyDnsTransport {
+                    transport: plan.prepared.runtime.transports.get(&node.id).cloned(),
+                    node,
+                    bootstrap,
+                    limit,
+                },
+                boundary,
+            };
+            resolver
+                .resolve_with_transport(host, port, &transport)
+                .await
+        } else {
+            resolver.resolve(host, port).await
         };
-        resolver
-            .resolve_with_transport(host, port, &transport)
-            .await
-    } else {
-        resolver.resolve(host, port).await
-    };
     result.map_err(|error| match error {
         "DnsEndpointForbidden" => "ClassificationIngressDenied",
         _ => error,
@@ -1738,7 +1745,9 @@ async fn session(
             &request.target,
             counters.clone(),
             false,
-            boundary.as_ref().map(|boundary| boundary as &dyn IngressBoundary),
+            boundary
+                .as_ref()
+                .map(|boundary| boundary as &dyn IngressBoundary),
         )
         .await?;
         if let Some(ingress) = &lan {
@@ -1907,7 +1916,9 @@ async fn prepare_udp(
             target.clone(),
             peer,
             generation,
-            boundary.as_ref().map(|boundary| boundary as &dyn IngressBoundary),
+            boundary
+                .as_ref()
+                .map(|boundary| boundary as &dyn IngressBoundary),
         )
         .await?;
         if let Some(ingress) = &lan {

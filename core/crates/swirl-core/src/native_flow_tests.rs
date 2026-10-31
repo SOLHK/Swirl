@@ -254,7 +254,12 @@ fn gateway_classification_rejects_protected_proxy_and_dns_before_tcp_udp_or_look
         candidate.policy.mode = Mode::Rule;
         candidate.policy.classification_dns = ClassificationDns::ViaDefaultPolicy;
         candidate.nodes[0].outbound = Outbound::HttpConnect {
-            host: if protected_proxy { "127.0.0.1" } else { "unresolved-classification-proxy.fixture.invalid" }.into(),
+            host: if protected_proxy {
+                "127.0.0.1"
+            } else {
+                "unresolved-classification-proxy.fixture.invalid"
+            }
+            .into(),
             port: proxy.local_addr().unwrap().port(),
             auth: None,
             tls: None,
@@ -272,7 +277,9 @@ fn gateway_classification_rejects_protected_proxy_and_dns_before_tcp_udp_or_look
             };
             let (_client, inbound) = tokio::io::duplex(64);
             assert_eq!(
-                dispatcher.relay_tcp(inbound, source, destination.clone()).await,
+                dispatcher
+                    .relay_tcp(inbound, source, destination.clone())
+                    .await,
                 Err("ClassificationIngressDenied")
             );
             assert_eq!(
@@ -280,13 +287,21 @@ fn gateway_classification_rejects_protected_proxy_and_dns_before_tcp_udp_or_look
                 Some("ClassificationIngressDenied")
             );
             assert_eq!(
-                dispatcher.resolve_dns(&destination.host, destination.port, source).await,
+                dispatcher
+                    .resolve_dns(&destination.host, destination.port, source)
+                    .await,
                 Err("ClassificationIngressDenied")
             );
             until(|| core.snapshot().unwrap()["active"] == 0).await;
         });
-        assert_eq!(proxy.accept().unwrap_err().kind(), std::io::ErrorKind::WouldBlock);
-        assert_eq!(dns.accept().unwrap_err().kind(), std::io::ErrorKind::WouldBlock);
+        assert_eq!(
+            proxy.accept().unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+        assert_eq!(
+            dns.accept().unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock
+        );
         assert_eq!(core.snapshot().unwrap()["failed"], 3);
         core.stop();
     }
@@ -303,22 +318,28 @@ fn gateway_configured_dns_guard_covers_direct_mandatory_and_proxy_bootstrap_path
             let mut candidate = config();
             candidate.dns.tls_servers[0].address = dns.local_addr().unwrap();
             candidate.dns.tls_servers[0].https_path = https_path.clone();
-            let host = if path == "bootstrap" { "known-target.fixture.invalid" } else { "unresolved-target.fixture.invalid" };
+            let host = if path == "bootstrap" {
+                "known-target.fixture.invalid"
+            } else {
+                "unresolved-target.fixture.invalid"
+            };
             match path {
                 "direct" => {}
                 "mandatory" => {
                     candidate.policy.mode = Mode::Rule;
-                    candidate.policy.explicit_direct_rules.push(swirl_subscription::v2::PolicyRule {
-                        id: "60000000-0000-4000-8000-000000000009".into(),
-                        name: "gateway configured DNS fixture".into(),
-                        enabled: true,
-                        priority: 1,
-                        matcher: swirl_subscription::Matcher::Cidr {
-                            value: "198.51.100.0/24".parse().unwrap(),
-                            resolve: true,
+                    candidate.policy.explicit_direct_rules.push(
+                        swirl_subscription::v2::PolicyRule {
+                            id: "60000000-0000-4000-8000-000000000009".into(),
+                            name: "gateway configured DNS fixture".into(),
+                            enabled: true,
+                            priority: 1,
+                            matcher: swirl_subscription::Matcher::Cidr {
+                                value: "198.51.100.0/24".parse().unwrap(),
+                                resolve: true,
+                            },
+                            target: Target::Direct {},
                         },
-                        target: Target::Direct {},
-                    });
+                    );
                 }
                 "bootstrap" => {
                     candidate.policy.mode = Mode::Global;
@@ -339,15 +360,38 @@ fn gateway_configured_dns_guard_covers_direct_mandatory_and_proxy_bootstrap_path
             let dispatcher = gateway(&core.flow_dispatcher().unwrap());
             runtime().block_on(async {
                 let source = "192.168.77.12:50000".parse().unwrap();
-                let destination = NetworkTarget { host: host.into(), port: 443 };
+                let destination = NetworkTarget {
+                    host: host.into(),
+                    port: 443,
+                };
                 let (_client, inbound) = tokio::io::duplex(64);
-                assert_eq!(dispatcher.relay_tcp(inbound, source, destination.clone()).await, Err("DnsEndpointForbidden"), "{path}");
-                assert_eq!(dispatcher.open_udp(source, destination).await.err(), Some("DnsEndpointForbidden"), "{path}");
-                assert_eq!(dispatcher.resolve_dns(host, 443, source).await, Err("DnsEndpointForbidden"), "{path}");
+                assert_eq!(
+                    dispatcher
+                        .relay_tcp(inbound, source, destination.clone())
+                        .await,
+                    Err("DnsEndpointForbidden"),
+                    "{path}"
+                );
+                assert_eq!(
+                    dispatcher.open_udp(source, destination).await.err(),
+                    Some("DnsEndpointForbidden"),
+                    "{path}"
+                );
+                assert_eq!(
+                    dispatcher.resolve_dns(host, 443, source).await,
+                    Err("DnsEndpointForbidden"),
+                    "{path}"
+                );
                 until(|| core.snapshot().unwrap()["active"] == 0).await;
             });
-            assert_eq!(dns.accept().unwrap_err().kind(), std::io::ErrorKind::WouldBlock);
-            assert_eq!(proxy.accept().unwrap_err().kind(), std::io::ErrorKind::WouldBlock);
+            assert_eq!(
+                dns.accept().unwrap_err().kind(),
+                std::io::ErrorKind::WouldBlock
+            );
+            assert_eq!(
+                proxy.accept().unwrap_err().kind(),
+                std::io::ErrorKind::WouldBlock
+            );
             core.stop();
         }
     }

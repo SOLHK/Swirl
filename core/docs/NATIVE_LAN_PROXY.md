@@ -150,10 +150,11 @@ subsequent changes require their own run.
 | `81bd69128122d02f791d9173ed470c8872770555` | [Native LAN run 41193550079](https://github.com/SOLHK/Swirl/actions/runs/41193550079) | All five added encrypted-DNS/target-pinning socket regressions passed on all three systems. Workspace totals: Windows 838, Linux 837, macOS 836; zero failures or ignored Rust tests. This run still failed formatting; `8a808c18` applies its exact rustfmt patch and reruns the gates. |
 | `5c3ae925528b3064a552d2a01e98d4333ca8ce04` | [Original Rust Core run 41191607693](https://github.com/SOLHK/Swirl/actions/runs/41191607693) | The original Windows, Linux and macOS jobs passed, including the Windows Qt-to-Rust integration. Platform-specific skipped public-network cases remain skipped, not accepted evidence. |
 | `5c3ae925528b3064a552d2a01e98d4333ca8ce04` | [Qt security run 41191607821](https://github.com/SOLHK/Swirl/actions/runs/41191607821) | All seven jobs passed, including the actual Qt 6.12 Windows application build, deployment checks, DPAPI checks and existing product regressions. The tested PR merge tree was source-identical to this commit. This is a regression build with UI tests enabled, not a production installer. |
+| `81bd69128122d02f791d9173ed470c8872770555` | [Qt security run 41193550109](https://github.com/SOLHK/Swirl/actions/runs/41193550109) | All seven jobs passed. The actual Windows Qt 6.12 product and LAN test executable built; all 13 required LAN validation/lifecycle cases executed without skips, followed by the existing DPAPI and product network checks. Tested merge `4369b858b6534d852e6819611d427a599bc1de83` was source-identical. |
 
-The additional Qt LAN lifecycle and real scoped Windows firewall fixtures are
-separate gates; the older Qt success above does not establish their results.
-The latter compiles the same COM rule and DPAPI cleanup primitives into a
+The new real scoped Windows firewall fixture is a separate gate; the previous
+Qt successes above do not establish its result. It compiles the same COM rule
+and DPAPI cleanup primitives into a
 separate test executable. Its unique rules are disabled, limited to that
 executable and loopback addresses, and never open a listener. Tests verify
 readback, duplicate refusal, retained external edits and independent-session

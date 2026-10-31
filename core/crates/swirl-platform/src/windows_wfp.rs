@@ -829,7 +829,10 @@ mod tests {
             }
             let mut changed = indexed;
             changed.flags ^= flag;
-            assert!(!same_filter(&changed, &native.raw), "changed flag {flag:#x}");
+            assert!(
+                !same_filter(&changed, &native.raw),
+                "changed flag {flag:#x}"
+            );
         }
         let mut foreign_provider = GUID::from_u128(99);
         let mut changed = indexed;

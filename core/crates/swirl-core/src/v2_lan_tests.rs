@@ -1326,17 +1326,20 @@ fn proxy_domain_rebinding_and_malformed_encrypted_dns_cannot_delegate_a_target()
 
 fn require_rule_dns(candidate: &mut RuntimeConfig) {
     candidate.policy.mode = Mode::Rule;
-    candidate.policy.explicit_direct_rules.push(swirl_subscription::v2::PolicyRule {
-        id: "60000000-0000-4000-8000-000000000009".into(),
-        name: "configured DNS boundary fixture".into(),
-        enabled: true,
-        priority: 1,
-        matcher: swirl_subscription::Matcher::Cidr {
-            value: "198.51.100.0/24".parse().unwrap(),
-            resolve: true,
-        },
-        target: Target::Direct {},
-    });
+    candidate
+        .policy
+        .explicit_direct_rules
+        .push(swirl_subscription::v2::PolicyRule {
+            id: "60000000-0000-4000-8000-000000000009".into(),
+            name: "configured DNS boundary fixture".into(),
+            enabled: true,
+            priority: 1,
+            matcher: swirl_subscription::Matcher::Cidr {
+                value: "198.51.100.0/24".parse().unwrap(),
+                resolve: true,
+            },
+            target: Target::Direct {},
+        });
 }
 
 #[test]
@@ -1355,7 +1358,8 @@ fn configured_dns_guard_precedes_direct_mandatory_rule_and_proxy_bootstrap_io() 
                 "direct" => candidate.policy.mode = Mode::Direct,
                 "mandatory" => require_rule_dns(&mut candidate),
                 "bootstrap" => {
-                    let Outbound::HttpConnect { host, .. } = &mut candidate.nodes[0].outbound else {
+                    let Outbound::HttpConnect { host, .. } = &mut candidate.nodes[0].outbound
+                    else {
                         unreachable!();
                     };
                     *host = "guarded-bootstrap.fixture.invalid".into();
@@ -1365,11 +1369,19 @@ fn configured_dns_guard_precedes_direct_mandatory_rule_and_proxy_bootstrap_io() 
             let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
             let lan = lan_config(false);
             start_strict_fixture(&mut core, &lan, &[proxy.address]);
-            let host = if path == "bootstrap" { "target.fixture.invalid" } else { "configured-dns.fixture.invalid" };
+            let host = if path == "bootstrap" {
+                "target.fixture.invalid"
+            } else {
+                "configured-dns.fixture.invalid"
+            };
             let (client, response) = http_connect(&lan, true, host);
             assert!(!response.starts_with(b"HTTP/1.1 200"), "{protocol}/{path}");
             wait(|| core.lan_status().unwrap()["active_connections"] == 0);
-            assert_eq!(core.lan_status().unwrap()["last_error"], "DnsEndpointForbidden", "{protocol}/{path}");
+            assert_eq!(
+                core.lan_status().unwrap()["last_error"],
+                "DnsEndpointForbidden",
+                "{protocol}/{path}"
+            );
             assert_eq!(dns.queries.load(Ordering::Acquire), 0);
             assert_eq!(proxy.accepted.load(Ordering::Acquire), 0);
             assert_eq!(proxy.queries.load(Ordering::Acquire), 0);
@@ -1384,7 +1396,11 @@ fn configured_dns_guard_precedes_direct_mandatory_rule_and_proxy_bootstrap_io() 
 fn permitted_configured_dns_keeps_mandatory_routing_bootstrap_and_shared_cache() {
     for bootstrap in [false, true] {
         let peer = Peer::new(b'A');
-        let address = if bootstrap { "127.0.0.1" } else { "203.0.113.80" };
+        let address = if bootstrap {
+            "127.0.0.1"
+        } else {
+            "203.0.113.80"
+        };
         let dns = DnsPeer::with_ttl(vec![address.parse().unwrap()], 60);
         let mut candidate = config(vec![peer.node(A)], A);
         dns.configure(&mut candidate);
@@ -1399,18 +1415,30 @@ fn permitted_configured_dns_keeps_mandatory_routing_bootstrap_and_shared_cache()
         let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
         let lan = lan_config(false);
         start_strict_fixture(&mut core, &lan, &[peer.address, dns.address]);
-        let host = if bootstrap { "target.fixture.invalid" } else { "permitted-rule.fixture.invalid" };
+        let host = if bootstrap {
+            "target.fixture.invalid"
+        } else {
+            "permitted-rule.fixture.invalid"
+        };
         for _ in 0..2 {
             let (mut client, response) = http_connect(&lan, true, host);
             assert!(response.starts_with(b"HTTP/1.1 200"), "{response:?}");
             exchange(&mut client, b'A');
         }
         wait(|| core.lan_status().unwrap()["active_connections"] == 0);
-        assert_eq!(dns.queries.load(Ordering::Acquire), 1, "the guarded view retains the original cache");
+        assert_eq!(
+            dns.queries.load(Ordering::Acquire),
+            1,
+            "the guarded view retains the original cache"
+        );
         assert_eq!(peer.requests.load(Ordering::Acquire), 2);
         let records = core.shared.records.lock().unwrap();
         assert_eq!(records.len(), 2);
-        assert!(records.values().all(|record| record.node == A && record.trace["chosen_ip"] == "203.0.113.80"));
+        assert!(
+            records
+                .values()
+                .all(|record| record.node == A && record.trace["chosen_ip"] == "203.0.113.80")
+        );
         drop(records);
         core.stop();
     }
@@ -1442,7 +1470,10 @@ fn classification_cannot_dial_a_protected_default_proxy_before_lan_outbound_prep
         let (client, response) = http_connect(&lan, true, "classified-protected.fixture.invalid");
         assert!(!response.starts_with(b"HTTP/1.1 200"));
         wait(|| core.lan_status().unwrap()["active_connections"] == 0);
-        assert_eq!(core.lan_status().unwrap()["last_error"], "ClassificationIngressDenied");
+        assert_eq!(
+            core.lan_status().unwrap()["last_error"],
+            "ClassificationIngressDenied"
+        );
         assert_eq!(proxy.accepted.load(Ordering::Acquire), 0);
         assert_eq!(proxy.queries.load(Ordering::Acquire), 0);
         proxy.assert_no_direct_dns();
@@ -1471,7 +1502,10 @@ fn classification_checks_dot_and_doh_endpoints_before_proxy_hostname_bootstrap()
         let (client, response) = http_connect(&lan, true, "classified-dns-pivot.fixture.invalid");
         assert!(!response.starts_with(b"HTTP/1.1 200"));
         wait(|| core.lan_status().unwrap()["active_connections"] == 0);
-        assert_eq!(core.lan_status().unwrap()["last_error"], "ClassificationIngressDenied");
+        assert_eq!(
+            core.lan_status().unwrap()["last_error"],
+            "ClassificationIngressDenied"
+        );
         assert_eq!(proxy.accepted.load(Ordering::Acquire), 0);
         assert_eq!(proxy.queries.load(Ordering::Acquire), 0);
         proxy.assert_no_direct_dns();
@@ -1492,15 +1526,21 @@ fn udp_classification_cannot_open_a_protected_default_proxy_after_authentication
     start_strict_fixture(&mut core, &lan, &[]);
     let (mut control, authenticated) = socks_auth(&lan, &lan.auth.password);
     assert_eq!(authenticated, [1, 0]);
-    let client = StdUdpSocket::bind(SocketAddr::new(control.local_addr().unwrap().ip(), 0)).unwrap();
-    client.set_read_timeout(Some(Duration::from_millis(150))).unwrap();
+    let client =
+        StdUdpSocket::bind(SocketAddr::new(control.local_addr().unwrap().ip(), 0)).unwrap();
+    client
+        .set_read_timeout(Some(Duration::from_millis(150)))
+        .unwrap();
     let mut request = vec![5, 3, 0, 1, 0, 0, 0, 0];
     request.extend(client.local_addr().unwrap().port().to_be_bytes());
     control.write_all(&request).unwrap();
     let mut response = [0; 10];
     control.read_exact(&mut response).unwrap();
     assert_eq!(&response[..4], &[5, 0, 0, 1]);
-    let relay = SocketAddr::new(lan.listen_ip, u16::from_be_bytes([response[8], response[9]]));
+    let relay = SocketAddr::new(
+        lan.listen_ip,
+        u16::from_be_bytes([response[8], response[9]]),
+    );
     let host = b"udp-classification.fixture.invalid";
     let mut datagram = vec![0, 0, 0, 3, host.len() as u8];
     datagram.extend(host);
@@ -1529,16 +1569,28 @@ fn classification_keeps_selected_proxy_dns_cache_and_unused_nodes_for_authentica
     let lan = lan_config(false);
     // Only the actual selected node and its declared DNS socket are authorized
     // fixtures. An unrelated, unused loopback node must not invalidate routing.
-    start_strict_fixture(&mut core, &lan, &[proxy.address, proxy.direct_dns.local_addr().unwrap()]);
+    start_strict_fixture(
+        &mut core,
+        &lan,
+        &[proxy.address, proxy.direct_dns.local_addr().unwrap()],
+    );
     for _ in 0..2 {
-        let (mut client, response) = http_connect(&lan, true, "classification-cache.fixture.invalid");
+        let (mut client, response) =
+            http_connect(&lan, true, "classification-cache.fixture.invalid");
         assert!(response.starts_with(b"HTTP/1.1 200"), "{response:?}");
         exchange(&mut client, b'P');
     }
     wait(|| core.lan_status().unwrap()["active_connections"] == 0);
-    assert_eq!(proxy.queries.load(Ordering::Acquire), 1, "classification keeps its existing cache");
+    assert_eq!(
+        proxy.queries.load(Ordering::Acquire),
+        1,
+        "classification keeps its existing cache"
+    );
     assert_eq!(proxy.accepted.load(Ordering::Acquire), 3);
-    assert_eq!(*proxy.targets.lock().unwrap(), vec!["203.0.113.80:80", "203.0.113.80:80"]);
+    assert_eq!(
+        *proxy.targets.lock().unwrap(),
+        vec!["203.0.113.80:80", "203.0.113.80:80"]
+    );
     assert_eq!(unused.requests.load(Ordering::Acquire), 0);
     let records = core.shared.records.lock().unwrap();
     assert!(records.values().any(|record| record.ingress == "lan"
