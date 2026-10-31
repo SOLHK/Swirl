@@ -49,6 +49,8 @@ int main(int argc, char *argv[])
 {
     std::fprintf(stderr, "SwirlIconBuilder: initializing Qt (requested QPA=%s)\n",
                  qgetenv("QT_QPA_PLATFORM").constData());
+    std::fprintf(stderr, "SwirlIconBuilder: Qt runtime=%s, platform plugin directory=%s\n",
+                 qVersion(), qgetenv("QT_QPA_PLATFORM_PLUGIN_PATH").constData());
     std::fflush(stderr);
     QGuiApplication app(argc, argv);
     std::fprintf(stderr, "SwirlIconBuilder: Qt initialized (actual QPA=%s)\n",
