@@ -1168,6 +1168,12 @@ impl swirl_dns::QueryTransport for PolicyDnsTransport {
         Box<dyn std::future::Future<Output = Result<swirl_transport::BoxStream>> + Send + '_>,
     > {
         Box::pin(async move {
+            // Ingress resolver views may restrict learned physical endpoints.
+            // DNS carried through a selected proxy is still an outbound target
+            // and must not become a path to a protected host service.
+            if !self.bootstrap.endpoint_allowed(address) {
+                return Err("DnsEndpointForbidden");
+            }
             let target = NetworkTarget {
                 host: address.ip().to_string(),
                 port: address.port(),
@@ -1188,6 +1194,45 @@ impl swirl_dns::QueryTransport for PolicyDnsTransport {
         })
     }
 }
+/// Pin an unresolved ingress target through the existing encrypted DNS and
+/// the already selected outbound. The proxy receives a checked address, never
+/// another opportunity to resolve a client-controlled name. Domain routing and
+/// application TLS/HTTP Host remain based on the original request.
+async fn pin_proxy_target(
+    routed: &mut Routed,
+    check: impl Fn(&NetworkTarget) -> Result<()>,
+) -> Result<()> {
+    if matches!(routed.node.outbound, Outbound::Direct {} | Outbound::Reject {})
+        || routed.target.host.parse::<IpAddr>().is_ok()
+    {
+        return Ok(());
+    }
+    let original = routed.target.clone();
+    let transport = PolicyDnsTransport {
+        node: routed.node.clone(),
+        transport: routed.transport.clone(),
+        bootstrap: routed.resolver.clone(),
+        limit: routed.limit,
+    };
+    let addresses = timeout(
+        routed.limit,
+        routed.resolver.resolve_with_transport(&original.host, original.port, &transport),
+    ).await.map_err(|_| "IngressTargetDnsTimeout")??;
+    if addresses.is_empty() || addresses.len() > 16 {
+        return Err("IngressTargetDnsAnswers");
+    }
+    for address in &addresses {
+        check(&NetworkTarget { host: address.ip().to_string(), port: address.port() })?;
+    }
+    let selected = addresses[0].ip().to_string();
+    routed.target.host = selected.clone();
+    routed.trace["target_domain"] = json!(original.host);
+    routed.trace["chosen_ip"] = json!(selected);
+    routed.trace["dns_path"] = json!("configured_encrypted_via_selected_outbound");
+    routed.trace["dns_profile"] = json!("target");
+    Ok(())
+}
+
 async fn classify(plan: &Plan, host: &str, port: u16) -> Result<Vec<SocketAddr>> {
     let resolver = plan
         .prepared
@@ -1797,7 +1842,15 @@ async fn udp_associate(
                     _= &mut idle=>break Err("LanIdleTimeout"),
                     _=control.read(&mut closed)=>break Ok(()),
                     Some(prepared)=pending.join_next(),if !pending.is_empty()=>{
-                        let prepared=match prepared{Ok(Ok(prepared))=>prepared,_=>{super::udp_drop(&counters,&shared.totals);continue}};flows.retain(|_,(at,_)|at.elapsed()<Duration::from_secs(30));if flows.len()>=64&&!flows.contains_key(&prepared.key){super::udp_drop(&counters,&shared.totals);continue}
+                        let prepared = match prepared {
+                            Ok(Ok(prepared)) => prepared,
+                            Ok(Err(error)) => {
+                                if let Some(ingress) = &lan { ingress.error(error); }
+                                super::udp_drop(&counters, &shared.totals);
+                                continue;
+                            }
+                            Err(_) => { super::udp_drop(&counters, &shared.totals); continue; }
+                        };flows.retain(|_,(at,_)|at.elapsed()<Duration::from_secs(30));if flows.len()>=64&&!flows.contains_key(&prepared.key){super::udp_drop(&counters,&shared.totals);continue}
                         flows.insert(prepared.key,(Instant::now(),prepared.flow.clone()));if let Ok(mut records)=shared.records.lock()&& let Some(record)=records.get_mut(&id){record.node=prepared.flow.routed.node.id.clone();record.trace=prepared.flow.routed.trace.clone();record.target=prepared.flow.routed.target.clone();}
                         match prepared.packet{
                             UdpPacket::Proxy(target,payload)=>pool.send_with_plan(socks5_udp::Flow{plan:prepared.flow.plan.clone(),generation:prepared.flow.routed.generation,node_id:prepared.flow.routed.node.id.clone(),cancellation:Some(cancellation.clone())},target,payload,prepared.permit),

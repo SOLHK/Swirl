@@ -91,11 +91,22 @@ DIRECT address is checked after the existing resolver/policy path. Upstream
 connection addresses are also checked and pinned for the connection so a
 second resolution cannot rebind to a local listener or management service.
 
-Remote-outbound DNS keeps its existing semantics: a remote proxy resolves
-remote destination names. It must not be silently replaced by local DNS just
-to classify a LAN request. Local protection covers sockets opened on this
-host; it does not promise to enforce the remote server's own network access
-policy. Policy rejection or proxy failure never authorizes a DIRECT fallback.
+For a proxy-routed LAN hostname, the existing configured DoH/DoT resolver
+travels through the already selected native outbound. Every returned address
+must pass the same target boundary before a literal destination is passed to
+the proxy protocol. Routing and the client's HTTP Host/TLS payload keep the
+original hostname. The upstream proxy cannot choose a different destination
+address by resolving that hostname again. This also closes the case where an
+upstream proxy on the same LAN could otherwise resolve a name back to Swirl's
+protected management services.
+
+This requires configured encrypted DNS for proxy-routed LAN hostnames. Missing
+configuration returns `LanTargetDnsPolicyRequired`; failure or a protected DNS
+endpoint/answer rejects the flow. It never silently introduces system or plain
+UDP DNS to make a remote-only request succeed, never creates a second resolver,
+and never authorizes DIRECT fallback. Literal targets and authorized DIRECT
+routing retain their existing behavior. Core policy updates and existing
+sessions keep their original lifecycle.
 
 ## Evidence and acceptance
 
