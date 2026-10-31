@@ -656,14 +656,19 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
                     const double position=ancestor->property("contentY").toDouble()+text->mapToItem(ancestor,QPointF()).y();
                     ancestor->setProperty("contentY",qBound(first,position-qMax(0.0,(ancestor->height()-text->height())/2),last));
                 }
-                return text&&!visibleBounds(text).isEmpty();
+                // Visibility changes before the next layout polish assigns the
+                // wrapped label its constrained width. Wait for the existing
+                // full-readability requirement, not its natural pre-layout size.
+                const auto rect=bounds(text),visible=visibleBounds(text);
+                return !text->property("truncated").toBool()&&!visible.isEmpty()
+                    &&visible.width()+1>=rect.width();
             },1500);
             const auto rect=text?bounds(text):QRectF(),visible=text?visibleBounds(text):QRectF();
             const auto geometry=[](const QRectF &value){return QJsonObject{{"x",value.x()},{"y",value.y()},{"width",value.width()},{"height",value.height()}};};
             const bool complete=shown&&text&&!text->property("truncated").toBool()&&visible.width()+1>=rect.width();
             dataSamples.append(QJsonObject{{"phase",phase},{"expected",expected},{"model",model},
                 {"displayed",text?text->property("text").toString():QString()},{"bounds",geometry(rect)},
-                {"visibleBounds",geometry(visible)},{"fullyReadableHorizontally",complete},{"visible",shown},
+                {"visibleBounds",geometry(visible)},{"fullyReadableHorizontally",complete},{"visible",!visible.isEmpty()},{"readabilityReady",shown},
                 {"truncated",text?text->property("truncated").toBool():true},{"scopeMatches",scopeMatches},
                 {"locator",expectedSource?"selected-detail-surface-visual-tree":"named-source-selection-label"},
                 {"expectedSelectedId",expectedId},{"sourceViewport",expectedSource?expectedSource->objectName():QString()},
