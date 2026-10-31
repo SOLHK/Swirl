@@ -103,6 +103,7 @@ target_sources(SwirlEngine PRIVATE engine/SwirlProtocolRegistry.h engine/SwirlPr
 target_sources(SwirlEngine PRIVATE engine/ConnectionDiagnostics.h engine/ConnectionDiagnostics.cpp)
 target_sources(SwirlEngine PRIVATE engine/NodeImportService.h engine/NodeImportService.cpp)
 target_sources(SwirlEngine PRIVATE network/HttpRequestPolicy.h)
+target_sources(SwirlEngine PRIVATE network/LanFirewall.h network/LanFirewall.cpp network/LanProxySession.h network/LanProxySession.cpp)
 target_sources(SwirlEngine PRIVATE engine/RustCoreEngine.h engine/RustCoreEngine.cpp)
 include(cmake/SwirlRustCore.cmake)
 swirl_pair_rust_core(SwirlEngine)
@@ -141,7 +142,7 @@ if(WIN32)
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/SubscriptionCapture.py" "$<TARGET_FILE_DIR:Swirl>/SubscriptionCapture.py")
  add_dependencies(Swirl SwirlCodexManagementTools)
  target_compile_definitions(SwirlEngine PUBLIC NOMINMAX)
- target_link_libraries(SwirlEngine PRIVATE advapi32 ws2_32 iphlpapi crypt32 wininet)
+ target_link_libraries(SwirlEngine PRIVATE advapi32 ws2_32 iphlpapi crypt32 wininet ole32 oleaut32 uuid)
  add_executable(SwirlGatewayGuard WIN32 tools/GatewayGuard.cpp network/GatewayRouting.cpp)
  target_include_directories(SwirlGatewayGuard PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
  target_link_libraries(SwirlGatewayGuard PRIVATE Qt6::Core Qt6::Network)
@@ -284,6 +285,29 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  add_test(NAME swirl-storage-paths COMMAND SwirlStoragePathsTests)
  file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/packaging/rules" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
  find_package(Qt6 REQUIRED COMPONENTS Test)
+ qt_add_executable(SwirlLanProxyTests tests/LanProxyTests.cpp)
+ target_link_libraries(SwirlLanProxyTests PRIVATE SwirlEngine Qt6::Test)
+ target_include_directories(SwirlLanProxyTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+ if(MSVC)
+  target_compile_options(SwirlLanProxyTests PRIVATE /utf-8)
+ endif()
+ add_test(NAME swirl-lan-proxy-control COMMAND SwirlLanProxyTests -o "${CMAKE_CURRENT_BINARY_DIR}/lan-proxy-control.xml,xml" -o "-,txt")
+ set_tests_properties(swirl-lan-proxy-control PROPERTIES TIMEOUT 60)
+ if(WIN32)
+  # Compile the internal COM fixture seam only into this dedicated executable,
+  # never into SwirlEngine/Swirl. It is deliberately absent from normal CTest;
+  # CI must opt in explicitly before creating its disabled loopback-only rules.
+  qt_add_executable(SwirlLanFirewallTests tests/LanFirewallTests.cpp network/LanFirewall.cpp network/LanFirewall.h)
+  target_include_directories(SwirlLanFirewallTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+  target_compile_definitions(SwirlLanFirewallTests PRIVATE SWIRL_LAN_FIREWALL_TESTS)
+  target_link_libraries(SwirlLanFirewallTests PRIVATE Qt6::Core Qt6::Network Qt6::Test advapi32 ws2_32 iphlpapi crypt32 ole32 oleaut32 uuid)
+  if(MSVC)
+   target_compile_options(SwirlLanFirewallTests PRIVATE /utf-8)
+  endif()
+  add_custom_command(TARGET SwirlLanFirewallTests POST_BUILD
+   COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:SwirlLanFirewallTests> $<TARGET_FILE_DIR:SwirlLanFirewallTests>
+   COMMAND_EXPAND_LISTS)
+ endif()
  qt_add_executable(SwirlWindowShadowTests tests/WindowShadowRendererTests.cpp app/WindowShadowRenderer.cpp app/WindowShadowRenderer.h)
  target_link_libraries(SwirlWindowShadowTests PRIVATE Qt6::Gui Qt6::Test)
  target_include_directories(SwirlWindowShadowTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -565,16 +589,23 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
 endif()
 if(WIN32)
  # Generate the Windows-only ICO from its optical SVG before RC compilation.
+ if(NOT TARGET Qt6::QOffscreenIntegrationPlugin)
+  message(FATAL_ERROR "The selected Qt SDK must provide its offscreen platform plugin for the icon build tool")
+ endif()
  add_executable(SwirlIconBuilder tools/BuildWindowsIcon.cpp)
  target_link_libraries(SwirlIconBuilder PRIVATE Qt6::Gui Qt6::Svg)
  set(SWIRL_GENERATED_ICON "${CMAKE_CURRENT_BINARY_DIR}/brand/Swirl.ico")
  add_custom_command(
   OUTPUT "${SWIRL_GENERATED_ICON}"
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/brand"
-  COMMAND $<TARGET_FILE:SwirlIconBuilder>
-          "${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
-          "${SWIRL_GENERATED_ICON}"
+  COMMAND "${CMAKE_COMMAND}"
+          "-DSWIRL_ICON_BUILDER=$<TARGET_FILE:SwirlIconBuilder>"
+          "-DSWIRL_ICON_PLATFORM_PLUGIN=$<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin>"
+          "-DSWIRL_ICON_SOURCE=${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
+          "-DSWIRL_ICON_OUTPUT=${SWIRL_GENERATED_ICON}"
+          -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildWindowsIcon.cmake"
   DEPENDS SwirlIconBuilder app/BrandRaster.h "${SWIRL_ASSET_PATH}/icons/swirl_windows.svg"
+          "${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildWindowsIcon.cmake"
   COMMENT "Generate Windows ICO from Swirl SVG"
   VERBATIM
  )
@@ -592,7 +623,7 @@ if(WIN32)
  target_link_libraries(Swirl PRIVATE dwmapi advapi32 psapi shell32 propsys shlwapi)
 endif()
 
-foreach(runtime_target IN ITEMS SwirlProxyGuard SwirlExtensionTests SwirlTelemetryTests
+foreach(runtime_target IN ITEMS SwirlLanProxyTests SwirlProxyGuard SwirlExtensionTests SwirlTelemetryTests
  SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlSystemProxyTests SwirlAcceptance SwirlNodeTests
  SwirlNetworkRegressionTests SwirlImportTests SwirlSubscriptionFormatTests
  SwirlPrivateSubscriptionInspect SwirlPolicyConfigurationTests SwirlCatalogTransactionTests)

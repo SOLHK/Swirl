@@ -1,13 +1,16 @@
 //! Fixed-buffer full-duplex transfer with independent half-close and live counters.
+pub mod egress;
 pub mod grpc;
 mod h2_stream;
 pub mod http2;
 pub mod httpupgrade;
+pub mod inbound;
 pub mod quic;
 pub mod reality;
 mod udp;
 pub mod xhttp;
-pub use udp::bind_udp;
+pub use egress::connect_tcp;
+pub use udp::{bind_udp, bind_udp_inbound, reserve_datagram_buffers};
 
 use std::{
     io,
@@ -39,7 +42,7 @@ pub async fn secure<S: Stream + 'static>(
 
 /// Authenticate TLS and require the selected application protocol where the
 /// transport needs it. An empty offer gets that transport's protocol; an
-/// explicit incompatible offer or a different negotiated protocol is rejected.
+/// explicit incompatible offer or a different negotiated offer is rejected.
 pub async fn secure_with_alpn<S: Stream + 'static>(
     stream: S,
     tls: &swirl_subscription::Tls,

@@ -1,0 +1,143 @@
+name: Swirl Native LAN
+
+on:
+  push:
+    branches: [work/native-lan-proxy-20261031, work/native-lan-gateway-20261031]
+  pull_request:
+    branches: [test]
+    paths:
+      - 'core/**'
+      - 'tools/tests/test_native_lan_abi.py'
+      - 'tools/tests/test_native_gateway_abi.py'
+      - '.github/workflows/native-lan.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-lan-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  native-lan-rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    env:
+      SWIRL_SOURCE_SHA: ${{ github.sha }}
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Rust tools
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - name: Record compiler identity
+        id: compiler
+        shell: python
+        run: |
+          import hashlib, os, subprocess
+          identity = subprocess.check_output(['rustc', '-vV'])
+          print(identity.decode())
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write('hash=' + hashlib.sha256(identity).hexdigest() + '\n')
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+          key: native-lan-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            native-lan-${{ runner.os }}-${{ steps.compiler.outputs.hash }}-${{ hashFiles('core/Cargo.lock') }}-
+      - name: Format
+        id: format
+        working-directory: core
+        run: cargo fmt --all -- --check
+      - name: Check
+        id: check
+        if: ${{ !cancelled() }}
+        working-directory: core
+        run: cargo check --workspace --locked
+      - name: Clippy
+        if: ${{ !cancelled() && steps.check.outcome == 'success' }}
+        working-directory: core
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Workspace tests including real LAN ingress sockets
+        id: tests
+        if: ${{ !cancelled() && steps.check.outcome == 'success' }}
+        working-directory: core
+        run: cargo test --workspace --locked
+      - name: Build the native control ABI
+        id: abi
+        if: ${{ !cancelled() && steps.check.outcome == 'success' }}
+        working-directory: core
+        run: cargo build --locked -p swirl-api --lib
+      - name: Independent C ABI security and lifecycle checks
+        if: ${{ !cancelled() && steps.abi.outcome == 'success' }}
+        shell: python
+        run: |
+          import os, subprocess, sys
+          from pathlib import Path
+          name = 'swirl_api.dll' if os.name == 'nt' else ('libswirl_api.dylib' if sys.platform == 'darwin' else 'libswirl_api.so')
+          library = Path('core/target/debug', name).resolve()
+          if not library.is_file():
+              raise SystemExit('Native control ABI library is missing')
+          os.environ['SWIRL_BUILT_LIBRARY'] = str(library)
+          subprocess.run([sys.executable, 'tools/tests/test_native_lan_abi.py', '-v'], check=True)
+          subprocess.run([sys.executable, 'tools/tests/test_native_gateway_abi.py', '-v'], check=True)
+      - name: Scoped Windows WFP and DHCP firewall/socket ownership
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        shell: python
+        run: |
+          import ctypes, subprocess
+          if not ctypes.windll.shell32.IsUserAnAdmin():
+              raise SystemExit('Disposable Windows runner must be elevated for scoped WFP fixtures')
+          # These explicit fixtures own synthetic, absent-interface WFP IDs,
+          # a loopback-only UDP67 socket and one disabled firewall rule.
+          # They never start LAN DHCP or change default routes/profiles.
+          failures = []
+          for fixture in ['persistent_wfp_fixture_installs_verifies_ownership_and_removes_exact_objects',
+                          'real_udp67_attestation_accepts_single_interface_and_rejects_replay',
+                          'disabled_dhcp_firewall_fixture_verifies_scope_and_preserves_foreign_edits']:
+              result = subprocess.run(['cargo', 'test', '-p', 'swirl-platform', '--locked', fixture,
+                                       '--', '--ignored', '--nocapture'], cwd='core',
+                                      text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+              print(result.stdout)
+              if result.returncode or '1 passed; 0 failed; 0 ignored;' not in result.stdout:
+                  failures.append(fixture)
+          if failures:
+              raise SystemExit('Scoped fixtures failed or did not execute exactly once: ' + ', '.join(failures))
+      - name: Preserve exact formatter diagnostics without weakening the gate
+        if: ${{ !cancelled() && steps.format.outcome == 'failure' }}
+        shell: python
+        run: |
+          import base64, hashlib, json, os, subprocess, zlib
+          from pathlib import Path
+          # The Format step remains failed. This only supplies an exact patch
+          # for a subsequent reviewed source commit; it never pushes changes.
+          subprocess.run(['cargo', 'fmt', '--all'], cwd='core', check=True)
+          patch = subprocess.check_output(['git', 'diff', '--binary', '--', 'core'])
+          directory = Path('out/native-lan-format')
+          directory.mkdir(parents=True, exist_ok=True)
+          (directory / 'rustfmt.patch').write_bytes(patch)
+          (directory / 'source.json').write_text(json.dumps({'source_sha': os.environ['GITHUB_SHA'], 'patch_sha256': hashlib.sha256(patch).hexdigest()}), encoding='utf-8')
+          print('SWIRL_RUSTFMT_PATCH_ZLIB_BASE64=' + base64.b64encode(zlib.compress(patch, 9)).decode('ascii'))
+      - name: Preserve formatter patch
+        if: ${{ !cancelled() && steps.format.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Native-LAN-rustfmt-${{ runner.os }}-${{ github.sha }}
+          path: out/native-lan-format
+          if-no-files-found: error
+          retention-days: 14

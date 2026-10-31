@@ -1,0 +1,470 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-29T20:14:15.809853+00:00",
+  "source_commit": "ffea437c612de0e15938f3576f5c0a89a17fadcd",
+  "cargo_lock_sha256": "a2adc62304af61b3d9c4faf7935b5572783f295510719f45fef9d74185175941",
+  "environment": {
+    "host": "x86_64-unknown-linux-gnu",
+    "rustc": "1.99.1 (58cf8f9c3 2026-10-13)",
+    "network": "real local IPv4/IPv6 loopback sockets; no host route, DNS or driver changes"
+  },
+  "command": "cargo test --offline --locked --workspace --all-targets",
+  "exit_code": 0,
+  "totals": {
+    "passed": 870,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered": 0
+  },
+  "test_targets": [
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/swirl_api-da8eb75578ba77a3",
+      "passed": 50,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/main.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/swirl_api-53bf7acd65bab341",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/bin/swirl-diagnose.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/swirl_diagnose-2a49a39edb31e3de",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/bin/swirl-inspect.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/swirl_inspect-a4ced9e9409c7239",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/bin/swirl-tun-helper.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/swirl_tun_helper-345f3c5994209e31",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_boundary.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/xray_boundary-7250228500c32dd5",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_cli.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/xray_cli-3aafa25ee436d8a4",
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/windows-tun-smoke.rs",
+      "executable": "/tmp/swirl-api-validation/debug/examples/windows_tun_smoke-ee7fdd4ef4ff55f4",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/swirl_core-faa3287dc9040290",
+      "passed": 63,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/china_rules.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/china_rules-337975beb4071cfd",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/network.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/network-26e7f97e77b3982e",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/socks5_udp.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/socks5_udp-0b462081e59cb60e",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_import.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/xray_import-f2a7927a3f12574a",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/transport-runtime.rs",
+      "executable": "/tmp/swirl-api-validation/debug/examples/transport_runtime-b6604fcc6f2adb2d",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/swirl_dns-735471f3af808391",
+      "passed": 27,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/swirl_platform-eed1f6c5c368ac33",
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/swirl_protocol-5e13494f80adfded",
+      "passed": 127,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/quic_preflight.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/quic_preflight-0c4c26c69f30aa4d",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/vision.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/vision-022796987843e148",
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/vision_record.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/vision_record-b727f5e44f4ba24c",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/vision_stream.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/vision_stream-5451d7fbe8015f2a",
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/vision_tls.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/vision_tls-a3589ddfbed8b39d",
+      "passed": 26,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/hysteria2-client.rs",
+      "executable": "/tmp/swirl-api-validation/debug/examples/hysteria2_client-6a6c9f22b3bd1402",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/hysteria2-lifecycle.rs",
+      "executable": "/tmp/swirl-api-validation/debug/examples/hysteria2_lifecycle-e3a9873302fd864d",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/ss2022-client.rs",
+      "executable": "/tmp/swirl-api-validation/debug/examples/ss2022_client-638d18feffe06baf",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/transport-client.rs",
+      "executable": "/tmp/swirl-api-validation/debug/examples/transport_client-dd665b10db2e19e0",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/tuic-client.rs",
+      "executable": "/tmp/swirl-api-validation/debug/examples/tuic_client-44697d8b5ce7350f",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/vision-client.rs",
+      "executable": "/tmp/swirl-api-validation/debug/examples/vision_client-e76bd362167244af",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/swirl_routing-1deb7a804a1a39d1",
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/swirl_subscription-2d35cfb4528e611a",
+      "passed": 160,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_adversarial.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/xray_adversarial-9e653bc5035d32b9",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_conversion.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/xray_conversion-090590f6e5abf7c9",
+      "passed": 18,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_conversion_auth.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/xray_conversion_auth-a8bf32cd8566190c",
+      "passed": 19,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_conversion_password.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/xray_conversion_password-216f324a812eeddf",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_conversion_security.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/xray_conversion_security-44faf7328898b3f0",
+      "passed": 27,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_native.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/xray_native-305e6b4eabe96b31",
+      "passed": 23,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_native_selection.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/xray_native_selection-4d8e2108a93078af",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_native_transports.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/xray_native_transports-7b13df557a53934d",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_structure.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/xray_structure-ab43556018d72778",
+      "passed": 27,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/swirl_transport-7f97287ffde1e737",
+      "passed": 120,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/client_hello_customizer.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/client_hello_customizer-e8e4f9599ce0bb2a",
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/reality-client.rs",
+      "executable": "/tmp/swirl-api-validation/debug/examples/reality_client-99772651c76f73ad",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/reality-hello.rs",
+      "executable": "/tmp/swirl-api-validation/debug/examples/reality_hello-1b44cb9d7821f1c3",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/swirl_tun-c9ce5913015cdfd3",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/packet_flows.rs",
+      "executable": "/tmp/swirl-api-validation/debug/deps/packet_flows-93c7022551274e08",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    }
+  ],
+  "clippy": {
+    "command": "cargo clippy --offline --locked --workspace --all-targets -- -D warnings",
+    "exit_code": 0,
+    "log_sha256": "e5a5bf3d2bfa15410d809bc48c0c5134f172f17da0aa36aa72008999d526feea"
+  },
+  "rustfmt": {
+    "command": "cargo fmt --all -- --check",
+    "exit_code": 0
+  },
+  "rustsec": {
+    "tool": "cargo-audit 0.22.2",
+    "database_commit": "ee1a49a2769a24a596afc1c20cb33748d2769586",
+    "advisories": 1386,
+    "vulnerabilities": 0,
+    "warnings": {},
+    "ignore": [],
+    "deny": "warnings",
+    "exit_code": 0
+  },
+  "scope_notes": [
+    "An initial sandboxed attempt could not bind local sockets (EPERM). This recorded complete rerun used authorized loopback access and kept all original assertions.",
+    "Packet simulation and local socket integration do not prove Windows driver integration, public proxy interoperability, application acceptance, sleep/wake or pressure measurements.",
+    "Real Windows 11 Wintun and application acceptance has not run.",
+    "The tests named xray cover retained import/compatibility behavior; they do not use Xray as the Swirl runtime.",
+    "Final frozen implementation after the UDP accounting-publication, Windows PowerShell null, Job Object command ownership and bounded stdin fixes. Windows code is cfg-gated on Linux; process and driver execution require Windows CI."
+  ],
+  "log_sha256": "7c0c6d043eab39d545625538ba0684386e28c802528f29f42f2d37a2e1089dd0",
+  "source_files_sha256": {
+    "core/Cargo.lock": "a2adc62304af61b3d9c4faf7935b5572783f295510719f45fef9d74185175941",
+    "core/crates/swirl-core/src/native_flow.rs": "dcd572bb1ab12d447985e5f81f93f03ca7d2d94f3cdd8754df7193fdf540ba97",
+    "core/crates/swirl-core/src/native_flow_tests.rs": "cbec85a6693c807dcc749c928adb0d3ef769b8133c784d70fb3a561ae7f70ab5",
+    "core/crates/swirl-platform/src/windows_command.rs": "54deaa8fd34865706f7add30ab0bbb7fac22c8deebd4f016176bd8f4c32d6f94",
+    "core/crates/swirl-platform/src/windows_network.rs": "5112ee963a667455d3d5e298785c293163d112864c4365de7fa25b5e394a08c7",
+    "core/crates/swirl-api/examples/windows-tun-smoke.rs": "87b129dc8ab7baa49febd3665b29e773ae6a6d72b8646156dfe9f08615dbc6de"
+  },
+  "windows_cross_check": {
+    "target": "x86_64-pc-windows-gnu",
+    "package": "swirl-platform",
+    "all_targets": true,
+    "check_exit_code": 0,
+    "clippy_deny_warnings_exit_code": 0,
+    "execution": false
+  }
+}

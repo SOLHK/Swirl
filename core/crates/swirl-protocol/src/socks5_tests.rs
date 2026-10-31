@@ -273,3 +273,46 @@ async fn disabled_tls_and_handshake_timeout_fail_closed() {
     assert!(started.elapsed() < Duration::from_secs(1));
     peer.await.unwrap();
 }
+
+#[tokio::test]
+async fn advertised_udp_relay_cannot_bypass_ingress_endpoint_guard() {
+    for host in ["127.0.0.1", "relay.fixture.test"] {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let outbound = outbound(listener.local_addr().unwrap().port());
+        let relay = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let forbidden = relay.local_addr().unwrap();
+        let mut reply = vec![5, 0, 0];
+        Target {
+            host: host.into(),
+            port: forbidden.port(),
+        }
+        .encode(&mut reply)
+        .unwrap();
+        let server = tokio::spawn(accept_associate(listener, reply));
+        let resolver = Resolver::default()
+            .with_hosts(&[HostMapping {
+                name: "relay.fixture.test".into(),
+                address: forbidden.ip(),
+            }])
+            .with_endpoint_guard(move |address| address != forbidden);
+        assert!(matches!(
+            UdpAssociation::connect(&outbound, &resolver, Duration::from_secs(2)).await,
+            Err("Socks5UdpRelayForbidden")
+        ));
+        let mut control = server.await.unwrap();
+        let mut byte = [0];
+        assert_eq!(
+            timeout(Duration::from_secs(1), control.read(&mut byte))
+                .await
+                .unwrap()
+                .unwrap(),
+            0
+        );
+        let mut packet = [0; 128];
+        assert!(
+            timeout(Duration::from_millis(50), relay.recv_from(&mut packet))
+                .await
+                .is_err()
+        );
+    }
+}

@@ -1,4 +1,5 @@
 //! Rust-owned runtime, sockets, scheduling, statistics and immutable session plans.
+pub mod lan;
 mod policy;
 mod policy_v2;
 mod probe;
@@ -951,7 +952,8 @@ async fn udp_associate(
     if !requested_ip.is_unspecified() && requested_ip != peer.ip() {
         return Err("UdpClientAddress");
     }
-    let relay = bind_udp(SocketAddr::new(peer.ip(), 0))
+    let local_ip = control.local_addr().map_err(|_| "UdpLocalAddress")?.ip();
+    let relay = swirl_transport::bind_udp_inbound(SocketAddr::new(local_ip, 0))
         .await
         .map_err(|_| "UdpBind")?;
     let v4 = bind_udp(SocketAddr::from(([0, 0, 0, 0], 0)))

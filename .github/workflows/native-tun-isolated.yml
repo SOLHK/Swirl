@@ -1,0 +1,126 @@
+name: Native TUN isolated backend
+
+on:
+  push:
+    branches: [work/native-tun-windows-20261030-isolated]
+  pull_request:
+    paths:
+      - 'core/**'
+      - '.github/workflows/native-tun-isolated.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-tun-isolated-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: ${{ matrix.os }} native packet and core tests
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      SWIRL_SOURCE_SHA: ${{ github.sha }}
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stable Rust with lint and formatting
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+          key: native-tun-isolated
+          cache-on-failure: true
+      - name: Source formatting
+        run: cargo fmt --all -- --check
+      - name: Stage exact locked dependency notices
+        run: |
+          cargo metadata --locked --format-version 1 > "${{ runner.temp }}/swirl-native-metadata.json"
+          python ../tools/Collect-RustDependencies.py --metadata "${{ runner.temp }}/swirl-native-metadata.json" --inventory "${{ runner.temp }}/swirl-native-notices/DEPENDENCIES.json" --notices "${{ runner.temp }}/swirl-native-notices" --supplemental-inventory DEPENDENCIES.json
+          python -c "import json,pathlib,sys; p=pathlib.Path(sys.argv[1]); source=json.loads(pathlib.Path('DEPENDENCIES.json').read_text(encoding='utf-8')); built=json.loads((p/'DEPENDENCIES.json').read_text(encoding='utf-8')); assert source==built; notices=[n for a in source['runtime_artifacts'] for n in a['notices']]+[n for a in source['packages'] for n in a.get('supplemental_notices',[])]; assert all(pathlib.Path(n).read_bytes()==(p/n).read_bytes() for n in notices)" "${{ runner.temp }}/swirl-native-notices"
+      - name: Parse Windows product staging script
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $parseTokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path ../scripts/Stage-WindowsRustProduct.ps1), [ref]$parseTokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+      - name: Lint complete affected crates
+        run: cargo clippy --locked -p swirl-tun -p swirl-platform -p swirl-dns -p swirl-transport -p swirl-protocol -p swirl-core -p swirl-api --all-targets -- -D warnings
+      - name: Packet, resolver, network transaction and original proxy regressions
+        run: cargo test --locked -p swirl-tun -p swirl-platform -p swirl-dns -p swirl-transport -p swirl-protocol -p swirl-core -p swirl-api
+      - name: Build actual Rust library and helper
+        run: cargo build --locked -p swirl-api --lib --bin swirl-tun-helper --release
+      - name: Real Wintun scoped TCP UDP and DNS smoke in this disposable VM
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $smokeIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
+          $smokePrincipal = [Security.Principal.WindowsPrincipal]::new($smokeIdentity)
+          if (-not $smokePrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            throw 'The explicitly scoped driver smoke requires an elevated disposable runner; it must not be silently skipped.'
+          }
+          $smokeArchive = Join-Path $env:RUNNER_TEMP 'wintun-0.14.1.zip'
+          Invoke-WebRequest 'https://www.wintun.net/builds/wintun-0.14.1.zip' -OutFile $smokeArchive
+          if ((Get-FileHash $smokeArchive -Algorithm SHA256).Hash -ne '07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51') {
+            throw 'Official Wintun archive hash mismatch.'
+          }
+          $smokeDirectory = Join-Path $env:RUNNER_TEMP 'swirl-wintun-smoke'
+          Expand-Archive -LiteralPath $smokeArchive -DestinationPath $smokeDirectory
+          $smokeDriver = Join-Path $smokeDirectory 'wintun/bin/amd64/wintun.dll'
+          cargo run --locked --release -p swirl-api --example windows-tun-smoke -- --disposable-network --wintun $smokeDriver 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'swirl-wintun-smoke.log')
+          if ($LASTEXITCODE -ne 0) { throw "Scoped Wintun smoke failed with exit code $LASTEXITCODE" }
+      - name: Real Windows forwarding between two owned Wintun interfaces
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $packetTests = & cargo test --locked -p swirl-api --example windows-gateway-forward-smoke 2>&1
+          $packetExit = $LASTEXITCODE
+          $packetTests | Write-Output
+          if ($packetExit -ne 0 -or (($packetTests | Out-String) -notmatch '1 passed; 0 failed; 0 ignored;')) {
+            throw 'The Gateway packet evidence test must execute and pass.'
+          }
+          $smokeDriver = Join-Path $env:RUNNER_TEMP 'swirl-wintun-smoke/wintun/bin/amd64/wintun.dll'
+          cargo run --locked --release -p swirl-api --example windows-gateway-forward-smoke -- --disposable-network --wintun $smokeDriver 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'swirl-gateway-forward-smoke.log')
+          if ($LASTEXITCODE -ne 0) { throw "Scoped Gateway forwarding smoke failed with exit code $LASTEXITCODE" }
+      - name: Preserve native backend build
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-tun-backend-${{ runner.os }}-${{ github.sha }}
+          path: |
+            core/target/release/swirl_api.dll
+            core/target/release/libswirl_api.so
+            core/target/release/swirl-tun-helper.exe
+            core/target/release/swirl-tun-helper
+            ${{ runner.temp }}/swirl-native-notices/
+            ${{ runner.temp }}/swirl-wintun-smoke.log
+            ${{ runner.temp }}/swirl-gateway-forward-smoke.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Preserve driver failure diagnostics
+        if: failure() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-tun-driver-failure-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/swirl-wintun-smoke.log
+            ${{ runner.temp }}/swirl-gateway-forward-smoke.log
+          if-no-files-found: warn
+
+  # The explicit Windows-only smoke owns one temporary adapter and only exact
+  # test-destination routes. It never changes physical DNS, firewall rules or
+  # default/capture routes. This is real driver evidence on Windows Server,
+  # separate from Windows 11 full-tunnel/application/recovery acceptance.
+  # The Gateway fixture adds two owned virtual interfaces, enables forwarding
+  # only on those interfaces and exercises actual Windows ingress/return paths.
+  # It does not establish physical LAN, DHCP or external TCP/UDP acceptance.

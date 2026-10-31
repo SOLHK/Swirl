@@ -155,6 +155,7 @@ RustCoreLibrary::inspectPortableExecutable(QByteArrayView header)
 bool RustCoreLibrary::fail(const char *stage, const char *code, const QString &message)
 {
     m_command = nullptr;
+    m_configurationV2 = false; m_lanProxy = false;
     m_importXray = nullptr;
     m_importNode = nullptr;
     m_importProfile = nullptr;
@@ -343,6 +344,10 @@ bool RustCoreLibrary::load(const QString &absolutePath)
     m_configurationV2=info.value("control_schemas").toArray().contains(2)&&info.value("config_schemas").toArray().contains(2)&&
         required.size()==3&&capabilities.size()==3&&capabilities.contains("config_transactions_v1")&&
         capabilities.contains("stable_policy_ids_v1")&&capabilities.contains("routing_tiers_v1");
+
+    m_lanProxy = m_configurationV2 && info.value("capabilities").toObject().value("optional").toObject().value("lan_proxy").toBool(false)
+        && info.value("capabilities").toObject().value("optional").toObject().value("lan_proxy_control_schema").toInt() == 1;
+    m_diagnostics["lan_proxy_available"] = m_lanProxy;
 
     // Optional ABI additions are exposed only after the same ABI/source/build
     // checks as runtime commands. A consumer fails closed if its export is absent.

@@ -1,0 +1,15 @@
+[package]
+name = "swirl-tun"
+version.workspace = true
+edition.workspace = true
+rust-version = "1.91"
+publish.workspace = true
+
+[dependencies]
+ipnet.workspace = true
+tokio.workspace = true
+ring.workspace = true
+smoltcp = { version = "=0.14.0", default-features = false, features = ["std", "medium-ip", "proto-ipv4", "proto-ipv6", "socket-tcp", "socket-udp", "async", "socket-tcp-reno", "proto-ipv4-fragmentation", "proto-ipv6-fragmentation", "reassembly-buffer-size-65536", "reassembly-buffer-count-4", "fragmentation-buffer-size-65536"] }
+
+[lints]
+workspace = true

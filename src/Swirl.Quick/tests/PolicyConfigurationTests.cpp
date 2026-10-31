@@ -281,6 +281,38 @@ private slots:
         controller.testNodes({id},QUrl("https://fixture.example.invalid"));QVERIFY(!controller.m_tests.busy());
         controller.testSelectedNode(id,QUrl("https://fixture.example.invalid"));QVERIFY(!controller.m_tests.busy());
     }
+    void lanPreferencesUseTheExistingDurableTransactionWithoutRestartingCore(){
+        QTemporaryDir dir;const auto path=dir.filePath("lan-preferences.dpapi");const QString secret="synthetic-lan-password-1234";
+        QVariantMap expected{{"listen_ip","192.168.50.1"},{"http_port",7899},{"socks_port",7899},{"udp_port_start",7900},{"udp_port_end",7915},
+            {"allowed_cidrs",QStringList{"192.168.50.0/24"}},{"max_connections",128},{"max_connections_per_client",16},{"auth_failures_per_minute",10},{"idle_timeout_secs",300}};
+        {
+            auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+            EngineController controller(std::move(peer),nullptr,path,false,std::make_unique<PolicySystemProxyBackend>());
+            QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+            controller.connectConfiguredPolicy();QVERIFY(controller.processAlive());const auto starts=engine->starts,stops=engine->stops;
+            auto candidate=controller.m_options;candidate.lanConfiguration=expected;candidate.lanUsername="swirl";candidate.lanPassword=secret;
+            QJsonObject beforePlan,afterPlan;QVERIFY(RustCoreEngine::configurationV2(controller.m_options,document(),&beforePlan).isEmpty());
+            QVERIFY(RustCoreEngine::configurationV2(candidate,document(),&afterPlan).isEmpty());QCOMPARE(beforePlan,afterPlan);
+            QVERIFY(controller.applyPolicyConfiguration(document(),candidate));QVERIFY(controller.m_options.lanPassword.isEmpty());
+            QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
+            QCOMPARE(controller.m_options.lanConfiguration,expected);QCOMPARE(controller.m_options.lanPassword,secret);
+            QCOMPARE(engine->starts,starts);QCOMPARE(engine->stops,stops);QVERIFY(controller.processAlive());QVERIFY(!controller.lanEnabled());
+            const auto stored=envelope(path);QVERIFY(!stored.contains("pending"));
+            const auto network=stored.value("committed").toObject().value("snapshot").toObject().value("networkConfiguration").toObject();
+            QCOMPARE(network.value("lanConfiguration").toObject(),QJsonObject::fromVariantMap(expected));QCOMPARE(network.value("allowLan"),QJsonValue(false));
+            QVERIFY(!network.value("lanPasswordProtected").toString().isEmpty());QVERIFY(!QJsonDocument(stored).toJson().contains(secret.toUtf8()));
+            QVERIFY(!bytes(path).contains(secret.toUtf8()));
+            const auto original=bytes(path);const auto revision=controller.savedRevision();engine->rejectPrepare=true;
+            candidate=controller.m_options;candidate.lanPassword="another-synthetic-lan-password";
+            QVERIFY(controller.applyPolicyConfiguration(document(),candidate));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+            QCOMPARE(bytes(path),original);QCOMPARE(controller.savedRevision(),revision);QCOMPARE(controller.m_options.lanPassword,secret);
+            QCOMPARE(engine->starts,starts);QCOMPARE(engine->stops,stops);QVERIFY(controller.processAlive());
+            controller.stop();
+        }
+        EngineController reopened(std::make_unique<ConfigurationPeer>(),nullptr,path,false,std::make_unique<PolicySystemProxyBackend>());
+        QCOMPARE(QJsonObject::fromVariantMap(reopened.lanConfiguration()),QJsonObject::fromVariantMap(expected));
+        QCOMPARE(reopened.m_options.lanPassword,secret);QVERIFY(!reopened.lanEnabled());
+    }
     void preparationFailureLeavesDiskAndRunningReceiptUnchanged(){
         QTemporaryDir dir;auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();EngineController controller(std::move(peer),nullptr,dir.filePath("nodes.dpapi"));
         QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);controller.connectConfiguredPolicy();QVERIFY(controller.processAlive());
