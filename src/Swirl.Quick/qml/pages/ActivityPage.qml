@@ -150,6 +150,13 @@ Item {
         color: Theme.text; font.pixelSize: Theme.fontSize(17); font.weight: Font.DemiBold
         Layout.minimumWidth: 0; elide: Text.ElideRight
     }
+    component CardChevron: SwirlIcon {
+        id: chevron
+        objectName: "activityCardChevron"
+        name: "chevron-right"; size: Theme.dp(13); color: Theme.muted
+        // Layouts round to logical pixels; keep the drawn icon exactly centered.
+        transform: Translate { y: (chevron.parent.height - chevron.height) / 2 - chevron.y }
+    }
     component Fact: RowLayout {
         id: fact
         property string caption: ""
@@ -229,7 +236,7 @@ Item {
                                 CardTitle { id: statusTitle; objectName: "activityConnectionDetails"; text: qsTr("连接状态"); Layout.fillWidth: true }
                                 SwirlStatusBadge { objectName: "activityRuntimeCapsule"; label: page.runtimeLabel; tone: page.runtimeHealthy ? "success" : page.proxyError.length ? "warning" : "neutral"; busy: page.proxyPhase === "pending" }
                                 SwirlIconButton { objectName: "activityProxyErrorDetails"; visible: page.proxyError.length > 0; Layout.preferredWidth: Theme.dp(28); Layout.preferredHeight: Theme.dp(28); iconName: "warning"; iconColor: Theme.red; quiet: true; tooltip: qsTr("查看代理错误详情"); Accessible.description: page.proxyError; onClicked: { page.errorDetailsText = page.proxyError; page.errorDetailsRequested = true } }
-                                SwirlIcon { name: "chevron-right"; size: Theme.dp(13); color: Theme.muted }
+                                CardChevron { }
                             }
                             ColumnLayout {
                                 objectName: "activityNodeSection"
@@ -268,7 +275,7 @@ Item {
                                 Layout.fillWidth: true; Layout.minimumHeight: Theme.dp(28)
                                 CardTitle { id: trafficTitle; objectName: "activityTrafficDetails"; text: qsTr("传输"); Layout.fillWidth: true }
                                 SwirlText { text: qsTr("合计 · 最近 1 分钟"); color: Theme.muted; font.pixelSize: Theme.fontSize(11) }
-                                SwirlIcon { name: "chevron-right"; size: Theme.dp(13); color: Theme.muted }
+                                CardChevron { }
                             }
                             RowLayout { objectName: "activityRateRow"; Layout.fillWidth: true; spacing: Theme.dp(12); Rate { objectName: "activityUploadRate"; caption: qsTr("上传"); value: page.telemetry.uploadRate } Rate { objectName: "activityDownloadRate"; caption: qsTr("下载"); value: page.telemetry.downloadRate } }
                             SwirlTrafficChart { subdued: true; axisFontSize: Theme.fontSize(11); id: trafficChart; objectName: "activityTrafficChart"; Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.fillHeight: true; Layout.minimumHeight: Theme.dp(110); Layout.preferredHeight: Theme.dp(110); rangeIndex: 0; series: "total"; enabled: false; updatesEnabled: page.overviewActive }
@@ -367,7 +374,7 @@ Item {
                                     Layout.fillWidth: true
                                     CardTitle { id: diagnosticTitle; objectName: "networkDiagnosticDetails"; text: qsTr("网络诊断"); Layout.fillWidth: true }
                                     SwirlIconButton { objectName: "networkDiagnosticButton"; Layout.preferredWidth: Theme.dp(28); Layout.preferredHeight: Theme.dp(28); iconName: "refresh"; quiet: true; enabled: page.telemetry.measurementState !== "正在测量"; tooltip: qsTr("重新检测网络"); onClicked: page.telemetry.measureNetwork() }
-                                    SwirlIcon { name: "chevron-right"; size: Theme.dp(13); color: Theme.muted }
+                                    CardChevron { }
                                 }
                                 RowLayout {
                                     Layout.fillWidth: true; Layout.fillHeight: true; spacing: Theme.dp(5)
@@ -398,7 +405,7 @@ Item {
                             ColumnLayout {
                                 objectName: "activityConnectionsBody"
                                 anchors.fill: parent; anchors.margins: page.cardInset; spacing: page.moduleGap
-                                RowLayout { Layout.fillWidth: true; Layout.minimumHeight: Theme.dp(28); CardTitle { id: connectionsTitle; objectName: "activityConnectionsDetails"; text: qsTr("活动连接"); Layout.fillWidth: true } SwirlIcon { name: "chevron-right"; size: Theme.dp(13); color: Theme.muted } }
+                                RowLayout { Layout.fillWidth: true; Layout.minimumHeight: Theme.dp(28); CardTitle { id: connectionsTitle; objectName: "activityConnectionsDetails"; text: qsTr("活动连接"); Layout.fillWidth: true } CardChevron { } }
                                 RowLayout {
                                     Layout.fillWidth: true; Layout.fillHeight: true; spacing: Theme.dp(7)
                                     SwirlText { objectName: "activityConnectionCount"; text: page.telemetry.connectionsSampled ? String(page.telemetry.activeConnections) : "—"; tabularFigures: true; color: Theme.text; font.pixelSize: Theme.fontSize(28); font.weight: Font.DemiBold; Layout.alignment: Qt.AlignBaseline }

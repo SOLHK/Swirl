@@ -219,6 +219,20 @@ int runActivityLayoutChecks(QQuickWindow *window, const QString &outputDirectory
             check(caseName + "-" + names[index] + "-opaque", cards[index]->property("color").value<QColor>().alpha() == 255);
             check(caseName + "-" + names[index] + "-inside-content-horizontal-edges",
                 boundsHere.left() >= -1 && boundsHere.right() <= page->width() + 1);
+            // The sources card uses its existing "view all" button instead.
+            if (names[index] != QStringLiteral("activitySourcesCard")) {
+                auto *chevron = visual(cards[index], QStringLiteral("activityCardChevron"));
+                auto *header = chevron ? chevron->parentItem() : nullptr;
+                const auto chevronBounds = chevron ? rect(chevron) : QRectF();
+                const auto headerBounds = header ? rect(header) : QRectF();
+                const qreal centerErrorPixels = std::abs(chevronBounds.center().y() - headerBounds.center().y()) * window->devicePixelRatio();
+                check(caseName + "-" + names[index] + "-chevron-centered-within-half-physical-pixel",
+                    chevron && header && centerErrorPixels <= 0.5);
+                check(caseName + "-" + names[index] + "-chevron-keeps-square-size",
+                    chevron && chevron->width() > 0 && chevron->width() == chevron->height());
+                sample.insert(names[index] + "Chevron", QJsonObject{{"bounds", rectangle(chevronBounds)},
+                    {"header", rectangle(headerBounds)}, {"centerErrorPhysicalPixels", centerErrorPixels}});
+            }
             QJsonArray clippedText;
             std::function<void(QQuickItem *)> inspectText = [&](QQuickItem *item) {
                 if (!item->isVisible() || item->opacity() <= 0) return;
