@@ -17,6 +17,7 @@
 #include "engine/SystemProxySession.h"
 #include "engine/EngineController.h"
 #include <QDateTime>
+#include <QCursor>
 #include <memory>
 #include <QTest>
 #include <QSignalSpy>
@@ -249,13 +250,19 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
     auto *policy=qobject_cast<MotionPolicy *>(qmlContext(window)->contextProperty("motionPolicy").value<QObject *>());
     check("motion-policy-present",policy!=nullptr);if(!policy)return 1;
     policy->setSystemReducedMotionOverrideForTest(0);
-    struct RestorePolicy{MotionPolicy *policy;~RestorePolicy(){policy->setSystemReducedMotionOverrideForTest(-1);}} restore{policy};
+    struct RestorePolicy{MotionPolicy *policy;QPoint cursor;~RestorePolicy(){QCursor::setPos(cursor);policy->setSystemReducedMotionOverrideForTest(-1);}} restore{policy,QCursor::pos()};
     const auto hostProxyBefore=SystemProxySession::snapshot();
     eval("Theme.reduceMotion=false;Theme.followSystemMotion=false;AppState.navigate('activity')");
     const QSize initialSize=window->size();window->resize(1100,760);window->requestActivate();
-    // Resting layout excludes the accepted hover lift. Use the same neutral
-    // pointer position as ActivityLayoutChecks within the existing settlement.
+    // Resting layout excludes hover lift. Park the native cursor as well as
+    // the Qt test pointer within the existing settlement, then restore it.
+    QCursor::setPos(window->mapToGlobal(QPoint(1,1)));
     QTest::mouseMove(window,QPoint(1,1));activityWait(650);
+    const auto parkedCursorGlobal=QCursor::pos(),parkedCursorScene=window->mapFromGlobal(parkedCursorGlobal);
+    dataSamples.append(QJsonObject{{"phase","overview-pointer-baseline"},
+        {"originalGlobal",QJsonArray{restore.cursor.x(),restore.cursor.y()}},
+        {"actualGlobal",QJsonArray{parkedCursorGlobal.x(),parkedCursorGlobal.y()}},
+        {"actualScene",QJsonArray{parkedCursorScene.x(),parkedCursorScene.y()}}});
     auto *page=activityVisual(window->contentItem(),"activityScroll");page=page?page->parentItem():nullptr;
     auto *transition=activityVisual(window->contentItem(),"activityDetailTransition");
     auto *surface=activityVisual(window->contentItem(),"activityDetailSurface");
@@ -656,14 +663,19 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
                     const double position=ancestor->property("contentY").toDouble()+text->mapToItem(ancestor,QPointF()).y();
                     ancestor->setProperty("contentY",qBound(first,position-qMax(0.0,(ancestor->height()-text->height())/2),last));
                 }
-                return text&&!visibleBounds(text).isEmpty();
+                // Visibility changes before the next layout polish assigns the
+                // wrapped label its constrained width. Wait for the existing
+                // full-readability requirement, not its natural pre-layout size.
+                const auto rect=bounds(text),visible=visibleBounds(text);
+                return !text->property("truncated").toBool()&&!visible.isEmpty()
+                    &&visible.width()+1>=rect.width();
             },1500);
             const auto rect=text?bounds(text):QRectF(),visible=text?visibleBounds(text):QRectF();
             const auto geometry=[](const QRectF &value){return QJsonObject{{"x",value.x()},{"y",value.y()},{"width",value.width()},{"height",value.height()}};};
             const bool complete=shown&&text&&!text->property("truncated").toBool()&&visible.width()+1>=rect.width();
             dataSamples.append(QJsonObject{{"phase",phase},{"expected",expected},{"model",model},
                 {"displayed",text?text->property("text").toString():QString()},{"bounds",geometry(rect)},
-                {"visibleBounds",geometry(visible)},{"fullyReadableHorizontally",complete},{"visible",shown},
+                {"visibleBounds",geometry(visible)},{"fullyReadableHorizontally",complete},{"visible",!visible.isEmpty()},{"readabilityReady",shown},
                 {"truncated",text?text->property("truncated").toBool():true},{"scopeMatches",scopeMatches},
                 {"locator",expectedSource?"selected-detail-surface-visual-tree":"named-source-selection-label"},
                 {"expectedSelectedId",expectedId},{"sourceViewport",expectedSource?expectedSource->objectName():QString()},
