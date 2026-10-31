@@ -9,8 +9,9 @@ continues to use its own listener lifecycle without requiring TUN.
 - Target `test`: `56948e4d6044154f1c5d91c6d817099d1c01a87f` when rechecked.
 - LAN PR [#46](https://github.com/SOLHK/Swirl/pull/46), dependency
   `5c3ae925528b3064a552d2a01e98d4333ca8ce04` at initial integration.
-  Subsequent integration parent `8a808c18c08187e09faeca8acaadbb707828748c`
-  includes the independent LAN DNS-target regressions and strict CI fixes.
+  Subsequent integration parent `c162e7d8697fd50ffac175f149069e36a376e2e0`
+  includes independent LAN DNS-target, configured-resolver/classification
+  regressions and the strict CI fixes. Its three-platform LAN gates passed.
 - TUN PR [#42](https://github.com/SOLHK/Swirl/pull/42), dependency
   `930c3f5fc2cbcfb99de4769c44f1682f4fc2e01d`, still Draft and unmerged.
 - TUN/test merge base: `4ad8a23b7fd59f0f8c09f1e3547548b16baaf4e9`.
@@ -77,7 +78,7 @@ The existing C ABI version stays at 1. A separate JSON envelope uses
 | --- | --- |
 | `gateway_validate` | Pure typed validation; returns `network_preflight_required: true`. |
 | `gateway_prepare` | Helper-only; validates Core handle/epoch, prepares persistent LAN isolation, starts the existing TUN, and returns an expiring preparation identity and actual helper worker PID. LAN forwarding remains off. |
-| `gateway_activate` | Helper-only; rechecks capture, topology and optional real DHCP socket ownership; enables LAN forwarding last. |
+| `gateway_activate` | Helper-only; rechecks capture, topology and optional real DHCP socket ownership; applies and verifies the owned DHCP firewall exception when needed, then enables LAN forwarding last. |
 | `gateway_status` | Actual observed state, identities, IPv4-only scope and preparation/running/recovery information. |
 | `gateway_stop` | Quiesces LAN forwarding before restoring capture/routes/DNS; removes isolation only after dependent restoration succeeds. |
 | `gateway_recover` | Helper-only; locks and quiesces all stale Gateway journals before restoring TUN journals, then removes fully owned guards. |
@@ -111,9 +112,13 @@ Clients use the existing intercepted DNS address `198.18.0.2`.
 
 Gateway `.gateway.json` and TUN `.network.json` journals stay locked under the
 existing protected helper journal directory. Journaled prefix application installs
-isolation before capture and defers LAN forwarding until activation. An operation
+isolation before capture and defers LAN forwarding until activation. DHCP-enabled
+plans use journal version 2 for the ordered isolation/exception/forwarding stages;
+existing version-1 journals remain recoverable. An operation
 is durably marked Applying before its OS mutation and checked after application.
-Stopping first restores the forwarding suffix; capture stays alive on a conflict.
+Stopping first disables forwarding and restores the exact owned DHCP exception;
+capture stays alive on a conflict. The persistent isolation guard remains until
+the dependent TUN resources have been restored.
 Recovery never resets the whole Windows network or deletes foreign VPN routes.
 
 Changed GUID/LUID, host addresses, network profile, routes, forwarding, physical
@@ -159,6 +164,27 @@ opaque socket token is not persisted or logged. A caller-supplied ready boolean
 does not satisfy activation. Native preflight performs a bounded DHCP-server
 conflict probe on the confirmed dedicated LAN before any server is attached.
 
+Socket attestation alone does not admit DHCP through Windows Firewall's default
+inbound block. A nonce-owned ordinary allow rule therefore accompanies the
+attested socket. It is restricted to the exact sibling `Swirl.exe`, the captured
+LAN interface alias and identity, Wired interface type, Private profile, UDP
+local port 67 and remote port 68. Local addresses are the gateway and the two
+applicable broadcast addresses; remote addresses are the configured allowlist
+plus the single pre-lease source `0.0.0.0/32`, never a wildcard network.
+The rule cannot override external block rules or change firewall profile/default
+settings. Activation requires matching PersistentStore and ActiveStore readback
+and local inbound-rule merging to be permitted.
+
+The transaction snapshots the full scope before applying isolation, creates the
+exception only after the actual one-use socket receipt, and rechecks the DHCP
+owner before enabling forwarding. Recovery compares the original rule name,
+owner, program, interface, profile, addresses, ports and security filters. A
+foreign edit preserves both the rule and recovery evidence. Exact removal does
+not require the original executable or LAN alias to remain available. A separate
+explicit Windows fixture creates only a disabled rule, exercises a foreign
+program edit and exact cleanup, and never starts DHCP or enables forwarding.
+Its results are tracked independently from real DHCP broadcast acceptance.
+
 The formal Qt Gateway start path remains closed. End-to-end Qt helper orchestration
 and real client DHCP broadcast/renewal tests are not yet accepted. Saving a Gateway
 configuration neither starts DHCP nor changes interface addresses or forwarding.
@@ -176,7 +202,8 @@ the ancestor LAN evidence in NATIVE_LAN_PROXY.md.
 | Source | Run | Actual observation |
 | --- | --- | --- |
 | `6101cd2bbde5d304805f15e231201de01f3b917d` | [Native LAN candidate 41193986434](https://github.com/SOLHK/Swirl/actions/runs/41193986434) | Linux/macOS strict Rust and ABI gates passed. Windows fmt/check/Clippy/workspace/LAN+Gateway ABI passed; the real UDP67 attestation/replay fixture passed. The WFP fixture failed and kept the job red. |
-| Same source | [Windows WFP job 124516336234](https://github.com/SOLHK/Swirl/actions/runs/41193986434/job/124516336234) | BFE returned `PERSISTENT | INDEXED` (`0x41`) for a requested `PERSISTENT` (`0x1`) filter. The exact flags comparison rejected the engine indexing bit. The correction accepts only that additional bit; disabled/unknown flags and all other ownership fields remain checked. Its actual fixture rerun must pass before this issue is considered closed. |
+| Same source | [Windows WFP job 124516336234](https://github.com/SOLHK/Swirl/actions/runs/41193986434/job/124516336234) | BFE returned `PERSISTENT | INDEXED` (`0x41`) for a requested `PERSISTENT` (`0x1`) filter. The exact flags comparison rejected the engine indexing bit. The correction accepts only that additional bit; disabled/unknown flags and all other ownership fields remain checked. This original failed run remains recorded. |
+| `3a42a2f62aedc9d0bfd9fd98a0ab96016e06bb6f` | [Windows WFP rerun 124520441401](https://github.com/SOLHK/Swirl/actions/runs/41195401753/job/124520441401) | Actual persistent WFP install/readback/ownership-preserving removal passed, as did actual UDP67 attestation/replay. All three platforms passed check, Clippy, workspace tests and LAN/Gateway ABI; only rustfmt failed. Its exact patch is committed in `ccd134a4`; this does not validate the subsequent DHCP firewall addition. |
 | Same source; tested merge `8b613d80063860f49c30f16f9fd9ce2016436b8f` | [Native TUN 41193989282](https://github.com/SOLHK/Swirl/actions/runs/41193989282) | Linux and Windows jobs passed. The merge tree is source-identical to the branch commit. Windows Server 2025 actually executed the Wintun TCP/UDP/DNS smoke, not just compilation. |
 
 The successful scoped Wintun run recorded 1,986 received and 1,735 sent driver
@@ -192,9 +219,10 @@ It does not exercise physical LAN ingress, LAN return-interface metadata or
 the new Gateway DHCP/WFP transaction together.
 
 The additive candidate CI runs all requested locked workspace gates, independent
-LAN/Gateway ctypes checks, and two explicitly scoped Windows fixtures: persistent
+LAN/Gateway ctypes checks, and three explicitly scoped Windows fixtures: persistent
 WFP install/readback/ownership-preserving removal on absent synthetic interface
-IDs, and loopback UDP67 socket attestation. The existing isolated TUN workflow
+IDs, loopback UDP67 socket attestation, and disabled DHCP firewall ownership and
+foreign-edit preservation. The existing isolated TUN workflow
 retains its real scoped Wintun TCP/UDP/DNS smoke. No original test gate is removed.
 
 Still required: actual LAN NIC ingress and return packets, independent Windows 11

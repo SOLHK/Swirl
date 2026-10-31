@@ -241,7 +241,7 @@ impl WindowsNetworkBackend {
     }
 
     fn check_resource(&self, resource: &Resource) -> io::Result<()> {
-        if matches!(resource, Resource::GatewayIsolation { .. }) {
+        if matches!(resource, Resource::GatewayIsolation { .. } | Resource::GatewayDhcpFirewall { .. }) {
             return Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
                 "physical gateway isolation requires its dedicated backend",

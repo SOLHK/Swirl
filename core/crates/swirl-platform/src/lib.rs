@@ -20,6 +20,8 @@ mod windows_command;
 #[cfg(windows)]
 pub mod windows_gateway;
 #[cfg(windows)]
+mod windows_gateway_firewall;
+#[cfg(windows)]
 pub mod windows_network;
 #[cfg(windows)]
 mod windows_notify;

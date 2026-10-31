@@ -191,9 +191,21 @@ impl GatewayState {
             (false, Some(_)) => return Err("GatewayUnexpectedDhcpAttachment"),
             (false, None) => {}
         }
-        // The previous isolation stage remains owned if forwarding activation
-        // fails. The enclosing Active scope quiesces it before restoring TUN.
-        transaction::apply_prefix(&mut self.backend, &mut self.store, &mut self.journal, 2)
+        if self.policy.dhcp {
+            // A real socket receipt precedes the exception. If the owner exits
+            // during this write, forwarding remains disabled and the enclosing
+            // coordinator restores the exact owned exception before TUN.
+            transaction::apply_prefix(&mut self.backend, &mut self.store, &mut self.journal, 2)
+                .map_err(|_| "GatewayDhcpFirewallApplyFailed")?;
+            let attachment = dhcp.as_ref().ok_or("GatewayDhcpAttachmentRequired")?;
+            windows_gateway::verify_dhcp_attachment(&self.policy, attachment.owner_pid, &attachment.owner_creation)
+                .map_err(|_| "GatewayDhcpAttachmentLost")?;
+        }
+        // Earlier stages remain owned if forwarding activation fails. Reverse
+        // recovery disables forwarding, removes the owned DHCP exception, then
+        // allows TUN teardown while persistent WFP isolation remains installed.
+        let through = self.journal.changes.len();
+        transaction::apply_prefix(&mut self.backend, &mut self.store, &mut self.journal, through)
             .map_err(|_| "GatewayForwardingApplyFailed")?;
         self.forwarding = true;
         windows_gateway::verify(&self.policy, true).map_err(|_| "GatewayActivationChanged")?;
@@ -287,6 +299,7 @@ impl GatewayState {
             "preparation_id":if !self.forwarding && !self.restored { Some(&self.policy.owner) } else { None },
             "preparation_expires_in_ms":PREPARATION_WINDOW.saturating_sub(self.prepared_at.elapsed()).as_millis(),
             "dhcp_required":self.policy.dhcp,"dhcp_attachment_verified":self.dhcp.is_some(),
+            "dhcp_firewall_observed":self.journal.changes.iter().any(|change| matches!(change.resource, Resource::GatewayDhcpFirewall { .. }) && change.state == transaction::ChangeState::Applied),
             "journal_restored":self.restored,"observation_scope":"last_successful_readback",
             "automatic_restart":false})
     }

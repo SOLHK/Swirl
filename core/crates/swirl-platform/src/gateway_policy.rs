@@ -170,6 +170,85 @@ impl GatewayIsolationPolicy {
     }
 }
 
+/// The exact, independently recoverable Windows Firewall exception for the
+/// attested Qt DHCP socket. An ordinary allow rule still respects external
+/// block rules. The interface alias is captured together with its GUID/index;
+/// aliases and the executable path are never patterns or executable text.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GatewayDhcpFirewallScope {
+    pub owner: String,
+    pub lan: InterfaceIdentity,
+    pub interface_alias: String,
+    pub program: String,
+    pub gateway: Ipv4Addr,
+    pub subnet: Ipv4Net,
+    pub allowed_sources: Vec<Ipv4Net>,
+    pub enabled: bool,
+}
+
+impl GatewayDhcpFirewallScope {
+    pub fn name(&self) -> String {
+        format!("Swirl.NativeGateway.DHCP.{}.{}", self.lan.guid, self.owner)
+    }
+
+    pub fn validate(&self) -> io::Result<()> {
+        GatewayRequest {
+            lan: self.lan.clone(),
+            subnet: self.subnet,
+            gateway: self.gateway,
+            allowed_sources: self.allowed_sources.clone(),
+            dedicated_lan_confirmed: true,
+            dhcp: true,
+        }
+        .validate()?;
+        let path = self.program.as_bytes();
+        if self.owner.len() != 32
+            || !self.owner.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            || self.interface_alias.is_empty()
+            || self.interface_alias.encode_utf16().count() > 256
+            || self.interface_alias.contains(['\0', '*', '?', '[', ']', '`'])
+            || path.len() < 12
+            || self.program.encode_utf16().count() > 32767
+            || !path[0].is_ascii_alphabetic()
+            || path[1..3] != *b":\\"
+            || self.program.contains(['\0', '\r', '\n', '*', '?', '"', '%', '/'])
+            || self.program[2..].contains(':')
+            || self.program.split('\\').skip(1).any(|part| part.is_empty() || part.ends_with(['.', ' ']))
+            || !self.program.rsplit('\\').next().is_some_and(|name| name.eq_ignore_ascii_case("Swirl.exe"))
+        {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid gateway DHCP firewall scope"));
+        }
+        Ok(())
+    }
+
+    pub fn matches_policy(&self, policy: &GatewayIsolationPolicy) -> bool {
+        policy.dhcp
+            && self.owner == policy.owner
+            && self.lan == policy.lan
+            && self.gateway == policy.gateway
+            && self.subnet == policy.subnet
+            && self.allowed_sources == policy.allowed_sources
+    }
+
+    pub fn local_addresses(&self) -> Vec<Ipv4Addr> {
+        let mut addresses = vec![self.gateway, self.subnet.broadcast(), Ipv4Addr::BROADCAST];
+        addresses.sort();
+        addresses.dedup();
+        addresses
+    }
+
+    pub fn remote_addresses(&self) -> Vec<Ipv4Net> {
+        let mut addresses = self.allowed_sources.clone();
+        // A client with no lease legitimately sends DHCP from 0.0.0.0.
+        // This is one host, never the IPv4 default route /0.
+        addresses.push(Ipv4Net::new(Ipv4Addr::UNSPECIFIED, 32).expect("IPv4 host prefix"));
+        addresses.sort();
+        addresses.dedup();
+        addresses
+    }
+}
+
 #[cfg(test)]
 pub(crate) fn fixture() -> GatewayIsolationPolicy {
     GatewayIsolationPolicy {
@@ -193,6 +272,43 @@ pub(crate) fn fixture() -> GatewayIsolationPolicy {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dhcp_firewall_scope_is_specific_and_rejects_program_or_interface_patterns() {
+        let policy = fixture();
+        let scope = GatewayDhcpFirewallScope {
+            owner: policy.owner.clone(),
+            lan: policy.lan.clone(),
+            interface_alias: "Dedicated LAN".into(),
+            program: r"C:\Program Files\Swirl\Swirl.exe".into(),
+            gateway: policy.gateway,
+            subnet: policy.subnet,
+            allowed_sources: policy.allowed_sources.clone(),
+            enabled: true,
+        };
+        scope.validate().unwrap();
+        assert_eq!(scope.local_addresses(), ["192.168.77.1", "192.168.77.255", "255.255.255.255"].map(|ip| ip.parse::<Ipv4Addr>().unwrap()));
+        let remote = scope.remote_addresses();
+        assert!(remote.iter().any(|net| net.contains(&Ipv4Addr::UNSPECIFIED)));
+        assert!(remote.iter().any(|net| net.contains(&Ipv4Addr::new(192,168,77,20))));
+        for address in [Ipv4Addr::new(192,168,77,200), Ipv4Addr::new(203,0,113,8), Ipv4Addr::new(127,0,0,1)] {
+            assert!(!remote.iter().any(|net| net.contains(&address)));
+        }
+        for program in [r"Swirl.exe", r"\\host\share\Swirl.exe", r"C:\*\Swirl.exe", r"C:\%TEMP%\Swirl.exe", r"C:\Swirl\..\Swirl.exe", r"C:\Swirl\Swirl.exe:stream", r"C:\Swirl\Other.exe"] {
+            let mut changed = scope.clone();
+            changed.program = program.into();
+            assert!(changed.validate().is_err(), "program {program}");
+        }
+        let mut changed = scope.clone();
+        changed.interface_alias = "Ethernet*".into();
+        assert!(changed.validate().is_err());
+        assert!(!scope.matches_policy(&policy), "disabled DHCP cannot acquire an exception");
+        let mut dhcp_policy = policy;
+        dhcp_policy.dhcp = true;
+        assert!(scope.matches_policy(&dhcp_policy));
+        dhcp_policy.owner = "b".repeat(32);
+        assert!(!scope.matches_policy(&dhcp_policy));
+    }
 
     #[test]
     fn forwarding_is_confined_to_authorized_clients_and_tun() {

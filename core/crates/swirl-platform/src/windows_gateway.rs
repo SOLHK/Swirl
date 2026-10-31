@@ -7,6 +7,7 @@ use crate::{
     gateway_policy::GatewayIsolationPolicy,
     network_transaction::{InterfaceIdentity, NetworkBackend, Resource, Value, validate_value},
     windows_dhcp_attachment, windows_dhcp_probe,
+    windows_gateway_firewall,
     windows_network::{SystemRoute, run_json},
     windows_wfp,
 };
@@ -93,6 +94,9 @@ pub fn verify(policy: &GatewayIsolationPolicy, forwarding_expected: bool) -> io:
             "host address inventory changed; gateway requires a fresh preparation",
         ));
     }
+    if forwarding_expected && policy.dhcp {
+        windows_gateway_firewall::verify(policy)?;
+    }
     Ok(())
 }
 
@@ -148,11 +152,7 @@ pub fn verify_dhcp_attachment(
             "invalid DHCP process attachment",
         ));
     }
-    let executable = std::env::current_exe()?;
-    let parent = executable
-        .parent()
-        .ok_or_else(|| io::Error::other("helper installation path is unavailable"))?;
-    let expected_image = parent.join("Swirl.exe").canonicalize()?;
+    let expected_image = windows_gateway_firewall::installed_dhcp_image()?;
     let verified: bool = run_json(
         DHCP_ATTACHMENT,
         &json!({
@@ -192,7 +192,7 @@ pub fn desired_resources(
     policy: &GatewayIsolationPolicy,
 ) -> io::Result<Vec<(Resource, Option<Value>)>> {
     policy.validate()?;
-    Ok(vec![
+    let mut resources = vec![
         (
             Resource::GatewayIsolation {
                 name: policy.name(),
@@ -201,11 +201,16 @@ pub fn desired_resources(
                 policy: policy.clone(),
             }),
         ),
-        (
-            Resource::Forwarding { ipv6: false },
-            Some(Value::Forwarding { enabled: true }),
-        ),
-    ])
+    ];
+    if policy.dhcp {
+        let scope = windows_gateway_firewall::scope(policy)?;
+        resources.push((
+            Resource::GatewayDhcpFirewall { name: scope.name() },
+            Some(Value::GatewayDhcpFirewall { scope }),
+        ));
+    }
+    resources.push((Resource::Forwarding { ipv6: false }, Some(Value::Forwarding { enabled: true })));
+    Ok(resources)
 }
 
 pub struct WindowsGatewayBackend {
@@ -222,7 +227,7 @@ impl WindowsGatewayBackend {
         if interface != &self.policy.lan
             || !matches!(
                 resource,
-                Resource::Forwarding { ipv6: false } | Resource::GatewayIsolation { .. }
+                Resource::Forwarding { ipv6: false } | Resource::GatewayIsolation { .. } | Resource::GatewayDhcpFirewall { .. }
             )
         {
             return Err(io::Error::new(
@@ -237,6 +242,11 @@ impl WindowsGatewayBackend {
                 io::ErrorKind::PermissionDenied,
                 "gateway guard ownership mismatch",
             ));
+        }
+        if let Resource::GatewayDhcpFirewall { name } = resource
+            && (!self.policy.dhcp || name != &format!("Swirl.NativeGateway.DHCP.{}.{}", self.policy.lan.guid, self.policy.owner))
+        {
+            return Err(io::Error::new(io::ErrorKind::PermissionDenied, "gateway DHCP firewall ownership mismatch"));
         }
         Ok(())
     }
@@ -254,6 +264,7 @@ impl NetworkBackend for WindowsGatewayBackend {
                     policy: self.policy.clone(),
                 },
             )),
+            Resource::GatewayDhcpFirewall { .. } => Ok(windows_gateway_firewall::read(&self.policy)?.map(|scope| Value::GatewayDhcpFirewall { scope })),
             Resource::Forwarding { .. } => {
                 run_json(FORWARDING, &json!({"mode":"read","policy":self.policy}))
             }
@@ -277,6 +288,30 @@ impl NetworkBackend for WindowsGatewayBackend {
             ));
         }
         match resource {
+            Resource::GatewayDhcpFirewall { .. } => {
+                let expected = match expected {
+                    Some(Value::GatewayDhcpFirewall { scope }) => Some(scope.clone()),
+                    None => None,
+                    _ => unreachable!("validated DHCP firewall value"),
+                };
+                let desired = match desired {
+                    Some(Value::GatewayDhcpFirewall { scope }) if scope.enabled => Some(scope.clone()),
+                    None => None,
+                    _ => return Err(io::Error::new(io::ErrorKind::PermissionDenied, "runtime DHCP exception must be enabled")),
+                };
+                // The coordinator calls this only after socket attestation.
+                // Verify that isolation still exists and forwarding is still
+                // disabled before creating the ordinary inbound exception.
+                if desired.is_some() {
+                    verify(&self.policy, false)?;
+                } else {
+                    let forwarding: Option<Value> = run_json(FORWARDING, &json!({"mode":"read","policy":self.policy}))?;
+                    if !matches!(forwarding, None | Some(Value::Forwarding { enabled: false })) {
+                        return Err(io::Error::other("LAN forwarding must be quiesced before restoring its DHCP exception"));
+                    }
+                }
+                windows_gateway_firewall::compare_exchange(&self.policy, &expected, &desired)?;
+            }
             Resource::GatewayIsolation { .. } => match (expected, desired) {
                 (None, Some(Value::GatewayIsolation { policy })) if policy == &self.policy => {
                     windows_wfp::install(policy)?
@@ -294,6 +329,9 @@ impl NetworkBackend for WindowsGatewayBackend {
                         return Err(io::Error::other(
                             "LAN forwarding is enabled; gateway isolation retained",
                         ));
+                    }
+                    if self.policy.dhcp && windows_gateway_firewall::read(&self.policy)?.is_some() {
+                        return Err(io::Error::other("DHCP exception still exists; gateway isolation retained"));
                     }
                     windows_wfp::remove(policy)?;
                 }
@@ -316,6 +354,9 @@ impl NetworkBackend for WindowsGatewayBackend {
                     // write. A missing TUN or externally removed guard denies
                     // activation; recovery can always turn forwarding off.
                     verify(&self.policy, false)?;
+                    if self.policy.dhcp {
+                        windows_gateway_firewall::verify(&self.policy)?;
+                    }
                 }
                 let actual: Option<Value> = run_json(FORWARDING, &json!({"mode":"compare_exchange","policy":self.policy,"expected":expected,"desired":desired})).map_err(|error| {
                     if error.to_string().starts_with("Windows network operation failed: Forwarding changed after snapshot; refusing overwrite") {
