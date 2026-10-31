@@ -80,6 +80,7 @@
 #include "tests/HeroChecks.h"
 #include "tests/NavigationChecks.h"
 #include "tests/AppearanceChecks.h"
+#include "tests/ActivityPerfTrace.h"
 #include <QSslSocket>
 #endif
 #include "app/SystemDataProvider.h"
@@ -94,6 +95,15 @@
 #include "engine/EngineController.h"
 
 #ifdef SWIRL_UI_TESTS
+class SwirlTestApplication final : public QGuiApplication {
+public:
+    using QGuiApplication::QGuiApplication;
+    bool notify(QObject *receiver,QEvent *event) override {
+        ActivityPerfTrace::DispatchScope dispatch(int(event->type()));
+        return QGuiApplication::notify(receiver,event);
+    }
+};
+
 static void recordQmlCreationLifecycle(QQmlApplicationEngine &engine, const char *phase)
 {
     // The public controller counts incubators, while the engine also counts
@@ -226,7 +236,11 @@ int main(int argc, char *argv[])
     QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
     QQuickWindow::setDefaultAlphaBuffer(true);
     QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
+#ifdef SWIRL_UI_TESTS
+    SwirlTestApplication app(argc, argv);
+#else
     QGuiApplication app(argc, argv);
+#endif
     app.setApplicationName(QStringLiteral("Swirl"));
     app.setOrganizationName(QStringLiteral("SOLHK"));
     app.setOrganizationDomain(QStringLiteral("solhk.dev"));

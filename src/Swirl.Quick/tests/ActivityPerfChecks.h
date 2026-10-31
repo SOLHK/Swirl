@@ -3,6 +3,7 @@
 #include <cmath>
 #include <vector>
 #include <QDateTime>
+#include <QCursor>
 
 static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
     struct Frame {qint64 ns=0;double progress=0;int phase=-1,cycle=-1,kind=0,destination=-1,visibility=0;bool moving=false,opened=false,active=false,exposed=false,visible=false;};
@@ -34,9 +35,14 @@ static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
     if(!controller||!policy)return 2;
     const auto proxyBefore=SystemProxySession::snapshot();
     policy->setSystemReducedMotionOverrideForTest(0);
-    struct RestorePolicy {MotionPolicy *policy;~RestorePolicy(){policy->setSystemReducedMotionOverrideForTest(-1);}} restore{policy};
+    struct RestorePolicy {MotionPolicy *policy;QPoint cursor;~RestorePolicy(){QCursor::setPos(cursor);policy->setSystemReducedMotionOverrideForTest(-1);}} restore{policy,QCursor::pos()};
     eval(window,"Theme.mode='Light';Theme.reduceMotion=false;Theme.followSystemMotion=false;SwirlMotion.speed=1;AppState.navigate('activity')");
-    window->resize(1100,760);window->requestActivate();activityWait(550);
+    window->resize(1100,760);window->requestActivate();
+    const QPoint neutralCursorScene(2,2);
+    const QPoint neutralCursorGlobal=window->mapToGlobal(neutralCursorScene);
+    QCursor::setPos(neutralCursorGlobal);
+    QTest::mouseMove(window,neutralCursorScene,0);
+    activityWait(550);
     auto *transition=activityVisual(window->contentItem(),"activityDetailTransition");
     if(!transition)return 2;
     QObject *clock=nullptr;for(auto *candidate:transition->findChildren<QObject *>(QString(),Qt::FindDirectChildrenOnly))if(candidate->metaObject()->indexOfProperty("retargeting")>=0){clock=candidate;break;}
@@ -77,6 +83,8 @@ static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
     // Installing the nullable observer can reevaluate a QML binding. Use the
     // existing final warmup wait before arming either measurement collector.
     fixture.connectionsAt=fixture.trafficAt=QDateTime::currentMSecsSinceEpoch();telemetry->ingest(fixture);activityWait(350);
+    const QPoint parkedCursorGlobal=QCursor::pos();
+    const QPoint parkedCursorScene=window->mapFromGlobal(parkedCursorGlobal);
     const QStringList tableNames={"activitySourcesTable","connectionTable","activityTransferHistoryTable","trafficRankingTable"};
     std::array<QQuickItem *,4> tables{};std::array<int,4> rowChanges{},projections{};
     std::vector<std::unique_ptr<RouteBenchSignalTap>> taps;
@@ -201,7 +209,12 @@ static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
             &&observation.effectiveOpacity>0&&observation.visibleRect.width()>0&&observation.visibleRect.height()>0;
         const double first=scrollViewport->property("originY").toDouble();
         const double last=first+qMax(0.0,scrollViewport->property("contentHeight").toDouble()-scrollViewport->height());
-        observation.requested=qBound(first,observation.before+((scrollTick++/18)%2?-80:80),last);
+        const double step=(scrollTick++/18)%2?-80:80;
+        observation.requested=qBound(first,observation.before+step,last);
+        // Preserve the original direction cadence while making a boundary-
+        // clamped input travel back into the live viewport instead of no move.
+        if(observation.requested==observation.before&&last>first)
+            observation.requested=qBound(first,observation.before-step,last);
         // Details remain live and clipped during travel. Model projection and
         // new input are deliberately paused; do not scroll a hidden viewport.
         if(observation.presented)tables[1]->setProperty("scrollPosition",observation.requested);
@@ -317,6 +330,21 @@ static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
         {"chronological",guiChronological},{"balanced",stagesBalanced},{"unclosedBegins",qint64(pendingStages.size())},{"unmatchedEnds",unmatchedStageEnds},
         {"collectorTotalNs",guiCollectorTotalNs},{"collectorMaxNs",guiCollectorMaxNs},{"coverage",stageCoverage},{"marks",guiMarks},
         {"method","GUI boundary marks share the original elapsed epoch. Nested durations are inclusive and must not be summed. Deferred marks cover execution, not queue waiting. Stage 12 measures native connection copying/sorting before return; QVariant-to-JavaScript conversion is outside it. Collector costs are lower bounds excluding QML/native dispatch and return; observation overhead is nonzero."}};
+    QJsonArray dispatchEvents;qint64 maxDispatchNs=0,maxCompletedDispatchNs=0;int incompleteDispatches=0;
+    for(size_t index=0;index<guiTrace.dispatchCount();++index){
+        const auto &sample=guiTrace.dispatches()[index];
+        maxDispatchNs=qMax(maxDispatchNs,sample.durationNs);
+        if(sample.complete)maxCompletedDispatchNs=qMax(maxCompletedDispatchNs,sample.durationNs);else ++incompleteDispatches;
+        dispatchEvents.append(QJsonObject{{"type",sample.type},{"startMs",sample.startedNs/1000000.0},
+            {"durationMs",sample.durationNs/1000000.0},{"complete",sample.complete}});
+    }
+    check("gui-event-dispatch-trace-is-present-and-fits-fixed-buffer",guiTrace.dispatchCount()>0&&!guiTrace.dispatchOverflow()&&guiTrace.dispatchDropped()==0);
+    QJsonObject dispatchTraceJson{{"schema",1},{"armedMs",guiTrace.armedNs()/1000000.0},{"stoppedMs",guiTrace.stoppedNs()/1000000.0},
+        {"capacity",qint64(guiTrace.dispatches().size())},{"count",qint64(guiTrace.dispatchCount())},
+        {"overflow",guiTrace.dispatchOverflow()},{"droppedEvents",qint64(guiTrace.dispatchDropped())},
+        {"incompleteEvents",incompleteDispatches},{"maxObservedDurationMs",maxDispatchNs/1000000.0},
+        {"maxCompletedDurationMs",maxCompletedDispatchNs/1000000.0},{"events",dispatchEvents},
+        {"method","All outermost GUI notify dispatches beginning while armed share the original GUI/render elapsed epoch. Nested notify calls are included in their outer dispatch. Incomplete dispatches are retained through disarm as duration lower bounds. No receiver/event is read after base notify; event type is captured before dispatch. No timer or wakeup is added. Direct work outside notify remains covered separately by the GUI stage trace. Observer overhead is nonzero; dispatch duration is not physical scan-out or an idle frame interval."}};
     const QStringList renderNames={"beforeFrameBegin","beforeSynchronizing","afterSynchronizing","beforeRendering","afterRendering","frameSwapped","afterFrameEnd"};
     std::array<int,7> renderCounts{};QJsonArray renderEvents,renderCoverage;
     qint64 previousRenderNs=-1,renderCollectorTotalNs=0,renderCollectorMaxNs=0;
@@ -353,6 +381,13 @@ static int runActivityPerfChecks(QQuickWindow *window,const QString &output) {
         {"method","Direct QQuickWindow signal entry timestamps share the original elapsed epoch and read no GUI/QML state. Phase/frame labels are derived only after disarm and disconnect; every orphan, partial and duplicate is retained. frameSwapped is a Qt callback, not physical scan-out. Collector costs include mutex acquisition but exclude final unlock/Qt dispatch and are lower bounds; existing queued GUI frames remain a separate stream."}};
     QJsonObject report{{"rows",rowCount},{"checks",checks},{"failures",failures},{"qt",qVersion()},{"renderer",int(window->rendererInterface()->graphicsApi())},{"dpr",window->devicePixelRatio()},{"refreshHz",window->screen()?window->screen()->refreshRate():0},{"phases",phaseJson},{"frames",rawFrames},{"updates",updates},{"realUpdates",realUpdateCount},{"identicalHeartbeats",heartbeatCount},{"scrolling",scrolling},{"tableNames",QJsonArray::fromStringList(tableNames)},{"finalResources",resourceJson(finalResources)},{"methods",QJsonArray{"Same deterministic authenticated-adapter-shaped records enter the actual isolated TelemetryService, without starting a proxy or network engine.","500ms pulses alternate two real byte/timestamp changes with one identical heartbeat. Fixture preparation and ingestion durations, monotonic observation timestamps and actual service revisions are recorded separately.","Frame completion callbacks capture GUI-side motion/exposure context; they are not exact render-time or hardware-presentation observations. Every observed frame/event remains in the raw record.","Quiet/static phases and active transitions must be analyzed separately, retaining boundaries and inactive/exposure changes.","The existing connection-detail return runs with the scroll and data timers still active. Scroll observations require a live list viewport with positive effective opacity and a positive intersection through every ancestor clip and the native window; hidden lists are not scrolled. These are GUI-state observations, not hardware-presentation measurements.","Detail model projection and new input intentionally pause during transition. Continued visible scrolling does not require a model refresh or a 500ms data pulse inside the shorter return animation; real ingestion is asserted in the preceding sustained live phase.","Frame, update and scroll storage is fixed and initialized before measurement. JSON serialization and screenshots are excluded from timing. Model row notifications/projection signals are counted without per-event allocation.","CPU is process user+kernel time, expressed as a percentage of one CPU core; private commit and working set are separate. Finite measurements are not unlimited leak proof."}}};
     report.insert("guiStageTrace",guiTraceJson);report.insert("renderTrace",renderTraceJson);
+    report.insert("guiEventDispatchTrace",dispatchTraceJson);
+    report.insert("pointer",QJsonObject{{"originalGlobal",QJsonArray{restore.cursor.x(),restore.cursor.y()}},
+        {"requestedScene",QJsonArray{neutralCursorScene.x(),neutralCursorScene.y()}},
+        {"requestedGlobal",QJsonArray{neutralCursorGlobal.x(),neutralCursorGlobal.y()}},
+        {"parkedGlobal",QJsonArray{parkedCursorGlobal.x(),parkedCursorGlobal.y()}},
+        {"parkedScene",QJsonArray{parkedCursorScene.x(),parkedCursorScene.y()}},
+        {"method","Native QCursor and Qt mouse move park at neutral (2,2) before the existing warmup. Actual Qt global/scene coordinates are sampled after the final existing warmup, before measurement; original global position is restored on every exit. Coordinate pairs are [x,y]."}});
     report.insert("ingestionSplitMethod","Accounting excludes synchronous publish intervals; publish includes synchronous signal fan-out. Both are measured by the test-compiled TelemetryService. The existing outer ingest duration also includes profiler completion/property recording.");
     QDir().mkpath(QFileInfo(output).absolutePath());QFile file(output);if(!file.open(QIODevice::WriteOnly))return 2;file.write(QJsonDocument(report).toJson());
     qInfo()<<"ACTIVITY_PERF_RESULT"<<rowCount<<failures<<"updates"<<updateCount<<"frames"<<frameCount;return failures?1:0;

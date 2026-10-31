@@ -1,4 +1,5 @@
 #include "AppearanceChecks.h"
+#include "app/SwirlPressClock.h"
 #include <QQuickWindow>
 #include <QQuickItem>
 #include <QQuickItemGrabResult>
@@ -19,6 +20,7 @@
 #include <QFontDatabase>
 #include <QCursor>
 #include <QMouseEvent>
+#include <QKeyEvent>
 #include <QElapsedTimer>
 #include <QDateTime>
 #include <QFileInfo>
@@ -453,8 +455,7 @@ Item {
                             presented->armed=false;
                             presentedFrames=presented->frames;
                         }
-                        QObject::disconnect(pressFrameBegin);QObject::disconnect(pressSync);QObject::disconnect(pressGeometry);QObject::disconnect(pressRenderStart);
-                        QObject::disconnect(pressRenderEnd);QObject::disconnect(pressSwap);
+
                         check(pressDelivered&&pressDown,"same-stack timed press reaches the actual control");
                         bool contractedWithin40ms=false;
                         bool submittedGeometryPresent=!presentedFrames.isEmpty();
@@ -486,6 +487,122 @@ Item {
                         check(paint->scale()<.999,"release continues from the pressed frame through a spring return");
                         check(releaseDelivered&&released,"same-stack timed release reaches the actual control");
                         check(QTest::qWaitFor([&]{return qAbs(paint->scale()-1)<.001;},1400),"released button springs back to its resting scale");
+                        if(theme=="Light" && name=="reviewButton"){
+                            SwirlPressClock *nativeClock=nullptr;
+                            for(auto *candidate:control->findChildren<SwirlPressClock *>())
+                                if(candidate->surfaceTarget()==paint && candidate->contentTarget()==content)nativeClock=candidate;
+                            check(nativeClock!=nullptr,"ordinary review button owns its production native press clock");
+                            if(nativeClock){
+                                const auto armNative=[&]{
+                                    QMutexLocker lock(&presented->mutex);
+                                    presented->start=std::chrono::steady_clock::now();
+                                    presented->frames=QJsonArray();presented->pending=false;
+                                    presented->latestFrameBeginMs=-1;presented->inputDown=true;presented->armed=true;
+                                };
+                                const auto submittedContraction=[&]{
+                                    QMutexLocker lock(&presented->mutex);
+                                    for(const auto &entry:presented->frames){const auto frame=entry.toObject();
+                                        if(frame.value("geometryValid").toBool() && frame.value("surfaceScale").toDouble()<.995
+                                            && frame.value("surfaceScaleY").toDouble()<.995
+                                            && qAbs(frame.value("surfaceScaleY").toDouble()-frame.value("contentScaleY").toDouble())<.001
+                                            && frame.value("swappedMs").toDouble()<=40
+                                            && qAbs(frame.value("surfaceScale").toDouble()-frame.value("contentScale").toDouble())<.001)
+                                            return true;
+                                    }
+                                    return false;
+                                };
+                                const auto adoptedScale=[&]{
+                                    QMutexLocker lock(&presented->mutex);
+                                    return QPointF(presented->surfaceScale,presented->contentScale);
+                                };
+                                const auto sendMouse=[&](QEvent::Type type){
+                                    QMouseEvent event(type,QPointF(at),globalAt,Qt::LeftButton,
+                                        type==QEvent::MouseButtonPress?Qt::LeftButton:Qt::NoButton,Qt::NoModifier);
+                                    return QCoreApplication::sendEvent(window,&event);
+                                };
+                                armNative();pressDeadline.start(40);sendMouse(QEvent::MouseButtonPress);pressObservation.exec();
+                                check(submittedContraction(),"native reversal fixture observes a submitted paired contraction within the first40ms");
+                                // These values came from existing SG nodes after sync. The
+                                // same-stack release must hand off that adopted pose to
+                                // the GUI spring, rather than the earlier GUI clock value.
+                                const auto adopted=adoptedScale();sendMouse(QEvent::MouseButtonRelease);
+                                check(qAbs(paint->scale()-adopted.x())<.001 && qAbs(content->scale()-adopted.y())<.001,
+                                    "native press release starts its spring from the actual adopted paired geometry");
+                                // Deliver re-press during a real GUI spring update that
+                                // has not yet reached the scene graph. The previous node
+                                // matrices remain the visual origin for this reversal.
+                                QPointF springOrigin;
+                                bool reversedSpring=false,repressContinuous=false;
+                                QEventLoop reversalObservation;
+                                QTimer reversalBudget,repressDeadline;
+                                reversalBudget.setSingleShot(true);repressDeadline.setSingleShot(true);
+                                repressDeadline.setTimerType(Qt::PreciseTimer);
+                                QObject::connect(&reversalBudget,&QTimer::timeout,&reversalObservation,&QEventLoop::quit);
+                                QObject::connect(&repressDeadline,&QTimer::timeout,&reversalObservation,&QEventLoop::quit);
+                                const auto reverseSpring=QObject::connect(window,&QQuickWindow::afterAnimating,&pressContext,[&]{
+                                    if(reversedSpring)return;
+                                    const auto actual=adoptedScale();const auto gui=paint->scale();
+                                    if(actual.x()<=.983 || gui>=.999 || qAbs(gui-actual.x())<.0001)return;
+                                    springOrigin=actual;armNative();repressDeadline.start(40);
+                                    sendMouse(QEvent::MouseButtonPress);reversedSpring=true;
+                                    repressContinuous=qAbs(paint->scale()-springOrigin.x())<.001
+                                        && qAbs(content->scale()-springOrigin.y())<.001;
+                                });
+                                reversalBudget.start(1400);reversalObservation.exec();reversalBudget.stop();repressDeadline.stop();
+                                QObject::disconnect(reverseSpring);
+                                QJsonArray reverseFrames;
+                                {QMutexLocker lock(&presented->mutex);reverseFrames=presented->frames;}
+                                bool firstRepressContinuous=false;
+                                if(!reverseFrames.isEmpty()){
+                                    const auto first=reverseFrames.first().toObject();
+                                    firstRepressContinuous=first.value("swappedMs").toDouble()<=40
+                                        && first.value("geometryValid").toBool()
+                                        && first.value("surfaceScale").toDouble()<=springOrigin.x()+.001
+                                        && first.value("contentScale").toDouble()<=springOrigin.y()+.001
+                                        && first.value("surfaceScaleY").toDouble()<=springOrigin.x()+.001
+                                        && first.value("contentScaleY").toDouble()<=springOrigin.y()+.001
+                                        && qAbs(first.value("surfaceScaleY").toDouble()-first.value("contentScaleY").toDouble())<.001
+                                        && qAbs(first.value("surfaceScale").toDouble()-first.value("contentScale").toDouble())<.001;
+                            }
+                            qInfo().noquote()<<"NATIVE_PRESS_SPRING_REVERSAL"<<QJsonDocument(QJsonObject{
+                                {"exercised",reversedSpring},{"sameStackContinuous",repressContinuous},
+                                {"adoptedSurfaceBefore",springOrigin.x()},{"adoptedContentBefore",springOrigin.y()},
+                                {"submittedFrames",reverseFrames}}).toJson(QJsonDocument::Compact);
+                            check(reversedSpring && repressContinuous,"re-press reverses from the actual adopted spring pose in the input stack");
+                            check(reversedSpring && firstRepressContinuous,"the first submitted re-press preserves adopted geometry within40ms");
+                            sendMouse(QEvent::MouseButtonRelease);
+                            check(QTest::qWaitFor([&]{return !nativeClock->running() && qAbs(paint->scale()-1)<.001;},1400),
+                                "native release retires its clock and settles normally");
+                            control->forceActiveFocus(Qt::TabFocusReason);armNative();pressDeadline.start(40);
+                            QKeyEvent keyDown(QEvent::KeyPress,Qt::Key_Space,Qt::NoModifier);
+                            const bool keyboardDelivered=QCoreApplication::sendEvent(window,&keyDown);
+                            const bool keyboardDown=control->property("down").toBool();
+                            pressObservation.exec();
+                            check(keyboardDelivered && keyboardDown && submittedContraction(),
+                                "Space activation submits paired native surface and label geometry within the first40ms");
+                            const auto keyboardAdopted=adoptedScale();
+                            QKeyEvent keyUp(QEvent::KeyRelease,Qt::Key_Space,Qt::NoModifier);
+                            QCoreApplication::sendEvent(window,&keyUp);
+                            check(!control->property("down").toBool() && qAbs(paint->scale()-keyboardAdopted.x())<.001
+                                && qAbs(content->scale()-keyboardAdopted.y())<.001 && control->scale()==1,
+                                "Space release preserves the adopted pose and stable hit area");
+                            check(QTest::qWaitFor([&]{return !nativeClock->running() && qAbs(paint->scale()-1)<.001;},1400),
+                                "Space release settles the production native clock");
+                            const auto visibility=window->visibility();
+                            sendMouse(QEvent::MouseButtonPress);
+                            check(nativeClock && nativeClock->running(),"window hide interrupts an active production native press");
+                            window->hide();
+                            check(!nativeClock->running() && !paint->property("moving").toBool(),
+                                "hiding the real window retires native press callbacks and feedback motion");
+                            window->setVisibility(visibility);window->requestActivate();sendMouse(QEvent::MouseButtonRelease);
+                            check(QTest::qWaitFor([&]{return !control->property("down").toBool() && !nativeClock->running()
+                                && qAbs(paint->scale()-1)<.001 && qAbs(content->scale()-1)<.001;},1400),
+                                "restoring the real window leaves no stale paired press transform");
+                            {QMutexLocker lock(&presented->mutex);presented->armed=false;}
+                            }
+                        }
+                        QObject::disconnect(pressFrameBegin);QObject::disconnect(pressSync);QObject::disconnect(pressGeometry);QObject::disconnect(pressRenderStart);
+                        QObject::disconnect(pressRenderEnd);QObject::disconnect(pressSwap);
                     }
                     control->setEnabled(false);
                     // Compare exact premultiplied channels: RGB hidden by alpha=0
@@ -528,7 +645,26 @@ Item {
                 check(qAbs(metrics.horizontalAdvance("111111")-metrics.horizontalAdvance("888888"))<0.05,"numeric glyph updates retain equal advances in bundled and Windows fonts");
                 check(figures->baselineOffset()>0&&figures->baselineOffset()<=figures->height(),"mixed-script baseline remains inside measured text height");
             }
+            auto *teardownButton=fixture->findChild<QQuickItem *>("reviewButton");
+            QPointer<SwirlPressClock> teardownClock;
+            if(teardownButton)for(auto *candidate:teardownButton->findChildren<SwirlPressClock *>())
+                if(candidate->surfaceTarget()==teardownButton->property("background").value<QQuickItem *>()
+                    && candidate->contentTarget()==teardownButton->property("contentItem").value<QQuickItem *>())teardownClock=candidate;
+            if(teardownButton){
+                const auto at=teardownButton->mapToScene(QPointF(teardownButton->width()/2,teardownButton->height()/2));
+                QMouseEvent press(QEvent::MouseButtonPress,at,window->mapToGlobal(at.toPoint()),
+                    Qt::LeftButton,Qt::LeftButton,Qt::NoModifier);
+                QCoreApplication::sendEvent(window,&press);
+            }
+            check(teardownClock && teardownClock->running(),"fixture destruction interrupts a live native paired press");
             delete fixture;
+            check(teardownClock.isNull(),"destroying a pressed control releases its production clock and transforms");
+            int fullMotionIdleFrames=0;
+            QObject idleReceiver;
+            const auto idleConnection=QObject::connect(window,&QQuickWindow::frameSwapped,&idleReceiver,[&]{++fullMotionIdleFrames;});
+            QTest::qWait(650);QObject::disconnect(idleConnection);
+            qInfo()<<"NATIVE_PRESS_FULL_MOTION_IDLE_FRAMES"<<fullMotionIdleFrames;
+            check(fullMotionIdleFrames<=4,"completed and destroyed native press clocks leave no full-motion idle drawing loop");
         }
     }
     stage("shared-controls-and-fonts");

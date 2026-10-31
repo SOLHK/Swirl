@@ -29,6 +29,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QLineF>
+#include <QLocale>
 #include <QDebug>
 #include <QElapsedTimer>
 #include <QEventLoop>
@@ -840,6 +841,68 @@ int runActivityDetailChecks(QQuickWindow *window,const QString &output) {
             check("ipv6-connection-detail-releases-before-card-return",lastSelectedDetail
                 &&QTest::qWaitFor([&]{return !lastSelectedDetail->property("moving").toBool()&&!lastSelectedDetail->property("detailOpen").toBool();},2000));
             connectionSearch->setProperty("text",QString());connectionPage->setProperty("selectedId",QString());
+
+            // Exercise the actual page/model with temporary complete value
+            // snapshots; compare against the accepted uncached comparator.
+            for(int mode:{0,3}){
+                connectionSort->setProperty("currentIndex",mode);
+                const auto key=mode==0?QStringLiteral("host"):QStringLiteral("process");
+                const auto probe=QStringLiteral(R"JS((function(){
+                    const key=%1,mode=%2,initial=connectionRows,previousSelection=selectedId,result={};
+                    const compare=function(a,b){const order=String(a[key]||'').localeCompare(String(b[key]||''),undefined,{numeric:true});
+                        return order||String(a.id).localeCompare(String(b.id),undefined,{numeric:true})};
+                    const exact=function(){return JSON.stringify(visibleRows)===JSON.stringify(connectionRows.slice().sort(compare))};
+                    try{
+                        result.initial=exact()&&sortCache.mode===mode;
+                        const ids=sortCache.ids,keys=sortCache.keys;
+                        const chosen=String(initial[2].id),nextIp='2001:db8::7788';selectedId=chosen;
+                        const updated=initial.map(row=>Object.assign({},row,{uploadBytes:Number(row.uploadBytes||0)+17,
+                            ip:nextIp,route:Object.assign({},row.route||{},{chosen_ip:nextIp,revision:'9007199254740993'})}));
+                        connectionRows=updated;
+                        result.sameKeysKeepOrderAndFreshRecords=exact()&&sortCache.ids===ids&&sortCache.keys===keys
+                            &&selectedId===chosen&&selected.route.chosen_ip===nextIp&&selected.ip===nextIp
+                            &&selected.uploadBytes===Number(initial[2].uploadBytes||0)+17;
+                        const changed=updated.slice();changed[2]=Object.assign({},changed[2]);changed[3]=Object.assign({},changed[3]);
+                        changed[2][key]='节点-02';changed[3][key]='节点-2';connectionRows=changed;
+                        result.changedTiedKeysResort=exact()&&sortCache.ids!==ids;
+                        const replaced=changed.slice();replaced[0]=Object.assign({},replaced[0],{id:'__proto__'});connectionRows=replaced;
+                        result.replacedIdentityResorts=exact()&&visibleRows.some(row=>row.id==='__proto__')
+                            &&!visibleRows.some(row=>row.id===changed[0].id);
+                        connectionRows=replaced.concat([Object.assign({},replaced[0],{id:'sort-added-record'})]);
+                        result.addedIdentityRetainsEveryRecord=exact()&&visibleRows.length===initial.length+1;
+                        connectionRows=connectionRows.filter(row=>row.id!=='__proto__');
+                        result.removedIdentityLeavesFreshSelection=exact()&&visibleRows.length===initial.length&&selectedId===chosen
+                            &&selected.route.chosen_ip===nextIp;
+                    }finally{connectionRows=initial;selectedId=previousSelection}
+                    result.fixtureRestored=exact()&&connectionRows===initial&&selectedId===previousSelection;
+                    return JSON.stringify(result);
+                })())JS").arg(quoted(key),QString::number(mode));
+                const auto result=QJsonDocument::fromJson(evalOn(connectionPage,probe).toString().toUtf8()).object();
+                dataSamples.append(QJsonObject{{"phase","connection-sort-cache-"+key},{"results",result}});
+                check("connection-sort-cache-reports-all-cases-"+key,result.size()==7);
+                for(auto it=result.begin();it!=result.end();++it)check("connection-sort-cache-"+key+"-"+it.key(),it.value().toBool());
+            }
+            connectionSort->setProperty("currentIndex",0);
+            connectionSearch->setProperty("text","fixture-0002.exe");
+            check("connection-sort-cache-filter-membership-is-current",evalOn(connectionPage,
+                "visibleRows.length===1&&visibleRows[0].id==='activity-fixture-2'&&sortCache.ids.length===1").toBool());
+            connectionSearch->setProperty("text",QString());
+            check("connection-sort-cache-filter-removal-restores-every-native-record",evalOn(connectionPage,
+                "visibleRows.length===connectionRows.length&&visibleRows.length===600&&sortCache.ids.length===600").toBool());
+            const QLocale originalLocale;
+            const QLocale alternateLocale(originalLocale.name()==QStringLiteral("en_US")?QStringLiteral("zh_CN"):QStringLiteral("en_US"));
+            QLocale::setDefault(alternateLocale);
+            const bool localeOrder=evalOn(connectionPage,QStringLiteral(R"JS((function(){
+                const oldKeys=sortCache.keys;connectionRows=connectionRows.slice();
+                const expected=connectionRows.slice().sort(function(a,b){
+                    const order=String(a.host||'').localeCompare(String(b.host||''),undefined,{numeric:true});
+                    return order||String(a.id).localeCompare(String(b.id),undefined,{numeric:true})});
+                const actual=JSON.stringify(visibleRows);
+                return sortCache.locale===Qt.locale().name&&sortCache.keys!==oldKeys&&actual===JSON.stringify(expected);
+            })())JS")).toBool();
+            QLocale::setDefault(originalLocale);
+            evalOn(connectionPage,"(function(){connectionRows=connectionRows.slice()})()");
+            check("connection-sort-cache-locale-change-keeps-original-comparison",localeOrder);
 
             // Keep the actual JS rows alive across a native telemetry notification.
             // No event loop runs between ingest and the old-snapshot observation:

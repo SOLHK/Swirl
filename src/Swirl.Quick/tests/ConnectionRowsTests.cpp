@@ -20,6 +20,15 @@ public:
     Q_INVOKABLE void run() { if (callback) callback(); }
 };
 
+class NativeSnapshotSource : public QObject {
+    Q_OBJECT
+public:
+    QVariantList rows;
+    std::function<void()> onRead;
+    int reads=0;
+    Q_INVOKABLE QVariantList connectionSnapshot(){++reads;const auto result=rows;const auto callback=onRead;if(callback)callback();return result;}
+};
+
 class ConnectionRowsTests : public QObject {
     Q_OBJECT
     static std::unique_ptr<SwirlConnectionRows> model(QQmlEngine &engine) {
@@ -184,6 +193,52 @@ private slots:
         QCOMPARE(target->error(), QString());
         QCOMPARE(keys(*target), QStringList{QStringLiteral("recovered")});
     }
+    void bulkNotificationsPreserveRetainedRowsAndIndices() {
+        QQmlEngine engine;
+        auto target = model(engine);
+        QVERIFY(target);
+        const auto make = engine.evaluate(QStringLiteral(R"((function(step) {
+            const result=[];
+            for(let i=0;i<2000;++i)result.push({id:'bulk-'+i,bytes:i+step,
+                route:{chosen_ip:'2001:db8::'+i,unknown:[null,true,step]}});
+            return result;
+        }))"));
+        QSignalSpy inserted(target.get(), &QAbstractItemModel::rowsInserted);
+        QSignalSpy changed(target.get(), &QAbstractItemModel::dataChanged);
+        QSignalSpy moved(target.get(), &QAbstractItemModel::rowsMoved);
+        QSignalSpy resets(target.get(), &QAbstractItemModel::modelReset);
+        target->setSourceRows(make.call({0}));
+        QCOMPARE(target->count(), 2000);
+        QCOMPARE(inserted.count(), 1);
+        QCOMPARE(inserted.first().at(1).toInt(), 0);
+        QCOMPARE(inserted.first().at(2).toInt(), 1999);
+        const QPersistentModelIndex retained(target->index(1000));
+        const auto history = target->get(1000);
+        target->setSourceRows(make.call({1}));
+        QCOMPARE(changed.count(), 1);
+        QCOMPARE(changed.first().at(0).value<QModelIndex>().row(), 0);
+        QCOMPARE(changed.first().at(1).value<QModelIndex>().row(), 1999);
+        QVERIFY(retained.isValid());
+        QCOMPARE(retained.row(), 1000);
+        QCOMPARE(retained.data(SwirlConnectionRows::EntryRole).value<QJSValue>().property("bytes").toInt(), 1001);
+        QCOMPARE(history.property("bytes").toInt(), 1000);
+        const auto source = target->sourceRows();
+        engine.globalObject().setProperty(QStringLiteral("bulkSource"), source);
+        const auto rotate = engine.evaluate(QStringLiteral("bulkSource.slice(1000).concat(bulkSource.slice(0,1000))"));
+        target->setSourceRows(rotate);
+        QCOMPARE(moved.count(), 1);
+        QCOMPARE(moved.first().at(1).toInt(), 1000);
+        QCOMPARE(moved.first().at(2).toInt(), 1999);
+        QCOMPARE(moved.first().at(4).toInt(), 0);
+        QCOMPARE(changed.count(), 1);
+        QVERIFY(retained.isValid());
+        QCOMPARE(retained.row(), 0);
+        QCOMPARE(resets.count(), 0);
+        for (int i = 0; i < target->count(); ++i) {
+            QCOMPARE(json(engine, target->get(i)), json(engine, rotate.property(i)));
+            QCOMPARE(target->rowForDisplayKey(target->get(i).property("id").toString()), i);
+        }
+    }
     void reentrantChangesCoalesceAfterCurrentTransaction() {
         QQmlEngine engine;
         auto target = model(engine);
@@ -279,6 +334,157 @@ private slots:
         target->setSourceRows(rows(*engine, R"([{"id":"current"}])"));
         target.reset();
         QCoreApplication::processEvents();
+    }
+    void ownedProducerFreezesCompleteNativeValuesAndRetainsHistory() {
+        QQmlEngine engine;auto target=model(engine);QVERIFY(target);
+        QAbstractItemModelTester tester(target.get(),QAbstractItemModelTester::FailureReportingMode::QtTest);
+        NativeSnapshotSource source;
+        for(int i=0;i<2000;++i)source.rows.append(QVariantMap{{"id",QString("owned-%1").arg(i)},
+            {"host",QString("长节点-%1.example").arg(i)},{"ip","198.51.100.1"},{"process",QVariant::fromValue(nullptr)},
+            {"protocol",false},{"latency",0},{"uploadBytes",qint64(9007199254740993LL+i)},
+            {"downloadBytes",qint64(9007199254740998LL+i)},{"__proto__","top-retained"},
+            {"unknown",QVariantMap{{"2",i},{"10",true},{"__proto__","nested-retained"},{"null",QVariant::fromValue(nullptr)}}},
+            {"route",QVariantMap{{"chosen_ip",QString("2001:db8::%1").arg(i)},
+                {"revision","9007199254740993"},{"group_chain",QStringList{"来源","策略组"}}}}});
+        const auto original=QJsonDocument::fromVariant(source.rows).toJson(QJsonDocument::Compact);
+        auto expected=source.rows;
+        for(auto &value:expected){auto row=value.toMap();row["ip"]=row.value("route").toMap().value("chosen_ip");
+            row["process"]="missing";row["protocol"]="false";row["latency"]="0";value=row;}
+        const auto referenceJson=engine.globalObject().property("JSON");
+        const auto reference=referenceJson.property("parse").callWithInstance(referenceJson,
+            {QString::fromUtf8(QJsonDocument::fromVariant(expected).toJson(QJsonDocument::Compact))});
+        auto snapshot=target->readSnapshot(&source,"missing");QCOMPARE(source.reads,1);QVERIFY(snapshot.isArray());
+        QCOMPARE(QJsonDocument::fromVariant(source.rows).toJson(QJsonDocument::Compact),original);
+        QCOMPARE(json(engine,snapshot),json(engine,reference));
+        const auto frozen=engine.evaluate(QStringLiteral(R"((function deep(value){if(value===null||typeof value!=='object')return true;
+            return Object.isFrozen(value)&&Object.keys(value).every(key=>deep(value[key]));}))"));
+        QVERIFY(frozen.call({snapshot}).toBool());
+        const auto mutate=engine.evaluate(QStringLiteral("(function(value){'use strict';value.unknown.__proto__='changed'})"));
+        QVERIFY(mutate.call({snapshot.property(0)}).isError());QCOMPARE(json(engine,snapshot),json(engine,reference));
+        target->setSourceRows(snapshot);QCOMPARE(target->count(),2000);QCOMPARE(target->error(),QString());
+        const QPersistentModelIndex retained(target->index(1000));const auto entry=target->get(1000);
+        const auto history=json(engine,snapshot),entryHistory=json(engine,entry);
+        QSignalSpy changes(target.get(),&QAbstractItemModel::dataChanged),moves(target.get(),&QAbstractItemModel::rowsMoved);
+        auto same=target->readSnapshot(&source,"missing");target->setSourceRows(same);QCOMPARE(source.reads,2);
+        QCOMPARE(changes.count(),0);QVERIFY(target->get(1000).strictlyEquals(entry));
+        for(int i=0;i<2000;++i)QVERIFY(same.property(i).strictlyEquals(snapshot.property(i)));
+        auto last=source.rows.last().toMap();last["downloadBytes"]=last.value("downloadBytes").toLongLong()+1;source.rows.last()=last;
+        auto sparse=target->readSnapshot(&source,"missing");
+        for(int i=0;i<1999;++i)QVERIFY(sparse.property(i).strictlyEquals(same.property(i)));
+        QVERIFY(!sparse.property(1999).strictlyEquals(same.property(1999)));
+        target->setSourceRows(sparse);QCOMPARE(changes.count(),1);
+        QCOMPARE(changes.last().at(0).value<QModelIndex>().row(),1999);QCOMPARE(changes.last().at(1).value<QModelIndex>().row(),1999);
+        QCOMPARE(json(engine,same),history);changes.clear();
+        for(auto &value:source.rows){auto row=value.toMap();row["downloadBytes"]=row.value("downloadBytes").toLongLong()+7;value=row;}
+        snapshot=target->readSnapshot(&source,"missing");target->setSourceRows(snapshot);QCOMPARE(changes.count(),1);
+        QCOMPARE(json(engine,entry),entryHistory);QCOMPARE(json(engine,same),history);
+        for(int i=0;i<target->count();++i)QVERIFY(target->get(i).strictlyEquals(snapshot.property(i)));
+        engine.globalObject().setProperty("ownedSnapshot",snapshot);
+        const auto rotated=engine.evaluate("ownedSnapshot.slice(1000).concat(ownedSnapshot.slice(0,1000))");
+        target->setSourceRows(rotated);QCOMPARE(moves.count(),1);QVERIFY(retained.isValid());QCOMPARE(retained.row(),0);
+        const auto filtered=engine.evaluate("ownedSnapshot.filter((row,index)=>index%2===0)");
+        target->setSourceRows(filtered);QCOMPARE(target->count(),1000);QVERIFY(retained.isValid());
+        source.rows.removeAt(1000);snapshot=target->readSnapshot(&source,"missing");target->setSourceRows(snapshot);
+        QVERIFY(!retained.isValid());QCOMPARE(target->count(),1999);QCOMPARE(json(engine,entry),entryHistory);
+    }
+    void ownedProducerGuardsSourceCallbacksAndEngineClosure() {
+        auto engine=std::make_unique<QQmlEngine>();auto target=model(*engine);QVERIFY(target);
+        NativeSnapshotSource source;source.rows={QVariantMap{{"id","native"}}};
+        const auto latest=rows(*engine,R"([{"id":"latest","value":7}])");
+        source.onRead=[&]{target->setSourceRows(latest);};
+        QVERIFY(target->readSnapshot(&source,"missing").isUndefined());QCOMPARE(keys(*target),QStringList{"latest"});
+        source.onRead={};auto snapshot=target->readSnapshot(&source,"missing");target->setSourceRows(snapshot);
+        QCOMPARE(keys(*target),QStringList{"native"});
+        NativeSnapshotSource inner;inner.rows={QVariantMap{{"id","inner"}}};QJSValue nested;
+        source.onRead=[&]{nested=target->readSnapshot(&inner,"missing");};
+        QVERIFY(target->readSnapshot(&source,"missing").isUndefined());QVERIFY(nested.isArray());target->setSourceRows(nested);
+        QCOMPARE(keys(*target),QStringList{"inner"});
+        source.onRead=[&]{engine.reset();};
+        QVERIFY(target->readSnapshot(&source,"missing").isUndefined());QCOMPARE(target->count(),0);QVERIFY(target->get(0).isUndefined());
+        QCoreApplication::processEvents();QCOMPARE(target->count(),0);
+        engine=std::make_unique<QQmlEngine>();target=model(*engine);QVERIFY(target);QPointer<SwirlConnectionRows> guard(target.get());
+        source.onRead=[&]{target.reset();};const auto value=guard->readSnapshot(&source,"missing");QVERIFY(value.isUndefined());QVERIFY(!guard);
+    }
+    void ownedProducerUsesReadOnlyIntrinsicsAndRejectsInvalidSnapshots() {
+        QQmlEngine engine;auto target=model(engine);QVERIFY(target);NativeSnapshotSource source;
+        const auto descriptor=engine.evaluate("JSON.stringify(Object.getOwnPropertyDescriptor(Object,'freeze'))");
+        const auto properties=QJsonDocument::fromJson(descriptor.toString().toUtf8()).object();
+        QVERIFY(!properties.value("writable").toBool());QVERIFY(!properties.value("configurable").toBool());
+        const auto latest=rows(engine,R"([{"id":"newest"}])");target->setSourceRows(latest);
+        source.rows={QVariantMap{{"id","duplicate"}},QVariantMap{{"id","duplicate"}}};
+        QVERIFY(target->readSnapshot(&source,"missing").isUndefined());QVERIFY(!target->error().isEmpty());QCOMPARE(keys(*target),QStringList{"newest"});
+        source.rows={QVariantMap{{"id","valid"}}};auto snapshot=target->readSnapshot(&source,"missing");QVERIFY(snapshot.isArray());QCOMPARE(target->error(),QString());
+        target->setSourceRows(snapshot);QCOMPARE(keys(*target),QStringList{"valid"});
+    }
+    void ownedProducerPreservesArraySlotsDespiteInheritedSetters() {
+        QQmlEngine engine;auto target=model(engine);QVERIFY(target);
+        NativeSnapshotSource source;source.rows={QVariantMap{{"id","array"},{"unknown",QVariantList{17,QStringLiteral("second")}}}};
+        QVERIFY(!engine.evaluate("var swallowed=0;Object.defineProperty(Array.prototype,'0',{set:function(value){swallowed++},configurable:true});var trial=new Array(1);trial[0]=99").isError());
+        QCOMPARE(engine.evaluate("swallowed").toInt(),1);
+        const auto snapshot=target->readSnapshot(&source,"missing");
+        const int swallowed=engine.evaluate("swallowed").toInt();
+        QVERIFY(!engine.evaluate("delete Array.prototype[0]").isError());
+        QCOMPARE(swallowed,1);
+        QVERIFY(snapshot.isArray());QCOMPARE(snapshot.property(0).property("unknown").property(0).toInt(),17);
+        QCOMPARE(snapshot.property(0).property("unknown").property(1).toString(),QStringLiteral("second"));
+        target->setSourceRows(snapshot);QCOMPARE(target->get(0).property("id").toString(),QStringLiteral("array"));
+    }
+    void ownedComparisonKeepsUnknownJsonTypesDistinct() {
+        QQmlEngine engine;auto target=model(engine);QVERIFY(target);NativeSnapshotSource source;
+        const QVariantList cases={1,QStringLiteral("1"),false,0,QVariant::fromValue(nullptr),QString(),
+            QVariantMap{{"nested",1}},QVariantMap{{"nested",QStringLiteral("1")}},
+            QVariantList{QVariantMap{{"nested",false}}},QVariantList{QVariantMap{{"nested",0}}}};
+        QSignalSpy changes(target.get(),&QAbstractItemModel::dataChanged);QJSValue historical;QString bytes;
+        for(int i=0;i<cases.size();++i){
+            source.rows={QVariantMap{{"id","typed"},{"unknown",cases[i]}}};
+            const auto snapshot=target->readSnapshot(&source,"missing");QVERIFY(snapshot.isArray());
+            const int notifications=changes.count();target->setSourceRows(snapshot);
+            QCOMPARE(changes.count(),notifications+(i?1:0));
+            QCOMPARE(json(engine,target->get(0)),json(engine,snapshot.property(0)));
+            if(i)QCOMPARE(json(engine,historical),bytes);
+            historical=target->get(0);bytes=json(engine,historical);
+        }
+    }
+    void ownedProducerRetiresDestroyedSource() {
+        QQmlEngine engine;
+        auto target=model(engine);QVERIFY(target);auto source=std::make_unique<NativeSnapshotSource>();
+        source->rows={QVariantMap{{"id","deleted-source"}}};bool called=false;
+        source->onRead=[&]{called=true;source.reset();};
+        auto *pointer=source.get();QVERIFY(target->readSnapshot(pointer,"missing").isUndefined());
+        QVERIFY(called);QVERIFY(!source);QCOMPARE(target->count(),0);
+    }
+    void ownedProducerReusesOnlyStrictlyEqualFrozenSubtrees() {
+        QQmlEngine engine;auto target=model(engine);QVERIFY(target);NativeSnapshotSource source;
+        QVariantMap row{{"id","subtree"},{"uploadBytes",1},
+            {"route",QVariantMap{{"chosen_ip","2001:db8::1"},{"group_chain",QStringList{"first"}}}},
+            {"unknown",QVariantMap{{"__proto__","retained"},{"changing",QVariantMap{{"value",1}}},
+                {"stable",QVariantMap{{"list",QVariantList{true,QVariant::fromValue(nullptr),7}}}}}}};
+        source.rows={row};auto first=target->readSnapshot(&source,"missing");target->setSourceRows(first);
+        const auto history=json(engine,first);
+        const auto original=first.property(0);
+        QSignalSpy changes(target.get(),&QAbstractItemModel::dataChanged);
+        row["uploadBytes"]=2;source.rows={row};auto second=target->readSnapshot(&source,"missing");
+        QVERIFY(!second.property(0).strictlyEquals(original));
+        QVERIFY(second.property(0).property("route").strictlyEquals(original.property("route")));
+        QVERIFY(second.property(0).property("unknown").strictlyEquals(original.property("unknown")));
+        target->setSourceRows(second);QCOMPARE(changes.count(),1);QCOMPARE(json(engine,first),history);
+        auto unknown=row.value("unknown").toMap();unknown["changing"]=QVariantMap{{"value",QStringLiteral("1")}};row["unknown"]=unknown;
+        source.rows={row};auto third=target->readSnapshot(&source,"missing");target->setSourceRows(third);
+        QCOMPARE(changes.count(),2);
+        QVERIFY(!third.property(0).property("unknown").strictlyEquals(second.property(0).property("unknown")));
+        QVERIFY(third.property(0).property("unknown").property("stable").strictlyEquals(second.property(0).property("unknown").property("stable")));
+        QVERIFY(third.property(0).property("unknown").property("changing").property("value").isString());
+        QVERIFY(second.property(0).property("unknown").property("changing").property("value").isNumber());
+        auto route=row.value("route").toMap();route["group_chain"]=QStringList{"first","second"};row["route"]=route;
+        source.rows={row};auto fourth=target->readSnapshot(&source,"missing");target->setSourceRows(fourth);
+        QCOMPARE(changes.count(),3);
+        QVERIFY(!fourth.property(0).property("route").strictlyEquals(third.property(0).property("route")));
+        QVERIFY(fourth.property(0).property("unknown").strictlyEquals(third.property(0).property("unknown")));
+        QCOMPARE(third.property(0).property("route").property("group_chain").property("length").toInt(),1);
+        QCOMPARE(fourth.property(0).property("route").property("group_chain").property("length").toInt(),2);
+        const auto latest=json(engine,fourth);row["uploadBytes"]=3;source.rows={row};QVERIFY(target->readSnapshot(&source,"missing").isArray());
+        row["uploadBytes"]=2;source.rows={row};auto restored=target->readSnapshot(&source,"missing");target->setSourceRows(restored);
+        QCOMPARE(changes.count(),4);QCOMPARE(json(engine,restored),latest);QCOMPARE(json(engine,first),history);
     }
 };
 

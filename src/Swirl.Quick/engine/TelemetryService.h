@@ -12,6 +12,7 @@
 class TelemetryService final : public QObject {
  Q_OBJECT
  Q_PROPERTY(int revision READ revision NOTIFY changed)
+ Q_PROPERTY(quint64 connectionRevision READ connectionRevision NOTIFY changed)
  Q_PROPERTY(bool sampled READ sampled NOTIFY changed)
  Q_PROPERTY(bool connectionsSampled READ connectionsSampled NOTIFY changed)
  Q_PROPERTY(double downloadRate READ downloadRate NOTIFY changed)
@@ -32,6 +33,7 @@ public:
  void ingest(const ProxyEngine::Status &);
  void rejectNativeProbe(quint64 tag,const QString &code);
  int revision() const { return m_revision; }
+ quint64 connectionRevision() const { return m_connectionRevision; }
  bool sampled() const;
  bool connectionsSampled() const;
  double downloadRate() const { return m_status.downloadRate; }
@@ -79,6 +81,7 @@ private:
  void finishMeasurement(quint64 generation);
  QString m_path,m_epoch,m_routeEpoch,m_storageError,m_externalIp,m_measurementState;
  int m_revision=0,m_measurements=0;
+ quint64 m_connectionRevision=0;
  bool m_networkEnabled=true,m_dirty=false;
  bool m_publishedSampled=false,m_publishedConnectionsSampled=false;
  qint64 m_lastConnections=0,m_lastTraffic=0,m_lastUp=0,m_lastDown=0;

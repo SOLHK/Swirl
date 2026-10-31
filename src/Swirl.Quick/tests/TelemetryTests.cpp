@@ -32,6 +32,43 @@ class TelemetryTests:public QObject {
  Q_OBJECT
  ProxyEngine::Status sample(qint64 time,int up,int down){ProxyEngine::Status s;s.processAlive=true;s.processId=1;s.apiHealthy=true;s.connectionsAt=time;s.trafficAt=time;s.uploadTotal=up;s.downloadTotal=down;s.uploadRate=up;s.downloadRate=down;s.connections={QVariantMap{{"id","connection-a"},{"host","fixture.test"},{"process","fixture.exe"},{"policy","DIRECT"},{"category","direct"},{"uploadBytes",up},{"downloadBytes",down},{"time",QDateTime::fromMSecsSinceEpoch(time).toString(Qt::ISODateWithMs)}}};return s;}
 private slots:
+ void connectionRevisionTracksOwnedSnapshotChangesWithoutSuppressingStatus(){
+  QTemporaryDir temp;TelemetryService model(temp.filePath("connection-revision.json"),false);
+  QSignalSpy notifications(&model,&TelemetryService::changed);
+  QCOMPARE(model.connectionRevision(),quint64(0));
+  auto status=sample(QDateTime::currentMSecsSinceEpoch(),10,20);
+  auto row=status.connections.first().toMap();
+  row["route"]=QVariantMap{{"chosen_ip","2001:db8::1"},{"revision","9007199254740993"},{"group_chain",QStringList{"first","second"}}};
+  status.connections={row};model.ingest(status);
+  auto revision=model.connectionRevision();QVERIFY(revision>0);
+  QCOMPARE(model.property("connectionRevision").toULongLong(),revision);
+  const auto retained=model.connectionSnapshot();
+  const auto retainedBytes=QJsonDocument::fromVariant(retained).toJson(QJsonDocument::Compact);
+  const auto originalTime=status.connectionsAt;
+  const int statusRevision=model.revision();model.ingest(status);
+  QCOMPARE(model.connectionRevision(),revision);QCOMPARE(model.revision(),statusRevision+1);QCOMPARE(notifications.count(),2);
+  ++status.trafficAt;status.downloadRate=99;model.ingest(status);
+  QCOMPARE(model.connectionRevision(),revision);QCOMPARE(model.downloadRate(),99.0);QCOMPARE(model.connectionSnapshot(),retained);
+  status.connectionsAt=originalTime-7000;model.ingest(status);
+  QVERIFY(!model.connectionsSampled());QCOMPARE(model.connectionRevision(),revision);QCOMPARE(model.connectionSnapshot(),retained);
+  status.connectionsAt=originalTime+1;row["uploadBytes"]=15;
+  auto route=row.value("route").toMap();route["chosen_ip"]="2001:db8::2";row["route"]=route;status.connections={row};model.ingest(status);
+  QVERIFY(model.connectionRevision()>revision);revision=model.connectionRevision();
+  QCOMPARE(model.connectionSnapshot().first().toMap().value("route").toMap().value("chosen_ip").toString(),QString("2001:db8::2"));
+  QCOMPARE(QJsonDocument::fromVariant(retained).toJson(QJsonDocument::Compact),retainedBytes);
+  status.apiHealthy=false;model.ingest(status);QVERIFY(model.connectionRevision()>revision);revision=model.connectionRevision();
+  QCOMPARE(model.connectionSnapshot().first().toMap().value("status").toString(),QStringLiteral("采样中断"));
+  model.ingest(status);QCOMPARE(model.connectionRevision(),revision);
+  status.processAlive=false;model.ingest(status);QVERIFY(model.connectionRevision()>revision);revision=model.connectionRevision();
+  QCOMPARE(model.connectionSnapshot().first().toMap().value("status").toString(),QStringLiteral("已结束"));
+  model.ingest(status);QCOMPARE(model.connectionRevision(),revision);
+  status=sample(originalTime-1,1,2);status.processId=2;status.sessionId="new-session";model.ingest(status);
+  QVERIFY(model.connectionRevision()>revision);revision=model.connectionRevision();QCOMPARE(model.connectionSnapshot().size(),1);
+  QCOMPARE(model.connectionSnapshot().first().toMap().value("status").toString(),QStringLiteral("活动"));
+  status.processId=3;status.apiHealthy=false;status.connections.clear();status.connectionsAt=0;model.ingest(status);
+  QVERIFY(model.connectionRevision()>revision);QVERIFY(model.connectionSnapshot().isEmpty());
+  QCOMPARE(QJsonDocument::fromVariant(retained).toJson(QJsonDocument::Compact),retainedBytes);
+ }
  void batchedGroupsMatchLegacyAccountingAtCardinalityAndSessionBoundaries(){
   QTemporaryDir temp;const auto path=temp.filePath("batched-groups.json");TelemetryService model(path,false);
   const QStringList kinds={"apps","domains","devices","nodes","categories","proxyApps","proxyDomains","proxyDevices","proxyNodes"};

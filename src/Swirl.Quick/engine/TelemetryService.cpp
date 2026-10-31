@@ -140,7 +140,7 @@ void TelemetryService::publish(){
  m_publishedSampled=sampled();m_publishedConnectionsSampled=connectionsSampled();++m_revision;emit changed();
 }
 QString TelemetryService::formatBytes(double bytes) const {
- const QStringList units={"B","KB","MB","GB","TB"};int i=0;while(bytes>=1024&&i<4){bytes/=1024;++i;}
+ static const QStringList units={QStringLiteral("B"),QStringLiteral("KB"),QStringLiteral("MB"),QStringLiteral("GB"),QStringLiteral("TB")};int i=0;while(bytes>=1024&&i<4){bytes/=1024;++i;}
  return QString::number(bytes,'f',i?1:0)+" "+units[i];
 }
 int TelemetryService::activeConnections() const {int count=0;for(const auto &r:m_status.connections)if(!r.toMap().value("closed").toBool())++count;return count;}
@@ -159,7 +159,7 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
  TelemetryIngestProfile profile(this);
 #endif
  const auto epoch=QString::number(status.processId)+"/"+status.sessionId;
- if(status.processAlive&&m_epoch!=epoch){m_epoch=epoch;m_seen.clear();m_lastConnections=0;m_lastTraffic=0;m_lastUp=0;m_lastDown=0;m_externalIp.clear();m_latencies.clear();}
+ if(status.processAlive&&m_epoch!=epoch){m_epoch=epoch;m_seen.clear();++m_connectionRevision;m_lastConnections=0;m_lastTraffic=0;m_lastUp=0;m_lastDown=0;m_externalIp.clear();m_latencies.clear();}
  const auto route=epoch+"/"+status.selectedNodeId+"/"+status.mode+"/"+QString::number(status.proxyPort)+"/"+QString::number(status.processAlive)+"/"+QString::number(status.apiHealthy)+"/"+QString::number(status.directSession)+"/"+status.configurationReceipt.value("applied_revision").toString()+"/"+status.configurationReceipt.value("generation").toString();
  if(route!=m_routeEpoch){m_routeEpoch=route;++m_routeGeneration;
   // Switching away and back still invalidates the old native measurement.
@@ -176,8 +176,14 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
     {"routeVerified",ok},{"route",status.configurationReceipt.isEmpty()?QStringLiteral("当前所选 Rust 出站"):QStringLiteral("当前 Rust 策略")},{"detail",status.configurationReceipt.isEmpty()?QStringLiteral("Rust Core 测量所选出站至最终响应首部；不含界面刷新等待时间。"):QStringLiteral("Rust Core 根据当前策略测量至响应首部；本次实际出口见连接详情。")}});
   }
  }
- if(!status.apiHealthy){for(auto it=m_seen.begin();it!=m_seen.end();++it)if(it->value("status")!="已结束")(*it)["status"]=status.processAlive?QStringLiteral("采样中断"):QStringLiteral("已结束");publish();return;}
+ if(!status.apiHealthy){
+  const auto state=status.processAlive?QStringLiteral("采样中断"):QStringLiteral("已结束");bool changed=false;
+  for(auto it=m_seen.begin();it!=m_seen.end();++it)if(it->value("status")!="已结束"&&it->value("status")!=state){(*it)["status"]=state;changed=true;}
+  if(changed)++m_connectionRevision;
+  publish();return;
+ }
  if(status.connectionsAt>m_lastConnections){
+  ++m_connectionRevision;
   m_lastConnections=status.connectionsAt;const auto date=QDateTime::fromMSecsSinceEpoch(status.connectionsAt).date().toString(Qt::ISODate);
   auto day=m_days.value(date).toObject();
   // Earlier persisted days cannot be split by source after the fact.
@@ -196,32 +202,43 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
   // touched JSON row once. Hot categories no longer detach a row per connection.
   const auto aggregateGroup=[&](int index,const QString &key,double up,double down,bool count){groups[index].accumulate(key,up,down,count);};
   QSet<QString> active;
+  QString previousRawTime,previousDisplayTime;bool havePreviousTime=false;
   for(const auto &value:status.connections){
-   auto row=value.toMap();const auto id=row.value("id").toString();if(id.isEmpty()||active.contains(id))continue;active.insert(id);
-   if(row.contains("route"))row.insert("route",SwirlRouteObservation::sanitized(QJsonObject::fromVariantMap(row.value("route").toMap())));
-   const auto old=m_seen.value(id);const auto u=row.value("uploadBytes").toLongLong(),d=row.value("downloadBytes").toLongLong();
-   const auto ou=old.value("uploadBytes").toLongLong(),od=old.value("downloadBytes").toLongLong();
+   auto row=value.toMap();const auto id=row.value(QStringLiteral("id")).toString();if(id.isEmpty()||active.contains(id))continue;active.insert(id);
+   if(row.contains(QStringLiteral("route")))row.insert(QStringLiteral("route"),SwirlRouteObservation::sanitized(QJsonObject::fromVariantMap(row.value(QStringLiteral("route")).toMap())));
+   const auto old=m_seen.value(id);const auto u=row.value(QStringLiteral("uploadBytes")).toLongLong(),d=row.value(QStringLiteral("downloadBytes")).toLongLong();
+   const auto ou=old.value(QStringLiteral("uploadBytes")).toLongLong(),od=old.value(QStringLiteral("downloadBytes")).toLongLong();
    const auto du=qMax<qint64>(0,u>=ou?u-ou:u),dd=qMax<qint64>(0,d>=od?d-od:d);
-   const bool count=old.value("accountedDay").toString()!=date;
-   const bool proxy=row.value("category").toString()==QStringLiteral("proxy");
-   const bool proxyCount=old.value("proxyAccountedDay").toString()!=date;
-   aggregateGroup(0,row.value("process","未知进程").toString(),du,dd,count);
-   aggregateGroup(1,row.value("host",row.value("ip")).toString(),du,dd,count);
-   if(!row.value("sourceIp").toString().isEmpty())aggregateGroup(2,row.value("sourceIp").toString(),du,dd,count);
-   aggregateGroup(3,row.value("policy").toString(),du,dd,count);
-   aggregateGroup(4,row.value("category","other").toString(),du,dd,count);
+   const bool count=old.value(QStringLiteral("accountedDay")).toString()!=date;
+   const auto process=row.value(QStringLiteral("process"),QStringLiteral("未知进程")).toString();
+   const auto domain=row.value(QStringLiteral("host"),row.value(QStringLiteral("ip"))).toString();
+   const auto sourceIp=row.value(QStringLiteral("sourceIp")).toString();
+   const auto policy=row.value(QStringLiteral("policy")).toString();
+   const auto category=row.value(QStringLiteral("category"),QStringLiteral("other")).toString();
+   const bool proxy=category==QStringLiteral("proxy");
+   const bool proxyCount=old.value(QStringLiteral("proxyAccountedDay")).toString()!=date;
+   aggregateGroup(0,process,du,dd,count);
+   aggregateGroup(1,domain,du,dd,count);
+   if(!sourceIp.isEmpty())aggregateGroup(2,sourceIp,du,dd,count);
+   aggregateGroup(3,policy,du,dd,count);
+   aggregateGroup(4,category,du,dd,count);
    if(proxy){
-    aggregateGroup(5,row.value("process","未知进程").toString(),du,dd,proxyCount);
-    aggregateGroup(6,row.value("host",row.value("ip")).toString(),du,dd,proxyCount);
-    if(!row.value("sourceIp").toString().isEmpty())aggregateGroup(7,row.value("sourceIp").toString(),du,dd,proxyCount);
-    aggregateGroup(8,row.value("policy").toString(),du,dd,proxyCount);
+    aggregateGroup(5,process,du,dd,proxyCount);
+    aggregateGroup(6,domain,du,dd,proxyCount);
+    if(!sourceIp.isEmpty())aggregateGroup(7,sourceIp,du,dd,proxyCount);
+    aggregateGroup(8,policy,du,dd,proxyCount);
     add(bucket,"proxy",du+dd);
-    row["proxyAccountedDay"]=date;
-   }else if(old.contains("proxyAccountedDay"))row["proxyAccountedDay"]=old.value("proxyAccountedDay");
-   const auto interval=status.connectionsAt-old.value("lastSeen").toLongLong();
-   row["uploadRate"]=!old.isEmpty()&&interval>0?double(du)*1000/interval:0;row["downloadRate"]=!old.isEmpty()&&interval>0?double(dd)*1000/interval:0;
-   row["accountedDay"]=date;row["lastSeen"]=status.connectionsAt;row["status"]=row.value("closed").toBool()?"已结束":"活动";
-   row["up"]=formatBytes(u);row["down"]=formatBytes(d);row["time"]=QDateTime::fromString(row.value("time").toString(),Qt::ISODateWithMs).toLocalTime().toString("MM-dd HH:mm:ss");
+    row[QStringLiteral("proxyAccountedDay")]=date;
+   }else if(old.contains(QStringLiteral("proxyAccountedDay")))row[QStringLiteral("proxyAccountedDay")]=old.value(QStringLiteral("proxyAccountedDay"));
+   const auto interval=status.connectionsAt-old.value(QStringLiteral("lastSeen")).toLongLong();
+   row[QStringLiteral("uploadRate")]=!old.isEmpty()&&interval>0?double(du)*1000/interval:0;row[QStringLiteral("downloadRate")]=!old.isEmpty()&&interval>0?double(dd)*1000/interval:0;
+   row[QStringLiteral("accountedDay")]=date;row[QStringLiteral("lastSeen")]=status.connectionsAt;row[QStringLiteral("status")]=row.value(QStringLiteral("closed")).toBool()?QStringLiteral("已结束"):QStringLiteral("活动");
+   row[QStringLiteral("up")]=formatBytes(u);row[QStringLiteral("down")]=formatBytes(d);
+   const auto rawTime=row.value(QStringLiteral("time")).toString();
+   if(!havePreviousTime||rawTime!=previousRawTime){
+    previousRawTime=rawTime;previousDisplayTime=QDateTime::fromString(rawTime,Qt::ISODateWithMs).toLocalTime().toString(QStringLiteral("MM-dd HH:mm:ss"));havePreviousTime=true;
+   }
+   row[QStringLiteral("time")]=previousDisplayTime;
    m_seen[id]=row;
   }
   // Untouched groups retain their original missing/empty representation.

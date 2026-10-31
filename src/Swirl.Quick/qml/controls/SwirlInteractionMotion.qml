@@ -32,7 +32,10 @@ Item {
         if(focusTravel.from!==focusTravel.to)focusTravel.start()
         if(pressed){
             contactTravel.stop()
-            if(!pressTravel.running && contact!==1){pressTravel.from=contact;pressTravel.start()}
+            if(!pressTravel.running){
+                contact=pressTravel.adoptedValue(contact)
+                if(contact!==1){pressTravel.from=contact;pressTravel.start()}
+            }
         }else{
             pressTravel.stop()
             if(!contactTravel.running && contact!==0)contactTravel.start()

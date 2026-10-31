@@ -15,8 +15,9 @@ struct SwirlPressRenderState {
     int duration=0;
     quint64 generation=0,frameSerial=0,syncGeneration=0,committedFrame=0;
     unsigned appliedTargets=0;
+    qreal surfaceContact=0,contentContact=0;
     Qt::HANDLE syncThread=nullptr;
-    bool armed=false,synchronizing=false;
+    bool armed=false,synchronizing=false,observing=false,hasCommitted=false;
 };
 
 class SwirlPressTransform final : public QQuickTransform {
@@ -36,11 +37,13 @@ public:
     void applyTo(QMatrix4x4 *matrix) const override {
         qreal contact,minimumScale;
         quint64 generation,serial;
-        bool synchronizedSample;
+        bool synchronizedSample,armed;
         {
             QMutexLocker lock(&m_state->mutex);
-            if(!m_state->armed)return;
+            if(!m_state->observing)return;
+            armed=m_state->armed;
             synchronizedSample=m_state->synchronizing&&m_state->syncThread==QThread::currentThreadId();
+            if(!armed&&!synchronizedSample)return;
             contact=synchronizedSample?m_state->sampledContact:m_state->committedContact;
             minimumScale=m_state->minimumScale;
             generation=m_state->generation;serial=m_state->frameSerial;
@@ -52,17 +55,30 @@ public:
         if(!item)return;
         const qreal base=item->scale();
         if(!std::isfinite(base)||base==0)return;
-        const qreal ratio=(1-(1-minimumScale)*contact)/base;
-        const QPointF origin=item->transformOriginPoint();
-        if(!std::isfinite(ratio)||!std::isfinite(origin.x())||!std::isfinite(origin.y()))return;
-        matrix->translate(origin.x(),origin.y());
-        matrix->scale(ratio,ratio);
-        matrix->translate(-origin.x(),-origin.y());
+        if(armed){
+            const qreal ratio=(1-(1-minimumScale)*contact)/base;
+            const QPointF origin=item->transformOriginPoint();
+            if(!std::isfinite(ratio)||!std::isfinite(origin.x())||!std::isfinite(origin.y()))return;
+            matrix->translate(origin.x(),origin.y());
+            matrix->scale(ratio,ratio);
+            matrix->translate(-origin.x(),-origin.y());
+        }else{
+            // The ordinary GUI spring owns the transform while unarmed. Keep
+            // its matrix unchanged and remember only the scale consumed by
+            // this real synchronization, so a re-press can reverse from it.
+            if(minimumScale==1)return;
+            contact=(1-base)/(1-minimumScale);
+            if(!std::isfinite(contact))return;
+        }
         if(synchronizedSample){
             QMutexLocker lock(&m_state->mutex);
-            if(m_state->armed&&m_state->synchronizing&&m_state->generation==generation
-                &&m_state->syncGeneration==generation&&m_state->frameSerial==serial)
+            if(m_state->observing&&m_state->synchronizing&&m_state->armed==armed
+                &&m_state->generation==generation&&m_state->syncGeneration==generation
+                &&m_state->frameSerial==serial){
+                if(m_targetBit==1)m_state->surfaceContact=contact;
+                else m_state->contentContact=contact;
                 m_state->appliedTargets|=m_targetBit;
+            }
         }
     }
 private:
@@ -75,6 +91,7 @@ SwirlPressClock::SwirlPressClock(QObject *parent)
     : QObject(parent),m_renderState(std::make_shared<SwirlPressRenderState>()) {}
 SwirlPressClock::~SwirlPressClock() {
     disconnectFrames();
+    disconnectRenderFrames();
     disconnect(m_destroyedConnection);
     disconnect(m_surfaceDestroyedConnection);disconnect(m_contentDestroyedConnection);
     disconnect(m_surfaceWindowConnection);disconnect(m_contentWindowConnection);
@@ -90,6 +107,7 @@ void SwirlPressClock::setWindow(QQuickWindow *window) {
     const QPointer<SwirlPressClock> guard(this);
     const auto visual=committedVisualContact();
     disconnectFrames();
+    disconnectRenderFrames();
     disconnect(m_destroyedConnection);
     m_destroyedConnection = {};
     m_window = window;
@@ -155,6 +173,7 @@ void SwirlPressClock::setMinimumScale(qreal value) {
     {
         QMutexLocker lock(&m_renderState->mutex);
         m_renderState->minimumScale=value;
+        m_renderState->hasCommitted=false;
         ++m_renderState->generation;m_renderState->synchronizing=false;
     }
     invalidateRenderTransforms();
@@ -163,10 +182,13 @@ void SwirlPressClock::setMinimumScale(qreal value) {
 
 std::optional<qreal> SwirlPressClock::committedVisualContact() const {
     QMutexLocker lock(&m_renderState->mutex);
-    if(!m_renderState->armed)return std::nullopt;
+    if(!m_renderState->observing||!m_renderState->hasCommitted)return std::nullopt;
     return m_renderState->committedContact;
 }
 
+qreal SwirlPressClock::adoptedValue(qreal fallback) const {
+    return committedVisualContact().value_or(fallback);
+}
 void SwirlPressClock::invalidateRenderTransforms() {
     if(m_surfaceTransform)m_surfaceTransform->invalidateOnGui();
     if(m_contentTransform)m_contentTransform->invalidateOnGui();
@@ -185,48 +207,55 @@ void SwirlPressClock::rebuildRenderTargets() {
         m_surfaceTransform=new SwirlPressTransform(m_renderState,m_surfaceTarget,1,this);
         m_contentTransform=new SwirlPressTransform(m_renderState,m_contentTarget,2,this);
     }
-    if(m_running)connectRenderFrames();
+    connectRenderFrames();
 }
 
 void SwirlPressClock::connectRenderFrames() {
-    disconnectRenderFrames();
-    if(!m_running||!m_window||!m_surfaceTransform||!m_contentTransform||m_runDuration<=0)return;
+    if(!m_window||!m_surfaceTransform||!m_contentTransform)return;
     const auto state=m_renderState;
     {
         QMutexLocker lock(&state->mutex);
-        state->elapsed=m_elapsed;state->from=m_start;state->to=m_end;state->duration=m_runDuration;
+        state->observing=true;
         state->minimumScale=m_minimumScale;
-        // Before the first sync, preserve the already-visible GUI pose. A
-        // release must not hand off an unsynchronized, hypothetical sample.
-        state->sampledContact=m_value;state->committedContact=m_value;state->committedFrame=0;
-        state->armed=true;state->synchronizing=false;state->appliedTargets=0;++state->generation;
+        state->armed=m_running&&m_runDuration>0;
+        if(state->armed){
+            state->elapsed=m_elapsed;state->from=m_start;state->to=m_end;state->duration=m_runDuration;
+            state->sampledContact=m_value;
+            if(!state->hasCommitted)state->committedContact=m_value;
+        }
+        state->synchronizing=false;state->appliedTargets=0;++state->generation;
     }
+    if(m_syncConnection)return;
+    // Passive observations never request a frame. They only follow the GUI
+    // spring when another real update is already being synchronized.
     m_syncConnection=connect(m_window,&QQuickWindow::beforeSynchronizing,this,[state]{
         QMutexLocker lock(&state->mutex);
-        if(!state->armed)return;
-        const qreal progress=std::min(qreal(1),qreal(state->elapsed.nsecsElapsed())/(qreal(state->duration)*1000000));
-        state->sampledContact=state->from+(state->to-state->from)*state->curve.valueForProgress(progress);
+        if(!state->observing)return;
+        if(state->armed){
+            const qreal progress=std::min(qreal(1),qreal(state->elapsed.nsecsElapsed())/(qreal(state->duration)*1000000));
+            state->sampledContact=state->from+(state->to-state->from)*state->curve.valueForProgress(progress);
+        }
         state->syncGeneration=state->generation;++state->frameSerial;state->appliedTargets=0;
         state->syncThread=QThread::currentThreadId();state->synchronizing=true;
     },Qt::DirectConnection);
     m_afterSyncConnection=connect(m_window,&QQuickWindow::afterSynchronizing,this,[state]{
         QMutexLocker lock(&state->mutex);
-        // GUI invalidation dirties both real target transforms every active
-        // frame. Commit only when both consumed this generation's sync sample.
-        // This is scene-graph adoption, not frameSwapped or physical scan-out.
-        if(state->armed&&state->synchronizing&&state->syncGeneration==state->generation
-            &&state->appliedTargets==3){
-            state->committedContact=state->sampledContact;state->committedFrame=state->frameSerial;
+        // Commit only the same contact actually consumed by both transforms.
+        // This includes unmodified GUI spring frames while the clock is idle.
+        if(state->observing&&state->synchronizing&&state->syncGeneration==state->generation
+            &&state->appliedTargets==3&&state->surfaceContact==state->contentContact){
+            state->committedContact=state->surfaceContact;state->committedFrame=state->frameSerial;
+            state->hasCommitted=true;
         }
         state->synchronizing=false;
     },Qt::DirectConnection);
 }
-
 void SwirlPressClock::disconnectRenderFrames() {
     bool wasArmed;
     {
         QMutexLocker lock(&m_renderState->mutex);
         wasArmed=m_renderState->armed;m_renderState->armed=false;m_renderState->synchronizing=false;
+        m_renderState->observing=false;m_renderState->hasCommitted=false;
         ++m_renderState->generation;
     }
     disconnect(m_syncConnection);disconnect(m_afterSyncConnection);
@@ -310,7 +339,13 @@ void SwirlPressClock::connectFrames() {
 }
 
 void SwirlPressClock::disconnectFrames() {
-    disconnectRenderFrames();
+    bool wasArmed;
+    {
+        QMutexLocker lock(&m_renderState->mutex);
+        wasArmed=m_renderState->armed;m_renderState->armed=false;m_renderState->synchronizing=false;
+        ++m_renderState->generation;
+    }
+    if(wasArmed)invalidateRenderTransforms();
     disconnect(m_frameConnection);
     disconnect(m_visibilityConnection);
     m_frameConnection = {};

@@ -15,7 +15,9 @@ Item {
     property string selectedId:""
     property var connectionRows:[]
     property bool snapshotDirty:true
+    property double snapshotRevision:-1
     property string protocolFilter:""
+    property var sortCache:({mode:-1,locale:"",ids:[],keys:Object.create(null)})
     readonly property var selected:connectionRows.find(record=>String(record.id)===selectedId)||null
     readonly property var observedRoute:selected&&selected.route?selected.route:({})
     function observed(value) {return value===undefined||value===null||value===""?qsTr("未提供"):String(value)}
@@ -59,30 +61,30 @@ Item {
     readonly property var protocolOptions:[qsTr("全部协议")].concat(Array.from(new Set(connectionRows.map(row=>row.protocol||"").concat([protocolFilter]).filter(value=>value.length))).sort())
     function refreshSnapshot() {
         if(!visible||!updatesEnabled)return
+        const revision=engineController.telemetry.connectionRevision
+        if(revision===snapshotRevision){snapshotDirty=false;return}
         const observer=performanceObserver
         if(observer)observer.mark(1,true)
         try {
             let rows
             if(observer)observer.mark(2,true)
             try {
-                // A method return owns its QVariantList data. Reading the property
-                // here retains nested route references that can change before refresh.
-                rows=engineController.telemetry.connectionSnapshot().map(row=>Object.assign({},row,{
-                    host:observed(row.host),ip:observed((row.route||{}).chosen_ip||row.ip),
-                    process:observed(row.process),protocol:observed(row.protocol),latency:observed(row.latency)
-                }))
+                // The native model returns complete frozen values owned by this engine.
+                rows=connectionRowsModel.readSnapshot(engineController.telemetry,qsTr("未提供"))
+                if(!Array.isArray(rows))return
             } finally {if(observer)observer.mark(2,false)}
             let changed
             if(observer)observer.mark(3,true)
             try {
                 changed=rows.length!==connectionRows.length
                 for(let i=0;!changed&&i<rows.length;++i)
-                    changed=JSON.stringify(rows[i])!==JSON.stringify(connectionRows[i])
+                    changed=rows[i]!==connectionRows[i]
             } finally {if(observer)observer.mark(3,false)}
             if(observer)observer.mark(4,true)
             try {if(changed)connectionRows=rows}
             finally {if(observer)observer.mark(4,false)}
-            snapshotDirty=false
+            snapshotRevision=revision
+            snapshotDirty=engineController.telemetry.connectionRevision!==revision
         } finally {if(observer)observer.mark(1,false)}
     }
     onVisibleChanged:if(visible)refreshSnapshot()
@@ -113,21 +115,34 @@ Item {
         } finally {if(observer)observer.mark(5,false)}
         if(observer)observer.mark(6,true)
         try {
-            rows.sort(function(a,b){
-                let order=0
-                if(sort.currentIndex===1) {
-                    const av=page.latencyValue(a),bv=page.latencyValue(b)
-                    order=av===bv?0:av<bv?-1:1
-                } else if(sort.currentIndex===2||sort.currentIndex===4) {
-                    const key=sort.currentIndex===2?"downloadBytes":"uploadBytes"
-                    order=Number(b[key]||0)-Number(a[key]||0)
-                } else if(sort.currentIndex===5) order=Number(b.lastSeen||0)-Number(a.lastSeen||0)
-                else {
-                    const key=sort.currentIndex===0?"host":"process"
-                    order=String(a[key]||"").localeCompare(String(b[key]||""),undefined,{numeric:true})
-                }
-                return order||String(a.id).localeCompare(String(b.id),undefined,{numeric:true})
-            })
+            const mode=sort.currentIndex,locale=Qt.locale().name
+            const key=mode===0?"host":mode===3?"process":""
+            const cache=sortCache,records=Object.create(null),keys=Object.create(null)
+            let sameOrder=key.length>0&&cache.mode===mode&&cache.locale===locale&&cache.ids.length===rows.length
+            if(key.length)for(const row of rows){
+                const id=String(row.id),value=String(row[key]||"")
+                records[id]=row;keys[id]=value
+                if(cache.keys[id]!==value)sameOrder=false
+            }
+            if(sameOrder)rows=cache.ids.map(id=>records[id])
+            else {
+                rows.sort(function(a,b){
+                    let order=0
+                    if(sort.currentIndex===1) {
+                        const av=page.latencyValue(a),bv=page.latencyValue(b)
+                        order=av===bv?0:av<bv?-1:1
+                    } else if(sort.currentIndex===2||sort.currentIndex===4) {
+                        const key=sort.currentIndex===2?"downloadBytes":"uploadBytes"
+                        order=Number(b[key]||0)-Number(a[key]||0)
+                    } else if(sort.currentIndex===5) order=Number(b.lastSeen||0)-Number(a.lastSeen||0)
+                    else {
+                        const key=sort.currentIndex===0?"host":"process"
+                        order=String(a[key]||"").localeCompare(String(b[key]||""),undefined,{numeric:true})
+                    }
+                    return order||String(a.id).localeCompare(String(b.id),undefined,{numeric:true})
+                })
+                if(key.length){cache.mode=mode;cache.locale=locale;cache.ids=rows.map(row=>String(row.id));cache.keys=keys}
+            }
         } finally {if(observer)observer.mark(6,false)}
         return rows
     }

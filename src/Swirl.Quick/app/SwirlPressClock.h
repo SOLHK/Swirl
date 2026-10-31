@@ -49,6 +49,7 @@ public:
     void setMinimumScale(qreal value);
     Q_INVOKABLE void start();
     Q_INVOKABLE void stop();
+    Q_INVOKABLE qreal adoptedValue(qreal fallback) const;
 signals:
     void windowChanged();
     void fromChanged();

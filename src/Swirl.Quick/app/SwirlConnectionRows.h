@@ -9,10 +9,10 @@
 
 class QJSEngine;
 
-// ConnectionsPage supplies immutable JSON snapshots from its owning QML engine.
-// Retaining the complete entry avoids recursively converting every field through
-// ListModel's dynamic QVariant roles. get() returns that immutable entry, not a
-// writable ListModel row wrapper. This model is confined to the engine thread.
+// readSnapshot produces frozen JSON values in this model's engine and retains
+// their complete native values for comparison. Other JS sources keep the strict
+// JSON comparison path. get() returns an owned entry, not a writable row wrapper.
+// This model is confined to the engine thread.
 class SwirlConnectionRows : public QAbstractListModel {
     Q_OBJECT
     QML_ELEMENT
@@ -29,6 +29,7 @@ public:
     QHash<int, QByteArray> roleNames() const override;
     QJSValue sourceRows() const;
     void setSourceRows(const QJSValue &source);
+    Q_INVOKABLE QJSValue readSnapshot(QObject *source, const QString &missing);
     QObject *performanceObserver() const { return m_observer.data(); }
     void setPerformanceObserver(QObject *observer);
     QString error() const { return m_error; }
@@ -42,7 +43,7 @@ signals:
     void aboutToSync();
     void synced();
 private:
-    struct Row { QString key, signature; QJSValue entry; };
+    struct Row { QString key, signature; QJSValue entry; QVariantMap native; };
     bool setError(const QString &error);
     bool prepareEngine();
     void resetAfterEngineDestroyed();
@@ -52,11 +53,14 @@ private:
     static void mark(const QPointer<QObject> &observer, bool entering);
     QVector<Row> m_rows;
     QHash<QString, int> m_index;
+    QHash<QString, Row> m_ownedRows;
     QJSValue m_source, m_json, m_stringify;
+    QJSValue m_freeze, m_isFrozen;
     QPointer<QJSEngine> m_engine;
     QPointer<QObject> m_observer;
     QString m_error;
     quint64 m_sourceRevision = 0;
+    quint64 m_snapshotGeneration = 0;
     bool m_pending = false;
     bool m_syncing = false;
     bool m_queued = false;
