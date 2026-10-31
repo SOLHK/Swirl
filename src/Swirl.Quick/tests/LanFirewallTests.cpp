@@ -9,7 +9,7 @@ class LanFirewallTests final : public QObject {
 private:
     void exercise(LanFirewall::FixtureCase scenario) {
         const auto result = LanFirewall::exerciseNativeFixture(scenario);
-        QVERIFY2(result.ok, qPrintable(result.error));
+        QVERIFY2(result.ok, qUtf8Printable(result.error));
         QCOMPARE(result.record.value("native_com"), QJsonValue(true));
         QCOMPARE(result.record.value("enabled"), QJsonValue(false));
         QCOMPARE(result.record.value("local_address"), QJsonValue("127.0.0.1"));
@@ -41,3 +41,4 @@ int main(int argc, char **argv) {
 }
 
 #include "LanFirewallTests.moc"
+

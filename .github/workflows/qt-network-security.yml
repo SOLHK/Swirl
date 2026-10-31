@@ -191,8 +191,19 @@ jobs:
         env:
           SWIRL_LAN_FIREWALL_TEST: '1'
         run: |
-          & build/qt-product/Release/SwirlLanFirewallTests.exe -o build/qt-product/lan-firewall-native.xml,xml -o -,txt
-          if ($LASTEXITCODE -ne 0) { throw 'The native COM firewall fixture failed; this is not a skipped or simulated result.' }
+          & build/qt-product/Release/SwirlLanFirewallTests.exe -o build/qt-product/lan-firewall-native.xml,xml -o build/qt-product/lan-firewall-native.txt,txt
+          $fixtureExitCode = $LASTEXITCODE
+          # The Qt Windows text logger can use OutputDebugString without a
+          # console. Preserve its original report and print it into the job log.
+          if (Test-Path -LiteralPath 'build/qt-product/lan-firewall-native.txt') {
+            Get-Content -LiteralPath 'build/qt-product/lan-firewall-native.txt' -Encoding utf8
+          } elseif (Test-Path -LiteralPath 'build/qt-product/lan-firewall-native.xml') {
+            Get-Content -LiteralPath 'build/qt-product/lan-firewall-native.xml' -Encoding utf8
+          }
+          if ($fixtureExitCode -ne 0) {
+            $fixtureExitCodeHex = '{0:X8}' -f [BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$fixtureExitCode), 0)
+            throw "The native COM firewall fixture failed with exit code $fixtureExitCode (0x$fixtureExitCodeHex); this is not a skipped or simulated result."
+          }
       - name: Require native firewall roundtrip and conflict evidence without skips
         shell: python
         run: |
@@ -271,8 +282,10 @@ jobs:
             build/qt-product/subscription-security.xml
             build/qt-product/lan-proxy-control.xml
             build/qt-product/lan-firewall-native.xml
+            build/qt-product/lan-firewall-native.txt
             build/qt-product/qt-network-policy.xml
             build/qt-product/swirl-telemetry-accounting.xml
             build/qt-product/Testing/Temporary/LastTest.log
             build/qt-product/Release/Swirl-diagnostics.txt
           if-no-files-found: error
+

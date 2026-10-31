@@ -199,7 +199,7 @@ bool writeRecord(const QString &path, const QJsonObject &record) {
 }
 QString hrError(const char *stage, HRESULT hr) {
     return QStringLiteral("Windows LAN %1 失败（0x%2）；未放宽安全配置。")
-        .arg(QString::fromLatin1(stage), QString::number(quint32(hr), 16));
+        .arg(QString::fromUtf8(stage), QString::number(quint32(hr), 16));
 }
 QString guidString(const GUID &guid) {
     wchar_t text[40]{};
@@ -371,39 +371,53 @@ bool applyRule(INetFwRules *rules, const QJsonObject &record, QString *error) {
     hr = CoCreateInstance(CLSID_NetFwRule, nullptr, CLSCTX_INPROC_SERVER, IID_INetFwRule,
                           reinterpret_cast<void **>(rule.out()));
     if (FAILED(hr)) return reject(error, hrError("规则创建", hr));
-    const auto string = [&](const char *key, auto setter) {
-        if (FAILED(hr))return;
-        const String text(record.value(QLatin1String(key)).toString());
-        hr=text.value?(rule.value->*setter)(text):E_OUTOFMEMORY;
+    const char *stage = "INetFwRule property initialization";
+    const auto property = [&](const char *operation, auto setter) {
+        if (FAILED(hr)) return;
+        stage = operation;
+        hr = setter();
     };
-    string("name", &INetFwRule::put_Name); string("description", &INetFwRule::put_Description);
-    string("group", &INetFwRule::put_Grouping); string("application", &INetFwRule::put_ApplicationName);
-    if (SUCCEEDED(hr)) hr = rule->put_Protocol(record.value("protocol").toInt());
-    string("local_ports", &INetFwRule::put_LocalPorts); string("remote_ports", &INetFwRule::put_RemotePorts);
-    string("local_addresses", &INetFwRule::put_LocalAddresses); string("remote_addresses", &INetFwRule::put_RemoteAddresses);
-    string("interface_types", &INetFwRule::put_InterfaceTypes);
-    if (SUCCEEDED(hr)) hr = rule->put_Direction(NET_FW_RULE_DIR_IN);
-    if (SUCCEEDED(hr)) hr = rule->put_Action(NET_FW_ACTION_ALLOW);
-    if (SUCCEEDED(hr)) hr = rule->put_Profiles(record.value("profiles").toInt());
-    if (SUCCEEDED(hr)) hr = rule->put_EdgeTraversal(VARIANT_FALSE);
+    const auto string = [&](const char *key, const char *operation, auto setter) {
+        if (FAILED(hr)) return;
+        const String text(record.value(QLatin1String(key)).toString());
+        property(operation, [&]() { return text.value ? (rule.value->*setter)(text) : E_OUTOFMEMORY; });
+    };
+    string("name", "INetFwRule::put_Name", &INetFwRule::put_Name);
+    string("description", "INetFwRule::put_Description", &INetFwRule::put_Description);
+    string("group", "INetFwRule::put_Grouping", &INetFwRule::put_Grouping);
+    string("application", "INetFwRule::put_ApplicationName", &INetFwRule::put_ApplicationName);
+    property("INetFwRule::put_Protocol", [&]() { return rule->put_Protocol(record.value("protocol").toInt()); });
+    string("local_ports", "INetFwRule::put_LocalPorts", &INetFwRule::put_LocalPorts);
+    string("remote_ports", "INetFwRule::put_RemotePorts", &INetFwRule::put_RemotePorts);
+    string("local_addresses", "INetFwRule::put_LocalAddresses", &INetFwRule::put_LocalAddresses);
+    string("remote_addresses", "INetFwRule::put_RemoteAddresses", &INetFwRule::put_RemoteAddresses);
+    string("interface_types", "INetFwRule::put_InterfaceTypes", &INetFwRule::put_InterfaceTypes);
+    property("INetFwRule::put_Direction", [&]() { return rule->put_Direction(NET_FW_RULE_DIR_IN); });
+    property("INetFwRule::put_Action", [&]() { return rule->put_Action(NET_FW_ACTION_ALLOW); });
+    property("INetFwRule::put_Profiles", [&]() { return rule->put_Profiles(record.value("profiles").toInt()); });
+    property("INetFwRule::put_EdgeTraversal", [&]() { return rule->put_EdgeTraversal(VARIANT_FALSE); });
     VARIANT interfaces; VariantInit(&interfaces); interfaces.vt = VT_ARRAY | VT_VARIANT;
     interfaces.parray = SafeArrayCreateVector(VT_VARIANT, 0, 1);
-    if (!interfaces.parray) hr = E_OUTOFMEMORY;
+    property("SafeArrayCreateVector(Interfaces)", [&]() { return interfaces.parray ? S_OK : E_OUTOFMEMORY; });
     if (SUCCEEDED(hr)) {
         VARIANT alias; VariantInit(&alias); alias.vt = VT_BSTR;
         const auto text = record.value("interfaces").toArray().first().toString();
         alias.bstrVal = SysAllocStringLen(reinterpret_cast<const OLECHAR *>(text.utf16()), UINT(text.size()));
         LONG index = 0;
-        hr = alias.bstrVal?SafeArrayPutElement(interfaces.parray, &index, &alias):E_OUTOFMEMORY;
+        property("SafeArrayPutElement(Interfaces)", [&]() {
+            return alias.bstrVal ? SafeArrayPutElement(interfaces.parray, &index, &alias) : E_OUTOFMEMORY;
+        });
         VariantClear(&alias);
     }
-    if (SUCCEEDED(hr)) hr = rule->put_Interfaces(interfaces);
+    property("INetFwRule::put_Interfaces", [&]() { return rule->put_Interfaces(interfaces); });
     VariantClear(&interfaces);
     // Production journals require enabled=true. The separately compiled test
     // fixture exercises the identical COM path with permanently disabled rules.
-    if (SUCCEEDED(hr)) hr = rule->put_Enabled(record.value("enabled").toBool() ? VARIANT_TRUE : VARIANT_FALSE);
-    if (SUCCEEDED(hr)) hr = rules->Add(rule.value);
-    if (FAILED(hr)) return reject(error, hrError("防火墙规则应用", hr));
+    property("INetFwRule::put_Enabled", [&]() {
+        return rule->put_Enabled(record.value("enabled").toBool() ? VARIANT_TRUE : VARIANT_FALSE);
+    });
+    property("INetFwRules::Add", [&]() { return rules->Add(rule.value); });
+    if (FAILED(hr)) return reject(error, hrError(stage, hr));
     Com<INetFwRule> observed;
     hr = rules->Item(name, observed.out());
     if (FAILED(hr) || ruleSnapshot(observed.value) != record)
@@ -888,3 +902,4 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
     return result;
 }
 #endif
+
