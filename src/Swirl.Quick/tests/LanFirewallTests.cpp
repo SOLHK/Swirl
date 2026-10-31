@@ -48,11 +48,12 @@ private:
         if (scenario == LanFirewall::FixtureCase::InvalidProperty) {
             const auto diagnostic = result.diagnostic;
             requireDiagnostic(diagnostic);
-            QCOMPARE(diagnostic.value("operation"), QJsonValue("INetFwRule::put_Description"));
-            QCOMPARE(diagnostic.value("property"), QJsonValue("Description"));
+            QCOMPARE(diagnostic.value("operation"), QJsonValue("INetFwRule::put_Protocol"));
+            QCOMPARE(diagnostic.value("property"), QJsonValue("Protocol"));
             QCOMPARE(diagnostic.value("hresult"), QJsonValue("0x80070057"));
             QCOMPARE(diagnostic.value("hresult_source"), QJsonValue("native_hresult"));
-            QCOMPARE(diagnostic.value("value_type"), QJsonValue("BSTR"));
+            QCOMPARE(diagnostic.value("value_type"), QJsonValue("LONG"));
+            QCOMPARE(diagnostic.value("value_summary").toObject().value("value"), QJsonValue(257));
             QCOMPARE(diagnostic.value("add_attempted"), QJsonValue(false));
             QCOMPARE(diagnostic.value("add_succeeded"), QJsonValue(false));
             QCOMPARE(diagnostic.value("persisted_rule_state"), QJsonValue("not_added"));

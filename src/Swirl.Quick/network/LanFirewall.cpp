@@ -1261,7 +1261,7 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
             return true;
         }
         if (scenario == FixtureCase::InvalidProperty) {
-            const auto privateValue = QStringLiteral("SwirlDiagnosticPrivateSentinel|invalid-description");
+            const auto privateValue = QStringLiteral("SwirlDiagnosticPrivateSentinel");
             // Establish the original HRESULT independently on a transient real
             // INetFwRule. This control object is never passed to Add.
             Com<INetFwRule> control;
@@ -1269,16 +1269,20 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
                 IID_INetFwRule, reinterpret_cast<void **>(control.out()));
             if (!check(SUCCEEDED(created) && control.value,
                        "Cannot create the native invalid-property positive control.")) return false;
-            const String description(privateValue);
-            if (!check(description.value != nullptr, "Cannot allocate the invalid-property control value.")) return false;
-            const auto nativeFailure = control->put_Description(description);
+            // Description text validation may be deferred until Add by the
+            // Windows implementation. A protocol beyond ANY (256) exercises
+            // the numeric setter's actual argument validation instead.
+            constexpr LONG invalidProtocol = 257;
+            const auto nativeFailure = control->put_Protocol(invalidProtocol);
             if (!check(nativeFailure == E_INVALIDARG,
-                       "The native Description positive control did not return E_INVALIDARG.")) return false;
+                       "The native Protocol positive control returned " + hresultText(nativeFailure)
+                           + "; expected E_INVALIDARG for protocol 257.")) return false;
 
             const auto session = QUuid::createUuid().toString(QUuid::Id128);
             auto invalid = first.record.value("rules").toArray().first().toObject();
             invalid.insert("name", "SwirlLanTest-" + session + "-invalid");
             invalid.insert("description", privateValue);
+            invalid.insert("protocol", int(invalidProtocol));
             Fixture candidate{directory.filePath(session + ".dpapi"), first.record};
             candidate.record.insert("session", session);
             candidate.record.insert("rules", QJsonArray{invalid});
@@ -1291,8 +1295,8 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
             const bool applied = applyRule(rules.value, invalid, &failure, &diagnostic);
             result.diagnostic = diagnostic;
             if (!check(!applied && !failure.isEmpty()
-                       && diagnostic.value("operation") == QJsonValue("INetFwRule::put_Description")
-                       && diagnostic.value("property") == QJsonValue("Description")
+                       && diagnostic.value("operation") == QJsonValue("INetFwRule::put_Protocol")
+                       && diagnostic.value("property") == QJsonValue("Protocol")
                        && diagnostic.value("hresult") == QJsonValue("0x80070057")
                        && diagnostic.value("hresult_source") == QJsonValue("native_hresult")
                        && diagnostic.value("add_attempted") == QJsonValue(false),

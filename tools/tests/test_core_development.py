@@ -1098,6 +1098,27 @@ class CoreDevelopmentTests(unittest.TestCase):
             with self.subTest(source=source[-80:]), self.assertRaises(ValueError):
                 development.updated_workflow(source)
 
+    def test_native_lan_branch_preserves_exact_reviewed_ci_scope(self):
+        checked_in = (Path(__file__).resolve().parents[2] / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
+        branch = "work/native-lan-proxy-20261031"
+        self.assertEqual(checked_in.count(branch), 1)
+        self.assertEqual(development.updated_workflow(checked_in), checked_in)
+        for required in ("test", "main", "work/core-completion-20261017",
+                         "work/core-rule-routing-20261021", "work/rust-core-network-fixes-20261021",
+                         "work/xray-v2ray-json-import-20261021"):
+            self.assertIn(required, checked_in.split("  pull_request:\n", 1)[0])
+        for replacement in ("work/unreviewed-lan-branch", "work/*", branch + ", " + branch):
+            with self.subTest(replacement=replacement), self.assertRaises(ValueError):
+                development.updated_workflow(checked_in.replace(branch, replacement, 1))
+        for removed in ("test, ", "main, ", "work/core-completion-20261017, ",
+                        "work/core-rule-routing-20261021, ", "work/rust-core-network-fixes-20261021, ",
+                        "work/xray-v2ray-json-import-20261021, "):
+            with self.subTest(removed=removed), self.assertRaises(ValueError):
+                development.updated_workflow(checked_in.replace(removed, "", 1))
+        push = checked_in.split("  pull_request:\n", 1)[0].split("on:\n", 1)[1]
+        with self.assertRaises(ValueError):
+            development.updated_workflow(checked_in.replace(push, push + push, 1))
+
     def test_partial_or_duplicate_new_test_menu_fails_closed(self):
         for injected in (
             "          python ../tools/tests/test_dns_https.py\n",
