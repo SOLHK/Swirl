@@ -197,9 +197,12 @@ bool writeRecord(const QString &path, const QJsonObject &record) {
     return !encrypted.isEmpty() && file.open(QIODevice::WriteOnly)
         && file.write(encrypted) == encrypted.size() && file.commit();
 }
+QString hresultText(HRESULT hr) {
+    return QStringLiteral("0x%1").arg(quint32(hr), 8, 16, QLatin1Char('0'));
+}
 QString hrError(const char *stage, HRESULT hr) {
-    return QStringLiteral("Windows LAN %1 失败（0x%2）；未放宽安全配置。")
-        .arg(QString::fromUtf8(stage), QString::number(quint32(hr), 16));
+    return QStringLiteral("Windows LAN %1 失败（%2）；未放宽安全配置。")
+        .arg(QString::fromUtf8(stage), hresultText(hr));
 }
 QString guidString(const GUID &guid) {
     wchar_t text[40]{};
@@ -289,11 +292,55 @@ QJsonObject adapterSnapshot(const QString &ip, QString *error) {
     selected.insert("host_addresses", QJsonArray::fromStringList(orderedHosts));
     return selected;
 }
-bool firewall(Com<INetFwPolicy2> &policy, Com<INetFwRules> &rules, QString *error) {
+// Only fixed labels, numeric enums, lengths and booleans enter diagnostics.
+// Never serialize a journal, BSTR, interface alias or application path here.
+struct ComCall {
+    QString operation, property, valueType, source = QStringLiteral("native_hresult"), reason;
+    QJsonObject summary;
+    QJsonArray secondaryFailures;
+    HRESULT hr = S_OK;
+    void set(const char *op, const char *prop, HRESULT result, const char *type,
+             const QJsonObject &safeSummary = {}, const char *origin = "native_hresult",
+             const char *why = "") {
+        operation = QString::fromLatin1(op); property = QString::fromLatin1(prop);
+        hr = result; valueType = QString::fromLatin1(type); summary = safeSummary;
+        source = QString::fromLatin1(origin); reason = QString::fromLatin1(why);
+    }
+    QJsonObject json() const {
+        return {{"operation", operation}, {"property", property}, {"hresult", hresultText(hr)},
+                {"hresult_source", source}, {"value_type", valueType},
+                {"value_summary", summary}, {"reason", reason}, {"secondary_failures", secondaryFailures}};
+    }
+    void releaseFailure(const char *prop, HRESULT result) {
+        secondaryFailures.append(QJsonObject{{"operation", "VariantClear"}, {"property", QLatin1String(prop)},
+            {"hresult", hresultText(result)}, {"hresult_source", "native_hresult"}});
+    }
+};
+QJsonObject textSummary(const QString &text) {
+    return {{"utf16_length", double(text.size())}, {"empty", text.isEmpty()},
+            {"contains_nul", text.contains(QChar(u'\0'))}, {"redacted", true}};
+}
+QJsonObject ruleSummary(const QJsonObject &record) {
+    const auto application = QDir::toNativeSeparators(record.value("application").toString());
+    return {{"protocol", record.value("protocol").toInt()}, {"profiles", record.value("profiles").toInt()},
+            {"enabled", record.value("enabled").toBool()}, {"edge_traversal", record.value("edge_traversal").toBool()},
+            {"application_length", double(application.size())},
+            {"application_absolute", QDir::isAbsolutePath(application)},
+            {"application_native_separators", !application.contains('/')},
+            {"interface_count", record.value("interfaces").toArray().size()}, {"redacted", true}};
+}
+bool firewall(Com<INetFwPolicy2> &policy, Com<INetFwRules> &rules, QString *error,
+              ComCall *diagnostic = nullptr) {
+    ComCall call;
     auto hr = CoCreateInstance(CLSID_NetFwPolicy2, nullptr, CLSCTX_INPROC_SERVER, IID_INetFwPolicy2,
                               reinterpret_cast<void **>(policy.out()));
-    if (SUCCEEDED(hr)) hr = policy->get_Rules(rules.out());
-    return SUCCEEDED(hr) || reject(error, hrError("防火墙访问", hr));
+    call.set("CoCreateInstance", "FirewallPolicy", hr, "INetFwPolicy2*");
+    if (SUCCEEDED(hr)) {
+        hr = policy->get_Rules(rules.out());
+        call.set("INetFwPolicy2::get_Rules", "Rules", hr, "INetFwRules*");
+    }
+    if (diagnostic) *diagnostic = call;
+    return SUCCEEDED(hr) || reject(error, hrError(qPrintable(call.operation), hr));
 }
 bool profileEnabled(INetFwPolicy2 *policy, int profile, QString *error) {
     VARIANT_BOOL enabled = VARIANT_FALSE, blocked = VARIANT_FALSE;
@@ -310,152 +357,446 @@ bool profileEnabled(INetFwPolicy2 *policy, int profile, QString *error) {
         return reject(error, QStringLiteral("所选网络必须启用防火墙、默认阻止入站且允许精确规则；未更改系统防火墙设置。"));
     return true;
 }
-QJsonObject ruleSnapshot(INetFwRule *rule) {
+QJsonObject ruleSnapshot(INetFwRule *rule, ComCall *failure = nullptr) {
+    ComCall local;
+    auto &call = failure ? *failure : local;
+    if (!rule) {
+        call.set("ruleSnapshot", "Rule", E_POINTER, "INetFwRule*", {}, "local_validation", "null_interface");
+        return {};
+    }
     QJsonObject result;
-    const auto string = [&](const char *key, auto getter) {
-        BSTR text = nullptr;
-        const auto hr = (rule->*getter)(&text);
-        if (SUCCEEDED(hr)) result.insert(QLatin1String(key), QString::fromWCharArray(text ? text : L""));
-        SysFreeString(text);
+    const auto read = [&](const char *op, const char *prop, HRESULT hr, const char *type) {
+        call.set(op, prop, hr, type);
         return SUCCEEDED(hr);
     };
-    if (!string("name", &INetFwRule::get_Name) || !string("description", &INetFwRule::get_Description)
-        || !string("group", &INetFwRule::get_Grouping) || !string("application", &INetFwRule::get_ApplicationName)
-        || !string("local_addresses", &INetFwRule::get_LocalAddresses) || !string("remote_addresses", &INetFwRule::get_RemoteAddresses)
-        || !string("local_ports", &INetFwRule::get_LocalPorts) || !string("remote_ports", &INetFwRule::get_RemotePorts)
-        || !string("interface_types", &INetFwRule::get_InterfaceTypes) || !string("service", &INetFwRule::get_ServiceName)) return {};
+    const auto string = [&](const char *key, const char *prop, const char *op, auto getter) {
+        BSTR text = nullptr;
+        const auto hr = (rule->*getter)(&text);
+        if (SUCCEEDED(hr))
+            result.insert(QLatin1String(key), QString::fromWCharArray(text ? text : L"", int(SysStringLen(text))));
+        SysFreeString(text);
+        return read(op, prop, hr, "BSTR");
+    };
+    if (!string("name", "Name", "INetFwRule::get_Name", &INetFwRule::get_Name)
+        || !string("description", "Description", "INetFwRule::get_Description", &INetFwRule::get_Description)
+        || !string("group", "Grouping", "INetFwRule::get_Grouping", &INetFwRule::get_Grouping)
+        || !string("application", "ApplicationName", "INetFwRule::get_ApplicationName", &INetFwRule::get_ApplicationName)
+        || !string("local_addresses", "LocalAddresses", "INetFwRule::get_LocalAddresses", &INetFwRule::get_LocalAddresses)
+        || !string("remote_addresses", "RemoteAddresses", "INetFwRule::get_RemoteAddresses", &INetFwRule::get_RemoteAddresses)
+        || !string("local_ports", "LocalPorts", "INetFwRule::get_LocalPorts", &INetFwRule::get_LocalPorts)
+        || !string("remote_ports", "RemotePorts", "INetFwRule::get_RemotePorts", &INetFwRule::get_RemotePorts)
+        || !string("interface_types", "InterfaceTypes", "INetFwRule::get_InterfaceTypes", &INetFwRule::get_InterfaceTypes)
+        || !string("service", "ServiceName", "INetFwRule::get_ServiceName", &INetFwRule::get_ServiceName)) return {};
     long protocol = 0, profiles = 0;
     NET_FW_RULE_DIRECTION direction{};
     NET_FW_ACTION action{};
     VARIANT_BOOL enabled{}, edge{};
-    if (FAILED(rule->get_Protocol(&protocol)) || FAILED(rule->get_Profiles(&profiles))
-        || FAILED(rule->get_Direction(&direction)) || FAILED(rule->get_Action(&action))
-        || FAILED(rule->get_Enabled(&enabled)) || FAILED(rule->get_EdgeTraversal(&edge))) return {};
+    if (!read("INetFwRule::get_Protocol", "Protocol", rule->get_Protocol(&protocol), "LONG")
+        || !read("INetFwRule::get_Profiles", "Profiles", rule->get_Profiles(&profiles), "LONG")
+        || !read("INetFwRule::get_Direction", "Direction", rule->get_Direction(&direction), "NET_FW_RULE_DIRECTION")
+        || !read("INetFwRule::get_Action", "Action", rule->get_Action(&action), "NET_FW_ACTION")
+        || !read("INetFwRule::get_Enabled", "Enabled", rule->get_Enabled(&enabled), "VARIANT_BOOL")
+        || !read("INetFwRule::get_EdgeTraversal", "EdgeTraversal", rule->get_EdgeTraversal(&edge), "VARIANT_BOOL")) return {};
+    if ((enabled != VARIANT_TRUE && enabled != VARIANT_FALSE) || (edge != VARIANT_TRUE && edge != VARIANT_FALSE)) {
+        call.set("ruleSnapshot::validateBoolean", enabled != VARIANT_TRUE && enabled != VARIANT_FALSE
+                 ? "Enabled" : "EdgeTraversal", E_INVALIDARG, "VARIANT_BOOL",
+                 {}, "local_validation", "noncanonical_boolean");
+        return {};
+    }
     result.insert("protocol", int(protocol)); result.insert("profiles", int(profiles));
     result.insert("direction", int(direction)); result.insert("action", int(action));
     result.insert("enabled", enabled == VARIANT_TRUE); result.insert("edge_traversal", edge == VARIANT_TRUE);
     VARIANT interfaces; VariantInit(&interfaces);
-    if (FAILED(rule->get_Interfaces(&interfaces))) { VariantClear(&interfaces); return {}; }
+    bool complete = read("INetFwRule::get_Interfaces", "Interfaces", rule->get_Interfaces(&interfaces), "VARIANT");
     QJsonArray aliases;
-    if (interfaces.vt == (VT_ARRAY | VT_VARIANT) && interfaces.parray) {
-        LONG low = 0, high = -1;
-        if (SUCCEEDED(SafeArrayGetLBound(interfaces.parray, 1, &low))
-            && SUCCEEDED(SafeArrayGetUBound(interfaces.parray, 1, &high)) && high - low < 64) {
-            for (LONG index = low; index <= high; ++index) {
-                VARIANT item; VariantInit(&item);
-                if (SUCCEEDED(SafeArrayGetElement(interfaces.parray, &index, &item)) && item.vt == VT_BSTR)
-                    aliases.append(QString::fromWCharArray(item.bstrVal));
-                VariantClear(&item);
-            }
+    if (complete && (interfaces.vt != (VT_ARRAY | VT_VARIANT) || !interfaces.parray
+                     || SafeArrayGetDim(interfaces.parray) != 1)) {
+        call.set("ruleSnapshot::validateInterfaces", "Interfaces", E_INVALIDARG, "VARIANT",
+                 {{"variant_type", int(interfaces.vt)}, {"array_present", interfaces.parray != nullptr}},
+                 "local_validation", "invalid_array_shape");
+        complete = false;
+    }
+    LONG low = 0, high = -1;
+    VARTYPE elementType = VT_EMPTY;
+    if (complete) complete = read("SafeArrayGetVartype", "Interfaces",
+                                  SafeArrayGetVartype(interfaces.parray, &elementType), "VARTYPE");
+    if (complete && elementType != VT_VARIANT) {
+        call.set("ruleSnapshot::validateInterfaces", "Interfaces", E_INVALIDARG, "VARTYPE",
+                 {{"element_type", int(elementType)}}, "local_validation", "invalid_element_type");
+        complete = false;
+    }
+    if (complete) complete = read("SafeArrayGetLBound", "Interfaces", SafeArrayGetLBound(interfaces.parray, 1, &low), "LONG");
+    if (complete) complete = read("SafeArrayGetUBound", "Interfaces", SafeArrayGetUBound(interfaces.parray, 1, &high), "LONG");
+    const qint64 count = qint64(high) - qint64(low) + 1;
+    if (complete && (count < 1 || count > 64)) {
+        call.set("ruleSnapshot::validateInterfaces", "Interfaces", E_INVALIDARG, "SAFEARRAY(VARIANT)",
+                 {{"count", double(count)}}, "local_validation", "invalid_array_bounds");
+        complete = false;
+    }
+    for (qint64 offset = 0; complete && offset < count; ++offset) {
+        LONG index = LONG(qint64(low) + offset);
+        VARIANT item; VariantInit(&item);
+        complete = read("SafeArrayGetElement", "Interfaces", SafeArrayGetElement(interfaces.parray, &index, &item), "VARIANT");
+        if (complete && item.vt != VT_BSTR) {
+            call.set("ruleSnapshot::validateInterfaceElement", "Interfaces", E_INVALIDARG, "VARIANT",
+                     {{"variant_type", int(item.vt)}, {"index", double(offset)}},
+                     "local_validation", "non_string_element");
+            complete = false;
+        }
+        if (complete) aliases.append(QString::fromWCharArray(item.bstrVal ? item.bstrVal : L"", int(SysStringLen(item.bstrVal))));
+        const auto clear = VariantClear(&item);
+        if (FAILED(clear)) {
+            if (complete) call.set("VariantClear", "Interfaces.Element", clear, "VARIANT");
+            else call.releaseFailure("Interfaces.Element", clear);
+            complete = false;
         }
     }
-    VariantClear(&interfaces);
+    const auto clear = VariantClear(&interfaces);
+    if (FAILED(clear)) {
+        if (complete) call.set("VariantClear", "Interfaces", clear, "VARIANT");
+        else call.releaseFailure("Interfaces", clear);
+        complete = false;
+    }
+    if (!complete) return {};
     result.insert("interfaces", aliases);
+    // Preserve the pre-existing Windows-equivalent comparisons: path separators
+    // and case; numeric IPv4 /32 spelling; unordered address and local-port lists.
     result["application"] = QDir::fromNativeSeparators(result.value("application").toString()).toLower();
-    const auto local=normalizedAddresses(result.value("local_addresses").toString());
-    const auto localSubnet=QHostAddress::parseSubnet(local);
-    result["local_addresses"] = !local.contains(',')&&localSubnet.second==32
-        ?localSubnet.first.toString():QString();
+    const auto localAddresses = normalizedAddresses(result.value("local_addresses").toString());
+    const auto localSubnet = QHostAddress::parseSubnet(localAddresses);
+    result["local_addresses"] = !localAddresses.contains(',') && localSubnet.second == 32
+        ? localSubnet.first.toString() : QString();
     result["remote_addresses"] = normalizedAddresses(result.value("remote_addresses").toString());
     result["local_ports"] = normalizedPorts(result.value("local_ports").toString());
     return result;
 }
-bool applyRule(INetFwRules *rules, const QJsonObject &record, QString *error) {
-    const String name(record.value("name").toString());
-    if(!name.value)return reject(error,QStringLiteral("LAN 防火墙规则分配内存失败，未应用规则。"));
-    Com<INetFwRule> existing;
-    auto hr = rules->Item(name, existing.out());
-    if (SUCCEEDED(hr)) return reject(error, QStringLiteral("LAN 防火墙规则名称已存在，未覆盖原规则。"));
-    if (hr != HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) return reject(error, hrError("规则所有权检查", hr));
+struct RuleObservation {
+    enum class Presence { Absent, Present, Unknown };
+    Presence presence = Presence::Unknown;
+    QJsonObject snapshot;
+    ComCall call;
+    bool owned = false;
+    QJsonArray mismatches;
+};
+RuleObservation observeRule(INetFwRules *rules, const QJsonObject &expected) {
+    RuleObservation result;
+    const auto text = expected.value("name").toString();
+    const String name(text);
+    if (!name.value) {
+        result.call.set("SysAllocStringLen", "Name", E_OUTOFMEMORY, "BSTR", textSummary(text), "derived_from_null");
+        return result;
+    }
+    Com<INetFwRule> current;
+    const auto hr = rules->Item(name, current.out());
+    result.call.set("INetFwRules::Item", "Name", hr, "BSTR", textSummary(text));
+    // The API documents exactly this result as absence; all other failures
+    // remain unknown, even if the preceding Add or Remove returned success.
+    if (hr == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
+        result.presence = RuleObservation::Presence::Absent;
+        return result;
+    }
+    if (FAILED(hr) || !current.value) {
+        if (SUCCEEDED(hr)) result.call.reason = QStringLiteral("null_interface");
+        return result;
+    }
+    result.presence = RuleObservation::Presence::Present;
+    ComCall snapshotCall;
+    result.snapshot = ruleSnapshot(current.value, &snapshotCall);
+    if (result.snapshot.isEmpty()) { result.call = snapshotCall; return result; }
+    result.owned = result.snapshot == expected;
+    // Only constant field names, never values, describe an ownership mismatch.
+    const char *keys[] = {"name", "description", "group", "application", "protocol", "local_ports",
+        "remote_ports", "local_addresses", "remote_addresses", "profiles", "interface_types", "interfaces",
+        "direction", "action", "enabled", "edge_traversal", "service"};
+    for (const auto *key : keys)
+        if (result.snapshot.value(QLatin1String(key)) != expected.value(QLatin1String(key)))
+            result.mismatches.append(QLatin1String(key));
+    if (!result.owned && result.mismatches.isEmpty()) result.mismatches.append("record_shape");
+    return result;
+}
+struct RuleDiagnostic {
+    ComCall call;
+    bool addAttempted = false, addSucceeded = false;
+    QString persisted = QStringLiteral("not_added"), ownership = QStringLiteral("not_applicable");
+    QString recovery = QStringLiteral("none");
+    QJsonValue present = QJsonValue::Null;
+    bool cleanupRequired = false, partialPossible = false;
+    QJsonObject verification;
+    QJsonObject addResult;
+    void observe(const RuleObservation &observed) {
+        verification = observed.call.json();
+        verification.insert("snapshot_complete", !observed.snapshot.isEmpty());
+        verification.insert("mismatched_properties", observed.mismatches);
+        if (observed.presence == RuleObservation::Presence::Absent) {
+            persisted = "absent"; ownership = "not_applicable"; present = false;
+            cleanupRequired = false; partialPossible = false; recovery = "none";
+        } else {
+            present = observed.presence == RuleObservation::Presence::Present ? QJsonValue(true) : QJsonValue(QJsonValue::Null);
+            cleanupRequired = true; partialPossible = true;
+            if (observed.snapshot.isEmpty()) {
+                persisted = "unknown"; ownership = "unknown"; recovery = "preserve_journal_retry_read";
+            } else {
+                ownership = observed.owned ? "owned" : "mismatch";
+                persisted = addSucceeded ? (observed.owned ? "present_owned" : "present_mismatch") : "present";
+                recovery = observed.owned ? "owned_cleanup_after_revalidation" : "preserve_journal_admin_review";
+            }
+        }
+    }
+    QJsonObject json() const {
+        auto result = call.json();
+        result.insert("add_attempted", addAttempted); result.insert("add_succeeded", addSucceeded);
+        result.insert("persisted_rule_state", persisted); result.insert("rule_present", present);
+        result.insert("ownership_state", ownership); result.insert("cleanup_required", cleanupRequired);
+        result.insert("partial_persistence_possible", partialPossible); result.insert("recovery_action", recovery);
+        result.insert("verification", verification);
+        if (addAttempted) result.insert("add_result", addResult);
+        return result;
+    }
+};
+QString diagnosticError(const QString &message, const QJsonObject &evidence) {
+    return message + ' ' + QString::fromUtf8(QJsonDocument(evidence).toJson(QJsonDocument::Compact));
+}
+bool ruleFailure(const RuleDiagnostic &context, QString *error, QJsonObject *diagnostic,
+                 const QString &message = {}) {
+    const auto evidence = context.json();
+    if (diagnostic) *diagnostic = evidence;
+    return reject(error, diagnosticError(message.isEmpty()
+        ? hrError(qPrintable(context.call.operation), context.call.hr) : message, evidence));
+}
+bool addAndObserve(INetFwRules *rules, INetFwRule *rule, const QJsonObject &record,
+                   RuleDiagnostic &context, QString *error, QJsonObject *diagnostic) {
+    context.addAttempted = true;
+    const auto hr = rules->Add(rule);
+    context.addSucceeded = SUCCEEDED(hr);
+    auto summary = ruleSummary(record);
+    summary.insert("interface_pointer_present", rule != nullptr);
+    context.call.set("INetFwRules::Add", "Rule", hr, "INetFwRule*", summary);
+    context.addResult = context.call.json();
+    const auto observed = observeRule(rules, record);
+    context.observe(observed);
+    if (FAILED(hr)) return ruleFailure(context, error, diagnostic);
+    if (!observed.owned) {
+        // Keep the successful Add HRESULT separate from the actual read failure.
+        // A property mismatch is not an invented COM failure.
+        if (FAILED(observed.call.hr)) context.call = observed.call;
+        else context.call.reason = observed.snapshot.isEmpty()
+            ? QStringLiteral("persisted_state_unconfirmed") : QStringLiteral("snapshot_mismatch");
+        return ruleFailure(context, error, diagnostic,
+                           QStringLiteral("防火墙规则回读与请求不同或无法确认，恢复记录已保留。"));
+    }
+    if (diagnostic) *diagnostic = context.json();
+    return true;
+}
+bool applyRule(INetFwRules *rules, const QJsonObject &record, QString *error,
+               QJsonObject *diagnostic = nullptr) {
+    RuleDiagnostic context;
+    const auto before = observeRule(rules, record);
+    if (before.presence != RuleObservation::Presence::Absent) {
+        context.call = before.call;
+        context.observe(before);
+        context.call.reason = before.presence == RuleObservation::Presence::Present
+            ? QStringLiteral("name_conflict") : QStringLiteral("existence_unconfirmed");
+        return ruleFailure(context, error, diagnostic, QStringLiteral("LAN 防火墙规则名称已存在或无法确认，未覆盖原规则。"));
+    }
+    // Absence was observed at preflight. A property failure cannot persist this
+    // new, disconnected COM object; it must not claim Add was attempted.
+    context.present = false;
+    context.verification = before.call.json();
+    context.verification.insert("snapshot_complete", false);
     Com<INetFwRule> rule;
-    hr = CoCreateInstance(CLSID_NetFwRule, nullptr, CLSCTX_INPROC_SERVER, IID_INetFwRule,
-                          reinterpret_cast<void **>(rule.out()));
-    if (FAILED(hr)) return reject(error, hrError("规则创建", hr));
-    const char *stage = "INetFwRule property initialization";
-    const auto property = [&](const char *operation, auto setter) {
+    auto hr = CoCreateInstance(CLSID_NetFwRule, nullptr, CLSCTX_INPROC_SERVER, IID_INetFwRule,
+                              reinterpret_cast<void **>(rule.out()));
+    context.call.set("CoCreateInstance", "Rule", hr, "INetFwRule*");
+    if (FAILED(hr)) return ruleFailure(context, error, diagnostic);
+    const auto property = [&](const char *op, const char *prop, const char *type,
+                              const QJsonObject &summary, auto setter) {
         if (FAILED(hr)) return;
-        stage = operation;
         hr = setter();
+        context.call.set(op, prop, hr, type, summary);
     };
-    const auto string = [&](const char *key, const char *operation, auto setter) {
+    const auto string = [&](const char *key, const char *prop, const char *op, auto setter, bool nativePath = false) {
         if (FAILED(hr)) return;
-        const String text(record.value(QLatin1String(key)).toString());
-        property(operation, [&]() { return text.value ? (rule.value->*setter)(text) : E_OUTOFMEMORY; });
+        auto value = record.value(QLatin1String(key)).toString();
+        if (nativePath) value = QDir::toNativeSeparators(value);
+        const String text(value);
+        auto summary = textSummary(value);
+        if (nativePath) {
+            summary.insert("native_separators", !value.contains('/'));
+            summary.insert("absolute", QDir::isAbsolutePath(value));
+        }
+        if (!text.value) {
+            hr = E_OUTOFMEMORY;
+            context.call.set("SysAllocStringLen", prop, hr, "BSTR", summary, "derived_from_null");
+            return;
+        }
+        property(op, prop, "BSTR", summary, [&]() { return (rule.value->*setter)(text); });
     };
-    string("name", "INetFwRule::put_Name", &INetFwRule::put_Name);
-    string("description", "INetFwRule::put_Description", &INetFwRule::put_Description);
-    string("group", "INetFwRule::put_Grouping", &INetFwRule::put_Grouping);
-    // Journals and snapshots use Qt's canonical separators. The Windows
-    // firewall validates the executable path when Add commits the rule.
-    const String application(QDir::toNativeSeparators(record.value("application").toString()));
-    property("INetFwRule::put_ApplicationName", [&]() {
-        return application.value ? rule->put_ApplicationName(application) : E_OUTOFMEMORY;
-    });
-    property("INetFwRule::put_Protocol", [&]() { return rule->put_Protocol(record.value("protocol").toInt()); });
-    string("local_ports", "INetFwRule::put_LocalPorts", &INetFwRule::put_LocalPorts);
-    string("remote_ports", "INetFwRule::put_RemotePorts", &INetFwRule::put_RemotePorts);
-    string("local_addresses", "INetFwRule::put_LocalAddresses", &INetFwRule::put_LocalAddresses);
-    string("remote_addresses", "INetFwRule::put_RemoteAddresses", &INetFwRule::put_RemoteAddresses);
-    string("interface_types", "INetFwRule::put_InterfaceTypes", &INetFwRule::put_InterfaceTypes);
-    property("INetFwRule::put_Direction", [&]() { return rule->put_Direction(NET_FW_RULE_DIR_IN); });
-    property("INetFwRule::put_Action", [&]() { return rule->put_Action(NET_FW_ACTION_ALLOW); });
-    property("INetFwRule::put_Profiles", [&]() { return rule->put_Profiles(record.value("profiles").toInt()); });
-    property("INetFwRule::put_EdgeTraversal", [&]() { return rule->put_EdgeTraversal(VARIANT_FALSE); });
-    VARIANT interfaces; VariantInit(&interfaces); interfaces.vt = VT_ARRAY | VT_VARIANT;
-    interfaces.parray = SafeArrayCreateVector(VT_VARIANT, 0, 1);
-    property("SafeArrayCreateVector(Interfaces)", [&]() { return interfaces.parray ? S_OK : E_OUTOFMEMORY; });
+    string("name", "Name", "INetFwRule::put_Name", &INetFwRule::put_Name);
+    string("description", "Description", "INetFwRule::put_Description", &INetFwRule::put_Description);
+    string("group", "Grouping", "INetFwRule::put_Grouping", &INetFwRule::put_Grouping);
+    // Keep the previously Windows-CI-verified native-path boundary unchanged.
+    string("application", "ApplicationName", "INetFwRule::put_ApplicationName", &INetFwRule::put_ApplicationName, true);
+    property("INetFwRule::put_Protocol", "Protocol", "LONG", {{"value", record.value("protocol").toInt()}},
+             [&]() { return rule->put_Protocol(record.value("protocol").toInt()); });
+    string("local_ports", "LocalPorts", "INetFwRule::put_LocalPorts", &INetFwRule::put_LocalPorts);
+    string("remote_ports", "RemotePorts", "INetFwRule::put_RemotePorts", &INetFwRule::put_RemotePorts);
+    string("local_addresses", "LocalAddresses", "INetFwRule::put_LocalAddresses", &INetFwRule::put_LocalAddresses);
+    string("remote_addresses", "RemoteAddresses", "INetFwRule::put_RemoteAddresses", &INetFwRule::put_RemoteAddresses);
+    string("interface_types", "InterfaceTypes", "INetFwRule::put_InterfaceTypes", &INetFwRule::put_InterfaceTypes);
+    property("INetFwRule::put_Direction", "Direction", "NET_FW_RULE_DIRECTION", {{"value", int(NET_FW_RULE_DIR_IN)}},
+             [&]() { return rule->put_Direction(NET_FW_RULE_DIR_IN); });
+    property("INetFwRule::put_Action", "Action", "NET_FW_ACTION", {{"value", int(NET_FW_ACTION_ALLOW)}},
+             [&]() { return rule->put_Action(NET_FW_ACTION_ALLOW); });
+    property("INetFwRule::put_Profiles", "Profiles", "LONG", {{"value", record.value("profiles").toInt()}},
+             [&]() { return rule->put_Profiles(record.value("profiles").toInt()); });
+    property("INetFwRule::put_EdgeTraversal", "EdgeTraversal", "VARIANT_BOOL", {{"value", false}},
+             [&]() { return rule->put_EdgeTraversal(VARIANT_FALSE); });
+    VARIANT interfaces; VariantInit(&interfaces);
+    if (SUCCEEDED(hr)) {
+        interfaces.vt = VT_ARRAY | VT_VARIANT;
+        interfaces.parray = SafeArrayCreateVector(VT_VARIANT, 0, 1);
+        if (!interfaces.parray) {
+            hr = E_OUTOFMEMORY;
+            context.call.set("SafeArrayCreateVector", "Interfaces", hr, "SAFEARRAY(VARIANT)",
+                             {{"count", 1}}, "derived_from_null");
+        }
+    }
     if (SUCCEEDED(hr)) {
         VARIANT alias; VariantInit(&alias); alias.vt = VT_BSTR;
         const auto text = record.value("interfaces").toArray().first().toString();
         alias.bstrVal = SysAllocStringLen(reinterpret_cast<const OLECHAR *>(text.utf16()), UINT(text.size()));
         LONG index = 0;
-        property("SafeArrayPutElement(Interfaces)", [&]() {
-            return alias.bstrVal ? SafeArrayPutElement(interfaces.parray, &index, &alias) : E_OUTOFMEMORY;
-        });
-        VariantClear(&alias);
+        if (!alias.bstrVal) {
+            hr = E_OUTOFMEMORY;
+            context.call.set("SysAllocStringLen", "Interfaces.Element", hr, "BSTR", textSummary(text), "derived_from_null");
+        } else {
+            property("SafeArrayPutElement", "Interfaces", "VARIANT(BSTR)", {{"index", 0}, {"utf16_length", double(text.size())}},
+                     [&]() { return SafeArrayPutElement(interfaces.parray, &index, &alias); });
+        }
+        const auto clear = VariantClear(&alias);
+        if (FAILED(clear)) {
+            if (SUCCEEDED(hr)) {
+                hr = clear; context.call.set("VariantClear", "Interfaces.Element", hr, "VARIANT");
+            } else context.call.releaseFailure("Interfaces.Element", clear);
+        }
     }
-    property("INetFwRule::put_Interfaces", [&]() { return rule->put_Interfaces(interfaces); });
-    VariantClear(&interfaces);
-    // Production journals require enabled=true. The separately compiled test
-    // fixture exercises the identical COM path with permanently disabled rules.
-    property("INetFwRule::put_Enabled", [&]() {
-        return rule->put_Enabled(record.value("enabled").toBool() ? VARIANT_TRUE : VARIANT_FALSE);
-    });
-    property("INetFwRules::Add", [&]() { return rules->Add(rule.value); });
-    if (FAILED(hr)) return reject(error, hrError(stage, hr));
-    Com<INetFwRule> observed;
-    hr = rules->Item(name, observed.out());
-    if (FAILED(hr) || ruleSnapshot(observed.value) != record)
-        return reject(error, QStringLiteral("防火墙规则回读与请求不同，恢复记录已保留。"));
-    return true;
+    property("INetFwRule::put_Interfaces", "Interfaces", "VARIANT(ARRAY|VARIANT)", {{"count", 1}},
+             [&]() { return rule->put_Interfaces(interfaces); });
+    const auto clear = VariantClear(&interfaces);
+    if (FAILED(clear)) {
+        if (SUCCEEDED(hr)) {
+            hr = clear; context.call.set("VariantClear", "Interfaces", hr, "VARIANT");
+        } else context.call.releaseFailure("Interfaces", clear);
+    }
+    // The production validator requires true. Only the separately compiled
+    // fixture supplies false; no diagnostic changes any rule's Enabled value.
+    property("INetFwRule::put_Enabled", "Enabled", "VARIANT_BOOL", {{"value", record.value("enabled").toBool()}},
+             [&]() { return rule->put_Enabled(record.value("enabled").toBool() ? VARIANT_TRUE : VARIANT_FALSE); });
+    if (FAILED(hr)) return ruleFailure(context, error, diagnostic);
+    // Add may replace a matching identifier. Recheck after property setup too;
+    // this narrows, but cannot make atomic, the Windows name-based API race.
+    const auto beforeCommit = observeRule(rules, record);
+    if (beforeCommit.presence != RuleObservation::Presence::Absent) {
+        context.call = beforeCommit.call; context.observe(beforeCommit);
+        context.call.reason = QStringLiteral("pre_add_name_or_read_conflict");
+        return ruleFailure(context, error, diagnostic,
+                           QStringLiteral("LAN 防火墙提交前发现同名规则或无法确认，未调用 Add。"));
+    }
+    return addAndObserve(rules, rule.value, record, context, error, diagnostic);
 }
-LanFirewall::Result cleanupLocked(const QString &path, const QJsonObject &record) {
+LanFirewall::Result cleanupLocked(const QString &path, const QJsonObject &record
+#ifdef SWIRL_LAN_FIREWALL_TESTS
+                                 , bool fixtureReadFailure = false
+#endif
+                                 ) {
     LanFirewall::Result result; result.record = record;
     Com<INetFwPolicy2> policy; Com<INetFwRules> rules;
-    if (!firewall(policy, rules, &result.error)) return result;
+    ComCall access;
+    if (!firewall(policy, rules, &result.error, &access)) {
+        RuleDiagnostic context;
+        context.call = access; context.persisted = "unknown"; context.ownership = "unknown";
+        context.cleanupRequired = true; context.partialPossible = true; context.recovery = "preserve_journal_retry_read";
+        ruleFailure(context, &result.error, &result.diagnostic);
+        result.diagnostic.insert("journal_retained", QFileInfo::exists(path));
+        result.diagnostic.insert("removed_count", 0);
+        result.diagnostic.insert("confirmed_absent_count", 0);
+        result.diagnostic.insert("rules_not_confirmed_absent", record.value("rules").toArray().size());
+        result.error = diagnosticError(hrError(qPrintable(access.operation), access.hr), result.diagnostic);
+        return result;
+    }
     const auto rows = record.value("rules").toArray();
-    // Reverse order, and only delete an exact owned rule. A foreign edit is
-    // evidence to retain, not permission to overwrite another administrator.
+    int removedCount = 0, absentCount = 0;
+    const auto evidence = [&](const RuleDiagnostic &context) {
+        result.diagnostic = context.json();
+        result.diagnostic.insert("removed_count", removedCount);
+        result.diagnostic.insert("confirmed_absent_count", absentCount);
+        result.diagnostic.insert("journal_retained", QFileInfo::exists(path));
+        result.diagnostic.insert("partial_cleanup", removedCount > 0 && absentCount < rows.size());
+        result.diagnostic.insert("rules_not_confirmed_absent", rows.size() - absentCount);
+        // Rule-level absence never means the whole transaction has finished.
+        if (!result.ok) {
+            result.diagnostic.insert("cleanup_required", true);
+            result.diagnostic.insert("partial_persistence_possible", context.partialPossible || absentCount < rows.size());
+            if (context.recovery == "none")
+                result.diagnostic.insert("recovery_action", absentCount < rows.size()
+                    ? "preserve_journal_retry_read" : "retry_journal_removal");
+        }
+    };
+    // The Windows API has no atomic compare-and-delete. Immediately before
+    // each name-based removal require the complete, unchanged owned snapshot.
     for (int index = rows.size() - 1; index >= 0; --index) {
         const auto expected = rows[index].toObject();
+        auto current = observeRule(rules.value, expected);
+#ifdef SWIRL_LAN_FIREWALL_TESTS
+        if (fixtureReadFailure && current.presence == RuleObservation::Presence::Present) {
+            current.snapshot = {}; current.owned = false;
+            current.call.set("fixture::snapshotReadFailure", "Interfaces", E_ACCESSDENIED, "VARIANT",
+                             {}, "test_injection", "simulated_unavailable_snapshot_after_real_item");
+        }
+#endif
+        RuleDiagnostic context;
+        context.call = current.call; context.observe(current);
+        if (current.presence == RuleObservation::Presence::Absent) { ++absentCount; continue; }
+        if (!current.owned) {
+            evidence(context);
+            result.error = diagnosticError(
+                QStringLiteral("LAN 防火墙规则被外部修改或无法读取，未覆盖它；恢复记录已保留。"), result.diagnostic);
+            return result;
+        }
         const String name(expected.value("name").toString());
-        if(!name.value){result.error=QStringLiteral("LAN 防火墙恢复内存分配失败，记录已保留。");return result;}
-        Com<INetFwRule> current;
-        const auto hr = rules->Item(name, current.out());
-        if (hr == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) continue;
-        if (FAILED(hr) || ruleSnapshot(current.value) != expected) {
-            result.error = QStringLiteral("LAN 防火墙规则被外部修改或无法读取，未覆盖它；恢复记录已保留。"); return result;
+        if (!name.value) {
+            context.call.set("SysAllocStringLen", "Name", E_OUTOFMEMORY, "BSTR",
+                             textSummary(expected.value("name").toString()), "derived_from_null");
+            evidence(context);
+            result.error = diagnosticError(hrError(qPrintable(context.call.operation), context.call.hr), result.diagnostic);
+            return result;
         }
         const auto removed = rules->Remove(name);
-        if (FAILED(removed)) { result.error = hrError("自有规则清理", removed); return result; }
-        Com<INetFwRule> after;
-        if (rules->Item(name, after.out()) != HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
-            result.error = QStringLiteral("未确认 LAN 防火墙规则已移除，恢复记录已保留。"); return result;
+        context.call.set("INetFwRules::Remove", "Name", removed, "BSTR", textSummary(expected.value("name").toString()));
+        const auto after = observeRule(rules.value, expected);
+        context.observe(after);
+        if (after.presence == RuleObservation::Presence::Absent) {
+            ++absentCount;
+            if (SUCCEEDED(removed)) ++removedCount;
+        }
+        if (FAILED(removed) || after.presence != RuleObservation::Presence::Absent) {
+            evidence(context);
+            result.error = diagnosticError(QStringLiteral("未确认 LAN 防火墙规则已安全移除，恢复记录已保留。"), result.diagnostic);
+            return result;
         }
     }
     result.ok = QFile::remove(path);
+    RuleDiagnostic context;
+    context.persisted = "absent"; context.present = false;
+    context.call.set("QFile::remove", "RecoveryJournal", result.ok ? S_OK : E_FAIL, "DPAPI file",
+                     {{"removed", result.ok}}, "local_validation");
     if (result.ok) QFile::remove(readyPath(path, record.value("session").toString()));
-    else result.error = QStringLiteral("LAN 规则已恢复，但恢复记录无法移除。");
+    else {
+        context.cleanupRequired = true; context.recovery = "retry_journal_removal";
+        result.error = QStringLiteral("LAN 规则已恢复，但恢复记录无法移除。");
+    }
+    evidence(context);
+    if (!result.ok) result.error = diagnosticError(result.error, result.diagnostic);
     return result;
 }
 #endif
@@ -628,9 +969,14 @@ LanFirewall::Result LanFirewall::prepare(const QString &path, const QJsonObject 
     if (again != adapter) { QFile::remove(path); if (result.error.isEmpty()) result.error = QStringLiteral("LAN 接口状态在启动期间改变，未修改防火墙。"); return result; }
     for (int i = 0; i < desired.size(); ++i) {
         record.insert("phase", i ? "applying_udp" : "applying_tcp");
-        if (!writeRecord(path, record) || !applyRule(rules.value, desired[i].toObject(), &result.error)) {
+        if (!writeRecord(path, record) || !applyRule(rules.value, desired[i].toObject(), &result.error, &result.diagnostic)) {
             if (result.error.isEmpty()) result.error = QStringLiteral("无法更新 LAN 防火墙事务记录。");
             const auto cleaned = cleanupLocked(path, record);
+            result.diagnostic.insert("rollback", cleaned.diagnostic);
+            result.diagnostic.insert("rollback_complete", cleaned.ok);
+            result.diagnostic.insert("journal_retained", QFileInfo::exists(path));
+            result.error = diagnosticError(result.error, QJsonObject{{"rollback", cleaned.diagnostic},
+                {"rollback_complete", cleaned.ok}, {"journal_retained", QFileInfo::exists(path)}});
             if (!cleaned.ok) result.error += ' ' + cleaned.error;
             return result;
         }
@@ -638,7 +984,11 @@ LanFirewall::Result LanFirewall::prepare(const QString &path, const QJsonObject 
     record.insert("phase", "active");
     if (!writeRecord(path, record)) {
         result.error = QStringLiteral("LAN 防火墙状态确认无法保存，已请求回滚。");
-        const auto cleaned = cleanupLocked(path, record); if (!cleaned.ok) result.error += ' ' + cleaned.error;
+        const auto cleaned = cleanupLocked(path, record);
+        result.diagnostic.insert("rollback", cleaned.diagnostic);
+        result.diagnostic.insert("rollback_complete", cleaned.ok);
+        result.diagnostic.insert("journal_retained", QFileInfo::exists(path));
+        if (!cleaned.ok) result.error += ' ' + cleaned.error;
         return result;
     }
     result.config.insert("host_addresses", adapter.value("host_addresses"));
@@ -663,10 +1013,15 @@ LanFirewall::Result LanFirewall::verify(const QJsonObject &record) {
     Com<INetFwPolicy2> policy; Com<INetFwRules> rules;
     if (!firewall(policy, rules, &result.error) || !profileEnabled(policy.value, record.value("profile").toInt(), &result.error)) return result;
     for (const auto &value : record.value("rules").toArray()) {
-        const auto expected = value.toObject(); Com<INetFwRule> current;
-        const String name(expected.value("name").toString());
-        const auto hr = name.value?rules->Item(name,current.out()):E_OUTOFMEMORY;
-        if (FAILED(hr) || ruleSnapshot(current.value) != expected) { result.error = QStringLiteral("LAN 防火墙规则已改变，已请求停止监听并保留恢复证据。"); return result; }
+        const auto observed = observeRule(rules.value, value.toObject());
+        RuleDiagnostic context;
+        context.call = observed.call; context.observe(observed);
+        result.diagnostic = context.json();
+        if (!observed.owned) {
+            ruleFailure(context, &result.error, nullptr,
+                QStringLiteral("LAN 防火墙规则已改变，已请求停止监听并保留恢复证据。"));
+            return result;
+        }
     }
     result.ok = true;
 #else
@@ -811,8 +1166,18 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
         if (!check(!encrypted.isEmpty() && !encrypted.contains(session.toUtf8())
                    && !encrypted.contains(productionNames ? "SwirlLan-" : "SwirlLanTest-"),
                    "The recovery fixture journal was not encrypted.")) return false;
-        for (const auto &value : desired)
-            if (!applyRule(rules.value, value.toObject(), &result.error)) return false;
+        for (const auto &value : desired) {
+            QJsonObject diagnostic;
+            if (!applyRule(rules.value, value.toObject(), &result.error, &diagnostic)) return false;
+            if (!check(diagnostic.value("add_attempted") == QJsonValue(true)
+                       && diagnostic.value("add_succeeded") == QJsonValue(true)
+                       && diagnostic.value("persisted_rule_state") == QJsonValue("present_owned")
+                       && diagnostic.value("ownership_state") == QJsonValue("owned")
+                       && diagnostic.value("verification").toObject().value("snapshot_complete") == QJsonValue(true),
+                       "Successful native Add was not followed by a complete, owned readback diagnostic.")) return false;
+            result.diagnostic = diagnostic;
+        }
+        recoveryEvidence.insert("successful_add_readback_diagnostic", true);
         return exact(fixture);
     };
     const auto absent = [&](const Fixture &fixture) {
@@ -827,6 +1192,246 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
     const auto exercise = [&]() {
         if (!add()) return false;
         const auto first = fixtures.first();
+        if (scenario == FixtureCase::ReadbackMismatch) {
+            const auto session = QUuid::createUuid().toString(QUuid::Id128);
+            auto actual = first.record.value("rules").toArray().first().toObject();
+            actual.insert("name", "SwirlLanTest-" + session + "-readback");
+            Fixture candidate{directory.filePath(session + ".dpapi"), first.record};
+            candidate.record.insert("session", session);
+            candidate.record.insert("rules", QJsonArray{actual});
+            // Save the exact disabled/loopback IN rule before any Add. The
+            // teardown can use only this independently recorded actual scope.
+            if (!check(actual.value("direction") == QJsonValue(1)
+                       && actual.value("enabled") == QJsonValue(false)
+                       && actual.value("local_addresses") == QJsonValue("127.0.0.1")
+                       && actual.value("remote_addresses") == QJsonValue("127.0.0.1/32")
+                       && writeRecord(candidate.path, candidate.record),
+                       "Cannot preserve the exact safe readback fixture before native Add.")) return false;
+            fixtures.append(candidate);
+            const auto originalJournal = bytes(candidate.path);
+            if (!check(!originalJournal.isEmpty() && readRecord(candidate.path) == candidate.record,
+                       "The prewritten readback fixture journal did not roundtrip.")) return false;
+
+            // Intentionally inconsistent expected direction, not a simulated
+            // administrator race. The existing setter always writes IN; the
+            // production journal validator rejects OUT, so production inputs
+            // cannot take this deliberately malformed test-only expectation.
+            auto expected = actual;
+            expected.insert("direction", 2);
+            QString failure;
+            QJsonObject diagnostic;
+            const bool applied = applyRule(rules.value, expected, &failure, &diagnostic);
+            result.diagnostic = diagnostic;
+            if (!check(!applied && !failure.isEmpty()
+                       && diagnostic.value("operation") == QJsonValue("INetFwRules::Add")
+                       && diagnostic.value("hresult") == QJsonValue("0x00000000")
+                       && diagnostic.value("add_attempted") == QJsonValue(true)
+                       && diagnostic.value("add_succeeded") == QJsonValue(true)
+                       && diagnostic.value("persisted_rule_state") == QJsonValue("present_mismatch")
+                       && diagnostic.value("ownership_state") == QJsonValue("mismatch")
+                       && diagnostic.value("verification").toObject().value("mismatched_properties")
+                              .toArray().contains(QJsonValue("direction")),
+                       "A successful native Add with inconsistent expected direction did not report a persisted mismatch.")) return false;
+            QJsonObject snapshot;
+            if (!observed(actual, &snapshot)
+                || !check(snapshot == actual,
+                          "The persisted native readback rule differs from its prewritten exact safe scope.")) return false;
+
+            auto wrongRecord = candidate.record;
+            wrongRecord.insert("rules", QJsonArray{expected});
+            const auto refused = cleanupLocked(candidate.path, wrongRecord);
+            result.diagnostic.insert("cleanup_refusal", refused.diagnostic);
+            if (!check(!refused.ok && !refused.error.isEmpty()
+                       && refused.diagnostic.value("ownership_state") == QJsonValue("mismatch")
+                       && refused.diagnostic.value("removed_count") == QJsonValue(0)
+                       && refused.diagnostic.value("journal_retained") == QJsonValue(true),
+                       "Cleanup removed a native rule using an inconsistent expected snapshot.")) return false;
+            if (!observed(actual, &snapshot)
+                || !check(snapshot == actual && bytes(candidate.path) == originalJournal
+                          && readRecord(candidate.path) == candidate.record,
+                          "Mismatch cleanup changed the actual rule or its prewritten encrypted ownership record.")
+                || !exact(first)) return false;
+            recoveryEvidence.insert("native_add_succeeded", true);
+            recoveryEvidence.insert("prewritten_actual_journal", true);
+            recoveryEvidence.insert("wrong_expected_cleanup_refused", true);
+            recoveryEvidence.insert("existing_rules_unchanged", true);
+            recoveryEvidence.insert("recovery_journal_unchanged", true);
+            return true;
+        }
+        if (scenario == FixtureCase::InvalidProperty) {
+            const auto privateValue = QStringLiteral("SwirlDiagnosticPrivateSentinel|invalid-description");
+            // Establish the original HRESULT independently on a transient real
+            // INetFwRule. This control object is never passed to Add.
+            Com<INetFwRule> control;
+            const auto created = CoCreateInstance(CLSID_NetFwRule, nullptr, CLSCTX_INPROC_SERVER,
+                IID_INetFwRule, reinterpret_cast<void **>(control.out()));
+            if (!check(SUCCEEDED(created) && control.value,
+                       "Cannot create the native invalid-property positive control.")) return false;
+            const String description(privateValue);
+            if (!check(description.value != nullptr, "Cannot allocate the invalid-property control value.")) return false;
+            const auto nativeFailure = control->put_Description(description);
+            if (!check(nativeFailure == E_INVALIDARG,
+                       "The native Description positive control did not return E_INVALIDARG.")) return false;
+
+            const auto session = QUuid::createUuid().toString(QUuid::Id128);
+            auto invalid = first.record.value("rules").toArray().first().toObject();
+            invalid.insert("name", "SwirlLanTest-" + session + "-invalid");
+            invalid.insert("description", privateValue);
+            Fixture candidate{directory.filePath(session + ".dpapi"), first.record};
+            candidate.record.insert("session", session);
+            candidate.record.insert("rules", QJsonArray{invalid});
+            if (!check(writeRecord(candidate.path, candidate.record),
+                       "Cannot preserve the invalid-property candidate's encrypted recovery record.")) return false;
+            fixtures.append(candidate);
+            const auto originalJournal = bytes(candidate.path);
+            QString failure;
+            QJsonObject diagnostic;
+            const bool applied = applyRule(rules.value, invalid, &failure, &diagnostic);
+            result.diagnostic = diagnostic;
+            if (!check(!applied && !failure.isEmpty()
+                       && diagnostic.value("operation") == QJsonValue("INetFwRule::put_Description")
+                       && diagnostic.value("property") == QJsonValue("Description")
+                       && diagnostic.value("hresult") == QJsonValue("0x80070057")
+                       && diagnostic.value("hresult_source") == QJsonValue("native_hresult")
+                       && diagnostic.value("add_attempted") == QJsonValue(false),
+                       "The invalid-property diagnostic did not preserve the real COM method and HRESULT.")) return false;
+            const auto output = QJsonDocument(diagnostic).toJson(QJsonDocument::Compact) + failure.toUtf8();
+            if (!check(!output.contains(privateValue.toUtf8())
+                       && !output.contains("SwirlDiagnosticPrivateSentinel")
+                       && !output.contains(application.toUtf8())
+                       && !output.contains(application.toLower().toUtf8())
+                       && !output.contains(QDir::toNativeSeparators(application).toUtf8())
+                       && !output.contains(invalid.value("name").toString().toUtf8()),
+                       "A native COM diagnostic exposed an unredacted parameter.")) return false;
+            auto privateContext = invalid;
+            privateContext.insert("application", "C:/Users/PrivatePathSentinel/Swirl.exe");
+            privateContext.insert("interfaces", QJsonArray{"PrivateInterfaceSentinel"});
+            const auto safeContext = QJsonDocument(ruleSummary(privateContext)).toJson(QJsonDocument::Compact);
+            if (!check(!safeContext.contains("PrivatePathSentinel")
+                       && !safeContext.contains("PrivateInterfaceSentinel"),
+                       "The shared Add context summary exposed a private path or interface alias.")) return false;
+            const String name(invalid.value("name").toString());
+            Com<INetFwRule> unexpected;
+            if (!check(name.value && rules->Item(name, unexpected.out()) == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
+                       "An invalid-property rule unexpectedly exists in the native collection.")) return false;
+            if (!check(!originalJournal.isEmpty() && bytes(candidate.path) == originalJournal
+                       && readRecord(candidate.path) == candidate.record,
+                       "Invalid-property diagnostics changed the encrypted recovery transaction.")) return false;
+            recoveryEvidence.insert("native_failure_matched", true);
+            recoveryEvidence.insert("redaction_checked", true);
+            recoveryEvidence.insert("invalid_rule_absent", true);
+            recoveryEvidence.insert("recovery_journal_unchanged", true);
+            return exact(first);
+        }
+        if (scenario == FixtureCase::AddFailure) {
+            // A null INetFwRule is a deterministic invalid native COM argument;
+            // it can never overwrite any existing disabled fixture rule. The
+            // production Add/observation helper still executes the real Add.
+            const auto nativeFailure = rules->Add(nullptr);
+            if (!check(FAILED(nativeFailure), "The native null-rule Add positive control unexpectedly succeeded.")) return false;
+            const auto originalHresult = QStringLiteral("0x%1").arg(quint32(nativeFailure), 8, 16, QLatin1Char('0'));
+            const auto originalJournal = bytes(first.path);
+            const auto expected = first.record.value("rules").toArray().first().toObject();
+            auto missing = expected;
+            missing.insert("name", "SwirlLanTest-" + QUuid::createUuid().toString(QUuid::Id128) + "-absent");
+            const String missingName(missing.value("name").toString());
+            Com<INetFwRule> before;
+            if (!check(missingName.value && rules->Item(missingName, before.out()) == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
+                       "The intended absent-rule test name has a real native collision; it was preserved.")) return false;
+            RuleDiagnostic absentContext;
+            QJsonObject absentDiagnostic;
+            QString absentError;
+            if (!check(!addAndObserve(rules.value, nullptr, missing, absentContext, &absentError, &absentDiagnostic)
+                       && !absentError.isEmpty()
+                       && absentDiagnostic.value("hresult") == QJsonValue(originalHresult)
+                       && absentDiagnostic.value("persisted_rule_state") == QJsonValue("absent"),
+                       "Failed native Add did not preserve its original HRESULT and confirm absence.")) return false;
+            Com<INetFwRule> after;
+            if (!check(rules->Item(missingName, after.out()) == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
+                       "The null-rule Add changed the supposedly absent native rule.")) return false;
+
+            RuleDiagnostic existingContext;
+            QJsonObject existingDiagnostic;
+            QString existingError;
+            if (!check(!addAndObserve(rules.value, nullptr, expected, existingContext, &existingError, &existingDiagnostic)
+                       && !existingError.isEmpty()
+                       && existingDiagnostic.value("hresult") == QJsonValue(originalHresult)
+                       && existingDiagnostic.value("persisted_rule_state") == QJsonValue("present")
+                       && existingDiagnostic.value("ownership_state") == QJsonValue("owned"),
+                       "Failed native Add incorrectly assumed an already-existing rule was absent.")) return false;
+
+            auto mismatched = expected;
+            mismatched.insert("description", "A distinct expected owner that must not replace the existing rule");
+            RuleDiagnostic mismatchedContext;
+            QJsonObject mismatchedDiagnostic;
+            QString mismatchedError;
+            if (!check(!addAndObserve(rules.value, nullptr, mismatched, mismatchedContext, &mismatchedError, &mismatchedDiagnostic)
+                       && !mismatchedError.isEmpty()
+                       && mismatchedDiagnostic.value("hresult") == QJsonValue(originalHresult)
+                       && mismatchedDiagnostic.value("persisted_rule_state") == QJsonValue("present")
+                       && mismatchedDiagnostic.value("ownership_state") == QJsonValue("mismatch"),
+                       "Failed Add confused a matching name with exact rule ownership.")) return false;
+            if (!exact(first)
+                || !check(!originalJournal.isEmpty() && bytes(first.path) == originalJournal
+                          && readRecord(first.path) == first.record,
+                          "Failed Add observation changed existing native rules or the encrypted journal.")) return false;
+            absentDiagnostic.insert("existing_state", existingDiagnostic);
+            absentDiagnostic.insert("mismatched_state", mismatchedDiagnostic);
+            result.diagnostic = absentDiagnostic;
+            recoveryEvidence.insert("native_add_hresult", originalHresult);
+            recoveryEvidence.insert("null_rule_add_native", true);
+            recoveryEvidence.insert("post_add_absence_confirmed", true);
+            recoveryEvidence.insert("existing_rules_unchanged", true);
+            recoveryEvidence.insert("recovery_journal_unchanged", true);
+            return true;
+        }
+        if (scenario == FixtureCase::NameCollision) {
+            const auto originalJournal = bytes(first.path);
+            auto conflicting = first.record.value("rules").toArray().first().toObject();
+            conflicting.insert("description", "A different owner must never replace this disabled fixture");
+            QString failure;
+            QJsonObject diagnostic;
+            const bool applied = applyRule(rules.value, conflicting, &failure, &diagnostic);
+            result.diagnostic = diagnostic;
+            if (!check(!applied && !failure.isEmpty()
+                       && diagnostic.value("operation") == QJsonValue("INetFwRules::Item")
+                       && diagnostic.value("add_attempted") == QJsonValue(false)
+                       && diagnostic.value("persisted_rule_state") == QJsonValue("present")
+                       && diagnostic.value("ownership_state") == QJsonValue("mismatch"),
+                       "A same-name rule with a different expected owner was not refused before Add.")) return false;
+            if (!exact(first)
+                || !check(!originalJournal.isEmpty() && bytes(first.path) == originalJournal
+                          && readRecord(first.path) == first.record,
+                          "Collision refusal changed the original rule or encrypted recovery record.")) return false;
+            recoveryEvidence.insert("same_name_different_owner_refused", true);
+            recoveryEvidence.insert("existing_rules_unchanged", true);
+            recoveryEvidence.insert("recovery_journal_unchanged", true);
+            return true;
+        }
+        if (scenario == FixtureCase::UnknownOwnership) {
+            const auto originalJournal = bytes(first.path);
+            // Only the read failure is injected after a real Item call. This
+            // is not evidence of an actual firewall-service outage; the rules,
+            // DPAPI journal, refusal path and later normal cleanup are real.
+            const auto refused = cleanupLocked(first.path, first.record, true);
+            result.diagnostic = refused.diagnostic;
+            if (!check(!refused.ok && !refused.error.isEmpty()
+                       && refused.diagnostic.value("operation") == QJsonValue("fixture::snapshotReadFailure")
+                       && refused.diagnostic.value("hresult") == QJsonValue("0x80070005")
+                       && refused.diagnostic.value("hresult_source") == QJsonValue("test_injection")
+                       && refused.diagnostic.value("ownership_state") == QJsonValue("unknown")
+                       && refused.diagnostic.value("persisted_rule_state") == QJsonValue("unknown"),
+                       "An explicitly injected snapshot-read failure did not refuse cleanup with unknown ownership.")) return false;
+            if (!exact(first)
+                || !check(!originalJournal.isEmpty() && bytes(first.path) == originalJournal
+                          && readRecord(first.path) == first.record,
+                          "Unconfirmed ownership removed a real rule or changed the encrypted journal.")) return false;
+            recoveryEvidence.insert("snapshot_read_failure_injected", true);
+            recoveryEvidence.insert("unknown_ownership_cleanup_refused", true);
+            recoveryEvidence.insert("existing_rules_unchanged", true);
+            recoveryEvidence.insert("recovery_journal_unchanged", true);
+            return true;
+        }
         if (scenario == FixtureCase::RoundTrip) {
             QString duplicateError;
             if (!check(!applyRule(rules.value, first.record.value("rules").toArray().first().toObject(), &duplicateError)
@@ -848,7 +1453,13 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
             QJsonObject actual;
             if (!observed(expected, &actual) || !check(actual == edited, "The deliberate external edit was not observed.")) return false;
             const auto refused = cleanupLocked(first.path, first.record);
+            result.diagnostic = refused.diagnostic;
             if (!check(!refused.ok && !refused.error.isEmpty(), "Owned cleanup did not reject an external rule edit.")
+                || !check(refused.diagnostic.value("ownership_state") == QJsonValue("mismatch")
+                          && refused.diagnostic.value("cleanup_required") == QJsonValue(true)
+                          && refused.diagnostic.value("journal_retained") == QJsonValue(true)
+                          && refused.diagnostic.value("removed_count") == QJsonValue(0),
+                          "External modification did not retain explicit conflict and recovery diagnostics.")
                 || !check(bytes(first.path) == originalBytes && readRecord(first.path) == first.record,
                           "A recovery conflict changed or removed its encrypted journal.")) return false;
             if (!observed(expected, &actual) || !check(actual == edited, "Conflict recovery modified the external edit.")) return false;
@@ -952,7 +1563,11 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
             recoveryEvidence.insert("dead_owner", true);
             const auto refused = recover(recoveryPath, session, true);
             if (!check(!refused.ok && refused.record == journal
-                       && refused.error == QStringLiteral("LAN 防火墙规则被外部修改或无法读取，未覆盖它；恢复记录已保留。"),
+                       && refused.error == diagnosticError(
+                           QStringLiteral("LAN 防火墙规则被外部修改或无法读取，未覆盖它；恢复记录已保留。"), refused.diagnostic)
+                       && refused.diagnostic.value("ownership_state") == QJsonValue("mismatch")
+                       && refused.diagnostic.value("cleanup_required") == QJsonValue(true)
+                       && refused.diagnostic.value("journal_retained") == QJsonValue(true),
                        "Dead-owner recovery did not reach and reject the non-owned rule snapshot.") || !unchanged()) return false;
             recoveryEvidence.insert("recovery_refused", true);
             recoveryEvidence.insert("foreign_rules_preserved", true);
@@ -973,7 +1588,7 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
         if (!QFileInfo::exists(it->path)) continue;
         if (readRecord(it->path) != it->record) {
             cleanupComplete = false;
-            check(false, "The fixture journal changed unexpectedly; evidence is retained at " + it->path);
+            check(false, "The fixture journal changed unexpectedly; encrypted recovery evidence is retained (path redacted).");
             continue;
         }
         // Undo only the exact edit this fixture just made. If any other property
@@ -994,14 +1609,14 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
             }
         }
         const auto restored = cleanupLocked(it->path, it->record);
-        if (!restored.ok) { cleanupComplete = false; check(false, restored.error + " Journal: " + it->path); }
+        if (!restored.ok) { cleanupComplete = false; check(false, restored.error + " Encrypted recovery journal retained (path redacted)."); }
         else if (!absent(*it)) cleanupComplete = false;
     }
     if (preserveRecoveryEvidence) cleanupComplete = false;
     if (cleanupComplete) cleanupComplete = directory.remove();
     result.ok = result.ok && cleanupComplete;
     if (!cleanupComplete && result.error.isEmpty()) result.error = "The isolated native fixture directory could not be removed.";
-    if (!cleanupComplete) result.error += " Evidence directory: " + directory.path();
+    if (!cleanupComplete) result.error += " Isolated encrypted recovery evidence retained (directory path redacted).";
     result.record = {{"native_com", true}, {"enabled", false}, {"local_address", "127.0.0.1"},
                      {"remote_addresses", "127.0.0.1/32"}, {"tcp_and_udp", true},
                      {"cleanup_complete", cleanupComplete}};
@@ -1014,3 +1629,4 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
     return result;
 }
 #endif
+

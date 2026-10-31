@@ -197,8 +197,13 @@ jobs:
           # console. Preserve its original report and print it into the job log.
           if (Test-Path -LiteralPath 'build/qt-product/lan-firewall-native.txt') {
             Get-Content -LiteralPath 'build/qt-product/lan-firewall-native.txt' -Encoding utf8
-          } elseif (Test-Path -LiteralPath 'build/qt-product/lan-firewall-native.xml') {
+          }
+          # Keep the actual XML available through job logs even when a fixture
+          # fails. The fixture emits only controlled, redacted diagnostics.
+          if (Test-Path -LiteralPath 'build/qt-product/lan-firewall-native.xml') {
+            Write-Output 'SWIRL_XML_BEGIN lan-firewall-native.xml'
             Get-Content -LiteralPath 'build/qt-product/lan-firewall-native.xml' -Encoding utf8
+            Write-Output 'SWIRL_XML_END lan-firewall-native.xml'
           }
           if ($fixtureExitCode -ne 0) {
             $fixtureExitCodeHex = '{0:X8}' -f [BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$fixtureExitCode), 0)
@@ -207,8 +212,11 @@ jobs:
       - name: Require native firewall roundtrip and conflict evidence without skips
         shell: python
         run: |
-          import xml.etree.ElementTree as ET
-          report = ET.parse('build/qt-product/lan-firewall-native.xml').getroot()
+          import hashlib, json, os, subprocess, xml.etree.ElementTree as ET
+          from pathlib import Path
+          path = Path('build/qt-product/lan-firewall-native.xml')
+          xml_bytes = path.read_bytes()
+          report = ET.fromstring(xml_bytes)
           assert report.tag == 'TestCase' and report.get('name') == 'LanFirewallTests'
           assert report.findtext('Environment/QtVersion') == '6.12.0'
           functions = report.findall('TestFunction')
@@ -217,6 +225,11 @@ jobs:
               'externalEditPreservesRulesAndEncryptedJournal',
               'ownedCleanupLeavesIndependentFixtureUntouched',
               'deadOwnerRecoveryRejectsForeignRulesAndPreservesJournals',
+              'invalidPropertyReportsRedactedComContext',
+              'failedAddReportsObservedPersistence',
+              'postAddReadbackMismatchRefusesCleanup',
+              'sameNameCollisionPreservesExistingRule',
+              'unconfirmedOwnershipRefusesCleanup',
           }
           assert mandatory.issubset({function.get('name') for function in functions})
           for function in functions:
@@ -224,7 +237,29 @@ jobs:
               assert incidents and all(incident.get('type') == 'pass' for incident in incidents)
               assert not function.findall('Skip')
               assert not any(message.get('type') == 'skip' for message in function.findall('Message'))
-          print('Actual Windows COM firewall: disabled loopback TCP/UDP rules, DPAPI journal, conflict preservation and exact owned removal executed; no live LAN or Windows 11 acceptance claimed')
+          # Include nested/data-row skips and fatal messages as well as the
+          # original incident checks; process exit zero is not acceptance.
+          assert not report.findall('.//Skip')
+          assert not any(message.get('type') in {'skip', 'qfatal', 'fatal'} for message in report.findall('.//Message'))
+          summary = {
+              'report': path.name,
+              'xml_sha256': hashlib.sha256(xml_bytes).hexdigest(),
+              'qt_version': report.findtext('Environment/QtVersion'),
+              'github_sha': os.environ['GITHUB_SHA'],
+              'checkout_sha': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+              'checkout_tree': subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(),
+              'mandatory_cases': sorted(mandatory),
+              'functions': [{'name': function.get('name'),
+                             'incidents': [incident.get('type') for incident in function.findall('Incident')]}
+                            for function in functions],
+              'passed_incidents': sum(incident.get('type') == 'pass' for incident in report.findall('.//Incident')),
+              'failed_incidents': sum(incident.get('type') != 'pass' for incident in report.findall('.//Incident')),
+              'skips': len(report.findall('.//Skip')) + sum(message.get('type') == 'skip' for message in report.findall('.//Message')),
+          }
+          assert summary['checkout_sha'] == summary['github_sha']
+          Path('build/qt-product/lan-firewall-evidence.json').write_text(json.dumps(summary, indent=2) + '\n', encoding='utf-8')
+          print('SWIRL_FIREWALL_EVIDENCE ' + json.dumps(summary, sort_keys=True))
+          print('Actual Windows COM firewall: all original and diagnostic cases passed with disabled loopback rules and exact owned cleanup; no live LAN or Windows 11 acceptance claimed')
       - name: Build product and network regression targets
         run: cmake --build build/qt-product --config Release --target Swirl SwirlImportTests SwirlTelemetryTests SwirlQtNetworkPolicyTests SwirlLanProxyTests SwirlLanFirewallTests --parallel 2
       - name: Deploy actual Qt product runtime
@@ -274,6 +309,95 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify download policy, HTTPS measurements and preserved capture HTTP/2 input
         run: ctest --test-dir build/qt-product -C Release -R "^swirl-(qt-network-policy|telemetry-accounting|capture-network)$" --output-on-failure --no-tests=error
+      - name: Require actual product XML results without skips
+        shell: python
+        run: |
+          import hashlib, json, os, xml.etree.ElementTree as ET
+          from pathlib import Path
+          expected = {
+              'subscription-security.xml': ('ImportTests', {
+                  'subscriptionAtomicRefreshAndEncryptedUrl',
+                  'httpsRedirectAndDowngradeProtection',
+                  'redirectsPreserveNodesAndBoundLoops',
+              }),
+              'qt-network-policy.xml': ('QtNetworkPolicyTests', {
+                  'unprotectedClientNegotiatesHttp2PositiveControl',
+                  'policyOverridesExplicitHttp2AndDirectOptions',
+                  'subscriptionHttpsDownloadsAndParsesOverHttp1',
+                  'subscriptionHttpsRedirectsStayOnHttp1',
+                  'cleartextSubscriptionIgnoresH2cEnvironment',
+                  'subscriptionStillRejectsUntrustedTls',
+                  'subscriptionStillRejectsHttpsDowngrade',
+                  'shutdownCancelsHangingHttp1Download',
+              }),
+              'swirl-telemetry-accounting.xml': ('TelemetryTests', {
+                  'httpsMeasurementWaitsForCompleteResponse',
+                  'nativeNodeProbeKeepsOutboundAndHeaderDurationsSeparate',
+                  'httpsMeasurementStaysHttp1WhenOriginOffersHttp2',
+                  'proxyLatencyComesFromRustAndRejectsUntrustedTargetTls',
+                  'nativeProbeIgnoresStaleSuccessAndInvalidatesOnRouteChange',
+                  'httpProbeRejectsObsoleteRoundTrip',
+                  'internetUsesExplicitProxyAndActualHttpResponse',
+                  'internetFailureClassificationAndRouteChanges',
+              }),
+              'lan-proxy-control.xml': ('LanProxyTests', {
+                  'listenerConfigurationRejectsPublicWildcardAndIpv6',
+                  'authenticationAndBoundsFailClosed',
+                  'clientAclCannotCoverPublicSpace',
+                  'recoveryRequiresExactOwnershipAndScope',
+                  'hostInventoryProtectsIpv6AndRejectsAmbiguousEntries',
+                  'lostCommandReceiptsHaveBoundedRecoveryAndNeverFakeStoppedStatus',
+                  'stoppedRuntimeCancellationNeverMutatesSystemOrCore',
+                  'listenerReceiptsOwnRunningStateAndMainRuntimeSurvives',
+                  'refusedListenerRollsBackOnlyPreparedFirewall',
+                  'cancellationDuringFirewallPreparationNeverStartsListener',
+                  'mainRuntimeStopRecoversEvenWhenItsEpochDropsTheLanReply',
+                  'failedStopOrExternalRuleEditCannotBecomeFalseSuccess',
+                  'badConfigurationAndPendingRecoveryNeverOpenListeners',
+              }),
+          }
+          summaries, errors = [], []
+          for filename, (case_name, mandatory) in expected.items():
+              path = Path('build/qt-product') / filename
+              if not path.is_file():
+                  errors.append(filename + ': missing XML')
+                  continue
+              xml_bytes = path.read_bytes()
+              print('SWIRL_XML_BEGIN ' + filename)
+              print(xml_bytes.decode('utf-8-sig').rstrip())
+              print('SWIRL_XML_END ' + filename)
+              try:
+                  report = ET.fromstring(xml_bytes)
+              except ET.ParseError:
+                  errors.append(filename + ': invalid XML')
+                  continue
+              functions = report.findall('TestFunction')
+              names = {function.get('name') for function in functions}
+              incidents = report.findall('.//Incident')
+              skips = len(report.findall('.//Skip')) + sum(message.get('type') == 'skip' for message in report.findall('.//Message'))
+              failed = sum(incident.get('type') != 'pass' for incident in incidents)
+              fatal = sum(message.get('type') in {'qfatal', 'fatal'} for message in report.findall('.//Message'))
+              valid = (report.tag == 'TestCase' and report.get('name') == case_name
+                       and report.findtext('Environment/QtVersion') == '6.12.0'
+                       and mandatory.issubset(names)
+                       and names - {'initTestCase', 'cleanupTestCase'}
+                       and all(function.findall('Incident') for function in functions)
+                       and incidents and not failed and not skips and not fatal)
+              summaries.append({
+                  'report': filename, 'xml_sha256': hashlib.sha256(xml_bytes).hexdigest(),
+                  'test_case': report.get('name'), 'qt_version': report.findtext('Environment/QtVersion'),
+                  'functions': [{'name': function.get('name'),
+                                 'incidents': [incident.get('type') for incident in function.findall('Incident')]}
+                                for function in functions],
+                  'passed_incidents': len(incidents) - failed, 'failed_incidents': failed,
+                  'skips': skips, 'fatal_messages': fatal, 'accepted': bool(valid),
+              })
+              if not valid:
+                  errors.append(filename + ': required case, Qt version, pass or no-skip check failed')
+          evidence = {'github_sha': os.environ['GITHUB_SHA'], 'reports': summaries, 'errors': errors}
+          Path('build/qt-product/product-xml-evidence.json').write_text(json.dumps(evidence, indent=2) + '\n', encoding='utf-8')
+          print('SWIRL_PRODUCT_XML_EVIDENCE ' + json.dumps(evidence, sort_keys=True))
+          assert not errors, '; '.join(errors)
       - name: Preserve Windows product evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -284,8 +408,11 @@ jobs:
             build/qt-product/lan-proxy-control.xml
             build/qt-product/lan-firewall-native.xml
             build/qt-product/lan-firewall-native.txt
+            build/qt-product/lan-firewall-evidence.json
+            build/qt-product/product-xml-evidence.json
             build/qt-product/qt-network-policy.xml
             build/qt-product/swirl-telemetry-accounting.xml
             build/qt-product/Testing/Temporary/LastTest.log
             build/qt-product/Release/Swirl-diagnostics.txt
           if-no-files-found: error
+

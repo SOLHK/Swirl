@@ -11,6 +11,8 @@ struct Result {
     QString error;
     QJsonObject record;
     QJsonObject config;
+    // Redacted operational evidence, never part of the encrypted ownership journal.
+    QJsonObject diagnostic;
 };
 
 bool privateIpv4(const QString &address);
@@ -28,7 +30,11 @@ int guard(const QString &path);
 #ifdef SWIRL_LAN_FIREWALL_TESTS
 // Built only into the separately opted-in Windows fixture executable. The
 // production library never exposes synthetic rules or bypasses validation.
-enum class FixtureCase { RoundTrip, ExternalEdit, IndependentOwnership, CrashRecoveryConflict };
+enum class FixtureCase {
+    RoundTrip, ExternalEdit, IndependentOwnership, CrashRecoveryConflict,
+    InvalidProperty, AddFailure, NameCollision, UnknownOwnership, ReadbackMismatch
+};
 Result exerciseNativeFixture(FixtureCase scenario);
 #endif
 }
+
