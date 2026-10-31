@@ -39,9 +39,12 @@ destinations, rejects unauthorized DNS destinations and bounds TCP, UDP and DNS
 work per client. Local host flows retain their existing path. Shared global
 admission spans LAN and TUN; stopping the explicit LAN listener does not stop an
 established native flow. Direct destination resolution and actual locally dialed
-proxy/UDP relay endpoints are checked and pinned. Remote proxy DNS stays with
-the selected proxy protocol, so its remote-side DNS/target enforcement remains
-the proxy server's responsibility, as described in NATIVE_LAN_PROXY.md.
+proxy/UDP relay endpoints are checked and pinned. Proxy-routed Gateway client
+hostnames, including Fake-IP reverse mappings, are resolved by the configured
+DoH/DoT service through the already selected outbound and pinned to an admitted
+literal destination. Missing encrypted DNS returns
+`GatewayTargetDnsPolicyRequired`; no local-system or DIRECT fallback is added.
+Native host TUN behavior remains unchanged. See NATIVE_LAN_PROXY.md.
 
 Windows IPv4 forwarding alone is not evidence that a packet entered Rust.
 `windows_gateway` verifies a dedicated, already statically configured private

@@ -82,6 +82,7 @@ impl GatewayAdmission {
         self: &Arc<Self>,
         source: SocketAddr,
         routed: &mut Routed,
+        pin_target: bool,
     ) -> Result<()> {
         if !self.is_lan(source)? {
             return Ok(());
@@ -141,6 +142,19 @@ impl GatewayAdmission {
                         .is_ok()
                 }),
         );
+        if pin_target {
+            // Fake-IP reverse mapping restores the domain for policy routing.
+            // Do not delegate a second, unvalidated domain resolution to the
+            // proxy: bind the selected flow to a checked numeric destination.
+            pin_proxy_target(routed, |target| self.target(source, target))
+                .await
+                .map_err(|error| match error {
+                    "DnsEncryptedServerRequired" => "GatewayTargetDnsPolicyRequired",
+                    "IngressTargetDnsTimeout" => "GatewayTargetDnsTimeout",
+                    "IngressTargetDnsAnswers" => "GatewayTargetDnsAnswers",
+                    _ => error,
+                })?;
+        }
         Ok(())
     }
 
@@ -210,6 +224,7 @@ fn mark_gateway_record(
     id: u64,
     admission: &GatewayAdmission,
     source: SocketAddr,
+    trace: Option<&Value>,
 ) -> Result<()> {
     if admission.is_lan(source)?
         && let Some(record) = shared
@@ -219,6 +234,9 @@ fn mark_gateway_record(
             .get_mut(&id)
     {
         record.ingress = "gateway";
+        if let Some(trace) = trace {
+            record.trace = trace.clone();
+        }
     }
     Ok(())
 }
@@ -301,14 +319,15 @@ impl FlowDispatcher {
                 let mut routed =
                     route_flow(&shared, id, source, &target, counters.clone(), true).await?;
                 if let Some(gateway) = &gateway {
-                    mark_gateway_record(&shared, id, gateway, source)?;
+                    mark_gateway_record(&shared, id, gateway, source, None)?;
                 }
                 // Fake-IP has already been reversed by the packet adapter.
                 // Check the route's existing hosts/DNS result before any
                 // outbound socket or protocol handshake is created.
                 gateway_target(&gateway, source, &routed.target)?;
                 if let Some(gateway) = &gateway {
-                    gateway.prepare_outbound(source, &mut routed).await?;
+                    gateway.prepare_outbound(source, &mut routed, true).await?;
+                    mark_gateway_record(&shared, id, gateway, source, Some(&routed.trace))?;
                 }
                 let mut upstream = connect_routed_tcp(&routed).await?;
                 swirl_transport::relay(&mut inbound, &mut upstream, counters, shared.totals.clone())
@@ -407,7 +426,10 @@ impl FlowDispatcher {
                 .await?;
                 if let Some(gateway) = &gateway {
                     gateway.dns_host(source, &routed.target.host)?;
-                    gateway.prepare_outbound(source, &mut routed).await?;
+                    // This operation resolves the query name itself. Only its
+                    // proxy endpoint needs preparation here; PolicyDnsTransport
+                    // validates the actual encrypted DNS server destination.
+                    gateway.prepare_outbound(source, &mut routed, false).await?;
                 }
                 shared.bind(id, &routed.node.id)?;
                 if matches!(routed.node.outbound, Outbound::Reject {}) {
@@ -857,11 +879,12 @@ async fn run_udp(
         gateway_target(&gateway, source, &target)?;
         let mut routed = route_flow(&shared, id, source, &target, counters.clone(), true).await?;
         if let Some(gateway) = &gateway {
-            mark_gateway_record(&shared, id, gateway, source)?;
+            mark_gateway_record(&shared, id, gateway, source, None)?;
         }
         gateway_target(&gateway, source, &routed.target)?;
         if let Some(gateway) = &gateway {
-            gateway.prepare_outbound(source, &mut routed).await?;
+            gateway.prepare_outbound(source, &mut routed, true).await?;
+            mark_gateway_record(&shared, id, gateway, source, Some(&routed.trace))?;
         }
         let association = timeout(routed.limit, NativeAssociation::connect(&routed))
             .await

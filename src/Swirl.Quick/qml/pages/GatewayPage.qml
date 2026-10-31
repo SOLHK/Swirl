@@ -131,7 +131,7 @@ Item {
    id:lanScroll;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
    ColumnLayout {
     width:lanScroll.availableWidth;spacing:Theme.dp(12)
-    SwirlText {text:qsTr("启用后，其他设备使用所选地址和端口连接。认证与客户端 CIDR 同时生效；IPv6 监听尚未开放。HTTP/SOCKS5 用户名密码不提供链路加密，请只在可信局域网使用。");Layout.fillWidth:true;wrapMode:Text.WordWrap;color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+    SwirlText {text:qsTr("启用后，其他设备使用所选地址和端口连接。认证与客户端 CIDR 同时生效；IPv6 监听尚未开放。代理域名访问需要已配置 DoH/DoT，否则连接会被拒绝以保护本机服务。HTTP/SOCKS5 用户名密码不提供链路加密，请只在可信局域网使用。");Layout.fillWidth:true;wrapMode:Text.WordWrap;color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
     SwirlText {visible:!engineController.elevated;text:qsTr("启用与恢复需要以管理员身份运行 Swirl，以管理精确的防火墙规则。");Layout.fillWidth:true;wrapMode:Text.WordWrap;color:Theme.orange;font.pixelSize:Theme.fontSize(12)}
     SwirlComboBox {id:lanProxyInterface;objectName:"lanProxyInterface";Layout.fillWidth:true;model:engineController.lanInterfaces;textRole:"label";enabled:!engineController.lanEnabled&&!engineController.lanBusy;onActivated:{const entry=engineController.lanInterfaces[currentIndex];if(entry)lanAllowed.text=entry.cidr}}
     SwirlText {visible:engineController.lanInterfaces.length===0;text:qsTr("没有可用的局域网 IPv4 地址。启用时还会核验 Windows 网络类别，公共网络将被拒绝。");Layout.fillWidth:true;wrapMode:Text.WordWrap;color:Theme.orange;font.pixelSize:Theme.fontSize(12)}

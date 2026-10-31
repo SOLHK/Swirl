@@ -162,7 +162,16 @@ fn config(nodes: Vec<Node>, selected: &str) -> RuntimeConfig {
             missing_targets: vec![],
             classification_dns: ClassificationDns::Disabled,
         },
-        dns: Dns::default(),
+        dns: Dns {
+            // Most fixtures exercise ingress, routing and session lifetime.
+            // Give their synthetic target an explicit policy-owned address;
+            // unresolved proxy domains have dedicated encrypted-DNS tests.
+            hosts: vec![swirl_subscription::HostMapping {
+                name: "target.fixture.invalid".into(),
+                address: "203.0.113.80".parse().unwrap(),
+            }],
+            ..Dns::default()
+        },
         inbound_auth: None,
         limits: Limits::default(),
         china_rules_directory: None,
@@ -920,6 +929,296 @@ impl Drop for DnsPeer {
     }
 }
 
+/// A real HTTP proxy carries a verified DoT exchange inside its first CONNECT.
+/// The declared DNS address is also watched by a separate listening socket:
+/// neither target queries nor TLS are allowed to bypass the selected proxy.
+struct EncryptedDnsProxy {
+    address: SocketAddr,
+    direct_dns: StdListener,
+    trust: String,
+    accepted: Arc<AtomicUsize>,
+    queries: Arc<AtomicUsize>,
+    targets: Arc<Mutex<Vec<String>>>,
+    application_headers: Arc<Mutex<Vec<String>>>,
+    stop: Arc<AtomicBool>,
+    task: Option<thread::JoinHandle<()>>,
+}
+
+impl EncryptedDnsProxy {
+    fn new(answers: Vec<std::net::Ipv4Addr>, malformed: bool) -> Self {
+        use tokio_rustls::rustls::{
+            ServerConfig,
+            pki_types::{CertificateDer, PrivatePkcs8KeyDer},
+        };
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../swirl-transport/tests/fixtures/reality_auth.json"
+        )).unwrap();
+        let certificate = &fixture["certificate"];
+        let hex = |name: &str| {
+            certificate[name].as_str().unwrap().as_bytes().as_chunks::<2>().0.iter()
+                .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).unwrap())
+                .collect::<Vec<_>>()
+        };
+        let der = hex("ordinary_self_signed_der_hex");
+        let server = Arc::new(ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(vec![CertificateDer::from(der.clone())],
+                PrivatePkcs8KeyDer::from(hex("ed25519_pkcs8_der_hex")).into())
+            .unwrap());
+        let listener = StdListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let address = listener.local_addr().unwrap();
+        let direct_dns = StdListener::bind("127.0.0.1:0").unwrap();
+        direct_dns.set_nonblocking(true).unwrap();
+        let dns_target = direct_dns.local_addr().unwrap().to_string();
+        let accepted = Arc::new(AtomicUsize::new(0));
+        let queries = Arc::new(AtomicUsize::new(0));
+        let targets = Arc::new(Mutex::new(Vec::new()));
+        let application_headers = Arc::new(Mutex::new(Vec::new()));
+        let stop = Arc::new(AtomicBool::new(false));
+        let task = thread::spawn({
+            let accepted = accepted.clone();
+            let queries = queries.clone();
+            let targets = targets.clone();
+            let application_headers = application_headers.clone();
+            let stop = stop.clone();
+            move || {
+                let mut workers = Vec::new();
+                while !stop.load(Ordering::Acquire) {
+                    let (mut socket, _) = match listener.accept() {
+                        Ok(value) => value,
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            thread::sleep(Duration::from_millis(5)); continue;
+                        }
+                        Err(error) => panic!("encrypted proxy accept: {error}"),
+                    };
+                    accepted.fetch_add(1, Ordering::AcqRel);
+                    let server = server.clone();
+                    let dns_target = dns_target.clone();
+                    let answers = answers.clone();
+                    let queries = queries.clone();
+                    let targets = targets.clone();
+                    let application_headers = application_headers.clone();
+                    workers.push(thread::spawn(move || {
+                        use tokio_rustls::rustls::{ServerConnection, StreamOwned};
+                        socket.set_nonblocking(false).unwrap();
+                        socket.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+                        socket.set_write_timeout(Some(Duration::from_secs(3))).unwrap();
+                        let Ok(request) = header(&mut socket) else { return; };
+                        let request = String::from_utf8(request).unwrap();
+                        let mut words = request.split_ascii_whitespace();
+                        assert_eq!(words.next(), Some("CONNECT"));
+                        let target = words.next().unwrap().to_owned();
+                        socket.write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n").unwrap();
+                        if target == dns_target {
+                            let mut tls = StreamOwned::new(ServerConnection::new(server).unwrap(), socket);
+                            let mut length = [0; 2];
+                            let Ok(()) = tls.read_exact(&mut length) else { return; };
+                            let mut query = vec![0; usize::from(u16::from_be_bytes(length))];
+                            assert!((17..=4096).contains(&query.len()));
+                            tls.read_exact(&mut query).unwrap();
+                            assert_eq!(&query[query.len() - 4..], &[0, 1, 0, 1]);
+                            queries.fetch_add(1, Ordering::AcqRel);
+                            let mut reply = query;
+                            reply[2..4].copy_from_slice(&[0x81, 0x80]);
+                            reply[6..8].copy_from_slice(&(answers.len() as u16).to_be_bytes());
+                            for answer in answers {
+                                // Zero TTL makes any second resolution visible.
+                                reply.extend([0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 0, 0, 4]);
+                                reply.extend(answer.octets());
+                            }
+                            if malformed { reply[0] ^= 1; }
+                            tls.write_all(&(reply.len() as u16).to_be_bytes()).unwrap();
+                            tls.write_all(&reply).unwrap();
+                            tls.flush().unwrap();
+                            tls.conn.send_close_notify();
+                            let _ = tls.flush();
+                            return;
+                        }
+                        targets.lock().unwrap().push(target);
+                        let mut first = [0; 4];
+                        if socket.read_exact(&mut first).is_err() { return; }
+                        if first == *b"GET " {
+                            let Ok(rest) = header(&mut socket) else { return; };
+                            application_headers.lock().unwrap().push(String::from_utf8(rest).unwrap());
+                            let _ = socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\nokay");
+                        } else {
+                            assert_eq!(&first, b"ping");
+                            let _ = socket.write_all(b"Pping");
+                        }
+                    }));
+                }
+                for worker in workers { worker.join().unwrap(); }
+            }
+        });
+        Self { address, direct_dns, trust: STANDARD.encode(der), accepted, queries, targets,
+            application_headers, stop, task: Some(task) }
+    }
+
+    fn config(&self) -> RuntimeConfig {
+        let mut runtime = config(vec![Node { id: A.into(), outbound: Outbound::HttpConnect {
+            host: self.address.ip().to_string(), port: self.address.port(), auth: None, tls: None,
+        }}], A);
+        runtime.dns.servers.clear();
+        runtime.dns.query_family = swirl_subscription::DnsQueryFamily::Ipv4Only;
+        runtime.dns.use_system_hosts = false;
+        runtime.dns.tls_servers = vec![swirl_subscription::DnsTlsServer {
+            address: self.direct_dns.local_addr().unwrap(),
+            tls: swirl_subscription::Tls { server_name: "reality.test".into(), alpn: vec![], ca_der_base64: Some(self.trust.clone()) },
+            https_path: None,
+        }];
+        runtime
+    }
+
+    fn assert_no_direct_dns(&self) {
+        assert_eq!(self.direct_dns.accept().unwrap_err().kind(), std::io::ErrorKind::WouldBlock);
+    }
+}
+
+impl Drop for EncryptedDnsProxy {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Release);
+        if let Some(task) = self.task.take() { task.join().unwrap(); }
+    }
+}
+
+#[test]
+fn proxy_domain_without_authorized_dns_never_reaches_proxy_or_plaintext_dns() {
+    let peer = Peer::new(b'A');
+    let dns = DnsPeer::new(vec!["127.0.0.1".parse().unwrap()]);
+    let mut candidate = config(vec![peer.node(A)], A);
+    dns.configure(&mut candidate);
+    let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+    let lan = lan_config(false);
+    start_fixture(&mut core, &lan);
+    let (client, response) = http_connect(&lan, true, "unresolved-protected.fixture.invalid");
+    assert!(!response.starts_with(b"HTTP/1.1 200"));
+    wait(|| core.lan_status().unwrap()["last_error"] == "LanTargetDnsPolicyRequired");
+    assert_eq!(peer.requests.load(Ordering::Acquire), 0);
+    assert_eq!(dns.queries.load(Ordering::Acquire), 0);
+    drop(client);
+    core.stop();
+}
+
+#[test]
+fn udp_proxy_domain_without_authorized_dns_cannot_open_an_upstream_association() {
+    let upstream = StdListener::bind("127.0.0.1:0").unwrap();
+    upstream.set_nonblocking(true).unwrap();
+    let address = upstream.local_addr().unwrap();
+    let dns = DnsPeer::new(vec!["127.0.0.1".parse().unwrap()]);
+    let mut candidate = config(vec![Node { id: A.into(), outbound: Outbound::Socks5 {
+        host: address.ip().to_string(), port: address.port(), auth: None, tls: None, udp: true,
+    }}], A);
+    dns.configure(&mut candidate);
+    let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+    let lan = lan_config(false);
+    start_fixture(&mut core, &lan);
+    let (mut control, authenticated) = socks_auth(&lan, &lan.auth.password);
+    assert_eq!(authenticated, [1, 0]);
+    let client = StdUdpSocket::bind(SocketAddr::new(control.local_addr().unwrap().ip(), 0)).unwrap();
+    client.set_read_timeout(Some(Duration::from_millis(150))).unwrap();
+    let mut request = vec![5, 3, 0, 1, 0, 0, 0, 0];
+    request.extend(client.local_addr().unwrap().port().to_be_bytes());
+    control.write_all(&request).unwrap();
+    let mut response = [0; 10]; control.read_exact(&mut response).unwrap();
+    assert_eq!(&response[..4], &[5, 0, 0, 1]);
+    let relay = SocketAddr::new(lan.listen_ip, u16::from_be_bytes([response[8], response[9]]));
+    let host = b"udp-protected.fixture.invalid";
+    let mut datagram = vec![0, 0, 0, 3, host.len() as u8];
+    datagram.extend(host); datagram.extend(443u16.to_be_bytes()); datagram.extend(b"private-udp");
+    client.send_to(&datagram, relay).unwrap();
+    wait(|| core.shared.totals.udp_dropped.load(Ordering::Relaxed) > 0);
+    assert_eq!(core.lan_status().unwrap()["last_error"], "LanTargetDnsPolicyRequired");
+    assert!(client.recv_from(&mut [0; 512]).is_err());
+    assert_eq!(upstream.accept().unwrap_err().kind(), std::io::ErrorKind::WouldBlock);
+    assert_eq!(dns.queries.load(Ordering::Acquire), 0);
+    drop(control);
+    wait(|| core.lan_status().unwrap()["active_connections"] == 0);
+    core.stop();
+}
+
+#[test]
+fn proxy_target_uses_verified_dns_over_selected_node_then_only_the_pinned_ip() {
+    let proxy = EncryptedDnsProxy::new(vec!["203.0.113.80".parse().unwrap()], false);
+    let mut core = Core::start(proxy.config(), STORE.into(), 1, START.into()).unwrap();
+    let lan = lan_config(false);
+    start_fixture(&mut core, &lan);
+    let (mut client, response) = http_connect(&lan, true, "encrypted-target.fixture.invalid");
+    assert!(response.starts_with(b"HTTP/1.1 200"), "{response:?}");
+    exchange(&mut client, b'P');
+    drop(client);
+    let mut forward = stream(SocketAddr::new(lan.listen_ip, lan.http_port));
+    let auth = STANDARD.encode(format!("{}:{}", lan.auth.username, lan.auth.password));
+    forward.write_all(format!("GET http://encrypted-target.fixture.invalid/original HTTP/1.1\r\nHost: encrypted-target.fixture.invalid\r\nProxy-Authorization: Basic {auth}\r\n\r\n").as_bytes()).unwrap();
+    assert!(header(&mut forward).unwrap().starts_with(b"HTTP/1.1 200"));
+    let mut body = [0; 4]; forward.read_exact(&mut body).unwrap(); assert_eq!(&body, b"okay");
+    assert_eq!(*proxy.targets.lock().unwrap(), vec!["203.0.113.80:80", "203.0.113.80:80"]);
+    assert_eq!(proxy.queries.load(Ordering::Acquire), 2, "TTL zero must not hide target re-resolution");
+    let headers = proxy.application_headers.lock().unwrap();
+    assert_eq!(headers.len(), 1);
+    assert!(headers[0].contains("Host: encrypted-target.fixture.invalid\r\n"));
+    assert!(!headers[0].to_ascii_lowercase().contains("proxy-authorization"));
+    drop(headers);
+    let records = core.shared.records.lock().unwrap();
+    assert!(records.values().any(|record| record.ingress == "lan"
+        && record.target.host == "encrypted-target.fixture.invalid"
+        && record.trace["chosen_ip"] == "203.0.113.80"
+        && record.trace["dns_path"] == "configured_encrypted_via_selected_outbound"));
+    drop(records);
+    proxy.assert_no_direct_dns();
+    drop(forward);
+    core.stop();
+}
+
+#[test]
+fn proxy_domain_rebinding_and_malformed_encrypted_dns_cannot_delegate_a_target() {
+    let protected: std::net::Ipv4Addr = "203.0.113.42".parse().unwrap();
+    for (answers, malformed) in [
+        (vec![protected], false),
+        (vec!["203.0.113.80".parse().unwrap(), protected], false),
+        (vec!["203.0.113.80".parse().unwrap()], true),
+    ] {
+        let proxy = EncryptedDnsProxy::new(answers, malformed);
+        let mut core = Core::start(proxy.config(), STORE.into(), 1, START.into()).unwrap();
+        let mut lan = lan_config(false);
+        // A multihomed host may own a public address. Private-hop blocking
+        // alone cannot protect this management endpoint from a remote proxy.
+        lan.host_addresses.push(protected.into());
+        start_fixture(&mut core, &lan);
+        let (client, response) = http_connect(&lan, true, "attacker-rebinding.fixture.invalid");
+        assert!(!response.starts_with(b"HTTP/1.1 200"));
+        wait(|| core.lan_status().unwrap()["active_connections"] == 0);
+        if !malformed { assert_eq!(core.lan_status().unwrap()["last_error"], "LanHostAccessDenied"); }
+        assert_eq!(proxy.queries.load(Ordering::Acquire), 1);
+        assert!(proxy.targets.lock().unwrap().is_empty(), "proxy must never receive a forbidden target");
+        assert_eq!(proxy.accepted.load(Ordering::Acquire), 1, "only the approved encrypted DNS stream may open");
+        proxy.assert_no_direct_dns();
+        drop(client);
+        core.stop();
+    }
+}
+
+#[test]
+fn protected_dns_endpoint_is_rejected_before_opening_its_proxy_tunnel() {
+    let proxy = EncryptedDnsProxy::new(vec!["203.0.113.80".parse().unwrap()], false);
+    let protected: IpAddr = "203.0.113.42".parse().unwrap();
+    let mut candidate = proxy.config();
+    candidate.dns.tls_servers[0].address = SocketAddr::new(protected, 853);
+    let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+    let mut lan = lan_config(false);
+    lan.host_addresses.push(protected);
+    start_fixture(&mut core, &lan);
+    let (client, response) = http_connect(&lan, true, "dns-pivot.fixture.invalid");
+    assert!(!response.starts_with(b"HTTP/1.1 200"));
+    wait(|| core.lan_status().unwrap()["active_connections"] == 0);
+    assert_eq!(proxy.accepted.load(Ordering::Acquire), 0);
+    assert_eq!(proxy.queries.load(Ordering::Acquire), 0);
+    assert!(proxy.targets.lock().unwrap().is_empty());
+    proxy.assert_no_direct_dns();
+    drop(client);
+    core.stop();
+}
+
 #[test]
 fn real_dns_rebinding_is_rechecked_before_each_direct_connection() {
     let origin = StdListener::bind("127.0.0.1:0").unwrap();
@@ -994,7 +1293,7 @@ fn upstream_dns_validation_and_native_dial_use_the_same_frozen_answers() {
     let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
     let lan = lan_config(false);
     start_fixture(&mut core, &lan);
-    let (mut client, response) = http_connect(&lan, true, "remote-dns-target.fixture.invalid");
+    let (mut client, response) = http_connect(&lan, true, "target.fixture.invalid");
     assert!(response.starts_with(b"HTTP/1.1 200"));
     exchange(&mut client, b'A');
     assert_eq!(dns.queries.load(Ordering::Acquire), 1);

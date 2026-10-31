@@ -389,7 +389,18 @@ impl Ingress {
                 config.check_target(&address.ip().to_string()).is_ok()
             });
         routed.resolver = Arc::new(resolver);
-        Ok(())
+        // The target is also an address boundary. Delegating a domain to even
+        // an approved proxy would let that proxy resolve it back to this host.
+        // Resolve over the selected outbound's encrypted DNS path, validate
+        // every answer, and send only the approved numeric target on the wire.
+        pin_proxy_target(routed, |target| self.check_target(target))
+            .await
+            .map_err(|error| match error {
+                "DnsEncryptedServerRequired" => "LanTargetDnsPolicyRequired",
+                "IngressTargetDnsTimeout" => "LanTargetDnsTimeout",
+                "IngressTargetDnsAnswers" => "LanTargetDnsAnswers",
+                _ => error,
+            })
     }
 
     pub(super) async fn check_protocol(&self, stream: &TcpStream) -> Result<()> {
@@ -411,6 +422,10 @@ impl Ingress {
 
     pub(super) fn authenticated(&self) {
         self.state.authenticated(self.peer, self.id);
+    }
+
+    pub(super) fn error(&self, code: &'static str) {
+        self.state.error(code);
     }
 
     pub(super) fn bind_udp(&self) -> Result<UdpLease> {

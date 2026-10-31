@@ -39,8 +39,10 @@ fn api(code: u32, operation: &str) -> io::Result<()> {
         )))
     }
 }
-fn ownership() -> io::Error {
-    io::Error::other("gateway WFP object changed; isolation retained for explicit recovery")
+fn ownership(object: &str, detail: &str) -> io::Error {
+    io::Error::other(format!(
+        "gateway WFP object changed; isolation retained for explicit recovery ({object}: {detail})"
+    ))
 }
 fn same_guid(a: &GUID, b: &GUID) -> bool {
     a.data1 == b.data1 && a.data2 == b.data2 && a.data3 == b.data3 && a.data4 == b.data4
@@ -563,6 +565,106 @@ fn same_filter(actual: &FWPM_FILTER0, expected: &FWPM_FILTER0) -> bool {
     }
 }
 
+/// Diagnose a rejected readback without changing the ownership predicate.
+/// Only compiler-owned tags, scalar WFP metadata, condition positions and
+/// equality results are reported. Never emit policy addresses, owner GUIDs,
+/// provider data, display names, or raw condition values.
+fn filter_difference(actual: &FWPM_FILTER0, expected: &FWPM_FILTER0) -> String {
+    let mut differences = Vec::new();
+    for (field, actual, expected) in [
+        ("key", &actual.filterKey, &expected.filterKey),
+        ("layer", &actual.layerKey, &expected.layerKey),
+        ("sublayer", &actual.subLayerKey, &expected.subLayerKey),
+    ] {
+        if !same_guid(actual, expected) {
+            differences.push(format!("{field} differs"));
+        }
+    }
+    if actual.flags != expected.flags {
+        differences.push(format!(
+            "flags actual={:#x} expected={:#x}",
+            actual.flags, expected.flags
+        ));
+    }
+    if !actual.providerKey.is_null() {
+        differences.push("unexpected provider key".into());
+    }
+    if !same_blob(&actual.providerData, &expected.providerData) {
+        differences.push(format!(
+            "provider data differs (size={})",
+            actual.providerData.size
+        ));
+    }
+    if actual.action.r#type != expected.action.r#type {
+        differences.push(format!(
+            "action actual={:#x} expected={:#x}",
+            actual.action.r#type, expected.action.r#type
+        ));
+    }
+    if actual.weight.r#type != FWP_UINT8 {
+        differences.push(format!(
+            "weight type actual={} expected={FWP_UINT8}",
+            actual.weight.r#type
+        ));
+    } else if unsafe { actual.weight.Anonymous.uint8 != expected.weight.Anonymous.uint8 } {
+        // SAFETY: both active weight arms are UINT8, as checked above and
+        // guaranteed by the native rule compiler for expected.
+        differences.push("weight value differs".into());
+    }
+    if actual.numFilterConditions != expected.numFilterConditions {
+        differences.push(format!(
+            "condition count actual={} expected={}",
+            actual.numFilterConditions, expected.numFilterConditions
+        ));
+    } else if actual.filterCondition.is_null() {
+        differences.push("null condition array".into());
+    } else {
+        // SAFETY: WFP owns the actual array, and its count was compared with
+        // the bounded compiler-owned expected array. Neither outlives this call.
+        let actual = unsafe {
+            std::slice::from_raw_parts(actual.filterCondition, actual.numFilterConditions as usize)
+        };
+        let expected = unsafe {
+            std::slice::from_raw_parts(
+                expected.filterCondition,
+                expected.numFilterConditions as usize,
+            )
+        };
+        for (index, condition) in expected.iter().enumerate() {
+            let Some(value) = actual
+                .iter()
+                .find(|value| same_guid(&value.fieldKey, &condition.fieldKey))
+            else {
+                differences.push(format!("condition[{index}] field missing"));
+                continue;
+            };
+            if !same_condition(value, condition) {
+                differences.push(format!(
+                    "condition[{index}] differs (type actual={} expected={}, match actual={} expected={})",
+                    value.conditionValue.r#type,
+                    condition.conditionValue.r#type,
+                    value.matchType,
+                    condition.matchType
+                ));
+                if value.conditionValue.r#type == FWP_UINT32
+                    && condition.conditionValue.r#type == FWP_V4_ADDR_MASK
+                {
+                    // A possible /32 representation change is reported as
+                    // an equality result, never silently accepted as ownership.
+                    let same_host = unsafe {
+                        let expected = condition.conditionValue.Anonymous.v4AddrMask;
+                        !expected.is_null()
+                            && (*expected).mask == u32::MAX
+                            && (*expected).addr == value.conditionValue.Anonymous.uint32
+                    };
+                    differences.push(format!("condition[{index}] equivalent_host={same_host}"));
+                }
+            }
+        }
+    }
+    differences.join("; ")
+}
+
 fn inspect(engine: &Engine, policy: &GatewayIsolationPolicy) -> io::Result<bool> {
     let mut layer = null_mut();
     let code = unsafe { FwpmSubLayerGetByKey0(engine.0, &key(policy, "sublayer"), &mut layer) };
@@ -572,7 +674,7 @@ fn inspect(engine: &Engine, policy: &GatewayIsolationPolicy) -> io::Result<bool>
     api(code, "FwpmSubLayerGetByKey0")?;
     let layer = WfpAllocation(layer);
     if layer.0.is_null() {
-        return Err(ownership());
+        return Err(ownership("sublayer", "null readback"));
     }
     let mut digest = fingerprint(policy)?;
     let expected_blob = FWP_BYTE_BLOB {
@@ -585,19 +687,38 @@ fn inspect(engine: &Engine, policy: &GatewayIsolationPolicy) -> io::Result<bool>
         || !raw.providerKey.is_null()
         || !same_blob(&raw.providerData, &expected_blob)
     {
-        return Err(ownership());
+        return Err(ownership(
+            "sublayer",
+            &format!(
+                "flags actual={:#x} expected={:#x}; weight actual={} expected={}; unexpected_provider={}; provider_data_size={}; provider_data_equal={}",
+                raw.flags,
+                FWPM_SUBLAYER_FLAG_PERSISTENT,
+                raw.weight,
+                SUBLAYER_WEIGHT,
+                !raw.providerKey.is_null(),
+                raw.providerData.size,
+                same_blob(&raw.providerData, &expected_blob)
+            ),
+        ));
     }
     for rule in rules(policy) {
         let expected = NativeRule::new(policy, &rule)?;
         let mut actual = null_mut();
         let code = unsafe { FwpmFilterGetByKey0(engine.0, &expected.raw.filterKey, &mut actual) };
         if code == FWP_E_FILTER_NOT_FOUND as u32 {
-            return Err(ownership());
+            return Err(ownership(&rule.tag, "filter missing"));
         }
         api(code, "FwpmFilterGetByKey0")?;
         let actual = WfpAllocation(actual);
-        if actual.0.is_null() || !same_filter(unsafe { &*actual.0 }, &expected.raw) {
-            return Err(ownership());
+        if actual.0.is_null() {
+            return Err(ownership(&rule.tag, "null filter readback"));
+        }
+        let actual = unsafe { &*actual.0 };
+        if !same_filter(actual, &expected.raw) {
+            return Err(ownership(
+                &rule.tag,
+                &filter_difference(actual, &expected.raw),
+            ));
         }
     }
     Ok(true)
@@ -681,6 +802,43 @@ pub(crate) fn remove(policy: &GatewayIsolationPolicy) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejected_readback_reports_metadata_without_weakening_ownership() {
+        let policy = crate::gateway_policy::fixture();
+        let rule = rules(&policy).remove(0);
+        let native = NativeRule::new(&policy, &rule).unwrap();
+        let mut actual = native.raw;
+        actual.flags |= FWPM_FILTER_FLAG_DISABLED;
+        actual.weight.r#type = FWP_EMPTY;
+        assert!(!same_filter(&actual, &native.raw));
+        let detail = filter_difference(&actual, &native.raw);
+        assert!(detail.contains("flags actual="));
+        assert!(detail.contains("weight type actual="));
+
+        let mut conditions = native._conditions.clone();
+        let condition = conditions
+            .iter_mut()
+            .find(|condition| condition.conditionValue.r#type == FWP_V4_ADDR_MASK)
+            .unwrap();
+        // This fixture's /32 address is initialized and borrowed from native.
+        let address = unsafe { (*condition.conditionValue.Anonymous.v4AddrMask).addr };
+        condition.conditionValue = FWP_CONDITION_VALUE0 {
+            r#type: FWP_UINT32,
+            Anonymous: FWP_CONDITION_VALUE0_0 { uint32: address },
+        };
+        let mut actual = native.raw;
+        actual.filterCondition = conditions.as_mut_ptr();
+        assert!(!same_filter(&actual, &native.raw));
+        let detail = filter_difference(&actual, &native.raw);
+        assert!(detail.contains("equivalent_host=true"));
+        assert!(detail.len() < 1024);
+        assert!(!detail.contains(&policy.owner));
+        assert!(!detail.contains(&policy.lan.guid));
+        for address in &policy.host_addresses {
+            assert!(!detail.contains(&address.to_string()));
+        }
+    }
 
     fn compiled_forward(
         policy: &GatewayIsolationPolicy,

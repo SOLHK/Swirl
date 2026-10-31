@@ -105,6 +105,7 @@ jobs:
               raise SystemExit('Disposable Windows runner must be elevated for scoped WFP fixtures')
           # These explicit fixtures own synthetic, absent-interface WFP IDs
           # and a loopback-only UDP67 socket. No LAN DHCP or default routes.
+          failures = []
           for fixture in ['persistent_wfp_fixture_installs_verifies_ownership_and_removes_exact_objects',
                           'real_udp67_attestation_accepts_single_interface_and_rejects_replay']:
               result = subprocess.run(['cargo', 'test', '-p', 'swirl-platform', '--locked', fixture,
@@ -112,7 +113,9 @@ jobs:
                                       text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
               print(result.stdout)
               if result.returncode or '1 passed; 0 failed; 0 ignored;' not in result.stdout:
-                  raise SystemExit('Scoped fixture failed or did not execute exactly once: ' + fixture)
+                  failures.append(fixture)
+          if failures:
+              raise SystemExit('Scoped fixtures failed or did not execute exactly once: ' + ', '.join(failures))
       - name: Preserve exact formatter diagnostics without weakening the gate
         if: ${{ !cancelled() && steps.format.outcome == 'failure' }}
         shell: python
