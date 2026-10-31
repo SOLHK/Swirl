@@ -226,7 +226,9 @@ impl Resolver {
         self
     }
     pub fn endpoint_allowed(&self, address: SocketAddr) -> bool {
-        self.endpoint_guard.as_ref().is_none_or(|guard| guard(address))
+        self.endpoint_guard
+            .as_ref()
+            .is_none_or(|guard| guard(address))
     }
     fn pinned_addresses(&self, host: &str, port: u16) -> Option<Vec<SocketAddr>> {
         self.pinned

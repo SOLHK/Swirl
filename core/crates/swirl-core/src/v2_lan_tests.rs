@@ -850,7 +850,9 @@ struct DnsPeer {
 impl DnsPeer {
     fn new(answers: Vec<std::net::Ipv4Addr>) -> Self {
         let socket = StdUdpSocket::bind("127.0.0.1:0").unwrap();
-        socket.set_read_timeout(Some(Duration::from_millis(50))).unwrap();
+        socket
+            .set_read_timeout(Some(Duration::from_millis(50)))
+            .unwrap();
         let address = socket.local_addr().unwrap();
         let queries = Arc::new(AtomicUsize::new(0));
         let stop = Arc::new(AtomicBool::new(false));
@@ -862,12 +864,22 @@ impl DnsPeer {
                     let mut query = [0; 2048];
                     let (length, peer) = match socket.recv_from(&mut query) {
                         Ok(received) => received,
-                        Err(error) if matches!(error.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => continue,
+                        Err(error)
+                            if matches!(
+                                error.kind(),
+                                std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                            ) =>
+                        {
+                            continue;
+                        }
                         Err(error) => panic!("DNS fixture receive: {error}"),
                     };
                     assert!(length >= 17);
                     let mut end = 12;
-                    while query[end] != 0 { end += 1 + usize::from(query[end]); assert!(end < length); }
+                    while query[end] != 0 {
+                        end += 1 + usize::from(query[end]);
+                        assert!(end < length);
+                    }
                     end += 5;
                     assert!(end <= length);
                     assert_eq!(&query[end - 4..end], &[0, 1, 0, 1]);
@@ -883,7 +895,12 @@ impl DnsPeer {
                 }
             }
         });
-        Self { address, queries, stop, task: Some(task) }
+        Self {
+            address,
+            queries,
+            stop,
+            task: Some(task),
+        }
     }
 
     fn configure(&self, runtime: &mut RuntimeConfig) {
@@ -897,7 +914,9 @@ impl DnsPeer {
 impl Drop for DnsPeer {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Release);
-        if let Some(task) = self.task.take() { task.join().unwrap(); }
+        if let Some(task) = self.task.take() {
+            task.join().unwrap();
+        }
     }
 }
 
@@ -907,13 +926,18 @@ fn real_dns_rebinding_is_rechecked_before_each_direct_connection() {
     let destination = origin.local_addr().unwrap();
     let origin_task = thread::spawn(move || {
         let (mut client, _) = origin.accept().unwrap();
-        client.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+        client
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
         let mut bytes = [0; 4];
         client.read_exact(&mut bytes).unwrap();
         assert_eq!(&bytes, b"ping");
         client.write_all(b"pong").unwrap();
     });
-    let dns = DnsPeer::new(vec!["127.0.0.1".parse().unwrap(), "127.0.0.3".parse().unwrap()]);
+    let dns = DnsPeer::new(vec![
+        "127.0.0.1".parse().unwrap(),
+        "127.0.0.3".parse().unwrap(),
+    ]);
     let unused = Peer::new(b'A');
     let mut candidate = config(vec![unused.node(A)], A);
     candidate.policy.mode = Mode::Direct;
@@ -921,9 +945,20 @@ fn real_dns_rebinding_is_rechecked_before_each_direct_connection() {
     let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
     let lan = lan_config(false);
     start_fixture(&mut core, &lan);
-    core.lan.as_ref().unwrap().state.fixture_targets.lock().unwrap().insert(destination);
+    core.lan
+        .as_ref()
+        .unwrap()
+        .state
+        .fixture_targets
+        .lock()
+        .unwrap()
+        .insert(destination);
     let auth = STANDARD.encode(format!("{}:{}", lan.auth.username, lan.auth.password));
-    let request = format!("CONNECT rebinding.fixture.invalid:{} HTTP/1.1\r\nHost: rebinding.fixture.invalid:{}\r\nProxy-Authorization: Basic {auth}\r\n\r\n", destination.port(), destination.port());
+    let request = format!(
+        "CONNECT rebinding.fixture.invalid:{} HTTP/1.1\r\nHost: rebinding.fixture.invalid:{}\r\nProxy-Authorization: Basic {auth}\r\n\r\n",
+        destination.port(),
+        destination.port()
+    );
     let mut first = stream(SocketAddr::new(lan.listen_ip, lan.http_port));
     first.write_all(request.as_bytes()).unwrap();
     assert!(header(&mut first).unwrap().starts_with(b"HTTP/1.1 200"));
@@ -946,7 +981,10 @@ fn real_dns_rebinding_is_rechecked_before_each_direct_connection() {
 #[test]
 fn upstream_dns_validation_and_native_dial_use_the_same_frozen_answers() {
     let peer = Peer::new(b'A');
-    let dns = DnsPeer::new(vec!["127.0.0.1".parse().unwrap(), "127.0.0.3".parse().unwrap()]);
+    let dns = DnsPeer::new(vec![
+        "127.0.0.1".parse().unwrap(),
+        "127.0.0.3".parse().unwrap(),
+    ]);
     let mut upstream = peer.node(A);
     if let Outbound::HttpConnect { host, .. } = &mut upstream.outbound {
         *host = "upstream.fixture.invalid".into();
@@ -994,7 +1032,9 @@ fn contiguous_udp_pair(ip: IpAddr) -> (u16, u16) {
     for _ in 0..128 {
         let first = StdUdpSocket::bind(SocketAddr::new(ip, 0)).unwrap();
         let port = first.local_addr().unwrap().port();
-        let Some(next) = port.checked_add(1) else { continue };
+        let Some(next) = port.checked_add(1) else {
+            continue;
+        };
         if let Ok(_second) = StdUdpSocket::bind(SocketAddr::new(ip, next)) {
             return (port, next);
         }
@@ -1003,15 +1043,27 @@ fn contiguous_udp_pair(ip: IpAddr) -> (u16, u16) {
 }
 
 fn source_bound_stream(address: SocketAddr, ip: IpAddr) -> StdStream {
-    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
     let stream = runtime.block_on(async {
         let socket = tokio::net::TcpSocket::new_v4().unwrap();
         socket.bind(SocketAddr::new(ip, 0)).unwrap();
-        timeout(Duration::from_secs(3), socket.connect(address)).await.unwrap().unwrap().into_std().unwrap()
+        timeout(Duration::from_secs(3), socket.connect(address))
+            .await
+            .unwrap()
+            .unwrap()
+            .into_std()
+            .unwrap()
     });
     stream.set_nonblocking(false).unwrap();
-    stream.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
-    stream.set_write_timeout(Some(Duration::from_secs(3))).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    stream
+        .set_write_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
     stream
 }
 
@@ -1019,7 +1071,9 @@ fn source_bound_stream(address: SocketAddr, ip: IpAddr) -> StdStream {
 fn simultaneous_udp_clients_have_distinct_relays_and_cannot_cross_associations() {
     let origin = StdUdpSocket::bind("127.0.0.1:0").unwrap();
     let destination = origin.local_addr().unwrap();
-    origin.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+    origin
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
     let received = Arc::new(AtomicUsize::new(0));
     let worker = thread::spawn({
         let received = received.clone();
@@ -1040,7 +1094,14 @@ fn simultaneous_udp_clients_have_distinct_relays_and_cannot_cross_associations()
     let mut lan = lan_config(false);
     (lan.udp_port_start, lan.udp_port_end) = contiguous_udp_pair(lan.listen_ip);
     start_fixture(&mut core, &lan);
-    core.lan.as_ref().unwrap().state.fixture_targets.lock().unwrap().insert(destination);
+    core.lan
+        .as_ref()
+        .unwrap()
+        .state
+        .fixture_targets
+        .lock()
+        .unwrap()
+        .insert(destination);
     let client_ips = if cfg!(target_os = "macos") {
         ["127.0.0.1", "127.0.0.1"]
     } else {
@@ -1053,16 +1114,26 @@ fn simultaneous_udp_clients_have_distinct_relays_and_cannot_cross_associations()
         let (mut control, authenticated) = socks_auth_stream(stream, &lan, &lan.auth.password);
         assert_eq!(authenticated, [1, 0]);
         let client = StdUdpSocket::bind(SocketAddr::new(ip, 0)).unwrap();
-        client.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+        client
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
         let mut request = vec![5, 3, 0, 1, 0, 0, 0, 0];
         request.extend(client.local_addr().unwrap().port().to_be_bytes());
         control.write_all(&request).unwrap();
         let mut response = [0; 10];
         control.read_exact(&mut response).unwrap();
         assert_eq!(response[1], 0);
-        let relay = SocketAddr::new(lan.listen_ip, u16::from_be_bytes([response[8], response[9]]));
+        let relay = SocketAddr::new(
+            lan.listen_ip,
+            u16::from_be_bytes([response[8], response[9]]),
+        );
         let mut packet = vec![0, 0, 0];
-        NetworkTarget { host: destination.ip().to_string(), port: destination.port() }.encode(&mut packet).unwrap();
+        NetworkTarget {
+            host: destination.ip().to_string(),
+            port: destination.port(),
+        }
+        .encode(&mut packet)
+        .unwrap();
         packet.extend(if index == 0 { b"client-A" } else { b"client-B" });
         client.send_to(&packet, relay).unwrap();
         let mut reply = [0; 128];
@@ -1074,7 +1145,9 @@ fn simultaneous_udp_clients_have_distinct_relays_and_cannot_cross_associations()
     assert_ne!(associations[0].2, associations[1].2);
     worker.join().unwrap();
     let (_, first, _, packet) = &associations[0];
-    first.set_read_timeout(Some(Duration::from_millis(100))).unwrap();
+    first
+        .set_read_timeout(Some(Duration::from_millis(100)))
+        .unwrap();
     first.send_to(packet, associations[1].2).unwrap();
     let mut bytes = [0; 128];
     assert!(first.recv_from(&mut bytes).is_err());
@@ -1085,6 +1158,8 @@ fn simultaneous_udp_clients_have_distinct_relays_and_cannot_cross_associations()
     wait(|| core.lan_status().unwrap()["active_connections"] == 0);
     assert_eq!(core.lan_status().unwrap()["uploaded"], 16);
     assert_eq!(core.lan_status().unwrap()["downloaded"], 16);
-    for relay in relays { assert!(StdUdpSocket::bind(relay).is_ok()); }
+    for relay in relays {
+        assert!(StdUdpSocket::bind(relay).is_ok());
+    }
     core.stop();
 }
