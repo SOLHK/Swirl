@@ -9,6 +9,9 @@
 #include <QTest>
 #include <QDebug>
 #include <QDir>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QUrl>
 #include <QTcpServer>
 #include <functional>
 
@@ -107,7 +110,71 @@ int runOverviewChecks(QQuickWindow *window) {
         check(page&&page->window()==window&&window->winId()==nativeHandle&&item("windowCloseButton")&&item("windowMinimizeButton")&&item("windowMaximizeButton"),"every settings route uses the original main shell and its controls");
         if(QString::fromLatin1(route)=="settings"){
             state("pageLoader.item.section='关于 Swirl'");
-            check(wait([&]{const auto *brand=page?find(page,QStringLiteral("brandVector")):nullptr;return state("pageLoader.item.currentSectionReady()").toBool()&&brand&&brand->isVisible()&&brand->width()>=104;}),"About retains the enlarged brand mark inside the settings page");
+            QJsonObject aboutObservation;
+            QElapsedTimer aboutWait;aboutWait.start();
+            const bool aboutBrandReady=wait([&]{
+                aboutObservation=QJsonDocument::fromJson(state(QStringLiteral(
+                    "JSON.stringify({route:AppState.currentPage,activeRoute:pageLoader.activeLoader?pageLoader.activeLoader.routeId:'',"
+                    "loaderStatus:pageLoader.activeLoader?pageLoader.activeLoader.status:-1,loaderReady:Loader.Ready,imageReady:Image.Ready,"
+                    "moving:pageLoader.moving,pending:pageLoader.pendingGrab,preparing:pageLoader.preparing,registry:SwirlTransitionRegistry.activeCount,"
+                    "section:pageLoader.item?pageLoader.item.section:'',sectionReady:!!pageLoader.item&&typeof pageLoader.item.currentSectionReady==='function'&&pageLoader.item.currentSectionReady(),"
+                    "uiScale:Theme.uiScale,compactBoundary:Theme.dp(520),compactSize:Theme.dp(64),regularSize:Theme.dp(76),"
+                    "expectedSource:Theme.increaseContrast?(Theme.dark?'qrc:/swirl/icons/swirl_knot_mark_mono_dark.svg':'qrc:/swirl/icons/swirl_knot_mark_mono_light.svg')"
+                    ":(Theme.dark?'qrc:/swirl/icons/swirl_knot_mark_dark.svg':'qrc:/swirl/icons/swirl_knot_mark_light.svg')})")).toString().toUtf8()).object();
+                const bool samePage=page&&state("pageLoader.item").value<QObject *>()==page;
+                auto *brand=samePage?find(page,QStringLiteral("brandVector")):nullptr;
+                auto *mark=brand?brand->parentItem():nullptr;
+                QQuickItem *pane=nullptr,*paneLoader=nullptr,*shell=nullptr;
+                // Identify the loaded About pane through its own visual ancestry;
+                // cached pages and the other windows also own brandVector images.
+                for(auto *ancestor=mark;ancestor&&ancestor!=page;ancestor=ancestor->parentItem()){
+                    if(!pane&&ancestor->property("settingsPage").value<QObject *>()==page
+                        &&ancestor->property("viewportHeight").isValid()&&ancestor->property("compact").isValid())pane=ancestor;
+                    if(pane&&!paneLoader&&ancestor->property("item").value<QObject *>()==pane
+                        &&ancestor->property("status").isValid())paneLoader=ancestor;
+                    if(paneLoader&&ancestor->property("modelData").toString()==QStringLiteral("关于 Swirl")
+                        &&ancestor->property("selected").toBool())shell=ancestor;
+                }
+                const qreal viewportHeight=pane?pane->property("viewportHeight").toReal():0;
+                const bool compact=viewportHeight>0&&viewportHeight<aboutObservation.value("compactBoundary").toDouble();
+                const qreal expectedSize=aboutObservation.value(compact?"compactSize":"regularSize").toDouble();
+                const bool paneReady=paneLoader&&paneLoader->property("active").toBool()
+                    &&paneLoader->property("status").toInt()==aboutObservation.value("loaderReady").toInt();
+                const bool imageReady=brand&&brand->property("status").toInt()==aboutObservation.value("imageReady").toInt();
+                const auto source=brand?brand->property("source").toUrl().toString():QString();
+                const QRectF brandRect=brand?brand->mapRectToScene(QRectF(0,0,brand->width(),brand->height())):QRectF();
+                QRectF visibleRect=brandRect.intersected(QRectF(0,0,window->width(),window->height()));
+                qreal opacity=1;
+                for(auto *ancestor=brand;ancestor;ancestor=ancestor->parentItem()){
+                    opacity*=ancestor->opacity();
+                    if(ancestor->clip())visibleRect=visibleRect.intersected(ancestor->mapRectToScene(QRectF(0,0,ancestor->width(),ancestor->height())));
+                }
+                const bool fullyVisible=brand&&brand->isVisible()&&opacity>0&&!brandRect.isEmpty()&&visibleRect==brandRect;
+                const bool exactSize=brand&&mark&&expectedSize>0&&brand->width()==expectedSize&&brand->height()==expectedSize
+                    &&mark->width()==expectedSize&&mark->height()==expectedSize;
+                aboutObservation.insert("samePage",samePage);
+                aboutObservation.insert("pageInMainWindow",page&&page->window()==window);
+                aboutObservation.insert("paneFound",pane!=nullptr);aboutObservation.insert("paneReady",paneReady);
+                aboutObservation.insert("activeAboutShell",shell&&shell->property("ready").toBool()&&shell->isVisible());
+                aboutObservation.insert("viewportHeight",viewportHeight);aboutObservation.insert("expectedCompact",compact);
+                aboutObservation.insert("actualCompact",pane&&pane->property("compact").toBool());aboutObservation.insert("expectedSize",expectedSize);
+                aboutObservation.insert("brandWidth",brand?brand->width():-1);aboutObservation.insert("brandHeight",brand?brand->height():-1);
+                aboutObservation.insert("markWidth",mark?mark->width():-1);aboutObservation.insert("markHeight",mark?mark->height():-1);
+                aboutObservation.insert("imageStatus",brand?brand->property("status").toInt():-1);aboutObservation.insert("source",source);
+                aboutObservation.insert("brandInMainWindow",brand&&brand->window()==window);aboutObservation.insert("fullyVisible",fullyVisible);
+                aboutObservation.insert("effectiveOpacity",opacity);
+                return samePage&&page->window()==window&&aboutObservation.value("route").toString()=="settings"
+                    &&aboutObservation.value("activeRoute").toString()=="settings"
+                    &&aboutObservation.value("loaderStatus").toInt()==aboutObservation.value("loaderReady").toInt()
+                    &&!aboutObservation.value("moving").toBool()&&!aboutObservation.value("pending").toBool()&&!aboutObservation.value("preparing").toBool()
+                    &&aboutObservation.value("registry").toInt()==0&&aboutObservation.value("section").toString()==QStringLiteral("关于 Swirl")
+                    &&aboutObservation.value("sectionReady").toBool()&&paneReady&&shell&&shell->property("ready").toBool()&&shell->isVisible()
+                    &&pane->property("compact").toBool()==compact&&brand&&brand->window()==window&&imageReady
+                    &&source==aboutObservation.value("expectedSource").toString()&&exactSize&&fullyVisible;
+            });
+            aboutObservation.insert("waitMs",aboutWait.elapsed());
+            qInfo().noquote()<<"ABOUT_BRAND_GEOMETRY"<<QJsonDocument(aboutObservation).toJson(QJsonDocument::Compact);
+            check(aboutBrandReady,"About retains the enlarged brand mark inside the settings page");
         }
         const auto qaDirectory=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");
         if(!qaDirectory.isEmpty()){QDir().mkpath(qaDirectory);check(window->grabWindow().save(qaDirectory+"/"+route+".png"),"embedded page render saved for visual review");}

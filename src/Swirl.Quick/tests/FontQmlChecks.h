@@ -1,6 +1,7 @@
 #pragma once
 
 #include "app/FontDisplayContext.h"
+#include "app/SwirlPressClock.h"
 #include <QQmlProperty>
 #include <QQuickImageProvider>
 #include <QQuickStyle>
@@ -32,6 +33,7 @@ inline void registerFontQmlTypes()
         // Match qmltyperegistrar's generated path, including QQmlElement<T>,
         // so standalone compilation catches incompatible QML type declarations.
         qmlRegisterTypesAndRevisions<FontDisplayContext>("SwirlQuick", 1);
+        qmlRegisterTypesAndRevisions<SwirlPressClock>("SwirlQuick", 1);
         qmlRegisterType<VariableFontPreview>("SwirlQuick", 1, 0, "VariableFontPreview");
         qmlRegisterType(QUrl::fromLocalFile(QStringLiteral(SWIRL_QML_SOURCE_DIR "/components/SwirlContinuousSurface.qml")),
                         "SwirlQuick", 1, 0, "SwirlContinuousSurface");

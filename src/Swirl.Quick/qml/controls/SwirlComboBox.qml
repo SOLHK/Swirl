@@ -32,10 +32,7 @@ ComboBox {
         elide: Text.ElideRight
         leftPadding:0; rightPadding:0
     }
-    SwirlToolTip {
-        id: hint
-        parent:control;visible:(control.hovered||control.visualFocus)&&valueLabel.truncated&&!popupLayer.visible;text:AppState.zh(control.displayText);delay:600
-    }
+
     indicator: SwirlIcon {
         x:Math.round(control.width-width-Theme.dp(6));y:Math.round((control.height-height)/2)
         name:"chevron-right";size:Theme.dp(14);rotation:control.popup.visible?270:90;color:Theme.muted
@@ -110,8 +107,8 @@ ComboBox {
         margins:edgeMargin
         enter:reveal.enterTransition
         exit:reveal.exitTransition
-        background: Rectangle { transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
-            radius:Theme.menuRadius; color:Theme.material("floating"); border.width:Theme.borderWidth; border.color:Theme.increaseContrast?Theme.text:Theme.border }
+        background: SwirlCardSurface { transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
+            cornerRadius:Theme.menuRadius }
         contentItem: ListView { pixelAligned: true;
             id:popupList
             transform:Translate{x:reveal.xOffset;y:reveal.yOffset}

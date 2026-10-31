@@ -47,5 +47,5 @@ SwirlMotionButton {
     Accessible.role: Accessible.ListItem
     Accessible.selectable: true
     Accessible.selected: chosen
-    SwirlToolTip { parent: entry; visible: entry.enabled && entry.hovered && entry.compact && !previewCaptureMode; text: entry.title }
+
 }

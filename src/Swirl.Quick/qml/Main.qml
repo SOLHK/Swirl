@@ -97,7 +97,12 @@ ApplicationWindow {
             id:appSceneBackdrop
             anchors.fill:parent;targetWindow:window
             glassSurface:sidebar.glassSurface;glassSampled:sidebar.glassSampled
+            ribbonProgress: pageLoader.item && pageLoader.item.ribbonTourProgress !== undefined ? pageLoader.item.ribbonTourProgress : 1
+            ribbonStrength: pageLoader.item && pageLoader.item.ribbonTourStrength !== undefined ? pageLoader.item.ribbonTourStrength : 0
         }
+
+        Item { id: ribbonBackLayer; anchors.fill: parent; Accessible.ignored: true }
+        Item { id: ribbonFrontLayer; anchors.fill: parent; z: 80; Accessible.ignored: true }
 
         Binding { target: SwirlProxyWingMotion; property: "windowVisible"; value: window.visible && window.visibility !== Window.Minimized }
 
@@ -113,20 +118,51 @@ ApplicationWindow {
         }
         SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false;backdropSource:appSceneBackdrop.decorationSource }
         SwirlWindowControls {
-            id:windowControls;objectName:"windowControls";z:70
+            id:windowControls;objectName:"windowControls";z:90
             anchors.right:parent.right;anchors.rightMargin:Theme.dp(5);y:Theme.dp(5)
             targetWindow:window
         }
         Item {
             id:mainArea; x:window.actualSidebarWidth+window.sidebarGutter; width:parent.width-x-(AppState.currentPage==="activity"?0:Theme.dp(12)); height:parent.height
             RowLayout {
-                id:toolbar; z:1; visible:AppState.currentPage==="activity"; x:Theme.pagePadding+Theme.dp(7); y:Theme.dp(9); width:parent.width-x-windowControls.width-Theme.dp(16); height:Theme.dp(32); spacing:Theme.dp(8)
-                SwirlStatusCapsule { objectName:"eventsCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.dp(28); label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"暂无事件";tone:systemProvider.eventCount>0?"success":"neutral";detail:"查看事件与活动记录"; onClicked:AppState.navigate("logs") }
-                Item {Layout.fillWidth:true}
-                SwirlSystemProxyCapsule {id:proxyCapsule;objectName:"proxyCapsule";Layout.preferredWidth:implicitWidth;Layout.preferredHeight:Theme.dp(28);controller:engineController}
-
-                SwirlStatusCapsule { objectName:"tunCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.dp(28); label:engineController.tunEnabled?"TUN · 已开":"TUN · 未开启";detail:engineController.routingError||(engineController.tunEnabled?"TUN 模式已开启，点击关闭":"当前 Rust Core 暂不支持 TUN 模式"); tone:engineController.tunEnabled?"success":"neutral"; enabled:!engineController.busy; onClicked:{if(!engineController.setTunEnabled(!engineController.tunRequested))AppState.notice(engineController.routingError||engineController.networkConfigurationError)} }
-
+                id: toolbar
+                z: 1; visible: AppState.currentPage === "activity"
+                x: Theme.pagePadding; y: Theme.dp(9)
+                width: parent.width - x - windowControls.width - Theme.dp(20)
+                height: Theme.dp(32); spacing: Theme.dp(10)
+                SwirlStatusCapsule {
+                    objectName: "eventsCapsule"
+                    visible: toolbar.width >= Theme.dp(530)
+                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.toolbarHeight
+                    label: systemProvider.eventCount > 0 ? qsTr("%1 个事件").arg(systemProvider.eventCount) : qsTr("暂无事件")
+                    tone: systemProvider.eventCount > 0 ? "success" : "neutral"
+                    detail: qsTr("查看事件与活动记录")
+                    onClicked: AppState.navigate("logs")
+                }
+                Item { Layout.fillWidth: true; Layout.minimumWidth: Theme.dp(16) }
+                SwirlSystemProxyCapsule {
+                    id: proxyCapsule; objectName: "proxyCapsule"
+                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.toolbarHeight
+                    controller: engineController
+                }
+                SwirlStatusCapsule {
+                    id: tunCapsule; objectName: "tunCapsule"
+                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.toolbarHeight
+                    label: engineController.tunEnabled ? qsTr("TUN · 已开") : qsTr("TUN · 未开启")
+                    detail: engineController.routingError || (engineController.tunEnabled
+                        ? qsTr("TUN 模式已开启，点击关闭") : qsTr("当前 Rust Core 暂不支持 TUN 模式"))
+                    tone: engineController.tunEnabled ? "success" : "neutral"
+                    enabled: !engineController.busy
+                    onClicked: {
+                        if (!engineController.setTunEnabled(!engineController.tunRequested))
+                            AppState.notice(engineController.routingError || engineController.networkConfigurationError)
+                    }
+                }
+                OutboundModeControl {
+                    id: outboundModeControl
+                    Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.toolbarHeight
+                    engineController: window.engineControllerContext
+                }
             }
             SwirlButton {
                 id:settingsBack
@@ -278,7 +314,7 @@ ApplicationWindow {
     }
     Shortcut { sequence:"Alt+Space"; context:Qt.ApplicationShortcut; onActivated:backdrop.showSystemMenu() }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+K"; context:Qt.ApplicationShortcut; onActivated:sidebar.openSearch() }
-    Shortcut { enabled:dismissals.count===0;sequence:"Alt+Left"; onActivated:AppState.goBack() }
+    Shortcut { enabled:dismissals.count===0;sequence:"Alt+Left"; onActivated:{if(pageLoader.item && pageLoader.item.dismissDetail && pageLoader.item.dismissDetail())return;AppState.goBack()} }
     Shortcut { enabled:dismissals.count===0;sequence:"Alt+Right"; onActivated:AppState.goForward() }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+1"; onActivated:AppState.navigate("overview") }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+2"; onActivated:AppState.navigate("proxies") }
@@ -286,7 +322,7 @@ ApplicationWindow {
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+4"; onActivated:AppState.navigate("inspector") }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+,"; onActivated:AppState.navigate("settings") }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+B"; onActivated:AppState.sidebarCollapsed=!AppState.sidebarCollapsed }
-        Component { id:activity; ActivityPage { engineController:window.engineControllerContext; systemProvider:window.systemProviderContext } }
+        Component { id:activity; ActivityPage { engineController:window.engineControllerContext; systemProvider:window.systemProviderContext; ribbonBack: ribbonBackLayer; ribbonFront: ribbonFrontLayer; proxyAnchor: proxyCapsule; toolbarItems: [proxyCapsule, tunCapsule, outboundModeControl]; sidebarAnchor: sidebar.glassSurface; wingScene: appSceneBackdrop; sceneRevision: window.width + window.height + window.actualSidebarWidth; sceneSettled: AppState.currentPage === "activity" && !pageLoader.moving && !pageLoader.pendingGrab } }
         Component { id:overview; OverviewPage { engineController:window.engineControllerContext; systemProvider:window.systemProviderContext } }
     Component { id:capturePage; CapturePage { captureProvider:window.captureProviderContext } }
     Component { id:externalTools; ExternalToolsPage {} }

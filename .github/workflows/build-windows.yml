@@ -45,3 +45,25 @@ jobs:
           echo "Qt-only tree verified. Build and runtime checks run in build-qt-ui."
       - name: Validate production release gate source
         run: python tools/tests/test_release_gate.py
+      - name: Require source and dependency graph test prerequisites
+        shell: python
+        run: |
+          import os, re, shutil, subprocess, sys
+          if os.name != 'posix' or sys.version_info < (3, 11):
+              raise SystemExit('Source guards require POSIX and Python 3.11 or newer.')
+          for tool in ('cmake', 'ninja', 'c++', 'git'):
+              executable = shutil.which(tool)
+              if not executable:
+                  raise SystemExit(f'Missing {tool}; dependency graph tests must not be skipped.')
+              version = subprocess.check_output([executable, '--version'], text=True)
+              print(version.splitlines()[0], flush=True)
+              if tool == 'cmake':
+                  match = re.search(r'cmake version (\d+)\.(\d+)', version)
+                  if not match or tuple(map(int, match.groups())) < (3, 25):
+                      raise SystemExit('Dependency graph fixtures require CMake 3.25 or newer.')
+      - name: Reject removed runtime sources and product fallback paths
+        run: python tools/test_rust_only_runtime.py -v
+      - name: Keep native platform dependencies outside common Rust crates
+        run: python tools/tests/test_portable_core_boundary.py
+      - name: CMake dependency graph regression
+        run: python tools/test_rust_build_chain.py -v
