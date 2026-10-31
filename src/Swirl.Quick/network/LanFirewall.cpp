@@ -28,10 +28,12 @@
 #define NOMINMAX
 #endif
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <objbase.h>
 #include <oleauto.h>
 #include <iphlpapi.h>
+#include <netioapi.h>
 #include <aclapi.h>
 #include <netfw.h>
 #include <netlistmgr.h>
