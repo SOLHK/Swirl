@@ -97,7 +97,7 @@ jobs:
           subprocess.run([sys.executable, 'tools/tests/test_native_lan_abi.py', '-v'], check=True)
           subprocess.run([sys.executable, 'tools/tests/test_native_gateway_abi.py', '-v'], check=True)
       - name: Scoped Windows WFP ownership and DHCP socket attestation
-        if: ${{ !cancelled() && runner.os == 'Windows' && steps.check.outcome == 'success' }}
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
         shell: python
         run: |
           import ctypes, subprocess

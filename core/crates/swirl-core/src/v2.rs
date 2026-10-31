@@ -1319,8 +1319,10 @@ async fn pin_proxy_target(
     routed: &mut Routed,
     check: impl Fn(&NetworkTarget) -> Result<()>,
 ) -> Result<()> {
-    if matches!(routed.node.outbound, Outbound::Direct {} | Outbound::Reject {})
-        || routed.target.host.parse::<IpAddr>().is_ok()
+    if matches!(
+        routed.node.outbound,
+        Outbound::Direct {} | Outbound::Reject {}
+    ) || routed.target.host.parse::<IpAddr>().is_ok()
     {
         return Ok(());
     }
@@ -1333,13 +1335,20 @@ async fn pin_proxy_target(
     };
     let addresses = timeout(
         routed.limit,
-        routed.resolver.resolve_with_transport(&original.host, original.port, &transport),
-    ).await.map_err(|_| "IngressTargetDnsTimeout")??;
+        routed
+            .resolver
+            .resolve_with_transport(&original.host, original.port, &transport),
+    )
+    .await
+    .map_err(|_| "IngressTargetDnsTimeout")??;
     if addresses.is_empty() || addresses.len() > 16 {
         return Err("IngressTargetDnsAnswers");
     }
     for address in &addresses {
-        check(&NetworkTarget { host: address.ip().to_string(), port: address.port() })?;
+        check(&NetworkTarget {
+            host: address.ip().to_string(),
+            port: address.port(),
+        })?;
     }
     let selected = addresses[0].ip().to_string();
     routed.target.host = selected.clone();

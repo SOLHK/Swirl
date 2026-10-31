@@ -2,9 +2,10 @@
 //! transactions and accounting remain owned by the existing V2 runtime.
 use super::{
     NetworkTarget, Outbound, PolicyDnsTransport, RegisteredSession, Result, Routed, Shared,
-    cancelled, connect_routed_tcp, route, route_flow,
+    cancelled, connect_routed_tcp, pin_proxy_target, route, route_flow,
 };
 use crate::socks5_udp::ProxyAssociation;
+use serde_json::Value;
 use std::{
     collections::BTreeSet,
     net::{IpAddr, SocketAddr},
