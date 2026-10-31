@@ -11,7 +11,7 @@ bytes.workspace = true
 serde.workspace = true
 httparse.workspace = true
 url.workspace = true
-socket2 = { workspace = true, features = ["all"] }
+socket2.workspace = true
 tokio-rustls.workspace = true
 webpki-roots.workspace = true
 swirl-subscription.workspace = true
@@ -25,5 +25,7 @@ x509-cert.workspace = true
 der.workspace = true
 [dev-dependencies]
 serde_json.workspace = true
-[lints]
-workspace = true
+# The private Windows borrowed-socket option shim is the only FFI exception.
+# No protocol, TLS, relay or routing code may introduce unsafe operations.
+[lints.rust]
+unsafe_code = "deny"
