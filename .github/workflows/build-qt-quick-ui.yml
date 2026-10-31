@@ -23,7 +23,9 @@ concurrency:
 jobs:
   build-qt-ui:
     runs-on: windows-2022
-    timeout-minutes: 55
+    # Cold UI + independent production compilation takes about 38 minutes.
+    # Leave time for the complete regression, DPR checks and compiler cache.
+    timeout-minutes: 75
     permissions:
       contents: read
     steps:
@@ -456,6 +458,25 @@ jobs:
               }
             }
           }
+      # Retain successful compiler work before downstream tests can time out.
+      # Restored test evidence is still discarded before every build above.
+      - name: Save reusable compiler outputs
+        if: ${{ !cancelled() && steps.ui_build.outcome == 'success' && steps.build_cache.outputs.cache-hit != 'true' }}
+        shell: pwsh
+        run: |
+          . ./scripts/BuildInputTimes.ps1
+          Sync-SwirlBuildInputTimes -RepositoryRoot $env:GITHUB_WORKSPACE -BuildDirectory (Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick')
+      - name: Cache compiled Qt and Rust outputs
+        if: ${{ !cancelled() && steps.ui_build.outcome == 'success' && steps.build_cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+            build/swirl-quick
+            build/swirl-product
+          key: ${{ steps.build_cache.outputs.cache-primary-key }}
       - name: Start the production Release UI with cold and warm QML caches
         shell: pwsh
         env:
@@ -801,23 +822,6 @@ jobs:
             build/swirl-quick/Release/Swirl-hero-diagnostics.txt
             build/swirl-quick/Release/Swirl-hero-material-diagnostics.txt
           if-no-files-found: warn
-      - name: Save reusable compiler outputs
-        if: ${{ !cancelled() && steps.ui_build.outcome == 'success' && steps.build_cache.outputs.cache-hit != 'true' }}
-        shell: pwsh
-        run: |
-          . ./scripts/BuildInputTimes.ps1
-          Sync-SwirlBuildInputTimes -RepositoryRoot $env:GITHUB_WORKSPACE -BuildDirectory (Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick')
-      - name: Cache compiled Qt and Rust outputs
-        if: ${{ !cancelled() && steps.ui_build.outcome == 'success' && steps.build_cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            core/target
-            build/swirl-quick
-            build/swirl-product
-          key: ${{ steps.build_cache.outputs.cache-primary-key }}
       - name: Preserve SDK and exact-package identity evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
