@@ -988,6 +988,8 @@ LanFirewall::Result LanFirewall::prepare(const QString &path, const QJsonObject 
         result.diagnostic.insert("rollback", cleaned.diagnostic);
         result.diagnostic.insert("rollback_complete", cleaned.ok);
         result.diagnostic.insert("journal_retained", QFileInfo::exists(path));
+        result.error = diagnosticError(result.error, QJsonObject{{"rollback", cleaned.diagnostic},
+            {"rollback_complete", cleaned.ok}, {"journal_retained", QFileInfo::exists(path)}});
         if (!cleaned.ok) result.error += ' ' + cleaned.error;
         return result;
     }
