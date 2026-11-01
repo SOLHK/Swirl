@@ -613,14 +613,21 @@ streams. The first-lease health fix closes the admission omission only. Real
 physical-interface switching, ongoing health probes and existing system-proxy
 flows still need observed cancellation/recovery behavior before stronger claims.
 
-**DNS guard liveness is not continuously verified.** Port-53 installation and
-owned-resource recovery validate the rules, but an administrator removing a
-rule, disabling the firewall or changing its policy need not trigger the current
-network watcher. The running-state `dns_guard_active` field is not independent
-proof of rule presence. Hardware IPv4/IPv6, LAN-specific routes, newly attached
-adapters and multi-NIC changes remain real-environment acceptance cases. Physical
-egress selects the eligible lowest-metric default interface per family, not an
-independently selected interface for each LAN destination.
+**DNS guard enforcement is independently polled; packet leakage remains
+unverified.** Startup and a background monitor query effective ActiveStore
+TCP/UDP rules, ownership and filter scope, actual enforcement, service/profile
+policy, excluded interfaces and current hardware coverage. Status exposes audit
+age and reports unknown for failed/stale observations. Security-policy drift
+retains capture/journal and suspends new Core egress in `recovery_required`,
+instead of removing capture during automatic recovery. Polling every 5 seconds
+after the preceding query, a 30-second query deadline and 40-second freshness cap
+leave a detection window. This is not a kill switch or a zero-leak claim.
+Application-owned DoH/DoT, IPsec/bypass policy, real IPv4/IPv6 packet leakage and
+multi-NIC changes remain acceptance cases. Physical egress selects the eligible
+lowest-metric default interface per family, not an independently selected
+interface for each LAN destination. See the
+[2026-11-01 production audit](NATIVE_TUN_PRODUCTION_AUDIT_20261101.md) and
+[reproducible acceptance collector](NATIVE_TUN_WINDOWS_ACCEPTANCE.md).
 
 **Crash recovery still needs a surviving or restarted process.** Normal stop,
 input EOF and supervisor recovery paths are implemented. A simultaneous

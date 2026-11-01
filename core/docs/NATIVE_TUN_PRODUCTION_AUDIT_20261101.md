@@ -1,0 +1,178 @@
+# Native TUN production audit — 2026-11-01
+
+## Release decision
+
+**Development stage. Do not merge PR #42 into `test` or promote it to `main`
+under the production acceptance criteria yet.** System-wide kill switch,
+restricted-token data plane, authenticated GUI/UAC integration and physical
+Windows 11 full-tunnel/fault/long-load acceptance remain blocking work. No
+capability flag has been changed to imply their completion.
+
+This is a continuation of the existing Wintun / smoltcp / shared FlowDispatcher
+implementation. It adds no external proxy core, alternate rule engine or new
+production dependency. The only dependency-feature extension is Tokio's
+development-only virtual-clock support for deterministic idle-session tests.
+
+## Source and remote baseline
+
+Remote refs were fetched and PR/Actions were queried again before editing:
+
+| Ref | Observed SHA |
+| --- | --- |
+| `work/native-tun-windows-20261030-isolated` | `930c3f5fc2cbcfb99de4769c44f1682f4fc2e01d` |
+| `test` | `63dde8812f85839aa6024cbba6c498c96cae022d` |
+| `main` | `bd4d60cf42322cf62aa49fa09f219d800c128c30` |
+| Other owner's `work/native-tun-windows-20261030` | `4d2162a9eb3e64a91aea39faae82342dfffd1925` |
+
+[PR #42](https://github.com/SOLHK/Swirl/pull/42) was open, Draft, unmerged and
+conflicting. `git rev-list --left-right --count origin/test...HEAD` returned
+48 test-only / 36 TUN-only commits; main comparison returned 5 / 36.
+`git merge-tree --write-tree --name-only origin/test HEAD` identified one
+conflicting file, `.github/workflows/build-qt-quick-ui.yml`. This was an object-only
+merge preview, not a worktree merge. UI/LAN/activity changes on `test` were not
+overwritten. The other Native TUN branch was not modified.
+
+The public Actions API independently returned six completed successful latest
+attempts for baseline `930c3f5`: Native TUN
+[41001028590](https://github.com/SOLHK/Swirl/actions/runs/41001028590) and
+[41001023735 attempt 2](https://github.com/SOLHK/Swirl/actions/runs/41001023735/attempts/2),
+Rust Core [41001028595](https://github.com/SOLHK/Swirl/actions/runs/41001028595),
+Native Protocols [41001023770](https://github.com/SOLHK/Swirl/actions/runs/41001023770),
+Qt [41001028582](https://github.com/SOLHK/Swirl/actions/runs/41001028582), and
+source guard [41001028571](https://github.com/SOLHK/Swirl/actions/runs/41001028571).
+These remain **baseline-source results**, not validation of later fixes.
+Historical original driver/failure logs and manifests remain under
+[`native-tun-evidence/`](native-tun-evidence/); no old failure record was deleted.
+
+## Capability matrix
+
+"Implemented" describes source, not physical application acceptance. Controlled
+packet/loopback tests, real Server Wintun, Windows 11 read-only observations and
+Windows 11 full-network acceptance are separate evidence classes.
+
+| Area | Existing implementation / defect | Current acceptance boundary |
+| --- | --- | --- |
+| IPv4/IPv6 TCP | Existing smoltcp state machine, bounded sockets/queues, shared Core, FIN/RST, half-close, retransmission/SYN deduplication and byte-exact transfer regressions. | Controlled packet/loopback and historical scoped Server Wintun evidence. Public Win11 TCP/long-lived/HTTP2/WS/SSE/app acceptance not run. |
+| IPv4/IPv6 UDP | Existing sessions, replies, fragments, timeouts and native outbound integration. Malformed unfragmented UDP was admitted before length/checksum validation; IPv6 checksum zero was accepted upstream. Boundary now validates before allocating endpoint capacity. | New capacity-exhaustion and checksum-family regressions; IPv4 first-fragment admission still reserves an endpoint before complete reassembly. Real QUIC/TUIC/HY2 applications not accepted. |
+| Failed UDP tuple identity | Existing failed-slot tombstones prevented immediate policy fallback but expired from failure time even while packets continued arriving. Retention now follows actual idle time. | Both virtual-clock shared-Core REJECT-to-DIRECT trap regressions passed; full idle may intentionally admit a new session. This does not migrate live QUIC sessions. |
+| DNS/Fake-IP | Existing UDP/TCP A/AAAA, durable dual-stack Fake-IP identity, TTL/cache and rule mapping. Non-A/AAAA support remains deliberately limited. | Controlled tests and historical scoped driver DNS; no independent physical DNS/IPv6 leakage trial. Durable reopen is not crash/reboot acceptance. |
+| DNS guard | Existing port-53 physical-adapter block rules and ownership journal. Previously status equalled capture state. Added initial/effective ActiveStore audit, bounded background verification and age/unknown status; security drift retains capture and requests explicit recovery. | Production script exercised against PowerShell fault mocks; no actual firewall deletion/service-stop/packet-capture trial. Polling leaves a detection window. DoH/DoT/application DNS and bypass/IPsec policies remain boundaries. |
+| Routes/egress | Existing dual-stack split defaults, physical binding, known VPN conflict preflight, network notifications and rebuild. | Rebuild still removes the old capture transaction; no system-wide zero-leak protection during that interval. Multi-NIC/handoff/sleep/public egress not accepted. |
+| Kill switch | **Not implemented.** Core socket binding and DNS guard do not block all other applications' physical egress. | Formal release blocker. Helper crash, reboot, existing flows, interface changes, DNS and explicit unlock all require real tests. |
+| Privilege/IPC | Existing ordinary GUI mutation refusal, private inherited stdio, bounded commands/output, protected journal directory and PowerShell Job Objects. Worker still inherits elevated helper token. | Restricted-token packet/protocol worker, authenticated product launch/IPC, signed installed payload and unauthorized-local-process acceptance missing. |
+| Recovery | Existing durable typed journal, GUID/index ownership, readback, conflict preservation, explicit recovery and supervisor child-exit handling. | Normal scoped Server teardown passed historically. Simultaneous helper/worker failure and reboot require a surviving/restarted process; no startup recovery service or whole-worker hang watchdog. |
+| Rules/protocols | Existing FlowDispatcher reuses MRS, policy groups and native outbounds; no independent TUN rules. Existing failure paths are fail-closed. | Historical native protocol matrix is not blanket interoperability. VMess strict half-close, TUIC empty UDP and HY2 half-close/large UDP limitations remain recorded in architecture/PR. |
+| GUI/product | GUI TUN capability remains disabled in EngineController, RustCoreEngine and settings QML. | No safe GUI/UAC/worker connection or helper/driver installer integration yet. Enabling a flag would conceal missing lifecycle/security work. No unrelated visual/module files changed. |
+| Performance | Existing bounded buffers and exact synthetic transfers. | No matched throughput/latency before/after data, sustained physical load, task/socket/handle leak proof or mature-client comparison. No performance improvement is claimed. |
+| CI | Existing workspace/Windows/driver/native-protocol/Qt/product workflows. Native workflow lacked post-merge `test`/`main` push and tooling-path coverage. Conflicting PRs cannot rely on `pull_request` jobs. | Added native trigger coverage/evidence tests and isolated-branch push triggers for Rust Core and Qt. Native workflow Actions are pinned to the live-resolved commit SHAs; checkout does not retain credentials. New source requires its own Actions results. Server driver smoke remains explicitly scoped loopback. |
+
+## Observed Windows 11 failure and targeted fixes
+
+The accessible host is Windows 11 Home Insider Preview, build **29698**, Lenovo
+model **83NN**, ordinary medium-integrity process. It has not been used for
+privileged full-tunnel testing. A default read-only acceptance inventory recorded
+12 adapters / 43 routes / 3 firewall profiles and no owned Native TUN DNS rules;
+inventory counts can change with the host's network state.
+
+The first local `cargo test --locked -p swirl-platform -p swirl-tun -p swirl-dns
+--all-targets` failed in
+`configuration_snapshot_reads_system_state_without_network_writes`: a real
+connected CIM row had a **present null `InterfaceMetric`**. The previous required
+`u32` decoder rejected the entire snapshot. The fix preserves a required-nullable
+`Option<u32>`; missing/wrong-type fields still fail, null and zero remain distinct,
+and PowerShell explicitly requires the property to exist. The corrected platform
+suite passed its actual read-only snapshot and the null/zero/missing/type tests.
+No fake zero, interface exclusion, schema skip or fallback was introduced.
+
+The new UDP capacity/checksum tests first reproduced the defects on the original
+implementation. Reporting checksum-invalid packets earlier intentionally changes
+the existing roundtrip fixture's exact malformed count from 1 to 2: it injects one
+truncated IP packet and one invalid-checksum UDP packet. Tuple/content/no-forward
+assertions remain intact; this is additional malformed-packet accounting.
+
+DNS guard regressions execute the unchanged production fixed PowerShell script
+against child-local mocks for healthy state and eleven faults: removed rule,
+stopped firewall, disabled profile, rejected local policy, exempt interface,
+uncovered new hardware, degraded status, incomplete enforcement, port/protocol
+change and IPv4-only scope. Three monitor tests cover failed initial audit,
+independent subsequent rule loss, stale success and cancellation. These are
+explicitly **not live physical DNS leakage tests**.
+
+Raw local command logs and read-only inventories stay outside Git. The
+[collector/verifier contract](NATIVE_TUN_WINDOWS_ACCEPTANCE.md) provides fresh,
+source-bound baseline/resource/scoped-driver collection with original outputs,
+pre-run thresholds and artifact hashes. Its validator never grants release or
+physical Win11 acceptance from flags, hashes or operator declarations.
+
+## Local validation and change identities
+
+| Change | Commit |
+| --- | --- |
+| UDP integrity before endpoint admission | `9f2bb94` |
+| Failed UDP identity retained through continuing traffic | `6aaeb89` |
+| Effective DNS guard audit and real Windows 11 null-metric snapshot correction | `edfbbed` |
+| Bound evidence tooling, CI trigger coverage and Native Action pins | `9ca8917` |
+
+The final frozen Rust changes passed these local Windows GNU checks with Rust
+1.99.1; this is not MSVC or an installed Qt product claim:
+
+- `cargo fmt --all -- --check` — passed.
+- `cargo clippy --locked --workspace --all-targets -- -D warnings` — passed.
+- `cargo test --locked --workspace --all-targets` — **934 passed, 0 failed,
+  0 ignored, 0 filtered; 49 target result blocks**. The source was the frozen
+  working tree subsequently committed in the changes above; standalone Cargo
+  identity is explicitly distinguishable from a paired product DLL.
+- `cargo test --locked --workspace --doc` — **1 passed, 0 failed/ignored/filtered**
+  across nine crate result blocks; separate from the all-targets count.
+- `python scripts/tests/Test-NativeTunAcceptance.py` — **24 passed**.
+- `actionlint` on the three touched workflows and `git diff --check` — passed.
+- Four archived Windows original-log manifests were checked against Git blob
+  bytes for exact SHA-256 and recorded byte length, including failed runs.
+
+Original failing evidence is retained locally: real CIM null-metric decoding,
+malformed UDP capacity / IPv6 zero-checksum admission, and both corrected-domain
+UDP tombstone regressions on the old implementation. An early tombstone fixture
+was invalid because built-in LAN routing takes precedence over a loopback
+custom REJECT rule; its initial timeout/hang is recorded as a **fixture failure**,
+not production failure proof. The corrected fixture uses Fake-IP domain identity,
+an actual Core transaction and a real UDP trap. It then reproduces both policy
+identity defects before the fix, without waiting 60 wall-clock seconds.
+
+No modified test was deleted, ignored or given a larger production timeout to
+obtain these results. Changes to the exact malformed counter are explained above.
+No driver was installed or host route/DNS/firewall/proxy changed by these local
+checks. CI and product build results must be attached separately to their exact
+remote HEAD; old `930c3f5` runs cannot be reused as these changes' acceptance.
+
+## Kill-switch architecture constraints still to implement
+
+Evaluated WFP and existing Windows Firewall integration against Microsoft's
+[filter arbitration](https://learn.microsoft.com/en-us/windows/win32/fwp/filter-arbitration)
+and [object lifetime/transactions](https://learn.microsoft.com/en-us/windows/win32/fwp/object-management).
+A blanket Windows Firewall block plus an ordinary application allow rule is not
+a sufficient design. A WFP implementation must isolate its own sublayer and
+exceptions while preserving other providers' security policy; indiscriminate
+hard permits could bypass other firewall decisions. Dynamic session objects
+disappear on process death, so they cannot provide persistent crash protection.
+Persistent runtime filters and boot-time filters have distinct lifetimes.
+
+Before enabling this feature, implement and verify owned atomic WFP policy,
+exact helper/worker identity, IPv4/IPv6 and already-established/forwarded/raw-flow
+coverage, tunnel/physical-interface changes, explicit LAN and essential-system
+exceptions, durable enable intent, crash/reboot behavior, independent readback,
+administrator-only emergency unlock, installation/uninstallation and concurrent
+recovery ownership. Filters must outlive capture rebuild and unexpected helper
+exit, but explicit user disable must remove only Swirl-owned protection. No
+prototype policy was installed on this host or represented as a completed kill
+switch.
+
+## Unperformed acceptance and integration gates
+
+Full system capture, real public IPv4/IPv6 TCP/UDP, independent DNS/IPv6 packet
+leakage, Chrome/Edge/VS Code/Codex/GitHub, WebSocket/SSE/HTTP2/HTTP3, kill switch,
+unauthorized IPC, helper/worker force-kill, Wi-Fi/Ethernet handoff, suspend/resume,
+machine reboot and sustained load remain **not run**. A recoverable dedicated
+Windows 11 environment and the missing implementations are prerequisites.
+Passing a read-only test on a physical Windows 11 host does not change these
+statuses. Neither `test` nor `main` may be merged merely because a Server
+workflow or a backend build is green.
