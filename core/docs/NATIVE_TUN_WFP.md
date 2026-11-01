@@ -73,12 +73,23 @@ manually widen the rules to obtain a successful test.
 
 ## Evidence boundary
 
-Local Windows GNU checks passed five model/SDDL tests, the peer-error join test,
+Local Windows GNU checks passed nine model/SDDL/diagnostic tests, the peer-error join test,
 Clippy with `-D warnings`, and actual Release linking. The accessible ordinary
 Windows 11 process also confirmed missing opt-in and insufficient-elevation
 preflights refuse execution before receipt/engine creation. No actual WFP rule
 has been installed on that workstation. Real BFE readback, enforcement and
 persistence require the explicit CI command; pending runs are not passes.
+
+The first real Server run at development `ef74bc0`, actual PR checkout
+`b7986bb`, **failed** with `scoped WFP ownership or policy differs` (exit 1).
+Its Wintun step had passed, but the Native workflow as a whole did not. The
+original full job log, WFP log, exact receipt and failure ZIP are retained.
+That message alone does not identify an ACL, provider or filter difference;
+no specific SDK cause is inferred from it. The follow-up diagnostic patch
+retains every acceptance comparison, ACL/flags and error kind, adding fixed SDK
+operation/code and privacy-preserving field/condition differences. It does not
+print paths, application IDs, receipt contents, endpoint values or private SIDs.
+Fresh real-run evidence is still required before any enforcement success claim.
 
 Before this can become a product kill switch, system-scope policy, tunnel and
 physical interface changes, existing inbound-origin/raw/forwarded flows, LAN and

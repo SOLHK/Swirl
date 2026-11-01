@@ -63,7 +63,10 @@ impl SecurityDescriptor {
             )
         } == 0
         {
-            return Err(io::Error::last_os_error());
+            return Err(context(
+                "ConvertStringSecurityDescriptorToSecurityDescriptorW",
+                io::Error::last_os_error(),
+            ));
         }
         Ok(Self(descriptor))
     }
@@ -93,14 +96,40 @@ fn security_shape(descriptor: *mut std::ffi::c_void) -> io::Result<SecurityShape
     // SAFETY: private callers lend either LocalAlloc or BFE-owned valid
     // descriptors. Windows returns borrowed SID/ACL pointers into that owner.
     unsafe {
-        if GetSecurityDescriptorOwner(descriptor, &mut owner, &mut defaulted) == 0
-            || GetSecurityDescriptorControl(descriptor, &mut control, &mut revision) == 0
-            || GetSecurityDescriptorDacl(descriptor, &mut present, &mut dacl, &mut defaulted) == 0
-        {
-            return Err(io::Error::last_os_error());
+        if GetSecurityDescriptorOwner(descriptor, &mut owner, &mut defaulted) == 0 {
+            return Err(context(
+                "GetSecurityDescriptorOwner",
+                io::Error::last_os_error(),
+            ));
+        }
+        if GetSecurityDescriptorControl(descriptor, &mut control, &mut revision) == 0 {
+            return Err(context(
+                "GetSecurityDescriptorControl",
+                io::Error::last_os_error(),
+            ));
+        }
+        if GetSecurityDescriptorDacl(descriptor, &mut present, &mut dacl, &mut defaulted) == 0 {
+            return Err(context(
+                "GetSecurityDescriptorDacl",
+                io::Error::last_os_error(),
+            ));
         }
         if owner.is_null() || present == 0 || dacl.is_null() || (*dacl).AceCount != 3 {
-            return Err(conflict());
+            let owner_label = if owner.is_null() {
+                "null".into()
+            } else {
+                sid_label(std::slice::from_raw_parts(
+                    owner.cast::<u8>(),
+                    GetLengthSid(owner) as usize,
+                ))
+            };
+            return Err(conflict_detail(format!(
+                "security_shape owner={owner_label} owner_null={} dacl_present={present} dacl_null={} ace_count={:?} protected={}",
+                owner.is_null(),
+                dacl.is_null(),
+                dacl.as_ref().map(|acl| acl.AceCount),
+                control & SE_DACL_PROTECTED != 0
+            )));
         }
         let owner =
             std::slice::from_raw_parts(owner.cast::<u8>(), GetLengthSid(owner) as usize).to_vec();
@@ -108,18 +137,27 @@ fn security_shape(descriptor: *mut std::ffi::c_void) -> io::Result<SecurityShape
         for index in 0..u32::from((*dacl).AceCount) {
             let mut ace = null_mut();
             if GetAce(dacl, index, &mut ace) == 0 {
-                return Err(io::Error::last_os_error());
+                return Err(context(
+                    &format!("GetAce index={index}"),
+                    io::Error::last_os_error(),
+                ));
             }
             let ace = &*ace.cast::<ACCESS_ALLOWED_ACE>();
             if ace.Header.AceType != 0 || ace.Header.AceFlags != 0 {
-                return Err(conflict());
+                return Err(conflict_detail(format!(
+                    "security_shape ACE index={index} type={} flags=0x{:02x}; expected allow type=0 flags=0",
+                    ace.Header.AceType, ace.Header.AceFlags
+                )));
             }
             let sid = (&ace.SidStart as *const u32).cast_mut().cast();
             let length = GetLengthSid(sid) as usize;
             if length + std::mem::offset_of!(ACCESS_ALLOWED_ACE, SidStart)
                 > usize::from(ace.Header.AceSize)
             {
-                return Err(conflict());
+                return Err(conflict_detail(format!(
+                    "security_shape ACE index={index} sid_length={length} ace_size={} does not contain SID",
+                    ace.Header.AceSize
+                )));
             }
             grants.push((
                 ace.Mask,
@@ -230,6 +268,35 @@ fn conflict() -> io::Error {
     )
 }
 
+fn context(operation: &str, error: io::Error) -> io::Error {
+    let code = error
+        .raw_os_error()
+        .map(|code| format!("0x{:08x}", code as u32));
+    io::Error::new(
+        error.kind(),
+        format!("{operation}: sdk_code={code:?}; {error}"),
+    )
+}
+
+fn conflict_detail(detail: impl std::fmt::Display) -> io::Error {
+    let error = conflict();
+    io::Error::new(error.kind(), format!("{error}: {detail}"))
+}
+
+fn sid_label(bytes: &[u8]) -> String {
+    match bytes {
+        [1, 2, 0, 0, 0, 0, 0, 5, 32, 0, 0, 0, 32, 2, 0, 0] => "BUILTIN_ADMINISTRATORS".into(),
+        [1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0] => "LOCAL_SYSTEM".into(),
+        [1, 1, 0, 0, 0, 0, 0, 3, 4, 0, 0, 0] => "OWNER_RIGHTS".into(),
+        _ => format!("sha256:{:x}", Sha256::digest(bytes)),
+    }
+}
+
+fn security_summary(shape: &SecurityShape) -> serde_json::Value {
+    serde_json::json!({"owner":sid_label(&shape.owner),"protected":shape.protected,
+        "grants":shape.grants.iter().map(|(mask,sid)|serde_json::json!({"mask":format!("0x{mask:08x}"),"sid":sid_label(sid)})).collect::<Vec<_>>()})
+}
+
 struct Allocation<T>(*mut T);
 
 impl<T> Allocation<T> {
@@ -248,10 +315,13 @@ impl<T> Drop for Allocation<T> {
     }
 }
 
-fn allocated<T>(call: impl FnOnce(*mut *mut T) -> u32) -> io::Result<Allocation<T>> {
+fn allocated<T>(
+    operation: &str,
+    call: impl FnOnce(*mut *mut T) -> u32,
+) -> io::Result<Allocation<T>> {
     let mut value = Allocation(null_mut());
-    status(call(&mut value.0))?;
-    value.get()?;
+    status(call(&mut value.0)).map_err(|error| context(operation, error))?;
+    value.get().map_err(|error| context(operation, error))?;
     Ok(value)
 }
 
@@ -278,7 +348,9 @@ fn app_id(policy: &ScopedPolicy) -> io::Result<Allocation<FWP_BYTE_BLOB>> {
         .chain(Some(0))
         .collect::<Vec<_>>();
     // SAFETY: terminated path and writable output; BFE owns the returned blob.
-    allocated(|out| unsafe { FwpmGetAppIdFromFileName0(wide.as_ptr(), out) })
+    allocated("FwpmGetAppIdFromFileName0", |out| unsafe {
+        FwpmGetAppIdFromFileName0(wide.as_ptr(), out)
+    })
 }
 
 /// A non-dynamic engine session. Closing it never implicitly unlocks a policy.
@@ -293,7 +365,8 @@ impl Engine {
         let mut handle = null_mut();
         // SAFETY: local authenticated RPC, no supplied credentials, valid
         // input/output pointers. The session is copied by BFE during this call.
-        status(unsafe { FwpmEngineOpen0(null(), u32::MAX, null(), &session, &mut handle) })?;
+        status(unsafe { FwpmEngineOpen0(null(), u32::MAX, null(), &session, &mut handle) })
+            .map_err(|error| context("FwpmEngineOpen0", error))?;
         Ok(Self(handle))
     }
 
@@ -303,14 +376,16 @@ impl Engine {
 
     pub fn close(mut self) -> io::Result<()> {
         // SAFETY: uniquely owned live handle with no borrowed transaction.
-        status(unsafe { FwpmEngineClose0(self.0) })?;
+        status(unsafe { FwpmEngineClose0(self.0) })
+            .map_err(|error| context("FwpmEngineClose0", error))?;
         self.0 = null_mut();
         Ok(())
     }
 
     fn transaction(&mut self, flags: u32) -> io::Result<Transaction<'_>> {
         // SAFETY: live engine, exclusive borrow prevents nested transactions.
-        status(unsafe { FwpmTransactionBegin0(self.0, flags) })?;
+        status(unsafe { FwpmTransactionBegin0(self.0, flags) })
+            .map_err(|error| context("FwpmTransactionBegin0", error))?;
         Ok(Transaction {
             engine: self,
             active: true,
@@ -387,14 +462,17 @@ impl Transaction<'_> {
         };
         // SAFETY: all nested buffers/pointers are live through these copying
         // BFE calls. Existing objects are rejected, never adopted or overwritten.
-        status(unsafe { FwpmProviderAdd0(self.engine.0, &provider, security.0) })?;
+        status(unsafe { FwpmProviderAdd0(self.engine.0, &provider, security.0) })
+            .map_err(|error| context("FwpmProviderAdd0", error))?;
         // SAFETY: same ownership and buffer lifetime as the provider above.
-        status(unsafe { FwpmSubLayerAdd0(self.engine.0, &sublayer, security.0) })?;
+        status(unsafe { FwpmSubLayerAdd0(self.engine.0, &sublayer, security.0) })
+            .map_err(|error| context("FwpmSubLayerAdd0", error))?;
         for (index, rule) in policy.rules.iter().enumerate() {
             with_filter(policy, index, rule, app.get()?, &mut metadata, |filter| {
                 // SAFETY: with_filter keeps every nested buffer alive while
                 // BFE copies the filter; no user pointer is retained by BFE.
                 status(unsafe { FwpmFilterAdd0(self.engine.0, filter, security.0, null_mut()) })
+                    .map_err(|error| context(&format!("FwpmFilterAdd0 index={index}"), error))
             })?;
         }
         self.verify_inner(policy)
@@ -414,11 +492,13 @@ impl Transaction<'_> {
         self.verify_security(&PROVIDER, Object::Provider, &security)?;
         self.verify_security(&SUBLAYER, Object::Sublayer, &security)?;
         // SAFETY: live engine/key/output; returned structures stay owned below.
-        let provider =
-            allocated(|out| unsafe { FwpmProviderGetByKey0(self.engine.0, &PROVIDER, out) })?;
+        let provider = allocated("FwpmProviderGetByKey0", |out| unsafe {
+            FwpmProviderGetByKey0(self.engine.0, &PROVIDER, out)
+        })?;
         // SAFETY: as above, distinct BFE allocation owned by this wrapper.
-        let sublayer =
-            allocated(|out| unsafe { FwpmSubLayerGetByKey0(self.engine.0, &SUBLAYER, out) })?;
+        let sublayer = allocated("FwpmSubLayerGetByKey0", |out| unsafe {
+            FwpmSubLayerGetByKey0(self.engine.0, &SUBLAYER, out)
+        })?;
         let provider = provider.get()?;
         let sublayer = sublayer.get()?;
         // SAFETY: optional providerKey is part of the live BFE allocation.
@@ -431,18 +511,33 @@ impl Transaction<'_> {
             || !linked_provider.is_some_and(|key| same_guid(key, &PROVIDER))
             || !blob_matches(&sublayer.providerData, &metadata)
         {
-            return Err(conflict());
+            return Err(conflict_detail(
+                serde_json::json!({"phase":"verify provider/sublayer",
+                "provider_flags":{"actual":provider.flags,"expected":FWPM_PROVIDER_FLAG_PERSISTENT},
+                "provider_service_name_is_null":provider.serviceName.is_null(),
+                "provider_metadata_equal":blob_matches(&provider.providerData,&metadata),
+                "sublayer_flags":{"actual":sublayer.flags,"expected":FWPM_SUBLAYER_FLAG_PERSISTENT},
+                "sublayer_weight":{"actual":sublayer.weight,"expected":SUBLAYER_WEIGHT},
+                "sublayer_provider_equal":linked_provider.is_some_and(|key|same_guid(key,&PROVIDER)),
+                "sublayer_metadata_equal":blob_matches(&sublayer.providerData,&metadata)}),
+            ));
         }
         for (index, rule) in policy.rules.iter().enumerate() {
             let key = policy.key(index);
-            self.verify_security(&key, Object::Filter, &security)?;
+            self.verify_security(&key, Object::Filter(index), &security)?;
             // SAFETY: live engine/key/output; returned filter is uniquely owned.
-            let actual = allocated(|out| unsafe { FwpmFilterGetByKey0(self.engine.0, &key, out) })?;
+            let actual = allocated(
+                &format!("FwpmFilterGetByKey0 index={index}"),
+                |out| unsafe { FwpmFilterGetByKey0(self.engine.0, &key, out) },
+            )?;
             with_filter(policy, index, rule, app.get()?, &mut metadata, |expected| {
                 if filter_matches(actual.get()?, expected) {
                     Ok(())
                 } else {
-                    Err(conflict())
+                    Err(conflict_detail(format!(
+                        "verify filter index={index}: {}",
+                        filter_summary(actual.get()?, expected)
+                    )))
                 }
             })?;
         }
@@ -483,7 +578,7 @@ impl Transaction<'_> {
                     null_mut(),
                     out,
                 ),
-                Object::Filter => FwpmFilterGetSecurityInfoByKey0(
+                Object::Filter(_) => FwpmFilterGetSecurityInfoByKey0(
                     self.engine.0,
                     key,
                     information,
@@ -495,9 +590,22 @@ impl Transaction<'_> {
                 ),
             }
         };
-        status(code)?;
-        if descriptor.0.is_null() || security_shape(descriptor.0.cast())? != *expected {
-            return Err(conflict());
+        status(code).map_err(|error| context(object.operation(), error))?;
+        if descriptor.0.is_null() {
+            return Err(conflict_detail(format!(
+                "verify_security {} returned null descriptor",
+                object.label()
+            )));
+        }
+        let actual = security_shape(descriptor.0.cast())
+            .map_err(|error| context(&format!("verify_security {}", object.label()), error))?;
+        if actual != *expected {
+            return Err(conflict_detail(format!(
+                "verify_security {} actual={} expected={}",
+                object.label(),
+                security_summary(&actual),
+                security_summary(expected)
+            )));
         }
         Ok(())
     }
@@ -511,14 +619,17 @@ impl Transaction<'_> {
             return Ok(false);
         }
         if provider_status != FWP_E_PROVIDER_NOT_FOUND as u32 {
-            status(provider_status)?;
+            status(provider_status)
+                .map_err(|error| context("FwpmProviderGetByKey0 absent", error))?;
         }
         let mut sublayer = Allocation(null_mut());
         // SAFETY: live engine and valid output for owned BFE allocation.
         let sublayer_status =
             unsafe { FwpmSubLayerGetByKey0(self.engine.0, &SUBLAYER, &mut sublayer.0) };
         if sublayer_status != FWP_E_SUBLAYER_NOT_FOUND as u32 {
-            return Err(conflict());
+            return Err(conflict_detail(format!(
+                "absent sublayer expected_not_found=true sdk_code=0x{sublayer_status:08x}"
+            )));
         }
         for index in 0..policy.rules.len() {
             let mut filter = Allocation(null_mut());
@@ -526,7 +637,9 @@ impl Transaction<'_> {
             let code =
                 unsafe { FwpmFilterGetByKey0(self.engine.0, &policy.key(index), &mut filter.0) };
             if code != FWP_E_FILTER_NOT_FOUND as u32 {
-                return Err(conflict());
+                return Err(conflict_detail(format!(
+                    "absent filter index={index} expected_not_found=true sdk_code=0x{code:08x}"
+                )));
             }
         }
         Ok(true)
@@ -543,15 +656,22 @@ impl Transaction<'_> {
             self.verify_inner(policy)?;
             for index in 0..policy.rules.len() {
                 // SAFETY: exact filter key was verified in this transaction.
-                status(unsafe { FwpmFilterDeleteByKey0(self.engine.0, &policy.key(index)) })?;
+                status(unsafe { FwpmFilterDeleteByKey0(self.engine.0, &policy.key(index)) })
+                    .map_err(|error| {
+                        context(&format!("FwpmFilterDeleteByKey0 index={index}"), error)
+                    })?;
             }
             // SAFETY: owned child filters are deleted; BFE refuses unlisted
             // children rather than allowing removal of another owner's objects.
-            status(unsafe { FwpmSubLayerDeleteByKey0(self.engine.0, &SUBLAYER) })?;
+            status(unsafe { FwpmSubLayerDeleteByKey0(self.engine.0, &SUBLAYER) })
+                .map_err(|error| context("FwpmSubLayerDeleteByKey0", error))?;
             // SAFETY: exact owned provider was verified; foreign links block deletion.
-            status(unsafe { FwpmProviderDeleteByKey0(self.engine.0, &PROVIDER) })?;
+            status(unsafe { FwpmProviderDeleteByKey0(self.engine.0, &PROVIDER) })
+                .map_err(|error| context("FwpmProviderDeleteByKey0", error))?;
             if !self.absent(policy)? {
-                return Err(conflict());
+                return Err(conflict_detail(
+                    "remove completed but owned keys are not all absent",
+                ));
             }
             Ok(())
         })();
@@ -564,7 +684,8 @@ impl Transaction<'_> {
             return Err(io::Error::other("failed WFP transaction cannot commit"));
         }
         // SAFETY: this uniquely borrowed engine has a live explicit transaction.
-        status(unsafe { FwpmTransactionCommit0(self.engine.0) })?;
+        status(unsafe { FwpmTransactionCommit0(self.engine.0) })
+            .map_err(|error| context("FwpmTransactionCommit0", error))?;
         self.active = false;
         Ok(())
     }
@@ -580,10 +701,28 @@ impl Drop for Transaction<'_> {
     }
 }
 
+#[derive(Clone, Copy)]
 enum Object {
     Provider,
     Sublayer,
-    Filter,
+    Filter(usize),
+}
+
+impl Object {
+    fn label(self) -> String {
+        match self {
+            Self::Provider => "provider".into(),
+            Self::Sublayer => "sublayer".into(),
+            Self::Filter(index) => format!("filter[index={index}]"),
+        }
+    }
+    fn operation(self) -> &'static str {
+        match self {
+            Self::Provider => "FwpmProviderGetSecurityInfoByKey0",
+            Self::Sublayer => "FwpmSubLayerGetSecurityInfoByKey0",
+            Self::Filter(_) => "FwpmFilterGetSecurityInfoByKey0",
+        }
+    }
 }
 
 fn with_filter<T>(
@@ -735,6 +874,59 @@ fn filter_matches(actual: &FWPM_FILTER0, expected: &FWPM_FILTER0) -> bool {
                 .count()
                 == 1
         })
+    }
+}
+
+/// Failure-only diagnostics. Keep the acceptance predicate above unchanged;
+/// never print raw application IDs, paths, receipt blobs or endpoint values.
+fn filter_summary(actual: &FWPM_FILTER0, expected: &FWPM_FILTER0) -> serde_json::Value {
+    // SAFETY: the same BFE/local structures used by filter_matches are live.
+    // Check every discriminant, count and nullable pointer before access.
+    unsafe {
+        let weight = if actual.weight.r#type == FWP_UINT64 {
+            actual.weight.Anonymous.uint64.as_ref().copied()
+        } else {
+            None
+        };
+        let mut conditions = Vec::new();
+        if actual.numFilterConditions == 4 && !actual.filterCondition.is_null() {
+            let actual_conditions = std::slice::from_raw_parts(actual.filterCondition, 4);
+            for (index, condition) in std::slice::from_raw_parts(expected.filterCondition, 4)
+                .iter()
+                .enumerate()
+            {
+                let name = if same_guid(&condition.fieldKey, &FWPM_CONDITION_ALE_APP_ID) {
+                    "ALE_APP_ID"
+                } else if same_guid(&condition.fieldKey, &FWPM_CONDITION_IP_REMOTE_ADDRESS) {
+                    "IP_REMOTE_ADDRESS"
+                } else if same_guid(&condition.fieldKey, &FWPM_CONDITION_IP_REMOTE_PORT) {
+                    "IP_REMOTE_PORT"
+                } else if same_guid(&condition.fieldKey, &FWPM_CONDITION_IP_PROTOCOL) {
+                    "IP_PROTOCOL"
+                } else {
+                    "unknown"
+                };
+                let candidates = actual_conditions
+                    .iter()
+                    .filter(|other| same_guid(&other.fieldKey, &condition.fieldKey))
+                    .collect::<Vec<_>>();
+                conditions.push(serde_json::json!({"index":index,"name":name,"field_occurrences":candidates.len(),
+                    "expected_type":condition.conditionValue.r#type,"expected_match":condition.matchType,
+                    "actual_types":candidates.iter().map(|other|other.conditionValue.r#type).collect::<Vec<_>>(),
+                    "actual_matches":candidates.iter().map(|other|other.matchType).collect::<Vec<_>>(),
+                    "matching_conditions":candidates.iter().filter(|other|other.matchType==condition.matchType && condition_value_matches(&other.conditionValue,&condition.conditionValue)).count()}));
+            }
+        }
+        serde_json::json!({"filter_key_equal":same_guid(&actual.filterKey,&expected.filterKey),
+            "flags":{"actual":actual.flags,"expected":expected.flags},
+            "layer_key_equal":same_guid(&actual.layerKey,&expected.layerKey),
+            "sublayer_key_equal":same_guid(&actual.subLayerKey,&SUBLAYER),
+            "provider_key_equal":actual.providerKey.as_ref().is_some_and(|key|same_guid(key,&PROVIDER)),
+            "metadata_equal":blob_matches(&actual.providerData,std::slice::from_raw_parts(expected.providerData.data,expected.providerData.size as usize)),
+            "metadata_size":{"actual":actual.providerData.size,"expected":expected.providerData.size},
+            "action":{"actual":actual.action.r#type,"expected":expected.action.r#type},
+            "weight":{"actual_type":actual.weight.r#type,"expected_type":FWP_UINT64,"actual_value":weight,"expected_value":*expected.weight.Anonymous.uint64},
+            "condition_count":{"actual":actual.numFilterConditions,"expected":4},"condition_pointer_null":actual.filterCondition.is_null(),"conditions":conditions})
     }
 }
 

@@ -86,12 +86,24 @@ fn scoped_filter_verifier_rejects_broadened_application_protocol_flags_or_action
                 let mut changed = *expected;
                 changed.flags |= FWPM_FILTER_FLAG_CLEAR_ACTION_RIGHT;
                 assert!(!filter_matches(&changed, expected));
+                assert_ne!(
+                    filter_summary(&changed, expected)["flags"]["actual"],
+                    filter_summary(&changed, expected)["flags"]["expected"]
+                );
                 changed = *expected;
                 changed.action.r#type = FWP_ACTION_PERMIT;
                 assert!(!filter_matches(&changed, expected));
+                assert_eq!(
+                    filter_summary(&changed, expected)["action"]["actual"],
+                    FWP_ACTION_PERMIT
+                );
                 changed = *expected;
                 changed.numFilterConditions = 3;
                 assert!(!filter_matches(&changed, expected));
+                assert_eq!(
+                    filter_summary(&changed, expected)["condition_count"]["actual"],
+                    3
+                );
                 // SAFETY: with_filter's condition array is live for this callback.
                 let mut conditions =
                     unsafe { std::slice::from_raw_parts(expected.filterCondition, 4) }.to_vec();
@@ -99,6 +111,9 @@ fn scoped_filter_verifier_rejects_broadened_application_protocol_flags_or_action
                 changed = *expected;
                 changed.filterCondition = conditions.as_mut_ptr();
                 assert!(!filter_matches(&changed, expected));
+                let diagnosis = filter_summary(&changed, expected);
+                assert_eq!(diagnosis["conditions"][0]["name"], "ALE_APP_ID");
+                assert_eq!(diagnosis["conditions"][0]["matching_conditions"], 0);
                 Ok(())
             },
         )
@@ -157,4 +172,96 @@ fn security_descriptor_is_admin_owned_protected_and_has_no_creator_user_grant() 
         1
     );
     assert_eq!(shape.grants.len(), 3);
+}
+
+#[test]
+fn security_diagnostic_classifies_known_sids_and_hashes_private_values() {
+    let shape = SecurityShape {
+        owner: b"PRIVATE_OWNER_SID".to_vec(),
+        protected: false,
+        grants: vec![(0x000f07ff, b"PRIVATE_GRANTEE_SID".to_vec())],
+    };
+    let summary = security_summary(&shape).to_string();
+    assert!(summary.contains("sha256:"));
+    assert!(summary.contains("0x000f07ff"));
+    assert!(!summary.contains("PRIVATE_OWNER_SID"));
+    assert!(!summary.contains("PRIVATE_GRANTEE_SID"));
+    let descriptor = SecurityDescriptor::new().unwrap();
+    let shape = security_shape(descriptor.0).unwrap();
+    let summary = security_summary(&shape).to_string();
+    for known in ["BUILTIN_ADMINISTRATORS", "LOCAL_SYSTEM", "OWNER_RIGHTS"] {
+        assert!(summary.contains(known));
+    }
+}
+
+#[test]
+fn early_security_rejections_report_acl_structure_without_private_owner_sid() {
+    for (sddl, expected) in [
+        (
+            "O:S-1-5-21-111111-222222-333333-1001G:BAD:P(A;;GA;;;BA)(A;;GA;;;SY)",
+            "ace_count=Some(2)",
+        ),
+        ("O:BAG:BAD:P(D;;GA;;;SY)(A;;GA;;;BA)(A;;RC;;;OW)", "type=1"),
+        (
+            "O:BAG:BAD:P(A;CI;GA;;;SY)(A;;GA;;;BA)(A;;RC;;;OW)",
+            "flags=0x02",
+        ),
+    ] {
+        let wide = sddl.encode_utf16().chain(Some(0)).collect::<Vec<_>>();
+        let mut raw = null_mut();
+        // SAFETY: pure local descriptor conversion; no OS object is created or changed.
+        assert_ne!(
+            unsafe {
+                ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                    wide.as_ptr(),
+                    SDDL_REVISION_1,
+                    &mut raw,
+                    null_mut(),
+                )
+            },
+            0
+        );
+        let descriptor = SecurityDescriptor(raw);
+        let error = security_shape(descriptor.0).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+        assert!(error.to_string().contains(expected), "{error}");
+        assert!(!error.to_string().contains("111111"));
+    }
+}
+
+#[test]
+fn sdk_diagnostics_preserve_error_kind_and_include_fixed_operation_and_code() {
+    let original = io::Error::from_raw_os_error(5);
+    let kind = original.kind();
+    let error = context("FwpmProviderAdd0", original);
+    assert_eq!(error.kind(), kind);
+    assert!(error.to_string().contains("FwpmProviderAdd0"));
+    assert!(error.to_string().contains("0x00000005"));
+}
+
+#[test]
+fn filter_diagnostics_exclude_application_path_id_and_receipt_contents() {
+    let mut policy = policy();
+    policy.application = r"C:\PRIVATE_PATH_SENTINEL\worker.exe".into();
+    let mut metadata = policy.metadata().unwrap();
+    let mut app_bytes = b"PRIVATE_APPLICATION_ID_SENTINEL".to_vec();
+    let app = blob(&mut app_bytes);
+    with_filter(
+        &policy,
+        0,
+        &policy.rules[0],
+        &app,
+        &mut metadata,
+        |expected| {
+            let mut changed = *expected;
+            changed.numFilterConditions = 3;
+            assert!(!filter_matches(&changed, expected));
+            let diagnosis = filter_summary(&changed, expected).to_string();
+            assert!(diagnosis.contains("condition_count"));
+            assert!(!diagnosis.contains("PRIVATE_PATH_SENTINEL"));
+            assert!(!diagnosis.contains("PRIVATE_APPLICATION_ID_SENTINEL"));
+            Ok(())
+        },
+    )
+    .unwrap();
 }
