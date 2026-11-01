@@ -62,7 +62,7 @@ Windows 11 full-network acceptance are separate evidence classes.
 | DNS guard | Existing port-53 physical-adapter block rules and ownership journal. Previously status equalled capture state. Added initial/effective ActiveStore audit, bounded background verification and age/unknown status; security drift retains capture and requests explicit recovery. | Production script exercised against PowerShell fault mocks; no actual firewall deletion/service-stop/packet-capture trial. Polling leaves a detection window. DoH/DoT/application DNS and bypass/IPsec policies remain boundaries. |
 | Routes/egress | Existing dual-stack split defaults, physical binding, known VPN conflict preflight, network notifications and rebuild. | Rebuild still removes the old capture transaction; no system-wide zero-leak protection during that interval. Multi-NIC/handoff/sleep/public egress not accepted. |
 | Kill switch | **System-wide feature not implemented.** A new explicitly scoped WFP transaction foundation is limited to one executable's reserved loopback TCP/UDP endpoints and is not called by product lifecycle code. Core socket binding and DNS guard do not block other applications' physical egress. | Formal release blocker. Pure model/SDDL checks and a separate opt-in disposable-runner enforcement command are distinct from actual system protection. Helper crash, reboot, existing flows, interface changes, DNS and explicit unlock all require full tests. |
-| Privilege/IPC | Existing ordinary GUI mutation refusal, private inherited stdio, bounded commands/output, protected journal directory and PowerShell Job Objects. Worker still inherits elevated helper token. | Restricted-token packet/protocol worker, authenticated product launch/IPC, signed installed payload and unauthorized-local-process acceptance missing. |
+| Privilege/IPC | Existing ordinary GUI mutation refusal, private stdio, bounded IO and protected journals remain. The legacy product helper still runs its worker elevated. The experimental packet endpoint now reuses the shared Core behind validated Low-token/fixed-resource IPC and suspended physical egress. | Local model/pipe tests and real-Core loopback scenario passed; actual restricted startup still fails before main. Experimental endpoint is not wired into product capture. Authenticated launch/IPC, kernel principal, installed payload and unauthorized-local-process acceptance remain missing. |
 | Recovery | Existing durable typed journal, GUID/index ownership, readback, conflict preservation, explicit recovery and supervisor child-exit handling. Added control-loop heartbeat, bounded stall termination/reaping before recovery and explicit worker-error reporting. | Real finite child-process stall/progress and original recovery-ordering tests passed. Normal scoped Server teardown passed historically. Actual driver-hang/crash restoration is unaccepted; simultaneous helper/worker failure and reboot require a surviving/restarted process and no startup recovery service exists. |
 | Rules/protocols | Existing FlowDispatcher reuses MRS, policy groups and native outbounds; no independent TUN rules. Existing failure paths are fail-closed. | Historical native protocol matrix is not blanket interoperability. VMess strict half-close, TUIC empty UDP and HY2 half-close/large UDP limitations remain recorded in architecture/PR. |
 | GUI/product | GUI TUN capability remains disabled in EngineController, RustCoreEngine and settings QML. | No safe GUI/UAC/worker connection or helper/driver installer integration yet. Enabling a flag would conceal missing lifecycle/security work. No unrelated visual/module files changed. |
@@ -550,3 +550,26 @@ OS AccessCheck refusal cases and service removal. Its service token was
 non-elevated/non-admin with only change-notify privilege, session zero and
 integrity RID 12288. It does not establish a low-integrity Core child, WFP
 service-SID packet enforcement, product broker integration or Win11 acceptance.
+
+### Shared packet-worker checkpoint
+
+`62ae3de` adds the [internal packet endpoint](NATIVE_TUN_PACKET_WORKER.md) using
+the same Core/FlowDispatcher and durable DNS implementation. The original helper
+shares its exact bounded-output implementation; eight existing helper tests
+remain unchanged. Core/schema/epoch/resource/input/output boundaries and a
+real-Core dual-stack TCP/UDP/Fake-IP loopback fixture are implemented. These do
+not resolve the independent Windows loader failure or authenticate a broker.
+
+Frozen local affected all-target regression passed **330 tests / 24 result
+groups**, zero failed/ignored/filtered, plus targeted all-target Clippy, fmt,
+11 portable-boundary contracts and actionlint. The TCP fixture verifies 1,024
+upload bytes plus client FIN before an exact 128 KiB reply/FIN for each family.
+No throughput improvement, restricted-process network success or physical
+acceptance is inferred from this local scenario.
+
+`b65ba74` extends the existing SCM fixture with an optional two-rule WFP kernel
+identity test, independently observed before/blocked/after socket controls and
+exact owned recovery. Its seven local models/read-only tests passed; actual
+fifth-condition enforcement is pending the new disposable CI gate. Refusal must
+be real WSAEACCES 10013, not timeout or absence of a response. This still supplies
+no global kill switch, boot protection or low-integrity service-derived worker.

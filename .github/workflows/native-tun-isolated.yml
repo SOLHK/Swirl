@@ -84,9 +84,12 @@ jobs:
       - name: Real loopback TLS fixture preserves its listener after completed client reset
         if: runner.os == 'Windows'
         run: cargo test --locked -p swirl-api --example windows-tun-smoke
-      - name: Build actual Rust library and helper
+      - name: Packet worker fixture uses real shared Core and bounded protocol parsing
+        if: runner.os == 'Windows'
+        run: cargo test --locked -p swirl-api --example windows-packet-worker-smoke
+      - name: Build actual Rust library, helper and internal packet worker
         id: backend_build
-        run: cargo build --locked -p swirl-api --lib --bin swirl-tun-helper --release
+        run: cargo build --locked -p swirl-api --lib --bin swirl-tun-helper --bin swirl-tun-packet-worker --example windows-packet-worker-smoke --release
       - name: Real Wintun scoped TCP UDP and DNS smoke in this disposable VM
         if: runner.os == 'Windows'
         shell: pwsh
@@ -106,7 +109,30 @@ jobs:
           $smokeDriver = Join-Path $smokeDirectory 'wintun/bin/amd64/wintun.dll'
           cargo run --locked --release -p swirl-api --example windows-tun-smoke -- --disposable-network --wintun $smokeDriver 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'swirl-wintun-smoke.log')
           if ($LASTEXITCODE -ne 0) { throw "Scoped Wintun smoke failed with exit code $LASTEXITCODE" }
+      - name: Real restricted packet worker and shared Core in this disposable VM
+        # Independent of driver traffic: preserve both failures and never run
+        # an unbuilt/unvalidated binary after an earlier build-chain failure.
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.backend_build.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $directory = Join-Path $env:RUNNER_TEMP 'swirl-packet-worker-smoke'
+          $log = Join-Path $env:RUNNER_TEMP 'swirl-packet-worker-smoke.log'
+          $worker = (Resolve-Path 'target/release/swirl-tun-packet-worker.exe').Path
+          ./target/release/examples/windows-packet-worker-smoke.exe --disposable-environment --worker $worker --directory $directory 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'Restricted packet/Core smoke failed; retain original child output and frozen workload plan.' }
+          $final = @(Get-Content -LiteralPath $log | Where-Object { $_.TrimStart().StartsWith('{') })
+          if ($final.Count -ne 1) { throw 'Packet worker final evidence is missing or ambiguous.' }
+          $summary = $final[0] | ConvertFrom-Json
+          if ($summary.ok -ne $true -or $summary.source_sha -ne $env:GITHUB_SHA) { throw 'Packet worker source evidence differs.' }
+          if ($summary.worker_sha256 -ne (Get-FileHash -LiteralPath $worker -Algorithm SHA256).Hash.ToLowerInvariant()) { throw 'Packet worker binary identity differs.' }
+          foreach ($field in @('restricted_core_udp_ipv4_ipv6','restricted_core_tcp_ipv4_ipv6_half_close','empty_and_1200_byte_datagrams','udp_dns_a_aaaa','fake_ip_reopened','normal_child_exit_and_pipe_join')) {
+            if ($summary.$field -ne $true) { throw "Restricted packet/Core assertion is missing: $field" }
+          }
+          foreach ($field in @('network_configuration_changed','wintun_acceptance','kernel_service_identity_acceptance','product_broker_integrated','physical_windows_11_acceptance')) {
+            if ($summary.$field -ne $false) { throw "Packet process evidence exceeds its tested scope: $field" }
+          }
       - name: Preserve native backend build
+        if: ${{ !cancelled() && steps.backend_build.outcome == 'success' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: native-tun-backend-${{ runner.os }}-${{ github.sha }}
@@ -115,8 +141,14 @@ jobs:
             core/target/release/libswirl_api.so
             core/target/release/swirl-tun-helper.exe
             core/target/release/swirl-tun-helper
+            core/target/release/swirl-tun-packet-worker.exe
+            core/target/release/swirl-tun-packet-worker
             ${{ runner.temp }}/swirl-native-notices/
             ${{ runner.temp }}/swirl-wintun-smoke.log
+            ${{ runner.temp }}/swirl-packet-worker-smoke.log
+            ${{ runner.temp }}/swirl-packet-worker-smoke/plan.json
+            ${{ runner.temp }}/swirl-packet-worker-smoke/child-stdout.log
+            ${{ runner.temp }}/swirl-packet-worker-smoke/child-stderr.log
           if-no-files-found: error
           retention-days: 7
 
@@ -192,6 +224,7 @@ jobs:
             throw 'Scoped WFP evidence must not be relabelled as system kill-switch or boot acceptance.'
           }
       - name: Real restricted-token child isolation in this disposable VM
+        id: restricted_smoke
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.platform_build.outcome == 'success' }}
         shell: pwsh
         run: |
@@ -218,6 +251,21 @@ jobs:
           if ($summary.network_modified -ne $false -or $summary.product_broker_integrated -ne $false -or $summary.network_compatibility_verified -ne $false -or $summary.physical_windows_11_acceptance -ne $false) {
             throw 'Restricted process evidence must not be relabelled as product or network acceptance.'
           }
+      - name: Independently trace original restricted-loader failure without relaxing isolation
+        if: ${{ !cancelled() && steps.platform_build.outcome == 'success' && steps.restricted_smoke.outcome == 'failure' }}
+        shell: pwsh
+        run: |
+          # Original required A/B failure stays red. This separate debug port
+          # changes scheduling and cannot replace non-debugged startup evidence.
+          $directory = Join-Path $env:RUNNER_TEMP 'swirl-restricted-loader-trace'
+          $log = Join-Path $env:RUNNER_TEMP 'swirl-restricted-loader-trace.log'
+          $probe = (Resolve-Path 'target/release/examples/windows-headless-worker-probe.exe').Path
+          ./target/release/examples/windows-restricted-loader-trace.exe --disposable-environment --probe $probe --directory $directory 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'Restricted loader trace failed to collect/clean up; retain original diagnostics.' }
+          $summary = Get-Content -LiteralPath (Join-Path $directory 'loader-result.json') -Raw | ConvertFrom-Json
+          if ($summary.source_sha -ne $env:GITHUB_SHA -or $summary.trace_complete -ne $true -or $summary.cleanup_complete -ne $true) { throw 'Loader diagnostic source, collection or cleanup differs.' }
+          if ($summary.original_required_smoke_replaced -ne $false -or $summary.security_policy_relaxed -ne $false -or $summary.debug_only_this_process -ne $true -or $summary.inherited_handle_count -ne 6) { throw 'Diagnostic process exceeded its explicit isolation/scope contract.' }
+          if ($summary.probe_image_sha256 -ne (Get-FileHash -LiteralPath $probe -Algorithm SHA256).Hash.ToLowerInvariant()) { throw 'Loader diagnostic binary identity differs.' }
       - name: Real owned virtual-service identity in this disposable VM
         if: ${{ !cancelled() && steps.platform_build.outcome == 'success' }}
         shell: pwsh
@@ -226,7 +274,7 @@ jobs:
           # service, physical network, driver, host-wide WFP or boot policy.
           $directory = Join-Path $env:RUNNER_TEMP 'swirl-service-identity-smoke'
           $log = Join-Path $env:RUNNER_TEMP 'swirl-service-identity-smoke.log'
-          cargo run --locked --release -p swirl-platform --example windows-service-identity-smoke -- --disposable-services --directory $directory 2>&1 | Tee-Object -FilePath $log
+          cargo run --locked --release -p swirl-platform --example windows-service-identity-smoke -- --disposable-services --directory $directory --scoped-wfp 2>&1 | Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) { throw 'Owned virtual-service identity smoke failed; retain its exact receipt and diagnostics.' }
           $final = @(Get-Content -LiteralPath $log | Where-Object { $_.TrimStart().StartsWith('{') })
           if ($final.Count -ne 1) { throw 'Service identity final evidence is missing or ambiguous.' }
@@ -235,8 +283,9 @@ jobs:
           foreach ($field in @('owned_config_and_acl_verified','scm_live_process_image_verified','normal_token_access_refused','standard_token_access_refused','forged_restricting_sid_access_refused','owned_service_removed')) {
             if ($summary.$field -ne $true) { throw "Service identity assertion is missing: $field" }
           }
-          if ($summary.wfp_enforcement_verified -ne $false -or $summary.low_integrity_core_child_verified -ne $false -or $summary.product_broker_integrated -ne $false) {
-            throw 'Service token proof must not be relabelled as kernel WFP or low-privilege product acceptance.'
+          if ($summary.wfp_enforcement_verified -ne $true -or $summary.owned_wfp_policy_removed -ne $true) { throw 'Scoped kernel service identity enforcement or removal did not pass.' }
+          if ($summary.low_integrity_core_child_verified -ne $false -or $summary.product_broker_integrated -ne $false -or $summary.system_kill_switch_acceptance -ne $false) {
+            throw 'Scoped service WFP proof must not be relabelled as low-privilege product or system kill-switch acceptance.'
           }
       - name: Preserve original Windows security SDK evidence
         if: always()
@@ -248,6 +297,7 @@ jobs:
             core/target/release/examples/windows-restricted-worker-smoke.exe
             core/target/release/examples/windows-service-identity-smoke.exe
             core/target/release/examples/windows-headless-worker-probe.exe
+            core/target/release/examples/windows-restricted-loader-trace.exe
             ${{ runner.temp }}/swirl-security-notices/
             ${{ runner.temp }}/swirl-wfp-scoped-smoke.log
             ${{ runner.temp }}/swirl-wfp-scoped-receipt.json
@@ -258,8 +308,18 @@ jobs:
             ${{ runner.temp }}/swirl-restricted-worker-smoke/data-child-stderr.log
             ${{ runner.temp }}/swirl-restricted-worker-smoke/headless-child-stdout.log
             ${{ runner.temp }}/swirl-restricted-worker-smoke/headless-child-stderr.log
+            ${{ runner.temp }}/swirl-restricted-loader-trace.log
+            ${{ runner.temp }}/swirl-restricted-loader-trace/loader-events.jsonl
+            ${{ runner.temp }}/swirl-restricted-loader-trace/loader-result.json
+            ${{ runner.temp }}/swirl-restricted-loader-trace/probe-image.json
+            ${{ runner.temp }}/swirl-restricted-loader-trace/child-stdout.log
+            ${{ runner.temp }}/swirl-restricted-loader-trace/child-stderr.log
             ${{ runner.temp }}/swirl-service-identity-smoke.log
             ${{ runner.temp }}/swirl-service-identity-smoke/service-receipt.json
             ${{ runner.temp }}/swirl-service-identity-smoke/service-result.json
+            ${{ runner.temp }}/swirl-service-identity-smoke/wfp-receipt.json
+            ${{ runner.temp }}/swirl-service-identity-smoke/wfp-negative-*.json
+            ${{ runner.temp }}/swirl-service-identity-smoke/wfp-negative-*.log
+            ${{ runner.temp }}/swirl-service-identity-smoke/wfp-origin-*.json
           if-no-files-found: warn
           retention-days: 7
