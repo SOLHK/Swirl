@@ -380,6 +380,41 @@ mod windows {
         ))
     }
 
+    fn headless_comparison(executable: &Path, directory: &Path) -> io::Result<serde_json::Value> {
+        let probe = executable.with_file_name("windows-headless-worker-probe.exe");
+        let worker = spawn(&probe, &["--headless-pipe-probe".into()])?;
+        let desktop = worker.desktop_name().to_owned();
+        let (exit, stdout, stderr) = capture(worker, b"ping\n")?;
+        std::fs::write(directory.join("headless-child-stdout.log"), &stdout)?;
+        std::fs::write(directory.join("headless-child-stderr.log"), &stderr)?;
+        eprintln!(
+            "restricted headless comparison exited: code={exit} hex=0x{exit:08x} stdout_bytes={} stderr_bytes={}",
+            stdout.len(),
+            stderr.len()
+        );
+        require_desktop_removed(&desktop)?;
+        require(
+            exit == 0,
+            "headless comparison failed; inspect exact exit and outputs",
+        )?;
+        require(
+            stderr == b"SWIRL_HEADLESS_WORKER_MAIN_ENTERED\n",
+            "headless main marker differs",
+        )?;
+        let result: serde_json::Value =
+            serde_json::from_slice(&stdout).map_err(io::Error::other)?;
+        require(
+            result["ok"] == true
+                && result["stdio_reply"] == "pong"
+                && result["source_sha"] == option_env!("SWIRL_SOURCE_SHA").unwrap_or("unknown")
+                && result["desktop_identity_verified"] == false
+                && result["product_broker_integrated"] == false
+                && result["network_modified"] == false,
+            "headless comparison evidence differs",
+        )?;
+        Ok(result)
+    }
+
     fn run() -> io::Result<()> {
         let args = std::env::args_os().skip(1).collect::<Vec<_>>();
         match args.first().and_then(|s| s.to_str()) {
@@ -460,10 +495,18 @@ mod windows {
         require_desktop_removed(&expected_desktop)?;
         std::fs::write(directory.join("child-stdout.log"), &out)?;
         std::fs::write(directory.join("child-stderr.log"), &err)?;
+        // Collect this independent comparison before propagating A's failure.
+        // It uses the same launcher/token/desktop/job/environment/three pipes.
+        // B cannot substitute for A's desktop/token/handle acceptance checks.
+        let headless = headless_comparison(&executable, &directory);
+        if let Err(error) = &headless {
+            eprintln!("headless comparison failed: {error}");
+        }
         require(
             exit == 0,
             "restricted worker capability probe failed; inspect preserved stdout/stderr",
         )?;
+        let headless = headless?;
         let result: serde_json::Value = serde_json::from_slice(&out).map_err(io::Error::other)?;
         require(
             result["stdio_reply"] == "pong" && err == CHILD_STDERR.as_bytes(),
@@ -590,6 +633,7 @@ mod windows {
             serde_json::json!({"ok":true,"evidence":"restricted worker process foundation smoke",
         "source_sha":option_env!("SWIRL_SOURCE_SHA").unwrap_or("unknown"),"child":result,
             "data_plane_child":data_result,
+            "headless_comparison":headless,"headless_comparison_verified":true,
             "delegated_packet_pipes_verified":true,"delegated_file_write_verified":true,
             "job_descendants_reaped":true,"parent_desktop_unchanged":true,"private_desktops_removed":true,
             "network_modified":false,"product_broker_integrated":false,

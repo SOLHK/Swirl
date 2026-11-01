@@ -29,7 +29,7 @@ use windows_sys::{
     Win32::{
         Foundation::{
             DUPLICATE_SAME_ACCESS, DuplicateHandle, ERROR_BAD_LENGTH, ERROR_INSUFFICIENT_BUFFER,
-            HANDLE, LocalFree, WAIT_OBJECT_0, WAIT_TIMEOUT,
+            GENERIC_ALL, HANDLE, LocalFree, WAIT_OBJECT_0, WAIT_TIMEOUT,
         },
         Security::{
             Authorization::{
@@ -49,7 +49,8 @@ use windows_sys::{
             StationsAndDesktops::*,
             SystemInformation::GetWindowsDirectoryW,
             SystemServices::{
-                SE_GROUP_ENABLED, SE_GROUP_INTEGRITY, SE_GROUP_LOGON_ID, SE_GROUP_USE_FOR_DENY_ONLY,
+                MAXIMUM_ALLOWED, SE_GROUP_ENABLED, SE_GROUP_INTEGRITY, SE_GROUP_LOGON_ID,
+                SE_GROUP_USE_FOR_DENY_ONLY,
             },
             Threading::*,
         },
@@ -257,6 +258,334 @@ fn verify_restricted(profile: &TokenProfile) -> io::Result<()> {
         ));
     }
     Ok(())
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct CreationProbeError {
+    operation: &'static str,
+    win32_error: Option<i32>,
+}
+impl CreationProbeError {
+    fn new(operation: &'static str, error: io::Error) -> Self {
+        // Never serialize arbitrary SDK error text, paths or account identity.
+        Self {
+            operation,
+            win32_error: error.raw_os_error(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct CreationAccessDecision {
+    requested_mask: u32,
+    mapped_mask: Option<u32>,
+    api_success: Option<bool>,
+    allowed: Option<bool>,
+    granted_mask: Option<u32>,
+    error: Option<CreationProbeError>,
+}
+impl CreationAccessDecision {
+    fn unknown(requested_mask: u32, error: CreationProbeError) -> Self {
+        Self {
+            requested_mask,
+            mapped_mask: None,
+            api_success: None,
+            allowed: None,
+            granted_mask: None,
+            error: Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct CreationLabel {
+    integrity_rid: u32,
+    mandatory_policy: u32,
+}
+
+#[derive(Debug, Serialize)]
+struct CreationObjectAccess {
+    object: &'static str,
+    station_visible: Option<bool>,
+    descriptor_error: Option<CreationProbeError>,
+    explicit_label: Option<CreationLabel>,
+    label_error: Option<CreationProbeError>,
+    full_access: CreationAccessDecision,
+    maximum_access: CreationAccessDecision,
+}
+
+fn creation_desktop_mapping() -> GENERIC_MAPPING {
+    // Microsoft Desktop Security and Access Rights generic mapping. These are
+    // requested rights for an observational SDK-contract check, not ACL grants.
+    GENERIC_MAPPING {
+        GenericRead: 0x0002_0041,
+        GenericWrite: 0x0002_00be,
+        GenericExecute: 0x0002_0100,
+        GenericAll: 0x000f_01ff,
+    }
+}
+
+fn creation_station_mapping(visible: bool) -> GENERIC_MAPPING {
+    // Window Station Security and Access Rights specifies separate interactive
+    // and noninteractive mappings. The latter excludes READSCREEN/EXITWINDOWS.
+    GENERIC_MAPPING {
+        GenericRead: if visible { 0x0002_0303 } else { 0x0002_0103 },
+        GenericWrite: 0x0002_001c,
+        GenericExecute: if visible { 0x0002_0060 } else { 0x0002_0020 },
+        GenericAll: if visible { 0x000f_037f } else { 0x000f_013f },
+    }
+}
+
+fn creation_probe_buffer(bytes: u32) -> io::Result<Vec<usize>> {
+    if bytes == 0 || bytes > 1024 * 1024 {
+        return Err(invalid(
+            "creation access probe returned invalid buffer size",
+        ));
+    }
+    Ok(vec![0; (bytes as usize).div_ceil(size_of::<usize>())])
+}
+
+fn creation_object_descriptor(handle: HANDLE) -> io::Result<Vec<usize>> {
+    let information = OWNER_SECURITY_INFORMATION
+        | GROUP_SECURITY_INFORMATION
+        | DACL_SECURITY_INFORMATION
+        | LABEL_SECURITY_INFORMATION;
+    let mut bytes = 0;
+    // SAFETY: size query on the chosen live desktop/window station only.
+    let first = unsafe { GetUserObjectSecurity(handle, &information, null_mut(), 0, &mut bytes) };
+    if first != 0 || io::Error::last_os_error().raw_os_error() != Some(122) {
+        return Err(io::Error::last_os_error());
+    }
+    let mut buffer = creation_probe_buffer(bytes)?;
+    let allocated = bytes;
+    // SAFETY: aligned owned storage covers the exact reported length. This
+    // reads owner/group/DACL and the mandatory label, never writes an ACL.
+    success(unsafe {
+        GetUserObjectSecurity(
+            handle,
+            &information,
+            buffer.as_mut_ptr().cast(),
+            allocated,
+            &mut bytes,
+        )
+    })?;
+    if bytes == 0 || bytes > allocated {
+        return Err(invalid("creation access descriptor exceeded allocation"));
+    }
+    Ok(buffer)
+}
+
+fn creation_object_label(descriptor: PSECURITY_DESCRIPTOR) -> io::Result<Option<CreationLabel>> {
+    let mut present = 0;
+    let mut defaulted = 0;
+    let mut acl = null_mut();
+    // SAFETY: descriptor is the live kernel-returned binary security descriptor.
+    success(unsafe {
+        GetSecurityDescriptorSacl(descriptor, &mut present, &mut acl, &mut defaulted)
+    })?;
+    if present == 0 || acl.is_null() {
+        return Ok(None);
+    }
+    // SAFETY: GetSecurityDescriptorSacl returned an ACL within that owner.
+    for index in 0..u32::from(unsafe { (*acl).AceCount }) {
+        let mut ace = null_mut();
+        // SAFETY: GetAce checks the index and lends a pointer into the live ACL.
+        success(unsafe { GetAce(acl, index, &mut ace) })?;
+        // SAFETY: Windows returned the ACE's valid type and corresponding data.
+        unsafe {
+            if (*ace.cast::<ACE_HEADER>()).AceType != 0x11 {
+                continue;
+            }
+            let label = &*ace.cast::<SYSTEM_MANDATORY_LABEL_ACE>();
+            let sid = (&label.SidStart as *const u32).cast_mut().cast();
+            let count = *GetSidSubAuthorityCount(sid);
+            if count == 0 {
+                return Err(invalid("creation access label has no RID"));
+            }
+            return Ok(Some(CreationLabel {
+                integrity_rid: *GetSidSubAuthority(sid, u32::from(count - 1)),
+                mandatory_policy: label.Mask,
+            }));
+        }
+    }
+    Ok(None)
+}
+
+fn creation_access_check(
+    descriptor: PSECURITY_DESCRIPTOR,
+    token: HANDLE,
+    requested: u32,
+    mapping: &GENERIC_MAPPING,
+) -> CreationAccessDecision {
+    let mut mapped = requested;
+    // SAFETY: mapping and access mask are owned values; no object is changed.
+    unsafe { MapGenericMask(&mut mapped, mapping) };
+    let mut report = CreationAccessDecision {
+        requested_mask: requested,
+        mapped_mask: Some(mapped),
+        api_success: Some(false),
+        allowed: None,
+        granted_mask: None,
+        error: None,
+    };
+    let mut bytes = size_of::<PRIVILEGE_SET>() as u32;
+    let mut privileges = vec![0usize; size_of::<PRIVILEGE_SET>().div_ceil(size_of::<usize>())];
+    for attempt in 0..2 {
+        let mut granted = 0;
+        let mut allowed = 0;
+        // SAFETY: live binary SD, query-only impersonation token, generic bits
+        // already mapped, and aligned output buffer with its exact byte length.
+        let result = unsafe {
+            AccessCheck(
+                descriptor,
+                token,
+                mapped,
+                mapping,
+                privileges.as_mut_ptr().cast(),
+                &mut bytes,
+                &mut granted,
+                &mut allowed,
+            )
+        };
+        if result != 0 {
+            report.api_success = Some(true);
+            report.allowed = Some(allowed != 0);
+            report.granted_mask = Some(granted);
+            return report;
+        }
+        let error = io::Error::last_os_error();
+        if attempt == 0 && error.raw_os_error() == Some(122) {
+            match creation_probe_buffer(bytes) {
+                Ok(buffer) => {
+                    privileges = buffer;
+                    continue;
+                }
+                Err(error) => {
+                    report.error = Some(CreationProbeError::new("AccessCheck buffer", error));
+                    return report;
+                }
+            }
+        }
+        report.error = Some(CreationProbeError::new("AccessCheck", error));
+        return report;
+    }
+    report
+}
+
+fn creation_object_access(
+    object: &'static str,
+    handle: HANDLE,
+    token: &Result<OwnedHandle, CreationProbeError>,
+    mapping: Result<GENERIC_MAPPING, CreationProbeError>,
+    station_visible: Option<bool>,
+) -> CreationObjectAccess {
+    let mut descriptor = creation_object_descriptor(handle)
+        .map_err(|error| CreationProbeError::new("GetUserObjectSecurity", error));
+    let mut report = CreationObjectAccess {
+        object,
+        station_visible,
+        descriptor_error: descriptor.as_ref().err().cloned(),
+        explicit_label: None,
+        label_error: None,
+        full_access: CreationAccessDecision::unknown(
+            GENERIC_ALL,
+            CreationProbeError {
+                operation: "not checked",
+                win32_error: None,
+            },
+        ),
+        maximum_access: CreationAccessDecision::unknown(
+            MAXIMUM_ALLOWED,
+            CreationProbeError {
+                operation: "not checked",
+                win32_error: None,
+            },
+        ),
+    };
+    if let Ok(buffer) = &mut descriptor {
+        match creation_object_label(buffer.as_mut_ptr().cast()) {
+            Ok(label) => report.explicit_label = label,
+            Err(error) => {
+                report.label_error = Some(CreationProbeError::new("mandatory label", error))
+            }
+        }
+    }
+    let error = match (descriptor, token, mapping) {
+        (Ok(mut descriptor), Ok(token), Ok(mapping)) => {
+            report.full_access = creation_access_check(
+                descriptor.as_mut_ptr().cast(),
+                token.as_raw_handle(),
+                GENERIC_ALL,
+                &mapping,
+            );
+            report.maximum_access = creation_access_check(
+                descriptor.as_mut_ptr().cast(),
+                token.as_raw_handle(),
+                MAXIMUM_ALLOWED,
+                &mapping,
+            );
+            return report;
+        }
+        (Err(error), _, _) | (_, _, Err(error)) => error,
+        (_, Err(error), _) => error.clone(),
+    };
+    report.full_access = CreationAccessDecision::unknown(GENERIC_ALL, error.clone());
+    report.maximum_access = CreationAccessDecision::unknown(MAXIMUM_ALLOWED, error);
+    report
+}
+
+/// Observational SDK-contract checks only. AccessCheck does not reveal the
+/// loader's actual requested rights or prove MIC/Job/loader initialization.
+/// Called only from an already-authorized restricted launch, never on import
+/// or from the pure/read-only test suite. No ACL or token policy is modified.
+fn creation_access_preflight(primary: HANDLE, desktop: HDESK) -> serde_json::Value {
+    let policy = TokenBuffer::query(primary, TokenMandatoryPolicy).and_then(|buffer| {
+        buffer
+            .value::<TOKEN_MANDATORY_POLICY>()
+            .map(|value| value.Policy)
+    });
+    let token = (|| {
+        let mut raw = null_mut();
+        // SAFETY: clone only this verified restricted token for AccessCheck.
+        // It is never assigned to a thread, child, or inherited handle list.
+        success(unsafe {
+            DuplicateTokenEx(
+                primary,
+                TOKEN_QUERY,
+                null(),
+                SecurityIdentification,
+                TokenImpersonation,
+                &mut raw,
+            )
+        })?;
+        owned(raw)
+    })()
+    .map_err(|error| CreationProbeError::new("DuplicateTokenEx query-only", error));
+    // SAFETY: borrowed current-process window station, never switched or closed.
+    let station = unsafe { GetProcessWindowStation() };
+    let visibility = (|| {
+        let mut flags = USEROBJECTFLAGS::default();
+        let mut bytes = 0;
+        // SAFETY: read-only flags query into the correctly sized owned record.
+        success(unsafe {
+            GetUserObjectInformationW(
+                station,
+                UOI_FLAGS,
+                (&mut flags as *mut USEROBJECTFLAGS).cast(),
+                size_of::<USEROBJECTFLAGS>() as u32,
+                &mut bytes,
+            )
+        })?;
+        Ok::<_, io::Error>(flags.dwFlags & 1 != 0) // SDK WSF_VISIBLE.
+    })()
+    .map_err(|error| CreationProbeError::new("window station UOI_FLAGS", error));
+    serde_json::json!({
+        "scope":"SDK full-access preflight only; not actual loader requests or startup proof",
+        "token_mandatory_policy": policy.as_ref().ok(),
+        "token_policy_error": policy.err().map(|error| CreationProbeError::new("TokenMandatoryPolicy", error)),
+        "private_desktop":creation_object_access("private_desktop", desktop, &token, Ok(creation_desktop_mapping()), None),
+        "current_window_station":creation_object_access("current_window_station", station, &token, visibility.as_ref().map(|visible| creation_station_mapping(*visible)).map_err(Clone::clone), visibility.ok()),
+    })
 }
 
 fn restricted_token() -> io::Result<OwnedHandle> {
@@ -996,6 +1325,10 @@ fn spawn_inner(
         )
     })?;
     let mut process = PROCESS_INFORMATION::default();
+    eprintln!(
+        "restricted worker creation access preflight: {}",
+        creation_access_preflight(token.as_raw_handle(), desktop.handle)
+    );
     // SAFETY: live restricted token, fixed local exe, mutable quoted command,
     // explicit environment/desktop and exactly the three/six listed handles.
     // The primary thread cannot execute before the job assignment below.
@@ -1051,3 +1384,7 @@ fn spawn_inner(
 #[cfg(test)]
 #[path = "windows_restricted_worker_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "windows_creation_access_tests.rs"]
+mod creation_access_tests;

@@ -81,6 +81,20 @@ Rust-main-entry marker, exact unsigned/hex exit and original child output now
 separate startup and application failure; no token, desktop ACL or job
 restriction was relaxed on the basis of empty output.
 
+At `744d10a` / PR `fedd409`, the original probe exited with unsigned
+3221225794 (`0xc0000142`) and never emitted its fixed Rust-main marker.
+Its real MSVC image statically imports USER32; this establishes pre-main DLL
+initialization failure, not which DLL or access check failed. The next run
+records only observational AccessCheck/MIC results for the actual restricted
+token, chosen private desktop and current window station. Unknown queries remain
+unknown; no ACL, token, Job or start decision changes. It also launches a tiny
+headless comparison through the same three-pipe launcher before propagating the
+original failure. GNU static inspection found no USER32/GDI32 imports in that
+comparison; MSVC imports and real startup still need their own evidence. B's
+success cannot replace A's desktop/token/handle gate, and neither proves Core
+forwarding. Original source-bound evidence is in the
+[SDK result record](native-tun-evidence/windows-744d10a-sdk-results.json).
+
 ## Product authorization boundary
 
 An application-path-only WFP permit is insufficient to authorize this worker.
