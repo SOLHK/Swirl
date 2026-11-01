@@ -335,6 +335,51 @@ switch.
 
 ## Unperformed acceptance and integration gates
 
+### Subsequent real failures and independent diagnostics
+
+At `0494abe`, Native Protocols completed 5/6 jobs: the macOS official Xray
+Trojan UDP multi-target test timed out on its first five-byte datagram. The
+original receipt recorded upload 5, download 0 and no retained association after
+cleanup. Its VLESS counterpart completed 22/22 bytes. Xray had authenticated and
+decoded the Trojan frame, but the original artifact had no origin receive/reply
+observations. Neither cleanup's later closed-pipe log nor the earlier green
+`ef74bc0` proves the missing packet's cause. This remains a failed regression.
+The fixture path does not call the TUN task guard; that fact does not rule out
+an existing product or fixture defect. Additional real origin/Core observations
+retain the original four-second deadline, wire behavior, assertions and original
+exception, and do not label intentional negative probes as suite failures.
+
+The same source's Windows Wintun run failed in the IPv4 UDP unavailable-proxy
+case's **after-DIRECT control**. Earlier unavailable-proxy/no-redial assertions
+had completed along the source path; the final control receive timed out. A DoT
+fixture connection reset preceded the initial empty datagram, and that fixture's
+single-connection error propagation terminates its whole listener. The original
+log did not identify whether reset occurred during handshake, question handling
+or shutdown, so the precise cause remains unproven. Six owned resources restored
+with zero conflicts, adapter removal and the original eight-adapter/26-route Eq
+did pass; those cleanup results do not turn the failed data test into success.
+DoT connection/phase and before/after control diagnostics preserve every original
+deadline and assertion.
+
+That driver failure prevented the new WFP field diagnostics from executing.
+The independent WFP command now runs when the real format/lint/unit/library/helper
+build chain succeeded, even if later driver traffic fails. The failed driver
+step still fails the job; an unvalidated/skipped backend build cannot authorize
+the WFP command. No failure is cleared, continued as success or replaced by a
+later independent result.
+
+Live run inventories also confirmed duplicate push/PR Rust Core matrices and
+Qt builds for each isolated-branch commit. Only this repository's designated TUN
+branch now shares a workflow concurrency group across those two events; a fork
+with the same branch name cannot cancel it. Other Rust branches keep independent
+runs and other Qt branches keep their previous queue. Native concurrency includes
+the head repository identity. All matrix legs, test commands, thresholds and
+required full-product checks remain. The expected reduction is three duplicate
+Core jobs and one duplicate Qt job per such event pair, not a measured wall-clock
+improvement. Actionlint and the 60-case development-tool contract passed locally
+(58 pass, two existing Windows platform skips); live grouping/cancellation still
+requires the next push's evidence.
+
 Full system capture, real public IPv4/IPv6 TCP/UDP, independent DNS/IPv6 packet
 leakage, Chrome/Edge/VS Code/Codex/GitHub, WebSocket/SSE/HTTP2/HTTP3, kill switch,
 unauthorized IPC, helper/worker force-kill, Wi-Fi/Ethernet handoff, suspend/resume,

@@ -15,10 +15,10 @@ env:
   SWIRL_QT_VERSION: '6.12.0'
 
 concurrency:
-  group: swirl-quick-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: swirl-quick-${{ github.workflow }}-${{ (github.head_ref || github.ref_name) == 'work/native-tun-windows-20261030-isolated' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'native-tun-development' || github.event.pull_request.number || github.ref }}
   # Keep product branches queued so they can finish their cache and installer
   # evidence. Only the isolated TUN branch replaces its own stale PR runs.
-  cancel-in-progress: ${{ (github.head_ref || github.ref_name) == 'work/native-tun-windows-20261030-isolated' }}
+  cancel-in-progress: ${{ (github.head_ref || github.ref_name) == 'work/native-tun-windows-20261030-isolated' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
 
 jobs:
   build-qt-ui:

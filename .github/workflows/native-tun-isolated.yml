@@ -28,7 +28,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: native-tun-isolated-${{ github.head_ref || github.ref_name }}
+  group: native-tun-isolated-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -82,6 +82,7 @@ jobs:
       - name: Packet, resolver, network transaction and original proxy regressions
         run: cargo test --locked -p swirl-tun -p swirl-platform -p swirl-dns -p swirl-transport -p swirl-protocol -p swirl-core -p swirl-api
       - name: Build actual Rust library and helper
+        id: backend_build
         run: cargo build --locked -p swirl-api --lib --bin swirl-tun-helper --release
       - name: Real Wintun scoped TCP UDP and DNS smoke in this disposable VM
         if: runner.os == 'Windows'
@@ -103,7 +104,10 @@ jobs:
           cargo run --locked --release -p swirl-api --example windows-tun-smoke -- --disposable-network --wintun $smokeDriver 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'swirl-wintun-smoke.log')
           if ($LASTEXITCODE -ne 0) { throw "Scoped Wintun smoke failed with exit code $LASTEXITCODE" }
       - name: Real scoped WFP transaction and application isolation in this disposable VM
-        if: runner.os == 'Windows'
+        # Driver traffic and WFP are independent evidence. Only proceed after
+        # the real format/lint/unit/build chain succeeded; preserve any driver
+        # failure as a failed job while collecting the separate WFP result.
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.backend_build.outcome == 'success' }}
         shell: pwsh
         run: |
           # Explicitly limited to this smoke executable and reserved loopback
