@@ -1,6 +1,101 @@
 use super::*;
 
 #[test]
+fn delegated_journal_supports_allocator_io_without_attribute_or_delete_access() {
+    use std::{
+        fs::OpenOptions,
+        io::{Read, Seek, SeekFrom, Write},
+        sync::atomic::{AtomicU64, Ordering},
+        time::{SystemTime, UNIX_EPOCH},
+    };
+    use windows_sys::Win32::{
+        Foundation::{FILETIME, GetHandleInformation, HANDLE_FLAG_INHERIT},
+        Storage::FileSystem::{
+            FILE_DISPOSITION_INFO, FileDispositionInfo, SetFileInformationByHandle, SetFileTime,
+        },
+    };
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let path = std::env::temp_dir().join(format!(
+        "swirl-delegated-journal-{}-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos(),
+        NEXT.fetch_add(1, Ordering::Relaxed),
+    ));
+    struct Remove(std::path::PathBuf);
+    impl Drop for Remove {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+    let _remove = Remove(path.clone());
+    let mut source = OpenOptions::new()
+        .create_new(true)
+        .read(true)
+        .write(true)
+        .open(&path)
+        .unwrap();
+    source.write_all(b"prefix").unwrap();
+    let duplicate = inherited_fake_ip_journal(&source).unwrap();
+    let mut flags = 0;
+    // SAFETY: read-only query on the newly delegated temporary-file handle.
+    assert_ne!(
+        unsafe { GetHandleInformation(duplicate.as_raw_handle(), &mut flags) },
+        0
+    );
+    assert_ne!(flags & HANDLE_FLAG_INHERIT, 0);
+    let mut file = File::from(duplicate);
+    file.try_lock().unwrap();
+    file.seek(SeekFrom::Start(0)).unwrap();
+    let mut prefix = [0; 6];
+    file.read_exact(&mut prefix).unwrap();
+    assert_eq!(&prefix, b"prefix");
+    file.write_all(b"-record\n-torn").unwrap();
+    file.set_len(14).unwrap();
+    file.seek(SeekFrom::End(0)).unwrap();
+    file.write_all(b"next\n").unwrap();
+    file.sync_all().unwrap();
+    assert_eq!(file.metadata().unwrap().len(), 19);
+    file.unlock().unwrap();
+    let time = FILETIME {
+        dwLowDateTime: 1,
+        dwHighDateTime: 0,
+    };
+    // SAFETY: only this synthetic temporary file can be affected. The exact
+    // delegated rights must refuse FILE_WRITE_ATTRIBUTES before changing it.
+    assert_eq!(
+        unsafe { SetFileTime(file.as_raw_handle(), null(), null(), &time) },
+        0
+    );
+    assert_eq!(io::Error::last_os_error().raw_os_error(), Some(5));
+    let disposition = FILE_DISPOSITION_INFO { DeleteFile: true };
+    // SAFETY: only this synthetic temporary file; DELETE must not be delegated.
+    assert_eq!(
+        unsafe {
+            SetFileInformationByHandle(
+                file.as_raw_handle(),
+                FileDispositionInfo,
+                (&disposition as *const FILE_DISPOSITION_INFO).cast(),
+                size_of::<FILE_DISPOSITION_INFO>() as u32,
+            )
+        },
+        0
+    );
+    assert_eq!(io::Error::last_os_error().raw_os_error(), Some(5));
+    assert_eq!(std::fs::read(path).unwrap(), b"prefix-record\nnext\n");
+}
+
+#[test]
+fn delegated_journal_refuses_anonymous_pipe_before_any_file_io() {
+    let (read, _write) = pipe().unwrap();
+    let error = inherited_fake_ip_journal(&File::from(read)).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+    assert!(error.to_string().contains("regular disk file"));
+}
+
+#[test]
 fn desktop_restoration_is_conditional_and_checks_the_resulting_binding() {
     use std::cell::{Cell, RefCell};
     let original = 1usize as HDESK;

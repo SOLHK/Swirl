@@ -149,6 +149,10 @@ jobs:
           }
           foreach ($field in @('private_desktop_verified','admin_token_not_inherited','broker_write_denied','explicit_environment_verified')) {
             if ($summary.child.$field -ne $true) { throw "Restricted worker assertion is missing: $field" }
+            if ($summary.data_plane_child.$field -ne $true) { throw "Restricted data-plane child assertion is missing: $field" }
+          }
+          if ($summary.delegated_packet_pipes_verified -ne $true -or $summary.delegated_file_write_verified -ne $true -or $summary.data_plane_child.delegated_file_and_packet_io -ne $true) {
+            throw 'Restricted data-plane exact packet/file resource evidence differs.'
           }
           if ($summary.network_modified -ne $false -or $summary.product_broker_integrated -ne $false -or $summary.network_compatibility_verified -ne $false -or $summary.physical_windows_11_acceptance -ne $false) {
             throw 'Restricted process evidence must not be relabelled as product or network acceptance.'
@@ -169,6 +173,8 @@ jobs:
             ${{ runner.temp }}/swirl-restricted-worker-smoke.log
             ${{ runner.temp }}/swirl-restricted-worker-smoke/child-stdout.log
             ${{ runner.temp }}/swirl-restricted-worker-smoke/child-stderr.log
+            ${{ runner.temp }}/swirl-restricted-worker-smoke/data-child-stdout.log
+            ${{ runner.temp }}/swirl-restricted-worker-smoke/data-child-stderr.log
           if-no-files-found: error
           retention-days: 7
 
@@ -178,12 +184,16 @@ jobs:
         with:
           name: native-tun-driver-failure-${{ github.sha }}
           path: |
+            core/target/release/examples/windows-wfp-scoped-smoke.exe
+            core/target/release/examples/windows-restricted-worker-smoke.exe
             ${{ runner.temp }}/swirl-wintun-smoke.log
             ${{ runner.temp }}/swirl-wfp-scoped-smoke.log
             ${{ runner.temp }}/swirl-wfp-scoped-receipt.json
             ${{ runner.temp }}/swirl-restricted-worker-smoke.log
             ${{ runner.temp }}/swirl-restricted-worker-smoke/child-stdout.log
             ${{ runner.temp }}/swirl-restricted-worker-smoke/child-stderr.log
+            ${{ runner.temp }}/swirl-restricted-worker-smoke/data-child-stdout.log
+            ${{ runner.temp }}/swirl-restricted-worker-smoke/data-child-stderr.log
           if-no-files-found: warn
 
   # The explicit Windows-only smoke owns one temporary adapter and only exact

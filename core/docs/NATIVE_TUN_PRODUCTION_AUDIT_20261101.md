@@ -401,6 +401,37 @@ step still fails the job; an unvalidated/skipped backend build cannot authorize
 the WFP command. No failure is cleared, continued as success or replaced by a
 later independent result.
 
+At `88e9fdf` / actual PR `6d81b38`, the scoped Server Wintun test again passed.
+WFP proceeded beyond the repaired weight comparison and failed on filter flags
+`0x41` versus requested `0x1`; its other displayed fields matched. The new
+explicit `PERSISTENT | INDEXED` request retains exact verification, including
+refusal of disabled, hard-permit and unknown bits. The independent restricted
+process test failed with actual empty child stdout/stderr and no recorded exit
+value. This is unresolved; exact exit/main-entry diagnostics were added without
+relaxing token, desktop or job policy. Original bytes and hashes are in the
+[failure manifest](native-tun-evidence/windows-88e9fdf-failed.json).
+
+The next packet-worker seam adds two dedicated directional packet pipe ends and
+one minimum-rights preopened Fake-IP file to the explicit six-handle variant;
+the ordinary three-stdio launcher remains unchanged. It reuses the same durable
+Fake-IP allocator, including complete replay from a nonzero inherited cursor.
+The independent packet carrier validates its 24-byte header, launch epoch,
+sequence and MTU before allocation and refuses reuse after framing/IO failure.
+Its 13 regressions passed. A frozen affected platform/DNS/API all-target run
+passed **214 tests in 13 result groups**, zero failed/ignored/filtered; targeted
+all-target Clippy, formatting, workflow lint and both Release example links
+passed. The new disposable fixture checks raw packet-pipe transfer and delegated
+file IO. It still does not run the actual Core in a low-privilege process or
+establish product IPC authentication/cancellation/throughput acceptance.
+
+The `88e9fdf` Native Protocols matrix passed 6/6. Its complete Qt PR run
+[41287491283](https://github.com/SOLHK/Swirl/actions/runs/41287491283) passed
+UI 9/9, network 10/10 and remaining 22/22, all zero failed/skipped/disabled,
+plus the unchanged simulated DPR checks and full installer build/package
+verification. Actual checkout was `6d81b38`; physical DPI/refresh and real
+installation/uninstallation were not performed. These successes do not clear
+the same source's WFP/restricted failures or later source gates.
+
 Live run inventories also confirmed duplicate push/PR Rust Core matrices and
 Qt builds for each isolated-branch commit. Only this repository's designated TUN
 branch now shares a workflow concurrency group across those two events; a fork

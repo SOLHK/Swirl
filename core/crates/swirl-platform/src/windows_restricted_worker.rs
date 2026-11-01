@@ -1,6 +1,8 @@
 //! Restricted headless process foundation, not the product broker integration.
 //!
-//! Only three anonymous stdio pipe ends are inherited. The child gets an
+//! Only three anonymous stdio pipe ends are inherited by `spawn`. The explicit
+//! data-plane variant adds two packet-pipe ends and one approved journal file.
+//! The child gets an
 //! explicitly restricted low-integrity token, a private low-label desktop and
 //! an owning kill-on-close job with UI restrictions. No elevation, account,
 //! service, filesystem permission or host-network change happens on import.
@@ -35,6 +37,10 @@ use windows_sys::{
                 SDDL_REVISION_1,
             },
             *,
+        },
+        Storage::FileSystem::{
+            FILE_READ_ATTRIBUTES, FILE_READ_DATA, FILE_TYPE_DISK, FILE_WRITE_DATA, GetFileType,
+            SYNCHRONIZE,
         },
         System::{
             JobObjects::*,
@@ -663,12 +669,95 @@ fn inheritable(handle: &OwnedHandle) -> io::Result<OwnedHandle> {
     owned(duplicate)
 }
 
+const JOURNAL_ACCESS: u32 = FILE_READ_DATA | FILE_WRITE_DATA | FILE_READ_ATTRIBUTES | SYNCHRONIZE;
+
+fn inherited_fake_ip_journal(journal: &File) -> io::Result<OwnedHandle> {
+    // SAFETY: borrowed caller-approved file handle, queried without changing it.
+    if unsafe { GetFileType(journal.as_raw_handle()) } != FILE_TYPE_DISK
+        || !journal.metadata()?.is_file()
+    {
+        return Err(invalid("fake-IP delegation requires a regular disk file"));
+    }
+    let mut duplicate = null_mut();
+    // SAFETY: delegate this one already-opened approved file, with no DELETE,
+    // WRITE_DAC, WRITE_OWNER, attribute-write, or directory-traversal access.
+    // No pathname or mutable broker handle list is accepted from the worker.
+    success(unsafe {
+        DuplicateHandle(
+            GetCurrentProcess(),
+            journal.as_raw_handle(),
+            GetCurrentProcess(),
+            &mut duplicate,
+            JOURNAL_ACCESS,
+            1,
+            0,
+        )
+    })?;
+    owned(duplicate)
+}
+
+struct DataPlaneInheritance {
+    packet_input: OwnedHandle,
+    packet_output: OwnedHandle,
+    fake_ip_journal: OwnedHandle,
+}
+
+/// Child-local handle values, delivered only over its private control pipe.
+/// These identify the launcher's explicit inherited resources; they are not
+/// authentication credentials or a way to request arbitrary broker handles.
+#[derive(Clone, Copy, Debug, Serialize)]
+pub struct DataPlaneHandles {
+    pub packet_input: usize,
+    pub packet_output: usize,
+    pub fake_ip_journal: usize,
+}
+
+pub struct DataPlaneChild {
+    pub worker: RestrictedChild,
+    /// Broker writes packets here; only the read end is inherited by the worker.
+    pub packet_input: File,
+    /// Broker reads packets here; only the write end is inherited by the worker.
+    pub packet_output: File,
+    pub inherited: DataPlaneHandles,
+}
+
+/// Launch the data-plane worker with exactly six purpose-limited resources:
+/// stdio, two internally-created directional packet pipes, and the approved
+/// fake-IP journal. Caller must establish the file's provenance and must not use
+/// its shared cursor or acquire the allocator's lock while the worker owns it.
+pub fn spawn_data_plane(
+    executable: &Path,
+    arguments: &[OsString],
+    fake_ip_journal: &File,
+) -> io::Result<DataPlaneChild> {
+    let journal = inherited_fake_ip_journal(fake_ip_journal)?;
+    let (packet_input, broker_input) = pipe()?;
+    let (broker_output, packet_output) = pipe()?;
+    let inheritance = DataPlaneInheritance {
+        packet_input: inheritable(&packet_input)?,
+        packet_output: inheritable(&packet_output)?,
+        fake_ip_journal: journal,
+    };
+    let inherited = DataPlaneHandles {
+        packet_input: inheritance.packet_input.as_raw_handle() as usize,
+        packet_output: inheritance.packet_output.as_raw_handle() as usize,
+        fake_ip_journal: inheritance.fake_ip_journal.as_raw_handle() as usize,
+    };
+    let worker = spawn_inner(executable, arguments, Some(&inheritance))?;
+    Ok(DataPlaneChild {
+        worker,
+        packet_input: File::from(broker_input),
+        packet_output: File::from(broker_output),
+        inherited,
+    })
+}
+
 struct Attributes {
     memory: Vec<usize>,
     list: LPPROC_THREAD_ATTRIBUTE_LIST,
 }
 impl Attributes {
-    fn new(handles: &[HANDLE; 3]) -> io::Result<Self> {
+    fn new(handles: &[HANDLE]) -> io::Result<Self> {
         let mut bytes = 0;
         // SAFETY: documented first size query for one process attribute.
         unsafe { InitializeProcThreadAttributeList(null_mut(), 1, 0, &mut bytes) };
@@ -680,8 +769,8 @@ impl Attributes {
         // SAFETY: aligned storage sized by the preceding API query.
         success(unsafe { InitializeProcThreadAttributeList(list, 1, 0, &mut bytes) })?;
         let result = Self { memory, list };
-        // SAFETY: the three-handle array lives through CreateProcessAsUser;
-        // handles are exclusively pipe ends, made inheritable above.
+        // SAFETY: the private three/six-handle array lives through
+        // CreateProcessAsUser; all entries were made inheritable above.
         success(unsafe {
             UpdateProcThreadAttribute(
                 result.list,
@@ -799,6 +888,14 @@ impl Drop for RestrictedChild {
 /// Launch an approved worker. Caller owns executable provenance/authentication;
 /// this API accepts no arbitrary inherited handle or parent environment block.
 pub fn spawn(executable: &Path, arguments: &[OsString]) -> io::Result<RestrictedChild> {
+    spawn_inner(executable, arguments, None)
+}
+
+fn spawn_inner(
+    executable: &Path,
+    arguments: &[OsString],
+    data_plane: Option<&DataPlaneInheritance>,
+) -> io::Result<RestrictedChild> {
     if !executable.is_absolute()
         || !matches!(executable.components().next(), Some(Component::Prefix(prefix))
         if matches!(prefix.kind(), Prefix::Disk(_) | Prefix::VerbatimDisk(_)))
@@ -840,12 +937,23 @@ pub fn spawn(executable: &Path, arguments: &[OsString]) -> io::Result<Restricted
     let child_input = inheritable(&input_read)?;
     let child_output = inheritable(&output_write)?;
     let child_error = inheritable(&error_write)?;
-    let handles = [
+    let mut handles = [
         child_input.as_raw_handle(),
         child_output.as_raw_handle(),
         child_error.as_raw_handle(),
+        null_mut(),
+        null_mut(),
+        null_mut(),
     ];
-    let attributes = Attributes::new(&handles)?;
+    let count = if let Some(resources) = data_plane {
+        handles[3] = resources.packet_input.as_raw_handle();
+        handles[4] = resources.packet_output.as_raw_handle();
+        handles[5] = resources.fake_ip_journal.as_raw_handle();
+        6
+    } else {
+        3
+    };
+    let attributes = Attributes::new(&handles[..count])?;
     let mut startup = STARTUPINFOEXW::default();
     startup.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
     startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
@@ -889,7 +997,7 @@ pub fn spawn(executable: &Path, arguments: &[OsString]) -> io::Result<Restricted
     })?;
     let mut process = PROCESS_INFORMATION::default();
     // SAFETY: live restricted token, fixed local exe, mutable quoted command,
-    // explicit environment/desktop and exactly three listed pipe handles.
+    // explicit environment/desktop and exactly the three/six listed handles.
     // The primary thread cannot execute before the job assignment below.
     success(unsafe {
         CreateProcessAsUserW(

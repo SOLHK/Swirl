@@ -83,20 +83,42 @@ impl FakeIpStore {
     }
 
     pub fn open(path: &Path, capacity: usize) -> Result<Self> {
-        let mut result = Self::memory(capacity)?;
+        let result = Self::memory(capacity)?;
         if !path.is_absolute() {
             return Err("FakeIpJournalPath");
         }
         if std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
             return Err("FakeIpJournalSymlink");
         }
-        let mut journal =
+        let journal =
             swirl_platform::open_private_journal(path).map_err(|_| "FakeIpJournalOpen")?;
+        Self::load_journal(journal, result)
+    }
+
+    /// Consume an already-opened, trusted read/write regular file. A privileged
+    /// broker may delegate this exact file without granting access to its state
+    /// directory. The caller owns file provenance; this constructor never opens
+    /// a supplied path or weakens permissions. All journal validation, locking,
+    /// repair and sync semantics are shared with `open`.
+    pub fn from_file(journal: File, capacity: usize) -> Result<Self> {
+        Self::load_journal(journal, Self::memory(capacity)?)
+    }
+
+    fn load_journal(mut journal: File, mut result: Self) -> Result<Self> {
         journal.try_lock().map_err(|_| "FakeIpJournalOwned")?;
-        let size = journal.metadata().map_err(|_| "FakeIpJournalRead")?.len();
+        let metadata = journal.metadata().map_err(|_| "FakeIpJournalRead")?;
+        if !metadata.is_file() {
+            return Err("FakeIpJournalType");
+        }
+        let size = metadata.len();
         if size > JOURNAL_LIMIT {
             return Err("FakeIpJournalLimit");
         }
+        // A delegated handle may have a nonzero shared file cursor. Replay the
+        // complete identity history before repairing or appending any record.
+        journal
+            .seek(SeekFrom::Start(0))
+            .map_err(|_| "FakeIpJournalRead")?;
         let mut bytes = Vec::with_capacity(size as usize);
         (&mut journal)
             .take(JOURNAL_LIMIT + 1)
@@ -150,7 +172,7 @@ impl FakeIpStore {
                 result.names.insert(record.name.clone(), record);
             }
         }
-        if result.names.len() > capacity {
+        if result.names.len() > result.capacity {
             return Err("FakeIpCapacity");
         }
         journal
@@ -480,6 +502,127 @@ impl TunDns {
 mod tests {
     use super::*;
     use std::fs::OpenOptions;
+
+    struct JournalPath(std::path::PathBuf);
+    impl JournalPath {
+        fn create() -> (Self, File) {
+            use std::sync::atomic::{AtomicU64, Ordering};
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let path = std::env::temp_dir().join(format!(
+                "swirl-fakeip-handle-{}-{}-{}.jsonl",
+                std::process::id(),
+                now().unwrap(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            let file = OpenOptions::new()
+                .create_new(true)
+                .read(true)
+                .write(true)
+                .open(&path)
+                .unwrap();
+            (Self(path), file)
+        }
+
+        fn open(&self) -> File {
+            OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(&self.0)
+                .unwrap()
+        }
+    }
+    impl Drop for JournalPath {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+
+    #[test]
+    fn delegated_file_replays_from_start_repairs_tail_and_keeps_identity_after_reopen() {
+        let (path, file) = JournalPath::create();
+        let at = now().unwrap();
+        let first = {
+            let mut store = FakeIpStore::from_file(file, 4).unwrap();
+            store.allocate("one.test", at).unwrap()
+        };
+        let prefix = std::fs::read(&path.0).unwrap();
+        let mut file = path.open();
+        file.seek(SeekFrom::End(0)).unwrap();
+        file.write_all(b"{\"torn\":").unwrap();
+        // Cursor is deliberately after the torn tail, as an inherited/duplicated
+        // file object can share a cursor previously used by its broker.
+        let second = {
+            let mut store = FakeIpStore::from_file(file, 4).unwrap();
+            assert_eq!(store.allocate("one.test", at).unwrap(), first);
+            assert_eq!(
+                store.domain_at(fake_address(first, true), at).unwrap(),
+                Some("one.test".into())
+            );
+            assert!(matches!(
+                FakeIpStore::from_file(path.open(), 4),
+                Err("FakeIpJournalOwned")
+            ));
+            store.allocate("two.test", at).unwrap()
+        };
+        assert_eq!(second, first + 1);
+        assert!(std::fs::read(&path.0).unwrap().starts_with(&prefix));
+        let mut file = path.open();
+        file.seek(SeekFrom::End(0)).unwrap();
+        let mut reopened = FakeIpStore::from_file(file, 4).unwrap();
+        assert_eq!(reopened.active_names(), 2);
+        assert_eq!(reopened.allocate("two.test", at).unwrap(), second);
+        assert_eq!(reopened.allocate("three.test", at).unwrap(), second + 1);
+        assert_ne!(fake_address(first, false), fake_address(second, false));
+    }
+
+    #[test]
+    fn delegated_file_rejects_complete_corruption_or_sequence_gap_without_repairing_it() {
+        for bytes in [
+            b"not-json\n".as_slice(),
+            b"{\"name\":\"one.test\",\"id\":257,\"expires\":1}\n".as_slice(),
+        ] {
+            let (path, mut file) = JournalPath::create();
+            file.write_all(bytes).unwrap();
+            let error = match FakeIpStore::from_file(file, 4) {
+                Err(error) => error,
+                Ok(_) => panic!("corrupt complete journal was accepted"),
+            };
+            assert!(matches!(
+                error,
+                "FakeIpJournalInvalid" | "FakeIpJournalSequence"
+            ));
+            assert_eq!(std::fs::read(&path.0).unwrap(), bytes);
+            // Failure must drop the consumed file and release its exclusive lock.
+            let reopened = path.open();
+            reopened.try_lock().unwrap();
+        }
+    }
+
+    #[test]
+    fn delegated_file_preserves_size_and_capacity_limits_before_any_repair() {
+        let (path, file) = JournalPath::create();
+        file.set_len(JOURNAL_LIMIT + 1).unwrap();
+        assert!(matches!(
+            FakeIpStore::from_file(file, 4),
+            Err("FakeIpJournalLimit")
+        ));
+        assert_eq!(std::fs::metadata(&path.0).unwrap().len(), JOURNAL_LIMIT + 1);
+        let file = path.open();
+        file.set_len(0).unwrap();
+        let at = now().unwrap();
+        {
+            let mut store = FakeIpStore::from_file(file, 4).unwrap();
+            store.allocate("one.test", at).unwrap();
+            store.allocate("two.test", at).unwrap();
+        }
+        let before = std::fs::read(&path.0).unwrap();
+        assert!(matches!(
+            FakeIpStore::from_file(path.open(), 1),
+            Err("FakeIpCapacity")
+        ));
+        assert_eq!(std::fs::read(&path.0).unwrap(), before);
+    }
+
     struct Lookup(Result<Vec<IpAddr>>);
     impl TunLookup for Lookup {
         fn lookup<'a>(

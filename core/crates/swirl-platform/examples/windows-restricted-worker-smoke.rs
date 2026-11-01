@@ -8,7 +8,7 @@ mod windows {
     use std::{
         ffi::OsString,
         fs::{File, OpenOptions},
-        io::{self, BufRead, Read, Write},
+        io::{self, BufRead, Read, Seek, SeekFrom, Write},
         os::windows::{
             ffi::OsStrExt,
             io::{AsRawHandle, FromRawHandle, OwnedHandle},
@@ -21,7 +21,7 @@ mod windows {
         time::Duration,
     };
     use swirl_platform::windows_restricted_worker::{
-        RestrictedChild, current_desktop_name, current_token_profile, spawn,
+        RestrictedChild, current_desktop_name, current_token_profile, spawn, spawn_data_plane,
     };
     use windows_sys::Win32::{
         Foundation::{
@@ -41,6 +41,10 @@ mod windows {
             PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE, WaitForSingleObject,
         },
     };
+
+    const MAIN_ENTER: &str = "restricted smoke entered Rust main\n";
+    const CHILD_STDERR: &str =
+        "restricted smoke entered Rust main\nrestricted stderr pipe verified\n";
 
     fn require(value: bool, message: &str) -> io::Result<()> {
         if value {
@@ -210,6 +214,12 @@ mod windows {
                     .all(|key| keys.iter().any(|present| present == key)),
             "worker inherited ambient broker environment",
         )?;
+        let delegated_io = if args[0] == "--data-plane-child" {
+            delegated_io(&mut stdin)?;
+            true
+        } else {
+            false
+        };
         let mut input = String::new();
         (&mut stdin).take(65).read_line(&mut input)?;
         require(input == "ping\n", "inherited stdin pipe content mismatch")?;
@@ -217,8 +227,68 @@ mod windows {
         println!(
             "{}",
             serde_json::json!({"profile":profile,"private_desktop_verified":true,"admin_token_not_inherited":true,
-        "broker_write_denied":true,"explicit_environment_verified":true,"stdio_reply":"pong"})
+        "broker_write_denied":true,"explicit_environment_verified":true,"stdio_reply":"pong",
+        "delegated_file_and_packet_io":delegated_io})
         );
+        Ok(())
+    }
+
+    #[derive(serde::Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct InheritedData {
+        packet_input: usize,
+        packet_output: usize,
+        fake_ip_journal: usize,
+    }
+
+    #[allow(unsafe_code)]
+    fn delegated_io(input: &mut impl BufRead) -> io::Result<()> {
+        let mut line = String::new();
+        input.take(1025).read_line(&mut line)?;
+        require(
+            line.len() <= 1024 && line.ends_with('\n'),
+            "invalid resource frame",
+        )?;
+        let handles: InheritedData = serde_json::from_str(&line).map_err(io::Error::other)?;
+        let values = [
+            handles.packet_input,
+            handles.packet_output,
+            handles.fake_ip_journal,
+        ];
+        require(
+            values.iter().all(|value| *value != 0)
+                && values[0] != values[1]
+                && values[0] != values[2]
+                && values[1] != values[2],
+            "invalid resource handles",
+        )?;
+        // SAFETY: only this explicit fixture child consumes the three distinct
+        // handles just inherited through the launcher's exact handle list.
+        // Their IDs arrive on its private stdin; IDs are not authentication.
+        let (mut incoming, mut outgoing, mut journal) = unsafe {
+            (
+                File::from_raw_handle(handles.packet_input as HANDLE),
+                File::from_raw_handle(handles.packet_output as HANDLE),
+                File::from_raw_handle(handles.fake_ip_journal as HANDLE),
+            )
+        };
+        journal.try_lock().map_err(io::Error::other)?;
+        journal.seek(SeekFrom::Start(0))?;
+        let mut original = Vec::new();
+        (&mut journal).take(129).read_to_end(&mut original)?;
+        require(
+            original == b"initial-owned-fake-ip-fixture\n",
+            "delegated journal differs",
+        )?;
+        journal.seek(SeekFrom::End(0))?;
+        journal.write_all(b"child-owned-fake-ip-fixture\n")?;
+        journal.sync_all()?;
+        journal.unlock()?;
+        let mut packet = [0; 128];
+        incoming.read_exact(&mut packet)?;
+        require(packet == [0xa7; 128], "dedicated packet input differs")?;
+        outgoing.write_all(&packet)?;
+        outgoing.flush()?;
         Ok(())
     }
 
@@ -313,7 +383,7 @@ mod windows {
     fn run() -> io::Result<()> {
         let args = std::env::args_os().skip(1).collect::<Vec<_>>();
         match args.first().and_then(|s| s.to_str()) {
-            Some("--child") => return child(&args),
+            Some("--child" | "--data-plane-child") => return child(&args),
             Some("--descendant") => {
                 thread::sleep(Duration::from_secs(60));
                 return Ok(());
@@ -378,6 +448,11 @@ mod windows {
         stdin.write_all(b"ping\n")?;
         drop(stdin);
         let (exit, out, err) = capture(probe, b"")?;
+        eprintln!(
+            "restricted worker child exited: code={exit} hex=0x{exit:08x} stdout_bytes={} stderr_bytes={}",
+            out.len(),
+            err.len()
+        );
         require(
             current_desktop_name()? == broker_desktop,
             "restricted child cleanup changed the broker thread desktop",
@@ -391,13 +466,87 @@ mod windows {
         )?;
         let result: serde_json::Value = serde_json::from_slice(&out).map_err(io::Error::other)?;
         require(
-            result["stdio_reply"] == "pong" && err == b"restricted stderr pipe verified\n",
+            result["stdio_reply"] == "pong" && err == CHILD_STDERR.as_bytes(),
             "worker output pipe mismatch",
         )?;
         require(
             std::fs::read(&file)? == b"broker-private-fixture\n",
             "worker modified broker fixture",
         )?;
+        let journal_path = directory.join("delegated-fake-ip.dat");
+        let mut journal = OpenOptions::new()
+            .create_new(true)
+            .read(true)
+            .write(true)
+            .open(&journal_path)?;
+        journal.write_all(b"initial-owned-fake-ip-fixture\n")?;
+        journal.sync_all()?;
+        let mut data = spawn_data_plane(
+            &executable,
+            &[
+                "--data-plane-child".into(),
+                file.as_os_str().to_owned(),
+                (sentinel.as_raw_handle() as usize).to_string().into(),
+                "__DESKTOP_FROM_STDIN__".into(),
+            ],
+            &journal,
+        )?;
+        drop(journal);
+        let data_desktop = data.worker.desktop_name().to_owned();
+        require(
+            current_desktop_name()? == broker_desktop,
+            "data-plane launch changed broker desktop",
+        )?;
+        let resource_line = serde_json::to_string(&data.inherited).map_err(io::Error::other)?;
+        let input = format!("{data_desktop}\n{resource_line}\nping\n");
+        data.packet_input.write_all(&[0xa7; 128])?;
+        drop(data.packet_input);
+        // A failed child is killed/reaped by capture before this bounded pipe
+        // reader is joined, so a failed resource test cannot leave it hanging.
+        let packet_reader = thread::spawn(move || {
+            let mut bytes = Vec::new();
+            data.packet_output.take(129).read_to_end(&mut bytes)?;
+            Ok::<_, io::Error>(bytes)
+        });
+        let captured = capture(data.worker, input.as_bytes());
+        let packet = packet_reader
+            .join()
+            .map_err(|_| io::Error::other("packet reader panicked"))?;
+        let (data_exit, data_out, data_err) = captured?;
+        eprintln!(
+            "restricted data-plane child exited: code={data_exit} hex=0x{data_exit:08x} stdout_bytes={} stderr_bytes={}",
+            data_out.len(),
+            data_err.len()
+        );
+        std::fs::write(directory.join("data-child-stdout.log"), &data_out)?;
+        std::fs::write(directory.join("data-child-stderr.log"), &data_err)?;
+        require(
+            data_exit == 0,
+            "restricted data-plane resource probe failed",
+        )?;
+        require(packet? == [0xa7; 128], "dedicated packet output differs")?;
+        let data_result: serde_json::Value =
+            serde_json::from_slice(&data_out).map_err(io::Error::other)?;
+        require(
+            data_result["delegated_file_and_packet_io"] == true
+                && data_result["stdio_reply"] == "pong"
+                && data_err == CHILD_STDERR.as_bytes(),
+            "delegated child or control response differs",
+        )?;
+        require(
+            std::fs::read(&journal_path)?
+                == b"initial-owned-fake-ip-fixture\nchild-owned-fake-ip-fixture\n",
+            "delegated journal change differs",
+        )?;
+        require(
+            std::fs::read(&file)? == b"broker-private-fixture\n",
+            "broker file changed",
+        )?;
+        require(
+            current_desktop_name()? == broker_desktop,
+            "data cleanup changed broker desktop",
+        )?;
+        require_desktop_removed(&data_desktop)?;
         let mut family = spawn(&executable, &["--parent".into()])?;
         let family_desktop = family.desktop_name().to_owned();
         require(
@@ -440,6 +589,8 @@ mod windows {
             "{}",
             serde_json::json!({"ok":true,"evidence":"restricted worker process foundation smoke",
         "source_sha":option_env!("SWIRL_SOURCE_SHA").unwrap_or("unknown"),"child":result,
+            "data_plane_child":data_result,
+            "delegated_packet_pipes_verified":true,"delegated_file_write_verified":true,
             "job_descendants_reaped":true,"parent_desktop_unchanged":true,"private_desktops_removed":true,
             "network_modified":false,"product_broker_integrated":false,
         "network_compatibility_verified":false,"physical_windows_11_acceptance":false})
@@ -448,6 +599,9 @@ mod windows {
     }
 
     pub fn main() {
+        // This fixed marker distinguishes a process which reached Rust main
+        // from loader/CRT failure; it contains no paths, tokens or environment.
+        eprint!("{MAIN_ENTER}");
         if let Err(error) = run() {
             eprintln!("restricted worker smoke failed: {error}");
             std::process::exit(1);

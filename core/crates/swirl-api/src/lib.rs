@@ -13,6 +13,7 @@ mod control_v2;
 mod import_ffi;
 pub mod native_tun;
 pub mod native_tun_control;
+pub mod native_tun_ipc;
 #[cfg(windows)]
 mod native_windows;
 mod node_import;
