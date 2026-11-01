@@ -1,6 +1,7 @@
 //! L3 packet bridge acceptance against real, independently owned loopback peers.
 //! These tests do not install a driver or modify host routes, DNS or adapters.
 use crate::native_tun::{PacketBridge, spawn};
+use crate::v2::{Core, RuntimeConfig};
 use smoltcp::{
     phy::ChecksumCapabilities,
     wire::{
@@ -13,7 +14,6 @@ use std::{
     net::{IpAddr, SocketAddr},
     time::Duration,
 };
-use swirl_core::v2::{Core, RuntimeConfig};
 use swirl_dns::tun::{ANSWER_TTL, DNS_IPV4, DNS_IPV6, FakeIpStore, TunDns};
 use swirl_subscription::{
     Dns, DnsTlsServer, HostMapping, Limits, Matcher, Node, Outbound, Tls,
@@ -616,7 +616,7 @@ fn revoked_node_resets_tcp_after_upstream_half_close(v6: bool) {
     core.finish(
         request,
         token,
-        swirl_core::v2::DurableReceipt {
+        crate::v2::DurableReceipt {
             store_id: STORE.into(),
             request_id: request.into(),
             saved_revision: "2".into(),
@@ -1144,7 +1144,7 @@ fn failed_udp_tuple_requires_full_idle_before_readmission(v6: bool) {
     core.finish(
         request,
         token,
-        swirl_core::v2::DurableReceipt {
+        crate::v2::DurableReceipt {
             store_id: STORE.into(),
             request_id: request.into(),
             saved_revision: "2".into(),

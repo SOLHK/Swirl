@@ -308,3 +308,24 @@ executable-binary scanning support, not Cargo.lock security checks. `--no-fetch`
 uses the reviewed advisory checkout; registry/yanked checks were not disabled.
 For future acceptance, also run with the then-current official advisory database
 and retain both the tool version and database revision in the evidence.
+
+## Shared packet worker dependency boundary
+
+The existing native packet bridge and versioned packet codec now live in
+`swirl-core`; `swirl-api` keeps compatibility re-exports. This moves the same
+implementation and all 24 existing tests, rather than introducing another Core
+or rule engine. The bridge is behind Core's optional `native-tun` feature; the
+codec itself has no TUN dependency. API explicitly enables that feature.
+
+The lockfile adds only two edges from Core to the already locked `swirl-tun`
+and smoltcp 0.14.0. No third-party package/version/checksum or license changed.
+Core's direct optional smoltcp dependency exists for the moved packet tests:
+Cargo cannot feature-gate a dev-dependency. Default Core's normal/build/dev
+dependency tree was checked to exclude both packages. The optional TUN feature
+retains smoltcp's Rust 1.91 requirement; the default workspace Rust 1.89
+declaration is unchanged. An actual Rust 1.89 build was not performed.
+
+On the available Windows GNU toolchain, the affected Core/API/TUN all-target
+run passed 227 tests in 17 result groups, with zero failed, ignored or filtered.
+The 11 portable-boundary contracts and targeted all-target Clippy also passed.
+These are shared-code checks, not low-integrity process forwarding acceptance.

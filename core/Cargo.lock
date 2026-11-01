@@ -1421,11 +1421,13 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "smoltcp",
  "swirl-dns",
  "swirl-protocol",
  "swirl-routing",
  "swirl-subscription",
  "swirl-transport",
+ "swirl-tun",
  "tokio",
  "tokio-rustls",
 ]

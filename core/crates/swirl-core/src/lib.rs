@@ -1,4 +1,7 @@
 //! Rust-owned runtime, sockets, scheduling, statistics and immutable session plans.
+#[cfg(feature = "native-tun")]
+pub mod native_tun;
+pub mod native_tun_ipc;
 mod policy;
 mod policy_v2;
 mod probe;
