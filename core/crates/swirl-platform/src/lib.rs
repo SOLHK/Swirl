@@ -19,6 +19,8 @@ pub mod windows_network;
 #[cfg(windows)]
 mod windows_notify;
 #[cfg(windows)]
+pub mod windows_packet_resources;
+#[cfg(windows)]
 pub mod windows_restricted_worker;
 #[cfg(windows)]
 pub mod windows_wfp;
