@@ -124,6 +124,24 @@ protocols and actions rejecting missing flags or extra DISABLED,
 CLEAR_ACTION_RIGHT and unknown bits. This is not evidence of real enforcement
 recovery until the next exact-source BFE test completes.
 
+That next real test at `744d10a` / PR checkout `fedd409` **passed**: all four
+IPv4/IPv6 TCP/UDP scoped blocks, staged-error rollback, foreign-owner refusal,
+engine reopen, other application/control isolation and exact owned removal.
+The [original success log](native-tun-evidence/windows-wfp-744d10a-passed.log),
+[receipt](native-tun-evidence/windows-wfp-744d10a-receipt.json) and
+[source/result manifest](native-tun-evidence/windows-744d10a-sdk-results.json)
+are retained. The overall Native job still failed its independent restricted
+child probe. Existing-flow echo observations were false in both families but
+remain observations, not a revocation guarantee. Boot, system kill switch and
+physical Windows 11 acceptance stayed explicitly false.
+
+An optional service-SID condition now further narrows an individual scoped rule
+to `ALE_APP_ID AND ALE_USER_ID`; absent SID preserves schema-2 metadata. The
+[service identity fixture](NATIVE_TUN_SERVICE_IDENTITY.md) first validates real
+SCM principals and OS AccessCheck. Fifteen local WFP models passed, but actual
+five-condition BFE enforcement has not executed and is not inferred from the
+four-condition success above.
+
 Before this can become a product kill switch, system-scope policy, tunnel and
 physical interface changes, existing inbound-origin/raw/forwarded flows, LAN and
 essential-system exceptions, helper/worker failures, boot/reboot behavior,

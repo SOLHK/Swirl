@@ -9,3 +9,6 @@ windows-wfp-d1bdea0.log -text whitespace=blank-at-eol,-blank-at-eof,space-before
 windows-wfp-d1bdea0-receipt.json -text
 windows-wfp-88e9fdf.log -text whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
 windows-restricted-88e9fdf*.log -text whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+windows-wfp-744d10a-passed.log -text whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+windows-wfp-744d10a-receipt.json -text
+windows-restricted-744d10a-failed.log -text whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol

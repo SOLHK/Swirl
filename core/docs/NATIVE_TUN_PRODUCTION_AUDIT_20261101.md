@@ -432,6 +432,44 @@ verification. Actual checkout was `6d81b38`; physical DPI/refresh and real
 installation/uninstallation were not performed. These successes do not clear
 the same source's WFP/restricted failures or later source gates.
 
+At `744d10a` / PR `fedd409`, both the real scoped Wintun and four-rule WFP
+components passed. The overall Native job failed the restricted child with
+pre-main DLL initialization status `0xc0000142`; exact original evidence is
+[recorded separately](native-tun-evidence/windows-744d10a-sdk-results.json).
+No isolation policy was relaxed. Observational desktop/window-station access
+diagnostics and an independent headless-loader comparison now precede the
+unchanged required child gate. Local platform validation passed 82 library
+plus three example tests, zero failures/ignored, with all-target Clippy and
+Release linking. [SCM identity](NATIVE_TUN_SERVICE_IDENTITY.md) is a separate,
+unexecuted disposable fixture; kernel identity and real low Core stay false.
+
+The same source's Protocols matrix passed 6/6, but Qt failed **UI 8/9** while
+network passed **10/10**, zero skipped/disabled. Light/reviewIcon lost hover;
+four original assertions failed. A D3D diagnostic variant passed, another
+reproduced the failure; seven independent activity regressions did not replace
+the failed gate. Production/remaining regressions/installer were blocked.
+UI source was identical to the previous successful `88e9fdf`. A bounded test
+observer now records native/QPA move intent and window enter/leave/show/hide
+events without changing 67 existing input/wait actions or 124 check messages.
+It outputs only after failure, leaves all original deadlines/assertions intact
+and is not a hover fix. Its Qt 6.12 object compilation passed after pinning the
+local Rust build environment to the configured compiler; initial missing-rustc
+and dependency-directory MSRV selection failures remain recorded. No GUI was
+started locally and no production visual source was changed.
+
+Measured `88e9fdf` Native Windows timings showed WFP waited 13m21s and its two
+security probes together took 33s; preceding Core/helper and Wintun consumed
+553s. The probes now live in an independent required Windows security job with
+its own format/lint/all-target unit/build chain. Original Windows/Linux packet,
+Core, driver and product gates remain; each SDK failure still fails the workflow.
+The new job also runs the explicit SCM identity fixture and preserves original
+logs, receipts, binaries and notices. No total runner-minute saving is claimed;
+the additional setup/cache overhead and actual feedback time require live data.
+
+An authenticated repository runner inventory returned zero registered
+self-hosted runners. The available workstation remains ordinary Windows 11;
+no recoverable dedicated Win11 lab has been established for privileged capture.
+
 Live run inventories also confirmed duplicate push/PR Rust Core matrices and
 Qt builds for each isolated-branch commit. Only this repository's designated TUN
 branch now shares a workflow concurrency group across those two events; a fork

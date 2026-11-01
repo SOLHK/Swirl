@@ -3,6 +3,8 @@
 #include <QQuickWindow>
 #include <QQuickItem>
 #include <QQuickItemGrabResult>
+#include <QObject>
+#include <QPointer>
 #include <QQmlContext>
 #include <QQmlExpression>
 #include <QQmlProperty>
@@ -19,6 +21,7 @@
 #include <QFontMetricsF>
 #include <QFontDatabase>
 #include <QCursor>
+#include <QEnterEvent>
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QElapsedTimer>
@@ -33,9 +36,12 @@
 #include <QMutex>
 #include <QMutexLocker>
 #include <QtMath>
+#include <algorithm>
+#include <array>
 #include <chrono>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <QSGRendererInterface>
 #include <QSGTransformNode>
 #include <private/qquickitem_p.h>
@@ -116,6 +122,140 @@ static QJsonObject appearanceSwapChainProbe(QQuickWindow *window) {
     return result;
 }
 
+// Test-only, GUI-thread observer. Recording never allocates, emits output or
+// injects/consumes an event. JSON is assembled only after a hover check fails.
+// No Q_OBJECT is needed: this observer defines no signals or properties.
+class AppearanceHoverInputTrace final : public QObject {
+    Q_DISABLE_COPY_MOVE(AppearanceHoverInputTrace)
+public:
+    enum class Marker : unsigned char {
+        Event, BeforeNativeSetPos, AfterNativeSetPos, BeforeNativeEvents, AfterNativeEvents,
+        BeforeQTestMove, AfterQTestMove, HoverFrame, BeforeHide, AfterHide,
+        BeforeShow, AfterShow, BeforeRelease, AfterRelease,
+    };
+    explicit AppearanceHoverInputTrace(QQuickWindow *window):m_window(window) {
+        m_clock.start();window->installEventFilter(this);
+    }
+    void setControl(const QString &theme,const QString &name,QQuickItem *control) {
+        m_control=control;
+        m_context=-1;
+        if(m_contextCount<m_contexts.size()){
+            m_context=int(m_contextCount);
+            m_contexts[m_contextCount++]={theme,name};
+        }
+    }
+    void mark(Marker marker,std::optional<QPoint> intended=std::nullopt) {
+        Entry entry;
+        entry.marker=marker;
+        entry.hasPosition=true;
+        entry.global=QCursor::pos();
+        entry.local=m_window->mapFromGlobal(entry.global.toPoint());
+        if(intended){entry.hasIntent=true;entry.intended=*intended;}
+        append(entry);
+    }
+    void frame() {
+        Entry entry;entry.marker=Marker::HoverFrame;append(entry);
+    }
+    void dump(const QString &theme,const QString &name) const {
+        QJsonArray events;
+        const auto retained=(std::min)(m_total,quint64(m_entries.size()));
+        const auto begin=(m_next+m_entries.size()-size_t(retained))%m_entries.size();
+        for(quint64 index=0;index<retained;++index){
+            const auto &entry=m_entries[(begin+size_t(index))%m_entries.size()];
+            auto row=QJsonObject{{"sequence",qint64(entry.sequence)},{"elapsedMs",entry.elapsedNs/1000000.0},
+                {"marker",markerName(entry.marker)},{"eventType",int(entry.event)},
+                {"spontaneous",entry.spontaneous},{"inputTimestamp",qint64(entry.inputTimestamp)},
+                {"windowActive",entry.active},{"windowExposed",entry.exposed},
+                {"controlPresent",entry.controlPresent},{"hovered",entry.hovered},{"buttons",entry.buttons}};
+            if(entry.context>=0){
+                const auto &context=m_contexts[size_t(entry.context)];
+                row.insert("theme",context.theme);row.insert("control",context.control);
+            }
+            if(entry.hasPosition){
+                row.insert("local",QJsonArray{entry.local.x(),entry.local.y()});
+                row.insert("global",QJsonArray{entry.global.x(),entry.global.y()});
+            }
+            if(entry.hasIntent)row.insert("intendedLocal",QJsonArray{entry.intended.x(),entry.intended.y()});
+            events.append(row);
+        }
+        qInfo().noquote()<<"HOVER_INPUT_TRACE"<<QJsonDocument(QJsonObject{
+            {"scope","test observer; event-filter state is sampled before delivery"},
+            {"failedTheme",theme},{"failedControl",name},{"capacity",int(m_entries.size())},
+            {"totalRecorded",qint64(m_total)},{"overwritten",qint64(m_total-retained)},
+            {"events",events}}).toJson(QJsonDocument::Compact);
+    }
+protected:
+    bool eventFilter(QObject *watched,QEvent *event) override {
+        if(watched!=m_window)return false;
+        switch(event->type()){
+        case QEvent::Enter:case QEvent::Leave:case QEvent::MouseMove:
+        case QEvent::Show:case QEvent::Hide:
+        case QEvent::WindowActivate:case QEvent::WindowDeactivate:case QEvent::ActivationChange:
+            break;
+        default:return false;
+        }
+        Entry entry;entry.event=event->type();entry.spontaneous=event->spontaneous();
+        if(event->type()==QEvent::MouseMove){
+            const auto *mouse=static_cast<QMouseEvent *>(event);
+            entry.hasPosition=true;entry.local=mouse->position();entry.global=mouse->globalPosition();
+            entry.buttons=mouse->buttons().toInt();entry.inputTimestamp=mouse->timestamp();
+        }else if(event->type()==QEvent::Enter){
+            const auto *enter=static_cast<QEnterEvent *>(event);
+            entry.hasPosition=true;entry.local=enter->position();entry.global=enter->globalPosition();
+            entry.buttons=enter->buttons().toInt();entry.inputTimestamp=enter->timestamp();
+        }
+        append(entry);
+        return false;
+    }
+private:
+    struct Context {QString theme,control;};
+    struct Entry {
+        quint64 sequence=0,inputTimestamp=0;
+        qint64 elapsedNs=0;
+        Marker marker=Marker::Event;
+        QEvent::Type event=QEvent::None;
+        QPointF local,global;
+        QPoint intended;
+        int context=-1,buttons=0;
+        bool spontaneous=false,hasPosition=false,hasIntent=false,active=false,exposed=false;
+        bool controlPresent=false,hovered=false;
+    };
+    void append(Entry entry) {
+        entry.sequence=++m_total;entry.elapsedNs=m_clock.nsecsElapsed();entry.context=m_context;
+        entry.active=m_window->isActive();entry.exposed=m_window->isExposed();
+        entry.controlPresent=!m_control.isNull();
+        entry.hovered=m_control&&m_control->property("hovered").toBool();
+        m_entries[m_next]=entry;m_next=(m_next+1)%m_entries.size();
+    }
+    static const char *markerName(Marker marker) {
+        switch(marker){
+        case Marker::Event:return "event";
+        case Marker::BeforeNativeSetPos:return "before-native-setpos";
+        case Marker::AfterNativeSetPos:return "after-native-setpos";
+        case Marker::BeforeNativeEvents:return "before-native-process-events";
+        case Marker::AfterNativeEvents:return "after-native-process-events";
+        case Marker::BeforeQTestMove:return "before-qtest-move";
+        case Marker::AfterQTestMove:return "after-qtest-move";
+        case Marker::HoverFrame:return "hover-frame";
+        case Marker::BeforeHide:return "before-hide";
+        case Marker::AfterHide:return "after-hide";
+        case Marker::BeforeShow:return "before-show";
+        case Marker::AfterShow:return "after-show";
+        case Marker::BeforeRelease:return "before-release";
+        case Marker::AfterRelease:return "after-release";
+        }
+        return "unknown";
+    }
+    QQuickWindow *m_window;
+    QPointer<QQuickItem> m_control;
+    QElapsedTimer m_clock;
+    std::array<Entry,256> m_entries{};
+    std::array<Context,16> m_contexts{};
+    size_t m_next=0,m_contextCount=0;
+    quint64 m_total=0;
+    int m_context=-1;
+};
+
 int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
     if(!window)return 2;
     QElapsedTimer totalClock,stageClock;totalClock.start();stageClock.start();
@@ -149,12 +289,19 @@ Item {
         if(fixture){
             fixture->setParentItem(window->contentItem());
             struct RestoreCursor { QPoint position=QCursor::pos(); ~RestoreCursor(){QCursor::setPos(position);} } restoreCursor;
+            AppearanceHoverInputTrace hoverInputTrace(window);
             window->requestActivate();QTest::qWait(100);
             const auto surface=[](QQuickItem *control){return control?control->property("background").value<QQuickItem *>():nullptr;};
             const auto movePointer=[&](QPoint local,int settle=160){
+                hoverInputTrace.mark(AppearanceHoverInputTrace::Marker::BeforeNativeSetPos,local);
                 QCursor::setPos(window->mapToGlobal(local));
+                hoverInputTrace.mark(AppearanceHoverInputTrace::Marker::AfterNativeSetPos,local);
+                hoverInputTrace.mark(AppearanceHoverInputTrace::Marker::BeforeNativeEvents,local);
                 QCoreApplication::processEvents();
+                hoverInputTrace.mark(AppearanceHoverInputTrace::Marker::AfterNativeEvents,local);
+                hoverInputTrace.mark(AppearanceHoverInputTrace::Marker::BeforeQTestMove,local);
                 QTest::mouseMove(window,window->mapFromGlobal(QCursor::pos()));
+                hoverInputTrace.mark(AppearanceHoverInputTrace::Marker::AfterQTestMove,local);
                 QTest::qWait(settle);
             };
             std::function<QQuickItem *(QQuickItem *,const QString &)> visualItem;
@@ -189,6 +336,7 @@ Item {
                     auto *control=fixture->findChild<QQuickItem *>(name);auto *paint=surface(control);
                     check(paint&&qAbs(paint->property("radius").toReal()-(name=="reviewNavigation"?eval("Theme.sidebarRowRadius").toReal():paint->height()/2))<0.01,"shared surfaces retain the requested capsule or navigation curve");
                     if(!control||!paint)continue;
+                    hoverInputTrace.setControl(theme,name,control);
                     const auto size=control->size();const auto position=control->position();
                     auto *content=control->property("contentItem").value<QQuickItem *>();
                     auto *focusFill=paint->findChild<QQuickItem *>("controlFocusFill");
@@ -211,9 +359,10 @@ Item {
                     const bool restingSettled=QTest::qWaitFor([&]{return !control->property("hovered").toBool()&&!control->property("visualFocus").toBool()&&motionRetired()&&sameRenderedColor(paint->property("color").value<QColor>(),expectedNormal);},1000);
                     if(!restingSettled)diagnose("resting",expectedNormal);
                     check(restingSettled,"native pointer leaves and all shared control motion settles before its resting sample");
-                    if(!restingSettled)continue;
+                    if(!restingSettled){hoverInputTrace.dump(theme,name);continue;}
                     const auto normal=paint->property("color").value<QColor>();
                     const auto restingPixels=window->grabWindow();
+                    const int hoverFailuresBefore=failures;
                     bool intermediateHoverFrame=false;
                     qreal sampledHoverProgress=0;
                     qint64 sampledHoverMs=-1;
@@ -222,6 +371,7 @@ Item {
                     // Observe rendered-frame preparation from before input: a fixed sleep can
                     // resume after a short animation has already finished on a busy runner.
                     const auto hoverSample=QObject::connect(window,&QQuickWindow::afterAnimating,fixture,[&]{
+                        hoverInputTrace.frame();
                         if(!control->property("hovered").toBool())return;
                         ++hoveredFrames;
                         const auto progress=paint->property("hoverProgress").toReal();
@@ -245,6 +395,7 @@ Item {
                     const QRect pixelRect(qFloor(rect.x()*dpr),qFloor(rect.y()*dpr),qCeil(rect.width()*dpr),qCeil(rect.height()*dpr));
                     check(!restingPixels.isNull()&&!hoveredPixels.isNull()&&restingPixels.copy(pixelRect)!=hoveredPixels.copy(pixelRect),"hover feedback changes the actual rendered button pixels");
                     if(name!="reviewCombo")check(control->property("motionLift").toReal()<-.5,"hover gently lifts the button without relaying out its shell");
+                    if(failures>hoverFailuresBefore)hoverInputTrace.dump(theme,name);
                     control->forceActiveFocus(Qt::TabFocusReason);
                     const bool focusSettled=QTest::qWaitFor([&]{return control->property("visualFocus").toBool()&&paint->property("focused").toBool()&&focusFill&&focusFill->isVisible()&&focusFill->opacity()>.99;},1000);
                     if(!focusSettled)diagnose("focused",normal);
@@ -591,10 +742,17 @@ Item {
                             const auto visibility=window->visibility();
                             sendMouse(QEvent::MouseButtonPress);
                             check(nativeClock && nativeClock->running(),"window hide interrupts an active production native press");
+                            hoverInputTrace.mark(AppearanceHoverInputTrace::Marker::BeforeHide);
                             window->hide();
+                            hoverInputTrace.mark(AppearanceHoverInputTrace::Marker::AfterHide);
                             check(!nativeClock->running() && !paint->property("moving").toBool(),
                                 "hiding the real window retires native press callbacks and feedback motion");
-                            window->setVisibility(visibility);window->requestActivate();sendMouse(QEvent::MouseButtonRelease);
+                            hoverInputTrace.mark(AppearanceHoverInputTrace::Marker::BeforeShow);
+                            window->setVisibility(visibility);window->requestActivate();
+                            hoverInputTrace.mark(AppearanceHoverInputTrace::Marker::AfterShow);
+                            hoverInputTrace.mark(AppearanceHoverInputTrace::Marker::BeforeRelease);
+                            sendMouse(QEvent::MouseButtonRelease);
+                            hoverInputTrace.mark(AppearanceHoverInputTrace::Marker::AfterRelease);
                             check(QTest::qWaitFor([&]{return !control->property("down").toBool() && !nativeClock->running()
                                 && qAbs(paint->scale()-1)<.001 && qAbs(content->scale()-1)<.001;},1400),
                                 "restoring the real window leaves no stale paired press transform");
