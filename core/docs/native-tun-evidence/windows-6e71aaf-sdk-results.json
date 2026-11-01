@@ -1,0 +1,158 @@
+{
+  "schema": 1,
+  "evidence_class": "Windows Server scoped SDK components; independent security job failed",
+  "development_sha": "6e71aaf63151e93e1e46a27abb8cbcdb722d7e72",
+  "actual_checkout_sha": "6676423dcf4e0287c0db5caea7571ec0625632b6",
+  "source_tree": "addac789f4ee55fb8411056e1ecbdea09376f318",
+  "core_tree": "91fe9584e57bad9f6a85d977a826912d5e6c4f2c",
+  "development_and_checkout_trees_equal": true,
+  "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41293096458",
+  "job_id": 124808353608,
+  "job_name": "Windows WFP, worker and service identity security",
+  "runner_label": "windows-2025",
+  "overall_status": "failed",
+  "artifact_id": 13078200906,
+  "artifact_zip_sha256": "1bf1ec00da073e24ffc4e24bbfee7e6945d3b1fa8f418e5a0562bd073577be54",
+  "wfp": {
+    "status": "passed",
+    "rules": 4,
+    "transaction_error_rollback": true,
+    "nonce_conflict_refused": true,
+    "persistent_across_engine_reopen": true,
+    "control_endpoints_unchanged": true,
+    "other_application_unchanged": true,
+    "owned_policy_removed": true,
+    "new_flow_block_ipv4_ipv6_tcp_udp": true,
+    "existing_tcp_echo_after_commit": [
+      false,
+      false
+    ],
+    "existing_udp_echo_after_commit": [
+      false,
+      false
+    ],
+    "existing_flow_revocation_guarantee": false,
+    "boot_acceptance": false,
+    "system_kill_switch_acceptance": false
+  },
+  "restricted_process": {
+    "status": "failed",
+    "required_capability_probe": {
+      "unsigned_exit": 3221225794,
+      "hex_exit": "0xc0000142",
+      "child_rust_main_marker_seen": false,
+      "stdout_bytes": 0,
+      "stderr_bytes": 0
+    },
+    "headless_diagnostic_comparison": {
+      "unsigned_exit": 3221225794,
+      "hex_exit": "0xc0000142",
+      "child_rust_main_marker_seen": false,
+      "stdout_bytes": 0,
+      "stderr_bytes": 0,
+      "replaces_required_capability_probe": false
+    },
+    "parent_rust_main_marker_seen": true,
+    "access_check_preflight": {
+      "scope": "SDK full-access preflight only; not actual loader requests or startup proof",
+      "same_observations_for_required_and_headless_children": true,
+      "current_window_station": {
+        "full_access_allowed": true,
+        "granted_mask": 983935
+      },
+      "private_desktop": {
+        "full_access_allowed": false,
+        "full_granted_mask": 0,
+        "full_mapped_mask": 983551,
+        "maximum_access_allowed": true,
+        "maximum_granted_mask": 131203
+      },
+      "both_explicit_integrity_rid": 4096,
+      "both_explicit_mandatory_policy": 1,
+      "token_mandatory_policy": 3
+    },
+    "delegated_six_handle_resource_path_executed": false,
+    "conclusion": "Both children terminate with STATUS_DLL_INIT_FAILED before their Rust-main markers. The denied desktop full-access preflight does not establish the loader request or the specific failing DLL. No isolation relaxation is justified by this receipt alone."
+  },
+  "service_identity": {
+    "status": "failed",
+    "parent_error": {
+      "operation": "OpenProcessToken",
+      "sdk_code": 5,
+      "message": "Access is denied."
+    },
+    "secondary_service_result": {
+      "ok": false,
+      "sdk_code": 10060,
+      "message": "Socket operation timed out."
+    },
+    "secondary_timeout_replaces_parent_error": false,
+    "kernel_sid_enforcement_accepted": false,
+    "cleanup_acceptance": "Not established by this failed run."
+  },
+  "files": [
+    {
+      "path": "windows-wfp-6e71aaf-passed.log",
+      "zip_entry": "_temp/swirl-wfp-scoped-smoke.log",
+      "bytes": 803,
+      "sha256": "bd6bc53bb194dca103d7c2a9e9ae438c0487f204ff2a9efc68769d0a4c4c58ac"
+    },
+    {
+      "path": "windows-wfp-6e71aaf-receipt.json",
+      "zip_entry": "_temp/swirl-wfp-scoped-receipt.json",
+      "bytes": 694,
+      "sha256": "cdbd288c4b34590d26c7613e1ed1ba844c79543850dc968c9823931595032524"
+    },
+    {
+      "path": "windows-restricted-6e71aaf-failed.log",
+      "zip_entry": "_temp/swirl-restricted-worker-smoke.log",
+      "bytes": 3011,
+      "sha256": "ec4bf5f713840723ec6e1194d6a3a60b12d4a45e208d54d7ca18e349aeb493d3"
+    },
+    {
+      "path": "windows-restricted-6e71aaf-child-stdout.log",
+      "zip_entry": "_temp/swirl-restricted-worker-smoke/child-stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "windows-restricted-6e71aaf-child-stderr.log",
+      "zip_entry": "_temp/swirl-restricted-worker-smoke/child-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "windows-restricted-6e71aaf-headless-child-stdout.log",
+      "zip_entry": "_temp/swirl-restricted-worker-smoke/headless-child-stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "windows-restricted-6e71aaf-headless-child-stderr.log",
+      "zip_entry": "_temp/swirl-restricted-worker-smoke/headless-child-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "windows-service-6e71aaf-failed.log",
+      "zip_entry": "_temp/swirl-service-identity-smoke.log",
+      "bytes": 503,
+      "sha256": "f0da64bd42f3a5b6278fa5e500e0d6e122085ad6a0090762355c470f6673fe13"
+    },
+    {
+      "path": "windows-service-6e71aaf-receipt.json",
+      "zip_entry": "_temp/swirl-service-identity-smoke/service-receipt.json",
+      "bytes": 387,
+      "sha256": "d31a1225801de2e9c30deb40488c23189e3487b06a6db3010e19eab2062ea753"
+    },
+    {
+      "path": "windows-service-6e71aaf-result.json",
+      "zip_entry": "_temp/swirl-service-identity-smoke/service-result.json",
+      "bytes": 300,
+      "sha256": "e12b7f5fd42ec22d9a5e2ad216cdff5bd48b7fc98293d6578c7700dd89d24555"
+    }
+  ],
+  "normalization": "none; original ZIP-entry bytes, including four empty child logs",
+  "physical_windows_11_acceptance": false,
+  "release_approved": false
+}

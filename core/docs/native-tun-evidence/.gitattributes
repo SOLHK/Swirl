@@ -12,3 +12,15 @@ windows-restricted-88e9fdf*.log -text whitespace=blank-at-eol,-blank-at-eof,spac
 windows-wfp-744d10a-passed.log -text whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
 windows-wfp-744d10a-receipt.json -text
 windows-restricted-744d10a-failed.log -text whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+windows-wfp-6e71aaf-passed.log -text whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+windows-wfp-6e71aaf-receipt.json -text
+windows-restricted-6e71aaf*.log -text whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+windows-service-6e71aaf-failed.log -text whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+windows-service-6e71aaf-receipt.json -text
+windows-service-6e71aaf-result.json -text
+windows-wfp-35847e9-passed.log -text whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+windows-wfp-35847e9-receipt.json -text
+windows-restricted-35847e9*.log -text whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+windows-service-35847e9-passed.log -text whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+windows-service-35847e9-receipt.json -text
+windows-service-35847e9-result.json -text

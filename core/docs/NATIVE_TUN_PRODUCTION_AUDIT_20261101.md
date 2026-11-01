@@ -490,3 +490,63 @@ Windows 11 environment and the missing implementations are prerequisites.
 Passing a read-only test on a physical Windows 11 host does not change these
 statuses. Neither `test` nor `main` may be merged merely because a Server
 workflow or a backend build is green.
+
+### Recorded `6e71aaf` matrix and `35847e9` checkpoint
+
+Development `6e71aaf63151e93e1e46a27abb8cbcdb722d7e72` and actual PR checkout
+`6676423dcf4e0287c0db5caea7571ec0625632b6` share source tree
+`addac789f4ee55fb8411056e1ecbdea09376f318` and Core tree
+`91fe9584e57bad9f6a85d977a826912d5e6c4f2c`. The source-bound
+[SDK manifest](native-tun-evidence/windows-6e71aaf-sdk-results.json) retains ten
+original ZIP entries, including the four empty child outputs, without
+normalizing their bytes or replacing an earlier failure.
+
+| Exact-source gate | Actual result |
+| --- | --- |
+| [Native TUN](https://github.com/SOLHK/Swirl/actions/runs/41293096458) | Linux and Windows driver jobs passed; the independent Windows security job failed. Wintun recorded 1,957 RX / 1,736 TX packets and owned cleanup. Physical DNS/firewall were unchanged; Win11 application acceptance stayed false. |
+| [Windows SDK security](https://github.com/SOLHK/Swirl/actions/runs/41293096458/job/124808353608) | Scoped WFP passed. Required and headless children both exited `0xc0000142` before their Rust-main markers, with empty stdout/stderr. The parent's main marker is not child-startup evidence. SCM first failed `OpenProcessToken` with SDK error 5; its secondary service result timed out with 10060. Neither comparison nor secondary result clears the required failures. |
+| [Qt product](https://github.com/SOLHK/Swirl/actions/runs/41293096352) | UI 9/9, network 10/10 and remaining 22/22; all zero failed/skipped/disabled. Production startup, package/installer build and simulated DPR checks passed. Physical DPI/refresh and real installation/uninstallation were not run. |
+| [Native Protocols](https://github.com/SOLHK/Swirl/actions/runs/41292957259) | 6/6 jobs passed. The retained VMess/TUIC/Hysteria2 interoperability boundaries remain; one later green run does not explain the historical macOS Trojan UDP failure. |
+| [Qt HTTP client security](https://github.com/SOLHK/Swirl/actions/runs/41293096392) | 7/7 jobs passed. Windows Qt 6.12 ran three CTests; original XML recorded subscription-security 5, telemetry 34 and network-policy 11 passes, zero failures/skips. |
+| [Rust Core](https://github.com/SOLHK/Swirl/actions/runs/41293096346) | Linux/macOS passed; Windows was cancelled during the complete application build by the subsequent checkpoint. Earlier unit/protocol/Qt integration successes do not establish a completed three-platform run. |
+
+The independent security job's first raw log was at 09:26:20.932 UTC; scoped
+WFP succeeded at 09:28:45.069 and both child failures were reported at
+09:28:45.789. This roughly 2m25s SDK feedback is recorded separately from the
+earlier `88e9fdf` serial timing. Source, cache and test scope differ, so it is
+not a controlled throughput benchmark or a claim of lower total runner minutes.
+The denied private-desktop full-access preflight is not evidence of the actual
+loader request or the failing DLL. Scoped WFP success still excludes a system
+kill switch, boot acceptance and a guaranteed existing-flow revocation contract.
+The successful Qt run also does not establish the cause or repair of the
+historical `744d10a` hover failure.
+
+The next development checkpoint is
+`35847e97abe42e3b7040196d684ba0e52df5c7c7`, actual PR checkout
+`255208f528aa4cd642f6aff27ca10c4d9f989e33`. Both have source tree
+`6e2b804db3ef02afbeee60f7c251b17a21834eb5` and Core tree
+`86e3e3a2fd49cc82832fc3fc4b68fe892f25b35c`. Its frozen local receipts record
+Core/API/TUN **227 passes in 17 result groups**, platform **87 passes**
+(83 library + 3 SCM + 1 WFP example unit tests), 11 portable-boundary contracts,
+and successful targeted all-target Clippy/formatting. Local unit/link results
+do not substitute for privileged SDK execution. Fresh
+[Native](https://github.com/SOLHK/Swirl/actions/runs/41295881425),
+[Rust Core](https://github.com/SOLHK/Swirl/actions/runs/41295885262),
+[Qt](https://github.com/SOLHK/Swirl/actions/runs/41295885273),
+[Protocols](https://github.com/SOLHK/Swirl/actions/runs/41295881328) and
+[Qt HTTP](https://github.com/SOLHK/Swirl/actions/runs/41295885319) runs were
+started. The source-bound security result below still blocks product acceptance.
+
+The subsequent `35847e9` PR SDK execution did pass scoped WFP and SCM identity,
+but the independent security job remained failed. Its
+[new source-bound manifest](native-tun-evidence/windows-35847e9-sdk-results.json)
+retains the original logs and receipts separately from `6e71aaf`. Both required
+and headless children still exited `0xc0000142` before their Rust-main markers
+with empty outputs, even though private-desktop full/maximum access now passed
+at `0xf01ff`. That result disproves the proposed full-access grant as a
+sufficient loader repair; it does not identify the actual failing DLL/access.
+The SCM receipt verifies owned configuration/ACL, live process image, original
+OS AccessCheck refusal cases and service removal. Its service token was
+non-elevated/non-admin with only change-notify privilege, session zero and
+integrity RID 12288. It does not establish a low-integrity Core child, WFP
+service-SID packet enforcement, product broker integration or Win11 acceptance.

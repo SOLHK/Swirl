@@ -1,0 +1,174 @@
+{
+  "schema": 1,
+  "evidence_class": "Windows Server scoped SDK components; independent security job failed",
+  "development_sha": "35847e97abe42e3b7040196d684ba0e52df5c7c7",
+  "actual_checkout_sha": "255208f528aa4cd642f6aff27ca10c4d9f989e33",
+  "source_tree": "6e2b804db3ef02afbeee60f7c251b17a21834eb5",
+  "core_tree": "86e3e3a2fd49cc82832fc3fc4b68fe892f25b35c",
+  "development_and_checkout_trees_equal": true,
+  "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41295885266",
+  "job_id": 124817692637,
+  "job_name": "Windows WFP, worker and service identity security",
+  "runner_label": "windows-2025",
+  "overall_status": "failed",
+  "artifact_id": 13078469723,
+  "artifact_zip_sha256": "bcb2e93464723f04ad0f0e96174ba309e3772116c4a3e2ee2ec72f3b61ffa90f",
+  "wfp": {
+    "status": "passed",
+    "rules": 4,
+    "transaction_error_rollback": true,
+    "nonce_conflict_refused": true,
+    "persistent_across_engine_reopen": true,
+    "control_endpoints_unchanged": true,
+    "other_application_unchanged": true,
+    "owned_policy_removed": true,
+    "new_flow_block_ipv4_ipv6_tcp_udp": true,
+    "existing_tcp_echo_after_commit": [
+      false,
+      false
+    ],
+    "existing_udp_echo_after_commit": [
+      false,
+      false
+    ],
+    "existing_flow_revocation_guarantee": false,
+    "boot_acceptance": false,
+    "system_kill_switch_acceptance": false
+  },
+  "restricted_process": {
+    "status": "failed",
+    "required_capability_probe": {
+      "unsigned_exit": 3221225794,
+      "hex_exit": "0xc0000142",
+      "child_rust_main_marker_seen": false,
+      "stdout_bytes": 0,
+      "stderr_bytes": 0
+    },
+    "headless_diagnostic_comparison": {
+      "unsigned_exit": 3221225794,
+      "hex_exit": "0xc0000142",
+      "child_rust_main_marker_seen": false,
+      "stdout_bytes": 0,
+      "stderr_bytes": 0,
+      "replaces_required_capability_probe": false
+    },
+    "parent_rust_main_marker_seen": true,
+    "access_check_preflight": {
+      "scope": "SDK full-access preflight only; not actual loader requests or startup proof",
+      "same_observations_for_required_and_headless_children": true,
+      "current_window_station": {
+        "full_access_allowed": true,
+        "granted_mask": 983935
+      },
+      "private_desktop": {
+        "full_access_allowed": true,
+        "full_granted_mask": 983551,
+        "full_mapped_mask": 983551,
+        "maximum_access_allowed": true,
+        "maximum_granted_mask": 983551
+      },
+      "both_explicit_integrity_rid": 4096,
+      "both_explicit_mandatory_policy": 1,
+      "token_mandatory_policy": 3
+    },
+    "delegated_six_handle_resource_path_executed": false,
+    "conclusion": "Both children still fail DLL initialization before Rust main despite successful private-desktop GENERIC_ALL preflight. The grant is not a demonstrated loader repair; exact DLL/access cause remains unresolved. No token/job isolation reduction or headless fallback is accepted."
+  },
+  "service_identity": {
+    "status": "passed",
+    "owned_config_and_acl_verified": true,
+    "scm_live_process_image_verified": true,
+    "owned_service_removed": true,
+    "normal_token_access_refused": true,
+    "standard_token_access_refused": true,
+    "forged_restricting_sid_access_refused": true,
+    "identity": {
+      "condition_access_matches": true,
+      "normal_principal_matches": true,
+      "restricted_principal_matches": true,
+      "only_change_notify_privilege": true,
+      "session_zero": true
+    },
+    "profile": {
+      "admin_deny_only": false,
+      "admin_enabled": false,
+      "elevated": false,
+      "enabled_privileges": 1,
+      "integrity_rid": 12288,
+      "restricted": true,
+      "unexpected_enabled_privileges": 0
+    },
+    "loopback_tcp_baseline": true,
+    "service_deadline_seconds": 20,
+    "network_configuration_modified": false,
+    "low_integrity_core_child_verified": false,
+    "product_broker_integrated": false,
+    "wfp_enforcement_verified": false,
+    "kernel_sid_enforcement_accepted": false
+  },
+  "files": [
+    {
+      "path": "windows-wfp-35847e9-passed.log",
+      "zip_entry": "_temp/swirl-wfp-scoped-smoke.log",
+      "bytes": 803,
+      "sha256": "4b6e55b286431bf9a67e93e5e67a22d73dd85a2e4c88800352932c2074fa63ce"
+    },
+    {
+      "path": "windows-wfp-35847e9-receipt.json",
+      "zip_entry": "_temp/swirl-wfp-scoped-receipt.json",
+      "bytes": 691,
+      "sha256": "598de73da241aa02e4d07c2d58313276d3500f91953dbf9ab70d29f585ada3e4"
+    },
+    {
+      "path": "windows-restricted-35847e9-failed.log",
+      "zip_entry": "_temp/swirl-restricted-worker-smoke.log",
+      "bytes": 3019,
+      "sha256": "6b5677f98475004cb66fc2ec1ec115503fc5eaa6622e79e0ef8f98be8f28cc69"
+    },
+    {
+      "path": "windows-restricted-35847e9-child-stdout.log",
+      "zip_entry": "_temp/swirl-restricted-worker-smoke/child-stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "windows-restricted-35847e9-child-stderr.log",
+      "zip_entry": "_temp/swirl-restricted-worker-smoke/child-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "windows-restricted-35847e9-headless-child-stdout.log",
+      "zip_entry": "_temp/swirl-restricted-worker-smoke/headless-child-stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "windows-restricted-35847e9-headless-child-stderr.log",
+      "zip_entry": "_temp/swirl-restricted-worker-smoke/headless-child-stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "windows-service-35847e9-passed.log",
+      "zip_entry": "_temp/swirl-service-identity-smoke.log",
+      "bytes": 1250,
+      "sha256": "5b78cb4bad62ab3f6f47117b92a5a3c75e5e44f53c2634f614613230147d85d8"
+    },
+    {
+      "path": "windows-service-35847e9-receipt.json",
+      "zip_entry": "_temp/swirl-service-identity-smoke/service-receipt.json",
+      "bytes": 387,
+      "sha256": "9fbb65bdd348c2c4e2e0b31523d160bab67d283dc1f4828db866d57ac97a66a0"
+    },
+    {
+      "path": "windows-service-35847e9-result.json",
+      "zip_entry": "_temp/swirl-service-identity-smoke/service-result.json",
+      "bytes": 583,
+      "sha256": "285fadbf468d70693de551636dc28841781193708aac56b0a7bebc0ff93dfd8a"
+    }
+  ],
+  "normalization": "none; original ZIP-entry bytes, including four empty child logs",
+  "physical_windows_11_acceptance": false,
+  "release_approved": false
+}
