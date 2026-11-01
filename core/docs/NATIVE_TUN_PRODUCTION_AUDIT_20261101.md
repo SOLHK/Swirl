@@ -361,6 +361,23 @@ did pass; those cleanup results do not turn the failed data test into success.
 DoT connection/phase and before/after control diagnostics preserve every original
 deadline and assertion.
 
+A subsequent controlled Windows 11 loopback regression reproduced a specific
+fixture defect: after both validated A/AAAA replies had been fully written and
+flushed, a zero-linger client reset made TLS shutdown return Windows 10054. The
+listener exited and the next independently certificate-verified TLS DNS client
+failed. The fix treats only `ConnectionReset` plus raw 10054 at that completed
+shutdown as the end of that session. It keeps listening without changing any
+handshake, question, length, write, flush or timeout error handling. Four real
+TLS tests passed: the next connection succeeds after the completed reset, while
+a reset before either question, a reset after only the A reply and an invalid
+question still fail the fixture. The Windows workflow explicitly runs this
+example's tests; the existing package-only test command does not run them.
+Original [red](native-tun-evidence/windows-dot-close-red.log) and
+[green](native-tun-evidence/windows-dot-close-green.log) logs are retained.
+These tests neither load Wintun nor change system configuration. They establish
+the fixture defect, not the absent phase of the historical `0494abe` failure;
+that original result remains failed and a fresh driver run is still required.
+
 That driver failure prevented the new WFP field diagnostics from executing.
 The independent WFP command now runs when the real format/lint/unit/library/helper
 build chain succeeded, even if later driver traffic fails. The failed driver

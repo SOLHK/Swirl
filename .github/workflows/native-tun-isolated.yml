@@ -81,6 +81,9 @@ jobs:
         run: cargo clippy --locked -p swirl-tun -p swirl-platform -p swirl-dns -p swirl-transport -p swirl-protocol -p swirl-core -p swirl-api --all-targets -- -D warnings
       - name: Packet, resolver, network transaction and original proxy regressions
         run: cargo test --locked -p swirl-tun -p swirl-platform -p swirl-dns -p swirl-transport -p swirl-protocol -p swirl-core -p swirl-api
+      - name: Real loopback TLS fixture preserves its listener after completed client reset
+        if: runner.os == 'Windows'
+        run: cargo test --locked -p swirl-api --example windows-tun-smoke
       - name: Build actual Rust library and helper
         id: backend_build
         run: cargo build --locked -p swirl-api --lib --bin swirl-tun-helper --release

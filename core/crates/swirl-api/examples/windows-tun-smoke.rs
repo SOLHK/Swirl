@@ -1,6 +1,7 @@
 //! Explicit, scoped Wintun smoke for a disposable Windows runner.
 //! `cargo test --all-targets` compiles this example without running `main`.
-//! No networking or driver operation is reachable without that explicit flag.
+//! Driver and network configuration require the explicit flag. Private fixture
+//! tests exercise loopback TLS only, without changing system network state.
 
 use std::{io, path::PathBuf, process::ExitCode};
 
@@ -746,6 +747,23 @@ mod windows {
     /// Thus both PROXY/REJECT and a reachable DIRECT control can target exactly
     /// the same hostname, port and listening socket.
     fn dns_fixture(runtime: &Handle) -> io::Result<(Dns, Peer, Arc<AtomicU64>)> {
+        dns_fixture_inner(
+            runtime,
+            #[cfg(test)]
+            None,
+        )
+    }
+
+    #[cfg(test)]
+    struct DnsFixtureShutdownHook {
+        reached: tokio::sync::oneshot::Sender<()>,
+        resume: tokio::sync::oneshot::Receiver<()>,
+    }
+
+    fn dns_fixture_inner(
+        runtime: &Handle,
+        #[cfg(test)] mut before_shutdown: Option<DnsFixtureShutdownHook>,
+    ) -> io::Result<(Dns, Peer, Arc<AtomicU64>)> {
         let fixture: serde_json::Value = serde_json::from_str(include_str!(
             "../../swirl-transport/tests/fixtures/reality_auth.json"
         ))
@@ -870,9 +888,36 @@ mod windows {
                     }
                     phase = "shutdown";
                     question = None;
+                    #[cfg(test)]
+                    if let Some(hook) = before_shutdown.take() {
+                        hook.reached.send(()).map_err(|_| {
+                            io::Error::other("DoT shutdown test coordinator dropped")
+                        })?;
+                        hook.resume.await.map_err(io::Error::other)?;
+                        // Observe the peer close in the OS before attempting
+                        // shutdown; readiness does not consume the socket error.
+                        stream.get_ref().0.readable().await?;
+                    }
                     note(phase, "begin", question);
-                    stream.shutdown().await?;
-                    note(phase, "complete", question);
+                    match stream.shutdown().await {
+                        Ok(()) => note(phase, "complete", question),
+                        Err(error)
+                            if error.kind() == io::ErrorKind::ConnectionReset
+                                && error.raw_os_error() == Some(10054) =>
+                        {
+                            // Both validated A/AAAA replies were fully flushed.
+                            // A Windows client may abort its completed TLS
+                            // socket before receiving our close_notify. This
+                            // ends that session, not the resolver listener.
+                            eprintln!(
+                                "Wintun smoke: DoT fixture stage {}",
+                                json!({"listener_port":address.port(),"connection":connection,
+                                    "phase":phase,"event":"completed_peer_close", "os_error":10054,
+                                    "elapsed_ms":started.elapsed().as_millis()})
+                            );
+                        }
+                        Err(error) => return Err(error),
+                    }
                     Ok::<_, io::Error>(())
                 })
                 .await
@@ -911,6 +956,179 @@ mod windows {
             peer,
             queries,
         ))
+    }
+
+    #[cfg(test)]
+    mod dns_fixture_tests {
+        use super::*;
+        use tokio_rustls::{
+            TlsConnector,
+            client::TlsStream,
+            rustls::{ClientConfig, RootCertStore, pki_types::ServerName},
+        };
+
+        fn runtime() -> io::Result<tokio::runtime::Runtime> {
+            tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(2)
+                .enable_all()
+                .build()
+        }
+
+        async fn client(dns: &Dns) -> io::Result<TlsStream<tokio::net::TcpStream>> {
+            let resolver = &dns.tls_servers[0];
+            let certificate = base64::engine::general_purpose::STANDARD
+                .decode(resolver.tls.ca_der_base64.as_ref().unwrap())
+                .map_err(io::Error::other)?;
+            let mut roots = RootCertStore::empty();
+            roots
+                .add(CertificateDer::from(certificate))
+                .map_err(io::Error::other)?;
+            let connector = TlsConnector::from(Arc::new(
+                ClientConfig::builder()
+                    .with_root_certificates(roots)
+                    .with_no_client_auth(),
+            ));
+            let socket = tokio::net::TcpSocket::new_v4()?;
+            socket.set_zero_linger()?;
+            assert_eq!(socket.linger()?, Some(Duration::ZERO));
+            let stream = socket.connect(resolver.address).await?;
+            connector
+                .connect(
+                    ServerName::try_from(resolver.tls.server_name.clone())
+                        .map_err(io::Error::other)?,
+                    stream,
+                )
+                .await
+        }
+
+        async fn answers(
+            stream: &mut TlsStream<tokio::net::TcpStream>,
+            families: &[bool],
+        ) -> io::Result<()> {
+            for &ipv6 in families {
+                let request = query(HOST_V4, ipv6);
+                stream.write_u16(request.len() as u16).await?;
+                stream.write_all(&request).await?;
+                stream.flush().await?;
+                let length = usize::from(stream.read_u16().await?);
+                require((12..=4096).contains(&length), "DoT test response length")?;
+                let mut reply = vec![0; length];
+                stream.read_exact(&mut reply).await?;
+                let mut expected = request;
+                expected[2..4].copy_from_slice(&[0x81, 0x80]);
+                if !ipv6 {
+                    expected[6..8].copy_from_slice(&[0, 1]);
+                    expected.extend_from_slice(&[0xc0, 0x0c, 0, 1, 0, 1]);
+                    expected.extend_from_slice(&ANSWER_TTL.to_be_bytes());
+                    expected.extend_from_slice(&[0, 4]);
+                    expected.extend_from_slice(&Ipv4Addr::LOCALHOST.octets());
+                }
+                assert_eq!(reply, expected, "fully read and validate each DNS reply");
+            }
+            Ok(())
+        }
+
+        #[test]
+        fn completed_response_reset_preserves_next_dns_connection() -> io::Result<()> {
+            let runtime = runtime()?;
+            let (reached, shutdown_ready) = tokio::sync::oneshot::channel();
+            let (resume, shutdown_resume) = tokio::sync::oneshot::channel();
+            let (dns, peer, observed) = dns_fixture_inner(
+                runtime.handle(),
+                Some(DnsFixtureShutdownHook {
+                    reached,
+                    resume: shutdown_resume,
+                }),
+            )?;
+            runtime.block_on(async {
+                timeout(IO_WAIT, async {
+                    let mut first = client(&dns).await?;
+                    answers(&mut first, &[false, true]).await?;
+                    shutdown_ready.await.map_err(io::Error::other)?;
+                    assert_eq!(observed.load(Ordering::Acquire), 2);
+                    // Dropping the real zero-linger TCP socket sends RST. The
+                    // server is paused only after both TLS frames were flushed.
+                    drop(first);
+                    resume.send(()).map_err(|_| {
+                        io::Error::other("DoT shutdown test listener already exited")
+                    })?;
+                    eprintln!("DoT close regression: connecting second verified TLS DNS client");
+                    let mut second = client(&dns).await?;
+                    answers(&mut second, &[false, true]).await?;
+                    assert_eq!(observed.load(Ordering::Acquire), 4);
+                    Ok::<_, io::Error>(())
+                })
+                .await
+                .map_err(io::Error::other)?
+            })?;
+            assert!(
+                !peer.0.is_finished(),
+                "completed client must not kill listener"
+            );
+            drop(peer);
+            Ok(())
+        }
+
+        #[test]
+        fn reset_before_first_question_still_fails_fixture() -> io::Result<()> {
+            let runtime = runtime()?;
+            let (dns, peer, observed) = dns_fixture(runtime.handle())?;
+            runtime.block_on(async {
+                let stream = timeout(IO_WAIT, client(&dns))
+                    .await
+                    .map_err(io::Error::other)??;
+                drop(stream);
+                Ok::<_, io::Error>(())
+            })?;
+            let error = peer.finish(runtime.handle()).unwrap_err();
+            assert_eq!(error.kind(), io::ErrorKind::ConnectionReset);
+            assert_eq!(error.raw_os_error(), Some(10054));
+            assert_eq!(observed.load(Ordering::Acquire), 0);
+            Ok(())
+        }
+
+        #[test]
+        fn reset_after_only_first_reply_still_fails_fixture() -> io::Result<()> {
+            let runtime = runtime()?;
+            let (dns, peer, observed) = dns_fixture(runtime.handle())?;
+            runtime.block_on(async {
+                timeout(IO_WAIT, async {
+                    let mut stream = client(&dns).await?;
+                    answers(&mut stream, &[false]).await?;
+                    drop(stream);
+                    Ok::<_, io::Error>(())
+                })
+                .await
+                .map_err(io::Error::other)?
+            })?;
+            let error = peer.finish(runtime.handle()).unwrap_err();
+            assert_eq!(error.kind(), io::ErrorKind::ConnectionReset);
+            assert_eq!(error.raw_os_error(), Some(10054));
+            assert_eq!(observed.load(Ordering::Acquire), 1);
+            Ok(())
+        }
+
+        #[test]
+        fn invalid_question_still_fails_fixture() -> io::Result<()> {
+            let runtime = runtime()?;
+            let (dns, peer, observed) = dns_fixture(runtime.handle())?;
+            let _client = runtime.block_on(async {
+                timeout(IO_WAIT, async {
+                    let mut stream = client(&dns).await?;
+                    let request = query("unexpected.wintun.smoke.invalid", false);
+                    stream.write_u16(request.len() as u16).await?;
+                    stream.write_all(&request).await?;
+                    stream.flush().await?;
+                    Ok::<_, io::Error>(stream)
+                })
+                .await
+                .map_err(io::Error::other)?
+            })?;
+            let error = peer.finish(runtime.handle()).unwrap_err();
+            assert_eq!(error.to_string(), "unexpected DoT fixture question");
+            assert_eq!(observed.load(Ordering::Acquire), 0);
+            Ok(())
+        }
     }
 
     fn no_tcp_accept(listener: &std::net::TcpListener) -> io::Result<()> {
