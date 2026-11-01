@@ -107,6 +107,22 @@ source-bound baseline/resource/scoped-driver collection with original outputs,
 pre-run thresholds and artifact hashes. Its validator never grants release or
 physical Win11 acceptance from flags, hashes or operator declarations.
 
+The [restricted process foundation](NATIVE_TUN_RESTRICTED_WORKER.md) now launches
+only an explicitly approved executable with a verified low-integrity restricted
+token, three inherited pipe ends, a minimum environment, private desktop and
+kill-on-close child job. The existing product worker is **not yet connected** to
+it. Desktop creation is isolated on a dedicated creator thread; binding is
+restored and the thread joined before a desktop handle is returned or closed.
+Explicit kill/wait report close failures instead of silently accepting cleanup.
+Ten pure/read-only tests passed. The frozen platform all-target suite passed
+72 library tests plus one example cleanup regression with zero failures or
+ignored tests; targeted all-target Clippy, formatting, portable boundary 11/11,
+workflow lint and both restricted/WFP Release example links passed. A no-opt-in
+local invocation refused before any process/desktop creation. No restricted
+token, private desktop or privileged process smoke was executed on this host.
+The independent disposable CI step must prove real child token/handle/file/job
+isolation, unchanged parent desktop and removal of the private desktops.
+
 ## Local validation and change identities
 
 | Change | Commit |

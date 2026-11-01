@@ -131,6 +131,28 @@ jobs:
           if ($summary.system_kill_switch_acceptance -ne $false -or $summary.boot_acceptance -ne $false -or $summary.existing_flow_revocation_guarantee -ne $false) {
             throw 'Scoped WFP evidence must not be relabelled as system kill-switch or boot acceptance.'
           }
+      - name: Real restricted-token child isolation in this disposable VM
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.backend_build.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          # Only fresh fixture files, a noninteractive private desktop and a
+          # restricted child job. No host network, UAC or product installation.
+          $directory = Join-Path $env:RUNNER_TEMP 'swirl-restricted-worker-smoke'
+          $log = Join-Path $env:RUNNER_TEMP 'swirl-restricted-worker-smoke.log'
+          cargo run --locked --release -p swirl-platform --example windows-restricted-worker-smoke -- --disposable-environment --directory $directory 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'Restricted worker smoke failed; retain original child diagnostics.' }
+          $final = @(Get-Content -LiteralPath $log | Where-Object { $_.TrimStart().StartsWith('{') })
+          if ($final.Count -ne 1) { throw 'Restricted worker final evidence is missing or ambiguous.' }
+          $summary = $final[0] | ConvertFrom-Json
+          if ($summary.ok -ne $true -or $summary.source_sha -ne $env:GITHUB_SHA -or $summary.job_descendants_reaped -ne $true -or $summary.parent_desktop_unchanged -ne $true -or $summary.private_desktops_removed -ne $true) {
+            throw 'Restricted worker source or child lifecycle evidence differs.'
+          }
+          foreach ($field in @('private_desktop_verified','admin_token_not_inherited','broker_write_denied','explicit_environment_verified')) {
+            if ($summary.child.$field -ne $true) { throw "Restricted worker assertion is missing: $field" }
+          }
+          if ($summary.network_modified -ne $false -or $summary.product_broker_integrated -ne $false -or $summary.network_compatibility_verified -ne $false -or $summary.physical_windows_11_acceptance -ne $false) {
+            throw 'Restricted process evidence must not be relabelled as product or network acceptance.'
+          }
       - name: Preserve native backend build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -144,6 +166,9 @@ jobs:
             ${{ runner.temp }}/swirl-wintun-smoke.log
             ${{ runner.temp }}/swirl-wfp-scoped-smoke.log
             ${{ runner.temp }}/swirl-wfp-scoped-receipt.json
+            ${{ runner.temp }}/swirl-restricted-worker-smoke.log
+            ${{ runner.temp }}/swirl-restricted-worker-smoke/child-stdout.log
+            ${{ runner.temp }}/swirl-restricted-worker-smoke/child-stderr.log
           if-no-files-found: error
           retention-days: 7
 
@@ -156,6 +181,9 @@ jobs:
             ${{ runner.temp }}/swirl-wintun-smoke.log
             ${{ runner.temp }}/swirl-wfp-scoped-smoke.log
             ${{ runner.temp }}/swirl-wfp-scoped-receipt.json
+            ${{ runner.temp }}/swirl-restricted-worker-smoke.log
+            ${{ runner.temp }}/swirl-restricted-worker-smoke/child-stdout.log
+            ${{ runner.temp }}/swirl-restricted-worker-smoke/child-stderr.log
           if-no-files-found: warn
 
   # The explicit Windows-only smoke owns one temporary adapter and only exact
