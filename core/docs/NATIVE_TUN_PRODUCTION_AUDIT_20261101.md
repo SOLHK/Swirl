@@ -180,8 +180,24 @@ the portable guard passed 10 tests and the updater reported 58 passed / 2 existi
 Windows platform skips out of 60. A subsequent local all-workspace Clippy run
 reported `missing_const_for_thread_local` in the unchanged REALITY backend,
 whose initializer already contains `const { ... }`; this new lint result is
-under investigation and is not recorded as a successful latest check. No lint
-allowance or protocol-source workaround was added.
+not recorded as a successful latest check. An independent tiny crate reproduced
+it with the same compiler/std binary hashes: GNU with matching `rust-src` fails,
+an isolated copy without optional sources passes, adding those same sources back
+fails again, and checking the Linux target passes. The Windows GNU std TLS macro
+emits a non-const wrapper around an already-const body;
+[this version's Clippy check](https://github.com/rust-lang/rust/blob/58cf8f9c35b355199727627d07ae34a4e2846d67/src/tools/clippy/clippy_lints/src/missing_const_for_thread_local.rs#L95)
+still flags that wrapper when source snippets are available. The installed
+toolchain and protocol source were not altered and no lint allowance was added.
+Fresh Windows MSVC Clippy passed in both Native and Rust Core jobs at `1e624b2`.
+
+The first `1e624b2` macOS Rust Core run then failed the new missing-parent journal
+test with `NotADirectory`, where `NotFound` was required. Its fixture names used
+only PID and timestamp; parallel tests can observe the same macOS clock tick and
+create the same pathname as a file. A per-process monotonic atomic suffix now
+separates fixture ownership. The exact `NotFound`, no implicit parent creation,
+nontruncate repair and Unix permission assertions remain unchanged. This is a
+test-fixture collision correction, not a file-open fallback or broadened accepted
+error set. Its new-source macOS result remains a required re-test.
 
 ## Kill-switch architecture constraints still to implement
 

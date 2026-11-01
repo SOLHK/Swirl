@@ -2,20 +2,26 @@ use super::open_private_journal;
 use std::{
     io::{Read, Seek, SeekFrom, Write},
     path::PathBuf,
+    sync::atomic::{AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
+
+static NEXT_PATH: AtomicU64 = AtomicU64::new(0);
 
 struct JournalPath(PathBuf);
 
 impl JournalPath {
     fn new() -> Self {
         Self(std::env::temp_dir().join(format!(
-            "swirl-private-journal-{}-{}",
+            "swirl-private-journal-{}-{}-{}",
             std::process::id(),
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
-                .as_nanos()
+                .as_nanos(),
+            // Clock precision is platform-dependent; parallel tests can
+            // observe the same tick without owning the same fixture path.
+            NEXT_PATH.fetch_add(1, Ordering::Relaxed)
         )))
     }
 }
