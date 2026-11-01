@@ -211,6 +211,51 @@ fn scoped_filter_verifier_rejects_broadened_application_protocol_flags_or_action
 }
 
 #[test]
+fn scoped_filters_request_indexing_and_reject_any_flag_drift() {
+    for endpoint in ["127.0.0.1:34567", "[::1]:34567"] {
+        for protocol in [Protocol::Tcp, Protocol::Udp] {
+            for action in [Action::Block, Action::SoftPermit] {
+                let mut policy = policy();
+                policy.rules[0] = ScopedRule {
+                    endpoint: endpoint.parse().unwrap(),
+                    protocol,
+                    action,
+                };
+                let mut metadata = policy.metadata().unwrap();
+                let mut application_bytes = b"application-id".to_vec();
+                let app = blob(&mut application_bytes);
+                with_filter(
+                    &policy,
+                    0,
+                    &policy.rules[0],
+                    &app,
+                    &mut metadata,
+                    |expected| {
+                        let required = FWPM_FILTER_FLAG_PERSISTENT | FWPM_FILTER_FLAG_INDEXED;
+                        assert_eq!(expected.flags, required);
+                        assert_eq!(required, 0x41);
+                        assert!(filter_matches(expected, expected));
+                        for flags in [
+                            required & !FWPM_FILTER_FLAG_INDEXED,
+                            required & !FWPM_FILTER_FLAG_PERSISTENT,
+                            required | FWPM_FILTER_FLAG_DISABLED,
+                            required | FWPM_FILTER_FLAG_CLEAR_ACTION_RIGHT,
+                            required | 0x8000_0000,
+                        ] {
+                            let mut changed = *expected;
+                            changed.flags = flags;
+                            assert!(!filter_matches(&changed, expected), "flags={flags:#x}");
+                        }
+                        Ok(())
+                    },
+                )
+                .unwrap();
+            }
+        }
+    }
+}
+
+#[test]
 fn scoped_permit_stays_overridable_in_its_own_sublayer() {
     let mut policy = policy();
     policy.rules[0].action = Action::SoftPermit;
@@ -224,7 +269,10 @@ fn scoped_permit_stays_overridable_in_its_own_sublayer() {
         &app,
         &mut metadata,
         |filter| {
-            assert_eq!(filter.flags, FWPM_FILTER_FLAG_PERSISTENT);
+            assert_eq!(
+                filter.flags,
+                FWPM_FILTER_FLAG_PERSISTENT | FWPM_FILTER_FLAG_INDEXED
+            );
             assert_eq!(filter.flags & FWPM_FILTER_FLAG_CLEAR_ACTION_RIGHT, 0);
             assert_eq!(filter.action.r#type, FWP_ACTION_PERMIT);
             assert!(same_guid(&filter.subLayerKey, &SUBLAYER));

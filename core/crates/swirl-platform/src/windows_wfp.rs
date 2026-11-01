@@ -915,7 +915,10 @@ fn with_filter<T>(
         },
         // Do not set CLEAR_ACTION_RIGHT: permits remain overridable by other
         // sublayers/providers. This scoped API cannot issue a hard permit.
-        flags: FWPM_FILTER_FLAG_PERSISTENT,
+        // Request indexing explicitly on the supported Windows 11/Server
+        // targets. BFE can return INDEXED on readback; the verifier requires
+        // this exact requested flag set rather than masking returned flags.
+        flags: FWPM_FILTER_FLAG_PERSISTENT | FWPM_FILTER_FLAG_INDEXED,
         providerKey: &mut provider,
         providerData: blob(metadata),
         layerKey: if rule.endpoint.is_ipv6() {

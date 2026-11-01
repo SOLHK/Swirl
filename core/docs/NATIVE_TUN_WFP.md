@@ -112,6 +112,18 @@ closed. Legacy schema-1 receipts are explicitly refused rather than adopted
 without a recorded weight. Thirteen model/SDDL/diagnostic tests and the scoped
 example's cleanup regression passed locally; fresh BFE execution is pending.
 
+At `88e9fdf` / PR checkout `6d81b38`, the real BFE test passed sublayer
+verification and reached filter 0. Its actual flags were `0x41`, expected `0x1`;
+all four displayed conditions, action, weight, keys and metadata matched.
+The [original log](native-tun-evidence/windows-wfp-88e9fdf.log) is retained.
+The [FWPM_FILTER0 SDK contract](https://learn.microsoft.com/en-us/windows/win32/api/fwpmtypes/ns-fwpmtypes-fwpm_filter0)
+defines `INDEXED` as classification lookup indexing, supported since Windows 8.
+Filters now explicitly request `PERSISTENT | INDEXED`; the verifier still
+requires exact flags. Fourteen local WFP tests passed, including both families,
+protocols and actions rejecting missing flags or extra DISABLED,
+CLEAR_ACTION_RIGHT and unknown bits. This is not evidence of real enforcement
+recovery until the next exact-source BFE test completes.
+
 Before this can become a product kill switch, system-scope policy, tunnel and
 physical interface changes, existing inbound-origin/raw/forwarded flows, LAN and
 essential-system exceptions, helper/worker failures, boot/reboot behavior,
