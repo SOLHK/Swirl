@@ -780,21 +780,48 @@ mod windows {
         let queries = Arc::new(AtomicU64::new(0));
         let observed = queries.clone();
         let peer = Peer::spawn(runtime, "DoT A/AAAA resolver", async move {
+            let mut connection = 0u64;
             loop {
                 let (stream, source) = listener.accept().await?;
+                connection += 1;
+                let started = Instant::now();
+                let note = |phase: &str, event: &str, question: Option<u16>| {
+                    eprintln!(
+                        "Wintun smoke: DoT fixture stage {}",
+                        json!({"listener_port":address.port(),"connection":connection,
+                            "phase":phase,"event":event,"question_type":question,
+                            "elapsed_ms":started.elapsed().as_millis()})
+                    );
+                };
                 require(
                     source.ip().is_loopback(),
                     "DoT fixture received non-loopback client",
                 )?;
-                timeout(IO_WAIT, async {
+                let mut phase = "handshake";
+                let mut question = None;
+                let result = timeout(IO_WAIT, async {
+                    note(phase, "begin", question);
                     let mut stream = acceptor.accept(stream).await?;
+                    note(phase, "complete", question);
                     // The production DoT resolver sends A then AAAA on this
                     // same verified TLS connection, not separate sockets.
                     for expected_v6 in [false, true] {
+                        question = Some(if expected_v6 { 28 } else { 1 });
+                        phase = "read_length";
+                        note(phase, "begin", question);
                         let length = usize::from(stream.read_u16().await?);
+                        note(phase, "complete", question);
+                        phase = "validate_length";
+                        note(phase, "begin", question);
                         require((12..=4096).contains(&length), "DoT fixture query length")?;
+                        note(phase, "complete", question);
                         let mut request = vec![0; length];
+                        phase = "read_body";
+                        note(phase, "begin", question);
                         stream.read_exact(&mut request).await?;
+                        note(phase, "complete", question);
+                        phase = "validate_question";
+                        note(phase, "begin", question);
                         let mut selected = None;
                         for (host, ipv6) in [(HOST_V4, false), (HOST_V6, true)] {
                             for q6 in [false, true] {
@@ -807,6 +834,7 @@ mod windows {
                         let (host_v6, query_v6) = selected
                             .ok_or_else(|| io::Error::other("unexpected DoT fixture question"))?;
                         require(query_v6 == expected_v6, "DoT family order changed")?;
+                        note(phase, "complete", question);
                         let mut reply = request;
                         reply[2..4].copy_from_slice(&[0x81, 0x80]);
                         if host_v6 == query_v6 {
@@ -827,14 +855,40 @@ mod windows {
                             }
                         }
                         observed.fetch_add(1, Ordering::AcqRel);
+                        phase = "write_length";
+                        note(phase, "begin", question);
                         stream.write_u16(reply.len() as u16).await?;
+                        note(phase, "complete", question);
+                        phase = "write_body";
+                        note(phase, "begin", question);
                         stream.write_all(&reply).await?;
+                        note(phase, "complete", question);
+                        phase = "flush_reply";
+                        note(phase, "begin", question);
                         stream.flush().await?;
+                        note(phase, "complete", question);
                     }
-                    stream.shutdown().await
+                    phase = "shutdown";
+                    question = None;
+                    note(phase, "begin", question);
+                    stream.shutdown().await?;
+                    note(phase, "complete", question);
+                    Ok::<_, io::Error>(())
                 })
                 .await
-                .map_err(io::Error::other)??;
+                .map_err(io::Error::other)
+                .and_then(|result| result);
+                if let Err(error) = &result {
+                    eprintln!(
+                        "Wintun smoke: DoT fixture stage {}",
+                        json!({"listener_port":address.port(),"connection":connection,
+                            "phase":phase,"event":"error","question_type":question,
+                            "elapsed_ms":started.elapsed().as_millis(),
+                            "os_error":error.raw_os_error(),"kind":format!("{:?}",error.kind()),
+                            "error":error.to_string()})
+                    );
+                }
+                result?;
             }
         });
         Ok((
@@ -1422,6 +1476,7 @@ mod windows {
         mut config: RuntimeConfig,
         fake: IpAddr,
         trap: &std::net::UdpSocket,
+        run: &DeviceRun,
     ) -> io::Result<std::net::UdpSocket> {
         config.policy.mode = Mode::Direct;
         apply_policy(core, directory, config)?;
@@ -1432,7 +1487,15 @@ mod windows {
             timeout(IO_WAIT, async {
                 let server = tokio::net::UdpSocket::from_std(server)?;
                 let mut buffer = [0; UDP_BYTES + 1];
+                eprintln!(
+                    "Wintun smoke: UDP DIRECT peer stage {}",
+                    json!({"port":port,"stage":"receive_trap_begin"})
+                );
                 let (length, source) = server.recv_from(&mut buffer).await?;
+                eprintln!(
+                    "Wintun smoke: UDP DIRECT peer stage {}",
+                    json!({"port":port,"stage":"receive_trap_complete","bytes":length})
+                );
                 require(
                     source.ip().is_loopback(),
                     "UDP DIRECT control escaped loopback",
@@ -1444,24 +1507,64 @@ mod windows {
                 require(
                     server.send_to(b"live", source).await? == 4,
                     "short UDP DIRECT control reply",
-                )
+                )?;
+                eprintln!(
+                    "Wintun smoke: UDP DIRECT peer stage {}",
+                    json!({"port":port,"stage":"send_reply_complete","bytes":4})
+                );
+                Ok(())
             })
             .await
             .map_err(io::Error::other)?
         });
         let client = local_udp(fake.is_ipv6())?;
         let destination = SocketAddr::new(fake, port);
+        let context = json!({"kind":"UDP DIRECT control","host":if fake.is_ipv6(){HOST_V6}else{HOST_V4},
+            "family":if fake.is_ipv6(){6}else{4},"port":port,"source":client.local_addr()?,
+            "destination":destination,"baseline":baseline});
+        eprintln!(
+            "Wintun smoke: UDP DIRECT client stage {}",
+            json!({"stage":"send_trap_begin","context":context})
+        );
         require(
-            client.send_to(b"trap", destination)? == 4,
+            client.send_to(b"trap", destination).map_err(|error| {
+                udp_stage_error(core, run, &context, "DIRECT control send trap", error)
+            })? == 4,
             "short UDP DIRECT control send",
         )?;
+        eprintln!(
+            "Wintun smoke: UDP DIRECT client stage {}",
+            json!({"stage":"send_trap_complete","context":context})
+        );
         let mut response = [0; UDP_BYTES + 1];
-        let (length, sender) = client.recv_from(&mut response)?;
+        eprintln!(
+            "Wintun smoke: UDP DIRECT client stage {}",
+            json!({"stage":"receive_reply_begin","context":context})
+        );
+        let (length, sender) = client.recv_from(&mut response).map_err(|error| {
+            udp_stage_error(core, run, &context, "DIRECT control receive reply", error)
+        })?;
+        eprintln!(
+            "Wintun smoke: UDP DIRECT client stage {}",
+            json!({"stage":"receive_reply_complete","bytes":length,"context":context})
+        );
         require(
             sender == destination && &response[..length] == b"live",
             "UDP DIRECT control did not return through Wintun",
         )?;
-        peer.finish(runtime)?;
+        peer.finish(runtime).map_err(|error| {
+            udp_stage_error(
+                core,
+                run,
+                &context,
+                "DIRECT control finish trap peer",
+                error,
+            )
+        })?;
+        eprintln!(
+            "Wintun smoke: UDP DIRECT client stage {}",
+            json!({"stage":"verify_record_begin","context":context})
+        );
         udp_record(
             core,
             baseline,
@@ -1474,7 +1577,20 @@ mod windows {
                 error: "",
                 bytes: 4,
             },
-        )?;
+        )
+        .map_err(|error| {
+            udp_stage_error(
+                core,
+                run,
+                &context,
+                "DIRECT control verify Core record",
+                error,
+            )
+        })?;
+        eprintln!(
+            "Wintun smoke: UDP DIRECT client stage {}",
+            json!({"stage":"verify_record_complete","context":context})
+        );
         // Keep this Windows source port occupied: UDP has no FIN, and reusing
         // its five-tuple would intentionally retain the previous Core policy.
         Ok(client)
@@ -1692,6 +1808,10 @@ mod windows {
                     tls: None,
                     udp: true,
                 };
+                eprintln!(
+                    "Wintun smoke: UDP client stage {}",
+                    json!({"family":family,"case":case,"host":host,"port":port,"stage":"direct_before_begin"})
+                );
                 retained_clients.push(udp_direct_control(
                     core,
                     directory,
@@ -1699,6 +1819,7 @@ mod windows {
                     config.clone(),
                     fake[index],
                     &trap,
+                    run,
                 )?);
                 eprintln!(
                     "Wintun smoke: UDP client stage {}",
@@ -1889,6 +2010,10 @@ mod windows {
                 no_udp_receive(&client)?;
                 no_tcp_accept(&proxy)?;
                 retained_clients.push(client);
+                eprintln!(
+                    "Wintun smoke: UDP client stage {}",
+                    json!({"family":family,"case":case,"host":host,"port":port,"stage":"direct_after_begin"})
+                );
                 retained_clients.push(udp_direct_control(
                     core,
                     directory,
@@ -1896,6 +2021,7 @@ mod windows {
                     config,
                     fake[index],
                     &trap,
+                    run,
                 )?);
                 no_udp_receive(&trap)?;
                 let result = json!({"family":family,"case":case,"source":source,
