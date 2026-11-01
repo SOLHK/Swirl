@@ -20,5 +20,6 @@ ipnet.workspace = true
 ring.workspace = true
 [dev-dependencies]
 base64.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
 tokio-rustls.workspace = true
 smoltcp = { version = "=0.14.0", default-features = false, features = ["std", "medium-ip", "proto-ipv4", "proto-ipv6", "socket-tcp", "socket-udp"] }

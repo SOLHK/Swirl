@@ -867,3 +867,197 @@ fn packet_bridge_reject_records_core_decision_and_never_dials_proxy_or_replies_w
     });
     core.stop();
 }
+
+fn failed_udp_tuple_requires_full_idle_before_readmission(v6: bool) {
+    use std::sync::{Arc, atomic::Ordering};
+    use tokio::sync::{mpsc, watch};
+
+    async fn until(mut condition: impl FnMut() -> bool) {
+        // The Core owns a real-time runtime while this bridge's idle clock is
+        // paused. A real deadline bounds cross-runtime observations without
+        // allowing auto-advance to expire the association under observation.
+        let deadline = std::time::Instant::now() + WAIT;
+        while !condition() {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "UDP bridge observation deadline"
+            );
+            tokio::task::yield_now().await;
+        }
+    }
+
+    struct Lookup(IpAddr);
+    impl swirl_dns::tun::TunLookup for Lookup {
+        fn lookup<'a>(
+            &'a self,
+            _: &'a str,
+        ) -> std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<Vec<IpAddr>, &'static str>> + Send + 'a>,
+        > {
+            Box::pin(async move { Ok(vec![self.0]) })
+        }
+    }
+
+    let trap = std::net::UdpSocket::bind(if v6 { "[::1]:0" } else { "127.0.0.1:0" }).unwrap();
+    trap.set_nonblocking(true).unwrap();
+    let peer = trap.local_addr().unwrap();
+    let origin = source(v6, 45000);
+    let name = "udp-tombstone.packet.fixture.invalid";
+    let mut direct = runtime_config();
+    direct.dns.hosts.push(HostMapping {
+        name: name.into(),
+        address: peer.ip(),
+    });
+    // The original rejected domain has no local mapping. The later DIRECT
+    // policy alone adds the loopback fixture, avoiding the built-in LAN rule.
+    let mut config = runtime_config();
+    config.policy.mode = Mode::Rule;
+    config.policy.custom_rules.push(PolicyRule {
+        id: "d1000000-0000-4000-8000-000000000002".into(),
+        name: "Reject original UDP association".into(),
+        enabled: true,
+        priority: 0,
+        matcher: Matcher::Domain { value: name.into() },
+        target: Target::Reject {},
+    });
+    let mut core = start(config);
+    let _lease = core.prepare_native_tun().unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .start_paused(true)
+        .build()
+        .unwrap();
+    let dns = TunDns::new(FakeIpStore::memory(8).unwrap());
+    let answer = runtime
+        .block_on(dns.answer(&dns_query(name, v6), &Lookup(peer.ip())))
+        .unwrap();
+    let fake = if v6 {
+        std::net::Ipv6Addr::from(<[u8; 16]>::try_from(&answer[answer.len() - 16..]).unwrap()).into()
+    } else {
+        std::net::Ipv4Addr::from(<[u8; 4]>::try_from(&answer[answer.len() - 4..]).unwrap()).into()
+    };
+    let destination = SocketAddr::new(fake, peer.port());
+    let stack = runtime.block_on(async { swirl_tun::spawn(TunConfig::default()).unwrap() });
+    let (packets, incoming) = mpsc::channel(4);
+    let (stop, stopped) = watch::channel(false);
+    let stats = Arc::new(super::BridgeStats::default());
+    let task = runtime.spawn(super::run(
+        stack.tcp,
+        incoming,
+        stack.udp_reply,
+        stack.control,
+        core.flow_dispatcher().unwrap(),
+        dns,
+        TunConfig::default(),
+        stopped,
+        stats.clone(),
+    ));
+    // Retain the packet driver's I/O while exercising the real bridge control
+    // loop with explicitly supplied UDP packets and a virtual idle clock.
+    let _packet_io = (stack.ingress, stack.egress, stack.udp);
+    runtime.block_on(async {
+        packets
+            .send(swirl_tun::UdpDatagram {
+                source: origin,
+                destination,
+                payload: b"rejected".to_vec(),
+            })
+            .await
+            .unwrap();
+        until(|| stats.udp_failures.load(Ordering::Relaxed) == 1).await;
+        assert_eq!(core.snapshot().unwrap()["accepted"], 1);
+    });
+
+    // Use the ordinary Core transaction to select DIRECT. Continuing packets
+    // from the failed tuple are still the old association, not new admission.
+    let request = "b1000000-0000-4000-8000-000000000002";
+    let prepared = core
+        .prepare(request.into(), STORE, 1, 2, 1, 1, direct, vec![])
+        .unwrap();
+    let token = prepared["prepared_token"].as_str().unwrap();
+    let digest = prepared["plan_digest"].as_str().unwrap();
+    core.activate(request, token, digest, 1, 2).unwrap();
+    core.finish(
+        request,
+        token,
+        swirl_core::v2::DurableReceipt {
+            store_id: STORE.into(),
+            request_id: request.into(),
+            saved_revision: "2".into(),
+            plan_digest: digest.into(),
+        },
+    )
+    .unwrap();
+
+    runtime.block_on(async {
+        for dropped in 1..=3 {
+            tokio::time::advance(Duration::from_secs(40)).await;
+            packets
+                .send(swirl_tun::UdpDatagram {
+                    source: origin,
+                    destination,
+                    payload: b"must-not-fall-back".to_vec(),
+                })
+                .await
+                .unwrap();
+            until(|| {
+                stats.udp_dropped.load(Ordering::Relaxed) >= dropped
+                    || core.snapshot().unwrap()["accepted"].as_u64().unwrap() > 1
+            })
+            .await;
+            assert_eq!(
+                core.snapshot().unwrap()["accepted"],
+                1,
+                "continuing failed UDP tuple was admitted to the new DIRECT policy"
+            );
+            assert_eq!(stats.udp_dropped.load(Ordering::Relaxed), dropped);
+            let mut buffer = [0; 64];
+            assert_eq!(
+                trap.recv_from(&mut buffer).unwrap_err().kind(),
+                std::io::ErrorKind::WouldBlock
+            );
+        }
+
+        // Only a full quiet interval permits this tuple to represent a new
+        // association. Exercise both sides of the idle boundary explicitly.
+        tokio::time::advance(super::UDP_IDLE - Duration::from_secs(1)).await;
+        packets
+            .send(swirl_tun::UdpDatagram {
+                source: origin,
+                destination,
+                payload: b"still-old".to_vec(),
+            })
+            .await
+            .unwrap();
+        until(|| stats.udp_dropped.load(Ordering::Relaxed) == 4).await;
+        tokio::time::advance(super::UDP_IDLE + Duration::from_secs(1)).await;
+        packets
+            .send(swirl_tun::UdpDatagram {
+                source: origin,
+                destination,
+                payload: b"new-after-idle".to_vec(),
+            })
+            .await
+            .unwrap();
+        until(|| core.snapshot().unwrap()["upload"] == 14).await;
+        let mut buffer = [0; 64];
+        let (size, _) = trap.recv_from(&mut buffer).unwrap();
+        assert_eq!(&buffer[..size], b"new-after-idle");
+        assert_eq!(core.snapshot().unwrap()["accepted"], 2);
+        assert_eq!(stats.udp_failures.load(Ordering::Relaxed), 1);
+        assert_eq!(stats.udp_dropped.load(Ordering::Relaxed), 4);
+        stop.send(true).unwrap();
+        task.await.unwrap().unwrap();
+    });
+    core.stop();
+}
+
+#[test]
+fn failed_ipv4_udp_tuple_cannot_fall_back_to_direct_while_packets_continue() {
+    failed_udp_tuple_requires_full_idle_before_readmission(false);
+}
+
+#[test]
+fn failed_ipv6_udp_tuple_cannot_fall_back_to_direct_while_packets_continue() {
+    failed_udp_tuple_requires_full_idle_before_readmission(true);
+}

@@ -319,7 +319,19 @@ async fn run(
                     continue;
                 }
                 let key = (packet.source, packet.destination);
-                if udp_flows.get(&key).is_some_and(|slot| slot.failed_until.is_some() || slot.sender.is_closed()) {
+                let now = Instant::now();
+                // Admit a genuinely idle tuple independently of whether the
+                // periodic cleanup tick or this packet wins the select.
+                if udp_flows.get(&key).is_some_and(|slot| slot.failed_until.is_some_and(|expires| expires <= now)) {
+                    udp_flows.remove(&key);
+                }
+                if let Some(slot) = udp_flows.get_mut(&key)
+                    && (slot.failed_until.is_some() || slot.sender.is_closed())
+                {
+                    // Continuing packets still belong to the failed session.
+                    // Require a full quiet interval, not time since failure,
+                    // before allowing this tuple to choose another policy.
+                    if let Some(expires) = &mut slot.failed_until { *expires = now + UDP_IDLE; }
                     stats.udp_dropped.fetch_add(1, Ordering::Relaxed);
                     continue;
                 }
