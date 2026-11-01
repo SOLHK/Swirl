@@ -35,11 +35,11 @@ mod windows {
             *,
         },
         Storage::FileSystem::{CREATE_NEW, CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ},
+        System::StationsAndDesktops::{CloseDesktop, DESKTOP_READOBJECTS, OpenDesktopW},
         System::Threading::{
             CREATE_NO_WINDOW, GetCurrentProcess, OpenProcess, OpenProcessToken,
             PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE, WaitForSingleObject,
         },
-        System::StationsAndDesktops::{CloseDesktop, DESKTOP_READOBJECTS, OpenDesktopW},
     };
 
     fn require(value: bool, message: &str) -> io::Result<()> {
@@ -305,7 +305,9 @@ mod windows {
         if unsafe { CloseDesktop(handle) } == 0 {
             return Err(io::Error::last_os_error());
         }
-        Err(io::Error::other("private worker desktop remained after cleanup"))
+        Err(io::Error::other(
+            "private worker desktop remained after cleanup",
+        ))
     }
 
     fn run() -> io::Result<()> {
