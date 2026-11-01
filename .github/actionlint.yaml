@@ -1,0 +1,7 @@
+# Additional repository runner label, executed on 2026-11-02 in job
+# https://github.com/SOLHK/Swirl/actions/runs/39392843518/job/125015443995
+# actionlint 1.7.12's built-in label list predates this image. This explicit
+# allowlist does not change runner selection or any font acceptance assertion.
+self-hosted-runner:
+  labels:
+    - xcode-27

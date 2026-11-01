@@ -87,7 +87,10 @@ jobs:
           git rev-parse HEAD > build/swirl-vf-evidence/commit.txt
           sw_vers > build/swirl-vf-evidence/macos.txt
           xcodebuild -version > build/swirl-vf-evidence/xcode.txt
-          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          python -m pip install fonttools==4.61.1 numpy==2.2.6 uharfbuzz==0.56.3
+      - name: Isolate native outline-format loading with authored controls
+        run: |
+          python tools/swirl_vf/platform/diagnose_coretext_formats.py --output build/swirl-vf-evidence/format-controls
       - name: Compile official HVF oracle and test original synthetic geometry
         run: |
           xcrun clang -std=c11 -O2 -Wall -Wextra -Werror -mmacosx-version-min=15.4 tools/swirl_vf/platform/hvf_oracle.c -lhvf -o build/hvf_oracle
