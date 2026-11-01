@@ -501,6 +501,170 @@ fn packet_bridge_ipv6_dns_fake_ip_tcp_half_close_reaches_real_core_socket() {
     tcp_roundtrip(true);
 }
 
+fn revoked_node_resets_tcp_after_upstream_half_close(v6: bool) {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let proxy = listener.local_addr().unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let mut config = runtime_config();
+    config.policy.mode = Mode::Global;
+    config.nodes[0].outbound = Outbound::HttpConnect {
+        host: proxy.ip().to_string(),
+        port: proxy.port(),
+        auth: None,
+        tls: None,
+    };
+    let mut replacement = config.clone();
+    let next_node = "c1000000-0000-4000-8000-000000000002";
+    replacement.nodes[0].id = next_node.into();
+    replacement.policy.default_policy.target = Target::Node {
+        id: next_node.into(),
+    };
+    let mut core = start(config);
+    let dispatcher = core.flow_dispatcher().unwrap();
+    let runtime = dispatcher.runtime_handle();
+    let (mut bridge, server) = runtime.block_on(async {
+        let server = tokio::spawn(async move {
+            let listener = tokio::net::TcpListener::from_std(listener).unwrap();
+            let (mut stream, _) = timeout(WAIT, listener.accept()).await.unwrap().unwrap();
+            timeout(WAIT, async {
+                let mut header = Vec::new();
+                while !header.ends_with(b"\r\n\r\n") {
+                    assert!(header.len() < 4096);
+                    header.push(stream.read_u8().await.unwrap());
+                }
+                assert!(header.starts_with(b"CONNECT "));
+                stream
+                    .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\nearly-fin")
+                    .await
+                    .unwrap();
+                stream.shutdown().await.unwrap();
+                let mut upload = Vec::new();
+                stream.read_to_end(&mut upload).await.unwrap();
+                assert!(upload.is_empty());
+            })
+            .await
+            .unwrap();
+        });
+        let mut bridge = spawn(
+            dispatcher,
+            TunDns::new(FakeIpStore::memory(8).unwrap()),
+            TunConfig::default(),
+        )
+        .unwrap();
+        let origin = source(v6, 46000);
+        let destination: SocketAddr = if v6 {
+            "[2001:db8::20]:443"
+        } else {
+            "203.0.113.20:443"
+        }
+        .parse()
+        .unwrap();
+        let mut server_next = handshake(&mut bridge, origin, destination).await;
+        let mut response = Vec::new();
+        loop {
+            let segment = next_tcp(&mut bridge).await;
+            assert_eq!((segment.source, segment.destination), (destination, origin));
+            assert_ne!(segment.control, TcpControl::Rst);
+            if !segment.payload.is_empty() {
+                assert_eq!(segment.sequence, server_next);
+                server_next = server_next.wrapping_add(segment.payload.len() as i32);
+                response.extend_from_slice(&segment.payload);
+            }
+            let finished = segment.control == TcpControl::Fin;
+            if finished {
+                server_next = server_next.wrapping_add(1);
+            }
+            bridge
+                .input
+                .send(tcp_packet(
+                    origin,
+                    destination,
+                    101,
+                    Some(server_next),
+                    TcpControl::None,
+                    &[],
+                ))
+                .await
+                .unwrap();
+            if finished {
+                break;
+            }
+        }
+        assert_eq!(response, b"early-fin");
+        assert_eq!(core.snapshot().unwrap()["active"], 1);
+        (bridge, server)
+    });
+
+    // Revoke the original node through the real Core transaction while its
+    // upstream write half is closed and the client upload has never sent FIN.
+    let request = "b1000000-0000-4000-8000-000000000003";
+    let prepared = core
+        .prepare(
+            request.into(),
+            STORE,
+            1,
+            2,
+            1,
+            1,
+            replacement,
+            vec![NODE.into()],
+        )
+        .unwrap();
+    let token = prepared["prepared_token"].as_str().unwrap();
+    let digest = prepared["plan_digest"].as_str().unwrap();
+    core.activate(request, token, digest, 1, 2).unwrap();
+    core.finish(
+        request,
+        token,
+        swirl_core::v2::DurableReceipt {
+            store_id: STORE.into(),
+            request_id: request.into(),
+            saved_revision: "2".into(),
+            plan_digest: digest.into(),
+        },
+    )
+    .unwrap();
+    runtime.block_on(async {
+        until(|| {
+            bridge
+                .bridge_stats
+                .tcp_failures
+                .load(std::sync::atomic::Ordering::Relaxed)
+                == 1
+        })
+        .await;
+        assert_eq!(core.snapshot().unwrap()["active"], 0);
+        let reset = next_tcp(&mut bridge).await;
+        assert_eq!(reset.control, TcpControl::Rst);
+        until(|| bridge.stats.snapshot().active_tcp_flows == 0).await;
+        let snapshot = core.snapshot().unwrap();
+        assert_eq!(snapshot["accepted"], 1);
+        assert_eq!(snapshot["failed"], 1);
+        assert!(
+            snapshot["connections"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|row| row["node"] == NODE
+                    && row["error"] == "SessionRevoked"
+                    && row["ended"] == true)
+        );
+        timeout(WAIT, server).await.unwrap().unwrap();
+        bridge.control.shutdown().await.unwrap();
+    });
+    core.stop();
+}
+
+#[test]
+fn packet_bridge_ipv4_revoked_node_resets_tcp_after_upstream_half_close() {
+    revoked_node_resets_tcp_after_upstream_half_close(false);
+}
+
+#[test]
+fn packet_bridge_ipv6_revoked_node_resets_tcp_after_upstream_half_close() {
+    revoked_node_resets_tcp_after_upstream_half_close(true);
+}
+
 fn dns_tcp_framing(v6: bool) {
     let name = "tcp-dns.packet.fixture.invalid";
     let mut config = runtime_config();

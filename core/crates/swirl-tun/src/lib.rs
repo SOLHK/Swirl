@@ -107,14 +107,52 @@ pub struct TcpFlow {
 }
 
 /// A bounded byte stream with cancellation distinct from orderly half-close.
-/// Dropping a dispatcher operation on failure resets its application TCP flow;
-/// completing AsyncWrite::shutdown emits FIN after buffered reply bytes.
+/// Completing AsyncWrite::shutdown emits FIN after buffered reply bytes.
+/// A dispatcher task must retain `abort_on_drop` until successful completion,
+/// so cancellation still resets a flow whose write half already sent FIN.
 #[derive(Debug)]
 pub struct TunTcpStream {
     inner: DuplexStream,
     abort: Arc<AtomicBool>,
     wake: Arc<Notify>,
     graceful: bool,
+}
+
+impl TunTcpStream {
+    /// Bind a dispatcher task's lifetime to explicit reset on error/cancellation.
+    /// Only successful completion of the entire operation may disarm the guard.
+    pub fn abort_on_drop(&self) -> TcpAbortGuard {
+        TcpAbortGuard {
+            abort: self.abort.clone(),
+            wake: self.wake.clone(),
+            armed: true,
+        }
+    }
+}
+
+/// Resets the application TCP flow when its dispatcher task fails or is dropped.
+#[derive(Debug)]
+#[must_use = "retain the guard until the dispatcher operation finishes"]
+pub struct TcpAbortGuard {
+    abort: Arc<AtomicBool>,
+    wake: Arc<Notify>,
+    armed: bool,
+}
+
+impl TcpAbortGuard {
+    /// Preserve orderly FIN/draining only after the whole operation succeeds.
+    pub fn complete(mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for TcpAbortGuard {
+    fn drop(&mut self) {
+        if self.armed {
+            self.abort.store(true, Ordering::Release);
+            self.wake.notify_one();
+        }
+    }
 }
 
 impl AsyncRead for TunTcpStream {

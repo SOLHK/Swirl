@@ -139,6 +139,15 @@ impl TunLookup for Lookup {
 }
 
 async fn tcp(flow: TcpFlow, dispatcher: FlowDispatcher, dns: TunDns) -> Result<()> {
+    let cancellation = flow.stream.abort_on_drop();
+    let result = tcp_operation(flow, dispatcher, dns).await;
+    if result.is_ok() {
+        cancellation.complete();
+    }
+    result
+}
+
+async fn tcp_operation(flow: TcpFlow, dispatcher: FlowDispatcher, dns: TunDns) -> Result<()> {
     if flow.destination.port() != 53 {
         let host = dns.target_host(flow.destination.ip()).await?;
         return dispatcher

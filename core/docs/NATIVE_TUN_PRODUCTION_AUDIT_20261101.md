@@ -55,7 +55,7 @@ Windows 11 full-network acceptance are separate evidence classes.
 
 | Area | Existing implementation / defect | Current acceptance boundary |
 | --- | --- | --- |
-| IPv4/IPv6 TCP | Existing smoltcp state machine, bounded sockets/queues, shared Core, FIN/RST, half-close, retransmission/SYN deduplication and byte-exact transfer regressions. | Controlled packet/loopback and historical scoped Server Wintun evidence. Public Win11 TCP/long-lived/HTTP2/WS/SSE/app acceptance not run. |
+| IPv4/IPv6 TCP | Existing smoltcp state machine, bounded sockets/queues, shared Core, FIN/RST, half-close, retransmission/SYN deduplication and byte-exact transfers. A task-owned abort guard now resets cancelled/failed forwarding even after its write half has sent FIN. | Real dual-stack Core node-revocation/HTTP CONNECT and packet task-abort regressions passed locally; normal write-only FIN and 1 MiB tail draining remain intact. Historical scoped Server Wintun is separate. Public Win11 TCP/long-lived/HTTP2/WS/SSE/app acceptance not run. |
 | IPv4/IPv6 UDP | Existing sessions, replies, fragments, timeouts and native outbound integration. Malformed datagrams and incomplete IPv4 first fragments previously consumed endpoint capacity. Admission now requires a complete, valid UDP packet; IPv6 zero checksums are refused. | Original checksum tests and new first-fragment/bad-reassembly/correct-first-delivery regressions passed. Reassembly remains in the same smoltcp Interface; no second assembler exists. Real full-system QUIC/TUIC/HY2 applications are not accepted. |
 | Failed UDP tuple identity | Existing failed-slot tombstones prevented immediate policy fallback but expired from failure time even while packets continued arriving. Retention now follows actual idle time. | Both virtual-clock shared-Core REJECT-to-DIRECT trap regressions passed; full idle may intentionally admit a new session. This does not migrate live QUIC sessions. |
 | DNS/Fake-IP | Existing UDP/TCP A/AAAA, durable dual-stack Fake-IP identity, TTL/cache and rule mapping. Non-A/AAAA support remains deliberately limited. | Controlled tests and historical scoped driver DNS; no independent physical DNS/IPv6 leakage trial. Durable reopen is not crash/reboot acceptance. |
@@ -212,6 +212,27 @@ the kill-switch capability. Its real enforcement command runs only with explicit
 disposable-network authorization and elevation; model tests are not enforcement.
 
 ### Further reproduced backend repairs
+
+Dual-stack Core/HTTP CONNECT regressions then exposed a TCP cancellation gap:
+after the upstream sent FIN, revoking the node completed the Core transaction
+and removed its session, but the packet socket did not reset or release its
+remaining upload side. A stream's successful write shutdown had been mistaken
+for proof that its containing operation completed. A task-owned `TcpAbortGuard`
+now retains the original abort/wake state across the entire TCP/DNS operation;
+only overall success disarms it. Errors, node revocation, panic unwinding and
+outer task cancellation can reset the flow even after local FIN.
+
+The first attempted two-direction EOF heuristic was rejected by the unchanged
+1 MiB write-only regression: normal `write_all -> shutdown -> drop` must retain
+buffered tail data even if the client has not yet sent FIN. That attempt was
+reverted, not committed or rescued by changing its old assertion. The final
+guard preserves those stream semantics. Original dual-stack Core red tests and
+the failed heuristic log are retained; the initial bare-stream Drop probe alone
+was not sufficient to distinguish legitimate write-only completion from task
+cancellation. The real Core cancellation reproducer supplies that distinction.
+Final local checks passed two unit plus 24 packet tests and 11 Native TUN API
+tests, including actual polled-task abort, empty ReadBuf, `SessionRevoked`, RST
+and zero active packet-flow state.
 
 Two new actual-packet regressions reproduced premature IPv4 UDP admission:
 with endpoint capacity one, either an isolated first fragment or a complete

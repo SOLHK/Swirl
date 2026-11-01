@@ -299,6 +299,96 @@ async fn ipv6_tcp_handshake_payload_and_half_close() {
     tcp_payload_half_close(true).await;
 }
 
+async fn cancelled_tcp_after_write_half_close(v6: bool, empty_read: bool) {
+    let source: SocketAddr = if v6 {
+        "[2001:db8::10]:40000"
+    } else {
+        "192.0.2.10:40000"
+    }
+    .parse()
+    .unwrap();
+    let destination: SocketAddr = if v6 {
+        "[2001:db8::20]:443"
+    } else {
+        "203.0.113.20:443"
+    }
+    .parse()
+    .unwrap();
+    let mut stack = spawn(TunConfig {
+        max_tcp_flows: 1,
+        ..TunConfig::default()
+    })
+    .unwrap();
+    let (mut stream, _) = handshake(&mut stack, source, destination).await;
+    let cancellation = stream.abort_on_drop();
+    if empty_read {
+        let mut bytes = [];
+        let mut buffer = tokio::io::ReadBuf::new(&mut bytes);
+        std::future::poll_fn(|cx| {
+            // Tokio may return Pending for an empty read on an idle duplex.
+            // Exercise one poll; it is neither data consumption nor EOF.
+            let _ =
+                tokio::io::AsyncRead::poll_read(std::pin::Pin::new(&mut stream), cx, &mut buffer);
+            std::task::Poll::Ready(())
+        })
+        .await;
+        assert!(buffer.filled().is_empty());
+    }
+    stream.shutdown().await.unwrap();
+    let fin = next_tcp(&mut stack).await;
+    assert_eq!(fin.control, TcpControl::Fin);
+    stack
+        .ingress
+        .send(tcp_packet(
+            source,
+            destination,
+            101,
+            Some(fin.sequence.wrapping_add(1)),
+            TcpControl::None,
+            &[],
+        ))
+        .await
+        .unwrap();
+    wait_received(&stack, 3).await;
+    // Preserve ordinary write-only shutdown/drop draining. A dispatcher task
+    // instead owns an explicit guard until the entire operation succeeds.
+    let (started, ready) = tokio::sync::oneshot::channel();
+    let task = tokio::spawn(async move {
+        let _cancellation = cancellation;
+        let _stream = stream;
+        started.send(()).unwrap();
+        std::future::pending::<()>().await;
+    });
+    timeout(WAIT, ready).await.unwrap().unwrap();
+    task.abort();
+    assert!(task.await.unwrap_err().is_cancelled());
+    let reset = next_tcp(&mut stack).await;
+    assert_eq!(reset.control, TcpControl::Rst);
+    timeout(WAIT, async {
+        while stack.stats.snapshot().active_tcp_flows != 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    stack.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn ipv4_tcp_cancel_after_write_half_close_resets_remaining_upload() {
+    cancelled_tcp_after_write_half_close(false, false).await;
+}
+
+#[tokio::test]
+async fn ipv6_tcp_cancel_after_write_half_close_resets_remaining_upload() {
+    cancelled_tcp_after_write_half_close(true, false).await;
+}
+
+#[tokio::test]
+async fn empty_read_buffer_does_not_hide_cancelled_half_closed_tcp_upload() {
+    cancelled_tcp_after_write_half_close(false, true).await;
+}
+
 #[tokio::test]
 async fn syn_retransmission_does_not_allocate_another_flow_and_limit_rejects() {
     let mut stack = spawn(TunConfig {
