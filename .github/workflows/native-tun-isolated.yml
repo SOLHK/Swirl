@@ -102,6 +102,28 @@ jobs:
           $smokeDriver = Join-Path $smokeDirectory 'wintun/bin/amd64/wintun.dll'
           cargo run --locked --release -p swirl-api --example windows-tun-smoke -- --disposable-network --wintun $smokeDriver 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'swirl-wintun-smoke.log')
           if ($LASTEXITCODE -ne 0) { throw "Scoped Wintun smoke failed with exit code $LASTEXITCODE" }
+      - name: Real scoped WFP transaction and application isolation in this disposable VM
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Explicitly limited to this smoke executable and reserved loopback
+          # endpoints. No host-wide block, physical DNS or default-route change.
+          cargo test --locked -p swirl-platform --example windows-wfp-scoped-smoke
+          if ($LASTEXITCODE -ne 0) { throw 'Scoped WFP fixture error/cleanup regression failed.' }
+          $receipt = Join-Path $env:RUNNER_TEMP 'swirl-wfp-scoped-receipt.json'
+          $log = Join-Path $env:RUNNER_TEMP 'swirl-wfp-scoped-smoke.log'
+          cargo run --locked --release -p swirl-platform --example windows-wfp-scoped-smoke -- --disposable-network --receipt $receipt 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw "Scoped WFP smoke failed with exit code $LASTEXITCODE; retain its receipt for owned cleanup." }
+          $final = @(Get-Content -LiteralPath $log | Where-Object { $_.TrimStart().StartsWith('{') })
+          if ($final.Count -ne 1) { throw 'Scoped WFP original final evidence is missing or ambiguous.' }
+          $summary = $final[0] | ConvertFrom-Json
+          if ($summary.ok -ne $true -or $summary.source_sha -ne $env:GITHUB_SHA -or $summary.rules -ne 4) { throw 'Scoped WFP source or rule-scope evidence differs.' }
+          foreach ($field in @('transaction_error_rollback','nonce_conflict_refused','persistent_across_engine_reopen','control_endpoints_unchanged','other_application_unchanged','owned_policy_removed','new_flow_block_ipv4_ipv6_tcp_udp')) {
+            if ($summary.$field -ne $true) { throw "Scoped WFP assertion is missing: $field" }
+          }
+          if ($summary.system_kill_switch_acceptance -ne $false -or $summary.boot_acceptance -ne $false -or $summary.existing_flow_revocation_guarantee -ne $false) {
+            throw 'Scoped WFP evidence must not be relabelled as system kill-switch or boot acceptance.'
+          }
       - name: Preserve native backend build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -113,6 +135,8 @@ jobs:
             core/target/release/swirl-tun-helper
             ${{ runner.temp }}/swirl-native-notices/
             ${{ runner.temp }}/swirl-wintun-smoke.log
+            ${{ runner.temp }}/swirl-wfp-scoped-smoke.log
+            ${{ runner.temp }}/swirl-wfp-scoped-receipt.json
           if-no-files-found: error
           retention-days: 7
 
@@ -121,10 +145,14 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: native-tun-driver-failure-${{ github.sha }}
-          path: ${{ runner.temp }}/swirl-wintun-smoke.log
+          path: |
+            ${{ runner.temp }}/swirl-wintun-smoke.log
+            ${{ runner.temp }}/swirl-wfp-scoped-smoke.log
+            ${{ runner.temp }}/swirl-wfp-scoped-receipt.json
           if-no-files-found: warn
 
   # The explicit Windows-only smoke owns one temporary adapter and only exact
   # test-destination routes. It never changes physical DNS, firewall rules or
-  # default/capture routes. This is real driver evidence on Windows Server,
-  # separate from Windows 11 full-tunnel/application/recovery acceptance.
+  # default/capture routes. The separate WFP command owns only its application's
+  # loopback filters. Both are Server evidence, separate from Windows 11 full
+  # capture, physical leakage, system kill-switch, boot and recovery acceptance.

@@ -19,6 +19,8 @@ pub mod windows_network;
 #[cfg(windows)]
 mod windows_notify;
 #[cfg(windows)]
+pub mod windows_wfp;
+#[cfg(windows)]
 pub mod wintun_device;
 #[cfg(windows)]
 pub use socket_pin::pin_outbound_socket;

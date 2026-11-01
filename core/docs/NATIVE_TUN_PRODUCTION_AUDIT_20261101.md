@@ -10,8 +10,11 @@ capability flag has been changed to imply their completion.
 
 This is a continuation of the existing Wintun / smoltcp / shared FlowDispatcher
 implementation. It adds no external proxy core, alternate rule engine or new
-production dependency. The only dependency-feature extension is Tokio's
-development-only virtual-clock support for deterministic idle-session tests.
+production package or version. Existing-package feature extensions are Tokio's
+development-only virtual clock, smoltcp's raw socket for post-reassembly UDP
+admission, and Windows SDK bindings for the scoped WFP transaction foundation.
+Their purpose and security/maintenance boundaries are recorded in the
+[dependency review](NATIVE_TUN_DEPENDENCIES.md).
 
 ## Source and remote baseline
 
@@ -53,12 +56,12 @@ Windows 11 full-network acceptance are separate evidence classes.
 | Area | Existing implementation / defect | Current acceptance boundary |
 | --- | --- | --- |
 | IPv4/IPv6 TCP | Existing smoltcp state machine, bounded sockets/queues, shared Core, FIN/RST, half-close, retransmission/SYN deduplication and byte-exact transfer regressions. | Controlled packet/loopback and historical scoped Server Wintun evidence. Public Win11 TCP/long-lived/HTTP2/WS/SSE/app acceptance not run. |
-| IPv4/IPv6 UDP | Existing sessions, replies, fragments, timeouts and native outbound integration. Malformed unfragmented UDP was admitted before length/checksum validation; IPv6 checksum zero was accepted upstream. Boundary now validates before allocating endpoint capacity. | New capacity-exhaustion and checksum-family regressions; IPv4 first-fragment admission still reserves an endpoint before complete reassembly. Real QUIC/TUIC/HY2 applications not accepted. |
+| IPv4/IPv6 UDP | Existing sessions, replies, fragments, timeouts and native outbound integration. Malformed datagrams and incomplete IPv4 first fragments previously consumed endpoint capacity. Admission now requires a complete, valid UDP packet; IPv6 zero checksums are refused. | Original checksum tests and new first-fragment/bad-reassembly/correct-first-delivery regressions passed. Reassembly remains in the same smoltcp Interface; no second assembler exists. Real full-system QUIC/TUIC/HY2 applications are not accepted. |
 | Failed UDP tuple identity | Existing failed-slot tombstones prevented immediate policy fallback but expired from failure time even while packets continued arriving. Retention now follows actual idle time. | Both virtual-clock shared-Core REJECT-to-DIRECT trap regressions passed; full idle may intentionally admit a new session. This does not migrate live QUIC sessions. |
 | DNS/Fake-IP | Existing UDP/TCP A/AAAA, durable dual-stack Fake-IP identity, TTL/cache and rule mapping. Non-A/AAAA support remains deliberately limited. | Controlled tests and historical scoped driver DNS; no independent physical DNS/IPv6 leakage trial. Durable reopen is not crash/reboot acceptance. |
 | DNS guard | Existing port-53 physical-adapter block rules and ownership journal. Previously status equalled capture state. Added initial/effective ActiveStore audit, bounded background verification and age/unknown status; security drift retains capture and requests explicit recovery. | Production script exercised against PowerShell fault mocks; no actual firewall deletion/service-stop/packet-capture trial. Polling leaves a detection window. DoH/DoT/application DNS and bypass/IPsec policies remain boundaries. |
 | Routes/egress | Existing dual-stack split defaults, physical binding, known VPN conflict preflight, network notifications and rebuild. | Rebuild still removes the old capture transaction; no system-wide zero-leak protection during that interval. Multi-NIC/handoff/sleep/public egress not accepted. |
-| Kill switch | **Not implemented.** Core socket binding and DNS guard do not block all other applications' physical egress. | Formal release blocker. Helper crash, reboot, existing flows, interface changes, DNS and explicit unlock all require real tests. |
+| Kill switch | **System-wide feature not implemented.** A new explicitly scoped WFP transaction foundation is limited to one executable's reserved loopback TCP/UDP endpoints and is not called by product lifecycle code. Core socket binding and DNS guard do not block other applications' physical egress. | Formal release blocker. Pure model/SDDL checks and a separate opt-in disposable-runner enforcement command are distinct from actual system protection. Helper crash, reboot, existing flows, interface changes, DNS and explicit unlock all require full tests. |
 | Privilege/IPC | Existing ordinary GUI mutation refusal, private inherited stdio, bounded commands/output, protected journal directory and PowerShell Job Objects. Worker still inherits elevated helper token. | Restricted-token packet/protocol worker, authenticated product launch/IPC, signed installed payload and unauthorized-local-process acceptance missing. |
 | Recovery | Existing durable typed journal, GUID/index ownership, readback, conflict preservation, explicit recovery and supervisor child-exit handling. Added control-loop heartbeat, bounded stall termination/reaping before recovery and explicit worker-error reporting. | Real finite child-process stall/progress and original recovery-ordering tests passed. Normal scoped Server teardown passed historically. Actual driver-hang/crash restoration is unaccepted; simultaneous helper/worker failure and reboot require a surviving/restarted process and no startup recovery service exists. |
 | Rules/protocols | Existing FlowDispatcher reuses MRS, policy groups and native outbounds; no independent TUN rules. Existing failure paths are fail-closed. | Historical native protocol matrix is not blanket interoperability. VMess strict half-close, TUIC empty UDP and HY2 half-close/large UDP limitations remain recorded in architecture/PR. |
@@ -200,6 +203,50 @@ test-fixture collision correction, not a file-open fallback or broadened accepte
 error set. Its new-source macOS result remains a required re-test.
 
 ## Kill-switch architecture constraints still to implement
+
+The [scoped WFP foundation](NATIVE_TUN_WFP.md) now provides owned persistent
+objects, explicit ACLs, atomic poisoned-on-error transactions, exact readback and
+receipt-based removal for one local application's loopback endpoints. It is not
+connected to `NativeSession`, cannot install host-wide rules and does not change
+the kill-switch capability. Its real enforcement command runs only with explicit
+disposable-network authorization and elevation; model tests are not enforcement.
+
+### Further reproduced backend repairs
+
+Two new actual-packet regressions reproduced premature IPv4 UDP admission:
+with endpoint capacity one, either an isolated first fragment or a complete
+bad-checksum fragmented datagram prevented a subsequent valid destination from
+being received. Four legitimate controls passed on the old implementation.
+The fix uses the existing smoltcp Interface's post-reassembly raw receive path,
+then validates UDP before allocating an endpoint. A first valid datagram is
+published once; existing endpoint copies are discarded from the raw path and
+continue through their original UDP sockets. There is no reinjection or second
+reassembler. Both fragment orders, exact payload/tuple, empty datagrams and
+ordered markers pass. The additional fixed buffer is in the memory ceiling;
+the extra IPv4 UDP copy has no measured performance claim.
+
+The helper's unbounded `child.wait()` also reproduced a live-stalled-worker
+regression using a real finite child process. The control loop now emits a
+private heartbeat; five minutes without progress kills and reaps the worker
+before attempting the existing journal recovery. Ordinary responses remain
+byte-exact and internal heartbeats never reach the client. Four new tests and
+the four existing output/recovery-ordering tests pass, including real child
+progress/stall behavior. A first positive fixture accidentally emitted CRLF
+heartbeats through PowerShell instead of the production Rust stream's LF; that
+fixture failure was preserved and corrected without broadening frame acceptance
+or any deadline. Local Release CLI checks also verified both internal worker
+modes return the unchanged command response and exit on EOF without OS mutation.
+
+After these changes and the scoped WFP module were frozen, local affected
+`cargo test --locked -p swirl-platform -p swirl-tun -p swirl-dns -p swirl-core
+-p swirl-api --all-targets` passed **286 tests across 20 result groups**, zero
+failed/ignored/filtered. A subsequent focused example test passed the added
+peer-error/panic cleanup regression. TUN alone is two unit plus 21 packet tests.
+Focused platform/TUN/API all-target Clippy with `--no-deps -D warnings`, workspace
+formatting, portable boundary 11/11, evidence contract 24/24 and Native actionlint
+passed. The scoped WFP example linked in Release. These do not replace a final
+full-workspace/MSVC/product run or the previously recorded normal GNU workspace
+Clippy toolchain failure. No local WFP engine or rule was used by these checks.
 
 ### Reconciliation with current product history
 

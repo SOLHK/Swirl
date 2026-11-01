@@ -1,5 +1,24 @@
 # Native TUN dependency and security review
 
+## 2026-11-01 existing-feature extensions
+
+No package version or production package is added by this continuation. The
+original lockfile/RustSec results below remain dated historical evidence, not a
+new advisory-database audit.
+
+| Existing dependency | Necessary extension | License and maintenance/security scope |
+| --- | --- | --- |
+| smoltcp 0.14.0 | `socket-raw` exposes complete IPv4 UDP packets after the same Interface's native reassembly, so incomplete or invalid fragments cannot reserve endpoint capacity. | 0BSD, unchanged. Adds one fixed 65,535-byte receive buffer, included in the configured memory ceiling, and an extra IPv4 UDP receive copy. It introduces no second assembler or raw OS socket. Its latency/throughput cost has not been benchmarked. Exact-first-delivery, both fragment orders, malformed admission and memory-boundary tests are required. |
+| windows-sys 0.61.2 | Windows Filtering Platform, RPC and security-authorization API features for owned WFP transactions, application/endpoint scoping and explicit object security descriptors. | MIT OR Apache-2.0, unchanged. Uses Windows' own Fwpuclnt/security APIs; no additional runtime binary is distributed. The new unsafe platform boundary requires allocation/lifetime, transaction, ACL and real enforcement review. It currently permits only a single local executable and explicit loopback endpoints; it does not enable a system kill switch, service, boot policy or GUI permission flow. |
+| Tokio, existing locked version | Development-only `test-util` for deterministic failed-UDP quiet-time tests. | MIT, unchanged. No production runtime feature or virtual clock is enabled by this development dependency. |
+
+The WFP command is explicitly opt-in and restricted to an authorized recoverable
+disposable Windows runner. Ordinary `cargo test` performs pure model/descriptor
+checks and does not install rules. Its Server enforcement evidence, when
+executed, is not physical Windows 11, full capture or release acceptance. The
+existing Wintun driver/binding and smoltcp remain the only TUN stack; no external
+proxy core is added.
+
 Reviewed on 2026-10-29 against the Rust-only baseline `4ad8a23`. This review covers
 the exact Cargo lockfile, the added packet-stack and Windows-binding packages,
 and the separately distributed Wintun binary. It does not claim that Windows
