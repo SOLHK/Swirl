@@ -40,7 +40,7 @@ use windows_sys::{
 const PROVIDER: GUID = GUID::from_u128(0x391ebfc1_341d_4c97_a64d_d5cd33e1bca1);
 const SUBLAYER: GUID = GUID::from_u128(0x6d683252_9b58_43cf_b6f9_e6fd6e71d932);
 const NAME: &str = "Swirl Native TUN scoped WFP foundation v1";
-const SUBLAYER_WEIGHT: u16 = 0x100;
+const PREFERRED_SUBLAYER_WEIGHT: u16 = 0x100;
 // Explicit WFP/standard rights avoid inheriting the mutable engine/container
 // DACL. BA ownership and OWNER RIGHTS remove an unelevated creator's implicit
 // WRITE_DAC; no creator-user ACE is installed. No SACL privilege is required.
@@ -194,7 +194,8 @@ pub struct ScopedRule {
     pub action: Action,
 }
 
-/// Persist this exact receipt before installation if crash recovery is needed.
+/// Prepare the weight and persist this exact receipt before installation, while
+/// holding the same write transaction, if crash recovery is needed.
 /// The owner is an identity, not authentication; Windows ACLs authorize writes.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -202,12 +203,13 @@ pub struct ScopedPolicy {
     pub schema: u32,
     pub owner: [u8; 16],
     pub application: PathBuf,
+    pub sublayer_weight: u16,
     pub rules: Vec<ScopedRule>,
 }
 
 impl ScopedPolicy {
     pub fn validate(&self) -> io::Result<()> {
-        if self.schema != 1
+        if self.schema != 2
             || self.owner == [0; 16]
             || !self.application.is_absolute()
             || !matches!(self.application.components().next(), Some(Component::Prefix(prefix))
@@ -315,6 +317,84 @@ impl<T> Drop for Allocation<T> {
     }
 }
 
+struct SublayerEnumeration<'a> {
+    engine: &'a Engine,
+    handle: HANDLE,
+}
+
+impl SublayerEnumeration<'_> {
+    fn close(mut self) -> io::Result<()> {
+        // SAFETY: this scope uniquely owns the enumerator on the live engine.
+        status(unsafe { FwpmSubLayerDestroyEnumHandle0(self.engine.0, self.handle) })
+            .map_err(|error| context("FwpmSubLayerDestroyEnumHandle0", error))?;
+        self.handle = null_mut();
+        Ok(())
+    }
+}
+
+impl Drop for SublayerEnumeration<'_> {
+    fn drop(&mut self) {
+        if !self.handle.is_null() {
+            // SAFETY: error-path backstop for this uniquely owned enumerator.
+            unsafe { FwpmSubLayerDestroyEnumHandle0(self.engine.0, self.handle) };
+        }
+    }
+}
+
+fn available_sublayer_weight(occupied: &[bool]) -> io::Result<u16> {
+    let preferred = usize::from(PREFERRED_SUBLAYER_WEIGHT);
+    (preferred..occupied.len())
+        .chain(0..preferred)
+        .find(|&weight| !occupied[weight])
+        .map(|weight| weight as u16)
+        .ok_or_else(|| io::Error::other("no unoccupied WFP sublayer weight"))
+}
+
+fn enumerate_sublayer_weight(engine: &Engine) -> io::Result<u16> {
+    let mut enumeration = SublayerEnumeration {
+        engine,
+        handle: null_mut(),
+    };
+    // SAFETY: live engine and valid output; null template includes all sublayers.
+    status(unsafe { FwpmSubLayerCreateEnumHandle0(engine.0, null(), &mut enumeration.handle) })
+        .map_err(|error| context("FwpmSubLayerCreateEnumHandle0", error))?;
+    let mut occupied = vec![false; usize::from(u16::MAX) + 1];
+    const PAGE: u32 = 64;
+    loop {
+        let mut entries = Allocation::<*mut FWPM_SUBLAYER0>(null_mut());
+        let mut count = 0;
+        // SAFETY: the enumeration snapshot and engine are live; BFE allocates
+        // the returned page, freed once as an array, not as individual entries.
+        status(unsafe {
+            FwpmSubLayerEnum0(
+                engine.0,
+                enumeration.handle,
+                PAGE,
+                &mut entries.0,
+                &mut count,
+            )
+        })
+        .map_err(|error| context("FwpmSubLayerEnum0", error))?;
+        if count > PAGE || (count != 0 && entries.0.is_null()) {
+            return Err(io::Error::other("FwpmSubLayerEnum0 returned invalid page"));
+        }
+        if count != 0 {
+            // SAFETY: BFE returned count live entries in this owned page. Each
+            // nested pointer is checked before accessing its sublayer weight.
+            for entry in unsafe { std::slice::from_raw_parts(entries.0, count as usize) } {
+                let sublayer = unsafe { entry.as_ref() }
+                    .ok_or_else(|| io::Error::other("FwpmSubLayerEnum0 returned null entry"))?;
+                occupied[usize::from(sublayer.weight)] = true;
+            }
+        }
+        if count < PAGE {
+            break;
+        }
+    }
+    enumeration.close()?;
+    available_sublayer_weight(&occupied)
+}
+
 fn allocated<T>(
     operation: &str,
     call: impl FnOnce(*mut *mut T) -> u32,
@@ -390,6 +470,8 @@ impl Engine {
             engine: self,
             active: true,
             failed: false,
+            read_only: flags & FWPM_TXN_READ_ONLY != 0,
+            prepared_metadata: None,
         })
     }
 
@@ -425,9 +507,32 @@ pub struct Transaction<'a> {
     engine: &'a mut Engine,
     active: bool,
     failed: bool,
+    read_only: bool,
+    prepared_metadata: Option<Vec<u8>>,
 }
 
 impl Transaction<'_> {
+    /// Select an unoccupied weight under the same exclusive write transaction
+    /// used to install. BFE can otherwise adjust a requested occupied weight.
+    /// Persist and sync the updated receipt before calling `install` and commit.
+    /// This method itself makes no persistent system change.
+    pub fn prepare_policy_weight(&mut self, policy: &mut ScopedPolicy) -> io::Result<()> {
+        let result = (|| {
+            policy.validate()?;
+            if self.read_only || self.prepared_metadata.is_some() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "WFP weight preparation requires a fresh write transaction",
+                ));
+            }
+            policy.sublayer_weight = enumerate_sublayer_weight(self.engine)?;
+            self.prepared_metadata = Some(policy.metadata()?);
+            Ok(())
+        })();
+        self.failed |= result.is_err();
+        result
+    }
+
     /// Adds only absent keys. Any failure poisons the transaction: even a
     /// caller that mistakenly tries to commit cannot publish a partial policy.
     pub fn install(&mut self, policy: &ScopedPolicy) -> io::Result<()> {
@@ -438,6 +543,12 @@ impl Transaction<'_> {
 
     fn install_inner(&mut self, policy: &ScopedPolicy) -> io::Result<()> {
         let mut metadata = policy.metadata()?;
+        if self.read_only || self.prepared_metadata.as_deref() != Some(metadata.as_slice()) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "WFP policy must be prepared unchanged in this write transaction",
+            ));
+        }
         let app = app_id(policy)?;
         let security = SecurityDescriptor::new()?;
         let mut name = NAME.encode_utf16().chain(Some(0)).collect::<Vec<_>>();
@@ -458,7 +569,7 @@ impl Transaction<'_> {
             flags: FWPM_SUBLAYER_FLAG_PERSISTENT,
             providerKey: &mut provider_key,
             providerData: blob(&mut metadata),
-            weight: SUBLAYER_WEIGHT,
+            weight: policy.sublayer_weight,
         };
         // SAFETY: all nested buffers/pointers are live through these copying
         // BFE calls. Existing objects are rejected, never adopted or overwritten.
@@ -507,7 +618,7 @@ impl Transaction<'_> {
             || !provider.serviceName.is_null()
             || !blob_matches(&provider.providerData, &metadata)
             || sublayer.flags != FWPM_SUBLAYER_FLAG_PERSISTENT
-            || sublayer.weight != SUBLAYER_WEIGHT
+            || sublayer.weight != policy.sublayer_weight
             || !linked_provider.is_some_and(|key| same_guid(key, &PROVIDER))
             || !blob_matches(&sublayer.providerData, &metadata)
         {
@@ -517,7 +628,7 @@ impl Transaction<'_> {
                 "provider_service_name_is_null":provider.serviceName.is_null(),
                 "provider_metadata_equal":blob_matches(&provider.providerData,&metadata),
                 "sublayer_flags":{"actual":sublayer.flags,"expected":FWPM_SUBLAYER_FLAG_PERSISTENT},
-                "sublayer_weight":{"actual":sublayer.weight,"expected":SUBLAYER_WEIGHT},
+                "sublayer_weight":{"actual":sublayer.weight,"expected":policy.sublayer_weight},
                 "sublayer_provider_equal":linked_provider.is_some_and(|key|same_guid(key,&PROVIDER)),
                 "sublayer_metadata_equal":blob_matches(&sublayer.providerData,&metadata)}),
             ));

@@ -2,9 +2,10 @@ use super::*;
 
 fn policy() -> ScopedPolicy {
     ScopedPolicy {
-        schema: 1,
+        schema: 2,
         owner: [7; 16],
         application: "C:\\approved\\wfp-smoke.exe".into(),
+        sublayer_weight: 258,
         rules: vec![ScopedRule {
             endpoint: "127.0.0.1:34567".parse().unwrap(),
             protocol: Protocol::Tcp,
@@ -65,6 +66,94 @@ fn receipt_reopen_keeps_filter_keys_and_another_owner_cannot_claim_them() {
     let mut unknown = serde_json::to_value(&original).unwrap();
     unknown["host_wide"] = serde_json::json!(true);
     assert!(serde_json::from_value::<ScopedPolicy>(unknown).is_err());
+}
+
+#[test]
+fn receipt_requires_exact_weight_and_explicitly_rejects_legacy_schema() {
+    let valid = policy();
+    let reopened: ScopedPolicy = serde_json::from_slice(&valid.metadata().unwrap()).unwrap();
+    assert_eq!(reopened.sublayer_weight, 258);
+    let mut missing_weight = serde_json::to_value(&valid).unwrap();
+    missing_weight
+        .as_object_mut()
+        .unwrap()
+        .remove("sublayer_weight");
+    assert!(serde_json::from_value::<ScopedPolicy>(missing_weight).is_err());
+    let mut legacy = valid.clone();
+    legacy.schema = 1;
+    assert_eq!(
+        legacy.validate().unwrap_err().kind(),
+        io::ErrorKind::InvalidInput
+    );
+    let mut changed = valid.clone();
+    changed.sublayer_weight += 1;
+    assert_ne!(changed.metadata().unwrap(), valid.metadata().unwrap());
+}
+
+#[test]
+fn weight_selection_avoids_collisions_wraps_and_refuses_exhaustion() {
+    let mut occupied = vec![false; usize::from(u16::MAX) + 1];
+    assert_eq!(available_sublayer_weight(&occupied).unwrap(), 256);
+    occupied[256] = true;
+    occupied[257] = true;
+    assert_eq!(available_sublayer_weight(&occupied).unwrap(), 258);
+    occupied.fill(true);
+    occupied[usize::from(u16::MAX)] = false;
+    assert_eq!(available_sublayer_weight(&occupied).unwrap(), u16::MAX);
+    occupied[usize::from(u16::MAX)] = true;
+    occupied[0] = false;
+    assert_eq!(available_sublayer_weight(&occupied).unwrap(), 0);
+    occupied[0] = true;
+    assert_eq!(
+        available_sublayer_weight(&occupied)
+            .unwrap_err()
+            .to_string(),
+        "no unoccupied WFP sublayer weight"
+    );
+}
+
+#[test]
+fn install_refuses_unprepared_or_changed_receipts_before_any_sdk_call() {
+    let original = policy();
+    for prepared in [false, true] {
+        let mut changed = original.clone();
+        changed.sublayer_weight += 1;
+        // The null handle is deliberately unusable: refusal must occur at the
+        // prepared-receipt boundary, before any filesystem/BFE operation.
+        let mut engine = Engine(null_mut());
+        let mut transaction = Transaction {
+            engine: &mut engine,
+            active: false,
+            failed: false,
+            read_only: false,
+            prepared_metadata: prepared.then(|| original.metadata().unwrap()),
+        };
+        let error = transaction.install(&changed).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+        assert!(error.to_string().contains("prepared unchanged"));
+        assert!(transaction.failed);
+    }
+}
+
+#[test]
+fn weight_preparation_refuses_read_only_or_already_prepared_transactions() {
+    for read_only in [false, true] {
+        let mut original = policy();
+        let mut engine = Engine(null_mut());
+        let mut transaction = Transaction {
+            engine: &mut engine,
+            active: false,
+            failed: false,
+            read_only,
+            prepared_metadata: (!read_only).then(|| original.metadata().unwrap()),
+        };
+        let error = transaction
+            .prepare_policy_weight(&mut original)
+            .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+        assert!(error.to_string().contains("fresh write transaction"));
+        assert!(transaction.failed);
+    }
 }
 
 #[test]

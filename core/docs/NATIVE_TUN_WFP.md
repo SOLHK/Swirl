@@ -51,7 +51,11 @@ cargo build --manifest-path core/Cargo.toml --locked --release `
   --disposable-network --receipt C:/approved-fixture/wfp-receipt.json
 ```
 
-The command writes/syncs its receipt before installation, verifies transaction
+The command selects an unused sublayer weight while holding its exclusive BFE
+write transaction, then writes/syncs the schema-2 receipt before installation.
+The transaction binds that complete receipt and refuses any later change.
+Installation and all subsequent verification/removal compare the exact recorded
+weight; they do not accept arbitrary BFE adjustments. The command verifies transaction
 rollback after an actual duplicate-object error, and exercises IPv4/IPv6 TCP/UDP
 allow → block → engine close/reopen → owned removal → allow. It also checks an
 unaffected port set, another executable's application ID and a refused foreign
@@ -90,6 +94,23 @@ retains every acceptance comparison, ACL/flags and error kind, adding fixed SDK
 operation/code and privacy-preserving field/condition differences. It does not
 print paths, application IDs, receipt contents, endpoint values or private SIDs.
 Fresh real-run evidence is still required before any enforcement success claim.
+
+The next real run at `d1bdea0`, actual PR checkout `c46e3ba`, failed specifically
+at provider/sublayer verification: expected weight 256, actual 258. Provider
+and sublayer flags, receipt metadata and provider link matched; preceding ACL
+checks passed. Installation returned before commit and its transaction guard
+attempts abort; the original log has no independent post-failure absence readback.
+Original [log](native-tun-evidence/windows-wfp-d1bdea0.log) and
+[receipt](native-tun-evidence/windows-wfp-d1bdea0-receipt.json) remain unchanged.
+Microsoft's [provider installation example](https://learn.microsoft.com/en-us/windows/win32/fwp/installing-a-provider)
+explicitly lets BFE assign the closest available sublayer weight. Assuming a
+requested occupied weight would be returned unchanged was an incorrect API
+contract. Preparation now enumerates occupied weights under the same write
+transaction, selects a free value and persists it before any installation.
+SDK errors, exhaustion, unexpected readback or receipt mutation still fail
+closed. Legacy schema-1 receipts are explicitly refused rather than adopted
+without a recorded weight. Thirteen model/SDDL/diagnostic tests and the scoped
+example's cleanup regression passed locally; fresh BFE execution is pending.
 
 Before this can become a product kill switch, system-scope policy, tunnel and
 physical interface changes, existing inbound-origin/raw/forwarded flows, LAN and

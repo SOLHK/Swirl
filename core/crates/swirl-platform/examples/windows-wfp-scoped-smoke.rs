@@ -279,8 +279,9 @@ mod smoke {
             .duration_since(UNIX_EPOCH)
             .map_err(io::Error::other)?
             .as_nanos();
-        let policy = ScopedPolicy {
-            schema: 1,
+        let mut policy = ScopedPolicy {
+            schema: 2,
+            sublayer_weight: 0,
             owner: ticks.to_be_bytes(),
             application: std::env::current_exe()?,
             rules: peers
@@ -293,13 +294,6 @@ mod smoke {
                 })
                 .collect(),
         };
-        let mut receipt = OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&receipt_path)?;
-        receipt.write_all(&serde_json::to_vec_pretty(&policy).map_err(io::Error::other)?)?;
-        receipt.sync_all()?;
-        drop(receipt);
         let mut engine = Engine::open()?;
         require(
             engine.absent(&policy)?,
@@ -308,6 +302,7 @@ mod smoke {
         // Exercise a real BFE error after successful staged writes. A poisoned
         // commit must abort all staged objects, including provider/sublayer.
         let mut failed = engine.begin()?;
+        failed.prepare_policy_weight(&mut policy)?;
         failed.install(&policy)?;
         require(
             failed.install(&policy).is_err(),
@@ -336,6 +331,16 @@ mod smoke {
             }
         }
         let mut transaction = engine.begin()?;
+        // Reserve a genuinely available weight under this exclusive BFE
+        // transaction. Persist the exact receipt before any install/commit.
+        transaction.prepare_policy_weight(&mut policy)?;
+        let mut receipt = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&receipt_path)?;
+        receipt.write_all(&serde_json::to_vec_pretty(&policy).map_err(io::Error::other)?)?;
+        receipt.sync_all()?;
+        drop(receipt);
         transaction.install(&policy)?;
         transaction.commit()?;
         // From here every ordinary Result failure still runs exact cleanup.
