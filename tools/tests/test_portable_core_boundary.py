@@ -24,7 +24,7 @@ FORBIDDEN_SOURCE = re.compile(
     r"|\b(?:QQuickWindow|CreateFileW|GetAdaptersAddresses|JNIEnv|VpnService|"
     r"VpnExtensionAbility|NEPacketTunnelProvider)\b|System32/drivers/etc/hosts|"
     r"std::os::(?:windows|unix)|#\s*\[\s*link\s*\([^\]]*"
-    r"(?:kind\s*=\s*\"framework\"|kernel32|user32)"
+    rf"(?:kind\s*=\s*\"framework\"|kernel32|user32|\b{SDK_MODULE}\b)"
 )
 
 
@@ -98,6 +98,13 @@ class PortableCoreBoundary(unittest.TestCase):
         ):
             with self.subTest(source=source):
                 self.assertIsNotNone(FORBIDDEN_SOURCE.search(source))
+
+    def test_raw_sdk_library_links_cannot_hide_as_driver_configuration(self):
+        for sdk in ("wintun", "winapi", "windows_sys"):
+            for value in (f'"{sdk}"', f'r#"{sdk}"#'):
+                with self.subTest(sdk=sdk, value=value):
+                    self.assertIsNotNone(FORBIDDEN_SOURCE.search(
+                        f'#[link(\nname = {value}\n)] unsafe extern "system" {{}}'))
 
     def test_workspace_alias_cannot_hide_windows_sdk(self):
         workspace = {"dependencies": {"host": {"package": "windows-sys", "version": "0.61"}}}
