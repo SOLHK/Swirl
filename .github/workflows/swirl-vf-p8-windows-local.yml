@@ -4,6 +4,7 @@ on:
   push:
     branches: [work/vf-takeover-abc-20261021, work/swirlvf-delivery-20261102, test]
     paths:
+      - '.github/workflows/font-system-windows.yml'
       - .github/workflows/swirl-vf-p8-windows-local.yml
       - tools/swirl_vf/platform/p8_windows_local.py
       - tools/swirl_vf/platform/directwrite_probe.cpp
@@ -14,6 +15,7 @@ on:
   pull_request:
     branches: [test]
     paths:
+      - '.github/workflows/font-system-windows.yml'
       - .github/workflows/swirl-vf-p8-windows-local.yml
       - tools/swirl_vf/platform/p8_windows_local.py
       - tools/swirl_vf/platform/directwrite_probe.cpp

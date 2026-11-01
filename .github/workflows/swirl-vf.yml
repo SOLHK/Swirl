@@ -11,11 +11,13 @@ on:
       - work/swirlvf-delivery-20261102
       - test
     paths:
+      - '.github/workflows/font-system-windows.yml'
       - '.github/workflows/swirl-vf.yml'
       - 'tools/swirl_vf/**'
   pull_request:
     branches: [work/core-completion-20261017, test]
     paths:
+      - '.github/workflows/font-system-windows.yml'
       - '.github/workflows/swirl-vf.yml'
       - 'tools/swirl_vf/**'
   workflow_dispatch:

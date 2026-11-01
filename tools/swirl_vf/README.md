@@ -5,7 +5,21 @@ tools. This directory contains no Apple font, converted Apple font or extracted
 Apple outlines. A locally supplied font requires appropriate use/modification
 rights; availability of this code does not grant rights to redistribute fonts.
 
-## Current status
+## Current status — 2026-11-02
+
+Formal output is exactly **SwirlVF.ttc**. No accepted final font exists.
+The [delivery checkpoint](../../docs/SWIRL_VF_DELIVERY_20261102.md) and
+[branch recovery](../../docs/SWIRL_VF_RECOVERY_20261102.md) preserve P8's 228
+experimental models and the already-merged C1/D1 tools; these are not complete
+variable-face coverage. Current exact-source CoreText identity remains blocked.
+The production HVF comparator passes 1088/1088 finite cases, while the strict
+native vertical metric test still fails. Bounded new interpolation/default-grid
+measurements explain why the existing expanded-simple representation cannot
+meet the unchanged point-precision contract for selected real glyphs. Authored
+Qt 6.12 integration passes on macOS; final-font and Windows 11 acceptance remain
+NOT_RUN. See the linked exact-scope evidence and draft PR 49 before continuing.
+
+## Historical source mapping checkpoint — 2026-10-20
 
 The exact-source normalized-design geometry gate now passes: **1088/1088**, zero
 failures, at the unchanged **1/32 FUnit** threshold. Native run 39306798698 used
