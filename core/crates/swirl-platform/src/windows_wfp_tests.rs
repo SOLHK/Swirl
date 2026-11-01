@@ -10,6 +10,7 @@ fn policy() -> ScopedPolicy {
             endpoint: "127.0.0.1:34567".parse().unwrap(),
             protocol: Protocol::Tcp,
             action: Action::Block,
+            service_sid: None,
         }],
     }
 }
@@ -88,6 +89,84 @@ fn receipt_requires_exact_weight_and_explicitly_rejects_legacy_schema() {
     let mut changed = valid.clone();
     changed.sublayer_weight += 1;
     assert_ne!(changed.metadata().unwrap(), valid.metadata().unwrap());
+}
+
+#[test]
+fn service_condition_is_optional_on_wire_but_strict_when_present() {
+    let plain = policy();
+    let original = String::from_utf8(plain.metadata().unwrap()).unwrap();
+    assert!(!original.contains("service_sid"));
+    let reopened: ScopedPolicy = serde_json::from_str(&original).unwrap();
+    assert_eq!(reopened, plain);
+    for invalid in [
+        "S-1-5-18",
+        "S-1-5-80-0",
+        "S-1-5-80-1-2-3-4",
+        "S-1-5-80-1-2-3-4-05",
+        "S-1-5-80-1-2-3-4-4294967296",
+    ] {
+        let mut changed = plain.clone();
+        changed.rules[0].service_sid = Some(invalid.into());
+        assert!(changed.validate().is_err(), "{invalid}");
+    }
+    let mut service = plain;
+    service.rules[0].service_sid = Some("S-1-5-80-1-2-3-4-5".into());
+    service.validate().unwrap();
+    let mut metadata = service.metadata().unwrap();
+    let mut application = b"application-id".to_vec();
+    let app = blob(&mut application);
+    with_filter(
+        &service,
+        0,
+        &service.rules[0],
+        &app,
+        &mut metadata,
+        |expected| {
+            assert_eq!(expected.numFilterConditions, 5);
+            assert!(filter_matches(expected, expected));
+            let mut altered = *expected;
+            altered.numFilterConditions = 4;
+            assert!(
+                !filter_matches(&altered, expected),
+                "required identity cannot disappear"
+            );
+            // SAFETY: five local conditions remain live through this callback.
+            let mut conditions =
+                unsafe { std::slice::from_raw_parts(expected.filterCondition, 5) }.to_vec();
+            assert!(same_guid(
+                &conditions[4].fieldKey,
+                &FWPM_CONDITION_ALE_USER_ID
+            ));
+            let shape =
+                unsafe { descriptor_condition_shape(conditions[4].conditionValue.Anonymous.sd) }
+                    .unwrap();
+            assert_eq!(shape.grants.len(), 1);
+            assert_eq!(shape.grants[0].0, FWP_ACTRL_MATCH_FILTER);
+            assert!(shape.protected);
+            let wrong = SecurityDescriptor::from_sddl("O:SYG:SYD:P(A;;0x1;;;WD)").unwrap();
+            let mut wrong_blob = FWP_BYTE_BLOB {
+                size: unsafe { GetSecurityDescriptorLength(wrong.0) },
+                data: wrong.0.cast(),
+            };
+            conditions[4].conditionValue.Anonymous.sd = &mut wrong_blob;
+            altered = *expected;
+            altered.filterCondition = conditions.as_mut_ptr();
+            assert!(
+                !filter_matches(&altered, expected),
+                "World may not replace service principal"
+            );
+            assert_eq!(
+                filter_summary(&altered, expected)["conditions"][4]["name"],
+                "ALE_USER_ID"
+            );
+            assert_eq!(
+                filter_summary(&altered, expected)["conditions"][4]["matching_conditions"],
+                0
+            );
+            Ok(())
+        },
+    )
+    .unwrap();
 }
 
 #[test]
@@ -220,6 +299,7 @@ fn scoped_filters_request_indexing_and_reject_any_flag_drift() {
                     endpoint: endpoint.parse().unwrap(),
                     protocol,
                     action,
+                    service_sid: None,
                 };
                 let mut metadata = policy.metadata().unwrap();
                 let mut application_bytes = b"application-id".to_vec();

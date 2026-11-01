@@ -30,8 +30,8 @@ use windows_sys::{
                 ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
             },
             DACL_SECURITY_INFORMATION, GetAce, GetLengthSid, GetSecurityDescriptorControl,
-            GetSecurityDescriptorDacl, GetSecurityDescriptorOwner, OWNER_SECURITY_INFORMATION,
-            SE_DACL_PROTECTED,
+            GetSecurityDescriptorDacl, GetSecurityDescriptorLength, GetSecurityDescriptorOwner,
+            IsValidSecurityDescriptor, OWNER_SECURITY_INFORMATION, SE_DACL_PROTECTED,
         },
     },
     core::GUID,
@@ -50,7 +50,11 @@ struct SecurityDescriptor(*mut std::ffi::c_void);
 
 impl SecurityDescriptor {
     fn new() -> io::Result<Self> {
-        let text = SDDL.encode_utf16().chain(Some(0)).collect::<Vec<_>>();
+        Self::from_sddl(SDDL)
+    }
+
+    fn from_sddl(sddl: &str) -> io::Result<Self> {
+        let text = sddl.encode_utf16().chain(Some(0)).collect::<Vec<_>>();
         let mut descriptor = null_mut();
         // SAFETY: constant terminated SDDL and valid allocation output. The
         // returned LocalAlloc buffer is exclusively owned by this wrapper.
@@ -87,6 +91,13 @@ struct SecurityShape {
 }
 
 fn security_shape(descriptor: *mut std::ffi::c_void) -> io::Result<SecurityShape> {
+    security_shape_with_count(descriptor, 3)
+}
+
+fn security_shape_with_count(
+    descriptor: *mut std::ffi::c_void,
+    ace_count: u16,
+) -> io::Result<SecurityShape> {
     let mut owner = null_mut();
     let mut defaulted = 0;
     let mut control = 0;
@@ -114,7 +125,7 @@ fn security_shape(descriptor: *mut std::ffi::c_void) -> io::Result<SecurityShape
                 io::Error::last_os_error(),
             ));
         }
-        if owner.is_null() || present == 0 || dacl.is_null() || (*dacl).AceCount != 3 {
+        if owner.is_null() || present == 0 || dacl.is_null() || (*dacl).AceCount != ace_count {
             let owner_label = if owner.is_null() {
                 "null".into()
             } else {
@@ -192,6 +203,23 @@ pub struct ScopedRule {
     pub endpoint: SocketAddr,
     pub protocol: Protocol,
     pub action: Action,
+    /// Optional normal-token service principal. A restricting SID alone is not
+    /// authority; the caller must obtain this identity from verified SCM state.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service_sid: Option<String>,
+}
+
+fn service_sid_valid(sid: &str) -> bool {
+    let Some(parts) = sid.strip_prefix("S-1-5-80-") else {
+        return false;
+    };
+    let components = parts.split('-').collect::<Vec<_>>();
+    components.len() == 5
+        && components.iter().all(|value| {
+            value
+                .parse::<u32>()
+                .is_ok_and(|number| number.to_string() == *value)
+        })
 }
 
 /// Prepare the weight and persist this exact receipt before installation, while
@@ -218,6 +246,7 @@ impl ScopedPolicy {
             || !(1..=16).contains(&self.rules.len())
             || self.rules.iter().any(|rule| {
                 !rule.endpoint.ip().is_loopback()
+                    || rule.service_sid.as_deref().is_some_and(|sid| !service_sid_valid(sid))
                     || rule.endpoint.port() == 0
                     || matches!(rule.endpoint, SocketAddr::V6(v6) if v6.scope_id() != 0 || v6.flowinfo() != 0)
             })
@@ -863,7 +892,7 @@ fn with_filter<T>(
             }
         }
     };
-    let mut conditions = [
+    let mut conditions = vec![
         FWPM_FILTER_CONDITION0 {
             fieldKey: FWPM_CONDITION_ALE_APP_ID,
             matchType: FWP_MATCH_EQUAL,
@@ -901,6 +930,29 @@ fn with_filter<T>(
             },
         },
     ];
+    let service_security = rule
+        .service_sid
+        .as_ref()
+        .map(|sid| SecurityDescriptor::from_sddl(&format!("O:SYG:SYD:P(A;;0x1;;;{sid})")))
+        .transpose()?;
+    let mut service_blob = service_security.as_ref().map(|descriptor| {
+        // SAFETY: the LocalAlloc self-relative descriptor remains owned until
+        // after the synchronous filter callback. BFE copies this condition.
+        FWP_BYTE_BLOB {
+            size: unsafe { GetSecurityDescriptorLength(descriptor.0) },
+            data: descriptor.0.cast(),
+        }
+    });
+    if let Some(service_blob) = &mut service_blob {
+        conditions.push(FWPM_FILTER_CONDITION0 {
+            fieldKey: FWPM_CONDITION_ALE_USER_ID,
+            matchType: FWP_MATCH_EQUAL,
+            conditionValue: FWP_CONDITION_VALUE0 {
+                r#type: FWP_SECURITY_DESCRIPTOR_TYPE,
+                Anonymous: FWP_CONDITION_VALUE0_0 { sd: service_blob },
+            },
+        });
+    }
     let mut name = NAME.encode_utf16().chain(Some(0)).collect::<Vec<_>>();
     let mut provider = PROVIDER;
     let mut weight = match rule.action {
@@ -970,13 +1022,14 @@ fn filter_matches(actual: &FWPM_FILTER0, expected: &FWPM_FILTER0) -> bool {
             || actual.weight.r#type != FWP_UINT64
             || actual.weight.Anonymous.uint64.is_null()
             || *actual.weight.Anonymous.uint64 != *expected.weight.Anonymous.uint64
-            || actual.numFilterConditions != 4
+            || actual.numFilterConditions != expected.numFilterConditions
             || actual.filterCondition.is_null()
         {
             return false;
         }
-        let actual_conditions = std::slice::from_raw_parts(actual.filterCondition, 4);
-        let expected_conditions = std::slice::from_raw_parts(expected.filterCondition, 4);
+        let count = expected.numFilterConditions as usize;
+        let actual_conditions = std::slice::from_raw_parts(actual.filterCondition, count);
+        let expected_conditions = std::slice::from_raw_parts(expected.filterCondition, count);
         expected_conditions.iter().all(|condition| {
             actual_conditions
                 .iter()
@@ -1003,9 +1056,12 @@ fn filter_summary(actual: &FWPM_FILTER0, expected: &FWPM_FILTER0) -> serde_json:
             None
         };
         let mut conditions = Vec::new();
-        if actual.numFilterConditions == 4 && !actual.filterCondition.is_null() {
-            let actual_conditions = std::slice::from_raw_parts(actual.filterCondition, 4);
-            for (index, condition) in std::slice::from_raw_parts(expected.filterCondition, 4)
+        let count = expected.numFilterConditions as usize;
+        if actual.numFilterConditions == expected.numFilterConditions
+            && !actual.filterCondition.is_null()
+        {
+            let actual_conditions = std::slice::from_raw_parts(actual.filterCondition, count);
+            for (index, condition) in std::slice::from_raw_parts(expected.filterCondition, count)
                 .iter()
                 .enumerate()
             {
@@ -1017,6 +1073,8 @@ fn filter_summary(actual: &FWPM_FILTER0, expected: &FWPM_FILTER0) -> serde_json:
                     "IP_REMOTE_PORT"
                 } else if same_guid(&condition.fieldKey, &FWPM_CONDITION_IP_PROTOCOL) {
                     "IP_PROTOCOL"
+                } else if same_guid(&condition.fieldKey, &FWPM_CONDITION_ALE_USER_ID) {
+                    "ALE_USER_ID"
                 } else {
                     "unknown"
                 };
@@ -1040,7 +1098,7 @@ fn filter_summary(actual: &FWPM_FILTER0, expected: &FWPM_FILTER0) -> serde_json:
             "metadata_size":{"actual":actual.providerData.size,"expected":expected.providerData.size},
             "action":{"actual":actual.action.r#type,"expected":expected.action.r#type},
             "weight":{"actual_type":actual.weight.r#type,"expected_type":FWP_UINT64,"actual_value":weight,"expected_value":*expected.weight.Anonymous.uint64},
-            "condition_count":{"actual":actual.numFilterConditions,"expected":4},"condition_pointer_null":actual.filterCondition.is_null(),"conditions":conditions})
+            "condition_count":{"actual":actual.numFilterConditions,"expected":count},"condition_pointer_null":actual.filterCondition.is_null(),"conditions":conditions})
     }
 }
 
@@ -1073,8 +1131,29 @@ fn condition_value_matches(actual: &FWP_CONDITION_VALUE0, expected: &FWP_CONDITI
                             ),
                         )
                 }),
+            FWP_SECURITY_DESCRIPTOR_TYPE => descriptor_condition_shape(actual.Anonymous.sd)
+                .zip(descriptor_condition_shape(expected.Anonymous.sd))
+                .is_some_and(|(actual, expected)| actual == expected),
             _ => false,
         }
+    }
+}
+
+fn descriptor_condition_shape(blob: *const FWP_BYTE_BLOB) -> Option<SecurityShape> {
+    // SAFETY: callers lend only BFE-owned valid condition buffers or a local
+    // descriptor. Validate the type at the caller and blob bounds before API use.
+    unsafe {
+        let blob = blob.as_ref()?;
+        if blob.data.is_null() || !(20..=4096).contains(&blob.size) {
+            return None;
+        }
+        let descriptor = blob.data.cast();
+        if IsValidSecurityDescriptor(descriptor) == 0
+            || GetSecurityDescriptorLength(descriptor) != blob.size
+        {
+            return None;
+        }
+        security_shape_with_count(descriptor, 1).ok()
     }
 }
 

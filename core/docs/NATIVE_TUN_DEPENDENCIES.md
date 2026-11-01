@@ -19,6 +19,13 @@ executed, is not physical Windows 11, full capture or release acceptance. The
 existing Wintun driver/binding and smoltcp remain the only TUN stack; no external
 proxy core is added.
 
+The existing Windows SDK bindings also expose Service Control Manager APIs for
+the explicitly opted-in [virtual-service identity fixture](NATIVE_TUN_SERVICE_IDENTITY.md).
+This adds no crate/version/runtime binary or license change. Its service
+configuration, token, ACL, unique ownership, timeout and stop/delete recovery
+need actual disposable Windows validation. It installs no product or boot
+service and must not be presented as authenticated product integration.
+
 Reviewed on 2026-10-29 against the Rust-only baseline `4ad8a23`. This review covers
 the exact Cargo lockfile, the added packet-stack and Windows-binding packages,
 and the separately distributed Wintun binary. It does not claim that Windows

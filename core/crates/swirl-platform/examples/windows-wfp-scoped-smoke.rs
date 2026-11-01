@@ -291,6 +291,7 @@ mod smoke {
                     endpoint,
                     protocol,
                     action: Action::Block,
+                    service_sid: None,
                 })
                 .collect(),
         };
