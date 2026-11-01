@@ -132,3 +132,38 @@ restricting SID or CLI nonce is insufficient. The generic helper's existing
 Core-command entry must not receive a system egress exemption. This remains
 design/integration work; the process foundation does not enable a product
 capability or claim authenticated GUI/broker isolation.
+
+## Independent loader diagnosis
+
+At `35847e9`, both required and headless children still exited `0xc0000142`
+before Rust main, despite full desktop/window-station access preflight. The
+grant satisfies the SDK contract but is not a demonstrated startup repair.
+[Original source-bound results](native-tun-evidence/windows-35847e9-sdk-results.json)
+retain the failure. No token/Job restriction was removed.
+
+An optional disposable diagnostic now reuses the same token, private desktop,
+minimum environment, Job UI flags and six fixed inherited resources. Only that
+entrypoint adds `DEBUG_ONLY_THIS_PROCESS`. Its creating thread receives and
+continues bounded debug events: module basenames, original bounded debug strings,
+first/second-chance exception and exit values. Only the initial first-chance
+loader breakpoint is handled; other exceptions remain unhandled. SDK event file
+handles close once; process/thread event handles remain SDK-owned. The diagnostic
+keeps a separate process handle and drains exit events before reaping its job.
+
+```powershell
+cargo run --manifest-path core/Cargo.toml --locked --release -p swirl-platform `
+  --example windows-restricted-loader-trace -- --disposable-environment `
+  --probe (Resolve-Path ./core/target/release/examples/windows-headless-worker-probe.exe) `
+  --directory C:/approved-fixture/fresh-loader-trace
+```
+
+This explicit command requires an authorized elevated disposable Windows host.
+It records source/copied image hashes before launch, synced bounded JSONL events,
+independent child stdout/stderr and a result separating collection, cleanup and
+startup. Limits are 256 events, 512 KiB trace/output, 4 KiB per debug string and
+a 10-second event deadline. Debugging changes scheduling; collection success or
+debugged startup never replaces the original non-debugged A/B gate. No global
+registry flag, external debugger, new privilege or inherited handle is added.
+Four local pure/temp-log regressions, all-target Clippy and GNU linking passed;
+no restricted process or debug session ran on the workstation. Actual DLL
+initialization messages may still require further diagnosis after CI.

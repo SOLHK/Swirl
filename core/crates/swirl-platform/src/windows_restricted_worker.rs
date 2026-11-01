@@ -1068,6 +1068,15 @@ pub fn spawn_data_plane(
     arguments: &[OsString],
     fake_ip_journal: &File,
 ) -> io::Result<DataPlaneChild> {
+    spawn_data_plane_inner(executable, arguments, fake_ip_journal, false)
+}
+
+fn spawn_data_plane_inner(
+    executable: &Path,
+    arguments: &[OsString],
+    fake_ip_journal: &File,
+    diagnostic: bool,
+) -> io::Result<DataPlaneChild> {
     let journal = inherited_fake_ip_journal(fake_ip_journal)?;
     let (packet_input, broker_input) = pipe()?;
     let (broker_output, packet_output) = pipe()?;
@@ -1081,7 +1090,7 @@ pub fn spawn_data_plane(
         packet_output: inheritance.packet_output.as_raw_handle() as usize,
         fake_ip_journal: inheritance.fake_ip_journal.as_raw_handle() as usize,
     };
-    let worker = spawn_inner(executable, arguments, Some(&inheritance))?;
+    let worker = spawn_inner(executable, arguments, Some(&inheritance), diagnostic)?;
     Ok(DataPlaneChild {
         worker,
         packet_input: File::from(broker_input),
@@ -1139,6 +1148,9 @@ pub struct RestrictedChild {
     job: Option<OwnedHandle>,
     desktop: Desktop,
     assigned: bool,
+    // Only the explicit loader diagnostic sets this. Debug events must be
+    // continued by the creating thread before the exited process can be reaped.
+    debug_thread: Option<u32>,
     pub id: u32,
 }
 
@@ -1162,6 +1174,9 @@ impl RestrictedChild {
             if unsafe { TerminateProcess(self.process.as_raw_handle(), 1) } == 0 {
                 error.get_or_insert_with(io::Error::last_os_error);
             }
+        }
+        if let Some(creator) = self.debug_thread {
+            loader_diagnostic::drain_terminated(creator, self.id, self.process.as_raw_handle())?;
         }
         // SAFETY: live process handle supports SYNCHRONIZE; bound cleanup wait.
         let status = unsafe { WaitForSingleObject(self.process.as_raw_handle(), 5_000) };
@@ -1226,13 +1241,14 @@ impl Drop for RestrictedChild {
 /// Launch an approved worker. Caller owns executable provenance/authentication;
 /// this API accepts no arbitrary inherited handle or parent environment block.
 pub fn spawn(executable: &Path, arguments: &[OsString]) -> io::Result<RestrictedChild> {
-    spawn_inner(executable, arguments, None)
+    spawn_inner(executable, arguments, None, false)
 }
 
 fn spawn_inner(
     executable: &Path,
     arguments: &[OsString],
     data_plane: Option<&DataPlaneInheritance>,
+    diagnostic: bool,
 ) -> io::Result<RestrictedChild> {
     if !executable.is_absolute()
         || !matches!(executable.components().next(), Some(Component::Prefix(prefix))
@@ -1352,7 +1368,12 @@ fn spawn_inner(
             CREATE_NO_WINDOW
                 | CREATE_SUSPENDED
                 | CREATE_UNICODE_ENVIRONMENT
-                | EXTENDED_STARTUPINFO_PRESENT,
+                | EXTENDED_STARTUPINFO_PRESENT
+                | if diagnostic {
+                    DEBUG_ONLY_THIS_PROCESS
+                } else {
+                    0
+                },
             environment.as_ptr().cast(),
             directory.as_ptr(),
             &startup.StartupInfo,
@@ -1368,8 +1389,16 @@ fn spawn_inner(
         job: Some(job),
         desktop,
         assigned: false,
+        debug_thread: diagnostic.then(|| unsafe { GetCurrentThreadId() }),
         id: process.dwProcessId,
     };
+    if diagnostic {
+        // PROCESS_INFORMATION handles are caller-owned (CloseHandle required),
+        // unlike the separately supplied debug-event process/thread handles.
+        // Keep an explicitly independent non-inheritable owner for token,
+        // memory and post-Continue exit queries. Never own an event hProcess.
+        child.process = child.process.try_clone()?;
+    }
     // SAFETY: suspended child is uniquely owned and has not run user code.
     success(unsafe {
         AssignProcessToJobObject(
@@ -1389,6 +1418,10 @@ fn spawn_inner(
         )),
     }
 }
+
+#[path = "windows_loader_diagnostic.rs"]
+mod loader_diagnostic;
+pub use loader_diagnostic::trace_headless_startup;
 
 #[cfg(test)]
 #[path = "windows_restricted_worker_tests.rs"]
