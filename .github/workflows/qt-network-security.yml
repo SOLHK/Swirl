@@ -25,7 +25,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14, windows-2022]
+        # macOS 14 is in scheduled brownouts before its 2026-11-02 retirement.
+        # Keep the same ARM64 host and both Qt/security suites on supported 15.
+        os: [ubuntu-24.04, macos-15, windows-2022]
         qt-version: ['6.10.3', '6.11.3']
         include:
           - os: ubuntu-24.04
@@ -33,7 +35,7 @@ jobs:
             arch: linux_gcc_64
             generator: Ninja
             configure_args: ''
-          - os: macos-14
+          - os: macos-15
             host: mac
             arch: clang_64
             generator: Ninja
@@ -202,6 +204,7 @@ jobs:
           path: |
             build/qt-product/subscription-security.xml
             build/qt-product/qt-network-policy.xml
+            build/qt-product/swirl-telemetry-accounting.xml
             build/qt-product/Testing/Temporary/LastTest.log
             build/qt-product/Release/Swirl-diagnostics.txt
           if-no-files-found: error

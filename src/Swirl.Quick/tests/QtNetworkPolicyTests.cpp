@@ -3,11 +3,16 @@
 
 #include <QFile>
 #include <QCryptographicHash>
+#include <QDateTime>
 #include <QElapsedTimer>
+#include <QHostInfo>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkProxy>
+#include <QPointer>
 #include <QProcess>
 #include <QSignalSpy>
 #include <QSslCertificate>
@@ -18,6 +23,7 @@
 #include <QTcpServer>
 #include <QTemporaryDir>
 #include <QTest>
+#include <functional>
 
 namespace {
 const QByteArray subscription =
@@ -32,6 +38,53 @@ void reportClientTlsErrors(QNetworkReply *reply, const QSslCertificate &fixtureC
             qWarning() << "Native Qt TLS client:" << int(errors[i].error()) << errors[i].errorString().left(256);
     });
 }
+
+QJsonObject replyEvidence(QNetworkReply *reply, const QSslCertificate &fixtureCa) {
+    if (!reply) return {{"available", false}};
+    const auto configuration = reply->sslConfiguration();
+    const auto peer = configuration.peerCertificate();
+    const auto proxy = reply->manager()->proxy();
+    return {{"available", true}, {"error", int(reply->error())},
+        {"errorString", reply->errorString().left(1024)},
+        {"requestUrl", reply->request().url().toString(QUrl::FullyEncoded)},
+        {"replyUrl", reply->url().toString(QUrl::FullyEncoded)},
+        {"finished", reply->isFinished()},
+        {"httpStatus", reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()},
+        {"encrypted", reply->attribute(QNetworkRequest::ConnectionEncryptedAttribute).toBool()},
+        {"proxyType", int(proxy.type())}, {"proxyHost", proxy.hostName()},
+        {"configuredCAcount", int(configuration.caCertificates().size())},
+        {"fixtureCApresent", configuration.caCertificates().contains(fixtureCa)},
+        {"peerVerifyMode", int(configuration.peerVerifyMode())},
+        {"configuredProtocol", int(configuration.protocol())},
+        {"sessionProtocol", int(configuration.sessionProtocol())},
+        {"peerCertificatePresent", !peer.isNull()},
+        {"peerNotBeforeUtc", peer.effectiveDate().toUTC().toString(Qt::ISODateWithMs)},
+        {"peerNotAfterUtc", peer.expiryDate().toUTC().toString(Qt::ISODateWithMs)}};
+}
+
+// Declared after the observed client/server objects in each test, so assertion
+// returns record their still-live state without any extra request, wait or retry.
+class FailureDiagnostics final {
+public:
+    explicit FailureDiagnostics(std::function<QJsonObject()> snapshot) : snapshot(std::move(snapshot)) {}
+    ~FailureDiagnostics() {
+        if (!QTest::currentTestFailed()) return;
+        auto evidence = snapshot();
+        evidence.insert("test", QString::fromLatin1(QTest::currentTestFunction()));
+        evidence.insert("observedUtc", QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
+        evidence.insert("qt", QString::fromLatin1(qVersion()));
+        evidence.insert("tlsBackend", QSslSocket::activeBackend());
+        evidence.insert("tlsLibrary", QSslSocket::sslLibraryVersionString());
+        const auto localhost = QHostInfo::fromName(QStringLiteral("localhost"));
+        QJsonArray addresses;
+        for (const auto &address : localhost.addresses()) addresses.append(address.toString());
+        evidence.insert("localhostResolution", QJsonObject{{"addresses", addresses},
+            {"error", int(localhost.error())}, {"errorString", localhost.errorString()}});
+        qWarning().noquote() << "HTTP_POLICY_FAILURE" << QJsonDocument(evidence).toJson(QJsonDocument::Compact);
+    }
+private:
+    std::function<QJsonObject()> snapshot;
+};
 
 // The independent TLS peer offers h2 first and reports actual ALPN/request
 // bytes. Qt retains its native client backend (including Secure Transport,
@@ -58,6 +111,10 @@ public:
         });
     }
     ~Origin() override {
+        // Scope teardown follows the original assertions. Preserve the actual
+        // accepted loopback family on success as well as on a failure path.
+        if (secure && tlsPort)
+            qInfo().noquote() << "TLS_FIXTURE_SUMMARY" << QJsonDocument(evidence()).toJson(QJsonDocument::Compact);
         if (tlsProcess.state() != QProcess::NotRunning) {
             send({{"command", "quit"}});
             tlsProcess.closeWriteChannel();
@@ -84,6 +141,18 @@ public:
     QString error() const {
         return errors.join("; ") + " " + QString::fromUtf8(diagnostics) + " " + tlsProcess.errorString();
     }
+    QJsonObject evidence() const {
+        QJsonArray negotiated;
+        for (const auto &protocol : protocols) negotiated.append(QString::fromLatin1(protocol));
+        return {{"url", url().toString(QUrl::FullyEncoded)}, {"ready", readyEvent},
+            {"acceptedConnections", acceptedConnections}, {"acceptEvents", acceptEvents},
+            {"protocols", negotiated}, {"requests", int(requests.size())}, {"disconnected", disconnected},
+            {"errors", QJsonArray::fromStringList(errors)}, {"lastErrorEvent", lastErrorEvent},
+            {"processState", int(tlsProcess.state())}, {"processError", int(tlsProcess.error())},
+            {"processErrorString", tlsProcess.errorString().left(512)},
+            {"serverStderr", QString::fromUtf8(diagnostics).left(2048)},
+            {"partialEvent", QString::fromUtf8(eventBuffer).left(1024)}};
+    }
     QUrl url() const {
         return QUrl(QStringLiteral("%1://%2:%3/subscription")
             .arg(secure ? "https" : "http", secure ? "localhost" : "127.0.0.1")
@@ -93,6 +162,9 @@ private:
     QString certificateDirectory;
     QByteArray eventBuffer, diagnostics;
     int tlsPort = 0;
+    int acceptedConnections = 0;
+    QJsonObject readyEvent, lastErrorEvent;
+    QJsonArray acceptEvents;
 
     void send(const QJsonObject &message) {
         tlsProcess.write(QJsonDocument(message).toJson(QJsonDocument::Compact) + '\n');
@@ -109,7 +181,11 @@ private:
                 continue;
             }
             const auto type = event.value("event").toString();
-            if (type == "ready") tlsPort = event.value("port").toInt();
+            if (type == "ready") { tlsPort = event.value("port").toInt(); readyEvent = event; }
+            else if (type == "accepted") {
+                ++acceptedConnections;
+                if (acceptEvents.size() < 16) acceptEvents.append(event);
+            }
             else if (type == "protocol") protocols.append(event.value("value").toString().toLatin1());
             else if (type == "request") {
                 requests.append(QByteArray::fromBase64(event.value("headers").toString().toLatin1()));
@@ -118,6 +194,7 @@ private:
                 if (redirectOnce) { status = 200; location.clear(); redirectOnce = false; }
             } else if (type == "disconnected") ++disconnected;
             else if (type == "error") {
+                lastErrorEvent = event;
                 errors.append(event.value("message").toString());
                 qWarning() << "Independent TLS fixture:" << errors.last();
             } else errors.append("Unexpected event from independent TLS fixture");
@@ -258,6 +335,10 @@ private slots:
         request.setTransferTimeout(3000);
         auto *reply = manager.get(request);
         reportClientTlsErrors(reply, fixtureCa);
+        const QPointer<QNetworkReply> observedReply(reply);
+        const FailureDiagnostics diagnostics([&] {
+            return QJsonObject{{"origin", origin.evidence()}, {"client", replyEvidence(observedReply.data(), fixtureCa)}};
+        });
         QSignalSpy finished(reply, &QNetworkReply::finished);
         QTRY_VERIFY_WITH_TIMEOUT(origin.protocols.contains("h2"), 5000);
         QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, 5000);
@@ -278,6 +359,10 @@ private slots:
         request.setTransferTimeout(3000);
         auto *reply = manager.get(request);
         reportClientTlsErrors(reply, fixtureCa);
+        const QPointer<QNetworkReply> observedReply(reply);
+        const FailureDiagnostics diagnostics([&] {
+            return QJsonObject{{"origin", origin.evidence()}, {"client", replyEvidence(observedReply.data(), fixtureCa)}};
+        });
         QSignalSpy finished(reply, &QNetworkReply::finished);
         QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, 5000);
         QCOMPARE(reply->error(), QNetworkReply::NoError);
@@ -292,6 +377,10 @@ private slots:
         Origin origin(certificateDirectory.path());
         QVERIFY2(origin.listen(), qPrintable(origin.error()));
         Download download;
+        const FailureDiagnostics diagnostics([&] {
+            return QJsonObject{{"origin", origin.evidence()}, {"applied", download.applied},
+                {"serviceMessage", download.service.message().left(1024)}};
+        });
         QVERIFY(download.directory.isValid());
         download.service.importUrl(origin.url());
         QTRY_VERIFY_WITH_TIMEOUT(!download.service.busy(), 5000);
@@ -307,6 +396,10 @@ private slots:
         origin.location = origin.url().toEncoded();
         origin.redirectOnce = true;
         Download download;
+        const FailureDiagnostics diagnostics([&] {
+            return QJsonObject{{"origin", origin.evidence()}, {"applied", download.applied},
+                {"serviceMessage", download.service.message().left(1024)}};
+        });
         download.service.importUrl(origin.url());
         QTRY_VERIFY_WITH_TIMEOUT(!download.service.busy(), 5000);
         verifyParsed(download);
@@ -321,6 +414,10 @@ private slots:
         first.status = 302;
         first.location = second.url().toEncoded();
         Download download;
+        const FailureDiagnostics diagnostics([&] {
+            return QJsonObject{{"firstOrigin", first.evidence()}, {"secondOrigin", second.evidence()},
+                {"applied", download.applied}, {"serviceMessage", download.service.message().left(1024)}};
+        });
         download.service.importUrl(first.url());
         QTRY_VERIFY_WITH_TIMEOUT(!download.service.busy(), 5000);
         QCOMPARE(download.applied, 0);
@@ -336,6 +433,10 @@ private slots:
         Origin origin(certificateDirectory.path());
         QVERIFY(origin.listen(false));
         Download download;
+        const FailureDiagnostics diagnostics([&] {
+            return QJsonObject{{"origin", origin.evidence()}, {"applied", download.applied},
+                {"serviceMessage", download.service.message().left(1024)}};
+        });
         download.service.importUrl(origin.url());
         QTRY_VERIFY_WITH_TIMEOUT(!download.service.busy(), 5000);
         verifyParsed(download);
@@ -347,6 +448,10 @@ private slots:
         Origin origin(certificateDirectory.path());
         QVERIFY2(origin.listen(), qPrintable(origin.error()));
         Download download;
+        const FailureDiagnostics diagnostics([&] {
+            return QJsonObject{{"origin", origin.evidence()}, {"applied", download.applied},
+                {"serviceMessage", download.service.message().left(1024)}};
+        });
         download.service.importUrl(origin.url());
         QTRY_VERIFY_WITH_TIMEOUT(!download.service.busy(), 5000);
         QCOMPARE(download.applied, 0);
@@ -362,6 +467,10 @@ private slots:
         first.status = 302;
         first.location = plain.url().toEncoded();
         Download download;
+        const FailureDiagnostics diagnostics([&] {
+            return QJsonObject{{"firstOrigin", first.evidence()}, {"plainOrigin", plain.evidence()},
+                {"applied", download.applied}, {"serviceMessage", download.service.message().left(1024)}};
+        });
         download.service.importUrl(first.url());
         QTRY_VERIFY_WITH_TIMEOUT(!download.service.busy(), 5000);
         QCOMPARE(download.applied, 0);
@@ -377,6 +486,10 @@ private slots:
         QVERIFY2(origin.listen(), qPrintable(origin.error()));
         Download download;
         QSignalSpy applied(&download.service, &NodeImportService::nodesApplied);
+        const FailureDiagnostics diagnostics([&] {
+            return QJsonObject{{"origin", origin.evidence()}, {"applied", download.applied},
+                {"serviceMessage", download.service.message().left(1024)}};
+        });
         download.service.importUrl(origin.url());
         QTRY_COMPARE_WITH_TIMEOUT(origin.requests.size(), 1, 5000);
         QVERIFY(download.service.busy());

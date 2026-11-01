@@ -84,7 +84,7 @@ Dialog {
         exit:discardReveal.exitTransition
         onAboutToShow:{dismissals.push(discardPrompt,owner);discardReveal.prepare(SwirlMotion.popupVector(discardPrompt))}
         onClosed:{dismissals.pop(discardPrompt);discardReveal.reset()}
-        background:SwirlClearGlassSurface{radius:Theme.popupRadius;color:Theme.material("floating")}
+        background:SwirlCardSurface{cornerRadius:Theme.popupRadius}
         // Retain the prompt shell and header hook; its controls are only
         // instantiated while a real unsaved-change confirmation is visible.
         contentItem: Loader {
@@ -131,12 +131,11 @@ Dialog {
     background: Item {
         id:heroBackground
         readonly property point origin:dialog.heroSource?dialog.heroSource.mapToItem(heroBackground,0,0):Qt.point(0,0)
-        SwirlClearGlassSurface {
+        SwirlCardSurface {
             x:Math.round(heroBackground.origin.x*(1-dialog.heroProgress));y:Math.round(heroBackground.origin.y*(1-dialog.heroProgress))
             width:Math.round(dialog.heroSource?dialog.heroSource.width+(parent.width-dialog.heroSource.width)*dialog.heroProgress:parent.width)
             height:Math.round(dialog.heroSource?dialog.heroSource.height+(parent.height-dialog.heroSource.height)*dialog.heroProgress:parent.height)
-            color: Theme.material("floating")
-            radius:dialog.heroSource?Theme.buttonRadius+(Theme.popupRadius-Theme.buttonRadius)*dialog.heroProgress:Theme.popupRadius
+            cornerRadius:dialog.heroSource?Theme.buttonRadius+(Theme.popupRadius-Theme.buttonRadius)*dialog.heroProgress:Theme.popupRadius
             antialiasing:true
         }
     }

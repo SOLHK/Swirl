@@ -16,9 +16,14 @@
 #include <QThreadPool>
 #include <QPointer>
 #include <QSet>
+#include <QHash>
 #include <QTcpSocket>
 #include <cmath>
 #include <algorithm>
+#include <array>
+#ifdef SWIRL_ACTIVITY_PERF_TRACE
+#include <QThread>
+#endif
 #ifdef Q_OS_WIN
 #include <winsock2.h>
 #include <windows.h>
@@ -26,13 +31,96 @@
 #include <icmpapi.h>
 #endif
 namespace {
+#ifdef SWIRL_ACTIVITY_PERF_TRACE
+// Test-only, opt-in timings. Keep synchronous signal fan-out separate from
+// accounting without changing the service layout or any publication path.
+struct TelemetryIngestProfile;
+thread_local TelemetryIngestProfile *activeTelemetryIngestProfile=nullptr;
+struct TelemetryIngestProfile {
+ QPointer<QObject> owner;
+ TelemetryIngestProfile *previous;
+ QElapsedTimer clock;
+ qint64 publishNs=0;
+ int publishDepth=0;
+ bool enabled;
+ explicit TelemetryIngestProfile(QObject *service)
+  :owner(service),previous(activeTelemetryIngestProfile),enabled(service->property("_swirlProfileIngest").toBool()){
+  if(enabled){activeTelemetryIngestProfile=this;clock.start();}
+ }
+ ~TelemetryIngestProfile(){
+  if(!enabled)return;
+  const auto totalNs=clock.nsecsElapsed();
+  activeTelemetryIngestProfile=previous;
+  // Dynamic-property writes happen after the measured interval, never per row.
+  if(owner)owner->setProperty("_swirlLastIngestAccountingMs",double(totalNs-publishNs)/1000000.0);
+  if(owner)owner->setProperty("_swirlLastIngestPublishMs",double(publishNs)/1000000.0);
+ }
+};
+struct TelemetryPublishProfile {
+ TelemetryIngestProfile *ingest;
+ qint64 startedNs=0;
+ bool outermost=false;
+ explicit TelemetryPublishProfile(QObject *service)
+  :ingest(activeTelemetryIngestProfile&&activeTelemetryIngestProfile->owner==service?activeTelemetryIngestProfile:nullptr){
+  if(ingest){outermost=ingest->publishDepth++==0;if(outermost)startedNs=ingest->clock.nsecsElapsed();}
+ }
+ ~TelemetryPublishProfile(){
+  if(!ingest)return;
+  if(outermost)ingest->publishNs+=ingest->clock.nsecsElapsed()-startedNs;
+  --ingest->publishDepth;
+ }
+};
+struct TelemetryConnectionsProfile {
+ QPointer<QObject> observer;
+ explicit TelemetryConnectionsProfile(const QObject *service)
+  :observer(service->property("_swirlPerformanceObserver").value<QObject *>()){
+  if(!observer)return;
+  const auto thread=QThread::currentThread();
+  if(service->thread()!=thread||observer->thread()!=thread){observer.clear();return;}
+  if(!QMetaObject::invokeMethod(observer.data(),"mark",Qt::DirectConnection,Q_ARG(int,12),Q_ARG(bool,true)))observer.clear();
+ }
+ ~TelemetryConnectionsProfile(){
+  if(observer)QMetaObject::invokeMethod(observer.data(),"mark",Qt::DirectConnection,Q_ARG(int,12),Q_ARG(bool,false));
+ }
+};
+#endif
 qint64 nowMs(){return QDateTime::currentMSecsSinceEpoch();}
 void add(QJsonObject &o,const QString &key,double value){o[key]=o.value(key).toDouble()+value;}
-void aggregate(QJsonObject &day,const QString &kind,QString key,double up,double down,bool count){
- key=key.left(256);auto group=day.value(kind).toObject();if(!group.contains(key)&&group.size()>=128)key=QStringLiteral("其他（分类上限）");
- auto row=group.value(key).toObject();add(row,"up",up);add(row,"down",down);if(count)add(row,"count",1);
- group[key]=row;day[kind]=group;
-}
+struct TelemetryGroupAccumulator {
+ struct Totals {
+  QJsonObject original;
+  double up=0,down=0,count=0;
+  bool countTouched=false;
+ };
+ QJsonObject original;
+ QHash<QString,Totals> entries;
+ qsizetype addedKeys=0;
+ void accumulate(QString key,double up,double down,bool count){
+  key=key.left(256);
+  auto entry=entries.find(key);
+  if(entry==entries.end()&&!original.contains(key)&&original.size()+addedKeys>=128){
+   key=QStringLiteral("其他（分类上限）");entry=entries.find(key);
+  }
+  if(entry==entries.end()){
+   const bool existing=original.contains(key);const auto row=original.value(key).toObject();
+   entry=entries.insert(key,Totals{row,row.value("up").toDouble(),row.value("down").toDouble(),row.value("count").toDouble(),false});
+   if(!existing)++addedKeys;
+  }
+  // Preserve the exact per-key addition order, including floating-point
+  // rounding. Do not sum a separate delta and add it to the old total later.
+  entry->up+=up;entry->down+=down;
+  if(count){entry->count+=1;entry->countTouched=true;}
+ }
+ QJsonObject finish() const {
+  auto group=original;
+  for(auto entry=entries.cbegin();entry!=entries.cend();++entry){
+   auto row=entry->original;row["up"]=entry->up;row["down"]=entry->down;
+   if(entry->countTouched)row["count"]=entry->count;
+   group[entry.key()]=row;
+  }
+  return group;
+ }
+};
 }
 TelemetryService::TelemetryService(QString path,bool networkMeasurements,QObject *parent):QObject(parent),m_path(path),m_networkEnabled(networkMeasurements){
  if(m_path.isEmpty())m_path=SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/telemetry.json";
@@ -45,16 +133,33 @@ TelemetryService::TelemetryService(QString path,bool networkMeasurements,QObject
 TelemetryService::~TelemetryService(){flush();}
 bool TelemetryService::sampled() const{return m_status.apiHealthy&&m_status.trafficAt>0&&nowMs()-m_status.trafficAt<6000;}
 bool TelemetryService::connectionsSampled() const{return m_status.apiHealthy&&m_status.connectionsAt>0&&nowMs()-m_status.connectionsAt<6000;}
-void TelemetryService::publish(){m_publishedSampled=sampled();m_publishedConnectionsSampled=connectionsSampled();m_periodCache.clear();++m_revision;emit changed();}
+void TelemetryService::publish(){
+#ifdef SWIRL_ACTIVITY_PERF_TRACE
+ TelemetryPublishProfile profile(this);
+#endif
+ m_publishedSampled=sampled();m_publishedConnectionsSampled=connectionsSampled();++m_revision;emit changed();
+}
 QString TelemetryService::formatBytes(double bytes) const {
- const QStringList units={"B","KB","MB","GB","TB"};int i=0;while(bytes>=1024&&i<4){bytes/=1024;++i;}
+ static const QStringList units={QStringLiteral("B"),QStringLiteral("KB"),QStringLiteral("MB"),QStringLiteral("GB"),QStringLiteral("TB")};int i=0;while(bytes>=1024&&i<4){bytes/=1024;++i;}
  return QString::number(bytes,'f',i?1:0)+" "+units[i];
 }
 int TelemetryService::activeConnections() const {int count=0;for(const auto &r:m_status.connections)if(!r.toMap().value("closed").toBool())++count;return count;}
 int TelemetryService::activeProcesses() const {QSet<QString> names;for(const auto &r:m_status.connections){const auto row=r.toMap();if(row.value("closed").toBool())continue;const auto name=row.value("process").toString();if(!name.isEmpty()&&name!="未知进程")names.insert(name);}return names.size();}
+int TelemetryService::activeDevices() const {
+ QSet<QString> addresses;
+ for(const auto &row:m_seen){
+  if(row.value("status").toString()!=QStringLiteral("活动"))continue;
+  const auto address=row.value("sourceIp").toString();
+  if(!address.isEmpty()&&address!=QStringLiteral("127.0.0.1")&&address!=QStringLiteral("::1"))addresses.insert(address);
+ }
+ return addresses.size();
+}
 void TelemetryService::ingest(const ProxyEngine::Status &status){
+#ifdef SWIRL_ACTIVITY_PERF_TRACE
+ TelemetryIngestProfile profile(this);
+#endif
  const auto epoch=QString::number(status.processId)+"/"+status.sessionId;
- if(status.processAlive&&m_epoch!=epoch){m_epoch=epoch;m_seen.clear();m_lastConnections=0;m_lastTraffic=0;m_lastUp=0;m_lastDown=0;m_externalIp.clear();m_latencies.clear();}
+ if(status.processAlive&&m_epoch!=epoch){m_epoch=epoch;m_seen.clear();++m_connectionRevision;m_lastConnections=0;m_lastTraffic=0;m_lastUp=0;m_lastDown=0;m_externalIp.clear();m_latencies.clear();}
  const auto route=epoch+"/"+status.selectedNodeId+"/"+status.mode+"/"+QString::number(status.proxyPort)+"/"+QString::number(status.processAlive)+"/"+QString::number(status.apiHealthy)+"/"+QString::number(status.directSession)+"/"+status.configurationReceipt.value("applied_revision").toString()+"/"+status.configurationReceipt.value("generation").toString();
  if(route!=m_routeEpoch){m_routeEpoch=route;++m_routeGeneration;
   // Switching away and back still invalidates the old native measurement.
@@ -71,8 +176,14 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
     {"routeVerified",ok},{"route",status.configurationReceipt.isEmpty()?QStringLiteral("当前所选 Rust 出站"):QStringLiteral("当前 Rust 策略")},{"detail",status.configurationReceipt.isEmpty()?QStringLiteral("Rust Core 测量所选出站至最终响应首部；不含界面刷新等待时间。"):QStringLiteral("Rust Core 根据当前策略测量至响应首部；本次实际出口见连接详情。")}});
   }
  }
- if(!status.apiHealthy){for(auto it=m_seen.begin();it!=m_seen.end();++it)if(it->value("status")!="已结束")(*it)["status"]=status.processAlive?QStringLiteral("采样中断"):QStringLiteral("已结束");publish();return;}
+ if(!status.apiHealthy){
+  const auto state=status.processAlive?QStringLiteral("采样中断"):QStringLiteral("已结束");bool changed=false;
+  for(auto it=m_seen.begin();it!=m_seen.end();++it)if(it->value("status")!="已结束"&&it->value("status")!=state){(*it)["status"]=state;changed=true;}
+  if(changed)++m_connectionRevision;
+  publish();return;
+ }
  if(status.connectionsAt>m_lastConnections){
+  ++m_connectionRevision;
   m_lastConnections=status.connectionsAt;const auto date=QDateTime::fromMSecsSinceEpoch(status.connectionsAt).date().toString(Qt::ISODate);
   auto day=m_days.value(date).toObject();
   // Earlier persisted days cannot be split by source after the fact.
@@ -84,44 +195,70 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
   add(day,"up",up>=m_lastUp?up-m_lastUp:up);add(day,"down",down>=m_lastDown?down-m_lastDown:down);m_lastUp=up;m_lastDown=down;
   const auto time=QDateTime::fromMSecsSinceEpoch(status.connectionsAt).time();const auto bucketKey=QString::number(time.hour()*2+time.minute()/30);
   auto buckets=day.value("buckets").toObject(),bucket=buckets.value(bucketKey).toObject();bucket["sampled"]=true;add(bucket,"total",totalDelta);
+  const QStringList groupKeys={"apps","domains","devices","nodes","categories","proxyApps","proxyDomains","proxyDevices","proxyNodes"};
+  std::array<TelemetryGroupAccumulator,9> groups;
+  for(int index=0;index<int(groups.size());++index)groups[index].original=day.value(groupKeys[index]).toObject();
+  // Update native scalars in the original record order, then construct each
+  // touched JSON row once. Hot categories no longer detach a row per connection.
+  const auto aggregateGroup=[&](int index,const QString &key,double up,double down,bool count){groups[index].accumulate(key,up,down,count);};
   QSet<QString> active;
+  QString previousRawTime,previousDisplayTime;bool havePreviousTime=false;
   for(const auto &value:status.connections){
-   auto row=value.toMap();const auto id=row.value("id").toString();if(id.isEmpty()||active.contains(id))continue;active.insert(id);
-   if(row.contains("route"))row.insert("route",SwirlRouteObservation::sanitized(QJsonObject::fromVariantMap(row.value("route").toMap())));
-   const auto old=m_seen.value(id);const auto u=row.value("uploadBytes").toLongLong(),d=row.value("downloadBytes").toLongLong();
-   const auto ou=old.value("uploadBytes").toLongLong(),od=old.value("downloadBytes").toLongLong();
+   auto row=value.toMap();const auto id=row.value(QStringLiteral("id")).toString();if(id.isEmpty()||active.contains(id))continue;active.insert(id);
+   if(row.contains(QStringLiteral("route")))row.insert(QStringLiteral("route"),SwirlRouteObservation::sanitized(QJsonObject::fromVariantMap(row.value(QStringLiteral("route")).toMap())));
+   const auto old=m_seen.value(id);const auto u=row.value(QStringLiteral("uploadBytes")).toLongLong(),d=row.value(QStringLiteral("downloadBytes")).toLongLong();
+   const auto ou=old.value(QStringLiteral("uploadBytes")).toLongLong(),od=old.value(QStringLiteral("downloadBytes")).toLongLong();
    const auto du=qMax<qint64>(0,u>=ou?u-ou:u),dd=qMax<qint64>(0,d>=od?d-od:d);
-   const bool count=old.value("accountedDay").toString()!=date;
-   const bool proxy=row.value("category").toString()==QStringLiteral("proxy");
-   const bool proxyCount=old.value("proxyAccountedDay").toString()!=date;
-   aggregate(day,"apps",row.value("process","未知进程").toString(),du,dd,count);
-   aggregate(day,"domains",row.value("host",row.value("ip")).toString(),du,dd,count);
-   if(!row.value("sourceIp").toString().isEmpty())aggregate(day,"devices",row.value("sourceIp").toString(),du,dd,count);
-   aggregate(day,"nodes",row.value("policy").toString(),du,dd,count);
-   aggregate(day,"categories",row.value("category","other").toString(),du,dd,count);
+   const bool count=old.value(QStringLiteral("accountedDay")).toString()!=date;
+   const auto process=row.value(QStringLiteral("process"),QStringLiteral("未知进程")).toString();
+   const auto domain=row.value(QStringLiteral("host"),row.value(QStringLiteral("ip"))).toString();
+   const auto sourceIp=row.value(QStringLiteral("sourceIp")).toString();
+   const auto policy=row.value(QStringLiteral("policy")).toString();
+   const auto category=row.value(QStringLiteral("category"),QStringLiteral("other")).toString();
+   const bool proxy=category==QStringLiteral("proxy");
+   const bool proxyCount=old.value(QStringLiteral("proxyAccountedDay")).toString()!=date;
+   aggregateGroup(0,process,du,dd,count);
+   aggregateGroup(1,domain,du,dd,count);
+   if(!sourceIp.isEmpty())aggregateGroup(2,sourceIp,du,dd,count);
+   aggregateGroup(3,policy,du,dd,count);
+   aggregateGroup(4,category,du,dd,count);
    if(proxy){
-    aggregate(day,"proxyApps",row.value("process","未知进程").toString(),du,dd,proxyCount);
-    aggregate(day,"proxyDomains",row.value("host",row.value("ip")).toString(),du,dd,proxyCount);
-    if(!row.value("sourceIp").toString().isEmpty())aggregate(day,"proxyDevices",row.value("sourceIp").toString(),du,dd,proxyCount);
-    aggregate(day,"proxyNodes",row.value("policy").toString(),du,dd,proxyCount);
+    aggregateGroup(5,process,du,dd,proxyCount);
+    aggregateGroup(6,domain,du,dd,proxyCount);
+    if(!sourceIp.isEmpty())aggregateGroup(7,sourceIp,du,dd,proxyCount);
+    aggregateGroup(8,policy,du,dd,proxyCount);
     add(bucket,"proxy",du+dd);
-    row["proxyAccountedDay"]=date;
-   }else if(old.contains("proxyAccountedDay"))row["proxyAccountedDay"]=old.value("proxyAccountedDay");
-   const auto interval=status.connectionsAt-old.value("lastSeen").toLongLong();
-   row["uploadRate"]=!old.isEmpty()&&interval>0?double(du)*1000/interval:0;row["downloadRate"]=!old.isEmpty()&&interval>0?double(dd)*1000/interval:0;
-   row["accountedDay"]=date;row["lastSeen"]=status.connectionsAt;row["status"]=row.value("closed").toBool()?"已结束":"活动";
-   row["up"]=formatBytes(u);row["down"]=formatBytes(d);row["time"]=QDateTime::fromString(row.value("time").toString(),Qt::ISODateWithMs).toLocalTime().toString("MM-dd HH:mm:ss");
+    row[QStringLiteral("proxyAccountedDay")]=date;
+   }else if(old.contains(QStringLiteral("proxyAccountedDay")))row[QStringLiteral("proxyAccountedDay")]=old.value(QStringLiteral("proxyAccountedDay"));
+   const auto interval=status.connectionsAt-old.value(QStringLiteral("lastSeen")).toLongLong();
+   row[QStringLiteral("uploadRate")]=!old.isEmpty()&&interval>0?double(du)*1000/interval:0;row[QStringLiteral("downloadRate")]=!old.isEmpty()&&interval>0?double(dd)*1000/interval:0;
+   row[QStringLiteral("accountedDay")]=date;row[QStringLiteral("lastSeen")]=status.connectionsAt;row[QStringLiteral("status")]=row.value(QStringLiteral("closed")).toBool()?QStringLiteral("已结束"):QStringLiteral("活动");
+   row[QStringLiteral("up")]=formatBytes(u);row[QStringLiteral("down")]=formatBytes(d);
+   const auto rawTime=row.value(QStringLiteral("time")).toString();
+   if(!havePreviousTime||rawTime!=previousRawTime){
+    previousRawTime=rawTime;previousDisplayTime=QDateTime::fromString(rawTime,Qt::ISODateWithMs).toLocalTime().toString(QStringLiteral("MM-dd HH:mm:ss"));havePreviousTime=true;
+   }
+   row[QStringLiteral("time")]=previousDisplayTime;
    m_seen[id]=row;
   }
+  // Untouched groups retain their original missing/empty representation.
+  for(int index=0;index<int(groups.size());++index)if(!groups[index].entries.isEmpty())day[groupKeys[index]]=groups[index].finish();
   for(auto it=m_seen.begin();it!=m_seen.end();++it)if(!active.contains(it.key()))(*it)["status"]="已结束";
   while(m_seen.size()>2000){auto oldest=m_seen.end();for(auto it=m_seen.begin();it!=m_seen.end();++it)if(!active.contains(it.key())&&(oldest==m_seen.end()||it->value("lastSeen").toLongLong()<oldest->value("lastSeen").toLongLong()))oldest=it;if(oldest==m_seen.end())break;m_seen.erase(oldest);}
   buckets[bucketKey]=bucket;day["buckets"]=buckets;
-  m_days[date]=day;const auto oldest=QDate::currentDate().addDays(-31).toString(Qt::ISODate);for(const auto &key:m_days.keys())if(key<oldest)m_days.remove(key);while(m_days.size()>32)m_days.remove(m_days.keys().first());m_dirty=true;
+  m_days[date]=day;m_periodCache.clear();const auto oldest=QDate::currentDate().addDays(-31).toString(Qt::ISODate);for(const auto &key:m_days.keys())if(key<oldest)m_days.remove(key);while(m_days.size()>32)m_days.remove(m_days.keys().first());m_dirty=true;
  }
  if(status.trafficAt>m_lastTraffic){m_lastTraffic=status.trafficAt;m_history.append(QVariantMap{{"time",status.trafficAt},{"down",status.downloadRate},{"up",status.uploadRate}});while(m_history.size()>3600)m_history.removeFirst();m_dirty=true;}
  publish();
 }
-QVariantList TelemetryService::connections() const {QVariantList rows;for(const auto &r:m_seen)rows.append(r);std::sort(rows.begin(),rows.end(),[](const QVariant &a,const QVariant &b){return a.toMap().value("lastSeen").toLongLong()>b.toMap().value("lastSeen").toLongLong();});return rows;}
+QVariantList TelemetryService::connections() const {
+#ifdef SWIRL_ACTIVITY_PERF_TRACE
+ // This ends after native return-value construction; QVariant-to-JS conversion
+ // happens in the caller and is included only in the page's fetch/normalize span.
+ TelemetryConnectionsProfile profile(this);
+#endif
+ QVariantList rows;for(const auto &r:m_seen)rows.append(r);std::sort(rows.begin(),rows.end(),[](const QVariant &a,const QVariant &b){return a.toMap().value("lastSeen").toLongLong()>b.toMap().value("lastSeen").toLongLong();});return rows;
+}
 QJsonObject TelemetryService::periodData(int period) const {
  if(period<0||period>3)period=0;
  const auto today=QDate::currentDate();
@@ -142,7 +279,7 @@ QVariantList TelemetryService::ranking(const QString &kind,int period,int limit,
  const auto group=proxyOnly?QStringLiteral("proxy")+kind.left(1).toUpper()+kind.mid(1):kind;
  const auto entries=data.value(group).toObject();QVariantList result;
  const auto total=proxyOnly?data.value("categories").toObject().value("proxy").toObject().value("up").toDouble()+data.value("categories").toObject().value("proxy").toObject().value("down").toDouble():data.value("up").toDouble()+data.value("down").toDouble();
- for(const auto &name:entries.keys()){const auto r=entries.value(name).toObject();const auto up=r.value("up").toDouble(),down=r.value("down").toDouble();result.append(QVariantMap{{"id",name},{"name",name},{"upload",formatBytes(up)},{"download",formatBytes(down)},{"value",formatBytes(up+down)},{"total",up+down},{"connections",r.value("count").toDouble()},{"percent",total>0?QString::number(100*(up+down)/total,'f',1)+"%":"0%"},{"mark",name.left(1)},{"color","#596273"}});}
+ for(const auto &name:entries.keys()){const auto r=entries.value(name).toObject();const auto up=r.value("up").toDouble(),down=r.value("down").toDouble();result.append(QVariantMap{{"id",name},{"name",name},{"upload",formatBytes(up)},{"download",formatBytes(down)},{"uploadBytes",up},{"downloadBytes",down},{"value",formatBytes(up+down)},{"total",up+down},{"connections",r.value("count").toDouble()},{"percent",total>0?QString::number(100*(up+down)/total,'f',1)+"%":"0%"},{"mark",name.left(1)},{"color","#596273"}});}
  QHash<QString,double> speeds;
  if(connectionsSampled())for(const auto &value:m_seen){
   if(value.value("status")!="活动"||(proxyOnly&&value.value("category")!="proxy"))continue;
@@ -150,7 +287,7 @@ QVariantList TelemetryService::ranking(const QString &kind,int period,int limit,
   speeds[key.toString()]+=value.value("uploadRate").toDouble()+value.value("downloadRate").toDouble();
  }
  for(auto &entry:result){auto row=entry.toMap();const auto speed=speeds.value(row.value("name").toString());row["speed"]=speed;row["speedText"]=formatBytes(speed)+"/s";row["kind"]=kind;entry=row;}
- std::sort(result.begin(),result.end(),[](const QVariant &a,const QVariant &b){return a.toMap().value("total").toDouble()>b.toMap().value("total").toDouble();});while(result.size()>qBound(1,limit,512))result.removeLast();return result;
+ std::sort(result.begin(),result.end(),[](const QVariant &a,const QVariant &b){return a.toMap().value("total").toDouble()>b.toMap().value("total").toDouble();});if(limit!=0)while(result.size()>qBound(1,limit,512))result.removeLast();return result;
 }
 QVariantList TelemetryService::distribution(int period) const {
  const auto d=periodData(period),cats=d.value("categories").toObject();double measured=0;for(const auto &v:cats){const auto r=v.toObject();measured+=r.value("up").toDouble()+r.value("down").toDouble();}

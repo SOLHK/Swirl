@@ -1,4 +1,6 @@
 #version 440
+#extension GL_GOOGLE_include_directive : require
+#include "swirl-contour.glsl"
 layout(location=0) in vec2 qt_TexCoord0;
 layout(location=0) out vec4 fragColor;
 layout(std140,binding=0) uniform buf {
@@ -20,11 +22,8 @@ void main() {
     // second sidebar/workspace tint or decorative sheen.
     // Evaluate the continuous silhouette in the final material pass instead
     // of sampling a second whole-window mask (including all native text).
-    float r=clamp(cornerRadius,0.0,min(surfaceSize.x,surfaceSize.y)*0.5);
-    vec2 q=abs((qt_TexCoord0-0.5)*surfaceSize)-surfaceSize*0.5+r;
-    vec2 k=max(q,vec2(0.0));
-    float d=pow(max(dot(k*k,k*k),0.00000001),0.25)+min(max(q.x,q.y),0.0)-r;
-    float coverage=1.0-smoothstep(-max(fwidth(d),0.001),0.0,d);
+    float d=swirlSurfaceDistance((qt_TexCoord0-0.5)*surfaceSize,surfaceSize,cornerRadius);
+    float coverage=swirlCoverage(d);
     float alpha=surfaceOpacity*coverage*qt_Opacity;
     fragColor=vec4(shade*alpha,alpha);
 }

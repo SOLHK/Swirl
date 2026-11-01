@@ -10,6 +10,7 @@
 #include <QQmlContext>
 #include <QQmlExpression>
 #include <QQmlComponent>
+#include <QQmlIncubationController>
 #include <QQmlEngine>
 #include <QQmlProperty>
 #include <QTest>
@@ -20,8 +21,10 @@
 #include <QImage>
 #include <QFile>
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QJSValue>
+#include <QSet>
 #include <cstdio>
 #include <functional>
 #include <memory>
@@ -251,13 +254,15 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                                 const auto detail=capsule->property("detail").toString();
                                 const auto accessibleName=QQmlProperty::read(capsule,QStringLiteral("Accessible.name"),qmlContext(capsule));
                                 const auto accessibleDescription=QQmlProperty::read(capsule,QStringLiteral("Accessible.description"),qmlContext(capsule));
+                                // Qt separates the visible control name from its
+                                // full state/action description; neither may be lost.
                                 return label==QStringLiteral("系统代理")&&capsule->isEnabled()
                                     &&capsule->property("proxyEnabled").toBool()==enabled&&capsule->property("proxyOwned").toBool()==enabled
                                     &&capsule->property("tone").toString()==(enabled?"success":"neutral")
                                     &&capsule->property("activityPhase").toString()==(enabled?"succeeded":"idle")
                                     &&detail.contains(enabled?QStringLiteral("已接管系统代理"):QStringLiteral("点击启动已保存策略"))
                                     &&detail.contains(enabled?QStringLiteral("点击恢复原设置并停止内核"):QStringLiteral("通过 Swirl 开启代理"))
-                                    &&accessibleName.isValid()&&accessibleName.toString()==label+QStringLiteral("，")+detail
+                                    &&accessibleName.isValid()&&accessibleName.toString()==label
                                     &&accessibleDescription.isValid()&&accessibleDescription.toString()==detail;
                             };
                             QSignalSpy clicked(capsule,SIGNAL(clicked()));
@@ -552,7 +557,38 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         QTest::qWait(5);
         eval(QString("pageLoader.item.inspectRow(engineController.nodes[%1])").arg(i));
     }
-    check(QTest::qWaitFor([&]{return hero&&!hero->property("moving").toBool();},3500),"180 rapid node selections settle");
+    auto *incubation=qmlEngine(window)->incubationController();
+    const auto incubationCount=[&]{return incubation?incubation->incubatingObjectCount():0;};
+    const auto loadingSources=[&]{
+        QJsonArray loading;
+        QList<QObject *> objects;QSet<QObject *> visited;
+        std::function<void(QObject *)> collect=[&](QObject *parent){
+            if(!parent||visited.contains(parent))return;visited.insert(parent);objects.append(parent);
+            for(auto *child:parent->children())collect(child);
+            if(auto *visual=qobject_cast<QQuickItem *>(parent))for(auto *child:visual->childItems())collect(child);
+        };
+        collect(window);collect(window->contentItem());
+        for(auto *object:objects){
+            if(!object->inherits("QQuickLoader")||object->property("status").toInt()!=2)continue;
+            QStringList parents;QString route;
+            for(auto *ancestor=object;ancestor;ancestor=ancestor->parent()){
+                parents.append(QString::fromLatin1(ancestor->metaObject()->className())+":"+ancestor->objectName());
+                if(route.isEmpty()&&ancestor->property("routeId").isValid())route=ancestor->property("routeId").toString();
+            }
+            const auto *context=qmlContext(object);
+            loading.append(QJsonObject{{"class",QString::fromLatin1(object->metaObject()->className())},{"name",object->objectName()},
+                {"route",route},{"source",object->property("source").toUrl().toString()},{"context",context?context->baseUrl().toString():QString()},
+                {"active",object->property("active").toBool()},{"asynchronous",object->property("asynchronous").toBool()},{"parents",parents.join(" / ")}});
+        }
+        return loading;
+    };
+    const auto initialIncubations=incubationCount();const auto initialLoading=loadingSources();
+    check(QTest::qWaitFor([&]{return hero&&!hero->property("moving").toBool()&&incubationCount()==0;},3500),"180 rapid node selections settle");
+    const auto finalIncubations=incubationCount();const auto finalLoading=loadingSources();
+    qInfo()<<"NODE_INCUBATION_LIFECYCLE"<<QJsonDocument(QJsonObject{{"controllerPresent",incubation!=nullptr},
+        {"initialCount",initialIncubations},{"finalCount",finalIncubations},{"initialLoadingSources",initialLoading},{"finalLoadingSources",finalLoading},
+        {"scope","Public incubation-controller count and live Loader sources only; this does not prove the engine's broader in-progress-creation counter is empty."}}).toJson(QJsonDocument::Compact);
+    check(finalIncubations==0&&finalLoading.isEmpty(),"rapid node selection leaves no pending public incubation or Loading Loader before shutdown");
     check(eval("pageLoader.item.selected.name.indexOf('179')>=0").toBool(),"last of 180 rapid detail retargets retains its selected node");
     auto *identity=item("nodeIdentitySurface");
     check(identity&&identity->parentItem()!=hero->parentItem(),"settled node details return to scroll ownership");

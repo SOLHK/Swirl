@@ -25,5 +25,8 @@ ScrollView {
     }
     onVisibleChanged:if(visible)Qt.callLater(function(){if(form.viewport)form.viewport.contentY=0;form.revealFocus()})
     onHeightChanged:Qt.callLater(revealFocus)
+    // A layout can change the focused field's position after the focus/resize
+    // callbacks. Reveal it again when that layout updates the content extent.
+    onContentHeightChanged:Qt.callLater(revealFocus)
     Connections {target:form.ownerWindow;function onActiveFocusItemChanged(){Qt.callLater(form.revealFocus)}}
 }

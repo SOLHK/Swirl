@@ -91,7 +91,7 @@ Item {
   if(!next){
    // Incubate cold pages across frames while the current live page stays
    // visible. The initial page remains synchronous so startup has content.
-   next=pageFactory.createObject(viewport,{routeId:routeKey,asynchronous:incubateRoutes&&activeLoader!==null,sourceComponent:sourceComponent})
+   next=pageFactory.createObject(viewport,{routeId:routeKey,asynchronous:incubateRoutes&&activeLoader!==null,sourceComponent:sourceComponent,width:host.width,height:host.height-insetFor(routeKey)})
    if(!next){releaseShared();return}
    const copy=Object.assign({},pages);copy[routeKey]=next;pages=copy
   }
@@ -192,7 +192,12 @@ Item {
   property real arcBend:0
   readonly property point contentShift:Qt.point(host.interpolate(startShift.x,endShift.x,host.surfacePosition),host.interpolate(startShift.y,endShift.y,host.surfacePosition)+arcBend*SwirlMotion.arch(host.surfacePosition))
   opacity:startOpacity+(endOpacity-startOpacity)*host.pageReveal
-  x:0;y:host.insetFor(routeId);width:host.width;height:host.height-y;visible:false
+  x:0;y:host.insetFor(routeId);visible:false
+  // Cached pages keep their last layout while hidden. Only live/pending pages
+  // follow every frame of sidebar resizing; re-entry synchronizes before polish.
+  readonly property bool layoutActive:visible || cachedLoader===host.activeLoader || cachedLoader===host.pendingLoader
+  Binding {target:cachedLoader;property:"width";value:host.width;when:cachedLoader.layoutActive;restoreMode:Binding.RestoreNone}
+  Binding {target:cachedLoader;property:"height";value:host.height-cachedLoader.y;when:cachedLoader.layoutActive;restoreMode:Binding.RestoreNone}
   z:host.heroData && host.heroData.key==="settings" && host.heroData.returning?
       (host.leavingLoader===cachedLoader?2:0):(host.activeLoader===cachedLoader?2:0)
   readonly property bool expandingDetails:host.heroData!==null && host.heroData.key==="settings" &&

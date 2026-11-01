@@ -7,6 +7,9 @@ Item {
     property var columns:[{key:"name",label:"名称",w:220}]
     property var rows:[]
     property var externalModel:null
+    property bool externalProjectionEvents:false
+    property bool disableReuseForExternalRows:false
+    property QtObject performanceObserver:null
     property bool incrementalRows:false
     property bool sectioned:false
     property real sectionHeight:Theme.dp(32)
@@ -52,17 +55,25 @@ Item {
         visiblePositions={}
     }
     function restoreViewport() {
-        const generation=projectionGeneration
-        if(followTail&&wasAtEnd){list.positionViewAtEnd();animateVisibleRows();return}
-        const index=anchorKey.length?rowForKey(anchorKey):-1
-        if(index<0){animateVisibleRows();return}
-        list.positionViewAtIndex(index,ListView.Beginning)
-        Qt.callLater(function(){
-            if(generation!==table.projectionGeneration)return
-            const item=list.itemAtIndex(index)
-            if(item)list.contentY=Math.max(list.originY,Math.min(item.y-table.anchorOffset,list.originY+Math.max(0,list.contentHeight-list.height)))
-            table.animateVisibleRows()
-        })
+        const observer=performanceObserver
+        if(observer)observer.mark(9,true)
+        try {
+            const generation=projectionGeneration
+            if(followTail&&wasAtEnd){list.positionViewAtEnd();animateVisibleRows();return}
+            const index=anchorKey.length?rowForKey(anchorKey):-1
+            if(index<0){animateVisibleRows();return}
+            list.positionViewAtIndex(index,ListView.Beginning)
+            Qt.callLater(function(){
+                const deferredObserver=table.performanceObserver
+                if(deferredObserver)deferredObserver.mark(10,true)
+                try {
+                    if(generation!==table.projectionGeneration)return
+                    const item=list.itemAtIndex(index)
+                    if(item)list.contentY=Math.max(list.originY,Math.min(item.y-table.anchorOffset,list.originY+Math.max(0,list.contentHeight-list.height)))
+                    table.animateVisibleRows()
+                } finally {if(deferredObserver)deferredObserver.mark(10,false)}
+            })
+        } finally {if(observer)observer.mark(9,false)}
     }
     function beginProjection() {
         ++projectionGeneration
@@ -76,19 +87,36 @@ Item {
     }
     function endProjection() {
         const generation=projectionGeneration
-        Qt.callLater(function(){if(generation===table.projectionGeneration){list.forceLayout();table.restoreViewport()}})
+        Qt.callLater(function(){
+            const observer=table.performanceObserver
+            if(observer)observer.mark(11,true)
+            try {
+                if(generation!==table.projectionGeneration)return
+                if(observer)observer.mark(8,true)
+                try {list.forceLayout()}
+                finally {if(observer)observer.mark(8,false)}
+                table.restoreViewport()
+            } finally {if(observer)observer.mark(11,false)}
+        })
     }
     Connections {target:stableRows;function onAboutToSync(){table.beginProjection()}function onSynced(){table.endProjection()}}
-    Connections {target:table.sectioned?table.externalModel:null;ignoreUnknownSignals:true;function onAboutToSync(){table.beginProjection()}function onSynced(){table.endProjection()}}
+    Connections {target:table.sectioned||table.externalProjectionEvents?table.externalModel:null;ignoreUnknownSignals:true;function onAboutToSync(){table.beginProjection()}function onSynced(){table.endProjection()}}
     property bool managedSelection:false
     property bool animateRowChanges:false
     property bool animateLatency:false
     property bool minimal:false
     property alias scrollPosition:list.contentY
     function scrollToBeginning(){anchorKey="";list.positionViewAtBeginning()}
+    function positionRow(key) {
+        Qt.callLater(function() {
+            list.forceLayout()
+            const index = table.rowForKey(key)
+            if (index >= 0) list.positionViewAtIndex(index, ListView.Contain)
+        })
+    }
     function focusRowAt(index){const row=list.itemAtIndex(index);if(row){list.currentIndex=index;chooseRow(row,false)}}
     readonly property int renderedRows:list.contentItem.children.length
-    SwirlAnimatedModel{id:stableRows;source:table.incrementalRows?table.rows:[];keyRole:"id"}
+    SwirlAnimatedModel{id:stableRows;source:table.externalModel===null&&table.incrementalRows?table.rows:[];keyRole:"id";performanceObserver:table.performanceObserver}
     property string selectedId:""
     property Item selectedItem:null
     property int itemHeight:Theme.tableRowHeight
@@ -114,7 +142,7 @@ Item {
         return Theme.dp(column.min||12)+Math.round(flexible*(before+column.w)/totalWidth)-Math.round(flexible*before/totalWidth)
     }
     function chooseRow(row,activate) {
-        if(!row)return
+        if(!row||!row.enabled)return
         if(row.sectionRow){if(activate)sectionActivated(String(row.record.sectionKey));return}
         selectedItem=row
         if(!incrementalRows&&!managedSelection)selectedId=String(row.record.id||row.record.name)
@@ -180,7 +208,7 @@ Item {
                 height:Math.max(0,horizontal.height-table.headerHeight-(horizontal.contentWidth>horizontal.width?Theme.dp(10):0))
                 clip:true
                 model:table.externalModel!==null?table.externalModel:table.incrementalRows?stableRows:table.rows
-                reuseItems:table.externalModel!==null
+                reuseItems:table.externalModel!==null&&!table.disableReuseForExternalRows
                 boundsBehavior:Flickable.StopAtBounds
                 pixelAligned:false
                 activeFocusOnTab:true
@@ -197,6 +225,9 @@ Item {
                 ScrollBar.vertical:SwirlScrollBar {parent:table;z:11;anchors.right:parent.right;y:table.headerHeight;height:list.height}
                 delegate:Item {
                     id:recordRow
+                    // Removed delegates can remain visible until the next model
+                    // polish. Their retired contexts must not receive input.
+                    enabled:index>=0&&!pooled
                     z:1
                     width:list.width; height:sectionRow?table.sectionHeight:table.itemHeight
                     property var record:table.externalModel!==null||table.incrementalRows?model.entry:modelData

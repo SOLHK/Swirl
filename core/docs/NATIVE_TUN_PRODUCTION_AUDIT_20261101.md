@@ -201,6 +201,50 @@ error set. Its new-source macOS result remains a required re-test.
 
 ## Kill-switch architecture constraints still to implement
 
+### Reconciliation with current product history
+
+At `b9b190f16289954e0643867d5ea155cb2cbd3f77`, Native TUN
+[41276477070](https://github.com/SOLHK/Swirl/actions/runs/41276477070)
+passed 2/2 jobs and Native Protocols
+[41276477051](https://github.com/SOLHK/Swirl/actions/runs/41276477051)
+passed 6/6. The Wintun test received/sent 2,012/1,737 packets and restored six
+owned resources with zero conflicts. Its Server/loopback scope did not change.
+A separately built local Windows 11 Qt/Core pair at that source also passed
+the six existing independent TUIC/Hysteria2 product-chain tests (TCP/UDP,
+authentication rejection and Salamander). These exercise configuration import,
+encrypted reopen and native Core forwarding, not system-wide TUN or browser
+HTTP/3 acceptance.
+
+The same source's full Qt run
+[41276477118](https://github.com/SOLHK/Swirl/actions/runs/41276477118)
+**failed**: critical UI 8/9, network/security 10/10, with no skipped tests in
+either JUnit group. Both failing appearance assertions were Dark-mode press
+responses: `reviewButton` had no changed admissible frame within 40 ms;
+`reviewNavigation` reached scale 0.996403 within that window, above the original
+strict 0.995 threshold. Later deadline observations were not valid frame
+callbacks and did not satisfy the contract. The remaining regression and
+installer were blocked. Original logs, JUnit and artifact bytes are retained;
+this failure is not relabelled as passed.
+
+The current remote `test` history (`63dde8812f85839aa6024cbba6c498c96cae022d`)
+already contains monotonic input-time press sampling and paired native
+render-sync transforms (`3c3778b`, `f5512cb`, `842c78d`). It is being reconciled
+into the existing TUN development branch with an ordinary merge, preserving
+all product changes rather than authoring another UI repair. The sole manual
+conflict is the Qt workflow step header; its combined UI/network failure gate
+retains `critical_ui` identity for the newer diagnostics. Both sides' test,
+inventory, diagnostic, cache and evidence steps remain. Product UI sources
+match `test` exactly; the existing TUN dependency-notice addition is retained.
+This is not a merge into `test` or `main`, and requires fresh exact-merge-SHA CI.
+
+Before committing the merge, the paired Qt/Rust test targets compiled and all
+four selected CTests passed (storage paths, library loader, Rust/Qt integration,
+import boundaries). The first invocation lacked the explicitly required
+isolated storage directory and failed before import execution; after creating
+that fixture the unchanged tests passed. The development updater contract
+reported 58 passed / two existing Windows platform skips out of 60. No host
+proxy, physical route, DNS or firewall setting was changed.
+
 Evaluated WFP and existing Windows Firewall integration against Microsoft's
 [filter arbitration](https://learn.microsoft.com/en-us/windows/win32/fwp/filter-arbitration)
 and [object lifetime/transactions](https://learn.microsoft.com/en-us/windows/win32/fwp/object-management).

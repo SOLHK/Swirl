@@ -114,16 +114,24 @@ int runApecGlassChecks(QQuickWindow *window,const QString &output) {
     check("wing-decoration-spans-workspace",decoration && decoration->width()==scene->width() && decoration->height()==scene->height());
     auto *footprint=scene?scene->findChild<QQuickItem *>("apecWingFootprint"):nullptr;
     auto *wingVisual=scene?scene->findChild<QQuickItem *>("apecWingVisual"):nullptr;
+    auto *echo=scene?scene->findChild<QQuickItem *>("workspaceWingEcho"):nullptr;
     check("flat-wing-vector-loaded",footprint && wingVisual && findVisual(scene,"apecFlatWingPaths"));
     for(const QSize size:{QSize(760,672),QSize(914,672),QSize(1100,760)}) {
         window->resize(size);QTest::qWait(50);
-        check("single-wing-spans-window-diagonally-with-fixed-aspect",footprint
-            && footprint->width()>scene->width()
-            && qAbs(footprint->height()/footprint->width()-0.625)<0.001
-            && footprint->y()<scene->height()/4
-            && footprint->x()<0
-            && qAbs(footprint->x()+footprint->width()-scene->width()+20)<0.1
-            && qAbs(footprint->y()+footprint->height()-scene->height()-8)<0.1);
+        // The accepted whole-feather composition has two corner wings. Keep
+        // both master aspect ratios and their live workspace anchors; the
+        // retired single diagonal wing must not be restored to satisfy a test.
+        check("main-and-echo-wings-retain-aspect-and-responsive-corner-anchors",footprint && echo
+            && footprint->width()>=qMin(scene->width()*.40,eval("Theme.dp(280)").toDouble())-0.1
+            && footprint->width()<=scene->width()*.40+0.1
+            && footprint->width()<=scene->height()*.65+0.1
+            && qAbs(footprint->height()/footprint->width()-580.0/880)<0.001
+            && qAbs(footprint->x()+eval("Theme.dp(8)").toDouble())<0.1
+            && qAbs(footprint->y()+footprint->height()-scene->height()-eval("Theme.dp(4)").toDouble())<0.1
+            && qAbs(echo->width()-qMin(eval("Theme.dp(260)").toDouble(),scene->width()*.27))<0.1
+            && qAbs(echo->height()/echo->width()-130.0/540)<0.001
+            && qAbs(echo->x()+echo->width()-scene->width()-eval("Theme.dp(2)").toDouble())<0.1
+            && qAbs(echo->y())<0.1);
         const auto withGlass=window->grabWindow();
         if(productionSurface)productionSurface->setVisible(false);
         QTest::qWait(35);const auto withoutGlass=window->grabWindow();
@@ -131,8 +139,8 @@ int runApecGlassChecks(QQuickWindow *window,const QString &output) {
         QTest::qWait(35);
         check("production-wing-and-foreground-are-pixel-identical-through-pane",clearInterior(withGlass,withoutGlass,productionGlass,window->contentItem()));
     }
-    check("sidebar-retains-floating-inset-size-and-24dp-contour",eval("sidebar.glassSurface.x===Theme.shellInset && sidebar.glassSurface.y===Theme.shellInset && sidebar.glassSurface.width===sidebar.width-2*Theme.shellInset && sidebar.glassSurface.height===sidebar.height-2*Theme.shellInset && sidebar.glassSurface.radius===Theme.sidebarRadius && Theme.sidebarRadius===Theme.dp(24)").toBool());
-    check("neutral-light-canvas-and-card-palette",eval("Theme.canvas.toString()==='#f7f7f8' && Theme.surface.toString()==='#ffffff' && Theme.border.toString()==='#e0e0e3'").toBool());
+    check("sidebar-retains-floating-inset-size-and-shared-squircle-contour",eval("sidebar.glassSurface.x===Theme.shellInset && sidebar.glassSurface.y===Theme.shellInset && sidebar.glassSurface.width===sidebar.width-2*Theme.shellInset && sidebar.glassSurface.height===sidebar.height-2*Theme.shellInset && sidebar.glassSurface.radius===Theme.sidebarRadius && Theme.sidebarRadius===Theme.shapeCorner && Theme.windowRadius===Theme.shapeCorner && Theme.cardRadius===Theme.shapeCorner && Theme.shapeCorner===Theme.dp(28)").toBool());
+    check("neutral-light-canvas-and-card-palette",eval("Theme.canvas.toString()==='#f7f7f7' && Theme.surface.toString()==='#ffffff' && Theme.border.toString()==='#e0e0e3'").toBool());
     if(decoration){
         auto decorated=grab(scene);
         decoration->setVisible(false);QTest::qWait(35);auto plain=grab(scene);
@@ -370,9 +378,13 @@ Item {
             const auto image=window->grabWindow();
             check("settled-native-page-capture-saved",!image.isNull() && image.save(directory+QStringLiteral("/final-%1-%2.png").arg(theme.toLower(),route)));
             if(route=="activity"){
-                for(const char *name:{"activityCloudKnotWeave","diagnosticProxyWing"}){
-                    auto *smallWing=window->findChild<QQuickItem *>(name);
-                    check("stopped-production-proxy-art-is-empty",smallWing && smallWing->property("progress").toDouble()==0);
+                auto *weave=findVisual(window->contentItem(),"activityCloudKnotWeave");
+                check("stopped-production-proxy-art-is-empty",weave && !weave->property("active").toBool()
+                    &&weave->property("progress").toDouble()==0 && weave->property("release").toDouble()==1
+                    &&!weave->property("moving").toBool());
+                for(const auto &key:QStringList{"warm","return","crown","forward","heart"}){
+                    auto *feather=findVisual(window->contentItem(),"cloudFeather-"+key);
+                    check("stopped-production-proxy-feathers-are-hidden",feather && !feather->isVisible());
                 }
             }
             if(route=="featurehub"){
