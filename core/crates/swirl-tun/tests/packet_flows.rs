@@ -510,6 +510,25 @@ fn invalid_memory_budget_is_rejected_before_spawn() {
     assert!(config.validate().is_err());
 }
 
+#[test]
+fn ipv4_udp_admission_buffer_is_included_in_memory_budget() {
+    // The previous payload budget left 5,770 bytes below 1 GiB. The fixed
+    // 65,535-byte raw admission buffer must reject this before allocation.
+    let config = TunConfig {
+        mtu: 1280,
+        max_tcp_flows: 4092,
+        max_udp_endpoints: 1,
+        tcp_buffer_bytes: 65541,
+        udp_buffer_bytes: 65536,
+        queue_capacity: 1,
+        ..TunConfig::default()
+    };
+    assert_eq!(
+        config.validate().unwrap_err().to_string(),
+        "TUN socket budget exceeds 1 GiB"
+    );
+}
+
 async fn fragmented_udp(v6: bool) {
     let (source, destination) = if v6 {
         ("[2001:db8::10]:40000", "[2001:db8::20]:4444")
@@ -604,6 +623,151 @@ async fn ipv4_udp_fragmentation_and_out_of_order_reassembly() {
 #[tokio::test]
 async fn ipv6_udp_fragmentation_and_out_of_order_reassembly() {
     fragmented_udp(true).await;
+}
+
+fn ipv4_fragments(bytes: &[u8], identity: u16) -> Vec<Vec<u8>> {
+    let original = Ipv4Packet::new_checked(bytes).unwrap();
+    original
+        .payload()
+        .chunks(1480)
+        .enumerate()
+        .map(|(index, payload)| {
+            let offset = index * 1480;
+            let mut bytes = ip_packet(
+                original.src_addr().into(),
+                original.dst_addr().into(),
+                original.next_header(),
+                payload,
+            );
+            let mut packet = Ipv4Packet::new_unchecked(&mut bytes[..]);
+            packet.set_ident(identity);
+            packet.set_more_frags(offset + payload.len() < original.payload().len());
+            packet.set_frag_offset(offset as u16);
+            packet.fill_checksum();
+            bytes
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn ipv4_udp_first_fragment_does_not_reserve_endpoint_before_reassembly() {
+    let source = "192.0.2.10:40000".parse().unwrap();
+    let incomplete = "203.0.113.20:4444".parse().unwrap();
+    let valid = "203.0.113.21:5555".parse().unwrap();
+    let mut stack = spawn(TunConfig {
+        max_udp_endpoints: 1,
+        ..TunConfig::default()
+    })
+    .unwrap();
+    let fragments = ipv4_fragments(&udp_packet(source, incomplete, &vec![42; 5000]), 100);
+    stack.ingress.send(fragments[0].clone()).await.unwrap();
+    stack
+        .ingress
+        .send(udp_packet(source, valid, b"complete"))
+        .await
+        .unwrap();
+    assert_eq!(
+        timeout(WAIT, stack.udp.recv())
+            .await
+            .expect("an incomplete first fragment consumed endpoint capacity")
+            .unwrap(),
+        UdpDatagram {
+            source,
+            destination: valid,
+            payload: b"complete".to_vec(),
+        }
+    );
+    assert_eq!(stack.stats.snapshot().active_udp_endpoints, 1);
+    assert_eq!(stack.stats.snapshot().dropped_udp_datagrams, 0);
+    stack.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn ipv4_udp_bad_reassembled_checksum_does_not_consume_endpoint_capacity() {
+    let source = "192.0.2.10:40000".parse().unwrap();
+    let invalid = "203.0.113.20:4444".parse().unwrap();
+    let valid = "203.0.113.21:5555".parse().unwrap();
+    for reverse in [false, true] {
+        let mut stack = spawn(TunConfig {
+            max_udp_endpoints: 1,
+            ..TunConfig::default()
+        })
+        .unwrap();
+        let mut bytes = udp_packet(source, invalid, &vec![42; 5000]);
+        *bytes.last_mut().unwrap() ^= 1;
+        let mut fragments = ipv4_fragments(&bytes, 101);
+        if reverse {
+            fragments.reverse();
+        }
+        for fragment in fragments {
+            stack.ingress.send(fragment).await.unwrap();
+        }
+        stack
+            .ingress
+            .send(udp_packet(source, valid, b"valid-after-bad-checksum"))
+            .await
+            .unwrap();
+        assert_eq!(
+            timeout(WAIT, stack.udp.recv())
+                .await
+                .expect("bad reassembled UDP consumed endpoint capacity")
+                .unwrap(),
+            UdpDatagram {
+                source,
+                destination: valid,
+                payload: b"valid-after-bad-checksum".to_vec(),
+            }
+        );
+        assert_eq!(stack.stats.snapshot().active_udp_endpoints, 1);
+        assert_eq!(stack.stats.snapshot().malformed_packets, 1);
+        assert_eq!(stack.stats.snapshot().dropped_udp_datagrams, 0);
+        stack.shutdown().await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn ipv4_udp_reassembled_new_and_existing_endpoint_deliver_exactly_once() {
+    let source = "192.0.2.10:40000".parse().unwrap();
+    let destination = "203.0.113.20:4444".parse().unwrap();
+    let mut stack = spawn(TunConfig {
+        max_udp_endpoints: 1,
+        ..TunConfig::default()
+    })
+    .unwrap();
+    for (identity, reverse) in [(102, false), (103, true)] {
+        let payload: Vec<u8> = (0..5000).map(|index| (index % 251) as u8).collect();
+        let mut fragments = ipv4_fragments(&udp_packet(source, destination, &payload), identity);
+        if reverse {
+            fragments.reverse();
+        }
+        for fragment in fragments {
+            stack.ingress.send(fragment).await.unwrap();
+        }
+        stack
+            .ingress
+            .send(udp_packet(source, destination, &[]))
+            .await
+            .unwrap();
+        stack
+            .ingress
+            .send(udp_packet(source, destination, b"marker"))
+            .await
+            .unwrap();
+        for payload in [payload, vec![], b"marker".to_vec()] {
+            assert_eq!(
+                timeout(WAIT, stack.udp.recv()).await.unwrap().unwrap(),
+                UdpDatagram {
+                    source,
+                    destination,
+                    payload,
+                }
+            );
+        }
+    }
+    assert_eq!(stack.stats.snapshot().active_udp_endpoints, 1);
+    assert_eq!(stack.stats.snapshot().malformed_packets, 0);
+    assert_eq!(stack.stats.snapshot().dropped_udp_datagrams, 0);
+    stack.shutdown().await.unwrap();
 }
 
 #[tokio::test]

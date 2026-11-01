@@ -7,9 +7,10 @@ use crate::{
 use ring::rand::{SecureRandom, SystemRandom};
 use smoltcp::{
     iface::{Config, Interface, PollIngressSingleResult, SocketHandle, SocketSet},
-    socket::{tcp, udp},
+    phy::ChecksumCapabilities,
+    socket::{raw, tcp, udp},
     time::Instant as StackInstant,
-    wire::{HardwareAddress, IpCidr},
+    wire::{HardwareAddress, IpCidr, IpProtocol, IpVersion, Ipv4Packet, UdpPacket, UdpRepr},
 };
 use std::{
     collections::HashMap,
@@ -56,6 +57,7 @@ pub(crate) struct Driver {
     device: PacketDevice,
     iface: Interface,
     sockets: SocketSet<'static>,
+    ipv4_udp_admission: SocketHandle,
     tcp: HashMap<FlowKey, TcpEntry>,
     udp: HashMap<SocketAddr, UdpEntry>,
     tcp_tx: mpsc::Sender<TcpFlow>,
@@ -104,12 +106,22 @@ impl Driver {
             .add_default_ipv6_route(v6)
             .map_err(io::Error::other)?;
         iface.set_any_ip(true);
+        let mut sockets = SocketSet::new(Vec::new());
+        // smoltcp exposes raw IPv4 packets after its own reassembly and before
+        // UDP socket dispatch. One slot suffices: drain it after each ingress.
+        let ipv4_udp_admission = sockets.add(raw::Socket::new(
+            Some(IpVersion::Ipv4),
+            Some(IpProtocol::Udp),
+            raw::PacketBuffer::new(vec![raw::PacketMetadata::EMPTY], vec![0; 65535]),
+            raw::PacketBuffer::new(Vec::new(), Vec::new()),
+        ));
         let start = Instant::now();
         Ok(Self {
             config,
             device,
             iface,
-            sockets: SocketSet::new(Vec::new()),
+            sockets,
+            ipv4_udp_admission,
             tcp: HashMap::new(),
             udp: HashMap::new(),
             tcp_tx,
@@ -215,7 +227,9 @@ impl Driver {
         {
             self.admit_tcp(key);
         }
-        if let Some(destination) = metadata.udp_destination {
+        if let Some(destination) = metadata.udp_destination
+            && destination.is_ipv6()
+        {
             self.admit_udp(destination);
         }
         self.device.incoming.push_back(bytes);
@@ -314,16 +328,70 @@ impl Driver {
         let timestamp = self.timestamp();
         self.iface.poll_maintenance(timestamp);
         for _ in 0..PACKET_BATCH {
-            if self
-                .iface
-                .poll_ingress_single(timestamp, &mut self.device, &mut self.sockets)
-                == PollIngressSingleResult::None
-            {
+            let result =
+                self.iface
+                    .poll_ingress_single(timestamp, &mut self.device, &mut self.sockets);
+            self.collect_ipv4_udp_admission();
+            if result == PollIngressSingleResult::None {
                 break;
             }
         }
         self.iface
             .poll_egress(timestamp, &mut self.device, &mut self.sockets);
+    }
+
+    fn collect_ipv4_udp_admission(&mut self) {
+        let datagram = {
+            let socket = self.sockets.get_mut::<raw::Socket>(self.ipv4_udp_admission);
+            let Ok(bytes) = socket.recv() else {
+                return;
+            };
+            // smoltcp serialized this complete IPv4 header. UDP remains an
+            // external trust boundary, including after fragmented reception.
+            let ip = Ipv4Packet::new_unchecked(bytes);
+            let Ok(udp) = UdpPacket::new_checked(ip.payload()) else {
+                self.counters
+                    .malformed_packets
+                    .fetch_add(1, Ordering::Relaxed);
+                return;
+            };
+            let source = SocketAddr::new(ip.src_addr().into(), udp.src_port());
+            let destination = SocketAddr::new(ip.dst_addr().into(), udp.dst_port());
+            if self.udp.contains_key(&destination) {
+                // The existing UDP socket already received this packet during
+                // the same ingress call. Discard its raw copy, never reinject.
+                return;
+            }
+            if source.port() == 0
+                || UdpRepr::parse(
+                    &udp,
+                    &source.ip().into(),
+                    &destination.ip().into(),
+                    &ChecksumCapabilities::default(),
+                )
+                .is_err()
+            {
+                self.counters
+                    .malformed_packets
+                    .fetch_add(1, Ordering::Relaxed);
+                return;
+            }
+            UdpDatagram {
+                source,
+                destination,
+                payload: udp.payload().to_vec(),
+            }
+        };
+        if self.admit_udp(datagram.destination).is_none() {
+            return;
+        }
+        // There was no destination UDP socket during ingress. Publish its first
+        // valid datagram here; later packets follow the existing UDP path.
+        if self.udp_tx.try_send(datagram).is_err() {
+            self.counters
+                .dropped_udp_datagrams
+                .fetch_add(1, Ordering::Relaxed);
+        }
     }
 
     fn collect_accepts(&mut self) {

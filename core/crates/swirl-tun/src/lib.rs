@@ -86,6 +86,8 @@ impl TunConfig {
             + self.max_udp_endpoints as u64 * self.udp_buffer_bytes as u64 * 2
             + self.queue_capacity as u64 * (2 * self.mtu as u64 + 2 * 65507)
             + 32 * self.mtu as u64
+            // One complete IPv4 UDP packet before endpoint admission.
+            + 65535
             + 10 * 65536;
         if buffers > 1024 * 1024 * 1024 {
             return Err(io::Error::new(

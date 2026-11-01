@@ -106,26 +106,23 @@ pub(crate) fn inspect(bytes: &[u8]) -> Result<Metadata, ()> {
         if src.port() == 0 || dst.port() == 0 {
             return Err(());
         }
-        if protocol == IpProtocol::Udp {
-            if !fragmented {
-                // Check before allocating a socket: malformed datagrams must
-                // not occupy the bounded endpoint table until idle expiry.
-                // Fragmented IPv4 datagrams remain owned by smoltcp's
-                // reassembler; IPv6 is already reassembled before inspection.
-                let packet = UdpPacket::new_checked(payload).map_err(|_| ())?;
-                if source.is_ipv6() && packet.checksum() == 0 {
-                    // smoltcp's checksum verifier accepts zero for both IP
-                    // families, but RFC 8200 requires a checksum over IPv6.
-                    return Err(());
-                }
-                UdpRepr::parse(
-                    &packet,
-                    &source.into(),
-                    &destination.into(),
-                    &ChecksumCapabilities::default(),
-                )
-                .map_err(|_| ())?;
+        if protocol == IpProtocol::Udp && !fragmented {
+            // A first IPv4 fragment cannot authorize endpoint allocation. Its
+            // complete UDP packet is exposed by smoltcp's raw socket only after
+            // native reassembly; IPv6 is already reassembled before inspection.
+            let packet = UdpPacket::new_checked(payload).map_err(|_| ())?;
+            if source.is_ipv6() && packet.checksum() == 0 {
+                // smoltcp's checksum verifier accepts zero for both IP
+                // families, but RFC 8200 requires a checksum over IPv6.
+                return Err(());
             }
+            UdpRepr::parse(
+                &packet,
+                &source.into(),
+                &destination.into(),
+                &ChecksumCapabilities::default(),
+            )
+            .map_err(|_| ())?;
             result.udp_destination = Some(dst);
         }
         if protocol == IpProtocol::Tcp && !fragmented {
