@@ -61,6 +61,18 @@ DNS resolver, policy transactions, protocol outbounds, and session manager.
 | `--recover` | Attempts ownership-checked recovery of stale network journals in the protected, fixed state directory, then exits. |
 | `--worker` | Internal child mode. Integrations must use `--serve` to retain supervision. |
 
+The supervisor uses a separate internal `--supervised-worker` stream. Its worker
+control loop emits a private heartbeat at least once per second while idle;
+the supervisor consumes those frames without forwarding them to the client.
+No separate heartbeat thread can make a deadlocked control loop appear healthy.
+Five minutes without control-loop progress terminates and waits for the worker
+before the existing journal-recovery attempt. This finite stall limit includes
+Windows setup/recovery operations; it does not increase their individual
+deadlines. A final recovery report includes `worker_error=TunWorkerUnresponsive`
+for that timeout and the supervisor still exits unsuccessfully, even if recovery
+succeeds. This is not a network-health probe or a kill switch. Real driver-hang,
+crash, reboot and physical-network recovery acceptance remain separate tests.
+
 Network operations require the helper to have already been launched with the
 necessary administrative privilege. There is no automatic UAC prompt, service
 installation, public RPC listener, named-pipe server, or arbitrary shell-command
@@ -74,7 +86,9 @@ alone is not a complete privilege-separation design.
 
 Each worker request must be one complete JSON line followed by a newline. The
 line, including its terminator, is limited to 1 MiB. Responses are UTF-8 JSON
-lines. Drain stdout continuously and correlate ordinary responses by
+lines with at most 1 MiB of payload plus their newline. The private forwarder
+rejects oversized or unterminated worker frames without unbounded allocation.
+Drain stdout continuously and correlate ordinary responses by
 `request_id`; helper failure and supervisor recovery messages may also appear.
 A final unterminated line is not a command. Closing the command stream is the
 worker's orderly shutdown signal. Do not use terminating the process as the

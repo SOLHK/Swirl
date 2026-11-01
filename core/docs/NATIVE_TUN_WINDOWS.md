@@ -478,20 +478,24 @@ after worker exit. These are implemented lifecycle paths with portable
 fault-ordering tests, not completed Windows crash-injection acceptance. If both
 processes die or the machine reboots, no installed service automatically performs
 recovery: the next `--serve` startup or explicit `--recover` must reconcile the
-journal. There is also no whole-worker watchdog around an indefinitely live
-worker; the bounded command and output deadlines do not bound every device
-reader join or bridge shutdown.
+journal. A control-loop heartbeat watchdog now replaces the supervisor's
+unbounded worker wait: five minutes without a private heartbeat terminates and
+reaps the worker before attempting journal recovery. The heartbeat is emitted by
+the control loop, never a separate liveness thread, and never reaches the GUI.
+This covers a live but stalled worker while the supervisor survives; it does not
+prove actual device-reader/bridge hang recovery or Windows resource restoration.
 
 The physical DNS guards cover TCP and UDP remote port 53 on all hardware aliases
 recorded at setup, for either IP family and any local/remote address. They do not
 change physical DNS settings. Setup verifies the firewall service, enabled
 profiles and local-rule policy, and owned-rule comparison includes the actual
 filters. The network watcher observes interface, route and unicast-address
-changes; it does not continuously observe firewall rule deletion, service stop
-or profile/policy changes. `dns_guard_active` is currently derived from the
-controller's running state, not a fresh firewall inspection. New adapters and
-administrator changes therefore require real multi-NIC/IPv6/LAN leak testing and
-stronger ongoing guard verification before continuous protection can be claimed.
+changes. An independent initial and periodic ActiveStore audit checks firewall
+service, effective profiles, exact owned filters and hardware-adapter coverage.
+Failed or stale inspection makes `dns_guard_active` unknown and requests explicit
+recovery while retaining capture. Polling leaves a detection window; it does not
+establish zero leakage. New adapters and administrator changes still require real
+multi-NIC/IPv6/LAN packet-level leakage acceptance.
 
 Each PowerShell network command starts suspended and joins a private
 non-inheritable kill-on-close Job Object before its initial thread resumes.
@@ -632,9 +636,9 @@ interface for each LAN destination. See the
 **Crash recovery still needs a surviving or restarted process.** Normal stop,
 input EOF and supervisor recovery paths are implemented. A simultaneous
 helper/worker crash or reboot leaves reconciliation to the next helper start or
-explicit recovery command. No boot-time recovery service or whole-worker hang
-watchdog is installed. The command Job Object and stdout deadlines cannot prove
-that an entire worker shutdown or actual Windows network restoration completes.
+explicit recovery command. No boot-time recovery service is installed. The
+control-loop watchdog, command Job Object and stdout deadlines still require real
+worker-hang injection and exact Windows network-restoration acceptance.
 Owned recovery preserves conflicting later VPN/DHCP/administrator changes;
 restore-operation errors currently become conflict indices, limiting the detail
 available for diagnosing some Windows failures.

@@ -2,15 +2,26 @@
 //! shell command endpoint, GUI elevation, installed service or driver download.
 //! A supervisor survives a worker crash and restores owned network journals.
 use std::{
-    io::{self, BufRead, Write},
-    process::{Command, Stdio},
-    sync::mpsc,
+    io::{self, BufRead, Read, Write},
+    process::{Child, Command, Stdio},
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+        mpsc,
+    },
     thread,
     time::{Duration, Instant},
 };
 
 const MAX_COMMAND: usize = 1024 * 1024;
 const OUTPUT_DRAIN: Duration = Duration::from_secs(2);
+const WORKER_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(1);
+// Includes bounded Windows configuration/recovery operations on the worker's
+// control thread. This replaces an infinite wait; it does not extend any
+// command, socket or test timeout. Heartbeats must come from that control loop,
+// not a separate thread which could remain alive while the loop is deadlocked.
+const WORKER_STALL: Duration = Duration::from_secs(300);
+const HEARTBEAT_FRAME: &[u8] = b"{\"native_tun_worker_heartbeat\":1}\n";
 const RECOVER: &[u8] = br#"{"native_tun_schema":1,"request_id":"70000000-0000-4000-8000-000000000001","op":"native_tun_recover"}"#;
 
 fn emit(value: &serde_json::Value) -> io::Result<()> {
@@ -100,7 +111,8 @@ fn main() {
         }
         "--serve" => supervisor(),
         // Internal child endpoint; the normal entry point always supervises it.
-        "--worker" => worker(),
+        "--worker" => worker(false),
+        "--supervised-worker" => worker(true),
         _ => Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "TunHelperArgument",
@@ -110,7 +122,7 @@ fn main() {
         // A supervisor output thread can still be blocked in a client pipe.
         // Never acquire stdout again on that path: restoration has already run
         // and process exit must be able to terminate the blocked forwarder.
-        if mode != "--serve" && mode != "--worker" {
+        if mode != "--serve" && mode != "--worker" && mode != "--supervised-worker" {
             let _ = emit(&serde_json::json!({"ok":false,"error":"TunHelperStopped"}));
         }
         std::process::exit(1);
@@ -125,17 +137,19 @@ fn supervisor() -> io::Result<()> {
     }
     let executable = std::env::current_exe()?;
     let mut child = Command::new(executable)
-        .arg("--worker")
+        .arg("--supervised-worker")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .spawn()?;
+    let heartbeat = Arc::new(AtomicU64::new(0));
+    let worker_heartbeat = heartbeat.clone();
     let output = (|| {
         let mut child_input = child
             .stdin
             .take()
             .ok_or_else(|| io::Error::other("TunHelperStdin"))?;
-        let mut child_output = child
+        let child_output = child
             .stdout
             .take()
             .ok_or_else(|| io::Error::other("TunHelperStdout"))?;
@@ -148,7 +162,13 @@ fn supervisor() -> io::Result<()> {
             })?;
         thread::Builder::new()
             .name("swirl-helper-output".into())
-            .spawn(move || io::copy(&mut child_output, &mut io::stdout().lock()))
+            .spawn(move || {
+                forward_worker_output(
+                    io::BufReader::new(child_output),
+                    io::stdout().lock(),
+                    &worker_heartbeat,
+                )
+            })
     })();
     if output.is_err() {
         let _ = child.kill();
@@ -156,11 +176,69 @@ fn supervisor() -> io::Result<()> {
     // Neither wait errors nor failed output forwarding may bypass recovery.
     // A failed wait is also a reason to stop the worker, but does not justify
     // returning before attempting to restore any journal whose lock is free.
-    let status = child.wait().map(|status| status.success());
+    let status = wait_for_worker(&mut child, &heartbeat, WORKER_STALL);
     if status.is_err() {
         let _ = child.kill();
+        let _ = child.wait();
     }
     finish_worker(status, output, recover, emit, OUTPUT_DRAIN)
+}
+
+fn wait_for_worker(child: &mut Child, heartbeat: &AtomicU64, stall: Duration) -> io::Result<bool> {
+    let mut observed = heartbeat.load(Ordering::Acquire);
+    let mut progressed = Instant::now();
+    loop {
+        if let Some(status) = child.try_wait()? {
+            return Ok(status.success());
+        }
+        let current = heartbeat.load(Ordering::Acquire);
+        if current != observed {
+            observed = current;
+            progressed = Instant::now();
+        }
+        if progressed.elapsed() >= stall {
+            child.kill()?;
+            child.wait()?;
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "TunWorkerUnresponsive",
+            ));
+        }
+        thread::sleep(Duration::from_millis(100).min(stall.saturating_sub(progressed.elapsed())));
+    }
+}
+
+/// Heartbeats belong only to the private child stream. Preserve complete normal
+/// responses byte-for-byte, without exposing internal frames to the GUI. Bound
+/// allocation even if a broken worker never writes a newline.
+fn forward_worker_output(
+    mut input: impl BufRead,
+    mut output: impl Write,
+    heartbeat: &AtomicU64,
+) -> io::Result<u64> {
+    let mut forwarded = 0;
+    loop {
+        let mut frame = Vec::new();
+        let length = (&mut input)
+            .take((swirl_api::OUTPUT_CAPACITY + 2) as u64)
+            .read_until(b'\n', &mut frame)?;
+        if length == 0 {
+            return Ok(forwarded);
+        }
+        if length > swirl_api::OUTPUT_CAPACITY + 1 || !frame.ends_with(b"\n") {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "TunWorkerResponseFrame",
+            ));
+        }
+        if frame == HEARTBEAT_FRAME {
+            heartbeat.fetch_add(1, Ordering::Release);
+        } else {
+            output.write_all(&frame)?;
+            output.flush()?;
+            forwarded += length as u64;
+        }
+    }
 }
 
 fn finish_worker(
@@ -193,7 +271,16 @@ fn finish_worker(
     // Even after forwarding finishes, the client's pipe may still be full.
     // Bound the final recovery report as well; it must not hold the process up.
     let (reported, report_done) = mpsc::sync_channel(1);
-    let final_state = recovery.clone();
+    let mut final_state = recovery.clone();
+    let worker_error = match &status {
+        Err(error) if error.kind() == io::ErrorKind::TimedOut => Some("TunWorkerUnresponsive"),
+        Err(_) => Some("TunWorkerWaitFailed"),
+        Ok(false) => Some("TunWorkerFailed"),
+        Ok(true) => None,
+    };
+    if let Some(error) = worker_error {
+        final_state["worker_error"] = serde_json::json!(error);
+    }
     thread::Builder::new()
         .name("swirl-helper-final-report".into())
         .spawn(move || {
@@ -208,7 +295,7 @@ fn finish_worker(
     Ok(())
 }
 
-fn worker() -> io::Result<()> {
+fn worker(supervised: bool) -> io::Result<()> {
     let (commands, incoming) = mpsc::sync_channel::<io::Result<Vec<u8>>>(1);
     thread::spawn(move || {
         let stdin = io::stdin();
@@ -250,8 +337,18 @@ fn worker() -> io::Result<()> {
     });
     let mut output = BoundedOutput::new(emit)?;
     let mut controller = swirl_api::Controller::for_native_tun_helper();
+    let mut heartbeat_at = Instant::now();
     let outcome = loop {
         controller.maintain_native_tun();
+        if supervised && Instant::now() >= heartbeat_at {
+            if let Err(error) = output.write(
+                serde_json::json!({"native_tun_worker_heartbeat":1}),
+                OUTPUT_DRAIN,
+            ) {
+                break Err(error);
+            }
+            heartbeat_at = Instant::now() + WORKER_HEARTBEAT_INTERVAL;
+        }
         match incoming.recv_timeout(Duration::from_millis(250)) {
             Ok(Ok(command)) => {
                 if let Err(error) = output.write(controller.dispatch(&command), OUTPUT_DRAIN) {
@@ -268,6 +365,10 @@ fn worker() -> io::Result<()> {
     controller.stop_native_tunnels().map_err(io::Error::other)?;
     outcome
 }
+
+#[cfg(test)]
+#[path = "../native_tun_helper_tests.rs"]
+mod watchdog_tests;
 
 #[cfg(test)]
 mod tests {
