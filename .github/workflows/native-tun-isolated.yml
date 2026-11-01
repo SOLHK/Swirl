@@ -2,10 +2,23 @@ name: Native TUN isolated backend
 
 on:
   push:
-    branches: [work/native-tun-windows-20261030-isolated]
+    branches: [work/native-tun-windows-20261030-isolated, test, main]
+    paths:
+      - 'core/**'
+      - 'scripts/Stage-WindowsRustProduct.ps1'
+      - 'tools/Collect-RustDependencies.py'
+      - 'tools/Collect-NativeTunAcceptance.ps1'
+      - 'tools/Verify-NativeTunAcceptance.py'
+      - 'scripts/tests/Test-NativeTunAcceptance.py'
+      - '.github/workflows/native-tun-isolated.yml'
   pull_request:
     paths:
       - 'core/**'
+      - 'scripts/Stage-WindowsRustProduct.ps1'
+      - 'tools/Collect-RustDependencies.py'
+      - 'tools/Collect-NativeTunAcceptance.ps1'
+      - 'tools/Verify-NativeTunAcceptance.py'
+      - 'scripts/tests/Test-NativeTunAcceptance.py'
       - '.github/workflows/native-tun-isolated.yml'
   workflow_dispatch:
 
@@ -31,16 +44,20 @@ jobs:
       run:
         working-directory: core
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Stable Rust with lint and formatting
         run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@e9d7b9f1e587218970671bac74e5511ed9506e6a # v2
         with:
           workspaces: core
           key: native-tun-isolated
           cache-on-failure: true
       - name: Source formatting
         run: cargo fmt --all -- --check
+      - name: Acceptance evidence rejects unsupported or altered claims
+        run: python ../scripts/tests/Test-NativeTunAcceptance.py
       - name: Stage exact locked dependency notices
         run: |
           cargo metadata --locked --format-version 1 > "${{ runner.temp }}/swirl-native-metadata.json"
@@ -52,8 +69,10 @@ jobs:
         run: |
           $parseTokens = $null
           $parseErrors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path ../scripts/Stage-WindowsRustProduct.ps1), [ref]$parseTokens, [ref]$parseErrors) | Out-Null
-          if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+          foreach ($script in @('../scripts/Stage-WindowsRustProduct.ps1', '../tools/Collect-NativeTunAcceptance.ps1')) {
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $script), [ref]$parseTokens, [ref]$parseErrors) | Out-Null
+            if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+          }
       - name: Lint complete affected crates
         run: cargo clippy --locked -p swirl-tun -p swirl-platform -p swirl-dns -p swirl-transport -p swirl-protocol -p swirl-core -p swirl-api --all-targets -- -D warnings
       - name: Packet, resolver, network transaction and original proxy regressions
@@ -80,7 +99,7 @@ jobs:
           cargo run --locked --release -p swirl-api --example windows-tun-smoke -- --disposable-network --wintun $smokeDriver 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'swirl-wintun-smoke.log')
           if ($LASTEXITCODE -ne 0) { throw "Scoped Wintun smoke failed with exit code $LASTEXITCODE" }
       - name: Preserve native backend build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: native-tun-backend-${{ runner.os }}-${{ github.sha }}
           path: |
@@ -95,7 +114,7 @@ jobs:
 
       - name: Preserve driver failure diagnostics
         if: failure() && runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: native-tun-driver-failure-${{ github.sha }}
           path: ${{ runner.temp }}/swirl-wintun-smoke.log

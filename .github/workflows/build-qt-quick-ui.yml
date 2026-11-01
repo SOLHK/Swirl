@@ -2,7 +2,7 @@ name: Build Swirl Qt Quick UI (Preview)
 
 on:
   push:
-    branches: [main, test, work/swirl-apec-v3-20261027]
+    branches: [main, test, work/swirl-apec-v3-20261027, work/native-tun-windows-20261030-isolated]
   pull_request:
     branches: [test, main]
   workflow_dispatch:
