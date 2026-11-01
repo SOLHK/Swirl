@@ -13,6 +13,19 @@ FORBIDDEN = re.compile(
     r"objc2?(?:-.*)?|cocoa|core-foundation(?:-sys)?|"
     r"ohos(?:-.*)?|harmony(?:os)?(?:-.*)?)$"
 )
+SDK_MODULE = r"(?:windows_sys|winapi|wintun)"
+RUST_SPACE = r"(?:\s|/\*[\s\S]*?\*/|//[^\n]*(?:\n|$))*"
+FORBIDDEN_SOURCE = re.compile(
+    # A serialized driver filename is data. Actual SDK imports (including
+    # aliases/group imports) and module-qualified calls cross this boundary.
+    rf"\b(?:r#)?{SDK_MODULE}{RUST_SPACE}::"
+    rf"|\b(?:use\b|extern\b{RUST_SPACE}crate\b){RUST_SPACE}(?:::)?{RUST_SPACE}(?:r#)?{SDK_MODULE}\b"
+    rf"|\buse\b{RUST_SPACE}\{{[^;]*\b(?:r#)?{SDK_MODULE}\b"
+    r"|\b(?:QQuickWindow|CreateFileW|GetAdaptersAddresses|JNIEnv|VpnService|"
+    r"VpnExtensionAbility|NEPacketTunnelProvider)\b|System32/drivers/etc/hosts|"
+    r"std::os::(?:windows|unix)|#\s*\[\s*link\s*\([^\]]*"
+    r"(?:kind\s*=\s*\"framework\"|kernel32|user32)"
+)
 
 
 def platform_dependencies(manifest, workspace):
@@ -40,11 +53,51 @@ class PortableCoreBoundary(unittest.TestCase):
             self.assertEqual(platform_dependencies(data, workspace), [], manifest.parent.name)
 
     def test_platform_calls_stay_in_adapter(self):
-        forbidden = re.compile(r"\b(?:windows_sys|winapi|wintun|QQuickWindow|CreateFileW|GetAdaptersAddresses|JNIEnv|VpnService|VpnExtensionAbility|NEPacketTunnelProvider)\b|System32/drivers/etc/hosts|std::os::(?:windows|unix)|#\[link\(.*(?:kind\s*=\s*\"framework\"|kernel32|user32)")
         for path in ROOT.glob("*/src/**/*.rs"):
             if path.relative_to(ROOT).parts[0] == "swirl-platform":
                 continue
-            self.assertIsNone(forbidden.search(path.read_text(encoding="utf-8")), str(path.relative_to(ROOT)))
+            self.assertIsNone(FORBIDDEN_SOURCE.search(path.read_text(encoding="utf-8")), str(path.relative_to(ROOT)))
+
+    def test_serialized_driver_configuration_is_data_not_a_platform_call(self):
+        for source in (
+            r'json!({"driver_path":"C:\\Swirl\\wintun.dll","adapter_name":"Swirl Native TUN"})',
+            r'let path = r#"C:\Swirl\wintun.dll"#;',
+            r'let manifest = "windows_sys winapi wintun";',
+        ):
+            with self.subTest(source=source):
+                self.assertIsNone(FORBIDDEN_SOURCE.search(source))
+
+    def test_sdk_imports_aliases_raw_identifiers_and_qualified_calls_are_rejected(self):
+        for sdk in ("windows_sys", "winapi", "wintun"):
+            for source in (
+                f"{sdk}::Adapter::open();",
+                f"::{sdk} \n :: Adapter::open();",
+                f"use {sdk};",
+                f"use :: {sdk} as native;",
+                f"use\n {sdk} \n as native;",
+                f"use/* outer /* nested */ comment */{sdk} as native;",
+                f"{sdk}/* namespace separator */::Adapter::open();",
+                f"use {{std::net, {sdk} as native}};",
+                f"pub extern\n crate {sdk} as native;",
+                f"extern// comment\ncrate {sdk} as native;",
+                f"extern crate r#{sdk} as native;",
+            ):
+                with self.subTest(source=source):
+                    self.assertIsNotNone(FORBIDDEN_SOURCE.search(source))
+
+    def test_raw_ffi_os_calls_and_multiline_link_attributes_remain_rejected(self):
+        for source in (
+            'unsafe extern "system" { fn CreateFileW(); }',
+            'unsafe extern "system" { fn GetAdaptersAddresses(); }',
+            'use std::os::unix::fs::OpenOptionsExt;',
+            'use std::os::windows::process::CommandExt;',
+            '#[link (\n name="kernel32"\n)] unsafe extern "system" {}',
+            '#[link(name="user32")] extern "C" {}',
+            '#[link(\n name="NetworkExtension",\n kind = "framework"\n)] extern "C" {}',
+            'JNIEnv VpnService VpnExtensionAbility NEPacketTunnelProvider QQuickWindow',
+        ):
+            with self.subTest(source=source):
+                self.assertIsNotNone(FORBIDDEN_SOURCE.search(source))
 
     def test_workspace_alias_cannot_hide_windows_sdk(self):
         workspace = {"dependencies": {"host": {"package": "windows-sys", "version": "0.61"}}}

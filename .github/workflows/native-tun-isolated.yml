@@ -10,6 +10,7 @@ on:
       - 'tools/Collect-NativeTunAcceptance.ps1'
       - 'tools/Verify-NativeTunAcceptance.py'
       - 'scripts/tests/Test-NativeTunAcceptance.py'
+      - 'tools/tests/test_portable_core_boundary.py'
       - '.github/workflows/native-tun-isolated.yml'
   pull_request:
     paths:
@@ -19,6 +20,7 @@ on:
       - 'tools/Collect-NativeTunAcceptance.ps1'
       - 'tools/Verify-NativeTunAcceptance.py'
       - 'scripts/tests/Test-NativeTunAcceptance.py'
+      - 'tools/tests/test_portable_core_boundary.py'
       - '.github/workflows/native-tun-isolated.yml'
   workflow_dispatch:
 
@@ -58,6 +60,8 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Acceptance evidence rejects unsupported or altered claims
         run: python ../scripts/tests/Test-NativeTunAcceptance.py
+      - name: Shared Rust keeps operating-system calls in the platform adapter
+        run: python ../tools/tests/test_portable_core_boundary.py
       - name: Stage exact locked dependency notices
         run: |
           cargo metadata --locked --format-version 1 > "${{ runner.temp }}/swirl-native-metadata.json"

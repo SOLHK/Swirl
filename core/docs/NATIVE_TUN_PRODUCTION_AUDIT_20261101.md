@@ -144,6 +144,45 @@ No driver was installed or host route/DNS/firewall/proxy changed by these local
 checks. CI and product build results must be attached separately to their exact
 remote HEAD; old `930c3f5` runs cannot be reused as these changes' acceptance.
 
+### CI continuation after the first push
+
+The exact-source Native Protocols run
+[41273855056](https://github.com/SOLHK/Swirl/actions/runs/41273855056) passed all
+six jobs at `305a182`; its Windows unit command reported 935 tests including the
+doctest, while Linux/macOS each reported 896. The separate Qt/Core local build at
+that source passed four selected CTests (storage, loader, Rust integration and
+import boundaries). Generic Qt integration reported 95 pass / 10 existing
+dedicated-fixture skips. A separate real authenticated/unauthenticated SOCKS5 UDP
+reference-peer Qt test passed; the other skipped fixtures are not silently counted.
+
+Rust Core Linux/macOS CI correctly failed in the legacy development updater's
+exact workflow branch-list check: the newly authorized TUN branch was not yet a
+recognized current form. The correction recognizes exactly that reviewed form
+and tests idempotent preservation, unknown/duplicate branch refusal and ambiguous
+push-section refusal. It does not remove drift detection or the new TUN gate.
+
+An additional portable-boundary run then found two separate issues inherited
+from the existing TUN implementation: a serialized `wintun.dll` filename was
+mistaken for an SDK call, and Unix file-creation mode was implemented directly
+inside shared DNS. The guard now distinguishes module imports/qualified calls
+from bare data names, with import/alias/raw-identifier/FFI/link regressions; it
+does not exempt source files or remove actual OS-call bans. The existing Unix
+0600 read/write/nontruncate journal-opening operation moves into the already-used
+`swirl-platform` adapter. DNS lock, durable append, torn-tail repair and permission
+semantics are preserved. Portable behavior and Unix permission tests cover this
+boundary, and Native CI now executes the boundary guard explicitly.
+
+These follow-up changes require their own affected Rust checks and exact-head CI
+results; the earlier successful runs and diagnostic bundle remain identified by
+their original SHA. No previous failed CI record is removed or relabelled.
+Local affected checks after the adapter move passed 49 platform and 27 DNS tests;
+the portable guard passed 10 tests and the updater reported 58 passed / 2 existing
+Windows platform skips out of 60. A subsequent local all-workspace Clippy run
+reported `missing_const_for_thread_local` in the unchanged REALITY backend,
+whose initializer already contains `const { ... }`; this new lint result is
+under investigation and is not recorded as a successful latest check. No lint
+allowance or protocol-source workaround was added.
+
 ## Kill-switch architecture constraints still to implement
 
 Evaluated WFP and existing Windows Firewall integration against Microsoft's

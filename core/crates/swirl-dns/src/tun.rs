@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    fs::{File, OpenOptions},
+    fs::File,
     future::Future,
     io::{Read, Seek, SeekFrom, Write},
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
@@ -90,16 +90,8 @@ impl FakeIpStore {
         if std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
             return Err("FakeIpJournalSymlink");
         }
-        let mut options = OpenOptions::new();
-        // Windows append-only handles cannot truncate a torn final record.
-        // The exclusive lock below owns this read/write handle until drop.
-        options.read(true).write(true).create(true).truncate(false);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600);
-        }
-        let mut journal = options.open(path).map_err(|_| "FakeIpJournalOpen")?;
+        let mut journal =
+            swirl_platform::open_private_journal(path).map_err(|_| "FakeIpJournalOpen")?;
         journal.try_lock().map_err(|_| "FakeIpJournalOwned")?;
         let size = journal.metadata().map_err(|_| "FakeIpJournalRead")?.len();
         if size > JOURNAL_LIMIT {
@@ -487,6 +479,7 @@ impl TunDns {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::OpenOptions;
     struct Lookup(Result<Vec<IpAddr>>);
     impl TunLookup for Lookup {
         fn lookup<'a>(
