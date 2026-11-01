@@ -56,3 +56,18 @@ Local validation is 15 WFP model tests, two service-fixture pure tests, compiled
 SDK paths and a no-arguments refusal. The frozen platform suite passed 82 library
 tests and three example tests with zero failures/ignored tests. No service,
 restricted token, desktop or WFP operation was executed on the workstation.
+
+The first real run at `6e71aaf` / PR `6676423` failed the parent's
+`OpenProcessToken` with access denied (5). It unnecessarily requested both
+query and duplicate rights on the other account's live SCM token; the report
+also performed a hidden duplication for AccessCheck. The service's subsequent
+loopback timeout (10060) is retained as a secondary failure, not substituted
+for the parent's first error.
+
+The parent now requests only `TOKEN_QUERY` and reports GetTokenInformation
+results. The real service still performs its own duplicate-based AccessCheck;
+negative identity checks remain unchanged. A read-only current-token regression
+failed under the original duplicate attempt with error 5 and passed after the
+change; all three service example tests passed. No debug privilege or token/SCM
+ACL was added. Cross-account SCM identity and cleanup acceptance still require
+the next real disposable CI execution.

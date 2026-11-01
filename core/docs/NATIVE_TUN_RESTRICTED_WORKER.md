@@ -95,6 +95,24 @@ success cannot replace A's desktop/token/handle gate, and neither proves Core
 forwarding. Original source-bound evidence is in the
 [SDK result record](native-tun-evidence/windows-744d10a-sdk-results.json).
 
+At `6e71aaf` / PR `6676423`, both probes failed before Rust main with
+`0xc0000142`. The actual MSVC comparison imports neither USER32 nor GDI32;
+USER32 alone therefore does not explain the failure. Observational AccessCheck
+reported full current-window-station access (`0xf037f`), but denied the full
+private-desktop request: maximum allowed was `0x20083`. Both object labels
+were Low with no-write-up, and the worker mandatory policy was 3. This identifies
+a mismatch with the documented CreateProcessAsUser desktop startup contract;
+it is not a captured loader access request or proof that this is the only cause.
+
+The correction grants the verified target user `0xf01ff` only on the newly
+created private Low desktop. It does not alter any existing/global desktop or
+window-station ACL, token, handle list or Job UI restriction. The protected DACL,
+Administrators owner, SYSTEM/Administrators grants, owner-rights limitation and
+Low label are checked against the actual generated descriptor in a pure SDK
+test. That test first reproduced the old `0x20083` grant and then passed the
+corrected mask; six access-preflight regressions passed. Actual child startup
+and resource isolation must still pass a new disposable CI run.
+
 ## Product authorization boundary
 
 An application-path-only WFP permit is insufficient to authorize this worker.

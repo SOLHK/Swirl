@@ -1,6 +1,77 @@
 use super::*;
 
 #[test]
+fn private_desktop_grants_sdk_full_access_only_to_worker_system_and_administrators() {
+    let descriptor = private_desktop_descriptor("S-1-5-21-100-200-300-400").unwrap();
+    let mut owner = null_mut();
+    let mut defaulted = 0;
+    let mut control = 0;
+    let mut revision = 0;
+    let mut present = 0;
+    let mut dacl = null_mut();
+    // SAFETY: all queries inspect only our allocated synthetic descriptor.
+    unsafe {
+        assert_ne!(
+            GetSecurityDescriptorOwner(descriptor.0, &mut owner, &mut defaulted),
+            0
+        );
+        assert_ne!(
+            GetSecurityDescriptorControl(descriptor.0, &mut control, &mut revision),
+            0
+        );
+        assert_ne!(
+            GetSecurityDescriptorDacl(descriptor.0, &mut present, &mut dacl, &mut defaulted),
+            0
+        );
+    }
+    let administrators = Sid::well_known(WinBuiltinAdministratorsSid).unwrap();
+    // SAFETY: descriptor and well-known SID allocations remain live.
+    assert_ne!(unsafe { EqualSid(owner, administrators.raw()) }, 0);
+    assert_ne!(control & SE_DACL_PROTECTED, 0);
+    assert_ne!(present, 0);
+    assert!(!dacl.is_null());
+    // SAFETY: the successful DACL query returned a live ACL in the descriptor.
+    assert_eq!(unsafe { (*dacl).AceCount }, 4);
+    let sid_bytes = |sid: PSID| {
+        // SAFETY: every caller lends a valid SDK/descriptor-owned SID.
+        unsafe { std::slice::from_raw_parts(sid.cast::<u8>(), GetLengthSid(sid) as usize) }.to_vec()
+    };
+    let mut actual = Vec::new();
+    for index in 0..4 {
+        let mut ace = null_mut();
+        // SAFETY: the four ACEs belong to this synthetic descriptor's DACL.
+        unsafe {
+            assert_ne!(GetAce(dacl, index, &mut ace), 0);
+            let ace = &*ace.cast::<ACCESS_ALLOWED_ACE>();
+            assert_eq!((ace.Header.AceType, ace.Header.AceFlags), (0, 0));
+            let sid = (&ace.SidStart as *const u32).cast_mut().cast();
+            actual.push((sid_bytes(sid), ace.Mask));
+        }
+    }
+    let system = Sid::well_known(WinLocalSystemSid).unwrap();
+    let owner_rights = Sid::well_known(WinCreatorOwnerRightsSid).unwrap();
+    let mut worker_sid = vec![1, 5, 0, 0, 0, 0, 0, 5];
+    for subauthority in [21u32, 100, 200, 300, 400] {
+        worker_sid.extend_from_slice(&subauthority.to_le_bytes());
+    }
+    let mut expected = vec![
+        (sid_bytes(system.raw()), 0x000f_01ff),
+        (sid_bytes(administrators.raw()), 0x000f_01ff),
+        (worker_sid, 0x000f_01ff),
+        (sid_bytes(owner_rights.raw()), 0x0002_0000),
+    ];
+    actual.sort();
+    expected.sort();
+    // Exact equality excludes Everyone, Authenticated Users, extra rights and
+    // additional ACEs; the flags above also reject all inheritance grants.
+    assert_eq!(actual, expected);
+    assert_eq!(
+        serde_json::to_value(creation_object_label(descriptor.0).unwrap().unwrap()).unwrap(),
+        serde_json::json!({"integrity_rid":0x1000,"mandatory_policy":1})
+    );
+}
+
+#[test]
 fn delegated_journal_supports_allocator_io_without_attribute_or_delete_access() {
     use std::{
         fs::OpenOptions,

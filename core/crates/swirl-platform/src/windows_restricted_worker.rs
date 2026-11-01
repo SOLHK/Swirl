@@ -767,6 +767,17 @@ impl Drop for LocalDescriptor {
     }
 }
 
+fn private_desktop_descriptor(user_sid: &str) -> io::Result<LocalDescriptor> {
+    // The caller obtains this canonical SID from the verified worker token.
+    // This descriptor is used only when creating our own private desktop.
+    // CreateProcessAsUserW requires full access to its selected desktop for
+    // startup. Grant that only on this isolated Low desktop; the default
+    // desktop/window station, restricted token and Job limits are unchanged.
+    LocalDescriptor::new(&format!(
+        "O:BAG:BAD:P(A;;0x000f01ff;;;SY)(A;;0x000f01ff;;;BA)(A;;0x000f01ff;;;{user_sid})(A;;RC;;;OW)S:(ML;;NW;;;LW)"
+    ))
+}
+
 struct Desktop {
     handle: HDESK,
     name: String,
@@ -833,9 +844,7 @@ impl Desktop {
             LocalFree(text.cast());
             value?
         };
-        let security = LocalDescriptor::new(&format!(
-            "O:BAG:BAD:P(A;;0x000f01ff;;;SY)(A;;0x000f01ff;;;BA)(A;;0x00020083;;;{user_text})(A;;RC;;;OW)S:(ML;;NW;;;LW)"
-        ))?;
+        let security = private_desktop_descriptor(&user_text)?;
         let mut id = GUID::from_u128(0);
         // SAFETY: writable GUID; no external input or global network change.
         let status = unsafe { UuidCreate(&mut id) };

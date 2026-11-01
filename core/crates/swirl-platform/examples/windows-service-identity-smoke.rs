@@ -606,11 +606,11 @@ mod windows {
         }
     }
 
-    fn token(process: HANDLE) -> io::Result<OwnedHandle> {
+    fn token(process: HANDLE, access: u32, operation: &str) -> io::Result<OwnedHandle> {
         let mut raw = null_mut();
         sdk(
-            unsafe { OpenProcessToken(process, TOKEN_QUERY | TOKEN_DUPLICATE, &mut raw) },
-            "OpenProcessToken",
+            unsafe { OpenProcessToken(process, access, &mut raw) },
+            operation,
         )?;
         Ok(unsafe { OwnedHandle::from_raw_handle(raw) })
     }
@@ -780,7 +780,7 @@ mod windows {
             GetTokenInformation(token, TokenSessionId, data.cast(), bytes, needed)
         })?;
         Ok(
-            serde_json::json!({"normal_principal_matches":normal,"restricted_principal_matches":restricted_match,"only_change_notify_privilege":only_notify,"session_zero":*session.value::<u32>()? == 0,"condition_access_matches":access_matches(token, &sid_string(expected)?)?}),
+            serde_json::json!({"normal_principal_matches":normal,"restricted_principal_matches":restricted_match,"only_change_notify_privilege":only_notify,"session_zero":*session.value::<u32>()? == 0}),
         )
     }
     fn negative_token(source: HANDLE, principal: Option<PSID>) -> io::Result<OwnedHandle> {
@@ -865,8 +865,16 @@ mod windows {
     }
     fn service_work(settings: &Receipt) -> io::Result<serde_json::Value> {
         let expected = service_sid(&settings.name)?;
-        let token = token(unsafe { GetCurrentProcess() })?;
-        let identity = principal_report(token.as_raw_handle(), expected.0)?;
+        let token = token(
+            unsafe { GetCurrentProcess() },
+            TOKEN_QUERY | TOKEN_DUPLICATE,
+            "OpenProcessToken service self AccessCheck",
+        )?;
+        let mut identity = principal_report(token.as_raw_handle(), expected.0)?;
+        identity["condition_access_matches"] = serde_json::json!(access_matches(
+            token.as_raw_handle(),
+            &sid_string(expected.0)?
+        )?);
         check(
             identity["normal_principal_matches"] == true
                 && identity["restricted_principal_matches"] == true
@@ -1062,7 +1070,11 @@ mod windows {
                 .open(&complete_path)?
                 .sync_all()?;
             protect_file(&complete_path, Some(&expected_text), true, false)?;
-            let original = token(unsafe { GetCurrentProcess() })?;
+            let original = token(
+                unsafe { GetCurrentProcess() },
+                TOKEN_QUERY | TOKEN_DUPLICATE,
+                "OpenProcessToken negative fixture source",
+            )?;
             check(
                 !access_matches(original.as_raw_handle(), &expected_text)?,
                 "ordinary administrator token unexpectedly matches service identity",
@@ -1143,7 +1155,14 @@ mod windows {
                 unsafe { WaitForSingleObject(process.as_raw_handle(), 0) } == WAIT_TIMEOUT,
                 "service process already exited",
             )?;
-            let observed = token(process.as_raw_handle())?;
+            // This is read-only observation of another account's live SCM
+            // token. AccessCheck is performed by the service on its own token;
+            // the parent must not require TOKEN_DUPLICATE for these queries.
+            let observed = token(
+                process.as_raw_handle(),
+                TOKEN_QUERY,
+                "OpenProcessToken live SCM read-only",
+            )?;
             let identity = principal_report(observed.as_raw_handle(), expected.0)?;
             check(
                 identity["normal_principal_matches"] == true
@@ -1216,6 +1235,23 @@ mod windows {
     #[cfg(test)]
     mod tests {
         use super::*;
+        #[test]
+        fn live_principal_report_needs_only_query_access() -> io::Result<()> {
+            let mut raw = null_mut();
+            sdk(
+                unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut raw) },
+                "OpenProcessToken read-only regression",
+            )?;
+            let token = unsafe { OwnedHandle::from_raw_handle(raw) };
+            let expected = sid("S-1-5-80-1-2-3-4-5")?;
+            let report = principal_report(token.as_raw_handle(), expected.0)?;
+            assert_eq!(report["normal_principal_matches"], false);
+            assert!(
+                report.get("condition_access_matches").is_none(),
+                "live reporting must not duplicate another account's token for AccessCheck"
+            );
+            Ok(())
+        }
         #[test]
         fn cleanup_failure_prevents_a_success_receipt_and_preserves_both_errors() {
             assert!(
