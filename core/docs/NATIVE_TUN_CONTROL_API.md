@@ -295,11 +295,27 @@ network. Core outbound binding and strict DNS leases prevent Core routing loops
 and DNS downgrades, but do not supply a Windows-wide zero-leak guarantee during
 migration. Do not display `waiting_for_network` as a successfully connected TUN.
 
-`capture_active` and `dns_guard_active` are true in `running`, false in
+`capture_active` reflects the capture transaction: true in `running`, false in
 `waiting_for_network`/`stopped`, and null when the lifecycle cannot establish a
-safe conclusion, including `recovery_required`. Null is unknown, not false or
-success. These fields reflect the controller's transaction state, not an
-independent audit of subsequent administrator/firewall changes.
+safe conclusion, including `recovery_required`.
+
+`dns_guard_active` is independently derived from an effective Windows firewall
+audit, rather than copied from capture state. The initial audit must succeed
+before startup succeeds. A background audit checks ActiveStore TCP/UDP port-53
+rule ownership and complete filter scope, actual enforcement status, firewall
+service/profile policy, profile interface exemptions and coverage of every
+current hardware adapter. `dns_guard_audit_age_ms` records observation age.
+Failed or stale observations produce null (unknown), never a healthy flag;
+without an active capture the field is false. On detected security drift the
+controller suspends new Core egress, retains its existing capture transaction
+and journal, and enters `recovery_required`. It does not remove the old routes
+as if this were an ordinary network rebuild. Explicit stop/recovery retains the
+original compare-and-restore ownership checks.
+
+The audit runs every 5 seconds after the preceding query, with the platform's
+30-second process deadline and a 40-second freshness cap. This is bounded
+detection, not continuous packet enforcement or a zero-leak guarantee. Neither
+rule readback nor this status replaces independent packet leakage testing.
 `core_egress_guard_owned` reports the retained Core socket guard; its presence
 does not mean system-wide capture is active.
 

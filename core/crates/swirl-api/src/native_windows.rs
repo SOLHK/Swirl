@@ -9,8 +9,9 @@ use std::{
     io,
     path::{Path, PathBuf},
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, AtomicU64, Ordering},
+        mpsc,
     },
     thread,
     time::{Duration, Instant},
@@ -30,6 +31,102 @@ use swirl_tun::TunStats;
 use tokio::{runtime::Handle, task::JoinHandle};
 
 type Result<T> = std::result::Result<T, &'static str>;
+
+const DNS_GUARD_AUDIT_INTERVAL: Duration = Duration::from_secs(5);
+// A platform query has a 30-second process-tree deadline. An audit which has
+// stopped making progress must not leave a permanently healthy status flag.
+const DNS_GUARD_MAX_AGE: Duration = Duration::from_secs(40);
+
+struct DnsGuardObservation {
+    verified_at: Instant,
+    enforced: bool,
+}
+
+struct DnsGuardMonitor {
+    observation: Arc<Mutex<DnsGuardObservation>>,
+    cancel: mpsc::Sender<()>,
+    thread: Option<thread::JoinHandle<()>>,
+}
+
+impl DnsGuardMonitor {
+    fn start(mut audit: impl FnMut() -> bool + Send + 'static, interval: Duration) -> Result<Self> {
+        // Never publish a running session based solely on installation state.
+        if !audit() {
+            return Err("TunDnsGuardNotEnforced");
+        }
+        let observation = Arc::new(Mutex::new(DnsGuardObservation {
+            verified_at: Instant::now(),
+            enforced: true,
+        }));
+        let result = observation.clone();
+        let (cancel, stopped) = mpsc::channel();
+        let thread = thread::Builder::new()
+            .name("swirl-dns-guard-audit".into())
+            .spawn(move || {
+                while matches!(
+                    stopped.recv_timeout(interval),
+                    Err(mpsc::RecvTimeoutError::Timeout)
+                ) {
+                    let enforced = audit();
+                    let Ok(mut observation) = result.lock() else {
+                        break;
+                    };
+                    observation.enforced = enforced;
+                    observation.verified_at = Instant::now();
+                    if !enforced {
+                        break;
+                    }
+                }
+            })
+            .map_err(|_| "TunDnsGuardAuditThread")?;
+        Ok(Self {
+            observation,
+            cancel,
+            thread: Some(thread),
+        })
+    }
+
+    fn state(&self) -> (Option<bool>, Option<u64>) {
+        let Ok(observation) = self.observation.lock() else {
+            return (None, None);
+        };
+        let age = observation.verified_at.elapsed();
+        // Failed queries include inaccessible firewall policy and timeouts;
+        // neither can establish that a rule is absent or active.
+        let enforced = (age <= DNS_GUARD_MAX_AGE && observation.enforced).then_some(true);
+        (enforced, u64::try_from(age.as_millis()).ok())
+    }
+
+    fn failure(&self) -> Option<&'static str> {
+        let Ok(observation) = self.observation.lock() else {
+            return Some("TunDnsGuardAuditUnavailable");
+        };
+        if !observation.enforced {
+            Some("TunDnsGuardNotEnforced")
+        } else if observation.verified_at.elapsed() > DNS_GUARD_MAX_AGE {
+            Some("TunDnsGuardAuditUnavailable")
+        } else {
+            None
+        }
+    }
+
+    fn request_stop(&self) {
+        let _ = self.cancel.send(());
+    }
+
+    fn join(&mut self) {
+        self.request_stop();
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
+impl Drop for DnsGuardMonitor {
+    fn drop(&mut self) {
+        self.join();
+    }
+}
 
 fn code(error: io::Error) -> &'static str {
     match error.kind() {
@@ -95,6 +192,7 @@ struct Active {
     journal: Journal,
     path: PathBuf,
     watcher: Option<NetworkChangeWatcher>,
+    dns_guard: Option<DnsGuardMonitor>,
     restored: bool,
 }
 
@@ -298,6 +396,7 @@ impl Active {
             journal,
             path,
             watcher: Some(watcher),
+            dns_guard: None,
             restored: false,
         };
         if transaction::apply(&mut active.backend, &mut active.store, &mut active.journal).is_err()
@@ -306,12 +405,20 @@ impl Active {
             // Drop retries recovery; the durable journal remains for supervisor.
             return Err("TunNetworkApplyFailed");
         }
+        let guards = active.journal.clone();
+        active.dns_guard = Some(DnsGuardMonitor::start(
+            move || windows_network::audit_dns_guards(&guards).is_ok(),
+            DNS_GUARD_AUDIT_INTERVAL,
+        )?);
         Ok(active)
     }
 
     fn stop(&mut self) -> Result<()> {
         if self.restored {
             return Ok(());
+        }
+        if let Some(guard) = &self.dns_guard {
+            guard.request_stop();
         }
         if let Some(mut watcher) = self.watcher.take() {
             // Network restoration must still run if an observer cannot close;
@@ -334,6 +441,9 @@ impl Active {
             reader.join().map_err(|_| "TunReaderPanic")?;
         }
         archive(&self.path, &self.journal)?;
+        if let Some(mut guard) = self.dns_guard.take() {
+            guard.join();
+        }
         self.restored = true;
         Ok(())
     }
@@ -444,6 +554,30 @@ impl NativeSession {
         if !self.desired || self.state == "recovery_required" {
             return;
         }
+        if let Some(error) = self
+            .active
+            .as_ref()
+            .and_then(|active| active.dns_guard.as_ref())
+            .and_then(DnsGuardMonitor::failure)
+        {
+            // A security-policy drift is not a routine interface rebuild.
+            // Retain capture and the journal rather than automatically removing
+            // routes/guards and opening a physical escape path. Explicit stop
+            // still uses the original compare-and-restore recovery contract.
+            self.state = "recovery_required";
+            self.last_error = Some(
+                if self
+                    .binding
+                    .as_mut()
+                    .is_none_or(|binding| binding.suspend().is_err())
+                {
+                    "TunEgressUnavailable"
+                } else {
+                    error
+                },
+            );
+            return;
+        }
         if let Some(reason) = self.active.as_ref().and_then(Active::failure_or_change) {
             self.last_error = Some(reason);
             if self
@@ -533,9 +667,15 @@ impl NativeSession {
             "stopped" | "waiting_for_network" => Some(false),
             _ => None,
         };
+        let (dns_guard_active, dns_guard_audit_age_ms) = self
+            .active
+            .as_ref()
+            .and_then(|active| active.dns_guard.as_ref())
+            .map_or((Some(false), None), DnsGuardMonitor::state);
         json!({"state":self.state,"desired_enabled":self.desired,"last_error":self.last_error,
             "capture_active":capture_active,
-            "dns_guard_active":capture_active,
+            "dns_guard_active":dns_guard_active,
+            "dns_guard_audit_age_ms":dns_guard_audit_age_ms,
             "core_egress_guard_owned":self.binding.is_some(),
             "statistics":self.active.as_ref().map(Active::status),
             "capabilities":super::native_tun_control::capabilities()})
@@ -600,4 +740,57 @@ pub(crate) fn recover_stale() -> Result<Value> {
             .map_err(|_| "TunEgressStillOwned")?;
     }
     Ok(json!({"state":"recovered","journals_restored":restored,"active_owners":active}))
+}
+
+#[cfg(test)]
+mod guard_monitor_tests {
+    use super::*;
+    use std::sync::atomic::AtomicUsize;
+
+    #[test]
+    fn initial_failed_enforcement_never_publishes_a_healthy_monitor() {
+        assert_eq!(
+            DnsGuardMonitor::start(|| false, Duration::from_secs(1))
+                .err()
+                .unwrap(),
+            "TunDnsGuardNotEnforced"
+        );
+    }
+
+    #[test]
+    fn independently_observed_rule_loss_invalidates_prior_running_state() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let queried = calls.clone();
+        let mut monitor = DnsGuardMonitor::start(
+            move || queried.fetch_add(1, Ordering::SeqCst) == 0,
+            Duration::from_millis(1),
+        )
+        .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while monitor.failure().is_none() && Instant::now() < deadline {
+            thread::yield_now();
+        }
+        assert_eq!(monitor.failure(), Some("TunDnsGuardNotEnforced"));
+        assert_eq!(monitor.state().0, None);
+        monitor.join();
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn stale_success_is_unknown_and_normal_stop_wakes_a_waiting_monitor() {
+        let mut monitor = DnsGuardMonitor::start(|| true, Duration::from_secs(3600)).unwrap();
+        assert_eq!(monitor.state().0, Some(true));
+        monitor.observation.lock().unwrap().verified_at =
+            Instant::now() - DNS_GUARD_MAX_AGE - Duration::from_secs(1);
+        assert_eq!(monitor.state().0, None);
+        assert_eq!(monitor.failure(), Some("TunDnsGuardAuditUnavailable"));
+        // This would block for an hour if cancellation did not wake the poller.
+        let (finished, completion) = mpsc::channel();
+        let owner = thread::spawn(move || {
+            monitor.join();
+            finished.send(()).unwrap();
+        });
+        completion.recv_timeout(Duration::from_secs(2)).unwrap();
+        owner.join().unwrap();
+    }
 }

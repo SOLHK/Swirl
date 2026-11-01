@@ -4,7 +4,9 @@
 //! a configuration or journal is interpolated into executable script text. All
 //! mutation resources are scoped to one GUID+index pair; physical DNS settings
 //! and existing default routes are never changed.
-use crate::network_transaction::{InterfaceIdentity, NetworkBackend, Resource, Value};
+use crate::network_transaction::{
+    DnsProtocol, InterfaceIdentity, Journal, NetworkBackend, Resource, Value,
+};
 pub use crate::windows_notify::NetworkChangeWatcher;
 use ipnet::IpNet;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -97,6 +99,43 @@ pub fn snapshot() -> io::Result<NetworkSnapshot> {
     run_json(SNAPSHOT_SCRIPT, &json!({}))
 }
 
+/// Independently inspect effective firewall state. A persisted rule or a live
+/// packet device alone does not prove that Windows is enforcing DNS guards.
+/// This operation never repairs or replaces a changed rule.
+pub fn audit_dns_guards(journal: &Journal) -> io::Result<()> {
+    journal.validate()?;
+    let mut protocols = Vec::new();
+    let guards = journal
+        .changes
+        .iter()
+        .filter_map(|change| match (&change.resource, &change.after) {
+            (Resource::DnsGuard { .. }, Some(Value::DnsGuard { protocol, .. })) => {
+                protocols.push(*protocol);
+                Some(json!({"resource":change.resource,"expected":change.after}))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    if protocols.len() != 2
+        || !protocols.contains(&DnsProtocol::Tcp)
+        || !protocols.contains(&DnsProtocol::Udp)
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "DNS enforcement audit requires exactly one TCP and one UDP guard",
+        ));
+    }
+    let enforced: bool = run_json(
+        RESOURCE_SCRIPT,
+        &json!({"mode":"audit_dns_guards","interface":journal.interface,
+            "resource":null,"guards":guards}),
+    )?;
+    if !enforced {
+        return Err(io::Error::other("Windows DNS guard enforcement is unknown"));
+    }
+    Ok(())
+}
+
 /// Stable configuration of every enumerated adapter and every ActiveStore
 /// route. This read-only acceptance snapshot excludes aging lifetimes and
 /// counters; Windows does not provide an atomic snapshot across these cmdlets.
@@ -129,7 +168,10 @@ pub struct IpInterfaceConfiguration {
     pub nl_mtu_bytes: u32,
     pub dhcp: String,
     pub automatic_metric: String,
-    pub interface_metric: u32,
+    /// Some Windows 11 CIM rows have a present, null InterfaceMetric. Preserve
+    /// that observation; zero would invent state and weaken exact restoration.
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub interface_metric: Option<u32>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -562,10 +604,16 @@ try {
         return @{kind='dns';servers=$servers}
       }
       'dns_guard' {
-        try { $rules = @(Get-NetFirewallRule -Name ([string]$p.resource.name) -PolicyStore PersistentStore -ErrorAction Stop) }
+        $policyStore = if ($p.mode -eq 'audit_dns_guards') { 'ActiveStore' } else { 'PersistentStore' }
+        try { $rules = @(Get-NetFirewallRule -Name ([string]$p.resource.name) -PolicyStore $policyStore -ErrorAction Stop) }
         catch { if ($_.CategoryInfo.Category -eq [System.Management.Automation.ErrorCategory]::ObjectNotFound) { return $null } else { throw } }
         if ($rules.Count -ne 1) { throw 'Ambiguous firewall rule ownership' }
         $rule = $rules[0]
+        if ($p.mode -eq 'audit_dns_guards') {
+          # ActiveStore, unlike PersistentStore, exposes actual enforcement.
+          # Numeric CIM values are independent of localized display strings.
+          if ($null -eq $rule.PrimaryStatus -or [int]$rule.PrimaryStatus -ne 1 -or @($rule.EnforcementStatus).Count -eq 0 -or @($rule.EnforcementStatus | Where-Object { [int]$_ -ne 1 }).Count -ne 0) { throw 'DNS guard is not fully enforced by Windows' }
+        }
         $pieces = ([string]$p.resource.name).Split('.')
         $owner = $pieces[$pieces.Length-2]
         if ([string]$rule.Name -cne [string]$p.resource.name -or [string]$rule.DisplayName -cne [string]$p.resource.name -or [string]$rule.Group -cne 'Swirl Native TUN DNS Guard' -or [string]$rule.Description -cne ('Swirl native TUN DNS guard owner ' + $owner)) { throw 'Firewall ownership metadata changed' }
@@ -603,6 +651,32 @@ try {
       }
     }
     return $false
+  }
+  if ($p.mode -eq 'audit_dns_guards') {
+    if ((Get-Service -Name mpssvc -ErrorAction Stop).Status -ne 'Running') { throw 'Windows Defender Firewall service stopped' }
+    $profiles = @(Get-NetFirewallProfile -PolicyStore ActiveStore -ErrorAction Stop)
+    if ($profiles.Count -ne 3 -or @($profiles | Where-Object { [string]$_.Enabled -ne 'True' -or [string]$_.AllowLocalFirewallRules -eq 'False' }).Count -ne 0) { throw 'Active firewall profiles no longer enforce local DNS guard rules' }
+    $hardware = @(Get-NetAdapter -IncludeHidden -Physical -ErrorAction Stop | ForEach-Object { [string]$_.Name })
+    if ($hardware.Count -eq 0) { throw 'No physical adapters available for DNS guard audit' }
+    foreach ($profile in $profiles) {
+      foreach ($excluded in @($profile.DisabledInterfaceAliases)) {
+        if ([string]::IsNullOrEmpty([string]$excluded)) { continue }
+        foreach ($alias in $hardware) {
+          if ($alias -like [string]$excluded) { throw 'Firewall profile exempts a physical adapter' }
+        }
+      }
+    }
+    foreach ($guard in @($p.guards)) {
+      $p.resource = $guard.resource
+      if ($p.resource.kind -ne 'dns_guard') { throw 'Unsupported enforcement audit resource' }
+      $current = Read-State
+      if (-not (Same-State $current $guard.expected)) { throw 'Effective DNS guard differs from the owned transaction' }
+      foreach ($alias in $hardware) {
+        if (@($current.interfaces) -cnotcontains $alias) { throw 'Physical adapter is not protected by DNS guard' }
+      }
+    }
+    ConvertTo-Json -InputObject $true
+    return
   }
   $current = Read-State
   if ($p.mode -eq 'compare_exchange') {
@@ -712,7 +786,9 @@ try {
     $ip = @($interfaces | Where-Object { $_.InterfaceIndex -eq $index } | ForEach-Object {
       $mtuProperty = $_.PSObject.Properties['NlMtu']
       if ($null -eq $mtuProperty -or $null -eq $mtuProperty.Value) { throw 'Windows configuration snapshot missing NlMtu property or value' }
-      @{compartment_id=$_.CompartmentId;address_family=$_.AddressFamily;nl_mtu_bytes=$mtuProperty.Value;dhcp=$_.Dhcp.ToString();automatic_metric=$_.AutomaticMetric.ToString();interface_metric=$_.InterfaceMetric}
+      $metricProperty = $_.PSObject.Properties['InterfaceMetric']
+      if ($null -eq $metricProperty) { throw 'Windows configuration snapshot missing InterfaceMetric property' }
+      @{compartment_id=$_.CompartmentId;address_family=$_.AddressFamily;nl_mtu_bytes=$mtuProperty.Value;dhcp=$_.Dhcp.ToString();automatic_metric=$_.AutomaticMetric.ToString();interface_metric=$metricProperty.Value}
     })
     $address = @($addresses | Where-Object { $_.InterfaceIndex -eq $index } | ForEach-Object {
       @{instance_id=$_.InstanceID;address_family=$_.AddressFamily;address=$_.IPAddress;prefix_len=$_.PrefixLength;skip_as_source=$_.SkipAsSource;prefix_origin=$_.PrefixOrigin.ToString();suffix_origin=$_.SuffixOrigin.ToString()}
@@ -975,6 +1051,82 @@ ConvertTo-Json -InputObject $true
         }
     }
 
+    fn mocked_dns_guard_audit(drift: &str) -> io::Result<bool> {
+        // These functions shadow cmdlets only inside this test's child. The
+        // production fixed script runs unchanged; no host rule is read/written.
+        const MOCK: &str = r#"
+function Get-Service { param($Name) @{Status=$(if ($p.drift -eq 'service') {'Stopped'} else {'Running'})} }
+function Get-NetFirewallProfile {
+  param($PolicyStore)
+  if ($PolicyStore -ne 'ActiveStore') { throw 'Audit read the wrong profile store' }
+  foreach ($name in @('Domain','Private','Public')) {
+    @{Name=$name;Enabled=($p.drift -ne 'profile');AllowLocalFirewallRules=$(if ($p.drift -eq 'policy') {'False'} else {'True'});DisabledInterfaceAliases=$(if ($p.drift -eq 'exempt') {@('Ether*')} else {@()})}
+  }
+}
+function Get-NetAdapter {
+  param([switch]$IncludeHidden,[switch]$Physical)
+  if (-not $Physical) { throw 'Audit must enumerate physical adapters' }
+  @{Name='Ethernet'}
+  if ($p.drift -eq 'adapter') { @{Name='Wi-Fi'} }
+}
+function Get-NetFirewallRule {
+  param($Name,$PolicyStore)
+  if ($PolicyStore -ne 'ActiveStore') { throw 'Audit read PersistentStore instead of enforcement state' }
+  if ($p.drift -eq 'missing') { return }
+  $owner=$Name.Split('.')[-2]
+  @{Name=$Name;DisplayName=$Name;Group='Swirl Native TUN DNS Guard';Description=('Swirl native TUN DNS guard owner ' + $owner);Direction='Outbound';Action='Block';Enabled='True';Profile='Any';PrimaryStatus=$(if ($p.drift -eq 'degraded') {2} else {1});EnforcementStatus=$(if ($p.drift -eq 'enforcement') {@(1,16)} else {@(1)})}
+}
+function Get-NetFirewallPortFilter { process { @{Protocol=$(if ($p.drift -eq 'protocol') {'UDP'} elseif ($p.resource.name.EndsWith('.tcp')) {'TCP'} else {'UDP'});RemotePort=$(if ($p.drift -eq 'port') {'5353'} else {'53'});LocalPort='Any'} } }
+function Get-NetFirewallAddressFilter { process { @{LocalAddress='Any';RemoteAddress=$(if ($p.drift -eq 'ipv6') {'0.0.0.0/0'} else {'Any'})} } }
+function Get-NetFirewallApplicationFilter { process { @{Program='Any'} } }
+function Get-NetFirewallServiceFilter { process { @{Service='Any'} } }
+function Get-NetFirewallInterfaceTypeFilter { process { @{InterfaceType='Any'} } }
+function Get-NetFirewallSecurityFilter { process { @{Authentication='NotRequired';Encryption='NotRequired';LocalUser='Any';RemoteUser='Any';RemoteMachine='Any'} } }
+function Get-NetFirewallInterfaceFilter { process { @{InterfaceAlias=@('Ethernet')} } }
+function New-NetFirewallRule { throw 'An audit must never install a rule' }
+function Remove-NetFirewallRule { throw 'An audit must never remove a rule' }
+"#;
+        let identity = InterfaceIdentity::new(42, 1);
+        let guards = crate::network_transaction::dns_guard_resources(
+            &identity,
+            &"a".repeat(32),
+            &["Ethernet".into()],
+        )
+        .unwrap()
+        .into_iter()
+        .map(|(resource, expected)| json!({"resource":resource,"expected":expected}))
+        .collect::<Vec<_>>();
+        run_json(
+            &format!("{MOCK}\n{RESOURCE_SCRIPT}"),
+            &json!({"mode":"audit_dns_guards","interface":identity,
+                "resource":null,"guards":guards,"drift":drift}),
+        )
+    }
+
+    #[test]
+    fn dns_guard_audit_checks_effective_dual_protocol_rules_without_network_writes() {
+        assert!(mocked_dns_guard_audit("none").unwrap());
+    }
+
+    #[test]
+    fn dns_guard_audit_rejects_deleted_disabled_or_partially_enforced_protection() {
+        for drift in [
+            "missing",
+            "service",
+            "profile",
+            "policy",
+            "exempt",
+            "adapter",
+            "degraded",
+            "enforcement",
+            "port",
+            "protocol",
+            "ipv6",
+        ] {
+            assert!(mocked_dns_guard_audit(drift).is_err(), "{drift}");
+        }
+    }
+
     #[test]
     fn configuration_snapshot_reads_system_state_without_network_writes() {
         let snapshot = snapshot_network_configuration().unwrap();
@@ -1031,6 +1183,28 @@ ConvertTo-Json -InputObject $true
     }
 
     #[test]
+    fn interface_snapshot_preserves_present_null_metric_without_inventing_zero() {
+        let raw = json!({"compartment_id":1,"address_family":2,"nl_mtu_bytes":1500,
+            "dhcp":"Disabled","automatic_metric":"Disabled","interface_metric":null});
+        let no_metric: IpInterfaceConfiguration = serde_json::from_value(raw.clone()).unwrap();
+        assert_eq!(no_metric.interface_metric, None);
+        assert_eq!(serde_json::to_value(&no_metric).unwrap(), raw);
+        let mut zero = raw.clone();
+        zero["interface_metric"] = json!(0);
+        let zero: IpInterfaceConfiguration = serde_json::from_value(zero).unwrap();
+        assert_eq!(zero.interface_metric, Some(0));
+        assert_ne!(no_metric, zero);
+        let mut missing = raw.clone();
+        missing.as_object_mut().unwrap().remove("interface_metric");
+        assert!(serde_json::from_value::<IpInterfaceConfiguration>(missing).is_err());
+        for invalid in [json!(-1), json!("0"), json!(false), json!([]), json!({})] {
+            let mut malformed = raw.clone();
+            malformed["interface_metric"] = invalid;
+            assert!(serde_json::from_value::<IpInterfaceConfiguration>(malformed).is_err());
+        }
+    }
+
+    #[test]
     fn configuration_normalization_preserves_raw_mtu_dns_priority_scope_and_duplicates() {
         let adapter = AdapterConfiguration {
             identity: InterfaceIdentity::new(71, 1),
@@ -1042,7 +1216,7 @@ ConvertTo-Json -InputObject $true
                 nl_mtu_bytes: u32::MAX,
                 dhcp: "Disabled".into(),
                 automatic_metric: "Enabled".into(),
-                interface_metric: 75,
+                interface_metric: Some(75),
             }],
             addresses: vec![],
             dns: vec![DnsConfiguration {
