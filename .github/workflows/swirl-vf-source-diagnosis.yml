@@ -48,6 +48,15 @@ jobs:
               'font_generated': False, 'production_accepted': False, 'windows11_acceptance': 'NOT_RUN'}
           code = 2
           try:
+              summary['tool_versions'] = {name: subprocess.check_output(command, text=True).strip()
+                  for name, command in {
+                      'xcode': ['xcodebuild', '-version'],
+                      'macos_sdk': ['xcrun', '--sdk', 'macosx', '--show-sdk-version'],
+                      'swift': ['xcrun', 'swiftc', '--version'],
+                  }.items()}
+              summary['python'] = platform.python_version()
+              summary['fonttools'] = diagnosis.fontTools.__version__
+              summary['harfbuzz'] = diagnosis.hb.version_string()
               with tempfile.TemporaryDirectory(prefix='swirl-private-source-') as private_name:
                   private = pathlib.Path(private_name)
                   swift, binary = private/'probe.swift', private/'probe'

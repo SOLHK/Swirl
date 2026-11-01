@@ -1,0 +1,696 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-11-01T23:47:05.568951+00:00",
+  "status": "PARTIAL_BLOCKED",
+  "tested_code_head": "3c2ed586e15d6efee5e77d50e494715901f1a8d2",
+  "tested_PR_merge": "fd3e5a2eb6737da4bb62e049b7a0bfab2f459a8b",
+  "target_branch": "test",
+  "target_head_at_audit": "63dde8812f85839aa6024cbba6c498c96cae022d",
+  "font_generated": false,
+  "production_output_name": "SwirlVF.ttc",
+  "production_output_bytes": null,
+  "production_output_sha256": null,
+  "production_accepted_faces": 0,
+  "required_faces": 32,
+  "source_glyphs_per_face": 47102,
+  "required_face_GID_slots": 1507264,
+  "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+  "source_and_private_backup_bytes": 61473880,
+  "source_and_private_backup_mode": "0400",
+  "source_and_backup_hashes_match": true,
+  "local_native_sources": {
+    "status": "DIAGNOSIS_COMPLETE_NOT_FONT_ACCEPTANCE",
+    "host": "macOS-26.5.1-arm64-arm-64bit",
+    "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+    "source_unchanged": true,
+    "cases": {
+      "supplied-source": {
+        "sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "bytes": 61473880,
+        "physical_faces": 32,
+        "glyph_counts": [
+          47102
+        ],
+        "versions": [
+          "22.0d5e2"
+        ],
+        "native_identity_faces": 0,
+        "url_descriptors": 0,
+        "data_descriptors": 0,
+        "cgfont": false,
+        "registered": false,
+        "register_error_code": 103,
+        "source_unchanged": true
+      },
+      "system-0": {
+        "sha256": "9ff3ce9439fe285cdabb46f9ceb46b1ac58f1ca07e6f4a764e8286db621a0af9",
+        "bytes": 78222888,
+        "physical_faces": 24,
+        "glyph_counts": [
+          49533
+        ],
+        "versions": [
+          "21.0d1e1"
+        ],
+        "native_identity_faces": 24,
+        "url_descriptors": 24,
+        "data_descriptors": 24,
+        "cgfont": true,
+        "registered": true,
+        "register_error_code": null,
+        "source_unchanged": true
+      },
+      "system-0-copy": {
+        "sha256": "9ff3ce9439fe285cdabb46f9ceb46b1ac58f1ca07e6f4a764e8286db621a0af9",
+        "bytes": 78222888,
+        "physical_faces": 24,
+        "glyph_counts": [
+          49533
+        ],
+        "versions": [
+          "21.0d1e1"
+        ],
+        "native_identity_faces": 24,
+        "url_descriptors": 24,
+        "data_descriptors": 24,
+        "cgfont": true,
+        "registered": true,
+        "register_error_code": null,
+        "source_unchanged": true
+      },
+      "system-1": {
+        "sha256": "13b201d63324db59de86956c11c46d1f0ad9ac0aeaa0b9d035c012a794062db7",
+        "bytes": 61080840,
+        "physical_faces": 32,
+        "glyph_counts": [
+          47098
+        ],
+        "versions": [
+          "21.4d1e1"
+        ],
+        "native_identity_faces": 32,
+        "url_descriptors": 268,
+        "data_descriptors": 0,
+        "cgfont": false,
+        "registered": true,
+        "register_error_code": null,
+        "source_unchanged": true
+      },
+      "system-1-copy": {
+        "sha256": "13b201d63324db59de86956c11c46d1f0ad9ac0aeaa0b9d035c012a794062db7",
+        "bytes": 61080840,
+        "physical_faces": 32,
+        "glyph_counts": [
+          47098
+        ],
+        "versions": [
+          "21.4d1e1"
+        ],
+        "native_identity_faces": 0,
+        "url_descriptors": 0,
+        "data_descriptors": 0,
+        "cgfont": false,
+        "registered": false,
+        "register_error_code": 103,
+        "source_unchanged": true
+      }
+    },
+    "same_bytes_different_location_controls": {
+      "system-0": {
+        "byte_identical": true,
+        "differing_api_fields": []
+      },
+      "system-1": {
+        "byte_identical": true,
+        "differing_api_fields": [
+          "native_identity_faces",
+          "register_error_code",
+          "registered",
+          "url_descriptors"
+        ]
+      }
+    },
+    "font_generated": false,
+    "production_accepted": false,
+    "windows11_acceptance": "NOT_RUN"
+  },
+  "local_inventory": {
+    "available_postscript_count": 631,
+    "available_descriptor_count": 655,
+    "PingFang_descriptors": 48,
+    "discovery_errors_recorded": 63
+  },
+  "local_tools": {
+    "python": "3.12.16",
+    "fonttools": "4.61.1",
+    "harfbuzz": "14.6.0"
+  },
+  "minimal_authored_formats": {
+    "standard": {
+      "bytes": 1700,
+      "sha256": "e1e8848ea74e6f0787b831783a4f808fddb6d0042c0e187f73bfc821105dc958",
+      "directory_checksums": "PASS",
+      "physical_faces": 1,
+      "native_identity_faces": 1,
+      "registration_error": null,
+      "all_three_axes_retained": true
+    },
+    "both": {
+      "bytes": 3580,
+      "sha256": "9ae90675c853229da52069d552aaa90122568312da2f7847dee62ee052ebec97",
+      "directory_checksums": "PASS",
+      "physical_faces": 1,
+      "native_identity_faces": 1,
+      "registration_error": null,
+      "all_three_axes_retained": true
+    },
+    "hvgl-only": {
+      "bytes": 3276,
+      "sha256": "6a17038b0112c12891bd9d361123e620b3e7d154a0112c04909d096587ab2e71",
+      "directory_checksums": "PASS",
+      "physical_faces": 1,
+      "native_identity_faces": 0,
+      "registration_error": 103,
+      "all_three_axes_retained": true
+    }
+  },
+  "current_exact_resident_CI": {
+    "run": 41362777539,
+    "job": 125016508531,
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/41362777539",
+    "status": "BLOCKED_NATIVE_SOURCE_OR_AXES",
+    "source_commit": "3c2ed586e15d6efee5e77d50e494715901f1a8d2",
+    "host": "macOS-27.0.1-arm64-arm-64bit",
+    "expected_source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+    "font_generated": false,
+    "production_accepted": false,
+    "windows11_acceptance": "NOT_RUN",
+    "discovered_resources": 1,
+    "exact_source_locations": 1,
+    "discovery_error_count": 63,
+    "native_sources": {
+      "status": "DIAGNOSIS_COMPLETE_NOT_FONT_ACCEPTANCE",
+      "host": "macOS-27.0.1-arm64-arm-64bit",
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "source_unchanged": true,
+      "cases": {
+        "supplied-source": {
+          "sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+          "bytes": 61473880,
+          "physical_faces": 32,
+          "glyph_counts": [
+            47102
+          ],
+          "versions": [
+            "22.0d5e2"
+          ],
+          "native_identity_faces": 32,
+          "url_descriptors": 268,
+          "data_descriptors": 0,
+          "cgfont": false,
+          "registered": true,
+          "register_error_code": null,
+          "source_unchanged": true
+        },
+        "system-0": {
+          "sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+          "bytes": 61473880,
+          "physical_faces": 32,
+          "glyph_counts": [
+            47102
+          ],
+          "versions": [
+            "22.0d5e2"
+          ],
+          "native_identity_faces": 32,
+          "url_descriptors": 268,
+          "data_descriptors": 0,
+          "cgfont": false,
+          "registered": true,
+          "register_error_code": null,
+          "source_unchanged": true
+        },
+        "system-0-copy": {
+          "sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+          "bytes": 61473880,
+          "physical_faces": 32,
+          "glyph_counts": [
+            47102
+          ],
+          "versions": [
+            "22.0d5e2"
+          ],
+          "native_identity_faces": 0,
+          "url_descriptors": 0,
+          "data_descriptors": 0,
+          "cgfont": false,
+          "registered": false,
+          "register_error_code": 103,
+          "source_unchanged": true
+        }
+      },
+      "same_bytes_different_location_controls": {
+        "system-0": {
+          "byte_identical": true,
+          "differing_api_fields": [
+            "native_identity_faces",
+            "register_error_code",
+            "registered",
+            "url_descriptors"
+          ]
+        }
+      },
+      "font_generated": false,
+      "production_accepted": false,
+      "windows11_acceptance": "NOT_RUN"
+    },
+    "axis_baseline": {
+      "status": "SOURCE_IDENTITY_VERIFIED_NOT_CONVERSION",
+      "face_count": 32,
+      "physical_faces_verified": 32,
+      "axis_requests": 384,
+      "axis_strict_passes": 288,
+      "font_generated": false,
+      "windows11_acceptance": "NOT_RUN"
+    }
+  },
+  "native_all_GID_grid": {
+    "status": "EXTRACTED_FINITE_DESIGN_GRID",
+    "planned_native_glyph_records": 1271754,
+    "native_glyph_records": 1271754,
+    "failed_chunks": 0,
+    "completed_chunks": 1242,
+    "source_face_index": 0,
+    "glyphs_per_position": 47102,
+    "positions": 27,
+    "metrics": "NOT_EXTRACTED",
+    "user_axis_mapping": "NOT_TESTED",
+    "continuous_variation_proof": false,
+    "font_generated": false,
+    "production_accepted": false,
+    "checkpoint_sha256": "df57b9a6b5a69a45c2e7016012b1a94bc3092907ff2ad02de8868788d723af0a",
+    "recipe": {
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "source_bytes": 61473880,
+      "binary_sha256": "072be56bf05f71227cae79e696f0e91791d9f3c21787719eb161d19f3206d3b9",
+      "face_index": 0,
+      "glyph_count": 47102,
+      "same_source_hvgl_byte_range_faces": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31
+      ],
+      "axes": [
+        "WDTH",
+        "wght",
+        "HGHT"
+      ],
+      "coordinate_space": "normalized_design_after_avar",
+      "positions": [
+        [
+          -1.0,
+          -1.0,
+          -1.0
+        ],
+        [
+          -1.0,
+          -1.0,
+          0.0
+        ],
+        [
+          -1.0,
+          -1.0,
+          1.0
+        ],
+        [
+          -1.0,
+          0.0,
+          -1.0
+        ],
+        [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        [
+          -1.0,
+          0.0,
+          1.0
+        ],
+        [
+          -1.0,
+          1.0,
+          -1.0
+        ],
+        [
+          -1.0,
+          1.0,
+          0.0
+        ],
+        [
+          -1.0,
+          1.0,
+          1.0
+        ],
+        [
+          0.0,
+          -1.0,
+          -1.0
+        ],
+        [
+          0.0,
+          -1.0,
+          0.0
+        ],
+        [
+          0.0,
+          -1.0,
+          1.0
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          0.0,
+          1.0,
+          -1.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          -1.0,
+          -1.0
+        ],
+        [
+          1.0,
+          -1.0,
+          0.0
+        ],
+        [
+          1.0,
+          -1.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          -1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          -1.0
+        ],
+        [
+          1.0,
+          1.0,
+          0.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "batch_size": 1024,
+      "platform": "macOS-26.5.1-arm64-arm-64bit",
+      "code_sha256": {
+        "hvf_coverage.py": "7c3e2e9b30b1cdb53e6891785bb3a607b9542e817d59fde2e3ccf623b07d8113",
+        "hvf_transcript.py": "0bcf70b02b5aec9cebf7b811e5258871301f65b181ecc9d27d38f13bb9e48342",
+        "run_hvf_oracle.py": "149af2e99c8d53c9a384b0aabed11afea22b20f8c9f2a7ba0a24735be904d8b1",
+        "hvf_oracle.c": "ec41f13bc928de394b9e67a6baf774d1de72b79e93244de03f266b5f35a49a96"
+      }
+    },
+    "native_callback_counts": {
+      "events": 280843956,
+      "parts_begun": 36981873,
+      "parts_ended": 36981873,
+      "paths_begun": 19959507,
+      "paths_ended": 19959507,
+      "moves": 19959507,
+      "lines": 0,
+      "quads": 127042182,
+      "cubics": 0,
+      "closes": 19959507
+    },
+    "empty_glyph_observations": 135,
+    "resume_exercised": "stopped_after_first_chunk_then_resumed_with_exact_cached_chunk_verification",
+    "raw_outlines_public": false
+  },
+  "first_precision_failure": {
+    "source_sha256": "783625f70991f80584e88fdbef6f8db169c669081f38c22dc989fff46d28c3eb",
+    "scope": "SELF_AUTHORED_FIXTURE_ONLY",
+    "face_index": 0,
+    "glyph_id": 2,
+    "location": {
+      "HGHT": 1,
+      "WDTH": 1,
+      "wght": 100
+    },
+    "actual_axis_readback_equals_request": true,
+    "normalized_design_location": {
+      "WDTH": -1.0,
+      "wght": -1.0,
+      "HGHT": -1.0
+    },
+    "avar_identity": true,
+    "all_gvar_points_explicit": true,
+    "IUP_needed": false,
+    "gvar_tuple_count": 7,
+    "all_control_points_max_error": 0.0,
+    "encoded_top_phantom_y": 760.0,
+    "encoded_bottom_phantom_y": -90.0,
+    "expected_vertical_advance": 850.0,
+    "coretext_vertical_advance": 849,
+    "harfbuzz_vertical_advance": 850.0,
+    "expected_horizontal_advance": 570.0,
+    "coretext_horizontal_advance": 569.9920654296875,
+    "harfbuzz_horizontal_advance": 570.0,
+    "HVAR_present": false,
+    "VVAR_present": false,
+    "precision_limit": 0.03125,
+    "frozen_16_16_floor_then_integer_prediction": 849,
+    "prediction_matches": true,
+    "private_CoreText_arithmetic_implementation": "NOT_PROVEN",
+    "strict_gate": "FAIL_UNCHANGED",
+    "production_fix_accepted": false
+  },
+  "current_Apple_precision_diagnosis": {
+    "os": "macOS 26.6.2 (25G83)",
+    "run": 41362783001,
+    "job": 125016525228,
+    "unchanged_strict_gate": "FAIL",
+    "variants_at_original_UPM": {
+      "gvar_only": {
+        "glyph_observations": 174,
+        "direct_glyphs_outside_original_budget": 106,
+        "max_direct_error_by_field": {
+          "advance_width": 0.20194531250001546,
+          "advance_height": 1.337500000000091,
+          "vertical_origin_x": 200,
+          "vertical_origin_y": 820
+        },
+        "run_api_errors": 0,
+        "run_measurements": 232,
+        "max_run_advance_error": {
+          "run_horizontal": 0.20194531250001546,
+          "run_vertical": 1.337500000000091
+        }
+      },
+      "production_hvar_vvar": {
+        "glyph_observations": 174,
+        "direct_glyphs_outside_original_budget": 6,
+        "max_direct_error_by_field": {
+          "advance_width": 0.0011759327650224805,
+          "advance_height": 0.33750000000009095,
+          "vertical_origin_x": 200,
+          "vertical_origin_y": 820
+        },
+        "run_api_errors": 0,
+        "run_measurements": 232,
+        "max_run_advance_error": {
+          "run_horizontal": 0.0011759327650224805,
+          "run_vertical": 0.33750000000009095
+        }
+      },
+      "diagnostic_bearing_maps": {
+        "glyph_observations": 174,
+        "direct_glyphs_outside_original_budget": 6,
+        "max_direct_error_by_field": {
+          "advance_width": 0.0011759327650224805,
+          "advance_height": 0.33750000000009095,
+          "vertical_origin_x": 200,
+          "vertical_origin_y": 820
+        },
+        "run_api_errors": 0,
+        "run_measurements": 232,
+        "max_run_advance_error": {
+          "run_horizontal": 0.0011759327650224805,
+          "run_vertical": 0.33750000000009095
+        }
+      }
+    },
+    "note": "These all-metric diagnostic counts also inspect blank glyph origins; they are not the unchanged strict test count.",
+    "artifact_zip_sha256": "5c48dd95236a41b4d1a1e87304a48dca3406e459ccfd5abe07d97278f3fc4579"
+  },
+  "portable_regressions": {
+    "local_tests": 908,
+    "local_skips": 7,
+    "local_failures": 0,
+    "subsequent_privacy_regression_tests": 7,
+    "CI_tests": 909,
+    "CI_skips": 0,
+    "CI_failures": 0,
+    "audit_tests": 6
+  },
+  "DirectWrite_CI": {
+    "run": 41362783001,
+    "job": 125016525081,
+    "scope": "self_authored_standard_and_metric_fixtures_only",
+    "reports": [
+      {
+        "status": "PASS_NATIVE_PROBE",
+        "platform": "Microsoft Windows NT 10.0.20348.0",
+        "windows_product": "Microsoft Windows Server 2022 Datacenter",
+        "windows_build": "20348",
+        "input_sha256": "5120611edc79613a48a2467ecf73b6a7a599e40eb2debbd5dbb62cd6e95c30b7",
+        "input_bytes": 3776,
+        "source_sha256": "54231cac0cfb210444348b7375b707e78d9248939cb513c9a16bce502d711616",
+        "binary_sha256": "f1a68d4445106bcf330d7e82712f6111b08865295faf8dafb7ce53d9bd8f64c7",
+        "native_exit_code": 0,
+        "native_summary": [
+          {
+            "record": "summary",
+            "status": "PASS_NATIVE_PROBE",
+            "faces_passed": 3,
+            "faces_failed": 0,
+            "preservation": "NOT_EVALUATED",
+            "clarity_review": "NOT_EVALUATED",
+            "all_glyphs": true
+          }
+        ],
+        "input_unchanged": true,
+        "system_installation": "NOT_TESTED",
+        "real_swirl_ui": "NOT_TESTED"
+      },
+      {
+        "status": "PASS_NATIVE_PROBE",
+        "platform": "Microsoft Windows NT 10.0.20348.0",
+        "windows_product": "Microsoft Windows Server 2022 Datacenter",
+        "windows_build": "20348",
+        "input_sha256": "ad29b7b3e4fe6c654cb7487fb31fe6bad13f2c7940ad09fadf1357cd50cf5e3c",
+        "input_bytes": 3496,
+        "source_sha256": "54231cac0cfb210444348b7375b707e78d9248939cb513c9a16bce502d711616",
+        "binary_sha256": "f1a68d4445106bcf330d7e82712f6111b08865295faf8dafb7ce53d9bd8f64c7",
+        "native_exit_code": 0,
+        "native_summary": [
+          {
+            "record": "summary",
+            "status": "PASS_NATIVE_PROBE",
+            "faces_passed": 2,
+            "faces_failed": 0,
+            "preservation": "NOT_EVALUATED",
+            "clarity_review": "NOT_EVALUATED",
+            "all_glyphs": true
+          }
+        ],
+        "input_unchanged": true,
+        "system_installation": "NOT_TESTED",
+        "real_swirl_ui": "NOT_TESTED"
+      }
+    ],
+    "artifact_zip_sha256": "39e82daff349891f6bb9963c95271f5f53c9c17a48abbe00cf9357e706c4e012"
+  },
+  "Qt_CI": {
+    "run": 41362783107,
+    "job": 125016525262,
+    "Qt": "6.12.0",
+    "ctest_passed": 3,
+    "ctest_total": 3,
+    "individual_passes": 62,
+    "individual_skips": 9,
+    "gate_errors": 0,
+    "full_app_PR_steps": "SKIPPED_BY_EXISTING_POLICY",
+    "final_font": "NOT_RUN"
+  },
+  "prior_full_app_push": {
+    "run": 41336471755,
+    "head": "7736c6c95d94e6b79ff92cc77ebee998b717c84b",
+    "status": "SUCCESS",
+    "scope": "full_application_compile_and_isolated_font_navigation_smoke_with_authored_fixtures"
+  },
+  "Windows11_x64_final_font": "NOT_RUN",
+  "font_publication_grant": "SCOPE_NOT_VERIFIED_NO_GRANT_DOCUMENT_FOUND_IN_PROJECT",
+  "merged_to_test": false,
+  "remote_font_sha256_verification": "NOT_RUN_NO_FONT",
+  "post_merge_test_CI": "NOT_RUN_NO_MERGE",
+  "code_sha256": {
+    "tools/swirl_vf/platform/coretext_extract.swift": "8e5aaa0a921f24a656766c1e24a0d388397cdaddbdfebae1ab415c0d7c3f3bbf",
+    "tools/swirl_vf/platform/diagnose_font_sources.py": "23193152ac0ef189a2f4b8ddb6d32b21e9a249d91bb4a74c04e1ab53b3fa27b5",
+    "tools/swirl_vf/platform/diagnose_coretext_formats.py": "5dc95df4ffedf336154f714d08aa8d604c786ebde4d6ca665518d1a085f9aa26",
+    "tools/swirl_vf/platform/hvf_coverage.py": "7c3e2e9b30b1cdb53e6891785bb3a607b9542e817d59fde2e3ccf623b07d8113",
+    "tools/swirl_vf/platform/hvf_transcript.py": "0bcf70b02b5aec9cebf7b811e5258871301f65b181ecc9d27d38f13bb9e48342",
+    "tools/swirl_vf/platform/run_hvf_oracle.py": "149af2e99c8d53c9a384b0aabed11afea22b20f8c9f2a7ba0a24735be904d8b1",
+    "tools/swirl_vf/platform/test_coretext_extract.py": "4a263bd0545a920be19bbfc7bf980ac44703c799bb0f7de1eb4d5be6afaa9bc6"
+  }
+}

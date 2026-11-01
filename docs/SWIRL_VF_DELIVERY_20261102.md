@@ -1,5 +1,9 @@
 # SwirlVF delivery checkpoint — 2026-11-02
 
+Later continuation: [system-source root-cause checks and complete GID extraction](SWIRL_VF_ROOT_CAUSE_20261102.md).
+The local 0/32 result below remains historical; current independent macOS 27
+evidence reads the exact original at 32/32, while strict axis/metric gates fail.
+
 **PARTIAL / production BLOCKED. No accepted SwirlVF.ttc has been generated or
 published. This checkpoint is engineering progress, not the requested font
 delivery.**
