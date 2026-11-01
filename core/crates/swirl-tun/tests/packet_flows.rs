@@ -449,7 +449,9 @@ async fn udp_roundtrip(v6: bool) {
             (destination.port(), source.port())
         );
     }
-    assert_eq!(stack.stats.snapshot().malformed_packets, 1);
+    // Both the truncated IP packet and checksum-invalid UDP are now rejected
+    // and counted at admission, before either can consume an endpoint slot.
+    assert_eq!(stack.stats.snapshot().malformed_packets, 2);
     stack.shutdown().await.unwrap();
 }
 
@@ -622,6 +624,122 @@ async fn malformed_syn_checksum_does_not_consume_flow_capacity() {
     let _flow = handshake(&mut stack, source, destination).await;
     assert_eq!(stack.stats.snapshot().active_tcp_flows, 1);
     stack.shutdown().await.unwrap();
+}
+
+async fn malformed_udp_preserves_endpoint_capacity(v6: bool) {
+    let source: SocketAddr = if v6 {
+        "[2001:db8::10]:40000"
+    } else {
+        "192.0.2.10:40000"
+    }
+    .parse()
+    .unwrap();
+    let destination: SocketAddr = if v6 {
+        "[2001:db8::20]:4444"
+    } else {
+        "203.0.113.20:4444"
+    }
+    .parse()
+    .unwrap();
+    let valid_destination = SocketAddr::new(destination.ip(), 5555);
+    for malformed in 0..4 {
+        let mut stack = spawn(TunConfig {
+            max_udp_endpoints: 1,
+            ..TunConfig::default()
+        })
+        .unwrap();
+        let bytes = udp_packet(source, destination, b"payload");
+        let (_, _, _, payload) = ip_payload(&bytes);
+        let mut payload = payload.to_vec();
+        match malformed {
+            0 => payload[8] ^= 1, // Incorrect nonzero checksum.
+            1 => UdpPacket::new_unchecked(&mut payload[..]).set_len(7),
+            2 => UdpPacket::new_unchecked(&mut payload[..]).set_len(1024),
+            3 => payload.truncate(4), // Ports alone must not admit a socket.
+            _ => unreachable!(),
+        }
+        stack
+            .ingress
+            .send(ip_packet(
+                source.ip(),
+                destination.ip(),
+                IpProtocol::Udp,
+                &payload,
+            ))
+            .await
+            .unwrap();
+        stack
+            .ingress
+            .send(udp_packet(source, valid_destination, b"valid"))
+            .await
+            .unwrap();
+        let datagram = timeout(WAIT, stack.udp.recv())
+            .await
+            .expect("malformed UDP exhausted endpoint capacity")
+            .unwrap();
+        assert_eq!(
+            datagram,
+            UdpDatagram {
+                source,
+                destination: valid_destination,
+                payload: b"valid".to_vec(),
+            }
+        );
+        assert_eq!(stack.stats.snapshot().malformed_packets, 1);
+        assert_eq!(stack.stats.snapshot().active_udp_endpoints, 1);
+        stack.shutdown().await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn ipv4_malformed_udp_does_not_reserve_endpoint_capacity() {
+    malformed_udp_preserves_endpoint_capacity(false).await;
+}
+
+#[tokio::test]
+async fn ipv6_malformed_udp_does_not_reserve_endpoint_capacity() {
+    malformed_udp_preserves_endpoint_capacity(true).await;
+}
+
+#[tokio::test]
+async fn ipv4_udp_checksum_may_be_omitted_but_ipv6_checksum_is_required() {
+    for v6 in [false, true] {
+        let source: SocketAddr = if v6 {
+            "[2001:db8::10]:40000"
+        } else {
+            "192.0.2.10:40000"
+        }
+        .parse()
+        .unwrap();
+        let destination: SocketAddr = if v6 {
+            "[2001:db8::20]:4444"
+        } else {
+            "203.0.113.20:4444"
+        }
+        .parse()
+        .unwrap();
+        let mut stack = spawn(TunConfig::default()).unwrap();
+        let mut bytes = udp_packet(source, destination, b"no-checksum");
+        let offset = if v6 { 40 } else { 20 };
+        UdpPacket::new_unchecked(&mut bytes[offset..]).set_checksum(0);
+        stack.ingress.send(bytes).await.unwrap();
+        if v6 {
+            wait_received(&stack, 1).await;
+            assert_eq!(stack.stats.snapshot().malformed_packets, 1);
+            assert_eq!(stack.stats.snapshot().active_udp_endpoints, 0);
+            assert!(stack.udp.try_recv().is_err());
+        } else {
+            assert_eq!(
+                timeout(WAIT, stack.udp.recv()).await.unwrap().unwrap(),
+                UdpDatagram {
+                    source,
+                    destination,
+                    payload: b"no-checksum".to_vec(),
+                }
+            );
+        }
+        stack.shutdown().await.unwrap();
+    }
 }
 
 #[tokio::test]

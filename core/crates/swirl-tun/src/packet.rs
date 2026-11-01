@@ -1,7 +1,7 @@
 //! Admission metadata only; smoltcp performs TCP, UDP and IP reassembly.
 use smoltcp::{
     phy::ChecksumCapabilities,
-    wire::{IpProtocol, Ipv4Packet, Ipv6Packet, TcpPacket, TcpRepr},
+    wire::{IpProtocol, Ipv4Packet, Ipv6Packet, TcpPacket, TcpRepr, UdpPacket, UdpRepr},
 };
 use std::net::{IpAddr, SocketAddr};
 
@@ -107,6 +107,25 @@ pub(crate) fn inspect(bytes: &[u8]) -> Result<Metadata, ()> {
             return Err(());
         }
         if protocol == IpProtocol::Udp {
+            if !fragmented {
+                // Check before allocating a socket: malformed datagrams must
+                // not occupy the bounded endpoint table until idle expiry.
+                // Fragmented IPv4 datagrams remain owned by smoltcp's
+                // reassembler; IPv6 is already reassembled before inspection.
+                let packet = UdpPacket::new_checked(payload).map_err(|_| ())?;
+                if source.is_ipv6() && packet.checksum() == 0 {
+                    // smoltcp's checksum verifier accepts zero for both IP
+                    // families, but RFC 8200 requires a checksum over IPv6.
+                    return Err(());
+                }
+                UdpRepr::parse(
+                    &packet,
+                    &source.into(),
+                    &destination.into(),
+                    &ChecksumCapabilities::default(),
+                )
+                .map_err(|_| ())?;
+            }
             result.udp_destination = Some(dst);
         }
         if protocol == IpProtocol::Tcp && !fragmented {
