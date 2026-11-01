@@ -1,3 +1,5 @@
 # Preserve these original ZIP-entry bytes, including their original line ends.
 windows-wfp-ef74bc0.log -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 windows-wfp-ef74bc0-receipt.json -text
+windows-wintun-0494abe-failed.log -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+macos-trojan-udp-0494abe-receipt.json -text
