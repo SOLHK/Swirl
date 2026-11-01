@@ -56,7 +56,7 @@ FontManager::FontManager(QObject *parent, const QString &storageDirectory) : QOb
     QString localSwirlFamily;
     auto discover=[&](const QString &path){
         const int id=loadFontFile(path);
-        if(id<0||QFileInfo(path).fileName()!=QStringLiteral("Swirl-VF.ttc"))return;
+        if(id<0||QFileInfo(path).fileName()!=QStringLiteral("SwirlVF.ttc"))return;
         const auto names=QFontDatabase::applicationFontFamilies(id);
         // Swirl's UI is Simplified Chinese. Other regional faces remain
         // individually selectable; never collapse them to the SC family.
@@ -66,7 +66,7 @@ FontManager::FontManager(QObject *parent, const QString &storageDirectory) : QOb
     for(const auto &file:directory.entryList({"*.ttf","*.otf","*.ttc","*.otc"},QDir::Files))
         discover(directory.filePath(file));
     // Local user-supplied asset only. The repository/release does not bundle it.
-    for(const auto &relative:{"fonts/Swirl-VF.ttc","Swirl-VF.ttc"}){
+    for(const auto &relative:{"fonts/SwirlVF.ttc","SwirlVF.ttc"}){
         const auto path=QDir(QCoreApplication::applicationDirPath()).filePath(relative);
         if(QFileInfo::exists(path))discover(path);
     }

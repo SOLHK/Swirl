@@ -163,7 +163,7 @@ class NativeProtocolTests(unittest.TestCase):
                  "                      'error': 'original_protocol_reached_sampling'}), flush=True)"]
         executable.write_text('\n'.join(lines) + '\n', encoding='utf-8')
         executable.chmod(0o700)
-        output, report = root / 'Swirl-VF.ttc', root / 'report.json'
+        output, report = root / 'SwirlVF.ttc', root / 'report.json'
         command = [sys.executable, str(Path(__file__).resolve().parents[1] / 'tools' / 'rebuild.py'),
                    str(source), '--oracle', str(executable), '--output', str(output), '--report', str(report)]
         return source, executable, received, output, report, command

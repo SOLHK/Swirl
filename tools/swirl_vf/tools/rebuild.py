@@ -7,7 +7,7 @@ Apple avar records are never silently collapsed by a Python dictionary.  The
 target keeps the original axis tags/ranges and uses an identity avar: the source
 mapping is baked into the sampled geometry and metric variations.
 
-No font is published as Swirl-VF.ttc until every original face/glyph passes the
+No font is published as SwirlVF.ttc until every original face/glyph passes the
 configured independent holdout checks. Even success is bounded sampled evidence,
 not a proof over the continuous design space or a Windows acceptance result.
 """
@@ -908,7 +908,7 @@ class FaceCheckpoints:
 
 def run(source, executable, destination, report_path, batch_size=64,
         outline_limit=1.0, metric_limit=1.0, max_extra=24, checkpoint_dir=None):
-    check(destination.name == "Swirl-VF.ttc", "the final font filename must be Swirl-VF.ttc")
+    check(destination.name == "SwirlVF.ttc", "the final font filename must be SwirlVF.ttc")
     check(source.resolve() != destination.resolve(), "never overwrite the source font")
     check(not destination.exists(), "destination already exists; do not overwrite an unreviewed font")
     validate_io_paths(source, executable, destination, report_path)

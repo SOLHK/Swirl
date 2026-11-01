@@ -23,7 +23,7 @@ batches / 5,824 glyph observations with exact replay, then stopped at face 0 /
 GID 0 because the observed vertical X origin cannot be represented by vmtx alone.
 Training sample 1 at `WDTH=1, wght=501, HGHT=500` has a 100-FUnit absolute
 representation error, retained against the unchanged 1e-5 condition.
-Zero original glyph models/faces are complete. No accepted `Swirl-VF.ttc` exists.
+Zero original glyph models/faces are complete. No accepted `SwirlVF.ttc` exists.
 
 The new HVAR diagnosis measured 3048 user locations / 12192 advances across 32
 faces. Raw-order avar evaluation with zero-normalized coordinates preserved
@@ -109,7 +109,7 @@ After resolving the source-oracle gates, run privately:
 ```sh
 python tools/rebuild.py /private/PingFangUI.ttc \
   --oracle /private/build/coretext_extract \
-  --output /private/output/Swirl-VF.ttc \
+  --output /private/output/SwirlVF.ttc \
   --report /private/output/reconstruction.json
 ```
 

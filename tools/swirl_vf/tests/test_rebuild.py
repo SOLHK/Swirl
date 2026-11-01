@@ -250,7 +250,7 @@ class RebuildTests(unittest.TestCase):
 
     def test_missing_oracle_creates_no_final_font_and_keeps_source(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp); source=root/'source.ttc'; output=root/'Swirl-VF.ttc'; report=root/'report.json'
+            root=Path(tmp); source=root/'source.ttc'; output=root/'SwirlVF.ttc'; report=root/'report.json'
             write_fixture(source)
             before=source.read_bytes()
             with self.assertRaises(OSError):

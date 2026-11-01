@@ -8,11 +8,13 @@ on:
       - work/vf-metrics-b1
       - work/vf-rebuild-c1
       - work/vf-windows-d1
+      - work/swirlvf-delivery-20261102
+      - test
     paths:
       - '.github/workflows/swirl-vf.yml'
       - 'tools/swirl_vf/**'
   pull_request:
-    branches: [work/core-completion-20261017]
+    branches: [work/core-completion-20261017, test]
     paths:
       - '.github/workflows/swirl-vf.yml'
       - 'tools/swirl_vf/**'
@@ -27,11 +29,12 @@ concurrency:
 
 jobs:
   python:
-    # PR checks execute the merge candidate, only for the four delegated branches.
+    # PR checks execute the merge candidate; test-targeted font work runs every gate.
     if: >-
       github.event_name != 'pull_request' ||
       (github.event.pull_request.head.repo.full_name == github.repository &&
-       contains(fromJSON('["work/vf-axis-a3","work/vf-metrics-b1","work/vf-rebuild-c1","work/vf-windows-d1"]'), github.head_ref))
+       (github.base_ref == 'test' ||
+        contains(fromJSON('["work/vf-axis-a3","work/vf-metrics-b1","work/vf-rebuild-c1","work/vf-windows-d1"]'), github.head_ref)))
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -62,8 +65,11 @@ jobs:
     if: >-
       github.event_name != 'pull_request' ||
       (github.event.pull_request.head.repo.full_name == github.repository &&
-       contains(fromJSON('["work/vf-axis-a3","work/vf-metrics-b1","work/vf-rebuild-c1","work/vf-windows-d1"]'), github.head_ref))
-    runs-on: xcode-27
+       (github.base_ref == 'test' ||
+        contains(fromJSON('["work/vf-axis-a3","work/vf-metrics-b1","work/vf-rebuild-c1","work/vf-windows-d1"]'), github.head_ref)))
+    # Authored fixtures need a supported public macOS runner, not the legacy
+    # exact-original environment used by separate source-only workflows.
+    runs-on: macos-26
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -121,7 +127,8 @@ jobs:
     if: >-
       github.event_name != 'pull_request' ||
       (github.event.pull_request.head.repo.full_name == github.repository &&
-       contains(fromJSON('["work/vf-axis-a3","work/vf-metrics-b1","work/vf-rebuild-c1","work/vf-windows-d1"]'), github.head_ref))
+       (github.base_ref == 'test' ||
+        contains(fromJSON('["work/vf-axis-a3","work/vf-metrics-b1","work/vf-rebuild-c1","work/vf-windows-d1"]'), github.head_ref)))
     runs-on: windows-2022
     timeout-minutes: 15
     defaults:

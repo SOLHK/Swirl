@@ -16,7 +16,7 @@ class MetricFailureEvidenceTests(unittest.TestCase):
     def test_late_glyph_origin_failure_retains_actual_sample_and_blocks_TTC(self):
         with tempfile.TemporaryDirectory(prefix="original-origin-counterexample-") as tmp:
             root = Path(tmp)
-            source, candidate, report = root/"original.ttc", root/"Swirl-VF.ttc", root/"report.json"
+            source, candidate, report = root/"original.ttc", root/"SwirlVF.ttc", root/"report.json"
             write_fixture(source, faces=3)
             before = source.read_bytes()
             oracle = OriginalAnalyticOracle(source)

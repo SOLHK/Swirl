@@ -2,7 +2,17 @@ name: Swirl VF P8 Windows local wrapper (authored only)
 
 on:
   push:
-    branches: [work/vf-takeover-abc-20261021]
+    branches: [work/vf-takeover-abc-20261021, work/swirlvf-delivery-20261102, test]
+    paths:
+      - .github/workflows/swirl-vf-p8-windows-local.yml
+      - tools/swirl_vf/platform/p8_windows_local.py
+      - tools/swirl_vf/platform/directwrite_probe.cpp
+      - tools/swirl_vf/platform/run_directwrite_probe.ps1
+      - tools/swirl_vf/platform/CMakeLists.txt
+      - tools/swirl_vf/platform/rebuild_c1_fixture.py
+      - tools/swirl_vf/tests/test_p8_windows_local.py
+  pull_request:
+    branches: [test]
     paths:
       - .github/workflows/swirl-vf-p8-windows-local.yml
       - tools/swirl_vf/platform/p8_windows_local.py
@@ -105,7 +115,7 @@ jobs:
           & $env:P8_PYTHON tools/swirl_vf/platform/p8_windows_local.py `
             --font "$env:P8_ROOT\controls\authored-control.ttc" `
             --expected-sha256 $fixture.sha256 --font-scope authored_control `
-            --expected-faces 1 --expected-glyphs 7 --output "$env:P8_ROOT\private-native"
+            --expected-faces 1 --expected-glyphs 7 --all-glyphs --output "$env:P8_ROOT\private-native"
           if ($LASTEXITCODE -ne 0) { throw 'P8 actual authored native wrapper smoke failed.' }
       - name: Write only a fixed whitelisted authored aggregate
         if: always()
@@ -133,7 +143,7 @@ jobs:
             $summary.native_Windows_version = $report.native_Windows_version
             $summary.Windows_scope = $report.Windows_scope
             if ($report.observations) {
-              foreach ($field in @('physical_faces','sampled_glyphs_across_faces','native_instances',
+              foreach ($field in @('physical_faces','glyph_coverage','sampled_glyphs_across_faces','native_instances',
                                    'strict_binary32_axis_comparisons','raster_captures','cmap_probe_pairs')) {
                 $summary[$field] = $report.observations[$field]
               }
@@ -143,6 +153,8 @@ jobs:
           $summary | ConvertTo-Json -Depth 6
           if ($summary.status -ne 'PASS_LOCAL_DIRECTWRITE_PROTOCOL_ONLY' -or
               $summary.font_scope -ne 'authored_control' -or $summary.Windows_scope -ne 'WINDOWS_SERVER' -or
+              $summary.glyph_coverage -ne 'ALL_GIDS' -or $summary.physical_faces -ne 1 -or
+              $summary.sampled_glyphs_across_faces -ne 7 -or $summary.native_instances -ne 62 -or
               $summary.strict_binary32_axis_comparisons -ne 186 -or $summary.raster_captures -ne 10) {
             throw 'Authored Windows Server P8 evidence incomplete; no original-font acceptance granted.'
           }
