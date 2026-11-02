@@ -144,8 +144,15 @@ class CFF2GeometryTests(unittest.TestCase):
             path=Path(tmp)/'source.ttc';make_fixture(path)
             with TTCollection(path) as source:
                 font=source.fonts[0]
+                before = path.read_bytes()
+                with self.assertRaisesRegex(geometry.CFF2GeometryError, 'DirectWrite_compatibility'):
+                    geometry.install(prepare_from_truetype(font),
+                                     dict.fromkeys(font.getGlyphOrder(), factored))
+                self.assertEqual(path.read_bytes(), before)
+                self.assertIn('glyf', font)
                 candidate=geometry.install(prepare_from_truetype(font),
-                                           dict.fromkeys(font.getGlyphOrder(),factored))
+                                           dict.fromkeys(font.getGlyphOrder(),factored),
+                                           experimental_nested=True)
                 stream=io.BytesIO();candidate.save(stream)
             with TTFont(io.BytesIO(stream.getvalue())) as font:
                 for p in held+locations[::100]:

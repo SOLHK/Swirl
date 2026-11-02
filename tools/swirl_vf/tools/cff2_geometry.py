@@ -288,7 +288,7 @@ def fit(training_commands, training_locations, holdout_commands, holdout_locatio
     return model
 
 
-def install(font, models, *, experimental_slice=False):
+def install(font, models, *, experimental_slice=False, experimental_nested=False):
     """Install all modeled GIDs on a detached font; never fill missing models.
 
     Callers must supply correct CFF2-compatible metrics before serialization.
@@ -296,6 +296,13 @@ def install(font, models, *, experimental_slice=False):
     """
     order = font.getGlyphOrder()
     require(set(models) == set(order), 'complete_original_GID_model_coverage_required')
+    # OpenType 1.9.1 permits this encoding, but our actual Windows Server and
+    # Windows 11 controls lose its variable outlines. CoreText/FontTools success
+    # cannot admit it to the normal Windows-targeted construction path. Retain
+    # an explicit authored-diagnostic route so the native failure stays tested.
+    require(experimental_nested or not any(isinstance(model, FactoredOutlineModel)
+                                          for model in models.values()),
+            'nested_blends_lack_DirectWrite_compatibility')
     require(experimental_slice or all(model.evidence.get('domain_kind') != 'one_dimensional_slice'
                                     for model in models.values()),
             'slice_model_is_not_a_complete_design_space')

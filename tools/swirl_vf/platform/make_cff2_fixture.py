@@ -58,7 +58,8 @@ def convert(font, translation=0., *, factored=False, compact=False, repeat_conto
                              records(font, name, held, translation, repeat_contours=repeat_contours), held, TAGS)
         models[name] = (geometry.factor(model) if factored else
                         geometry.compact(model) if compact else model)
-    return geometry.install(prepare_from_truetype(font), models), models
+    return geometry.install(prepare_from_truetype(font), models,
+                            experimental_nested=factored), models
 
 
 def write_fixture(path, *, factored=False, compact=False, repeat_contours=1):
