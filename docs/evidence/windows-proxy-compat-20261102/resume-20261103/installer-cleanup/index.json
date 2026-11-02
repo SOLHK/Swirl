@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "scope": "Historical installer cleanup diagnosis plus local validator regression; not current-source Windows acceptance.",
+  "historical_head_sha": "24af5838e39b4612321a7ee2b1be11d78fb9b6dd",
+  "historical_checkout_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+  "diagnostic_run_id": 41486232873,
+  "artifact_id": 13160614838,
+  "artifact_zip_sha256": "b529aa04986ad10b1e8c29c6c4552a52ec6e9fa834843d7c4ff416ed608a32b5",
+  "files": [
+    {
+      "path": "README.md",
+      "size_bytes": 4234,
+      "sha256": "b975a8abe54f37e528e18992765991dab39e944f0b20e5cb4daee0c43a2b4f94"
+    },
+    {
+      "path": "Test-InstallerInventoryRegression.ps1",
+      "size_bytes": 5695,
+      "sha256": "ab6596808131259efee67525022c9a91715abf099f2be3b201fd6dcc5717f2c6"
+    },
+    {
+      "path": "envelope.json",
+      "size_bytes": 787,
+      "sha256": "9cf0583c32b67337f0b96f63acf0e7e6b3211b63daccfc302c7eaaf7718315f5"
+    },
+    {
+      "path": "historical-installer-root-cause.json",
+      "size_bytes": 1983,
+      "sha256": "75af2bae6bf59c89598d332915c9ded0155fcc4afa9e1003c3431998c2ea5dd8"
+    },
+    {
+      "path": "historical-nsis-directory-evidence.json",
+      "size_bytes": 3363,
+      "sha256": "89f1a8b4bb081c98219e57b633231f2eee09bbfc14fd78e03e963f114f893d2f"
+    },
+    {
+      "path": "inspect-historical-nsis-directories.py",
+      "size_bytes": 3876,
+      "sha256": "19303219f6efaf7827e91123df0b2b506ae78c29122cceafc9363ce4bbb61a68"
+    },
+    {
+      "path": "installed-layout.json",
+      "size_bytes": 334779,
+      "sha256": "f25c9d188561db7b96f16802e62b62799765a78d32740a23a5bb689af1d80c80"
+    },
+    {
+      "path": "inventory-regression.json",
+      "size_bytes": 1319,
+      "sha256": "6703ba1a4bf03cb0255efbb8a915dde2110c61e51a423ca6e170a22a8120c01e"
+    },
+    {
+      "path": "lifecycle.json",
+      "size_bytes": 2653,
+      "sha256": "1e81b2ba0465fd667bd24c9ce063b0cb84bf3368275af14edf1e87e2ee322bed"
+    },
+    {
+      "path": "staging-empty-stage-negative.stderr.log",
+      "size_bytes": 82,
+      "sha256": "735a079d7164b2746bce92636f572712ebd77eec4ba8589af891efad14f550ae"
+    },
+    {
+      "path": "staging-empty-stage-negative.stdout.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "staging-package-policy-ps7.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "staging-package-policy-ps7.stdout.log",
+      "size_bytes": 227,
+      "sha256": "957b20475e38cff8e8003cf700defae92837bb86e7c3bf799908d8bae3aca603"
+    },
+    {
+      "path": "staging-summary.json",
+      "size_bytes": 1019,
+      "sha256": "cf507503ddd6dc9f94c3a1b4fe3164d13ca82c2e44a0d87977114b1745aad4f3"
+    },
+    {
+      "path": "uninstall-remainder.json",
+      "size_bytes": 1619,
+      "sha256": "fbdf091e87b055d79571986a10fec80698d6abdf0f83b2109c75280b3b27ef96"
+    }
+  ]
+}

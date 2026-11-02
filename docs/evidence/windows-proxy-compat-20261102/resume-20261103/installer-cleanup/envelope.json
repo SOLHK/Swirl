@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "diagnostic_only": true,
+  "current_source_acceptance": false,
+  "diagnostic_commit": "ae083d7f0dc73c5d34802d872d124a34fb4e465d",
+  "diagnostic_script_sha256": "558b5cc705fd6751b229668cba0f0339c47d8048f1b605c16d8691bfdf50dd2e",
+  "historical_head_sha": "24af5838e39b4612321a7ee2b1be11d78fb9b6dd",
+  "historical_checkout_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+  "historical_run_id": 41475106009,
+  "installer_artifact_id": 13160021695,
+  "package_artifact_id": 13160625395,
+  "expected_installer_sha256": "082c6e60ffa968d0e6d3d8766a055e7dc49b5a6263de1f66c74352218b6ea84b",
+  "expected_manifest_sha256": "95e57c627ba3948422075ea22b731dc3bb77e386719e91cbf2450fb6a0758003",
+  "windows11_codex_desktop": "NOT_RUN",
+  "lifecycle_success": false
+}

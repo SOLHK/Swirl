@@ -318,3 +318,84 @@ try {
     Remove-Item -LiteralPath $tlsTestRoot -Recurse -Force
 }
 Write-Host "TLS package policy: $script:tlsAssertions scenarios passed."
+
+# NSIS File /r also includes empty directories. Normalize only the new build
+# stage; nested nonempty directories, all file bytes and outside data survive.
+$emptyStageBase = Join-Path ([IO.Path]::GetTempPath()) ('swirl-empty-stage-' + [guid]::NewGuid().ToString('N'))
+$emptyStage = Join-Path $emptyStageBase 'stage'
+$emptyStageChecks = 0
+function Check-EmptyStage([bool]$Passed,[string]$Label) {
+    if (-not $Passed) { throw "Empty staging directory regression: $Label" }
+    $script:emptyStageChecks++
+}
+New-Item -ItemType Directory -Path (Join-Path $emptyStage 'qml/Empty/Child'),
+    (Join-Path $emptyStage 'qml/Keep/EmptyChild'),(Join-Path $emptyStage '.empty'),
+    (Join-Path $emptyStage 'qml/[literal]/Nested'),(Join-Path $emptyStageBase 'outside/empty') -Force | Out-Null
+try {
+    $retained = Join-Path $emptyStage 'qml/Keep/.keep'
+    $product = Join-Path $emptyStage 'Swirl.exe'
+    $outside = Join-Path $emptyStageBase 'outside/sentinel.txt'
+    [IO.File]::WriteAllText($product,'controlled product bytes')
+    [IO.File]::WriteAllText($retained,'hidden nonempty-directory sentinel')
+    [IO.File]::WriteAllText($outside,'outside-stage sentinel')
+    if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) { [IO.File]::SetAttributes($retained,[IO.FileAttributes]::Hidden) }
+    $keptHash = (Get-FileHash -LiteralPath $retained -Algorithm SHA256).Hash
+    $outsideHash = (Get-FileHash -LiteralPath $outside -Algorithm SHA256).Hash
+    $productHash = (Get-FileHash -LiteralPath $product -Algorithm SHA256).Hash
+    $removed = @(Remove-SwirlEmptyStagingDirectories $emptyStage)
+    $expected = @('qml/Empty/Child','qml/Empty','qml/Keep/EmptyChild','.empty','qml/[literal]/Nested','qml/[literal]')
+    Check-EmptyStage ($removed.Count -eq $expected.Count -and
+        @(Compare-Object ($expected | Sort-Object) ($removed | Sort-Object)).Count -eq 0) 'exact nested and literal empty-directory list'
+    Check-EmptyStage ((Test-Path -LiteralPath $emptyStage) -and (Test-Path -LiteralPath (Join-Path $emptyStage 'qml/Keep'))) 'stage root and nonempty ancestors survive'
+    Check-EmptyStage ((Get-FileHash -LiteralPath $retained -Algorithm SHA256).Hash -ceq $keptHash -and
+        (Get-FileHash -LiteralPath $product -Algorithm SHA256).Hash -ceq $productHash) 'hidden file and product bytes unchanged'
+    Check-EmptyStage ((Get-FileHash -LiteralPath $outside -Algorithm SHA256).Hash -ceq $outsideHash -and
+        (Test-Path -LiteralPath (Join-Path $emptyStageBase 'outside/empty'))) 'outside file and empty directory untouched'
+    Check-EmptyStage (@(Remove-SwirlEmptyStagingDirectories $emptyStage).Count -eq 0) 'normalization is idempotent'
+    New-Item -ItemType Directory -Path (Join-Path $emptyStage 'must-remain-empty') | Out-Null
+    foreach ($marker in @('.swirl-install-owned','.swirl-isolated-install')) {
+        [IO.File]::WriteAllText((Join-Path $emptyStage $marker),'installed product marker')
+        $failure=$null
+        try { $null=Remove-SwirlEmptyStagingDirectories $emptyStage } catch { $failure=$_.Exception.Message }
+        Check-EmptyStage ($failure -eq 'Empty-directory pruning never modifies an installed product.' -and
+            (Test-Path -LiteralPath (Join-Path $emptyStage 'must-remain-empty'))) "installed product marker refused before mutation: $marker"
+        Remove-Item -LiteralPath (Join-Path $emptyStage $marker) -Force
+    }
+    $link = Join-Path $emptyStage 'linked-outside'
+    if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+        New-Item -ItemType Junction -Path $link -Target (Join-Path $emptyStageBase 'outside') | Out-Null
+    } else { New-Item -ItemType SymbolicLink -Path $link -Target (Join-Path $emptyStageBase 'outside') | Out-Null }
+    try {
+        $failure=$null
+        try { $null=Remove-SwirlEmptyStagingDirectories $emptyStage } catch { $failure=$_.Exception.Message }
+        Check-EmptyStage ($failure -eq 'Linked package or output path is forbidden.' -and
+            (Test-Path -LiteralPath (Join-Path $emptyStage 'must-remain-empty')) -and
+            (Test-Path -LiteralPath (Join-Path $emptyStageBase 'outside/empty')) -and
+            (Get-FileHash -LiteralPath $outside -Algorithm SHA256).Hash -ceq $outsideHash) 'child link rejected before any pruning'
+    } finally { [IO.Directory]::Delete($link,$false) }
+    $rootLink = Join-Path $emptyStageBase 'stage-alias'
+    if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+        New-Item -ItemType Junction -Path $rootLink -Target $emptyStage | Out-Null
+    } else { New-Item -ItemType SymbolicLink -Path $rootLink -Target $emptyStage | Out-Null }
+    try {
+        $failure=$null
+        try { $null=Remove-SwirlEmptyStagingDirectories $rootLink } catch { $failure=$_.Exception.Message }
+        Check-EmptyStage ($failure -eq 'Linked package or output path is forbidden.' -and
+            (Test-Path -LiteralPath (Join-Path $emptyStage 'must-remain-empty'))) 'linked root rejected before pruning'
+        $failure=$null
+        try { $null=Remove-SwirlEmptyStagingDirectories (Join-Path $rootLink 'qml') } catch { $failure=$_.Exception.Message }
+        Check-EmptyStage ($failure -eq 'Linked package or output path is forbidden.' -and
+            (Test-Path -LiteralPath (Join-Path $emptyStage 'must-remain-empty'))) 'linked root ancestor rejected before pruning'
+    } finally { [IO.Directory]::Delete($rootLink,$false) }
+    $failure=$null
+    try { $null=Remove-SwirlEmptyStagingDirectories ([IO.Path]::GetPathRoot($emptyStage)) } catch { $failure=$_.Exception.Message }
+    Check-EmptyStage ($failure -eq 'A filesystem root is not a build staging directory.') 'filesystem root refused without enumeration'
+    $failure=$null
+    try { $null=Remove-SwirlEmptyStagingDirectories $product } catch { $failure=$_.Exception.Message }
+    Check-EmptyStage ($failure -eq 'Empty-directory pruning requires a build staging directory.' -and
+        (Get-FileHash -LiteralPath $product -Algorithm SHA256).Hash -ceq $productHash) 'file root refused without modification'
+} finally {
+    if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($emptyStageBase)) -ne [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\','/')) { throw 'Unexpected empty-stage test cleanup path.' }
+    Remove-Item -LiteralPath $emptyStageBase -Recurse -Force
+}
+Write-Host "Empty staging directory policy: $emptyStageChecks scenarios passed."

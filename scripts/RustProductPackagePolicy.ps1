@@ -16,6 +16,60 @@ function Assert-SwirlPathWithoutLinks {
     }
 }
 
+# Only Stage-WindowsRustProduct may call this for the destination it just
+# created. Installed-product maintenance never calls it. No files or root
+# directory are removed; a nonempty directory is always preserved.
+function Remove-SwirlEmptyStagingDirectories {
+    param(
+        [Parameter(Mandatory=$true)][string]$StagingDirectory
+    )
+    $fullRoot = [IO.Path]::GetFullPath($StagingDirectory)
+    $root = $fullRoot.TrimEnd('\','/')
+    if (-not $root -or $root -eq [IO.Path]::GetPathRoot($fullRoot).TrimEnd('\','/')) {
+        throw 'A filesystem root is not a build staging directory.'
+    }
+    Assert-SwirlPathWithoutLinks $root
+    $stageItem = Get-Item -LiteralPath $root -Force -ErrorAction Stop
+    if (-not $stageItem.PSIsContainer) { throw 'Empty-directory pruning requires a build staging directory.' }
+    foreach ($marker in @('.swirl-install-owned','.swirl-isolated-install')) {
+        if (Test-Path -LiteralPath (Join-Path $root $marker)) {
+            throw 'Empty-directory pruning never modifies an installed product.'
+        }
+    }
+    $comparison = if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+        [StringComparison]::OrdinalIgnoreCase
+    } else { [StringComparison]::Ordinal }
+    $prefix = $root + [IO.Path]::DirectorySeparatorChar
+    $pending = New-Object 'System.Collections.Generic.Stack[string]'
+    $directories = New-Object 'System.Collections.Generic.List[string]'
+    $pending.Push($root)
+    # Inspect the entire tree before mutation, enumerating each directory
+    # without recursion so a junction/symlink is rejected before traversal.
+    while ($pending.Count) {
+        $directory = $pending.Pop()
+        Assert-SwirlPathWithoutLinks $directory
+        foreach ($entry in (Get-ChildItem -LiteralPath $directory -Force -ErrorAction Stop)) {
+            if (($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw 'Linked package or output path is forbidden.'
+            }
+            $full = [IO.Path]::GetFullPath($entry.FullName)
+            if (-not $full.StartsWith($prefix,$comparison)) { throw 'Staging directory inventory escaped its root.' }
+            if ($entry.PSIsContainer) { $directories.Add($full); $pending.Push($full) }
+        }
+    }
+    $removed = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($directory in ($directories | Sort-Object { $_.Length } -Descending)) {
+        Assert-SwirlPathWithoutLinks $directory
+        if (@(Get-ChildItem -LiteralPath $directory -Force -ErrorAction Stop).Count -eq 0) {
+            # Non-recursive deletion also refuses a file created after the
+            # emptiness check. Never replace this with recursive cleanup.
+            [IO.Directory]::Delete($directory,$false)
+            $removed.Add($directory.Substring($root.Length + 1).Replace('\','/'))
+        }
+    }
+    return $removed.ToArray()
+}
+
 function Test-SwirlForbiddenProductPath {
     param([Parameter(Mandatory=$true)][string]$RelativePath)
     $path = $RelativePath.Replace('\','/')

@@ -112,12 +112,24 @@ function Assert-InstalledPayload {
     Assert-FixturePath $target
     $expected = @($manifest.files | ForEach-Object { [string]$_.path }) +
         @('package-manifest.json','.swirl-install-owned','.swirl-isolated-install','卸载 Swirl.exe')
+    $directories = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($relative in $expected) {
+        $slash = $relative.LastIndexOf('/')
+        while ($slash -gt 0) {
+            $relative = $relative.Substring(0,$slash)
+            $null = $directories.Add($relative)
+            $slash = $relative.LastIndexOf('/')
+        }
+    }
+    $expectedInventory = @($expected | ForEach-Object { 'file:' + $_ }) +
+        @($directories | ForEach-Object { 'directory:' + $_ })
     $actual = @(Get-ChildItem -LiteralPath $target -Recurse -Force -ErrorAction Stop | ForEach-Object {
         if (($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Installed payload contains a linked entry.' }
-        if (-not $_.PSIsContainer) { $_.FullName.Substring($target.Length + 1).Replace('\','/') }
+        $kind = if ($_.PSIsContainer) { 'directory:' } else { 'file:' }
+        $kind + $_.FullName.Substring($target.Length + 1).Replace('\','/')
     })
-    if (@(Compare-Object ($expected | Sort-Object) ($actual | Sort-Object)).Count -ne 0) {
-        throw 'Installed payload inventory differs from the manifest and known installer ownership files.'
+    if (@(Compare-Object ($expectedInventory | Sort-Object) ($actual | Sort-Object)).Count -ne 0) {
+        throw 'Installed payload files or directories differ from the manifest and known installer ownership files.'
     }
     foreach ($entry in $manifest.files) {
         $file = Join-Path $target $entry.path
@@ -145,10 +157,10 @@ try {
     $env:SWIRL_TEST_ROOT = Join-Path $root 'runtime-state'
     New-Item -ItemType Directory -Path $env:SWIRL_TEST_ROOT | Out-Null
     $result.installer_exit_code = Run-InstalledProcess 'install' $setup "/S /ISOLATED /D=$target" 120
-    Assert-InstalledPayload
     $installedLayout = @(Get-InstalledLayout)
     ConvertTo-Json -InputObject $installedLayout -Depth 6 | Set-Content -LiteralPath (Join-Path $evidence 'installed-layout.json') -Encoding utf8
     $result.installed_empty_directories = @($installedLayout | Where-Object { $_.kind -eq 'directory' -and $_.empty } | ForEach-Object { $_.path })
+    Assert-InstalledPayload
     $result.installed_files = @($manifest.files).Count
     $result.all_installed_hashes_verified = $true; $result.exact_installed_inventory = $true
     $exe = Join-Path $target 'Swirl.exe'

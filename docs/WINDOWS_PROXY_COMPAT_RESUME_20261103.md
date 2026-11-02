@@ -90,3 +90,17 @@
 后续补齐仅修改 Windows CI 编排：复用本次生成的 Qt 6.12 测试程序和配对 Rust DLL，按既有锁文件下载并验证独立 Hysteria2/TUIC 服务端，驱动现有六个 TCP、UDP、错误认证用例；强制检查每份 XML 的实际 PASS、Qt 版本，以及 JSON 中的源码、程序和 DLL 身份，并保存原始报告。另用已构建的 C++ inspector 执行离线导入和既有加密存储保护用例。生产 Rust、原测试断言和子进程时间上限保持不变，执行结果必须以这次补齐后的新 HEAD 的 CI 为准。
 
 安装器测试还补充失败路径的诊断保全：即使已安装的程序在正常报告复制前失败，也先复制其实际 `Swirl-diagnostics.txt`，再进入独立的进程与专用目录清理流程。保全失败会使门禁失败，但不会阻断清理。该修改不改变生产安装器或运行时行为。
+
+## 9. 真实安装器发现并复现的空目录残留
+
+`2ff3c85` 的完整 Qt run [41481544129](https://github.com/SOLHK/Swirl/actions/runs/41481544129) 在新安装器门禁中实际失败：安装退出 0、1519 个文件摘要和库存一致，已安装 EXE 的 Rust HTTP/CONNECT/SOCKS5、TLS 和 61 个页面检查通过；卸载退出 0，但安装目录仍存在。该 run 整体为 FAIL，不能因为此前 UI/native 阶段成功而称完整 Qt 通过。
+
+随后用固定 SHA-256 的 `24af583` 历史完整生产包做独立 Windows 诊断 [41486232873](https://github.com/SOLHK/Swirl/actions/runs/41486232873)。诊断明确记录 `diagnostic_only=true`、历史 package checkout 和当前 probe 脚本身份，不计作新 HEAD 验收。真实安装目录包含 10 个空叶目录；卸载后残余 17 项，全部为目录、0 个文件，与实际 NSIS 压缩 header 中 11 个没有 manifest 文件后代的目录创建指令及其祖先完全对应。进程清理、用户 registry/快捷方式不变性、专用 fixture 最终清理均通过。原始 envelope、目录清单和退出报告见 [installer-cleanup 证据索引](evidence/windows-proxy-compat-20261102/resume-20261103/installer-cleanup/index.json)。
+
+原因是 Qt 部署生成的空目录被 NSIS `File /r` 一并创建，而文件 manifest 及按已删除文件祖先修剪的卸载逻辑没有这些空目录的拥有关系。修复仅在 `Stage-WindowsRustProduct.ps1` 已确认不存在、由本次构建新建的 staging 目录中清除空目录，然后再运行原有真实 EXE/TLS 验证。删除必须拒绝链接并逐层非递归执行，有文件的目录及用户安装目录保护规则保持有效。安装器验收同时检查 manifest 推导的目录集合，阻止相同问题再次进入生产包。新生产包仍须以修复后的完整 CI 实际安装和卸载结果确认。
+
+## 10. 保留远端新增的完整应用正常退出回归
+
+续接过程中远端增加 `3054b1c002eeac78b84f713ad125845b05adbaa2`，父提交为本轮 `77a366c`，已完整保留并同步。新增 `SystemProxyExitFixture` / `SystemProxyExitTests` 使用完整 Swirl、真实 Rust listener 与原生 WinINet 会话，在 PAC-only、manual+PAC 及两种后续外部修改情形下，通过生产 ShutdownCoordinator 正常关闭窗口。门禁要求代理恢复发生时 Rust 仍健康存活，最终 journal、guard 标记与 listener 清理完成，WinHTTP 不变，且三阶段回执都属于实际 checkout。
+
+这些回归与显式 `requestDisable` 的原生恢复用例分别登记；它们只编译入 UI 测试配置。最新提交下的四个数据行必须实际通过后，才可登记完整应用的原生代理正常退出 PASS。它们仍不能代替真实 Windows 11 Codex Desktop 的同设备 A/B 验收。
