@@ -10,6 +10,12 @@ do not retroactively change those identities. The
 counts, environments, native failures and CI identities. Raw outlines, copied
 fonts and full logs remain private, outside Git.
 
+The later strict product-entry execution is pinned separately to
+`cfebb62ec56c7ba3677a927091ba48d7cd562f5b`, PR merge checkout
+`09a83263d6de77411d1c3a9a40424c6d0a4f3167`. Its
+[strict-build evidence](evidence/SWIRL_VF_STRICT_BUILD_20261102.json) records the
+actual original-font attempt, compiler/tool hashes and completed CI results.
+
 ## System font reading and CoreText 103
 
 Actual enumeration on macOS 26.5.1 found 631 PostScript names, 655 descriptors
@@ -104,6 +110,25 @@ error passing the historical budget and failing the strict entry without an
 output file. Complete exact authored and cubic controls pass. This fixes budget
 selection, not the remaining original-font representation failures.
 
+The fixed entry was actually executed against the exact resident original on
+macOS 27.0.1 / Xcode 27.1 / SDK 27.0 in
+[run 41365043273](https://github.com/SOLHK/Swirl/actions/runs/41365043273).
+Compilation succeeded. The existing verified-axis adapter admitted **all 91
+initial batches / 5,824 observations** using exact per-GID native replay.
+All 32 source identities matched. The converter exited 2 at **face 0 / GID 0**,
+training sample 1: `WDTH=1, wght=501, HGHT=500`. Native vertical-origin X differs
+from `horizontal_origin_x + advance_width/2` by **100 FUnits**. The existing
+1e-5 representation guard and new total 1/32 budgets remain unchanged. No glyph
+model or face completed and no output was written; source SHA stayed identical.
+
+This independently reproduces the historical vertical-origin blocker after
+correct source access, with the current strict builder. It is not caused by
+CoreText 103 or a missing system reference. The existing vmtx/phantom encoder
+cannot express that independent X origin. Historical variable GPOS experiments
+also measured engine-dependent residuals above 1/32; they are not an accepted
+replacement. Neither the native source metrics nor the gate was rewritten to
+force this model through.
+
 ## Complete GID extraction and implemented changes
 
 The new resumable driver completed **47,102 GIDs × 27 design locations =
@@ -147,10 +172,11 @@ was force-pushed and no unrelated history or implementation was overwritten.
 | Requirement | Actual result |
 | --- | --- |
 | Local Python after strict entry fix | 914 tests, zero failures, seven platform skips; six audit tests pass |
-| CI Python | 909 tests, zero failures/skips; six audit tests pass |
+| CI Python at cfebb62e | 914 tests, zero failures/skips; six audit tests pass |
 | Changed workflows / whitespace | actionlint and `git diff --check` pass |
 | macOS strict fixture | FAIL: 849 versus 850 at unchanged 1/32 |
 | Exact-original independent macOS | 32/32 identities; 288/384 strict axes; overall gate FAIL |
+| Exact-original strict reconstruction at cfebb62e | 91/91 native batches; exit 2 at face 0/GID 0 vertical-origin X, 100 FUnit representation error; no output |
 | DirectWrite | Authored standard and production HVAR/VVAR fixtures PASS on Windows Server 2022 build 20348; all glyphs and 100–200% DPI captures |
 | Qt 6.12 Windows CI | CTest 3/3; 62 passes, nine declared skips, zero gate errors; authored fonts only |
 | Earlier full-app push | Run 41336471755 at 7736c6c completed full application compilation and isolated authored-font navigation smoke successfully |
