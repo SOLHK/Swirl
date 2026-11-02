@@ -36,6 +36,7 @@ $result = [ordered]@{
     installed_exe_sha256=$null; installed_rust_dll_sha256=$null; installed_manifest_sha256=$null
     rust_roundtrips_verified=$false; tls_runtime_verified=$false; installed_ui_pages=0; runtime_storage_isolated=$false
     installer_exit_code=$null; uninstaller_exit_code=$null; install_directory_removed=$false
+    installed_empty_directories=@(); remaining_installation_entries=$null
     user_integration_unchanged=$false; remaining_owned_processes=$null; fixture_removed=$false
     failure_diagnostics_preserved=$false
     forced_termination=$false; processes=$processes; success=$false; error=$null
@@ -125,6 +126,18 @@ function Assert-InstalledPayload {
     if ((Get-FileHash -LiteralPath (Join-Path $target 'package-manifest.json')).Hash -cne
         (Get-FileHash -LiteralPath (Join-Path $package 'package-manifest.json')).Hash) { throw 'Installed manifest differs from the verified source package.' }
 }
+function Get-InstalledLayout {
+    Assert-FixturePath $target
+    if (-not (Test-Path -LiteralPath $target)) { return @() }
+    return @(Get-ChildItem -LiteralPath $target -Recurse -Force -ErrorAction Stop | Sort-Object FullName | ForEach-Object {
+        if (($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Installed layout contains a linked entry.' }
+        $entry = [ordered]@{path=$_.FullName.Substring($target.Length + 1).Replace('\','/');
+            kind=$(if ($_.PSIsContainer) { 'directory' } else { 'file' })}
+        if ($_.PSIsContainer) { $entry.empty = @(Get-ChildItem -LiteralPath $_.FullName -Force -ErrorAction Stop).Count -eq 0 }
+        else { $entry.length=$_.Length; $entry.sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+        $entry
+    })
+}
 $before = $null
 try {
     $before = Snapshot-UserIntegration
@@ -133,6 +146,9 @@ try {
     New-Item -ItemType Directory -Path $env:SWIRL_TEST_ROOT | Out-Null
     $result.installer_exit_code = Run-InstalledProcess 'install' $setup "/S /ISOLATED /D=$target" 120
     Assert-InstalledPayload
+    $installedLayout = @(Get-InstalledLayout)
+    ConvertTo-Json -InputObject $installedLayout -Depth 6 | Set-Content -LiteralPath (Join-Path $evidence 'installed-layout.json') -Encoding utf8
+    $result.installed_empty_directories = @($installedLayout | Where-Object { $_.kind -eq 'directory' -and $_.empty } | ForEach-Object { $_.path })
     $result.installed_files = @($manifest.files).Count
     $result.all_installed_hashes_verified = $true; $result.exact_installed_inventory = $true
     $exe = Join-Path $target 'Swirl.exe'
@@ -187,6 +203,11 @@ try {
     $uninstaller = Join-Path $root 'uninstall-runner.exe'
     Copy-Item -LiteralPath (Join-Path $target '卸载 Swirl.exe') -Destination $uninstaller
     $result.uninstaller_exit_code = Run-InstalledProcess 'uninstall' $uninstaller "/S _?=$target" 120
+    # Keep the actual remainder before fixture cleanup. File-only manifests
+    # cannot reveal directories copied by NSIS that were empty from the start.
+    $remainder = @(Get-InstalledLayout)
+    $result.remaining_installation_entries = $remainder.Count
+    ConvertTo-Json -InputObject $remainder -Depth 6 | Set-Content -LiteralPath (Join-Path $evidence 'uninstall-remainder.json') -Encoding utf8
     $result.install_directory_removed = -not (Test-Path -LiteralPath $target)
     if (-not $result.install_directory_removed) { throw 'The actual production uninstaller left owned installation files behind.' }
     $result.success = $true
