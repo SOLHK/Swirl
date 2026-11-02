@@ -128,6 +128,11 @@ jobs:
           python tools/swirl_vf/platform/experiment_vertical_advance.py --output build/swirl-vf-evidence/vertical-advance-static --native coretext --constant-adjustment 24
           python tools/swirl_vf/platform/experiment_vertical_advance.py --output build/swirl-vf-evidence/vertical-advance-x --native coretext --coordinate X
           python tools/swirl_vf/platform/experiment_vertical_advance.py --output build/swirl-vf-evidence/vertical-advance-xy --native coretext --coordinate XY
+      - name: Isolate vertical metric routes and verify independent-origin placement
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/probe_metric_routes.py --output build/swirl-vf-evidence/metric-routes --binary "$PWD/build/swirl-vf-evidence/coretext/coretext_extract"
+          python tools/swirl_vf/platform/experiment_origin_compensation.py --output build/swirl-vf-evidence/origin-compensation --native coretext
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -214,11 +219,19 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Advance coordinate control execution failed' }
           python tools/swirl_vf/platform/experiment_vertical_advance.py --output build/swirl-vf-evidence/vertical-advance-xy --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe --coordinate XY
           if ($LASTEXITCODE -ne 0) { throw 'Combined advance coordinate control execution failed' }
+      - name: Verify independent vertical-origin placement through DirectWrite
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/experiment_origin_compensation.py --output build/swirl-vf-evidence/origin-compensation --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Independent-origin layout control failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: swirl-vf-windows-synthetic-${{ matrix.os }}-${{ github.sha }}
           path: |
+            build/swirl-vf-evidence/origin-compensation/*.json
+            build/swirl-vf-evidence/origin-compensation/*.jsonl
+            build/swirl-vf-evidence/origin-compensation/*.log
             build/swirl-vf-evidence/directwrite/*.json
             build/swirl-vf-evidence/directwrite/*.jsonl
             build/swirl-vf-evidence/directwrite/*.log
