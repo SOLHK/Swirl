@@ -107,13 +107,16 @@ public:
 class WaitingPolicyProxyBackend final : public SystemProxySession::Backend {
 public:
     PolicySystemProxyBackend memory;
-    bool ready=false,releaseReady=true;
+    bool ready=false,releaseReady=true,releaseFails=false;
     int preparations=0;
     State refresh() override {return memory.refresh();}
     State enable(int port,qint64 pid) override {return memory.enable(port,pid);}
     State disable() override {return memory.disable();}
     Preparation prepareEnable(int,qint64,QString *) override {++preparations;return ready?Preparation::Ready:Preparation::Pending;}
-    Preparation prepareDisable(QString *) override {return releaseReady?Preparation::Ready:Preparation::Pending;}
+    Preparation prepareDisable(QString *error) override {
+        if(releaseFails){if(error)*error=QStringLiteral("Controlled proxy release preparation failure");return Preparation::Failed;}
+        return releaseReady?Preparation::Ready:Preparation::Pending;
+    }
 };
 
 class PolicyConfigurationTests final : public QObject {
@@ -463,6 +466,64 @@ private slots:
             }
             QCOMPARE(proxy->memory.restoreCalls,cancel?1:2);QVERIFY(proxy->memory.current().systemEnabled);
         }
+    }
+    void shutdownKeepsTheCoreAliveUntilOwnedProxyReleaseCompletes(){
+        QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
+        auto backend=std::make_unique<WaitingPolicyProxyBackend>();auto *proxy=backend.get();proxy->ready=true;
+        auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("shutdown-release.dpapi"),false,std::move(backend));
+        controller.setProxyPort(listener.serverPort());QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
+        controller.toggleSystemProxy();QTRY_VERIFY(controller.systemProxy()->owned());QVERIFY(controller.processAlive());
+        const auto stoppedBefore=engine->stops;
+        QSignalSpy released(controller.systemProxy(),&SystemProxySession::releaseFinished);
+        bool aliveAtRelease=false;
+        connect(controller.systemProxy(),&SystemProxySession::releaseFinished,&controller,[&](bool){aliveAtRelease=controller.processAlive();});
+        proxy->releaseReady=false;controller.shutdown();controller.shutdown();
+        QVERIFY(controller.systemProxy()->owned());QVERIFY(controller.systemProxyBusy());
+        QVERIFY(controller.processAlive());QCOMPARE(engine->stops,stoppedBefore);
+        QTest::qWait(80);QVERIFY(controller.processAlive());QCOMPARE(released.size(),0);QCOMPARE(proxy->memory.restoreCalls,0);
+        proxy->releaseReady=true;
+        QTRY_COMPARE_WITH_TIMEOUT(released.size(),1,1000);QVERIFY(released.first().first().toBool());QVERIFY(aliveAtRelease);
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive()&&!controller.systemProxyBusy(),1000);
+        QCOMPARE(engine->stops,stoppedBefore+1);QCOMPARE(proxy->memory.restoreCalls,1);QVERIFY(!controller.systemProxy()->owned());
+        QVERIFY(proxy->memory.current().systemEnabled);QVERIFY(!controller.proxyRequested());
+        controller.shutdown();QTest::qWait(60);
+        QCOMPARE(engine->stops,stoppedBefore+1);QCOMPARE(proxy->memory.enableCalls,1);
+    }
+    void shutdownReleaseFailureAndTimeoutStopOnceWithoutReacquiring(){
+        for(const bool timeout:{false,true}) {
+            QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
+            auto backend=std::make_unique<WaitingPolicyProxyBackend>();auto *proxy=backend.get();proxy->ready=true;
+            auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+            EngineController controller(std::move(peer),nullptr,dir.filePath("shutdown-failed-release.dpapi"),false,std::move(backend));
+            controller.setProxyPort(listener.serverPort());QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
+            controller.toggleSystemProxy();QTRY_VERIFY(controller.systemProxy()->owned());
+            const auto stoppedBefore=engine->stops;
+            QSignalSpy released(controller.systemProxy(),&SystemProxySession::releaseFinished);
+            bool aliveAtRelease=false;
+            connect(controller.systemProxy(),&SystemProxySession::releaseFinished,&controller,[&](bool){aliveAtRelease=controller.processAlive();});
+            proxy->releaseReady=false;controller.shutdown();
+            QVERIFY(controller.processAlive());QVERIFY(controller.systemProxyBusy());QCOMPARE(engine->stops,stoppedBefore);
+            if(!timeout)proxy->releaseFails=true;
+            QTRY_COMPARE_WITH_TIMEOUT(released.size(),1,4500);
+            QVERIFY(!released.first().first().toBool());QVERIFY(aliveAtRelease);
+            QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive()&&!controller.systemProxyBusy(),1000);
+            QCOMPARE(engine->stops,stoppedBefore+1);QVERIFY(!controller.systemProxy()->error().isEmpty());
+            QVERIFY(controller.systemProxy()->owned());QCOMPARE(proxy->memory.restoreCalls,0);
+            QVERIFY(!controller.proxyRequested());QTest::qWait(80);
+            QCOMPARE(released.size(),1);QCOMPARE(engine->stops,stoppedBefore+1);QCOMPARE(proxy->memory.enableCalls,1);
+        }
+    }
+    void shutdownWithoutOwnedProxyStopsOnceAndPreservesExternalProxy(){
+        QTemporaryDir dir;auto backend=std::make_unique<WaitingPolicyProxyBackend>();auto *proxy=backend.get();
+        auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("shutdown-unowned.dpapi"),false,std::move(backend));
+        EngineStartOptions options;engine->start(options);QVERIFY(controller.processAlive());
+        QSignalSpy released(controller.systemProxy(),&SystemProxySession::releaseFinished);
+        controller.shutdown();controller.shutdown();
+        QVERIFY(!controller.processAlive());QVERIFY(!controller.systemProxyBusy());QCOMPARE(engine->stops,1);
+        QCOMPARE(released.size(),0);QCOMPARE(proxy->memory.disableCalls,0);QCOMPARE(proxy->memory.enableCalls,0);
+        QVERIFY(proxy->memory.current().systemEnabled);
     }
     void unavailableListenerRollsBackTheMasterIntentAndStopsTheCore(){
         QTemporaryDir dir;QTcpServer reserved;QVERIFY(reserved.listen(QHostAddress::LocalHost));const auto port=reserved.serverPort();reserved.close();

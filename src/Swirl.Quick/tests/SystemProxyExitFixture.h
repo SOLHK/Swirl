@@ -11,6 +11,7 @@ class QQuickWindow;
 // The implementation is linked only into the SWIRL_UI_TESTS executable.
 namespace SwirlSystemProxyExit {
 inline QString readyPath(const QString &root) { return QDir(root).filePath("system-proxy-exit-ready.json"); }
+inline QString waitingPath(const QString &root) { return QDir(root).filePath("system-proxy-exit-waiting.json"); }
 inline QString finalPath(const QString &root) { return QDir(root).filePath("system-proxy-exit-final.json"); }
 inline QString controlName(const QString &root) {
     const auto canonical=QFileInfo(root).canonicalFilePath();

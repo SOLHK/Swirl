@@ -236,3 +236,17 @@ Rust 的 workspace 零 ignored 不表示整个 workflow 零跳过。常规 Qt br
 本次只修正测试同步和证据门禁：观察 `connected`/`errorOccurred` 信号及终态，在既有成功连接测试使用的 3000 ms 条件等待上限内，必须收到明确的 `ConnectionRefusedError`，最终为 `UnconnectedState`，且没有连接事件，才通过。每行在断言前写入安全的数值诊断，超时、其他错误或实际连接仍失败。新增真实关闭端口与真实监听端口的正反对照，并记录旧 1500 ms 谓词在关闭端口上的实际结果；不把某个 Windows 延迟写成永久要求。CI 必须验证此控制用例、其源码匹配的 JSON，以及四行的明确拒绝回执。生产超时、120 秒 suite 上限、窗口尺寸、原 policy 120 ms 断言、四行测试和快照精确性都保持原要求。
 
 Linux Qt 6.12 信号/状态实验已验证关闭与监听两种终态，但不等于 Windows C++ 控制或完整应用验收。新候选必须重新取得全部 CI、原生退出与新生产包的实际结果；真实 Windows 11 Codex/Clash A/B 仍为 **NOT_RUN**，PR #50 保持 Draft，不合并 `test`。
+
+## 十一、恢复锁争用时的生产退出顺序
+
+在保留 `d061c061e86d0df611fdd5e2bf7911b0133b2741` 的终态拒绝探针与原始证据后，继续审查发现生产退出还有一条独立的时序缺口：`SystemProxySession::disable()` 遇到恢复日志锁争用时会返回并安排异步重试，但 `EngineController::shutdown()` 原先仍立即调用同步的 Rust `stop()`。主窗口的退出等待条件也没有包含系统代理恢复。Rust Core 与 Qt 位于同一进程，停止 Core 不会使守护进程观察的 owner/engine PID 结束，因此不能依靠守护进程保证这段等待期间监听器仍存活。
+
+生产修复让 shutdown 在释放仍为 Pending 时保留监听器；收到成功、明确失败或原有 2000 ms 释放期限到达的终态后，只续接一次 Core 停止。异步续接排到下一次事件循环，保证同一次 `releaseFinished` 的其他观察者先看到释放完成时仍活跃的 Core。shutdown 内的引擎状态回调不再重新启动已结束的释放尝试，主窗口也等待系统代理清理。失败时沿用原有恢复日志及 guard 保留机制，不无限等待，不改变 Rust 协议实现或生产期限。
+
+`PolicyConfigurationTests` 新增已接管后 Pending→成功、Pending→明确失败、真实释放期限到达、未接管时退出以及幂等停止检查，原有未完成接管的取消回归保留。完整应用原有四行 PAC/外部编辑测试全部保留，另增加 `pac-only-lock-contention`：父进程持有真实恢复日志锁，子进程只有实际进入 owned+busy 且 Rust 仍健康时才写入不含原始代理值的等待回执，父进程验证源码/PID/端口和状态后才解锁。该行继续要求释放时 Core 仍活跃、精确恢复、正常退出和资源清理，未增加原有 10 秒关闭预算。
+
+端口释放同时保留 `d061c06` 的明确 TCP 拒绝断言，并新增 Windows `SO_EXCLUSIVEADDRUSE` 同地址 bind/listen 的独立证明。真实 Rust 仍监听时必须拒绝独占绑定，退出后必须能独占重新监听。对照还执行真实 accept、完整请求响应和 EOF 后再关闭重绑；数值错误、耗时和仅限合成端口的 TCP state/PID 在失败前保存。正常 TCP 清理行为是否满足这些要求，必须由 Windows 实际运行判定，不能把超时或 TIME_WAIT 猜测成泄漏。
+
+CI 另将首次 critical UI 的整个 `policy-evidence` 在检查原始 CTest 退出码前复制到独立目录，避免后续诊断复跑覆盖首次几何报告或截图；原退出码、窗口、120 ms policy 断言及测试命令保持不变。原始历史证据继续使用上一节的 `listener-probe-1410` 目录，未复制一套重复记录。
+
+本地环境只有 Qt 运行库，没有 Qt C++ 开发 SDK，因而未将新 C++ 回归或旧实现负对照登记为已执行通过。YAML、PowerShell 解析与首次证据保存行为可在本地检查；新生产退出顺序、Windows 端口行为以及生产安装/卸载，以本提交后完整 Qt 6.12 应用、三平台 Rust 和安全矩阵的实际日志与产物为准。真实 Windows 11 Codex Desktop A/B 持续为 **NOT_RUN**，PR #50 保持 Draft，不合并 `test`。

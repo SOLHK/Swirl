@@ -60,6 +60,22 @@ public:
             m_restoredAtRelease=SystemProxySession::snapshot()==m_initial;
             m_journalAbsentAtRelease=!QFile::exists(SystemProxySession::journalPath());
         });
+        connect(m_controller->systemProxy(),&SystemProxySession::changed,this,[this]{
+            auto *proxy=m_controller->systemProxy();
+            if(m_releaseWaitingObserved||!m_ready||!m_closeRequested||!proxy->owned()||!proxy->busy())return;
+            m_releaseWaitingObserved=true;
+            m_releaseWaitingRuntimeAlive=m_controller->processAlive();
+            m_releaseWaitingRuntimeHealthy=m_controller->apiHealthy();
+            auto report=common("release-waiting");
+            report.insert("proxy_owned",proxy->owned());report.insert("proxy_busy",proxy->busy());
+            report.insert("runtime_alive",m_releaseWaitingRuntimeAlive);
+            report.insert("runtime_healthy",m_releaseWaitingRuntimeHealthy);
+            report.insert("journal_present",QFile::exists(SystemProxySession::journalPath()));
+            // An observer-only receipt lets the parent release its real file
+            // lock after Pending actually occurred, without adding a sleep or
+            // calling any production shutdown/recovery operation ourselves.
+            if(!writeReceipt(SwirlSystemProxyExit::waitingPath(m_root),report))fail("release-waiting-receipt-write-failed");
+        });
         connect(m_controller,&EngineController::statusChanged,this,[this]{observeReady();});
         connect(m_controller,&EngineController::policyApplyFinished,this,[this](const QString &,bool success){
             if(!success){fail("policy-save-failed");return;}
@@ -137,6 +153,9 @@ private:
         report.insert("journal_absent",!QFile::exists(SystemProxySession::journalPath()));
         report.insert("release_finished",m_releaseFinished);report.insert("release_succeeded",m_releaseSucceeded);
         report.insert("release_while_runtime_alive",m_releaseWhileRuntimeAlive);
+        report.insert("release_waiting_observed",m_releaseWaitingObserved);
+        report.insert("release_waiting_runtime_alive",m_releaseWaitingRuntimeAlive);
+        report.insert("release_waiting_runtime_healthy",m_releaseWaitingRuntimeHealthy);
         report.insert("snapshot_restored_at_release",m_restoredAtRelease);
         report.insert("journal_absent_at_release",m_journalAbsentAtRelease);
         report.insert("native_snapshot_readable",!snapshot.isEmpty());
@@ -156,6 +175,7 @@ private:
     int m_port=0;
     bool m_requested=false,m_ready=false,m_closeRequested=false;
     bool m_releaseFinished=false,m_releaseSucceeded=false,m_releaseWhileRuntimeAlive=false;
+    bool m_releaseWaitingObserved=false,m_releaseWaitingRuntimeAlive=false,m_releaseWaitingRuntimeHealthy=false;
     bool m_restoredAtRelease=false,m_journalAbsentAtRelease=false;
 };
 }

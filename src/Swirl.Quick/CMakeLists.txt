@@ -422,7 +422,7 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
    # and native proxy ownership. Keep this separate from the low-level suite,
    # which is also built before Swirl by the standalone core workflow.
    add_executable(SwirlSystemProxyExitTests tests/SystemProxyExitTests.cpp)
-   target_link_libraries(SwirlSystemProxyExitTests PRIVATE SwirlEngine Qt6::Test winhttp)
+   target_link_libraries(SwirlSystemProxyExitTests PRIVATE SwirlEngine Qt6::Test winhttp ws2_32 iphlpapi)
    add_dependencies(SwirlSystemProxyExitTests Swirl SwirlProxyGuard)
    if(MSVC)
     target_compile_options(SwirlSystemProxyExitTests PRIVATE /utf-8)

@@ -275,6 +275,13 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         emit statusChanged();
     });
     connect(&m_systemProxy,&SystemProxySession::releaseFinished,this,[this](bool success) {
+        if(m_shuttingDown) {
+            // All release observers must see the live listener before stop.
+            // A failed/timed-out attempt also completes this bounded wait;
+            // SystemProxySession retains its recovery journal and guard.
+            QTimer::singleShot(0,this,[this]{finishShutdownAfterProxyRelease();});
+            return;
+        }
         if(!success)return;
         // A new listener may have become ready while a guard held the restore
         // lock. Resume the still-current intent without requiring another core
@@ -323,7 +330,9 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         }
         if(s.state==ProxyEngine::State::Stopping||s.state==ProxyEngine::State::Stopped||s.state==ProxyEngine::State::Failed) {
             cancelSystemProxyCheck();
-            m_systemProxy.disable();
+            // Shutdown already owns the restore attempt. In particular, stop
+            // after its timeout must not start another asynchronous release.
+            if(!m_shuttingDown)m_systemProxy.disable();
             if(s.state==ProxyEngine::State::Failed)m_proxyRequested=false;
         } else if(s.state==ProxyEngine::State::Running&&s.apiHealthy&&m_proxyRequested&&!m_systemProxy.owned()&&!m_proxyChecking)setSystemProxy(true);
     });
@@ -461,7 +470,15 @@ void EngineController::shutdown() {
     rollbackPendingSelection(QStringLiteral("节点切换已取消，保留原选择。"));
     m_shuttingDown=true;m_connectionRequested=false;m_restartPending=false;m_proxyRequested=false;
     cancelSystemProxyCheck();
-    m_imports.shutdown();m_tests.cancel();m_systemProxy.disable();m_engine->stop();
+    m_imports.shutdown();m_tests.cancel();
+    m_shutdownAwaitingProxyRelease=true;
+    m_systemProxy.disable();
+    if(!m_systemProxy.busy())finishShutdownAfterProxyRelease();
+}
+void EngineController::finishShutdownAfterProxyRelease() {
+    if(!m_shuttingDown||!m_shutdownAwaitingProxyRelease||m_systemProxy.busy())return;
+    m_shutdownAwaitingProxyRelease=false;
+    m_engine->stop();
 }
 void EngineController::refresh() { m_engine->refresh(); }
 

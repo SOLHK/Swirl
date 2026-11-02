@@ -577,7 +577,7 @@ int main(int argc, char *argv[])
             QMetaObject::invokeMethod(rootWindow,"persistExitDrafts");
             engineController.shutdown();extensions.shutdown();capture.stop();gateway.shutdown();
             QSettings().sync();
-        },[&]{return engineController.processAlive()||engineController.busy()||engineController.tests()->busy()||gateway.busy()||extensions.busy();});
+        },[&]{return engineController.processAlive()||engineController.busy()||engineController.systemProxyBusy()||engineController.tests()->busy()||gateway.busy()||extensions.busy();});
         instance.activate=[&]{
             if(shutdown->started())return;
             const auto states=rootWindow->windowStates();

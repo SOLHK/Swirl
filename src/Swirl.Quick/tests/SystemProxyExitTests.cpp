@@ -1,24 +1,30 @@
+#define WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
+#include <windows.h>
+#include <iphlpapi.h>
+#include <winhttp.h>
 #include "SystemProxyExitFixture.h"
 #include "SwirlBuildIdentity.h"
 #include "engine/SystemProxySession.h"
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QLocalSocket>
+#include <QLockFile>
 #include <QNetworkProxy>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QSaveFile>
 #include <QScopeGuard>
+#include <QScopedPointer>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QTimer>
 #include <QtEndian>
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <winhttp.h>
 
 namespace {
 QJsonObject winHttpSnapshot() {
@@ -66,6 +72,7 @@ bool preserveEvidence(const QString &root,const QString &tag,const QJsonObject &
     if(!QDir().mkpath(evidence))return false;
     for(const auto &entry:QList<QPair<QString,QString>>{
         {SwirlSystemProxyExit::readyPath(root),tag+"-ready.json"},
+        {SwirlSystemProxyExit::waitingPath(root),tag+"-waiting.json"},
         {SwirlSystemProxyExit::finalPath(root),tag+"-final.json"}}){
         if(!QFile::exists(entry.first))continue;
         const auto destination=QDir(evidence).filePath(entry.second);
@@ -171,6 +178,97 @@ QJsonObject legacyListenerProbe(quint16 port) {
     return {{"deadline_ms",1500},{"finished",finished},{"socket_state",int(socket.state())},
         {"socket_error",int(socket.error())},{"elapsed_ms",double(elapsed.elapsed())},{"predicate_result",refused}};
 }
+QJsonObject observeClosedPortConnection(quint16 port) {
+    bool connected=false;
+    QTcpSocket socket;socket.setProxy(QNetworkProxy::NoProxy);
+    QObject::connect(&socket,&QTcpSocket::connected,&socket,[&]{connected=true;});
+    QElapsedTimer elapsed;elapsed.start();
+    socket.connectToHost(QHostAddress::LocalHost,port);
+    const bool finished=QTest::qWaitFor([&]{return socket.state()==QAbstractSocket::ConnectedState||socket.state()==QAbstractSocket::UnconnectedState;},1500);
+    // The previous oracle conflated a pending Windows connect, another socket
+    // error and a reachable listener. Keep the original budget as evidence;
+    // prove listener release independently with an exclusive bind and listen.
+    return {{"budget_ms",1500},{"finished",finished},{"connected",connected},
+        {"state",int(socket.state())},{"error",int(socket.error())},
+        {"elapsed_ms",double(elapsed.elapsed())}};
+}
+class ExclusiveLoopbackListener final {
+public:
+    explicit ExclusiveLoopbackListener(quint16 port) {
+        WSADATA data{};
+        m_error=WSAStartup(MAKEWORD(2,2),&data);
+        if(m_error)return;
+        m_started=true;m_stage="socket";
+        m_socket=WSASocketW(AF_INET,SOCK_STREAM,IPPROTO_TCP,nullptr,0,WSA_FLAG_NO_HANDLE_INHERIT);
+        if(m_socket==INVALID_SOCKET){m_error=WSAGetLastError();return;}
+        m_stage="exclusive-option";
+        const BOOL enabled=TRUE;
+        if(setsockopt(m_socket,SOL_SOCKET,SO_EXCLUSIVEADDRUSE,
+                      reinterpret_cast<const char *>(&enabled),sizeof(enabled))==SOCKET_ERROR){
+            m_error=WSAGetLastError();return;
+        }
+        BOOL actual=FALSE;int length=sizeof(actual);
+        if(getsockopt(m_socket,SOL_SOCKET,SO_EXCLUSIVEADDRUSE,
+                      reinterpret_cast<char *>(&actual),&length)==SOCKET_ERROR){
+            m_error=WSAGetLastError();return;
+        }
+        m_exclusive=actual!=FALSE;
+        if(!m_exclusive){m_error=WSAEINVAL;return;}
+        sockaddr_in address{};address.sin_family=AF_INET;
+        address.sin_addr.s_addr=htonl(INADDR_LOOPBACK);address.sin_port=htons(port);
+        m_stage="bind";
+        if(::bind(m_socket,reinterpret_cast<const sockaddr *>(&address),sizeof(address))==SOCKET_ERROR){
+            m_error=WSAGetLastError();return;
+        }
+        m_bound=true;m_stage="listen";
+        if(::listen(m_socket,SOMAXCONN)==SOCKET_ERROR){m_error=WSAGetLastError();return;}
+        m_listening=true;m_stage="listening";
+    }
+    ~ExclusiveLoopbackListener() {
+        if(m_socket!=INVALID_SOCKET)closesocket(m_socket);
+        if(m_started)WSACleanup();
+    }
+    Q_DISABLE_COPY_MOVE(ExclusiveLoopbackListener)
+    bool listening() const {return m_listening;}
+    bool rejectedOccupiedPort() const {
+        return m_exclusive&&!m_bound&&m_stage=="bind"&&(m_error==WSAEADDRINUSE||m_error==WSAEACCES);
+    }
+    QJsonObject report() const {
+        return {{"stage",m_stage},{"exclusive_option",m_exclusive},{"bound",m_bound},
+            {"listening",m_listening},{"win32_error",m_error}};
+    }
+private:
+    SOCKET m_socket=INVALID_SOCKET;
+    QString m_stage="startup";
+    int m_error=0;
+    bool m_started=false,m_exclusive=false,m_bound=false,m_listening=false;
+};
+template<typename Table> QJsonObject tcpPortState(quint16 port,ULONG family) {
+    DWORD size=0;
+    DWORD status=GetExtendedTcpTable(nullptr,&size,FALSE,family,TCP_TABLE_OWNER_PID_ALL,0);
+    QByteArray bytes;
+    for(int attempt=0;attempt<3&&status==ERROR_INSUFFICIENT_BUFFER;++attempt){
+        if(size>1024*1024)return {{"win32_error",int(ERROR_BUFFER_OVERFLOW)}};
+        bytes.resize(size);
+        status=GetExtendedTcpTable(bytes.data(),&size,FALSE,family,TCP_TABLE_OWNER_PID_ALL,0);
+    }
+    QJsonArray rows;
+    if(status==NO_ERROR){
+        const auto *table=reinterpret_cast<const Table *>(bytes.constData());
+        for(DWORD index=0;index<table->dwNumEntries;++index){
+            const auto &row=table->table[index];
+            if(ntohs(static_cast<u_short>(row.dwLocalPort))!=port)continue;
+            // Only this synthetic port's state/PID is retained. Never emit
+            // addresses, other connections or the runner's proxy settings.
+            rows.append(QJsonObject{{"state",double(row.dwState)},{"pid",double(row.dwOwningPid)}});
+        }
+    }
+    return {{"family",double(family)},{"win32_error",double(status)},{"rows",rows}};
+}
+QJsonObject tcpPortState(quint16 port) {
+    return {{"ipv4",tcpPortState<MIB_TCPTABLE_OWNER_PID>(port,AF_INET)},
+        {"ipv6",tcpPortState<MIB_TCP6TABLE_OWNER_PID>(port,AF_INET6)}};
+}
 }
 
 class SystemProxyExitTests final : public QObject {
@@ -227,15 +325,47 @@ private slots:
         QVERIFY2(!liveProbe.refused(),"A live listener must never be accepted as closed.");
         completed=true;
     }
+    void exclusiveListenerProbeRequiresReleasedPortAfterTraffic() {
+        QTcpServer listener;listener.setProxy(QNetworkProxy::NoProxy);
+        QVERIFY(listener.listen(QHostAddress::LocalHost));
+        const auto port=listener.serverPort();
+        {
+            ExclusiveLoopbackListener occupied(port);
+            QVERIFY2(occupied.rejectedOccupiedPort(),qPrintable(QString::fromUtf8(QJsonDocument(occupied.report()).toJson(QJsonDocument::Compact))));
+        }
+        QTcpSocket client;QVERIFY(connectTcp(client,port));
+        QVERIFY(QTest::qWaitFor([&]{return listener.hasPendingConnections();},3000));
+        QScopedPointer<QTcpSocket> accepted(listener.nextPendingConnection());QVERIFY(accepted);
+        const QByteArray request="exclusive-release-request",response="exclusive-release-response";
+        QCOMPARE(client.write(request),request.size());
+        QCOMPARE(readBytes(*accepted,request.size()),request);
+        QCOMPARE(accepted->write(response),response.size());
+        accepted->disconnectFromHost();
+        QByteArray received;
+        QVERIFY(QTest::qWaitFor([&]{received+=client.readAll();return client.state()==QAbstractSocket::UnconnectedState;},3000));
+        QCOMPARE(received,response);QCOMPARE(accepted->state(),QAbstractSocket::UnconnectedState);
+        accepted.reset();listener.close();
+        const auto connection=observeClosedPortConnection(port);
+        const auto state=tcpPortState(port);
+        ExclusiveLoopbackListener released(port);
+        const QJsonObject evidence{{"closed_port_connection",connection},
+            {"exclusive_rebind",released.report()},{"tcp_state_before_rebind",state}};
+        qInfo().noquote()<<"exclusive-listener-control "<<QJsonDocument(evidence).toJson(QJsonDocument::Compact);
+        QVERIFY2(!connection.value("connected").toBool(),"A deliberately closed control listener accepted a connection.");
+        QVERIFY2(released.listening(),"An exclusive listener could not reclaim the control port after complete traffic and EOF; see native state evidence.");
+        ExclusiveLoopbackListener duplicate(port);
+        QVERIFY2(duplicate.rejectedOccupiedPort(),"The exclusive probe permitted a second listener on its own live port.");
+    }
     void normalApplicationExitRestoresOwnedProxy_data() {
-        QTest::addColumn<int>("flags");QTest::addColumn<bool>("externalEdit");
-        QTest::newRow("pac-only")<<5<<false;
-        QTest::newRow("manual-and-pac")<<7<<false;
-        QTest::newRow("pac-only-external-edit")<<5<<true;
-        QTest::newRow("manual-and-pac-external-edit")<<7<<true;
+        QTest::addColumn<int>("flags");QTest::addColumn<bool>("externalEdit");QTest::addColumn<bool>("releaseContention");
+        QTest::newRow("pac-only")<<5<<false<<false;
+        QTest::newRow("manual-and-pac")<<7<<false<<false;
+        QTest::newRow("pac-only-external-edit")<<5<<true<<false;
+        QTest::newRow("manual-and-pac-external-edit")<<7<<true<<false;
+        QTest::newRow("pac-only-lock-contention")<<5<<false<<true;
     }
     void normalApplicationExitRestoresOwnedProxy() {
-        QFETCH(int,flags);QFETCH(bool,externalEdit);
+        QFETCH(int,flags);QFETCH(bool,externalEdit);QFETCH(bool,releaseContention);
         const auto original=SystemProxySession::snapshot();
         QVERIFY2(!original.isEmpty(),"Could not read the original native proxy snapshot.");
         QTemporaryDir root;QVERIFY(root.isValid());
@@ -243,7 +373,8 @@ private slots:
         const auto journal=root.filePath("data/system-proxy.dpapi");
         const QString tag=QString::fromLatin1(QTest::currentDataTag());
         QJsonObject result{{"schema",1},{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},
-            {"data_tag",tag},{"flags",flags},{"external_edit",externalEdit},{"success",false}};
+            {"data_tag",tag},{"flags",flags},{"external_edit",externalEdit},
+            {"release_contention",releaseContention},{"success",false}};
         bool completed=false;
         const auto restore=qScopeGuard([&]{
             // Close the actual app first, including on an assertion failure.
@@ -347,6 +478,11 @@ private slots:
         QCOMPARE(httpRequests,1);result.insert("http_roundtrip",true);
         QVERIFY2(socksRoundTrip(quint16(port),origin.serverPort()),"The same system-proxy port did not relay the actual SOCKS5 fixture through Rust.");
         QCOMPARE(socksRequests,1);result.insert("socks5_roundtrip",true);
+        {
+            ExclusiveLoopbackListener occupied{quint16(port)};
+            result.insert("live_listener_exclusive_probe",occupied.report());
+            QVERIFY2(occupied.rejectedOccupiedPort(),"The exclusive release probe did not reject the live Rust listener.");
+        }
         QVERIFY2(child.state()==QProcess::Running,"The owning application exited before the close request.");
 
         auto expectedAfterExit=fixture;
@@ -357,9 +493,37 @@ private slots:
             QVERIFY2(SystemProxySession::apply(expectedAfterExit),"The simulated later application's proxy change failed.");
             QVERIFY2(SystemProxySession::snapshot()==expectedAfterExit,"The later application's exact proxy edit was not retained.");
         }
+        // Declare these after restore: every assertion failure stops the poll
+        // and releases our lock before recovery or runner-state restoration.
+        QLockFile releaseLock(journal+".lock");releaseLock.setStaleLockTime(0);
+        QTimer releasePoll;releasePoll.setInterval(25);
+        const auto unlock=qScopeGuard([&]{releasePoll.stop();if(releaseLock.isLocked())releaseLock.unlock();});
+        if(releaseContention){
+            QVERIFY2(releaseLock.tryLock(0),"Could not hold the real recovery journal lock for the contention case.");
+            result.insert("release_lock_acquired",true);
+            connect(&releasePoll,&QTimer::timeout,&releasePoll,[&]{
+                const auto waiting=readReceipt(SwirlSystemProxyExit::waitingPath(root.path()));
+                if(waiting.isEmpty())return;
+                if(waiting.value("schema").toInt()!=1||waiting.value("source_sha").toString()!=QStringLiteral(SWIRL_SOURCE_SHA)
+                   ||waiting.value("phase").toString()!=QStringLiteral("release-waiting")
+                   ||qint64(waiting.value("pid").toDouble())!=pid||qint64(waiting.value("runtime_pid").toDouble())!=pid
+                   ||waiting.value("rust_port").toInt()!=port)return;
+                for(const auto *key:{"native_backend","ready","close_requested","proxy_owned","proxy_busy","runtime_alive","runtime_healthy","journal_present"})
+                    if(!waiting.value(key).isBool()||!waiting.value(key).toBool())return;
+                if(!waiting.value("fixture_failed").isBool()||waiting.value("fixture_failed").toBool())return;
+                result.insert("release_pending_observed",true);
+                releaseLock.unlock();result.insert("release_lock_released",!releaseLock.isLocked());
+                releasePoll.stop();
+            });
+            releasePoll.start();
+        }
         QVERIFY2(requestWindowClose(root.path()),"The full application's normal window-close command was not acknowledged.");
         QVERIFY2(QTest::qWaitFor([&]{return child.state()==QProcess::NotRunning;},10000),"Normal application shutdown did not complete.");
         QCOMPARE(child.exitStatus(),QProcess::NormalExit);QCOMPARE(child.exitCode(),0);
+        if(releaseContention){
+            QVERIFY2(result.value("release_pending_observed").toBool(),"The child never proved it was waiting for recovery while its Rust runtime remained healthy.");
+            QVERIFY2(result.value("release_lock_released").toBool()&&!releaseLock.isLocked(),"The parent did not release its journal lock after observing real contention.");
+        }
         const auto final=readReceipt(SwirlSystemProxyExit::finalPath(root.path()));
         QVERIFY2(!final.isEmpty(),"The full application did not publish its before-process-exit receipt.");
         QCOMPARE(final.value("source_sha").toString(),QStringLiteral(SWIRL_SOURCE_SHA));
@@ -369,6 +533,10 @@ private slots:
             QVERIFY2(final.value(key).isBool()&&final.value(key).toBool(),key);
         for(const auto *key:{"fixture_failed","proxy_owned","proxy_busy"})
             QVERIFY2(final.value(key).isBool()&&!final.value(key).toBool(),key);
+        if(releaseContention){
+            for(const auto *key:{"release_waiting_observed","release_waiting_runtime_alive","release_waiting_runtime_healthy"})
+                QVERIFY2(final.value(key).isBool()&&final.value(key).toBool(),key);
+        }
         if(!externalEdit){
             for(const auto *key:{"release_finished","release_succeeded","release_while_runtime_alive","snapshot_restored_at_release","journal_absent_at_release","snapshot_restored_before_exit"})
                 QVERIFY2(final.value(key).isBool()&&final.value(key).toBool(),key);
@@ -378,7 +546,14 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!QFile::exists(journal)&&QDir(root.filePath("data")).entryList({"system-proxy.dpapi.*.ready"},QDir::Files).isEmpty(),5000);
         result.insert("journal_and_guard_markers_removed",true);
         const auto listenerProbe=probeListener(quint16(port));result.insert("listener_probe",listenerProbe.report());
+        const auto connection=observeClosedPortConnection(quint16(port));
+        result.insert("closed_port_connection",connection);
+        result.insert("tcp_state_after_exit",tcpPortState(quint16(port)));
+        ExclusiveLoopbackListener released{quint16(port)};
+        result.insert("exclusive_rebind_after_exit",released.report());
         QVERIFY2(listenerProbe.refused(),"The post-exit listener probe did not confirm explicit TCP refusal; see its numeric receipt.");
+        QVERIFY2(!connection.value("connected").toBool(),"A TCP connection succeeded after normal application exit.");
+        QVERIFY2(released.listening(),"Could not exclusively bind and listen on the released Rust port; see socket and native TCP state receipts.");
         result.insert("listener_closed",true);
         completed=true;
     }
