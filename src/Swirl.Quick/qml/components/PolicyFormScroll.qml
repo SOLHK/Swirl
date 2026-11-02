@@ -28,5 +28,10 @@ ScrollView {
     // A layout can change the focused field's position after the focus/resize
     // callbacks. Reveal it again when that layout updates the content extent.
     onContentHeightChanged:Qt.callLater(revealFocus)
+    // ScrollView can resize its Flickable after the outer control's callback,
+    // or change the available viewport through padding without resizing the
+    // control at all. Observe the geometry actually used by revealFocus;
+    // another fixed wait would still race that layout and hide the defect.
+    Connections {target:form.viewport;function onHeightChanged(){Qt.callLater(form.revealFocus)}}
     Connections {target:form.ownerWindow;function onActiveFocusItemChanged(){Qt.callLater(form.revealFocus)}}
 }
