@@ -37,6 +37,7 @@ $result = [ordered]@{
     rust_roundtrips_verified=$false; tls_runtime_verified=$false; installed_ui_pages=0; runtime_storage_isolated=$false
     installer_exit_code=$null; uninstaller_exit_code=$null; install_directory_removed=$false
     user_integration_unchanged=$false; remaining_owned_processes=$null; fixture_removed=$false
+    failure_diagnostics_preserved=$false
     forced_termination=$false; processes=$processes; success=$false; error=$null
 }
 $savedEnvironment = @{}
@@ -192,6 +193,20 @@ try {
 } catch {
     $result.error = $_.Exception.Message; $result.success = $false
 } finally {
+    # Preserve the actual installed application's last diagnostics even when
+    # its process fails before the normal report-copy step. Evidence collection
+    # must not prevent the separately guarded fixture/process cleanup below.
+    try {
+        $lastDiagnostic = Join-Path $target 'Swirl-diagnostics.txt'
+        if (Test-Path -LiteralPath $lastDiagnostic -PathType Leaf) {
+            Assert-FixturePath $lastDiagnostic
+            Copy-Item -LiteralPath $lastDiagnostic -Destination (Join-Path $evidence 'installed-last-diagnostics.log')
+            $result.failure_diagnostics_preserved = $true
+        }
+    } catch {
+        $result.success = $false
+        $result.error = [string]$result.error + ' Installed diagnostics preservation failed: ' + $_.Exception.Message
+    }
     try {
         $remaining = @(Get-OwnedProcesses)
         $result.remaining_owned_processes = $remaining.Count

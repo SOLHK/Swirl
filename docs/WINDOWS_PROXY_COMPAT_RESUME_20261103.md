@@ -82,3 +82,11 @@
 当前环境没有已登录 Codex Desktop 的真实 Windows 11 设备、用户订阅与节点配置，故最终 Clash/Swirl A/B 为 **NOT_RUN**。Windows Server CI、受控 loopback、真实 Rust DLL 测试和 macOS/Linux 协议测试不能替代这一条件。
 
 只有新提交三平台 Rust、Qt 6.12 完整应用/策略页、原生恢复、同源码生产包身份与 Windows 11 Codex 实机 A/B 全部通过，才可合并 `test`。在此之前 PR #50 必须保持 Draft。最终 CI、安装包 SHA-256 与实际剩余阻塞将更新到现有 PR 和交付报告，不把未执行项目写成 PASS。
+
+## 8. 恢复后发现的 CI 覆盖缺口
+
+`2ff3c853c4df6e3da3760b353eed87dcaf58864a` 已提交上述真实 Rust listener 与生产安装器门禁。继续逐项审查 Rust workflow 的实际日志时，确认前期因未生成 Qt 二进制而跳过的多数用例会在后续 Windows 步骤实际执行，但仍有两个适用入口没有执行：`singBoxQuicProductChainAgainstIndependentPeer` 和 `test_offline_cpp_import_and_existing_store_protection`。因此不能把原来的 suite success 概括成所有适用 Qt 用例都已通过。
+
+后续补齐仅修改 Windows CI 编排：复用本次生成的 Qt 6.12 测试程序和配对 Rust DLL，按既有锁文件下载并验证独立 Hysteria2/TUIC 服务端，驱动现有六个 TCP、UDP、错误认证用例；强制检查每份 XML 的实际 PASS、Qt 版本，以及 JSON 中的源码、程序和 DLL 身份，并保存原始报告。另用已构建的 C++ inspector 执行离线导入和既有加密存储保护用例。生产 Rust、原测试断言和子进程时间上限保持不变，执行结果必须以这次补齐后的新 HEAD 的 CI 为准。
+
+安装器测试还补充失败路径的诊断保全：即使已安装的程序在正常报告复制前失败，也先复制其实际 `Swirl-diagnostics.txt`，再进入独立的进程与专用目录清理流程。保全失败会使门禁失败，但不会阻断清理。该修改不改变生产安装器或运行时行为。
