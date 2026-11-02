@@ -46,8 +46,16 @@ def interpolate(knots, values, points):
     return result
 
 
-def encode(knots, values, operators, axis_tags, *, basis='tent'):
+def encode(knots, values, operators, axis_tags, *, basis='tent', absolute_values=None):
     """Encode every coefficient, then remove only exactly encoded zero rows.
+
+    With independently retained absolute nodes, quantize absolute control
+    coefficients once and difference their integer ticks. Equal source control
+    columns then remain equal for EVERY encoded region, including explicit
+    closing endpoints. Rounding relative coefficients separately loses this
+    invariant and accumulates error along long contours. The supplied absolute
+    nodes must reproduce the relative input exactly; they are not a repair of
+    the source observations. Omitting them retains the historical encoding.
 
     Coefficient quantization happens once, to signed 16.16. Sample validation,
     disk/native verification and selection coverage are deliberately not
@@ -63,6 +71,15 @@ def encode(knots, values, operators, axis_tags, *, basis='tent'):
             and np.isfinite(v).all(), 'invalid_local_encoding_values')
     anchors = [int(np.argmin(np.abs(k))) for k in axes]
     coefficient = v.copy()
+    if absolute_values is not None:
+        absolute = np.asarray(absolute_values, dtype=float)
+        require(v.shape[-1] % 2 == 0 and
+                absolute.shape == (*v.shape[:3], v.shape[-1]//2, 2) and
+                np.isfinite(absolute).all(), 'invalid_absolute_encoding_values')
+        relative = np.diff(absolute, axis=-2,
+                           prepend=np.zeros((*v.shape[:3], 1, 2))).reshape(v.shape)
+        require(np.array_equal(relative, v), 'absolute_relative_node_mismatch')
+        coefficient = absolute.reshape(v.shape).copy()
     hierarchical_supports = []
     for a, anchor in enumerate(anchors):
         # The matrix at nodes has a column of ones and one unit column for
@@ -114,7 +131,15 @@ def encode(knots, values, operators, axis_tags, *, basis='tent'):
     # imply finite transformed coefficients (e.g. extreme divided slopes).
     require(np.isfinite(coefficient).all(), 'nonfinite_cff2_coefficient')
     with np.errstate(over='ignore'):
-        encoded = np.floor(coefficient*65536+.5)/65536
+        ticks = np.floor(coefficient*65536+.5)
+    if absolute_values is not None:
+        # A double represents these integers and their differences exactly.
+        # Check before casting, including nonfinite products from huge input.
+        require((np.abs(ticks) < 2**51).all(), 'absolute_coefficient_tick_overflow')
+        pairs = ticks.astype(np.int64).reshape(*v.shape[:3], v.shape[-1]//2, 2)
+        ticks = np.diff(pairs, axis=-2,
+                        prepend=np.zeros((*v.shape[:3], 1, 2), dtype=np.int64)).reshape(v.shape)
+    encoded = ticks/65536
     require(((encoded >= -32768) & (encoded < 32768)).all(),
             'cff2_fixed_coefficient_overflow')
     flat = encoded.reshape(int(np.prod(encoded.shape[:3])), encoded.shape[-1])
@@ -142,6 +167,8 @@ def encode(knots, values, operators, axis_tags, *, basis='tent'):
             support[tags[a]] = tuple(map(float, triple))
         supports.append(support)
     evidence = dict(domain_kind='local_box_only', basis=basis,
+        coefficient_quantization=('absolute_then_exact_relative' if absolute_values is not None
+                                  else 'relative_legacy'),
         box=[[float(k[0]), float(k[-1])] for k in axes],
         knots=[k.tolist() for k in axes], sampled_geometry_passed=False,
         production_accepted=False, serialized_verification='NOT_RUN',

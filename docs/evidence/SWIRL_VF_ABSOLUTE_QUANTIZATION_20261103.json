@@ -1,0 +1,539 @@
+{
+  "status": "PARTIAL_LOCAL_QUANTIZATION_FIX_ONLY",
+  "base_commit": "87ee4b9d4fa65537d2b5fe68dc83f5ca29979f5c",
+  "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+  "limit_source_units": 0.03125,
+  "independent_seed_start": 2026110381,
+  "cases": [
+    {
+      "glyph_id": 1166,
+      "knots": [
+        65,
+        33,
+        9
+      ],
+      "training_count": 19305,
+      "quantization": "absolute_then_exact_relative",
+      "holdout_count": 1024,
+      "full_cube": false,
+      "max_holdout_error": 0.009272330931255355,
+      "holdout_failures": 0,
+      "regions": 339,
+      "serialized": {
+        "observations": 1024,
+        "failures": 0,
+        "max_error": 0.009272330931256354
+      },
+      "passed": true,
+      "compression": {
+        "input_regions": 1985,
+        "output_regions": 339,
+        "error_budget": 0.0078125,
+        "max_control_error_bound": 0.007795291743714251,
+        "within_budget": true,
+        "scope": "reference_encoded_model_on_declared_box_only",
+        "proof": "multiaffine_vertex_convexity_with_outward_interval_synthesis",
+        "source_error_certified": false
+      },
+      "flat_encodable": true,
+      "font_sha256": "9aac37cda9b41d0f5bf635346818803d5633ba33b49b5b18ac1357ac7277535a",
+      "font_bytes": 108376,
+      "serialized_coefficient_identity": {
+        "status": "PASS_EXACT_SERIALIZED_CFF2_COEFFICIENTS",
+        "glyphs": 3,
+        "operands": 918,
+        "decoded_tokens": 230253,
+        "axes": [
+          "WDTH",
+          "wght",
+          "HGHT"
+        ],
+        "all_simultaneous_design_coordinates": true,
+        "read_saved_SFNT_tables": true,
+        "source_fit_accepted": false,
+        "native_execution": false,
+        "metrics_verified": false,
+        "production_accepted": false
+      },
+      "measured_target_gid": 2,
+      "authored_background_for_empty_target": false,
+      "native": {
+        "observations": 72,
+        "failures": 0,
+        "topology_failures": 0,
+        "max_cff2_libhvf_error": 0.008387562495820861,
+        "max_portable_libhvf_error": 4.633397912876327e-13
+      }
+    },
+    {
+      "glyph_id": 19177,
+      "knots": [
+        65,
+        33,
+        5
+      ],
+      "training_count": 10725,
+      "quantization": "absolute_then_exact_relative",
+      "holdout_count": 1024,
+      "full_cube": false,
+      "max_holdout_error": 0.014910982451988856,
+      "holdout_failures": 0,
+      "regions": 402,
+      "serialized": {
+        "observations": 1024,
+        "failures": 0,
+        "max_error": 0.014910982451988774
+      },
+      "passed": true,
+      "flat_encodable": true,
+      "font_sha256": "f01465c197172943724b4d6af2c7b92fa6742229c612ef5efe71f654a9731e5e",
+      "font_bytes": 303264,
+      "serialized_coefficient_identity": {
+        "status": "PASS_EXACT_SERIALIZED_CFF2_COEFFICIENTS",
+        "glyphs": 3,
+        "operands": 2088,
+        "decoded_tokens": 638808,
+        "axes": [
+          "WDTH",
+          "wght",
+          "HGHT"
+        ],
+        "all_simultaneous_design_coordinates": true,
+        "read_saved_SFNT_tables": true,
+        "source_fit_accepted": false,
+        "native_execution": false,
+        "metrics_verified": false,
+        "production_accepted": false
+      },
+      "measured_target_gid": 2,
+      "authored_background_for_empty_target": false,
+      "native": {
+        "observations": 72,
+        "failures": 0,
+        "topology_failures": 0,
+        "max_cff2_libhvf_error": 0.010992067777987795,
+        "max_portable_libhvf_error": 5.684452907299083e-13
+      }
+    },
+    {
+      "glyph_id": 0,
+      "knots": [
+        17,
+        17,
+        17
+      ],
+      "training_count": 4913,
+      "quantization": "absolute_then_exact_relative",
+      "holdout_count": 512,
+      "full_cube": true,
+      "max_holdout_error": 0.0007775837277964605,
+      "holdout_failures": 0,
+      "regions": 42,
+      "serialized": {
+        "observations": 512,
+        "failures": 0,
+        "max_error": 0.0007775837273962972
+      },
+      "passed": true,
+      "compression": {
+        "input_regions": 42,
+        "output_regions": 42,
+        "error_budget": 0.00390625,
+        "max_control_error_bound": 0.0,
+        "within_budget": true,
+        "scope": "reference_encoded_model_on_declared_box_only",
+        "proof": "multiaffine_vertex_convexity_with_outward_interval_synthesis",
+        "source_error_certified": false
+      },
+      "flat_encodable": true,
+      "font_sha256": "d97f7d05488ad552b14bdc453c7a60edbbb2f768ed44732a01afb80cc7ad321c",
+      "font_bytes": 36336,
+      "serialized_coefficient_identity": {
+        "status": "PASS_EXACT_SERIALIZED_CFF2_COEFFICIENTS",
+        "glyphs": 3,
+        "operands": 456,
+        "decoded_tokens": 14802,
+        "axes": [
+          "WDTH",
+          "wght",
+          "HGHT"
+        ],
+        "all_simultaneous_design_coordinates": true,
+        "read_saved_SFNT_tables": true,
+        "source_fit_accepted": false,
+        "native_execution": false,
+        "metrics_verified": false,
+        "production_accepted": false
+      },
+      "measured_target_gid": 2,
+      "authored_background_for_empty_target": false,
+      "native": {
+        "observations": 72,
+        "failures": 0,
+        "topology_failures": 0,
+        "max_cff2_libhvf_error": 0.00954007167291704,
+        "max_portable_libhvf_error": 2.7037995082594714e-13
+      }
+    },
+    {
+      "glyph_id": 2,
+      "knots": [
+        3,
+        3,
+        3
+      ],
+      "training_count": 27,
+      "quantization": "absolute_then_exact_relative",
+      "holdout_count": 512,
+      "full_cube": true,
+      "max_holdout_error": 0.0,
+      "holdout_failures": 0,
+      "regions": 0,
+      "serialized": {
+        "observations": 512,
+        "failures": 0,
+        "max_error": 0.0
+      },
+      "passed": true,
+      "compression": {
+        "input_regions": 0,
+        "output_regions": 0,
+        "error_budget": 0.00390625,
+        "max_control_error_bound": 0.0,
+        "within_budget": true,
+        "scope": "reference_encoded_model_on_declared_box_only",
+        "proof": "multiaffine_vertex_convexity_with_outward_interval_synthesis",
+        "source_error_certified": false
+      },
+      "flat_encodable": true,
+      "font_sha256": "c5ddca8ea49ddca58d0ac67871b6b497860eb4fda294592ea1974811565b3eee",
+      "font_bytes": 2716,
+      "serialized_coefficient_identity": {
+        "status": "PASS_EXACT_SERIALIZED_CFF2_COEFFICIENTS",
+        "glyphs": 3,
+        "operands": 8,
+        "decoded_tokens": 14,
+        "axes": [
+          "WDTH",
+          "wght",
+          "HGHT"
+        ],
+        "all_simultaneous_design_coordinates": true,
+        "read_saved_SFNT_tables": true,
+        "source_fit_accepted": false,
+        "native_execution": false,
+        "metrics_verified": false,
+        "production_accepted": false
+      },
+      "measured_target_gid": 2,
+      "authored_background_for_empty_target": true,
+      "native": {
+        "observations": 72,
+        "failures": 0,
+        "topology_failures": 0,
+        "max_cff2_libhvf_error": 0.0,
+        "max_portable_libhvf_error": 0.0
+      }
+    },
+    {
+      "glyph_id": 12,
+      "knots": [
+        17,
+        17,
+        17
+      ],
+      "training_count": 4913,
+      "quantization": "absolute_then_exact_relative",
+      "holdout_count": 512,
+      "full_cube": true,
+      "max_holdout_error": 0.011247853241590883,
+      "holdout_failures": 0,
+      "regions": 21,
+      "serialized": {
+        "observations": 512,
+        "failures": 0,
+        "max_error": 0.011247853241406182
+      },
+      "passed": true,
+      "compression": {
+        "input_regions": 21,
+        "output_regions": 21,
+        "error_budget": 0.00390625,
+        "max_control_error_bound": 0.0,
+        "within_budget": true,
+        "scope": "reference_encoded_model_on_declared_box_only",
+        "proof": "multiaffine_vertex_convexity_with_outward_interval_synthesis",
+        "source_error_certified": false
+      },
+      "flat_encodable": true,
+      "font_sha256": "03856f75f59bb38a6d41fa4ece4892e48a29f65e55e137e390600107018bb524",
+      "font_bytes": 11100,
+      "serialized_coefficient_identity": {
+        "status": "PASS_EXACT_SERIALIZED_CFF2_COEFFICIENTS",
+        "glyphs": 3,
+        "operands": 228,
+        "decoded_tokens": 3105,
+        "axes": [
+          "WDTH",
+          "wght",
+          "HGHT"
+        ],
+        "all_simultaneous_design_coordinates": true,
+        "read_saved_SFNT_tables": true,
+        "source_fit_accepted": false,
+        "native_execution": false,
+        "metrics_verified": false,
+        "production_accepted": false
+      },
+      "measured_target_gid": 2,
+      "authored_background_for_empty_target": false,
+      "native": {
+        "observations": 72,
+        "failures": 0,
+        "topology_failures": 0,
+        "max_cff2_libhvf_error": 0.01199143063937014,
+        "max_portable_libhvf_error": 2.2737367544323206e-13
+      }
+    }
+  ],
+  "same_holdout_comparison": [
+    {
+      "gid": 1166,
+      "independent_comparison_samples": 1024,
+      "models": {
+        "legacy": {
+          "max_holdout_error": 0.009250226167076832,
+          "failures": 0,
+          "regions": 339,
+          "contours": 6,
+          "nonzero_closure_coefficient_pairs": 115,
+          "maximum_closure_coefficient_error": 5.501634636633284e-05
+        },
+        "absolute": {
+          "max_holdout_error": 0.009272330931255355,
+          "failures": 0,
+          "regions": 339,
+          "contours": 6,
+          "nonzero_closure_coefficient_pairs": 0,
+          "maximum_closure_coefficient_error": 0.0
+        }
+      }
+    },
+    {
+      "gid": 19177,
+      "independent_comparison_samples": 1024,
+      "models": {
+        "legacy": {
+          "max_holdout_error": 0.014872810085735926,
+          "failures": 0,
+          "regions": 372,
+          "contours": 18,
+          "nonzero_closure_coefficient_pairs": 431,
+          "maximum_closure_coefficient_error": 6.291359902370698e-05
+        },
+        "absolute": {
+          "max_holdout_error": 0.014910982451988856,
+          "failures": 0,
+          "regions": 402,
+          "contours": 18,
+          "nonzero_closure_coefficient_pairs": 0,
+          "maximum_closure_coefficient_error": 0.0
+        }
+      }
+    }
+  ],
+  "qt_private_strict_and_authored": [
+    {
+      "build_architecture": "arm64",
+      "current_architecture": "arm64",
+      "empty_representation_positive_and_negative_controls": true,
+      "failures": 0,
+      "font_removed": true,
+      "font_sha256": "edfb588b4730d32966ee822c7ecd6d33c634d1df4fd3ed18bee04f11ceff159f",
+      "geometry_observations": 546,
+      "kernel": "25.5.0",
+      "limit_source_units": 0.03125,
+      "manifest_sha256": "96bd419ed0a7196fd3f525e2413d07dd3244d4e9a67bcb5a2e20e61a509de6b3",
+      "max_error_source_units": 0.0011567035779526146,
+      "observations": 546,
+      "os": "macOS Tahoe (26.5.1)",
+      "physical_display_verified": false,
+      "production_accepted": false,
+      "qpa": "offscreen",
+      "qt": "6.12.0",
+      "raw_topology_failures": 0,
+      "schema": 1,
+      "scope": "independent_authored_CFF2_controls_only",
+      "source_font_acceptance": false,
+      "status": "PASS_AUTHORED_QT_GEOMETRY",
+      "verified_empty_origin_representations": 0
+    },
+    {
+      "build_architecture": "arm64",
+      "current_architecture": "arm64",
+      "empty_representation_positive_and_negative_controls": true,
+      "failures": 64,
+      "font_removed": true,
+      "font_sha256": "d97f7d05488ad552b14bdc453c7a60edbbb2f768ed44732a01afb80cc7ad321c",
+      "geometry_observations": 8,
+      "kernel": "25.5.0",
+      "limit_source_units": 0.03125,
+      "manifest_sha256": "67ae0bc7c2cf8896e3fe59261b07833d7de0f36e2b69543701f0ce23cacd089e",
+      "max_error_source_units": 3.212212794159839e-05,
+      "observations": 72,
+      "os": "macOS Tahoe (26.5.1)",
+      "physical_display_verified": false,
+      "production_accepted": false,
+      "qpa": "offscreen",
+      "qt": "6.12.0",
+      "raw_topology_failures": 64,
+      "schema": 1,
+      "scope": "private_source_local_box_only",
+      "source_font_acceptance": false,
+      "source_glyph_id": 0,
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "status": "FAIL",
+      "verified_empty_origin_representations": 0
+    },
+    {
+      "build_architecture": "arm64",
+      "current_architecture": "arm64",
+      "empty_representation_positive_and_negative_controls": true,
+      "failures": 72,
+      "font_removed": true,
+      "font_sha256": "9aac37cda9b41d0f5bf635346818803d5633ba33b49b5b18ac1357ac7277535a",
+      "geometry_observations": 0,
+      "kernel": "25.5.0",
+      "limit_source_units": 0.03125,
+      "manifest_sha256": "585e5ab63cbc6caf2ed53608dbb8bd7536cc168b79411610edeea2a4b05e3039",
+      "max_error_source_units": null,
+      "observations": 72,
+      "os": "macOS Tahoe (26.5.1)",
+      "physical_display_verified": false,
+      "production_accepted": false,
+      "qpa": "offscreen",
+      "qt": "6.12.0",
+      "raw_topology_failures": 72,
+      "schema": 1,
+      "scope": "private_source_local_box_only",
+      "source_font_acceptance": false,
+      "source_glyph_id": 1166,
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "status": "FAIL",
+      "verified_empty_origin_representations": 0
+    },
+    {
+      "build_architecture": "arm64",
+      "current_architecture": "arm64",
+      "empty_representation_positive_and_negative_controls": true,
+      "failures": 64,
+      "font_removed": true,
+      "font_sha256": "03856f75f59bb38a6d41fa4ece4892e48a29f65e55e137e390600107018bb524",
+      "geometry_observations": 8,
+      "kernel": "25.5.0",
+      "limit_source_units": 0.03125,
+      "manifest_sha256": "0000f1aee49205754759d3b96ac4d2d79f2f54c57bc6cd495ffc08d78c0f872e",
+      "max_error_source_units": 1.888114600254962e-05,
+      "observations": 72,
+      "os": "macOS Tahoe (26.5.1)",
+      "physical_display_verified": false,
+      "production_accepted": false,
+      "qpa": "offscreen",
+      "qt": "6.12.0",
+      "raw_topology_failures": 64,
+      "schema": 1,
+      "scope": "private_source_local_box_only",
+      "source_font_acceptance": false,
+      "source_glyph_id": 12,
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "status": "FAIL",
+      "verified_empty_origin_representations": 0
+    },
+    {
+      "build_architecture": "arm64",
+      "current_architecture": "arm64",
+      "empty_representation_positive_and_negative_controls": true,
+      "failures": 64,
+      "font_removed": true,
+      "font_sha256": "f01465c197172943724b4d6af2c7b92fa6742229c612ef5efe71f654a9731e5e",
+      "geometry_observations": 8,
+      "kernel": "25.5.0",
+      "limit_source_units": 0.03125,
+      "manifest_sha256": "339baaff28c947a80f6421f52755c57e9d0fbc98018b37096db2c82867a74768",
+      "max_error_source_units": 3.707080308748872e-05,
+      "observations": 72,
+      "os": "macOS Tahoe (26.5.1)",
+      "physical_display_verified": false,
+      "production_accepted": false,
+      "qpa": "offscreen",
+      "qt": "6.12.0",
+      "raw_topology_failures": 64,
+      "schema": 1,
+      "scope": "private_source_local_box_only",
+      "source_font_acceptance": false,
+      "source_glyph_id": 19177,
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "status": "FAIL",
+      "verified_empty_origin_representations": 0
+    },
+    {
+      "build_architecture": "arm64",
+      "current_architecture": "arm64",
+      "empty_representation_positive_and_negative_controls": true,
+      "failures": 0,
+      "font_removed": true,
+      "font_sha256": "c5ddca8ea49ddca58d0ac67871b6b497860eb4fda294592ea1974811565b3eee",
+      "geometry_observations": 72,
+      "kernel": "25.5.0",
+      "limit_source_units": 0.03125,
+      "manifest_sha256": "9d340f4031badf1528ba4b5d305eb70dd18c5f328ac97989ddae89631577757d",
+      "max_error_source_units": 0,
+      "observations": 72,
+      "os": "macOS Tahoe (26.5.1)",
+      "physical_display_verified": false,
+      "production_accepted": false,
+      "qpa": "offscreen",
+      "qt": "6.12.0",
+      "raw_topology_failures": 0,
+      "schema": 1,
+      "scope": "private_source_local_box_only",
+      "source_font_acceptance": false,
+      "source_glyph_id": 2,
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "status": "PASS_PRIVATE_BOX_QT_GEOMETRY",
+      "verified_empty_origin_representations": 0
+    }
+  ],
+  "local_tests": {
+    "executed": 1007,
+    "passed": 1000,
+    "skipped": 7,
+    "failed": 0,
+    "audits_passed": 6
+  },
+  "code_sha256": {
+    "tools/swirl_vf/tools/local_cff2_geometry.py": "33f7b6a8b93ad5a521672c833d8a7a345e1722ddc61515605e32206a027cd507",
+    "tools/swirl_vf/platform/probe_local_cff2_basis.py": "8451fef0033cbc0f7be5dddf20e3f39de950f514e793bfd831f9a3e407152cb5",
+    "tools/swirl_vf/platform/qt_cff2/joint.cpp": "9e3fe6e52d7b1889fc57c4d910e1b9e3f49a4721ce2f55c4abfdabbe1d84c8ab",
+    "tools/swirl_vf/tests/test_local_cff2_geometry.py": "7fc81086a779003e561d670a3908d382287f99d6d5a03ed0f38f07444f732ff1"
+  },
+  "private_artifact_sha256": {
+    "absolute-basis-manifest.json": "812b99045ecf55a7b9af44420808049be30c47493f9fee0e04c7a48fb4571c5e",
+    "absolute-basis-native/report.json": "12d8589ab89e4f7de51412005c882f1456c657f0cced6b78ddaeb8cd6b42f3bf",
+    "absolute-encoding-comparison.json": "93fb059946375d571b72243f48ce1dba3fdb801bfa584e590e740d23fb241a23",
+    "absolute-quantization-full-tests.log": "7b127604dae93e8475a642fe77eb233250e8a82242cafbd145a532d6a8df7d36",
+    "absolute-quantization-audits.log": "97856a2264b6c385b57754104703c065d6aadedc6c9d0c7a1ff114c72547844d",
+    "compare_absolute_encoding.py": "264eab0b9daab42865a7c6b0fac36467c578e9148cedbada4912fde1705174b1",
+    "qt_absolute_source_boxes.py": "fea5dd1930962c19dc8c3c9caf784c82db22b9ee7e9a688af9d45f39a1afa6bb",
+    "qt-joint-build-6.log": "48a947a43867bab047d6b897e4fac99fab59191858abe75b578df1ce13abe4b0",
+    "qt-absolute-final/authored.json": "abc189a9214a50a4f9553810a1d36a11aa630fe3b782332dd42705c5052c63eb",
+    "qt-absolute-final/gid-0.json": "ea0b1a79bd59c1093c8a1dc1d7af7d5a775a2ff95f6e1da535722cb9f0ef8bb1",
+    "qt-absolute-final/gid-1166.json": "d75dd634148c320cf1509967ccba722190c0fab63d4e1fc828a8210a73cb1342",
+    "qt-absolute-final/gid-12.json": "855368da5c05f529807f20d25d9dba49ac1f901e22a32fdd45a3d1bc863c25d6",
+    "qt-absolute-final/gid-19177.json": "d2769502f8a5217a14826ded7da9aa674f02a52a0b51334294ae80f8c47ed315",
+    "qt-absolute-final/gid-2.json": "ffe166d47ce8e847a494957c19cb73d0269ec9fb2c85e07b2669a5246b22789d"
+  },
+  "whole_cube_targets_accepted": false,
+  "source_font_acceptance": false,
+  "production_accepted": false
+}

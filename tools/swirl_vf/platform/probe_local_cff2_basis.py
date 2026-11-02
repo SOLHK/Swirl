@@ -114,23 +114,28 @@ def run(source, manifest, output, *, native_binary=None, hvf_binary=None):
         held = np.random.default_rng(seed).uniform(box[:,0],box[:,1],(held_count,3))
         require(all(not all(p[a] in knots[a] for a in range(3)) for p in held), 'basis_holdout_overlaps_nodes')
         root_axes = table.part(gid).axis_count
+        quantization = case.get('quantization', 'relative_legacy')
+        require(quantization in ('relative_legacy', 'absolute_then_exact_relative'),
+                'unknown_basis_quantization')
         def sample(points):
-            operators, rows = None, []
+            operators, rows, absolute_rows = None, [], []
             for first in range(0,len(points),512):
-                ops, relative, _ = cubic_batch(renderer.render(gid,points[first:first+512,:root_axes]))
+                ops, relative, absolute = cubic_batch(renderer.render(gid,points[first:first+512,:root_axes]))
                 require(operators is None or ops == operators, 'source_basis_topology_changed')
-                operators = ops; rows.append(relative)
-            return operators, np.concatenate(rows)
-        ops, values = sample(nodes)
-        model = encode(knots,values.reshape(*counts,-1),ops,tags,basis=case.get('basis','ramp'))
+                operators = ops; rows.append(relative); absolute_rows.append(absolute)
+            return operators, np.concatenate(rows), np.concatenate(absolute_rows)
+        ops, values, absolute = sample(nodes)
+        model = encode(knots,values.reshape(*counts,-1),ops,tags,basis=case.get('basis','ramp'),
+                       absolute_values=(absolute.reshape(*counts,absolute.shape[1],2)
+                           if quantization == 'absolute_then_exact_relative' else None))
         if 'compression' in case:
             from hierarchical_cff2_compression import compress
             model=compress(model,**case['compression'])
-        _, exact = sample(held)
+        _, exact, expected = sample(held)
         predicted = np.asarray([model.evaluate(dict(zip(tags,p))) for p in held])
-        expected = np.cumsum(exact.reshape(len(held),-1,2),axis=1)
         errors = np.linalg.norm(predicted-expected,axis=2).max(axis=1,initial=0)
         row = dict(glyph_id=gid, box=box.tolist(), knots=counts, training_count=len(nodes),
+            quantization=quantization,
             holdout_count=len(held), full_cube=bool(np.array_equal(box,np.tile([-1.,1.],(3,1)))),
             max_holdout_error=float(errors.max()), holdout_failures=int((errors>geometry.LIMIT).sum()),
             regions=len(model.supports)-1, serialized='NOT_RUN', native='NOT_RUN', passed=False)
@@ -201,7 +206,7 @@ def run(source, manifest, output, *, native_binary=None, hvf_binary=None):
                             raw = next(r for r in map(json.loads,process.stdout.splitlines()) if r.get('record')=='outline')
                             source_ops, wanted = geometry.operands(native_commands(raw))
                             out_ops, actual = geometry.operands(record['commands'])
-                            portable_ops, portable = sample(normalized[None])
+                            portable_ops, portable, _ = sample(normalized[None])
                             require(source_ops==portable_ops, 'portable_native_basis_topology_changed')
                             portable_error = float(point_errors(portable,wanted[None])[0])
                             counts_native['max_portable_libhvf_error'] = max(counts_native['max_portable_libhvf_error'],portable_error)

@@ -37,12 +37,18 @@ class LocalTensorTests(unittest.TestCase):
             self.assertEqual(model.evidence['box_selection'], 'NOT_IMPLEMENTED')
             model.charstring(0).compile(isCFF2=True)
 
-    def serialized_case(self, basis):
+    def serialized_case(self, basis, absolute_quantization=False):
         knots = [np.asarray([.25, .5, 1.]), np.asarray([-1., -.5, -.25]),
                  np.asarray([-.5, 0., .5])]
         random = np.random.default_rng(291779)
         values = random.uniform(-2, 2, (3, 3, 3, 14))
-        model = encode(knots, values, OPS, TAGS, basis=basis)
+        absolute = None
+        if absolute_quantization:
+            absolute = values.reshape(3,3,3,7,2).copy()
+            absolute[...,-1,:] = absolute[...,0,:]
+            values = np.diff(absolute,axis=-2,
+                             prepend=np.zeros((3,3,3,1,2))).reshape(3,3,3,14)
+        model = encode(knots, values, OPS, TAGS, basis=basis,absolute_values=absolute)
         held = random.uniform([.25, -1., -.5], [1., -.25, .5], (64, 3))
         expected = interpolate(knots, values, held)
         errors = [np.linalg.norm(model.evaluate(dict(zip(TAGS, p)))-
@@ -63,6 +69,10 @@ class LocalTensorTests(unittest.TestCase):
                     dict.fromkeys(original.getGlyphOrder(), model), experimental_local=True)
                 stream = io.BytesIO(); font.save(stream)
             with TTFont(io.BytesIO(stream.getvalue())) as saved:
+                if absolute_quantization:
+                    from cff2_certificate import certify
+                    self.assertTrue(certify(saved,dict.fromkeys(saved.getGlyphOrder(),model))[
+                        'all_simultaneous_design_coordinates'])
                 regions = saved['CFF2'].cff.topDictIndex[0].VarStore.otVarStore.VarRegionList.Region
                 self.assertEqual(len(regions), len(model.supports)-1)
                 for p, row in zip(held, expected):
@@ -72,6 +82,9 @@ class LocalTensorTests(unittest.TestCase):
                     error = np.linalg.norm(geometry.control_points(ops, actual)-
                         geometry.control_points(OPS, row), axis=1).max()
                     self.assertLess(error, 1/32)
+                    if absolute_quantization:
+                        controls = geometry.control_points(ops,actual)
+                        np.testing.assert_allclose(controls[0],controls[-1],rtol=0,atol=1e-10)
 
     def test_saved_font_keeps_local_knots_and_off_grid_controls(self):
         self.serialized_case('tent')
@@ -81,6 +94,9 @@ class LocalTensorTests(unittest.TestCase):
 
     def test_saved_hierarchical_font_keeps_off_grid_controls(self):
         self.serialized_case('hierarchical')
+
+    def test_saved_absolute_control_coefficients_preserve_closure(self):
+        self.serialized_case('hierarchical',absolute_quantization=True)
 
     def test_ramps_remove_affine_span_redundancy_without_changing_the_function(self):
         knots = [np.linspace(0, 1, 9)]*3
@@ -105,6 +121,50 @@ class LocalTensorTests(unittest.TestCase):
             with self.assertRaises(ValueError): encode([bad, *knots[1:]], values, OPS, TAGS)
         with self.assertRaisesRegex(ValueError, 'extrapolation'):
             interpolate(knots, values, [[0, .5, .5]])
+
+    def test_absolute_quantization_preserves_closed_and_coincident_controls(self):
+        rng = np.random.default_rng(710449)
+        knots = [np.array([0., .25, .5, 1.])]*3
+        absolute = rng.uniform(-20, 20, (4, 4, 4, 7, 2))
+        absolute[..., 3, :] = absolute[..., 0, :]
+        absolute[..., 6, :] = absolute[..., 0, :]
+        relative = np.diff(absolute, axis=-2,
+                           prepend=np.zeros((4,4,4,1,2))).reshape(4,4,4,14)
+        for basis in ('tent', 'ramp', 'hierarchical'):
+            model = encode(knots,relative,OPS,TAGS,basis=basis,absolute_values=absolute)
+            ticks = np.rint(model.deltas*65536).astype(np.int64)
+            controls = np.cumsum(ticks.reshape(len(ticks),-1,2),axis=1)
+            np.testing.assert_array_equal(controls[:,0],controls[:,3])
+            np.testing.assert_array_equal(controls[:,0],controls[:,6])
+            self.assertFalse(model.evidence['sampled_geometry_passed'])
+            for p in rng.uniform(0,1,(32,3)):
+                points = model.evaluate(dict(zip(TAGS,p)))
+                np.testing.assert_allclose(points[0],points[-1],rtol=0,atol=1e-10)
+
+    def test_absolute_quantization_avoids_long_contour_rounding_accumulation(self):
+        # Each tiny but nonzero segment must survive in the nodal observations.
+        # Independent relative rounding destroys their accumulated displacement.
+        knots = [np.array([0.,1.])]*3
+        point_count = 301
+        operators = (('rmoveto',2),)+(('rrcurveto',6),)*100
+        absolute = np.zeros((2,2,2,point_count,2))
+        absolute[...,0] = np.arange(point_count)*(.49/65536)
+        relative = np.diff(absolute,axis=-2,
+                           prepend=np.zeros((2,2,2,1,2))).reshape(2,2,2,-1)
+        legacy = encode(knots,relative,operators,TAGS,basis='hierarchical')
+        model = encode(knots,relative,operators,TAGS,basis='hierarchical',absolute_values=absolute)
+        target = absolute[0,0,0]
+        self.assertGreater(np.max(np.linalg.norm(legacy.evaluate({})-target,axis=1)),.002)
+        self.assertLessEqual(np.max(np.linalg.norm(model.evaluate({})-target,axis=1)),.5/65536)
+        self.assertEqual(model.operators,operators)
+        self.assertEqual(model.evidence['coefficient_quantization'],'absolute_then_exact_relative')
+
+    def test_absolute_nodes_must_match_observed_relative_nodes_exactly(self):
+        knots = [np.array([0.,1.])]*3
+        absolute = np.zeros((2,2,2,7,2));relative = np.zeros((2,2,2,14))
+        for invalid in (absolute+1.,absolute[...,0],np.full_like(absolute,np.nan)):
+            with self.assertRaises(ValueError):
+                encode(knots,relative,OPS,TAGS,absolute_values=invalid)
 
 
 if __name__ == '__main__':

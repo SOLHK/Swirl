@@ -164,3 +164,52 @@ mathematical targets remain unresolved. A further local basis experiment that
 extends endpoint ramps to shared global supports reduces the fitted atlas
 subset from 7,894 to only 7,662 regions and creates one stack overflow; it is
 not adopted as a solution and its private code/results are preserved.
+# Absolute control quantization follow-up
+
+The new `absolute_then_exact_relative` option preserves the independently
+retained absolute source nodes. It transforms and quantizes absolute control
+coefficients, then differences exact integer 16.16 ticks into CFF2 operands.
+It rejects absolute inputs that do not exactly reproduce the supplied relative
+observations. This fixes accumulated coefficient-rounding drift without forcing
+endpoints closed, moving source controls or removing curves. The historical
+relative encoding remains reproducible.
+
+On the same new 1,024 holdouts for each target box, legacy/new errors are
+0.009250226 / 0.009272331 for GID 1166 and 0.014872810 / 0.014910982 for GID 19177.
+This is a closure-invariant fix, not an improved source fit. Nonzero closure
+coefficient pairs decrease from 115 / 431 to zero. Region counts are 339 / 402;
+the latter increases from 372. Integer coefficient identity survives actual
+serialization and the existing bounded compression.
+
+The new five-model run passes 3,584 independently selected saved/source checks
+and 360 CoreText/libhvf checks. GIDs 1166/19177 remain restricted to the previous
+declared local boxes; GIDs 0/2/12 have sampled full-cube scope. Exact serialized
+coefficient certificates pass for every model. Python validation executes
+1,007 tests: 1,000 pass, seven platform skips, no failures; six parser audits pass.
+
+The Qt authored correction is now verified on Windows Server 2022 x64:
+[run 41515917678](https://github.com/SOLHK/Swirl/actions/runs/41515917678),
+head `87ee4b9d4fa65537d2b5fe68dc83f5ca29979f5c`, merge
+`c50b1afc93bda8d6eb46fe35b7590e38c9a99695`. All 546 observations pass; maximum
+0.001171960 FUnit. Of these, 182 retain the documented verified empty-origin
+representation. The local authored Qt run also passes 546 observations.
+
+Private source Qt diagnostics remain **FAIL**: GIDs 1166/19177/0/2/12 have
+72/64/64/0/64 path-topology failures in 72 observations each. Qt adds tiny
+implicit closing edges and suppresses tiny degenerate curves. Exact encoded
+closure does not guarantee identical floating native path elements. No such
+elements are discarded by the strict gate. Unmatched topology now reports a
+null geometry error instead of a meaningless comparison between shifted
+element indices. These failures are retained separately from CoreText passes.
+
+Reproduce source fitting with `probe_local_cff2_basis.py` and a private manifest
+whose cases specify `quantization: absolute_then_exact_relative`. The private
+checkpoint `three-axis-20261103/absolute-basis-manifest.json` binds the source
+hash, original boxes, training knots and new holdout seeds. `qt_cff2/joint.cpp`
+accepts private manifests only with `--private-box`; default CI remains authored
+controls. The [receipt](evidence/SWIRL_VF_ABSOLUTE_QUANTIZATION_20261103.json)
+contains aggregate counts, font/code/input/log hashes and all failed Qt counts.
+Raw outlines, coefficients and failure positions stay outside Git.
+
+Full-cube source fitting, complete-font selection/capacity and final
+`SwirlVF.ttc` remain unaccepted. This checkpoint does not merge test or main.

@@ -53,7 +53,36 @@
     "status": "PASS_AUTHORED_QT_GEOMETRY",
     "verified_empty_origin_representations": 0
   },
-  "corrected_windows": "PENDING_CI",
+  "corrected_windows": {
+    "run_url": "https://github.com/SOLHK/Swirl/actions/runs/41515917678",
+    "head_sha": "87ee4b9d4fa65537d2b5fe68dc83f5ca29979f5c",
+    "merge_sha": "c50b1afc93bda8d6eb46fe35b7590e38c9a99695",
+    "artifact_id": 13174538900,
+    "archive_sha256": "b15a1e205606760f527c24415c319644d2f11c53014ddd10cb38b2e9e791e4c8",
+    "aggregate": {
+      "build_architecture": "x86_64",
+      "current_architecture": "x86_64",
+      "empty_representation_positive_and_negative_controls": true,
+      "failures": 0,
+      "font_removed": true,
+      "font_sha256": "edfb588b4730d32966ee822c7ecd6d33c634d1df4fd3ed18bee04f11ceff159f",
+      "kernel": "10.0.20348",
+      "limit_source_units": 0.03125,
+      "manifest_sha256": "64746a0fe734ede656597b563e2042a177ae320de5e4c1de34163fe7f9b3e58f",
+      "max_error_source_units": 0.0011719600372831183,
+      "observations": 546,
+      "os": "Windows Server 2022 Version 21H2",
+      "physical_display_verified": false,
+      "production_accepted": false,
+      "qpa": "windows",
+      "qt": "6.12.0",
+      "raw_topology_failures": 182,
+      "schema": 1,
+      "scope": "independent_authored_CFF2_geometry_only",
+      "status": "PASS_AUTHORED_QT_GEOMETRY",
+      "verified_empty_origin_representations": 182
+    }
+  },
   "scope": "authored source only; final/source-target fonts not accepted",
   "code_sha256": {
     "tools/swirl_vf/platform/make_qt_cff2_manifest.py": "15bd957d775bcc11684048d04fdb7bcb6659356e79d12bd3404300c50ba46311",
