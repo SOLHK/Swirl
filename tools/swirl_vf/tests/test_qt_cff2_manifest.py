@@ -36,6 +36,7 @@ class QtManifestTests(unittest.TestCase):
                                              else a.maxValue-a.defaultValue),x)
                         glyphs=font.getGlyphSet(location=case['normalized'],normalized=True)
                         for row in case['glyphs']:
+                            self.assertEqual(row['serialized_empty_cff2'], row['commands']==[])
                             name=font.getGlyphOrder()[row['gid']]
                             ops,actual=geometry.operands(geometry.source_commands(glyphs[name]))
                             wanted_ops,wanted=geometry.operands(row['commands'])

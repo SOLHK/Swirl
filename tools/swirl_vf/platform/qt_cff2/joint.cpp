@@ -20,6 +20,23 @@
 static QString sha(const QByteArray &data) {
     return QString::fromLatin1(QCryptographicHash::hash(data,QCryptographicHash::Sha256).toHex());
 }
+static bool emptyOrigin(const QPainterPath &path, bool serializedEmpty, bool referenceEmpty) {
+    // Qt's Windows sink starts an empty path with moveTo(0,0). This has no
+    // contour or ink. Permit only that exact representation, backed by an
+    // actually empty saved CFF2 CharString and an independently empty source.
+    if(!serializedEmpty||!referenceEmpty||!path.isEmpty()||path.elementCount()!=1)return false;
+    const auto p=path.elementAt(0);
+    return p.type==QPainterPath::MoveToElement&&p.x==0.&&p.y==0.;
+}
+static bool emptyRuleControls() {
+    QPainterPath origin;origin.moveTo(0,0);
+    QPainterPath displaced;displaced.moveTo(1,0);
+    QPainterPath edge;edge.moveTo(0,0);edge.lineTo(1./65536,0);
+    QPainterPath curve;curve.moveTo(0,0);curve.cubicTo(1,2,3,4,0,0);
+    return emptyOrigin(origin,true,true)&&!emptyOrigin(origin,false,true)&&
+        !emptyOrigin(origin,true,false)&&!emptyOrigin(displaced,true,true)&&
+        !emptyOrigin(edge,true,true)&&!emptyOrigin(curve,true,true);
+}
 static QPainterPath expectedPath(const QJsonArray &commands, bool &valid) {
     QPainterPath path;
     for (const auto &entry:commands) {
@@ -38,6 +55,7 @@ static QPainterPath expectedPath(const QJsonArray &commands, bool &valid) {
 }
 int main(int argc,char **argv) {
     QGuiApplication app(argc,argv);
+    if(!emptyRuleControls())return 6;
     if(argc!=4)return 2;
     QFile input(QString::fromUtf8(argv[1])),manifest(QString::fromUtf8(argv[2]));
     if(!input.open(QIODevice::ReadOnly)||!manifest.open(QIODevice::ReadOnly))return 3;
@@ -47,7 +65,7 @@ int main(int argc,char **argv) {
        plan["font_sha256"].toString()!=sha(bytes)||plan["limit_source_units"].toDouble()!=1./32)return 4;
     const int id=QFontDatabase::addApplicationFontFromData(bytes);
     const auto families=QFontDatabase::applicationFontFamilies(id);
-    QJsonArray rows;int failures=0;double maximum=0.;
+    QJsonArray rows;int failures=0,rawTopologyFailures=0,emptyRepresentations=0;double maximum=0.;
     bool ok=id>=0&&families.size()==2&&plan["faces"].toArray().size()==2;
     for(const auto &faceEntry:plan["faces"].toArray()) {
         const auto face=faceEntry.toObject();const auto family=face["family"].toString();
@@ -76,10 +94,16 @@ int main(int argc,char **argv) {
                     if(!std::isfinite(a.x)||!std::isfinite(a.y)){topology=false;continue;}
                     error=std::max(error,std::hypot(a.x-b.x,a.y-b.y));
                 }
+                const bool rawTopology=topology;
+                const bool emptyRepresentation=valid&&emptyOrigin(actual,
+                    glyph["serialized_empty_cff2"].toBool(false),glyph["commands"].toArray().isEmpty());
+                rawTopologyFailures+=!rawTopology;emptyRepresentations+=emptyRepresentation;
+                topology|=emptyRepresentation;
                 const bool passed=identity&&topology&&error<=1./32;
                 failures+=!passed;maximum=std::max(maximum,error);ok&=passed;
                 rows.append(QJsonObject{{"family",family},{"gid",gid},{"user",user},
                     {"identity",identity},{"topology",topology},{"error_source_units",error},
+                    {"raw_element_topology",rawTopology},{"verified_empty_origin",emptyRepresentation},
                     {"actual_elements",actual.elementCount()},{"reference_elements",reference.elementCount()},
                     {"passed",passed}});
             }
@@ -92,6 +116,8 @@ int main(int argc,char **argv) {
         {"current_architecture",QSysInfo::currentCpuArchitecture()},
         {"scope","independent_authored_CFF2_geometry_only"},{"font_sha256",sha(bytes)},
         {"manifest_sha256",sha(planBytes)},{"observations",rows.size()},{"failures",failures},
+        {"raw_topology_failures",rawTopologyFailures},{"verified_empty_origin_representations",emptyRepresentations},
+        {"empty_representation_positive_and_negative_controls",true},
         {"max_error_source_units",maximum},{"limit_source_units",1./32},{"font_removed",removed},
         {"production_accepted",false},{"physical_display_verified",false},{"rows",rows},
         {"status",ok?"PASS_AUTHORED_QT_GEOMETRY":"FAIL"}};

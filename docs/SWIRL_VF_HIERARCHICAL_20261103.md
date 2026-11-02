@@ -128,7 +128,7 @@ now request Qt **6.12.0**, exact font/table hashes and 546 three-axis source
 comparisons. Both ordinary controls and empty outlines are compared through
 actual `QRawFont::pathForGlyph`, with the unchanged 1/32 FUnit limit. Reference
 commands come from the authored source, not the target. Native Qt execution is
-pending; this Mac has no available Qt 6.12 SDK. The existing product workflow's
+pending at that checkpoint. The existing product workflow's
 branch filters, UI, Rust runtime and delivery gates are untouched.
 
 Validation before this follow-up: 1,002 Python tests, 995 passed, seven skipped,
@@ -136,3 +136,31 @@ zero failures, plus the newly added independent Qt-manifest test (one passed).
 The [follow-up receipt](evidence/SWIRL_VF_HIERARCHICAL_FOLLOWUP_20261103.json)
 binds these observations, the unchanged failure logs and private recovery
 commands. The primary target glyphs and final-font delivery remain unaccepted.
+
+
+## Qt native execution and empty-path representation
+
+The retained delivery receipt identified the existing private Qt 6.12.0 SDK;
+the earlier PATH-only lookup was insufficient to establish SDK absence. The
+standalone C++23 probe builds locally and passes **546 / 546** macOS ARM64
+observations, maximum **0.001156704 FUnit**, with actual Qt outlines, exact
+font/table identity and application-font removal. Its QPA is offscreen; this
+is geometry evidence, not physical display or final-font acceptance.
+
+The first Windows Qt run builds successfully and reports 182 topology failures:
+all are the authored blank GID 1, represented by a single `moveTo(0,0)` instead
+of an empty element list. Every nonempty observation passes (364 / 364), max
+0.001171961 FUnit. The failed archive and raw result are retained. The corrected
+probe admits only this exact zero-ink representation, and only when the manifest
+proves both an empty source command list and an empty saved CFF2 CharString.
+The exact target font/table hashes bind that proof. It rejects displaced moves,
+nonzero edges, curves, nonempty references and missing serialization proof;
+positive and negative Qt-path controls execute in the native binary. Raw topology
+mismatches remain reported separately. The coordinate limit is unchanged.
+
+The corrected Windows run is pending. The [Qt receipt](evidence/SWIRL_VF_QT_JOINT_20261103.json)
+records the actual local result and the failed Windows run separately. The
+mathematical targets remain unresolved. A further local basis experiment that
+extends endpoint ramps to shared global supports reduces the fitted atlas
+subset from 7,894 to only 7,662 regions and creates one stack overflow; it is
+not adopted as a solution and its private code/results are preserved.

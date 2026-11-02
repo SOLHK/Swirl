@@ -35,6 +35,7 @@ def write(output):
                     user = {a.axisTag:float(a.defaultValue+x*(a.defaultValue-a.minValue if x<0
                             else a.maxValue-a.defaultValue)) for a,x in zip(reference['fvar'].axes,point)}
                     face['cases'].append(dict(normalized=normalized,user=user,glyphs=[dict(gid=gid,
+                        serialized_empty_cff2=target['CFF2'].cff.topDictIndex[0].CharStrings[name].bytecode == b'',
                         commands=records(reference,name,[normalized],.25,nonlinear=True)[0])
                         for gid,name in enumerate(reference.getGlyphOrder())]))
                 report['faces'].append(face)
