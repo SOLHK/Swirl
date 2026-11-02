@@ -93,6 +93,17 @@ problem is **not fixed**. Existing nonempty-glyph model failures and integer
 grid limitations in the earlier
 [interpolation evidence](evidence/SWIRL_VF_INTERPOLATION_20261102.json) also remain.
 
+An additional build-entry defect was found during continuation: the historical
+`rebuild.py` CLI exposes only its 1-FUnit experiment defaults. The new
+`build_swirlvf.py` entry delegates to the same engine with fixed **1/32** outline
+and metric limits and a required source SHA. The cubic approximation parameter
+now reaches the engine and checkpoint recipe; its 1/64 allowance is charged to
+the total 1/32 outline bound. Historical experiments and expected values remain
+unchanged. A real serialization regression shows the same 0.25-unit authored
+error passing the historical budget and failing the strict entry without an
+output file. Complete exact authored and cubic controls pass. This fixes budget
+selection, not the remaining original-font representation failures.
+
 ## Complete GID extraction and implemented changes
 
 The new resumable driver completed **47,102 GIDs × 27 design locations =
@@ -118,6 +129,10 @@ outside the repository, bound to source, native binary, code and output hashes.
 | `tools/swirl_vf/platform/hvf_transcript.py` | Reject incomplete, duplicate, reordered, malformed or nonfinite native evidence |
 | `tools/swirl_vf/platform/run_hvf_oracle.py` | Replace count-only admission with complete transcript validation |
 | `tools/swirl_vf/platform/hvf_coverage.py` | Locked, resumable all-GID batches and persistent receipts |
+| `tools/swirl_vf/tools/build_swirlvf.py` | Fixed 1/32 product entry with mandatory source hash |
+| `tools/swirl_vf/tools/rebuild.py` | Carry cubic allowance into the shared engine and checkpoint recipe |
+| `tools/swirl_vf/platform/attempt_strict_rebuild.py` | Bounded actual strict reconstruction with private data and safe CI aggregates |
+| `tools/swirl_vf/tests/test_strict_build.py` | Actual serialization, budget, source-hash and privacy regressions |
 | `tools/swirl_vf/tests/test_font_source_diagnosis.py` | Source, copy, privacy and format regressions |
 | `tools/swirl_vf/tests/test_hvf_transcript.py` | Coverage, failure, empty-glyph and callback regressions |
 | `.github/workflows/swirl-vf.yml` | Add authored format diagnosis while preserving the strict failing gate |
@@ -131,7 +146,7 @@ was force-pushed and no unrelated history or implementation was overwritten.
 
 | Requirement | Actual result |
 | --- | --- |
-| Local Python | 908 tests, zero failures, seven platform skips; subsequent seven-test source/privacy group passes |
+| Local Python after strict entry fix | 914 tests, zero failures, seven platform skips; six audit tests pass |
 | CI Python | 909 tests, zero failures/skips; six audit tests pass |
 | Changed workflows / whitespace | actionlint and `git diff --check` pass |
 | macOS strict fixture | FAIL: 849 versus 850 at unchanged 1/32 |
