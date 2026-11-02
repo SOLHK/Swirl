@@ -173,6 +173,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Authored CFF2 fixture generation failed' }
           ./tools/swirl_vf/platform/run_directwrite_probe.ps1 -Font build/authored-cff2-factored.ttc -OutputDirectory build/swirl-vf-evidence/directwrite-cff2 -AllGlyphs -Render -Binary build/swirl-vf-evidence/directwrite/build/Release/directwrite_probe.exe
           if ($LASTEXITCODE -ne 0) { throw 'CFF2 native DirectWrite probe failed' }
+      - name: Isolate CFF2 serialization and blending through independent native cases
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/diagnose_cff2_directwrite.py --output build/swirl-vf-evidence/cff2-matrix --binary build/swirl-vf-evidence/directwrite/build/Release/directwrite_probe.exe
+          if ($LASTEXITCODE -ne 0) { throw 'CFF2 diagnostic execution failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -190,4 +195,7 @@ jobs:
             build/swirl-vf-evidence/directwrite-cff2/*.jsonl
             build/swirl-vf-evidence/directwrite-cff2/*.log
             build/swirl-vf-evidence/directwrite-cff2/*.png
+            build/swirl-vf-evidence/cff2-matrix/**/*.json
+            build/swirl-vf-evidence/cff2-matrix/**/*.jsonl
+            build/swirl-vf-evidence/cff2-matrix/**/*.log
           retention-days: 7
