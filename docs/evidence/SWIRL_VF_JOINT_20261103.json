@@ -1,0 +1,639 @@
+{
+  "status": "PARTIAL_NOT_ACCEPTED",
+  "created_utc": "2026-11-02T18:01:20.383153+00:00",
+  "branch": "work/swirlvf-joint-acceptance-20261103",
+  "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+  "limit_source_font_units": 0.03125,
+  "first_published_commit": "3a583f7bd1f3a4787cabd9276480acf452d6e8bd",
+  "first_published_tree": "c90ce889e40c1f02b10712347761a700d45bbf94",
+  "base_pr_heads": {
+    "49": "f7b868d648df8794a9432b3eea2ca75da7801727",
+    "51": "cc29a9e8caf29d7b668ccb9ec9c4be250d5abd1e",
+    "52": "b9d8cebf1de19acb31a3e54533419b9645c47e0d"
+  },
+  "baseline_reproduction": {
+    "scope": "selected_GIDs_post_avar_three_axis_native_and_CFF2_fit",
+    "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+    "native_binary_sha256": "072be56bf05f71227cae79e696f0e91791d9f3c21787719eb161d19f3206d3b9",
+    "platform": "macOS-26.5.1-arm64-arm-64bit",
+    "face_index": 0,
+    "source_glyph_count": 47102,
+    "axis_order": [
+      "WDTH",
+      "wght",
+      "HGHT"
+    ],
+    "grid_positions": 27,
+    "independent_positions": 128,
+    "position_plan_sha256": "ec9a660e966a333b64d7a580dc9054a164d2cf0f2533d8504dcc96c51be49bb3",
+    "limit_source_units": 0.03125,
+    "cases": [
+      {
+        "glyph_id": 1166,
+        "native_comparisons": 155,
+        "native_failures": [],
+        "max_portable_native_control_error": 4.614153139941158e-13,
+        "native_topology_failures": 0,
+        "fit": {
+          "passed": false,
+          "failed_samples": 128,
+          "max_control_error": 24.91568400538237
+        },
+        "adaptive_fit": {
+          "sampled_geometry_passed": false,
+          "training_count": 486,
+          "holdout_count": 128,
+          "nonzero_regions": 485,
+          "flat_blend_stack_encodable": true,
+          "max_training_error": 0.0005159026865336866,
+          "max_refinement_error": 3.006586287146321,
+          "max_holdout_error": 2.5959987480706506,
+          "native_failures": 125,
+          "max_native_control_error": 2.5959987480707096
+        }
+      },
+      {
+        "glyph_id": 19177,
+        "native_comparisons": 155,
+        "native_failures": [],
+        "max_portable_native_control_error": 5.684341886080801e-13,
+        "native_topology_failures": 0,
+        "fit": {
+          "passed": false,
+          "failed_samples": 128,
+          "max_control_error": 7.159414940299657
+        },
+        "adaptive_fit": {
+          "sampled_geometry_passed": false,
+          "training_count": 504,
+          "holdout_count": 128,
+          "nonzero_regions": 503,
+          "flat_blend_stack_encodable": true,
+          "max_training_error": 0.000685436754632206,
+          "max_refinement_error": 1.7377722153299116,
+          "max_holdout_error": 1.696680397693877,
+          "native_failures": 121,
+          "max_native_control_error": 1.6966803976937854
+        }
+      }
+    ],
+    "production_accepted": false,
+    "complete_font_acceptance": "NOT_RUN",
+    "user_axis_mapping": "NOT_TESTED",
+    "metrics": "NOT_EXTRACTED",
+    "source_unchanged": true
+  },
+  "final_source_probe": {
+    "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+    "face_index": 0,
+    "axis_tags": [
+      "WDTH",
+      "wght",
+      "HGHT"
+    ],
+    "oracle_sha256": "072be56bf05f71227cae79e696f0e91791d9f3c21787719eb161d19f3206d3b9",
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "limit_source_font_units": 0.03125,
+    "cases": [
+      {
+        "glyph_id": 1166,
+        "observations": 446,
+        "categories": {
+          "single": {
+            "observations": 96,
+            "max_error": 4.582862941503293e-13
+          },
+          "dual": {
+            "observations": 96,
+            "max_error": 4.582862941503293e-13
+          },
+          "triple": {
+            "observations": 128,
+            "max_error": 4.582862941503293e-13
+          },
+          "grid_boundary": {
+            "observations": 27,
+            "max_error": 4.582862941503293e-13
+          },
+          "branch_axis_zero": {
+            "observations": 40,
+            "max_error": 4.556346636343676e-13
+          },
+          "branch_tangent_lower": {
+            "observations": 21,
+            "max_error": 3.595093471822542e-13
+          },
+          "branch_tangent_upper": {
+            "observations": 24,
+            "max_error": 3.457650183405701e-13
+          },
+          "polynomial_witness": {
+            "observations": 14,
+            "max_error": 3.410605131648481e-13
+          }
+        },
+        "max_portable_native_error": 4.582862941503293e-13,
+        "native_failures": [],
+        "dense_model": {
+          "holdout_count": 128,
+          "max_holdout_error": 0.8799698192989998,
+          "failing_holdouts": 106,
+          "holdouts_disjoint_from_training_and_midpoint_grid": true,
+          "metadata_sha256": "97ff2d175d9482b164d1f3a55f3dd183003762c2c41e6082d11af50f5877075c",
+          "coefficient_sha256": "0371f4c1ce212b594e595aedeff6db42218d2f9bd4a24fc39b5c197cbe027b85",
+          "witnesses": [
+            {
+              "axis": "WDTH",
+              "degree": 1,
+              "observation_count": 3,
+              "control_index": 115,
+              "lower_bound": 0.44973781093676357,
+              "squared_lower_bound_numerator": "20314117187868946978850809976165410034909025976556973467257",
+              "squared_lower_bound_denominator": "100433627766186892221372630771322662657637687111424552206336",
+              "exceeds_limit": true,
+              "limit_source_font_units": 0.03125,
+              "scope": "necessary_bound_for_supplied_observations",
+              "source_and_native_arithmetic_certified": false,
+              "native_observation_bound": {
+                "degree": 1,
+                "observation_count": 3,
+                "control_index": 115,
+                "lower_bound": 0.44973781093664816,
+                "squared_lower_bound_numerator": "5078529296964629770190332584000114882097918234827840914569",
+                "squared_lower_bound_denominator": "25108406941546723055343157692830665664409421777856138051584",
+                "exceeds_limit": true,
+                "limit_source_font_units": 0.03125,
+                "scope": "necessary_bound_for_supplied_observations",
+                "source_and_native_arithmetic_certified": false
+              }
+            },
+            {
+              "axis": "wght",
+              "degree": 1,
+              "observation_count": 3,
+              "control_index": 118,
+              "lower_bound": 0.00037707088577252127,
+              "squared_lower_bound_numerator": "176013351325342860037",
+              "squared_lower_bound_denominator": "1237940039285380274899124224",
+              "exceeds_limit": false,
+              "limit_source_font_units": 0.03125,
+              "scope": "necessary_bound_for_supplied_observations",
+              "source_and_native_arithmetic_certified": false,
+              "native_observation_bound": {
+                "degree": 1,
+                "observation_count": 3,
+                "control_index": 118,
+                "lower_bound": 0.0003770708857853924,
+                "squared_lower_bound_numerator": "352026702674718106561",
+                "squared_lower_bound_denominator": "2475880078570760549798248448",
+                "exceeds_limit": false,
+                "limit_source_font_units": 0.03125,
+                "scope": "necessary_bound_for_supplied_observations",
+                "source_and_native_arithmetic_certified": false
+              }
+            },
+            {
+              "axis": "HGHT",
+              "degree": 1,
+              "observation_count": 3,
+              "control_index": 115,
+              "lower_bound": 0.002850604025931245,
+              "squared_lower_bound_numerator": "160950889339190814477917",
+              "squared_lower_bound_denominator": "19807040628566084398385987584",
+              "exceeds_limit": false,
+              "limit_source_font_units": 0.03125,
+              "scope": "necessary_bound_for_supplied_observations",
+              "source_and_native_arithmetic_certified": false,
+              "native_observation_bound": {
+                "degree": 1,
+                "observation_count": 3,
+                "control_index": 115,
+                "lower_bound": 0.002850604025931245,
+                "squared_lower_bound_numerator": "160950889339190814477917",
+                "squared_lower_bound_denominator": "19807040628566084398385987584",
+                "exceeds_limit": false,
+                "limit_source_font_units": 0.03125,
+                "scope": "necessary_bound_for_supplied_observations",
+                "source_and_native_arithmetic_certified": false
+              }
+            },
+            {
+              "axis": "joint",
+              "degree": 3,
+              "observation_count": 5,
+              "control_index": 109,
+              "lower_bound": 0.05967617737434316,
+              "squared_lower_bound_numerator": "1128603953638800000018726425",
+              "squared_lower_bound_denominator": "316912650057057350374175801344",
+              "exceeds_limit": true,
+              "limit_source_font_units": 0.03125,
+              "scope": "necessary_bound_for_supplied_observations",
+              "source_and_native_arithmetic_certified": false,
+              "native_observation_bound": {
+                "degree": 3,
+                "observation_count": 5,
+                "control_index": 109,
+                "lower_bound": 0.05967617737434316,
+                "squared_lower_bound_numerator": "70537747102425000007250369",
+                "squared_lower_bound_denominator": "19807040628566084398385987584",
+                "exceeds_limit": true,
+                "limit_source_font_units": 0.03125,
+                "scope": "necessary_bound_for_supplied_observations",
+                "source_and_native_arithmetic_certified": false
+              }
+            }
+          ]
+        },
+        "plan_sha256": "38454531910ed26c19865ba083466a467b25b5f21ee2e629b0fb1bbf9cce3436",
+        "transcript_sha256": "696e3f9e3c62962bc577c906873051cad80ba838f41064fe728e0d5215b338da"
+      },
+      {
+        "glyph_id": 19177,
+        "observations": 441,
+        "categories": {
+          "single": {
+            "observations": 96,
+            "max_error": 5.796914039811764e-13
+          },
+          "dual": {
+            "observations": 96,
+            "max_error": 5.084229945850415e-13
+          },
+          "triple": {
+            "observations": 128,
+            "max_error": 7.190186943645084e-13
+          },
+          "grid_boundary": {
+            "observations": 27,
+            "max_error": 4.687428401686771e-13
+          },
+          "branch_axis_zero": {
+            "observations": 44,
+            "max_error": 6.821210263296962e-13
+          },
+          "branch_tangent_lower": {
+            "observations": 18,
+            "max_error": 4.547473508864641e-13
+          },
+          "branch_tangent_upper": {
+            "observations": 18,
+            "max_error": 5.084229945850415e-13
+          },
+          "polynomial_witness": {
+            "observations": 14,
+            "max_error": 4.1382633578908315e-13
+          }
+        },
+        "max_portable_native_error": 7.190186943645084e-13,
+        "native_failures": [],
+        "dense_model": {
+          "holdout_count": 128,
+          "max_holdout_error": 0.5610597506297036,
+          "failing_holdouts": 66,
+          "holdouts_disjoint_from_training_and_midpoint_grid": true,
+          "metadata_sha256": "857df4085e5638acb59abc2ef7f4762b4204dcd3ad180b2f6003347f7f75d7c3",
+          "coefficient_sha256": "e5c28415680eebdef8103153de5db0ec13e03fc3b706bd64886c17ac9af87e6f",
+          "witnesses": [
+            {
+              "axis": "WDTH",
+              "degree": 1,
+              "observation_count": 3,
+              "control_index": 34,
+              "lower_bound": 0.0014022773821192338,
+              "squared_lower_bound_numerator": "38948205321052812574985",
+              "squared_lower_bound_denominator": "19807040628566084398385987584",
+              "exceeds_limit": false,
+              "limit_source_font_units": 0.03125,
+              "scope": "necessary_bound_for_supplied_observations",
+              "source_and_native_arithmetic_certified": false,
+              "native_observation_bound": {
+                "degree": 1,
+                "observation_count": 3,
+                "control_index": 34,
+                "lower_bound": 0.0014022773820622796,
+                "squared_lower_bound_numerator": "155792821271556081233689",
+                "squared_lower_bound_denominator": "79228162514264337593543950336",
+                "exceeds_limit": false,
+                "limit_source_font_units": 0.03125,
+                "scope": "necessary_bound_for_supplied_observations",
+                "source_and_native_arithmetic_certified": false
+              }
+            },
+            {
+              "axis": "wght",
+              "degree": 1,
+              "observation_count": 3,
+              "control_index": 319,
+              "lower_bound": 0.00324355559153923,
+              "squared_lower_bound_numerator": "33019604210804071312715691018021391466861302223964769",
+              "squared_lower_bound_denominator": "3138550867693340381917894711603833208051177722232017256448",
+              "exceeds_limit": false,
+              "limit_source_font_units": 0.03125,
+              "scope": "necessary_bound_for_supplied_observations",
+              "source_and_native_arithmetic_certified": false,
+              "native_observation_bound": {
+                "degree": 1,
+                "observation_count": 3,
+                "control_index": 319,
+                "lower_bound": 0.0032435555915101967,
+                "squared_lower_bound_numerator": "257965657892288631927980578138109733805512931244441",
+                "squared_lower_bound_denominator": "24519928653854221733733552434404946937899825954937634816",
+                "exceeds_limit": false,
+                "limit_source_font_units": 0.03125,
+                "scope": "necessary_bound_for_supplied_observations",
+                "source_and_native_arithmetic_certified": false
+              }
+            },
+            {
+              "axis": "HGHT",
+              "degree": 1,
+              "observation_count": 3,
+              "control_index": 256,
+              "lower_bound": 0.3226856619464403,
+              "squared_lower_bound_numerator": "653609723947403491086851029809559887356465489704638251077",
+              "squared_lower_bound_denominator": "6277101735386680763835789423207666416102355444464034512896",
+              "exceeds_limit": true,
+              "limit_source_font_units": 0.03125,
+              "scope": "necessary_bound_for_supplied_observations",
+              "source_and_native_arithmetic_certified": false,
+              "native_observation_bound": {
+                "degree": 1,
+                "observation_count": 3,
+                "control_index": 256,
+                "lower_bound": 0.32268566194642456,
+                "squared_lower_bound_numerator": "653609723947339645113461166285512787995317494309878258021",
+                "squared_lower_bound_denominator": "6277101735386680763835789423207666416102355444464034512896",
+                "exceeds_limit": true,
+                "limit_source_font_units": 0.03125,
+                "scope": "necessary_bound_for_supplied_observations",
+                "source_and_native_arithmetic_certified": false
+              }
+            },
+            {
+              "axis": "joint",
+              "degree": 3,
+              "observation_count": 5,
+              "control_index": 256,
+              "lower_bound": 0.04843927404910208,
+              "squared_lower_bound_numerator": "11618628156566876097142201",
+              "squared_lower_bound_denominator": "4951760157141521099596496896",
+              "exceeds_limit": true,
+              "limit_source_font_units": 0.03125,
+              "scope": "necessary_bound_for_supplied_observations",
+              "source_and_native_arithmetic_certified": false,
+              "native_observation_bound": {
+                "degree": 3,
+                "observation_count": 5,
+                "control_index": 256,
+                "lower_bound": 0.048439274049038146,
+                "squared_lower_bound_numerator": "46474512626144812228854337",
+                "squared_lower_bound_denominator": "19807040628566084398385987584",
+                "exceeds_limit": true,
+                "limit_source_font_units": 0.03125,
+                "scope": "necessary_bound_for_supplied_observations",
+                "source_and_native_arithmetic_certified": false
+              }
+            }
+          ]
+        },
+        "plan_sha256": "1294d251d4fa53624fd02a62fc60a796088bb89bc272064fcfcfe50f88969f9b",
+        "transcript_sha256": "ac7fceca5535663a66099035c34661e776c00fde44d2fbcf547b7b94152d1c40"
+      }
+    ],
+    "font_acceptance": false,
+    "full_font_coverage": false,
+    "scope": "post_avar_source_geometry_and_retained_model_diagnosis",
+    "status": "FAIL_RETAINED_MODELS"
+  },
+  "retained_dense_flat_encoding": [
+    {
+      "gid": 1166,
+      "regions": 4041,
+      "encoding": "FAIL",
+      "reason": "cff2_blend_operand_stack_overflow"
+    },
+    {
+      "gid": 19177,
+      "regions": 4031,
+      "encoding": "FAIL",
+      "reason": "cff2_blend_operand_stack_overflow"
+    }
+  ],
+  "authored_representation_controls": {
+    "scope": "authored_joint_axis_representation_controls_only",
+    "production_accepted": false,
+    "source_glyphs_accepted": 0,
+    "limit_source_font_units": 0.03125,
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "harfbuzz": "14.6.0",
+    "cases": {
+      "avar2": {
+        "font_sha256": "5ae3749cc3637364c49afbb13db0984dd9d18e74e5f375853385f0a490328141",
+        "observations": 71,
+        "engines": {
+          "CoreText": {
+            "observations": 71,
+            "failures": 0,
+            "topology_failures": 0,
+            "max_comparable_error": 0.00893691378533441
+          },
+          "HarfBuzz": {
+            "observations": 71,
+            "failures": 0,
+            "topology_failures": 0,
+            "max_comparable_error": 0.00694806675441842
+          },
+          "fontTools": {
+            "observations": 71,
+            "failures": 0,
+            "topology_failures": 0,
+            "max_comparable_error": 0.006285123118009697
+          }
+        },
+        "font_bytes": 3100,
+        "terminal_receipt": {
+          "error_count": 0,
+          "request_count": 71,
+          "source_sha256": "5ae3749cc3637364c49afbb13db0984dd9d18e74e5f375853385f0a490328141",
+          "successful_glyph_count": 71,
+          "type": "summary",
+          "axis_verification_backend": "CoreTextExactAxisReadbackBatchV2",
+          "verified_batch_count": 71,
+          "internal_native_request_count": 142,
+          "internal_native_glyph_count": 142,
+          "upstream_native_summary": {
+            "error_count": 0,
+            "request_count": 142,
+            "source_sha256": "5ae3749cc3637364c49afbb13db0984dd9d18e74e5f375853385f0a490328141",
+            "successful_glyph_count": 142,
+            "type": "summary"
+          },
+          "source_unchanged": true
+        },
+        "exact_axis_protocol": "CoreTextExactAxisReadbackBatchV2"
+      },
+      "VARC": {
+        "font_sha256": "c28079ddf57191742ddc03dbb627f8a4d87145da7b361501e8935766910188de",
+        "observations": 71,
+        "engines": {
+          "CoreText": {
+            "observations": 71,
+            "failures": 71,
+            "topology_failures": 71,
+            "max_comparable_error": null
+          },
+          "HarfBuzz": {
+            "observations": 71,
+            "failures": 71,
+            "topology_failures": 71,
+            "max_comparable_error": null
+          },
+          "fontTools": {
+            "observations": 71,
+            "failures": 0,
+            "topology_failures": 0,
+            "max_comparable_error": 1.0172526060614473e-05
+          }
+        },
+        "font_bytes": 3192,
+        "terminal_receipt": {
+          "error_count": 0,
+          "request_count": 71,
+          "source_sha256": "c28079ddf57191742ddc03dbb627f8a4d87145da7b361501e8935766910188de",
+          "successful_glyph_count": 71,
+          "type": "summary",
+          "axis_verification_backend": "CoreTextExactAxisReadbackBatchV2",
+          "verified_batch_count": 71,
+          "internal_native_request_count": 142,
+          "internal_native_glyph_count": 142,
+          "upstream_native_summary": {
+            "error_count": 0,
+            "request_count": 142,
+            "source_sha256": "c28079ddf57191742ddc03dbb627f8a4d87145da7b361501e8935766910188de",
+            "successful_glyph_count": 142,
+            "type": "summary"
+          },
+          "source_unchanged": true
+        },
+        "exact_axis_protocol": "CoreTextExactAxisReadbackBatchV2"
+      }
+    },
+    "binary_sha256": "8d412b69075a82598620f7bdc3886c9be4c2d349627a02b7cfa09cffa0097d6a",
+    "passed": false
+  },
+  "contour_decomposition": [
+    {
+      "gid": 1166,
+      "contours": 6,
+      "passing_contours": 4,
+      "maximum_holdout_error": 2.595992443250787,
+      "accepted": false
+    },
+    {
+      "gid": 19177,
+      "contours": 18,
+      "passing_contours": 2,
+      "maximum_holdout_error": 1.215582530975531,
+      "accepted": false
+    }
+  ],
+  "quantization_investigation": {
+    "scope": "1024 random F2DOT14 bins and eight opposite-corner directions per glyph; source quadratic points",
+    "results": [
+      {
+        "gid": 1166,
+        "max_F2DOT14_bin_pair_distance": 0.016399916497202842,
+        "necessary_minimax_error": 0.008199958248601421
+      },
+      {
+        "gid": 19177,
+        "max_F2DOT14_bin_pair_distance": 0.017043486434941853,
+        "necessary_minimax_error": 0.008521743217470927
+      }
+    ]
+  },
+  "validation": {
+    "python_tests": 984,
+    "passed": 977,
+    "skipped": 7,
+    "failed": 0,
+    "audits_passed": 6,
+    "joint_source_probe_exit_code": 1,
+    "joint_source_probe_status": "FAIL_RETAINED_MODELS",
+    "representation_probe_exit_code": 1,
+    "local_only": true,
+    "remote_ci": "NOT_RUN"
+  },
+  "coverage": {
+    "source_faces": 32,
+    "glyphs_per_face": 47102,
+    "source_faces_probed": [
+      0
+    ],
+    "source_gids_probed": [
+      1166,
+      19177
+    ],
+    "accepted_source_gids": 0,
+    "accepted_complete_faces": 0,
+    "full_font_validation": "NOT_STARTED_TARGET_GLYPHS_FAIL",
+    "source_user_coordinate_transport": "NOT_CERTIFIED",
+    "source_serialized_CFF2_geometry": "NOT_ACCEPTED",
+    "full_cube_continuous_equivalence": "NOT_CERTIFIED"
+  },
+  "environment": {
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "python": "3.12.16",
+    "fonttools": "4.61.1",
+    "numpy": "2.2.6",
+    "harfbuzz": "14.6.0"
+  },
+  "code_sha256": {
+    "tools/swirl_vf/tools/hvf_piecewise_axes.py": "6acd271adcdbbbfff27a47dabef0b22721b9c9de5c9e99b554cbbab53bd6a9b9",
+    "tools/swirl_vf/tools/interpolation_witness.py": "1fc863ad8e021749600aa27e2d472e7e1e2d439858738a2df692b554dab913ee",
+    "tools/swirl_vf/platform/probe_joint_boundaries.py": "6288b8f49fae5233131c5ccc593413be1da11f51bedc64751953b31a4901b2f1",
+    "tools/swirl_vf/platform/probe_joint_representations.py": "e5eccbffefb7f5761c11a3cb404b1b182d1e5f156b2666e4eeb2f7454eda7200",
+    "tools/swirl_vf/tests/test_joint_branch_witness.py": "b0cec2227c9b6ef9695fb9986730934ebe234d58c1a52c5709c1f35b590c6fe3",
+    "tools/swirl_vf/tests/test_joint_representations.py": "127d6391d678edfcd484d512e59b75d8a0060cce9b1465379e43582a56d912dd"
+  },
+  "private_artifact_sha256": {
+    "final-regression.log": "e9e9a0f4e83561a9976bd9fdfdd4f6e04845223785d63f5955f72cc46b2e3a40",
+    "final-source/report.json": "8099f26fdc84022bd9fa3d746a1077a1f0809c331626c1459ff09c9383598435",
+    "representations-final/report.json": "aa6e076eddd4a760ecee0adae44f7d5d7edbb28125899d7423a6558b75fcb994",
+    "contour_probe.py": "897a47005224685acbf8873c30f611484c290e02708a3ecfc8fcae8e4471a677",
+    "contour_probe.json": "37e7dfd9037b50892867c68f9e46eadce7e18547869377301a6b7fd446bcd298",
+    "capacity.json": "5d1c41565cdc229c9ac994b333e660641956aa29abda2724ed005b94c0d899fd",
+    "input-quantization.json": "c0cb2ab84d09745796801c979bd600733b20576952c89de12dd2e73203c3e713",
+    "final-audit.log": "97856a2264b6c385b57754104703c065d6aadedc6c9d0c7a1ff114c72547844d"
+  },
+  "retained_exploratory_failures": [
+    {
+      "scope": "first authored avar2 binary64 user-coordinate batch",
+      "reason": "native_replay_payload_not_exact",
+      "field": "advance_width",
+      "request": "warp-27",
+      "exit_code": 3,
+      "geometry_acceptance": false
+    },
+    {
+      "scope": "partial-axis VARC CFF2 fontTools pushLocation",
+      "max_error": 205.91260281974002,
+      "resolution": "explicitly encode all inherited axes in authored control; no installed library modification"
+    }
+  ],
+  "remaining": [
+    "Source-derived joint reconstruction still exceeds 1/32 for both target GIDs.",
+    "Retained dense ordinary blends exceed operand-stack capacity.",
+    "The native VARC CFF2 controls fail in both tested engines.",
+    "avar2 control success is not a source hierarchy compiler or full-font capacity proof.",
+    "No accepted serialized complete source glyph model, all-face proof or full-font acceptance."
+  ],
+  "remote_observation_after_tests": {
+    "main": "bd4d60cf42322cf62aa49fa09f219d800c128c30",
+    "test": "63dde8812f85839aa6024cbba6c498c96cae022d",
+    "PR49_concurrent_other_work": "4e282c43bb41bff45c21a369210e141de980ccb2",
+    "PR49_change_scope": "vertical origin metrics; not imported into this joint-axis branch",
+    "PR51": "cc29a9e8caf29d7b668ccb9ec9c4be250d5abd1e",
+    "PR52": "b9d8cebf1de19acb31a3e54533419b9645c47e0d"
+  }
+}

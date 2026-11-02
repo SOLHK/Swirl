@@ -70,14 +70,12 @@ def projection_roots(points):
     return roots
 
 
-def line_partition(table,gid,varying_axis,fixed_coordinates):
-    """Return exact structural branch candidates for one root-axis sweep."""
-    root=table.part(gid);fixed=np.asarray(fixed_coordinates,dtype=float)
-    require(fixed.shape==(root.axis_count,) and 0<=varying_axis<root.axis_count
-            and np.isfinite(fixed).all() and (np.abs(fixed)<=1).all(),'invalid_piecewise_root_line')
+def _partition(table,gid,start_coordinates,end_coordinates):
+    """Internal parameter u in [-1,1]; every root axis may change together."""
+    root=table.part(gid)
     values=[LinearPieces.constant(0.) for _ in range(root.tree_axes)]
-    for i,v in enumerate(fixed):values[i]=LinearPieces.constant(v)
-    values[varying_axis]=LinearPieces(np.asarray([-1.,1.]),np.asarray([-1.,1.]))
+    for i,(lo,hi) in enumerate(zip(start_coordinates,end_coordinates)):
+        values[i]=LinearPieces(np.asarray([-1.,1.]),np.asarray([lo,hi]))
     records=[];active=set();node_count=0
     def emit(kind,part,base,field,x):
         if -1<x<1:records.append(dict(kind=kind,part=part,tree_part_offset=base,field=field,coordinate=float(x)))
@@ -124,7 +122,48 @@ def line_partition(table,gid,varying_axis,fixed_coordinates):
         active.remove(index)
     visit(gid,0,0,0)
     records.sort(key=lambda r:r['coordinate'])
-    return {'glyph_id':gid,'varying_axis_index':varying_axis,'fixed_coordinates':fixed.tolist(),
-            'node_count':node_count,'events':records,
+    return {'glyph_id':gid,'node_count':node_count,'events':records,
             'knots':sorted(set([0.,*[r['coordinate'] for r in records]])),
             'three_dimensional_acceptance':False}
+
+
+def line_partition(table,gid,varying_axis,fixed_coordinates):
+    """Return structural candidates for one root-axis sweep (legacy API)."""
+    root=table.part(gid);fixed=np.asarray(fixed_coordinates,dtype=float)
+    require(fixed.shape==(root.axis_count,) and type(varying_axis) is int
+            and 0<=varying_axis<root.axis_count and np.isfinite(fixed).all()
+            and (np.abs(fixed)<=1).all(),'invalid_piecewise_root_line')
+    start=fixed.copy();end=fixed.copy()
+    start[varying_axis]=-1.;end[varying_axis]=1.
+    result=_partition(table,gid,start,end)
+    result.update(varying_axis_index=varying_axis,fixed_coordinates=fixed.tolist())
+    return result
+
+
+def segment_partition(table,gid,start_coordinates,end_coordinates):
+    """Partition a simultaneous-axis chord, without fitting outline samples.
+
+    Coordinates are post-avar, in original root-axis order. Returned parameters
+    are t in [0,1], where p(t)=(1-t)*start+t*end. Descendant zero crossings are
+    propagated before resolving clamps and quadratic projection boundaries;
+    equal-sign endpoint projections can therefore still contain two events.
+    This covers this chord, not the cube. Float64 roots are not exact rationals.
+    """
+    count=table.part(gid).axis_count
+    start=np.asarray(start_coordinates,dtype=float)
+    end=np.asarray(end_coordinates,dtype=float)
+    require(start.shape==end.shape==(count,) and count>0
+            and np.isfinite(start).all() and np.isfinite(end).all()
+            and (np.abs(start)<=1).all() and (np.abs(end)<=1).all()
+            and np.any(start!=end),'invalid_piecewise_root_segment')
+    result=_partition(table,gid,start,end)
+    events=[]
+    for record in result['events']:
+        item=dict(record)
+        t=(item.pop('coordinate')+1.)/2.
+        item.update(parameter=t,coordinates=((1-t)*start+t*end).tolist())
+        events.append(item)
+    return dict(glyph_id=gid,start_coordinates=start.tolist(),end_coordinates=end.tolist(),
+                node_count=result['node_count'],events=events,
+                parameters=sorted(set([0.,1.,*[r['parameter'] for r in events]])),
+                three_dimensional_acceptance=False)
