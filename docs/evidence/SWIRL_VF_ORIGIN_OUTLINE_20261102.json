@@ -87,7 +87,7 @@
     "standard_feature_condition": "PASS_AUTHORED_CONTROL_ALL_NATIVE_ENGINES",
     "experimental_coupled_condition": "UNSUPPORTED_ALL_NATIVE_ENGINES_TESTED"
   },
-  "new_DirectWrite": "NOT_RUN",
+  "new_DirectWrite": "FAIL_RAW_AXIS_ECHO_BEFORE_COMPLETE_LAYOUT",
   "regression": {
     "tests_run": 958,
     "passed": 951,
@@ -152,5 +152,21 @@
     "tools/swirl_vf/platform/directwrite_vertical_layout.cpp": "80b1c894ca6c9544a3b547e181537243ed58cc3c99fcb10699b6e2d88ce5d156",
     "tools/swirl_vf/tests/test_layout_translation.py": "b61d4ad3312a0bddbf7e2ceecbf064c54dfdf6c1287324b40d9e56a2c9281ea9",
     ".github/workflows/swirl-vf.yml": "5e5e75cef7221989b47f97f463b09eb0aec0257d1000a2d57a82a08b0446da18"
-  }
+  },
+  "CFF2_DirectWrite_strict_axis_CI": {
+    "head": "f7b868d648df8794a9432b3eea2ca75da7801727",
+    "run": "https://github.com/SOLHK/Swirl/actions/runs/41472615231",
+    "merge_checkout": "22503d97e3bec7c90bc064be8bd85d440219d4a0",
+    "jobs": [
+      125369855700,
+      125369855981,
+      125369856040
+    ],
+    "request_id": 47,
+    "error": "actual_layout_face_axis_ignored_or_clamped",
+    "actual_axis_values": "NOT_EMITTED_BY_OLD_FAIL_FAST_CHECK",
+    "native_CFF2_collection_loading": "PASS_BEFORE_AXIS_FAILURE",
+    "complete_layout_comparison": "NOT_RUN"
+  },
+  "next_experiment": "Explicitly observe actual native axes and preserve every raw echo failure, then compare baseline/candidate layout only at matching actual face axes; default strict parser unchanged."
 }

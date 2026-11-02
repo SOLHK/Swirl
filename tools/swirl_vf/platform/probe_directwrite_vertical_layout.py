@@ -85,7 +85,7 @@ def exact_axes(actual, wanted, context):
             f"{context}:requested_axis_missing_ignored_or_clamped")
 
 
-def validate_layout(record, request):
+def validate_layout(record, request, *, observe_axis_echo=False):
     context = f"request_{request['request_id']}"
     require(record.get("type") == "layout", f"{context}:not_a_layout_record")
     for field in ("request_id", "route", "policy", "direction", "locale", "text_kind", "requested_user_axes"):
@@ -102,7 +102,15 @@ def validate_layout(record, request):
     for run in runs:
         require(run.get("source_identity_verified") is True and run.get("physical_face_index") == 0
                 and run.get("simulations") == 0, f"{context}:unverified_or_fallback_font")
-        exact_axes(run.get("actual_face_axes"), desired, context + ":actual_face")
+        if observe_axis_echo:
+            actual = run.get("actual_face_axes")
+            require(type(actual) is dict and all(type(k) is str and len(k) == 4 and number(v) for k, v in actual.items())
+                    and all(k in actual for k in desired), f"{context}:missing_or_invalid_observed_axis")
+            require(type(run.get("raw_axis_echo_matches")) is bool
+                    and run["raw_axis_echo_matches"] == all(actual[k] == v for k, v in desired.items()),
+                    f"{context}:raw_axis_failure_not_recorded")
+        else:
+            exact_axes(run.get("actual_face_axes"), desired, context + ":actual_face")
         require(run.get("bidi_level") == 0 and type(run.get("is_sideways")) is bool
                 and run.get("orientation_angle") in (0, 1, 2, 3) and run.get("font_em_size") == 1000,
                 f"{context}:unexpected_fixture_run_properties")
@@ -141,7 +149,7 @@ def validate_layout(record, request):
             f"{context}:incomplete_layout_metrics")
 
 
-def parse_transcript(stdout, expected_requests, source, returncode):
+def parse_transcript(stdout, expected_requests, source, returncode, *, observe_axis_echo=False):
     def invalid_number(value):
         raise ObservationError("nonfinite_native_JSON:" + value)
 
@@ -155,6 +163,8 @@ def parse_transcript(stdout, expected_requests, source, returncode):
     require(returncode == 0, f"native_nonzero_exit:{returncode}")
     require(len(rows) == len(expected_requests) + 2, "native_record_count_mismatch_or_extra_after_summary")
     metadata, summary = rows[0], rows[-1]
+    if observe_axis_echo:
+        require(metadata.get("axis_echo_policy") == "OBSERVE_RAW_FAILURES", "native_axis_observation_policy_missing")
     sha = hashlib.sha256(source).hexdigest()
     require(metadata.get("type") == "metadata" and metadata.get("backend") == "DirectWrite_TextLayout4_TextRenderer1"
             and metadata.get("source_sha256") == sha and metadata.get("source_bytes") == len(source)
@@ -172,7 +182,7 @@ def parse_transcript(stdout, expected_requests, source, returncode):
             and summary.get("glyph_count") == glyph_count and summary.get("error_count") == 0
             and summary.get("font_file_locked_through_summary") is True, "native_terminal_summary_mismatch")
     for row, expected in zip(rows[1:-1], expected_requests):
-        validate_layout(row, expected)
+        validate_layout(row, expected, observe_axis_echo=observe_axis_echo)
     return {"metadata": metadata, "summary": summary, "records": rows[1:-1]}
 
 

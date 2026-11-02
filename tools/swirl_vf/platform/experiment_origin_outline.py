@@ -68,7 +68,7 @@ def run(output,native,binary=None):
     result={'scope':'authored_CFF2_vertical_alternate_layout_only','os':platform.platform(),
         'native':native,'limit':1/32,'source_font_acceptance':'NOT_RUN',
         'raw_geometry_and_side_bearing_equivalence':'FAIL_BY_CONSTRUCTION',
-        'raw_axis_echo_failures':0,
+        'raw_axis_echo_failures':0,'raw_axis_echo_samples':[],
         'unchanged_horizontal_outlines':True,'serialized':serial,'layout':{},'visual_raster':'NOT_ESTABLISHED',
         'processes':[]}
     hb_checks=0
@@ -109,11 +109,11 @@ def run(output,native,binary=None):
             records=[r for r in rows if r.get('type')=='observation']
             ct.require_registration_cleanup([r for r in rows if r.get('type')=='fixture_registration_cleanup'],config['font_sha256'])
         else:
-            process=subprocess.run([str(binary),str(path),'--authored-cff2'],input=''.join(dw.request_line(r) for r in requests),
+            process=subprocess.run([str(binary),str(path),'--authored-cff2','--observe-axis-echo'],input=''.join(dw.request_line(r) for r in requests),
                 capture_output=True,text=True,timeout=300)
             (output/f'{name}.jsonl').write_text(process.stdout);(output/f'{name}.stderr.log').write_text(process.stderr)
             try:
-                parsed=dw.parse_transcript(process.stdout,requests,blob,process.returncode)
+                parsed=dw.parse_transcript(process.stdout,requests,blob,process.returncode,observe_axis_echo=True)
                 fixture.require(parsed['metadata'].get('authored_outline_kind')=='CFF2',
                                 'outline_origin_native_CFF2_type_not_verified')
                 records=parsed['records']
@@ -139,6 +139,14 @@ def run(output,native,binary=None):
             p=req['normalized'];gid=y['gid']
         else:
             xr,x=dw.flatten(left)[0];yr,y=dw.flatten(right)[0];vertical=req['direction']=='V';locale=req['locale']
+            fixture.require(xr['actual_face_axes']==yr['actual_face_axes'],
+                            'outline_origin_DirectWrite_comparison_instances_differ')
+            for variant,run in (('source',xr),('compensated',yr)):
+                if not run['raw_axis_echo_matches']:
+                    result['raw_axis_echo_failures']+=1
+                    result['raw_axis_echo_samples'].append({'variant':variant,'request_id':req['request_id'],
+                        'requested_user_axes':req['requested_user_axes'],'float32_input_axes':left['float32_input_axes'],
+                        'actual_face_axes':run['actual_face_axes']})
             fixture.require(x['gid']==y['gid'] and x['advance']==y['advance'],'outline_origin_DirectWrite_changed_advance')
             for key in ('advance_width','advance_height','vertical_origin_y'):
                 fixture.require(x['design_metrics'][key]==y['design_metrics'][key],

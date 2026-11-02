@@ -88,14 +88,19 @@ static std::string axisJSON(const std::vector<DWRITE_FONT_AXIS_VALUE>& axes) {
     for (size_t i=0;i<axes.size();++i) out << (i?",":"") << quoted(tagString(axes[i].axisTag)) << ':' << axes[i].value;
     return out.str()+'}';
 }
-static void verifyAxes(const std::vector<DWRITE_FONT_AXIS_VALUE>& actual,
-                       const std::vector<DWRITE_FONT_AXIS_VALUE>& requested) {
+static bool verifyAxes(const std::vector<DWRITE_FONT_AXIS_VALUE>& actual,
+                       const std::vector<DWRITE_FONT_AXIS_VALUE>& requested, bool observeMismatch=false) {
     std::set<UINT32> seen;
+    bool equal=true;
     for (const auto& a : actual) require(std::isfinite(a.value) && seen.insert(a.axisTag).second, "invalid_or_duplicate_axis_observation");
     for (const auto& wanted : requested) {
         auto found = std::find_if(actual.begin(),actual.end(),[&](auto a){return a.axisTag == wanted.axisTag;});
-        require(found != actual.end() && found->value == wanted.value, "actual_layout_face_axis_ignored_or_clamped");
+        require(found != actual.end(), "actual_layout_face_axis_missing");
+        equal = equal && found->value == wanted.value;
     }
+    if (!equal && !observeMismatch)
+        throw ProbeError("actual_layout_face_axis_ignored_or_clamped:requested="+axisJSON(requested)+";actual="+axisJSON(actual));
+    return equal;
 }
 
 // Denying writes and deletion binds hashing, collection loading and all callback
@@ -194,6 +199,7 @@ struct Request {
 
 struct Environment {
     const LockedFixture& source;
+    bool observeAxisEcho = false;
     ComPtr<IDWriteFactory6> factory;
     ComPtr<ID2D1Factory> d2d;
     ComPtr<IDWriteTextAnalyzer2> analyzer;
@@ -202,7 +208,7 @@ struct Environment {
     ComPtr<IDWriteFontFallback> noFallback;
     ComPtr<IUnknown> loaderIdentity;
     std::vector<uint8_t> fileKey;
-    explicit Environment(const LockedFixture& input,const wchar_t* path) : source(input) {
+    explicit Environment(const LockedFixture& input,const wchar_t* path,bool observe=false) : source(input), observeAxisEcho(observe) {
         checked(DWriteCreateFactory(DWRITE_FACTORY_TYPE_ISOLATED,__uuidof(IDWriteFactory6),reinterpret_cast<IUnknown**>(factory.GetAddressOf())),"DWriteCreateFactory6");
         checked(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED,d2d.GetAddressOf()),"D2D1CreateFactory");
         ComPtr<IDWriteTextAnalyzer> baseAnalyzer;
@@ -252,7 +258,7 @@ struct Environment {
         require(axisFace->HasVariations(),"static_face_fallback");
         std::vector<DWRITE_FONT_AXIS_VALUE> values(axisFace->GetFontAxisValueCount());
         checked(axisFace->GetFontAxisValues(values.data(),UINT32(values.size())),"GetFontAxisValues(actual_layout_face)");
-        verifyAxes(values,request.axes); return values;
+        verifyAxes(values,request.axes,observeAxisEcho); return values;
     }
 };
 
@@ -324,6 +330,7 @@ struct Renderer final : IDWriteTextRenderer1 {
                 << ",\"is_sideways\":" << (run->isSideways?"true":"false") << ",\"bidi_level\":" << run->bidiLevel
                 << ",\"measuring_mode\":" << unsigned(mode) << ",\"font_em_size\":" << run->fontEmSize
                 << ",\"source_identity_verified\":true,\"physical_face_index\":0,\"simulations\":0,\"actual_face_axes\":" << axisJSON(values)
+                << ",\"raw_axis_echo_matches\":" << (verifyAxes(values,request.axes,true)?"true":"false")
                 << ",\"orientation_transform\":[" << orientation.m11 << ',' << orientation.m12 << ',' << orientation.m21 << ',' << orientation.m22 << ',' << orientation.dx << ',' << orientation.dy
                 << "],\"local_ink_bounds\":" << local << ",\"layout_ink_bounds\":" << placed << ",\"baseline_relative_ink_bounds\":" << relative << ",\"cluster_map\":[";
             for (UINT32 i=0;i<desc->stringLength;++i) { require(desc->clusterMap[i]<run->glyphCount,"cluster_map_out_of_bounds"); out << (i?",":"") << desc->clusterMap[i]; }
@@ -402,16 +409,18 @@ static std::string observe(const Environment& env,const Request& request) {
 int wmain(int argc,wchar_t** argv) {
     unsigned currentId=0, requests=0, glyphs=0;
     try {
-        const bool cff2Control=argc==3 && std::wstring(argv[2])==L"--authored-cff2";
-        require(argc==2 || cff2Control,"usage_directwrite_vertical_layout_FONT_optional_authored_cff2");
+        const bool cff2Control=argc>=3 && std::wstring(argv[2])==L"--authored-cff2";
+        const bool observeEcho=argc==4 && cff2Control && std::wstring(argv[3])==L"--observe-axis-echo";
+        require(argc==2 || (argc==3 && cff2Control) || observeEcho,"usage_directwrite_vertical_layout_FONT_optional_authored_cff2_and_observe_axis_echo");
         const auto path=std::filesystem::absolute(argv[1]);
-        LockedFixture source(path.c_str(),cff2Control); Environment env(source,path.c_str());
+        LockedFixture source(path.c_str(),cff2Control); Environment env(source,path.c_str(),observeEcho);
         OSVERSIONINFOEXW version{}; version.dwOSVersionInfoSize=sizeof(version);
         using VersionFn=LONG (WINAPI*)(OSVERSIONINFOW*);
         auto versionFn=reinterpret_cast<VersionFn>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"),"RtlGetVersion"));
         require(versionFn && versionFn(reinterpret_cast<OSVERSIONINFOW*>(&version))==0,"cannot_observe_Windows_version");
         std::cout << "{\"type\":\"metadata\",\"backend\":\"DirectWrite_TextLayout4_TextRenderer1\",\"source_sha256\":" << quoted(source.digest)
             << ",\"authored_outline_kind\":" << quoted(cff2Control ? "CFF2" : "TrueType")
+            << ",\"axis_echo_policy\":" << quoted(observeEcho ? "OBSERVE_RAW_FAILURES" : "STRICT")
             << ",\"source_bytes\":" << source.bytes.size() << ",\"physical_face_count\":1,\"glyph_count\":8,\"units_per_em\":1000,\"font_em_size_DIP\":1000"
             << ",\"font_family\":\"Swirl Original GPOS Laboratory\",\"custom_collection_only\":true,\"empty_fallback\":true,\"pixel_snapping_disabled\":true"
             << ",\"Windows_version\":{\"major\":" << version.dwMajorVersion << ",\"minor\":" << version.dwMinorVersion << ",\"build\":" << version.dwBuildNumber
