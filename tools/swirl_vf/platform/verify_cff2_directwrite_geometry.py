@@ -126,7 +126,7 @@ def validate_instances(transcript, native, sources):
 
 
 
-def compare(row, source, *, repeats=1):
+def compare(row, source, *, repeats=1, nonlinear=False):
     if row.get('record') != 'outline' or row.get('coordinate_frame') != 'x_right_y_down_font_units':
         raise ValueError('native_outline_frame_not_proven')
     gid = row['glyph_id']; order = source.getGlyphOrder()
@@ -147,7 +147,8 @@ def compare(row, source, *, repeats=1):
     # Source fixture avar is identity. Fail if that premise ever changes.
     if 'avar' in source and any(x != y for mapping in source['avar'].segments.values() for x,y in mapping.items()):
         raise ValueError('authored_geometry_requires_identity_avar')
-    expected = geometry.operands(records(source,order[gid],[location],.25,repeat_contours=repeats)[0])
+    expected = geometry.operands(records(source,order[gid],[location],.25,
+        repeat_contours=repeats, nonlinear=nonlinear)[0])
     commands = []
     for command in row['commands']:
         values = list(command)
@@ -182,7 +183,8 @@ def verify(path, transcript, native, *, variant):
                 if key not in expected or key in seen or row['axes']!=instances[key[:2]]['requested']:
                     raise ValueError('duplicate_unrequested_or_mismatched_native_outline')
                 seen.add(key)
-                result=compare(row,original.fonts[key[0]],repeats=512 if variant=='flat_long' else 1)
+                result=compare(row,original.fonts[key[0]],repeats=512 if variant=='flat_long' else 1,
+                               nonlinear=variant=='adaptive')
                 report['observations']+=1;report['controls']+=result.get('controls',0)
                 report['max_control_error']=max(report['max_control_error'],result.get('max_control_error',0))
                 if not result['passed']:

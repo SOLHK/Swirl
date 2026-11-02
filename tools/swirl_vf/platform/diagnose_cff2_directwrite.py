@@ -30,7 +30,7 @@ VARIANTS = ('flat', 'flat_standalone', 'flat_stat', 'flat_fdselect',
             'flat_private_vsindex', 'flat_default_vsindex', 'flat_post3', 'factored', 'compact',
             'factored_sparse', 'nested_default', 'nested_delta', 'nested_delta_sparse',
             'flat_regions_64', 'flat_regions_192', 'flat_regions_506', 'flat_long',
-            'flat_subr_blend', 'nested_subr_blend')
+            'flat_subr_blend', 'nested_subr_blend', 'adaptive')
 
 
 def move_blend_operator_to_subroutine(top):
@@ -127,8 +127,9 @@ def generate(output):
             path = output / (variant + ('.otf' if variant == 'flat_standalone' else '.ttc'))
             if variant == 'flat_long':
                 write_fixture(path, repeat_contours=512)
-            elif variant in ('factored', 'compact'):
-                write_fixture(path, factored=variant == 'factored', compact=variant == 'compact')
+            elif variant in ('factored', 'compact', 'adaptive'):
+                write_fixture(path, factored=variant == 'factored', compact=variant == 'compact',
+                              adaptive=variant == 'adaptive')
             elif variant == 'factored_sparse':
                 with TTCollection(source, recalcTimestamp=False) as original:
                     collection = TTCollection(); collection.fonts = []
@@ -204,7 +205,7 @@ def run(output, binary):
             (output / 'matrix.json').write_text(json.dumps(report, indent=2))
         report['status'] = 'DIAGNOSIS_COMPLETE_NOT_ACCEPTANCE'
         report['ordinary_geometry_passed'] = all(row['geometry']['status']=='PASS_AUTHORED_GEOMETRY'
-            for row in report['cases'] if row['variant'].startswith('flat') or row['variant']=='compact')
+            for row in report['cases'] if row['variant'].startswith('flat') or row['variant'] in ('compact', 'adaptive'))
     except Exception as error:
         report['status'] = 'FAIL_EXECUTION'; report['error'] = str(error)
         raise

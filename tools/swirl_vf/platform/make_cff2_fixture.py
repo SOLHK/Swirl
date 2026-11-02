@@ -27,11 +27,19 @@ GRID = [dict(zip(TAGS, p)) for p in itertools.product((-1., 0., 1.), repeat=3)]
 HOLDOUTS = [dict(zip(TAGS, p)) for p in ((.25, -.5, .75), (.125, .375, -.625))]
 
 
-def records(font, name, locations, translation=0., *, repeat_contours=1):
+def records(font, name, locations, translation=0., *, repeat_contours=1, nonlinear=False):
     result = []
     for location in locations:
         glyph = font.getGlyphSet(location=location, normalized=True, recalcBounds=False)[name]
         commands = geometry.source_commands(glyph)
+        if nonlinear:
+            # Authored non-additive curvature: zero on each individual axis,
+            # nonzero when width, weight and height move together. The formula
+            # is evaluated directly from the source, never from fitted deltas.
+            x, y, z = (location.get(tag, 0.) for tag in TAGS)
+            for command in commands:
+                if command[0] == 'qCurveTo':
+                    command[2] += .11*x*x*y*y*z
         for command in commands:
             for index in range(1, len(command), 2):
                 command[index] += translation
@@ -39,10 +47,10 @@ def records(font, name, locations, translation=0., *, repeat_contours=1):
     return result
 
 
-def convert(font, translation=0., *, factored=False, compact=False, repeat_contours=1):
+def convert(font, translation=0., *, factored=False, compact=False, adaptive=False, repeat_contours=1):
     if type(repeat_contours) is not int or not 1 <= repeat_contours <= 1024:
         raise ValueError('invalid_authored_contour_repeat')
-    if factored and compact:
+    if sum((factored, compact, adaptive)) > 1:
         raise ValueError('choose_one_cff2_encoding')
     grid, held = GRID, HOLDOUTS
     if factored or compact:
@@ -53,6 +61,21 @@ def convert(font, translation=0., *, factored=False, compact=False, repeat_conto
         held = [dict(zip(TAGS, p)) for p in ((.17, -.31, .79), (-.77, .42, .57))]
     models = {}
     for name in font.getGlyphOrder():
+        if adaptive:
+            import numpy as np
+            from adaptive_cff2_geometry import fit_tensor
+            operators = geometry.operands(records(font, name, [{}], translation, nonlinear=True, repeat_contours=repeat_contours)[0])[0]
+            def evaluate(points):
+                commands = records(font, name, [dict(zip(TAGS, map(float, p))) for p in points],
+                    translation, repeat_contours=repeat_contours, nonlinear=True)
+                values = [geometry.operands(row) for row in commands]
+                if any(ops != operators for ops, _ in values):
+                    raise ValueError('authored_adaptive_topology_changed')
+                return np.asarray([v for _, v in values])
+            model = fit_tensor(evaluate, operators, TAGS,
+                np.random.default_rng(19277).uniform(-1, 1, (64, 3)))
+            models[name] = geometry.compact(model)
+            continue
         model = geometry.fit(records(font, name, grid, translation, repeat_contours=repeat_contours), grid,
                              records(font, name, held, translation, repeat_contours=repeat_contours), held, TAGS)
         models[name] = (geometry.factor(model) if factored else
@@ -60,7 +83,7 @@ def convert(font, translation=0., *, factored=False, compact=False, repeat_conto
     return geometry.install(prepare_from_truetype(font), models), models
 
 
-def write_fixture(path, *, factored=False, compact=False, repeat_contours=1):
+def write_fixture(path, *, factored=False, compact=False, adaptive=False, repeat_contours=1):
     path = Path(path)
     if path.exists() or path.is_symlink():
         raise ValueError('fresh_authored_cff2_output_required')
@@ -69,7 +92,7 @@ def write_fixture(path, *, factored=False, compact=False, repeat_contours=1):
         source = Path(tmp) / 'authored-source.ttc'; make_fixture(source)
         with TTCollection(source) as original:
             conversions = [convert(font, .25, factored=factored, compact=compact,
-                                   repeat_contours=repeat_contours)
+                                   adaptive=adaptive, repeat_contours=repeat_contours)
                            for font in original.fonts]
             result = TTCollection(); result.fonts = [font for font, _ in conversions]
             output = Path(tmp) / 'authored-cff2.ttc'; result.save(output)
@@ -83,6 +106,7 @@ def write_fixture(path, *, factored=False, compact=False, repeat_contours=1):
             'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
             'bytes': path.stat().st_size, 'faces': 2, 'glyphs_per_face': 3,
             'axes': list(TAGS), 'factored_blends': factored, 'compact_blends': compact,
+            'adaptive_three_axis_blends': adaptive,
             'repeat_contours': repeat_contours, 'production_accepted': False}
 
 
@@ -92,5 +116,7 @@ if __name__ == '__main__':
     encoding = parser.add_mutually_exclusive_group()
     encoding.add_argument('--factored', action='store_true')
     encoding.add_argument('--compact', action='store_true')
+    encoding.add_argument('--adaptive', action='store_true')
     args = parser.parse_args()
-    print(json.dumps(write_fixture(args.output, factored=args.factored, compact=args.compact), indent=2))
+    print(json.dumps(write_fixture(args.output, factored=args.factored, compact=args.compact,
+                                  adaptive=args.adaptive), indent=2))
