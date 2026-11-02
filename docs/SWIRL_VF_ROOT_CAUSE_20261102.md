@@ -199,3 +199,86 @@ directory outside this checkout, currently absent.
 Development branch: `work/swirlvf-delivery-20261102`; PR 49 remains draft.
 `test` is unchanged. This report and the completed source-extraction corpus
 are engineering progress, not a substitute for the missing formal font.
+
+## Architecture continuation after c824c2ee
+
+Status remains **PARTIAL / BLOCKED**, with no accepted `SwirlVF.ttc`.
+The original input hash is unchanged. The current continuation implements a
+fractional CFF2 geometry backend, an explicit CFF2 vertical-metric bridge and
+additional native gates. The existing TrueType builder, source-identity checks,
+axis validator, 1/32 precision assertions and failing legacy fixture remain.
+The aggregate receipt is
+[SWIRL_VF_CFF2_ARCHITECTURE_20261102.json](evidence/SWIRL_VF_CFF2_ARCHITECTURE_20261102.json).
+
+The 100-unit origin mismatch has two distinct contracts. In the same horizontal
+coordinate frame, DirectWrite defines the vertical origin X as half the current
+horizontal advance. For a source gap `d = Xsource - Asource/2`, simultaneous
+errors of at most epsilon in both raw quantities require
+`abs(d) <= epsilon + epsilon/2`. A 100-unit gap exceeds that bound at epsilon
+1/32. This is a limitation of equality through that raw API, not proof that a
+complete OpenType layout cannot represent the desired visual position.
+[DWRITE_GLYPH_METRICS](https://learn.microsoft.com/en-us/windows/win32/api/dwrite/ns-dwrite-dwrite_glyph_metrics)
+documents the coordinate convention.
+
+Real CoreText layout controls now include 2,016 calls, 1,008 paired layouts
+and 1,764 glyph comparisons. Variable GPOS can compensate the independent
+visual X origin in these authored TrueType controls. Raw metrics do not change.
+A second experiment shifts points while holding the bearing fixed: the engine
+normalizes away the shift. Shifting the bearing as well moves the horizontal
+outline without changing the vertical origin. Neither result is an all-engine
+acceptance or a repair to the original strict builder.
+
+`cff2_geometry.py` retains fractional default points and residuals in CFF2
+16.16 operands and elevates quadratic curves exactly to cubic curves. Models
+must pass independent holdouts at the unchanged 1/32 limit, and assembly
+requires every original GID. Failed models cannot be assembled. A second
+encoder factors multi-axis regions into nested blends: an authored 729-master
+function can be serialized without putting 728 delta operands onto a single
+CFF2 stack. Factoring preserves the fitted function; it does not improve an
+inaccurate fit. CFF2 explicitly permits repeated blending for higher-order
+interpolation in its
+[advanced blend rules](https://learn.microsoft.com/en-us/typography/opentype/spec/cff2#advanced-uses-of-blend).
+
+The strict CoreText extractor now proves a zero-length CFF2 CharString by
+parsing the table header, TopDICT reference, INDEX count and bounded monotonic
+offsets. Nonempty programs and malformed inputs receive no empty-glyph
+exemption. All 28 native Swift structural tests pass. The diagnostic harness
+source fingerprint was updated only after reviewing this change; constructors,
+axis checks, identity verification and glyph measurement code were verified
+byte-identical to c824c2ee. No test tolerance or expected metric was changed.
+
+Actual local measurements on macOS 26.5.1, fontTools 4.61.1 and HarfBuzz 14.6.0:
+
+| Scope | Result |
+| --- | --- |
+| Python regression | 919 tests, zero failures, seven platform skips; six audits pass |
+| Authored CFF2 flat and factored collections | Both load as two faces with three GIDs and all three original axis tags |
+| CoreText geometry | 348 successful records, zero geometry failures; maximum cubic control error 0.00180813 FUnit |
+| CoreText CFF2 VORG/VVAR Y origin | Maximum error 0.000527344 FUnit |
+| CoreText CFF2 raw X origin with VORG | Uses default width in this control; error up to 70 FUnits against current half-advance |
+| CoreText vertical advance | Fractional error 0.3375 FUnit remains; 8x and 14x physical-preserving controls still fail at 0.0875 and 0.0517858 |
+| HarfBuzz raw metrics | Advance-width error 0.216594 and advance-height error 0.3375 FUnit remain in the unscaled controls |
+| CFF2 strict native gate | FAIL: 68 raw metric failures per encoder; every failure retained |
+| Real HVGL GID 0 | 125-point fit with 64 independent holdouts: maximum control error 0.0122735; finite geometry evidence only |
+| Real HVGL GID 1166 / 19177 | 729-point fits still fail at 5.126612 / 1.894212 FUnits over the same 64 holdouts |
+
+The two worst real-source holdouts were executed again through Apple's native
+HVF library. Portable extraction matches native cubic-equivalent controls to
+2.43e-13 and 3.42e-13 FUnit respectively, with the same topology. The remaining
+large errors therefore arise in these interpolation models, not in those source
+observations. Selected successful finite samples are not complete GID coverage
+or a continuous-space proof.
+
+VORG presence also changes CoreText behavior: removing VORG and supplying the
+appropriate authored VVAR side-bearing maps restores the current half-advance
+X origin and accurate Y origin. Fractional vertical advance still fails. This
+experiment rules out treating a different table choice alone as a complete fix.
+
+The workflow now executes the CFF2 strict native gate and loads/renders the
+factored CFF2 control through real Windows DirectWrite. Those controls are
+generated from repository-authored shapes and contain no original font data.
+Windows CI is still distinct from Windows 11 hardware, installation and final
+font acceptance. No new final-font Qt result exists. Production coverage stays
+0/32 accepted faces. Grant documents remain unavailable for scope verification;
+no font binary, native original outlines or private authorization material is
+included in this continuation. Merge to `test` remains blocked.

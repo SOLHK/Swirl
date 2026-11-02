@@ -117,6 +117,10 @@ jobs:
         if: always()
         run: |
           python tools/swirl_vf/platform/test_native_table_metrics.py --output build/swirl-vf-evidence/native-table-metrics --binary "$PWD/build/swirl-vf-evidence/coretext/coretext_extract" --require-native
+      - name: Validate fractional CFF2 outlines, factored blends and strict raw metrics
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/test_coretext_cff2.py --output build/swirl-vf-evidence/cff2-native
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -163,6 +167,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Exact metric fixture generation failed' }
           ./tools/swirl_vf/platform/run_directwrite_probe.ps1 -Font build/synthetic-metric-axes.ttc -OutputDirectory build/swirl-vf-evidence/directwrite-metrics -AllGlyphs -Render -Binary build/swirl-vf-evidence/directwrite/build/Release/directwrite_probe.exe
           if ($LASTEXITCODE -ne 0) { throw 'Production metric-table native probe failed' }
+      - name: Load and render fractional CFF2 collection with factored three-axis blends
+        run: |
+          python tools/swirl_vf/platform/make_cff2_fixture.py build/authored-cff2-factored.ttc --factored
+          if ($LASTEXITCODE -ne 0) { throw 'Authored CFF2 fixture generation failed' }
+          ./tools/swirl_vf/platform/run_directwrite_probe.ps1 -Font build/authored-cff2-factored.ttc -OutputDirectory build/swirl-vf-evidence/directwrite-cff2 -AllGlyphs -Render -Binary build/swirl-vf-evidence/directwrite/build/Release/directwrite_probe.exe
+          if ($LASTEXITCODE -ne 0) { throw 'CFF2 native DirectWrite probe failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -176,4 +186,8 @@ jobs:
             build/swirl-vf-evidence/directwrite-metrics/*.jsonl
             build/swirl-vf-evidence/directwrite-metrics/*.log
             build/swirl-vf-evidence/directwrite-metrics/*.png
+            build/swirl-vf-evidence/directwrite-cff2/*.json
+            build/swirl-vf-evidence/directwrite-cff2/*.jsonl
+            build/swirl-vf-evidence/directwrite-cff2/*.log
+            build/swirl-vf-evidence/directwrite-cff2/*.png
           retention-days: 7
