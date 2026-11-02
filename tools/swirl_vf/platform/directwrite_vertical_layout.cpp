@@ -102,10 +102,11 @@ static void verifyAxes(const std::vector<DWRITE_FONT_AXIS_VALUE>& actual,
 // identities to the same physical input. Keys and raw table bytes stay private.
 struct LockedFixture {
     HANDLE handle = INVALID_HANDLE_VALUE;
+    bool cff2Control = false;
     std::vector<uint8_t> bytes;
     std::map<UINT32,std::pair<UINT32,UINT32>> tables;
     std::string digest;
-    explicit LockedFixture(const wchar_t* path, bool cff2Control=false) {
+    explicit LockedFixture(const wchar_t* path, bool isCFF2Control=false) : cff2Control(isCFF2Control) {
         handle = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
         require(handle != INVALID_HANDLE_VALUE, "cannot_lock_fixture");
         try {
@@ -210,7 +211,8 @@ struct Environment {
         checked(factory->CreateFontFileReference(path,nullptr,file.GetAddressOf()),"CreateFontFileReference");
         BOOL supported=FALSE; DWRITE_FONT_FILE_TYPE fileType{}; DWRITE_FONT_FACE_TYPE faceType{}; UINT32 faces=0;
         checked(file->Analyze(&supported,&fileType,&faceType,&faces),"Analyze");
-        require(supported && faces==1 && faceType==DWRITE_FONT_FACE_TYPE_TRUETYPE,"single_supported_TrueType_face_required");
+        const auto expectedFace=source.cff2Control ? DWRITE_FONT_FACE_TYPE_CFF : DWRITE_FONT_FACE_TYPE_TRUETYPE;
+        require(supported && faces==1 && faceType==expectedFace,"single_supported_authored_face_type_required");
         const void* key=nullptr; UINT32 size=0;
         checked(file->GetReferenceKey(&key,&size),"GetReferenceKey");
         require(key && size,"empty_reference_key");
@@ -231,7 +233,8 @@ struct Environment {
         checked(fallbackBuilder->CreateFontFallback(noFallback.GetAddressOf()),"CreateEmptyFontFallback");
     }
     std::vector<DWRITE_FONT_AXIS_VALUE> verifyFace(IDWriteFontFace* face,const Request& request) const {
-        require(face && face->GetIndex()==0 && face->GetGlyphCount()==8 && face->GetSimulations()==DWRITE_FONT_SIMULATIONS_NONE,
+        require(face && face->GetType()==(source.cff2Control ? DWRITE_FONT_FACE_TYPE_CFF : DWRITE_FONT_FACE_TYPE_TRUETYPE)
+                && face->GetIndex()==0 && face->GetGlyphCount()==8 && face->GetSimulations()==DWRITE_FONT_SIMULATIONS_NONE,
                 "wrong_physical_face_or_font_simulation");
         UINT32 count=0; checked(face->GetFiles(&count,nullptr),"GetFiles(count)"); require(count==1,"layout_face_file_count_mismatch");
         ComPtr<IDWriteFontFile> actualFile;
@@ -408,6 +411,7 @@ int wmain(int argc,wchar_t** argv) {
         auto versionFn=reinterpret_cast<VersionFn>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"),"RtlGetVersion"));
         require(versionFn && versionFn(reinterpret_cast<OSVERSIONINFOW*>(&version))==0,"cannot_observe_Windows_version");
         std::cout << "{\"type\":\"metadata\",\"backend\":\"DirectWrite_TextLayout4_TextRenderer1\",\"source_sha256\":" << quoted(source.digest)
+            << ",\"authored_outline_kind\":" << quoted(cff2Control ? "CFF2" : "TrueType")
             << ",\"source_bytes\":" << source.bytes.size() << ",\"physical_face_count\":1,\"glyph_count\":8,\"units_per_em\":1000,\"font_em_size_DIP\":1000"
             << ",\"font_family\":\"Swirl Original GPOS Laboratory\",\"custom_collection_only\":true,\"empty_fallback\":true,\"pixel_snapping_disabled\":true"
             << ",\"Windows_version\":{\"major\":" << version.dwMajorVersion << ",\"minor\":" << version.dwMinorVersion << ",\"build\":" << version.dwBuildNumber

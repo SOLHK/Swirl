@@ -104,14 +104,25 @@ def run(output,native,binary=None):
                 'absent_tables':['glyf','gvar','loca','GPOS','GDEF'],'requests':requests}
             manifest=output/f'{name}.json';manifest.write_text(json.dumps(config))
             process=subprocess.run([str(binary),str(manifest)],capture_output=True,text=True,timeout=300)
+            (output/f'{name}.jsonl').write_text(process.stdout);(output/f'{name}.stderr.log').write_text(process.stderr)
             rows=[json.loads(line) for line in process.stdout.splitlines()]
             records=[r for r in rows if r.get('type')=='observation']
             ct.require_registration_cleanup([r for r in rows if r.get('type')=='fixture_registration_cleanup'],config['font_sha256'])
         else:
             process=subprocess.run([str(binary),str(path),'--authored-cff2'],input=''.join(dw.request_line(r) for r in requests),
                 capture_output=True,text=True,timeout=300)
-            records=dw.parse_transcript(process.stdout,requests,blob,process.returncode)['records']
-        (output/f'{name}.jsonl').write_text(process.stdout);(output/f'{name}.stderr.log').write_text(process.stderr)
+            (output/f'{name}.jsonl').write_text(process.stdout);(output/f'{name}.stderr.log').write_text(process.stderr)
+            try:
+                parsed=dw.parse_transcript(process.stdout,requests,blob,process.returncode)
+                fixture.require(parsed['metadata'].get('authored_outline_kind')=='CFF2',
+                                'outline_origin_native_CFF2_type_not_verified')
+                records=parsed['records']
+            except ValueError as error:
+                result.update(status='FAIL_NATIVE_EXECUTION',native_failure=str(error))
+                result['processes'].append({'variant':name,'sha256':hashlib.sha256(blob).hexdigest(),
+                    'exit_code':process.returncode,'stdout_sha256':hashlib.sha256(process.stdout.encode()).hexdigest()})
+                (output/'report.json').write_text(json.dumps(result,indent=2))
+                raise
         fixture.require(process.returncode==0 and len(records)==len(requests),'outline_origin_native_incomplete')
         result['processes'].append({'variant':name,'sha256':hashlib.sha256(blob).hexdigest(),
                                     'exit_code':process.returncode,'observations':len(records)})
