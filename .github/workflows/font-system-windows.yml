@@ -2,7 +2,7 @@ name: Font system Windows Qt 6.12.0
 
 on:
   push:
-    branches: [work/core-completion-20261017, work/swirlvf-delivery-20261102, test]
+    branches: [work/core-completion-20261017, work/swirlvf-delivery-20261102, work/swirlvf-recovery-20261102, test]
     paths:
       - '.github/workflows/font-system-windows.yml'
       - 'src/Swirl.Quick/CMakeLists.txt'
@@ -54,10 +54,10 @@ jobs:
     if: >-
       !github.event.repository.private &&
       ((github.event_name != 'pull_request' &&
-        contains(fromJSON('["refs/heads/work/core-completion-20261017","refs/heads/work/swirlvf-delivery-20261102","refs/heads/test"]'), github.ref)) ||
+        contains(fromJSON('["refs/heads/work/core-completion-20261017","refs/heads/work/swirlvf-delivery-20261102","refs/heads/work/swirlvf-recovery-20261102","refs/heads/test"]'), github.ref)) ||
        (github.event_name == 'pull_request' && github.base_ref == 'test' &&
         github.event.pull_request.head.repo.full_name == github.repository &&
-        contains(fromJSON('["work/core-completion-20261017","work/swirlvf-delivery-20261102"]'), github.head_ref)))
+        contains(fromJSON('["work/core-completion-20261017","work/swirlvf-delivery-20261102","work/swirlvf-recovery-20261102"]'), github.head_ref)))
     runs-on: windows-2022
     timeout-minutes: 40
     env:
