@@ -290,11 +290,16 @@ jobs:
           # Run affected UI checks before packaging. The remaining registered suite
           # runs after the test installer is uploaded; these names are excluded there
           # so a required check is never repeated just to change stage ordering.
-          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(appearance-ui|node-ui|engine-ui|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui)$" --output-on-failure --no-tests=error --output-junit $criticalUiJunit
+          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(appearance-ui|node-ui|engine-ui|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|policy-ui)$" --output-on-failure --no-tests=error --output-junit $criticalUiJunit
           if ($LASTEXITCODE -ne 0) {
             Get-Content build/swirl-quick/engine-contract.txt, build/swirl-quick/engine-real.txt -ErrorAction SilentlyContinue
             throw "Critical UI checks failed"
           }
+          # Keep the original full-application policy driver and its 120ms
+          # assertion before packaging; a standalone QML pass cannot replace it.
+          [xml]$criticalUiReport = Get-Content -LiteralPath $criticalUiJunit -Raw
+          $policyCases = @($criticalUiReport.SelectNodes('//testcase[@name="swirl-policy-ui"]'))
+          if ($policyCases.Count -ne 1 -or $policyCases[0].status -ne 'run' -or $policyCases[0].SelectNodes('failure|error|skipped').Count -ne 0) { throw 'The full-application policy regression must actually pass before packaging.' }
           if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') {
             ctest --test-dir build/swirl-quick -C Release -R "^swirl-(system-proxy-state|system-proxy-recovery|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network)$" --output-on-failure --no-tests=error --output-junit $criticalNetworkJunit
             if ($LASTEXITCODE -ne 0) { throw "Critical network/security checks failed ($LASTEXITCODE)." }
@@ -311,7 +316,7 @@ jobs:
                 $pac = @($report.SelectNodes('/TestCase/TestFunction[@name="takeoverRestoresPacAndCustomBypass"]/Incident[@type="pass"]/DataTag'))
                 $tags = @($pac | ForEach-Object { $_.InnerText })
                 if ($tags.Count -ne 2 -or 'pac-only' -notin $tags -or 'manual-and-pac' -notin $tags) { throw 'Both PAC/bypass restore cases must actually run.' }
-                foreach ($required in @('abruptOwnerExit','abruptEngineExit','registryOnlyExternalEdit','restoreDistinctStoresAndAbsentValues')) {
+                foreach ($required in @('abruptOwnerExit','abruptEngineExit','registryOnlyExternalEdit','restoreDistinctStoresAndAbsentValues','takeoverUsesActualRustCoreListenerAndRestoresExactly')) {
                   if ($null -eq $report.SelectSingleNode("/TestCase/TestFunction[@name='$required']/Incident[@type='pass']")) { throw "Required native proxy recovery case did not pass: $required" }
                 }
               }
@@ -647,6 +652,17 @@ jobs:
           $scope = if ($env:SWIRL_CI_UI_ONLY -eq 'true') { 'ui-only' } else { 'full' }
           $networkRegression = if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') { 'passed' } else { 'not-run-ui-only' }
           [ordered]@{source_sha=$env:GITHUB_SHA;version=$appVersion;qt=$env:SWIRL_QT_VERSION;installer_sha256=(Get-FileHash -LiteralPath 'out/Swirl-Setup.exe' -Algorithm SHA256).Hash.ToLowerInvariant();regression_scope=$scope;critical_ui_tests='passed';network_regression=$networkRegression;scoped_full_regression='pending';desktop_dpi_acceptance='manual';physical_refresh_rate_acceptance='unverified'} | ConvertTo-Json | Set-Content -LiteralPath out/delivery.json -Encoding utf8
+      - name: Verify actual production installer lifecycle in an isolated runner directory
+        shell: pwsh
+        env:
+          SWIRL_DISPOSABLE_INSTALL_TEST: '1'
+        run: |
+          ./scripts/tests/Test-WindowsProductionInstaller.ps1 -Installer out/Swirl-Setup.exe -PackageDirectory installer-bin -ExpectedSourceSha $env:GITHUB_SHA -EvidenceDirectory build-evidence/installer-lifecycle
+          $lifecycle = Get-Content -LiteralPath 'build-evidence/installer-lifecycle/lifecycle.json' -Raw | ConvertFrom-Json
+          if (-not $lifecycle.success -or $lifecycle.source_sha -cne $env:GITHUB_SHA) { throw 'Actual production installer lifecycle evidence is incomplete.' }
+          $delivery = Get-Content -LiteralPath out/delivery.json -Raw | ConvertFrom-Json
+          $delivery | Add-Member -NotePropertyName isolated_installer_lifecycle -NotePropertyValue 'passed' -Force
+          $delivery | ConvertTo-Json | Set-Content -LiteralPath out/delivery.json -Encoding utf8
       - name: Upload critical-test Windows installer
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -664,7 +680,7 @@ jobs:
             Remove-Item -LiteralPath 'build/swirl-quick/activity-layout/activity-layout-report.json' -ErrorAction SilentlyContinue
             # Critical tests have already passed before packaging. Exclude only
             # those exact tests here to avoid paying for a second execution.
-            $excludedTests = 'appearance-ui|node-ui|engine-ui|overview-input|all-pages|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|capture-network'
+            $excludedTests = 'appearance-ui|node-ui|engine-ui|overview-input|all-pages|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|policy-ui|capture-network'
             if ($env:SWIRL_CI_UI_ONLY -eq 'true') {
               # UI-only changes still run all parser, policy, storage, and local
               # regressions; skip only suites whose purpose is network/TLS traffic.

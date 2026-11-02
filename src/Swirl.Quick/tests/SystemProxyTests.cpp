@@ -1,4 +1,6 @@
 #include "engine/SystemProxySession.h"
+#include "engine/RustCoreEngine.h"
+#include "network/HttpRequestPolicy.h"
 #include <QCoreApplication>
 #include <QTest>
 #include <QTemporaryDir>
@@ -12,6 +14,12 @@
 #include <QSignalSpy>
 #include <QDir>
 #include <QScopeGuard>
+#include <QJsonArray>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkProxy>
+#include <QNetworkRequest>
+#include <QTcpSocket>
 #ifdef Q_OS_WIN
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -124,6 +132,100 @@ private slots:
         // registry types and exact bytes of all four stored registry values.
         QVERIFY2(SystemProxySession::snapshot()==fixture,"Releasing Swirl did not restore the original PAC/bypass configuration exactly.");
         QTRY_VERIFY_WITH_TIMEOUT(!QFile::exists(journal)&&QDir(temp.path()).entryList({"*.ready"},QDir::Files).isEmpty(),5000);
+    }
+    void takeoverUsesActualRustCoreListenerAndRestoresExactly() {
+        const auto original=SystemProxySession::snapshot();QVERIFY(!original.isEmpty());
+        const auto restore=qScopeGuard([&] {
+            // This native suite only runs on explicitly opted-in disposable
+            // runners. Restore their exact snapshot even after an early failure.
+            if(!SystemProxySession::apply(original)||SystemProxySession::snapshot()!=original)
+                QTest::qFail("Could not restore the disposable runner's original proxy configuration.",__FILE__,__LINE__);
+        });
+        QTemporaryDir temp;QVERIFY(temp.isValid());
+        int originRequests=0;
+        const QByteArray body("native-system-proxy-rust-v2");
+        QTcpServer origin;origin.setProxy(QNetworkProxy::NoProxy);
+        QVERIFY(origin.listen(QHostAddress::LocalHost));
+        QObject::connect(&origin,&QTcpServer::newConnection,&origin,[&] {
+            while(auto *socket=origin.nextPendingConnection()) {
+                QObject::connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+                QObject::connect(socket,&QTcpSocket::readyRead,socket,[&,socket] {
+                    const auto request=socket->property("request").toByteArray()+socket->readAll();
+                    if(request.size()>16384){socket->abort();return;}
+                    socket->setProperty("request",request);
+                    if(!request.contains("\r\n\r\n")||socket->property("answered").toBool())return;
+                    socket->setProperty("answered",true);
+                    if(!request.startsWith("GET /native-rust-proxy HTTP/1.1\r\n")){socket->abort();return;}
+                    ++originRequests;
+                    socket->write("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: "+QByteArray::number(body.size())+"\r\n\r\n"+body);
+                    socket->disconnectFromHost();
+                });
+            }
+        });
+        QTcpServer reservation;reservation.setProxy(QNetworkProxy::NoProxy);
+        QVERIFY(reservation.listen(QHostAddress::LocalHost));
+        const auto requestedPort=reservation.serverPort();reservation.close();
+        EngineStartOptions options;options.proxyPort=requestedPort;
+        options.policyDocument={{"schema",2},{"mode","direct"},
+            {"default_policy",QJsonObject{{"id","policy:default"},{"target",QJsonObject{{"kind","unconfigured"}}}}},
+            {"service_policies",QJsonArray{}},{"groups",QJsonArray{}},{"explicit_direct_rules",QJsonArray{}},
+            {"custom_rules",QJsonArray{}},{"missing_targets",QJsonArray{}}};
+        options.configurationStoreId="40000000-0000-4000-8000-000000000071";
+        options.configurationRevision="1";options.configurationRequestId="50000000-0000-4000-8000-000000000071";
+        RustCoreEngine engine;engine.start(options);
+        QVERIFY2(engine.status().apiHealthy,qPrintable(engine.status().message));
+        QCOMPARE(engine.status().controlEndpoint,QStringLiteral("in-process://SwirlRust/v2"));
+        QCOMPARE(engine.status().proxyPort,int(requestedPort));
+        const auto journal=temp.filePath("native-rust.dpapi");SystemProxySession proxy(nullptr,journal);
+        QVERIFY(proxy.requestEnable(engine.status().proxyPort,engine.status().processId));
+        QTRY_VERIFY_WITH_TIMEOUT(!proxy.busy(),5000);
+        QVERIFY2(proxy.owned()&&proxy.enabled(),qPrintable(proxy.error()));
+        // Derive the endpoint from the actual native readback, then use that
+        // endpoint for both wire protocols. The reserved proxy port has no Qt
+        // listener: only the production Rust DLL can serve these requests.
+        const auto owned=SystemProxySession::snapshot();
+        const auto address=owned.value("server").toString();
+        QVERIFY2(address==QStringLiteral("127.0.0.1:%1").arg(requestedPort),"Native proxy does not reference the real Rust listener; raw settings omitted.");
+        QCOMPARE(owned.value("flags").toInt(),3);
+        QSettings internet(QStringLiteral("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"),QSettings::NativeFormat);
+        internet.sync();
+        QCOMPARE(internet.value("ProxyEnable").toInt(),1);
+        QVERIFY2(internet.value("ProxyServer").toString()==address,"Native and registry listener identities differ; raw settings omitted.");
+        const auto endpoint=QUrl(QStringLiteral("http://")+address);
+        QVERIFY(endpoint.isValid());QCOMPARE(endpoint.host(),QStringLiteral("127.0.0.1"));
+        QCOMPARE(endpoint.port(),engine.status().proxyPort);
+        const auto url=QUrl(QStringLiteral("http://127.0.0.1:%1/native-rust-proxy").arg(origin.serverPort()));
+        for(const auto type:{QNetworkProxy::HttpProxy,QNetworkProxy::Socks5Proxy}) {
+            QNetworkAccessManager client;
+            // Explicitly use the observed native endpoint because a loopback
+            // fixture is intentionally covered by Windows's local bypass list.
+            client.setProxy(QNetworkProxy(type,endpoint.host(),quint16(endpoint.port())));
+            QNetworkRequest request(url);SwirlNetwork::applyHttp1OnlyPolicy(request);
+            request.setTransferTimeout(4000);request.setRawHeader("Connection","close");
+            auto *reply=client.get(request);
+            QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);
+            QCOMPARE(reply->error(),QNetworkReply::NoError);
+            QCOMPARE(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt(),200);
+            QCOMPARE(reply->readAll(),body);
+        }
+        QCOMPARE(originRequests,2);
+        QVERIFY(QTest::qWaitFor([&] {
+            engine.refresh();const auto connections=engine.status().connections;
+            if(connections.size()!=2)return false;
+            for(const auto &entry:connections)if(!entry.toMap().value("closed").toBool())return false;
+            return true;
+        },5000));
+        QVERIFY(engine.status().rustAccepted>=2);QCOMPARE(engine.status().rustFailed,0);
+        QVERIFY(engine.status().uploadTotal>0);QVERIFY(engine.status().downloadTotal>0);
+        QString error;const auto winHttpDuring=winHttpDefaultSnapshot(&error);
+        QVERIFY2(!winHttpDuring.isEmpty(),qPrintable(error));
+        QVERIFY2(winHttpDuring==m_winHttpBefore,"The real Rust proxy takeover changed machine-wide WinHTTP settings.");
+        proxy.disable();QTRY_VERIFY_WITH_TIMEOUT(!proxy.busy()&&!proxy.owned(),5000);
+        QVERIFY2(SystemProxySession::snapshot()==original,"The real Rust session did not restore the exact original settings; raw settings omitted.");
+        QTRY_VERIFY_WITH_TIMEOUT(!QFile::exists(journal)&&QDir(temp.path()).entryList({"*.ready"},QDir::Files).isEmpty(),5000);
+        engine.stop();QVERIFY(!engine.status().processAlive);
+        QTcpServer released;released.setProxy(QNetworkProxy::NoProxy);
+        QVERIFY2(released.listen(QHostAddress::LocalHost,requestedPort),"The real Rust proxy listener was not released.");
     }
     void lateAcknowledgementFromReleasedGuardCannotReplaceTheNextSession() {
         const auto original=SystemProxySession::snapshot();QVERIFY(!original.isEmpty());

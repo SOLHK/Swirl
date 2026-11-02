@@ -1,0 +1,38 @@
+{
+  "http": {
+    "status": 200,
+    "body_sha256": "43878098af4f84657acbb8202d8e3dc0fa5de67b2728cc6d741d9cfe4585cebb"
+  },
+  "socks5": {
+    "status": 200,
+    "body_sha256": "43878098af4f84657acbb8202d8e3dc0fa5de67b2728cc6d741d9cfe4585cebb"
+  },
+  "status": "PASS",
+  "origin_requests": 2,
+  "final_counters": {
+    "active": 0,
+    "accepted": 2,
+    "failed": 0,
+    "upload": 154,
+    "download": 170
+  },
+  "listener_released": true,
+  "policy": {
+    "schema": 2,
+    "mode": "direct",
+    "default_policy": {
+      "id": "policy:default",
+      "target": {
+        "kind": "unconfigured"
+      }
+    },
+    "service_policies": [],
+    "groups": [],
+    "explicit_direct_rules": [],
+    "custom_rules": [],
+    "missing_targets": []
+  },
+  "source_core_tree": "f4dbcd2bd4c565f92c0aae836fa7504fcd43efde",
+  "binary_sha256": "5cc28d77b90e86863f2dbdad90e403fce2200be47eed2111124df39f918f76f3",
+  "scope": "Linux V2 control and wire protocols only; not WinINet, Qt bridge, or Windows native suite acceptance"
+}
