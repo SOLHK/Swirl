@@ -590,7 +590,11 @@ async fn session(
                         counters: counters.clone(),
                     },
                 );
-                let _ = swirl_protocol::reply(&mut inbound, request.kind, false).await;
+                let _ = timeout(
+                    limit,
+                    swirl_protocol::reply_failure(&mut inbound, request.kind, error),
+                )
+                .await;
                 return Err(error);
             }
         };
@@ -633,7 +637,11 @@ async fn session(
     let mut upstream = match connected {
         Ok(s) => s,
         Err(e) => {
-            let _ = swirl_protocol::reply(&mut inbound, request.kind, false).await;
+            let _ = timeout(
+                limit,
+                swirl_protocol::reply_failure(&mut inbound, request.kind, e),
+            )
+            .await;
             return Err(e);
         }
     };

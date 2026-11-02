@@ -178,6 +178,27 @@ fn wait(mut predicate: impl FnMut() -> bool) {
     }
 }
 
+fn socks5_failure(address: SocketAddr, host: &str) -> Vec<u8> {
+    let mut client = StdStream::connect(address).unwrap();
+    client
+        .set_read_timeout(Some(Duration::from_secs(4)))
+        .unwrap();
+    client
+        .set_write_timeout(Some(Duration::from_secs(4)))
+        .unwrap();
+    client.write_all(&[5, 1, 0]).unwrap();
+    let mut method = [0; 2];
+    client.read_exact(&mut method).unwrap();
+    assert_eq!(method, [5, 0]);
+    let mut request = vec![5, 1, 0, 3, u8::try_from(host.len()).unwrap()];
+    request.extend_from_slice(host.as_bytes());
+    request.extend_from_slice(&443u16.to_be_bytes());
+    client.write_all(&request).unwrap();
+    let mut response = Vec::new();
+    client.read_to_end(&mut response).unwrap();
+    response
+}
+
 fn dns_peer(answers: Vec<IpAddr>, dual: bool) -> (SocketAddr, thread::JoinHandle<()>) {
     let dns = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
     let dns_address = dns.local_addr().unwrap();
@@ -419,22 +440,18 @@ fn pre_tunnel_route_and_dial_failures_return_protocol_replies() {
                 }
             );
         }
-        let mut client = StdStream::connect(core.address()).unwrap();
-        client
-            .set_read_timeout(Some(Duration::from_secs(4)))
-            .unwrap();
-        client.write_all(&[5, 1, 0]).unwrap();
-        let mut method = [0; 2];
-        client.read_exact(&mut method).unwrap();
-        assert_eq!(method, [5, 0]);
-        let host = b"target.fixture.invalid";
-        let mut request = vec![5, 1, 0, 3, host.len() as u8];
-        request.extend_from_slice(host);
-        request.extend_from_slice(&443u16.to_be_bytes());
-        client.write_all(&request).unwrap();
-        let mut response = Vec::new();
-        client.read_to_end(&mut response).unwrap();
-        assert_eq!(response, [5, 5, 0, 1, 0, 0, 0, 0, 0, 0]);
+        let response = socks5_failure(core.address(), "target.fixture.invalid");
+        // RFC 1928 section 6: policy denial is not a refused TCP connection.
+        // A timeout has no dedicated REP value and must not be reported as
+        // TTL expired or connection refused.
+        let expected_reply = if rejected {
+            2
+        } else if expected_dial_error == "UpstreamConnectionRefused" {
+            5
+        } else {
+            1
+        };
+        assert_eq!(response, [5, expected_reply, 0, 1, 0, 0, 0, 0, 0, 0]);
         wait(|| core.shared.active.load(Ordering::Acquire) == 0);
         assert_eq!(
             *core.shared.last_error.lock().unwrap(),
@@ -444,10 +461,144 @@ fn pre_tunnel_route_and_dial_failures_return_protocol_replies() {
                 expected_dial_error
             }
         );
+        assert_eq!(
+            socks5_failure(core.address(), "0.0.0.0"),
+            [5, 1, 0, 1, 0, 0, 0, 0, 0, 0],
+            "an invalid target is a general failure, not an unsupported address type"
+        );
+        wait(|| core.shared.active.load(Ordering::Acquire) == 0);
+        assert_eq!(*core.shared.last_error.lock().unwrap(), "InvalidTarget");
         core.stop();
     }
     assert_eq!(a.connections.load(Ordering::Acquire), 0);
     assert_eq!(b.connections.load(Ordering::Acquire), 0);
+}
+
+#[test]
+fn socks5_unsupported_address_type_replies_before_routing_and_closes() {
+    let a = Peer::new(b'A');
+    let b = Peer::new(b'B');
+    let mut core = Core::start(config(&a, &b, A, true), STORE.into(), 1, START.into()).unwrap();
+    for address_type in [2, 255] {
+        let mut client = StdStream::connect(core.address()).unwrap();
+        client
+            .set_read_timeout(Some(Duration::from_secs(4)))
+            .unwrap();
+        client
+            .set_write_timeout(Some(Duration::from_secs(4)))
+            .unwrap();
+        client.write_all(&[5, 1, 0]).unwrap();
+        let mut method = [0; 2];
+        client.read_exact(&mut method).unwrap();
+        assert_eq!(method, [5, 0]);
+        // No guessed address length or payload is needed after an explicitly
+        // unsupported ATYP. The server already knows the precise REP reason.
+        client.write_all(&[5, 1, 0, address_type]).unwrap();
+        let mut response = Vec::new();
+        client.read_to_end(&mut response).unwrap();
+        assert_eq!(response, [5, 8, 0, 1, 0, 0, 0, 0, 0, 0]);
+        wait(|| core.shared.active.load(Ordering::Acquire) == 0);
+        assert_eq!(*core.shared.last_error.lock().unwrap(), "AddressType");
+    }
+    assert_eq!(core.shared.failed.load(Ordering::Acquire), 2);
+    assert_eq!(a.connections.load(Ordering::Acquire), 0);
+    assert_eq!(b.connections.load(Ordering::Acquire), 0);
+    core.stop();
+}
+
+#[test]
+fn socks5_dns_without_addresses_reports_host_unreachable_and_never_uses_a_proxy() {
+    let (dns_address, dns_server) = dns_peer(vec![], false);
+    let a = Peer::new(b'A');
+    let b = Peer::new(b'B');
+    let mut candidate = config(&a, &b, A, true);
+    candidate.policy.mode = Mode::Direct;
+    candidate.dns = Dns {
+        servers: vec![dns_address],
+        use_system_hosts: false,
+        query_family: swirl_subscription::DnsQueryFamily::Ipv4Only,
+        ..Dns::default()
+    };
+    let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+    assert_eq!(
+        socks5_failure(core.address(), "missing.fixture.invalid"),
+        [5, 4, 0, 1, 0, 0, 0, 0, 0, 0]
+    );
+    wait(|| core.shared.active.load(Ordering::Acquire) == 0);
+    assert_eq!(*core.shared.last_error.lock().unwrap(), "DnsEmpty");
+    assert_eq!(core.shared.failed.load(Ordering::Acquire), 1);
+    dns_server.join().unwrap();
+    assert_eq!(a.connections.load(Ordering::Acquire), 0);
+    assert_eq!(b.connections.load(Ordering::Acquire), 0);
+    core.stop();
+}
+
+#[test]
+fn socks5_upstream_rejection_and_timeout_are_not_tcp_refusal_or_ttl_expiry() {
+    for rejected in [true, false] {
+        let listener = StdListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let peer = thread::spawn(move || {
+            let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+            runtime.block_on(async move {
+                timeout(Duration::from_secs(4), async move {
+                    let listener = TcpListener::from_std(listener).unwrap();
+                    let (mut stream, _) = listener.accept().await.unwrap();
+                    let mut request = Vec::new();
+                    while !request.ends_with(b"\r\n\r\n") {
+                        assert!(request.len() < 4096);
+                        request.push(stream.read_u8().await.unwrap());
+                    }
+                    assert_eq!(request, b"CONNECT target.fixture.invalid:443 HTTP/1.1\r\nHost: target.fixture.invalid:443\r\n\r\n");
+                    if rejected {
+                        // Neither this upstream challenge nor its body may be
+                        // copied to the inbound SOCKS client.
+                        stream.write_all(b"HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=\"fixture-private\"\r\nContent-Length: 7\r\n\r\nprivate").await.unwrap();
+                    } else {
+                        let mut payload = Vec::new();
+                        stream.read_to_end(&mut payload).await.unwrap();
+                        assert!(payload.is_empty());
+                    }
+                })
+                .await
+                .expect("upstream failure fixture exceeded its deadline");
+            });
+        });
+        let a = Peer::new(b'A');
+        let b = Peer::new(b'B');
+        let mut candidate = config(&a, &b, A, true);
+        if !rejected {
+            // Only the deliberately silent peer needs a short negative-test
+            // budget; a scheduled 407 response keeps the normal product limit.
+            candidate.limits.handshake_timeout_ms = 250;
+        }
+        candidate.nodes[0].outbound = Outbound::HttpConnect {
+            host: address.ip().to_string(),
+            port: address.port(),
+            auth: None,
+            tls: None,
+        };
+        let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+        assert_eq!(
+            socks5_failure(core.address(), "target.fixture.invalid"),
+            [5, 1, 0, 1, 0, 0, 0, 0, 0, 0]
+        );
+        wait(|| core.shared.active.load(Ordering::Acquire) == 0);
+        assert_eq!(
+            *core.shared.last_error.lock().unwrap(),
+            if rejected {
+                "UpstreamRejected"
+            } else {
+                "UpstreamProtocolTimeout"
+            }
+        );
+        assert_eq!(core.shared.failed.load(Ordering::Acquire), 1);
+        peer.join().unwrap();
+        assert_eq!(a.connections.load(Ordering::Acquire), 0);
+        assert_eq!(b.connections.load(Ordering::Acquire), 0);
+        core.stop();
+    }
 }
 
 #[test]

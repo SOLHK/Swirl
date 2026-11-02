@@ -404,15 +404,17 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  endif()
  # Read-only live observations and a unique temporary registry key only;
  # this does not opt in to changing the user's Internet Settings.
- add_test(NAME swirl-system-proxy-state COMMAND SwirlSystemProxyStateTests)
+ add_test(NAME swirl-system-proxy-state COMMAND SwirlSystemProxyStateTests
+  -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-system-proxy-state.xml,xml" -o -,txt)
  set_tests_properties(swirl-system-proxy-state PROPERTIES LABELS security TIMEOUT 30)
  if(WIN32)
   add_executable(SwirlSystemProxyTests tests/SystemProxyTests.cpp)
-  target_link_libraries(SwirlSystemProxyTests PRIVATE SwirlEngine Qt6::Test)
+  target_link_libraries(SwirlSystemProxyTests PRIVATE SwirlEngine Qt6::Test winhttp)
   add_dependencies(SwirlSystemProxyTests SwirlProxyGuard)
   # Explicit opt-in: normal CI and CTest never modify the runner's proxy.
   if(DEFINED ENV{SWIRL_SYSTEM_PROXY_TEST})
-   add_test(NAME swirl-system-proxy-recovery COMMAND SwirlSystemProxyTests)
+   add_test(NAME swirl-system-proxy-recovery COMMAND SwirlSystemProxyTests
+    -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-system-proxy-recovery.xml,xml" -o -,txt)
    set_tests_properties(swirl-system-proxy-recovery PROPERTIES RUN_SERIAL TRUE TIMEOUT 45 ENVIRONMENT "SWIRL_SYSTEM_PROXY_TEST=1")
   endif()
   add_executable(SwirlAcceptance tests/AcceptanceSession.cpp)

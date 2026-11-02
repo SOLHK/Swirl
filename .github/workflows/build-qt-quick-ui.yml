@@ -187,7 +187,7 @@ jobs:
           foreach ($directory in @('hero-evidence','navigation-evidence','settings-material-evidence','policy-evidence','activity-layout','liquid-glass-evidence')) {
             Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $directory) -Recurse -Force -ErrorAction SilentlyContinue
           }
-          foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt','connection-rows.xml','swirl-telemetry-accounting.xml')) {
+          foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt','connection-rows.xml','swirl-telemetry-accounting.xml','swirl-system-proxy-state.xml','swirl-system-proxy-recovery.xml')) {
             Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $file) -Force -ErrorAction SilentlyContinue
           }
           Get-ChildItem -Path 'build/swirl-quick/*-report.json','build/swirl-quick/activity-feather-*.png','build/swirl-quick/activity-data-*.png','build/swirl-quick/font-*.xml','build/swirl-quick/Release/Swirl-*.txt' -File -ErrorAction SilentlyContinue | Remove-Item -Force
@@ -298,6 +298,24 @@ jobs:
           if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') {
             ctest --test-dir build/swirl-quick -C Release -R "^swirl-(system-proxy-state|system-proxy-recovery|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network)$" --output-on-failure --no-tests=error --output-junit $criticalNetworkJunit
             if ($LASTEXITCODE -ne 0) { throw "Critical network/security checks failed ($LASTEXITCODE)." }
+            # A CTest suite-level pass must also have current native assertion
+            # evidence. Missing rows or platform skips do not meet this gate.
+            foreach ($suite in @('state','recovery')) {
+              $path = "build/swirl-quick/swirl-system-proxy-$suite.xml"
+              if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing native proxy assertions: $suite" }
+              [xml]$report = Get-Content -LiteralPath $path -Raw
+              $functions = @($report.SelectNodes('/TestCase/TestFunction'))
+              $incidents = @($report.SelectNodes('//Incident'))
+              if ($functions.Count -eq 0 -or $incidents.Count -eq 0 -or @($incidents | Where-Object { $_.type -ne 'pass' }).Count -gt 0) { throw "Native proxy $suite contains missing, skipped or failed assertions." }
+              if ($suite -eq 'recovery') {
+                $pac = @($report.SelectNodes('/TestCase/TestFunction[@name="takeoverRestoresPacAndCustomBypass"]/Incident[@type="pass"]/DataTag'))
+                $tags = @($pac | ForEach-Object { $_.InnerText })
+                if ($tags.Count -ne 2 -or 'pac-only' -notin $tags -or 'manual-and-pac' -notin $tags) { throw 'Both PAC/bypass restore cases must actually run.' }
+                foreach ($required in @('abruptOwnerExit','abruptEngineExit','registryOnlyExternalEdit','restoreDistinctStoresAndAbsentValues')) {
+                  if ($null -eq $report.SelectSingleNode("/TestCase/TestFunction[@name='$required']/Incident[@type='pass']")) { throw "Required native proxy recovery case did not pass: $required" }
+                }
+              }
+            }
           }
       - name: Overview input checks against deployed Qt runtime
         id: overview_input
@@ -783,11 +801,15 @@ jobs:
           path: |
             build/swirl-quick/Testing/Temporary/LastTest.log
             build-evidence/full-regression.xml
+            build-evidence/critical-ui.xml
+            build-evidence/critical-network.xml
             build-evidence/overview-input.log
             build-evidence/ctest-inventory.json
             build-evidence/activity-diagnostic-regression.xml
             build/swirl-quick/connection-rows.xml
             build/swirl-quick/swirl-telemetry-accounting.xml
+            build/swirl-quick/swirl-system-proxy-state.xml
+            build/swirl-quick/swirl-system-proxy-recovery.xml
             build-evidence/d3d11-frame-latency/
             build/swirl-quick/engine-contract.txt
             build/swirl-quick/engine-real.txt

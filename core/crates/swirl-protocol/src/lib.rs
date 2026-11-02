@@ -270,7 +270,16 @@ async fn accept_socks(stream: &mut TcpStream, auth: &Option<Credentials>) -> Res
         let _ = stream.write_all(&[5, 7, 0, 1, 0, 0, 0, 0, 0, 0]).await;
         return Err("SocksCommand");
     }
-    let target = read_target(stream, header[1] == 3).await?;
+    let target = match read_target(stream, header[1] == 3).await {
+        Err(error @ "AddressType") => {
+            // Method/authentication has completed and ATYP is known. Reply
+            // with RFC 1928's unsupported-address-type code before closing;
+            // keep the original parser error even if the client stops reading.
+            let _ = reply_failure(stream, InboundKind::Socks5, error).await;
+            return Err(error);
+        }
+        result => result?,
+    };
     Ok(Inbound {
         kind: InboundKind::Socks5,
         target,
@@ -447,6 +456,31 @@ pub async fn reply(stream: &mut TcpStream, kind: InboundKind, ok: bool) -> Resul
     };
     stream.write_all(&bytes).await.map_err(|_| "InboundReply")
 }
+
+/// Reply to a parsed request that failed before a success reply was started.
+/// RFC 1928 section 6 gives distinct SOCKS5 meanings to policy denial,
+/// reachability and TCP refusal. Do not invent a more specific cause for an
+/// ambiguous upstream failure or label an ordinary timeout as TTL expiry.
+/// Only fixed protocol bytes are sent; internal error details stay internal.
+pub async fn reply_failure(stream: &mut TcpStream, kind: InboundKind, code: &str) -> Result<()> {
+    if matches!(kind, InboundKind::Socks5) {
+        let status = match code {
+            "RouteRejected" | "ProxyLoop" | "UpstreamPermissionDenied" => 2,
+            "UpstreamNetworkUnreachable" => 3,
+            "DnsNameError" | "DnsEmpty" | "RouteDnsEmpty" | "DnsLookupFailed" => 4,
+            "UpstreamConnectionRefused" => 5,
+            "AddressType" => 8,
+            _ => 1,
+        };
+        stream
+            .write_all(&[5, status, 0, 1, 0, 0, 0, 0, 0, 0])
+            .await
+            .map_err(|_| "InboundReply")
+    } else {
+        reply(stream, kind, false).await
+    }
+}
+
 pub async fn connect(
     outbound: &Outbound,
     target: &Target,

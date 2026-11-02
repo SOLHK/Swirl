@@ -1780,7 +1780,7 @@ async fn session(
         tokio::select! {
             biased;
             _ = cancelled(&mut cancellation) => return Err("SessionRevoked"),
-            _ = timeout(limit, swirl_protocol::reply(&mut inbound, request.kind, false)) => {}
+            _ = timeout(limit, swirl_protocol::reply_failure(&mut inbound, request.kind, error)) => {}
         }
     }
     result

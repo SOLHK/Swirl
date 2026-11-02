@@ -5,6 +5,7 @@
 #include "SwirlBuildIdentity.h"
 #include "engine/EngineController.h"
 #include <QColor>
+#include <QCryptographicHash>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
@@ -503,17 +504,68 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
                 }
                 return evidence;
             };
+            // Observe the real resize without changing its order or fixed
+            // assertion. In particular, a pending layout must remain visible
+            // in the evidence instead of being hidden by an extra pre-wait.
+            auto *traceForm=item("policyGroupForm");
+            auto *traceViewport=traceForm?qvariant_cast<QQuickItem *>(traceForm->property("viewport")):nullptr;
+            auto *traceField=item("policyProbeTolerance");
+            QJsonArray focusTimeline;
+            QElapsedTimer resizeClock;resizeClock.start();
+            QObject resizeTrace;
+            const auto recordResize=[&](const QString &event){
+                if(focusTimeline.size()>=80)return;
+                focusTimeline.append(QJsonObject{{"event",event},{"elapsedMs",resizeClock.nsecsElapsed()/1000000.0},
+                    {"formHeight",traceForm?traceForm->height():-1},{"viewportHeight",traceViewport?traceViewport->height():-1},
+                    {"contentY",traceViewport?traceViewport->property("contentY").toReal():-1},
+                    {"activeFocus",traceField&&traceField->hasActiveFocus()}});
+            };
+            if(traceForm)QObject::connect(traceForm,&QQuickItem::heightChanged,&resizeTrace,[&]{recordResize("form-height");});
+            if(traceViewport)QObject::connect(traceViewport,&QQuickItem::heightChanged,&resizeTrace,[&]{recordResize("viewport-height");});
+            if(traceField)QObject::connect(traceField,&QQuickItem::activeFocusChanged,&resizeTrace,[&]{recordResize("field-focus");});
+            QObject::connect(window,&QQuickWindow::afterAnimating,&resizeTrace,[&]{recordResize("after-animating");});
+            QObject::connect(window,&QQuickWindow::frameSwapped,&resizeTrace,[&]{recordResize("frame-swapped");});
+            QQmlExpression contentYTrace(traceViewport?qmlContext(traceViewport):qmlContext(window),traceViewport,QStringLiteral("contentY"));
+            if(traceViewport){
+                contentYTrace.setNotifyOnValueChanged(true);contentYTrace.evaluate();
+                QObject::connect(&contentYTrace,&QQmlExpression::valueChanged,&resizeTrace,[&]{recordResize("content-y");contentYTrace.evaluate();});
+            }
+            minimumAdvancedFocus.insert("ownerWindowMatches",traceForm&&traceForm->property("ownerWindow").value<QObject *>()==window);
+            QJsonArray connectionTargets;
+            if(traceForm)for(auto *object:traceForm->findChildren<QObject *>()){
+                if(!QByteArray(object->metaObject()->className()).startsWith("QQmlConnections"))continue;
+                auto *target=object->property("target").value<QObject *>();
+                connectionTargets.append(QJsonObject{{"isViewport",target==traceViewport},{"isWindow",target==window},
+                    {"targetType",target?QString::fromLatin1(target->metaObject()->className()):QStringLiteral("null")}});
+            }
+            minimumAdvancedFocus.insert("connectionTargets",connectionTargets);
+            QFile embeddedForm(QStringLiteral(":/qt/qml/SwirlQuick/components/PolicyFormScroll.qml"));
+            check(embeddedForm.open(QIODevice::ReadOnly),QStringLiteral("The actual embedded policy form is readable for source identity"));
+            minimumAdvancedFocus.insert("embeddedFormSha256",QString::fromLatin1(QCryptographicHash::hash(embeddedForm.readAll(),QCryptographicHash::Sha256).toHex()));
+            recordResize("before-resize");
             minimumAdvancedFocus.insert("beforeResize",focusEvidence());
             window->resize(window->minimumWidth(),window->minimumHeight());
             if(auto *field=item("policyProbeTolerance"))field->forceActiveFocus();
             QElapsedTimer focusWait;focusWait.start();QTest::qWait(120);
             const qreal actualWaitMs=focusWait.nsecsElapsed()/1000000.0;
             const bool focusReachable=reachable(item("policyProbeTolerance"));
+            recordResize("original-assertion");
             minimumAdvancedFocus.insert("afterWait",focusEvidence());
             minimumAdvancedFocus.insert("requestedWaitMs",120);minimumAdvancedFocus.insert("actualWaitMs",actualWaitMs);
             minimumAdvancedFocus.insert("reachable",focusReachable);
             qInfo().noquote()<<"POLICY_MINIMUM_ADVANCED_FOCUS"<<QJsonDocument(minimumAdvancedFocus).toJson(QJsonDocument::Compact);
             check(focusReachable,QStringLiteral("Keyboard focus reveals the last advanced field at minimum window size"));
+            if(!focusReachable){
+                // This diagnostic never changes the failed result. It records
+                // whether the same geometry becomes visible on the next
+                // event turn, which distinguishes a lost trigger from a late
+                // deferred callback in the complete application's render loop.
+                QTest::qWaitFor([&]{return reachable(item("policyProbeTolerance"));},120);
+                recordResize("after-failure-diagnostic-drain");
+                minimumAdvancedFocus.insert("afterFailureDrain",focusEvidence());
+            }
+            minimumAdvancedFocus.insert("timeline",focusTimeline);
+            qInfo().noquote()<<"POLICY_FOCUS_RESIZE_TIMELINE"<<QJsonDocument(minimumAdvancedFocus).toJson(QJsonDocument::Compact);
         }
         click("savePolicyGroup");awaitSaved(QStringLiteral("Automatic strategy and advanced values are saved offline"));
         const auto group=recordNamed(controller->strategyGroups(),QString("Automatic fixture %1").arg(strategy)),probe=group.value("probe").toMap();
