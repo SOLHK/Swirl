@@ -115,3 +115,60 @@ V1/V2 路由、DNS、ATYP、认证节点和 HTTP 407 用真实独立 loopback pe
 | 合并 `test` | **禁止进入合并步骤**：完整 CI、当前生产包和真实 Windows 11 验收缺一不可；PR #50 保持 Draft，`main` 未修改 |
 
 后续更新应追加确切 commit、checkout/tree、Actions、原始报告和包身份，并明确哪些状态被新证据取代。发现失败继续按原断言修复；不能把本记录中的 `PENDING` 或 `NOT_RUN` 改成推测通过。
+
+## 七、已完成的 `24af583` 检查点与原生正常退出补验 — 16:43 UTC
+
+以上 15:42 UTC 及更早段落保留为当时的历史快照。**2026-11-02 16:40 UTC 重新查询时，`24af583` 的五个 Actions workflow 均已完成并为 SUCCESS。** 以下结果只属于这个固定源码检查点，不自动覆盖后来推进的分支。精简核验摘要和原始报告保存于 [检查点索引](evidence/windows-proxy-compat-20261102/native-exit-followup/checkpoint-24af583/index.json)：10 个证据文件共 214,087 字节，逐字节复制，保留原始 CRLF/LF；索引记录来源、大小及 SHA-256，未复制二进制、完整环境日志或临时签名下载 URL。
+
+| 身份 | 已核对值 |
+| --- | --- |
+| 开发提交 | `24af5838e39b4612321a7ee2b1be11d78fb9b6dd` |
+| 实际 CI checkout | `ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd` |
+| 两者相同的仓库 tree | `13a24de79dbab26098059286a1c74b291ed23084` |
+| Rust `core/` tree | `f4dbcd2bd4c565f92c0aae836fa7504fcd43efde` |
+
+| Workflow | 此检查点的实际结果 |
+| --- | --- |
+| [Rust 41475106020](https://github.com/SOLHK/Swirl/actions/runs/41475106020) | **SUCCESS**；Linux/macOS/Windows workspace 为 **822/822/823 passed**，各 0 failed、0 ignored；fmt、严格 Clippy、Release 和 Windows 最终完整 Swirl 应用构建通过 |
+| [完整 Qt 41475106009](https://github.com/SOLHK/Swirl/actions/runs/41475106009) | **SUCCESS**；critical UI 9/9、network 10/10、remaining 22/22，41 项 CTest 均无失败、跳过或 disabled；另 3 项注册检查以已部署 `Swirl.exe` 的 overview-input、all-pages、capture 入口执行成功，**44 项配置清单全部有对应执行** |
+| [Qt HTTP security 41475106022](https://github.com/SOLHK/Swirl/actions/runs/41475106022) | **7 个 job 全部 SUCCESS**；六组 Qt 6.10.3/6.11.3 各原 11 项均通过且无跳过；原生 Qt 6.12 的 policy/subscription/telemetry 为 11/5/34 个 pass 结果，完整产品 capture 亦通过。macOS 首次无 runner、无执行步骤的容量失败保留为失败记录；同源码第二次执行通过 |
+| [独立策略回归 41475106061](https://github.com/SOLHK/Swirl/actions/runs/41475106061) | **SUCCESS**；候选 7/7，固定 `1327cb4` 负对照只失败新增的同步 viewport 用例 |
+| [源码守卫 41475106025](https://github.com/SOLHK/Swirl/actions/runs/41475106025) | **SUCCESS**；9、7、3 项测试套件全部通过 |
+
+Rust 的 workspace 零 ignored 不表示整个 workflow 零跳过。常规 Qt bridge 是 95 pass/10 个 fixture skip；后续显式 native harness 覆盖其中九项，独立 QUIC 等原有可选范围未在这个 workflow 执行，macOS 公网步骤也因原 Linux-only 条件跳过。完整边界见检查点中的 `rust-validated-summary.json`。最终 Windows 原生报告已核对真实回复：上游握手失败为 **REP=1**，DOMAIN/MATCH 拒绝为 **REP=2**；8 次 lifecycle 调用的 22 项前端检查正确，公网 A/B×HTTP/SOCKS5×HTTP/TLS1.3 共 8 次成功。这些仍不是用户 provider 或 Codex 会话验收。
+
+### 完整策略页原断言与新增几何断言已经通过
+
+[完整应用原始 policy-ui.json](evidence/windows-proxy-compat-20261102/native-exit-followup/checkpoint-24af583/policy-ui.json) 记录 **537/537 checks、0 failures**，CTest 耗时 59.1586 秒。真实最小窗口仍为 **760×672**，本用例实际 DPR=1；原请求等待仍为 **120ms**，实际 136.501ms。运行时嵌入 QML 的 SHA-256 为 `875bd9b43c832e64c3ae66386a4cc2b62e4e42f7917b764531961cf9f0316eaf`，与提交和 checkout 的生产文件一致。
+
+候选时间线实际观察到外层 form 先从 543 变为 499，而 viewport 短暂仍为 543；随后 viewport=499 时 `contentY` 从 81 同步变为 125，原焦点断言通过。新增 viewport-only 用例保持窗口、外层高度 499、contentHeight 644、内容内字段几何和焦点不变，只把实际 viewport **499→455**；`contentY` **125→169**，在下一轮事件前完整 32px 字段已通过全部 clip 边界检查，恢复也成功。Activity 的 DPR 1/1.25/1.5/1.75/2 模拟另分别通过 465/467/468/467/467 checks，不扩称为策略页五个 DPR 或物理显示验收。
+
+诊断提交 `4048565` 的完整 Qt 最终确实失败于观察器的 **SEGFAULT**，不是一次成功取得的原焦点失败时间线。`24af583` 已修正有效 QML context 并完成以上实际复验；候选的时间戳不能被倒用来宣称已经测得旧实现 deferred callback 的精确停顿原因。
+
+### 原生恢复已验证；持有代理时的正常进程退出仍需补验
+
+检查点保存的原生 state/recovery XML 分别是 **34/15 个 QTest pass incident**，包含数据行和 init/cleanup，不是单个 `QVERIFY` 的计数；两行非空 PAC/bypass、异常 owner/engine 退出、外部修改和 registry 原始字节恢复均实际执行，无失败或跳过。WinHTTP 证据限定为只读 `WinHttpGetDefaultProxyConfiguration` 返回的 machine default。另有真实 Rust listener 的控制器/UI 集成，但其代理适配器是每实例内存实现。
+
+**显式 `release()` 恢复、异常退出后 guard 恢复，与“真实 Swirl 持有原生系统代理时正常退出整个进程”是不同的执行路径。** `24af583` 的这些成功结果尚未覆盖后一条组合生命周期，源码审查和分别通过的套件不能代替它。新增真实 `Swirl.exe`＋实际 Rust＋原生 WinINet/registry 的正常退出测试、对应 CI 和新包验证目前均为 **PENDING**；这里记录的是证据缺口，不预判产品一定损坏，也不提前记录新测试通过。
+
+### 固定检查点的生产包和持续流身份
+
+独立生产构建关闭 UI tests；实际 SDK、qmake 和 Qt runtime 均为 **6.12.0**，已核对 CMake 的 **C++23 REQUIRED** 契约、原生编译成功及包内 Qt/OpenSSL **3.5.9** 的实际 DLL 身份。冷启动和相同缓存路径的后续启动均完成 **61/61 页面**、exit 0、无 QML warnings/errors。两次 `cacheHitVerified` 均为 **false**，没有观察到 runtime disk-cache 文件；不能把成功热启动写成缓存命中已证明。
+
+[实际 NSIS artifact](https://github.com/SOLHK/Swirl/actions/runs/41475106009/artifacts/13160021695) 已下载、重算 ZIP digest、解包并核对 **1519/1519** 个 manifest 文件。生产 Rust self-test 的 HTTP、CONNECT、SOCKS5、core 启动和 listener 释放全部成功；运行时 source=`ceafbef…`、build ID=`0b285d29579917c4a34a744e06de52a5d05345d244dff991ee498ba2ba3f4bdc` 与实际包 manifest 一致。
+
+| `24af583` 包文件 | SHA-256 |
+| --- | --- |
+| `Swirl-Setup.exe`，79,148,856 字节 | `082c6e60ffa968d0e6d3d8766a055e7dc49b5a6263de1f66c74352218b6ea84b` |
+| `Swirl.exe` | `d7581841f897133b397125da60c2cce228ba8e694bd1983e17f07414db6dea16` |
+| `swirl_api.dll` | `4ca6c9c9a1a56b65b1d3ba698fde70777bbf810abc2d9bbbd1b19dfd1d425f6a` |
+| `package-manifest.json` | `95e57c627ba3948422075ea22b731dc3bb77e386719e91cbf2450fb6a0758003` |
+| GitHub installer ZIP | `1b3974f92455fc86404a0473f44bc497048ebc8603618025df39f864031fcc40` |
+
+30 分钟测试仍绑定上述相同 `core/` tree：**1800.004075 秒、8×1801=14408 事件**，raw SHA=`b4469c9adcaa82726bda10e6b219d4eb71634e7dbed1292c0c082e609f9fe875`，binary SHA=`5cc28d77b90e86863f2dbdad90e403fce2200be47eed2111124df39f918f76f3`。[另一个续接窗口的复核](evidence/windows-proxy-compat-20261102/resume-20261103/soak-1800-recheck.json) 指向的也是这次新测试。本次再次核对其 240,591 字节 raw 在 `24af583`、`2ff3c8` Git blob 及工作树逐字节相同，两个提交的 `core/` tree 均为 `f4dbcd2…`；原执行元数据 `source_commit_sha=null` 未改写。**这不是更早 1800.026379 秒、raw `c47df0…`、binary `458f7e…` 那次测试的原始文件恢复证明**；第五节对旧记录仅存 summary 的边界仍适用于旧记录。新测试的 Linux 受控 TLS/SSE 范围也没有变成 Windows/Codex 实测。
+
+### 后续源码与尚未满足的合并门禁
+
+远端随后另行推进到 `2ff3c853c4df6e3da3760b353eed87dcaf58864a`，增加真实 native→Rust listener 组合测试、生产 NSIS 安装/运行/卸载测试等；相关范围见 [该续接记录](WINDOWS_PROXY_COMPAT_RESUME_20261103.md)。16:43 UTC 查询时，其独立策略和 source guard 已成功，[完整 Qt](https://github.com/SOLHK/Swirl/actions/runs/41481544129) 与 [Rust](https://github.com/SOLHK/Swirl/actions/runs/41481544448) 正在运行，[Qt security](https://github.com/SOLHK/Swirl/actions/runs/41481544469) 尚在队列，不能由 `24af583` 的绿色结果代替。持有原生代理的正常 Swirl 进程退出补验是进一步独立门禁，仍须后续实际证据；新的安装/卸载门禁也不应倒记为本节历史包已执行。
+
+真实 Windows 11 已登录 Codex Desktop 的同设备/订阅/节点 Clash/Swirl A/B 继续为 **NOT_RUN**，Workspace Settings、多轮对话、真实 VS Code/WS/SSE 和退出后的该设备代理恢复均未冒称通过。PR #50 继续保持 Draft；上述检查点本身不满足合并 `test` 的全部条件，`main` 不在修改范围。

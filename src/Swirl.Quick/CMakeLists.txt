@@ -417,6 +417,24 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
     -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-system-proxy-recovery.xml,xml" -o -,txt)
    set_tests_properties(swirl-system-proxy-recovery PROPERTIES RUN_SERIAL TRUE TIMEOUT 45 ENVIRONMENT "SWIRL_SYSTEM_PROXY_TEST=1")
   endif()
+  if(SWIRL_BUILD_UI_TESTS)
+   # Exercise normal close in the complete application with a live Rust core
+   # and native proxy ownership. Keep this separate from the low-level suite,
+   # which is also built before Swirl by the standalone core workflow.
+   add_executable(SwirlSystemProxyExitTests tests/SystemProxyExitTests.cpp)
+   target_link_libraries(SwirlSystemProxyExitTests PRIVATE SwirlEngine Qt6::Test winhttp)
+   add_dependencies(SwirlSystemProxyExitTests Swirl SwirlProxyGuard)
+   if(MSVC)
+    target_compile_options(SwirlSystemProxyExitTests PRIVATE /utf-8)
+   endif()
+   if(DEFINED ENV{SWIRL_SYSTEM_PROXY_TEST})
+    add_test(NAME swirl-system-proxy-app-exit COMMAND SwirlSystemProxyExitTests
+     -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-system-proxy-app-exit.xml,xml" -o -,txt)
+    set_tests_properties(swirl-system-proxy-app-exit PROPERTIES RUN_SERIAL TRUE TIMEOUT 120
+     ENVIRONMENT "SWIRL_SYSTEM_PROXY_TEST=1;SWIRL_SYSTEM_PROXY_EXIT_EVIDENCE=${CMAKE_CURRENT_BINARY_DIR}/system-proxy-exit;QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11"
+     ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+   endif()
+  endif()
   add_executable(SwirlAcceptance tests/AcceptanceSession.cpp)
   target_link_libraries(SwirlAcceptance PRIVATE SwirlEngine)
   if(MSVC)
@@ -483,6 +501,9 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  set_tests_properties(swirl-node-real-chain PROPERTIES TIMEOUT 180)
  if(SWIRL_BUILD_UI_TESTS)
  target_sources(Swirl PRIVATE tests/EngineUiChecks.cpp tests/EngineUiChecks.h tests/NodeUiChecks.cpp tests/NodeUiChecks.h tests/PolicyUiChecks.cpp tests/PolicyUiChecks.h tests/MotionChecks.cpp tests/MotionChecks.h tests/ApecMotionChecks.cpp tests/ApecGlassChecks.cpp tests/RouteBench.cpp tests/RouteBench.h tests/LiquidGlassChecks.cpp tests/U2Checks.cpp)
+ if(WIN32)
+  target_sources(Swirl PRIVATE tests/SystemProxyExitFixture.cpp tests/SystemProxyExitFixture.h)
+ endif()
  target_sources(Swirl PRIVATE tests/ActivityPerfTrace.h)
  # Opt-in timing is compiled only for this QA profile; production has no
  # telemetry timing properties or test observer class.
@@ -604,7 +625,7 @@ if(WIN32)
 endif()
 
 foreach(runtime_target IN ITEMS SwirlProxyGuard SwirlExtensionTests SwirlTelemetryTests
- SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlSystemProxyTests SwirlAcceptance SwirlNodeTests
+ SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlSystemProxyTests SwirlSystemProxyExitTests SwirlAcceptance SwirlNodeTests
  SwirlNetworkRegressionTests SwirlImportTests SwirlSubscriptionFormatTests
  SwirlPrivateSubscriptionInspect SwirlPolicyConfigurationTests SwirlCatalogTransactionTests)
  if(TARGET ${runtime_target})

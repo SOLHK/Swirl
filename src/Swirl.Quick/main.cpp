@@ -74,6 +74,9 @@
 #include "tests/NodeUiChecks.h"
 #include "tests/PolicyUiChecks.h"
 #include "tests/PolicySystemProxyBackend.h"
+#ifdef Q_OS_WIN
+#include "tests/SystemProxyExitFixture.h"
+#endif
 #include "tests/MotionChecks.h"
 #include "tests/ActivityLayoutChecks.h"
 #include "tests/MaterialChecks.h"
@@ -339,6 +342,12 @@ int main(int argc, char *argv[])
 #ifdef SWIRL_UI_TESTS
     lifecycleTest=app.arguments().contains("--lifecycle-test");
 #endif
+#if defined(SWIRL_UI_TESTS) && defined(Q_OS_WIN)
+    const bool lifecycleSystemProxyTest=qEnvironmentVariable("SWIRL_LIFECYCLE_SYSTEM_PROXY")==QStringLiteral("1");
+    // Validate opt-in and a fresh isolated local profile before constructing
+    // the native proxy session or opening any persistent application stores.
+    if(lifecycleSystemProxyTest&&(!lifecycleTest||!SwirlSystemProxyExit::environmentIsValid()))return 64;
+#endif
     const bool isolatedRun=xrayUiTest||appearanceTest||lifecycleTest||realAcceptance||heroTest||navigationTest||radiusTest||nodeTest||policyTest||motionTest||activityLayoutTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
     SingleInstance instance;
     if(lifecycleTest || (!isolatedRun && !appearanceTest)) {
@@ -581,21 +590,28 @@ int main(int argc, char *argv[])
     }
 #ifdef SWIRL_UI_TESTS
     if(rootWindow&&lifecycleTest){
-        const auto fixture=qEnvironmentVariable("SWIRL_LIFECYCLE_ENGINE");
-        if(!fixture.isEmpty()){
-            QTcpServer reserve;reserve.listen(QHostAddress::LocalHost);const auto port=reserve.serverPort();reserve.close();
-            if(fixture!="rust")return 64;
-            engineController.setProxyPort(port);engineController.setRoutingMode("direct");
-            QObject::connect(&engineController,&EngineController::statusChanged,&app,[&]{if(engineController.processAlive())app.setProperty("lifecycleEnginePid",engineController.processId());});
-            engineController.connectNode("");
+#ifdef Q_OS_WIN
+        if(lifecycleSystemProxyTest){
+            if(!SwirlSystemProxyExit::start(rootWindow,&engineController))return 64;
+        }else
+#endif
+        {
+            const auto fixture=qEnvironmentVariable("SWIRL_LIFECYCLE_ENGINE");
+            if(!fixture.isEmpty()){
+                QTcpServer reserve;reserve.listen(QHostAddress::LocalHost);const auto port=reserve.serverPort();reserve.close();
+                if(fixture!="rust")return 64;
+                engineController.setProxyPort(port);engineController.setRoutingMode("direct");
+                QObject::connect(&engineController,&EngineController::statusChanged,&app,[&]{if(engineController.processAlive())app.setProperty("lifecycleEnginePid",engineController.processId());});
+                engineController.connectNode("");
+            }
+            QObject::connect(&app,&QCoreApplication::aboutToQuit,&app,[&]{
+                const auto path=qEnvironmentVariable("SWIRL_LIFECYCLE_REPORT");
+                if(!path.isEmpty()){QFile file(path);if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"pid",double(QCoreApplication::applicationPid())},{"enginePid",app.property("lifecycleEnginePid").toString()},{"shutdownMs",double(app.property("shutdownDurationMs").toLongLong())},{"executable",QCoreApplication::applicationFilePath()}}).toJson());}
+            });
+            QTimer::singleShot(250,rootWindow,[rootWindow]{QMetaObject::invokeMethod(rootWindow,"openDashboard");});
+            const auto delay=qEnvironmentVariableIntValue("SWIRL_LIFECYCLE_EXIT_MS");
+            QTimer::singleShot(delay>0?delay:2500,rootWindow,[rootWindow]{rootWindow->close();});
         }
-        QObject::connect(&app,&QCoreApplication::aboutToQuit,&app,[&]{
-            const auto path=qEnvironmentVariable("SWIRL_LIFECYCLE_REPORT");
-            if(!path.isEmpty()){QFile file(path);if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"pid",double(QCoreApplication::applicationPid())},{"enginePid",app.property("lifecycleEnginePid").toString()},{"shutdownMs",double(app.property("shutdownDurationMs").toLongLong())},{"executable",QCoreApplication::applicationFilePath()}}).toJson());}
-        });
-        QTimer::singleShot(250,rootWindow,[rootWindow]{QMetaObject::invokeMethod(rootWindow,"openDashboard");});
-        const auto delay=qEnvironmentVariableIntValue("SWIRL_LIFECYCLE_EXIT_MS");
-        QTimer::singleShot(delay>0?delay:2500,rootWindow,[rootWindow]{rootWindow->close();});
     }
 #endif
     // All smoke state is isolated. Finish with exit(), as other QA drivers do,
