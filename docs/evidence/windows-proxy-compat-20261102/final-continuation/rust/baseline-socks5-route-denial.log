@@ -1,0 +1,24 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s
+     Running unittests src/lib.rs (/workspace/scratch/a6f47dff1af2/rust-verify-target/debug/deps/swirl_core-eee49aa26ccd2490)
+
+running 1 test
+test v2::runtime_tests::pre_tunnel_route_and_dial_failures_return_protocol_replies ... FAILED
+
+failures:
+
+---- v2::runtime_tests::pre_tunnel_route_and_dial_failures_return_protocol_replies stdout ----
+bound-only TCP endpoint: Os { code: 111, kind: ConnectionRefused, message: "Connection refused" }; core must report UpstreamConnectionRefused
+
+thread 'v2::runtime_tests::pre_tunnel_route_and_dial_failures_return_protocol_replies' (86334) panicked at crates/swirl-core/src/v2_runtime_tests.rs:454:9:
+assertion `left == right` failed
+  left: [5, 5, 0, 1, 0, 0, 0, 0, 0, 0]
+ right: [5, 2, 0, 1, 0, 0, 0, 0, 0, 0]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    v2::runtime_tests::pre_tunnel_route_and_dial_failures_return_protocol_replies
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 53 filtered out; finished in 0.39s
+
+error: test failed, to rerun pass `-p swirl-core --lib`

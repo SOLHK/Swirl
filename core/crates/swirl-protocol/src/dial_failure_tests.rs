@@ -17,7 +17,7 @@ async fn uniform_os_failure_categories_reach_the_product_without_private_error_t
             io::ErrorKind::NetworkUnreachable,
             "UpstreamNetworkUnreachable",
         ),
-        (io::ErrorKind::HostUnreachable, "UpstreamNetworkUnreachable"),
+        (io::ErrorKind::HostUnreachable, "UpstreamHostUnreachable"),
         (io::ErrorKind::NetworkDown, "UpstreamNetworkUnreachable"),
         (io::ErrorKind::PermissionDenied, "UpstreamPermissionDenied"),
         (io::ErrorKind::Other, "UpstreamConnectFailed"),
@@ -43,28 +43,32 @@ async fn uniform_os_failure_categories_reach_the_product_without_private_error_t
 
 #[tokio::test(start_paused = true)]
 async fn mixed_address_failures_are_ambiguous_regardless_of_completion_order() {
-    for reverse in [false, true] {
-        let result = dial_addresses(
-            vec![
-                SocketAddr::from(([127, 0, 0, 1], 1)),
-                SocketAddr::from(([127, 0, 0, 1], 2)),
-                SocketAddr::from(([127, 0, 0, 1], 3)),
-            ],
-            Instant::now() + Duration::from_secs(1),
-            |address| async move {
-                let refused = (address.port() == 1) != reverse;
-                Err::<(), _>(
-                    if refused {
-                        io::ErrorKind::ConnectionRefused
-                    } else {
-                        io::ErrorKind::ConnectionReset
-                    }
-                    .into(),
-                )
-            },
-        )
-        .await;
-        assert_eq!(result, Err("UpstreamConnectFailed"));
+    for (first_kind, second_kind) in [
+        (
+            io::ErrorKind::ConnectionRefused,
+            io::ErrorKind::ConnectionReset,
+        ),
+        (
+            io::ErrorKind::HostUnreachable,
+            io::ErrorKind::NetworkUnreachable,
+        ),
+    ] {
+        for reverse in [false, true] {
+            let result = dial_addresses(
+                vec![
+                    SocketAddr::from(([127, 0, 0, 1], 1)),
+                    SocketAddr::from(([127, 0, 0, 1], 2)),
+                    SocketAddr::from(([127, 0, 0, 1], 3)),
+                ],
+                Instant::now() + Duration::from_secs(1),
+                |address| async move {
+                    let first = (address.port() == 1) != reverse;
+                    Err::<(), _>(if first { first_kind } else { second_kind }.into())
+                },
+            )
+            .await;
+            assert_eq!(result, Err("UpstreamConnectFailed"));
+        }
     }
 }
 
@@ -80,6 +84,13 @@ async fn dial_denial_and_network_errors_keep_distinct_socks5_wire_replies() {
         for (kind, status) in [
             (io::ErrorKind::PermissionDenied, 2),
             (io::ErrorKind::NetworkUnreachable, 3),
+            (io::ErrorKind::NetworkDown, 3),
+            (io::ErrorKind::HostUnreachable, 4),
+            (io::ErrorKind::ConnectionRefused, 5),
+            (io::ErrorKind::TimedOut, 1),
+            (io::ErrorKind::ConnectionReset, 1),
+            (io::ErrorKind::ConnectionAborted, 1),
+            (io::ErrorKind::Other, 1),
         ] {
             let error = dial_addresses(
                 vec![

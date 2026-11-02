@@ -623,7 +623,7 @@ void RustCoreEngine::recordForwardingFailures(const QJsonObject &state){
  static const QSet<QString> codes{
   "HandshakeTimeout","InboundClosed","InboundAuthentication","InboundReply",
   "UpstreamDnsTimeout","DnsLookupFailed","RouteDnsTimeout","UpstreamTcpTimeout","UpstreamConnectFailed","UpstreamAddressLimit",
-  "UpstreamConnectionRefused","UpstreamConnectionReset","UpstreamConnectionAborted","UpstreamNetworkUnreachable","UpstreamPermissionDenied",
+  "UpstreamConnectionRefused","UpstreamConnectionReset","UpstreamConnectionAborted","UpstreamNetworkUnreachable","UpstreamHostUnreachable","UpstreamPermissionDenied",
   "UpstreamTlsTimeout","TlsCertificateExpired","TlsCertificateNotValidYet","TlsCertificateNameMismatch","TlsCertificateUnknownIssuer",
   "TlsCertificateRevoked","TlsCertificateInvalid","TlsCertificateMissing","TlsVerificationOrHandshake","TlsHandshakeEof","TlsConnectionReset","TlsConnectionAborted","TlsConnectionRefused","TlsHandshakeIoTimeout","TlsHandshakeBrokenPipe",
   "UpstreamProtocolTimeout","UpstreamAuthentication","UpstreamRejected","UpstreamHeaderTooLarge","VmessHandshakeWrite","VlessHandshakeWrite","TrojanHandshakeWrite",

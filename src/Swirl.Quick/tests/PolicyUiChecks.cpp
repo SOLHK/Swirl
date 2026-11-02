@@ -14,6 +14,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLineF>
+#include <QMetaProperty>
 #include <QQmlComponent>
 #include <QQmlContext>
 #include <QQmlEngine>
@@ -525,9 +526,13 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
             if(traceField)QObject::connect(traceField,&QQuickItem::activeFocusChanged,&resizeTrace,[&]{recordResize("field-focus");});
             QObject::connect(window,&QQuickWindow::afterAnimating,&resizeTrace,[&]{recordResize("after-animating");});
             QObject::connect(window,&QQuickWindow::frameSwapped,&resizeTrace,[&]{recordResize("frame-swapped");});
-            QQmlExpression contentYTrace(traceViewport?qmlContext(traceViewport):qmlContext(window),traceViewport,QStringLiteral("contentY"));
+            // ScrollView creates its Flickable in C++; it need not have an
+            // attached QQmlContext. Use the real window's context and the
+            // viewport only as the expression scope object.
+            QQmlExpression contentYTrace(qmlContext(window),traceViewport,QStringLiteral("contentY"));
             if(traceViewport){
                 contentYTrace.setNotifyOnValueChanged(true);contentYTrace.evaluate();
+                check(!contentYTrace.hasError(),QStringLiteral("Viewport scroll observation uses a valid QML context"));
                 QObject::connect(&contentYTrace,&QQmlExpression::valueChanged,&resizeTrace,[&]{recordResize("content-y");contentYTrace.evaluate();});
             }
             minimumAdvancedFocus.insert("ownerWindowMatches",traceForm&&traceForm->property("ownerWindow").value<QObject *>()==window);
@@ -566,6 +571,76 @@ int runPolicyUiChecks(QQuickWindow *window,EngineController *controller,const QS
             }
             minimumAdvancedFocus.insert("timeline",focusTimeline);
             qInfo().noquote()<<"POLICY_FOCUS_RESIZE_TIMELINE"<<QJsonDocument(minimumAdvancedFocus).toJson(QJsonDocument::Compact);
+
+            // Exercise the production form after focus and window geometry
+            // have settled as well: only the internal viewport may shrink.
+            // The complete field must be visible when the geometry change
+            // returns, before another queued turn can rescue a stale scroll.
+            auto *field=item("policyProbeTolerance"),*form=item("policyGroupForm");
+            auto *viewport=form?qvariant_cast<QQuickItem *>(form->property("viewport")):nullptr;
+            auto *body=form?qvariant_cast<QQuickItem *>(form->property("formBody")):nullptr;
+            if(check(field&&form&&viewport&&body,QStringLiteral("Viewport regression uses the actual focused advanced field and production form"))){
+                const auto fullyVisible=[&]{
+                    if(!field->hasActiveFocus()||window->activeFocusItem()!=field||!reachable(field))return false;
+                    const QRectF bounds(QPointF(),field->size());
+                    if(!QRectF(QPointF(),viewport->size()).contains(field->mapRectToItem(viewport,bounds)))return false;
+                    for(auto *ancestor=field;ancestor;ancestor=ancestor->parentItem())
+                        if(ancestor->clip()&&!QRectF(QPointF(),ancestor->size()).contains(field->mapRectToItem(ancestor,bounds)))return false;
+                    return QRectF(QPointF(),window->size()).contains(field->mapRectToScene(bounds));
+                };
+                check(fullyVisible(),QStringLiteral("The entire focused advanced field is visible through every clip at minimum window size"));
+                const auto formSize=form->size();const auto windowSize=window->size();
+                const auto viewportHeight=viewport->height(),contentHeight=form->property("contentHeight").toReal();
+                const auto originalPadding=form->property("bottomPadding").toReal();
+                const auto fieldInBody=field->mapRectToItem(body,QRectF(QPointF(),field->size()));
+                QSignalSpy formHeightChanged(form,&QQuickItem::heightChanged);
+                QSignalSpy contentHeightChanged(form,QQmlProperty(form,"contentHeight").property().notifySignal());
+                QSignalSpy focusChanged(window,&QQuickWindow::activeFocusItemChanged);
+                QSignalSpy viewportHeightChanged(viewport,&QQuickItem::heightChanged);
+                check(formHeightChanged.isValid()&&contentHeightChanged.isValid()&&focusChanged.isValid()&&viewportHeightChanged.isValid(),
+                      QStringLiteral("Viewport regression observes outer geometry, content extent and focus signals"));
+                QQmlComponent paddingComponent(qmlEngine(window));
+                paddingComponent.setData(R"(
+                    import QtQml
+                    import SwirlQuick
+                    Binding {
+                        required property var targetForm
+                        required property real originalPadding
+                        property bool active: false
+                        readonly property real inset: Theme.dp(44)
+                        target: targetForm
+                        property: "bottomPadding"
+                        value: originalPadding + inset
+                        when: active
+                        restoreMode: Binding.RestoreBindingOrValue
+                    }
+                )",QUrl());
+                std::unique_ptr<QObject> paddingOverride(paddingComponent.createWithInitialProperties(
+                    {{"targetForm",QVariant::fromValue(form)},{"originalPadding",originalPadding}},qmlContext(window)));
+                if(!paddingOverride)qWarning()<<"Viewport padding fixture"<<paddingComponent.errorString();
+                if(check(paddingOverride!=nullptr,QStringLiteral("Viewport inset uses a reversible binding on the actual policy form"))){
+                    QJsonObject viewportOnly{{"before",focusEvidence()}};
+                    const auto inset=paddingOverride->property("inset").toReal();
+                    check(inset>0&&field->mapRectToItem(viewport,QRectF(QPointF(),field->size())).bottom()>viewportHeight-inset,
+                          QStringLiteral("The viewport inset would clip the field without a new reveal"));
+                    check(paddingOverride->setProperty("active",true),QStringLiteral("The viewport inset activates without replacing the original binding"));
+                    viewportOnly.insert("afterSynchronousShrink",focusEvidence());
+                    check(qAbs(viewport->height()-(viewportHeight-inset))<0.01&&viewportHeightChanged.count()>0,
+                          QStringLiteral("The actual viewport shrinks by the required inset"));
+                    check(form->size()==formSize&&window->size()==windowSize&&form->property("contentHeight").toReal()==contentHeight
+                          &&field->mapRectToItem(body,QRectF(QPointF(),field->size()))==fieldInBody
+                          &&formHeightChanged.count()==0&&contentHeightChanged.count()==0&&focusChanged.count()==0,
+                          QStringLiteral("Viewport shrink preserves outer dimensions, field geometry, content extent and keyboard focus"));
+                    check(fullyVisible(),QStringLiteral("Viewport shrink reveals the complete unchanged focused field before another event turn"));
+                    check(paddingOverride->setProperty("active",false),QStringLiteral("Viewport inset restores the original padding binding"));
+                    viewportOnly.insert("afterSynchronousRestore",focusEvidence());
+                    check(form->property("bottomPadding").toReal()==originalPadding&&qAbs(viewport->height()-viewportHeight)<0.01
+                          &&form->size()==formSize&&window->size()==windowSize&&fullyVisible()&&focusChanged.count()==0,
+                          QStringLiteral("Restoring the viewport retains the entire focused field and the original geometry"));
+                    minimumAdvancedFocus.insert("viewportOnly",viewportOnly);
+                    qInfo().noquote()<<"POLICY_VIEWPORT_ONLY_FOCUS"<<QJsonDocument(viewportOnly).toJson(QJsonDocument::Compact);
+                }
+            }
         }
         click("savePolicyGroup");awaitSaved(QStringLiteral("Automatic strategy and advanced values are saved offline"));
         const auto group=recordNamed(controller->strategyGroups(),QString("Automatic fixture %1").arg(strategy)),probe=group.value("probe").toMap();

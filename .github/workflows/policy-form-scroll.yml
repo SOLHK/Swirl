@@ -43,7 +43,7 @@ jobs:
           $qtRoot = (Resolve-Path -LiteralPath $sdk.kit_root).Path
           $version = (& (Join-Path $qtRoot 'bin/qmake.exe') -query QT_VERSION).Trim()
           if ($LASTEXITCODE -ne 0 -or $version -ne '6.12.0' -or $sdk.arch -ne 'win64_msvc2022_64') { throw 'Unexpected Qt version or ABI.' }
-          $baseline = '86b73d366a36f02a0a309e2aadd84b99917626f2'
+          $baseline = '1327cb4d587eddc60563c926672f67a6da5c16ce'
           git fetch --no-tags --depth=1 origin $baseline
           if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch pinned negative-control source.' }
           python tools/tests/test_policy_form_scroll.py --qmltestrunner (Join-Path $qtRoot 'bin/qmltestrunner.exe') --output build-evidence/policy-form-scroll --regression-baseline $baseline

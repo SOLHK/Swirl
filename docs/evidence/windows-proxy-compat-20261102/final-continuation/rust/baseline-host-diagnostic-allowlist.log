@@ -1,0 +1,18 @@
+test_native_typed_tcp_failures_keep_their_stage_and_closed_output_contract (__main__.ConnectivityDiagnostics.test_native_typed_tcp_failures_keep_their_stage_and_closed_output_contract) ... 
+  test_native_typed_tcp_failures_keep_their_stage_and_closed_output_contract (__main__.ConnectivityDiagnostics.test_native_typed_tcp_failures_keep_their_stage_and_closed_output_contract) (code='UpstreamHostUnreachable') ... ERROR
+
+======================================================================
+ERROR: test_native_typed_tcp_failures_keep_their_stage_and_closed_output_contract (__main__.ConnectivityDiagnostics.test_native_typed_tcp_failures_keep_their_stage_and_closed_output_contract) (code='UpstreamHostUnreachable')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/a6f47dff1af2/Swirl/tools/tests/test_connectivity_diagnostics.py", line 516, in test_native_typed_tcp_failures_keep_their_stage_and_closed_output_contract
+    safe = DIAG.safe_report(report, "swirl-rust")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/a6f47dff1af2/Swirl/tools/Diagnose-NativeConnectivity.py", line 307, in safe_report
+    raise ValueError("DiagnosticOutputInvalid")
+ValueError: DiagnosticOutputInvalid
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (errors=1)

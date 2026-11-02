@@ -1,0 +1,42 @@
+   Compiling swirl-protocol v0.1.0 (/workspace/scratch/a6f47dff1af2/Swirl/core/crates/swirl-protocol)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.10s
+     Running unittests src/lib.rs (/workspace/scratch/a6f47dff1af2/rust-host-verify-target/debug/deps/swirl_protocol-5f683816b47dd3ad)
+
+running 3 tests
+test dial::failure_tests::uniform_os_failure_categories_reach_the_product_without_private_error_text ... FAILED
+test dial::failure_tests::mixed_address_failures_are_ambiguous_regardless_of_completion_order ... FAILED
+test dial::failure_tests::dial_denial_and_network_errors_keep_distinct_socks5_wire_replies ... FAILED
+
+failures:
+
+---- dial::failure_tests::uniform_os_failure_categories_reach_the_product_without_private_error_text stdout ----
+
+thread 'dial::failure_tests::uniform_os_failure_categories_reach_the_product_without_private_error_text' (107815) panicked at crates/swirl-protocol/src/dial_failure_tests.rs:39:9:
+assertion `left == right` failed
+  left: Err("UpstreamNetworkUnreachable")
+ right: Err("UpstreamHostUnreachable")
+
+---- dial::failure_tests::mixed_address_failures_are_ambiguous_regardless_of_completion_order stdout ----
+
+thread 'dial::failure_tests::mixed_address_failures_are_ambiguous_regardless_of_completion_order' (107814) panicked at crates/swirl-protocol/src/dial_failure_tests.rs:70:13:
+assertion `left == right` failed
+  left: Err("UpstreamNetworkUnreachable")
+ right: Err("UpstreamConnectFailed")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- dial::failure_tests::dial_denial_and_network_errors_keep_distinct_socks5_wire_replies stdout ----
+
+thread 'dial::failure_tests::dial_denial_and_network_errors_keep_distinct_socks5_wire_replies' (107813) panicked at crates/swirl-protocol/src/dial_failure_tests.rs:121:13:
+assertion `left == right` failed
+  left: [5, 3, 0, 1, 0, 0, 0, 0, 0, 0]
+ right: [5, 4, 0, 1, 0, 0, 0, 0, 0, 0]
+
+
+failures:
+    dial::failure_tests::dial_denial_and_network_errors_keep_distinct_socks5_wire_replies
+    dial::failure_tests::mixed_address_failures_are_ambiguous_regardless_of_completion_order
+    dial::failure_tests::uniform_os_failure_categories_reach_the_product_without_private_error_text
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 128 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p swirl-protocol --lib`

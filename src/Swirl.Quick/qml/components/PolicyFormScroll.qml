@@ -32,6 +32,15 @@ ScrollView {
     // or change the available viewport through padding without resizing the
     // control at all. Observe the geometry actually used by revealFocus;
     // another fixed wait would still race that layout and hide the defect.
-    Connections {target:form.viewport;function onHeightChanged(){Qt.callLater(form.revealFocus)}}
+    Connections {
+        target:form.viewport
+        function onHeightChanged() {
+            // Layout can apply this geometry during the last event processed
+            // in a render turn. Keep focus visible with the new viewport now;
+            // the queued pass still covers subsequent body/layout changes.
+            form.revealFocus()
+            Qt.callLater(form.revealFocus)
+        }
+    }
     Connections {target:form.ownerWindow;function onActiveFocusItemChanged(){Qt.callLater(form.revealFocus)}}
 }

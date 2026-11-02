@@ -1,0 +1,11 @@
+test_v2_client_cancellation_and_core_stop_release_proxy_sessions (__main__.WindowsProxyCompatibility.test_v2_client_cancellation_and_core_stop_release_proxy_sessions) ... ok
+test_v2_connect_versions_preserve_coalesced_real_clienthello (__main__.WindowsProxyCompatibility.test_v2_connect_versions_preserve_coalesced_real_clienthello) ... ok
+test_v2_halfclose_delivers_delayed_large_tail_without_task_leak (__main__.WindowsProxyCompatibility.test_v2_halfclose_delivers_delayed_large_tail_without_task_leak) ... ok
+test_v2_tls_sse_chunking_and_idle_exceed_handshake_deadline (__main__.WindowsProxyCompatibility.test_v2_tls_sse_chunking_and_idle_exceed_handshake_deadline) ... ok
+test_v2_verified_tls_h2_multiplexes_three_real_requests (__main__.WindowsProxyCompatibility.test_v2_verified_tls_h2_multiplexes_three_real_requests) ... ok
+test_v2_wss_upgrade_first_frame_fragmentation_ping_and_clean_close (__main__.WindowsProxyCompatibility.test_v2_wss_upgrade_first_frame_fragmentation_ping_and_clean_close) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 6.095s
+
+OK

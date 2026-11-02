@@ -1,0 +1,41 @@
+{
+  "base_commit": "40485650ef72a41967b81cde72cb0600ce5b2538",
+  "core_changed_by_this_fixture_fix": false,
+  "source_sha256": {
+    "src/Swirl.Quick/tests/RustCoreTests.cpp": "10f79c916961a9ac89b84880af7ea18b256d6ddaec9acb0c1a5ef123371102dd",
+    "tools/tests/test_reality_runtime.py": "da29b4b80388bdd47eea88475105e43d98ef7eef321c1cba6c2f542c357ef73d",
+    "tools/tests/test_qt_reality_lifecycle.py": "bf0a49c24c96b45c1811ab6a7aa1980870a8cb0ea4bed83caccd39c2e37cd347"
+  },
+  "baseline_validator_sha256": "6d55c9ede5497f00122ab976bf71ccdc5b56c4256e396b269c7d0d8163bf782c",
+  "baseline_scope": "4048565 Python validator with candidate expected 2/1 replies and negative tests; not a full native Windows rerun",
+  "baseline_result": {
+    "tests": 10,
+    "failing_assertions": 4,
+    "exit_code": 1
+  },
+  "amended_result": {
+    "tests": 10,
+    "failures": 0,
+    "skipped": 0,
+    "exit_code": 0
+  },
+  "ci_guard_result": {
+    "tests": 1,
+    "failures": 0,
+    "exit_code": 0
+  },
+  "ci_execution": {
+    "workflow": ".github/workflows/rust-core.yml",
+    "step": "Qt persisted REALITY + Vision + Chrome133 through full Xray to HTTP and HTTPS",
+    "guard_command": "python tools/tests/test_qt_reality_lifecycle.py",
+    "native_command": "python tools/tests/test_reality_runtime.py --qt --vision --fingerprint chrome",
+    "exit_codes_enforced": true
+  },
+  "native_windows_verification": "PENDING_REBUILT_FULL_CI",
+  "artifacts_limit": "4048565 artifact records proxy_status -1 and closed true for rejected SOCKS5; original C++ parser did not retain actual REP bytes",
+  "raw_logs": {
+    "baseline-4048565-qt-lifecycle-validator.log": "badd5004c9a9aa7831e09196bd33f06be1652a96fc9f2301ac639ea25dce1de4",
+    "amended-qt-lifecycle-validator.log": "0a6e6549539f89791a8026bfe299a3eda5f6ad66c60c6036fed39a877f54c919",
+    "amended-qt-lifecycle-ci-guard.log": "8a5c9e1f34a2118bc71888fd4314ecbe50d90eafbfb36c49f2902c1a9b32f776"
+  }
+}

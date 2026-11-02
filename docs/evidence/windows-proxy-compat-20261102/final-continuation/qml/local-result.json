@@ -1,0 +1,40 @@
+{
+  "scope": "production QML geometry; presentation-only theme doubles; no desktop proxy acceptance",
+  "work_directory": "/workspace/scratch/a6f47dff1af2/evidence/qt-policy-final-local/policy-form-p62qnquz",
+  "candidate": {
+    "returncode": 0,
+    "tests": [
+      "PolicyFormScroll::initTestCase",
+      "PolicyFormScroll::test_externalFocusDoesNotScrollTheForm",
+      "PolicyFormScroll::test_focusRevealsLastField",
+      "PolicyFormScroll::test_unfocusedManualScrollIsPreserved",
+      "PolicyFormScroll::test_viewportResizeKeepsFocusedFieldVisible",
+      "PolicyFormScroll::test_viewportResizeRevealsBeforeReturningToEventLoop",
+      "PolicyFormScroll::cleanupTestCase"
+    ],
+    "failed": [],
+    "skipped": [],
+    "form_sha256": "875bd9b43c832e64c3ae66386a4cc2b62e4e42f7917b764531961cf9f0316eaf",
+    "scrollbar_sha256": "b04f2ab0a67d37435935ebf4c363431e99e95b8fef1e558bc206fe7e0be17664"
+  },
+  "baseline_revision": "1327cb4d587eddc60563c926672f67a6da5c16ce",
+  "baseline": {
+    "returncode": 1,
+    "tests": [
+      "PolicyFormScroll::initTestCase",
+      "PolicyFormScroll::test_externalFocusDoesNotScrollTheForm",
+      "PolicyFormScroll::test_focusRevealsLastField",
+      "PolicyFormScroll::test_unfocusedManualScrollIsPreserved",
+      "PolicyFormScroll::test_viewportResizeKeepsFocusedFieldVisible",
+      "PolicyFormScroll::test_viewportResizeRevealsBeforeReturningToEventLoop",
+      "PolicyFormScroll::cleanupTestCase"
+    ],
+    "failed": [
+      "PolicyFormScroll::test_viewportResizeRevealsBeforeReturningToEventLoop"
+    ],
+    "skipped": [],
+    "form_sha256": "e8464f82fa9305d2702e33e37ae707f4e0fb679b86134dfb36a05a75e7ae2892",
+    "scrollbar_sha256": "b04f2ab0a67d37435935ebf4c363431e99e95b8fef1e558bc206fe7e0be17664"
+  },
+  "passed": true
+}

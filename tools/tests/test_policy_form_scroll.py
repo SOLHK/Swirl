@@ -18,7 +18,7 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[2]
 FORM = "src/Swirl.Quick/qml/components/PolicyFormScroll.qml"
 BAR = "src/Swirl.Quick/qml/controls/SwirlScrollBar.qml"
-REGRESSION = "test_viewportResizeKeepsFocusedFieldVisible"
+REGRESSION = "test_viewportResizeRevealsBeforeReturningToEventLoop"
 QML = r'''import QtQuick
 import QtQuick.Controls.Basic
 import QtTest
@@ -77,6 +77,21 @@ Item {
             compare(form.contentHeight, 644)
             verify(field.activeFocus)
             tryVerify(fieldIsContained, 120)
+            compare(form.viewport.contentY, 125)
+        }
+        function test_viewportResizeRevealsBeforeReturningToEventLoop() {
+            focusLastField()
+            // A native layout can finish in the last event processed before a
+            // frame or caller deadline. Its already-focused field must fit the
+            // new viewport when that synchronous geometry update returns;
+            // requiring another event turn can leave the next frame clipped.
+            // Do not wait or force a second reveal after changing the viewport.
+            form.bottomPadding = 44
+            compare(form.viewport.height, 499)
+            compare(form.height, 543)
+            compare(form.contentHeight, 644)
+            verify(field.activeFocus)
+            verify(fieldIsContained())
             compare(form.viewport.contentY, 125)
         }
         function test_externalFocusDoesNotScrollTheForm() {
@@ -148,7 +163,7 @@ def run_case(runner: Path, directory: Path, form: bytes, bar: bytes) -> dict:
     failed = [c.get("name", "") for c in cases if c.find("failure") is not None or c.find("error") is not None]
     skipped = [c.get("name", "") for c in cases if c.find("skipped") is not None]
     names = [c.get("name", "") for c in cases]
-    expected = ["test_focusRevealsLastField", REGRESSION,
+    expected = ["test_focusRevealsLastField", "test_viewportResizeKeepsFocusedFieldVisible", REGRESSION,
                 "test_externalFocusDoesNotScrollTheForm", "test_unfocusedManualScrollIsPreserved"]
     if any(not any(name == test or name.endswith("::" + test) for name in names) for test in expected):
         raise RuntimeError(f"Required tests did not execute: {names}")

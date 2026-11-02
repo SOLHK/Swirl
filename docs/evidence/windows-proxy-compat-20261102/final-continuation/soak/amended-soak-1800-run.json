@@ -1,0 +1,40 @@
+{
+  "started_at_utc": "2026-11-02T15:12:05.616086+00:00",
+  "requested_duration_seconds": 1800,
+  "connections": 8,
+  "identity": {
+    "source_commit_sha": null,
+    "base_commit_sha": "40485650ef72a41967b81cde72cb0600ce5b2538",
+    "source_core_tree_sha": "f4dbcd2bd4c565f92c0aae836fa7504fcd43efde",
+    "binaries": {
+      "swirl-api": {
+        "path": "/workspace/scratch/a6f47dff1af2/network-acceptance-bin/f4dbcd2/swirl-api",
+        "sha256": "5cc28d77b90e86863f2dbdad90e403fce2200be47eed2111124df39f918f76f3",
+        "bytes": 11260968
+      },
+      "swirl-diagnose": {
+        "path": "/workspace/scratch/a6f47dff1af2/network-acceptance-bin/f4dbcd2/swirl-diagnose",
+        "sha256": "d6c8f101f63ed7299a853d78c3f0ff10f0d63de65085d39c7b3fa67502a4b6b8",
+        "bytes": 4493624
+      }
+    },
+    "platform": "linux",
+    "scope": "controlled local network fixtures; not Windows desktop acceptance"
+  },
+  "runner_pid": 115485,
+  "command": [
+    "/tmp/swirl-proxy-venv/bin/python",
+    "/workspace/scratch/a6f47dff1af2/Swirl/tools/tests/test_proxy_stream_soak.py",
+    "--duration-seconds",
+    "1800",
+    "--connections",
+    "8",
+    "--output",
+    "/workspace/scratch/a6f47dff1af2/evidence/rust/amended-soak-1800.json"
+  ],
+  "test_pid": 115487,
+  "exit_code": 0,
+  "elapsed_seconds": 1800.423,
+  "finished_at_utc": "2026-11-02T15:42:06.039493+00:00",
+  "raw_json_sha256": "b4469c9adcaa82726bda10e6b219d4eb71634e7dbed1292c0c082e609f9fe875"
+}

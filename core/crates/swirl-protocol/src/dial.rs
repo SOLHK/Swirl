@@ -269,9 +269,10 @@ fn tcp_failure_code(error: &io::Error) -> &'static str {
         io::ErrorKind::ConnectionReset => "UpstreamConnectionReset",
         io::ErrorKind::ConnectionAborted => "UpstreamConnectionAborted",
         io::ErrorKind::TimedOut => "UpstreamTcpTimeout",
-        io::ErrorKind::NetworkUnreachable
-        | io::ErrorKind::HostUnreachable
-        | io::ErrorKind::NetworkDown => "UpstreamNetworkUnreachable",
+        io::ErrorKind::NetworkUnreachable | io::ErrorKind::NetworkDown => {
+            "UpstreamNetworkUnreachable"
+        }
+        io::ErrorKind::HostUnreachable => "UpstreamHostUnreachable",
         io::ErrorKind::PermissionDenied => "UpstreamPermissionDenied",
         _ => "UpstreamConnectFailed",
     }

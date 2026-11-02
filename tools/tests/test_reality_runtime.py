@@ -1221,12 +1221,12 @@ def validate_qt_lifecycle_report(value, mode, port):
         assert row.get("tls_error_count") == 0, "Qt lifecycle unexpected TLS error"
         if row["phase"] == "reject":
             assert row.get("tunnel_accepted") is False, "Qt policy rejection"
-            assert row.get("proxy_status") == (502 if row["frontend"] == "http-connect" else 5), "Qt policy reply"
+            assert row.get("proxy_status") == (502 if row["frontend"] == "http-connect" else 2), "Qt policy reply"
         elif mode == "authentication-failure":
             assert row.get("http_status", 0) == 0, "Qt authentication failure cannot count HTTP success"
             accepted = row.get("tunnel_accepted")
             assert type(accepted) is bool, "Qt authentication frontend outcome"
-            assert row.get("proxy_status") == ((200 if accepted else 502) if row["frontend"] == "http-connect" else (0 if accepted else 5)), "Qt authentication reply"
+            assert row.get("proxy_status") == ((200 if accepted else 502) if row["frontend"] == "http-connect" else (0 if accepted else 1)), "Qt authentication reply"
         else:
             assert row.get("tunnel_accepted") is True, "Qt selected tunnel"
             assert row.get("proxy_status") == (200 if row["frontend"] == "http-connect" else 0), "Qt accepted proxy reply"

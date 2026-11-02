@@ -467,7 +467,11 @@ pub async fn reply_failure(stream: &mut TcpStream, kind: InboundKind, code: &str
         let status = match code {
             "RouteRejected" | "ProxyLoop" | "UpstreamPermissionDenied" => 2,
             "UpstreamNetworkUnreachable" => 3,
-            "DnsNameError" | "DnsEmpty" | "RouteDnsEmpty" | "DnsLookupFailed" => 4,
+            "UpstreamHostUnreachable"
+            | "DnsNameError"
+            | "DnsEmpty"
+            | "RouteDnsEmpty"
+            | "DnsLookupFailed" => 4,
             "UpstreamConnectionRefused" => 5,
             "AddressType" => 8,
             _ => 1,
