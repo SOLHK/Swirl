@@ -86,3 +86,53 @@ versions and aggregate hashes. `local-minimax/global_failures.py` reproduces
 the new full-cube witnesses. No private fonts, outlines or coefficients are
 committed. PR #52 remains draft; neither test nor main is merged. No final
 SwirlVF.ttc or delivery checksum exists at this checkpoint.
+
+## Serialization, regression and native CI follow-up
+
+PR #51's exact ordinary-CFF2 decoder and its eight regressions are selectively
+ported from `cc29a9e8caf29d7b668ccb9ec9c4be250d5abd1e`, byte-for-byte. The two
+saved difficult-box TTCs pass complete coefficient/support identity, including
+subroutines. Thus serialization preserves these supplied functions at all joint
+coordinates. Their source-fit scope remains the declared boxes.
+
+New full-cube sampled regressions cover GIDs 0, 2 and 12: 1,536 independent
+saved/reopened observations and 216 actual CoreText/libhvf comparisons, all
+pass. Saved maxima are 0.000796872, 0 and 0.012372212; native maxima are
+0.009099353, 0 and 0.010697792. An initial all-empty template was rejected by
+CoreText before identity verification. The harness now keeps a separate
+authored `.notdef`; the measured blank GID remains genuinely empty. Startup
+exceptions are retained as failed native records instead of escaping before
+the case report is written. No native identity check is relaxed.
+
+The frozen common-atlas experiment is also retained as a failure: 512 boxes,
+35 fitted, 477 unresolved; the fitted subset already has 7,894 distinct regions.
+A new 8,192-position independent plan gives 60 / 177 failed target observations,
+maximum errors 0.126357692 / 0.120257162. All 27 cube-grid positions pass, which
+again shows why corner-only validation is insufficient. An adaptive nonuniform
+19,747-node octant grid also fails: maximum held error 0.866730818 and its
+506-region compression bound is 0.126981944. No complete atlas font is installed.
+Changing the greedy compression initialization to 16, 64 or 128 regions does
+not improve the difficult-box result; the original 253-region seed is retained.
+These experiments do not prove that every standard CFF2 representation fails.
+
+At head `7a4337924f25bd2e57729a51c0e880cd6c4c846d`, actual CI now verifies the
+new hierarchical fixture: each of Server 2022 x64, Server 2025 x64 and Windows
+11 ARM64/x64-emulation passes 372 DirectWrite observations (max 0.007074312).
+macOS 26.6.2 ARM64 passes 174 geometry observations (max 0.001940973), retaining
+68 metric failures for this variant. Six nested variants still fail on Windows;
+the overall workflow is failed. The decoded fixture bytes match the local
+8,660-byte authored TTC exactly. [Run and artifacts](https://github.com/SOLHK/Swirl/actions/runs/41509979774).
+
+The independent `cff2_qt_joint` target and a narrowly scoped Windows workflow
+now request Qt **6.12.0**, exact font/table hashes and 546 three-axis source
+comparisons. Both ordinary controls and empty outlines are compared through
+actual `QRawFont::pathForGlyph`, with the unchanged 1/32 FUnit limit. Reference
+commands come from the authored source, not the target. Native Qt execution is
+pending; this Mac has no available Qt 6.12 SDK. The existing product workflow's
+branch filters, UI, Rust runtime and delivery gates are untouched.
+
+Validation before this follow-up: 1,002 Python tests, 995 passed, seven skipped,
+zero failures, plus the newly added independent Qt-manifest test (one passed).
+The [follow-up receipt](evidence/SWIRL_VF_HIERARCHICAL_FOLLOWUP_20261103.json)
+binds these observations, the unchanged failure logs and private recovery
+commands. The primary target glyphs and final-font delivery remain unaccepted.

@@ -31,6 +31,22 @@ from verified_axis_oracle import make_launcher
 from test_coretext_extract import make_fixture
 from probe_hvf_cff2_geometry import native_commands
 from hvf_transcript import validate_transcript
+from cff2_certificate import certify
+
+
+def probe_models(original, model):
+    """Keep an authored nonempty .notdef when the measured source GID is blank.
+
+    CoreText rejects our all-empty three-glyph control before identity replay.
+    Only GID 2 is compared to the source; an authored .notdef must not become
+    purported source geometry. Do not change or suppress the empty target.
+    """
+    models = dict.fromkeys(original.getGlyphOrder(), model)
+    if not model.operators:
+        from make_cff2_fixture import convert
+        _, models = convert(original)
+        models[original.getGlyphOrder()[2]] = model
+    return models
 
 
 def native_plan(box, profiles, seed):
@@ -136,8 +152,8 @@ def run(source, manifest, output, *, native_binary=None, hvf_binary=None):
             template = output/f'{prefix}-template.ttc'; make_fixture(template)
             with TTCollection(template) as collection:
                 original = collection.fonts[0]; original['head'].unitsPerEm = upm
-                font = geometry.install(prepare_from_truetype(original),
-                    dict.fromkeys(original.getGlyphOrder(),model),experimental_local=True)
+                models = probe_models(original, model)
+                font = geometry.install(prepare_from_truetype(original), models, experimental_local=True)
                 candidate = TTCollection(); candidate.fonts = [font]
                 path = output/f'{prefix}-research.ttc'; candidate.save(path)
             row['font_sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -145,6 +161,9 @@ def run(source, manifest, output, *, native_binary=None, hvf_binary=None):
             row['serialized'] = dict(observations=0,failures=0,max_error=0.)
             with TTCollection(path) as reopened:
                 saved = reopened.fonts[0]
+                row['serialized_coefficient_identity'] = certify(saved, models)
+                row['measured_target_gid'] = 2
+                row['authored_background_for_empty_target'] = not bool(model.operators)
                 for p, actual in zip(held,exact):
                     out_ops, out = geometry.operands(geometry.source_commands(saved.getGlyphSet(
                         location=dict(zip(tags,map(float,p))),normalized=True)[saved.getGlyphOrder()[2]]))
@@ -155,11 +174,12 @@ def run(source, manifest, output, *, native_binary=None, hvf_binary=None):
                     row['serialized']['max_error'] = max(row['serialized']['max_error'],error)
                 profiles = [(a.minValue,a.defaultValue,a.maxValue) for a in saved['fvar'].axes]
             if native_binary:
-                native = NativeOracle(launcher,path,output/f'{prefix}-coretext-stderr.log')
+                native = None
                 counts_native = dict(observations=0,failures=0,topology_failures=0,
                     max_cff2_libhvf_error=0.,max_portable_libhvf_error=0.)
                 row['native'] = counts_native
                 try:
+                    native = NativeOracle(launcher,path,output/f'{prefix}-coretext-stderr.log')
                     with (output/f'{prefix}-coretext.jsonl').open('x') as transcript:
                         for i,user in enumerate(native_plan(box,profiles,seed+1)):
                             normalized = np.asarray([(v-d)/(d-l if v<d else h-d)
@@ -197,7 +217,8 @@ def run(source, manifest, output, *, native_binary=None, hvf_binary=None):
                     counts_native['failures'] += 1
                     counts_native['execution_error'] = str(error)
                 finally:
-                    native.close()
+                    if native is not None:
+                        native.close()
             row['passed'] = not row['serialized']['failures'] and (
                 not native_binary or not row['native']['failures'])
         (output/'report.json').write_text(json.dumps(report,indent=2)+'\n')
