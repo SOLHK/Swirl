@@ -68,6 +68,10 @@ def dense_witnesses(table,renderer,gid,tags,directory,seed=2026110307):
     with np.load(data,allow_pickle=False) as archive:deltas=archive['deltas']
     model=geometry.OutlineModel(tags,tuple(map(tuple,spec['operators'])),spec['supports'],deltas,spec['evidence'])
     held=np.random.default_rng(seed).uniform(-1,1,(128,3))
+    # The retained fitter's nodes are F2DOT14 and its refinement midpoints
+    # are half-ticks. Reject even a coincidental overlap with that whole grid.
+    require(np.any(held*32768!=np.rint(held*32768),axis=1).all(),
+            'joint_holdout_overlaps_tensor_training_grid')
     batch=renderer.render(gid,held)
     actual=np.asarray([geometry.control_points(*geometry.operands(_commands(batch.paths,i,1)))
                        for i in range(len(held))])
@@ -111,9 +115,18 @@ def dense_witnesses(table,renderer,gid,tags,directory,seed=2026110307):
     witnesses.append(max(diagonals,key=lambda w:w['lower_bound']))
     return dict(holdout_count=len(held),max_holdout_error=float(errors.max()),
                 failing_holdouts=int(np.count_nonzero(errors>geometry.LIMIT)),
+                holdouts_disjoint_from_training_and_midpoint_grid=True,
                 metadata_sha256=hashlib.sha256(meta.read_bytes()).hexdigest(),
                 coefficient_sha256=hashlib.sha256(data.read_bytes()).hexdigest(),
                 witnesses=witnesses)
+
+
+def probe_status(cases):
+    if not cases or any(c['native_failures'] for c in cases):return 'FAIL_SOURCE_NATIVE'
+    if any(c['dense_model'] and (c['dense_model']['failing_holdouts'] or
+            any(w['native_observation_bound']['exceeds_limit'] for w in c['dense_model']['witnesses']))
+           for c in cases):return 'FAIL_RETAINED_MODELS'
+    return 'PASS_SCOPED_SOURCE_PROBE'
 
 
 def run(source,source_sha,binary,output,face=0,gids=(1166,19177),dense_models=None):
@@ -187,6 +200,7 @@ def run(source,source_sha,binary,output,face=0,gids=(1166,19177),dense_models=No
         row['plan_sha256']=hashlib.sha256((output/f'gid-{gid}-plan.json').read_bytes()).hexdigest()
         row['transcript_sha256']=hashlib.sha256((output/f'gid-{gid}-native.jsonl').read_bytes()).hexdigest()
         report['cases'].append(row)
+        report['status']=probe_status(report['cases'])
         require(hashlib.sha256(source.read_bytes()).hexdigest()==digest,'source_changed_during_probe')
         (output/'report.json').write_text(json.dumps(report,indent=2,allow_nan=False))
         print(json.dumps(row),flush=True)
@@ -205,4 +219,4 @@ if __name__=='__main__':
     args=parser.parse_args()
     result=run(args.source,args.source_sha256,args.binary,args.private_output,args.face,
                tuple(map(int,args.gids.split(','))),args.dense_models)
-    sys.exit(int(any(c['native_failures'] for c in result['cases'])))
+    sys.exit(0 if result['status']=='PASS_SCOPED_SOURCE_PROBE' else 1)

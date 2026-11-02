@@ -11,6 +11,7 @@ from hvf_piecewise_axes import line_partition,segment_partition
 from hvf_branch_cells import branch_cell
 from interpolation_witness import polynomial_witness,flat_cell_degree
 from test_hvf_branch_cells import authored_table
+from probe_joint_boundaries import independent_plan,probe_status
 
 
 class JointBranchTests(unittest.TestCase):
@@ -41,6 +42,26 @@ class JointBranchTests(unittest.TestCase):
         for a,b in (([0,0],[1,1]),([0,0,0],[0,0,0]),
                     ([0,0,0],[0,2,0]),([0,0,0],[0,np.nan,0])):
             with self.assertRaises(ValueError):segment_partition(authored_table(),0,a,b)
+
+    def test_native_plan_has_independent_single_dual_triple_and_boundary_samples(self):
+        plan,_=independent_plan(authored_table(),0)
+        self.assertEqual(len({tuple(r['point']) for r in plan}),len(plan))
+        for kind,count,active in (('single',96,1),('dual',96,2),('triple',128,3)):
+            selected=[r for r in plan if r['kind']==kind]
+            self.assertEqual(len(selected),count)
+            self.assertTrue(all(np.count_nonzero(r['point'])==active for r in selected))
+            self.assertTrue(all(any(x*32768!=round(x*32768) for x in r['point']) for r in selected))
+        self.assertTrue(any(r['kind'].startswith('branch_') for r in plan))
+
+    def test_source_agreement_does_not_hide_retained_model_failures(self):
+        case=dict(native_failures=[],dense_model=None)
+        self.assertEqual(probe_status([case]),'PASS_SCOPED_SOURCE_PROBE')
+        case['dense_model']=dict(failing_holdouts=1,witnesses=[])
+        self.assertEqual(probe_status([case]),'FAIL_RETAINED_MODELS')
+        case['dense_model']=dict(failing_holdouts=0,witnesses=[dict(native_observation_bound=dict(exceeds_limit=True))])
+        self.assertEqual(probe_status([case]),'FAIL_RETAINED_MODELS')
+        case['native_failures']=[dict(index=0)]
+        self.assertEqual(probe_status([case]),'FAIL_SOURCE_NATIVE')
 
 
 class PolynomialWitnessTests(unittest.TestCase):
