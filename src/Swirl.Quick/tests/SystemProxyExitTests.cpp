@@ -2,6 +2,7 @@
 #include "SwirlBuildIdentity.h"
 #include "engine/SystemProxySession.h"
 #include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QJsonDocument>
 #include <QLocalSocket>
@@ -116,11 +117,59 @@ bool socksRoundTrip(quint16 proxyPort,quint16 originPort) {
     socket.write("GET /socks-check HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
     return readHttpReply(socket,"swirl-native-exit-socks");
 }
-bool listenerRefusesConnections(quint16 port) {
+struct ListenerProbe {
+    bool terminalObserved=false;
+    bool connected=false;
+    bool errorObserved=false;
+    QAbstractSocket::SocketError signalError=QAbstractSocket::UnknownSocketError;
+    QAbstractSocket::SocketState socketState=QAbstractSocket::UnconnectedState;
+    QAbstractSocket::SocketError socketError=QAbstractSocket::UnknownSocketError;
+    qint64 elapsedMs=0;
+    bool refused() const {
+        return terminalObserved&&!connected&&errorObserved
+            &&signalError==QAbstractSocket::ConnectionRefusedError
+            &&socketState==QAbstractSocket::UnconnectedState
+            &&socketError==QAbstractSocket::ConnectionRefusedError;
+    }
+    QJsonObject report() const {
+        const QString outcome=refused()?QStringLiteral("refused"):
+            connected?QStringLiteral("connected"):
+            !terminalObserved?QStringLiteral("deadline"):
+            errorObserved?QStringLiteral("error"):QStringLiteral("unknown");
+        return {{"deadline_ms",3000},{"terminal_observed",terminalObserved},
+            {"connected",connected},{"error_observed",errorObserved},
+            {"signal_error",int(signalError)},{"socket_state",int(socketState)},
+            {"socket_error",int(socketError)},{"elapsed_ms",double(elapsedMs)},
+            {"refused",refused()},{"outcome",outcome}};
+    }
+};
+ListenerProbe probeListener(quint16 port) {
+    ListenerProbe probe;
     QTcpSocket socket;socket.setProxy(QNetworkProxy::NoProxy);
+    QObject::connect(&socket,&QTcpSocket::connected,&socket,[&]{probe.connected=true;});
+    QObject::connect(&socket,&QTcpSocket::errorOccurred,&socket,[&](QAbstractSocket::SocketError error){
+        probe.errorObserved=true;probe.signalError=error;
+    });
+    QElapsedTimer elapsed;elapsed.start();
     socket.connectToHost(QHostAddress::LocalHost,port);
+    // Windows can complete a refused loopback connection after SYN retries.
+    // Observe the actual terminal event within the same finite budget used
+    // for successful test connections; elapsed time is never proof of closure.
+    probe.terminalObserved=QTest::qWaitFor([&]{return probe.connected
+        ||(probe.errorObserved&&socket.state()==QAbstractSocket::UnconnectedState);},3000);
+    probe.elapsedMs=elapsed.elapsed();probe.socketState=socket.state();probe.socketError=socket.error();
+    return probe;
+}
+QJsonObject legacyListenerProbe(quint16 port) {
+    QTcpSocket socket;socket.setProxy(QNetworkProxy::NoProxy);
+    QElapsedTimer elapsed;elapsed.start();
+    socket.connectToHost(QHostAddress::LocalHost,port);
+    // Preserve the exact previous predicate as a measurement on a known
+    // closed control port. Future Windows versions may complete it promptly.
     const bool finished=QTest::qWaitFor([&]{return socket.state()==QAbstractSocket::ConnectedState||socket.state()==QAbstractSocket::UnconnectedState;},1500);
-    return finished&&socket.state()==QAbstractSocket::UnconnectedState&&socket.error()==QAbstractSocket::ConnectionRefusedError;
+    const bool refused=finished&&socket.state()==QAbstractSocket::UnconnectedState&&socket.error()==QAbstractSocket::ConnectionRefusedError;
+    return {{"deadline_ms",1500},{"finished",finished},{"socket_state",int(socket.state())},
+        {"socket_error",int(socket.error())},{"elapsed_ms",double(elapsed.elapsed())},{"predicate_result",refused}};
 }
 }
 
@@ -151,6 +200,32 @@ private slots:
         absentRegistry.insert("AutoConfigURL",QJsonObject{{"present",false}});
         absent.insert("registry",absentRegistry);
         QVERIFY2(owned!=absent,"Exact snapshot equality must distinguish an empty REG_SZ from an absent PAC value.");
+    }
+    void listenerProbeDistinguishesClosedAndLivePorts() {
+        QJsonObject report{{"schema",1},{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"success",false}};
+        bool completed=false;
+        const auto preserve=qScopeGuard([&]{
+            report.insert("success",completed&&!QTest::currentTestFailed());
+            const auto evidence=qEnvironmentVariable("SWIRL_SYSTEM_PROXY_EXIT_EVIDENCE");
+            if(!evidence.isEmpty()&&(!QDir().mkpath(evidence)
+                ||!writeReceipt(QDir(evidence).filePath("listener-probe-controls.json"),report)))
+                QTest::qFail("Could not preserve safe closed/live listener probe controls.",__FILE__,__LINE__);
+        });
+        QTcpServer closed;closed.setProxy(QNetworkProxy::NoProxy);
+        QVERIFY(closed.listen(QHostAddress::LocalHost));
+        const auto closedPort=closed.serverPort();closed.close();QVERIFY(!closed.isListening());
+        report.insert("legacy",QJsonObject{{"closed",legacyListenerProbe(closedPort)}});
+        const auto closedProbe=probeListener(closedPort);
+        QJsonObject current{{"closed",closedProbe.report()}};report.insert("current",current);
+        QVERIFY2(closedProbe.refused(),"A known-closed control port must produce an explicit connection refusal.");
+
+        QTcpServer live;live.setProxy(QNetworkProxy::NoProxy);
+        QVERIFY(live.listen(QHostAddress::LocalHost));
+        const auto liveProbe=probeListener(live.serverPort());
+        current.insert("live",liveProbe.report());report.insert("current",current);
+        QVERIFY2(liveProbe.terminalObserved&&liveProbe.connected,"The live control must produce an observed connection.");
+        QVERIFY2(!liveProbe.refused(),"A live listener must never be accepted as closed.");
+        completed=true;
     }
     void normalApplicationExitRestoresOwnedProxy_data() {
         QTest::addColumn<int>("flags");QTest::addColumn<bool>("externalEdit");
@@ -301,8 +376,10 @@ private slots:
         QVERIFY2(SystemProxySession::snapshot()==expectedAfterExit,"Normal exit did not preserve the exact required PAC/bypass and raw registry snapshot; private values omitted.");
         result.insert("exact_exit_snapshot",true);
         QTRY_VERIFY_WITH_TIMEOUT(!QFile::exists(journal)&&QDir(root.filePath("data")).entryList({"system-proxy.dpapi.*.ready"},QDir::Files).isEmpty(),5000);
-        QVERIFY2(listenerRefusesConnections(quint16(port)),"The real Rust listener remained reachable after normal application exit.");
-        result.insert("listener_closed",true);result.insert("journal_and_guard_markers_removed",true);
+        result.insert("journal_and_guard_markers_removed",true);
+        const auto listenerProbe=probeListener(quint16(port));result.insert("listener_probe",listenerProbe.report());
+        QVERIFY2(listenerProbe.refused(),"The post-exit listener probe did not confirm explicit TCP refusal; see its numeric receipt.");
+        result.insert("listener_closed",true);
         completed=true;
     }
 };

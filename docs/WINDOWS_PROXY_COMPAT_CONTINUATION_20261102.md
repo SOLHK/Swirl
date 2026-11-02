@@ -224,3 +224,15 @@ Rust 的 workspace 零 ignored 不表示整个 workflow 零跳过。常规 Qt br
 本地 Linux PowerShell 7 完整脚本执行通过：31 项 package、20 项 Release cache、14 项 manifest、42 项 TLS、远端原有 12 项 staging safety，以及新增 2 项 Finalize 入口场景。两份生产/测试文件已由独立复核重新计算 hash；[原始 old/new 日志与身份索引](evidence/windows-proxy-compat-20261102/native-exit-followup/finalizer-empty-dirs/index.json) 保存执行证据。完整 Qt workflow 会在 Windows PowerShell 5.1 和 pwsh 下各实际执行这份测试脚本，最终结果必须以新增提交的 CI 为准。未改变生产超时、卸载所有权规则或“安装目录必须移除”的断言。
 
 17:08:05 UTC，`ae083d7` 的完整 Windows Qt 构建已成功编译新增 `SwirlSystemProxyExitTests`，但当时四个数据行尚待 critical network 阶段，不能将编译成功登记为退出验收通过。最新源码的 Windows 原生退出、完整 Qt/Rust、安全矩阵、生产安装/卸载以及新产物身份仍待收齐；真实 Windows 11 Codex Desktop A/B 持续为 **NOT_RUN**，PR #50 保持 Draft，不合并 `test`。
+
+## 十、原生退出探针的终态同步 — 18:18 UTC
+
+`1410ee9f1d9158f32534892ccb7062ecab30be7f` 保留前述全部修复，并纠正了新退出测试将空 `REG_SZ` 的 PAC 项误写成缺失项的预期。该提交完整 Qt run [41491137276](https://github.com/SOLHK/Swirl/actions/runs/41491137276) 的实际 checkout 为 `ec7e54fced672561f8f06f958b75f1364403184e`，源码 tree 为 `972953bc88cadf82930e570c7c48b5c670599210`。首次 critical UI **10/10 通过**，原完整应用 `swirl-policy-ui` **56.57 秒通过**；critical network **10/11**，失败仅为新 `swirl-system-proxy-app-exit`。后续七项诊断复跑通过，保存的 policy JSON 为 548 项通过；该 JSON 属于诊断复跑，不冒充第一次执行的几何记录。
+
+原生 XML 和十二份回执已逐项核对：[失败证据索引](evidence/windows-proxy-compat-20261102/native-exit-followup/listener-probe-1410/index.json)。state 34、recovery 16 个 pass incident 均实际通过。app-exit 新的空 PAC 回归通过；四个完整应用数据行都完成真实 Rust HTTP/SOCKS5 转发、正常退出 0、精确 PAC/bypass/原始注册表恢复或后来外部设置保留、WinHTTP machine default 不变以及 journal/guard-marker 不存在的检查。正常恢复行明确在 Rust 仍活跃时恢复，最终关闭耗时分别为 85/60/48/55 ms。四行随后统一失败在第 304 行的 `listenerRefusesConnections`，整个原生退出门禁仍为 **FAIL**，未生成本候选生产安装包，剩余完整回归也未执行。
+
+该旧探针将 1500 ms 内仍未完成的连接、其他错误和实际连接成功都压成一个 false，且未保存状态/错误/耗时。因而其“仍可连接”错误文字不能证明存在监听器泄漏。Windows loopback 拒绝存在 SYN 重试延迟的主源码说明支持一个时序假设，但失败版本没有记录其实际 socket 终态，不能提前登记为已证实的 OS 延迟。
+
+本次只修正测试同步和证据门禁：观察 `connected`/`errorOccurred` 信号及终态，在既有成功连接测试使用的 3000 ms 条件等待上限内，必须收到明确的 `ConnectionRefusedError`，最终为 `UnconnectedState`，且没有连接事件，才通过。每行在断言前写入安全的数值诊断，超时、其他错误或实际连接仍失败。新增真实关闭端口与真实监听端口的正反对照，并记录旧 1500 ms 谓词在关闭端口上的实际结果；不把某个 Windows 延迟写成永久要求。CI 必须验证此控制用例、其源码匹配的 JSON，以及四行的明确拒绝回执。生产超时、120 秒 suite 上限、窗口尺寸、原 policy 120 ms 断言、四行测试和快照精确性都保持原要求。
+
+Linux Qt 6.12 信号/状态实验已验证关闭与监听两种终态，但不等于 Windows C++ 控制或完整应用验收。新候选必须重新取得全部 CI、原生退出与新生产包的实际结果；真实 Windows 11 Codex/Clash A/B 仍为 **NOT_RUN**，PR #50 保持 Draft，不合并 `test`。
