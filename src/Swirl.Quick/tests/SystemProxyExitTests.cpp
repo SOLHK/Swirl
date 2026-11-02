@@ -42,7 +42,8 @@ QJsonObject configuredProxy(QJsonObject value,int flags,const QString &server,co
     const QString values[]={server,bypass,pac};
     const char *names[]={"ProxyServer","ProxyOverride","AutoConfigURL"};
     for(int index=0;index<3;++index){
-        if(index==2&&values[index].isEmpty()){registry.insert(names[index],QJsonObject{{"present",false}});continue;}
+        // Native takeover writes an explicit empty REG_SZ for AutoConfigURL.
+        // Absence is a different raw registry state and must not be substituted.
         const QByteArray bytes(reinterpret_cast<const char *>(values[index].utf16()),(values[index].size()+1)*2);
         registry.insert(names[index],QJsonObject{{"present",true},{"type",1},{"data",QString::fromLatin1(bytes.toBase64())}});
     }
@@ -137,6 +138,19 @@ private slots:
         if(m_winHttpBefore.isEmpty())return;
         const auto after=winHttpSnapshot();
         QVERIFY2(!after.isEmpty()&&after==m_winHttpBefore,"The application exit changed machine-wide WinHTTP settings; private values omitted.");
+    }
+    void ownedSnapshotDistinguishesEmptyPacFromAbsentRegistry() {
+        const auto owned=configuredProxy({},3,QStringLiteral("127.0.0.1:65009"),{},QStringLiteral("<local>"));
+        const auto registry=owned.value("registry").toObject();
+        const auto pac=registry.value("AutoConfigURL").toObject();
+        QVERIFY2(pac.value("present").isBool()&&pac.value("present").toBool(),
+                 "Owned empty PAC must remain a present registry value.");
+        QCOMPARE(pac.value("type").toInt(),int(REG_SZ));
+        QCOMPARE(QByteArray::fromBase64(pac.value("data").toString().toLatin1()),QByteArray(2,'\0'));
+        auto absent=owned;auto absentRegistry=registry;
+        absentRegistry.insert("AutoConfigURL",QJsonObject{{"present",false}});
+        absent.insert("registry",absentRegistry);
+        QVERIFY2(owned!=absent,"Exact snapshot equality must distinguish an empty REG_SZ from an absent PAC value.");
     }
     void normalApplicationExitRestoresOwnedProxy_data() {
         QTest::addColumn<int>("flags");QTest::addColumn<bool>("externalEdit");
