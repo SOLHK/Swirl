@@ -1,0 +1,10 @@
+Package policy: 31 assertions passed.
+Release cache policy: 20 staging cases passed.
+Final manifest regression: 14 scenarios passed.
+Final payload inventory and hashes verified: 48caea558f616c6d9b958345b4c71956fe038564
+Exception: /workspace/scratch/a6f47dff1af2/Swirl/scripts/tests/Test-RustProductPackagePolicy.ps1:353
+Line |
+ 353 |          throw "Final packaging accepted the native empty-directory un …
+     |          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Final packaging accepted the native empty-directory uninstall regression
+     | or failed for another reason:

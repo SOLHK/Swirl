@@ -172,3 +172,55 @@ Rust 的 workspace 零 ignored 不表示整个 workflow 零跳过。常规 Qt br
 远端随后另行推进到 `2ff3c853c4df6e3da3760b353eed87dcaf58864a`，增加真实 native→Rust listener 组合测试、生产 NSIS 安装/运行/卸载测试等；相关范围见 [该续接记录](WINDOWS_PROXY_COMPAT_RESUME_20261103.md)。16:43 UTC 查询时，其独立策略和 source guard 已成功，[完整 Qt](https://github.com/SOLHK/Swirl/actions/runs/41481544129) 与 [Rust](https://github.com/SOLHK/Swirl/actions/runs/41481544448) 正在运行，[Qt security](https://github.com/SOLHK/Swirl/actions/runs/41481544469) 尚在队列，不能由 `24af583` 的绿色结果代替。持有原生代理的正常 Swirl 进程退出补验是进一步独立门禁，仍须后续实际证据；新的安装/卸载门禁也不应倒记为本节历史包已执行。
 
 真实 Windows 11 已登录 Codex Desktop 的同设备/订阅/节点 Clash/Swirl A/B 继续为 **NOT_RUN**，Workspace Settings、多轮对话、真实 VS Code/WS/SSE 和退出后的该设备代理恢复均未冒称通过。PR #50 继续保持 Draft；上述检查点本身不满足合并 `test` 的全部条件，`main` 不在修改范围。
+
+## 八、真实 NSIS 卸载留下空目录：已取得原生失败证据 — 17:03 UTC
+
+`2ff3c8` 新增的真实安装/运行/卸载门禁发现：已安装的 1519 个 manifest 文件、Rust 往返、TLS 和 61 个 UI 页面均通过，但卸载进程退出 0 后安装目录仍存在。这是此前 `24af583` 的解包/hash 验收没有覆盖到的执行路径，不能因为旧 workflow 为绿色便忽略新失败。原 `2ff3c8` 报告没有保存剩余目录清单，后续严格测试因此在清理一次性 fixture 前保留安装拓扑和卸载剩余项；原断言没有放宽。
+
+[原生诊断 run 41486232873](https://github.com/SOLHK/Swirl/actions/runs/41486232873)，job `125417202859`，于 **16:58:04 UTC** 实际失败于同一卸载断言。它用 `ae083d7` 的当前严格探针，安装并运行已经固定身份的 **历史 `24af583` 生产安装包**；历史 checkout 单独放置，探针脚本复制后再次核对 hash。这个诊断明确记录 `diagnostic_only=true`、`current_source_acceptance=false`，不充当当前分支的产品验收。
+
+| 原生诊断身份 | 已复核值 |
+| --- | --- |
+| 诊断 workflow/source | `ae083d7f0dc73c5d34802d872d124a34fb4e465d` |
+| 实际探针脚本 SHA-256 | `558b5cc705fd6751b229668cba0f0339c47d8048f1b605c16d8691bfdf50dd2e`；与诊断提交 Git blob 相同 |
+| 历史产品 head / checkout | `24af5838e39b4612321a7ee2b1be11d78fb9b6dd` / `ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd` |
+| 实际 `Swirl-Setup.exe` SHA-256 | `082c6e60ffa968d0e6d3d8766a055e7dc49b5a6263de1f66c74352218b6ea84b` |
+| 已安装 manifest SHA-256 | `95e57c627ba3948422075ea22b731dc3bb77e386719e91cbf2450fb6a0758003` |
+| 诊断 artifact / ZIP SHA-256 | `13160614838` / `b529aa04986ad10b1e8c29c6c4552a52ec6e9fa834843d7c4ff416ed608a32b5` |
+
+[原始 lifecycle](evidence/windows-proxy-compat-20261102/resume-20261103/installer-cleanup/lifecycle.json) 证明安装后的 **1519/1519 文件 hash 与精确清单**、source/build-ID 配对的真实 Rust HTTP/CONNECT/SOCKS5 往返、Qt/OpenSSL runtime、**61/61 UI 页面**均成功；安装、三个产品检查进程和卸载均正常退出 0，没有强制终止。检查后剩余 owned process 为 0，用户 registry/shortcut integration 与初始状态相同，一次性 fixture 最终移除。**整个 lifecycle 仍为 FAILURE**，因为产品卸载未自行移除安装目录；finally 的测试环境清理不算产品卸载成功。
+
+### 已定位的目录所有权遗漏
+
+[安装后的完整拓扑](evidence/windows-proxy-compat-20261102/resume-20261103/installer-cleanup/installed-layout.json) 与 [实际卸载剩余项](evidence/windows-proxy-compat-20261102/resume-20261103/installer-cleanup/uninstall-remainder.json) 可逐项对照：卸载后剩余 **0 个文件、17 个目录**，其中 **10 个从安装时就为空的 Qt QML 叶目录**，加上它们的 7 个祖先目录。没有剩余 `Swirl.exe`、DLL、manifest、安装标记或仍在运行的产品进程。
+
+| 安装时已经为空的目录（相对产品根） |
+| --- |
+| `qml/QtQml/DesignSupport` |
+| `qml/QtQml/XmlListModel` |
+| `qml/QtQuick/Controls/Native` |
+| `qml/QtQuick/LocalStorage` |
+| `qml/QtQuick/NativeStyle/controls` |
+| `qml/QtQuick/NativeStyle/util` |
+| `qml/QtQuick/Particles` |
+| `qml/QtQuick/Shapes/DesignHelpers` |
+| `qml/QtQuick/tooling` |
+| `qml/QtQuick/VectorImage/Helpers` |
+
+源码路径与原生观测一致：NSIS `File /r` 会复制 staging 树中的空目录；维护脚本按已验证的 manifest **文件**删除，再逐级裁剪那些文件的空父目录。上述只有空目录的分支没有 manifest 文件后代，因此不会被该遍历访问，最终非递归 `RMDir "$INSTDIR"` 留下目录树，历史卸载器仍退出 0。只复制 1519 个文件进行维护脚本重放会丢失这部分安装拓扑，不能用这样的重放替代真实 NSIS 失败。
+
+四份原始 JSON（envelope、lifecycle、installed-layout、uninstall-remainder）已逐字节保存；[核验摘要](evidence/windows-proxy-compat-20261102/resume-20261103/installer-cleanup/historical-installer-root-cause.json) 和 [文件 hash 索引](evidence/windows-proxy-compat-20261102/resume-20261103/installer-cleanup/index.json) 记录 artifact、脚本、历史二进制及每份 raw 的身份。这里只保存必要证据，没有复制二进制、完整 workflow 环境日志或临时签名 URL。
+
+**生产修复与新增候选的 Windows 完整复验仍为 PENDING。** 修复必须针对已证明的 staging/目录所有权问题，同时保留未知用户文件和目录的保护；不得扩大卸载删除范围，或把“没有文件”改成通过条件来回避原来的“安装目录移除”断言。`3054b1c` 引入的真实 Swirl 持有原生系统代理时正常退出组合测试也仍待后续完整 Qt 执行；由于后续提交替换了 pending run，`3054b1c` 的完整 Qt/security 未运行，不能记为通过。当前 `ae083d7` 的 source guard 与独立策略回归已成功，最终完整 CI、新生产包以及实机 Windows 11 Codex A/B 门禁尚未收齐；PR #50 保持 Draft，不合并 `test`。
+
+## 九、保留生产 staging 修复并补齐最终封包门禁 — 17:10 UTC
+
+远端 `48caea558f616c6d9b958345b4c71956fe038564` 已修复空目录来源，并完整保留本轮 `3054b1c` 的原生退出回归。新 staging helper 仅由已经验证目标不存在、由本次构建新建的 `Stage-WindowsRustProduct.ps1` 调用，在 Qt 部署成功后、真实 EXE/TLS 自检前处理空目录；它拒绝文件系统根、安装标记及链接，先检查整棵树，再逐层非递归删除空目录，保留非空目录、根目录和全部文件。真实安装器验收也已从文件清单扩大为文件及 manifest 推导的完整目录清单。临时历史诊断 workflow 已按其目的完成后移除，原始失败证据继续保留。
+
+对同一新源码的最终封包入口继续做了真实负对照：源身份、所有文件摘要及 TLS closure 均正确、但带有上述十个空叶目录的输入，仍被旧 `Finalize-WindowsRustProduct.ps1` 接受并生成 NSIS 授权 include。这意味着从 staging 到最终封包之间重新出现的空目录，或者直接传给 standalone finalizer 的同类输入，仍可越过最后的包验证。因此本次只在 Finalize 增加**只读的目录检查**：已有 manifest、链接和 TLS 验证通过后，发现任何空后代目录就拒绝，并且不生成 NSIS include；不在 Finalize 或卸载器中增加目录删除。正常封包报告新增 `no_empty_directories=true`。
+
+新增回归直接执行实际 Finalize 入口，包含两个阶段：坏目录树必须被拒绝，且十个原始叶目录、全部文件和 manifest 字节保持不变；随后仅对测试中新建的同一目录调用生产 staging helper，精确移除十个叶目录及其祖先共十七项，保留零长度文件和所有文件摘要，再由实际 Finalize 成功验证。旧 `48caea5` finalizer 与修改后的 finalizer 使用**同一份测试源码**，SHA-256 为 `04f104a618510104c575c60041a1ef2980b8253545a581b27e77bf418aba407a`；旧实现实际退出 1，命中预期的错误接受断言，修改后退出 0，不是因缺失 helper 或夹具初始化失败产生的负对照。
+
+本地 Linux PowerShell 7 完整脚本执行通过：31 项 package、20 项 Release cache、14 项 manifest、42 项 TLS、远端原有 12 项 staging safety，以及新增 2 项 Finalize 入口场景。两份生产/测试文件已由独立复核重新计算 hash；[原始 old/new 日志与身份索引](evidence/windows-proxy-compat-20261102/native-exit-followup/finalizer-empty-dirs/index.json) 保存执行证据。完整 Qt workflow 会在 Windows PowerShell 5.1 和 pwsh 下各实际执行这份测试脚本，最终结果必须以新增提交的 CI 为准。未改变生产超时、卸载所有权规则或“安装目录必须移除”的断言。
+
+17:08:05 UTC，`ae083d7` 的完整 Windows Qt 构建已成功编译新增 `SwirlSystemProxyExitTests`，但当时四个数据行尚待 critical network 阶段，不能将编译成功登记为退出验收通过。最新源码的 Windows 原生退出、完整 Qt/Rust、安全矩阵、生产安装/卸载以及新产物身份仍待收齐；真实 Windows 11 Codex Desktop A/B 持续为 **NOT_RUN**，PR #50 保持 Draft，不合并 `test`。

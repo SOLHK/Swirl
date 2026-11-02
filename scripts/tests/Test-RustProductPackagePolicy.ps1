@@ -313,6 +313,68 @@ try {
     try {
         Assert-TlsFixtureRejected $fixture 'linked TLS directory' 'Linked package or output path is forbidden.'
     } finally { [IO.Directory]::Delete($link) }
+
+    # Reproduce the ten empty Qt directories from the native NSIS failure
+    # through the actual final packaging entry point. The generic historical
+    # manifest reader remains compatible; finalization must reject this tree
+    # without deleting directories from an arbitrary supplied package.
+    $stagingSourceSha = (& git -C $repo rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0) { throw 'Finalization regression source identity is unavailable.' }
+    $finalizer = Join-Path $repo 'scripts/Finalize-WindowsRustProduct.ps1'
+    $emptyQtDirectories = @('qml/QtQml/DesignSupport','qml/QtQml/XmlListModel',
+        'qml/QtQuick/Controls/Native','qml/QtQuick/LocalStorage',
+        'qml/QtQuick/NativeStyle/controls','qml/QtQuick/NativeStyle/util',
+        'qml/QtQuick/Particles','qml/QtQuick/Shapes/DesignHelpers',
+        'qml/QtQuick/tooling','qml/QtQuick/VectorImage/Helpers')
+    $fixture = New-TlsFixture
+    $fixture.Manifest.source_sha = $stagingSourceSha
+    $fixture.Manifest.rust.source_sha = $stagingSourceSha
+    foreach ($relative in $emptyQtDirectories) {
+        New-Item -ItemType Directory -Path (Join-Path $fixture.Root $relative) -Force | Out-Null
+    }
+    New-Item -ItemType Directory -Path (Join-Path $fixture.Root 'kept') | Out-Null
+    [IO.File]::WriteAllBytes((Join-Path $fixture.Root 'kept/zero.bin'),[byte[]]@())
+    Write-TlsFixtureManifest $fixture
+    function Get-FinalizationFixtureFileIdentity([string]$Directory) {
+        return (@(Get-ChildItem -LiteralPath $Directory -File -Recurse -Force | Sort-Object FullName | ForEach-Object {
+            [ordered]@{path=$_.FullName.Substring($Directory.Length+1);length=$_.Length;
+                sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}
+        }) | ConvertTo-Json -Depth 4 -Compress)
+    }
+    $before = Get-FinalizationFixtureFileIdentity $fixture.Root
+    $null = Assert-SwirlProductManifest -ApplicationDirectory $fixture.Root -ExpectedSourceSha $stagingSourceSha
+    $finalEvidence = Join-Path $tlsTestRoot 'empty-directory-finalization'
+    $finalInclude = Join-Path $tlsTestRoot 'empty-directory-uninstall.nsh'
+    $failure = $null
+    try {
+        & $finalizer -ApplicationDirectory $fixture.Root -EvidenceDirectory $finalEvidence -UninstallList $finalInclude
+    } catch { $failure = $_.Exception.Message }
+    if ($failure -cne 'Package contains empty directories; use fresh product staging before packaging.') {
+        throw "Final packaging accepted the native empty-directory uninstall regression or failed for another reason: $failure"
+    }
+    foreach ($relative in $emptyQtDirectories) {
+        if (-not (Test-Path -LiteralPath (Join-Path $fixture.Root $relative) -PathType Container)) {
+            throw 'Finalization mutated an arbitrary input directory instead of rejecting it.'
+        }
+    }
+    if ((Get-FinalizationFixtureFileIdentity $fixture.Root) -cne $before -or (Test-Path -LiteralPath $finalInclude)) {
+        throw 'Finalization rejection changed payload bytes or authorized an invalid NSIS input.'
+    }
+    # This fixture root was freshly created above, just as the production
+    # Stage entry point guarantees before calling its normalization helper.
+    $removed = @(Remove-SwirlEmptyStagingDirectories -StagingDirectory $fixture.Root)
+    if ($removed.Count -ne 17 -or (Test-Path -LiteralPath (Join-Path $fixture.Root 'qml')) -or
+        -not (Test-Path -LiteralPath $fixture.Root -PathType Container)) { throw 'Fresh staging did not remove exactly the native empty-directory closure.' }
+    if ((Get-FinalizationFixtureFileIdentity $fixture.Root) -cne $before -or
+        (Get-Item -LiteralPath (Join-Path $fixture.Root 'kept/zero.bin')).Length -ne 0) {
+        throw 'Staging changed a payload file, zero-length file, or the manifest.'
+    }
+    & $finalizer -ApplicationDirectory $fixture.Root -EvidenceDirectory $finalEvidence -UninstallList $finalInclude
+    $finalReport = Get-Content -LiteralPath (Join-Path $finalEvidence 'final-package-verification.json') -Raw | ConvertFrom-Json
+    if (-not $finalReport.no_empty_directories -or (Get-FinalizationFixtureFileIdentity $fixture.Root) -cne $before) {
+        throw 'The real final packaging gate did not verify the pruned, byte-identical stage.'
+    }
+    Write-Host 'Finalization empty-directory regression: 2 entry-point scenarios passed.'
 } finally {
     if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($tlsTestRoot)) -ne [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\','/')) { throw 'Unexpected TLS fixture cleanup path.' }
     Remove-Item -LiteralPath $tlsTestRoot -Recurse -Force
