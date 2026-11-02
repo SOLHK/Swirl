@@ -7,7 +7,6 @@ import tempfile
 import unittest
 
 import numpy as np
-from fontTools.misc.psCharStrings import T2CharString, calcSubrBias
 from fontTools.ttLib import TTCollection, TTFont
 
 sys.path[:0] = [str(Path(__file__).resolve().parents[1] / 'tools'),
@@ -84,7 +83,7 @@ class CertificateTests(unittest.TestCase):
         font, models = convert(self.source.fonts[0], .25)
         # A detached converted font may retain a reader for its source. Its
         # generated CharStrings still have no serialized bytes to certify.
-        with self.assertRaisesRegex(ValueError, 'serialized_charstring'):
+        with self.assertRaisesRegex(ValueError, 'reopened_CFF2_font'):
             certify(font, models)
         with reopened(font) as saved:
             with self.assertRaisesRegex(ValueError, 'complete_GID'):
@@ -102,6 +101,13 @@ class CertificateTests(unittest.TestCase):
         with reopened(font) as saved:
             with self.assertRaisesRegex(ValueError, 'serialized_coefficient_mismatch'):
                 certify(saved, models)
+            # Restoring an edited table in memory must not hide corruption in
+            # the actual serialized file that a native engine would load.
+            axes = saved['CFF2'].cff.topDictIndex[0].VarStore.otVarStore.VarRegionList.Region[0].VarRegionAxis
+            next(a for a in axes if a.PeakCoord != 0).PeakCoord *= 2
+            with self.assertRaisesRegex(ValueError, 'serialized_coefficient_mismatch'):
+                certify(saved, models)
+            self.assertFalse(saved.reader.file.closed)
 
     def test_budget_is_checked_and_unknown_operators_are_not_ignored(self):
         font, _ = convert(self.source.fonts[0], .25)

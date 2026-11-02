@@ -15,6 +15,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from fontTools.misc.psCharStrings import calcSubrBias
+from fontTools.ttLib import TTFont
 
 
 def require(condition, reason):
@@ -148,8 +149,16 @@ def decode(font, name, *, max_tokens=2_000_000):
 
 def certify(font, models):
     """Sufficient exact identity proof, refusing unsupported representations."""
-    require(font.reader is not None and 'CFF2' in font and font.sfntVersion == 'OTTO',
+    require(font.reader is not None and 'CFF2' in font.reader and font.reader.sfntVersion == 'OTTO',
             'certificate_reopened_CFF2_font_required')
+    # A reopened TTFont may already have edited/decompiled tables or a cached
+    # glyph order. Those objects are not the saved artifact. Borrow its actual
+    # SFNT reader into a fresh table cache, without closing the caller's stream.
+    raw = TTFont(lazy=True, recalcBBoxes=False, recalcTimestamp=False)
+    raw.reader = font.reader
+    raw.sfntVersion = font.reader.sfntVersion
+    raw._tableCache = None  # Do not share a previously decompiled TTC table.
+    font = raw
     order = font.getGlyphOrder()
     require(set(models) == set(order) and len(order) == font['maxp'].numGlyphs and
             len(order) == len(font['CFF2'].cff.topDictIndex[0].CharStrings.charStrings),
@@ -173,5 +182,6 @@ def certify(font, models):
         operands += len(actual); tokens += count
     return {'status': 'PASS_EXACT_SERIALIZED_CFF2_COEFFICIENTS', 'glyphs': len(order),
             'operands': operands, 'decoded_tokens': tokens, 'axes': list(tags),
-            'all_simultaneous_design_coordinates': True, 'source_fit_accepted': False,
+            'all_simultaneous_design_coordinates': True, 'read_saved_SFNT_tables': True,
+            'source_fit_accepted': False,
             'native_execution': False, 'metrics_verified': False, 'production_accepted': False}

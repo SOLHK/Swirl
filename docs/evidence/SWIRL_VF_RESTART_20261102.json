@@ -2,7 +2,6 @@
   "schema": 1,
   "status": "PARTIAL_NOT_FONT_DELIVERY",
   "recorded_utc": "2026-11-02T14:18:11.953652+00:00",
-  "local_code_commit": "91daff95d01e3018399fa078aa517ab95e41a5df",
   "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
   "environment": {
     "os": "macOS-26.5.1-arm64-arm-64bit",
@@ -107,6 +106,7 @@
           "HGHT"
         ],
         "all_simultaneous_design_coordinates": true,
+        "read_saved_SFNT_tables": true,
         "source_fit_accepted": false,
         "native_execution": false,
         "metrics_verified": false,
@@ -129,6 +129,7 @@
           "HGHT"
         ],
         "all_simultaneous_design_coordinates": true,
+        "read_saved_SFNT_tables": true,
         "source_fit_accepted": false,
         "native_execution": false,
         "metrics_verified": false,
@@ -151,6 +152,7 @@
           "HGHT"
         ],
         "all_simultaneous_design_coordinates": true,
+        "read_saved_SFNT_tables": true,
         "source_fit_accepted": false,
         "native_execution": false,
         "metrics_verified": false,
@@ -173,6 +175,7 @@
           "HGHT"
         ],
         "all_simultaneous_design_coordinates": true,
+        "read_saved_SFNT_tables": true,
         "source_fit_accepted": false,
         "native_execution": false,
         "metrics_verified": false,
@@ -195,6 +198,7 @@
           "HGHT"
         ],
         "all_simultaneous_design_coordinates": true,
+        "read_saved_SFNT_tables": true,
         "source_fit_accepted": false,
         "native_execution": false,
         "metrics_verified": false,
@@ -217,6 +221,7 @@
           "HGHT"
         ],
         "all_simultaneous_design_coordinates": true,
+        "read_saved_SFNT_tables": true,
         "source_fit_accepted": false,
         "native_execution": false,
         "metrics_verified": false,
@@ -409,7 +414,7 @@
   },
   "code_sha256": {
     "tools/swirl_vf/tools/cff2_geometry.py": "35b56522c98a0f99751fca32ff50e82751ebdeea8dfaadd8b0132011ea61b951",
-    "tools/swirl_vf/tools/cff2_certificate.py": "6f14bb03b458a111ee65404229b1d1d0f8f9162d4331dd104df4b14fd78e43cd",
+    "tools/swirl_vf/tools/cff2_certificate.py": "5083c017ed2a2b9b981ab0776fbf0871d1ff64d2b5aa28ea796575489379d142",
     "tools/swirl_vf/tools/piecewise_geometry.py": "b5d03a637f14a0bf61ee4da0e447b5d4be9bfbf465e595615571c9da7b5f05c0",
     "tools/swirl_vf/tools/hvf_piecewise_axes.py": "574fb552d30a2a1f1c027c58293192071b67ffb52427b9419d7d48985c45d7c5",
     "tools/swirl_vf/platform/make_cff2_fixture.py": "c66132466fa239f349fb82b8b2a98f8d9941462c81bc707d5b7f001519bd8c19",
@@ -419,7 +424,6 @@
     ".github/workflows/font-system-windows.yml": "74fecef901850f418d669e7fcc2a10e6797cfc037fa4d684e148634bf9866750",
     ".github/workflows/swirl-vf.yml": "aac364b41aeea733785b81af1b8c9da96f2124f8b83ac66851d4a95f10a4ce8f"
   },
-  "remote_code_commit": "39d1186a51c3b4c4c76a0bff2197394fe4f1e3f4",
   "later_CI": {
     "head_sha": "aa3e37fbb3b081f0ba265b0cbe90f3bd9e4a12a5",
     "native_run": 41459374538,
@@ -847,5 +851,22 @@
         }
       ]
     }
+  },
+  "native_admission_commit": "39d1186a51c3b4c4c76a0bff2197394fe4f1e3f4",
+  "local_admission_commit": "91daff95d01e3018399fa078aa517ab95e41a5df",
+  "saved_reader_hardening_git_base": "21b552365c2550bc079925b05b3a0bcafc7b306b",
+  "saved_reader_hardening": {
+    "scope": "read_saved_SFNT_tables_not_mutable_decompiled_cache",
+    "intermediate_failure": "missing FontTools _tableCache initialization caused 10 errors; retained in private test logs",
+    "repair": "initialize an independent table cache; retain corruption assertions",
+    "focused_tests": 27,
+    "focused_passed": 27,
+    "full_tests": 962,
+    "passed": 955,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 7,
+    "source_slice_certificates_passed": 6,
+    "native_control_fonts_byte_identical": 19
   }
 }

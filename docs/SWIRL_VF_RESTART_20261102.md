@@ -28,6 +28,8 @@ work. No reset, cleanup, force push or change to main/test was performed.
    supplied model equals the source. Metrics, native arithmetic, avar/user-axis
    mapping and layout remain separate. The fixture generator now requires this
    certificate for ordinary, compact and long CFF2 controls before exposing them.
+   A fresh cache reads the saved SFNT tables; repairing a corrupt region only in
+   memory cannot hide the on-disk mismatch. The caller's file remains open.
 3. CFF2 holdout admission now treats omitted axes, explicit zero and negative
    zero as the same design point. A training point can no longer masquerade as
    an independent holdout because its dictionary uses different keys. Duplicate
@@ -43,9 +45,9 @@ work. No reset, cleanup, force push or change to main/test was performed.
 5. The Windows Qt workflow now admits this specific recovery branch, preserving
    its public-runner, same-repository and dependency identity restrictions.
 
-The exact code/admission change is remote commit
-`39d1186a51c3b4c4c76a0bff2197394fe4f1e3f4`. The evidence document added after it
-contains file hashes and does not change the executable font algorithms.
+The nested-blend admission change is remote commit
+`39d1186a51c3b4c4c76a0bff2197394fe4f1e3f4`. Later saved-SFNT reader hardening
+and its final tests are bound by the current file hashes in the evidence.
 
 ## Actual source slices
 
