@@ -104,6 +104,14 @@ try {
             # PSCustomObject cannot retain these distinct JSON keys.
             $rows = @(Get-Content -LiteralPath $nativeLog -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json -AsHashtable })
             $headers = @($rows | Where-Object { $_.record -eq 'header' })
+            if ($headers.Count -eq 1) {
+                $report.native_architecture = @{
+                    query_succeeded = $headers[0].architecture_query_succeeded
+                    process_machine = $headers[0].process_machine
+                    native_machine = $headers[0].native_machine
+                    process_emulated = $headers[0].process_emulated
+                }
+            }
             $summaries = @($rows | Where-Object { $_.record -eq 'summary' })
             $failures = @($rows | Where-Object { $_.record -eq 'face_result' -and $_.status -eq 'FAILED' })
             $report.native_log_sha256 = (Get-FileHash -LiteralPath $nativeLog -Algorithm SHA256).Hash.ToLowerInvariant()

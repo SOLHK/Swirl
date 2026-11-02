@@ -302,8 +302,18 @@ int wmain(int argc,wchar_t **argv){
         ComPtr<IDWriteFontFile> file;checked(factory->CreateFontFileReference(input.c_str(),nullptr,&file),"CreateFontFileReference");
         BOOL supported=FALSE;DWRITE_FONT_FILE_TYPE type{};DWRITE_FONT_FACE_TYPE faceType{};UINT32 faces=0;
         checked(file->Analyze(&supported,&type,&faceType,&faces),"Font Analyze");
+        // A hosted Windows 11 ARM system can execute this x64 binary. Record
+        // the native machine separately so emulation cannot become x64 proof.
+        using QueryMachine = BOOL(WINAPI *)(HANDLE, USHORT *, USHORT *);
+        auto queryMachine = reinterpret_cast<QueryMachine>(GetProcAddress(
+            GetModuleHandleW(L"kernel32.dll"), "IsWow64Process2"));
+        USHORT processMachine=0, nativeMachine=0;
+        const bool machineKnown = queryMachine && queryMachine(GetCurrentProcess(), &processMachine, &nativeMachine);
         log<<"{\"record\":\"header\",\"schema\":1,\"input_sha256\":"<<quoted(locked.sha256)<<",\"input_bytes\":"<<locked.bytes
            <<",\"directwrite_supported\":"<<(supported?"true":"false")<<",\"physical_face_count\":"<<faces<<",\"all_glyphs\":"<<(all?"true":"false")
+           <<",\"architecture_query_succeeded\":"<<(machineKnown?"true":"false")
+           <<",\"process_machine\":"<<processMachine<<",\"native_machine\":"<<nativeMachine
+           <<",\"process_emulated\":"<<(machineKnown?(processMachine?"true":"false"):"null")
            <<",\"original_equality\":\"NOT_TESTED\",\"swirl_ui\":\"NOT_TESTED\",\"system_install\":\"NOT_TESTED\"}\n";
         if(!supported||!faces)throw std::runtime_error("DirectWrite rejected the input font file");
         UINT32 passed=0,failed=0;

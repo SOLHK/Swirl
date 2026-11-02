@@ -5,3 +5,7 @@
 self-hosted-runner:
   labels:
     - xcode-27
+    # Published hosted image; ARM64/VS2026 availability is documented at
+    # https://github.com/actions/runner-images/issues/14592 . Actual execution
+    # and native machine type must still be recorded by the workflow.
+    - windows-11-vs2026-arm
