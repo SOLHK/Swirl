@@ -19,12 +19,25 @@ from vertical_metrics import Metrics,placement_correction,raw_origin_feasibility
 POINTS=((0.,0.,0.),(-1.,-1.,-1.),(1.,1.,1.),(-1.,1.,-1.),(1.,-1.,1.),
         (.201171875,.2475,.42225),(-.37,.62,-.18))
 
-def build():
+def desired(point, variable=False):
+    if not variable:return (-100.,0.)
+    x,w,y=point
+    return (-100-40*x-8*w-16*y-10*max(x,0)*max(y,0),24+6*x-12*w+10*y)
+
+
+def build(variable=False):
     raw,symbols=fixture.original_fixture()
     font=TTFont(io.BytesIO(raw))
     source=Metrics(800,1000,(0,0),(500,820));target=Metrics(800,1000,(0,0),(400,820))
     correction=placement_correction(source,target)
-    font=append_origin_compensation(font,{s.name:(tuple(int(x) for x in correction),[],[]) for s in symbols})
+    supports=[];deltas=[]
+    if variable:
+        correction=(-100,24)
+        for tag,delta in zip(('WDTH','wght','HGHT'),((-40,6),(-8,-12),(-16,10))):
+            supports.extend([{tag:(0.,1.,1.)},{tag:(-1.,-1.,0.)}])
+            deltas.extend([delta,tuple(-v for v in delta)])
+        supports.append({'WDTH':(0.,1.,1.),'HGHT':(0.,1.,1.)});deltas.append((-10,0))
+    font=append_origin_compensation(font,{s.name:(tuple(int(x) for x in correction),supports,deltas) for s in symbols})
     data=fixture.serialize(font)
     original=TTFont(io.BytesIO(raw));candidate=TTFont(io.BytesIO(data))
     fixture.require(all(original.getTableData(t)==candidate.getTableData(t) for t in fixture.PROTECTED),
@@ -32,12 +45,13 @@ def build():
     return raw,data,raw_origin_feasibility(source)
 
 
-def run(output,native,binary=None):
+def run(output,native,binary=None,variable=False):
     output=Path(output).resolve();output.mkdir(parents=True,exist_ok=False)
-    raw,data,feasibility=build()
+    raw,data,feasibility=build(variable)
     result={'scope':'authored_100_FUnit_origin_gap','os':platform.platform(),'source_acceptance':'NOT_RUN',
         'raw_API_equivalence':'FAIL_BY_CONSTRUCTION','raw_origin_feasibility':feasibility,
-        'layout':{},'visual':{},'native':native,'limit':1/32,'processes':[]}
+        'layout':{},'visual':{},'native':native,'limit':1/32,'processes':[],
+        'variable_XY_origin':variable}
     # HarfBuzz comparison includes default horizontal identity and independent
     # raw vertical origins. It is not a substitute for the native comparisons.
     hb_max=0.;hb_count=0
@@ -47,7 +61,9 @@ def run(output,native,binary=None):
             for x,y in zip(a['glyphs'],b['glyphs']):
                 fixture.require(all(x[k]==y[k] for k in ('gid','x_advance','y_advance','metric_width','metric_height','metric_vertical_origin')),
                                 'origin_compensation_changed_HB_raw_metrics_or_advances')
-                hb_max=max(hb_max,abs(y['x_offset']-x['x_offset']-(-100 if direction=='ttb' else 0)))
+                expected=desired(p,variable) if direction=='ttb' else (0,0)
+                hb_max=max(hb_max,abs(y['x_offset']-x['x_offset']-expected[0]),
+                           abs(y['y_offset']-x['y_offset']-expected[1]))
                 hb_count+=1
     result['HarfBuzz']={'observations':hb_count,'maximum_placement_error':hb_max}
     observed=[]
@@ -92,11 +108,12 @@ def run(output,native,binary=None):
             av=coretext_placement_in_outline_frame(ag['base_origin'],ag['text_matrix'])
             bv=coretext_placement_in_outline_frame(bg['base_origin'],bg['text_matrix'])
             shift=[bv[i]-av[i] for i in range(2)]
-            expected=-100 if direction=='ttb' and policy!='disabled' else 0
+            expected=desired(request['normalized'],variable) if direction=='ttb' and policy!='disabled' else (0,0)
             group=result['layout'].setdefault('/'.join((policy,direction)),{'checks':0,
-                'max_X_error':0.,'max_Y_change':0.,'raw_metrics_unchanged':True,
+                'max_X_error':0.,'max_Y_error':0.,'max_Y_change':0.,'raw_metrics_unchanged':True,
                 'base_advances_unchanged':True,'positioned_advance_vectors_changed':0})
-            group['checks']+=1;group['max_X_error']=max(group['max_X_error'],abs(shift[0]-expected))
+            group['checks']+=1;group['max_X_error']=max(group['max_X_error'],abs(shift[0]-expected[0]))
+            group['max_Y_error']=max(group['max_Y_error'],abs(shift[1]-expected[1]))
             group['max_Y_change']=max(group['max_Y_change'],abs(shift[1]))
             group['positioned_advance_vectors_changed']+=ag['advance']!=bg['advance']
             result['visual'].setdefault('/'.join((policy,direction)),[]).append(
@@ -107,10 +124,12 @@ def run(output,native,binary=None):
             ar,ag=dw.flatten(a)[0];br,bg=dw.flatten(b)[0]
             fixture.require(ag['gid']==bg['gid'] and ag['design_metrics']==bg['design_metrics']
                             and ag['advance']==bg['advance'],'origin_DirectWrite_raw_metric_or_advance_changed')
-            direction=request['direction'];policy=request['policy'];expected=-100 if direction=='V' and policy!='disabled' else 0
+            direction=request['direction'];policy=request['policy']
+            expected=desired(request['requested_normalized_model'],variable) if direction=='V' and policy!='disabled' else (0,0)
             before=ar['baseline_relative_ink_bounds'];after=br['baseline_relative_ink_bounds']
-            group=result['layout'].setdefault('/'.join((policy,direction)),{'checks':0,'max_X_error':0.,'max_Y_change':0.,'raw_metrics_unchanged':True})
-            group['checks']+=1;group['max_X_error']=max(group['max_X_error'],abs(after[0]-before[0]-expected))
+            group=result['layout'].setdefault('/'.join((policy,direction)),{'checks':0,'max_X_error':0.,'max_Y_error':0.,'max_Y_change':0.,'raw_metrics_unchanged':True})
+            group['checks']+=1;group['max_X_error']=max(group['max_X_error'],abs(after[0]-before[0]-expected[0]))
+            group['max_Y_error']=max(group['max_Y_error'],abs(after[1]-before[1]+expected[1]))
             group['max_Y_change']=max(group['max_Y_change'],abs(after[1]-before[1]))
             # The unchanged full path is actually positioned by DirectWrite and
             # Direct2D. This establishes ink geometry, not pixel raster identity.
@@ -121,7 +140,7 @@ def run(output,native,binary=None):
     result['required_layout_groups']=list(keys) if native!='none' else []
     result['layout_passed']=(native!='none' and hb_max<=1/32 and all(
         key in result['layout'] and result['layout'][key]['checks']==len(POINTS)
-        and result['layout'][key]['max_X_error']<=1/32 and result['layout'][key]['max_Y_change']<=1/32
+        and result['layout'][key]['max_X_error']<=1/32 and result['layout'][key]['max_Y_error']<=1/32
         for key in keys))
     result['status']='PASS_AUTHORED_LAYOUT_ONLY' if result['layout_passed'] else 'LAYOUT_NOT_ACCEPTED'
     (output/'report.json').write_text(json.dumps(result,indent=2))
@@ -130,5 +149,6 @@ def run(output,native,binary=None):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--native',choices=('none','coretext','directwrite'),default='none');parser.add_argument('--binary',type=Path)
-    a=parser.parse_args();r=run(a.output,a.native,a.binary);print(json.dumps({'status':r['status'],'layout':r['layout']}))
+    parser.add_argument('--variable-origin',action='store_true',help='Three-axis and coupled X/Y placement control')
+    a=parser.parse_args();r=run(a.output,a.native,a.binary,a.variable_origin);print(json.dumps({'status':r['status'],'layout':r['layout']}))
     if a.native!='none' and not r['layout_passed']:raise SystemExit(1)

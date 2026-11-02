@@ -9,6 +9,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'platform'))
 from vertical_metrics import Metrics,placement_correction,origin_coefficients,raw_origin_feasibility
 from origin_gpos import append_origin_compensation
 import experiment_vertical_gpos as fixture
+import experiment_origin_compensation as experiment
 
 class OriginTests(unittest.TestCase):
     def test_independent_origin_does_not_become_a_phantom_coordinate(self):
@@ -69,5 +70,20 @@ class OriginTests(unittest.TestCase):
         changed=append_origin_compensation(font,{name:((-100,0),[],[])})
         with self.assertRaisesRegex(ValueError,'already_present'):
             append_origin_compensation(changed,{name:((-100,0),[],[])})
+    def test_three_axis_coupled_xy_placement_at_independent_positions(self):
+        import random
+        raw, data, _ = experiment.build(variable=True)
+        rng = random.Random(81973)
+        points = [tuple(rng.uniform(-1,1) for _ in range(3)) for _ in range(96)]
+        for p in points:
+            for direction in ('ltr','ttb'):
+                before=fixture.shape(raw,p,direction,'zh-cn')
+                after=fixture.shape(data,p,direction,'zh-cn')
+                expected=experiment.desired(p,True) if direction=='ttb' else (0,0)
+                for a,b in zip(after['glyphs'],before['glyphs']):
+                    for key in ('gid','metric_width','metric_height','metric_vertical_origin','x_advance','y_advance'):
+                        self.assertEqual(a[key],b[key])
+                    self.assertLessEqual(abs(a['x_offset']-b['x_offset']-expected[0]),1/32)
+                    self.assertLessEqual(abs(a['y_offset']-b['y_offset']-expected[1]),1/32)
 
 if __name__=='__main__':unittest.main()

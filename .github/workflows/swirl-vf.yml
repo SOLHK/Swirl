@@ -133,6 +133,14 @@ jobs:
         run: |
           python tools/swirl_vf/platform/probe_metric_routes.py --output build/swirl-vf-evidence/metric-routes --binary "$PWD/build/swirl-vf-evidence/coretext/coretext_extract"
           python tools/swirl_vf/platform/experiment_origin_compensation.py --output build/swirl-vf-evidence/origin-compensation --native coretext
+      - name: Verify coupled three-axis X and Y origin placement
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/experiment_origin_compensation.py --output build/swirl-vf-evidence/origin-variable --native coretext --variable-origin
+      - name: Measure standard and experimental feature condition support
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/probe_feature_conditions.py --output build/swirl-vf-evidence/feature-conditions --native coretext
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -224,6 +232,16 @@ jobs:
         run: |
           python tools/swirl_vf/platform/experiment_origin_compensation.py --output build/swirl-vf-evidence/origin-compensation --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe
           if ($LASTEXITCODE -ne 0) { throw 'Independent-origin layout control failed' }
+      - name: Verify coupled three-axis X and Y origin placement
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/experiment_origin_compensation.py --output build/swirl-vf-evidence/origin-variable --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe --variable-origin
+          if ($LASTEXITCODE -ne 0) { throw 'Variable-origin layout control failed' }
+      - name: Measure standard and experimental feature condition support
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/probe_feature_conditions.py --output build/swirl-vf-evidence/feature-conditions --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Standard feature condition control failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -232,6 +250,12 @@ jobs:
             build/swirl-vf-evidence/origin-compensation/*.json
             build/swirl-vf-evidence/origin-compensation/*.jsonl
             build/swirl-vf-evidence/origin-compensation/*.log
+            build/swirl-vf-evidence/origin-variable/*.json
+            build/swirl-vf-evidence/origin-variable/*.jsonl
+            build/swirl-vf-evidence/origin-variable/*.log
+            build/swirl-vf-evidence/feature-conditions/**/*.json
+            build/swirl-vf-evidence/feature-conditions/**/*.jsonl
+            build/swirl-vf-evidence/feature-conditions/**/*.log
             build/swirl-vf-evidence/directwrite/*.json
             build/swirl-vf-evidence/directwrite/*.jsonl
             build/swirl-vf-evidence/directwrite/*.log
