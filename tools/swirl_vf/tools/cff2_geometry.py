@@ -282,7 +282,7 @@ def fit(training_commands, training_locations, holdout_commands, holdout_locatio
     return model
 
 
-def install(font, models, *, experimental_slice=False, experimental_local=False):
+def install(font, models, *, experimental_slice=False, experimental_local=False, experimental_nested=False):
     """Install all modeled GIDs on a detached font; never fill missing models.
 
     Callers must supply correct CFF2-compatible metrics before serialization.
@@ -290,6 +290,11 @@ def install(font, models, *, experimental_slice=False, experimental_local=False)
     """
     order = font.getGlyphOrder()
     require(set(models) == set(order), 'complete_original_GID_model_coverage_required')
+    # Port PR #51 / 39d1186a's admission guard. The diagnostic route retains
+    # native failures; normal construction cannot use this known-bad encoding.
+    require(experimental_nested or not any(isinstance(model, FactoredOutlineModel)
+                                          for model in models.values()),
+            'nested_blends_lack_DirectWrite_compatibility')
     require(experimental_slice or all(model.evidence.get('domain_kind') != 'one_dimensional_slice'
                                     for model in models.values()),
             'slice_model_is_not_a_complete_design_space')

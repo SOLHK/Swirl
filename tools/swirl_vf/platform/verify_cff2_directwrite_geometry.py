@@ -184,7 +184,7 @@ def verify(path, transcript, native, *, variant):
                     raise ValueError('duplicate_unrequested_or_mismatched_native_outline')
                 seen.add(key)
                 result=compare(row,original.fonts[key[0]],repeats=512 if variant=='flat_long' else 1,
-                               nonlinear=variant=='adaptive')
+                               nonlinear=variant in ('adaptive','ramp'))
                 report['observations']+=1;report['controls']+=result.get('controls',0)
                 report['max_control_error']=max(report['max_control_error'],result.get('max_control_error',0))
                 if not result['passed']:

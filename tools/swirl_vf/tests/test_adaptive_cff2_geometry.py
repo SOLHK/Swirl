@@ -98,6 +98,26 @@ class AdaptiveTensorTests(unittest.TestCase):
                 original_curve=next(c for c in a if c[0]=='qCurveTo')
                 changed_curve=next(c for c in b if c[0]=='qCurveTo')
                 self.assertAlmostEqual(changed_curve[2]-original_curve[2],.11)
+
+    def test_ramp_native_fixture_preserves_mixed_source_after_reload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'source.ttc'; make_fixture(path)
+            with TTCollection(path) as original:
+                source=original.fonts[0]
+                candidate,models=convert(source,.25,ramp=True)
+                self.assertTrue(all(m.evidence['sampled_geometry_passed'] for m in models.values()))
+                self.assertLess(len(models['probe'].supports),507)
+                self.assertEqual(models['probe'].evidence['basis'],'ramp')
+                data=io.BytesIO();candidate.save(data)
+                with TTFont(io.BytesIO(data.getvalue())) as saved:
+                    for p in self.held()[::8]:
+                        location=dict(zip(TAGS,map(float,p)))
+                        for name in source.getGlyphOrder():
+                            ops,values=geometry.operands(geometry.source_commands(saved.getGlyphSet(
+                                location=location,normalized=True)[name]))
+                            expected_ops,expected=geometry.operands(records(source,name,[location],.25,nonlinear=True)[0])
+                            self.assertEqual(ops,expected_ops)
+                            self.assertLessEqual(point_errors(values[None],expected[None])[0],1/32)
                 data=io.BytesIO();candidate.save(data)
                 with TTFont(io.BytesIO(data.getvalue())) as saved:
                     for p in self.held()[::16]:

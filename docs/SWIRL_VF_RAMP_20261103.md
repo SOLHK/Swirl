@@ -69,3 +69,18 @@ Full-cube target models, source metrics/layout, a viable complete-font region
 budget and Windows acceptance remain necessary. There is no final SwirlVF.ttc
 or delivery checksum at this checkpoint. Private fonts, coefficients, failure
 coordinates and source transcripts remain outside Git.
+
+## Native-matrix follow-up
+
+The authored fixture now has a `--ramp` mode for the existing nonlinear
+three-axis source (`.11 * WDTH^2 * wght^2 * HGHT`), with independent fit
+holdouts. The DirectWrite matrix and CoreText gate include it and compare
+against that source, not against the target model. HarfBuzz 14.6.0 passes 546
+outline observations over two faces, all three GIDs and 91 positions. The
+reference explicitly emits the implicit straight closure; no native segment
+is removed. Focused CFF2/adaptive/local/HarfBuzz tests: 40 passed, zero failed.
+The DirectWrite run is pending until the newly pushed CI completes.
+
+PR #51's `39d1186a` nested-blend admission guard is selectively ported, with
+regression coverage. Normal construction rejects the known incompatible
+encoding; authored diagnostics still retain and test its native failures.
