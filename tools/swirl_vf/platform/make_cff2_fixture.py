@@ -27,7 +27,7 @@ GRID = [dict(zip(TAGS, p)) for p in itertools.product((-1., 0., 1.), repeat=3)]
 HOLDOUTS = [dict(zip(TAGS, p)) for p in ((.25, -.5, .75), (.125, .375, -.625))]
 
 
-def records(font, name, locations, translation=0.):
+def records(font, name, locations, translation=0., *, repeat_contours=1):
     result = []
     for location in locations:
         glyph = font.getGlyphSet(location=location, normalized=True, recalcBounds=False)[name]
@@ -35,11 +35,13 @@ def records(font, name, locations, translation=0.):
         for command in commands:
             for index in range(1, len(command), 2):
                 command[index] += translation
-        result.append(commands)
+        result.append(commands * repeat_contours)
     return result
 
 
-def convert(font, translation=0., *, factored=False, compact=False):
+def convert(font, translation=0., *, factored=False, compact=False, repeat_contours=1):
+    if type(repeat_contours) is not int or not 1 <= repeat_contours <= 1024:
+        raise ValueError('invalid_authored_contour_repeat')
     if factored and compact:
         raise ValueError('choose_one_cff2_encoding')
     grid, held = GRID, HOLDOUTS
@@ -51,14 +53,14 @@ def convert(font, translation=0., *, factored=False, compact=False):
         held = [dict(zip(TAGS, p)) for p in ((.17, -.31, .79), (-.77, .42, .57))]
     models = {}
     for name in font.getGlyphOrder():
-        model = geometry.fit(records(font, name, grid, translation), grid,
-                             records(font, name, held, translation), held, TAGS)
+        model = geometry.fit(records(font, name, grid, translation, repeat_contours=repeat_contours), grid,
+                             records(font, name, held, translation, repeat_contours=repeat_contours), held, TAGS)
         models[name] = (geometry.factor(model) if factored else
                         geometry.compact(model) if compact else model)
     return geometry.install(prepare_from_truetype(font), models), models
 
 
-def write_fixture(path, *, factored=False, compact=False):
+def write_fixture(path, *, factored=False, compact=False, repeat_contours=1):
     path = Path(path)
     if path.exists() or path.is_symlink():
         raise ValueError('fresh_authored_cff2_output_required')
@@ -66,7 +68,8 @@ def write_fixture(path, *, factored=False, compact=False):
     with tempfile.TemporaryDirectory(dir=path.parent) as tmp:
         source = Path(tmp) / 'authored-source.ttc'; make_fixture(source)
         with TTCollection(source) as original:
-            conversions = [convert(font, .25, factored=factored, compact=compact)
+            conversions = [convert(font, .25, factored=factored, compact=compact,
+                                   repeat_contours=repeat_contours)
                            for font in original.fonts]
             result = TTCollection(); result.fonts = [font for font, _ in conversions]
             output = Path(tmp) / 'authored-cff2.ttc'; result.save(output)
@@ -80,7 +83,7 @@ def write_fixture(path, *, factored=False, compact=False):
             'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
             'bytes': path.stat().st_size, 'faces': 2, 'glyphs_per_face': 3,
             'axes': list(TAGS), 'factored_blends': factored, 'compact_blends': compact,
-            'production_accepted': False}
+            'repeat_contours': repeat_contours, 'production_accepted': False}
 
 
 if __name__ == '__main__':

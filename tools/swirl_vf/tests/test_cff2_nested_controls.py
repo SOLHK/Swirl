@@ -12,11 +12,28 @@ from fontTools.ttLib import TTCollection, TTFont
 sys.path[:0] = [str(Path(__file__).resolve().parents[1] / 'platform'),
                str(Path(__file__).resolve().parents[1] / 'tools')]
 from make_cff2_fixture import write_fixture, GRID, HOLDOUTS
-from diagnose_cff2_directwrite import nest_identity_blends, pad_zero_regions
+from diagnose_cff2_directwrite import nest_identity_blends, pad_zero_regions, move_blend_operator_to_subroutine
 import cff2_geometry as geometry
 
 
 class CFF2NestedControlTests(unittest.TestCase):
+    def test_operator_subroutine_preserves_flat_and_nested_stack_values(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'authored.ttc'; write_fixture(path)
+            with TTCollection(path) as collection:
+                source=collection.fonts[0]
+                for nested in (False,True):
+                    font=copy.deepcopy(source);top=font['CFF2'].cff.topDictIndex[0]
+                    if nested:nest_identity_blends(top,'nested_default')
+                    move_blend_operator_to_subroutine(top)
+                    stream=io.BytesIO();font.save(stream)
+                    with TTFont(io.BytesIO(stream.getvalue())) as saved:
+                        for p in GRID+HOLDOUTS:
+                            for name in source.getGlyphOrder():
+                                a=geometry.operands(geometry.source_commands(saved.getGlyphSet(location=p,normalized=True)[name]))
+                                b=geometry.operands(geometry.source_commands(source.getGlyphSet(location=p,normalized=True)[name]))
+                                self.assertEqual(a[0],b[0]);np.testing.assert_allclose(a[1],b[1],rtol=0,atol=1e-10)
+
     def test_flat_capacity_controls_preserve_serialized_curve_coordinates(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/'authored.ttc'; write_fixture(path)

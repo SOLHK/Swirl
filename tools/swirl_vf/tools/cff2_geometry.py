@@ -320,8 +320,13 @@ def install(font, models):
         store = VarStoreData(otVarStore=buildVarStore(buildVarRegionList(regions, list(tags)), data))
         top = candidate['CFF2'].cff.topDictIndex[0]
         top.VarStore = store
+        # FontTools' in-memory glyph set reads this reference, while serialized
+        # loading reconstructs it from TopDICT. Keep both views equivalent.
+        top.CharStrings.varStore = store
         for fd in top.FDArray:
             fd.Private.vstore = store
+    from cff2_subroutines import pack
+    pack(candidate)
     candidate['maxp'] = newTable('maxp')
     candidate['maxp'].tableVersion = 0x00005000
     candidate['maxp'].numGlyphs = len(order)

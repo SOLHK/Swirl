@@ -17,6 +17,7 @@ import subprocess
 import tempfile
 
 from fontTools.cffLib import FDSelect
+from fontTools.misc.psCharStrings import T2CharString, calcSubrBias
 from fontTools.otlLib.builder import buildStatTable
 from fontTools.ttLib import TTCollection
 from fontTools.varLib.builder import buildVarRegionList
@@ -27,7 +28,28 @@ from test_coretext_extract import make_fixture
 VARIANTS = ('flat', 'flat_standalone', 'flat_stat', 'flat_fdselect',
             'flat_private_vsindex', 'flat_default_vsindex', 'flat_post3', 'factored', 'compact',
             'factored_sparse', 'nested_default', 'nested_delta', 'nested_delta_sparse',
-            'flat_regions_64', 'flat_regions_192', 'flat_regions_506')
+            'flat_regions_64', 'flat_regions_192', 'flat_regions_506', 'flat_long',
+            'flat_subr_blend', 'nested_subr_blend')
+
+
+def move_blend_operator_to_subroutine(top):
+    """Test the same stack expression across a legal subroutine boundary.
+
+    The shared subroutine consumes exactly the operands already on the stack.
+    The small authored control has ample room for the extra call-index operand.
+    This isolates native parser behavior; it does not assert a compatibility fix.
+    """
+    globals_ = top.CharStrings.globalSubrs
+    if len(globals_):
+        raise ValueError('fresh_subroutine_control_required')
+    globals_.append(T2CharString(program=['blend'], private=top.FDArray[0].Private,
+                                globalSubrs=globals_))
+    operand = -calcSubrBias(globals_)
+    for cs in top.CharStrings.values():
+        cs.decompile(); program = []
+        for token in cs.program:
+            program.extend((operand, 'callgsubr') if token == 'blend' else (token,))
+        cs.setProgram(program)
 
 
 def pad_zero_regions(font, count):
@@ -102,7 +124,9 @@ def generate(output):
         source = Path(tmp) / 'source.ttc'; make_fixture(source)
         for variant in VARIANTS:
             path = output / (variant + ('.otf' if variant == 'flat_standalone' else '.ttc'))
-            if variant in ('factored', 'compact'):
+            if variant == 'flat_long':
+                write_fixture(path, repeat_contours=512)
+            elif variant in ('factored', 'compact'):
                 write_fixture(path, factored=variant == 'factored', compact=variant == 'compact')
             elif variant == 'factored_sparse':
                 with TTCollection(source, recalcTimestamp=False) as original:
@@ -131,6 +155,10 @@ def generate(output):
                                     cs.program = cs.program[2:]; cs.bytecode = None
                         elif variant == 'flat_post3':
                             font['post'].formatType = 3.0
+                        elif variant in ('flat_subr_blend', 'nested_subr_blend'):
+                            if variant == 'nested_subr_blend':
+                                nest_identity_blends(top, 'nested_default')
+                            move_blend_operator_to_subroutine(top)
                         elif variant.startswith('nested_'):
                             nest_identity_blends(top, variant)
                         elif variant.startswith('flat_regions_'):

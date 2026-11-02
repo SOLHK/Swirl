@@ -393,3 +393,49 @@ for precision acceptance. The next controls add the registered `vpal` and
 isolate routing, variation and coordinate handling. No existing raw gate or
 failed expectation is removed. The actual completed Windows results are in
 [`SWIRL_VF_NATIVE_LAYOUT_20261102.json`](evidence/SWIRL_VF_NATIVE_LAYOUT_20261102.json).
+
+
+## Long CFF2 programs and native feature routing continuation
+
+The encoder now splits generated CharStrings longer than the normative 65,535
+byte limit at completed drawing operators into shared subroutines. No operand,
+curve, region or GID is discarded. The single `vsindex` remains in the caller;
+subroutines contain no calls or variation-state changes. A real oversized control
+with 512 repetitions of each authored contour survives serialized point-by-point
+comparison at all 27 grid locations and two independent holdouts. CoreText reads
+both faces and all three GIDs: 174 observations, zero geometry failures, maximum
+error 0.001808122 FUnit. Its 68 raw metric failures remain, bringing the four
+native variants to 272 retained metric failures. The expanded DirectWrite matrix
+also measures the long program and isolates a `blend` operator across a subroutine
+boundary; those new native results are pending at this checkpoint.
+
+The same independent test exposed a separate in-memory defect: the constructed
+TopDICT VarStore and PrivateDICT references were set, but CharStrings.varStore
+was missing. FontTools therefore evaluated a freshly constructed glyph set at
+its default design even when a location was supplied; serialized reloads had the
+reference and were already correct. Assembly now sets all three references.
+This does not explain the previous independently serialized/native fit failures.
+
+The exact `350a67eb` native run 41403682017 completed on PR merge checkout
+`6d2ce0e679697fc39e015fe4d639e2fe17574826`. Across Server 2022, Server 2025 and
+Windows 11 ARM64 x64 emulation, YAdvance had no effect even in a fixed +24 control
+and with enabled `vpal`. XAdvance was applied, with a 0.5 FUnit worst residual;
+combined X/Y behaved like X alone. CoreText's enabled vertical `vert`, `vkrn` and
+`vpal` YAdvance controls pass, while other routes remain in the evidence. These
+results isolate component/platform behavior rather than proving a universal
+fractional-layout solution. Raw metric APIs were unchanged in every control.
+
+Two probe-guided source models used 512 training probes (seed 635327), 512 separate
+holdouts (seed 20261102), floating residual fitting and one final 16.16 encoding.
+They and a variant completing overlapping tensor ancestor paths all still fail
+1/32. The retained holdout maxima are 1.769757/0.791826 and 2.786528/0.774527 FUnit
+for GIDs 1166/19177 respectively, with thousands of nonzero regions. No failed
+model is installed or accepted. Private checkpoints retain the full coefficients;
+public evidence contains only aggregate results and hashes.
+
+Local regression: 933 tests, zero failures, seven platform skips; six audit tests
+pass. [Packing and routing evidence](evidence/SWIRL_VF_CFF2_PACKING_20261102.json)
+records the native results separately from the unchanged strict failures.
+No formal SwirlVF.ttc, distribution authorization or Windows 11 x64 acceptance
+is asserted. See the official [CFF2 specification](https://learn.microsoft.com/en-us/typography/opentype/spec/cff2)
+for the CharString length, stack and subroutine constraints.
