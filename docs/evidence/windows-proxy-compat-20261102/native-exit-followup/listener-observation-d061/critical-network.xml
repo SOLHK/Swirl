@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="(empty)"
+	tests="11"
+	failures="1"
+	disabled="0"
+	skipped="0"
+	hostname=""
+	time="138"
+	timestamp="2026-11-02T18:31:00"
+	>
+	<testcase name="swirl-system-proxy-state" classname="swirl-system-proxy-state" time="2.69927" status="run">
+		<properties>
+			<property name="cmake_labels" value="security"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-system-proxy-recovery" classname="swirl-system-proxy-recovery" time="3.21823" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-system-proxy-app-exit" classname="swirl-system-proxy-app-exit" time="24.087" status="fail">
+		<failure message="Failed"/>
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-node-real-chain" classname="swirl-node-real-chain" time="7.13605" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-stream-regression" classname="swirl-stream-regression" time="7.50444" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-subscription-download" classname="swirl-subscription-download" time="51.6094" status="run">
+		<properties>
+			<property name="cmake_labels" value="security"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-qt-network-policy" classname="swirl-qt-network-policy" time="1.93223" status="run">
+		<properties>
+			<property name="cmake_labels" value="security"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-subscription-formats" classname="swirl-subscription-formats" time="9.34381" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-import-subscription" classname="swirl-import-subscription" time="20.4909" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-import-boundaries" classname="swirl-import-boundaries" time="7.24493" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-gateway-network" classname="swirl-gateway-network" time="3.3541" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+</testsuite>

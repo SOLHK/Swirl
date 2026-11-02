@@ -25,6 +25,7 @@
 #include <QTest>
 #include <QTimer>
 #include <QtEndian>
+#include <optional>
 
 namespace {
 QJsonObject winHttpSnapshot() {
@@ -269,6 +270,24 @@ QJsonObject tcpPortState(quint16 port) {
     return {{"ipv4",tcpPortState<MIB_TCPTABLE_OWNER_PID>(port,AF_INET)},
         {"ipv6",tcpPortState<MIB_TCP6TABLE_OWNER_PID>(port,AF_INET6)}};
 }
+std::optional<bool> nativeListenerPresent(const QJsonObject &state) {
+    bool listening=false;
+    const char *names[]={"ipv4","ipv6"};const int families[]={AF_INET,AF_INET6};
+    for(int index=0;index<2;++index){
+        const auto table=state.value(names[index]).toObject();
+        const auto family=table.value("family"),error=table.value("win32_error"),rows=table.value("rows");
+        // A failed or incomplete native query is never evidence of absence.
+        if(!family.isDouble()||family.toDouble()!=families[index]
+           ||!error.isDouble()||error.toDouble()!=NO_ERROR||!rows.isArray())return std::nullopt;
+        for(const auto &entry:rows.toArray()){
+            const auto value=entry.toObject().value("state");
+            if(!value.isDouble()||value.toDouble()!=value.toInt()
+               ||value.toInt()<MIB_TCP_STATE_CLOSED||value.toInt()>MIB_TCP_STATE_DELETE_TCB)return std::nullopt;
+            if(value.toInt()==MIB_TCP_STATE_LISTEN)listening=true;
+        }
+    }
+    return listening;
+}
 }
 
 class SystemProxyExitTests final : public QObject {
@@ -312,17 +331,44 @@ private slots:
         QTcpServer closed;closed.setProxy(QNetworkProxy::NoProxy);
         QVERIFY(closed.listen(QHostAddress::LocalHost));
         const auto closedPort=closed.serverPort();closed.close();QVERIFY(!closed.isListening());
-        report.insert("legacy",QJsonObject{{"closed",legacyListenerProbe(closedPort)}});
+        const auto legacyClosed=legacyListenerProbe(closedPort);
+        report.insert("legacy",QJsonObject{{"closed",legacyClosed}});
         const auto closedProbe=probeListener(closedPort);
-        QJsonObject current{{"closed",closedProbe.report()}};report.insert("current",current);
-        QVERIFY2(closedProbe.refused(),"A known-closed control port must produce an explicit connection refusal.");
+        const auto closedState=tcpPortState(closedPort);
+        const auto closedListener=nativeListenerPresent(closedState);
+        QJsonObject current{{"closed",closedProbe.report()},{"closed_tcp_state",closedState}};
+        bool closedExclusive=false;
+        {
+            ExclusiveLoopbackListener released(closedPort);
+            current.insert("closed_exclusive_rebind",released.report());closedExclusive=released.listening();
+        }
+        report.insert("current",current);
 
         QTcpServer live;live.setProxy(QNetworkProxy::NoProxy);
         QVERIFY(live.listen(QHostAddress::LocalHost));
         const auto liveProbe=probeListener(live.serverPort());
-        current.insert("live",liveProbe.report());report.insert("current",current);
+        const auto liveState=tcpPortState(live.serverPort());
+        const auto liveListener=nativeListenerPresent(liveState);
+        current.insert("live",liveProbe.report());current.insert("live_tcp_state",liveState);
+        current.insert("live_native_listener_observed",liveListener.has_value()&&*liveListener);
+        bool liveExclusiveRejected=false;
+        {
+            ExclusiveLoopbackListener occupied(live.serverPort());
+            current.insert("live_exclusive_probe",occupied.report());liveExclusiveRejected=occupied.rejectedOccupiedPort();
+        }
+        report.insert("current",current);
+        // Always execute both controls, even if Windows has not completed the
+        // closed-port connect. A deadline remains a diagnostic observation;
+        // only native no-LISTEN plus exclusive same-endpoint ownership proves
+        // that the port was released, with the live control rejecting reuse.
+        QVERIFY2(!closedProbe.connected&&legacyClosed.value("socket_state").toInt()!=QAbstractSocket::ConnectedState,
+                 "A known-closed control port produced a connection.");
+        QVERIFY2(closedListener.has_value()&&!*closedListener,"Both native TCP tables must confirm no listening control socket.");
+        QVERIFY2(closedExclusive,"The known-closed control port could not be exclusively bound and listened on.");
         QVERIFY2(liveProbe.terminalObserved&&liveProbe.connected,"The live control must produce an observed connection.");
         QVERIFY2(!liveProbe.refused(),"A live listener must never be accepted as closed.");
+        QVERIFY2(liveListener.has_value()&&*liveListener,"The native TCP query did not observe the live control listener.");
+        QVERIFY2(liveExclusiveRejected,"The exclusive probe did not reject the live control listener.");
         completed=true;
     }
     void exclusiveListenerProbeRequiresReleasedPortAfterTraffic() {
@@ -352,6 +398,8 @@ private slots:
             {"exclusive_rebind",released.report()},{"tcp_state_before_rebind",state}};
         qInfo().noquote()<<"exclusive-listener-control "<<QJsonDocument(evidence).toJson(QJsonDocument::Compact);
         QVERIFY2(!connection.value("connected").toBool(),"A deliberately closed control listener accepted a connection.");
+        const auto nativeListener=nativeListenerPresent(state);
+        QVERIFY2(nativeListener.has_value()&&!*nativeListener,"Both native TCP tables must confirm no listener after complete control traffic and EOF.");
         QVERIFY2(released.listening(),"An exclusive listener could not reclaim the control port after complete traffic and EOF; see native state evidence.");
         ExclusiveLoopbackListener duplicate(port);
         QVERIFY2(duplicate.rejectedOccupiedPort(),"The exclusive probe permitted a second listener on its own live port.");
@@ -548,11 +596,15 @@ private slots:
         const auto listenerProbe=probeListener(quint16(port));result.insert("listener_probe",listenerProbe.report());
         const auto connection=observeClosedPortConnection(quint16(port));
         result.insert("closed_port_connection",connection);
-        result.insert("tcp_state_after_exit",tcpPortState(quint16(port)));
+        const auto nativeState=tcpPortState(quint16(port));
+        const auto nativeListener=nativeListenerPresent(nativeState);
+        result.insert("tcp_state_after_exit",nativeState);
+        result.insert("tcp_tables_readable",nativeListener.has_value());
+        result.insert("no_listening_socket",nativeListener.has_value()&&!*nativeListener);
         ExclusiveLoopbackListener released{quint16(port)};
         result.insert("exclusive_rebind_after_exit",released.report());
-        QVERIFY2(listenerProbe.refused(),"The post-exit listener probe did not confirm explicit TCP refusal; see its numeric receipt.");
-        QVERIFY2(!connection.value("connected").toBool(),"A TCP connection succeeded after normal application exit.");
+        QVERIFY2(!listenerProbe.connected&&!connection.value("connected").toBool(),"A TCP connection succeeded after normal application exit.");
+        QVERIFY2(nativeListener.has_value()&&!*nativeListener,"Both native TCP tables must confirm no listening socket after normal application exit.");
         QVERIFY2(released.listening(),"Could not exclusively bind and listen on the released Rust port; see socket and native TCP state receipts.");
         result.insert("listener_closed",true);
         completed=true;

@@ -332,16 +332,40 @@ jobs:
               }
               if ($suite -eq 'app-exit') {
                 if ($null -eq $report.SelectSingleNode('/TestCase/TestFunction[@name="listenerProbeDistinguishesClosedAndLivePorts"]/Incident[@type="pass"]')) { throw 'The native closed/live listener probe controls did not pass.' }
-                function Assert-RefusedListenerProbe($probe, [string]$label) {
-                  # Qt UnconnectedState and ConnectionRefusedError are both zero;
-                  # the native controls also verify the corresponding live behavior.
-                  if ($null -eq $probe -or $probe.refused -isnot [bool] -or -not $probe.refused -or
-                      $probe.terminal_observed -isnot [bool] -or -not $probe.terminal_observed -or
-                      $probe.connected -isnot [bool] -or $probe.connected -or
-                      $probe.error_observed -isnot [bool] -or -not $probe.error_observed -or
-                      $probe.outcome -cne 'refused' -or $probe.socket_state -ne 0 -or
-                      $probe.socket_error -ne 0 -or $probe.signal_error -ne 0) {
-                    throw "The listener probe did not observe an explicit native connection refusal: $label"
+                function Assert-NativeTcpState($tcp, [bool]$expectedListener, [string]$label) {
+                  $observedListener = $false
+                  foreach ($entry in @(@{key='ipv4'; family=2}, @{key='ipv6'; family=23})) {
+                    $table = $tcp.($entry.key)
+                    if ($null -eq $table -or $table.family -ne $entry.family -or $table.win32_error -ne 0 -or $table.rows -isnot [array]) {
+                      throw "Native TCP state was not read successfully: $label/$($entry.key)"
+                    }
+                    foreach ($row in $table.rows) {
+                      if ($row.state -notin (1..12) -or $null -eq $row.pid -or $row.pid -lt 0) { throw "Invalid native TCP row: $label" }
+                      if ($row.state -eq 2) { $observedListener = $true } # MIB_TCP_STATE_LISTEN
+                    }
+                  }
+                  if ($observedListener -ne $expectedListener) { throw "Unexpected native listener state: $label" }
+                }
+                function Assert-ExclusivePortOccupied($probe, [string]$label) {
+                  if ($null -eq $probe -or $probe.exclusive_option -isnot [bool] -or -not $probe.exclusive_option -or
+                      $probe.bound -isnot [bool] -or $probe.bound -or $probe.listening -isnot [bool] -or $probe.listening -or
+                      $probe.stage -cne 'bind' -or $probe.win32_error -notin @(10048,10013)) {
+                    throw "The exclusive probe did not reject a live listener: $label"
+                  }
+                }
+                function Assert-NativeListenerReleased($connection, $tcp, $exclusive, [string]$label) {
+                  # A connect deadline is only an observation. A known-closed
+                  # native control also remained Connecting after 3000 ms.
+                  # Require positive kernel ownership evidence for this port.
+                  if ($null -eq $connection -or $connection.connected -isnot [bool] -or $connection.connected) {
+                    throw "The post-exit connection observation is missing or connected: $label"
+                  }
+                  Assert-NativeTcpState $tcp $false $label
+                  if ($null -eq $exclusive -or $exclusive.exclusive_option -isnot [bool] -or -not $exclusive.exclusive_option -or
+                      $exclusive.bound -isnot [bool] -or -not $exclusive.bound -or
+                      $exclusive.listening -isnot [bool] -or -not $exclusive.listening -or
+                      $exclusive.stage -cne 'listening' -or $exclusive.win32_error -ne 0) {
+                    throw "The released port was not exclusively bound and listened on: $label"
                   }
                 }
                 $controlsPath = 'build/swirl-quick/system-proxy-exit/listener-probe-controls.json'
@@ -350,11 +374,14 @@ jobs:
                 if ($controls.schema -ne 1 -or $controls.source_sha -cne $env:GITHUB_SHA -or $controls.success -isnot [bool] -or -not $controls.success) { throw 'The native listener probe controls have invalid source identity or outcome.' }
                 $legacy = $controls.legacy.closed
                 if ($null -eq $legacy -or $legacy.deadline_ms -ne 1500 -or $legacy.finished -isnot [bool] -or $legacy.predicate_result -isnot [bool]) { throw 'Missing the original listener-probe observation on a known-closed native port.' }
-                Assert-RefusedListenerProbe $controls.current.closed 'closed fixture'
+                Assert-NativeListenerReleased $controls.current.closed $controls.current.closed_tcp_state $controls.current.closed_exclusive_rebind 'closed fixture'
                 $live = $controls.current.live
                 if ($null -eq $live -or $live.connected -isnot [bool] -or -not $live.connected -or
                     $live.terminal_observed -isnot [bool] -or -not $live.terminal_observed -or
                     $live.refused -isnot [bool] -or $live.refused -or $live.outcome -cne 'connected') { throw 'The native listener probe did not reject a genuinely live listener.' }
+                Assert-ExclusivePortOccupied $controls.current.live_exclusive_probe 'live fixture'
+                Assert-NativeTcpState $controls.current.live_tcp_state $true 'live fixture'
+                if ($controls.current.live_native_listener_observed -isnot [bool] -or -not $controls.current.live_native_listener_observed) { throw 'The TCP state query did not detect the live native control.' }
                 foreach ($required in @('ownedSnapshotDistinguishesEmptyPacFromAbsentRegistry','exclusiveListenerProbeRequiresReleasedPortAfterTraffic')) {
                   if ($null -eq $report.SelectSingleNode("/TestCase/TestFunction[@name='$required']/Incident[@type='pass']")) { throw "Required native exit control did not pass: $required" }
                 }
@@ -371,7 +398,13 @@ jobs:
                     $data = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json
                     if ($data.schema -ne 1 -or $data.source_sha -cne $env:GITHUB_SHA) { throw "Native application exit receipt has the wrong source identity: $tag/$stage" }
                     if ($stage -eq 'result' -and ($data.success -isnot [bool] -or -not $data.success)) { throw "Native application exit result did not pass: $tag" }
-                    if ($stage -eq 'result') { Assert-RefusedListenerProbe $data.listener_probe $tag }
+                    if ($stage -eq 'result') {
+                      Assert-NativeListenerReleased $data.listener_probe $data.tcp_state_after_exit $data.exclusive_rebind_after_exit $tag
+                      Assert-ExclusivePortOccupied $data.live_listener_exclusive_probe $tag
+                      foreach ($key in @('listener_closed','tcp_tables_readable','no_listening_socket')) {
+                        if ($data.$key -isnot [bool] -or -not $data.$key) { throw "Native listener release evidence is incomplete: $tag/$key" }
+                      }
+                    }
                     if ($stage -eq 'waiting') {
                       if ($data.phase -cne 'release-waiting') { throw 'Native release-contention evidence has the wrong phase.' }
                       foreach ($key in @('native_backend','ready','close_requested','proxy_owned','proxy_busy','runtime_alive','runtime_healthy','journal_present')) {

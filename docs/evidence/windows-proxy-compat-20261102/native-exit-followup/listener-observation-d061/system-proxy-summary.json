@@ -1,0 +1,589 @@
+{
+  "schema": 1,
+  "checked_at_utc": "2026-11-02T18:44:13.147283+00:00",
+  "run_id": 41499659849,
+  "job_id": 125463553970,
+  "artifact_id": 13168564433,
+  "artifact_zip_sha256": "4016e4cf95df2af0f8e24f915fc0c7982e8613b0924d4e08e4051ec8d0688b30",
+  "artifact_zip_provenance": "ci_evidence downloaded and verified; this audit independently parses source identities, native XML and all13 JSON hashes",
+  "source": {
+    "head_sha": "d061c061e86d0df611fdd5e2bf7911b0133b2741",
+    "checkout_sha": "efad550ce552c4cb64a530d0961d60fd157ac249",
+    "tree_sha": "8d5e39e327aa88fee97cb81dacdf771da0fbd3e0",
+    "tree_equivalence_verified_from_git_objects": true,
+    "tracked_file_sha256": {
+      "src/Swirl.Quick/tests/SystemProxyExitTests.cpp": "e12a76d29fd20f3febd03b2447dac4ec1dcd4d2261dfad38ef5461e2b0374ba4",
+      "src/Swirl.Quick/tests/SystemProxyExitFixture.cpp": "a084b8960abf7c637f0b6aaa27d9f9b13e082e202031b2dd369b685d67b3b5f6",
+      "src/Swirl.Quick/engine/EngineController.cpp": "586f7e204f2d883b3dd3218354f4f401f24b737ca3b7982578fe5c36c652d2c2",
+      "src/Swirl.Quick/engine/SystemProxySession.cpp": "5a5aefed14daeab2dc5942e1b45a02a2e9dbca758c3e8422018e0497401227d4",
+      ".github/workflows/build-qt-quick-ui.yml": "27e0ea1e176c54b72134d1cf7567d380c0ca0677bbb8c82ce6d8c0bc34a5d54e"
+    }
+  },
+  "overall_native_acceptance": "FAIL",
+  "suites": {
+    "state": {
+      "case": "SystemProxyStateTests",
+      "qt_version": "6.12.0",
+      "methods_including_init_cleanup": 13,
+      "pass_incidents": 34,
+      "body_data_rows": 32,
+      "failed": 0,
+      "skipped": 0,
+      "count_scope": "QTest pass incidents, including rows and init/cleanup; not a count of individual QVERIFY/QCOMPARE assertions.",
+      "methods": [
+        {
+          "method": "initTestCase",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "guardReadinessWaitKeepsTheEventLoopResponsive",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "guardTimeoutPreservesExternalProxyAndContinuesDispatching",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "cancellationAndLateReadinessCannotAcquireAnOldRequest",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "staleEngineGenerationAndExternalChangesNeverReachTheWrite",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "configuredProxyModes",
+          "passed_data_tags": [
+            "direct",
+            "manual",
+            "pac-url",
+            "automatic-detection",
+            "manual-and-automatic"
+          ],
+          "pass_incidents": 5
+        },
+        {
+          "method": "invalidAutomaticConfigurationIsNotInferred",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "manualStores",
+          "passed_data_tags": [
+            "both-disabled",
+            "native-only-enabled",
+            "wininet-only-enabled",
+            "both-enabled",
+            "pac-is-not-manual",
+            "auto-detect-is-not-manual",
+            "native-nonzero-dword"
+          ],
+          "pass_incidents": 7
+        },
+        {
+          "method": "unknownRegistryValues",
+          "passed_data_tags": [
+            "missing",
+            "absent",
+            "untyped-presence",
+            "wrong-type",
+            "string-type",
+            "fractional-type",
+            "null-data",
+            "short-dword",
+            "long-dword",
+            "invalid-base64",
+            "noncanonical-base64",
+            "absent-with-stale-bytes"
+          ],
+          "pass_incidents": 12
+        },
+        {
+          "method": "unknownSnapshotRemainsUnknown",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "liveDiagnosticIsReadOnly",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "nativeRegistryReaderUsesIsolatedFixture",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "cleanupTestCase",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        }
+      ],
+      "evidence": {
+        "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build/swirl-quick/swirl-system-proxy-state.xml",
+        "bytes": 5344,
+        "sha256": "3224631acff5b8b7925408a197fac5bae6f754fb98ee86e8969115072111a9b4"
+      }
+    },
+    "recovery": {
+      "case": "ProxyTests",
+      "qt_version": "6.12.0",
+      "methods_including_init_cleanup": 15,
+      "pass_incidents": 16,
+      "body_data_rows": 14,
+      "failed": 0,
+      "skipped": 0,
+      "count_scope": "QTest pass incidents, including rows and init/cleanup; not a count of individual QVERIFY/QCOMPARE assertions.",
+      "methods": [
+        {
+          "method": "initTestCase",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "takeoverRestoresPacAndCustomBypass",
+          "passed_data_tags": [
+            "pac-only",
+            "manual-and-pac"
+          ],
+          "pass_incidents": 2
+        },
+        {
+          "method": "takeoverUsesActualRustCoreListenerAndRestoresExactly",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "lateAcknowledgementFromReleasedGuardCannotReplaceTheNextSession",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "asynchronousTakeoverYieldsDuringJournalContentionAndCancelsSafely",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "explicitOffDisablesExternalAndOwnedProxy",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "currentUserRecovery",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "abruptOwnerExit",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "registryOnlyExternalEdit",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "restoreDistinctStoresAndAbsentValues",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "malformedRegistryDoesNotMutateSettings",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "inconsistentRepresentationsCannotLeavePartialSettings",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "legacyJournalRecoveryPreservesRegistry",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "abruptEngineExit",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        },
+        {
+          "method": "cleanupTestCase",
+          "passed_data_tags": [
+            null
+          ],
+          "pass_incidents": 1
+        }
+      ],
+      "evidence": {
+        "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build/swirl-quick/swirl-system-proxy-recovery.xml",
+        "bytes": 2910,
+        "sha256": "448f92a7cbd4f391f826cfe077a0d5fa77a8b915757c96d01b9f8f584904f017"
+      }
+    }
+  },
+  "critical": {
+    "ui": {
+      "tests": 10,
+      "failed": 0,
+      "skipped": 0,
+      "evidence": {
+        "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build-evidence/critical-ui.xml",
+        "bytes": 1740,
+        "sha256": "20bd7697837a1b09d945b5763ba81378b2f70404782bcaa791e217d1a5a37779"
+      }
+    },
+    "network": {
+      "tests": 11,
+      "failed": 1,
+      "skipped": 0,
+      "evidence": {
+        "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build-evidence/critical-network.xml",
+        "bytes": 2316,
+        "sha256": "1f75f96818e6bb1073a81d45cbd4a870dc41dbe28a75b36121366d39768a4cd1"
+      }
+    }
+  },
+  "app_exit": {
+    "pass_incidents": 3,
+    "fail_incidents": 5,
+    "skipped": 0,
+    "count_scope": "QTest pass/fail incidents including init/cleanup, not individual assertions",
+    "evidence": {
+      "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build/swirl-quick/swirl-system-proxy-app-exit.xml",
+      "bytes": 2797,
+      "sha256": "909b84ef74e19d7aff8bf70c7d08da9a87e2bf161dddcd23a757bdeb3ff4ed1f"
+    },
+    "incidents": [
+      {
+        "method": "initTestCase",
+        "type": "pass",
+        "tag": null,
+        "line": "0",
+        "description": null
+      },
+      {
+        "method": "ownedSnapshotDistinguishesEmptyPacFromAbsentRegistry",
+        "type": "pass",
+        "tag": null,
+        "line": "0",
+        "description": null
+      },
+      {
+        "method": "listenerProbeDistinguishesClosedAndLivePorts",
+        "type": "fail",
+        "tag": null,
+        "line": "220",
+        "description": "'closedProbe.refused()' returned FALSE. (A known-closed control port must produce an explicit connection refusal.)"
+      },
+      {
+        "method": "normalApplicationExitRestoresOwnedProxy",
+        "type": "fail",
+        "tag": "pac-only",
+        "line": "381",
+        "description": "'listenerProbe.refused()' returned FALSE. (The post-exit listener probe did not confirm explicit TCP refusal; see its numeric receipt.)"
+      },
+      {
+        "method": "normalApplicationExitRestoresOwnedProxy",
+        "type": "fail",
+        "tag": "manual-and-pac",
+        "line": "381",
+        "description": "'listenerProbe.refused()' returned FALSE. (The post-exit listener probe did not confirm explicit TCP refusal; see its numeric receipt.)"
+      },
+      {
+        "method": "normalApplicationExitRestoresOwnedProxy",
+        "type": "fail",
+        "tag": "pac-only-external-edit",
+        "line": "381",
+        "description": "'listenerProbe.refused()' returned FALSE. (The post-exit listener probe did not confirm explicit TCP refusal; see its numeric receipt.)"
+      },
+      {
+        "method": "normalApplicationExitRestoresOwnedProxy",
+        "type": "fail",
+        "tag": "manual-and-pac-external-edit",
+        "line": "381",
+        "description": "'listenerProbe.refused()' returned FALSE. (The post-exit listener probe did not confirm explicit TCP refusal; see its numeric receipt.)"
+      },
+      {
+        "method": "cleanupTestCase",
+        "type": "pass",
+        "tag": null,
+        "line": "0",
+        "description": null
+      }
+    ],
+    "controls": {
+      "data": {
+        "current": {
+          "closed": {
+            "connected": false,
+            "deadline_ms": 3000,
+            "elapsed_ms": 3005,
+            "error_observed": false,
+            "outcome": "deadline",
+            "refused": false,
+            "signal_error": -1,
+            "socket_error": -1,
+            "socket_state": 2,
+            "terminal_observed": false
+          }
+        },
+        "legacy": {
+          "closed": {
+            "deadline_ms": 1500,
+            "elapsed_ms": 1500,
+            "finished": false,
+            "predicate_result": false,
+            "socket_error": -1,
+            "socket_state": 2
+          }
+        },
+        "schema": 1,
+        "source_sha": "efad550ce552c4cb64a530d0961d60fd157ac249",
+        "success": false
+      },
+      "evidence": {
+        "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build/swirl-quick/system-proxy-exit/listener-probe-controls.json",
+        "bytes": 741,
+        "sha256": "b72eb8f8d6743f0f1325235841d3924855970d015ec29d5b8cf8cb8b4a1046ea"
+      },
+      "live_control_executed": false
+    },
+    "rows": [
+      {
+        "tag": "pac-only",
+        "external_edit": false,
+        "pid": 4804,
+        "actual_rust_port": 60371,
+        "shutdown_ms": 51,
+        "http_and_socks5_roundtrips": true,
+        "exact_required_post_exit_snapshot": true,
+        "normal_child_exit_code": 0,
+        "winhttp_unchanged": true,
+        "journal_and_guard_markers_removed": true,
+        "restore_before_rust_stop": true,
+        "later_external_edit_preserved": false,
+        "closed_port_probe": {
+          "connected": false,
+          "deadline_ms": 3000,
+          "elapsed_ms": 3001,
+          "error_observed": false,
+          "outcome": "deadline",
+          "refused": false,
+          "signal_error": -1,
+          "socket_error": -1,
+          "socket_state": 2,
+          "terminal_observed": false
+        },
+        "closure_verified": false,
+        "receipts": {
+          "ready": {
+            "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build/swirl-quick/system-proxy-exit/pac-only-ready.json",
+            "bytes": 552,
+            "sha256": "e17b4b954fc2c32e9cd16f867476cc54a0f8ed107db3e45fb9381ae422a9116a"
+          },
+          "final": {
+            "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build/swirl-quick/system-proxy-exit/pac-only-final.json",
+            "bytes": 766,
+            "sha256": "2a0964a0a90a2bab0c750969f04c8fa1a2b376c6e9a3f58ac09a222c30e6a301"
+          },
+          "result": {
+            "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build/swirl-quick/system-proxy-exit/pac-only-result.json",
+            "bytes": 835,
+            "sha256": "d01591f8e78cfda41e44d43ac5767e087551a2822ca204205c7e4e8dae9c34ce"
+          }
+        }
+      },
+      {
+        "tag": "manual-and-pac",
+        "external_edit": false,
+        "pid": 6044,
+        "actual_rust_port": 60383,
+        "shutdown_ms": 52,
+        "http_and_socks5_roundtrips": true,
+        "exact_required_post_exit_snapshot": true,
+        "normal_child_exit_code": 0,
+        "winhttp_unchanged": true,
+        "journal_and_guard_markers_removed": true,
+        "restore_before_rust_stop": true,
+        "later_external_edit_preserved": false,
+        "closed_port_probe": {
+          "connected": false,
+          "deadline_ms": 3000,
+          "elapsed_ms": 3015,
+          "error_observed": false,
+          "outcome": "deadline",
+          "refused": false,
+          "signal_error": -1,
+          "socket_error": -1,
+          "socket_state": 2,
+          "terminal_observed": false
+        },
+        "closure_verified": false,
+        "receipts": {
+          "ready": {
+            "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build/swirl-quick/system-proxy-exit/manual-and-pac-ready.json",
+            "bytes": 552,
+            "sha256": "da6f9835bec47937f41299fd346401235227a182cf02c766e232bbdd022a0fef"
+          },
+          "final": {
+            "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build/swirl-quick/system-proxy-exit/manual-and-pac-final.json",
+            "bytes": 766,
+            "sha256": "646703fa8acae1b85db35d457596599190b5095e5412d097cd9a50f29ae58a69"
+          },
+          "result": {
+            "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build/swirl-quick/system-proxy-exit/manual-and-pac-result.json",
+            "bytes": 841,
+            "sha256": "82d3e838086a1ab963b426bc0d428af5ebe963bd0da14bf335e42d5ac577b0ec"
+          }
+        }
+      },
+      {
+        "tag": "pac-only-external-edit",
+        "external_edit": true,
+        "pid": 2788,
+        "actual_rust_port": 60396,
+        "shutdown_ms": 67,
+        "http_and_socks5_roundtrips": true,
+        "exact_required_post_exit_snapshot": true,
+        "normal_child_exit_code": 0,
+        "winhttp_unchanged": true,
+        "journal_and_guard_markers_removed": true,
+        "restore_before_rust_stop": false,
+        "later_external_edit_preserved": true,
+        "closed_port_probe": {
+          "connected": false,
+          "deadline_ms": 3000,
+          "elapsed_ms": 3002,
+          "error_observed": false,
+          "outcome": "deadline",
+          "refused": false,
+          "signal_error": -1,
+          "socket_error": -1,
+          "socket_state": 2,
+          "terminal_observed": false
+        },
+        "closure_verified": false,
+        "receipts": {
+          "ready": {
+            "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build/swirl-quick/system-proxy-exit/pac-only-external-edit-ready.json",
+            "bytes": 552,
+            "sha256": "aa613bbf3a99eb78f856eaa1545afa65ddb21f110b9828e84468f7c1c09bf955"
+          },
+          "final": {
+            "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build/swirl-quick/system-proxy-exit/pac-only-external-edit-final.json",
+            "bytes": 768,
+            "sha256": "283c006cb776fd3b48ba47b5cd51b5986b9e428ed5ad04022e04877b25a06789"
+          },
+          "result": {
+            "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build/swirl-quick/system-proxy-exit/pac-only-external-edit-result.json",
+            "bytes": 848,
+            "sha256": "da72417fb5eba6a4ce8e17509a0da8dd8e6cc0199ebd56a42652f85ce9ee91f0"
+          }
+        }
+      },
+      {
+        "tag": "manual-and-pac-external-edit",
+        "external_edit": true,
+        "pid": 8172,
+        "actual_rust_port": 60414,
+        "shutdown_ms": 53,
+        "http_and_socks5_roundtrips": true,
+        "exact_required_post_exit_snapshot": true,
+        "normal_child_exit_code": 0,
+        "winhttp_unchanged": true,
+        "journal_and_guard_markers_removed": true,
+        "restore_before_rust_stop": false,
+        "later_external_edit_preserved": true,
+        "closed_port_probe": {
+          "connected": false,
+          "deadline_ms": 3000,
+          "elapsed_ms": 3000,
+          "error_observed": false,
+          "outcome": "deadline",
+          "refused": false,
+          "signal_error": -1,
+          "socket_error": -1,
+          "socket_state": 2,
+          "terminal_observed": false
+        },
+        "closure_verified": false,
+        "receipts": {
+          "ready": {
+            "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build/swirl-quick/system-proxy-exit/manual-and-pac-external-edit-ready.json",
+            "bytes": 552,
+            "sha256": "d3f051335ddd2336b5f6be6b588806a325e90f04d7e3faf8eb7580fbaab58400"
+          },
+          "final": {
+            "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build/swirl-quick/system-proxy-exit/manual-and-pac-external-edit-final.json",
+            "bytes": 768,
+            "sha256": "e9f08ff2896770ae2a9dc045cf2b0566aaf59aa70857a60c06f1b1b2915da98c"
+          },
+          "result": {
+            "path": "/workspace/scratch/a6f47dff1af2/evidence/cid061c06/13168564433/build/swirl-quick/system-proxy-exit/manual-and-pac-external-edit-result.json",
+            "bytes": 854,
+            "sha256": "78441a7a2dcffb08035b51c536fd75f784d8dd9bcbefc0c8c54f2917cab32fda"
+          }
+        }
+      }
+    ],
+    "receipt_files_verified": 13
+  },
+  "definite_finding": "A controlled QTcpServer port closed before any client traffic also produces no connection/error terminal event by both1500ms and3000ms on this Windows runner. Therefore completion of a Qt refusal within these budgets is not a valid mandatory oracle for listener release. The actual delay duration and underlying Windows/Qt cause remain unobserved.",
+  "unproven": "No Rust listener leak is proved by these deadlines. No native TCP table or exclusive rebind evidence existed in this d061 binary; those later-source tests are not credited here.",
+  "next_candidate_contract": "Keep all timing observations. Require native IPv4+IPv6 tables successfully read with no LISTEN rows plus successful SO_EXCLUSIVEADDRUSE exact-endpoint bind/listen and actual live/occupied negative controls; timeout alone never passes.",
+  "physical_windows11_codex_clash_ab": "NOT_RUN",
+  "notifications": "Native successful apply requires SETTINGS_CHANGED and REFRESH API success; external applications receiving or acting on notifications is not observed."
+}

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="(empty)"
+	tests="10"
+	failures="0"
+	disabled="0"
+	skipped="0"
+	hostname=""
+	time="367"
+	timestamp="2026-11-02T18:24:52"
+	>
+	<testcase name="swirl-appearance-ui" classname="swirl-appearance-ui" time="32.9199" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-node-ui" classname="swirl-node-ui" time="44.9491" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-engine-ui" classname="swirl-engine-ui" time="12.4508" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-motion" classname="swirl-motion" time="37.8156" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-apec-motion" classname="swirl-apec-motion" time="17.4053" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-policy-ui" classname="swirl-policy-ui" time="59.3931" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-apec-glass" classname="swirl-apec-glass" time="10.5695" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-hero" classname="swirl-hero" time="45.2718" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-settings-material" classname="swirl-settings-material" time="32.4013" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="swirl-navigation-ui" classname="swirl-navigation-ui" time="74.487" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+</testsuite>

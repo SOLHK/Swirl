@@ -1,0 +1,27 @@
+{
+  "scope": "Local validation of actual CI PowerShell functions with recorded deadline and synthetic ownership receipts; not native Windows execution",
+  "parse_errors": 0,
+  "critical_script_sha256": "8905ac76365b3b71bed5612c33cd76aacbbbf82a925232d7505f5f76f90474b8",
+  "original_control_sha256": "b72eb8f8d6743f0f1325235841d3924855970d015ec29d5b8cf8cb8b4a1046ea",
+  "deadline_without_positive_evidence_rejected": true,
+  "synthetic_complete_release_with_time_wait_accepted": true,
+  "invalid_receipts_rejected": [
+    "missing table",
+    "unreadable table",
+    "wrong family",
+    "missing rows",
+    "listener remains",
+    "invalid native state",
+    "not exclusive",
+    "not bound",
+    "not listening",
+    "wrong stage",
+    "native bind error",
+    "actual connection",
+    "missing connection observation",
+    "string instead of bool"
+  ],
+  "live_tcp_listener_detected": true,
+  "live_exclusive_rejection_accepted": true,
+  "incorrect_live_exclusive_success_rejected": true
+}

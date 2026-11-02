@@ -250,3 +250,17 @@ Linux Qt 6.12 信号/状态实验已验证关闭与监听两种终态，但不�
 CI 另将首次 critical UI 的整个 `policy-evidence` 在检查原始 CTest 退出码前复制到独立目录，避免后续诊断复跑覆盖首次几何报告或截图；原退出码、窗口、120 ms policy 断言及测试命令保持不变。原始历史证据继续使用上一节的 `listener-probe-1410` 目录，未复制一套重复记录。
 
 本地环境只有 Qt 运行库，没有 Qt C++ 开发 SDK，因而未将新 C++ 回归或旧实现负对照登记为已执行通过。YAML、PowerShell 解析与首次证据保存行为可在本地检查；新生产退出顺序、Windows 端口行为以及生产安装/卸载，以本提交后完整 Qt 6.12 应用、三平台 Rust 和安全矩阵的实际日志与产物为准。真实 Windows 11 Codex Desktop A/B 持续为 **NOT_RUN**，PR #50 保持 Draft，不合并 `test`。
+
+## 12. 原生已关闭端口对照证实连接探针的错误前提
+
+`d061c06` 的[完整 Qt run 41499659849](https://github.com/SOLHK/Swirl/actions/runs/41499659849) 已结束为 **FAIL**。原始 critical UI 10/10 通过，其中完整应用 policy 59.3931 秒通过；critical network 10/11，仍只有 app-exit 失败。原生 XML 为 3 pass / 5 fail：已知关闭的独立 `QTcpServer` 对照在第 220 行失败，四个完整应用退出行在第 381 行失败。没有生成此候选的生产安装包，也没有执行剩余完整回归。
+
+这次原始数值明确了失败的真实含义：对照先实际 listen、close 并检查 `isListening()==false`，但旧 1500 ms 与新 3000 ms 连接探针都一直处于 `ConnectingState=2`、`UnknownSocketError=-1`，没有 connected 或 errorOccurred 回调。新对照耗时 3005 ms；四个已退出应用的端口观察为 3000–3015 ms，同样没有任何终态回调。它证明“期限内未观察到拒绝”不能作为“Rust 监听器仍活跃”的判断依据；未观察最终拒绝到达时间，也没有抓包确认具体 Windows 重传或过滤原因，不虚构这些结论。
+
+四行在此之前均已完成实际 HTTP/SOCKS5 数据、正常应用退出 0、精确原代理恢复或后来外部修改保留、WinHTTP 不变和 journal/guard-marker 清理；runner 原始代理也已恢复。原始 16 份 XML/JSON 与独立审计的字节摘要保存在 [listener-observation-d061/index.json](evidence/windows-proxy-compat-20261102/native-exit-followup/listener-observation-d061/index.json)。后续诊断 policy 的 537 条通过记录属于另一次执行，不替代第一次几何证据。
+
+修复保留所有既有测试、原始连接观察、五个完整应用数据行及其预算，不继续增加等待。端口关闭必须同时有实际未连接、IPv4/IPv6 原生 TCP 表读取成功且无 LISTEN、相同 loopback 地址/端口的 `SO_EXCLUSIVEADDRUSE` bind/listen 成功三类证据。live 对照必须真正连接、被相同 TCP 查询发现，并使独占绑定明确失败；完整收发及 EOF 对照继续保留。因此 deadline 仍只是诊断数据，单独不能通过关闭门禁，也没有修改主机 TCP 配置或生产网络参数。
+
+`1c77d52` 的生产代理释放顺序修复、真实 journal 锁争用行、原始 policy 120 ms 断言以及首轮 policy 证据保存全部保留。新 C++ 和 Windows 端口所有权检查仍待本提交后的真实 CI；本地脚本检查不能代替原生通过。真实 Windows 11 已登录 Codex 的同节点 A/B 仍 **NOT_RUN**，PR 继续 Draft，未合并 `test`。
+
+本地直接解析修改后 workflow 的实际 PowerShell 函数，语法错误 0；保留的真实 d061 deadline 单独输入必须被拒，14 类缺失或不安全证明也全部被拒。完整但仅为合成的独占所有权凭据可通过，TIME_WAIT 不误作 LISTEN；live 的成功独占绑定被拒为无效负对照。这些仅验证 CI 凭据门禁的逻辑，执行脚本及结果随该证据索引保存，不当成 Windows 网络执行结果。
