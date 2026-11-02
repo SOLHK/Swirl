@@ -100,6 +100,55 @@ results cannot be attributed to that fixture or the original source font.
 The [aggregate receipt](evidence/SWIRL_VF_CONTINUATION_20261102.json) records
 counts, hashes, scope and failures without source geometry or coefficients.
 
+## Completed adaptive native CI
+
+Engineering head `e78b962f8d05e2ace7bd97952fee407ffd7bac9f`, source tree
+`bebf7f6563554dad4f0965fa70464d61fa92e58f`, was executed at PR merge checkout
+`455c77b6e0ed3c5ad968d307210a2a1c18310776` in
+[run 41462925682](https://github.com/SOLHK/Swirl/actions/runs/41462925682).
+The Ubuntu Python job passed **965 tests, zero failures/skips**, plus six
+audits. The P8 authored Windows wrapper also passed in run 41462925727.
+The separate Qt font-system workflow was skipped for this branch; this is
+not a Qt application acceptance result.
+
+| Actual native environment | Ordinary CFF2 geometry | Nested CFF2 geometry | Overall native job |
+| --- | --- | --- | --- |
+| Windows Server 2022 x64, build 20348 | 14 variants / 5,022 observations pass | 6 variants fail, 124 missing outlines each | FAIL |
+| Windows Server 2025 x64, build 26100 | 14 variants / 5,022 observations pass | 6 variants fail, 124 missing outlines each | FAIL |
+| Windows 11 Enterprise ARM64, build 26200, x64 emulation | 14 variants / 5,022 observations pass | 6 variants fail, 124 missing outlines each | FAIL |
+| macOS 26.6.2 ARM64, build 25G83 | 5 variants / 870 observations, zero geometry failures | Geometry works in these authored controls | FAIL: 340 raw-metric failures and original 849/850 gate |
+
+The new adaptive case passes **372 observations per Windows platform**, 1,116
+in total, at every required single-axis and mixed-axis position. Maximum control
+error is 0.007074312, below the unchanged 1/32 budget. All ordinary variants
+together pass **15,066 observations**. All nested failures and existing strict
+metric assertions remain visible. None of these authored controls is the
+requested complete source conversion or a Windows desktop installation.
+
+The [exact-head CI receipt](evidence/SWIRL_VF_CONTINUATION_CI_20261102.json)
+retains per-case counts, native architecture and downloaded artifact hashes.
+
+## Further boundary diagnosis
+
+The dense GID 19177 model's worst independent sample lies in a cell with 18
+source component-axis regime changes. Along HGHT, two structural boundaries
+occur inside that cell; the source's maximum chord defect is **0.591068**,
+matching the model's approximately 0.590699 error scale. For GID 1166, the
+worst cell has 15 component-axis regime changes and 11 boundaries inside its
+WDTH interval, with chord defect **0.888661**. These observations identify
+unresolved piecewise boundaries inside the fitted cells. They do not prove
+that every error has the same cause or that no other representation can work.
+
+A subsequent private experiment adds F2DOT14 neighbours of structural roots
+from 27 independent source-axis slices to the split candidates. Held-out
+positions do not select those roots. With the ordinary-blend budget, GID 19177
+still has 1.671927 error and GID 1166 has 2.812400 error. At a 4,096-node budget,
+their errors are respectively **0.569667** and **0.926360**, with 4,050 and 4,040
+nonzero regions; both fail the ordinary-blend stack capacity. This approach
+does not solve the problem and regresses one glyph. It remains an isolated
+failed experiment, with script/report hashes and aggregate results retained
+in the CI receipt. It does not replace the checked-in fitter.
+
 ## Outstanding delivery requirements
 
 The original font has **32 faces × 47,102 GIDs**, with physical axes `WDTH`,
