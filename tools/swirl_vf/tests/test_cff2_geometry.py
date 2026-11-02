@@ -131,3 +131,54 @@ class CFF2GeometryTests(unittest.TestCase):
                     error=np.linalg.norm(geometry.control_points(*actual)-
                                          geometry.control_points(*expected),axis=1).max()
                     self.assertLessEqual(float(error),1/32)
+
+    def test_zero_region_compaction_preserves_all_masters_and_independent_serialized_samples(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'source.ttc'; make_fixture(path)
+            with TTCollection(path) as collection:
+                source = collection.fonts[0]
+                _, nested = convert(source, .25, factored=True)
+                models = {name: geometry.compact(model.original) for name, model in nested.items()}
+                self.assertEqual(len(models['probe'].supports) - 1, 40)
+                self.assertEqual(len(models['space'].supports), 1)
+                locations = [dict(zip(TAGS, p)) for p in itertools.product(
+                    tuple(i / 4 for i in range(-4, 5)), repeat=3)]
+                locations += [dict(zip(TAGS, map(float, p)))
+                              for p in np.random.default_rng(20261102).uniform(-1, 1, (32, 3))]
+                for name, model in models.items():
+                    for p in locations:
+                        np.testing.assert_allclose(model.evaluate(p), nested[name].original.evaluate(p),
+                                                   rtol=0, atol=1e-10)
+                    self.assertEqual(model.evidence['failures'], nested[name].evidence['failures'])
+                    self.assertFalse(model.evidence['production_accepted'])
+                font = geometry.install(prepare_from_truetype(source), models)
+                stream = io.BytesIO(); font.save(stream)
+                with TTFont(io.BytesIO(stream.getvalue())) as saved:
+                    for p in locations:
+                        for name in source.getGlyphOrder():
+                            actual = geometry.operands(geometry.source_commands(saved.getGlyphSet(
+                                location=p, normalized=True)[name]))
+                            expected = geometry.operands(records(source, name, [p], .25)[0])
+                            self.assertEqual(actual[0], expected[0])
+                            error = np.linalg.norm(geometry.control_points(*actual) -
+                                                   geometry.control_points(*expected), axis=1).max(initial=0)
+                            self.assertLessEqual(float(error), 1/32)
+
+    def test_compaction_retains_smallest_nonzero_coefficient_and_failure_evidence(self):
+        supports = [{}, {'WDTH': (0, .5, 1)}, {'wght': (0, .5, 1)}]
+        evidence = {'sampled_geometry_passed': False, 'failures': [{'error': .25}],
+                    'production_accepted': False}
+        model = geometry.OutlineModel(TAGS, (('rmoveto', 2),), supports,
+            np.asarray([[.25, 0], [0, 0], [1/65536, 0]]), evidence)
+        compact = geometry.compact(model)
+        self.assertEqual(compact.supports, [supports[0], supports[2]])
+        self.assertEqual(compact.deltas[1, 0], 1/65536)
+        self.assertEqual(compact.evidence['failures'], evidence['failures'])
+        self.assertFalse(compact.evidence['sampled_geometry_passed'])
+        self.assertEqual(len(model.supports), 3)
+        # Compaction cannot turn a genuinely dense nonzero model into a legal
+        # flat CharString by discarding regions or suppressing the stack guard.
+        dense = geometry.OutlineModel(TAGS, model.operators, [{}] + [supports[2]] * 513,
+                                      np.full((514, 2), 1/65536), evidence)
+        with self.assertRaisesRegex(geometry.CFF2GeometryError, 'stack_overflow'):
+            geometry.compact(dense).charstring(0)

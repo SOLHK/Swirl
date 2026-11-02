@@ -226,6 +226,25 @@ def factor(model):
     return FactoredOutlineModel(model, supports, coefficients)
 
 
+def compact(model):
+    """Remove only regions whose encoded delta is exactly zero for every operand.
+
+    This preserves the already quantized function at every axis location. It
+    does not refit a model, discard small deltas, or change its acceptance
+    evidence. Ordinary blends avoid the nested-blend incompatibility observed
+    in DirectWrite; genuinely dense models still fail the stack limit.
+    """
+    require(isinstance(model, OutlineModel), 'unfactored_outline_model_required')
+    keep = [0] + [index for index in range(1, len(model.supports))
+                  if np.any(model.deltas[index] != 0)]
+    evidence = copy.deepcopy(model.evidence)
+    evidence['lossless_compaction'] = {'input_regions': len(model.supports) - 1,
+                                      'output_regions': len(keep) - 1}
+    return OutlineModel(model.axis_tags, model.operators,
+                        [model.supports[index] for index in keep],
+                        model.deltas[keep].copy(), evidence)
+
+
 def fit(training_commands, training_locations, holdout_commands, holdout_locations, axis_tags):
     require(len(training_commands) == len(training_locations) > 0 and
             len(holdout_commands) == len(holdout_locations) > 0, 'training_and_holdouts_required')

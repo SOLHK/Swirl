@@ -23,7 +23,7 @@ from fontTools.ttLib import TTCollection
 from make_cff2_fixture import write_fixture
 
 VARIANTS = ('flat', 'flat_standalone', 'flat_stat', 'flat_fdselect',
-            'flat_private_vsindex', 'flat_default_vsindex', 'flat_post3', 'factored')
+            'flat_private_vsindex', 'flat_default_vsindex', 'flat_post3', 'factored', 'compact')
 
 
 def generate(output):
@@ -33,8 +33,8 @@ def generate(output):
         flat = Path(tmp) / 'flat.ttc'; write_fixture(flat)
         for variant in VARIANTS:
             path = output / (variant + ('.otf' if variant == 'flat_standalone' else '.ttc'))
-            if variant == 'factored':
-                write_fixture(path, factored=True)
+            if variant in ('factored', 'compact'):
+                write_fixture(path, factored=variant == 'factored', compact=variant == 'compact')
             else:
                 with TTCollection(flat, recalcTimestamp=False) as collection:
                     for font in collection.fonts:

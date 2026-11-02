@@ -173,6 +173,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Authored CFF2 fixture generation failed' }
           ./tools/swirl_vf/platform/run_directwrite_probe.ps1 -Font build/authored-cff2-factored.ttc -OutputDirectory build/swirl-vf-evidence/directwrite-cff2 -AllGlyphs -Render -Binary build/swirl-vf-evidence/directwrite/build/Release/directwrite_probe.exe
           if ($LASTEXITCODE -ne 0) { throw 'CFF2 native DirectWrite probe failed' }
+      - name: Validate losslessly compacted CFF2 blends with native DirectWrite
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/make_cff2_fixture.py build/authored-cff2-compact.ttc --compact
+          if ($LASTEXITCODE -ne 0) { throw 'Compact CFF2 fixture generation failed' }
+          ./tools/swirl_vf/platform/run_directwrite_probe.ps1 -Font build/authored-cff2-compact.ttc -OutputDirectory build/swirl-vf-evidence/directwrite-cff2-compact -AllGlyphs -Render -Binary build/swirl-vf-evidence/directwrite/build/Release/directwrite_probe.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Compact CFF2 native DirectWrite probe failed' }
       - name: Isolate CFF2 serialization and blending through independent native cases
         if: always()
         run: |
@@ -195,6 +202,10 @@ jobs:
             build/swirl-vf-evidence/directwrite-cff2/*.jsonl
             build/swirl-vf-evidence/directwrite-cff2/*.log
             build/swirl-vf-evidence/directwrite-cff2/*.png
+            build/swirl-vf-evidence/directwrite-cff2-compact/*.json
+            build/swirl-vf-evidence/directwrite-cff2-compact/*.jsonl
+            build/swirl-vf-evidence/directwrite-cff2-compact/*.log
+            build/swirl-vf-evidence/directwrite-cff2-compact/*.png
             build/swirl-vf-evidence/cff2-matrix/**/*.json
             build/swirl-vf-evidence/cff2-matrix/**/*.jsonl
             build/swirl-vf-evidence/cff2-matrix/**/*.log

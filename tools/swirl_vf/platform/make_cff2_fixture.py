@@ -39,9 +39,11 @@ def records(font, name, locations, translation=0.):
     return result
 
 
-def convert(font, translation=0., *, factored=False):
+def convert(font, translation=0., *, factored=False, compact=False):
+    if factored and compact:
+        raise ValueError('choose_one_cff2_encoding')
     grid, held = GRID, HOLDOUTS
-    if factored:
+    if factored or compact:
         # More Cartesian regions than the CFF2 operand stack can hold in a
         # flat blend. Algebraic factoring must preserve the same function.
         grid = [dict(zip(TAGS, p)) for p in itertools.product(
@@ -51,11 +53,12 @@ def convert(font, translation=0., *, factored=False):
     for name in font.getGlyphOrder():
         model = geometry.fit(records(font, name, grid, translation), grid,
                              records(font, name, held, translation), held, TAGS)
-        models[name] = geometry.factor(model) if factored else model
+        models[name] = (geometry.factor(model) if factored else
+                        geometry.compact(model) if compact else model)
     return geometry.install(prepare_from_truetype(font), models), models
 
 
-def write_fixture(path, *, factored=False):
+def write_fixture(path, *, factored=False, compact=False):
     path = Path(path)
     if path.exists() or path.is_symlink():
         raise ValueError('fresh_authored_cff2_output_required')
@@ -63,7 +66,8 @@ def write_fixture(path, *, factored=False):
     with tempfile.TemporaryDirectory(dir=path.parent) as tmp:
         source = Path(tmp) / 'authored-source.ttc'; make_fixture(source)
         with TTCollection(source) as original:
-            conversions = [convert(font, .25, factored=factored) for font in original.fonts]
+            conversions = [convert(font, .25, factored=factored, compact=compact)
+                           for font in original.fonts]
             result = TTCollection(); result.fonts = [font for font, _ in conversions]
             output = Path(tmp) / 'authored-cff2.ttc'; result.save(output)
             # A serialized read is required before exposing even an authored control.
@@ -75,13 +79,15 @@ def write_fixture(path, *, factored=False):
     return {'scope': 'authored CFF2 control, not original-font conversion',
             'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
             'bytes': path.stat().st_size, 'faces': 2, 'glyphs_per_face': 3,
-            'axes': list(TAGS), 'factored_blends': factored,
+            'axes': list(TAGS), 'factored_blends': factored, 'compact_blends': compact,
             'production_accepted': False}
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('output', type=Path)
-    parser.add_argument('--factored', action='store_true')
+    encoding = parser.add_mutually_exclusive_group()
+    encoding.add_argument('--factored', action='store_true')
+    encoding.add_argument('--compact', action='store_true')
     args = parser.parse_args()
-    print(json.dumps(write_fixture(args.output, factored=args.factored), indent=2))
+    print(json.dumps(write_fixture(args.output, factored=args.factored, compact=args.compact), indent=2))

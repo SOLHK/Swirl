@@ -11,7 +11,7 @@
   "required_faces": 32,
   "required_glyphs_per_face": 47102,
   "python_tests": {
-    "run": 919,
+    "run": 921,
     "failed": 0,
     "skipped": 7,
     "audit_passed": 6
@@ -38,6 +38,7 @@
             "HGHT"
           ],
           "factored_blends": false,
+          "compact_blends": false,
           "production_accepted": false
         },
         "max_cubic_control_error": 0.0018081212919831642,
@@ -75,6 +76,7 @@
             "HGHT"
           ],
           "factored_blends": true,
+          "compact_blends": false,
           "production_accepted": false
         },
         "max_cubic_control_error": 0.0018081212919831642,
@@ -98,8 +100,47 @@
           "successful_glyph_count": 174,
           "type": "summary"
         }
+      },
+      "compact": {
+        "fixture": {
+          "scope": "authored CFF2 control, not original-font conversion",
+          "sha256": "33a81c78bb89eea0644d378f772273fee715de6a6b67ab1338309040299ce53d",
+          "bytes": 6164,
+          "faces": 2,
+          "glyphs_per_face": 3,
+          "axes": [
+            "WDTH",
+            "wght",
+            "HGHT"
+          ],
+          "factored_blends": false,
+          "compact_blends": true,
+          "production_accepted": false
+        },
+        "max_cubic_control_error": 0.001815558652092049,
+        "max_metric_errors": {
+          "CoreText.advance_width": 0.0011759327650224805,
+          "CoreText.advance_height": 0.33750000000009095,
+          "CoreText.vertical_origin_x": 70.0,
+          "CoreText.vertical_origin_y": 0.0005273437500363798,
+          "HarfBuzz.advance_width": 0.21659375000001546,
+          "HarfBuzz.advance_height": 0.33750000000009095,
+          "HarfBuzz.vertical_origin_x": 0.10829687500000773,
+          "HarfBuzz.vertical_origin_y": 0.00687500000003638
+        },
+        "glyph_observations": 174,
+        "geometry_failures": 0,
+        "raw_metric_failures": 68,
+        "summary": {
+          "error_count": 0,
+          "request_count": 58,
+          "source_sha256": "33a81c78bb89eea0644d378f772273fee715de6a6b67ab1338309040299ce53d",
+          "successful_glyph_count": 174,
+          "type": "summary"
+        }
       }
-    }
+    },
+    "total_raw_metric_failures": 204
   },
   "source_design_grid_models": [
     {
@@ -201,6 +242,208 @@
     "cff2-vorg-control.json": "eef6131e9a18b280132cd1ad363e5313d134479d5d945d2592c93ed88a5582e9",
     "source-cff2-dense.json": "3670072df28d93f7ad3236240971a687c04572c9a1598621062b28d276c1eba5",
     "hvf-worst-native-comparison.json": "703c3487edb951885f69f4aede636f634b8d3c21f4d7b149c310d7ad8ec4706d",
-    "oracle-prefix-review.json": "325fe2168d4993c01083f00c9ebc0a5d9a83d5fa1759382bf0ae2036abfc8d3a"
+    "oracle-prefix-review.json": "325fe2168d4993c01083f00c9ebc0a5d9a83d5fa1759382bf0ae2036abfc8d3a",
+    "cff2-compact-native/cff2-result.json": "7cf4dc05c990a9277dc448da4ab5c6ee617aa7cecd323f2410948d82c25c5724",
+    "qt-cff2-repo-result/result.json": "665d7eb55cf07edb8d2ec91fe90ffdd9ab32bdcfce92be66688f6a88542ca33b",
+    "python-tests-compact.log": "30bf1683f37e1fb40ab165a688ae62ea03ae8e3e7d257a98394b99f12618559b",
+    "audit-tests-compact.log": "97856a2264b6c385b57754104703c065d6aadedc6c9d0c7a1ff114c72547844d"
+  },
+  "directwrite_structural_matrix": {
+    "source_commit": "c46d10647eba3e0313389cc9a85b4972cf54dacc",
+    "run_id": 41389700440,
+    "job_id": 125098153719,
+    "platform": "Windows-2022Server-10.0.20348-SP0",
+    "artifact_sha256": "86f348ea2de236e9bae5a1e8c5f87376c43c808b6c15439617d202d7605e62ba",
+    "scope": "authored structural controls; not original-font or Windows 11 acceptance",
+    "cases": [
+      {
+        "variant": "flat",
+        "sha256": "27b049a9a4a6f07335171a9db914e18e6ad5677c546815aa88ee1a34205c5c76",
+        "bytes": 5092,
+        "exit_code": 0,
+        "face_results": [
+          {
+            "record": "face_result",
+            "face_index": 0,
+            "status": "PASS_NATIVE_PROBE",
+            "positions": 62
+          },
+          {
+            "record": "face_result",
+            "face_index": 1,
+            "status": "PASS_NATIVE_PROBE",
+            "positions": 62
+          }
+        ]
+      },
+      {
+        "variant": "flat_standalone",
+        "sha256": "69014315b2e4b04d46796843844681a2e7fd58a2c49f3b1bbeb884acdd664ecf",
+        "bytes": 2952,
+        "exit_code": 0,
+        "face_results": [
+          {
+            "record": "face_result",
+            "face_index": 0,
+            "status": "PASS_NATIVE_PROBE",
+            "positions": 62
+          }
+        ]
+      },
+      {
+        "variant": "flat_stat",
+        "sha256": "fc93fc4bac4806853375fea01f6bd9cf0d8e316a60b2885b0ca27179230c39ab",
+        "bytes": 5168,
+        "exit_code": 0,
+        "face_results": [
+          {
+            "record": "face_result",
+            "face_index": 0,
+            "status": "PASS_NATIVE_PROBE",
+            "positions": 62
+          },
+          {
+            "record": "face_result",
+            "face_index": 1,
+            "status": "PASS_NATIVE_PROBE",
+            "positions": 62
+          }
+        ]
+      },
+      {
+        "variant": "flat_fdselect",
+        "sha256": "accf2fee15f2c3ee3e077c7427eec1f98b573adfbd22a085c3bfc54866c89047",
+        "bytes": 5108,
+        "exit_code": 0,
+        "face_results": [
+          {
+            "record": "face_result",
+            "face_index": 0,
+            "status": "PASS_NATIVE_PROBE",
+            "positions": 62
+          },
+          {
+            "record": "face_result",
+            "face_index": 1,
+            "status": "PASS_NATIVE_PROBE",
+            "positions": 62
+          }
+        ]
+      },
+      {
+        "variant": "flat_private_vsindex",
+        "sha256": "9a740c8256945a90508c580a1aacc2ae0a97d6b5020f2076f7e3f8ff208ae956",
+        "bytes": 5092,
+        "exit_code": 0,
+        "face_results": [
+          {
+            "record": "face_result",
+            "face_index": 0,
+            "status": "PASS_NATIVE_PROBE",
+            "positions": 62
+          },
+          {
+            "record": "face_result",
+            "face_index": 1,
+            "status": "PASS_NATIVE_PROBE",
+            "positions": 62
+          }
+        ]
+      },
+      {
+        "variant": "flat_default_vsindex",
+        "sha256": "a15e50851bd81b0ba130d682039f03ef32ae916876d978e23fbec6a849e7bd75",
+        "bytes": 5084,
+        "exit_code": 0,
+        "face_results": [
+          {
+            "record": "face_result",
+            "face_index": 0,
+            "status": "PASS_NATIVE_PROBE",
+            "positions": 62
+          },
+          {
+            "record": "face_result",
+            "face_index": 1,
+            "status": "PASS_NATIVE_PROBE",
+            "positions": 62
+          }
+        ]
+      },
+      {
+        "variant": "flat_post3",
+        "sha256": "f30feeb3424a0171db201f3fb46a21230102754116538f624d16b517a22ec7c1",
+        "bytes": 5076,
+        "exit_code": 0,
+        "face_results": [
+          {
+            "record": "face_result",
+            "face_index": 0,
+            "status": "PASS_NATIVE_PROBE",
+            "positions": 62
+          },
+          {
+            "record": "face_result",
+            "face_index": 1,
+            "status": "PASS_NATIVE_PROBE",
+            "positions": 62
+          }
+        ]
+      },
+      {
+        "variant": "factored",
+        "sha256": "f5b9957a95928e7de530c0e54936a7f5791a5fff27955363d2b546d8caad3c67",
+        "bytes": 5772,
+        "exit_code": 1,
+        "face_results": [
+          {
+            "record": "face_result",
+            "face_index": 0,
+            "status": "FAILED",
+            "error": "No actual outline/metrics movement detected for WDTH"
+          },
+          {
+            "record": "face_result",
+            "face_index": 1,
+            "status": "FAILED",
+            "error": "No actual outline/metrics movement detected for WDTH"
+          }
+        ]
+      }
+    ]
+  },
+  "compact_encoder": {
+    "method": "remove only regions whose entire already encoded delta row equals zero",
+    "authored_training_masters": 729,
+    "input_regions": 728,
+    "remaining_probe_regions": 40,
+    "unchanged_holdout_failures": true,
+    "directwrite": "CI_PENDING_AT_COMMIT_CREATION",
+    "existing_nested_failure_gate": "RETAINED"
+  },
+  "authored_mac_Qt_6_12": {
+    "status": "PASS_AUTHORED_QT_SCOPE",
+    "qt": "6.12.0",
+    "qpa": "offscreen",
+    "input_sha256": "33a81c78bb89eea0644d378f772273fee715de6a6b67ab1338309040299ce53d",
+    "scope": "authored CFF2; QPainter/QML software captures, not physical DPI or final Swirl acceptance",
+    "families": 2,
+    "axes_checked": [
+      "WDTH",
+      "wght",
+      "HGHT"
+    ],
+    "axis_endpoint_records": 12,
+    "QPainter_DPRs": [
+      1,
+      1.25,
+      1.5,
+      1.75,
+      2
+    ],
+    "QPainter_images": 60,
+    "QML_images": 2,
+    "QML_font_binding_verified": true,
+    "CFF2_table_and_GID_identity_verified": true
   }
 }

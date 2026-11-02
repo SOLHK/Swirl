@@ -55,9 +55,9 @@ def run(output):
         report['binary_sha256'] = hashlib.sha256(binary.read_bytes()).hexdigest()
         source = output / 'authored-source.ttc'; make_fixture(source)
         with TTCollection(source) as original:
-            for kind in ('flat', 'factored'):
+            for kind in ('flat', 'factored', 'compact'):
                 path = output / f'authored-cff2-{kind}.ttc'
-                fixture = write_fixture(path, factored=kind == 'factored')
+                fixture = write_fixture(path, factored=kind == 'factored', compact=kind == 'compact')
                 native = NativeOracle(binary, path, output / f'{kind}-native.log')
                 result = {'fixture': fixture, 'native_identity': native.metadata,
                           'max_cubic_control_error': 0., 'max_metric_errors': {},
