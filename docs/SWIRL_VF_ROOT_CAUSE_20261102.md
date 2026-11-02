@@ -439,3 +439,32 @@ records the native results separately from the unchanged strict failures.
 No formal SwirlVF.ttc, distribution authorization or Windows 11 x64 acceptance
 is asserted. See the official [CFF2 specification](https://learn.microsoft.com/en-us/typography/opentype/spec/cff2)
 for the CharString length, stack and subroutine constraints.
+
+
+## Native packing results and independent DirectWrite geometry comparison
+
+At `66842eee`, all three Windows environments accept the long CharString control
+and the flat blend-operator subroutine. Each long face reports exactly 5,120
+control points versus 10 for the ordinary control, preserving the 512 repetitions.
+The nested subroutine still loses the variable outline and fails: moving the
+operator across a call boundary does not repair that native incompatibility.
+The native workflow 41406577699 remains failed at its unchanged strict gates.
+Local Qt 6.12 also loads the long collection, verifies both families and real
+three-axis path changes, and produces 60 software DPR captures plus two QML
+captures. This is authored-control evidence, not full-font or physical DPI proof.
+
+The DirectWrite probe now has an explicit, optional coordinate export. Normal
+runs retain their prior privacy behavior. The authored diagnostic matrix opts in
+and compares every exported cubic control point to the original authored TrueType
+fixture elevated analytically, rather than using the generated CFF2 as its own
+expected value. Y is converted from the declared screen coordinate frame to the
+source's upward coordinate frame; no tolerance is changed. Transcript hash,
+face/GID identity, UPM, axis identity, duplicate records and complete 62-position
+coverage are checked separately. Missing variable outlines remain geometry
+failures. Every supported ordinary variant must pass the independent geometry
+check for that diagnostic step to succeed. The new Windows code requires its
+actual CI build; it is not locally claimed as executed.
+
+Local Python validation: 935 tests, zero failures, seven platform skips; six audits
+pass. [Native packing receipt](evidence/SWIRL_VF_NATIVE_PACKING_20261102.json)
+records the completed previous-head native evidence and artifact identities.

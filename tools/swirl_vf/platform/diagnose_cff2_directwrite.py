@@ -24,6 +24,7 @@ from fontTools.varLib.builder import buildVarRegionList
 
 from make_cff2_fixture import write_fixture, convert, geometry, prepare_from_truetype
 from test_coretext_extract import make_fixture
+from verify_cff2_directwrite_geometry import verify as verify_geometry
 
 VARIANTS = ('flat', 'flat_standalone', 'flat_stat', 'flat_fdselect',
             'flat_private_vsindex', 'flat_default_vsindex', 'flat_post3', 'factored', 'compact',
@@ -188,18 +189,22 @@ def run(output, binary):
             directory = output / row['variant']
             command = ['pwsh', '-NoProfile', '-File', str(Path(__file__).with_name('run_directwrite_probe.ps1')),
                 '-Font', str(output / 'fonts' / row['file']), '-OutputDirectory', str(directory),
-                '-Binary', str(binary), '-AllGlyphs', '-Render']
+                '-Binary', str(binary), '-AllGlyphs', '-Render', '-ExportOutlines']
             result = subprocess.run(command, capture_output=True, text=True, timeout=180)
             (output / (row['variant'] + '.log')).write_text(result.stdout + result.stderr)
             native = json.loads((directory / 'directwrite-run.json').read_text(encoding='utf-8-sig'))
             if native['input_sha256'] != row['sha256'] or native.get('input_unchanged') is not True:
                 raise AssertionError('CFF2 diagnosis input identity changed')
             transcript = [json.loads(line) for line in (directory / 'directwrite.jsonl').read_text().splitlines()]
+            geometry_result = verify_geometry(directory/'outline-coordinates.jsonl',transcript,native,variant=row['variant'])
             report['cases'].append(dict(row, exit_code=result.returncode, native=native,
+                geometry=geometry_result,
                 face_results=[r for r in transcript if r.get('record') == 'face_result'],
                 default_geometry=[r for r in transcript if r.get('record') == 'instance' and r.get('case') == 'default']))
             (output / 'matrix.json').write_text(json.dumps(report, indent=2))
         report['status'] = 'DIAGNOSIS_COMPLETE_NOT_ACCEPTANCE'
+        report['ordinary_geometry_passed'] = all(row['geometry']['status']=='PASS_AUTHORED_GEOMETRY'
+            for row in report['cases'] if row['variant'].startswith('flat') or row['variant']=='compact')
     except Exception as error:
         report['status'] = 'FAIL_EXECUTION'; report['error'] = str(error)
         raise
@@ -221,3 +226,4 @@ if __name__ == '__main__':
         report = run(args.output, args.binary)
         print(json.dumps({'status': report['status'], 'native_exit_codes': {
             row['variant']: row['exit_code'] for row in report['cases']}}, indent=2))
+        raise SystemExit(0 if report['ordinary_geometry_passed'] else 1)
