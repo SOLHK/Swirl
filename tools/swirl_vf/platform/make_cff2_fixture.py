@@ -47,10 +47,10 @@ def records(font, name, locations, translation=0., *, repeat_contours=1, nonline
     return result
 
 
-def convert(font, translation=0., *, factored=False, compact=False, adaptive=False, ramp=False, repeat_contours=1):
+def convert(font, translation=0., *, factored=False, compact=False, adaptive=False, ramp=False, hierarchical=False, repeat_contours=1):
     if type(repeat_contours) is not int or not 1 <= repeat_contours <= 1024:
         raise ValueError('invalid_authored_contour_repeat')
-    if sum((factored, compact, adaptive, ramp)) > 1:
+    if sum((factored, compact, adaptive, ramp, hierarchical)) > 1:
         raise ValueError('choose_one_cff2_encoding')
     grid, held = GRID, HOLDOUTS
     if factored or compact:
@@ -61,7 +61,7 @@ def convert(font, translation=0., *, factored=False, compact=False, adaptive=Fal
         held = [dict(zip(TAGS, p)) for p in ((.17, -.31, .79), (-.77, .42, .57))]
     models = {}
     for name in font.getGlyphOrder():
-        if ramp:
+        if ramp or hierarchical:
             import numpy as np
             from local_cff2_geometry import encode
             knots = [np.linspace(-1,1,9)]*3
@@ -72,7 +72,12 @@ def convert(font, translation=0., *, factored=False, compact=False, adaptive=Fal
             ops = observed[0][0]
             geometry.require(all(o==ops for o,_ in observed),'authored_ramp_topology_changed')
             values = np.asarray([v for _,v in observed]).reshape(9,9,9,-1)
-            model = encode(knots,values,ops,TAGS,basis='ramp')
+            model = encode(knots,values,ops,TAGS,basis='hierarchical' if hierarchical else 'ramp')
+            if hierarchical:
+                from hierarchical_cff2_compression import compress
+                model = compress(model, max_regions=96, error_budget=1/256)
+                geometry.require(model.evidence['uniform_model_compression']['within_budget'],
+                                 'authored_hierarchical_compression_failed')
             held = np.random.default_rng(179331).uniform(-1,1,(128,3))
             locations = [dict(zip(TAGS,map(float,p))) for p in held]
             truth = [geometry.operands(c) for c in records(font,name,locations,translation,
@@ -84,7 +89,7 @@ def convert(font, translation=0., *, factored=False, compact=False, adaptive=Fal
             model.evidence.update(sampled_geometry_passed=bool((errors<=geometry.LIMIT).all()),
                 max_holdout_error=float(errors.max()),holdout_count=len(held),
                 failures=[dict(index=int(i),error=float(errors[i])) for i in np.flatnonzero(errors>geometry.LIMIT)],
-                fixture_scope='authored_full_cube_ramp_control')
+                fixture_scope='authored_full_cube_local_basis_control')
             models[name] = model
             continue
         if adaptive:
@@ -107,10 +112,10 @@ def convert(font, translation=0., *, factored=False, compact=False, adaptive=Fal
         models[name] = (geometry.factor(model) if factored else
                         geometry.compact(model) if compact else model)
     return geometry.install(prepare_from_truetype(font), models,
-                            experimental_local=ramp,experimental_nested=factored), models
+                            experimental_local=ramp or hierarchical,experimental_nested=factored), models
 
 
-def write_fixture(path, *, factored=False, compact=False, adaptive=False, ramp=False, repeat_contours=1):
+def write_fixture(path, *, factored=False, compact=False, adaptive=False, ramp=False, hierarchical=False, repeat_contours=1):
     path = Path(path)
     if path.exists() or path.is_symlink():
         raise ValueError('fresh_authored_cff2_output_required')
@@ -119,7 +124,7 @@ def write_fixture(path, *, factored=False, compact=False, adaptive=False, ramp=F
         source = Path(tmp) / 'authored-source.ttc'; make_fixture(source)
         with TTCollection(source) as original:
             conversions = [convert(font, .25, factored=factored, compact=compact,
-                                   adaptive=adaptive, ramp=ramp, repeat_contours=repeat_contours)
+                                   adaptive=adaptive, ramp=ramp, hierarchical=hierarchical, repeat_contours=repeat_contours)
                            for font in original.fonts]
             result = TTCollection(); result.fonts = [font for font, _ in conversions]
             output = Path(tmp) / 'authored-cff2.ttc'; result.save(output)
@@ -135,6 +140,7 @@ def write_fixture(path, *, factored=False, compact=False, adaptive=False, ramp=F
             'axes': list(TAGS), 'factored_blends': factored, 'compact_blends': compact,
             'adaptive_three_axis_blends': adaptive,
             'ramp_three_axis_blends': ramp,
+            'compressed_hierarchical_three_axis_blends': hierarchical,
             'repeat_contours': repeat_contours, 'production_accepted': False}
 
 
@@ -146,6 +152,7 @@ if __name__ == '__main__':
     encoding.add_argument('--compact', action='store_true')
     encoding.add_argument('--adaptive', action='store_true')
     encoding.add_argument('--ramp', action='store_true')
+    encoding.add_argument('--hierarchical', action='store_true')
     args = parser.parse_args()
     print(json.dumps(write_fixture(args.output, factored=args.factored, compact=args.compact,
-                                  adaptive=args.adaptive, ramp=args.ramp), indent=2))
+                                  adaptive=args.adaptive, ramp=args.ramp, hierarchical=args.hierarchical), indent=2))

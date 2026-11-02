@@ -106,7 +106,10 @@ def run(source, manifest, output, *, native_binary=None, hvf_binary=None):
                 operators = ops; rows.append(relative)
             return operators, np.concatenate(rows)
         ops, values = sample(nodes)
-        model = encode(knots,values.reshape(*counts,-1),ops,tags,basis='ramp')
+        model = encode(knots,values.reshape(*counts,-1),ops,tags,basis=case.get('basis','ramp'))
+        if 'compression' in case:
+            from hierarchical_cff2_compression import compress
+            model=compress(model,**case['compression'])
         _, exact = sample(held)
         predicted = np.asarray([model.evaluate(dict(zip(tags,p))) for p in held])
         expected = np.cumsum(exact.reshape(len(held),-1,2),axis=1)
@@ -115,6 +118,8 @@ def run(source, manifest, output, *, native_binary=None, hvf_binary=None):
             holdout_count=len(held), full_cube=bool(np.array_equal(box,np.tile([-1.,1.],(3,1)))),
             max_holdout_error=float(errors.max()), holdout_failures=int((errors>geometry.LIMIT).sum()),
             regions=len(model.supports)-1, serialized='NOT_RUN', native='NOT_RUN', passed=False)
+        compression=model.evidence.get('uniform_model_compression')
+        if compression is not None:row['compression']=compression
         report['cases'].append(row)
         prefix = f'case-{case_index}-gid-{gid}'
         np.savez_compressed(output/f'{prefix}-model.npz',deltas=model.deltas,holdouts=held)
@@ -124,7 +129,8 @@ def run(source, manifest, output, *, native_binary=None, hvf_binary=None):
             model.charstring(0).compile(isCFF2=True); row['flat_encodable'] = True
         except ValueError as error:
             row['flat_encodable'] = False; row['encoding_error'] = str(error)
-        if not row['holdout_failures'] and row['flat_encodable']:
+        if not row['holdout_failures'] and row['flat_encodable'] and (
+                compression is None or compression['within_budget']):
             model.evidence.update(sampled_geometry_passed=True, failures=[],
                 scope='private_declared_box_research_only',max_holdout_error=row['max_holdout_error'])
             template = output/f'{prefix}-template.ttc'; make_fixture(template)

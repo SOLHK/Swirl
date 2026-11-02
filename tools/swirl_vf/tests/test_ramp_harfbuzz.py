@@ -29,9 +29,15 @@ def explicit_closures(source):
 
 class RampHarfBuzzTests(unittest.TestCase):
     def test_reopened_ramp_font_matches_independent_three_axis_source(self):
+        self.verify_native('ramp')
+
+    def test_reopened_compressed_hierarchical_font_matches_independent_source(self):
+        self.verify_native('hierarchical')
+
+    def verify_native(self, basis):
         with tempfile.TemporaryDirectory() as tmp:
             source=Path(tmp)/'source.ttc'; make_fixture(source)
-            target=Path(tmp)/'ramp.ttc';write_fixture(target,ramp=True)
+            target=Path(tmp)/(basis+'.ttc');write_fixture(target,**{basis:True})
             points=np.r_[np.asarray(list(itertools.product((-1.,0.,1.),repeat=3))),
                          np.random.default_rng(885731).uniform(-1,1,(64,3))]
             blob=target.read_bytes(); observations=0

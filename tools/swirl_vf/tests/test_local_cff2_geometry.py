@@ -23,7 +23,7 @@ class LocalTensorTests(unittest.TestCase):
         random = np.random.default_rng(137711)
         domains = list(itertools.product(((-1., -.25), (.25, 1.)), repeat=3))
         domains.append(((-1., 1.),)*3)
-        for domain, basis in itertools.product(domains, ('tent', 'ramp')):
+        for domain, basis in itertools.product(domains, ('tent', 'ramp', 'hierarchical')):
             knots = [np.linspace(a, b, 5) for a, b in domain]
             values = random.uniform(-20, 20, (5, 5, 5, 14))
             model = encode(knots, values, OPS, TAGS, basis=basis)
@@ -78,6 +78,9 @@ class LocalTensorTests(unittest.TestCase):
 
     def test_saved_ramp_font_keeps_off_grid_controls(self):
         self.serialized_case('ramp')
+
+    def test_saved_hierarchical_font_keeps_off_grid_controls(self):
+        self.serialized_case('hierarchical')
 
     def test_ramps_remove_affine_span_redundancy_without_changing_the_function(self):
         knots = [np.linspace(0, 1, 9)]*3
