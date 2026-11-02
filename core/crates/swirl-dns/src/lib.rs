@@ -1,6 +1,11 @@
-//! Bounded system/custom/DoT/HTTP-1.1 DoH resolver. Fake-IP is not implemented.
+//! Bounded system/custom/DoT/HTTP-1.1 DoH resolver.
+//! Fake-IP and real-IP association live in `association` and are not applied
+//! by `Resolver::resolve`.
+mod association;
 mod dot;
+mod stub;
 mod wire;
+pub use association::{Association, DNS_IPV4, DNS_IPV6, Mapping, RecordKind, TUN_IPV4, TUN_IPV6};
 use std::{
     collections::HashMap,
     net::{IpAddr, SocketAddr},
@@ -8,6 +13,10 @@ use std::{
     time::{Duration, Instant},
 };
 use std::{future::Future, pin::Pin};
+pub use stub::{
+    AAAA, DNS_A, DnsQuestion, decode_answers, decode_query, encode_query, encode_response,
+    unwrap_tcp, wrap_tcp,
+};
 use swirl_subscription::{DnsQueryFamily, DnsTlsServer};
 use swirl_transport::BoxStream;
 use tokio::{net::lookup_host, sync::Semaphore, time::timeout};

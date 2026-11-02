@@ -42,11 +42,11 @@ pub(super) struct Resolution {
     pub(super) ttl: u32,
 }
 
-fn word(data: &[u8], at: usize) -> Result<u16> {
+pub(crate) fn word(data: &[u8], at: usize) -> Result<u16> {
     let bytes = data.get(at..at + 2).ok_or("DnsTruncated")?;
     Ok(u16::from_be_bytes([bytes[0], bytes[1]]))
 }
-fn dword(data: &[u8], at: usize) -> Result<u32> {
+pub(crate) fn dword(data: &[u8], at: usize) -> Result<u32> {
     Ok((u32::from(word(data, at)?) << 16) | u32::from(word(data, at + 2)?))
 }
 fn covers(zone: &str, host: &str) -> bool {
@@ -91,7 +91,7 @@ fn name_labels<'a>(data: &'a [u8], cursor: &mut usize) -> Result<Vec<&'a [u8]>> 
     }
     Err("DnsCompressionDepth")
 }
-fn name(data: &[u8], cursor: &mut usize) -> Result<String> {
+pub(crate) fn name(data: &[u8], cursor: &mut usize) -> Result<String> {
     let mut labels = Vec::new();
     for bytes in name_labels(data, cursor)? {
         if !bytes
