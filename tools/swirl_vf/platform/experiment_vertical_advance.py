@@ -29,10 +29,15 @@ from fontTools.varLib.builder import buildVarDevTable, buildVarData, buildVarReg
 import experiment_vertical_gpos as fixture
 
 POINTS = fixture.POINTS
+ROUTES = (*fixture.ROUTES, 'vpal', 'dist')
 
 
-def candidate(original, symbols, route):
-    data, failures = fixture.add_adjustment(original, symbols, route)
+def candidate(original, symbols, route, constant=None, coordinate='Y'):
+    fixture.require(route in ROUTES, 'unknown_advance_route')
+    fixture.require(coordinate in ('X','Y','XY'), 'invalid_advance_coordinate')
+    fixture.require(constant is None or type(constant) is int and -32768 <= constant <= 32767,
+                    'invalid_constant_adjustment')
+    data, failures = fixture.add_adjustment(original, symbols, 'vert')
     fixture.require(not failures, 'authored_advance_requires_exact_integer_coefficients')
     font = TTFont(io.BytesIO(data), recalcTimestamp=False)
     supports, rows = fixture.supports_and_deltas(symbols)
@@ -42,8 +47,14 @@ def candidate(original, symbols, route):
     font['GDEF'].table.VarStore = buildVarStore(
         buildVarRegionList(supports, [a[0] for a in fixture.AXES]),
         [buildVarData(list(range(len(supports))), rows, optimize=False)])
-    values = {s.name: buildValue({'YAdvance': 0, 'YAdvDevice': buildVarDevTable(gid)})
-              for gid, s in enumerate(symbols)}
+    values = {}
+    for gid,symbol in enumerate(symbols):
+        fields = {}
+        for axis in coordinate:
+            fields[axis+'Advance'] = 0 if constant is None else constant
+            if constant is None: fields[axis+'AdvDevice'] = buildVarDevTable(gid)
+        values[symbol.name] = buildValue(fields)
+    font['GPOS'].table.FeatureList.FeatureRecord[0].FeatureTag = route
     lookup = font['GPOS'].table.LookupList.Lookup[0]
     lookup.SubTable = [buildSinglePosSubtable(values, font.getReverseGlyphMap())]
     lookup.SubTableCount = 1
@@ -55,19 +66,19 @@ def candidate(original, symbols, route):
     return data
 
 
-def desired(symbol, normalized):
-    return fixture.analytic_width(symbol, normalized) - symbol.width
+def desired(symbol, normalized, constant=None):
+    return fixture.analytic_width(symbol, normalized) - symbol.width if constant is None else constant
 
 
 def statistic(stats, field, error, context):
     fixture.add_stat(stats, field, error, context)
 
 
-def compare_rows(before, after, normalized, symbols, stats, context, fields):
+def compare_rows(before, after, normalized, symbols, stats, context, fields, constant=None):
     fixture.require(len(before) == len(after), 'vertical_advance_changed_glyph_count')
     for b, a in zip(before, after):
         fixture.require(b['gid'] == a['gid'], 'vertical_advance_changed_substitution')
-        gid = a['gid']; expected = desired(symbols[gid], normalized)
+        gid = a['gid']; expected = desired(symbols[gid], normalized, constant)
         c = {**context, 'gid': gid, 'normalized': list(normalized), 'expected_delta': expected}
         for field in fields:
             fixture.require(a[field] == b[field], 'vertical_advance_changed_raw_metric_API')
@@ -77,7 +88,7 @@ def compare_rows(before, after, normalized, symbols, stats, context, fields):
         statistic(stats, 'advance_change_minus_requested_model', delta - expected, c)
 
 
-def harfbuzz(original, variants, symbols):
+def harfbuzz(original, variants, symbols, constant=None):
     import uharfbuzz as hb
     result = {'engine_version': hb.version_string(), 'groups': {}, 'calls': 0}
     for route, data in variants.items():
@@ -89,14 +100,14 @@ def harfbuzz(original, variants, symbols):
                     b = fixture.shape(original, q, direction, 'zh-cn', features)
                     fixture.require(a['observed_normalized'] == b['observed_normalized'], 'HB_instance_changed')
                     for record in (a, b):
-                        for g in record['glyphs']: g['layout_advance'] = -g['y_advance']
+                        for g in record['glyphs']: g['layout_advance'] = -g['y_advance'] if direction=='ttb' else g['x_advance']
                     group = result['groups'].setdefault('/'.join((route, policy, direction)), {})
                     compare_rows(b['glyphs'], a['glyphs'], q, symbols, group,
-                        {'point': list(q)}, ('metric_width', 'metric_height', 'metric_vertical_origin'))
+                        {'point': list(q)}, ('metric_width', 'metric_height', 'metric_vertical_origin'), constant)
                     for bg, ag in zip(b['glyphs'], a['glyphs']):
-                        fixture.require(all(ag[k] == bg[k] for k in ('x_advance','x_offset','y_offset')),
-                                        'YAdvance_changed_another_HB_position_field')
-                        correction = desired(symbols[ag['gid']], a['observed_normalized'])
+                        fixture.require(all(ag[k] == bg[k] for k in ('x_offset','y_offset')),
+                                        'advance_adjustment_changed_HB_placement')
+                        correction = desired(symbols[ag['gid']], a['observed_normalized'], constant)
                         statistic(group, 'advance_change_minus_observed_axis_model',
                             ag['layout_advance']-bg['layout_advance']-correction,
                             {'point': list(q), 'gid': ag['gid'], 'observed': a['observed_normalized']})
@@ -104,7 +115,7 @@ def harfbuzz(original, variants, symbols):
     return result
 
 
-def coretext(original, variants, symbols, folder):
+def coretext(original, variants, symbols, folder, constant=None):
     import probe_coretext_vertical_gpos as ct
     swift, binary = folder/'advance.swift', folder/'advance-native'
     swift.write_text(ct.make_harness())
@@ -155,15 +166,16 @@ def coretext(original, variants, symbols, folder):
                     g['layout_advance'] = g['advance'][0]
             group=result['groups'].setdefault('/'.join((route,request['policy'],request['direction'])),{})
             compare_rows(b['glyphs'],a['glyphs'],request['normalized'],symbols,group,
-                         {'request':request},('metric_width','metric_height','metric_vertical_origin'))
+                         {'request':request},('metric_width','metric_height','metric_vertical_origin'), constant)
     return result
 
 
-def directwrite(original, variants, symbols, binary, folder):
+def directwrite(original, variants, symbols, binary, folder, constant=None):
     import probe_directwrite_vertical_layout as dw
     result={'groups':{},'calls':0,'processes':{},'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest()}
     for route,data in variants.items():
-        requests=[r for r in dw.requests(POINTS) if r['route']==route and r['locale']=='zh-CN' and r['text_kind']=='mixed']
+        requests=[dict(r,route=route) for r in dw.requests(POINTS)
+                  if r['route']=='vert' and r['locale']=='zh-CN' and r['text_kind']=='mixed']
         fixture.require(requests, 'no_DirectWrite_advance_requests')
         observed=[]
         for variant,font_data in (('original',original),('candidate',data)):
@@ -183,29 +195,29 @@ def directwrite(original, variants, symbols, binary, folder):
                 for g in r:g['layout_advance']=g['advance']
             group=result['groups'].setdefault('/'.join((route,request['policy'],request['direction'])),{})
             compare_rows(before,after,request['requested_normalized_model'],symbols,group,
-                         {'request':request},('design_metrics',))
+                         {'request':request},('design_metrics',), constant)
     return result
 
 
-def run(output, native, binary=None):
+def run(output, native, binary=None, constant=None, coordinate='Y'):
     output=Path(output).resolve();fixture.require(not output.exists(),'new_output_directory_required')
     output.mkdir(parents=True)
     report={'status':'IN_PROGRESS','platform':platform.platform(),'production_accepted':False,
-            'scope':'authored_symbols_variable_YAdvance_only','original_font_acceptance':'NOT_RUN',
+            'scope':'authored_symbols_variable_or_constant_advance_control','original_font_acceptance':'NOT_RUN',
             'windows_11_x64_acceptance':'NOT_RUN','raw_metric_gates_unchanged':True,'limit':fixture.LIMIT,
-            'CoreText':'NOT_RUN','DirectWrite':'NOT_RUN'}
+            'CoreText':'NOT_RUN','DirectWrite':'NOT_RUN','constant_adjustment':constant,'coordinate':coordinate}
     try:
         original,symbols=fixture.original_fixture()
-        variants={route:candidate(original,symbols,route) for route in fixture.ROUTES}
+        variants={route:candidate(original,symbols,route,constant,coordinate) for route in ROUTES}
         report['font_sha256']={'original':hashlib.sha256(original).hexdigest(),
                               **{k:hashlib.sha256(v).hexdigest() for k,v in variants.items()}}
-        report['HarfBuzz']=harfbuzz(original,variants,symbols)
+        report['HarfBuzz']=harfbuzz(original,variants,symbols,constant)
         if native=='coretext':
             fixture.require(sys.platform=='darwin','CoreText_NOT_RUN_requires_macOS')
-            report['CoreText']=coretext(original,variants,symbols,output)
+            report['CoreText']=coretext(original,variants,symbols,output,constant)
         elif native=='directwrite':
             fixture.require(sys.platform=='win32' and binary is not None,'DirectWrite_NOT_RUN_requires_Windows_and_binary')
-            report['DirectWrite']=directwrite(original,variants,symbols,Path(binary).resolve(strict=True),output)
+            report['DirectWrite']=directwrite(original,variants,symbols,Path(binary).resolve(strict=True),output,constant)
         report['status']='DIAGNOSIS_COMPLETE_NOT_ACCEPTANCE'
     except Exception as error:
         report['status']='DIAGNOSIS_FAILED';report['error']=str(error);raise
@@ -219,5 +231,7 @@ if __name__=='__main__':
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--native',choices=('none','coretext','directwrite'),default='none')
     parser.add_argument('--binary',type=Path)
-    args=parser.parse_args();report=run(args.output,args.native,args.binary)
+    parser.add_argument('--constant-adjustment',type=int,help='Static advance control in place of variable data')
+    parser.add_argument('--coordinate',choices=('X','Y','XY'),default='Y',help='Independent control for layout coordinate handling')
+    args=parser.parse_args();report=run(args.output,args.native,args.binary,args.constant_adjustment,args.coordinate)
     print(json.dumps({'status':report['status'],'native':args.native}))

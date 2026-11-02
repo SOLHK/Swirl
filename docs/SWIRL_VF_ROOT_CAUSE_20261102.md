@@ -380,3 +380,16 @@ The pre-existing strict CoreText and nested DirectWrite gates remain failed.
 No formal font, Windows 11 x64 installation, final-font Qt acceptance, grant
 verification or merge to `test` is claimed. Aggregated evidence is in
 [`SWIRL_VF_ADAPTIVE_20261102.json`](evidence/SWIRL_VF_ADAPTIVE_20261102.json).
+
+At `137841c2`, [native run 41398712433](https://github.com/SOLHK/Swirl/actions/runs/41398712433)
+completed. Python passes 927 tests and six audits. All three Windows environments
+also pass ordinary blends at 64, 192 and 506 active regions. Windows 11 reports
+compiled machine 0x8664 and native machine 0xAA64: this is x64 emulation on ARM64.
+The CoreText/HarfBuzz YAdvance result reproduces, but DirectWrite applies none
+of that adjustment on the three initially tested routes, leaving a maximum
+156-FUnit discrepancy. Successful diagnostic execution must not be mistaken
+for precision acceptance. The next controls add the registered `vpal` and
+`dist` routes, constant YAdvance, variable XAdvance and combined XY values to
+isolate routing, variation and coordinate handling. No existing raw gate or
+failed expectation is removed. The actual completed Windows results are in
+[`SWIRL_VF_NATIVE_LAYOUT_20261102.json`](evidence/SWIRL_VF_NATIVE_LAYOUT_20261102.json).

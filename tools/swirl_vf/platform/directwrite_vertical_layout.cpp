@@ -2,7 +2,7 @@
 // Build: cl /std:c++17 /EHsc /W4 /utf-8 directwrite_vertical_layout.cpp
 //        /link dwrite.lib d2d1.lib bcrypt.lib
 // The Python driver supplies only its independent geometric-symbol fixture.
-// stdin: id H|V zh-CN|zh-HK vert|vrt2|vkrn default|enabled|disabled
+// stdin: id H|V zh-CN|zh-HK vert|vrt2|vkrn|vpal|dist default|enabled|disabled
 //        WDTH wght HGHT mixed|single_han (one request per line).
 // This observes real TextLayout::Draw callbacks, not a reconstructed glyph run.
 // It does not certify rasterization, Windows 11, Qt, or an Apple conversion.
@@ -172,7 +172,7 @@ struct Request {
         require(bool(in>>parsedId>>direction>>locale>>route>>policy>>requested[0]>>requested[1]>>requested[2]>>textKind) && !(in>>extra), "invalid_request_fields");
         require(parsedId>0 && parsedId<=100000, "request_id_out_of_scope"); id=unsigned(parsedId);
         require((direction=="H" || direction=="V") && (locale=="zh-CN" || locale=="zh-HK")
-                && (route=="vert" || route=="vrt2" || route=="vkrn")
+                && (route=="vert" || route=="vrt2" || route=="vkrn" || route=="vpal" || route=="dist")
                 && (policy=="default" || policy=="enabled" || policy=="disabled")
                 && (textKind=="mixed" || textKind=="single_han"),"unsupported_layout_request");
         for (unsigned i=0;i<3;++i) {

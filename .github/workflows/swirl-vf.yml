@@ -125,6 +125,9 @@ jobs:
         if: always()
         run: |
           python tools/swirl_vf/platform/experiment_vertical_advance.py --output build/swirl-vf-evidence/vertical-advance --native coretext
+          python tools/swirl_vf/platform/experiment_vertical_advance.py --output build/swirl-vf-evidence/vertical-advance-static --native coretext --constant-adjustment 24
+          python tools/swirl_vf/platform/experiment_vertical_advance.py --output build/swirl-vf-evidence/vertical-advance-x --native coretext --coordinate X
+          python tools/swirl_vf/platform/experiment_vertical_advance.py --output build/swirl-vf-evidence/vertical-advance-xy --native coretext --coordinate XY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -205,6 +208,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Vertical layout native build failed' }
           python tools/swirl_vf/platform/experiment_vertical_advance.py --output build/swirl-vf-evidence/vertical-advance --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe
           if ($LASTEXITCODE -ne 0) { throw 'Vertical advance diagnostic execution failed' }
+          python tools/swirl_vf/platform/experiment_vertical_advance.py --output build/swirl-vf-evidence/vertical-advance-static --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe --constant-adjustment 24
+          if ($LASTEXITCODE -ne 0) { throw 'Static advance control execution failed' }
+          python tools/swirl_vf/platform/experiment_vertical_advance.py --output build/swirl-vf-evidence/vertical-advance-x --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe --coordinate X
+          if ($LASTEXITCODE -ne 0) { throw 'Advance coordinate control execution failed' }
+          python tools/swirl_vf/platform/experiment_vertical_advance.py --output build/swirl-vf-evidence/vertical-advance-xy --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe --coordinate XY
+          if ($LASTEXITCODE -ne 0) { throw 'Combined advance coordinate control execution failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -229,6 +238,6 @@ jobs:
             build/swirl-vf-evidence/cff2-matrix/**/*.json
             build/swirl-vf-evidence/cff2-matrix/**/*.jsonl
             build/swirl-vf-evidence/cff2-matrix/**/*.log
-            build/swirl-vf-evidence/vertical-advance/*.json
-            build/swirl-vf-evidence/vertical-advance/*.log
+            build/swirl-vf-evidence/vertical-advance*/*.json
+            build/swirl-vf-evidence/vertical-advance*/*.log
           retention-days: 7

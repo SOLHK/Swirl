@@ -14,7 +14,7 @@ import experiment_vertical_advance as advance
 class VerticalAdvanceTests(unittest.TestCase):
     def test_serialized_height_adjustment_preserves_all_original_metrics(self):
         original, symbols = advance.fixture.original_fixture()
-        for route in advance.fixture.ROUTES:
+        for route in advance.ROUTES:
             data = advance.candidate(original, symbols, route)
             with TTFont(io.BytesIO(data)) as font:
                 sub = font['GPOS'].table.LookupList.Lookup[0].SubTable[0]
@@ -28,6 +28,25 @@ class VerticalAdvanceTests(unittest.TestCase):
                         actual=value.YAdvance + store[(device.StartSize<<16)|device.EndSize]
                         expected=advance.desired(symbols[font.getGlyphID(name)],point)
                         self.assertAlmostEqual(actual,expected,places=10)
+
+    def test_constant_and_coordinate_controls_remain_independent(self):
+        source,symbols=advance.fixture.original_fixture()
+        constant=advance.candidate(source,symbols,'vpal',constant=24)
+        with TTFont(io.BytesIO(constant)) as font:
+            sub=font['GPOS'].table.LookupList.Lookup[0].SubTable[0]
+            self.assertEqual(sub.ValueFormat,8)
+            values=[sub.Value] if sub.Format==1 else sub.Value
+            self.assertTrue(all(v.YAdvance==24 for v in values))
+        x=advance.candidate(source,symbols,'dist',coordinate='X')
+        with TTFont(io.BytesIO(x)) as font:
+            sub=font['GPOS'].table.LookupList.Lookup[0].SubTable[0]
+            self.assertEqual(sub.ValueFormat,0x44)
+        xy=advance.candidate(source,symbols,'vpal',coordinate='XY')
+        with TTFont(io.BytesIO(xy)) as font:
+            sub=font['GPOS'].table.LookupList.Lookup[0].SubTable[0]
+            self.assertEqual(sub.ValueFormat,0xCC)
+        with self.assertRaisesRegex(ValueError,'invalid_advance_coordinate'):
+            advance.candidate(source,symbols,'vert',coordinate='Z')
 
     def test_actual_harfbuzz_vertical_layout_keeps_fractional_advance(self):
         try:
