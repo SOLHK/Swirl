@@ -468,3 +468,48 @@ actual CI build; it is not locally claimed as executed.
 Local Python validation: 935 tests, zero failures, seven platform skips; six audits
 pass. [Native packing receipt](evidence/SWIRL_VF_NATIVE_PACKING_20261102.json)
 records the completed previous-head native evidence and artifact identities.
+
+
+## Completed independent DirectWrite coordinate validation
+
+Run [41408797609](https://github.com/SOLHK/Swirl/actions/runs/41408797609)
+executes code `14cd7a84cdcf231fff73d3c9267ce716198c4eba` at merge checkout
+`0d6bdcdce855fef000ad242dee8b946cf0e19b63`. Actual native compilation and the new
+coordinate comparator succeeded on Server 2022, Server 2025 and Windows 11 ARM64
+x64 emulation. Thirteen ordinary/compact controls each cover all authored GIDs
+and all 62 positions per face. They contribute 4,650 observations and 649,140
+control points per environment: **13,950 observations, zero geometry failures**
+in total, with maximum error **0.007074260 FUnit** against the independent source.
+The six nested variants retain 124 topology failures each per environment; the
+missing variable outlines cannot pass as an empty glyph. All old native metric
+failures also remain. The native workflow therefore correctly remains FAILED.
+
+The Python job passes 935 tests plus six audits. Windows Qt 6.12 run 41408797682
+passes its three existing CTests, within the declared authored-fixture scope.
+The actual source font, all-face candidate and installation acceptance are not
+inferred from any of these controls.
+
+Additional source investigations retain negative results. Sampling 2,048 pairs
+per axis and per difficult GID within a nominal F2DOT14 cell gives maximum half
+separations from 0.002403 to 0.006004 FUnit. This does not support axis-cell
+quantization as the sole cause of the much larger fit errors; it is not an
+exhaustive representability proof. An independent 506-region fit using absolute
+control residuals, fixed original grid anchors and orthogonal region selection
+still fails 509/512 and 507/512 holdouts for GIDs 1166 and 19177. Training-only GCV
+regularization does not fix generalization: the worst independent errors remain
+17.359573 and 4.270396 FUnit. Failed trial scripts and coefficients remain private,
+with their hashes and aggregate results in the receipt; none enters assembly.
+
+No font grant material was found in the earlier local review or six subsequent
+metadata-only searches of connected Google Drive. This is a missing-evidence
+finding, not a claim that the owner lacks rights. Modification/conversion,
+cross-platform use and public-distribution scope therefore remain unverified.
+No contract content, identities, source font or source outline data was published.
+
+[Independent native geometry receipt](evidence/SWIRL_VF_DIRECTWRITE_GEOMETRY_20261102.json)
+records exact code/run/artifact identities, retained failures and experimental
+limits. Formal delivery remains blocked: SwirlVF.ttc is absent, production
+acceptance is 0/32 faces, strict source models and raw metric gates fail, Windows
+11 x64 installation is NOT_RUN, and font distribution scope is not verified.
+The PR remains a draft targeting test. Neither test nor main is updated by this
+continuation, and no failure threshold has changed.
