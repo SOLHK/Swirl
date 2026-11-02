@@ -108,6 +108,7 @@ try {
                 $report.native_architecture = @{
                     query_succeeded = $headers[0].architecture_query_succeeded
                     process_machine = $headers[0].process_machine
+                    compiled_machine = $headers[0].compiled_machine
                     native_machine = $headers[0].native_machine
                     process_emulated = $headers[0].process_emulated
                 }

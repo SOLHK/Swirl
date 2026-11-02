@@ -126,9 +126,9 @@ class OutlineModel:
         for operator, count in self.operators:
             for argument in range(count):
                 values = self.deltas[:, column]
-                require(argument + regions + 2 <= 513, 'cff2_blend_operand_stack_overflow')
                 program.append(float(values[0]))
                 if regions and np.any(values[1:]):
+                    require(argument + regions + 2 <= 513, 'cff2_blend_operand_stack_overflow')
                     program.extend(float(value) for value in values[1:])
                     program.extend((1, 'blend'))
                 column += 1

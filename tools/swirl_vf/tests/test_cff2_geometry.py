@@ -20,6 +20,21 @@ from make_cff2_fixture import TAGS, GRID, HOLDOUTS, records, convert
 
 
 class CFF2GeometryTests(unittest.TestCase):
+    def test_static_operand_does_not_reserve_a_nonexistent_blend_stack(self):
+        # The first operand fits exactly: 1 default + 511 deltas + count.
+        # Its result and a following static operand occupy only two entries.
+        supports = [{}] + [{'wght': (0, i/512, 1)} for i in range(1, 512)]
+        deltas = np.zeros((512, 2)); deltas[0] = (10.25, 20.125)
+        deltas[1:, 0] = 1/65536
+        model = geometry.OutlineModel(TAGS, (('rmoveto', 2),), supports, deltas, {})
+        charstring = model.charstring(0)
+        self.assertEqual(charstring.program[-3:], ['blend', 20.125, 'rmoveto'])
+        self.assertEqual(charstring.program.count('blend'), 1)
+        # Making the second operand variable really does overflow by one.
+        model.deltas[1, 1] = 1/65536
+        with self.assertRaisesRegex(geometry.CFF2GeometryError, 'stack_overflow'):
+            model.charstring(0)
+
     def test_fractional_default_and_three_axis_models_survive_collection_serialization(self):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp)/'source.ttc'; make_fixture(source)

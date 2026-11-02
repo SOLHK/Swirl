@@ -121,6 +121,10 @@ jobs:
         if: always()
         run: |
           python tools/swirl_vf/platform/test_coretext_cff2.py --output build/swirl-vf-evidence/cff2-native
+      - name: Measure fractional vertical advance through actual CoreText layout
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/experiment_vertical_advance.py --output build/swirl-vf-evidence/vertical-advance --native coretext
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -160,7 +164,7 @@ jobs:
           architecture: x64
       - name: Generate original three-face three-axis variable fixture
         run: |
-          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          python -m pip install fonttools==4.61.1 numpy==2.2.6 uharfbuzz==0.56.3
           if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' }
           python tools/swirl_vf/platform/make_standard_fixture.py build/synthetic-three-axis.ttc
           if ($LASTEXITCODE -ne 0) { throw 'Original fixture generation failed' }
@@ -192,6 +196,15 @@ jobs:
         run: |
           python tools/swirl_vf/platform/diagnose_cff2_directwrite.py --output build/swirl-vf-evidence/cff2-matrix --binary build/swirl-vf-evidence/directwrite/build/Release/directwrite_probe.exe
           if ($LASTEXITCODE -ne 0) { throw 'CFF2 diagnostic execution failed' }
+      - name: Measure fractional vertical advance through actual DirectWrite layout
+        if: always()
+        run: |
+          cmake -S tools/swirl_vf/platform/vertical_layout -B build/vertical-layout -A x64
+          if ($LASTEXITCODE -ne 0) { throw 'Vertical layout CMake configure failed' }
+          cmake --build build/vertical-layout --config Release
+          if ($LASTEXITCODE -ne 0) { throw 'Vertical layout native build failed' }
+          python tools/swirl_vf/platform/experiment_vertical_advance.py --output build/swirl-vf-evidence/vertical-advance --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Vertical advance diagnostic execution failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -216,4 +229,6 @@ jobs:
             build/swirl-vf-evidence/cff2-matrix/**/*.json
             build/swirl-vf-evidence/cff2-matrix/**/*.jsonl
             build/swirl-vf-evidence/cff2-matrix/**/*.log
+            build/swirl-vf-evidence/vertical-advance/*.json
+            build/swirl-vf-evidence/vertical-advance/*.log
           retention-days: 7

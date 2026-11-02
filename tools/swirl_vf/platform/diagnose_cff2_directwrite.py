@@ -19,13 +19,45 @@ import tempfile
 from fontTools.cffLib import FDSelect
 from fontTools.otlLib.builder import buildStatTable
 from fontTools.ttLib import TTCollection
+from fontTools.varLib.builder import buildVarRegionList
 
 from make_cff2_fixture import write_fixture, convert, geometry, prepare_from_truetype
 from test_coretext_extract import make_fixture
 
 VARIANTS = ('flat', 'flat_standalone', 'flat_stat', 'flat_fdselect',
             'flat_private_vsindex', 'flat_default_vsindex', 'flat_post3', 'factored', 'compact',
-            'factored_sparse', 'nested_default', 'nested_delta', 'nested_delta_sparse')
+            'factored_sparse', 'nested_default', 'nested_delta', 'nested_delta_sparse',
+            'flat_regions_64', 'flat_regions_192', 'flat_regions_506')
+
+
+def pad_zero_regions(font, count):
+    """Measure the native flat-blend capacity without changing its function.
+
+    Each additional region has an exactly zero coefficient in every blend.
+    The regions and peaks are distinct and exactly representable in F2DOT14.
+    This is a parser-capacity control, not an optimizer or source-font model.
+    """
+    top = font['CFF2'].cff.topDictIndex[0]
+    store = top.VarStore.otVarStore
+    if len(store.VarData) != 1 or not store.VarData[0].VarRegionCount < count <= 506:
+        raise ValueError('invalid_flat_capacity_control')
+    data = store.VarData[0]; previous = data.VarRegionCount
+    extra = count - previous
+    regions = buildVarRegionList([{'WDTH': (0, i/16384, 1)} for i in range(1, extra+1)],
+                                  [a.axisTag for a in font['fvar'].axes])
+    first = len(store.VarRegionList.Region)
+    store.VarRegionList.Region.extend(regions.Region)
+    store.VarRegionList.RegionCount = len(store.VarRegionList.Region)
+    data.VarRegionIndex.extend(range(first, first+extra)); data.VarRegionCount = count
+    for charstring in top.CharStrings.values():
+        charstring.decompile(); output = []
+        for token in charstring.program:
+            if token == 'blend':
+                if output[-1] != 1:
+                    raise ValueError('flat_capacity_requires_single_operand_blends')
+                output[-1:] = [0]*extra + [1]
+            output.append(token)
+        charstring.program = output; charstring.bytecode = None
 
 
 def nest_identity_blends(top, mode):
@@ -101,6 +133,8 @@ def generate(output):
                             font['post'].formatType = 3.0
                         elif variant.startswith('nested_'):
                             nest_identity_blends(top, variant)
+                        elif variant.startswith('flat_regions_'):
+                            pad_zero_regions(font, int(variant.rsplit('_', 1)[1]))
                     if variant == 'flat_standalone':
                         collection.fonts[0].save(path)
                     else:
