@@ -233,8 +233,10 @@ func fixtureSnapshot(_ font: CTFont, _ request: [String: Any],
                     "requested_font": fixtureIdentity(font, expected, absent),
                     "actual_run_font": fixtureIdentity(runFont, expected, absent)])
             }
-            guard observedAxes(runFont) == observedAxes(font) else {
-                throw OracleError.invalid("original_fixture_run_changed_observed_axes")
+            let axisEchoMatches = observedAxes(runFont) == observedAxes(font)
+            if !axisEchoMatches && request["observe_axis_echo_mismatch"] as? Bool != true {
+                throw OracleError.diagnostic("original_fixture_run_changed_observed_axes", [
+                    "requested_font_axes": observedAxes(font), "actual_run_axes": observedAxes(runFont)])
             }
             let count = CTRunGetGlyphCount(run)
             var glyphs = [CGGlyph](repeating: 0, count: count)
@@ -263,6 +265,8 @@ func fixtureSnapshot(_ font: CTFont, _ request: [String: Any],
                     "text_matrix": layoutMatrix(matrix), "font_matrix": layoutMatrix(CTFontGetMatrix(runFont)),
                     "metric_width": Double(horizontal.width), "metric_height": Double(vertical.width),
                     "metric_vertical_origin": [-Double(translation.width), -Double(translation.height)],
+                    "raw_axis_echo_matches": axisEchoMatches,
+                    "actual_run_axes": observedAxes(runFont),
                     "actual_source_table_identity_verified": true]
                 if let rawPath = CTFontCreatePathForGlyph(runFont, glyph, nil) {
                     let box = rawPath.boundingBoxOfPath

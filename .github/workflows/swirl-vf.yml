@@ -141,6 +141,10 @@ jobs:
         if: always()
         run: |
           python tools/swirl_vf/platform/probe_feature_conditions.py --output build/swirl-vf-evidence/feature-conditions --native coretext
+      - name: Verify fractional CFF2 vertical-alternate ink placement
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/experiment_origin_outline.py --output build/swirl-vf-evidence/origin-outline --native coretext
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -242,6 +246,11 @@ jobs:
         run: |
           python tools/swirl_vf/platform/probe_feature_conditions.py --output build/swirl-vf-evidence/feature-conditions --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe
           if ($LASTEXITCODE -ne 0) { throw 'Standard feature condition control failed' }
+      - name: Verify fractional CFF2 vertical-alternate ink placement
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/experiment_origin_outline.py --output build/swirl-vf-evidence/origin-outline --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Fractional outline-origin placement failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -253,6 +262,9 @@ jobs:
             build/swirl-vf-evidence/origin-variable/*.json
             build/swirl-vf-evidence/origin-variable/*.jsonl
             build/swirl-vf-evidence/origin-variable/*.log
+            build/swirl-vf-evidence/origin-outline/*.json
+            build/swirl-vf-evidence/origin-outline/*.jsonl
+            build/swirl-vf-evidence/origin-outline/*.log
             build/swirl-vf-evidence/feature-conditions/**/*.json
             build/swirl-vf-evidence/feature-conditions/**/*.jsonl
             build/swirl-vf-evidence/feature-conditions/**/*.log

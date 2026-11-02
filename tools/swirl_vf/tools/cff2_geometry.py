@@ -282,7 +282,7 @@ def fit(training_commands, training_locations, holdout_commands, holdout_locatio
     return model
 
 
-def install(font, models, *, experimental_slice=False):
+def install(font, models, *, experimental_slice=False, experimental_layout=False):
     """Install all modeled GIDs on a detached font; never fill missing models.
 
     Callers must supply correct CFF2-compatible metrics before serialization.
@@ -293,6 +293,9 @@ def install(font, models, *, experimental_slice=False):
     require(experimental_slice or all(model.evidence.get('domain_kind') != 'one_dimensional_slice'
                                     for model in models.values()),
             'slice_model_is_not_a_complete_design_space')
+    require(experimental_layout or all(model.evidence.get('domain_kind') != 'vertical_layout_variant'
+                                     for model in models.values()),
+            'layout_variant_requires_verified_GSUB_route')
     tags = tuple(axis.axisTag for axis in font['fvar'].axes)
     require(all(model.axis_tags == tags and model.evidence['sampled_geometry_passed']
                 for model in models.values()), 'unaccepted_or_mismatched_outline_model')

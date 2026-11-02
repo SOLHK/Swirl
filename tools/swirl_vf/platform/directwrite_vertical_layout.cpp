@@ -105,7 +105,7 @@ struct LockedFixture {
     std::vector<uint8_t> bytes;
     std::map<UINT32,std::pair<UINT32,UINT32>> tables;
     std::string digest;
-    explicit LockedFixture(const wchar_t* path) {
+    explicit LockedFixture(const wchar_t* path, bool cff2Control=false) {
         handle = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
         require(handle != INVALID_HANDLE_VALUE, "cannot_lock_fixture");
         try {
@@ -113,7 +113,8 @@ struct LockedFixture {
             require(GetFileSizeEx(handle,&size) && size.QuadPart >= 12 && size.QuadPart <= 8*1024*1024, "fixture_size_out_of_scope");
             bytes.resize(size_t(size.QuadPart)); DWORD count = 0;
             require(ReadFile(handle,bytes.data(),DWORD(bytes.size()),&count,nullptr) && count == bytes.size(), "fixture_read_failed");
-            require(be32(bytes.data()) == 0x00010000, "single_TrueType_fixture_required");
+            require(be32(bytes.data()) == (cff2Control ? 0x4f54544f : 0x00010000),
+                    "explicit_authored_outline_format_required");
             UINT32 n = be16(bytes.data()+4); require(n && 12+16*n <= bytes.size(), "invalid_sfnt_directory");
             for (UINT32 i=0;i<n;++i) {
                 const uint8_t* p = bytes.data()+12+16*i;
@@ -126,6 +127,13 @@ struct LockedFixture {
                 return bytes.data()+found->second.first;
             };
             require(be16(get(DWRITE_MAKE_OPENTYPE_TAG('m','a','x','p'),6)+4)==8, "fixture_requires_eight_glyphs");
+            if (cff2Control) {
+                require(be32(get(DWRITE_MAKE_OPENTYPE_TAG('m','a','x','p'),6))==0x00005000
+                        && get(DWRITE_MAKE_OPENTYPE_TAG('C','F','F','2'),5)[0]==2
+                        && !tables.count(DWRITE_MAKE_OPENTYPE_TAG('g','l','y','f'))
+                        && !tables.count(DWRITE_MAKE_OPENTYPE_TAG('g','v','a','r')),
+                        "authored_CFF2_structure_mismatch");
+            }
             require(be16(get(DWRITE_MAKE_OPENTYPE_TAG('h','e','a','d'),20)+18)==1000, "fixture_requires_UPM_1000");
             const auto fvar = tables.at(DWRITE_MAKE_OPENTYPE_TAG('f','v','a','r'));
             const uint8_t* p = get(DWRITE_MAKE_OPENTYPE_TAG('f','v','a','r'),16);
@@ -391,9 +399,10 @@ static std::string observe(const Environment& env,const Request& request) {
 int wmain(int argc,wchar_t** argv) {
     unsigned currentId=0, requests=0, glyphs=0;
     try {
-        require(argc==2,"usage_directwrite_vertical_layout_FONT");
+        const bool cff2Control=argc==3 && std::wstring(argv[2])==L"--authored-cff2";
+        require(argc==2 || cff2Control,"usage_directwrite_vertical_layout_FONT_optional_authored_cff2");
         const auto path=std::filesystem::absolute(argv[1]);
-        LockedFixture source(path.c_str()); Environment env(source,path.c_str());
+        LockedFixture source(path.c_str(),cff2Control); Environment env(source,path.c_str());
         OSVERSIONINFOEXW version{}; version.dwOSVersionInfoSize=sizeof(version);
         using VersionFn=LONG (WINAPI*)(OSVERSIONINFOW*);
         auto versionFn=reinterpret_cast<VersionFn>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"),"RtlGetVersion"));

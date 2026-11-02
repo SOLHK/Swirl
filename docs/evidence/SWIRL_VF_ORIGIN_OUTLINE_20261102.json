@@ -1,0 +1,156 @@
+{
+  "scope": "fractional vertical alternate placement; not full-font or raw-API equivalence",
+  "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+  "parent_commit": "218003e3af92222d9826f14798662c9d7306c7d8",
+  "limit": 0.03125,
+  "new_model": "CFF2 first-moveto translation of dedicated existing GSUB vertical alternates; horizontal glyph models and all metric/layout tables retained",
+  "local_CoreText": {
+    "scope": "authored_CFF2_vertical_alternate_layout_only",
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "native": "coretext",
+    "limit": 0.03125,
+    "source_font_acceptance": "NOT_RUN",
+    "raw_geometry_and_side_bearing_equivalence": "FAIL_BY_CONSTRUCTION",
+    "raw_axis_echo_failures": 24,
+    "unchanged_horizontal_outlines": true,
+    "serialized": {
+      "checks": 312,
+      "maximum_control_translation_error": 6.83608952730234e-14,
+      "unchanged_tables": [
+        "GSUB",
+        "HVAR",
+        "OS/2",
+        "VORG",
+        "VVAR",
+        "cmap",
+        "fvar",
+        "hhea",
+        "hmtx",
+        "maxp",
+        "name",
+        "post",
+        "vhea",
+        "vmtx"
+      ]
+    },
+    "layout": {
+      "horizontal/zh-CN": {
+        "checks": 39,
+        "maximum_X_error": 0.0,
+        "maximum_Y_error": 0.0
+      },
+      "horizontal/zh-HK": {
+        "checks": 39,
+        "maximum_X_error": 0.0,
+        "maximum_Y_error": 0.0
+      },
+      "vertical/zh-CN": {
+        "checks": 39,
+        "maximum_X_error": 0.0021219367785079157,
+        "maximum_Y_error": 0.0006918769991486329
+      },
+      "vertical/zh-HK": {
+        "checks": 39,
+        "maximum_X_error": 0.0021219367785079157,
+        "maximum_Y_error": 0.0006918769991486329
+      }
+    },
+    "visual_raster": "NOT_ESTABLISHED",
+    "processes": [
+      {
+        "variant": "source",
+        "sha256": "5cd02be3efec28d1ccf15d19a0f009f0bc0ee1181cd9a8b0badef1319dc82652",
+        "exit_code": 0,
+        "observations": 156
+      },
+      {
+        "variant": "compensated",
+        "sha256": "b37c8b7f54fb55e1022c74ba74af8204004b366871b04bed8892e73d4c58bd6a",
+        "exit_code": 0,
+        "observations": 156
+      }
+    ],
+    "HarfBuzz_unchanged_positions_and_routes": 156,
+    "status": "PASS_AUTHORED_VERTICAL_INK_PLACEMENT_ONLY",
+    "raw_axis_echo_status": "FAIL_RETAINED"
+  },
+  "previous_GPOS_variable_CI": {
+    "run": "https://github.com/SOLHK/Swirl/actions/runs/41464158554",
+    "merge_checkout": "b9881e155fa51ebe6491d5f0a2aebc4fa2fde2f9",
+    "CoreText": "PASS_AUTHORED_LAYOUT_ONLY",
+    "Windows_Server_2022": "FAIL_STRICT_PLACEMENT",
+    "Windows_Server_2025": "FAIL_STRICT_PLACEMENT",
+    "Windows_11_ARM64_x64_emulation": "FAIL_STRICT_PLACEMENT",
+    "maximum_X_error": 0.36767675781248954,
+    "maximum_Y_error": 0.4599999999999973,
+    "raw_metric_and_nested_blend_gates": "FAIL_UNCHANGED",
+    "standard_feature_condition": "PASS_AUTHORED_CONTROL_ALL_NATIVE_ENGINES",
+    "experimental_coupled_condition": "UNSUPPORTED_ALL_NATIVE_ENGINES_TESTED"
+  },
+  "new_DirectWrite": "NOT_RUN",
+  "regression": {
+    "tests_run": 958,
+    "passed": 951,
+    "skipped": 7,
+    "exit_code": 0,
+    "seconds": 46.914
+  },
+  "three_dimensional_fitting": {
+    "1166": {
+      "gid": 1166,
+      "patches": 1500,
+      "max_probe_error": 0.1911883702967642,
+      "max_holdout_error": 0.23268982155134263,
+      "failures": 121,
+      "held": 512,
+      "seconds": 915.8525848340068,
+      "grid": [
+        3,
+        9,
+        5
+      ],
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890"
+    },
+    "19177": {
+      "gid": 19177,
+      "patches": 1500,
+      "max_probe_error": 0.14382967458788737,
+      "max_holdout_error": 0.16301324164892783,
+      "failures": 66,
+      "held": 512,
+      "seconds": 1994.1850925830076,
+      "grid": [
+        3,
+        9,
+        5
+      ],
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890"
+    }
+  },
+  "production_accepted": false,
+  "limitations": [
+    "Dedicated vertical targets must be proven not to serve default horizontal text before production use.",
+    "A translated alternate has deliberately different raw outlines and side bearings; original raw equivalence remains failed.",
+    "CoreText diagnostic collection retains 24 raw axis echo failures rather than treating them as axis acceptance. Original strict harness behaviour is unchanged unless explicitly collecting those diagnostics.",
+    "Pixel-raster equivalence and original-font text layout are NOT_RUN/NOT_ESTABLISHED.",
+    "Full three-axis source glyph models remain unaccepted."
+  ],
+  "reproduce_local": [
+    "python tools/swirl_vf/platform/experiment_origin_outline.py --output build/origin-outline --native coretext",
+    "python -m unittest discover -s tools/swirl_vf/tests"
+  ],
+  "reproduce_Windows": [
+    "cmake -S tools/swirl_vf/platform/vertical_layout -B build/vertical-layout -A x64",
+    "cmake --build build/vertical-layout --config Release",
+    "python tools/swirl_vf/platform/experiment_origin_outline.py --output build/origin-outline --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe"
+  ],
+  "implementation_sha256": {
+    "tools/swirl_vf/tools/layout_translation.py": "64dfe5111e9720d0101a0c81a8243ba9c44b87f689dbe171a3ecbfb45cc28bc9",
+    "tools/swirl_vf/tools/cff2_geometry.py": "1cb3b1a160e15cd17244d01831027117d39e76d48dd07ce58c6d346e55ee9dc5",
+    "tools/swirl_vf/platform/experiment_origin_outline.py": "20bfc278182b5bf5ecb53a88e8efe48859d8bf12cb35588254db813fae596839",
+    "tools/swirl_vf/platform/probe_coretext_vertical_gpos.py": "9c69771362e0e0960d8f59c46d94d1fbcd376bb6e841fc98b194fc2c5014cc57",
+    "tools/swirl_vf/platform/directwrite_vertical_layout.cpp": "80b1c894ca6c9544a3b547e181537243ed58cc3c99fcb10699b6e2d88ce5d156",
+    "tools/swirl_vf/tests/test_layout_translation.py": "b61d4ad3312a0bddbf7e2ceecbf064c54dfdf6c1287324b40d9e56a2c9281ea9",
+    ".github/workflows/swirl-vf.yml": "5e5e75cef7221989b47f97f463b09eb0aec0257d1000a2d57a82a08b0446da18"
+  }
+}
