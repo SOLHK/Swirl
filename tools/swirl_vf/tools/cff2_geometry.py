@@ -254,7 +254,13 @@ def fit(training_commands, training_locations, holdout_commands, holdout_locatio
     locations = training_locations + holdout_locations
     require(all(set(p) <= set(tags) and all(type(v) in (int, float) and math.isfinite(v)
             and -1 <= v <= 1 for v in p.values()) for p in locations), 'invalid_model_location')
-    require(all(p not in training_locations for p in holdout_locations), 'holdouts_must_be_independent')
+    # Omitted axes mean normalized zero. Dictionary inequality must not let a
+    # default master reappear as a supposedly independent holdout just because
+    # the caller spelled its zero-valued axes explicitly (or used -0.0).
+    training_keys = {tuple(p.get(tag, 0.) for tag in tags) for p in training_locations}
+    require(len(training_keys) == len(training_locations), 'duplicate_training_design_location')
+    require(all(tuple(p.get(tag, 0.) for tag in tags) not in training_keys
+                for p in holdout_locations), 'holdouts_must_be_independent')
     recordings = [operands(commands) for commands in training_commands + holdout_commands]
     operators = recordings[0][0]
     require(all(ops == operators for ops, _ in recordings), 'source_cubic_topology_changed')

@@ -20,6 +20,16 @@ from make_cff2_fixture import TAGS, GRID, HOLDOUTS, records, convert
 
 
 class CFF2GeometryTests(unittest.TestCase):
+    def test_explicit_zero_and_omitted_axes_are_the_same_training_point(self):
+        commands = [['moveTo', 0, 0], ['lineTo', 100, 200], ['closePath']]
+        for holdout in ({'WDTH': 0.}, {'wght': -0., 'HGHT': 0.}, dict.fromkeys(TAGS, 0.)):
+            with self.assertRaisesRegex(geometry.CFF2GeometryError, 'holdouts_must_be_independent'):
+                geometry.fit([commands, commands], [{}, {'WDTH': 1.}],
+                             [commands], [holdout], TAGS)
+        with self.assertRaisesRegex(geometry.CFF2GeometryError, 'duplicate_training_design_location'):
+            geometry.fit([commands, commands], [{}, {'HGHT': -0.}],
+                         [commands], [{'WDTH': .5}], TAGS)
+
     def test_static_operand_does_not_reserve_a_nonexistent_blend_stack(self):
         # The first operand fits exactly: 1 default + 511 deltas + count.
         # Its result and a following static operand occupy only two entries.
