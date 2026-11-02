@@ -9,6 +9,9 @@ from layout_translation import translate_vertical_model
 from test_coretext_extract import make_fixture
 from make_cff2_fixture import convert
 import experiment_origin_outline as experiment
+from cff2_side_bearings import install_top_bearings
+from fontTools.varLib.varStore import VarStoreInstancer
+from fontTools.pens.boundsPen import BoundsPen
 
 
 class LayoutTranslationTests(unittest.TestCase):
@@ -44,6 +47,32 @@ class LayoutTranslationTests(unittest.TestCase):
         self.assertEqual(a.getGlyphOrder(),b.getGlyphOrder())
         for table in ('GSUB','cmap','HVAR','VVAR','VORG','hmtx','vmtx','fvar'):
             self.assertEqual(a.getTableData(table),b.getTableData(table))
+
+    def test_translated_Y_bearing_matches_VORG_and_keeps_old_variation_maps(self):
+        before,after,_=experiment.build(repair_y_bearing=True)
+        a,b=TTFont(io.BytesIO(before)),TTFont(io.BytesIO(after))
+        old,new=a['VVAR'].table,b['VVAR'].table
+        self.assertEqual(old.AdvHeightMap.mapping,new.AdvHeightMap.mapping)
+        self.assertEqual(old.VOrgMap.mapping,new.VOrgMap.mapping)
+        for p in experiment.POINTS:
+            location=dict(zip(('WDTH','wght','HGHT'),p))
+            av=VarStoreInstancer(old.VarStore,a['fvar'].axes,location)
+            bv=VarStoreInstancer(new.VarStore,b['fvar'].axes,location)
+            for name in a.getGlyphOrder():
+                for field in ('AdvHeightMap','VOrgMap'):
+                    i=getattr(old,field).mapping[name]
+                    self.assertEqual(av[i],bv[i])
+            gs=b.getGlyphSet(location=location,normalized=True)
+            for name in experiment.VERTICAL_NAMES:
+                pen=BoundsPen(gs);gs[name].draw(pen)
+                tsb=b['vmtx'].metrics[name][1]+bv[new.TsbMap.mapping[name]]
+                origin=b['VORG'][name]+bv[new.VOrgMap.mapping[name]]
+                self.assertAlmostEqual(pen.bounds[3]+tsb,origin,places=9)
+        with self.assertRaisesRegex(ValueError,'existing_TsbMap'):
+            install_top_bearings(b,{'han.vert':(0,[],[])})
+        with self.assertRaisesRegex(ValueError,'not_int16'):
+            install_top_bearings(a,{'han.vert':(.5,[],[])})
+        self.assertIsNone(a['VVAR'].table.TsbMap)
 
 
 if __name__=='__main__':unittest.main()

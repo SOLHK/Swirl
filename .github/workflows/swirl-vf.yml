@@ -145,6 +145,14 @@ jobs:
         if: always()
         run: |
           python tools/swirl_vf/platform/experiment_origin_outline.py --output build/swirl-vf-evidence/origin-outline --native coretext
+      - name: Verify fractional independent X origin without changing Y metrics
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/experiment_origin_outline.py --output build/swirl-vf-evidence/origin-outline-x --native coretext --components x
+      - name: Verify CFF2 Y placement with consistent top side bearings
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/experiment_origin_outline.py --output build/swirl-vf-evidence/origin-outline-bearing --native coretext --repair-y-bearing
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -251,6 +259,16 @@ jobs:
         run: |
           python tools/swirl_vf/platform/experiment_origin_outline.py --output build/swirl-vf-evidence/origin-outline --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe
           if ($LASTEXITCODE -ne 0) { throw 'Fractional outline-origin placement failed' }
+      - name: Verify fractional independent X origin without changing Y metrics
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/experiment_origin_outline.py --output build/swirl-vf-evidence/origin-outline-x --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe --components x
+          if ($LASTEXITCODE -ne 0) { throw 'Independent fractional X origin failed' }
+      - name: Verify CFF2 Y placement with consistent top side bearings
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/experiment_origin_outline.py --output build/swirl-vf-evidence/origin-outline-bearing --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe --repair-y-bearing
+          if ($LASTEXITCODE -ne 0) { throw 'Consistent CFF2 Y side bearing control failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -262,9 +280,9 @@ jobs:
             build/swirl-vf-evidence/origin-variable/*.json
             build/swirl-vf-evidence/origin-variable/*.jsonl
             build/swirl-vf-evidence/origin-variable/*.log
-            build/swirl-vf-evidence/origin-outline/*.json
-            build/swirl-vf-evidence/origin-outline/*.jsonl
-            build/swirl-vf-evidence/origin-outline/*.log
+            build/swirl-vf-evidence/origin-outline*/*.json
+            build/swirl-vf-evidence/origin-outline*/*.jsonl
+            build/swirl-vf-evidence/origin-outline*/*.log
             build/swirl-vf-evidence/feature-conditions/**/*.json
             build/swirl-vf-evidence/feature-conditions/**/*.jsonl
             build/swirl-vf-evidence/feature-conditions/**/*.log

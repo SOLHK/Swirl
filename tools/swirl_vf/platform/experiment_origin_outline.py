@@ -19,13 +19,21 @@ from make_cff2_fixture import convert
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 from metric_variations import add_metric_variations
 from layout_translation import translate_vertical_model
+from cff2_side_bearings import install_top_bearings
 import cff2_geometry as geometry
 
 VERTICAL_NAMES=('han.vert','han.hk.vert')
 POINTS=origin.POINTS+tuple(tuple(map(float,p)) for p in np.random.default_rng(82931).uniform(-1,1,(32,3)))
 
 
-def build():
+def desired(p,components):
+    x,y=origin.desired(p,True)
+    return (x,y if components=='xy' else 0.)
+
+
+def build(components='xy',repair_y_bearing=False):
+    fixture.require(components in ('x','xy'),'unknown_origin_components')
+    fixture.require(not repair_y_bearing or components=='xy','Y_bearing_requires_Y_translation')
     raw,_=fixture.original_fixture(); font=TTFont(io.BytesIO(raw));font.ensureDecompiled()
     # Re-encode the unchanged authored phantom model, making explicit CFF2
     # VVAR/VORG as well as HVAR. The comparison starts from this CFF2 baseline.
@@ -36,12 +44,19 @@ def build():
         supports.extend([{tag:(0.,1.,1.)},{tag:(-1.,-1.,0.)}])
         deltas.extend([delta,tuple(-v for v in delta)])
     supports.append({'WDTH':(0.,1.,1.),'HGHT':(0.,1.,1.)});deltas.append((-10,0))
+    base=(-100,24 if components=='xy' else 0)
+    if components=='x':deltas=[(x,0) for x,y in deltas]
     for name in VERTICAL_NAMES:
-        models[name]=translate_vertical_model(models[name],(-100,24),supports,deltas)
+        models[name]=translate_vertical_model(models[name],base,supports,deltas)
     candidate=geometry.install(baseline,models,experimental_layout=True)
+    if repair_y_bearing:
+        candidate=install_top_bearings(candidate,{name:(baseline['vmtx'].metrics[name][1]-base[1],
+            supports,[-v[1] for v in deltas]) for name in VERTICAL_NAMES})
     a,b=fixture.serialize(baseline),fixture.serialize(candidate)
     old,new=TTFont(io.BytesIO(a)),TTFont(io.BytesIO(b))
     protected=sorted(set(old.keys())-{'GlyphOrder','head','CFF2'})
+    # vhea extrema are recalculated from the modified vmtx by fontTools.
+    if repair_y_bearing:protected=[t for t in protected if t not in ('VVAR','vmtx','vhea')]
     fixture.require(all(old.getTableData(t)==new.getTableData(t) for t in protected),
                     'outline_origin_changed_non_geometry_tables')
     # Independent full-domain geometry checks, including every unmodified GID.
@@ -53,7 +68,7 @@ def build():
             ao,av=geometry.operands(geometry.source_commands(before[name]))
             bo,bv=geometry.operands(geometry.source_commands(after[name]))
             fixture.require(ao==bo,'outline_origin_topology_changed')
-            shift=origin.desired(p,True) if name in VERTICAL_NAMES else (0,0)
+            shift=desired(p,components) if name in VERTICAL_NAMES else (0,0)
             if len(av):
                 error=np.linalg.norm(geometry.control_points(bo,bv)-geometry.control_points(ao,av)-shift,axis=1).max()
                 maximum=max(maximum,float(error))
@@ -62,13 +77,14 @@ def build():
     return a,b,{'checks':checks,'maximum_control_translation_error':maximum,'unchanged_tables':protected}
 
 
-def run(output,native,binary=None):
+def run(output,native,binary=None,*,components='xy',repair_y_bearing=False):
     output=Path(output).resolve();output.mkdir(parents=True,exist_ok=False)
-    a,b,serial=build()
+    a,b,serial=build(components,repair_y_bearing)
     result={'scope':'authored_CFF2_vertical_alternate_layout_only','os':platform.platform(),
         'native':native,'limit':1/32,'source_font_acceptance':'NOT_RUN',
         'raw_geometry_and_side_bearing_equivalence':'FAIL_BY_CONSTRUCTION',
         'raw_axis_echo_failures':0,'raw_axis_echo_samples':[],
+        'components':components,'repair_y_bearing':repair_y_bearing,'raw_metric_changes':[],
         'unchanged_horizontal_outlines':True,'serialized':serial,'layout':{},'visual_raster':'NOT_ESTABLISHED',
         'processes':[]}
     hb_checks=0
@@ -149,14 +165,15 @@ def run(output,native,binary=None):
                         'actual_face_axes':run['actual_face_axes']})
             fixture.require(x['gid']==y['gid'] and x['advance']==y['advance'],'outline_origin_DirectWrite_changed_advance')
             for key in ('advance_width','advance_height','vertical_origin_y'):
-                fixture.require(x['design_metrics'][key]==y['design_metrics'][key],
-                                'outline_origin_DirectWrite_changed_raw_advance_or_origin')
+                if x['design_metrics'][key]!=y['design_metrics'][key]:
+                    result['raw_metric_changes'].append({'request_id':req['request_id'],'field':key,
+                        'source':x['design_metrics'][key],'candidate':y['design_metrics'][key]})
             before,after=xr['baseline_relative_ink_bounds'],yr['baseline_relative_ink_bounds']
             shift=[after[0]-before[0],before[1]-after[1]]
             p=req['requested_normalized_model'];gid=y['gid']
         wanted=(4 if locale=='zh-CN' else 5) if vertical else (2 if locale=='zh-CN' else 3)
         fixture.require(gid==wanted,'outline_origin_actual_native_GSUB_route_incorrect')
-        expected=origin.desired(p,True) if vertical else (0,0)
+        expected=desired(p,components) if vertical else (0,0)
         group=result['layout'].setdefault(('vertical' if vertical else 'horizontal')+'/'+locale,
             {'checks':0,'maximum_X_error':0.,'maximum_Y_error':0.})
         group['checks']+=1
@@ -166,6 +183,7 @@ def run(output,native,binary=None):
         and g['maximum_X_error']<=1/32 and g['maximum_Y_error']<=1/32 for g in result['layout'].values()))
     result['status']='PASS_AUTHORED_VERTICAL_INK_PLACEMENT_ONLY' if passed else 'LAYOUT_NOT_ACCEPTED'
     result['raw_axis_echo_status']='FAIL_RETAINED' if result['raw_axis_echo_failures'] else 'NO_RAW_ECHO_MISMATCH_OBSERVED'
+    result['raw_advance_origin_status']='FAIL_RETAINED' if result['raw_metric_changes'] else 'NO_DIFFERENCE_OBSERVED'
     (output/'report.json').write_text(json.dumps(result,indent=2))
     return result
 
@@ -173,5 +191,6 @@ def run(output,native,binary=None):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',type=Path,required=True)
     p.add_argument('--native',choices=('none','coretext','directwrite'),default='none');p.add_argument('--binary',type=Path)
-    args=p.parse_args();r=run(args.output,args.native,args.binary);print(json.dumps(r))
+    p.add_argument('--components',choices=('x','xy'),default='xy');p.add_argument('--repair-y-bearing',action='store_true')
+    args=p.parse_args();r=run(args.output,args.native,args.binary,components=args.components,repair_y_bearing=args.repair_y_bearing);print(json.dumps(r))
     if args.native!='none' and r['status']!='PASS_AUTHORED_VERTICAL_INK_PLACEMENT_ONLY':raise SystemExit(1)

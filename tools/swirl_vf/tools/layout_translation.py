@@ -5,6 +5,10 @@ The caller must provide an independently verified GSUB route to a dedicated
 vertical alternate. It must never apply the translated model to a glyph still
 used by default horizontal text. Installation needs explicit experimental
 layout opt-in until the complete font's shaping and metric mapping is verified.
+Y translation also changes yMax: vmtx/VVAR top bearings must remain consistent
+with VORG for engines using the bbox-based vertical origin. This geometry-only
+operation cannot prove that correspondence; install_top_bearings accepts an
+explicit exact model, whose bounds and native behaviour need separate checks.
 """
 from __future__ import annotations
 import copy
