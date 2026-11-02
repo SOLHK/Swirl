@@ -374,11 +374,13 @@ catch { try? emit(nativeErrorRecord(error, "fatal")); exit(2) }
 '''
 
 
-def make_harness():
+def make_harness(*,expected_upm=1000):
+    fixture.require(expected_upm in (1000,16000),'unsupported_authored_UPM_control')
     shared = SHARED_LAYOUT_SWIFT.split('func layoutAxes(', 1)[0]
     fixture.require('func layoutInk(' in shared and 'constructInstance(' not in shared,
                     'review_changed_shared_raster_instrument')
-    return HEADER + shared.replace('BITMAP_PIXELS', str(BITMAP_PIXELS)).replace(
+    header=HEADER.replace('CTFontGetUnitsPerEm(font) == 1000',f'CTFontGetUnitsPerEm(font) == {expected_upm}')
+    return header + shared.replace('BITMAP_PIXELS', str(BITMAP_PIXELS)).replace(
         'RASTER_SCALE', str(RASTER_SCALE)) + NATIVE
 
 

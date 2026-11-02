@@ -74,5 +74,22 @@ class LayoutTranslationTests(unittest.TestCase):
             install_top_bearings(a,{'han.vert':(.5,[],[])})
         self.assertIsNone(a['VVAR'].table.TsbMap)
 
+    def test_hybrid_scaling_preserves_the_physical_source_before_placement(self):
+        original=TTFont(io.BytesIO(experiment.build()[0]))
+        before,after,_=experiment.build(hybrid_upm16=True)
+        a,b=TTFont(io.BytesIO(before)),TTFont(io.BytesIO(after))
+        self.assertEqual(a['head'].unitsPerEm,16000)
+        for tag in ('HVAR','VVAR','VORG','hmtx','vmtx','GSUB','cmap'):
+            self.assertEqual(a.getTableData(tag),b.getTableData(tag))
+        self.assertNotIn('GPOS',a);self.assertIn('GPOS',b)
+        for q in ((-1.,-1.,-1.),(0.,0.,0.),(.31,-.27,.43),(1.,1.,1.)):
+            loc=dict(zip(('WDTH','wght','HGHT'),q))
+            old,new=original.getGlyphSet(location=loc,normalized=True),a.getGlyphSet(location=loc,normalized=True)
+            for name in original.getGlyphOrder():
+                p,v=geometry.operands(geometry.source_commands(old[name]))
+                r,w=geometry.operands(geometry.source_commands(new[name]))
+                self.assertEqual(p,r);self.assertLess(float(np.abs(w/16-v).max(initial=0)),1e-9)
+                self.assertAlmostEqual(new[name].width/16,old[name].width,places=9)
+
 
 if __name__=='__main__':unittest.main()

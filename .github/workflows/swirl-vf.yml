@@ -153,6 +153,14 @@ jobs:
         if: always()
         run: |
           python tools/swirl_vf/platform/experiment_origin_outline.py --output build/swirl-vf-evidence/origin-outline-bearing --native coretext --repair-y-bearing
+      - name: Measure coupled avar2 coordinates on variable CFF2 outlines
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/probe_coupled_avar.py --output build/swirl-vf-evidence/coupled-avar --native coretext
+      - name: Verify hybrid X outline and Y GPOS placement at preserved physical size
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/experiment_origin_outline.py --output build/swirl-vf-evidence/origin-outline-hybrid16 --native coretext --hybrid-upm16
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -269,6 +277,16 @@ jobs:
         run: |
           python tools/swirl_vf/platform/experiment_origin_outline.py --output build/swirl-vf-evidence/origin-outline-bearing --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe --repair-y-bearing
           if ($LASTEXITCODE -ne 0) { throw 'Consistent CFF2 Y side bearing control failed' }
+      - name: Measure coupled avar2 coordinates on variable CFF2 outlines
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/probe_coupled_avar.py --output build/swirl-vf-evidence/coupled-avar --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Coupled avar2 coordinates not accepted' }
+      - name: Verify hybrid X outline and Y GPOS placement at preserved physical size
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/experiment_origin_outline.py --output build/swirl-vf-evidence/origin-outline-hybrid16 --native directwrite --binary build/vertical-layout/Release/directwrite_vertical_layout.exe --hybrid-upm16
+          if ($LASTEXITCODE -ne 0) { throw 'Hybrid X and Y placement failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -283,6 +301,9 @@ jobs:
             build/swirl-vf-evidence/origin-outline*/*.json
             build/swirl-vf-evidence/origin-outline*/*.jsonl
             build/swirl-vf-evidence/origin-outline*/*.log
+            build/swirl-vf-evidence/coupled-avar/*.json
+            build/swirl-vf-evidence/coupled-avar/*.jsonl
+            build/swirl-vf-evidence/coupled-avar/*.log
             build/swirl-vf-evidence/feature-conditions/**/*.json
             build/swirl-vf-evidence/feature-conditions/**/*.jsonl
             build/swirl-vf-evidence/feature-conditions/**/*.log

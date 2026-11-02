@@ -108,10 +108,12 @@ static bool verifyAxes(const std::vector<DWRITE_FONT_AXIS_VALUE>& actual,
 struct LockedFixture {
     HANDLE handle = INVALID_HANDLE_VALUE;
     bool cff2Control = false;
+    UINT16 unitsPerEm = 1000;
     std::vector<uint8_t> bytes;
     std::map<UINT32,std::pair<UINT32,UINT32>> tables;
     std::string digest;
-    explicit LockedFixture(const wchar_t* path, bool isCFF2Control=false) : cff2Control(isCFF2Control) {
+    explicit LockedFixture(const wchar_t* path, bool isCFF2Control=false, bool scaledControl=false)
+        : cff2Control(isCFF2Control), unitsPerEm(scaledControl ? 16000 : 1000) {
         handle = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
         require(handle != INVALID_HANDLE_VALUE, "cannot_lock_fixture");
         try {
@@ -140,7 +142,7 @@ struct LockedFixture {
                         && !tables.count(DWRITE_MAKE_OPENTYPE_TAG('g','v','a','r')),
                         "authored_CFF2_structure_mismatch");
             }
-            require(be16(get(DWRITE_MAKE_OPENTYPE_TAG('h','e','a','d'),20)+18)==1000, "fixture_requires_UPM_1000");
+            require(be16(get(DWRITE_MAKE_OPENTYPE_TAG('h','e','a','d'),20)+18)==unitsPerEm, "fixture_UPM_differs_from_explicit_control");
             const auto fvar = tables.at(DWRITE_MAKE_OPENTYPE_TAG('f','v','a','r'));
             const uint8_t* p = get(DWRITE_MAKE_OPENTYPE_TAG('f','v','a','r'),16);
             UINT32 offset = be16(p+4), stride = be16(p+10);
@@ -253,7 +255,7 @@ struct Environment {
         checked(loader.As(&identity),"QueryInterface(actual loader identity)");
         require(identity.Get()==loaderIdentity.Get(),"layout_font_loader_mismatch");
         source.verifyTables(face);
-        DWRITE_FONT_METRICS metrics{}; face->GetMetrics(&metrics); require(metrics.designUnitsPerEm==1000,"layout_UPM_mismatch");
+        DWRITE_FONT_METRICS metrics{}; face->GetMetrics(&metrics); require(metrics.designUnitsPerEm==source.unitsPerEm,"layout_UPM_mismatch");
         ComPtr<IDWriteFontFace5> axisFace; checked(face->QueryInterface(IID_PPV_ARGS(axisFace.GetAddressOf())),"QueryInterface(actual layout FontFace5)");
         require(axisFace->HasVariations(),"static_face_fallback");
         std::vector<DWRITE_FONT_AXIS_VALUE> values(axisFace->GetFontAxisValueCount());
@@ -410,10 +412,12 @@ int wmain(int argc,wchar_t** argv) {
     unsigned currentId=0, requests=0, glyphs=0;
     try {
         const bool cff2Control=argc>=3 && std::wstring(argv[2])==L"--authored-cff2";
-        const bool observeEcho=argc==4 && cff2Control && std::wstring(argv[3])==L"--observe-axis-echo";
-        require(argc==2 || (argc==3 && cff2Control) || observeEcho,"usage_directwrite_vertical_layout_FONT_optional_authored_cff2_and_observe_axis_echo");
+        const bool observeEcho=argc>=4 && cff2Control && std::wstring(argv[3])==L"--observe-axis-echo";
+        const bool scaledControl=argc==5 && observeEcho && std::wstring(argv[4])==L"--authored-upm16";
+        require(argc==2 || (argc==3 && cff2Control) || (argc==4 && observeEcho) || scaledControl,
+                "usage_directwrite_vertical_layout_FONT_optional_authored_cff2_observe_axis_echo_authored_upm16");
         const auto path=std::filesystem::absolute(argv[1]);
-        LockedFixture source(path.c_str(),cff2Control); Environment env(source,path.c_str(),observeEcho);
+        LockedFixture source(path.c_str(),cff2Control,scaledControl); Environment env(source,path.c_str(),observeEcho);
         OSVERSIONINFOEXW version{}; version.dwOSVersionInfoSize=sizeof(version);
         using VersionFn=LONG (WINAPI*)(OSVERSIONINFOW*);
         auto versionFn=reinterpret_cast<VersionFn>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"),"RtlGetVersion"));
@@ -421,7 +425,7 @@ int wmain(int argc,wchar_t** argv) {
         std::cout << "{\"type\":\"metadata\",\"backend\":\"DirectWrite_TextLayout4_TextRenderer1\",\"source_sha256\":" << quoted(source.digest)
             << ",\"authored_outline_kind\":" << quoted(cff2Control ? "CFF2" : "TrueType")
             << ",\"axis_echo_policy\":" << quoted(observeEcho ? "OBSERVE_RAW_FAILURES" : "STRICT")
-            << ",\"source_bytes\":" << source.bytes.size() << ",\"physical_face_count\":1,\"glyph_count\":8,\"units_per_em\":1000,\"font_em_size_DIP\":1000"
+            << ",\"source_bytes\":" << source.bytes.size() << ",\"physical_face_count\":1,\"glyph_count\":8,\"units_per_em\":" << source.unitsPerEm << ",\"font_em_size_DIP\":1000"
             << ",\"font_family\":\"Swirl Original GPOS Laboratory\",\"custom_collection_only\":true,\"empty_fallback\":true,\"pixel_snapping_disabled\":true"
             << ",\"Windows_version\":{\"major\":" << version.dwMajorVersion << ",\"minor\":" << version.dwMinorVersion << ",\"build\":" << version.dwBuildNumber
             << ",\"product_type\":" << unsigned(version.wProductType) << "},\"windows_11_acceptance\":\"NOT_RUN\",\"Qt_acceptance\":\"NOT_RUN\"}" << std::endl;

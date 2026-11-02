@@ -70,6 +70,16 @@ def transcript(records=None, metadata=None, summary=None):
 
 
 class DirectWriteLayoutProtocolTests(unittest.TestCase):
+    def test_scaled_control_requires_explicit_UPM_and_keeps_physical_em_size(self):
+        metadata=literal_metadata();metadata['units_per_em']=16000
+        data=transcript(metadata=metadata)
+        with self.assertRaisesRegex(probe.ObservationError,'metadata_or_fixture_identity'):
+            probe.parse_transcript(data,[literal_request()],SOURCE,0)
+        probe.parse_transcript(data,[literal_request()],SOURCE,0,expected_upm=16000)
+        metadata['font_em_size_DIP']=16000
+        with self.assertRaisesRegex(probe.ObservationError,'metadata_or_fixture_identity'):
+            probe.parse_transcript(transcript(metadata=metadata),[literal_request()],SOURCE,0,expected_upm=16000)
+
     def test_axis_observation_retains_raw_failure_without_changing_strict_default(self):
         record=literal_layout();run=record['runs'][0]
         run['actual_face_axes']['WDTH']=500.0000305175781

@@ -149,7 +149,8 @@ def validate_layout(record, request, *, observe_axis_echo=False):
             f"{context}:incomplete_layout_metrics")
 
 
-def parse_transcript(stdout, expected_requests, source, returncode, *, observe_axis_echo=False):
+def parse_transcript(stdout, expected_requests, source, returncode, *, observe_axis_echo=False, expected_upm=1000):
+    require(expected_upm in (1000,16000), "unsupported_authored_UPM_control")
     def invalid_number(value):
         raise ObservationError("nonfinite_native_JSON:" + value)
 
@@ -169,7 +170,7 @@ def parse_transcript(stdout, expected_requests, source, returncode, *, observe_a
     require(metadata.get("type") == "metadata" and metadata.get("backend") == "DirectWrite_TextLayout4_TextRenderer1"
             and metadata.get("source_sha256") == sha and metadata.get("source_bytes") == len(source)
             and metadata.get("physical_face_count") == 1 and metadata.get("glyph_count") == 8
-            and metadata.get("units_per_em") == metadata.get("font_em_size_DIP") == 1000
+            and metadata.get("units_per_em") == expected_upm and metadata.get("font_em_size_DIP") == 1000
             and metadata.get("font_family") == "Swirl Original GPOS Laboratory"
             and all(metadata.get(k) is True for k in ("custom_collection_only", "empty_fallback", "pixel_snapping_disabled")),
             "native_metadata_or_fixture_identity_mismatch")
