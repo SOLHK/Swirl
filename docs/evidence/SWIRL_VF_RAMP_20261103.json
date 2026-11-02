@@ -1,0 +1,426 @@
+{
+  "status": "PARTIAL_TARGET_FULL_CUBES_NOT_ACCEPTED",
+  "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+  "limit_source_font_units": 0.03125,
+  "branch": "work/swirlvf-continuation-20261102",
+  "base_commit": "b9d8cebf1de19acb31a3e54533419b9645c47e0d",
+  "tests": {
+    "executed": 984,
+    "passed": 977,
+    "skipped": 7,
+    "failures": 0,
+    "audits_passed": 6
+  },
+  "source_branch_probe": [
+    {
+      "glyph_id": 1166,
+      "observations": 44,
+      "max_control_error": 4.582862941503293e-13,
+      "contours": 6,
+      "cubic_controls": 153,
+      "failures": []
+    },
+    {
+      "glyph_id": 19177,
+      "observations": 42,
+      "max_control_error": 5.084229945850415e-13,
+      "contours": 18,
+      "cubic_controls": 348,
+      "failures": []
+    },
+    {
+      "glyph_id": 0,
+      "observations": 33,
+      "max_control_error": 3.2155493553843715e-13,
+      "contours": 4,
+      "cubic_controls": 76,
+      "failures": []
+    },
+    {
+      "glyph_id": 2,
+      "observations": 27,
+      "max_control_error": 0.0,
+      "contours": 0,
+      "cubic_controls": 0,
+      "failures": []
+    },
+    {
+      "glyph_id": 12,
+      "observations": 33,
+      "max_control_error": 2.3437142008433856e-13,
+      "contours": 2,
+      "cubic_controls": 38,
+      "failures": []
+    }
+  ],
+  "basis_native": [
+    {
+      "glyph_id": 0,
+      "full_cube": true,
+      "training_count": 35937,
+      "holdout_count": 256,
+      "max_holdout_error": 0.00022096606869334128,
+      "holdout_failures": 0,
+      "regions": 70,
+      "serialized": {
+        "observations": 256,
+        "failures": 0,
+        "max_error": 0.0002209660686428573
+      },
+      "native": {
+        "observations": 72,
+        "failures": 0,
+        "topology_failures": 0,
+        "max_cff2_libhvf_error": 0.009804685682650593,
+        "max_portable_libhvf_error": 2.7506012378739453e-13,
+        "receipt": {
+          "error_count": 0,
+          "request_count": 72,
+          "source_sha256": "64d1fe5d303e3b89bbc7549976cde70507864ade47347b78ec7dc60546d38cd4",
+          "successful_glyph_count": 72,
+          "type": "summary",
+          "axis_verification_backend": "CoreTextExactAxisReadbackBatchV2",
+          "verified_batch_count": 72,
+          "internal_native_request_count": 144,
+          "internal_native_glyph_count": 144,
+          "upstream_native_summary": {
+            "error_count": 0,
+            "request_count": 144,
+            "source_sha256": "64d1fe5d303e3b89bbc7549976cde70507864ade47347b78ec7dc60546d38cd4",
+            "successful_glyph_count": 144,
+            "type": "summary"
+          },
+          "source_unchanged": true
+        }
+      },
+      "passed": true,
+      "font_sha256": "64d1fe5d303e3b89bbc7549976cde70507864ade47347b78ec7dc60546d38cd4",
+      "font_bytes": 54020
+    },
+    {
+      "glyph_id": 12,
+      "full_cube": true,
+      "training_count": 35937,
+      "holdout_count": 256,
+      "max_holdout_error": 0.004513522042589987,
+      "holdout_failures": 0,
+      "regions": 38,
+      "serialized": {
+        "observations": 256,
+        "failures": 0,
+        "max_error": 0.004513522042788875
+      },
+      "native": {
+        "observations": 72,
+        "failures": 0,
+        "topology_failures": 0,
+        "max_cff2_libhvf_error": 0.007795612002270172,
+        "max_portable_libhvf_error": 2.2737367544323206e-13,
+        "receipt": {
+          "error_count": 0,
+          "request_count": 72,
+          "source_sha256": "89b6baa9b91ccc7f6417dbcd09aed4cb51fa315b6252560e3da373d73f8c127d",
+          "successful_glyph_count": 72,
+          "type": "summary",
+          "axis_verification_backend": "CoreTextExactAxisReadbackBatchV2",
+          "verified_batch_count": 72,
+          "internal_native_request_count": 144,
+          "internal_native_glyph_count": 144,
+          "upstream_native_summary": {
+            "error_count": 0,
+            "request_count": 144,
+            "source_sha256": "89b6baa9b91ccc7f6417dbcd09aed4cb51fa315b6252560e3da373d73f8c127d",
+            "successful_glyph_count": 144,
+            "type": "summary"
+          },
+          "source_unchanged": true
+        }
+      },
+      "passed": true,
+      "font_sha256": "89b6baa9b91ccc7f6417dbcd09aed4cb51fa315b6252560e3da373d73f8c127d",
+      "font_bytes": 17144
+    },
+    {
+      "glyph_id": 1166,
+      "full_cube": false,
+      "training_count": 729,
+      "holdout_count": 256,
+      "max_holdout_error": 0.0004783353806326044,
+      "holdout_failures": 0,
+      "regions": 35,
+      "serialized": {
+        "observations": 256,
+        "failures": 0,
+        "max_error": 0.00047833538089607074
+      },
+      "native": {
+        "observations": 72,
+        "failures": 0,
+        "topology_failures": 0,
+        "max_cff2_libhvf_error": 0.008403317812516855,
+        "max_portable_libhvf_error": 3.452330923159429e-13,
+        "receipt": {
+          "error_count": 0,
+          "request_count": 72,
+          "source_sha256": "9336cdcd3a67b54644baa98fc24ecefcf50007e7feea1e75ffb11c42a336166e",
+          "successful_glyph_count": 72,
+          "type": "summary",
+          "axis_verification_backend": "CoreTextExactAxisReadbackBatchV2",
+          "verified_batch_count": 72,
+          "internal_native_request_count": 144,
+          "internal_native_glyph_count": 144,
+          "upstream_native_summary": {
+            "error_count": 0,
+            "request_count": 144,
+            "source_sha256": "9336cdcd3a67b54644baa98fc24ecefcf50007e7feea1e75ffb11c42a336166e",
+            "successful_glyph_count": 144,
+            "type": "summary"
+          },
+          "source_unchanged": true
+        }
+      },
+      "passed": true,
+      "font_sha256": "9336cdcd3a67b54644baa98fc24ecefcf50007e7feea1e75ffb11c42a336166e",
+      "font_bytes": 39876
+    },
+    {
+      "glyph_id": 19177,
+      "full_cube": false,
+      "training_count": 729,
+      "holdout_count": 256,
+      "max_holdout_error": 0.001188488644225483,
+      "holdout_failures": 0,
+      "regions": 22,
+      "serialized": {
+        "observations": 256,
+        "failures": 0,
+        "max_error": 0.0011884886443382884
+      },
+      "native": {
+        "observations": 72,
+        "failures": 0,
+        "topology_failures": 0,
+        "max_cff2_libhvf_error": 0.010325508501218128,
+        "max_portable_libhvf_error": 4.565237077258644e-13,
+        "receipt": {
+          "error_count": 0,
+          "request_count": 72,
+          "source_sha256": "2f2fd55632b139ff32b76c3653f45e30251e39cd138aa2f0e45d5953912647b1",
+          "successful_glyph_count": 72,
+          "type": "summary",
+          "axis_verification_backend": "CoreTextExactAxisReadbackBatchV2",
+          "verified_batch_count": 72,
+          "internal_native_request_count": 144,
+          "internal_native_glyph_count": 144,
+          "upstream_native_summary": {
+            "error_count": 0,
+            "request_count": 144,
+            "source_sha256": "2f2fd55632b139ff32b76c3653f45e30251e39cd138aa2f0e45d5953912647b1",
+            "successful_glyph_count": 144,
+            "type": "summary"
+          },
+          "source_unchanged": true
+        }
+      },
+      "passed": true,
+      "font_sha256": "2f2fd55632b139ff32b76c3653f45e30251e39cd138aa2f0e45d5953912647b1",
+      "font_bytes": 95736
+    }
+  ],
+  "retained_failures": [
+    {
+      "gid": 1166,
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "scope": "local_math_only_no_CFF2_selection",
+      "boxes": 1000,
+      "max_probe": 0.14056521020352492,
+      "max_holdout": 0.11273609632877805,
+      "holdout_count": 2048,
+      "failed_holdouts": 129,
+      "source_observations": 3769966,
+      "seconds": 144.58082654100144,
+      "production_accepted": false
+    },
+    {
+      "gid": 19177,
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "scope": "local_math_only_no_CFF2_selection",
+      "boxes": 1000,
+      "max_probe": 0.12542525544765487,
+      "max_holdout": 0.13188377326496953,
+      "holdout_count": 2048,
+      "failed_holdouts": 151,
+      "source_observations": 3782887,
+      "seconds": 378.2299410419946,
+      "production_accepted": false
+    },
+    {
+      "gid": 1166,
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "scope": "local_minimax_plane_insertion_math_only",
+      "boxes": 128,
+      "max_probe": 0.2542425641760847,
+      "max_holdout": 0.6492496173383784,
+      "holdout_count": 2048,
+      "failed_holdouts": 580,
+      "source_observations": 999312,
+      "seconds": 184.559665666995,
+      "production_accepted": false
+    }
+  ],
+  "ramp_development_probes": [
+    {
+      "gid": 1166,
+      "nodes": 343,
+      "nonzero_regions": 163,
+      "max_interpolation_error": 0.11798234471101682,
+      "max_encoded_error": 0.11798170107153969,
+      "max_quantization_difference": 0.00014177150201503608,
+      "flat_encodable": true,
+      "seconds": 0.13036329198803287
+    },
+    {
+      "gid": 1166,
+      "nodes": 4913,
+      "nonzero_regions": 800,
+      "max_interpolation_error": 0.04292276793712842,
+      "max_encoded_error": 0.04292025739597877,
+      "max_quantization_difference": 0.00036258632772760284,
+      "flat_encodable": false,
+      "seconds": 0.8843567919975612
+    },
+    {
+      "gid": 1166,
+      "nodes": 35937,
+      "nonzero_regions": 2665,
+      "max_interpolation_error": 0.017792258606357438,
+      "max_encoded_error": 0.01778001621047666,
+      "max_quantization_difference": 0.00033830626918887645,
+      "flat_encodable": false,
+      "seconds": 5.147122125010355
+    },
+    {
+      "gid": 19177,
+      "nodes": 343,
+      "nonzero_regions": 101,
+      "max_interpolation_error": 0.1242484768063642,
+      "max_encoded_error": 0.12418328774975947,
+      "max_quantization_difference": 0.0004963768823529813,
+      "flat_encodable": true,
+      "seconds": 0.17118812499393243
+    },
+    {
+      "gid": 19177,
+      "nodes": 4913,
+      "nonzero_regions": 390,
+      "max_interpolation_error": 0.06041200843976851,
+      "max_encoded_error": 0.06037224391693542,
+      "max_quantization_difference": 0.0005020369180276352,
+      "flat_encodable": true,
+      "seconds": 1.5344617079972522
+    },
+    {
+      "gid": 19177,
+      "nodes": 35937,
+      "nonzero_regions": 1178,
+      "max_interpolation_error": 0.025097536590812188,
+      "max_encoded_error": 0.02504047837159336,
+      "max_quantization_difference": 0.0005815888438609325,
+      "flat_encodable": false,
+      "seconds": 9.798824458004674
+    },
+    {
+      "gid": 0,
+      "nodes": 343,
+      "nonzero_regions": 22,
+      "max_interpolation_error": 0.005483028614311703,
+      "max_encoded_error": 0.005518008796938118,
+      "max_quantization_difference": 7.2463872888575e-05,
+      "flat_encodable": true,
+      "seconds": 0.030884624997270294
+    },
+    {
+      "gid": 0,
+      "nodes": 4913,
+      "nonzero_regions": 42,
+      "max_interpolation_error": 0.0007708286206235586,
+      "max_encoded_error": 0.0008169612167238265,
+      "max_quantization_difference": 8.81027820312893e-05,
+      "flat_encodable": true,
+      "seconds": 0.25912450000760145
+    },
+    {
+      "gid": 0,
+      "nodes": 35937,
+      "nonzero_regions": 70,
+      "max_interpolation_error": 0.00019271576739494003,
+      "max_encoded_error": 0.0002385038212675171,
+      "max_quantization_difference": 0.00015878315225442428,
+      "flat_encodable": true,
+      "seconds": 1.8499355420062784
+    },
+    {
+      "gid": 12,
+      "nodes": 343,
+      "nonzero_regions": 11,
+      "max_interpolation_error": 0.031934782353526495,
+      "max_encoded_error": 0.03194561353565288,
+      "max_quantization_difference": 8.38974501320417e-05,
+      "flat_encodable": true,
+      "seconds": 0.015139291994273663
+    },
+    {
+      "gid": 12,
+      "nodes": 4913,
+      "nonzero_regions": 20,
+      "max_interpolation_error": 0.01086147776178098,
+      "max_encoded_error": 0.01087480425771062,
+      "max_quantization_difference": 0.00010000535140402475,
+      "flat_encodable": true,
+      "seconds": 0.14071833300113212
+    },
+    {
+      "gid": 12,
+      "nodes": 35937,
+      "nonzero_regions": 38,
+      "max_interpolation_error": 0.003517933524918882,
+      "max_encoded_error": 0.0035335386622905793,
+      "max_quantization_difference": 0.0002010677599104598,
+      "flat_encodable": true,
+      "seconds": 1.0235165419871919
+    }
+  ],
+  "remaining": [
+    "No accepted full-cube model for source GIDs 1166 or 19177.",
+    "Local boxes require a verified selection architecture and whole-font capacity accounting; installation is guarded.",
+    "No complete source cmap, metrics, original-GID font or SwirlVF.ttc is produced by these authored-template probes.",
+    "Windows/DirectWrite, HarfBuzz and Qt acceptance of the new basis is not run in this checkpoint.",
+    "Passing finite observations does not prove continuous-space equivalence."
+  ],
+  "code_sha256": {
+    "tools/swirl_vf/tools/hvf_branch_cells.py": "64f389f5e27b6e8eaed4d902c50c5a8b3638a56123c9f0334d1c5de1a841081f",
+    "tools/swirl_vf/tools/hvf_cubic_batch.py": "6ddc6a6f7627c61f7b7f22c098ee13f22114a1294a2f7147b64af65bf3da76bc",
+    "tools/swirl_vf/tools/local_cff2_geometry.py": "973fc6a9803131ceefd08e3278174aab91e19885b2c914a5636e42f80d95668e",
+    "tools/swirl_vf/tools/cff2_geometry.py": "5d77c2f279caa958060d4a0af5f58df7176576320fcb6973dd3d1e0249ea3d28",
+    "tools/swirl_vf/platform/probe_hvf_branch_cells.py": "799cba46609685cb20cd63d9a130e2a38b3098c042407078c327c66f47530011",
+    "tools/swirl_vf/platform/probe_local_cff2_basis.py": "697e325b0a1274e33bfcad68d101cb2d551729e63925fa82d0ba9b1bd83faf63",
+    "tools/swirl_vf/tests/test_hvf_branch_cells.py": "d3be41c697bacaaf6637b0986d2f6e729a45e2de8aeee8efb9d3ce04bc1dbb91",
+    "tools/swirl_vf/tests/test_hvf_cubic_batch.py": "953dedcb0bd9877db635c6233a6b7c582026c88bd548621ebfd274b93df134a4",
+    "tools/swirl_vf/tests/test_local_cff2_geometry.py": "2d6f53381d6549fd9b86f80d84c4d801d1f9d72101f29b05a4ce03377b598d6b",
+    "tools/swirl_vf/tests/test_local_cff2_probe.py": "4bec8f8a2710f8fb3e40bf3fd7c3946ecb9898753068a827cf24bbe1a034a401"
+  },
+  "private_artifact_sha256": {
+    "ramp-checkpoint-tests.log": "9c4a58aae7c276d037a5caaccc0fc45ee376de2f9b73fa1d4b5abacbe8bc1323",
+    "checkpoint-audits.log": "97856a2264b6c385b57754104703c065d6aadedc6c9d0c7a1ff114c72547844d",
+    "native-branches-3/report.json": "205ad3ff7f67af26d5ebbde136e537f63957385f039e8d4fb2085d88b8bd129f",
+    "basis-native-2/report.json": "fe9f3b01a8ac693440697ebf8a01c018a7903b7510845f4cf2e1520fe349154c",
+    "basis-native-manifest.json": "0c026b01ae484d5d9fc0fd092921ae953d9e631425bc49d4b5d454874888b4d8",
+    "local-minimax/probe.py": "0f8231d92431a56c0a7e0a8ad785fe6f4f8ccc86833b0a4339e0196ec07ece1a",
+    "local-minimax/adaptive.py": "cce337677e6f9c1a9f7484074178afe0298e20ea408003f655970175f8f4331d",
+    "local-minimax/ramp_probe.py": "eb9baffeb0cac8834f8abe57639acdb2357606c8ea7509fb669b9805626e6769",
+    "local-minimax/report-1166.json": "0b45628291bbd307a544022c3b951d1e23286d2d3730ee68672862550b636aca",
+    "local-minimax/report-19177.json": "c907acdfe66e1dcb4d64c179e917d1f2d6dedf7aa8037201c945e1fc68da64ad",
+    "local-minimax/adaptive-1166/report.json": "48a7485b1704856d996beef4e9e6b2c8b252b937cb984ed6863a70934a52c6f5",
+    "local-minimax/ramp-results.json": "926b40e79054660639d22bdfeb1ffc3af8f714fa74ad96ca0fe056255c04d591"
+  }
+}

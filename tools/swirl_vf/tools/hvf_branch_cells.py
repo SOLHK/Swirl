@@ -61,10 +61,38 @@ def dot_surface(left, right):
     return (q+q.T)/2
 
 
+def axis_has_kink(part, axis):
+    """Conservative exact test, including outgoing transforms.
+
+    N*max(-a,0)+P*max(a,0) = -N*a+(N+P)*max(a,0).
+    Only exactly cancelling stored coefficients remove the sign condition.
+    Rotations are ordered rigid-transform products, not additive coordinates;
+    an active rotation therefore always retains its branch.
+    """
+    negative, positive = 2*axis, 2*axis+1
+    if not isinstance(part, Composite):
+        return bool(np.any(part.delta[negative]+part.delta[positive]))
+    totals = {}
+    for column in (negative, positive):
+        first, last = map(int, part.column_starts[column:column+2])
+        for row, value in zip(part.extreme_rows[first:last], part.extreme_values[first:last]):
+            totals[int(row)] = totals.get(int(row), 0.)+float(value)
+    if any(totals.values()):
+        return True
+    totals = {}
+    for (row, column), value in zip(part.translations.extreme_indices, part.translations.extreme_values):
+        if column in (negative, positive):
+            totals[int(row)] = totals.get(int(row), np.zeros(2))+value
+    if any(np.any(value) for value in totals.values()):
+        return True
+    return any(column in (negative, positive) and np.any(value)
+               for (_, column), value in zip(part.rotations.extreme_indices, part.rotations.extreme_values))
+
+
 def branch_cell(table, gid, anchor):
     root = table.part(gid)
     anchor = np.asarray(anchor, dtype=float)
-    require(anchor.shape == (root.axis_count,) and 0 < len(anchor) <= 3
+    require(anchor.shape == (root.axis_count,) and len(anchor) <= 3
             and np.isfinite(anchor).all() and (np.abs(anchor) <= 1).all(),
             'invalid_root_branch_anchor')
     dim = len(anchor)+1
@@ -93,7 +121,12 @@ def branch_cell(table, gid, anchor):
         result.axis_expressions[(part.index, part_base)] = axes
         weights = np.zeros((part.axis_count*2, dim))
         for axis, expression in enumerate(axes):
-            sign = surface((part.index, part_base, 'axis_zero', axis), affine_surface(expression))
+            if axis_has_kink(part, axis):
+                sign = surface((part.index, part_base, 'axis_zero', axis), affine_surface(expression))
+            else:
+                # Either affine continuation is identical across zero. Keep
+                # the observed side without adding an artificial partition.
+                sign = 1 if h @ expression >= 0 else -1
             weights[2*axis+(sign > 0)] = sign*expression
         if isinstance(part, Composite):
             base = axis_base+part.axis_count

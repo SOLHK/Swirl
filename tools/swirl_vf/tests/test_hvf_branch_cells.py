@@ -9,7 +9,8 @@ sys.path[:0] = [str(Path(__file__).resolve().parents[1]/'tools'),
                str(Path(__file__).resolve().parents[1]/'platform')]
 from hvf import HVGL
 from batch_geometry import BatchGeometry
-from hvf_branch_cells import branch_cell, affine_surface, dot_surface, BranchSurface
+from hvf_branch_cells import branch_cell, affine_surface, dot_surface, BranchSurface, axis_has_kink
+from probe_hvf_branch_cells import boundary_positions
 from probe_transform_stages import composite
 from probe_hierarchy_rules import shape_record, hvgl_table
 
@@ -43,6 +44,48 @@ class BranchCellTests(unittest.TestCase):
                 if node.shape_coordinates is not None:
                     np.testing.assert_allclose(np.einsum('nd,dsp->nsp',h,cell.shape_expressions[key]),
                         node.shape_coordinates,atol=1e-12,rtol=0)
+
+    def test_exact_symmetric_extrema_remove_only_redundant_root_branches(self):
+        table = authored_table(); cell = branch_cell(table, 0, [.5, .5, .5])
+        self.assertFalse(any(s.identity[:3] == (0, 0, 'axis_zero') for s in cell.surfaces))
+        self.assertTrue(any(s.identity[:3] == (1, 1, 'axis_zero') for s in cell.surfaces))
+        points = np.asarray([[-.1, .8, .1], [.5, .5, -.1]])
+        self.assertTrue(cell.contains(points).all())
+        trace = BatchGeometry(table, isolated_tangents=True).render(0, points, capture_trace=True).trace
+        h = np.column_stack((np.ones(len(points)), points))
+        for node in trace:
+            if node.shape_coordinates is not None:
+                np.testing.assert_allclose(np.einsum('nd,dsp->nsp',h,
+                    cell.shape_expressions[(node.part_index,node.tree_part_offset)]),
+                    node.shape_coordinates,rtol=0,atol=1e-12)
+
+    def test_small_nonzero_axis_extremum_does_not_disappear(self):
+        from dataclasses import replace
+        original = authored_table().part(0)
+        self.assertFalse(axis_has_kink(original, 0))
+        values = original.extreme_values.astype(float).copy()
+        values[0] += 2**-40
+        self.assertTrue(axis_has_kink(replace(original, extreme_values=values), 0))
+
+    def test_glyph_without_root_axes_keeps_its_static_shape(self):
+        table = HVGL(hvgl_table([shape_record(axes=0)]))
+        cell = branch_cell(table, 0, [])
+        self.assertEqual(cell.surfaces, [])
+        self.assertEqual(boundary_positions(cell), [])
+        self.assertEqual(cell.contains(np.empty((2,0))).tolist(), [True,True])
+        np.testing.assert_array_equal(cell.shape_expressions[(0,0)][0],table.part(0).master)
+
+    def test_boundary_probe_retains_both_quadratic_contacts(self):
+        from hvf_branch_cells import BranchCell
+        # Lift .16-x+x*x into 3D; anchor .1 gives a nonzero gradient.
+        q = np.zeros((4,4)); q[0,0]=.16; q[0,1]=q[1,0]=-.5; q[1,1]=1
+        cell = BranchCell(np.array([.1,0.,0.]),[BranchSurface(('test',),q,1)],{}, {})
+        pairs = boundary_positions(cell)
+        self.assertEqual(len(pairs),2)
+        contacts = sorted(np.mean(b['positions'],axis=0)[0] for b in pairs)
+        np.testing.assert_allclose(contacts,[.2,.8],atol=3e-16,rtol=0)
+        for maximum in (0,-1,65,True):
+            with self.assertRaises(ValueError):boundary_positions(cell,maximum)
 
     def test_quadratic_projection_detects_two_contacts_with_equal_endpoint_signs(self):
         # (P-A).(B-A) = .16-t+t*t. Both endpoints are positive, while
