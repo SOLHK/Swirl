@@ -1019,6 +1019,7 @@ if let Ok(mut records)=shared.records.lock()&& let Some(record)=records.get_mut(
                 target,
                 "127.0.0.1".parse().map_err(|_| failed("ProbeSource"))?,
                 generation,
+                false,
             )
             .await
             .map_err(failed)?;
@@ -1104,6 +1105,9 @@ async fn expire_prepared(
 struct Routed {
     node: Node,
     target: NetworkTarget,
+    // DNS answers that keep the already selected DIRECT leaf and exact rule.
+    // Proxy routes and static/literal targets never acquire fallback exits.
+    direct_addresses: Vec<SocketAddr>,
     resolver: Arc<Resolver>,
     transport: Option<Transport>,
     trace: Value,
@@ -1182,6 +1186,7 @@ async fn route(
     target: NetworkTarget,
     source: IpAddr,
     generation: u64,
+    direct_tcp_fallback: bool,
 ) -> Result<Routed> {
     let runtime = &plan.prepared.runtime;
     let policy = &runtime.policy;
@@ -1191,6 +1196,7 @@ async fn route(
         .mapped_host(&target.host)
         .or_else(|| target.host.parse().ok());
     let mut classification_attempted = false;
+    let mut resolved_addresses = Vec::new();
     let configured_path = if !runtime.dns.tls_servers.is_empty() {
         "configured_encrypted"
     } else if !runtime.dns.servers.is_empty() {
@@ -1252,6 +1258,7 @@ async fn route(
         {
             Ok(Ok(addresses)) => {
                 known = Some(addresses.first().ok_or("RouteDnsEmpty")?.ip());
+                resolved_addresses = addresses;
                 dns_path = if classification_attempted {
                     classification_path.unwrap_or("unavailable")
                 } else {
@@ -1313,17 +1320,341 @@ async fn route(
         };
         routed.host = address.ip().to_string();
         chosen_ip = Some(address.ip());
+        resolved_addresses = addresses;
     }
-    let trace = json!({"revision":plan.revision.to_string(),"generation":generation.to_string(),"mode":policy.mode.as_str(),"rule_id":decision.rule_id,"tier":decision.tier,"service_policy_id":decision.service_policy_id,"catalog_key":decision.catalog_key,"group_chain":resolved.chain,"leaf_node_id":node.id,"source_id":runtime.node_sources.get(&node.id),"chosen_ip":chosen_ip.map(|ip|ip.to_string()),"dns_profile":if classification_attempted{"classification"}else if resolved_for_rule{"mandatory_rules"}else{"target"},"dns_path":dns_path,"classification_dns_path":classification_path,"classification_state":decision.classification_state,"rejection_code":if matches!(node.outbound,Outbound::Reject{}){Some("Rejected")}else{None},"affinity_reason":resolved.affinity_reason});
+    let direct_addresses = if direct_tcp_fallback && matches!(node.outbound, Outbound::Direct {}) {
+        direct_candidates(
+            resolved_addresses,
+            policy,
+            &target,
+            source,
+            &decision,
+            classification_attempted,
+            china,
+        )
+    } else {
+        Vec::new()
+    };
+    // The scheduler chooses the connected address later. Do not label the
+    // first DNS answer as the actual selected IP when fallback is possible.
+    if direct_addresses.len() > 1 {
+        chosen_ip = None;
+    }
+    let trace = json!({"revision":plan.revision.to_string(),"generation":generation.to_string(),"mode":policy.mode.as_str(),"rule_id":decision.rule_id,"tier":decision.tier,"service_policy_id":decision.service_policy_id,"catalog_key":decision.catalog_key,"group_chain":resolved.chain,"leaf_node_id":node.id,"source_id":runtime.node_sources.get(&node.id),"chosen_ip":chosen_ip.map(|ip|ip.to_string()),"direct_candidate_count":direct_addresses.len(),"dns_profile":if classification_attempted{"classification"}else if resolved_for_rule{"mandatory_rules"}else{"target"},"dns_path":dns_path,"classification_dns_path":classification_path,"classification_state":decision.classification_state,"rejection_code":if matches!(node.outbound,Outbound::Reject{}){Some("Rejected")}else{None},"affinity_reason":resolved.affinity_reason});
     Ok(Routed {
         transport: runtime.transports.get(&node.id).cloned(),
         node,
         target: routed,
+        direct_addresses,
         resolver: plan.prepared.resolver.clone(),
         trace,
         generation,
         limit: Duration::from_millis(runtime.limits.handshake_timeout_ms),
     })
+}
+
+fn direct_candidates(
+    addresses: Vec<SocketAddr>,
+    policy: &PolicyDocument,
+    target: &NetworkTarget,
+    source: IpAddr,
+    selected: &swirl_routing::v2::RouteDecision,
+    classification_attempted: bool,
+    china: Option<(&ChinaRules, &ChinaRules)>,
+) -> Vec<SocketAddr> {
+    // A DIRECT rule may have been selected before its eventual DNS lookup,
+    // when classification was disabled/unavailable. Knowing the first public
+    // IP changes that diagnostic state to non_china_ip without changing the
+    // route. Admit this one-field transition only; every semantic field must
+    // still equal the already selected decision. Never resolve a policy group
+    // or replace the originally selected leaf here.
+    let reference = addresses.first().and_then(|address| {
+        let first_decision = swirl_routing::v2::select(
+            policy,
+            &target.host,
+            target.port,
+            source,
+            Some(address.ip()),
+            classification_attempted,
+            china,
+        )
+        .ok()?;
+        let mut admitted = selected.clone();
+        admitted.classification_state = first_decision.classification_state;
+        (admitted == first_decision).then_some(first_decision)
+    });
+    let mut candidates = Vec::new();
+    for (index, address) in addresses.into_iter().enumerate() {
+        // Preserve the first answer already admitted by route(). Subsequent
+        // answers must match the entire decision, including rule identity,
+        // service/group target and classification. Resolving the policy again
+        // here would advance selectors or permit a different proxy/direct exit.
+        if address.port() != target.port || swirl_routing::v2::forbidden_ip(address.ip()) {
+            continue;
+        }
+        let equivalent = index == 0
+            || reference.as_ref().is_some_and(|reference| {
+                swirl_routing::v2::select(
+                    policy,
+                    &target.host,
+                    target.port,
+                    source,
+                    Some(address.ip()),
+                    classification_attempted,
+                    china,
+                )
+                .is_ok_and(|decision| decision == *reference)
+            });
+        if equivalent && !candidates.contains(&address) {
+            candidates.push(address);
+        }
+    }
+    candidates
+}
+
+fn proxy_loop(target: &NetworkTarget, candidates: &[SocketAddr], listener: SocketAddr) -> bool {
+    (target.port == listener.port()
+        && target
+            .host
+            .parse::<IpAddr>()
+            .ok()
+            .is_some_and(|ip| swirl_routing::v2::normalize_ip(ip).is_loopback()))
+        || candidates.iter().any(|address| {
+            address.port() == listener.port()
+                && swirl_routing::v2::normalize_ip(address.ip()).is_loopback()
+        })
+}
+
+#[cfg(test)]
+mod direct_candidate_tests {
+    use super::*;
+    use swirl_subscription::{Matcher, v2::PolicyRule};
+
+    fn policy() -> PolicyDocument {
+        PolicyDocument {
+            schema: 2,
+            mode: Mode::Rule,
+            default_policy: swirl_subscription::v2::DefaultPolicy {
+                id: swirl_subscription::v2::DEFAULT_POLICY_ID.into(),
+                target: Target::Node {
+                    id: "10000000-0000-4000-8000-000000000001".into(),
+                },
+            },
+            service_policies: vec![],
+            groups: vec![],
+            explicit_direct_rules: vec![],
+            custom_rules: vec![],
+            missing_targets: vec![],
+            classification_dns: ClassificationDns::Disabled,
+        }
+    }
+
+    #[test]
+    fn post_route_dns_may_update_only_diagnostic_classification_for_fallback() {
+        let (domains, ips) = swirl_routing::shared_bundled_rules().unwrap();
+        let china = Some((domains.as_ref(), ips.as_ref()));
+        let target = NetworkTarget {
+            host: "fallback.fixture.invalid".into(),
+            port: 443,
+        };
+        let source = "127.0.0.1".parse().unwrap();
+        let first: SocketAddr = "192.0.2.1:443".parse().unwrap();
+        let second = "198.51.100.1:443".parse().unwrap();
+        let cn = "114.114.114.114:443".parse().unwrap();
+        let local = "127.0.0.1:443".parse().unwrap();
+        for (attempted, dns, expected_state) in [
+            (false, ClassificationDns::Disabled, "disabled"),
+            (true, ClassificationDns::ViaDefaultPolicy, "unavailable"),
+        ] {
+            let mut policy = policy();
+            policy.classification_dns = dns;
+            policy.custom_rules.push(PolicyRule {
+                id: "30000000-0000-4000-8000-000000000003".into(),
+                name: "Direct after classification".into(),
+                enabled: true,
+                priority: 0,
+                matcher: Matcher::Match {},
+                target: Target::Direct {},
+            });
+            let selected = swirl_routing::v2::select(
+                &policy,
+                &target.host,
+                target.port,
+                source,
+                None,
+                attempted,
+                china,
+            )
+            .unwrap();
+            assert_eq!(selected.classification_state, expected_state);
+            let first_decision = swirl_routing::v2::select(
+                &policy,
+                &target.host,
+                target.port,
+                source,
+                Some(first.ip()),
+                attempted,
+                china,
+            )
+            .unwrap();
+            assert_eq!(first_decision.classification_state, "non_china_ip");
+            let mut only_diagnostic_change = selected.clone();
+            only_diagnostic_change.classification_state = "non_china_ip";
+            assert_eq!(only_diagnostic_change, first_decision);
+            assert_eq!(
+                direct_candidates(
+                    vec![first, cn, second, local],
+                    &policy,
+                    &target,
+                    source,
+                    &selected,
+                    attempted,
+                    china,
+                ),
+                vec![first, second]
+            );
+            // If the first DNS address would change the actual rule (here to
+            // CN-IP), keep its existing pinned path but do not use the original
+            // custom DIRECT rule to admit different later addresses.
+            assert_eq!(
+                direct_candidates(
+                    vec![cn, first, second],
+                    &policy,
+                    &target,
+                    source,
+                    &selected,
+                    attempted,
+                    china,
+                ),
+                vec![cn]
+            );
+        }
+    }
+
+    #[test]
+    fn fallback_cannot_cross_rule_identity_even_to_the_same_direct_leaf() {
+        let mut policy = policy();
+        policy.explicit_direct_rules.push(PolicyRule {
+            id: "30000000-0000-4000-8000-000000000001".into(),
+            name: "Fixture direct range".into(),
+            enabled: true,
+            priority: 0,
+            matcher: Matcher::Cidr {
+                value: "192.0.2.0/24".parse().unwrap(),
+                resolve: true,
+            },
+            target: Target::Direct {},
+        });
+        policy.custom_rules.push(PolicyRule {
+            id: "30000000-0000-4000-8000-000000000002".into(),
+            name: "Different rule, same DIRECT leaf".into(),
+            enabled: true,
+            priority: 0,
+            matcher: Matcher::Match {},
+            target: Target::Direct {},
+        });
+        let (domains, ips) = swirl_routing::shared_bundled_rules().unwrap();
+        let china = Some((domains.as_ref(), ips.as_ref()));
+        let target = NetworkTarget {
+            host: "fallback.fixture.invalid".into(),
+            port: 443,
+        };
+        let source = "127.0.0.1".parse().unwrap();
+        let first: SocketAddr = "192.0.2.1:443".parse().unwrap();
+        let other_rule = "198.51.100.1:443".parse().unwrap();
+        let same_rule = "192.0.2.2:443".parse().unwrap();
+        let selected = swirl_routing::v2::select(
+            &policy,
+            &target.host,
+            target.port,
+            source,
+            Some(first.ip()),
+            false,
+            china,
+        )
+        .unwrap();
+        assert_eq!(
+            direct_candidates(
+                vec![first, other_rule, same_rule, first],
+                &policy,
+                &target,
+                source,
+                &selected,
+                false,
+                china,
+            ),
+            vec![first, same_rule]
+        );
+    }
+
+    #[test]
+    fn fallback_cannot_cross_china_classification_or_use_forbidden_targets() {
+        let policy = policy();
+        let (domains, ips) = swirl_routing::shared_bundled_rules().unwrap();
+        let china = Some((domains.as_ref(), ips.as_ref()));
+        let target = NetworkTarget {
+            host: "fallback.fixture.invalid".into(),
+            port: 443,
+        };
+        let source = "127.0.0.1".parse().unwrap();
+        let first: SocketAddr = "114.114.114.114:443".parse().unwrap();
+        let same_rule = "114.114.114.115:443".parse().unwrap();
+        let selected = swirl_routing::v2::select(
+            &policy,
+            &target.host,
+            target.port,
+            source,
+            Some(first.ip()),
+            true,
+            china,
+        )
+        .unwrap();
+        assert_eq!(selected.rule_id, "builtin:cn-ip");
+        assert_eq!(
+            direct_candidates(
+                vec![
+                    first,
+                    "8.8.8.8:443".parse().unwrap(),
+                    "0.0.0.0:443".parse().unwrap(),
+                    "224.0.0.1:443".parse().unwrap(),
+                    "255.255.255.255:443".parse().unwrap(),
+                    "[::ffff:0.0.0.0]:443".parse().unwrap(),
+                    "114.114.114.115:80".parse().unwrap(),
+                    same_rule,
+                ],
+                &policy,
+                &target,
+                source,
+                &selected,
+                true,
+                china,
+            ),
+            vec![first, same_rule]
+        );
+    }
+
+    #[test]
+    fn proxy_loop_checks_every_candidate_and_normalizes_mapped_loopback() {
+        let target = NetworkTarget {
+            host: "192.0.2.1".into(),
+            port: 7890,
+        };
+        let listener = "127.0.0.1:7890".parse().unwrap();
+        let first = "192.0.2.1:7890".parse().unwrap();
+        assert!(!proxy_loop(&target, &[first], listener));
+        for later in ["127.0.0.1:7890", "[::1]:7890", "[::ffff:127.0.0.1]:7890"] {
+            assert!(proxy_loop(
+                &target,
+                &[first, later.parse().unwrap()],
+                listener
+            ));
+        }
+        assert!(!proxy_loop(
+            &target,
+            &[first, "127.0.0.1:7891".parse().unwrap()],
+            listener,
+        ));
+    }
 }
 
 async fn cancelled(receiver: &mut watch::Receiver<bool>) {
@@ -1353,17 +1684,11 @@ async fn session(
         return udp_associate(inbound, peer, request, shared, id, cancellation).await;
     }
     let counters = Arc::new(Counters::default());
+    let mut reply_started = false;
     let work = async {
         let (plan, generation) = shared.admit().await?;
-        let routed = route(plan, request.target.clone(), peer.ip(), generation).await?;
-        if routed.target.port == shared.address.port()
-            && routed
-                .target
-                .host
-                .parse::<IpAddr>()
-                .ok()
-                .is_some_and(|ip| ip.is_loopback())
-        {
+        let routed = route(plan, request.target.clone(), peer.ip(), generation, true).await?;
+        if proxy_loop(&routed.target, &routed.direct_addresses, shared.address) {
             return Err("ProxyLoop");
         }
         shared.bind(id, &routed.node.id)?;
@@ -1387,7 +1712,10 @@ async fn session(
                 error: "",
             },
         );
-        let mut upstream = if let Some(transport) = &routed.transport {
+        let mut upstream = if routed.direct_addresses.len() > 1 {
+            swirl_protocol::connect_direct_resolved(routed.direct_addresses.clone(), routed.limit)
+                .await?
+        } else if let Some(transport) = &routed.transport {
             swirl_protocol::connect_with_transport(
                 &routed.node.outbound,
                 &routed.target,
@@ -1406,6 +1734,9 @@ async fn session(
             .await?
         };
         drop(routed);
+        // A partially written success reply must never be followed by an
+        // HTTP error response, nor may an error be injected into TLS bytes.
+        reply_started = true;
         swirl_protocol::reply(&mut inbound, request.kind, true).await?;
         if matches!(request.kind, swirl_protocol::InboundKind::HttpForward) {
             return Box::pin(swirl_protocol::http_single::forward(
@@ -1438,7 +1769,21 @@ async fn session(
             .await
             .map_err(|error| super::stream_failure_code(&error))
     };
-    tokio::select! {biased;_=cancelled(&mut cancellation)=>Err("SessionRevoked"),result=work=>result}
+    let result = tokio::select! {biased;_=cancelled(&mut cancellation)=>Err("SessionRevoked"),result=work=>result};
+    if let Err(error) = result
+        && !reply_started
+        && error != "SessionRevoked"
+    {
+        // Once the request has been parsed, routing and dial failures have a
+        // protocol response. Preserve the actual failure code, and keep stop /
+        // revocation responsive even when a client refuses to read the reply.
+        tokio::select! {
+            biased;
+            _ = cancelled(&mut cancellation) => return Err("SessionRevoked"),
+            _ = timeout(limit, swirl_protocol::reply(&mut inbound, request.kind, false)) => {}
+        }
+    }
+    result
 }
 
 struct PreparationGuard {
@@ -1529,7 +1874,7 @@ async fn prepare_udp(
             active: true,
         };
         let (plan, generation) = shared.admit().await?;
-        let routed = route(plan, target.clone(), peer, generation).await?;
+        let routed = route(plan, target.clone(), peer, generation, false).await?;
         if routed.target.port == shared.address.port()
             && routed
                 .target

@@ -177,6 +177,322 @@ fn wait(mut predicate: impl FnMut() -> bool) {
         thread::yield_now();
     }
 }
+
+fn dns_peer(answers: Vec<IpAddr>, dual: bool) -> (SocketAddr, thread::JoinHandle<()>) {
+    let dns = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+    let dns_address = dns.local_addr().unwrap();
+    dns.set_read_timeout(Some(Duration::from_secs(4))).unwrap();
+    let dns_server = thread::spawn(move || {
+        for _ in 0..if dual { 2 } else { 1 } {
+            let mut buffer = [0; 512];
+            let (size, peer) = dns.recv_from(&mut buffer).unwrap();
+            let mut response = buffer[..size].to_vec();
+            let kind = u16::from_be_bytes([response[size - 4], response[size - 3]]);
+            assert!(kind == 1 || (dual && kind == 28));
+            response[2..4].copy_from_slice(&[0x81, 0x80]);
+            let records: Vec<_> = answers
+                .iter()
+                .copied()
+                .filter(|ip| ip.is_ipv4() == (kind == 1))
+                .collect();
+            response[6..8].copy_from_slice(&(records.len() as u16).to_be_bytes());
+            for address in records {
+                response.extend_from_slice(&[0xc0, 0x0c]);
+                response.extend_from_slice(&kind.to_be_bytes());
+                response.extend_from_slice(&[0, 1, 0, 0, 0, 60]);
+                let bytes = match address {
+                    IpAddr::V4(ip) => ip.octets().to_vec(),
+                    IpAddr::V6(ip) => ip.octets().to_vec(),
+                };
+                response.extend_from_slice(&(bytes.len() as u16).to_be_bytes());
+                response.extend_from_slice(&bytes);
+            }
+            dns.send_to(&response, peer).unwrap();
+        }
+    });
+    (dns_address, dns_server)
+}
+
+// Own both the refused endpoint and the usable endpoint for the whole test.
+// A bound-but-not-listening socket cannot be claimed by another parallel test.
+fn direct_dns_fallback(ipv6: bool) {
+    use swirl_subscription::DnsQueryFamily;
+
+    let refused = tokio::net::TcpSocket::new_v4().unwrap();
+    refused.bind("127.0.0.2:0".parse().unwrap()).unwrap();
+    let port = refused.local_addr().unwrap().port();
+    let live: SocketAddr = if ipv6 {
+        format!("[::1]:{port}").parse().unwrap()
+    } else {
+        format!("127.0.0.1:{port}").parse().unwrap()
+    };
+    let listener = StdListener::bind(live).unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let origin = thread::spawn(move || {
+        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+        runtime.block_on(async move {
+            let listener = TcpListener::from_std(listener).unwrap();
+            let (mut stream, _) = timeout(Duration::from_secs(4), listener.accept())
+                .await
+                .unwrap()
+                .unwrap();
+            let mut request = Vec::new();
+            timeout(Duration::from_secs(4), stream.read_to_end(&mut request))
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(request, b"request-after-fallback");
+            stream
+                .write_all(b"response-after-half-close")
+                .await
+                .unwrap();
+            stream.shutdown().await.unwrap();
+        });
+    });
+    let (dns_address, dns_server) = dns_peer(vec!["127.0.0.2".parse().unwrap(), live.ip()], ipv6);
+    let a = Peer::new(b'A');
+    let b = Peer::new(b'B');
+    let mut candidate = config(&a, &b, A, true);
+    candidate.policy.mode = Mode::Direct;
+    candidate.dns = Dns {
+        servers: vec![dns_address],
+        use_system_hosts: false,
+        query_family: if ipv6 {
+            DnsQueryFamily::Dual
+        } else {
+            DnsQueryFamily::Ipv4Only
+        },
+        ..Dns::default()
+    };
+    let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+    let mut client = StdStream::connect(core.address()).unwrap();
+    client
+        .set_read_timeout(Some(Duration::from_secs(4)))
+        .unwrap();
+    client
+        .set_write_timeout(Some(Duration::from_secs(4)))
+        .unwrap();
+    write!(client, "CONNECT fallback.fixture.invalid:{port} HTTP/1.1\r\nHost: fallback.fixture.invalid:{port}\r\n\r\n").unwrap();
+    assert!(
+        header(&mut client)
+            .expect("v2 must try a route-equivalent DNS answer after TCP refusal")
+            .starts_with(b"HTTP/1.1 200")
+    );
+    client.write_all(b"request-after-fallback").unwrap();
+    client.shutdown(std::net::Shutdown::Write).unwrap();
+    let mut response = Vec::new();
+    client.read_to_end(&mut response).unwrap();
+    assert_eq!(response, b"response-after-half-close");
+    origin.join().unwrap();
+    dns_server.join().unwrap();
+    assert_eq!(a.connections.load(Ordering::Acquire), 0);
+    assert_eq!(b.connections.load(Ordering::Acquire), 0);
+    core.stop();
+    drop(refused);
+}
+
+#[test]
+fn direct_dns_falls_back_to_a_second_ipv4_answer_without_changing_policy() {
+    direct_dns_fallback(false);
+}
+
+#[test]
+fn direct_dns_falls_back_across_address_families_without_disabling_ipv6() {
+    direct_dns_fallback(true);
+}
+
+#[test]
+fn dns_listener_port_rejection_does_not_recursively_accept_connections() {
+    let (dns_address, dns_server) = dns_peer(
+        vec!["127.0.0.2".parse().unwrap(), "127.0.0.1".parse().unwrap()],
+        false,
+    );
+    let a = Peer::new(b'A');
+    let b = Peer::new(b'B');
+    let mut candidate = config(&a, &b, A, true);
+    candidate.policy.mode = Mode::Direct;
+    candidate.dns = Dns {
+        servers: vec![dns_address],
+        use_system_hosts: false,
+        query_family: swirl_subscription::DnsQueryFamily::Ipv4Only,
+        ..Dns::default()
+    };
+    let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+    let port = core.address().port();
+    let refused = tokio::net::TcpSocket::new_v4().unwrap();
+    refused
+        .bind(format!("127.0.0.2:{port}").parse().unwrap())
+        .unwrap();
+    let mut client = StdStream::connect(core.address()).unwrap();
+    client
+        .set_read_timeout(Some(Duration::from_secs(4)))
+        .unwrap();
+    write!(
+        client,
+        "CONNECT loop.fixture.invalid:{port} HTTP/1.1\r\nHost: loop.fixture.invalid:{port}\r\n\r\n"
+    )
+    .unwrap();
+    let mut response = Vec::new();
+    client.read_to_end(&mut response).unwrap();
+    assert_eq!(
+        response,
+        b"HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    );
+    wait(|| core.shared.active.load(Ordering::Acquire) == 0);
+    assert_eq!(core.shared.accepted.load(Ordering::Acquire), 1);
+    assert_eq!(*core.shared.last_error.lock().unwrap(), "ProxyLoop");
+    dns_server.join().unwrap();
+    core.stop();
+}
+
+#[test]
+fn pre_tunnel_route_and_dial_failures_return_protocol_replies() {
+    let a = Peer::new(b'A');
+    let b = Peer::new(b'B');
+    let refused = tokio::net::TcpSocket::new_v4().unwrap();
+    refused.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+    for rejected in [true, false] {
+        let mut candidate = config(&a, &b, A, true);
+        if rejected {
+            candidate.policy.mode = Mode::Rule;
+            candidate
+                .policy
+                .service_policies
+                .push(swirl_subscription::v2::ServicePolicy {
+                    id: "30000000-0000-4000-8000-000000000001".into(),
+                    name: "Rejected fixture".into(),
+                    enabled: true,
+                    priority: 0,
+                    domains: vec![swirl_subscription::v2::DomainMatch::Domain {
+                        value: "target.fixture.invalid".into(),
+                    }],
+                    target: Target::Reject {},
+                    catalog_key: None,
+                    catalog_version: None,
+                });
+        } else {
+            candidate.nodes[0].outbound = Outbound::HttpConnect {
+                host: "127.0.0.1".into(),
+                port: refused.local_addr().unwrap().port(),
+                auth: None,
+                tls: None,
+            };
+        }
+        let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+        for request in [
+            b"CONNECT target.fixture.invalid:443 HTTP/1.0\r\n\r\n".as_slice(),
+            b"CONNECT target.fixture.invalid:443 HTTP/1.1\r\nHost: target.fixture.invalid:443\r\n\r\n",
+            b"GET http://target.fixture.invalid/ HTTP/1.1\r\nHost: target.fixture.invalid\r\n\r\n",
+            // Rejected in routing itself, before selecting an outbound.
+            b"CONNECT 0.0.0.0:443 HTTP/1.1\r\nHost: 0.0.0.0:443\r\n\r\n",
+        ] {
+            let mut client = StdStream::connect(core.address()).unwrap();
+            client.set_read_timeout(Some(Duration::from_secs(4))).unwrap();
+            client.write_all(request).unwrap();
+            let mut response = Vec::new();
+            client.read_to_end(&mut response).unwrap();
+            assert_eq!(response, b"HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+        }
+        let mut client = StdStream::connect(core.address()).unwrap();
+        client
+            .set_read_timeout(Some(Duration::from_secs(4)))
+            .unwrap();
+        client.write_all(&[5, 1, 0]).unwrap();
+        let mut method = [0; 2];
+        client.read_exact(&mut method).unwrap();
+        assert_eq!(method, [5, 0]);
+        let host = b"target.fixture.invalid";
+        let mut request = vec![5, 1, 0, 3, host.len() as u8];
+        request.extend_from_slice(host);
+        request.extend_from_slice(&443u16.to_be_bytes());
+        client.write_all(&request).unwrap();
+        let mut response = Vec::new();
+        client.read_to_end(&mut response).unwrap();
+        assert_eq!(response, [5, 5, 0, 1, 0, 0, 0, 0, 0, 0]);
+        core.stop();
+    }
+    assert_eq!(a.connections.load(Ordering::Acquire), 0);
+    assert_eq!(b.connections.load(Ordering::Acquire), 0);
+}
+
+#[test]
+fn an_established_tunnel_error_never_appends_an_http_failure_response() {
+    // VLESS reads its response prefix lazily after CONNECT has succeeded. Use
+    // both an invalid prefix and a truncated one to exercise actual stream
+    // errors without a TLS fixture or treating an ordinary TCP EOF as failure.
+    for (prefix, expected_error) in [
+        (vec![1, 0], "StreamInvalidData"),
+        (vec![0], "StreamUnexpectedEof"),
+    ] {
+        let listener = StdListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let (release, after_success) = std::sync::mpsc::channel();
+        let peer = thread::spawn(move || {
+            let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+            runtime.block_on(async move {
+                let listener = TcpListener::from_std(listener).unwrap();
+                let (mut stream, _) = timeout(Duration::from_secs(4), listener.accept())
+                    .await
+                    .unwrap()
+                    .unwrap();
+                let mut request = [0; 23];
+                timeout(Duration::from_secs(4), stream.read_exact(&mut request))
+                    .await
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(request[0], 0);
+                assert_eq!(
+                    &request[1..17],
+                    &[
+                        0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc,
+                        0xdd, 0xee, 0xff
+                    ]
+                );
+                assert_eq!(&request[17..22], &[0, 1, 0, 80, 2]);
+                let mut host = vec![0; usize::from(request[22])];
+                timeout(Duration::from_secs(4), stream.read_exact(&mut host))
+                    .await
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(host, b"target.fixture.invalid");
+                // The client explicitly confirms receipt of the complete 200
+                // before the peer causes the upstream reader to fail.
+                after_success.recv_timeout(Duration::from_secs(4)).unwrap();
+                stream.write_all(&prefix).await.unwrap();
+                stream.shutdown().await.unwrap();
+            });
+        });
+        let a = Peer::new(b'A');
+        let b = Peer::new(b'B');
+        let mut candidate = config(&a, &b, A, true);
+        candidate.nodes[0].outbound = Outbound::Vless {
+            host: address.ip().to_string(),
+            port: address.port(),
+            uuid: "00112233-4455-6677-8899-aabbccddeeff".into(),
+            tls: None,
+            websocket: None,
+            reality: None,
+            flow: None,
+            transport: None,
+            udp: false,
+        };
+        let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
+        let mut client = connect(core.address());
+        release.send(()).unwrap();
+        let mut tail = Vec::new();
+        client.read_to_end(&mut tail).unwrap();
+        assert!(
+            tail.is_empty(),
+            "no HTTP error may follow an established tunnel"
+        );
+        wait(|| core.shared.active.load(Ordering::Acquire) == 0);
+        assert_eq!(core.shared.failed.load(Ordering::Acquire), 1);
+        assert_eq!(*core.shared.last_error.lock().unwrap(), expected_error);
+        peer.join().unwrap();
+        core.stop();
+    }
+}
 fn prepared(
     core: &Core,
     candidate: RuntimeConfig,

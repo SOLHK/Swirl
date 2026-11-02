@@ -1,0 +1,152 @@
+{
+  "schema": 1,
+  "scope": "precommit_local_reproducible_regressions_not_Windows_11_acceptance",
+  "baseline_source_sha": "63dde8812f85839aa6024cbba6c498c96cae022d",
+  "host_platform": "Linux",
+  "python": "3.12.14",
+  "runs": [
+    {
+      "log": "baseline-rust.log",
+      "command": "cargo test --workspace --locked",
+      "exit_code": 0,
+      "log_sha256": "1a20271fbc36d2d2e0a65609b96cb6aff8f1d45140c359ee12b16bf78625a6b5",
+      "passed": 804,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "log": "baseline-direct_dns_.log",
+      "command": "cargo test --locked -p swirl-core --lib direct_dns_ -- --nocapture",
+      "exit_code": 101,
+      "log_sha256": "bf16b92ed230db65ab042af4b042310d5fe57476997703ebcf822b5780dd4e67",
+      "passed": 0,
+      "failed": 2,
+      "ignored": 0,
+      "expected_failure_against_unmodified_production_code": true
+    },
+    {
+      "log": "baseline-pre-tunnel-confirmed.log",
+      "command": "cargo test --locked -p swirl-core --lib pre_tunnel_route_and_dial_failures_return_protocol_replies -- --nocapture",
+      "exit_code": 101,
+      "log_sha256": "e8df19ec6b0e0eb92090263104468e720f1e51d47b3f9ecce5a23e5778b30db9",
+      "passed": 0,
+      "failed": 1,
+      "ignored": 0,
+      "expected_failure_against_unmodified_production_code": true
+    },
+    {
+      "log": "baseline-outbound-confirmed.log",
+      "command": "cargo test --locked -p swirl-protocol --lib outbound_http_tests -- --nocapture",
+      "exit_code": 101,
+      "log_sha256": "000da8e4974970744be8bc8d08b2cf8ee37d05d47c16fadbe15de7100a721447",
+      "passed": 1,
+      "failed": 2,
+      "ignored": 0,
+      "expected_failure_against_unmodified_production_code": true
+    },
+    {
+      "log": "candidate-fresh-rust.log",
+      "command": "cargo test --workspace --locked",
+      "exit_code": 0,
+      "log_sha256": "f7bd7e7547c005a364d388342d738a11d5518b766dcf2bc15ca01cca121593a6",
+      "passed": 816,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "log": "candidate-fresh-clippy.log",
+      "command": "cargo clippy --workspace --all-targets --locked -- -D warnings",
+      "exit_code": 0,
+      "log_sha256": "5f8bd0e83382e50d60033101c8a95772b6241fbfdec3c9957e9686450af09d8b"
+    },
+    {
+      "log": "candidate-fresh-build.log",
+      "command": "cargo build --locked --workspace --lib --bins",
+      "exit_code": 0,
+      "log_sha256": "4fe1e7151886da5bf034840216e3096b6e78e4fae4a970de6470baf94595804d"
+    },
+    {
+      "log": "candidate-v2-compat-final.log",
+      "command": "python tools/tests/test_windows_proxy_compat.py -v",
+      "exit_code": 0,
+      "log_sha256": "f4f8aee83d2d1a75a7fa346473c453968bb5020e78adfcd01abf5708ef83b447",
+      "executed": 6,
+      "skipped": 0,
+      "subscenarios": 14,
+      "v2_sessions": 16
+    },
+    {
+      "log": "candidate-powershell-final.log",
+      "command": "pwsh -NoLogo -NoProfile -File tools/tests/Test-CodexNetworkEvidence.ps1",
+      "exit_code": 0,
+      "log_sha256": "5fc858550d7db1506f6e3214c6bcc948d115b1fe7e3f91362d9c438d34b35d46",
+      "powershell_version": "7.6.9",
+      "assertions_passed": 24,
+      "windows_native_and_package_cases": "NOT_RUN"
+    },
+    {
+      "log": "guard-test_rust_only_runtime.log",
+      "command": "python tools/test_rust_only_runtime.py",
+      "exit_code": 0,
+      "log_sha256": "052bd8d6b69360179ee6e76d506c3d451f3bec6dd6488b28ebbf21880b298223",
+      "executed": 9,
+      "skipped": 0
+    },
+    {
+      "log": "guard-test_portable_core_boundary.log",
+      "command": "python tools/tests/test_portable_core_boundary.py",
+      "exit_code": 0,
+      "log_sha256": "26c4b4d1829c4c1c736cc134d13b0407d34dc53c51c3f67dd8b34df0f446c0cb",
+      "executed": 7,
+      "skipped": 0
+    },
+    {
+      "log": "guard-test_rust_build_chain-final.log",
+      "command": "python tools/test_rust_build_chain.py -v",
+      "exit_code": 0,
+      "log_sha256": "823f43c4c68f25e6b65c1e3b54b18d380e328f2ce955e8268fdcbb2efc26f552",
+      "executed": 3,
+      "skipped": 0
+    },
+    {
+      "log": "guard-test_core_development-final.log",
+      "command": "python tools/tests/test_core_development.py",
+      "exit_code": 0,
+      "log_sha256": "445250e3ec5eedcd12d171d944f4e9d7ab71511c1d30245dfb5d941e243adeb6",
+      "executed": 58,
+      "skipped": 1
+    },
+    {
+      "log": "guard-test_codex_management.log",
+      "command": "python tools/tests/test_codex_management.py",
+      "exit_code": 0,
+      "log_sha256": "4d64aa18f2aefc024130f0975e2d63f53ca96f4a1f41eee0be64b5407d7b384e",
+      "executed": 0,
+      "skipped": 11,
+      "scope_note": "All 11 cases require Windows or an installed opt-in Codex CLI; not a passing execution."
+    }
+  ],
+  "windows_11_desktop": "NOT_RUN",
+  "same_device_Clash_Swirl_AB": "NOT_RUN",
+  "installed_user_package": "UNKNOWN",
+  "native_binary_sha256": "45cbf38444d650e39898b38b677c43cbe76a2a29fa6ae1d1dfaac1b921fd9eed",
+  "notes": [
+    "The baseline regression worktree adds the new test cases only; production code remains baseline.",
+    "Candidate Rust was rebuilt in a fresh target directory after a shared-target doctest cache collision.",
+    "Final source hashes and CI identity are tracked by the containing Git commit and its PR checks.",
+    "Expected failures demonstrate controlled code defects, not causality for the user-specific Codex Desktop error."
+  ],
+  "toolchain": {
+    "os": "Ubuntu 24.04.3 LTS",
+    "rust": "1.99.1 (58cf8f9c3 2026-10-13)",
+    "python": "3.12.14",
+    "openssl": "3.5.8 25 Aug 2026",
+    "cryptography": "50.0.2",
+    "h2": "4.3.0",
+    "hpack": "4.2.0",
+    "hyperframe": "6.1.0",
+    "powershell": "7.6.9",
+    "cmake": "3.31.6",
+    "ninja": "1.11.1.4"
+  }
+}

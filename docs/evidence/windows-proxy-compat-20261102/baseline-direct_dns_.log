@@ -1,0 +1,34 @@
+   Compiling tokio v1.53.3
+   Compiling tokio-util v0.7.20
+   Compiling quinn v0.11.12
+   Compiling tokio-rustls v0.26.6
+   Compiling h3 v0.0.8
+   Compiling h2 v0.4.20
+   Compiling h3-quinn v0.0.10
+   Compiling swirl-transport v0.1.0 (/workspace/scratch/d849c9bea5b5/Swirl-baseline/core/crates/swirl-transport)
+   Compiling swirl-dns v0.1.0 (/workspace/scratch/d849c9bea5b5/Swirl-baseline/core/crates/swirl-dns)
+   Compiling swirl-protocol v0.1.0 (/workspace/scratch/d849c9bea5b5/Swirl-baseline/core/crates/swirl-protocol)
+   Compiling swirl-core v0.1.0 (/workspace/scratch/d849c9bea5b5/Swirl-baseline/core/crates/swirl-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 18.06s
+     Running unittests src/lib.rs (/workspace/scratch/d849c9bea5b5/rust-target/debug/deps/swirl_core-bc079a38f3eed821)
+
+running 2 tests
+
+thread 'v2::runtime_tests::direct_dns_falls_back_to_a_second_ipv4_answer_without_changing_policy' (14655) panicked at crates/swirl-core/src/v2_runtime_tests.rs:275:14:
+v2 must try a route-equivalent DNS answer after TCP refusal: Error { kind: UnexpectedEof, message: "failed to fill whole buffer" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'v2::runtime_tests::direct_dns_falls_back_across_address_families_without_disabling_ipv6' (14654) panicked at crates/swirl-core/src/v2_runtime_tests.rs:275:14:
+v2 must try a route-equivalent DNS answer after TCP refusal: Error { kind: UnexpectedEof, message: "failed to fill whole buffer" }
+test v2::runtime_tests::direct_dns_falls_back_to_a_second_ipv4_answer_without_changing_policy ... FAILED
+test v2::runtime_tests::direct_dns_falls_back_across_address_families_without_disabling_ipv6 ... FAILED
+
+failures:
+
+failures:
+    v2::runtime_tests::direct_dns_falls_back_across_address_families_without_disabling_ipv6
+    v2::runtime_tests::direct_dns_falls_back_to_a_second_ipv4_answer_without_changing_policy
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 43 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p swirl-core --lib`

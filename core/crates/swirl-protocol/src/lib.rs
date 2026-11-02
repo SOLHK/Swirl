@@ -6,6 +6,8 @@ pub mod http_single;
 pub mod hysteria2;
 #[cfg(test)]
 mod inbound_http_tests;
+#[cfg(test)]
+mod outbound_http_tests;
 mod probe;
 mod shadowsocks;
 mod socks4;
@@ -960,23 +962,41 @@ async fn handshake_inner(
                 .await
                 .map_err(|_| "HttpUpstreamWrite")?;
             stream.flush().await.map_err(|_| "HttpUpstreamWrite")?;
-            // Read exactly through the header: tunnel bytes must stay in the socket.
-            let mut header = Vec::new();
-            while !header.ends_with(b"\r\n\r\n") {
-                if header.len() >= 16384 {
-                    return Err("UpstreamHeaderTooLarge");
+            // RFC 9110 9.3.6: every 2xx CONNECT establishes an opaque tunnel.
+            // Read exactly through each header so coalesced tunnel bytes stay
+            // in the socket, ignoring framing fields on the final success.
+            // Section 15.2 also permits unsolicited interim responses. Bound
+            // their count within the existing overall handshake deadline.
+            let mut informational = 0;
+            loop {
+                let mut header = Vec::new();
+                while !header.ends_with(b"\r\n\r\n") {
+                    if header.len() >= 16384 {
+                        return Err("UpstreamHeaderTooLarge");
+                    }
+                    header.push(stream.read_u8().await.map_err(|_| "HttpUpstreamRead")?);
                 }
-                header.push(stream.read_u8().await.map_err(|_| "HttpUpstreamRead")?);
-            }
-            let mut fields = [httparse::EMPTY_HEADER; 64];
-            let mut response = httparse::Response::new(&mut fields);
-            if !response
-                .parse(&header)
-                .map_err(|_| "HttpUpstreamSyntax")?
-                .is_complete()
-                || response.code != Some(200)
-            {
-                return Err("UpstreamRejected");
+                let mut fields = [httparse::EMPTY_HEADER; 64];
+                let mut response = httparse::Response::new(&mut fields);
+                if !response
+                    .parse(&header)
+                    .map_err(|_| "HttpUpstreamSyntax")?
+                    .is_complete()
+                {
+                    return Err("HttpUpstreamSyntax");
+                }
+                let code = response.code.ok_or("HttpUpstreamSyntax")?;
+                if (100..200).contains(&code) && code != 101 {
+                    informational += 1;
+                    if informational > 8 {
+                        return Err("HttpUpstreamInformationalLimit");
+                    }
+                    continue;
+                }
+                if !(200..300).contains(&code) {
+                    return Err("UpstreamRejected");
+                }
+                break;
             }
             Ok(())
         })
