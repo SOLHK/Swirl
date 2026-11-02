@@ -11,7 +11,7 @@
 | 起始远端 `test` | `63dde8812f85839aa6024cbba6c498c96cae022d`，开始时重新读取 |
 | 独立开发分支 | `work/windows-proxy-compat-20261102` |
 | 本文对应的本地证据 | 本轮候选工作树；最终提交身份须与提交后的 CI 重新绑定 |
-| 最终 Commit / PR / Actions | **PENDING**：由提交后的实际记录填写，不能沿用基线或其他分支的结果 |
+| Commit / PR / Actions | [PR #50](https://github.com/SOLHK/Swirl/pull/50)；最终固定提交与 Actions 结果记录在该 PR，不能沿用基线或其他分支的结果 |
 | 用户当前安装的 Swirl EXE/DLL 版本及 source SHA | **UNKNOWN**，没有取得当前 Windows 设备上的读数 |
 | 相同 Windows 11 设备、订阅、节点的 Clash/Swirl A/B | **NOT_RUN**，当前执行环境没有该设备、节点和已登录桌面会话 |
 | Codex Desktop 工作空间、认证多轮回复、已有项目、真实持续流 | **NOT_RUN** |
@@ -77,20 +77,31 @@ Clash 与 Swirl 当前实机行为差异还没有实测。可以确认的边界�
 | 新 DNS 回归运行于旧实现 | 2 failed | `baseline-direct_dns_.log` |
 | 新 pre-tunnel 回归运行于旧实现 | 1 failed | `baseline-pre-tunnel-confirmed.log` |
 | 新 upstream CONNECT 回归运行于旧实现 | 1 passed、2 failed | `baseline-outbound-confirmed.log`；负对照保留 |
-| 候选 fresh Rust workspace | **816 passed，0 failed，0 ignored**，退出 0 | `candidate-fresh-rust.log`，40 个结果段，使用新的构建目录 |
-| 候选 Clippy，warnings 为错误 | 退出 0 | `candidate-fresh-clippy.log` |
+| 候选 fresh Rust workspace | **816 passed，0 failed，0 ignored**，退出 0 | `candidate-portable-rust.log`，40 个结果段，使用新的构建目录 |
+| 候选 Clippy，warnings 为错误 | 退出 0 | `candidate-portable-clippy.log` |
 | 候选 Rust dev 构建 | 退出 0 | `candidate-fresh-build.log`；不等于 Windows 安装包验证 |
 | 原 collector + 新隐私 fixture | 退出 1，预期失败 | `codex-network-evidence-baseline.log` |
-| 修复后 PowerShell collector suite | **24 assertions passed**，退出 0 | 实读 PowerShell **7.6.9**，Ubuntu；`codex-network-evidence-fixed.log` |
+| 修复后 PowerShell collector suite | **27 assertions passed**，退出 0 | 实读 PowerShell **7.6.9**，Ubuntu；`candidate-powershell-final.log`；新增 IPv6 展开/大小写/zone 规范化回归 |
 | Windows PowerShell 5.1 / 7 原生 API、包 identity 测试 | **PENDING CI** | Linux 明确输出 Windows native/package `NOT_RUN` |
 | Python 独立 V2 HTTP/TLS/H2/WS/SSE fixture | **6 tests passed**，退出 0；14 个子场景、16 条 V2 session | `candidate-v2-compat-final.log`，6.035 秒；本地受控网络，不计入上述 816 |
-| 持续连接 soak | **8 连接连续 60.003701 秒通过** | 同一 core、无重连、每连接 61 事件；[逐秒证据](evidence/windows-proxy-compat-20261102/soak-60s.json)。300 秒本地扩展及 CI 120 秒另记 |
+| 持续连接 soak | **8 连接连续 300.024764 秒通过** | 同一 core、无重连、每连接 301 事件；[300 秒完整关闭与结果摘要](evidence/windows-proxy-compat-20261102/soak-300s-summary.json)，另保留 [60 秒逐秒证据](evidence/windows-proxy-compat-20261102/soak-60s.json)。三平台 CI 各跑 120 秒 |
 | Windows Qt 集成、完整 Actions | **PENDING CI** | 本文编写时尚无对应最终提交的完整通过记录 |
 | Windows 11 + 实际订阅 + Codex Desktop | **NOT_RUN** | 没有用 loopback 或 Windows Server runner 替代 |
 
 新增 `test_windows_proxy_compat.py` 使用实际 `swirl-api/start_v2`、独立认证 HTTP/SOCKS5 节点和独立 TLS origin。其验收断言包括严格证书验证、同包 ClientHello、真实 HTTP/2 三路复用、WSS 首帧/分片/ping/close、分块 SSE 跨握手时间窗、半关闭延迟大尾部、取消和 stop 后资源释放。所有正向代理请求使用保留的 synthetic 域名并核对节点记录，不利用 loopback 自动 DIRECT 规则冒充代理成功。`h2` 等 Python 依赖仅属于测试。
 
 可复现的旧基线失败日志与本地结果清单保存在 [evidence/windows-proxy-compat-20261102](evidence/windows-proxy-compat-20261102)。清单逐项区分执行、失败与跳过；例如 Linux 上全部跳过的 Codex DPAPI 管理测试不算通过。其余原始日志保留在本轮本地审计目录，完整跨平台日志由对应 GitHub Actions 保存。PR 最终验收记录须列明 Commit、Actions 和失败/跳过，不能把本地成功登记为跨平台成功。所有网络 fixture 仅使用合成目标及测试凭据。
+
+### 首轮跨平台 CI 暴露的问题与修正
+
+[首轮 Rust CI](https://github.com/SOLHK/Swirl/actions/runs/41404057051) 使用 PR 合并引用 `b78f23fa6ae0a400167026d4b5e29f63ec703a5d`（分支 head `e682f28f08b23d914dd43f60bd059d228739b1e6`）。失败没有删除、忽略或改成通过：
+
+- Windows PowerShell 5.1 的固定 IPv6 端点断言失败，尚未进入 native API smoke。候选修复把 Uri 已识别的 IPv6 经 IPAddress 规范化，保留原地址/端口/协议期望，增加展开、大小写和数字 scope 回归；下一轮 Windows 会打印仅针对合成常量的表示证据。Linux 复验 27 断言通过不能替代该 Windows 复验。
+- macOS 没有默认配置 `127.0.0.2` alias，三个夹具的 bind 失败。可用 peer 改为绑定已有 `127.0.0.1` / `::1`；首个不可用 DNS 候选由真实 connect 预检确认，不要求创建系统 alias。
+- macOS 对 bound-but-not-listening TCP 端口可能丢弃 SYN，原客户端 4 秒读取预算早于核心默认握手结束。失败夹具改用明确的 **250 毫秒测试预算**，并按原生探测严格断言 `UpstreamConnectionRefused` 或 `UpstreamTcpTimeout`；生产默认未改变，客户端超时没有增加，HTTP/SOCKS 回复字节断言完整保留。
+- 新增错误类型断言与真实 `RouteRejected` / `InvalidTarget` 常量逐项核对。修正后的 workspace 再次为 816/0/0，Clippy 与格式检查通过；最终可移植回归回放旧生产代码依然失败，日志已保存。
+
+Qt CI 另保存 critical UI 与 network/security 的独立 JUnit 文件，防止后续 CTest 覆盖前序日志；测试范围、失败处理与断言不变。固定提交的最终 CI 结果以 PR #50 验收记录为准。
 
 ## 五、Windows 11 同节点 A/B 实机步骤
 
@@ -174,5 +185,5 @@ Swirl 正在运行时自动发现其 EXE；未运行时，可用实际安装路�
 | TCP 保活 | `swirl-protocol/src/dial.rs` 的连接路径设置 `TCP_NODELAY`，没有显式启用或配置 TCP keepalive | 没有证据证明这一点就是 Codex 根因；本轮未盲目增加 keepalive 或放宽超时。QUIC 的 keepalive 配置不能代替 TCP/NAT 验证 |
 | 实际获胜地址 | 多个 DIRECT 候选时 V2 trace 的 `chosen_ip` 为 null，保留 `direct_candidate_count` | 避免将第一个 DNS 答案误报为出口，但尚未回填连接调度实际获胜的 IP；不能据该字段推断完整连接路径 |
 | 上游 HTTP 拒绝状态 | HTTP CONNECT 的 `403` / `407` / `429` 等仍汇总为 `UpstreamRejected` | 本轮修复成功响应兼容性，没有完成细化状态的诊断字段；现有错误码不足以区分认证、策略拒绝或限流，更不能据此认定节点质量 |
-| 长时与网络变更 | 本地受控 soak 已运行 8 连接、60.003701 秒，300 秒扩展及固定提交 CI 另记；小时级真实网络、NAT 空闲过期、睡眠/恢复、网络切换均 **NOT_RUN** | 短协议 fixture 证明有限协议行为。后续受控 soak 即使通过，也须分别报告时长和负载，不能替代 Windows 11 实际节点及电源/网络事件验收 |
+| 长时与网络变更 | 本地受控 soak 已运行 8 连接、300.024764 秒；固定提交三平台 CI 分别记录；小时级真实网络、NAT 空闲过期、睡眠/恢复、网络切换均 **NOT_RUN** | 短协议 fixture 证明有限协议行为。后续受控 soak 即使通过，也须分别报告时长和负载，不能替代 Windows 11 实际节点及电源/网络事件验收 |
 | 桌面因果链 | 当前用户安装包身份、请求是否到达 Swirl、实际节点参数、出口和认证桌面结果尚未取得 | 已修复三个可复现的内核缺陷；用户报告的 Codex 故障是否由它们触发，仍须第五节的同条件 A/B 证实 |

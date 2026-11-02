@@ -12,6 +12,12 @@ function ConvertTo-ProxyEndpointEvidence {
         $text=if ($Value.Contains('://')) {$Value} else {$DefaultScheme+'://'+$Value}
         $uri=[uri]$text
         $hostName=$uri.IdnHost.Trim('[',']')
+        # Windows PowerShell's .NET Framework Uri may use legacy IPv6
+        # formatting (eight expanded groups). Normalize the parsed address,
+        # independently of the host application's Uri compatibility switches.
+        if ($uri.HostNameType -eq [UriHostNameType]::IPv6) {
+            $hostName=[Net.IPAddress]::Parse($hostName).ToString()
+        }
         if (!$uri.IsAbsoluteUri -or $uri.Scheme -notin @('http','https','socks','socks4','socks4a','socks5','socks5h') -or
             [string]::IsNullOrEmpty($hostName) -or $hostName -notmatch '\A[0-9A-Za-z.:%_-]+\z') { return $invalid }
         $port=$uri.Port

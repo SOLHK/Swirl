@@ -23,7 +23,23 @@ foreach ($value in @(
 $endpoint=ConvertTo-ProxyEndpointEvidence ('http://user:'+$secret+'@proxy.invalid:8080/?token='+$secret)
 Assert ($endpoint.valid -and $endpoint.host -eq 'proxy.invalid' -and $endpoint.port -eq 8080 -and $endpoint.credentialsPresent -and $endpoint.extraUriComponentsPresent) 'Endpoint metadata was lost while removing credentials and URI suffixes.'
 $v6=ConvertTo-ProxyEndpointEvidence '[::1]:7897'
+# This diagnostic is restricted to the constant synthetic URI above. Never
+# reuse it for native proxy observations or arbitrary collector input.
+$v6Types=@{}
+foreach ($field in @('valid','host','port','scheme')) {
+    $v6Types[$field]=if ($v6.ContainsKey($field) -and $null -ne $v6[$field]) {$v6[$field].GetType().FullName} else {'missing'}
+}
+$v6Diagnostic=@{powerShell=$PSVersionTable.PSVersion.ToString();uriIdnHost=([uri]'http://[::1]:7897').IdnHost;endpoint=$v6;fieldTypes=$v6Types}
+Write-Output ('Synthetic IPv6 endpoint metadata: '+($v6Diagnostic | ConvertTo-Json -Depth 4 -Compress))
 Assert ($v6.valid -and $v6.host -eq '::1' -and $v6.port -eq 7897 -and $v6.scheme -eq 'http') 'IPv6 HTTP proxy was not represented correctly.'
+foreach ($fixture in @(
+    @{endpoint='[0:0:0:0:0:0:0:1]:7897';host='::1'},
+    @{endpoint='[2001:0DB8:0:0:0:0:0:1]:7897';host='2001:db8::1'},
+    @{endpoint='[fe80::1%12]:7897';host='fe80::1%12'}
+)) {
+    $normalized=ConvertTo-ProxyEndpointEvidence $fixture.endpoint
+    Assert ($normalized.valid -and $normalized.host -ceq $fixture.host -and $normalized.port -eq 7897 -and $normalized.scheme -eq 'http') 'IPv6 address normalization changed the endpoint address, scope or port.'
+}
 $ordinary=ConvertTo-ProxyMapEvidence '127.0.0.1:7897'
 Assert ($ordinary.entries.Count -eq 1 -and $ordinary.entries[0].mapping -eq 'all' -and $ordinary.entries[0].endpoint.scheme -eq 'http') 'Swirl single proxy was mistaken for SOCKS.'
 $map=ConvertTo-ProxyMapEvidence 'http=127.0.0.1:7897;https=[::1]:7898;socks=127.0.0.1:7899'

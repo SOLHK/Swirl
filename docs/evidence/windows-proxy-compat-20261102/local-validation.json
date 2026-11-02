@@ -45,19 +45,19 @@
       "expected_failure_against_unmodified_production_code": true
     },
     {
-      "log": "candidate-fresh-rust.log",
+      "log": "candidate-portable-rust.log",
       "command": "cargo test --workspace --locked",
       "exit_code": 0,
-      "log_sha256": "f7bd7e7547c005a364d388342d738a11d5518b766dcf2bc15ca01cca121593a6",
+      "log_sha256": "17617d95178d1a8df5b8325ce29f3d466a20a7a8ccfa19cb958c2b49cf954345",
       "passed": 816,
       "failed": 0,
       "ignored": 0
     },
     {
-      "log": "candidate-fresh-clippy.log",
+      "log": "candidate-portable-clippy.log",
       "command": "cargo clippy --workspace --all-targets --locked -- -D warnings",
       "exit_code": 0,
-      "log_sha256": "5f8bd0e83382e50d60033101c8a95772b6241fbfdec3c9957e9686450af09d8b"
+      "log_sha256": "36cbca976f2cb62511b610ba615d389e1f33b14d692c08495d5170793eb45624"
     },
     {
       "log": "candidate-fresh-build.log",
@@ -79,9 +79,9 @@
       "log": "candidate-powershell-final.log",
       "command": "pwsh -NoLogo -NoProfile -File tools/tests/Test-CodexNetworkEvidence.ps1",
       "exit_code": 0,
-      "log_sha256": "5fc858550d7db1506f6e3214c6bcc948d115b1fe7e3f91362d9c438d34b35d46",
+      "log_sha256": "13e9c73b632519770d6b81f2033f19fefbff12f52d5d16ddb41e392cddc2e9be",
       "powershell_version": "7.6.9",
-      "assertions_passed": 24,
+      "assertions_passed": 27,
       "windows_native_and_package_cases": "NOT_RUN"
     },
     {
@@ -124,6 +124,26 @@
       "executed": 0,
       "skipped": 11,
       "scope_note": "All 11 cases require Windows or an installed opt-in Codex CLI; not a passing execution."
+    },
+    {
+      "log": "baseline-portable-dns.log",
+      "command": "cargo test --locked -p swirl-core --lib direct_dns_ -- --nocapture",
+      "exit_code": 101,
+      "passed": 0,
+      "failed": 2,
+      "ignored": 0,
+      "expected_failure_against_unmodified_production_code": true,
+      "log_sha256": "6210236c704410c573c00e83d809fd9860a12b528180f0b600eb6449e6676b84"
+    },
+    {
+      "log": "baseline-portable-replies.log",
+      "command": "cargo test --locked -p swirl-core --lib pre_tunnel_route_and_dial_failures_return_protocol_replies -- --nocapture",
+      "exit_code": 101,
+      "passed": 0,
+      "failed": 1,
+      "ignored": 0,
+      "expected_failure_against_unmodified_production_code": true,
+      "log_sha256": "8a7a57df36f19e609669f19d556c5f53b55de05d6dd884a3eaa1db76f64ded97"
     }
   ],
   "windows_11_desktop": "NOT_RUN",
@@ -148,5 +168,15 @@
     "powershell": "7.6.9",
     "cmake": "3.31.6",
     "ninja": "1.11.1.4"
+  },
+  "pr": "https://github.com/SOLHK/Swirl/pull/50",
+  "additional_soak_evidence": "soak-300s-summary.json",
+  "first_ci": {
+    "head": "e682f28f08b23d914dd43f60bd059d228739b1e6",
+    "pr_merge_sha": "b78f23fa6ae0a400167026d4b5e29f63ec703a5d",
+    "rust_run": "https://github.com/SOLHK/Swirl/actions/runs/41404057051",
+    "windows_failure": "PowerShell 5.1 IPv6 endpoint representation assertion before native API smoke",
+    "macos_failures": "Three tests bound a non-default loopback alias; one bound-only TCP endpoint dropped SYNs and the client deadline preceded the default core handshake deadline",
+    "scope": "Failures retained; portability fix retains all protocol assertions and changes only fixture budget, not product deadlines. A new CI run is required."
   }
 }

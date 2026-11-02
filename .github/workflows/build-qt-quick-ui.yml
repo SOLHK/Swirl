@@ -276,6 +276,10 @@ jobs:
         id: critical_ui
         shell: pwsh
         run: |
+          $criticalEvidence = Join-Path $env:GITHUB_WORKSPACE 'build-evidence'
+          New-Item -ItemType Directory -Force -Path $criticalEvidence | Out-Null
+          $criticalUiJunit = Join-Path $criticalEvidence 'critical-ui.xml'
+          $criticalNetworkJunit = Join-Path $criticalEvidence 'critical-network.xml'
           # Preserve the actual configured test inventory so the staged runs
           # can be audited for complete coverage without executing them twice.
           $inventoryJson = ctest --test-dir build/swirl-quick -C Release --show-only=json-v1
@@ -286,13 +290,13 @@ jobs:
           # Run affected UI checks before packaging. The remaining registered suite
           # runs after the test installer is uploaded; these names are excluded there
           # so a required check is never repeated just to change stage ordering.
-          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(appearance-ui|node-ui|engine-ui|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui)$" --output-on-failure --no-tests=error
+          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(appearance-ui|node-ui|engine-ui|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui)$" --output-on-failure --no-tests=error --output-junit $criticalUiJunit
           if ($LASTEXITCODE -ne 0) {
             Get-Content build/swirl-quick/engine-contract.txt, build/swirl-quick/engine-real.txt -ErrorAction SilentlyContinue
             throw "Critical UI checks failed"
           }
           if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') {
-            ctest --test-dir build/swirl-quick -C Release -R "^swirl-(system-proxy-state|system-proxy-recovery|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network)$" --output-on-failure --no-tests=error
+            ctest --test-dir build/swirl-quick -C Release -R "^swirl-(system-proxy-state|system-proxy-recovery|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network)$" --output-on-failure --no-tests=error --output-junit $criticalNetworkJunit
             if ($LASTEXITCODE -ne 0) { throw "Critical network/security checks failed ($LASTEXITCODE)." }
           }
       - name: Overview input checks against deployed Qt runtime

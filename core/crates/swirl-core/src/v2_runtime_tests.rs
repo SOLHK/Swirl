@@ -213,20 +213,19 @@ fn dns_peer(answers: Vec<IpAddr>, dual: bool) -> (SocketAddr, thread::JoinHandle
     (dns_address, dns_server)
 }
 
-// Own both the refused endpoint and the usable endpoint for the whole test.
-// A bound-but-not-listening socket cannot be claimed by another parallel test.
+// Bind the usable endpoint to an address present on every supported runner.
+// macOS does not assign every address in 127/8 to lo0, so the unreachable DNS
+// candidate must not require binding a non-default loopback alias.
 fn direct_dns_fallback(ipv6: bool) {
     use swirl_subscription::DnsQueryFamily;
 
-    let refused = tokio::net::TcpSocket::new_v4().unwrap();
-    refused.bind("127.0.0.2:0".parse().unwrap()).unwrap();
-    let port = refused.local_addr().unwrap().port();
-    let live: SocketAddr = if ipv6 {
-        format!("[::1]:{port}").parse().unwrap()
-    } else {
-        format!("127.0.0.1:{port}").parse().unwrap()
-    };
-    let listener = StdListener::bind(live).unwrap();
+    let listener = StdListener::bind(if ipv6 { "[::1]:0" } else { "127.0.0.1:0" }).unwrap();
+    let live = listener.local_addr().unwrap();
+    let port = live.port();
+    let unavailable: SocketAddr = format!("127.0.0.2:{port}").parse().unwrap();
+    let unavailable_error = StdStream::connect_timeout(&unavailable, Duration::from_millis(250))
+        .expect_err("the first DNS candidate must not accept connections");
+    eprintln!("first DNS candidate: {unavailable_error:?}");
     listener.set_nonblocking(true).unwrap();
     let origin = thread::spawn(move || {
         let runtime = Builder::new_current_thread().enable_all().build().unwrap();
@@ -249,7 +248,7 @@ fn direct_dns_fallback(ipv6: bool) {
             stream.shutdown().await.unwrap();
         });
     });
-    let (dns_address, dns_server) = dns_peer(vec!["127.0.0.2".parse().unwrap(), live.ip()], ipv6);
+    let (dns_address, dns_server) = dns_peer(vec![unavailable.ip(), live.ip()], ipv6);
     let a = Peer::new(b'A');
     let b = Peer::new(b'B');
     let mut candidate = config(&a, &b, A, true);
@@ -275,7 +274,7 @@ fn direct_dns_fallback(ipv6: bool) {
     write!(client, "CONNECT fallback.fixture.invalid:{port} HTTP/1.1\r\nHost: fallback.fixture.invalid:{port}\r\n\r\n").unwrap();
     assert!(
         header(&mut client)
-            .expect("v2 must try a route-equivalent DNS answer after TCP refusal")
+            .expect("v2 must try a route-equivalent DNS answer after an unusable first candidate")
             .starts_with(b"HTTP/1.1 200")
     );
     client.write_all(b"request-after-fallback").unwrap();
@@ -288,7 +287,6 @@ fn direct_dns_fallback(ipv6: bool) {
     assert_eq!(a.connections.load(Ordering::Acquire), 0);
     assert_eq!(b.connections.load(Ordering::Acquire), 0);
     core.stop();
-    drop(refused);
 }
 
 #[test]
@@ -319,10 +317,6 @@ fn dns_listener_port_rejection_does_not_recursively_accept_connections() {
     };
     let mut core = Core::start(candidate, STORE.into(), 1, START.into()).unwrap();
     let port = core.address().port();
-    let refused = tokio::net::TcpSocket::new_v4().unwrap();
-    refused
-        .bind(format!("127.0.0.2:{port}").parse().unwrap())
-        .unwrap();
     let mut client = StdStream::connect(core.address()).unwrap();
     client
         .set_read_timeout(Some(Duration::from_secs(4)))
@@ -351,8 +345,23 @@ fn pre_tunnel_route_and_dial_failures_return_protocol_replies() {
     let b = Peer::new(b'B');
     let refused = tokio::net::TcpSocket::new_v4().unwrap();
     refused.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+    // A bound-but-not-listening TCP socket refuses SYNs on Linux, but macOS
+    // drops them while its existing TCB remains CLOSED. Keep ownership of the
+    // port and exercise that platform's actual failure within an explicit test
+    // budget, rather than racing to reuse a closed ephemeral port or extending
+    // the client's read timeout beyond the production default handshake limit.
+    let dial_budget = Duration::from_millis(250);
+    let native_error = StdStream::connect_timeout(&refused.local_addr().unwrap(), dial_budget)
+        .expect_err("the owned TCP endpoint must not accept connections");
+    let expected_dial_error = match native_error.kind() {
+        std::io::ErrorKind::ConnectionRefused => "UpstreamConnectionRefused",
+        std::io::ErrorKind::TimedOut => "UpstreamTcpTimeout",
+        other => panic!("unexpected bound-only endpoint failure: {other:?}: {native_error}"),
+    };
+    eprintln!("bound-only TCP endpoint: {native_error:?}; core must report {expected_dial_error}");
     for rejected in [true, false] {
         let mut candidate = config(&a, &b, A, true);
+        candidate.limits.handshake_timeout_ms = dial_budget.as_millis() as u64;
         if rejected {
             candidate.policy.mode = Mode::Rule;
             candidate
@@ -390,8 +399,25 @@ fn pre_tunnel_route_and_dial_failures_return_protocol_replies() {
             client.set_read_timeout(Some(Duration::from_secs(4))).unwrap();
             client.write_all(request).unwrap();
             let mut response = Vec::new();
-            client.read_to_end(&mut response).unwrap();
+            client.read_to_end(&mut response).unwrap_or_else(|error| {
+                panic!(
+                    "failure response was not completed: rejected={rejected}, request={:?}, core_error={}, read_error={error}",
+                    String::from_utf8_lossy(request),
+                    *core.shared.last_error.lock().unwrap(),
+                )
+            });
             assert_eq!(response, b"HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            wait(|| core.shared.active.load(Ordering::Acquire) == 0);
+            assert_eq!(
+                *core.shared.last_error.lock().unwrap(),
+                if request.starts_with(b"CONNECT 0.0.0.0:") {
+                    "InvalidTarget"
+                } else if rejected {
+                    "RouteRejected"
+                } else {
+                    expected_dial_error
+                }
+            );
         }
         let mut client = StdStream::connect(core.address()).unwrap();
         client
@@ -409,6 +435,15 @@ fn pre_tunnel_route_and_dial_failures_return_protocol_replies() {
         let mut response = Vec::new();
         client.read_to_end(&mut response).unwrap();
         assert_eq!(response, [5, 5, 0, 1, 0, 0, 0, 0, 0, 0]);
+        wait(|| core.shared.active.load(Ordering::Acquire) == 0);
+        assert_eq!(
+            *core.shared.last_error.lock().unwrap(),
+            if rejected {
+                "RouteRejected"
+            } else {
+                expected_dial_error
+            }
+        );
         core.stop();
     }
     assert_eq!(a.connections.load(Ordering::Acquire), 0);
