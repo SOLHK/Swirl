@@ -1,0 +1,851 @@
+{
+  "schema": 1,
+  "status": "PARTIAL_NOT_FONT_DELIVERY",
+  "recorded_utc": "2026-11-02T14:18:11.953652+00:00",
+  "local_code_commit": "91daff95d01e3018399fa078aa517ab95e41a5df",
+  "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+  "environment": {
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "python": "3.12.16",
+    "fonttools": "4.61.1",
+    "numpy": "2.2.6"
+  },
+  "python_tests": {
+    "total": 962,
+    "passed": 955,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 7
+  },
+  "audit_tests": {
+    "total": 6,
+    "passed": 6,
+    "failed": 0
+  },
+  "cff2_targeted_tests": {
+    "total": 27,
+    "passed": 27,
+    "failed": 0,
+    "included_in_full_suite": true
+  },
+  "source_slice_refit": [
+    {
+      "glyph_id": 1166,
+      "axis": "WDTH",
+      "knots": 49,
+      "independent_holdouts": 512,
+      "baseline_error": 0.6063755494070824,
+      "max_holdout_error": 0.004984997985222888,
+      "passed": true,
+      "source_full_three_axis_acceptance": false
+    },
+    {
+      "glyph_id": 1166,
+      "axis": "wght",
+      "knots": 80,
+      "independent_holdouts": 512,
+      "baseline_error": 5.639471689444844,
+      "max_holdout_error": 0.007065696960260983,
+      "passed": true,
+      "source_full_three_axis_acceptance": false
+    },
+    {
+      "glyph_id": 1166,
+      "axis": "HGHT",
+      "knots": 27,
+      "independent_holdouts": 512,
+      "baseline_error": 2.3972874898359255,
+      "max_holdout_error": 0.007705035894372643,
+      "passed": true,
+      "source_full_three_axis_acceptance": false
+    },
+    {
+      "glyph_id": 19177,
+      "axis": "WDTH",
+      "knots": 11,
+      "independent_holdouts": 512,
+      "baseline_error": 0.2450328979785644,
+      "max_holdout_error": 0.005774796096398801,
+      "passed": true,
+      "source_full_three_axis_acceptance": false
+    },
+    {
+      "glyph_id": 19177,
+      "axis": "wght",
+      "knots": 181,
+      "independent_holdouts": 512,
+      "baseline_error": 2.790351645432472,
+      "max_holdout_error": 0.007142869186859774,
+      "passed": true,
+      "source_full_three_axis_acceptance": false
+    },
+    {
+      "glyph_id": 19177,
+      "axis": "HGHT",
+      "knots": 28,
+      "independent_holdouts": 512,
+      "baseline_error": 1.1427846178986922,
+      "max_holdout_error": 0.004193691220452037,
+      "passed": true,
+      "source_full_three_axis_acceptance": false
+    }
+  ],
+  "source_slice_certificates": [
+    {
+      "gid": 1166,
+      "axis": "WDTH",
+      "scope": "source_slice_only_not_full_source_glyph",
+      "sha256": "ea0a3571c5b74a0dd7162a04674a38d3fbaeccda4a81f4d367600ed3c1580acc",
+      "certificate": {
+        "status": "PASS_EXACT_SERIALIZED_CFF2_COEFFICIENTS",
+        "glyphs": 3,
+        "operands": 314,
+        "decoded_tokens": 10177,
+        "axes": [
+          "WDTH",
+          "wght",
+          "HGHT"
+        ],
+        "all_simultaneous_design_coordinates": true,
+        "source_fit_accepted": false,
+        "native_execution": false,
+        "metrics_verified": false,
+        "production_accepted": false
+      }
+    },
+    {
+      "gid": 1166,
+      "axis": "wght",
+      "scope": "source_slice_only_not_full_source_glyph",
+      "sha256": "248d09b676f7bdc8e434b3ae8584710e7077d2552c3eeee948f709d54d599ddf",
+      "certificate": {
+        "status": "PASS_EXACT_SERIALIZED_CFF2_COEFFICIENTS",
+        "glyphs": 3,
+        "operands": 314,
+        "decoded_tokens": 18849,
+        "axes": [
+          "WDTH",
+          "wght",
+          "HGHT"
+        ],
+        "all_simultaneous_design_coordinates": true,
+        "source_fit_accepted": false,
+        "native_execution": false,
+        "metrics_verified": false,
+        "production_accepted": false
+      }
+    },
+    {
+      "gid": 1166,
+      "axis": "HGHT",
+      "scope": "source_slice_only_not_full_source_glyph",
+      "sha256": "feb7ae8ba79cd39a6bbc4f1d9f828a5181f3eddd74e6081114fcafc20c9460e1",
+      "certificate": {
+        "status": "PASS_EXACT_SERIALIZED_CFF2_COEFFICIENTS",
+        "glyphs": 3,
+        "operands": 314,
+        "decoded_tokens": 5809,
+        "axes": [
+          "WDTH",
+          "wght",
+          "HGHT"
+        ],
+        "all_simultaneous_design_coordinates": true,
+        "source_fit_accepted": false,
+        "native_execution": false,
+        "metrics_verified": false,
+        "production_accepted": false
+      }
+    },
+    {
+      "gid": 19177,
+      "axis": "WDTH",
+      "scope": "source_slice_only_not_full_source_glyph",
+      "sha256": "9cda9d02dace895994edf384b08cfc2567bb0bcd0e5057997b2dfb50442f21bc",
+      "certificate": {
+        "status": "PASS_EXACT_SERIALIZED_CFF2_COEFFICIENTS",
+        "glyphs": 3,
+        "operands": 704,
+        "decoded_tokens": 5652,
+        "axes": [
+          "WDTH",
+          "wght",
+          "HGHT"
+        ],
+        "all_simultaneous_design_coordinates": true,
+        "source_fit_accepted": false,
+        "native_execution": false,
+        "metrics_verified": false,
+        "production_accepted": false
+      }
+    },
+    {
+      "gid": 19177,
+      "axis": "wght",
+      "scope": "source_slice_only_not_full_source_glyph",
+      "sha256": "31879922d9af84cc41041ba5d1b1a6f8f60437ae009319a9a0f8c70016917386",
+      "certificate": {
+        "status": "PASS_EXACT_SERIALIZED_CFF2_COEFFICIENTS",
+        "glyphs": 3,
+        "operands": 704,
+        "decoded_tokens": 96224,
+        "axes": [
+          "WDTH",
+          "wght",
+          "HGHT"
+        ],
+        "all_simultaneous_design_coordinates": true,
+        "source_fit_accepted": false,
+        "native_execution": false,
+        "metrics_verified": false,
+        "production_accepted": false
+      }
+    },
+    {
+      "gid": 19177,
+      "axis": "HGHT",
+      "scope": "source_slice_only_not_full_source_glyph",
+      "sha256": "3be0bebbb2445159d3b4f664c9023b67793c019694b6b8eef2f5e5e976c34d01",
+      "certificate": {
+        "status": "PASS_EXACT_SERIALIZED_CFF2_COEFFICIENTS",
+        "glyphs": 3,
+        "operands": 704,
+        "decoded_tokens": 12759,
+        "axes": [
+          "WDTH",
+          "wght",
+          "HGHT"
+        ],
+        "all_simultaneous_design_coordinates": true,
+        "source_fit_accepted": false,
+        "native_execution": false,
+        "metrics_verified": false,
+        "production_accepted": false
+      }
+    }
+  ],
+  "local_authored_native": {
+    "observations": 696,
+    "geometry_failures": 0,
+    "max_control_error": 0.001815558652092049,
+    "metric_failures": 272,
+    "CoreText_metric_failures": 224,
+    "HarfBuzz_metric_failures": 48,
+    "status": "FAIL_STRICT_METRICS_OR_GEOMETRY"
+  },
+  "windows_checkpoint": {
+    "artifact_id": 13147012819,
+    "artifact_sha256": "a8bf2f6face22a22b4801438857822a886ae30b35a0fcc9a2f922e2396e29bf0",
+    "head_sha": "e8f765de592a10b3a1cdde614ce2fdd897e11e53",
+    "merge_sha": "18cca440d0e04233f4f2c4550d9aa2cf1ddcb6a7",
+    "run": 41456608240,
+    "ordinary_variants": 13,
+    "observations": 4650,
+    "failed_observations": 0,
+    "max_control_error": 0.007074259509481338,
+    "nested": {
+      "factored": 124,
+      "factored_sparse": 124,
+      "nested_default": 124,
+      "nested_delta": 124,
+      "nested_delta_sparse": 124,
+      "nested_subr_blend": 124
+    },
+    "header": {
+      "record": "header",
+      "schema": 1,
+      "input_sha256": "27b049a9a4a6f07335171a9db914e18e6ad5677c546815aa88ee1a34205c5c76",
+      "input_bytes": 5092,
+      "directwrite_supported": true,
+      "physical_face_count": 2,
+      "all_glyphs": true,
+      "outline_coordinates_exported": true,
+      "architecture_query_succeeded": true,
+      "process_machine": 0,
+      "native_machine": 43620,
+      "compiled_machine": 34404,
+      "process_emulated": true,
+      "original_equality": "NOT_TESTED",
+      "swirl_ui": "NOT_TESTED",
+      "system_install": "NOT_TESTED"
+    }
+  },
+  "current_controls_byte_identical_to_native": {
+    "previous_native_run": 41456608240,
+    "new_source_head": "91daff95d01e3018399fa078aa517ab95e41a5df",
+    "cases": [
+      {
+        "variant": "flat",
+        "sha256": "27b049a9a4a6f07335171a9db914e18e6ad5677c546815aa88ee1a34205c5c76",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "flat_standalone",
+        "sha256": "69014315b2e4b04d46796843844681a2e7fd58a2c49f3b1bbeb884acdd664ecf",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "flat_stat",
+        "sha256": "fc93fc4bac4806853375fea01f6bd9cf0d8e316a60b2885b0ca27179230c39ab",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "flat_fdselect",
+        "sha256": "accf2fee15f2c3ee3e077c7427eec1f98b573adfbd22a085c3bfc54866c89047",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "flat_private_vsindex",
+        "sha256": "9a740c8256945a90508c580a1aacc2ae0a97d6b5020f2076f7e3f8ff208ae956",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "flat_default_vsindex",
+        "sha256": "a15e50851bd81b0ba130d682039f03ef32ae916876d978e23fbec6a849e7bd75",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "flat_post3",
+        "sha256": "f30feeb3424a0171db201f3fb46a21230102754116538f624d16b517a22ec7c1",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "factored",
+        "sha256": "f5b9957a95928e7de530c0e54936a7f5791a5fff27955363d2b546d8caad3c67",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "compact",
+        "sha256": "33a81c78bb89eea0644d378f772273fee715de6a6b67ab1338309040299ce53d",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "factored_sparse",
+        "sha256": "e7e6a50765ad619becc90c39b7a2cf9119c4be8075a714c780d81a52999efafc",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "nested_default",
+        "sha256": "23844272ce2a3af1f6bff65b25502997eb462e5311833b411c0f0436859ee552",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "nested_delta",
+        "sha256": "3d6d0c0544886d44d374d9a230a2b0f473e897cc7d705fb442237d058f680223",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "nested_delta_sparse",
+        "sha256": "4f676b0d198fcb981f44c7aef6e78bd5885ff583e63d406c50db83562a7eb02e",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "flat_regions_64",
+        "sha256": "1fc66190634e9104edd1629abe563cfa1738fc5fc335442f016d627a1f4e4be3",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "flat_regions_192",
+        "sha256": "4a6bd6ddf204201fc5a91bb87a8b1a7a35e9701773ac2c0d4c626d3f4195663b",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "flat_regions_506",
+        "sha256": "6d7720f9afc394c3201219727f4d946989aa9565659a1db41efdd3b438906edf",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "flat_long",
+        "sha256": "f88e2ca26e5612089e9a91dd7ac14f63cba72f6500452366ea9080e0cf0320a0",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "flat_subr_blend",
+        "sha256": "3b1913954735c9751caa4a35e96c11bdbfc0cdbe1b17ae17c51a2a0a65addbfe",
+        "identical_to_native_CI": true
+      },
+      {
+        "variant": "nested_subr_blend",
+        "sha256": "ecc84360b59706aff7cc8bae6eab70d22ebdb99df80267ec220b488945e01157",
+        "identical_to_native_CI": true
+      }
+    ],
+    "all_19_byte_identical": true
+  },
+  "build_gate": {
+    "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+    "output_generated": false,
+    "conversion_kind": "native-instance-reconstruction",
+    "lossless_conversion": false,
+    "windows_acceptance": "NOT_RUN",
+    "fonttools_version": "4.61.1",
+    "outline_limit_font_units": 0.03125,
+    "metric_limit_font_units": 0.03125,
+    "cubic_approximation_limit_font_units": 0.015625,
+    "faces": [],
+    "failures": [
+      {
+        "type": "ReconstructionError",
+        "message": "native oracle could not verify every requested physical face",
+        "context": {
+          "stage": "native_metadata"
+        }
+      }
+    ],
+    "status": "BLOCKED",
+    "native_observation_progress": {
+      "attempted_batches_this_run": 0,
+      "completed_batches_this_run": 0,
+      "glyph_observations_in_completed_batches_this_run": 0,
+      "count_scope": "completed native batches; no completed glyph model or finalized transcript implied"
+    }
+  },
+  "formal_output": {
+    "filename": "SwirlVF.ttc",
+    "exists": false,
+    "sha256": null,
+    "production_accepted_faces": 0,
+    "required_faces": 32
+  },
+  "code_sha256": {
+    "tools/swirl_vf/tools/cff2_geometry.py": "35b56522c98a0f99751fca32ff50e82751ebdeea8dfaadd8b0132011ea61b951",
+    "tools/swirl_vf/tools/cff2_certificate.py": "6f14bb03b458a111ee65404229b1d1d0f8f9162d4331dd104df4b14fd78e43cd",
+    "tools/swirl_vf/tools/piecewise_geometry.py": "b5d03a637f14a0bf61ee4da0e447b5d4be9bfbf465e595615571c9da7b5f05c0",
+    "tools/swirl_vf/tools/hvf_piecewise_axes.py": "574fb552d30a2a1f1c027c58293192071b67ffb52427b9419d7d48985c45d7c5",
+    "tools/swirl_vf/platform/make_cff2_fixture.py": "c66132466fa239f349fb82b8b2a98f8d9941462c81bc707d5b7f001519bd8c19",
+    "tools/swirl_vf/platform/diagnose_cff2_directwrite.py": "895e041500012ee4a8a2b17b47778bc841f3a51b042b6c7acbd18bd11b78c211",
+    "tools/swirl_vf/platform/verify_cff2_directwrite_geometry.py": "82f5e02f57ae93c5d87de2bd8889a594fd7107ac83a25e55c0eada5a4ead026a",
+    "tools/swirl_vf/platform/test_coretext_cff2.py": "b067f3a6249bee91216c2e7730357d30a61ef17b403183155a04f18ef4ab50bc",
+    ".github/workflows/font-system-windows.yml": "74fecef901850f418d669e7fcc2a10e6797cfc037fa4d684e148634bf9866750",
+    ".github/workflows/swirl-vf.yml": "aac364b41aeea733785b81af1b8c9da96f2124f8b83ac66851d4a95f10a4ce8f"
+  },
+  "remote_code_commit": "39d1186a51c3b4c4c76a0bff2197394fe4f1e3f4",
+  "later_CI": {
+    "head_sha": "aa3e37fbb3b081f0ba265b0cbe90f3bd9e4a12a5",
+    "native_run": 41459374538,
+    "jobs": [
+      {
+        "id": 125325503552,
+        "name": "python",
+        "status": "completed",
+        "conclusion": "success",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Dependencies and independent synthetic tests",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Check prohibited font-data extensions",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 125325504042,
+        "name": "directwrite (windows-2022)",
+        "status": "completed",
+        "conclusion": "failure",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Generate original three-face three-axis variable fixture",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Compile and run actual DirectWrite with all synthetic glyphs",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Validate production HVAR and VVAR tables through DirectWrite",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Load and render fractional CFF2 collection with factored three-axis blends",
+            "status": "completed",
+            "conclusion": "failure"
+          },
+          {
+            "name": "Validate losslessly compacted CFF2 blends with native DirectWrite",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Isolate CFF2 serialization and blending through independent native cases",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Measure fractional vertical advance through actual DirectWrite layout",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Verify independent vertical-origin placement through DirectWrite",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/upload-artifact@v4",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "status": "completed",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 125325504105,
+        "name": "apple-oracles",
+        "status": "completed",
+        "conclusion": "failure",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Record exact source and native SDK",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Isolate native outline-format loading with authored controls",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Compile official HVF oracle and test original synthetic geometry",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Compile CoreText extractor and verify original two-face tracking fixture",
+            "status": "completed",
+            "conclusion": "failure"
+          },
+          {
+            "name": "Reconstruct and remeasure all synthetic faces through CoreText",
+            "status": "completed",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Diagnose unchanged CoreText metrics using independent equivalent tables",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Locate metric quantization across native sizes and layout APIs",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Reconstruct native synthetic paths with explicitly sourced table metrics",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Validate fractional CFF2 outlines, factored blends and strict raw metrics",
+            "status": "completed",
+            "conclusion": "failure"
+          },
+          {
+            "name": "Measure fractional vertical advance through actual CoreText layout",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Isolate vertical metric routes and verify independent-origin placement",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/upload-artifact@v4",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "status": "completed",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 125325504113,
+        "name": "directwrite (windows-11-vs2026-arm)",
+        "status": "completed",
+        "conclusion": "failure",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Generate original three-face three-axis variable fixture",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Compile and run actual DirectWrite with all synthetic glyphs",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Validate production HVAR and VVAR tables through DirectWrite",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Load and render fractional CFF2 collection with factored three-axis blends",
+            "status": "completed",
+            "conclusion": "failure"
+          },
+          {
+            "name": "Validate losslessly compacted CFF2 blends with native DirectWrite",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Isolate CFF2 serialization and blending through independent native cases",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Measure fractional vertical advance through actual DirectWrite layout",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Verify independent vertical-origin placement through DirectWrite",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/upload-artifact@v4",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "status": "completed",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 125325504134,
+        "name": "directwrite (windows-2025)",
+        "status": "completed",
+        "conclusion": "failure",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Generate original three-face three-axis variable fixture",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Compile and run actual DirectWrite with all synthetic glyphs",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Validate production HVAR and VVAR tables through DirectWrite",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Load and render fractional CFF2 collection with factored three-axis blends",
+            "status": "completed",
+            "conclusion": "failure"
+          },
+          {
+            "name": "Validate losslessly compacted CFF2 blends with native DirectWrite",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Isolate CFF2 serialization and blending through independent native cases",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Measure fractional vertical advance through actual DirectWrite layout",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Verify independent vertical-origin placement through DirectWrite",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/upload-artifact@v4",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "status": "completed",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      }
+    ],
+    "qt_run": 41459374057,
+    "qt_status": "success",
+    "qt_ctests": 3,
+    "qt_merge_sha": "df783ca8fdd159130800a64c5f2e2194b75528e1",
+    "qt_artifacts": {
+      "artifacts": [
+        {
+          "id": 13147449488,
+          "name": "Swirl-Font-Evidence-df783ca8fdd159130800a64c5f2e2194b75528e1-1",
+          "size_in_bytes": 15351,
+          "url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/13147449488",
+          "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/13147449488/zip",
+          "expired": false,
+          "created_at": "2026-11-02T14:15:59Z",
+          "expires_at": "2026-11-09T14:15:58Z",
+          "updated_at": "2026-11-02T14:15:59Z",
+          "digest": "sha256:2fdaf547dd96238b54ee1ab67df98e7f2d719bf4fe83ebbd91b97a8de1933506",
+          "workflow_run": {
+            "id": 41459374057,
+            "repository_id": 1411888911,
+            "head_repository_id": 1411888911,
+            "head_branch": "work/swirlvf-recovery-20261102",
+            "head_sha": "aa3e37fbb3b081f0ba265b0cbe90f3bd9e4a12a5"
+          }
+        }
+      ]
+    }
+  }
+}
