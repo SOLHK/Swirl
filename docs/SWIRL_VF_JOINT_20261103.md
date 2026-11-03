@@ -211,3 +211,28 @@ platform skips**. Source fonts, coefficients, coordinates and native transcripts
 remain private. Larger fresh acceptance sets and the GID 19177 native candidate
 are still in progress; this checkpoint is not joint-task completion or proof
 of full-font scalability. These large diagnostic fonts are not release assets.
+
+## Sparse clamp maps and source-aware component partitions
+
+`sparse_projection` fits the **unclamped** rational projection parameter with
+hierarchical tensor hats. It takes mixed hierarchical differences using cached
+parents; it does not solve a dense tensor system. For M ramps, the exact scalar
+identity is `clamp(t,0,1) = sum(clip(2*M*t-(2*j+1),-1,1)+1)/(2*M)`.
+The compiler quantizes avar2 deltas first, then removes only exact zero rows.
+Physical output-axis deltas stay zero. Region coordinates, delta capacity,
+training-node budget and hidden-axis counts have explicit format guards.
+
+`adaptive_projection_atlas` fits baseline/direction fields, retaining source
+axis-zero and Type-0 branches. Analytic branch intersections propose cut planes;
+measured field bends choose among them. Midpoint cuts remain an explicit
+reproduction option. Both modes test source branch intersections and nearby
+positions in refinement, independently of held-out acceptance. Every source
+evaluation used for fitting/refinement receives a location fingerprint, saved
+with the private atlas and bound to source SHA/face/GID. Holdouts overlapping
+these receipts or each other are rejected. No native result enters the fitter.
+
+Nine authored regression tests cover sparse mixed-axis fields, OpenType scalar
+agreement, clamp quantization, capacity failures, source-derived cut positions,
+all octants, source identity and training/holdout separation. The source-aware
+cut heuristic is still being evaluated on real glyphs; these tests do not
+certify its resource cost or arbitrary-space precision on the complete font.
