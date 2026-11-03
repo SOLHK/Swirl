@@ -245,7 +245,10 @@ def run(args):
             hb.ot_font_set_funcs(hfont); hfont.scale = (upm*64, upm*64)
         metrics = SourceMetrics(source)
         ft_indices = set(np.linspace(0, len(requests)-1, min(args.fonttools, len(requests)), dtype=int))
+        from audit_joint_axis_contract import compare_fonts
         report = dict(identity=identity, limit=geometry.LIMIT, independence=separation,
+            acceptance_scope='joint_post_avar_q_geometry_and_reported_metrics',
+            axis_mapping_contract=compare_fonts(source,font),
             observations=len(requests), categories=dict(Counter(p['kind'] for p in plan)),
             engines={}, source_HarfBuzz_advance_max_error=0., production_accepted=False,
             full_font_coverage=False, os=platform.platform(), harfbuzz=hb.version_string(),

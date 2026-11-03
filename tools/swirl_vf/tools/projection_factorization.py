@@ -10,6 +10,7 @@ baseline and direction fields, and still require independent validation.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import time
 import numpy as np
 
 from batch_geometry import BatchGeometry
@@ -49,14 +50,12 @@ class ProjectionFactors:
         return self.values[:, 0] + np.einsum('nf,nfp->np', np.clip(t, 0, 1), self.values[:, 1:])
 
 
-def factor_geometry(table, batch):
+def parameter_entries(table, batch):
     require(batch.trace is not None and len(batch.paths) == len(batch.sources),
             'factorization_requires_source_geometry_trace')
     traces = {(node.part_index, node.tree_part_offset): node for node in batch.trace}
     require(len(traces) == len(batch.trace), 'duplicate_factor_trace_identity')
-    paths = [path.copy() for path in batch.paths]
-    factors, parameters, identities = [], [], []
-    for pi, (path, identity) in enumerate(zip(paths, batch.sources)):
+    for pi, (path, identity) in enumerate(zip(batch.paths, batch.sources)):
         node = traces[(identity.part_index, identity.tree_part_offset)]
         part = table.part(identity.part_index)
         first = identity.source_segment_start
@@ -75,15 +74,22 @@ def factor_geometry(table, batch):
             t = (np.sum((raw[:, k, :2]-a)*unit, axis=1)
                  / np.sum(unit*unit, axis=1))/scale
             require(np.isfinite(t).all(), 'nonfinite_projection_factor')
-            world_a = path[:, 2*((k-1) % count)+1]
-            world_b = path[:, 2*k+1]
-            path[:, 2*k] = world_a
-            delta = [np.zeros_like(p) for p in paths]
-            delta[pi][:, 2*k] = world_b-world_a
-            factors.append(delta)
-            parameters.append(t)
-            identities.append((identity.part_index, identity.tree_part_offset,
-                               identity.source_path_index, k))
+            yield pi,k,t,(identity.part_index,identity.tree_part_offset,identity.source_path_index,k)
+
+
+def factor_geometry(table, batch):
+    paths = [path.copy() for path in batch.paths]
+    factors, parameters, identities = [], [], []
+    for pi,k,t,identity in parameter_entries(table,batch):
+        path=paths[pi];count=path.shape[1]//2
+        world_a = path[:, 2*((k-1) % count)+1]
+        world_b = path[:, 2*k+1]
+        path[:, 2*k] = world_a
+        delta = [np.zeros_like(p) for p in paths]
+        delta[pi][:, 2*k] = world_b-world_a
+        factors.append(delta)
+        parameters.append(t)
+        identities.append(identity)
     operators, baseline = relative_cubics(paths)
     values = np.stack([baseline] + [relative_cubics(p)[1] for p in factors], axis=1)
     t = np.asarray(parameters).T if parameters else np.empty((batch.sample_count, 0))
@@ -98,10 +104,12 @@ class ProjectionSource:
         self.table, self.gid = table, glyph_id
         self.renderer = BatchGeometry(table, isolated_tangents=True)
         self.batch_size, self.count = batch_size, 0
+        self.evaluation_seconds=0.
         self.base_ops = self.ops = self.identities = None
         self.closed_control_pairs = []
 
     def components(self, positions):
+        started=time.perf_counter()
         require(len(positions) > 0, 'nonempty_projection_positions_required')
         values, parameters = [], []
         for start in range(0, len(positions), self.batch_size):
@@ -124,7 +132,23 @@ class ProjectionSource:
                     'projection_factor_topology_changed')
             values.append(result.values)
             parameters.append(result.parameters)
-        return np.concatenate(values), np.concatenate(parameters)
+        result=np.concatenate(values),np.concatenate(parameters)
+        self.evaluation_seconds+=time.perf_counter()-started
+        return result
+
+    def parameter_values(self,positions):
+        """Sample rational parameters without allocating every direction field."""
+        require(len(positions)>0,'nonempty_projection_positions_required')
+        if self.identities is None:self.components(positions[:1])
+        started=time.perf_counter();result=[]
+        for start in range(0,len(positions),self.batch_size):
+            batch=self.renderer.render(self.gid,positions[start:start+self.batch_size],capture_trace=True)
+            entries=list(parameter_entries(self.table,batch))
+            require(tuple(item[3] for item in entries)==self.identities,'projection_factor_topology_changed')
+            result.append(np.asarray([item[2] for item in entries]).T if entries else np.empty((batch.sample_count,0)))
+            self.count+=batch.sample_count
+        result=np.concatenate(result);self.evaluation_seconds+=time.perf_counter()-started
+        return result
 
     def __call__(self, positions):
         values, _ = self.components(positions)

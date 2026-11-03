@@ -17,7 +17,7 @@ from test_coretext_extract import make_fixture
 from probe_polynomial_clamp import source, delta, ops
 from joint_polynomial import interpolate, TAGS
 from adaptive_projection_atlas import ProjectionAtlas
-from sparse_projection import fit
+from sparse_projection import fit, SparseParameters
 from localized_projection_font import build
 from cff2_geometry import source_commands
 from probe_joint_representations import compare
@@ -26,6 +26,23 @@ from probe_projection_selection import coordinate_font
 
 
 class ProjectionFontTests(unittest.TestCase):
+    def test_zero_projection_fields_need_no_computational_axes_or_avar2(self):
+        boxes=[interpolate(np.c_[lo,np.asarray(lo)+1],ops,source) for lo in itertools.product((-1.,0.),repeat=3)]
+        atlas=ProjectionAtlas(boxes,dict(max_refinement_error=0.,component_holdout=dict(holdouts_disjoint=True,max_envelope_error=0.)),np.empty(0,dtype='V16'))
+        parameters=SparseParameters(np.zeros((1,3,3)),np.empty((1,0)),1)
+        with tempfile.TemporaryDirectory() as d:
+            path=Path(d)/'fixture.ttc';make_fixture(path)
+            with TTCollection(path) as collection:
+                lazy=build(collection.fonts[0],2,atlas,parameters)
+                eager=build(collection.fonts[0],2,atlas,parameters,eager_fields=True)
+                self.assertEqual(lazy.getTableData('CFF2'),eager.getTableData('CFF2'))
+                raw=io.BytesIO();lazy.save(raw)
+            with TTFont(io.BytesIO(raw.getvalue())) as saved:
+                self.assertEqual(saved['avar'].majorVersion,1)
+                self.assertEqual(len(saved['fvar'].axes),3)
+                self.assertEqual(lazy._swirl_projection_receipt['computational_axes'],0)
+                self.assertEqual(lazy._swirl_projection_receipt['avar2_regions'],0)
+
     def test_serialized_axes_clamp_fields_and_implicit_metric_indices(self):
         boxes = [interpolate(np.c_[lo, np.asarray(lo)+1], ops*2,
                              lambda p: np.c_[source(p), delta(p)])
@@ -43,6 +60,8 @@ class ProjectionFontTests(unittest.TestCase):
                 hvar.table.AdvWidthMap = hvar.table.LsbMap = hvar.table.RsbMap = None
                 original['HVAR'] = hvar
                 result = build(original, 2, atlas, parameters)
+                eager=build(original,2,atlas,parameters,eager_fields=True)
+                self.assertEqual(result.getTableData('CFF2'),eager.getTableData('CFF2'))
                 raw = io.BytesIO(); result.save(raw)
             with TTFont(io.BytesIO(raw.getvalue())) as font:
                 self.assertEqual([a.axisTag for a in font['fvar'].axes[:3]], list(TAGS))

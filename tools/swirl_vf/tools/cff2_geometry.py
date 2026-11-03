@@ -314,7 +314,9 @@ def install(font, models, *, experimental_slice=False, release_programs=False, s
         for support in model.supports[1:]:
             key = tuple((tag, tuple(support.get(tag, (0, 0, 0)))) for tag in tags)
             if key not in region_ids:
-                require(len(regions) < 65535, 'cff2_region_count_overflow')
+                # OpenType reserves the high bit of regionCount, despite the
+                # uint16 storage type (otvarcommonformats VariationRegionList).
+                require(len(regions) < 32767, 'cff2_region_count_overflow')
                 region_ids[key] = len(regions); regions.append(support)
             indices.append(region_ids[key])
         key = tuple(indices)

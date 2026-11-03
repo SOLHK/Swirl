@@ -16,6 +16,7 @@ import numpy as np
 from cff2_geometry import LIMIT, require
 from joint_polynomial import interpolate, PolynomialBox, GRID, NODES
 from hvf_piecewise_axes import segment_partition
+from sparse_polynomial_fields import SparseFieldBox, save_arrays, legacy_coefficient_slices
 
 GRID_PROBES = np.asarray(list(product((0., .125, .25, .5, .75, .875, 1.), repeat=3)))
 JITTER_PROBES = np.random.default_rng(2026110379).uniform(0, 1, (64, 3))
@@ -43,8 +44,14 @@ class RecordedSource:
 
 
 def source_events(source, start, end):
-    return [row for row in segment_partition(source.table, source.gid, start, end)['events']
-            if not row['kind'].startswith('tangent')]
+    # Type-2 clamps are handled by the separate parameter field. Do not solve
+    # their quadratic contacts here only to discard them. Identical chord
+    # parameters imply identical coordinates and split probes; keep the first.
+    result=[];seen=set()
+    for row in segment_partition(source.table,source.gid,start,end,include_tangents=False)['events']:
+        if row['parameter'] not in seen:
+            result.append(row);seen.add(row['parameter'])
+    return result
 
 
 def branch_probes(source, bounds):
@@ -105,56 +112,79 @@ class ProjectionAtlas:
 
     def save(self, path, identity):
         """Private coefficients and every fitting/refinement location receipt."""
-        metadata = dict(schema=1, identity=identity, evidence=self.evidence,
+        metadata = dict(schema=2, identity=identity, evidence=self.evidence,
                         operators=self.boxes[0].operators)
-        np.savez_compressed(path, bounds=[b.bounds for b in self.boxes],
-                            coefficients=[b.coefficients for b in self.boxes],
-                            fitting_fingerprints=self.fitting_fingerprints,
-                            metadata=json.dumps(metadata))
+        boxes=[SparseFieldBox.from_model(b) for b in self.boxes]
+        offsets=np.r_[0,np.cumsum([len(b.columns) for b in boxes])]
+        save_arrays(path,dict(bounds=np.asarray([b.bounds for b in boxes]),column_offsets=offsets,
+            fitting_fingerprints=self.fitting_fingerprints,metadata=json.dumps(metadata)),
+            dict(columns=((int(offsets[-1]),),'<i8',(b.columns for b in boxes)),
+                 coefficient_values=((int(offsets[-1]),64),'<f8',(b.data.reshape(64,-1).T for b in boxes))))
 
     @classmethod
     def load(cls, path, identity):
         with np.load(path, allow_pickle=False) as data:
             metadata = json.loads(str(data['metadata']))
-            require(metadata['schema'] == 1 and metadata['identity'] == identity,
+            require(metadata['schema'] in (1,2) and metadata['identity'] == identity,
                     'projection_atlas_source_identity_mismatch')
             ops = tuple(tuple(item) for item in metadata['operators'])
-            boxes = [PolynomialBox(b, ops, c, {'production_accepted': False})
-                     for b, c in zip(data['bounds'], data['coefficients'])]
-            require(bool(boxes) and len(boxes) == len(data['bounds']) == len(data['coefficients']),
+            if metadata['schema']==1:
+                bounds=data['bounds']
+                coefficients=legacy_coefficient_slices(path,(len(bounds),4,4,4,sum(n for _,n in ops)))
+                boxes=[SparseFieldBox.from_model(PolynomialBox(b,ops,c,{'production_accepted':False}))
+                       for b,c in zip(bounds,coefficients)]
+                # Exhaust the generator's trailing-data check as zip stops when
+                # bounds is exhausted before requesting another coefficient row.
+                require(next(coefficients,None) is None,'invalid_projection_atlas_storage')
+            else:
+                offsets,columns,values=data['column_offsets'],data['columns'],data['coefficient_values']
+                require(len(offsets)==len(data['bounds'])+1 and offsets[0]==0
+                    and np.all(np.diff(offsets)>=0) and offsets[-1]==len(columns)
+                    and values.shape==(len(columns),64),'invalid_sparse_atlas_storage')
+                boxes=[SparseFieldBox(b,ops,columns[a:z],values[a:z].T.reshape(4,4,4,z-a),{'production_accepted':False})
+                       for b,a,z in zip(data['bounds'],offsets[:-1],offsets[1:])]
+            require(bool(boxes) and len(boxes) == len(data['bounds']),
                     'invalid_projection_atlas_storage')
             return cls(boxes, metadata['evidence'], data['fitting_fingerprints'].copy())
 
     def values(self, positions):
         positions = np.asarray(positions)
-        result = np.empty((len(positions), self.boxes[0].coefficients.shape[-1]))
-        covered = np.zeros(len(positions), dtype=bool)
+        result = np.empty((len(positions), sum(n for _,n in self.boxes[0].operators)))
         # Ordered first-match semantics agree with GSUB FeatureVariations at
         # shared closed boundaries. All neighbouring boxes are tested separately.
-        for box in self.boxes:
-            mask = ~covered & np.all((positions >= box.bounds[:, 0]) &
-                                     (positions <= box.bounds[:, 1]), axis=1)
-            if mask.any():
-                result[mask] = box.values(positions[mask])
-                covered[mask] = True
-        require(covered.all(), 'projection_atlas_does_not_cover_request')
+        bounds=np.asarray([b.bounds for b in self.boxes])
+        for start in range(0,len(positions),64):
+            p=positions[start:start+64]
+            matches=np.all((p[:,None,:]>=bounds[None,:,:,0])&(p[:,None,:]<=bounds[None,:,:,1]),axis=2)
+            require(matches.any(axis=1).all(),'projection_atlas_does_not_cover_request')
+            chosen=np.argmax(matches,axis=1)
+            for index in np.unique(chosen):
+                where=np.flatnonzero(chosen==index)
+                result[start+where]=self.boxes[index].values(p[where])
         return result
 
 
 def fit(source, *, max_boxes=4096, budget=LIMIT/4, use_source_branches=True,
-        source_aligned_cuts=True, progress=None):
+        source_aligned_cuts=True, progress=None, initial_atlas=None):
     require(type(max_boxes) is int and 8 <= max_boxes <= 65532
             and 0 < budget <= LIMIT/2 and type(use_source_branches) is bool
             and type(source_aligned_cuts) is bool,
             'invalid_projection_atlas_budget')
     evaluate = RecordedSource(source)
     evaluate(np.zeros((1, 3)))
+    if initial_atlas is not None:
+        require(len(initial_atlas.boxes)<=max_boxes and
+                all(b.operators==source.ops for b in initial_atlas.boxes),
+                'incompatible_resumed_projection_atlas')
+        # Preserve every prior training/refinement receipt; no prior holdout
+        # value or failure location is supplied to refinement.
+        evaluate.receipts.append(initial_atlas.fitting_fingerprints)
     queue, accepted = [], []
     serial = source_cuts = 0
 
-    def cell(bounds):
+    def cell(bounds, previous=None):
         nonlocal serial
-        model = interpolate(bounds, source.ops, evaluate)
+        model = previous or SparseFieldBox.from_model(interpolate(bounds, source.ops, evaluate))
         points = model.from_local(PROBES)
         errors = source.errors(model.values(points), evaluate(points))
         axis = int(np.argmax([errors[mask].max() for mask in AXIS_MASKS]))
@@ -169,8 +199,12 @@ def fit(source, *, max_boxes=4096, budget=LIMIT/4, use_source_branches=True,
         serial += 1
         heapq.heappush(queue, (-error, serial, model, axis, anchor))
 
-    for lo in product((-1., 0.), repeat=3):
-        cell(np.c_[lo, np.asarray(lo)+1])
+    if initial_atlas is None:
+        for lo in product((-1., 0.), repeat=3):
+            cell(np.c_[lo, np.asarray(lo)+1])
+    else:
+        for previous in initial_atlas.boxes:
+            cell(previous.bounds,previous)
     while queue and len(queue)+len(accepted) < max_boxes:
         negative, _, model, axis, anchor = heapq.heappop(queue)
         if -negative <= budget:
@@ -201,6 +235,7 @@ def fit(source, *, max_boxes=4096, budget=LIMIT/4, use_source_branches=True,
                     partition_strategy='source_aligned' if source_aligned_cuts and use_source_branches else 'midpoint',
                     max_refinement_error=error, source_branch_cuts=source_cuts,
                     refinement_budget=budget, refinement_budget_met=error <= budget,
+                    resumed_boxes=0 if initial_atlas is None else len(initial_atlas.boxes),
                     training_and_refinement_unique_positions=len(receipt), boxes=len(entries))
     return ProjectionAtlas([m for _, m in entries], evidence, receipt)
 
@@ -214,13 +249,16 @@ def validate(atlas, source, heldout_positions):
     require(len(np.unique(held)) == len(held)
             and not np.intersect1d(held, atlas.fitting_fingerprints).size,
             'holdouts_overlap_training_or_refinement')
-    expected, parameters = source.components(points)
-    actual = atlas.values(points).reshape(expected.shape)
-    clamp = np.clip(parameters, 0, 1)
-    error = actual[:, 0]-expected[:, 0]+np.einsum('nf,nfp->np', clamp, actual[:, 1:]-expected[:, 1:])
-    physical = np.linalg.norm(np.cumsum(error.reshape(len(error), -1, 2), axis=1), axis=2).max(axis=1)
-    envelope = source.errors(actual.reshape(len(points), -1), expected.reshape(len(points), -1))
-    return dict(holdout_count=len(points), max_physical_error=float(physical.max()),
-                physical_failures=int((physical > LIMIT).sum()), max_envelope_error=float(envelope.max()),
-                envelope_failures=int((envelope > LIMIT).sum()), holdouts_disjoint=True,
+    maxima=[0.,0.];failures=[0,0]
+    for start in range(0,len(points),64):
+        p=points[start:start+64];expected,parameters=source.components(p)
+        actual=atlas.values(p).reshape(expected.shape)
+        error=actual[:,0]-expected[:,0]+np.einsum('nf,nfp->np',np.clip(parameters,0,1),actual[:,1:]-expected[:,1:])
+        physical=np.linalg.norm(np.cumsum(error.reshape(len(p),-1,2),axis=1),axis=2).max(axis=1)
+        envelope=source.errors(actual.reshape(len(p),-1),expected.reshape(len(p),-1))
+        for i,values in enumerate((physical,envelope)):
+            maxima[i]=max(maxima[i],float(values.max()));failures[i]+=int((values>LIMIT).sum())
+    return dict(holdout_count=len(points), max_physical_error=maxima[0],
+                physical_failures=failures[0], max_envelope_error=maxima[1],
+                envelope_failures=failures[1], holdouts_disjoint=True,
                 production_accepted=False, source_projection_parameters_exact=True)

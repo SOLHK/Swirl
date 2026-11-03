@@ -69,6 +69,18 @@ class AdaptiveProjectionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'atlas_budget'):
                 fit(PolynomialSource(), max_boxes=cap)
 
+    def test_resume_reassesses_cells_without_losing_previous_training_receipts(self):
+        source=PolynomialSource();first=fit(source,max_boxes=8,use_source_branches=False)
+        first.fitting_fingerprints=np.r_[first.fitting_fingerprints,np.asarray([b'previous-receipt!'],dtype='V16')]
+        # Validation evidence is deliberately poisonous: it must not steer fit.
+        first.evidence['component_holdout']={'max_envelope_error':12345.}
+        resumed=fit(source,max_boxes=16,use_source_branches=False,initial_atlas=first)
+        self.assertEqual(resumed.evidence['resumed_boxes'],8)
+        self.assertEqual(len(resumed.boxes),8)
+        self.assertFalse(np.setdiff1d(first.fitting_fingerprints,resumed.fitting_fingerprints).size)
+        self.assertNotIn('component_holdout',resumed.evidence)
+        np.testing.assert_array_equal(first.values([[.39,-.23,.71]]),resumed.values([[.39,-.23,.71]]))
+
     def test_private_roundtrip_retains_training_receipts_and_binds_source_identity(self):
         atlas = fit(PolynomialSource(), max_boxes=8, use_source_branches=False)
         identity = dict(source_sha256='authored', face_index=0, glyph_id=0)

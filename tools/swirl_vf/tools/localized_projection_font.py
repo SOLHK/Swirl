@@ -1,6 +1,10 @@
 """Serialize a selected-glyph atlas as an OpenType/CFF2 probe using avar2.
 
-Physical fvar axes and their source avar segment maps are retained verbatim.
+Physical fvar axes and the decoded avar segment dictionaries are retained.
+This is a joint post-avar research compiler, not a raw-record mapping repair:
+duplicate source avar records cannot survive the fontTools dictionary, and
+segment-map conformance / original user-coordinate parity require a separate
+audit (platform/audit_joint_axis_contract.py).
 Hidden computational axes carry avar2 clamp ramps; rvrn selects variable CFF2
 patches using Format-1 conditions. This is an explicitly labelled diagnostic
 font, not a full-font conversion or an installation/delivery artifact.
@@ -8,6 +12,7 @@ font, not a full-font conversion or an installation/delivery artifact.
 from __future__ import annotations
 
 import copy
+from dataclasses import dataclass, field
 import numpy as np
 from fontTools.fontBuilder import FontBuilder
 from fontTools.ttLib import newTable
@@ -19,6 +24,48 @@ from fontTools.otlLib.builder import buildStatTable
 import cff2_geometry as geometry
 from joint_polynomial import TAGS, PolynomialBox
 from sparse_projection import encode_clamp_ramps
+
+
+@dataclass
+class LocalizedBox:
+    """Retain one source coefficient array; materialize one output glyph at a time."""
+    box: object
+    operators: tuple
+    axis_tags: tuple
+    count: int
+    ramps: int
+    constants: np.ndarray
+    localize: bool
+    evidence: dict = field(default_factory=lambda:dict(sampled_geometry_passed=True,
+        production_accepted=False,scope='component_fields_only_composed_native_acceptance_required'))
+
+    @property
+    def supports(self):
+        return ([{}]+[{tag:(lo,lo if hi<=0 else hi,hi)}
+            for tag,(lo,hi) in zip(TAGS,self.box.bounds)]
+            +[{tag:triple} for tag,constant in zip(self.axis_tags[3:],self.constants)
+              if not np.isfinite(constant) for triple in ((-1,-1,0),(0,1,1))])
+
+    def materialize(self):
+        width=sum(n for _,n in self.operators)
+        coefficients=self.box.coefficients.reshape(4,4,4,self.count+1,width)
+        baseline=coefficients[...,0,:]+.5*coefficients[...,1:,:].sum(axis=3)
+        directions=[coefficients[...,k+1,:]/(2*self.ramps) for k in range(self.count)]
+        factors={self.axis_tags[3+k*self.ramps+j]:directions[k]
+                 for k in range(self.count) for j in range(self.ramps)}
+        if self.localize:
+            baseline=np.floor(baseline*65536+.5)/65536
+            for tag,constant in zip(self.axis_tags[3:],self.constants):
+                if np.isfinite(constant):
+                    baseline+=np.floor(constant*factors.pop(tag)*65536+.5)/65536
+        return PolynomialBox(self.box.bounds,self.operators,baseline,self.evidence,
+                             self.axis_tags,factors,True)
+
+    def _program(self,vsindex,expression_pool=None):
+        return self.materialize()._program(vsindex,expression_pool)
+
+    def charstring(self,vsindex):
+        return self.materialize().charstring(vsindex)
 
 
 def copy_metric_variations(source, candidate, tag, source_name, source_gid, hidden):
@@ -46,7 +93,7 @@ def copy_metric_variations(source, candidate, tag, source_name, source_gid, hidd
 
 
 def build(source, source_gid, atlas, parameters, *, ramps=4, share_expressions=True,
-          localize_clamps=True):
+          localize_clamps=True, eager_fields=False):
     """Encoding gate covers component fields only; native acceptance is separate."""
     require = geometry.require
     require(tuple(a.axisTag for a in source['fvar'].axes) == TAGS,
@@ -98,13 +145,14 @@ def build(source, source_gid, atlas, parameters, *, ramps=4, share_expressions=T
         axis.flags, axis.axisNameID = 1, template['name'].addName('Projection ramp '+str(i))
         template['fvar'].axes.append(axis)
     avar = newTable('avar')
-    avar.majorVersion, avar.minorVersion = 2, 0
+    avar.majorVersion, avar.minorVersion = (2 if count else 1), 0
     avar.segments = copy.deepcopy(source['avar'].segments) if 'avar' in source else {
         tag: {-1.: -1., 0.: 0., 1.: 1.} for tag in TAGS}
     avar.segments.update({tag: {-1.: -1., 0.: 0., 1.: 1.} for tag in hidden})
     avar.table = otTables.avar()
     avar.table.Reserved = 0
-    avar.table.VarStore, avar.table.VarIdxMap = clamp.var_store(TAGS, hidden)
+    if count:
+        avar.table.VarStore, avar.table.VarIdxMap = clamp.var_store(TAGS, hidden)
     template['avar'] = avar
     for tag in ('HVAR', 'VVAR'):
         copy_metric_variations(source, template, tag, source_name, source_gid, hidden)
@@ -113,24 +161,11 @@ def build(source, source_gid, atlas, parameters, *, ramps=4, share_expressions=T
     certificates, active_counts = 0, []
     for index, box in enumerate(atlas.boxes):
         require(box.operators == ops, 'projection_patch_topology_changed')
-        coefficients = box.coefficients.reshape(4, 4, 4, count+1, width)
-        baseline = coefficients[..., 0, :]+.5*coefficients[..., 1:, :].sum(axis=3)
-        directions = [coefficients[..., k+1, :]/(2*ramps) for k in range(count)]
-        factors = {hidden[k*ramps+j]: directions[k]
-                   for k in range(count) for j in range(ramps)}
-        if localize_clamps:
-            constants = clamp.constant_axes(box.bounds)
-            # Bake precisely the separately rounded signed operand that the
-            # original CFF2 blend used at its saturated endpoint.
-            baseline = np.floor(baseline*65536+.5)/65536
-            for tag, constant in zip(hidden, constants):
-                if np.isfinite(constant):
-                    baseline += np.floor(constant*factors.pop(tag)*65536+.5)/65536
-                    certificates += 1
-        active_counts.append(len(factors))
-        models[f'box{index}'] = PolynomialBox(box.bounds, base_ops, baseline,
-            dict(sampled_geometry_passed=True, production_accepted=False,
-                 scope='component_fields_only_composed_native_acceptance_required'), tags, factors, True)
+        constants=clamp.constant_axes(box.bounds) if localize_clamps else np.full(len(hidden),np.nan)
+        certificates+=int(np.isfinite(constants).sum())
+        active_counts.append(int((~np.isfinite(constants)).sum()))
+        model=LocalizedBox(box,base_ops,tags,count,ramps,constants,localize_clamps)
+        models[f'box{index}']=model.materialize() if eager_fields else model
     models['probe'] = models['box0']
     result = geometry.install(template, models, release_programs=True, share_expressions=share_expressions)
     if share_expressions:
@@ -149,6 +184,8 @@ def build(source, source_gid, atlas, parameters, *, ramps=4, share_expressions=T
         source_gid=source_gid, physical_axes=list(TAGS), computational_axes=len(hidden),
         patch_glyphs=len(atlas.boxes), avar2_regions=len(clamp.supports),
         raw_parameter_regions=clamp.source_region_count, production_accepted=False,
+        eager_field_materialization=eager_fields,
+        maximum_operand_stack=max(m.evidence.get('maximum_operand_stack',0) for m in models.values()),
         certified_constant_ramps=certificates, maximum_active_ramps=max(active_counts),
         minimum_active_ramps=min(active_counts), clamp_certificate_padding=2/16384,
         serialized_native_verification='NOT_RUN',

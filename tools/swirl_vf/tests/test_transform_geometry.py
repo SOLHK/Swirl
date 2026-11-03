@@ -24,11 +24,16 @@ class TransformGeometryTests(unittest.TestCase):
                                        expected, rtol=0, atol=1e-12)
 
     def test_zero_and_tiny_angles_keep_translation_limit(self):
-        weights = np.array([0., .137, .61, 1., 1.7]); t = np.array([17., -23.])
+        weights = np.array([-2., -1e-200, 0., .137, .61, 1., 1.7]); t = np.array([17., -23.])
         np.testing.assert_array_equal(fractional_translation(t, 0., weights), weights[:, None] * t)
         for theta in (-1e-12, 1e-12):
-            np.testing.assert_allclose(fractional_translation(t, theta, weights), weights[:, None] * t,
-                                       rtol=0, atol=2e-11)
+            # Negative extrapolation has a larger first-order rotation term;
+            # test that term rather than imposing the old positive-only bound.
+            expected=weights[:,None]*t+(weights*(weights-1)*theta/2)[:,None]*np.array([-t[1],t[0]])
+            np.testing.assert_allclose(fractional_translation(t, theta, weights),expected,rtol=0,atol=1e-13)
+        self.assertEqual(fractional_translation(t,0.,.137).shape,(2,))
+        with np.errstate(over='ignore'):
+            with self.assertRaises(ValueError):fractional_translation([1e308,1.],0.,1e308)
 
     def test_native_observed_fraction_is_not_straight_translation(self):
         # Original fixture from native run 39304868120; no source-font data.

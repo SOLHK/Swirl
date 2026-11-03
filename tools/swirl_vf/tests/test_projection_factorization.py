@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'tools'))
@@ -52,6 +53,17 @@ class ProjectionFactorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'requires_source_geometry_trace'):
             factor_geometry(table, batch)
 
+    def test_parameter_only_sampling_keeps_exact_rational_values(self):
+        table,batch,_=self.authored()
+        source=ProjectionSource(authored_table(),0)
+        source.table=table
+        positions=np.zeros((batch.sample_count,3))
+        with patch.object(source.renderer,'render',return_value=batch):
+            _,expected=source.components(positions)
+            actual=source.parameter_values(positions)
+        np.testing.assert_array_equal(actual,expected)
+        self.assertEqual(source.count,2*batch.sample_count)
+
     def test_batched_no_tangent_source_preserves_all_commands_and_closures(self):
         table = authored_table()
         source = ProjectionSource(table, 0, batch_size=17)
@@ -59,6 +71,7 @@ class ProjectionFactorTests(unittest.TestCase):
         values, parameters = source.components(p)
         self.assertEqual(source.factors, 0)
         self.assertEqual(parameters.shape, (67, 0))
+        np.testing.assert_array_equal(source.parameter_values(p),parameters)
         batch = source.renderer.render(0, p)
         for i in range(len(p)):
             ops, expected = operands(_commands(batch.paths, i, 1))

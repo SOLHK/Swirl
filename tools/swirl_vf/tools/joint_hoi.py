@@ -60,7 +60,7 @@ def add_axis_copies(font):
                 region.VarRegionAxis.append(axis)
             store.VarRegionList.Region.append(region)
     store.VarRegionList.RegionCount += 6
-    require(store.VarRegionList.RegionCount <= 65535, 'HOI_avar_region_overflow')
+    require(store.VarRegionList.RegionCount < 32768, 'HOI_avar_region_overflow')
     rows = np.zeros((6, 6), dtype=int)
     for i in range(6):
         rows[i, 2*(i//2):2*(i//2)+2] = (-16384, 16384)

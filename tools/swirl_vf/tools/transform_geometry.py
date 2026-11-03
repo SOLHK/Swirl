@@ -20,6 +20,11 @@ def fractional_translation(translation, angle: float, weights):
     w = np.asarray(weights, dtype=np.float64)
     if t.shape != (2,) or not np.isfinite(t).all() or not np.isfinite(angle) or not np.isfinite(w).all():
         raise ValueError('invalid rigid-transform input')
+    if angle == 0:
+        result=w[...,None]*t
+        if not np.isfinite(result).all():
+            raise ValueError('nonfinite fractional rigid transform')
+        return result
     half = angle / 2
     ratio = w * np.sinc(w * half / np.pi) / np.sinc(half / np.pi)
     phase = (w - 1) * half

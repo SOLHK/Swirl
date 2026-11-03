@@ -166,10 +166,13 @@ def encode_clamp_ramps(model, ramps=4):
     """
     require(type(ramps) is int and 1 <= ramps <= 32, 'invalid_clamp_ramp_count')
     require(model.supports.shape == (len(model.coefficients), 3, 3)
-            and model.coefficients.ndim == 2 and model.coefficients.shape[1] > 0
+            and model.coefficients.ndim == 2
             and np.isfinite(model.coefficients).all()
             and np.isfinite(model.supports).all()
             and np.all(model.supports[0] == 0), 'invalid_sparse_parameter_model')
+    if model.coefficients.shape[1] == 0:
+        require(len(model.supports)==1,'empty_parameter_model_requires_only_origin')
+        return ClampRamps(np.empty((0,3,3)),np.empty((0,0),dtype=np.int64),0,ramps,len(model.supports))
     require(model.coefficients.shape[1]*ramps <= 65532, 'clamp_axis_count_overflow')
     supports = model.supports
     require(np.all(np.abs(supports) <= 1)
@@ -182,7 +185,7 @@ def encode_clamp_ramps(model, ramps=4):
     quantized = np.floor(model.coefficients*(32768*ramps)+.5)
     keep = np.any(quantized != 0, axis=1)
     keep[0] = True
-    require(np.count_nonzero(keep) <= 65535, 'avar2_region_count_overflow')
+    require(np.count_nonzero(keep) < 32768, 'avar2_region_count_overflow')
     columns = []
     for k in range(model.coefficients.shape[1]):
         for j in range(ramps):

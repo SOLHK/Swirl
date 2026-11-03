@@ -6,6 +6,15 @@ localized-tricubic, avar2 and required-GSUB architecture. These are selected-gly
 research fonts, not a full-font release. Private inputs, outlines, coefficients,
 coordinates and raw transcripts remain outside Git.
 
+**Axis-contract qualification:** the successful outline comparisons below use
+the inherited joint post-avar **q-space** contract. The original raw weight map
+has conflicting duplicate records; a decoded fontTools dictionary does not
+preserve them. Its reserialized map also lacks a mandatory identity endpoint.
+Thus these outline results do **not** establish original physical-user mapping
+parity or fully conformant installable fonts. The corpus exposed this through
+real HarfBuzz advance failures; see checkpoint 2. Earlier references to source
+avar preservation mean dictionary preservation, not raw-record preservation.
+
 ## Checkpoint 1: exact CFF2 instruction sharing
 
 The actual latest inputs were smaller than the historical 62/256 MB HOI fonts:
@@ -81,3 +90,80 @@ The PR remains Draft. No full-font or Windows success follows from these results
 The existing upstream source/license investigation is retained in
 [the open-source comparison](SWIRL_VF_OPEN_SOURCE_INTERPOLATION_20261103.md).
 This pass is independently implemented; it imports no upstream font or source.
+
+## Checkpoint 2: bounded field storage and sampling
+
+`sparse_polynomial_fields.py` stores only columns with an exactly nonzero
+coefficient, including arbitrarily small nonzero values. Evaluation retains the
+original dense operand shape and contraction order for one cell at a time.
+Legacy archives stream one cell at a time; new archives stream ragged columns
+without a giant concatenation. `localized_projection_font.py` materializes only
+the output glyph being encoded. Clamp localization and fixed-point rounding are
+unchanged. Every non-`head` table is byte-identical to a fresh old-code build;
+`head` differs only in timestamps/checksum adjustment.
+
+| GID | Old build peak RSS | Streaming build peak RSS | Reduction | Old / new build seconds | New encode / save seconds |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1166 | 2,382,987,264 | 1,525,874,688 | 35.97% | 141.246 / 113.480 | 82.156 / 30.639 |
+| 19177 | 7,246,495,744 | 4,444,078,080 | 38.67% | 434.499 / 399.929 | 292.366 / 103.900 |
+
+These are separate measured macOS processes on 16 GB RAM, not theoretical
+estimates. Other research jobs were concurrent; timings are individual runs,
+not a stable performance distribution. RSS is not macOS memory footprint.
+Compression remains a separate bounded pass and produces the same sizes as
+checkpoint 1. Fresh streaming builds were compressed, reloaded and validated:
+
+| GID | Seed | CT/HB observations each | Unique independent | CoreText maximum | HarfBuzz maximum | fontTools maximum (512) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1166 | 2026110753 | 12,615 | 11,086 | 0.020462832574 | 0.017497873540 | 0.016397893012 |
+| 19177 | 2026110757 | 14,902 | 11,597 | 0.017883106686 | 0.017048651460 | 0.013912359161 |
+
+All reported geometry, topology, closure, direction, selection and advance
+checks pass at the unchanged 0.03125 FUnit threshold. Each run includes 4,096
+new random triples plus the complete historical physical-request replay.
+Hashes, categories, counts and stage timings are in the
+[streaming receipt](evidence/SWIRL_VF_STREAMING_20261103.json).
+
+`ProjectionSource.parameter_values()` avoids allocating direction fields while
+sampling the rational projection parameters. On the preselected maximum-factor
+GID 35709 (12 factors), 16,384 samples produce exactly the same parameter bytes:
+11.486 to 5.381 seconds; RSS 435,781,632 to 252,362,752 bytes. Zero-factor glyphs
+need no sparse parameter grid, hidden axes or avar2 store.
+
+Field refinement skips quadratic tangent contacts handled by the separate
+parameter model and deduplicates exactly identical chord probes. Same-sign
+piecewise operations and zero-angle rigid transforms use their exact limits.
+A 32-cell GID 46459 profiling experiment is 65.567 to 38.654 seconds, with
+identical bounds, coefficients, training receipts and 4,096 holdout results.
+That small model still fails precision; it is a CPU comparison, not acceptance.
+Resumed refinement retains every previous fitting receipt and does not use old
+holdout failures to train. Holdout evaluation streams in batches without
+reducing its sample count.
+
+Three fresh-process native timing repetitions use 128 fixed-seed coordinates
+each. Explicit/omitted computational defaults give identical results in all
+384 comparisons per engine/font. CoreText peak RSS drops from 85,229,568 to
+59,228,160 bytes for 1166 and 219,709,440 to 113,344,512 for 19177. HarfBuzz peaks
+drop from 172,294,144 to 120,209,408 and 451,428,352 to 238,616,576. Timing
+distributions are retained in the receipt; OS file cache is uncontrolled.
+Direct, unshaped base-GID access differs from normal shaped output in all
+384 comparisons per engine/font. Hidden flags are a UI recommendation, not a
+read-only mechanism ([fvar specification](https://learn.microsoft.com/en-us/typography/opentype/spec/fvar)).
+
+The first corpus cases exposed physical mapping failures that the two anchors'
+constant weight advance had masked. GID 50/117 geometry passes but HarfBuzz
+source advance differs by up to 15/23 FUnits. Copying raw avar bytes back fixes
+GID 50's HarfBuzz advance but breaks both native outline comparisons, reaching
+17.937 FUnits. This is not a valid repair. The new aggregate raw-axis audit and
+verifier scope field prevent joint-q success being mistaken for user-axis
+equivalence. The pre-existing [axis mapping investigation](SWIRL_VF_P4_FONT_MAPPING_20261021.md)
+remains relevant; no endpoint or precision requirement is silently relaxed.
+
+Checkpoint 2 executes 1,044 regression tests: 1,037 pass, seven platform skips;
+six parser audit tests also pass. A newly extended tiny-angle test initially
+used a positive-only bound for negative extrapolation; its expected value now
+includes the analytical first-order rotation term and uses a tighter 1e-13
+tolerance. The 0.03125 acceptance threshold and every existing case remain.
+The region-count guards now enforce the specification's reserved high bit:
+at most 32,767 regions, not 65,535
+([common variation formats](https://learn.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats)).
