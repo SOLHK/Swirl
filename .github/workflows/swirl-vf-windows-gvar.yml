@@ -26,7 +26,7 @@ jobs:
       - name: Test mixed-axis compiler and generate authored four-face TTC
         shell: pwsh
         run: |
-          python -m unittest discover -s tools/swirl_vf/tests -p test_windows_gvar.py -v
+          python -m unittest discover -s tools/swirl_vf/tests -p 'test_windows*.py' -v
           if ($LASTEXITCODE -ne 0) { throw 'Compiler regressions failed' }
           python tools/swirl_vf/platform/windows_gvar_control.py --output build/windows-gvar/control.ttc
           if ($LASTEXITCODE -ne 0) { throw 'Authored font failed' }
@@ -61,16 +61,28 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Observer compilation failed' }
           python tools/swirl_vf/platform/windows_gvar_control.py --binary build/windows-gvar/observe.exe --output build/windows-gvar/independent
           if ($LASTEXITCODE -ne 0) { throw 'Requested geometry or private registration failed' }
+      - name: Retain uncompressed control measurements to isolate IUP
+        if: always()
+        shell: pwsh
+        run: |
+          python tools/swirl_vf/platform/windows_gvar_control.py --binary build/windows-gvar/observe.exe --no-iup --output build/windows-gvar/uncompressed
+          if ($LASTEXITCODE -ne 0) { throw 'Uncompressed research precision gate failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: authored-gvar-${{ matrix.os }}-${{ github.sha }}
           path: |
+            build/windows-gvar/observe.exe
+            build/windows-gvar/medium.exe
+            build/windows-gvar/native/build/Release/directwrite_probe.exe
             build/windows-gvar/geometry.json
             build/windows-gvar/medium.json
             build/windows-gvar/independent/*.json
             build/windows-gvar/independent/*.jsonl
             build/windows-gvar/independent/*.log
+            build/windows-gvar/uncompressed/*.json
+            build/windows-gvar/uncompressed/*.jsonl
+            build/windows-gvar/uncompressed/*.log
             build/windows-gvar/native/*.json
             build/windows-gvar/native/*.jsonl
             build/windows-gvar/native/*.png

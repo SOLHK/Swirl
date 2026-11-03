@@ -78,8 +78,21 @@ class TensorModel:
         weights = np.asarray([[supportScalar(dict(zip(TAGS, p)), s) for s in self.supports] for p in points])
         return np.tensordot(weights, c, axes=(1, 0))
 
+    def vertices(self, coefficients):
+        """Inverse of anchored differences in O(number of grid values)."""
+        c = np.asarray(coefficients, dtype=float)
+        require(c.shape[0] == len(self.indices), 'coefficient_count_mismatch')
+        result = c.reshape(tuple(map(len, self.knots))+c.shape[1:]).copy()
+        for axis in range(3):
+            anchor = np.take(result, self.zero[axis], axis=axis).copy()
+            result += np.expand_dims(anchor, axis)
+            selection = [slice(None)]*result.ndim
+            selection[axis] = self.zero[axis]
+            result[tuple(selection)] = anchor
+        return result.reshape(c.shape)
 
-def compile_glyph(model, values, flags, ends, *, optimize=True):
+
+def compile_glyph(model, values, flags, ends, *, optimize=True, quantization='vertices'):
     """values include four explicit phantom points, already in target units.
 
     Quantize vertices ONCE, then take integer anchored differences. This keeps
@@ -92,8 +105,16 @@ def compile_glyph(model, values, flags, ends, *, optimize=True):
             and np.isfinite(values).all(), 'invalid_glyph_tensor_values')
     require((not flags and not ends) or (ends and ends[-1] == len(flags)-1
             and all(a < b for a, b in zip([-1]+list(ends), ends))), 'invalid_contour_endpoints')
-    integer_vertices = np.floor(values + .5)
-    integer = model.coefficients(integer_vertices)
+    require(quantization in ('vertices', 'coefficients'), 'unsupported_quantization')
+    if quantization == 'vertices':
+        integer_vertices = np.floor(values + .5)
+        integer = model.coefficients(integer_vertices)
+    else:
+        # fontTools varLib rounds delta coefficients. This optional compact
+        # encoding has a DIFFERENT quantization bound; report all vertex errors.
+        # It is not the exact-nodal encoding used by the research control.
+        integer = np.floor(model.coefficients(values)+.5)
+        integer_vertices = model.vertices(integer)
     default = model.indices.index(model.zero)
     base = integer[default]
     require(np.all(base[:-4] >= -32768) and np.all(base[:-4] <= 32767), 'glyf_coordinate_overflow')
@@ -134,6 +155,7 @@ def compile_glyph(model, values, flags, ends, *, optimize=True):
     require(all(0 <= v[0] <= 65535 and -32768 <= v[1] <= 32767 for v in (horizontal, vertical)),
             'metric_storage_overflow')
     report = dict(grid_vertices=len(values), tuples=len(tuples),
+                  quantization=quantization,
                   tuple_dimensions={str(n): sum(len(t.axes) == n for t in tuples) for n in (1, 2, 3)},
                   inferred_points=inferred, rejected_inexact_iup=rejected_iup,
                   max_vertex_rounding=float(np.linalg.norm(integer_vertices-values, axis=-1).max()),

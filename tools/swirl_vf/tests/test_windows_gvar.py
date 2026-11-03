@@ -59,6 +59,19 @@ class WindowsTensorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'horizontal_origin'):
             compile_glyph(model, values, [], [])
 
+    def test_optional_delta_rounding_reports_real_vertex_error(self):
+        model = TensorModel([-1, -.5, 0, .5, 1])
+        rectangle = np.asarray([(0., 0.), (100., 0.), (100., 200.), (0., 200.)])
+        values = np.asarray([np.vstack((rectangle+analytic([p])[0]/7,
+                            [(0, 0), (300, 0), (0, 880), (0, -120)])) for p in model.locations])
+        np.testing.assert_allclose(model.vertices(model.coefficients(values)), values, atol=1e-13, rtol=0)
+        *_, coefficients, report = compile_glyph(model, values, [1]*4, [3], quantization='coefficients')
+        actual = model.evaluate(coefficients, model.locations)
+        np.testing.assert_array_equal(model.vertices(coefficients), actual)
+        self.assertAlmostEqual(report['max_vertex_rounding'], np.linalg.norm(actual-values, axis=-1).max())
+        self.assertEqual(report['quantization'], 'coefficients')
+        self.assertFalse(report['production_accepted'])
+
 
 if __name__ == '__main__':
     unittest.main()

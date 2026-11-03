@@ -40,7 +40,7 @@ def formula(location, face):
     return np.asarray([(60+dx, 40+dy), (60+w+dx, 40+dy), (60+w+dx, 40+h+dy), (60+dx, 40+h+dy)])
 
 
-def make(output):
+def make(output, optimize=True):
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists():
@@ -50,7 +50,7 @@ def make(output):
     for fi, label in enumerate(LABELS):
         values = np.asarray([np.vstack((formula(p, fi), [(0, 0), (600+50*p[0]+20*p[0]*p[1]*p[2], 0),
                                                         (0, 880), (0, -120)]))*SCALE for p in model.locations])
-        glyph, variations, hm, vm, _, _ = compile_glyph(model, values, [1]*4, [3])
+        glyph, variations, hm, vm, _, _ = compile_glyph(model, values, [1]*4, [3], optimize=optimize)
         b = FontBuilder((1064 if fi % 2 else 1028)*SCALE, isTTF=True)
         b.setupGlyphOrder(['.notdef', 'A'])
         b.setupCharacterMap({65: 'A', 0x4e2d: 'A', 0x9ad4: 'A', 48: 'A', 0x3002: 'A'})
@@ -63,7 +63,8 @@ def make(output):
         b.setupNameTable(dict(familyName=family, styleName='Regular', typographicFamily=family,
                              typographicSubfamily='Regular', fullName=family, uniqueFontIdentifier=family+'-1',
                              psName=family.replace(' ', ''), version='Version 0.1.0 Authored control'))
-        b.setupOS2(sTypoAscender=884*SCALE, sTypoDescender=-144*SCALE, usWinAscent=1060*SCALE, usWinDescent=340*SCALE)
+        b.setupOS2(sTypoAscender=884*SCALE, sTypoDescender=-144*SCALE, usWinAscent=1060*SCALE, usWinDescent=340*SCALE,
+                   usWeightClass=499 if fi % 2 else 501)
         b.setupPost()
         b.setupMaxp()
         b.setupFvar(face_axes(fi), [dict(stylename=n, location={'wdth': 100, 'wght': w, 'HGHT': 500})
@@ -110,15 +111,15 @@ def verify(native, output):
     if faces != set(range(4)) or count < 400:
         report['transcript_failure'] = 'missing_faces_or_positions'
     Path(output).write_text(json.dumps(report, indent=2))
-    print(json.dumps(report))
+    print(json.dumps({k: v for k, v in report.items() if k != 'failures'} | {'failure_count': len(failures)}))
     return not failures and 'transcript_failure' not in report
 
 
-def observe(binary, output):
+def observe(binary, output, optimize=True):
     directory = Path(output)
     directory.mkdir(parents=True, exist_ok=False)
     font = directory/'control.ttc'
-    make(font)
+    make(font, optimize=optimize)
     positions = np.r_[np.asarray(list(itertools.product((-1., -.5, 0., .5, 1.), repeat=3))),
                       np.random.default_rng(2026110301).uniform(-1, 1, (128, 3))]
     lines = []
@@ -149,9 +150,10 @@ if __name__ == '__main__':
     p.add_argument('--output', required=True, type=Path)
     p.add_argument('--native', type=Path)
     p.add_argument('--binary', type=Path)
+    p.add_argument('--no-iup', action='store_true')
     args = p.parse_args()
     if args.binary:
-        raise SystemExit(0 if observe(args.binary, args.output) else 1)
+        raise SystemExit(0 if observe(args.binary, args.output, optimize=not args.no_iup) else 1)
     if args.native:
         raise SystemExit(0 if verify(args.native, args.output) else 1)
-    print(json.dumps(make(args.output)))
+    print(json.dumps(make(args.output, optimize=not args.no_iup)))

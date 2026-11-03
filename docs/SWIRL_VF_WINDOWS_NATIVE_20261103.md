@@ -95,3 +95,68 @@ Medium matching on Server 2022/2025 and Windows 11 ARM64 with an x64 process.
 It contains no private font payload. Original-glyph Windows testing requires
 an authorized private Windows machine; public CI must not receive these fonts.
 Actual run links and final measurements are appended after execution.
+
+## Executed Alpha measurements
+
+The private 113-GID four-face Alpha has been generated, not only designed.
+The compact coefficient-rounded build is 628,792 bytes (SHA256
+`0c2191036ddd69ba789934adb6c77b8f336c4f414490ec479e5932ca925f90db`).
+Its SC/TC best cmaps contain 103/104 Unicode entries. It is not a complete font.
+The ordinary glyph grid uses 27 vertices; failed sampled geometry screens are
+retried with 125 vertices, retaining the better measured fit. Both encodings
+remain available, and both retain exact IUP reconstruction of stored deltas.
+
+The original nodal-rounding Alpha was 1,612,668 bytes. Compact rounding follows
+the strategy reviewed in fontTools `varLib._add_gvar`: round coefficients rather
+than introducing mixed differences of separately rounded vertices. On these
+113 glyphs the maximum vertex quantization bound increases from 0.04714 to
+0.20538 original units. This is a measured tradeoff, not high-precision acceptance.
+At the same 60 independent positions, maximum saved-font control errors change
+from 6.91352/7.95539 to 6.90583/7.91874 for Text/Display. The number above the
+2-unit screen changes from 16/16 to 17/15. No claim of every-glyph improvement
+is made. The source decoder and interpolation errors are reported separately.
+
+The compact Alpha's four faces have 27,120 saved-font observations, no empty
+mismatch, and native HarfBuzz movement on all three axes. Apple libhvf checks
+cover 896 nonempty glyph/position observations; maximum decoder discrepancy is
+4.55e-13 original units, with zero topology failures in the corresponding native
+HarfBuzz samples. These finite observations do not validate the full source.
+
+The reference comparison examines 28 characters per regional Text face at 27
+positions. Within the original, maximum second/third-order mixed coefficients
+are 8.43501/0.05541 (SC) and 8.30071/0.04585 (TC). Within the reference they are
+below 1.14e-13. This independently corroborates the missing coupled terms.
+Different font versions and unverified physical-axis alignment prevent calling
+these values a cross-version conversion error; the tool deliberately does not
+make that comparison.
+
+Actual [Windows run 41578061249](https://github.com/SOLHK/Swirl/actions/runs/41578061249)
+tested the authored control on Server 2022, Server 2025 and Windows 11 ARM64.
+All three passed native Medium matching. The Server 2025 observer loaded four
+physical faces, registered 20 process-private GDI entries, and returned 2,024
+outline observations. The unchanged exact-axis gate failed (684 differing axis
+readbacks, maximum 7.62939453125e-6). The unchanged 1/32 research geometry gate
+also failed: maximum 0.33274718 units, 1,808 failing observations. The workflow
+is therefore **failed**, not Windows acceptance. Neither GDI process registration
+nor an authored control proves desktop installation of the private candidate.
+
+Per-glyph work uses Python's PSF-licensed [ProcessPoolExecutor](https://github.com/python/cpython/blob/3.12/Lib/concurrent/futures/process.py),
+reviewed along with [its licence](https://github.com/python/cpython/blob/3.12/LICENSE).
+The project scheduler submits at most twice the worker count and streams results
+in GID order; no upstream scheduler code was copied. Full conversion retains
+per-glyph progress even if stopped. An initial exact-nodal full build was stopped
+after 11,382 Text glyphs and 229,880,280 gvar bytes, to avoid a multi-gigabyte test
+delivery. Its partial files and measurements are retained privately.
+
+Reproduce a private test build using the pinned environment:
+
+```sh
+python tools/swirl_vf/tools/windows_font_builder.py \
+  --source /absolute/private/PingFangUI.ttc \
+  --output /absolute/private/new-test-directory \
+  --adaptive --workers 6 --quantization coefficients
+```
+
+Add `--full` for all source GIDs and original cmap/UVS/GSUB. Output must be a new
+directory outside Git. `--quantization vertices` preserves the nodal encoding
+for precision comparisons. Windows outcomes remain separately required.
