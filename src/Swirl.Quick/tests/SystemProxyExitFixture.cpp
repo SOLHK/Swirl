@@ -11,6 +11,7 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QNetworkProxy>
+#include <QPointer>
 #include <QQuickWindow>
 #include <QSaveFile>
 #include <QTcpServer>
@@ -40,20 +41,31 @@ public:
             while(auto *socket=m_control.nextPendingConnection()){
                 socket->setReadBufferSize(16);
                 connect(socket,&QLocalSocket::disconnected,socket,&QObject::deleteLater);
+                const QPointer<QQuickWindow> window{m_window};
+                connect(socket,&QLocalSocket::disconnected,this,[this,socket,window]{
+                    if(!window||!socket->property("closeCommandAccepted").toBool())return;
+                    m_closeAfterControlDisconnect=true;
+                    // The client consumes CLOSING before closing its pipe.
+                    // Keep the real root-window close/ShutdownCoordinator
+                    // behind that boundary, not behind a nonblocking flush.
+                    QTimer::singleShot(0,window.data(),[window]{if(window)window->close();});
+                });
                 connect(socket,&QLocalSocket::readyRead,socket,[this,socket]{
                     const auto bytes=socket->property("command").toByteArray()+socket->readAll();
                     if(bytes.size()>7||(!QByteArray("CLOSE\n").startsWith(bytes)
                         &&!QByteArray("STOP\n").startsWith(bytes)&&!QByteArray("STATUS\n").startsWith(bytes))){socket->abort();return;}
                     socket->setProperty("command",bytes);
                     if(bytes=="STATUS\n"){
-                        socket->write(QJsonDocument(normalStopState("normal-stop-status")).toJson(QJsonDocument::Compact)+"\n");
-                        socket->flush();socket->disconnectFromServer();return;
+                        const auto reply=QJsonDocument(normalStopState("normal-stop-status")).toJson(QJsonDocument::Compact)+"\n";
+                        if(socket->write(reply)!=reply.size()){socket->abort();return;}
+                        socket->flush();return;
                     }
                     if(bytes=="STOP\n"){
                         if(!m_ready||m_closeRequested||!m_controller->processAlive()||m_controller->systemProxyStopping()){
                             socket->abort();return;
                         }
-                        socket->write("STOPPING\n");socket->flush();socket->disconnectFromServer();
+                        if(socket->write("STOPPING\n")!=9){socket->abort();return;}
+                        socket->flush();
                         QTimer::singleShot(0,this,[this]{
                             ++m_normalStopAttempts;m_normalStopLastReleaseFinished=false;
                             m_normalStopLastReleaseSucceeded=false;m_normalStopLastReleaseAlive=false;
@@ -66,11 +78,13 @@ public:
                     }
                     if(bytes!="CLOSE\n")return;
                     if(!m_ready||m_closeRequested){socket->abort();return;}
-                    m_closeRequested=true;
-                    socket->write("CLOSING\n");socket->flush();socket->disconnectFromServer();
-                    // Exercise the normal root-window close event and its
-                    // production ShutdownCoordinator, not explicit disable.
-                    QTimer::singleShot(0,m_window,[this]{m_window->close();});
+                    m_closeRequested=true;socket->setProperty("closeCommandAccepted",true);
+                    // Server-side DisconnectNamedPipe may discard unread data,
+                    // even after a successful Qt write/flush. All replies stay
+                    // open until the client has consumed them and disconnects.
+                    m_closeReplyWriteSucceeded=socket->write("CLOSING\n")==8;
+                    if(!m_closeReplyWriteSucceeded){socket->abort();return;}
+                    socket->flush();
                 });
             }
         });
@@ -232,6 +246,10 @@ private:
         auto *proxy=m_controller->systemProxy();
         const auto snapshot=SystemProxySession::snapshot();
         auto report=common("final");
+        // Write acceptance and the observed disconnect are separate from the
+        // parent's exact-reply assertion and production shutdown completion.
+        report.insert("close_reply_write_succeeded",m_closeReplyWriteSucceeded);
+        report.insert("close_after_control_disconnect",m_closeAfterControlDisconnect);
         report.insert("shutdown_coordinator_completed",QCoreApplication::instance()->property("shutdownDurationMs").isValid());
         report.insert("shutdown_ms",double(QCoreApplication::instance()->property("shutdownDurationMs").toLongLong()));
         report.insert("runtime_stopped",!m_controller->processAlive()&&!m_controller->busy());
@@ -267,6 +285,7 @@ private:
     qint64 m_runtimePid=0;
     int m_port=0;
     bool m_requested=false,m_ready=false,m_closeRequested=false;
+    bool m_closeReplyWriteSucceeded=false,m_closeAfterControlDisconnect=false;
     bool m_releaseFinished=false,m_releaseSucceeded=false,m_releaseWhileRuntimeAlive=false;
     bool m_releaseWaitingObserved=false,m_releaseWaitingRuntimeAlive=false,m_releaseWaitingRuntimeHealthy=false;
     bool m_restoredAtRelease=false,m_journalAbsentAtRelease=false;

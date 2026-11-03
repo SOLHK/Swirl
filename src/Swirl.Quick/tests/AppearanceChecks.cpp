@@ -149,12 +149,55 @@ Item {
         if(fixture){
             fixture->setParentItem(window->contentItem());
             struct RestoreCursor { QPoint position=QCursor::pos(); ~RestoreCursor(){QCursor::setPos(position);} } restoreCursor;
-            window->requestActivate();QTest::qWait(100);
+            window->requestActivate();
+            check(QTest::qWaitFor([&]{return window->isExposed()&&window->isActive();},1000),
+                "native review window is exposed and active before pointer input");
             const auto surface=[](QQuickItem *control){return control?control->property("background").value<QQuickItem *>():nullptr;};
+#ifdef Q_OS_WIN
+            class NativePointerObservation final : public QObject {
+            public:
+                quint64 moves=0,enters=0,leaves=0;
+                QPoint global;
+                bool spontaneous=false;
+                bool eventFilter(QObject *,QEvent *event) override {
+                    if(event->type()==QEvent::MouseMove){
+                        ++moves;global=static_cast<QMouseEvent *>(event)->globalPosition().toPoint();
+                        spontaneous=event->spontaneous();
+                    }else if(event->type()==QEvent::Enter){++enters;}
+                    else if(event->type()==QEvent::Leave){++leaves;}
+                    return false;
+                }
+            } pointerObservation;
+            window->installEventFilter(&pointerObservation);
+#endif
             const auto movePointer=[&](QPoint local,int settle=160){
-                QCursor::setPos(window->mapToGlobal(local));
+                const auto global=window->mapToGlobal(local);
+#ifdef Q_OS_WIN
+                // Use one input path. QTest's QWindow mouse helper bypasses the
+                // platform pointer tracker and cannot acknowledge SetCursorPos.
+                // A distinct native move also covers a reused cursor position
+                // after a hide/show or a previous process at the same location.
+                if(QCursor::pos()==global){
+                    const auto before=pointerObservation.moves;
+                    const auto adjacent=global+QPoint(1,0);
+                    QCursor::setPos(adjacent);
+                    check(QTest::qWaitFor([&]{return pointerObservation.moves>before&&pointerObservation.global==adjacent;},1000),
+                        "native pointer acknowledges the distinct departure position");
+                }
+                const auto before=pointerObservation.moves;
+                const auto enters=pointerObservation.enters,leaves=pointerObservation.leaves;
+                QCursor::setPos(global);
+                const bool delivered=QTest::qWaitFor([&]{return pointerObservation.moves>before&&pointerObservation.global==global;},1000);
+                qInfo()<<"APPEARANCE_NATIVE_POINTER"<<"requestedGlobal"<<global<<"observedGlobal"<<pointerObservation.global
+                    <<"delivered"<<delivered<<"moves"<<(pointerObservation.moves-before)
+                    <<"enters"<<(pointerObservation.enters-enters)<<"leaves"<<(pointerObservation.leaves-leaves)
+                    <<"spontaneous"<<pointerObservation.spontaneous<<"exposed"<<window->isExposed()<<"active"<<window->isActive();
+                check(delivered,"native pointer move reaches the review window before sampling");
+#else
+                QCursor::setPos(global);
                 QCoreApplication::processEvents();
                 QTest::mouseMove(window,window->mapFromGlobal(QCursor::pos()));
+#endif
                 QTest::qWait(settle);
             };
             std::function<QQuickItem *(QQuickItem *,const QString &)> visualItem;
@@ -595,9 +638,10 @@ Item {
                             check(!nativeClock->running() && !paint->property("moving").toBool(),
                                 "hiding the real window retires native press callbacks and feedback motion");
                             window->setVisibility(visibility);window->requestActivate();sendMouse(QEvent::MouseButtonRelease);
-                            check(QTest::qWaitFor([&]{return !control->property("down").toBool() && !nativeClock->running()
+                            check(QTest::qWaitFor([&]{return window->isExposed() && window->isActive()
+                                && !control->property("down").toBool() && !nativeClock->running()
                                 && qAbs(paint->scale()-1)<.001 && qAbs(content->scale()-1)<.001;},1400),
-                                "restoring the real window leaves no stale paired press transform");
+                                "restoring the real window is ready for input and leaves no stale paired press transform");
                             {QMutexLocker lock(&presented->mutex);presented->armed=false;}
                             }
                         }

@@ -60,8 +60,9 @@ foreach ($name in @('Swirl-brand-phase3.ico','Swirl-brand-0217-optical.ico')) {
 if (-not $OpenSslRoot) { throw 'An explicitly verified OpenSSL runtime root is required.' }
 & (Join-Path $PSScriptRoot 'Copy-VerifiedOpenSslRuntime.ps1') -OpenSslRoot $OpenSslRoot `
     -ApplicationDirectory $stage -Target VC-WIN64A -Python $Python
-& windeployqt --release --compiler-runtime --openssl-root $OpenSslRoot --include-plugins qopensslbackend --qmldir (Join-Path $repo 'src/Swirl.Quick/qml') (Join-Path $stage 'Swirl.exe')
+& windeployqt --release --no-compiler-runtime --openssl-root $OpenSslRoot --include-plugins qopensslbackend --qmldir (Join-Path $repo 'src/Swirl.Quick/qml') (Join-Path $stage 'Swirl.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Qt deployment failed.' }
+& (Join-Path $PSScriptRoot 'Copy-VerifiedMsvcRuntime.ps1') -BuildDirectory $build -ApplicationDirectory $stage
 # windeployqt creates empty QML directories that NSIS File /r would own only
 # implicitly. Prune this freshly created stage before any real runtime checks;
 # installed-product maintenance must preserve unknown user directories.

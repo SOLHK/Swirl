@@ -98,7 +98,11 @@ jobs:
           ./scripts/tests/Test-RustProductPackagePolicy.ps1
       - name: Check package path policy with Windows PowerShell 5.1
         shell: powershell
-        run: ./scripts/tests/Test-RustProductPackagePolicy.ps1
+        run: |
+          ./scripts/tests/Test-RustProductPackagePolicy.ps1
+          # Compile the actual PE reader under Windows PowerShell 5.1 before
+          # the expensive native build; product deployment is verified later.
+          . ./scripts/Copy-VerifiedMsvcRuntime.ps1
       - name: Verify user integration transactions with an actual standard-user token
         shell: pwsh
         env:
@@ -252,12 +256,34 @@ jobs:
           # screenshot/input drivers also need offscreen; production staging
           # remains separate and uses the native Windows plugin.
           ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory dist -Target VC-WIN64A
-          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml dist/Swirl.exe
+          windeployqt --release --no-compiler-runtime --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml dist/Swirl.exe
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath 'dist/platforms/qoffscreen.dll')) { throw 'The isolated offscreen test runtime is incomplete.' }
           # CTest executes these binaries in the build directory, not dist.
           ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory build/swirl-quick/Release -Target VC-WIN64A
-          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml build/swirl-quick/Release/Swirl.exe
+          windeployqt --release --no-compiler-runtime --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml build/swirl-quick/Release/Swirl.exe
           if ($LASTEXITCODE -ne 0) { throw 'Qt test runtime deployment failed.' }
+          # Validate only the clean deployment. The test build also contains
+          # intentionally invalid loader fixtures and is not a product payload.
+          . ./scripts/RustProductPackagePolicy.ps1
+          foreach ($deployment in @('dist','build/swirl-quick/Release')) {
+            Assert-SwirlPathWithoutLinks $deployment
+            $oldBootstrap = Join-Path $deployment 'vc_redist.x64.exe'
+            Assert-SwirlPathWithoutLinks $oldBootstrap
+            if (Test-Path -LiteralPath $oldBootstrap -PathType Leaf) { Remove-Item -LiteralPath $oldBootstrap -Force }
+          }
+          ./scripts/Copy-VerifiedMsvcRuntime.ps1 -BuildDirectory build/swirl-quick -ApplicationDirectory dist
+          if ((Get-FileHash -LiteralPath 'dist/Swirl.exe' -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath 'build/swirl-quick/Release/Swirl.exe' -Algorithm SHA256).Hash) { throw 'Test runtime CRT deployment requires the exact verified application.' }
+          $msvc = Get-Content -LiteralPath 'dist/msvc-runtime.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          foreach ($entry in $msvc.files.PSObject.Properties) {
+            if ($entry.Name -cnotmatch '^(?:msvcp[0-9][a-z0-9_]*|vcruntime[0-9][a-z0-9_]*|concrt[0-9][a-z0-9_]*|vccorlib[0-9][a-z0-9_]*)\.dll$') { throw 'Invalid verified CRT file name.' }
+            $target = Join-Path 'build/swirl-quick/Release' $entry.Name
+            Assert-SwirlPathWithoutLinks $target
+            Copy-Item -LiteralPath (Join-Path 'dist' $entry.Name) -Destination $target -Force
+            if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() -cne $entry.Value.sha256) { throw 'Test runtime CRT bytes differ from the verified deployment.' }
+          }
+          Assert-SwirlPathWithoutLinks 'build/swirl-quick/Release/msvc-runtime.json'
+          Copy-Item -LiteralPath 'dist/msvc-runtime.json' -Destination 'build/swirl-quick/Release/msvc-runtime.json' -Force
+          if ((Get-FileHash -LiteralPath 'dist/msvc-runtime.json' -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath 'build/swirl-quick/Release/msvc-runtime.json' -Algorithm SHA256).Hash) { throw 'Test runtime CRT metadata differs from the verified deployment.' }
           & dist/Swirl.exe --tls-runtime-self-test build-evidence/ui-tls-runtime.json
           if ($LASTEXITCODE -ne 0) { throw 'The bundled UI TLS runtime is incomplete or borrowed from PATH.' }
       - name: Prove normal proxy-stop ordering against the old production controller
@@ -414,11 +440,16 @@ jobs:
                     if (-not (Test-Path -LiteralPath $receipt -PathType Leaf)) { throw "Missing native application exit receipt: $tag/$stage" }
                     $data = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json
                     if ($data.schema -ne 1 -or $data.source_sha -cne $env:GITHUB_SHA) { throw "Native application exit receipt has the wrong source identity: $tag/$stage" }
+                    if ($stage -eq 'final') {
+                      foreach ($key in @('close_reply_write_succeeded','close_after_control_disconnect')) {
+                        if ($data.$key -isnot [bool] -or -not $data.$key) { throw "Native close-control delivery evidence is incomplete: $tag/$key" }
+                      }
+                    }
                     if ($stage -eq 'result' -and ($data.success -isnot [bool] -or -not $data.success)) { throw "Native application exit result did not pass: $tag" }
                     if ($stage -eq 'result') {
                       Assert-NativeListenerReleased $data.listener_probe $data.tcp_state_after_exit $data.exclusive_rebind_after_exit $tag
                       Assert-ExclusivePortOccupied $data.live_listener_exclusive_probe $tag
-                      foreach ($key in @('listener_closed','tcp_tables_readable','no_listening_socket')) {
+                      foreach ($key in @('close_acknowledged','listener_closed','tcp_tables_readable','no_listening_socket')) {
                         if ($data.$key -isnot [bool] -or -not $data.$key) { throw "Native listener release evidence is incomplete: $tag/$key" }
                       }
                       if ($data.journal_absent_after_exit -isnot [bool] -or -not $data.journal_absent_after_exit -or
@@ -450,8 +481,13 @@ jobs:
                     if (-not (Test-Path -LiteralPath $receipt -PathType Leaf)) { throw "Missing native normal-stop receipt: $tag/$stage" }
                     $data = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json
                     if ($data.schema -ne 1 -or $data.source_sha -cne $env:GITHUB_SHA) { throw "Native normal-stop receipt has the wrong source identity: $tag/$stage" }
+                    if ($stage -eq 'final') {
+                      foreach ($key in @('close_reply_write_succeeded','close_after_control_disconnect')) {
+                        if ($data.$key -isnot [bool] -or -not $data.$key) { throw "Native close-control delivery evidence is incomplete: $tag/$key" }
+                      }
+                    }
                     if ($stage -eq 'result') {
-                      foreach ($key in @('success','http_roundtrip','socks5_roundtrip','child_normal_exit','exact_stop_snapshot','exact_exit_snapshot','winhttp_unchanged','runner_original_restored','app_alive_after_stop','app_alive_after_listener_checks','normal_stop_completed','journal_absent_after_stop','listener_closed','tcp_tables_readable','no_listening_socket')) {
+                      foreach ($key in @('success','http_roundtrip','socks5_roundtrip','child_normal_exit','close_acknowledged','exact_stop_snapshot','exact_exit_snapshot','winhttp_unchanged','runner_original_restored','app_alive_after_stop','app_alive_after_listener_checks','normal_stop_completed','journal_absent_after_stop','listener_closed','tcp_tables_readable','no_listening_socket')) {
                         if ($data.$key -isnot [bool] -or -not $data.$key) { throw "Native normal-stop result is incomplete: $tag/$key" }
                       }
                       if ($data.child_exit_code -ne 0 -or $null -eq $data.guard_marker_count_after_stop -or $data.guard_marker_count_after_stop -ne 0) { throw "Normal-stop process or guard cleanup failed: $tag" }
@@ -648,6 +684,9 @@ jobs:
           }
           try {
             ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/swirl-product -Destination installer-bin -OpenSslRoot $env:SWIRL_OPENSSL_ROOT
+            ./scripts/tests/Test-WindowsMsvcRuntimePackage.ps1 -ApplicationDirectory installer-bin -ExpectedSourceSha $env:GITHUB_SHA -EvidenceDirectory out/package-evidence/msvc-runtime-policy
+            $crt = Get-Content -LiteralPath 'out/package-evidence/msvc-runtime-policy/msvc-runtime-policy.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($crt.schema -ne 1 -or $crt.source_sha -cne $env:GITHUB_SHA -or -not $crt.success -or -not $crt.candidate_unchanged -or -not $crt.fixture_removed -or $crt.forced_termination -or @($crt.negative_controls).Count -ne 5 -or @($crt.negative_controls | Where-Object { -not $_.expected_assertion_failed }).Count) { throw 'The actual app-local CRT dependency and fallback rejection evidence is incomplete.' }
           } finally {
             # Preserve genuinely new diagnostics even when staging rejects them.
             foreach ($report in $runtimeReports) {
@@ -979,12 +1018,13 @@ jobs:
           $testExit = $LASTEXITCODE
           if (-not (Test-Path -LiteralPath $junit -PathType Leaf)) { throw 'Independent activity JUnit evidence is missing.' }
           if ($testExit -ne 0) { throw "Independent activity diagnostic regression failed ($testExit)." }
-      - name: Diagnose D3D11 queue latency after an early UI failure
-        if: ${{ !cancelled() && failure() && (steps.critical_ui.outcome == 'failure' || steps.overview_input.outcome == 'failure') }}
+      - name: Verify isolated D3D11 frame-latency cases
+        if: ${{ !cancelled() && (steps.critical_ui.outcome == 'success' || steps.critical_ui.outcome == 'failure') }}
         shell: pwsh
         run: |
-          # Both isolated cold-cache cases retain every original Appearance
-          # assertion. Neither result replaces the failed critical gate.
+          # Re-execute the two isolated cases that exposed the native pointer
+          # driver defect, including on a successful main path. Keep all original
+          # Appearance assertions and preserve their separate diagnostic scope.
           ./scripts/Test-QtD3D11FrameLatency.ps1 `
             -RepositoryRoot "$env:GITHUB_WORKSPACE" `
             -RuntimeDirectory 'dist' `

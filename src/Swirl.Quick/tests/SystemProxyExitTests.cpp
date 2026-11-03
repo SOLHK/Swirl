@@ -93,7 +93,11 @@ bool requestWindowClose(const QString &root) {
     if(socket.bytesToWrite()&&!socket.waitForBytesWritten(1000))return false;
     QByteArray response;
     const bool received=QTest::qWaitFor([&]{response+=socket.readAll();return response.size()>=8;},1500);
-    return received&&response==QByteArray("CLOSING\n");
+    const bool acknowledged=received&&response==QByteArray("CLOSING\n");
+    // The server closes the window only after this client-side disconnect.
+    // A failed/partial reply remains a failure even though it permits cleanup.
+    socket.disconnectFromServer();
+    return acknowledged;
 }
 QByteArray fixtureCommand(const QString &root,const QByteArray &command) {
     QLocalSocket socket;socket.connectToServer(SwirlSystemProxyExit::controlName(root));
@@ -105,6 +109,7 @@ QByteArray fixtureCommand(const QString &root,const QByteArray &command) {
         response+=socket.readAll();
         return response.endsWith('\n')||response.size()>16384||socket.state()==QLocalSocket::UnconnectedState;
     },1500);
+    socket.disconnectFromServer();
     return received&&response.size()<=16384&&response.endsWith('\n')?response:QByteArray{};
 }
 QJsonObject fixtureStatus(const QString &root) {
@@ -589,7 +594,9 @@ private slots:
             });
             releasePoll.start();
         }
-        QVERIFY2(requestWindowClose(root.path()),"The full application's normal window-close command was not acknowledged.");
+        const bool closeAcknowledged=requestWindowClose(root.path());
+        result.insert("close_acknowledged",closeAcknowledged);
+        QVERIFY2(closeAcknowledged,"The full application's normal window-close command was not acknowledged.");
         QVERIFY2(QTest::qWaitFor([&]{return child.state()==QProcess::NotRunning;},10000),"Normal application shutdown did not complete.");
         QCOMPARE(child.exitStatus(),QProcess::NormalExit);QCOMPARE(child.exitCode(),0);
         if(releaseContention){
@@ -601,7 +608,8 @@ private slots:
         QCOMPARE(final.value("source_sha").toString(),QStringLiteral(SWIRL_SOURCE_SHA));
         QCOMPARE(final.value("phase").toString(),QStringLiteral("final"));
         QCOMPARE(qint64(final.value("pid").toDouble()),pid);
-        for(const auto *key:{"native_backend","ready","close_requested","shutdown_coordinator_completed","runtime_stopped","journal_absent","native_snapshot_readable"})
+        for(const auto *key:{"native_backend","ready","close_requested","close_reply_write_succeeded","close_after_control_disconnect",
+                             "shutdown_coordinator_completed","runtime_stopped","journal_absent","native_snapshot_readable"})
             QVERIFY2(final.value(key).isBool()&&final.value(key).toBool(),key);
         for(const auto *key:{"fixture_failed","proxy_owned","proxy_busy"})
             QVERIFY2(final.value(key).isBool()&&!final.value(key).toBool(),key);
@@ -873,13 +881,15 @@ private slots:
         result.insert("app_alive_after_listener_checks",true);
         QCOMPARE(httpRequests,1+int(releaseContention)+int(releaseTimeout));QCOMPARE(socksRequests,httpRequests);
         result.insert("http_requests",httpRequests);result.insert("socks5_requests",socksRequests);
-        QVERIFY(requestWindowClose(root.path()));
+        const bool closeAcknowledged=requestWindowClose(root.path());
+        result.insert("close_acknowledged",closeAcknowledged);QVERIFY(closeAcknowledged);
         QVERIFY(QTest::qWaitFor([&]{return child.state()==QProcess::NotRunning;},10000));
         QCOMPARE(child.exitStatus(),QProcess::NormalExit);QCOMPARE(child.exitCode(),0);
         const auto final=readReceipt(SwirlSystemProxyExit::finalPath(root.path()));
         QCOMPARE(final.value("source_sha").toString(),QStringLiteral(SWIRL_SOURCE_SHA));
         QCOMPARE(final.value("phase").toString(),QStringLiteral("final"));QCOMPARE(qint64(final.value("pid").toDouble()),pid);
-        for(const auto *key:{"close_requested","shutdown_coordinator_completed","runtime_stopped","journal_absent"})
+        for(const auto *key:{"close_requested","close_reply_write_succeeded","close_after_control_disconnect",
+                             "shutdown_coordinator_completed","runtime_stopped","journal_absent"})
             QVERIFY2(final.value(key).isBool()&&final.value(key).toBool(),key);
         for(const auto *key:{"fixture_failed","proxy_owned","proxy_busy"})
             QVERIFY2(final.value(key).isBool()&&!final.value(key).toBool(),key);

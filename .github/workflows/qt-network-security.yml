@@ -185,8 +185,14 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory build/qt-product/Release -Target VC-WIN64A
-          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml build/qt-product/Release/Swirl.exe
+          windeployqt --release --no-compiler-runtime --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qoffscreen,qopensslbackend --qmldir src/Swirl.Quick/qml build/qt-product/Release/Swirl.exe
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath 'build/qt-product/Release/platforms/qoffscreen.dll')) { throw 'The isolated offscreen test runtime is incomplete.' }
+          . ./scripts/RustProductPackagePolicy.ps1
+          Assert-SwirlPathWithoutLinks 'build/qt-product/Release'
+          $oldBootstrap = 'build/qt-product/Release/vc_redist.x64.exe'
+          Assert-SwirlPathWithoutLinks $oldBootstrap
+          if (Test-Path -LiteralPath $oldBootstrap -PathType Leaf) { Remove-Item -LiteralPath $oldBootstrap -Force }
+          ./scripts/Copy-VerifiedMsvcRuntime.ps1 -BuildDirectory build/qt-product -ApplicationDirectory build/qt-product/Release
           & build/qt-product/Release/Swirl.exe --tls-runtime-self-test build/qt-product/tls-runtime.json
           if ($LASTEXITCODE -ne 0) { throw 'The product TLS runtime is incomplete or borrowed from PATH.' }
       - name: Verify Windows DPAPI subscription refresh and redirects
@@ -203,6 +209,8 @@ jobs:
           name: qt-network-product-windows-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             build/qt-product/subscription-security.xml
+            build/qt-product/tls-runtime.json
+            build/qt-product/Release/msvc-runtime.json
             build/qt-product/qt-network-policy.xml
             build/qt-product/swirl-telemetry-accounting.xml
             build/qt-product/Testing/Temporary/LastTest.log

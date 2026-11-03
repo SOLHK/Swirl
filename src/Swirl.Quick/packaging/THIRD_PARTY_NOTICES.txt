@@ -26,6 +26,15 @@ is licenses/OpenSSL-NOTICE.txt. The source URL and verified SHA256 are recorded
 in openssl-runtime.json and tools/openssl-runtime.lock.json in Swirl source.
 https://openssl-library.org/source/
 
+Microsoft Visual C++ runtime libraries (Windows x64). Copyright Microsoft
+Corporation. These unmodified redistributable DLLs come from the Visual Studio
+build toolchain and are deployed alongside Swirl for standard-user installation.
+The exact toolchain provenance, versions and SHA256 hashes are recorded in
+msvc-runtime.json. Updates to these application-local copies are delivered in
+updated Swirl packages. Microsoft license terms and the REDIST list:
+https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files
+https://learn.microsoft.com/en-us/visualstudio/releases/2022/redistribution
+
 FreeType 2.14.3, bundled inside Qt, is used for Windows font rasterization.
 Portions of this software are copyright (C) 1996-2026 The FreeType Project
 (https://freetype.org/). All rights reserved.
