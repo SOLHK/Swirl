@@ -282,7 +282,7 @@ def fit(training_commands, training_locations, holdout_commands, holdout_locatio
     return model
 
 
-def install(font, models, *, experimental_slice=False):
+def install(font, models, *, experimental_slice=False, release_programs=False):
     """Install all modeled GIDs on a detached font; never fill missing models.
 
     Callers must supply correct CFF2-compatible metrics before serialization.
@@ -318,6 +318,8 @@ def install(font, models, *, experimental_slice=False):
             data_ids[key] = len(data)
             data.append(buildVarData(indices, None, optimize=False))
         strings[name] = model.charstring(data_ids[key])
+        if release_programs:
+            strings[name].compile(isCFF2=True)
     builder.setupCFF2(strings)
     if regions:
         store = VarStoreData(otVarStore=buildVarStore(buildVarRegionList(regions, list(tags)), data))
@@ -329,7 +331,7 @@ def install(font, models, *, experimental_slice=False):
         for fd in top.FDArray:
             fd.Private.vstore = store
     from cff2_subroutines import pack
-    pack(candidate)
+    pack(candidate, release_programs=release_programs)
     candidate['maxp'] = newTable('maxp')
     candidate['maxp'].tableVersion = 0x00005000
     candidate['maxp'].numGlyphs = len(order)

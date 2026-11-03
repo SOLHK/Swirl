@@ -145,3 +145,28 @@ data API published the tested tree without force updating an existing branch.
 The first remote commit is `3a583f7bd1f3a4787cabd9276480acf452d6e8bd`, tree
 `c90ce889e40c1f02b10712347761a700d45bbf94`, matching local commit `ff1bf82f`.
 Subsequent commits preserve that ancestry. Main and test were not changed.
+
+## Continuation: factored projection and local polynomial encoding
+
+The continuation preserves the uncommitted research found in this worktree and
+adds public regression coverage. `projection_factorization` separates a Type-2
+point into its neighbouring control, direction, and unclamped rational parameter.
+Clamping is applied to the scalar, after interpolation, rather than fitting the
+kink into the same ordinary multilinear region. `joint_polynomial` encodes local
+tricubic tensors by nested Horner blends with one `vsindex`. Absolute-control
+coefficient quantization preserves explicitly certified closing controls.
+These are reusable components, not yet an accepted compiler for both targets.
+
+On this continuation, seven polynomial/projection regression tests pass. A new
+serialized, self-authored clamp/polynomial/GSUB control passes **155 positions per
+engine**, with no outline or region-selection failures: CoreText maximum
+**0.004202047**, HarfBuzz **0.002863535**, fontTools **0.003309031** FUnit.
+The control keeps the three physical axes and uses four hidden computational
+axes. Its success does not certify original HVF glyphs, all user coordinates,
+metrics, or other engines. The native observer verifies the actual shaping-run
+tables and exact axis readback. All control artifacts remain outside Git.
+
+The CFF2 packer also supports releasing decoded programs after encoding, to
+bound memory while assembling many polynomial regions. Its bytecode mode is
+checked through serialization and reload, including subroutine call bias.
+Both source GIDs remain **not finally accepted**; PR #53 remains Draft.
