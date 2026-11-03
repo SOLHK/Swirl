@@ -58,6 +58,9 @@ class SparseProjectionTests(unittest.TestCase):
         for count in (0, 33, 1.5):
             with self.assertRaises(ValueError):
                 encode_clamp_ramps(model, count)
+        model.supports[1, 0, 0] += 1/65536
+        with self.assertRaisesRegex(ValueError, 'F2DOT14_parameter_supports'):
+            encode_clamp_ramps(model, 4)
 
 
 if __name__ == '__main__':

@@ -135,6 +135,14 @@ def encode_clamp_ramps(model, ramps=4):
             and np.isfinite(model.supports).all()
             and np.all(model.supports[0] == 0), 'invalid_sparse_parameter_model')
     require(model.coefficients.shape[1]*ramps <= 65532, 'clamp_axis_count_overflow')
+    supports = model.supports
+    require(np.all(np.abs(supports) <= 1)
+            and np.all(supports*16384 == np.rint(supports*16384))
+            and np.all(supports[:, :, 0] <= supports[:, :, 1])
+            and np.all(supports[:, :, 1] <= supports[:, :, 2])
+            and np.all(supports[:, :, 0]*supports[:, :, 2] >= 0)
+            and np.all((supports[:, :, 1] != 0) | np.all(supports == 0, axis=2)),
+            'invalid_F2DOT14_parameter_supports')
     quantized = np.floor(model.coefficients*(32768*ramps)+.5)
     keep = np.any(quantized != 0, axis=1)
     keep[0] = True
