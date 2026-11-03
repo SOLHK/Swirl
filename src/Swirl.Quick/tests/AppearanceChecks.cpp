@@ -19,6 +19,7 @@
 #include <QFontMetricsF>
 #include <QFontDatabase>
 #include <QCursor>
+#include <QEnterEvent>
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QElapsedTimer>
@@ -156,15 +157,18 @@ Item {
 #ifdef Q_OS_WIN
             class NativePointerObservation final : public QObject {
             public:
-                quint64 moves=0,enters=0,leaves=0;
+                quint64 positionEvents=0,moves=0,enters=0,leaves=0;
                 QPoint global;
+                QEvent::Type positionEventType=QEvent::None;
                 bool spontaneous=false;
                 bool eventFilter(QObject *,QEvent *event) override {
                     if(event->type()==QEvent::MouseMove){
                         ++moves;global=static_cast<QMouseEvent *>(event)->globalPosition().toPoint();
-                        spontaneous=event->spontaneous();
-                    }else if(event->type()==QEvent::Enter){++enters;}
-                    else if(event->type()==QEvent::Leave){++leaves;}
+                        ++positionEvents;positionEventType=event->type();spontaneous=event->spontaneous();
+                    }else if(event->type()==QEvent::Enter){
+                        ++enters;global=static_cast<QEnterEvent *>(event)->globalPosition().toPoint();
+                        ++positionEvents;positionEventType=event->type();spontaneous=event->spontaneous();
+                    }else if(event->type()==QEvent::Leave){++leaves;}
                     return false;
                 }
             } pointerObservation;
@@ -177,22 +181,27 @@ Item {
                 // platform pointer tracker and cannot acknowledge SetCursorPos.
                 // A distinct native move also covers a reused cursor position
                 // after a hide/show or a previous process at the same location.
+                // Qt's Windows backend can consume the first WM_MOUSEMOVE after
+                // show as Enter only. Its real QEnterEvent still carries the
+                // delivered position, so acknowledge either fresh positional event.
                 const auto nativeAt=QCursor::pos();
                 if(nativeAt==global || pointerObservation.global==global){
-                    const auto before=pointerObservation.moves;
+                    const auto before=pointerObservation.positionEvents;
                     const auto adjacent=global+(nativeAt==global+QPoint(1,0)?QPoint(-1,0):QPoint(1,0));
                     QCursor::setPos(adjacent);
-                    check(QTest::qWaitFor([&]{return pointerObservation.moves>before&&pointerObservation.global==adjacent;},1000),
+                    check(QTest::qWaitFor([&]{return pointerObservation.positionEvents>before&&pointerObservation.global==adjacent&&pointerObservation.spontaneous;},1000),
                         "native pointer acknowledges the distinct departure position");
                 }
-                const auto before=pointerObservation.moves;
+                const auto before=pointerObservation.positionEvents,moves=pointerObservation.moves;
                 const auto enters=pointerObservation.enters,leaves=pointerObservation.leaves;
                 QCursor::setPos(global);
-                const bool delivered=QTest::qWaitFor([&]{return pointerObservation.moves>before&&pointerObservation.global==global;},1000);
+                const bool delivered=QTest::qWaitFor([&]{return pointerObservation.positionEvents>before&&pointerObservation.global==global&&pointerObservation.spontaneous;},1000);
                 qInfo()<<"APPEARANCE_NATIVE_POINTER"<<"requestedGlobal"<<global<<"observedGlobal"<<pointerObservation.global
-                    <<"delivered"<<delivered<<"moves"<<(pointerObservation.moves-before)
+                    <<"delivered"<<delivered<<"moves"<<(pointerObservation.moves-moves)
                     <<"enters"<<(pointerObservation.enters-enters)<<"leaves"<<(pointerObservation.leaves-leaves)
-                    <<"spontaneous"<<pointerObservation.spontaneous<<"exposed"<<window->isExposed()<<"active"<<window->isActive();
+                    <<"spontaneous"<<pointerObservation.spontaneous<<"exposed"<<window->isExposed()<<"active"<<window->isActive()
+                    <<"positionEvents"<<(pointerObservation.positionEvents-before)
+                    <<"eventType"<<(pointerObservation.positionEventType==QEvent::Enter?"Enter":pointerObservation.positionEventType==QEvent::MouseMove?"MouseMove":"None");
                 check(delivered,"native pointer move reaches the review window before sampling");
 #else
                 QCursor::setPos(global);

@@ -1102,6 +1102,7 @@ jobs:
           name: Swirl-Qt612-Package-Evidence
           path: |
             build-evidence/
+            dist/msvc-runtime.json
             build/swirl-quick/font-*.xml
             out/package-evidence/
             out/delivery.json
