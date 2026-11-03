@@ -1,0 +1,48 @@
+name: Swirl VF authored joint CFF2 avar2 DirectWrite control
+on:
+  push:
+    branches: [work/swirlvf-joint-acceptance-20261103]
+    paths:
+      - '.github/workflows/swirl-vf-joint-directwrite.yml'
+      - 'tools/swirl_vf/platform/directwrite_joint_layout.cpp'
+      - 'tools/swirl_vf/platform/probe_joint_directwrite.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fonttools==4.61.1 numpy==2.2.6 uharfbuzz==0.56.3
+      - name: Compile native TextLayout observer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path build/joint-control -Force | Out-Null
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw 'MSVC installation unavailable' }
+          $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
+          cmd /c "`"$vcvars`" && cl /nologo /std:c++17 /EHsc /W4 tools\swirl_vf\platform\directwrite_joint_layout.cpp /Fe:build\joint-control\observer.exe /Fo:build\joint-control\observer.obj /link dwrite.lib"
+          if ($LASTEXITCODE -ne 0) { throw 'DirectWrite observer compilation failed' }
+      - name: Execute authored control through native layout
+        run: python tools/swirl_vf/platform/probe_joint_directwrite.py --output build/joint-control/observations --binary build/joint-control/observer.exe
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: joint-authored-directwrite-${{ matrix.os }}-${{ github.sha }}
+          path: |
+            build/joint-control/observations/report.json
+            build/joint-control/observations/native.jsonl
+            build/joint-control/observations/native.stderr.log
+          retention-days: 7
