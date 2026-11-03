@@ -198,7 +198,11 @@ public:
     Q_INVOKABLE void setSystemProxy(bool enabled);
     Q_INVOKABLE void toggleSystemProxy();
     bool proxyRequested() const { return m_proxyRequested; }
-    bool systemProxyStopping() const { return m_stopAfterPolicy||m_engine->status().state==ProxyEngine::State::Stopping; }
+    bool systemProxyStopping() const {
+        return m_stopPhase==StopPhase::ReleasingProxy||m_stopPhase==StopPhase::StoppingCore
+            ||(m_stopAfterPolicy&&m_stopPhase!=StopPhase::ReleaseFailed)
+            ||m_engine->status().state==ProxyEngine::State::Stopping;
+    }
     bool systemProxyBusy() const { return m_shutdownAwaitingProxyRelease||m_proxyChecking||m_systemProxy.busy()||(m_proxyRequested&&busy())||systemProxyStopping(); }
     QVariantMap policyDocument() const { return m_policyDocument.toVariantMap(); }
     bool policyV2Active() const { return m_store.configurationV2(); }
@@ -247,6 +251,9 @@ private:
     bool m_shuttingDown=false;
     bool m_shutdownAwaitingProxyRelease=false;
     void finishShutdownAfterProxyRelease();
+    enum class StopPhase { Idle, ReleasingProxy, ReleaseFailed, StoppingCore };
+    StopPhase m_stopPhase=StopPhase::Idle;
+    void finishStopAfterProxyRelease();
     bool m_ingestingEngineStatus=false;
     bool m_meteredPending=false,m_meteredOldTun=false;
     QString m_meteredOldMode;

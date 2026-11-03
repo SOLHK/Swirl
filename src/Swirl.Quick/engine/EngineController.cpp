@@ -282,6 +282,12 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             QTimer::singleShot(0,this,[this]{finishShutdownAfterProxyRelease();});
             return;
         }
+        if(m_stopPhase==StopPhase::ReleasingProxy) {
+            // Keep the listener alive through every release observer. The
+            // queued continuation also rechecks policy and shutdown ownership.
+            QTimer::singleShot(0,this,[this]{finishStopAfterProxyRelease();});
+            return;
+        }
         if(!success)return;
         // A new listener may have become ready while a guard held the restore
         // lock. Resume the still-current intent without requiring another core
@@ -356,7 +362,12 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             // Revocation closes the Rust snapshot before it can continue using
             // deleted credentials. Do not roll back a pending choice to a node
             // that has just been removed, or automatically pick another exit.
-            m_pendingSelection.clear();m_previousSelection.clear();stop();
+            m_pendingSelection.clear();m_previousSelection.clear();
+            // Revocation is a security stop, not a retryable user disconnect:
+            // an owned proxy must not extend the lifetime of deleted secrets.
+            m_proxyRequested=false;m_connectionRequested=false;m_restartPending=false;
+            m_stopPhase=StopPhase::StoppingCore;m_routingError.clear();cancelSystemProxyCheck();m_systemProxy.disable();
+            m_options.selectedNodeId.clear();m_options.directSession=false;m_engine->stop();m_stopPhase=StopPhase::Idle;
             m_nodeError=QStringLiteral("正在使用的节点或策略依赖已删除；相应连接已停止，请重新选择节点。");
             emit diagnostic("EngineController","NodeSourceRevoked",m_nodeError);
         }
@@ -452,23 +463,63 @@ QString EngineController::errorCode() const {
 }
 bool EngineController::busy() const {
     const auto state = m_engine->status().state;
-    return state == ProxyEngine::State::Validating || state == ProxyEngine::State::Starting || state == ProxyEngine::State::Stopping;
+    return m_stopPhase==StopPhase::ReleasingProxy||m_stopPhase==StopPhase::StoppingCore
+        ||(m_stopAfterPolicy&&m_stopPhase!=StopPhase::ReleaseFailed)
+        ||state == ProxyEngine::State::Validating || state == ProxyEngine::State::Starting || state == ProxyEngine::State::Stopping;
 }
 void EngineController::start() { if(canStart())startConfiguredSession(); }
 void EngineController::stop() {
+    if(m_shuttingDown||m_stopPhase==StopPhase::StoppingCore)return;
+    if(m_stopPhase==StopPhase::ReleasingProxy) {
+        // changed/status observers can re-enter while disable() is still
+        // emitting its release result. Never stop from inside that emission.
+        QTimer::singleShot(0,this,[this]{finishStopAfterProxyRelease();});
+        return;
+    }
+    if(m_stopPhase==StopPhase::ReleaseFailed)m_routingError.clear();
+    m_stopPhase=StopPhase::ReleasingProxy;
     m_proxyRequested=false;m_connectionRequested=false;m_restartPending=false;cancelSystemProxyCheck();m_systemProxy.disable();
     if(m_policyBusy){
         m_stopAfterPolicy=true;
-        if(m_policyState=="preparing"&&!m_policyIntentDurable&&!m_policyRestartRecovery)finishPolicyMutation(false,QStringLiteral("用户停止，候选尚未写入或激活。"));
+        if(m_policyWaitingForStop)finishStopAfterProxyRelease();
+        else if(m_policyState=="preparing"&&!m_policyIntentDurable&&!m_policyRestartRecovery)finishPolicyMutation(false,QStringLiteral("用户停止，候选尚未写入或激活。"));
         else if(m_policyState=="reconciling"&&!m_policyDiskWrite)recoverPolicyConfiguration();
+        finishStopAfterProxyRelease();
         emit statusChanged();return;
     }
-    rollbackPendingSelection(QStringLiteral("节点切换已取消，保留原选择。"));m_diagnostics.noteEvent(QStringLiteral("Swirl 操作"),QStringLiteral("用户停止引擎，现有本机代理连接将关闭。"));m_options.selectedNodeId.clear();m_options.directSession=false;emit statusChanged();m_engine->stop();
+    finishStopAfterProxyRelease();
+}
+void EngineController::finishStopAfterProxyRelease() {
+    if(m_shuttingDown||m_stopPhase!=StopPhase::ReleasingProxy||m_systemProxy.busy())return;
+    if(m_systemProxy.owned()) {
+        // The owner process stays alive after a normal stop request. Its guard
+        // cannot recover a dead in-process listener while that owner still runs.
+        // Keep serving the owned endpoint, preserve recovery evidence, and let
+        // the same stop control retry without reacquiring or restarting Core.
+        m_stopPhase=StopPhase::ReleaseFailed;
+        m_routingError=(processAlive()
+            ?QStringLiteral("系统代理尚未恢复，内核保持运行；请重试关闭代理。")
+            :QStringLiteral("系统代理尚未恢复，内核已停止；请重试恢复系统设置。"))+m_systemProxy.error();
+        emit statusChanged();return;
+    }
+    // A durable policy transaction may need the Core stopped to reconcile its
+    // receipt. That explicit waiting state is safe to advance; other phases
+    // retain their existing completion/admission gates.
+    if(m_policyBusy&&!m_policyWaitingForStop)return;
+    m_stopPhase=StopPhase::StoppingCore;
+    rollbackPendingSelection(QStringLiteral("节点切换已取消，保留原选择。"));
+    if(m_shuttingDown)return;
+    m_diagnostics.noteEvent(QStringLiteral("Swirl 操作"),QStringLiteral("用户停止引擎，现有本机代理连接将关闭。"));
+    m_options.selectedNodeId.clear();m_options.directSession=false;
+    const auto state=m_engine->status().state;
+    if(state!=ProxyEngine::State::Stopped&&state!=ProxyEngine::State::Stopping)m_engine->stop();
+    m_stopPhase=StopPhase::Idle;
+    emit statusChanged();
 }
 void EngineController::shutdown() {
     if(m_shuttingDown)return;
     rollbackPendingSelection(QStringLiteral("节点切换已取消，保留原选择。"));
-    m_shuttingDown=true;m_connectionRequested=false;m_restartPending=false;m_proxyRequested=false;
+    m_shuttingDown=true;m_stopPhase=StopPhase::Idle;m_connectionRequested=false;m_restartPending=false;m_proxyRequested=false;
     cancelSystemProxyCheck();
     m_imports.shutdown();m_tests.cancel();
     m_shutdownAwaitingProxyRelease=true;
@@ -647,7 +698,7 @@ void EngineController::connectNode(const QString &id) {
     else m_engine->start(m_options);
 }
 void EngineController::startConfiguredSession() {
-    if(m_shuttingDown)return;
+    if(m_shuttingDown||m_stopPhase!=StopPhase::Idle||m_stopAfterPolicy)return;
     if(m_store.configurationV2()){
         if(m_policyBusy||m_store.configurationRecoveryRequired()||m_policyDocument.isEmpty()){
             m_policyError=QStringLiteral("配置仍在保存或恢复，未启动连接。");emit policyChanged();return;
@@ -1594,11 +1645,14 @@ void EngineController::finishPolicyMutation(bool success,const QString &error) {
     // copies must not outlive their result, especially after credential revoke.
     m_policyCandidateOptions={};m_policyRuntimeCandidate={};m_policyCandidateNetwork={};m_policyCandidate={};
     m_policyPrepared={};m_policyBaseReceipt={};
-    const auto requestId=m_policyRequestId;const bool stopAfter=m_stopAfterPolicy;m_stopAfterPolicy=false;
+    const auto requestId=m_policyRequestId;const bool stopAfter=m_stopAfterPolicy;
     emit policyChanged();emit optionsChanged();emit selectionChanged();emit statusChanged();
     emit policyApplyFinished(requestId,success);
     if(catalogCompletion)catalogCompletion(success,error);
-    if(stopAfter)stop();
+    m_stopAfterPolicy=false;
+    // A failed restore remains explicitly retryable; finishing a transaction
+    // must not silently restart the failed release attempt or stop its listener.
+    if(stopAfter&&m_stopPhase!=StopPhase::ReleaseFailed)stop();
 }
 void EngineController::failPolicyMutation(const QString &error) {
     m_policyError=error;
@@ -1763,7 +1817,10 @@ bool EngineController::recoverPolicyConfiguration() {
     if(m_store.configurationReceipt().value("request_id").toString()==m_policyRequestId)m_policyRecoveryAction="validate_committed";
     else if(m_policyIntentDurable&&m_policyCatalog&&!m_policyCatalog->removedNodeIds().isEmpty())m_policyRecoveryAction="validate_pending";
     else m_policyRecoveryAction=m_policyIntentDurable?"abort_pending":"cancel_unwritten";
-    m_policyState="reconciling";m_policyWaitingForStop=true;m_engine->stop();
+    m_policyState="reconciling";m_policyWaitingForStop=true;
+    const bool revokingCredentials=m_policyCatalog&&!m_policyCatalog->removedNodeIds().isEmpty();
+    if(m_stopAfterPolicy&&!revokingCredentials)finishStopAfterProxyRelease();
+    else m_engine->stop(); // Credential revocation must still fail closed immediately.
     QMetaObject::invokeMethod(this,[this]{
         if(m_policyWaitingForStop&&!processAlive()&&m_engine->status().state==ProxyEngine::State::Stopped)continuePolicyRecoveryAfterStop();
     },Qt::QueuedConnection);

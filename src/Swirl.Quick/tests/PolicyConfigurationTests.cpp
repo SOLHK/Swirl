@@ -3,6 +3,7 @@
 #include "PolicySystemProxyBackend.h"
 #include <QCryptographicHash>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -450,15 +451,24 @@ private slots:
         for(const bool cancel:{false,true}) {
             QTemporaryDir dir;QTcpServer listener,capture;QVERIFY(listener.listen(QHostAddress::LocalHost));QVERIFY(capture.listen(QHostAddress::LocalHost));
             auto backend=std::make_unique<WaitingPolicyProxyBackend>();auto *proxy=backend.get();proxy->ready=true;
-            EngineController controller(std::make_unique<ConfigurationPeer>(),nullptr,dir.filePath("restore-contention.dpapi"),false,std::move(backend));
+            auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+            EngineController controller(std::move(peer),nullptr,dir.filePath("restore-contention.dpapi"),false,std::move(backend));
             controller.setProxyPort(listener.serverPort());QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
             controller.toggleSystemProxy();QTRY_VERIFY(controller.systemProxy()->owned());QCOMPARE(proxy->memory.enableCalls,1);
+            const auto startsBefore=engine->starts,stopsBefore=engine->stops;
             proxy->releaseReady=false;controller.setCaptureProxyPort(capture.serverPort());QVERIFY(controller.systemProxyBusy());
-            if(cancel)controller.toggleSystemProxy();
+            if(cancel){
+                controller.toggleSystemProxy();
+                QVERIFY(!controller.proxyRequested());QVERIFY(controller.systemProxy()->owned());QVERIFY(controller.systemProxyBusy());
+                QVERIFY(controller.processAlive());QCOMPARE(engine->stops,stopsBefore);QCOMPARE(engine->starts,startsBefore);
+                QTest::qWait(80);QVERIFY(controller.processAlive());QCOMPARE(engine->stops,stopsBefore);
+                QCOMPARE(engine->starts,startsBefore);QCOMPARE(proxy->memory.restoreCalls,0);
+            }
             proxy->releaseReady=true;
             if(cancel) {
                 QTRY_VERIFY(!controller.systemProxyBusy());QTest::qWait(60);
                 QVERIFY(!controller.proxyRequested());QVERIFY(!controller.systemProxy()->owned());QCOMPARE(proxy->memory.enableCalls,1);
+                QVERIFY(!controller.processAlive());QCOMPARE(engine->stops,stopsBefore+1);QCOMPARE(engine->starts,startsBefore);
             }else {
                 QTRY_COMPARE(proxy->memory.enableCalls,2);QTRY_VERIFY(!controller.systemProxyBusy());
                 QVERIFY(controller.proxyRequested());QVERIFY(controller.systemProxy()->owned());QCOMPARE(proxy->memory.lastPort,int(capture.serverPort()));
@@ -466,6 +476,88 @@ private slots:
             }
             QCOMPARE(proxy->memory.restoreCalls,cancel?1:2);QVERIFY(proxy->memory.current().systemEnabled);
         }
+    }
+    void normalStopKeepsTheCoreAliveUntilOwnedProxyReleaseCompletes(){
+        QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
+        auto backend=std::make_unique<WaitingPolicyProxyBackend>();auto *proxy=backend.get();proxy->ready=true;
+        auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("normal-stop-release.dpapi"),false,std::move(backend));
+        controller.setProxyPort(listener.serverPort());QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
+        const auto original=controller.systemProxy()->diagnosticState();
+        controller.toggleSystemProxy();QTRY_VERIFY(controller.systemProxy()->owned());QVERIFY(controller.processAlive());QVERIFY(controller.apiHealthy());
+        const auto startsBefore=engine->starts,stopsBefore=engine->stops;
+        QSignalSpy released(controller.systemProxy(),&SystemProxySession::releaseFinished);
+        bool aliveAtRelease=false,healthyAtRelease=false;
+        connect(controller.systemProxy(),&SystemProxySession::releaseFinished,&controller,[&](bool){
+            aliveAtRelease=controller.processAlive();healthyAtRelease=controller.apiHealthy();
+        });
+        bool releaseReentryArmed=false,reentrantStopObserved=false,reentryKeptCoreAlive=false;
+        connect(&controller,&EngineController::statusChanged,&controller,[&]{
+            if(!releaseReentryArmed||controller.systemProxy()->owned())return;
+            releaseReentryArmed=false;reentrantStopObserved=true;
+            controller.stop();reentryKeptCoreAlive=controller.processAlive()&&engine->stops==stopsBefore;
+        });
+        proxy->releaseReady=false;controller.stop();controller.stop();
+        QVERIFY(!controller.proxyRequested());QVERIFY(controller.systemProxy()->owned());QVERIFY(controller.systemProxyBusy());
+        QVERIFY(controller.processAlive());QVERIFY(controller.apiHealthy());QCOMPARE(engine->stops,stopsBefore);QCOMPARE(engine->starts,startsBefore);
+        QTest::qWait(80);controller.stop();
+        QVERIFY(controller.processAlive());QVERIFY(controller.apiHealthy());QCOMPARE(engine->stops,stopsBefore);QCOMPARE(engine->starts,startsBefore);
+        QCOMPARE(released.size(),0);QCOMPARE(proxy->memory.restoreCalls,0);QCOMPARE(proxy->memory.enableCalls,1);
+        releaseReentryArmed=true;proxy->releaseReady=true;
+        QTRY_COMPARE_WITH_TIMEOUT(released.size(),1,1000);QVERIFY(released.first().first().toBool());QVERIFY(aliveAtRelease);QVERIFY(healthyAtRelease);
+        QVERIFY(reentrantStopObserved);QVERIFY(reentryKeptCoreAlive);
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive()&&!controller.systemProxyBusy(),1000);
+        QCOMPARE(engine->stops,stopsBefore+1);QCOMPARE(engine->starts,startsBefore);QCOMPARE(proxy->memory.restoreCalls,1);
+        QVERIFY(!controller.systemProxy()->owned());QVERIFY(!controller.proxyRequested());QCOMPARE(controller.systemProxy()->diagnosticState(),original);
+        QTest::qWait(80);QCOMPARE(released.size(),1);QCOMPARE(engine->stops,stopsBefore+1);QCOMPARE(engine->starts,startsBefore);
+        QCOMPARE(proxy->memory.enableCalls,1);QCOMPARE(proxy->memory.restoreCalls,1);QCOMPARE(proxy->memory.disableCalls,1);
+    }
+    void normalStopReleaseFailureAndTimeoutKeepTheOwnedListenerRetryable_data(){
+        QTest::addColumn<bool>("timeout");
+        QTest::newRow("release-preparation-failure")<<false;
+        QTest::newRow("real-two-second-release-timeout")<<true;
+    }
+    void normalStopReleaseFailureAndTimeoutKeepTheOwnedListenerRetryable(){
+        QFETCH(bool,timeout);
+        QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
+        auto backend=std::make_unique<WaitingPolicyProxyBackend>();auto *proxy=backend.get();proxy->ready=true;
+        auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("normal-stop-failed-release.dpapi"),false,std::move(backend));
+        controller.setProxyPort(listener.serverPort());QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY(!controller.policyBusy());
+        const auto original=controller.systemProxy()->diagnosticState();
+        controller.toggleSystemProxy();QTRY_VERIFY(controller.systemProxy()->owned());QVERIFY(controller.processAlive());
+        const auto startsBefore=engine->starts,stopsBefore=engine->stops;
+        QSignalSpy released(controller.systemProxy(),&SystemProxySession::releaseFinished);
+        QList<bool> aliveAtRelease,healthyAtRelease;QStringList errorsAtRelease;
+        connect(controller.systemProxy(),&SystemProxySession::releaseFinished,&controller,[&](bool){
+            aliveAtRelease.append(controller.processAlive());healthyAtRelease.append(controller.apiHealthy());errorsAtRelease.append(controller.systemProxy()->error());
+        });
+        proxy->releaseReady=false;QElapsedTimer releaseElapsed;releaseElapsed.start();controller.stop();
+        QVERIFY(!controller.proxyRequested());QVERIFY(controller.systemProxy()->owned());QVERIFY(controller.systemProxyBusy());
+        QVERIFY(controller.processAlive());QVERIFY(controller.apiHealthy());QCOMPARE(engine->stops,stopsBefore);
+        if(!timeout)proxy->releaseFails=true;
+        // Exercise the unchanged production deadline; do not advance a private
+        // timer or replace ownership restoration with a timeout-only success.
+        QTRY_COMPARE_WITH_TIMEOUT(released.size(),1,4500);
+        if(timeout)QVERIFY2(releaseElapsed.elapsed()>=2000,"The real two-second release deadline did not elapse.");
+        QVERIFY(!released.first().first().toBool());QCOMPARE(aliveAtRelease.size(),1);QVERIFY(aliveAtRelease.first());QVERIFY(healthyAtRelease.first());
+        QVERIFY(!errorsAtRelease.first().isEmpty());
+        if(timeout)QVERIFY(errorsAtRelease.first().contains(QStringLiteral("可重试释放代理")));
+        else QVERIFY(errorsAtRelease.first().contains(QStringLiteral("release preparation failure")));
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.systemProxyBusy(),1000);
+        QVERIFY(controller.systemProxy()->owned());QVERIFY(controller.processAlive());QVERIFY(controller.apiHealthy());
+        QVERIFY(!controller.systemProxy()->error().isEmpty());QVERIFY(!controller.proxyRequested());
+        QCOMPARE(engine->stops,stopsBefore);QCOMPARE(engine->starts,startsBefore);QCOMPARE(proxy->memory.restoreCalls,0);
+        QTest::qWait(80);QCOMPARE(released.size(),1);QVERIFY(controller.processAlive());QVERIFY(controller.systemProxy()->owned());
+        QVERIFY(!controller.systemProxyBusy());QCOMPARE(engine->stops,stopsBefore);QCOMPARE(engine->starts,startsBefore);QCOMPARE(proxy->memory.enableCalls,1);
+        proxy->releaseFails=false;proxy->releaseReady=true;controller.stop();
+        QTRY_COMPARE_WITH_TIMEOUT(released.size(),2,1000);QVERIFY(released.last().first().toBool());
+        QCOMPARE(aliveAtRelease.size(),2);QVERIFY(aliveAtRelease.last());QVERIFY(healthyAtRelease.last());
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive()&&!controller.systemProxyBusy(),1000);
+        QCOMPARE(engine->stops,stopsBefore+1);QCOMPARE(engine->starts,startsBefore);QCOMPARE(proxy->memory.restoreCalls,1);
+        QVERIFY(!controller.systemProxy()->owned());QVERIFY(!controller.proxyRequested());QVERIFY(controller.systemProxy()->error().isEmpty());
+        QCOMPARE(controller.systemProxy()->diagnosticState(),original);QTest::qWait(80);
+        QCOMPARE(released.size(),2);QCOMPARE(engine->stops,stopsBefore+1);QCOMPARE(engine->starts,startsBefore);QCOMPARE(proxy->memory.enableCalls,1);
     }
     void shutdownKeepsTheCoreAliveUntilOwnedProxyReleaseCompletes(){
         QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
@@ -536,14 +628,23 @@ private slots:
     void acquisitionFailureStopsTheCoreAndRestorationFailureRetainsItsRetry(){
         QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
         auto backend=std::make_unique<FailingPolicyProxyBackend>();auto *proxy=backend.get();proxy->rejectEnable=true;
-        EngineController controller(std::make_unique<ConfigurationPeer>(),nullptr,dir.filePath("restore.dpapi"),false,std::move(backend));
+        auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,dir.filePath("restore.dpapi"),false,std::move(backend));
         controller.setProxyPort(listener.serverPort());QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        const auto original=controller.systemProxy()->diagnosticState();
         controller.toggleSystemProxy();QTRY_VERIFY_WITH_TIMEOUT(!controller.proxyRequested()&&!controller.processAlive(),3000);
         QCOMPARE(proxy->enableAttempts,1);QVERIFY(proxy->current().systemEnabled);QVERIFY(controller.routingError().contains(QStringLiteral("acquisition failure")));
+        QCOMPARE(engine->starts,1);QCOMPARE(engine->stops,1);
         proxy->rejectEnable=false;controller.toggleSystemProxy();QTRY_VERIFY_WITH_TIMEOUT(controller.systemProxy()->owned(),3000);
-        proxy->rejectRestore=true;controller.toggleSystemProxy();QVERIFY(!controller.proxyRequested());QVERIFY(!controller.processAlive());
+        const auto stopsBefore=engine->stops;QCOMPARE(engine->starts,2);
+        // A failed restore still owns the system proxy. Keeping its listener
+        // alive is a stronger safety requirement than the former dead-core assertion.
+        proxy->rejectRestore=true;controller.toggleSystemProxy();QVERIFY(!controller.proxyRequested());QVERIFY(controller.processAlive());
         QVERIFY(controller.systemProxy()->owned());QVERIFY(controller.systemProxy()->error().contains(QStringLiteral("restoration failure")));
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.systemProxyBusy(),1000);QCOMPARE(engine->stops,stopsBefore);QCOMPARE(engine->starts,2);
         proxy->rejectRestore=false;controller.toggleSystemProxy();QVERIFY(!controller.systemProxy()->owned());QVERIFY(controller.systemProxy()->systemEnabled());QVERIFY(controller.systemProxy()->error().isEmpty());QCOMPARE(proxy->memory.restoreCalls,1);
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive()&&!controller.systemProxyBusy(),1000);QCOMPARE(engine->stops,stopsBefore+1);QCOMPARE(engine->starts,2);
+        QCOMPARE(controller.systemProxy()->diagnosticState(),original);
     }
     void stoppingDuringADurablePolicyChangeClearsIntentBeforeDeferredShutdown(){
         QTemporaryDir dir;QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
@@ -555,6 +656,113 @@ private slots:
         QVERIFY(controller.applyPolicyDocument(changedDocument().toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy()&&!controller.processAlive(),5000);
         QVERIFY(deferred);QVERIFY(!controller.proxyRequested());QVERIFY(!controller.systemProxy()->owned());QVERIFY(proxy->current().systemEnabled);QCOMPARE(proxy->takeoverCalls,1);QCOMPARE(proxy->restoreCalls,1);
         QCOMPARE(controller.policyDocument(),changedDocument().toVariantMap());QVERIFY(controller.policyError().isEmpty());
+    }
+    void durablePolicyStopWaitsForProxyRelease(){
+        QTemporaryDir dir;const auto path=dir.filePath("durable-policy-stop.dpapi");QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
+        auto backend=std::make_unique<WaitingPolicyProxyBackend>();auto *proxy=backend.get();proxy->ready=true;
+        auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,path,false,std::move(backend));
+        controller.setProxyPort(listener.serverPort());QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        const auto original=controller.systemProxy()->diagnosticState();
+        controller.toggleSystemProxy();QTRY_VERIFY_WITH_TIMEOUT(controller.systemProxy()->owned(),3000);
+        const auto startsBefore=engine->starts,stopsBefore=engine->stops;
+        QSignalSpy finished(&controller,&EngineController::policyApplyFinished);
+        QSignalSpy released(controller.systemProxy(),&SystemProxySession::releaseFinished);
+        bool deferred=false,aliveAtRelease=false;
+        connect(controller.systemProxy(),&SystemProxySession::releaseFinished,&controller,[&](bool){aliveAtRelease=controller.processAlive();});
+        bool completionReentryArmed=true,completionReentryObserved=false,completionKeptStopped=false;
+        connect(&controller,&EngineController::policyApplyFinished,&controller,[&](const QString &,bool success){
+            if(!success||!completionReentryArmed)return;
+            completionReentryArmed=false;completionReentryObserved=true;
+            controller.setSystemProxy(true);
+            completionKeptStopped=!controller.proxyRequested()&&!controller.processAlive()&&engine->starts==startsBefore;
+        });
+        engine->beforeActivate=[&]{
+            proxy->releaseReady=false;controller.stop();
+            deferred=controller.policyBusy()&&controller.processAlive()&&!controller.proxyRequested()&&controller.systemProxy()->owned();
+        };
+        QVERIFY(controller.applyPolicyDocument(changedDocument().toVariantMap()));const auto request=controller.policyRequestId();
+        QTRY_VERIFY_WITH_TIMEOUT(controller.m_policyWaitingForStop,5000);
+        QVERIFY(deferred);QVERIFY(controller.policyBusy());QVERIFY(controller.processAlive());QVERIFY(controller.apiHealthy());QVERIFY(engine->gate);
+        QVERIFY(controller.systemProxy()->owned());QVERIFY(controller.systemProxy()->busy());QVERIFY(controller.systemProxyBusy());
+        QCOMPARE(engine->stops,stopsBefore);QCOMPARE(engine->starts,startsBefore);QCOMPARE(released.size(),0);QCOMPARE(finished.size(),0);
+        const auto committedWhileWaiting=envelope(path);QVERIFY(!committedWhileWaiting.contains("pending"));
+        QCOMPARE(committedWhileWaiting.value("committed").toObject().value("request_id").toString(),request);
+        QCOMPARE(engine->current.configurationReceipt.value("applied_revision").toString(),controller.savedRevision());
+        controller.stop();QTest::qWait(80);
+        QVERIFY(controller.m_policyWaitingForStop);QVERIFY(controller.processAlive());QVERIFY(engine->gate);QCOMPARE(engine->stops,stopsBefore);
+        QCOMPARE(engine->starts,startsBefore);QCOMPARE(proxy->memory.restoreCalls,0);QCOMPARE(finished.size(),0);
+        proxy->releaseReady=true;
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy()&&!controller.processAlive()&&!controller.systemProxyBusy(),5000);
+        QCOMPARE(released.size(),1);QVERIFY(released.first().first().toBool());QVERIFY(aliveAtRelease);
+        QCOMPARE(finished.size(),1);QCOMPARE(finished.first().first().toString(),request);QVERIFY(finished.first().at(1).toBool());
+        QVERIFY(completionReentryObserved);QVERIFY(completionKeptStopped);
+        QVERIFY(!controller.m_policyWaitingForStop);QVERIFY(!controller.systemProxy()->owned());QVERIFY(!controller.proxyRequested());QVERIFY(!engine->gate);
+        QCOMPARE(engine->stops,stopsBefore+1);QCOMPARE(engine->starts,startsBefore);QCOMPARE(proxy->memory.enableCalls,1);QCOMPARE(proxy->memory.restoreCalls,1);
+        QCOMPARE(controller.systemProxy()->diagnosticState(),original);QCOMPARE(controller.policyDocument(),changedDocument().toVariantMap());
+        QCOMPARE(controller.savedRevision(),QString("2"));QVERIFY(controller.policyError().isEmpty());
+        const auto stored=envelope(path);QCOMPARE(stored,committedWhileWaiting);
+        const auto committed=stored.value("committed").toObject();
+        QCOMPARE(committed.value("snapshot").toObject().value("networkConfiguration").toObject().value("policyDocumentV2").toObject(),changedDocument());
+        auto expectedReceipt=committed;expectedReceipt.remove("snapshot");expectedReceipt.insert("store_id",stored.value("store_id"));
+        QCOMPARE(controller.m_store.configurationReceipt(),expectedReceipt);expectedReceipt.insert("scope","saved-next-connect");
+        QCOMPARE(controller.policyReceipt(),expectedReceipt.toVariantMap());
+        QTest::qWait(80);QCOMPARE(engine->stops,stopsBefore+1);QCOMPARE(engine->starts,startsBefore);QCOMPARE(finished.size(),1);
+    }
+    void durablePolicyStopTimeoutKeepsTheOwnedListenerAndTransactionRetryable(){
+        QTemporaryDir dir;const auto path=dir.filePath("durable-policy-stop-timeout.dpapi");QTcpServer listener;QVERIFY(listener.listen(QHostAddress::LocalHost));
+        auto backend=std::make_unique<WaitingPolicyProxyBackend>();auto *proxy=backend.get();proxy->ready=true;
+        auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();
+        EngineController controller(std::move(peer),nullptr,path,false,std::move(backend));
+        controller.setProxyPort(listener.serverPort());QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        const auto original=controller.systemProxy()->diagnosticState();
+        controller.toggleSystemProxy();QTRY_VERIFY_WITH_TIMEOUT(controller.systemProxy()->owned(),3000);
+        const auto startsBefore=engine->starts,stopsBefore=engine->stops;
+        QSignalSpy finished(&controller,&EngineController::policyApplyFinished);
+        QSignalSpy released(controller.systemProxy(),&SystemProxySession::releaseFinished);
+        QElapsedTimer releaseElapsed;QList<bool> aliveAtRelease;QStringList errorsAtRelease;bool deferred=false;
+        connect(controller.systemProxy(),&SystemProxySession::releaseFinished,&controller,[&](bool){
+            aliveAtRelease.append(controller.processAlive());errorsAtRelease.append(controller.systemProxy()->error());
+        });
+        engine->beforeActivate=[&]{
+            proxy->releaseReady=false;releaseElapsed.start();controller.stop();
+            deferred=controller.policyBusy()&&controller.processAlive()&&!controller.proxyRequested()&&controller.systemProxy()->owned();
+        };
+        QVERIFY(controller.applyPolicyDocument(changedDocument().toVariantMap()));const auto request=controller.policyRequestId();
+        QTRY_VERIFY_WITH_TIMEOUT(controller.m_policyWaitingForStop,5000);
+        QVERIFY(deferred);QVERIFY(controller.policyBusy());QVERIFY(controller.processAlive());QVERIFY(engine->gate);
+        QVERIFY(controller.systemProxy()->owned());QVERIFY(controller.systemProxy()->busy());QVERIFY(controller.systemProxyBusy());
+        QCOMPARE(engine->stops,stopsBefore);QCOMPARE(engine->starts,startsBefore);QCOMPARE(released.size(),0);
+        const auto committedWhileWaiting=envelope(path);QVERIFY(!committedWhileWaiting.contains("pending"));
+        QCOMPARE(committedWhileWaiting.value("committed").toObject().value("request_id").toString(),request);
+        // Keep the actual release pending until its production deadline. The
+        // durable transaction must retain its admission gate and live listener.
+        QTRY_COMPARE_WITH_TIMEOUT(released.size(),1,4500);
+        QVERIFY2(releaseElapsed.elapsed()>=2000,"The durable-policy release did not reach the real two-second deadline.");
+        QVERIFY(!released.first().first().toBool());QCOMPARE(aliveAtRelease.size(),1);QVERIFY(aliveAtRelease.first());
+        QVERIFY(errorsAtRelease.first().contains(QStringLiteral("可重试释放代理")));
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.systemProxyStopping()&&!controller.systemProxyBusy(),1000);
+        QVERIFY(controller.policyBusy());QVERIFY(controller.m_policyWaitingForStop);QVERIFY(engine->gate);
+        QVERIFY(controller.processAlive());QVERIFY(controller.apiHealthy());QVERIFY(controller.systemProxy()->owned());QVERIFY(!controller.proxyRequested());
+        QVERIFY(!controller.routingError().isEmpty());QCOMPARE(finished.size(),0);QCOMPARE(engine->stops,stopsBefore);QCOMPARE(engine->starts,startsBefore);
+        QCOMPARE(proxy->memory.restoreCalls,0);QCOMPARE(proxy->memory.enableCalls,1);QCOMPARE(envelope(path),committedWhileWaiting);
+        QTest::qWait(80);QVERIFY(controller.processAlive());QVERIFY(controller.m_policyWaitingForStop);QVERIFY(engine->gate);
+        QVERIFY(!controller.systemProxyStopping());QVERIFY(!controller.systemProxyBusy());QCOMPARE(released.size(),1);QCOMPARE(engine->stops,stopsBefore);
+        proxy->releaseReady=true;controller.toggleSystemProxy();
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy()&&!controller.processAlive()&&!controller.systemProxyBusy(),5000);
+        QCOMPARE(released.size(),2);QVERIFY(released.last().first().toBool());QCOMPARE(aliveAtRelease.size(),2);QVERIFY(aliveAtRelease.last());
+        QCOMPARE(finished.size(),1);QCOMPARE(finished.first().first().toString(),request);QVERIFY(finished.first().at(1).toBool());
+        QVERIFY(!controller.m_policyWaitingForStop);QVERIFY(!controller.systemProxyStopping());QVERIFY(!controller.systemProxy()->owned());
+        QVERIFY(!controller.proxyRequested());QVERIFY(!engine->gate);QVERIFY(controller.routingError().isEmpty());QVERIFY(controller.policyError().isEmpty());
+        QCOMPARE(engine->stops,stopsBefore+1);QCOMPARE(engine->starts,startsBefore);QCOMPARE(proxy->memory.enableCalls,1);QCOMPARE(proxy->memory.restoreCalls,1);
+        QCOMPARE(controller.systemProxy()->diagnosticState(),original);QCOMPARE(controller.policyDocument(),changedDocument().toVariantMap());
+        QCOMPARE(controller.savedRevision(),QString("2"));const auto stored=envelope(path);QCOMPARE(stored,committedWhileWaiting);
+        const auto committed=stored.value("committed").toObject();
+        QCOMPARE(committed.value("snapshot").toObject().value("networkConfiguration").toObject().value("policyDocumentV2").toObject(),changedDocument());
+        auto expectedReceipt=committed;expectedReceipt.remove("snapshot");expectedReceipt.insert("store_id",stored.value("store_id"));
+        QCOMPARE(controller.m_store.configurationReceipt(),expectedReceipt);expectedReceipt.insert("scope","saved-next-connect");
+        QCOMPARE(controller.policyReceipt(),expectedReceipt.toVariantMap());
+        QTest::qWait(80);QCOMPARE(engine->stops,stopsBefore+1);QCOMPARE(engine->starts,startsBefore);QCOMPARE(finished.size(),1);
     }
 };
 QTEST_GUILESS_MAIN(PolicyConfigurationTests)

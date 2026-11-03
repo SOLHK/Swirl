@@ -250,6 +250,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Qt test runtime deployment failed.' }
           & dist/Swirl.exe --tls-runtime-self-test build-evidence/ui-tls-runtime.json
           if ($LASTEXITCODE -ne 0) { throw 'The bundled UI TLS runtime is incomplete or borrowed from PATH.' }
+      - name: Prove normal proxy-stop ordering against the old production controller
+        shell: pwsh
+        run: |
+          git fetch --no-tags --depth=1 origin 0a38491d2b87ba9790ebe4e9b797d30680c9e960
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch the exact proxy-stop negative-control source.' }
+          python tools/tests/test_system_proxy_stop_regression.py --build-dir build/swirl-quick --output build-evidence/system-proxy-stop
+          if ($LASTEXITCODE -ne 0) { throw 'Normal proxy-stop candidate or old-code negative control failed.' }
       # Qt's offscreen QPA font database reads appdir/lib/fonts and does not
       # automatically discover the fonts installed on a Windows CI runner.
       # These fixtures are used for synthetic screenshot tests ONLY.
@@ -915,6 +922,7 @@ jobs:
             build-evidence/critical-ui.xml
             build-evidence/critical-policy-evidence/
             build-evidence/critical-network.xml
+            build-evidence/system-proxy-stop/
             build-evidence/overview-input.log
             build-evidence/ctest-inventory.json
             build-evidence/activity-diagnostic-regression.xml
