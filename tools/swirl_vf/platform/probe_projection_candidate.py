@@ -135,6 +135,28 @@ def declared_user_location(location):
     return location
 
 
+def replay_requests(source, candidate, paths, offset):
+    """Replay exact physical inputs, never previous outlines or verdicts."""
+    requests, roots = [], []
+    defaults = {a.axisTag: a.defaultValue for a in candidate['fvar'].axes[3:]}
+    axes = {a.axisTag: a for a in source['fvar'].axes}
+    for path in paths:
+        for row in json.loads(path.read_text())['requests']:
+            values = row['coordinates']
+            geometry.require(set(TAGS) <= set(values) and row['text']=='A'
+                and all(value == 0 for tag,value in values.items() if tag not in TAGS),
+                'replay_requires_physical_inputs_and_default_computational_axes')
+            physical = {tag: values[tag] for tag in TAGS}
+            geometry.require(all(type(v) in (int,float) and np.isfinite(v)
+                and axes[tag].minValue <= v <= axes[tag].maxValue for tag,v in physical.items()),
+                'invalid_replay_physical_coordinate')
+            roots.append([piecewiseLinearMap(normalizeValue(physical[tag],
+                (axes[tag].minValue,axes[tag].defaultValue,axes[tag].maxValue)),source['avar'].segments[tag])
+                for tag in TAGS])
+            requests.append(dict(id=str(offset+len(requests)),text='A',coordinates={**physical,**defaults}))
+    return requests,np.asarray(roots).reshape(-1,3)
+
+
 def independence(points, atlas_path, parameter_path, *, legacy_grid=False):
     held = fingerprints(points)
     with np.load(atlas_path, allow_pickle=False) as atlas:
@@ -189,6 +211,10 @@ def run(args):
             plan.extend(dict(row, kind='retained_failure_regression')
                         for row in json.loads(args.regression_plan.read_text()))
         requests, roots = requests_for_plan(source, font, plan)
+        extra_requests,extra_roots = replay_requests(source,font,getattr(args,'replay_manifest',()),len(requests))
+        if extra_requests:
+            requests.extend(extra_requests);roots=np.r_[roots,extra_roots]
+            plan.extend(dict(kind='exact_physical_regression',point=p.tolist()) for p in extra_roots)
         separation, independent = independence(roots, args.atlas, args.parameters, legacy_grid=args.legacy_grid_atlas)
         (out/'plan.json').write_text(json.dumps(dict(plan=plan, roots=roots.tolist(), separation=separation)))
         blob = args.candidate.read_bytes()
@@ -315,6 +341,8 @@ if __name__ == '__main__':
     parser.add_argument('--fonttools', type=int, default=256)
     parser.add_argument('--coretext-binary', type=Path)
     parser.add_argument('--regression-plan', type=Path)
+    parser.add_argument('--replay-manifest', type=Path, action='append', default=[],
+                        help='Freshly execute exact physical inputs from a retained private manifest')
     parser.add_argument('--legacy-grid-atlas', action='store_true')
     args = parser.parse_args()
     geometry.require(args.random > 0 and args.seams > 0 and args.fonttools > 0, 'positive_validation_coverage_required')

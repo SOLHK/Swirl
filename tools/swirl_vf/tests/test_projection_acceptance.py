@@ -1,17 +1,32 @@
 """No native response may alter the input plan or upgrade overlap to holdout."""
 from pathlib import Path
+import json
+from types import SimpleNamespace
 import sys
 import tempfile
 import unittest
 import numpy as np
 sys.path[:0] = [str(Path(__file__).resolve().parents[1]/'tools'),
                str(Path(__file__).resolve().parents[1]/'platform')]
-from probe_projection_candidate import independence, contour_measure, declared_user_location
+from probe_projection_candidate import independence, contour_measure, declared_user_location, replay_requests
 from adaptive_projection_atlas import fingerprints
 from verified_axis_oracle import declare_readback
 
 
 class ProjectionAcceptanceTests(unittest.TestCase):
+    def test_replay_preserves_exact_inputs_and_rejects_nondefault_hidden_axes(self):
+        axes=[SimpleNamespace(axisTag=t,minValue=-1,defaultValue=0,maxValue=1) for t in ('WDTH','wght','HGHT','H000')]
+        source={'fvar':SimpleNamespace(axes=axes[:3]),'avar':SimpleNamespace(segments={a.axisTag:{-1:-1,0:0,1:1} for a in axes[:3]})}
+        target={'fvar':SimpleNamespace(axes=axes)}
+        values=dict(WDTH=.123456789,wght=-.7654321,HGHT=.314159265,H000=0)
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/'manifest.json';p.write_text(json.dumps(dict(requests=[dict(text='A',coordinates=values)])))
+            requests,roots=replay_requests(source,target,[p],11)
+            self.assertEqual(requests,[dict(id='11',text='A',coordinates=values)])
+            np.testing.assert_array_equal(roots,[list(values.values())[:3]])
+            values['H000']=.5;p.write_text(json.dumps(dict(requests=[dict(text='A',coordinates=values)])))
+            with self.assertRaisesRegex(ValueError,'default_computational_axes'):replay_requests(source,target,[p],0)
+
     def test_training_refinement_and_duplicate_rows_are_not_independent(self):
         with tempfile.TemporaryDirectory() as directory:
             a, p = Path(directory)/'atlas.npz', Path(directory)/'parameters.npz'
