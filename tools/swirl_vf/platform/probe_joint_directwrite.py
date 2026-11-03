@@ -95,9 +95,9 @@ def run(output,binary=None,variant='full'):
             report['DirectWrite']='EXECUTION_FAILED'
         else:
             rows=list(map(json.loads,native.stdout.splitlines()))
-            if rows[0]['type']!='metadata' or rows[-1].get('requests')!=len(requests) or not rows[-1].get('actual_tables_and_axes_verified'):
+            if rows[0]['type']!='metadata' or rows[-1].get('requests')!=len(requests) or not rows[-1].get('actual_tables_verified'):
                 raise ValueError('incomplete_native_transcript')
-            report['native_metadata']=rows[0];stats=dict(observations=0,failures=0,max_error=0.,selection_failures=0,advance_failures=0,empty_outlines=0)
+            report['native_metadata']=rows[0];stats=dict(observations=0,failures=0,max_error=0.,selection_failures=0,advance_failures=0,empty_outlines=0,axis_readback_failures=0,max_axis_readback_error=0.)
             observed=rows[1:-1]
             if len(observed)!=len(requests):raise ValueError('native_request_count_mismatch')
             for r,wanted,row in zip(requests,expected,observed):
@@ -107,6 +107,8 @@ def run(output,binary=None,variant='full'):
                 stats['observations']+=1;stats['failures']+=not verdict['passed'];stats['max_error']=max(stats['max_error'],verdict['error'] or 0.)
                 stats['selection_failures']+=not selected;stats['advance_failures']+=abs(row['advance']-700)>1/32
                 stats['empty_outlines']+=not row['commands']
+                stats['axis_readback_failures']+=row['axis_readback_failures']
+                stats['max_axis_readback_error']=max(stats['max_axis_readback_error'],row['max_axis_readback_error'])
             report['DirectWrite']=stats
     (out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report),flush=True)
     return report
@@ -119,5 +121,5 @@ if __name__=='__main__':
     reports=[run(a.output/v,a.binary,v) if a.matrix else run(a.output,a.binary) for v in variants]
     def failed(r):
         dw=r['DirectWrite']
-        return r['HarfBuzz']['failures'] or (isinstance(dw,dict) and any(dw[k] for k in ('failures','selection_failures','advance_failures'))) or dw=='EXECUTION_FAILED'
+        return r['HarfBuzz']['failures'] or (isinstance(dw,dict) and any(dw[k] for k in ('failures','selection_failures','advance_failures','axis_readback_failures'))) or dw=='EXECUTION_FAILED'
     raise SystemExit(1 if any(map(failed,reports)) else 0)

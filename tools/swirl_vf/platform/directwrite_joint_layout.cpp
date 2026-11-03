@@ -51,7 +51,7 @@ struct Fixture {
         for(unsigned i=0;i<7;++i){const BYTE* a=p+offset+20*i;defaults.push_back({DWRITE_FONT_AXIS_TAG(tag(a)),float(int32_t(u32(a+8))/65536.0)});}
     }
     ~Fixture(){if(lock!=INVALID_HANDLE_VALUE)CloseHandle(lock);}
-    void verify(IDWriteFontFace* face,const std::vector<DWRITE_FONT_AXIS_VALUE>& wanted)const{
+    std::pair<unsigned,float> verify(IDWriteFontFace* face,const std::vector<DWRITE_FONT_AXIS_VALUE>& wanted)const{
         require(face->GetIndex()==0&&face->GetSimulations()==DWRITE_FONT_SIMULATIONS_NONE,"wrong_face_or_simulation");
         for(const char* name:{"CFF2","fvar","avar","GSUB","cmap"}){
             UINT32 t=tag(reinterpret_cast<const BYTE*>(name));auto reference=tables.at(t);
@@ -63,8 +63,11 @@ struct Fixture {
         ComPtr<IDWriteFontFace5> variable;check(face->QueryInterface(IID_PPV_ARGS(&variable)),"FontFace5");
         std::vector<DWRITE_FONT_AXIS_VALUE> actual(variable->GetFontAxisValueCount());
         check(variable->GetFontAxisValues(actual.data(),UINT32(actual.size())),"GetFontAxisValues");
+        unsigned mismatches=0;float maximum=0;
         for(auto a:wanted){auto b=std::find_if(actual.begin(),actual.end(),[&](auto x){return x.axisTag==a.axisTag;});
-            require(b!=actual.end()&&b->value==a.value,"actual_axis_readback_mismatch");}
+            require(b!=actual.end()&&std::isfinite(b->value),"missing_actual_axis");
+            mismatches+=b->value!=a.value;maximum=std::max(maximum,std::abs(b->value-a.value));}
+        return {mismatches,maximum};
     }
 };
 
@@ -87,7 +90,7 @@ struct Sink final:IDWriteGeometrySink {
 
 struct Renderer final:IDWriteTextRenderer {
     std::atomic<ULONG> refs{1};const Fixture& fixture;std::vector<DWRITE_FONT_AXIS_VALUE> axes;
-    std::string error,commands;UINT16 gid=0;float advance=0;unsigned runs=0;
+    std::string error,commands;UINT16 gid=0;float advance=0,axisError=0;unsigned runs=0,axisFailures=0;
     Renderer(const Fixture& f,std::vector<DWRITE_FONT_AXIS_VALUE> a):fixture(f),axes(std::move(a)){}
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid,void** p)override{if(!p)return E_POINTER;*p=nullptr;if(iid==__uuidof(IUnknown)||iid==__uuidof(IDWritePixelSnapping)||iid==__uuidof(IDWriteTextRenderer)){*p=this;AddRef();return S_OK;}return E_NOINTERFACE;}
     ULONG STDMETHODCALLTYPE AddRef()override{return ++refs;} ULONG STDMETHODCALLTYPE Release()override{auto n=--refs;if(!n)delete this;return n;}
@@ -95,7 +98,7 @@ struct Renderer final:IDWriteTextRenderer {
     HRESULT STDMETHODCALLTYPE GetCurrentTransform(void*,DWRITE_MATRIX* p)override{*p={1,0,0,1,0,0};return S_OK;}
     HRESULT STDMETHODCALLTYPE GetPixelsPerDip(void*,FLOAT* p)override{*p=1;return S_OK;}
     HRESULT STDMETHODCALLTYPE DrawGlyphRun(void*,FLOAT,FLOAT,DWRITE_MEASURING_MODE,const DWRITE_GLYPH_RUN* r,const DWRITE_GLYPH_RUN_DESCRIPTION*,IUnknown*)override{
-        try{require(r&&r->glyphCount==1&&r->fontEmSize==1000&&!r->isSideways&&!r->bidiLevel,"unexpected_layout_run");fixture.verify(r->fontFace,axes);
+        try{require(r&&r->glyphCount==1&&r->fontEmSize==1000&&!r->isSideways&&!r->bidiLevel,"unexpected_layout_run");auto axisProof=fixture.verify(r->fontFace,axes);axisFailures+=axisProof.first;axisError=std::max(axisError,axisProof.second);
             ComPtr<Sink> sink;sink.Attach(new Sink);check(r->fontFace->GetGlyphRunOutline(1000,r->glyphIndices,nullptr,nullptr,1,FALSE,FALSE,sink.Get()),"GetGlyphRunOutline");check(sink->Close(),"outline_close");
             commands=sink->out.str()+']';gid=r->glyphIndices[0];advance=r->glyphAdvances[0];++runs;return S_OK;
         }catch(const std::exception& e){error=e.what();return E_FAIL;}}
@@ -124,9 +127,9 @@ int wmain(int argc,wchar_t** argv){
             check(layout->SetFontAxisValues(supplied.data(),UINT32(supplied.size()),{0,1}),"SetFontAxisValues");check(layout->SetAutomaticFontAxes(DWRITE_AUTOMATIC_FONT_AXES_NONE),"LayoutAutomaticAxes");
             ComPtr<Renderer> renderer;renderer.Attach(new Renderer(fixture,axes));HRESULT hr=layout->Draw(nullptr,renderer.Get(),0,0);
             if(!renderer->error.empty())throw std::runtime_error(renderer->error);check(hr,"TextLayoutDraw");require(renderer->runs==1,"missing_or_multiple_runs");
-            std::cout<<std::setprecision(17)<<"{\"type\":\"sample\",\"id\":"<<id<<",\"gid\":"<<renderer->gid<<",\"advance\":"<<renderer->advance<<",\"commands\":"<<renderer->commands<<'}'<<std::endl;++total;
+            std::cout<<std::setprecision(17)<<"{\"type\":\"sample\",\"id\":"<<id<<",\"gid\":"<<renderer->gid<<",\"advance\":"<<renderer->advance<<",\"axis_readback_failures\":"<<renderer->axisFailures<<",\"max_axis_readback_error\":"<<renderer->axisError<<",\"commands\":"<<renderer->commands<<'}'<<std::endl;++total;
         }
-        require(std::cin.eof()&&total,"malformed_or_empty_requests");std::cout<<"{\"type\":\"summary\",\"requests\":"<<total<<",\"actual_tables_and_axes_verified\":true}"<<std::endl;return 0;
+        require(std::cin.eof()&&total,"malformed_or_empty_requests");std::cout<<"{\"type\":\"summary\",\"requests\":"<<total<<",\"actual_tables_verified\":true}"<<std::endl;return 0;
     }catch(const std::exception& e){std::cerr<<e.what()<<std::endl;return 1;}
 }
 #endif
