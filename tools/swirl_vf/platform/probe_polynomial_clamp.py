@@ -31,7 +31,7 @@ def source(p):
 def delta(p):
  x,y,z=p.T
  return np.array([20+10*x*y,30+5*x*x*z,0*x,0*x,0*x,0*x,0*x,0*x,0*x,0*x]).T
-def build_control(template):
+def build_control(template, encoding='horner'):
     boxes=[]
     for lo in itertools.product((-1,0),repeat=3):
      m=interpolate(np.c_[lo,np.array(lo)+1],ops,source)
@@ -50,14 +50,23 @@ def build_control(template):
     f['hmtx'].metrics=dict.fromkeys(order,(700,0));f['vmtx'].metrics=dict.fromkeys(order,(1000,0))
     for tag in ('HVAR','VVAR','GSUB','GPOS'):
      if tag in f:del f[tag]
-    empty=g.OutlineModel(ALLTAGS,(),[{}],np.zeros((1,0)),{'sampled_geometry_passed':True})
+    tags = ALLTAGS
+    if encoding in ('hoi', 'hoi-axis'):
+     from joint_hoi import add_axis_copies, HOIPolynomialBox, HOIAxisPowerBox
+     tags = add_axis_copies(f)
+     cls = HOIPolynomialBox if encoding == 'hoi' else HOIAxisPowerBox
+     boxes = [cls(m.bounds, m.operators, m.coefficients, m.evidence,
+                              tags, m.factors, m.signed_factors) for m in boxes]
+    else:
+     g.require(encoding == 'horner', 'unknown_polynomial_encoding')
+    empty=g.OutlineModel(tags,(),[{}],np.zeros((1,0)),{'sampled_geometry_passed':True})
     models=dict.fromkeys(order,empty);models['probe']=boxes[0]
     models.update({f'box{i}':m for i,m in enumerate(boxes)})
     f=g.install(f,models)
     addFeatureVariations(f,[([{t:tuple(b) for t,b in zip(TAGS,m.bounds)}],{'probe':f'box{i}'}) for i,m in enumerate(boxes)])
     return f,boxes
 
-def run(output):
+def run(output, encoding='horner'):
     out=Path(output).resolve()
     g.require(not out.exists() and not out.is_relative_to(Path(__file__).resolve().parents[3]), 'fresh_external_control_output_required')
     out.mkdir(parents=True, mode=0o700)
@@ -66,7 +75,7 @@ def run(output):
     (out/'compile.log').write_text(result.stdout+result.stderr);result.check_returncode()
     make_fixture(out/'template.ttc')
     with TTCollection(out/'template.ttc') as template:
-        candidate,boxes=build_control(template.fonts[0]);candidate.save(out/'poly.otf')
+        candidate,boxes=build_control(template.fonts[0], encoding);candidate.save(out/'poly.otf')
     q=np.r_[np.asarray(list(itertools.product((-1,0,1),repeat=3))),np.random.default_rng(47).uniform(-1,1,(128,3))]
     profiles=((1,500,1000),(100,400,900),(1,500,1000));requests=[]
     for i,p in enumerate(q):
@@ -74,7 +83,10 @@ def run(output):
      requests.append(dict(id=str(i),text='A',coordinates=loc))
      loc.update(dict.fromkeys(HIDDEN,0.))
     blob=(out/'poly.otf').read_bytes();font=TTFont(out/'poly.otf')
-    config=dict(font_path=str(out/'poly.otf'),font_sha256=hashlib.sha256(blob).hexdigest(),axis_defaults={**{t:d for t,(lo,d,hi) in zip(TAGS,profiles)},**dict.fromkeys(HIDDEN,0.)},table_hashes={t:hashlib.sha256(font.reader[t]).hexdigest() for t in ('CFF2','fvar','avar','GSUB','cmap')},requests=requests)
+    for request in requests:
+     for axis in font['fvar'].axes:
+      request['coordinates'].setdefault(axis.axisTag, axis.defaultValue)
+    config=dict(font_path=str(out/'poly.otf'),font_sha256=hashlib.sha256(blob).hexdigest(),axis_defaults={a.axisTag:a.defaultValue for a in font['fvar'].axes},table_hashes={t:hashlib.sha256(font.reader[t]).hexdigest() for t in ('CFF2','fvar','avar','GSUB','cmap')},requests=requests)
     (out/'manifest.json').write_text(json.dumps(config))
     r=subprocess.run([str(binary),str(out/'manifest.json')],capture_output=True,text=True);(out/'native.jsonl').write_text(r.stdout);(out/'stderr.log').write_text(r.stderr);r.check_returncode()
     rows=[json.loads(line) for line in r.stdout.splitlines()];assert rows[-1]['request_count']==len(requests)
@@ -87,10 +99,14 @@ def run(output):
      actuals={'CoreText':(row['glyphs'][0]['gid'],row['glyphs'][0]['commands']),'HarfBuzz':(gid,commands(h,gid)),'fontTools':(gid,g.source_commands(font.getGlyphSet(location=loc)[font.getGlyphOrder()[gid]]))}
      for engine,(selected,cmd) in actuals.items():
       v=compare(expected,cmd);stats=report[engine];stats['observations']+=1;stats['failures']+=not v['passed'];stats['max_error']=max(stats['max_error'],v['error'] or 0);stats['selection_failures']+=selected<3 or not np.all((p>=boxes[selected-3].bounds[:,0])&(p<=boxes[selected-3].bounds[:,1]))
-    report={'scope':'authored_clamp_polynomial_control_only','production_accepted':False,'engines':report};print(json.dumps(report));(out/'report.json').write_text(json.dumps(report,indent=2));return report
+    report={'scope':'authored_clamp_polynomial_control_only','production_accepted':False,
+            'encoding':encoding, 'font_bytes':len(blob),
+            'maximum_operand_stack':max(m.evidence['maximum_operand_stack'] for m in boxes),
+            'engines':report};print(json.dumps(report));(out/'report.json').write_text(json.dumps(report,indent=2));return report
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--private-output', required=True, type=Path)
-    args=parser.parse_args();report=run(args.private_output)
+    parser.add_argument('--encoding', choices=('horner', 'hoi', 'hoi-axis'), default='horner')
+    args=parser.parse_args();report=run(args.private_output, args.encoding)
     sys.exit(0 if all(v['failures']==v['selection_failures']==0 for v in report['engines'].values()) else 1)
