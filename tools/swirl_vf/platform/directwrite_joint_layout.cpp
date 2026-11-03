@@ -41,23 +41,23 @@ struct Fixture {
         LARGE_INTEGER size{};require(GetFileSizeEx(lock,&size)&&size.QuadPart>12&&size.QuadPart<8*1024*1024,"authored_fixture_size_required");
         bytes.resize(size_t(size.QuadPart));DWORD read=0;
         require(ReadFile(lock,bytes.data(),DWORD(bytes.size()),&read,nullptr)&&read==bytes.size(),"font_read_failed");
-        require(u32(bytes.data())==0x4f54544f,"OTTO_required");
+        require(u32(bytes.data())==0x4f54544f||u32(bytes.data())==0x00010000,"OpenType_outline_format_required");
         UINT16 n=u16(bytes.data()+4);require(12+size_t(n)*16<=bytes.size(),"bad_directory");
         for(UINT16 i=0;i<n;++i){const BYTE* p=bytes.data()+12+16*i;UINT32 a=u32(p+8),b=u32(p+12);
             require(a<=bytes.size()&&b<=bytes.size()-a&&tables.emplace(tag(p),std::make_pair(a,b)).second,"bad_table");}
         auto fvar=tables.at(DWRITE_MAKE_OPENTYPE_TAG('f','v','a','r'));const BYTE* p=bytes.data()+fvar.first;
-        require(fvar.second>=16&&u16(p+8)==7&&u16(p+10)==20,"seven_authored_axes_required");
-        UINT16 offset=u16(p+4);require(size_t(offset)+140<=fvar.second,"truncated_fvar");
-        for(unsigned i=0;i<7;++i){const BYTE* a=p+offset+20*i;defaults.push_back({DWRITE_FONT_AXIS_TAG(tag(a)),float(int32_t(u32(a+8))/65536.0)});}
+        require(fvar.second>=16&&u16(p+8)>=3&&u16(p+8)<=32&&u16(p+10)==20,"bounded_authored_axes_required");
+        UINT16 offset=u16(p+4),count=u16(p+8);require(size_t(offset)+20*size_t(count)<=fvar.second,"truncated_fvar");
+        for(unsigned i=0;i<count;++i){const BYTE* a=p+offset+20*i;defaults.push_back({DWRITE_FONT_AXIS_TAG(tag(a)),float(int32_t(u32(a+8))/65536.0)});}
     }
     ~Fixture(){if(lock!=INVALID_HANDLE_VALUE)CloseHandle(lock);}
     std::pair<unsigned,float> verify(IDWriteFontFace* face,const std::vector<DWRITE_FONT_AXIS_VALUE>& wanted)const{
         require(face->GetIndex()==0&&face->GetSimulations()==DWRITE_FONT_SIMULATIONS_NONE,"wrong_face_or_simulation");
-        for(const char* name:{"CFF2","fvar","avar","GSUB","cmap"}){
-            UINT32 t=tag(reinterpret_cast<const BYTE*>(name));auto reference=tables.at(t);
+        for(const char* name:{"CFF2","glyf","loca","gvar","fvar","avar","GSUB","cmap"}){
+            UINT32 t=tag(reinterpret_cast<const BYTE*>(name));auto reference=tables.find(t);
             const void* data=nullptr;UINT32 size=0;void* context=nullptr;BOOL exists=FALSE;
             check(face->TryGetFontTable(t,&data,&size,&context,&exists),"TryGetFontTable");
-            bool same=exists&&size==reference.second&&std::memcmp(data,bytes.data()+reference.first,size)==0;
+            bool same=reference==tables.end()?!exists:exists&&size==reference->second.second&&std::memcmp(data,bytes.data()+reference->second.first,size)==0;
             if(context)face->ReleaseFontTable(context);require(same,"actual_run_table_identity_mismatch");
         }
         ComPtr<IDWriteFontFace5> variable;check(face->QueryInterface(IID_PPV_ARGS(&variable)),"FontFace5");

@@ -6,6 +6,7 @@ on:
       - '.github/workflows/swirl-vf-joint-directwrite.yml'
       - 'tools/swirl_vf/platform/directwrite_joint_layout.cpp'
       - 'tools/swirl_vf/platform/probe_joint_directwrite.py'
+      - 'tools/swirl_vf/platform/probe_scaled_glyf.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -37,6 +38,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'DirectWrite observer compilation failed' }
       - name: Execute authored control through native layout
         run: python tools/swirl_vf/platform/probe_joint_directwrite.py --matrix --output build/joint-control/observations --binary build/joint-control/observer.exe
+      - name: Execute fractional glyf component control
+        if: always()
+        run: python tools/swirl_vf/platform/probe_scaled_glyf.py --output build/joint-control/observations/scaled-glyf --binary build/joint-control/observer.exe
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -45,4 +49,6 @@ jobs:
             build/joint-control/observations/**/report.json
             build/joint-control/observations/**/native.jsonl
             build/joint-control/observations/**/native.stderr.log
+            build/joint-control/observations/**/directwrite.jsonl
+            build/joint-control/observations/**/directwrite.stderr.log
           retention-days: 7
