@@ -1,4 +1,4 @@
-// Native Windows collection matching: Medium must select real wght=500.
+// Native Windows collection matching: five named weights, including Medium.
 // Uses the Microsoft DirectWrite FontSet and typographic-family interfaces.
 #include <cstdio>
 #if !defined(_WIN32)
@@ -28,20 +28,25 @@ int wmain(int argc, wchar_t** argv) {
         for (UINT32 i = 0; i < 4; ++i) {
             ComPtr<IDWriteFontFamily> family;
             check(static_cast<IDWriteFontCollection*>(collection.Get())->GetFontFamily(i, &family));
-            ComPtr<IDWriteFont> font;
-            check(family->GetFirstMatchingFont(DWRITE_FONT_WEIGHT_MEDIUM, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL, &font));
-            ComPtr<IDWriteFontFace> base; check(font->CreateFontFace(&base));
-            ComPtr<IDWriteFontFace5> face; check(base.As(&face));
-            if (face->GetSimulations() != DWRITE_FONT_SIMULATIONS_NONE) throw std::runtime_error("synthetic face selected");
-            std::vector<DWRITE_FONT_AXIS_VALUE> axes(face->GetFontAxisValueCount());
-            check(face->GetFontAxisValues(axes.data(), UINT32(axes.size())));
-            bool matched = false;
-            for (const auto& axis : axes) {
-                if (axis.axisTag == DWRITE_FONT_AXIS_TAG_WEIGHT) matched = axis.value == 500.f;
+            for (UINT32 weight : {300u, 400u, 500u, 600u, 700u}) {
+                ComPtr<IDWriteFont> font;
+                check(family->GetFirstMatchingFont(static_cast<DWRITE_FONT_WEIGHT>(weight), DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL, &font));
+                ComPtr<IDWriteFontFace> base; check(font->CreateFontFace(&base));
+                ComPtr<IDWriteFontFace5> face; check(base.As(&face));
+                if (face->GetSimulations() != DWRITE_FONT_SIMULATIONS_NONE) throw std::runtime_error("synthetic face selected");
+                std::vector<DWRITE_FONT_AXIS_VALUE> axes(face->GetFontAxisValueCount());
+                check(face->GetFontAxisValues(axes.data(), UINT32(axes.size())));
+                bool matched = false;
+                for (const auto& axis : axes) {
+                    if (axis.axisTag == DWRITE_FONT_AXIS_TAG_WEIGHT) matched = axis.value == static_cast<float>(weight);
+                }
+                if (!matched) {
+                    std::cerr << "Requested weight " << weight << '\n';
+                    throw std::runtime_error("Named weight did not select its real axis value");
+                }
             }
-            if (!matched) throw std::runtime_error("Medium did not select wght 500");
         }
-        std::cout << "{\"status\":\"PASS\",\"families\":4,\"Medium_weight\":500,\"simulations\":false}\n";
+        std::cout << "{\"status\":\"PASS\",\"families\":4,\"Medium_weight\":500,\"named_weights\":[300,400,500,600,700],\"simulations\":false}\n";
         return 0;
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
 }
