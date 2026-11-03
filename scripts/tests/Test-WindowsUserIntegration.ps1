@@ -8,6 +8,7 @@ $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $repo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
 . (Join-Path $repo 'scripts/WindowsUserIntegration.ps1')
+. (Join-Path $PSScriptRoot 'WindowsShortcutFixture.ps1')
 $evidence=[IO.Path]::GetFullPath($EvidenceDirectory)
 [IO.Directory]::CreateDirectory($evidence)|Out-Null
 
@@ -36,6 +37,8 @@ if (-not $ExpectedUserSid) {
     & (Join-Path $PSScriptRoot 'Invoke-DisposableWindowsUser.ps1') -Script $PSCommandPath -ArgumentsFile $argsPath -EvidenceDirectory $evidence -TimeoutSeconds 240
     $capturePolicy=Get-Content -LiteralPath (Join-Path $evidence 'process-capture/process-capture-policy.json') -Raw -Encoding UTF8|ConvertFrom-Json
     if($capturePolicy.schema -ne 1 -or -not $capturePolicy.success -or $capturePolicy.source_sha -cne $source -or -not $capturePolicy.actual_non_admin_token -or -not $capturePolicy.actual_x86_powershell -or $capturePolicy.forced_termination -or -not $capturePolicy.fixture_removed -or @($capturePolicy.processes).Count -ne 5 -or @($capturePolicy.processes|Where-Object {-not $_.passed}).Count){throw 'Actual x86 standard-user process capture evidence is incomplete.'}
+    $shortcutPolicy=Get-Content -LiteralPath (Join-Path $evidence 'shortcut-fixture/shortcut-fixture-policy.json') -Raw -Encoding UTF8|ConvertFrom-Json
+    if($shortcutPolicy.schema -ne 1 -or -not $shortcutPolicy.success -or $shortcutPolicy.source_sha -cne $source -or $shortcutPolicy.user_sid -cne $capturePolicy.user_sid -or -not $shortcutPolicy.actual_non_admin_token -or -not $shortcutPolicy.actual_x86_powershell -or -not $shortcutPolicy.fixture_removed -or -not $shortcutPolicy.operation.success -or -not $shortcutPolicy.operation.staging_removed -or -not $shortcutPolicy.operation.final_bytes_match -or -not $shortcutPolicy.operation.target_matches -or -not $shortcutPolicy.operation.arguments_match -or -not $shortcutPolicy.operation.description_matches){throw 'Actual x86 standard-user Unicode shortcut fixture evidence is incomplete.'}
     $result=Get-Content -LiteralPath (Join-Path $evidence 'integration-policy.json') -Raw -Encoding UTF8|ConvertFrom-Json
     if(-not $result.success -or $result.source_sha -cne $source -or -not $result.negative_control.required_assertion_failed){throw 'Integration policy or legacy negative-control evidence is incomplete.'}
     Write-Host 'Raw registry/shortcut ownership, upgrade, recovery and legacy negative control verified in actual x86 standard-user PowerShell.'
@@ -46,6 +49,35 @@ $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
 $principal=New-Object Security.Principal.WindowsPrincipal $identity
 if($identity.User.Value -cne $ExpectedUserSid -or $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) -or [Environment]::Is64BitProcess){throw 'Integration child must use the actual new standard-user x86 token.'}
 & (Join-Path $PSScriptRoot 'Test-WindowsProcessCapture.ps1') -EvidenceDirectory (Join-Path $evidence 'process-capture') -ExpectedUserSid $ExpectedUserSid -ExpectedSourceSha $ExpectedSourceSha
+# The normal installer uses this exact fixture function for pre-existing and
+# later edited real shortcuts. Exercise its Unicode final path before builds.
+$shortcutEvidence=Join-Path $evidence 'shortcut-fixture'
+$null=[IO.Directory]::CreateDirectory($shortcutEvidence)
+$shortcutRoot=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) ('SwirlUnicodeShortcutPolicy-'+[guid]::NewGuid().ToString('N'))
+$shortcutDirectory=Join-Path $shortcutRoot '原始 快捷方式'
+$shortcutPath=Join-Path $shortcutDirectory '通过 Swirl 启动 Codex.lnk'
+$shortcutReport=[ordered]@{schema=1;source_sha=$ExpectedSourceSha;user_sid=$ExpectedUserSid;actual_non_admin_token=$true;actual_x86_powershell=$true;powershell_version=$PSVersionTable.PSVersion.ToString();helper_sha256=(Get-SwirlIntegrationHash (Join-Path $PSScriptRoot 'WindowsShortcutFixture.ps1'));operation=$null;fixture_removed=$false;success=$false;error=$null}
+try {
+    $null=Assert-SwirlIntegrationPath $shortcutRoot
+    if(Test-Path -LiteralPath $shortcutRoot){throw 'The unique Unicode shortcut fixture directory already exists.'}
+    $shortcutReport.operation=Save-SwirlTestShortcut -Path $shortcutPath -Description '用户原始快捷方式 codex-start-menu'
+    # Preserve the actual final file bytes with the receipt for independent
+    # artifact verification; neither the COM input nor a generated substitute.
+    [IO.File]::WriteAllBytes((Join-Path $shortcutEvidence 'final-unicode-shortcut.lnk'),[IO.File]::ReadAllBytes($shortcutPath))
+    $shortcutReport.success=$shortcutReport.operation.success -and $shortcutReport.operation.staging_removed
+}catch{$shortcutReport.error=$_.Exception.Message;$shortcutReport.success=$false}
+finally {
+    try {
+        foreach($path in @($shortcutPath,$shortcutDirectory,$shortcutRoot)){$null=Assert-SwirlIntegrationPath $path}
+        if([IO.File]::Exists($shortcutPath)){[IO.File]::Delete($shortcutPath)}
+        if([IO.Directory]::Exists($shortcutDirectory)){[IO.Directory]::Delete($shortcutDirectory,$false)}
+        if([IO.Directory]::Exists($shortcutRoot)){[IO.Directory]::Delete($shortcutRoot,$false)}
+        $shortcutReport.fixture_removed=-not [IO.Directory]::Exists($shortcutRoot)
+    }catch{$shortcutReport.success=$false;$shortcutReport.error=([string]$shortcutReport.error+'; Unicode shortcut fixture cleanup: '+$_.Exception.Message)}
+    if(-not $shortcutReport.fixture_removed){$shortcutReport.success=$false}
+    $shortcutReport|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path $shortcutEvidence 'shortcut-fixture-policy.json') -Encoding UTF8
+}
+if(-not $shortcutReport.success){throw ('Unicode shortcut fixture regression failed: '+$shortcutReport.error)}
 $root=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) ('SwirlIntegrationPolicy-'+[guid]::NewGuid().ToString('N'))
 $null=Assert-SwirlIntegrationPath $root
 [IO.Directory]::CreateDirectory($root)|Out-Null

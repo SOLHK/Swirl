@@ -13,6 +13,7 @@ Set-StrictMode -Version Latest
 $repo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
 . (Join-Path $repo 'scripts/WindowsUserIntegration.ps1')
 . (Join-Path $PSScriptRoot 'WindowsProcessCapture.ps1')
+. (Join-Path $PSScriptRoot 'WindowsShortcutFixture.ps1')
 $evidence=[IO.Path]::GetFullPath($EvidenceDirectory)
 [IO.Directory]::CreateDirectory($evidence)|Out-Null
 $setup=(Resolve-Path -LiteralPath $Installer).Path
@@ -150,10 +151,7 @@ function Assert-Payload([string[]]$Extra=@()) {
     Require 'no-isolated-install-marker' (-not [IO.File]::Exists((Join-Path $target '.swirl-isolated-install')))
 }
 function Save-Shortcut([string]$Path,[string]$Description) {
-    [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($Path))|Out-Null
-    $shell=New-Object -ComObject WScript.Shell;$link=$null
-    try{$link=$shell.CreateShortcut($Path);$link.TargetPath=Join-Path $PSHOME 'powershell.exe';$link.Arguments='-NoProfile';$link.Description=$Description;$link.Save()}
-    finally{if($null -ne $link){$null=[Runtime.InteropServices.Marshal]::FinalReleaseComObject($link)};$null=[Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell)}
+    $null=Save-SwirlTestShortcut -Path $Path -Description $Description
 }
 function Capture-States {
     $state=@{};foreach($id in $context.Targets.Keys){$state[$id]=Get-SwirlIntegrationState $context $id};return $state
