@@ -5,6 +5,8 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+from contextlib import ExitStack
 
 import numpy as np
 from fontTools.ttLib import TTCollection, TTFont
@@ -121,3 +123,19 @@ class CFF2SubroutineTests(unittest.TestCase):
         for value in (0, 1, None, 'yes'):
             with self.assertRaisesRegex(ValueError, 'invalid_cff2_program_memory_policy'):
                 pack(None, release_programs=value)
+
+    def test_bounded_bytecode_is_not_expanded_again_to_measure_its_size(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory)/'source.ttc'; make_fixture(source)
+            with TTCollection(source) as collection:
+                font, _ = convert(collection.fonts[0], .25)
+                pack(font, byte_limit=256, release_programs=True)
+                strings = list(font['CFF2'].cff.topDictIndex[0].CharStrings.values())
+                before = [cs.bytecode for cs in strings]
+                with ExitStack() as guard:
+                    for cs in strings:
+                        guard.enter_context(patch.object(cs, 'decompile', side_effect=AssertionError('expanded shared operands')))
+                    report = pack(font, byte_limit=256, release_programs=True)
+                self.assertEqual(report['glyphs_repacked'], 0)
+                self.assertEqual([cs.bytecode for cs in strings], before)
+                self.assertTrue(all(not cs.program for cs in strings))

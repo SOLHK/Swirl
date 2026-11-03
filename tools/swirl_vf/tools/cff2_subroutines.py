@@ -46,6 +46,15 @@ def pack(font, *, byte_limit=MAX_BYTES, release_programs=False):
               'maximum_input_bytes': 0, 'maximum_output_bytes': 0, 'maximum_subroutine_bytes': 0}
     for name in font.getGlyphOrder():
         cs = top.CharStrings[name]
+        # An already encoded, bounded main needs no transformation. In
+        # particular, do not recursively decompile all shared operand helpers
+        # just to measure the caller's byte length. This is the same length
+        # contract as the decoded branch below, with byte-for-byte preservation.
+        if cs.bytecode is not None and len(cs.bytecode) <= byte_limit:
+            size = len(cs.bytecode)
+            report['maximum_input_bytes'] = max(report['maximum_input_bytes'], size)
+            report['maximum_output_bytes'] = max(report['maximum_output_bytes'], size)
+            continue
         cs.decompile()
         program = list(cs.program)
         original = encode(program, cs.private, globals_)

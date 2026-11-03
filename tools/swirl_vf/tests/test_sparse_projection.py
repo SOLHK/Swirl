@@ -62,6 +62,23 @@ class SparseProjectionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'F2DOT14_parameter_supports'):
             encode_clamp_ramps(model, 4)
 
+    def test_interval_certificates_cover_the_whole_box_and_clamp_crossings(self):
+        source = lambda p: (.35+.6*p[:, 0]+.2*p[:, 1]*p[:, 2])[:, None]
+        model = fit(source, 4); ramps = encode_clamp_ramps(model, 4)
+        rng = np.random.default_rng(887)
+        certified = 0
+        for _ in range(32):
+            lo = rng.uniform(-1, .8, 3); box = np.c_[lo, lo+.2]
+            constants = ramps.constant_axes(box)
+            points = rng.uniform(np.clip(lo-2/16384, -1, 1), np.clip(lo+.2+2/16384, -1, 1), (257, 3))
+            axes = ramps.evaluate_axes(points)
+            for i, value in enumerate(constants):
+                if np.isfinite(value):
+                    certified += 1
+                    np.testing.assert_array_equal(axes[:, i], np.full(len(points), value))
+        self.assertGreater(certified, 32)
+        self.assertTrue(np.isnan(ramps.constant_axes(np.array([[-1., 1.]]*3))).all())
+
 
 if __name__ == '__main__':
     unittest.main()

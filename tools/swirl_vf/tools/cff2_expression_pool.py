@@ -27,6 +27,7 @@ def encoded(program):
 class Expression:
     data: bytes
     regions: int
+    token_count: int
     count: int = 0
 
 
@@ -44,7 +45,7 @@ class ExpressionPool:
                 'expression_must_preserve_variation_and_drawing_state')
         data = encoded(program)
         key = (regions, data)
-        node = self.expressions.setdefault(key, Expression(data, regions))
+        node = self.expressions.setdefault(key, Expression(data, regions, len(program)))
         node.count += 1
         return node
 
@@ -60,7 +61,7 @@ class ExpressionPool:
         useful.sort(key=lambda e: (-((e.count-1)*len(e.data)-4*e.count), e.regions, e.data))
         helpers = useful[:self.maximum_helpers]
         selected = {node: index for index, node in enumerate(helpers)}
-        mains, chunks = {}, []
+        mains, chunks, operation_counts = {}, [], {}
 
         def pieces(tokens):
             output, plain = [], []
@@ -79,6 +80,12 @@ class ExpressionPool:
             return sum(4 if isinstance(item, int) else len(item) for item in items)
 
         for name, tokens in programs.items():
+            # HarfBuzz counts numeric tokens too. Every helper call contributes
+            # an index, call operator, and implicit return; the main has an
+            # implicit end. Sharing bytes does not reduce executed operations.
+            operation_counts[name] = 1+sum(
+                token.token_count+(3 if token in selected else 0)
+                if isinstance(token, Expression) else 1 for token in tokens)
             prefix = encoded(tokens[:2]) if len(tokens) >= 2 and tokens[1] == 'vsindex' else b''
             body = tokens[2:] if prefix else tokens
             blocks, block = [], []
@@ -102,6 +109,7 @@ class ExpressionPool:
                 calls.append(len(helpers)+len(chunks)); chunks.append(chunk)
             require(len(prefix)+4*len(calls) <= LIMIT, 'pooled_charstring_caller_too_large')
             mains[name] = [prefix, *calls]
+            operation_counts[name] += 3*len(calls)
         count = len(helpers)+len(chunks)
         require(count <= 65536, 'pooled_subroutine_index_overflow')
         bias = calcSubrBias([None]*count)
@@ -122,6 +130,9 @@ class ExpressionPool:
                       maximum_added_subroutine_depth=2 if chunks else int(bool(helpers)),
                       encoded_program_bytes=sum(map(len, main_bytes.values()))+sum(map(len, sub_bytes)),
                       maximum_main_bytes=max(map(len, main_bytes.values()), default=0),
-                      maximum_subroutine_bytes=max(map(len, sub_bytes), default=0))
+                      maximum_subroutine_bytes=max(map(len, sub_bytes), default=0),
+                      maximum_interpreter_operations=max(operation_counts.values(), default=0),
+                      harfbuzz_14_6_operation_limit=200000,
+                      glyphs_reaching_operation_limit=sum(n >= 200000 for n in operation_counts.values()))
         return ({name: T2CharString(bytecode=data) for name, data in main_bytes.items()},
                 [T2CharString(bytecode=data) for data in sub_bytes], report)

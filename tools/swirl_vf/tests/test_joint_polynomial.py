@@ -95,6 +95,37 @@ class JointPolynomialTests(unittest.TestCase):
             self.assertLess(np.linalg.norm(geometry.control_points(ops, actual)
                                           - geometry.control_points(ops, expected), axis=1).max(), 1/32)
 
+    def test_rounded_away_trees_are_removed_without_changing_signed_half_ticks(self):
+        coefficients = np.full((4, 4, 4, 10), .49/65536)
+        coefficients[0, 0, 0] = authored(np.zeros((1, 3)))[0]
+        model = PolynomialBox(np.array([[0., 1.]]*3), OPS, coefficients,
+                              {'sampled_geometry_passed': True})
+        self.assertNotIn('blend', model.charstring(0).program)
+        direction = np.zeros_like(coefficients); direction[3, 3, 3, 1] = .5/65536
+        model.axis_tags = TAGS+('H000',)
+        model.factors, model.signed_factors = {'H000': direction}, True
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/'template.ttc'; make_fixture(path)
+            with TTCollection(path) as collection:
+                font = collection.fonts[0]
+                axis = Axis(); axis.axisTag = 'H000'; axis.minValue = -1
+                axis.defaultValue = 0; axis.maxValue = 1; axis.flags = 1
+                axis.axisNameID = font['name'].addName('Signed half tick')
+                font['fvar'].axes.append(axis)
+                font['avar'].segments['H000'] = {-1.: -1., 0.: 0., 1.: 1.}
+                empty = geometry.OutlineModel(model.axis_tags, (), [{}], np.zeros((1, 0)),
+                                              {'sampled_geometry_passed': True})
+                candidate = geometry.install(font, {'.notdef': empty, 'space': empty, 'probe': model})
+                stream = io.BytesIO(); candidate.save(stream)
+            with TTFont(io.BytesIO(stream.getvalue())) as saved:
+                for hidden in (-1., -.5, 0., .5, 1.):
+                    location = dict(WDTH=.75, wght=.5, HGHT=.25, H000=hidden)
+                    actual = geometry.operands(geometry.source_commands(saved.getGlyphSet(
+                        location=location, normalized=True)['probe']))
+                    expected = authored(np.zeros((1, 3)))[0]
+                    expected[1] += max(hidden, 0)*(.75*.5*.25)**3/65536
+                    np.testing.assert_allclose(actual[1], expected, rtol=0, atol=1e-12)
+
 
 if __name__ == '__main__':
     unittest.main()

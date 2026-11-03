@@ -88,6 +88,24 @@ class PolynomialBox:
         program = [vsindex, 'vsindex']
         regions = len(self.supports) - 1
         stack = maximum = 0
+        # The serialized constants are 16.16, regardless of the fitter's
+        # precision. Prune zeros AFTER exactly that quantization; otherwise
+        # rounded-away coefficients still generate large zero Horner trees.
+        # Signed factors must be rounded independently: round(-x) can differ
+        # from -round(x) at half ticks.
+        def quantized(values):
+            result = np.floor(values*65536+.5)/65536
+            require(np.all(result >= -32768) and np.all(result < 32768),
+                    'polynomial_fixed_coefficient_overflow')
+            return result
+        base = quantized(self.coefficients)
+        cache, encoded_factors = {}, []
+        for coefficients in self.factors.values():
+            for sign in ((-1, 1) if self.signed_factors else (1,)):
+                key = (id(coefficients), sign)
+                if key not in cache:
+                    cache[key] = quantized(sign*coefficients)
+                encoded_factors.append(cache[key])
 
         def push(value):
             nonlocal stack, maximum
@@ -128,13 +146,11 @@ class PolynomialBox:
         column = 0
         for operator, count in self.operators:
             for _ in range(count):
-                operand(self.coefficients[..., column])
-                if any(np.any(c[..., column]) for c in self.factors.values()):
+                operand(base[..., column])
+                if any(np.any(c[..., column]) for c in encoded_factors):
                     for _ in range(3):
                         push(0)
-                    for c in self.factors.values():
-                        if self.signed_factors:
-                            operand(-c[..., column])
+                    for c in encoded_factors:
                         operand(c[..., column])
                     push(1)
                     program[-1] = 1

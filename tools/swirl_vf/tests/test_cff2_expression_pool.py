@@ -7,6 +7,7 @@ import unittest
 
 import numpy as np
 from fontTools.ttLib import TTCollection, TTFont
+from fontTools.misc.psCharStrings import calcSubrBias
 sys.path[:0] = [str(Path(__file__).resolve().parents[1]/'tools'),
                str(Path(__file__).resolve().parents[1]/'platform')]
 from cff2_expression_pool import ExpressionPool
@@ -22,6 +23,18 @@ class ExpressionPoolTests(unittest.TestCase):
             with TTCollection(path) as collection:
                 ordinary,boxes=build_control(collection.fonts[0])
                 shared,_=build_control(collection.fonts[0],share_expressions=True)
+            subroutines = shared['CFF2'].cff.GlobalSubrs
+            bias = calcSubrBias(subroutines)
+            def executed_tokens(string):
+                index, previous, count = 0, None, 1  # implicit return/end
+                while True:
+                    token, _, index = string.getToken(index)
+                    if token is None: return count
+                    count += 1
+                    if token == 'callgsubr': count += executed_tokens(subroutines[int(previous)+bias])
+                    previous = token
+            maximum = max(executed_tokens(s) for s in shared['CFF2'].cff.topDictIndex[0].CharStrings.values())
+            self.assertEqual(maximum, shared._swirl_expression_pool_report['maximum_interpreter_operations'])
             a,b=io.BytesIO(),io.BytesIO();ordinary.save(a);shared.save(b)
             self.assertLess(len(b.getvalue()),len(a.getvalue()))
             self.assertGreater(shared._swirl_expression_pool_report['shared_expressions'],0)

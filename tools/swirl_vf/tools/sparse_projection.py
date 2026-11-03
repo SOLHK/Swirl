@@ -108,6 +108,42 @@ class ClampRamps:
         axes = self.evaluate_axes(points).reshape(len(points), self.parameter_count, self.ramps)
         return (axes+1).sum(axis=2)/(2*self.ramps)
 
+    def constant_axes(self, bounds, *, padding=2/16384):
+        """Certify saturated outputs over a whole padded box, without sampling.
+
+        Each nonnegative tensor hat is bounded by its endpoint minima and
+        peak-inclusive maxima. Signed interval accumulation bounds the stored
+        integer delta field. A conservative floating-point sum error is added
+        before declaring a clamp constant. NaN means no certificate.
+        Padding covers a pair of F2DOT14 ticks between an engine's mapped
+        coordinates and its region-selection coordinates; native verification
+        remains required for the supported engines.
+        """
+        bounds = np.asarray(bounds, dtype=float)
+        require(bounds.shape == (3, 2) and np.isfinite(bounds).all()
+                and np.all(bounds[:, 0] <= bounds[:, 1]) and np.all(np.abs(bounds) <= 1)
+                and np.isfinite(padding) and padding >= 0, 'invalid_clamp_interval_box')
+        box = np.clip(bounds+np.array([-padding, padding]), -1, 1)
+        low, high = np.ones(len(self.supports)), np.ones(len(self.supports))
+        for axis in range(3):
+            lo, peak, hi = self.supports[:, axis].T
+            def at(x):
+                left = np.divide(x-lo, peak-lo, out=np.ones_like(lo), where=peak != lo)
+                right = np.divide(hi-x, hi-peak, out=np.ones_like(lo), where=peak != hi)
+                return np.where(peak == 0, 1, np.clip(np.minimum(left, right), 0, 1))
+            a, b = at(box[axis, 0]), at(box[axis, 1])
+            low *= np.minimum(a, b)
+            high *= np.where((peak >= box[axis, 0]) & (peak <= box[axis, 1]), 1, np.maximum(a, b))
+        positive, negative = np.maximum(self.coefficients, 0), np.minimum(self.coefficients, 0)
+        lower = low @ positive+high @ negative
+        upper = high @ positive+low @ negative
+        neps = (len(self.supports)+16)*np.finfo(float).eps
+        margin = 2*neps/(1-neps)*np.abs(self.coefficients).sum(axis=0)+1e-9
+        result = np.full(self.coefficients.shape[1], np.nan)
+        result[upper+margin <= -16384] = -1.
+        result[lower-margin >= 16384] = 1.
+        return result
+
     def var_store(self, physical_tags, hidden_tags):
         from fontTools.varLib.builder import buildVarStore, buildVarRegionList, buildVarData, buildDeltaSetIndexMap
         tags = tuple(physical_tags)+tuple(hidden_tags)
