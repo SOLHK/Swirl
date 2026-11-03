@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 import numpy as np
 from fontTools.pens.recordingPen import RecordingPointPen
@@ -19,6 +20,9 @@ sys.path[:0] = [str(ROOT/'tools'), str(ROOT/'platform')]
 from windows_font_builder import bounded_map, rebased_avar, source_locations
 from target_axis_mapping import SourceAxis
 from windows_gvar_control import make, formula, face_axes, SCALE, verify
+from windows_full_audit import inspect_standard
+from windows_explicit_deltas import expand
+from windows_font_inventory import sha256
 
 
 class DeliveryTests(unittest.TestCase):
@@ -77,6 +81,26 @@ class DeliveryTests(unittest.TestCase):
             self.assertEqual(list(bounded_map(pool, lambda x: x*x, range(8), 3)), [x*x for x in range(8)])
             with self.assertRaises(ZeroDivisionError):
                 list(bounded_map(pool, lambda x: 1/x, (2, 0, 1), 2))
+
+    def test_explicit_reencoding_preserves_complete_metric_models_and_points(self):
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+            path = Path(directory)
+            make(path/'control.ttc')
+            (path/'report.json').write_text(json.dumps(dict(sha256=sha256(path/'control.ttc'), faces=[{} for _ in range(4)])))
+            for style in ('Text', 'Display'):
+                (path/(style+'-glyph-report.json')).write_text('{}')
+            result = expand(SimpleNamespace(candidate=path/'control.ttc', output=path/'expanded'))
+            self.assertTrue(result['coefficient_maps_preserved_exactly'])
+            with TTCollection(path/'control.ttc') as old, TTCollection(path/'expanded/SwirlVF.ttc') as new:
+                for a, b in zip(old.fonts, new.fonts):
+                    for location in [dict(wdth=.35, wght=-.75, HGHT=.2), dict(wdth=-.5, wght=.5, HGHT=1.)]:
+                        pens = [RecordingPointPen(), RecordingPointPen()]
+                        for font, pen in zip((a, b), pens):
+                            font.getGlyphSet(location=location, normalized=True)['A'].drawPoints(pen)
+                        self.assertEqual(pens[0].value, pens[1].value)
+                    checked = inspect_standard(b, [False, False])
+                    self.assertEqual(checked['inferred_points'], 0)
+                    self.assertEqual(checked['exact_metric_models'], 4)
 
 
 if __name__ == '__main__':

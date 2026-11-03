@@ -116,6 +116,12 @@ from 6.91352/7.95539 to 6.90583/7.91874 for Text/Display. The number above the
 2-unit screen changes from 16/16 to 17/15. No claim of every-glyph improvement
 is made. The source decoder and interpolation errors are reported separately.
 
+The source HVAR was also evaluated at source design width -1/0/+1. GIDs
+0/1166/19177 advance by 800/1000/1200 units; GID 12 advances by 539/674/809.
+Target `wdth` 80/100/120 therefore describes the measured approximately
+80/100/120-percent width endpoints. This does not establish physical alignment
+with the separately versioned Windows reference.
+
 The compact Alpha's four faces have 27,120 saved-font observations, no empty
 mismatch, and native HarfBuzz movement on all three axes. Apple libhvf checks
 cover 896 nonempty glyph/position observations; maximum decoder discrepancy is
@@ -139,6 +145,38 @@ readbacks, maximum 7.62939453125e-6). The unchanged 1/32 research geometry gate
 also failed: maximum 0.33274718 units, 1,808 failing observations. The workflow
 is therefore **failed**, not Windows acceptance. Neither GDI process registration
 nor an authored control proves desktop installation of the private candidate.
+
+## Native IUP diagnosis and exact re-encoding
+
+[Windows run 41579230845](https://github.com/SOLHK/Swirl/actions/runs/41579230845)
+repeated the authored experiment on all three OS images and added a no-IUP
+control. Windows 11 was Enterprise build 26200 on an ARM64 host running the
+x64 probes. Each variant produced 2,024 requested outline observations. Medium
+matching passed on all images. IUP retained the 0.33274718-unit maximum error;
+explicit deltas reduced it to 0.04714046 units (1,304 observations still fail
+the unchanged 1/32 research gate). The maximum matches the scale-15 nearest
+integer point bound in this experiment. This is neither a general impossibility
+theorem nor private-candidate acceptance. All three CI jobs remain failed, and
+the 684 exact-axis readback differences remain reported.
+
+`windows_explicit_deltas.py` reconstructs every omitted delta with fontTools,
+requires exact integer reconstruction, and writes the same coefficient maps
+without IUP. It does not refit any source geometry. A bounded process pool and
+SHA256-keyed per-face cache allow the complete font to be re-encoded without
+repeating HVF conversion. SC and TC reuse the matching Text/Display tables;
+124 shared tuple peaks remove repeated support headers. These mechanisms have
+public authored round-trip and complete HVAR/VVAR coefficient equality tests.
+The private 113-GID expanded Alpha is 693,596 bytes, SHA256
+`c135ba2fd5c6b3383db91beef4e3214752617d07f15ddefc3e44fb298b532d72`.
+The saved-font interpolation errors are unchanged; removing IUP is specifically
+an engine-execution mitigation with a measured size cost.
+
+The offline Windows kit pins both the candidate and diagnostic executables by
+SHA256, captures requested positions and native Medium matching, and retains
+the original strict probe's failures. It never uploads results or installs a
+persistent system font. Its capture status requires subsequent geometry and
+visual review; it is not a release acceptance flag. Only independently authored
+data is permitted in the public CI test of this kit.
 
 Per-glyph work uses Python's PSF-licensed [ProcessPoolExecutor](https://github.com/python/cpython/blob/3.12/Lib/concurrent/futures/process.py),
 reviewed along with [its licence](https://github.com/python/cpython/blob/3.12/LICENSE).

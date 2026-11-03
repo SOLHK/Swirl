@@ -67,6 +67,18 @@ jobs:
         run: |
           python tools/swirl_vf/platform/windows_gvar_control.py --binary build/windows-gvar/observe.exe --no-iup --output build/windows-gvar/uncompressed
           if ($LASTEXITCODE -ne 0) { throw 'Uncompressed research precision gate failed' }
+      - name: Execute offline delivery kit against authored data only
+        if: always()
+        shell: pwsh
+        run: |
+          $kitRoot = Join-Path $env:RUNNER_TEMP ('swirlvf-authored-kit-' + $env:GITHUB_RUN_ID)
+          New-Item -ItemType Directory -Path $kitRoot | Out-Null
+          Copy-Item build/windows-gvar/control.ttc (Join-Path $kitRoot 'SwirlVF.ttc')
+          @{ sha256 = (Get-FileHash (Join-Path $kitRoot 'SwirlVF.ttc') -Algorithm SHA256).Hash.ToLowerInvariant(); version = 'Authored CI control'; source_gids = @(0, 1) } | ConvertTo-Json | Set-Content (Join-Path $kitRoot 'report.json') -Encoding utf8
+          python tools/swirl_vf/platform/prepare_windows_candidate.py --candidate (Join-Path $kitRoot 'SwirlVF.ttc') --artifacts build/windows-gvar
+          if ($LASTEXITCODE -ne 0) { throw 'Offline kit preparation failed' }
+          & (Join-Path $kitRoot 'windows-test/Run-Windows-Test.ps1') -OutputDirectory build/windows-gvar/kit-result
+          if ($LASTEXITCODE -ne 0) { throw 'Offline native capture failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -87,4 +99,5 @@ jobs:
             build/windows-gvar/native/*.jsonl
             build/windows-gvar/native/*.png
             build/windows-gvar/native/*.log
+            build/windows-gvar/kit-result/**
           retention-days: 7

@@ -259,6 +259,7 @@ def make_font(source, label, order, glyf_data, gvar_data, offsets, hm, vm, store
             ScalerVisitor(multiplier).visit(font[tag])
     font['head'].flags |= 2
     font['head'].indexToLocFormat = 1
+    font['head'].fontRevision = .1
     font['head'].xMin, font['head'].yMin, font['head'].xMax, font['head'].yMax = bounds
     font['glyf'] = raw_table('glyf', glyf_data)
     font['loca'] = raw_table('loca', struct.pack('>'+str(len(offsets))+'I', *offsets))
@@ -312,7 +313,8 @@ def build(args):
     require(sha256(args.source) == SOURCE_SHA, 'exact_source_sha256_required')
     output.mkdir(parents=True, mode=0o700)
     started = time.monotonic()
-    report = dict(version='0.1.0 '+('Beta' if args.full else 'Alpha'), source_sha256=SOURCE_SHA,
+    report = dict(status='BUILDING', version='0.1.0 '+('Beta' if args.full else 'Alpha'), source_sha256=SOURCE_SHA,
+        iup='DISABLED' if args.no_iup else 'EXACT_DECODED_DELTAS_NATIVE_EXECUTION_SEPARATE',
         full_glyph_coverage=args.full, source_user_mapping='RETAINED_A3_HYPOTHESIS_REBASED_LEGAL_AVAR1',
         source_avar_discontinuities='CONTINUOUS_APPROXIMATION_REQUIRES_VISUAL_REVIEW',
         precision_target=LIMIT, basic_geometry_screen_source_units=2., visual_acceptance='NOT_RUN', workers=args.workers, adaptive=args.adaptive, quantization=args.quantization, faces=[],
@@ -421,7 +423,7 @@ def build(args):
                 while block := src.read(1024*1024):
                     stream.write(block)
         require(sha256(final) == sha256(staging), 'test_delivery_copy_mismatch')
-        report.update(file=final.name, sha256=sha256(final), bytes=final.stat().st_size,
+        report.update(status='BUILT_LOCAL_TEST_CANDIDATE', file=final.name, sha256=sha256(final), bytes=final.stat().st_size,
             seconds=time.monotonic()-started, peak_rss_bytes=peak_rss(),
             packaging=packed, quality={k: v['counts'] for k, v in reports.items()},
             source_sha256_after=sha256(args.source))
