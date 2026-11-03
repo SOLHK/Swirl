@@ -33,6 +33,12 @@ reviewed, in addition to the earlier Windows research recorded in
   separate SHA256 manifest. Records retain binary64 numbers. No pickle or
   executable serialized objects; no archive extraction or embedded dependency
   binaries. Path validation is identical on Windows and POSIX.
+  The final archive uses the standard library's streaming ZipFile writer and
+  ZipExtFile reader. Its [CRC implementation](https://github.com/python/cpython/blob/v3.12.0/Lib/zipfile/__init__.py)
+  and [tests](https://github.com/python/cpython/blob/v3.12.0/Lib/test/test_zipfile/test_core.py)
+  were reviewed; every archived entry is fully reread and independently SHA256
+  checked against the sealed manifest. Existing gzip blocks are stored without
+  a second compression pass.
   A new offline replay regression exposed macOS `/var` being a symlink to
   `/private/var`. After reading [pathlib.resolve and its tests](https://github.com/python/cpython/blob/v3.12.0/Lib/test/test_pathlib.py),
   canonicalize the selected bundle root before rejecting links inside it.
@@ -44,7 +50,7 @@ reviewed, in addition to the earlier Windows research recorded in
   and reject malformed requests. No Apple implementation code is copied.
 * The complete first replay exposed 146 Display advance differences caused by
   comparing different coordinates: HarfBuzz constructed the source Display
-  fonts at normalized wght **-0.02398681640625**, whereas the exported baseline
+  fonts at a **nonzero normalized wght**, whereas the exported baseline
   explicitly means **design zero**. Read [HarfBuzz hb-font.cc](https://github.com/harfbuzz/harfbuzz/blob/df9e6d15140d6bc5e983dcb5508ad254e76c8a0e/src/hb-font.cc),
   its [font API tests](https://github.com/harfbuzz/harfbuzz/blob/df9e6d15140d6bc5e983dcb5508ad254e76c8a0e/test/api/test-font.c)
   and [Old MIT license](https://github.com/harfbuzz/harfbuzz/blob/df9e6d15140d6bc5e983dcb5508ad254e76c8a0e/COPYING).
@@ -102,9 +108,9 @@ identical em geometry or identical user-coordinate mapping.
 Raw source axis order is **WDTH,wght,HGHT**. WDTH/HGHT have user ranges
 1/500/1000; wght has 100/501/900 for Text and 100/499/900 for Display.
 The source fvar named weights are Light 300, Regular 400, Medium 500,
-Semibold 600 and Bold 700. Raw avar record order and duplicates are retained.
-Medium's candidate post-avar wght q is -1146/16384 for Text and 13/16384 for
-Display. These are explicitly the retained A3 **candidate**, not a new global
+Semibold 600 and Bold 700. Raw avar record order, duplicates and detailed
+candidate post-avar instance coordinates are retained in the private catalog.
+The mapping is explicitly the retained A3 **candidate**, not a new global
 CoreText mapping acceptance. Windows `wdth` percent values must not be passed
 directly to the source WDTH axis.
 In particular, the exported **design-zero baseline is not a certified CoreText
@@ -142,15 +148,32 @@ standard encoding/IUP practice, not original HVF coupling fidelity.
   internal axis zeros, 14 lower and 15 upper tangent projection contacts.
   Float64 roots and a bounded selection are documented; no full clamp-surface
   or continuous-cube proof is claimed.
-* Final local suite: **1,068 run, 1,061 passed, 7 skipped, 0 failed**; separate
-  audit suite **6/6 passed**. The 13 handoff regressions pass on this Mac,
+* Final local suite: **1,069 run, 1,062 passed, 7 skipped, 0 failed**; separate
+  audit suite **6/6 passed**. The 14 handoff regressions pass on this Mac,
   including two actual Apple request-stream integration tests.
-* [CI 41594442756](https://github.com/SOLHK/Swirl/actions/runs/41594442756), at
-  code commit `04771ddc1ad0116ef03e21c8e427657ee2190bba`, passed on Windows
+  Five skips require installed Linux native APIs; two are guards whose real
+  native experiments run separately. Skips do not count as passing native
+  source acceptance.
+* [CI 41597247039](https://github.com/SOLHK/Swirl/actions/runs/41597247039), at
+  code commit `128f0b67130472249a46966c1a3d04ab1ed04ced`, passed on Windows
   Server 2022, Windows Server 2025, Ubuntu and macOS 15. Each Windows job ran
-  13 handoff tests (11 passed, two Mac-only skips) plus 65 retained HVF tests
+  14 handoff tests (12 passed, two Mac-only skips) plus 65 retained HVF tests
   (65 passed). These use authored data only. The real private package has
   **not** been uploaded or executed on a Windows machine.
+* The final offline replay ran **from the packaged code**, without calling an
+  Apple library: all **86,598** geometry records reproduced exactly (maximum
+  replay difference **0.0**); their stored Apple observations still compare
+  within **9.890754881780595e-12 FUnit**, with zero failures. All **376,816**
+  default advance fields agree with HarfBuzz after explicitly setting design
+  zero. Across **78,992** sampled variable advance fields, integer-rounded
+  mismatches are zero. The **17,576** raw fractional differences above 1/32
+  FUnit, with maximum **0.4997120201587677**, remain reported separately;
+  this is not a sub-1/32 metric precision pass. Maximum normalized-coordinate
+  readback difference is **3.0339094429177038e-05**. HarfBuzz coordinate and
+  integer-advance quantization are not HVF contour errors.
+  Replay took **576.644 s**, peak resident memory **583,614,464 bytes**;
+  initial export took **606.646 s**. The original failed replay, its code and
+  manifest remain in the bundle alongside the successful corrected report.
 
 These numbers concern HVF decoding and reference geometry. They are not new
 glyf/gvar precision, DirectWrite or desktop visual results. The 1/32 FUnit
@@ -166,6 +189,10 @@ table identity was introduced. Authored standard glyf and glyf+HVGL controls
 load and verify 1/1; authored HVGL-only verifies 0/1 and also returns 103.
 This isolates a current loading-path limitation without proving Apple's
 private implementation cause or calling the source's valid geometry corrupt.
+Eight supplementary exact-name and URL+name constructor probes were also
+rejected by the unchanged identity guard: they returned Times New Roman or
+Helvetica, not the source. The probe source, responses and CoreText diagnostic
+messages are retained privately; no substituted font becomes a baseline.
 The installed font inventory was also queried: system PingFangUI is version
 **21.4d1e1**, 47,098 GIDs, SHA256
 `13b201d63324db59de86956c11c46d1f0ad9ac0aeaa0b9d035c012a794062db7`;
@@ -212,6 +239,29 @@ launcher provides the same operations. Transfer only using a user-controlled
 encrypted drive or an authorized direct SSH/SFTP connection, then check the
 archive hash and run `verify`. No private delivery has been transmitted.
 
-Final full-replay and archive receipts are added after the ongoing independent
-bundle-code execution completes. The public PR contains only source, authored
-tests, research notes and aggregate statistics, never these private data files.
+The final sealed directory contains **518 files**, **414,582,915 bytes**,
+including **275,006 JSONL records** (188,408 face-index records plus 86,598
+geometry records). Manifest SHA256:
+`daf80e8c79947dc8488e1f9049b4a7311f32b8abe775cda4a81697bac7ef12b7`.
+The archive `private/handoff-windows-20261103.zip` is **385,915,148 bytes**
+(368.04 MiB), SHA256:
+`59877b45a8290626779670a8e8b546f559ed0426a5c5f85418547fd6fafe67f9`.
+Every one of its 518 entries was decompressed/read and SHA256 verified against
+the manifest; archive creation and verification took 2.838 s. The matching
+`.sha256` sidecar is beside the archive. These private files remain local.
+
+The runtime snapshot is pinned to tested code commit
+`128f0b67130472249a46966c1a3d04ab1ed04ced`; this final documentation commit does
+not change that runtime. `acceptance-replay.json` binds the pre-replay manifest
+`8ad1ce18c6929dd69ba44811be06a5d633d2dfda1c882e94f60ff349e2e67cc3`,
+saved as `evidence/pre-replay-manifest.json`. All its 508 payload files were
+confirmed unchanged before adding final receipts and sealing the final
+manifest. This avoids a self-referential report/hash and preserves the exact
+data and code tested. Public aggregate results are also available in
+`SWIRL_VF_MAC_HANDOFF_20261103.json`.
+
+The public PR contains only source, authored tests, research notes and aggregate
+statistics. The handoff is ready for private transfer and Windows development;
+full original CoreText acceptance and complete Mac retirement remain blocked
+as detailed above. Neither this handoff nor its tests certify the Windows Beta
+as a release or establish permission to redistribute the Apple-derived fonts.
