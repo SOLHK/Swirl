@@ -23,10 +23,15 @@ avar preservation mean dictionary preservation, not raw-record preservation.
 
 The latest post-optimization anchor run is recorded in
 [the final anchor receipt](evidence/SWIRL_VF_FINAL_ANCHORS_20261103.json).
-It adds 4,096 new random triples per glyph (seeds 2026110861 / 2026110863)
-and executes every request from the preceding final run again, including
-historical maxima. It uses the corrected serialized fontTools GSUB selector.
-No fitting occurs in verification and no previous observed outline is reused.
+It validates the optional 1,239-helper files, now 28,532,496 / 80,682,776 bytes,
+and retains the preceding default-dictionary receipts. Their complete CoreText
+paths and all engines' per-observation verdicts are exactly equal.
+The shared manifest contains 4,096 independent random triples per glyph
+(seeds 2026110861 / 2026110863) plus the entire earlier request replay,
+including historical maxima. Both encodings execute this manifest afresh
+using the corrected serialized fontTools GSUB selector.
+No fitting occurs in verification and no previous observed outline is reused
+as the new candidate or source observation.
 
 | GID | CT/HB observations each | Unique independent positions | CoreText maximum | HarfBuzz maximum | fontTools maximum (512) |
 | --- | ---: | ---: | ---: | ---: | ---: |
