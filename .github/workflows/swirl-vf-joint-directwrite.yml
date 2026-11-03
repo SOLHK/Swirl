@@ -36,13 +36,13 @@ jobs:
           cmd /c "`"$vcvars`" && cl /nologo /std:c++17 /EHsc /W4 tools\swirl_vf\platform\directwrite_joint_layout.cpp /Fe:build\joint-control\observer.exe /Fo:build\joint-control\observer.obj /link dwrite.lib"
           if ($LASTEXITCODE -ne 0) { throw 'DirectWrite observer compilation failed' }
       - name: Execute authored control through native layout
-        run: python tools/swirl_vf/platform/probe_joint_directwrite.py --output build/joint-control/observations --binary build/joint-control/observer.exe
+        run: python tools/swirl_vf/platform/probe_joint_directwrite.py --matrix --output build/joint-control/observations --binary build/joint-control/observer.exe
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: joint-authored-directwrite-${{ matrix.os }}-${{ github.sha }}
           path: |
-            build/joint-control/observations/report.json
-            build/joint-control/observations/native.jsonl
-            build/joint-control/observations/native.stderr.log
+            build/joint-control/observations/**/report.json
+            build/joint-control/observations/**/native.jsonl
+            build/joint-control/observations/**/native.stderr.log
           retention-days: 7

@@ -80,7 +80,9 @@ struct Sink final:IDWriteGeometrySink {
     void STDMETHODCALLTYPE AddLines(const D2D1_POINT_2F* p,UINT32 n)override{for(UINT32 i=0;i<n;++i){start("lineTo");point(p[i]);out<<']';}}
     void STDMETHODCALLTYPE AddBeziers(const D2D1_BEZIER_SEGMENT* b,UINT32 n)override{for(UINT32 i=0;i<n;++i){start("curveTo");point(b[i].point1);point(b[i].point2);point(b[i].point3);out<<']';}}
     void STDMETHODCALLTYPE EndFigure(D2D1_FIGURE_END end)override{closed&=end==D2D1_FIGURE_END_CLOSED;start("closePath");out<<']';}
-    HRESULT STDMETHODCALLTYPE Close()override{return count&&closed?S_OK:E_FAIL;}
+    // Empty native output is recorded and fails the independent topology
+    // comparison; keep collecting the other requested positions.
+    HRESULT STDMETHODCALLTYPE Close()override{return closed?S_OK:E_FAIL;}
 };
 
 struct Renderer final:IDWriteTextRenderer {
