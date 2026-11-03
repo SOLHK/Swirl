@@ -19,6 +19,28 @@ from p7_validate_candidate import commands
 import cff2_geometry as geometry
 from fontTools.ttLib import newTable
 from required_variation_feature import require_feature
+from fontTools.misc.psCharStrings import T2CharString
+
+
+class MicroBlendControl:
+    """One region, no calls; blend stack four, drawing stack six."""
+    def __init__(self,tags,base,variant):
+        self.axis_tags,self.base,self.variant=tags,base,variant
+        self.supports=[{},{tags[0]:(0,1,1)}]
+        self.operators=ops;self.evidence={'sampled_geometry_passed':True}
+    def charstring(self,vsindex):
+        program=[vsindex,'vsindex'];column=0
+        for operator,count in self.operators:
+            for _ in range(count):
+                value=geometry.fixed(float(self.base[column]))
+                if column==0:
+                    if self.variant=='micro_nested_delta':program.extend([value,0,20,1,'blend',1,'blend'])
+                    elif self.variant=='micro_nested_base':program.extend([value,20,1,'blend',0,1,'blend'])
+                    else:program.extend([value,20,1,'blend'])
+                else:program.append(value)
+                column+=1
+            program.append(operator)
+        return T2CharString(program=program)
 
 
 def control_variant(font,variant):
@@ -35,11 +57,15 @@ def control_variant(font,variant):
             for k in range(4):coefficients[7+2*k:9+2*k]=[-direction/8,direction/8]
         model=geometry.OutlineModel(tags,ops,supports,coefficients,dict(sampled_geometry_passed=True))
         font=geometry.install(font,dict.fromkeys(font.getGlyphOrder(),model))
-    if variant in ('static_cff2','flat_cff2','horner_avar1'):
+    if variant.startswith('micro_'):
+        model=MicroBlendControl(tags,base,variant)
+        font=geometry.install(font,dict.fromkeys(font.getGlyphOrder(),model))
+    if variant in ('static_cff2','flat_cff2','horner_avar1') or variant.startswith('micro_'):
         avar=newTable('avar');avar.majorVersion=1;avar.minorVersion=0
         avar.segments={t:{-1.:-1.,0.:0.,1.:1.} for t in tags};font['avar']=avar
     def expected(p):
         if variant=='static_cff2':values=base
+        elif variant.startswith('micro_'):values=base+max(0,p[0])**(2 if variant=='micro_nested_delta' else 1)*slope
         elif variant=='flat_cff2':values=base+p[0]*slope
         elif variant=='flat_avar2':values=base+p[0]*slope+np.clip(.25+.6*p[0]+.4*p[1]-.3*p[2],0,1)*direction
         else:values=source(p[None])[0]+(.5 if variant=='horner_avar1' else np.clip(.25+.6*p[0]+.4*p[1]-.3*p[2],0,1))*delta(p[None])[0]
@@ -82,6 +108,11 @@ def run(output,binary=None,variant='full'):
         font_bytes=len(blob),requests=len(requests),compression=compression,production_accepted=False,
         original_font_acceptance=False,Windows_11_acceptance='NOT_RUN',DirectWrite='NOT_RUN',
         HarfBuzz=dict(observations=0,failures=0,max_error=0.))
+    if base_variant.startswith('micro_'):
+        report['micro_isolation']=dict(variation_regions=1,subroutine_calls=0,avar_version=1,
+            maximum_blend_stack=4,maximum_drawing_stack=max(n for _,n in ops),
+            nested_operand='delta' if base_variant=='micro_nested_delta' else
+                           'base' if base_variant=='micro_nested_base' else None)
     expected=[]
     for r in requests:
         p=r['p'];wanted=expected_function(p);expected.append(wanted)
@@ -125,7 +156,8 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',type=Path,required=True);p.add_argument('--binary',type=Path)
     p.add_argument('--matrix',action='store_true');a=p.parse_args()
     variants=('static_cff2','flat_cff2','horner_avar1','flat_avar2','unshared','full',
-              'flat_cff2_rlig','flat_cff2_requested','full_rlig','full_requested') if a.matrix else ('full',)
+              'flat_cff2_rlig','flat_cff2_requested','full_rlig','full_requested',
+              'micro_linear_requested','micro_nested_base_requested','micro_nested_delta_requested') if a.matrix else ('full',)
     reports=[run(a.output/v,a.binary,v) if a.matrix else run(a.output,a.binary) for v in variants]
     def failed(r):
         dw=r['DirectWrite']
