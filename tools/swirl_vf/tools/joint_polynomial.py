@@ -82,9 +82,9 @@ class PolynomialBox:
                 [[location[t] for t in self.axis_tags[:3]]])[0]
         return control_points(self.operators, values)
 
-    def charstring(self, vsindex):
+    def _program(self, vsindex, expression_pool=None):
         if not self.operators:
-            return T2CharString(program=[])
+            return []
         program = [vsindex, 'vsindex']
         regions = len(self.supports) - 1
         stack = maximum = 0
@@ -119,17 +119,23 @@ class PolynomialBox:
             program.append('blend')
             stack -= regions + 1
 
+        def operand(coefs):
+            begin = len(program)
+            emit(coefs, 0)
+            if expression_pool is not None:
+                program[begin:] = [expression_pool.intern(program[begin:], regions)]
+
         column = 0
         for operator, count in self.operators:
             for _ in range(count):
-                emit(self.coefficients[..., column], 0)
+                operand(self.coefficients[..., column])
                 if any(np.any(c[..., column]) for c in self.factors.values()):
                     for _ in range(3):
                         push(0)
                     for c in self.factors.values():
                         if self.signed_factors:
-                            emit(-c[..., column], 0)
-                        emit(c[..., column], 0)
+                            operand(-c[..., column])
+                        operand(c[..., column])
                     push(1)
                     program[-1] = 1
                     program.append('blend')
@@ -139,7 +145,10 @@ class PolynomialBox:
             program.append(operator)
             stack = 0
         self.evidence['maximum_operand_stack'] = maximum
-        return T2CharString(program=program)
+        return program
+
+    def charstring(self, vsindex):
+        return T2CharString(program=self._program(vsindex))
 
 
 def interpolate(bounds, operators, evaluate):

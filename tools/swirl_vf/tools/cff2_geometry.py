@@ -282,7 +282,7 @@ def fit(training_commands, training_locations, holdout_commands, holdout_locatio
     return model
 
 
-def install(font, models, *, experimental_slice=False, release_programs=False):
+def install(font, models, *, experimental_slice=False, release_programs=False, share_expressions=False):
     """Install all modeled GIDs on a detached font; never fill missing models.
 
     Callers must supply correct CFF2-compatible metrics before serialization.
@@ -302,6 +302,11 @@ def install(font, models, *, experimental_slice=False, release_programs=False):
             del candidate[tag]
     candidate.setGlyphOrder(order)
     builder = FontBuilder(font=candidate, isTTF=False)
+    require(type(share_expressions) is bool, 'invalid_shared_expression_policy')
+    pool = None
+    if share_expressions:
+        from cff2_expression_pool import ExpressionPool
+        pool = ExpressionPool()
     regions, region_ids, data, data_ids, strings = [], {}, [], {}, {}
     for name in order:
         model = models[name]
@@ -317,10 +322,20 @@ def install(font, models, *, experimental_slice=False, release_programs=False):
             require(len(data) < 65535, 'cff2_vsindex_overflow')
             data_ids[key] = len(data)
             data.append(buildVarData(indices, None, optimize=False))
-        strings[name] = model.charstring(data_ids[key])
-        if release_programs:
+        if pool is not None:
+            require(not model.operators or hasattr(model, '_program'), 'polynomial_model_required_for_expression_pool')
+            strings[name] = model._program(data_ids[key], pool) if model.operators else []
+        else:
+            strings[name] = model.charstring(data_ids[key])
+        if release_programs and pool is None:
             strings[name].compile(isCFF2=True)
+    shared = []
+    if pool is not None:
+        strings, shared, pool_report = pool.compile(strings)
+        candidate._swirl_expression_pool_report = pool_report
     builder.setupCFF2(strings)
+    for subroutine in shared:
+        candidate['CFF2'].cff.GlobalSubrs.append(subroutine)
     if regions:
         store = VarStoreData(otVarStore=buildVarStore(buildVarRegionList(regions, list(tags)), data))
         top = candidate['CFF2'].cff.topDictIndex[0]

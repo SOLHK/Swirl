@@ -227,3 +227,44 @@ and all six parser audits pass. No remote CI result is inferred. The input
 sampler predeclares fractional decimal coordinates with stable native transport;
 the exact readback guard remains unchanged. Arbitrary binary64 transport and
 continuous-space error bounds have not been certified. PR #53 remains Draft.
+
+## Lossless polynomial operand sharing checkpoint
+
+`cff2_expression_pool` interns complete operand expressions, including their
+variation-region count, and calls them through CFF2 global subroutines. Helpers
+contain neither `vsindex` nor calls; drawing chunks may call helpers, with at
+most two additional call levels. The final subroutine count determines call
+bias before any caller is encoded. Main strings and subroutines are bounded
+to 65,535 bytes. No coefficients or samples are removed or refitted.
+
+Three new unit tests cover serialized arithmetic identity, region-state
+isolation, and oversized drawing chunks. The shared authored control repeats
+all 155 positions in CoreText, HarfBuzz and fontTools with exactly the previous
+maximum errors. Its font is 5,976 bytes, with 20 operand helpers.
+
+For the private face-0 GID 1166 candidate, sharing reduces the file from
+165,773,884 to **104,063,548 bytes**. It uses 2,048 polynomial boxes, 8,051
+quantized avar2 regions, three physical and eight hidden computational axes.
+Reloaded, shared encoding repeats 2,006 observations against retained validated
+Apple libhvf transcripts at the identical requests:
+
+| Engine | Observations | Maximum control error (FUnit) | Outline/topology/selection failures |
+|---|---:|---:|---:|
+| CoreText | 2,006 | 0.018987351765994864 | 0 |
+| HarfBuzz | 2,006 | 0.020539522817323415 | 0 |
+| fontTools | 59 | 0.007295238302643026 | 0 |
+
+CoreText controls are identical to the unshared candidate (maximum change 0).
+The 2,006 observations are **not 2,006 independent positions**: the earlier
+grid/parameter-node audit counts 1,756 unique positions, of which 1,706 are
+distinct from fitting/refinement nodes. Both native engines preserve contour
+direction; maximum explicit closure gaps are 0.002081 FUnit or less. HarfBuzz
+candidate advances equal original-source HarfBuzz advances at every request.
+HarfBuzz rounds source advances to integral FUnits, so agreement with the
+unrounded table evaluator is a separate metric and is not claimed.
+
+The complete regression checkpoint has **1,005 tests: 998 passed, seven
+platform skips**. Source fonts, coefficients, coordinates and native transcripts
+remain private. Larger fresh acceptance sets and the GID 19177 native candidate
+are still in progress; this checkpoint is not joint-task completion or proof
+of full-font scalability. These large diagnostic fonts are not release assets.

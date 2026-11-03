@@ -31,7 +31,7 @@ def source(p):
 def delta(p):
  x,y,z=p.T
  return np.array([20+10*x*y,30+5*x*x*z,0*x,0*x,0*x,0*x,0*x,0*x,0*x,0*x]).T
-def build_control(template, encoding='horner'):
+def build_control(template, encoding='horner', *, share_expressions=False):
     boxes=[]
     for lo in itertools.product((-1,0),repeat=3):
      m=interpolate(np.c_[lo,np.array(lo)+1],ops,source)
@@ -62,11 +62,11 @@ def build_control(template, encoding='horner'):
     empty=g.OutlineModel(tags,(),[{}],np.zeros((1,0)),{'sampled_geometry_passed':True})
     models=dict.fromkeys(order,empty);models['probe']=boxes[0]
     models.update({f'box{i}':m for i,m in enumerate(boxes)})
-    f=g.install(f,models)
+    f=g.install(f,models,share_expressions=share_expressions)
     addFeatureVariations(f,[([{t:tuple(b) for t,b in zip(TAGS,m.bounds)}],{'probe':f'box{i}'}) for i,m in enumerate(boxes)])
     return f,boxes
 
-def run(output, encoding='horner'):
+def run(output, encoding='horner', *, share_expressions=False):
     out=Path(output).resolve()
     g.require(not out.exists() and not out.is_relative_to(Path(__file__).resolve().parents[3]), 'fresh_external_control_output_required')
     out.mkdir(parents=True, mode=0o700)
@@ -75,7 +75,7 @@ def run(output, encoding='horner'):
     (out/'compile.log').write_text(result.stdout+result.stderr);result.check_returncode()
     make_fixture(out/'template.ttc')
     with TTCollection(out/'template.ttc') as template:
-        candidate,boxes=build_control(template.fonts[0], encoding);candidate.save(out/'poly.otf')
+        candidate,boxes=build_control(template.fonts[0], encoding, share_expressions=share_expressions);candidate.save(out/'poly.otf')
     q=np.r_[np.asarray(list(itertools.product((-1,0,1),repeat=3))),np.random.default_rng(47).uniform(-1,1,(128,3))]
     profiles=((1,500,1000),(100,400,900),(1,500,1000));requests=[]
     for i,p in enumerate(q):
@@ -101,6 +101,8 @@ def run(output, encoding='horner'):
       v=compare(expected,cmd);stats=report[engine];stats['observations']+=1;stats['failures']+=not v['passed'];stats['max_error']=max(stats['max_error'],v['error'] or 0);stats['selection_failures']+=selected<3 or not np.all((p>=boxes[selected-3].bounds[:,0])&(p<=boxes[selected-3].bounds[:,1]))
     report={'scope':'authored_clamp_polynomial_control_only','production_accepted':False,
             'encoding':encoding, 'font_bytes':len(blob),
+            'share_expressions':share_expressions,
+            'expression_pool':getattr(candidate,'_swirl_expression_pool_report',None),
             'maximum_operand_stack':max(m.evidence['maximum_operand_stack'] for m in boxes),
             'engines':report};print(json.dumps(report));(out/'report.json').write_text(json.dumps(report,indent=2));return report
 
@@ -108,5 +110,6 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--private-output', required=True, type=Path)
     parser.add_argument('--encoding', choices=('horner', 'hoi', 'hoi-axis'), default='horner')
-    args=parser.parse_args();report=run(args.private_output, args.encoding)
+    parser.add_argument('--share-expressions', action='store_true')
+    args=parser.parse_args();report=run(args.private_output, args.encoding, share_expressions=args.share_expressions)
     sys.exit(0 if all(v['failures']==v['selection_failures']==0 for v in report['engines'].values()) else 1)
