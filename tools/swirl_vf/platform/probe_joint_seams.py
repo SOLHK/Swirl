@@ -75,10 +75,15 @@ def run(args):
             engine.set_var_coords_normalized(vector)
             g.require(engine.get_var_coords_normalized() == vector, 'seam_normalized_readback_mismatch')
             glyphs = font.getGlyphSet(location=normalized, normalized=True)
-            gids = [font.getGlyphID(f'joint{i}') for i in (left, right)]
+            # post 3.0 deliberately discards glyph names. Both research
+            # serializers keep the declared contiguous patch GID range.
+            gids = [args.first_patch_gid+i for i in (left, right)]
+            g.require(all(0 <= gid < len(font.getGlyphOrder()) for gid in gids),
+                      'seam_patch_gid_out_of_range')
+            names = [font.getGlyphOrder()[gid] for gid in gids]
             for name, outlines in (
                 ('HarfBuzz', [commands(engine, gid) for gid in gids]),
-                ('fontTools', [g.source_commands(glyphs[f'joint{i}']) for i in (left, right)])):
+                ('fontTools', [g.source_commands(glyphs[name]) for name in names])):
                 a, b = [g.operands(implicit_closures(value)) for value in outlines]
                 topology = a[0] == b[0]
                 error = float(np.linalg.norm(g.control_points(*a)-g.control_points(*b), axis=1).max()) if topology else None
@@ -100,4 +105,6 @@ if __name__ == '__main__':
         parser.add_argument('--'+name, type=Path, required=True)
     parser.add_argument('--seed', type=int, default=2026110447)
     parser.add_argument('--count', type=int, default=256)
+    parser.add_argument('--first-patch-gid', type=int, default=3,
+                        help='first contiguous local patch GID, independent of optional glyph names')
     sys.exit(0 if run(parser.parse_args())['passed'] else 1)
