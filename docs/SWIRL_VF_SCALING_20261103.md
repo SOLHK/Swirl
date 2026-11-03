@@ -6,6 +6,12 @@ localized-tricubic, avar2 and required-GSUB architecture. These are selected-gly
 research fonts, not a full-font release. Private inputs, outlines, coefficients,
 coordinates and raw transcripts remain outside Git.
 
+The completed [representative corpus](SWIRL_VF_CORPUS_20261103.md) records
+all 14 preselected cases: nine pass the qualified joint-q contract, including
+six new unique GIDs; five fail. The stage ledger includes failed attempts and
+resumed fits. Optional further storage savings are documented in the
+[bias-preserving dictionary extension](SWIRL_VF_EXTENDED_DICTIONARY_20261103.md).
+
 **Axis-contract qualification:** the successful outline comparisons below use
 the inherited joint post-avar **q-space** contract. The original raw weight map
 has conflicting duplicate records; a decoded fontTools dictionary does not
@@ -14,6 +20,27 @@ Thus these outline results do **not** establish original physical-user mapping
 parity or fully conformant installable fonts. The corpus exposed this through
 real HarfBuzz advance failures; see checkpoint 2. Earlier references to source
 avar preservation mean dictionary preservation, not raw-record preservation.
+
+The latest post-optimization anchor run is recorded in
+[the final anchor receipt](evidence/SWIRL_VF_FINAL_ANCHORS_20261103.json).
+It adds 4,096 new random triples per glyph (seeds 2026110861 / 2026110863)
+and executes every request from the preceding final run again, including
+historical maxima. It uses the corrected serialized fontTools GSUB selector.
+No fitting occurs in verification and no previous observed outline is reused.
+
+| GID | CT/HB observations each | Unique independent positions | CoreText maximum | HarfBuzz maximum | fontTools maximum (512) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1166 | 24,713 | 21,649 | 0.020462832574 | 0.018338193258 | 0.020435461376 |
+| 19177 | 28,570 | 22,481 | 0.020124576588 | 0.018596886107 | 0.013433502069 |
+
+Both serialized compressed fonts pass control-point, topology, direction,
+closure, selection and advance checks. Repeated or training-overlapping
+requests remain tested but excluded from independent counts. All errors are
+original FUnits, with the unchanged 0.03125 limit. The final local suite runs
+1,069 tests: 1,062 pass and seven platform skips, plus six parser-audit passes.
+Executed Windows incompatibility controls remain failures and are reported
+separately; they are not relabelled regression-suite passes.
+
 
 ## Checkpoint 1: exact CFF2 instruction sharing
 
@@ -150,6 +177,23 @@ each. Explicit/omitted computational defaults give identical results in all
 59,228,160 bytes for 1166 and 219,709,440 to 113,344,512 for 19177. HarfBuzz peaks
 drop from 172,294,144 to 120,209,408 and 451,428,352 to 238,616,576. Timing
 distributions are retained in the receipt; OS file cache is uncontrolled.
+
+The extra subroutine calls have a measured execution cost. Median outline
+extraction time per request, in microseconds, is:
+
+| GID | Engine | Original | Compressed |
+| --- | --- | ---: | ---: |
+| 1166 | HarfBuzz | 213.625 | 263.656 |
+| 1166 | CoreText | 100.812 | 127.771 |
+| 19177 | HarfBuzz | 400.563 | 445.875 |
+| 19177 | CoreText | 160.240 | 201.917 |
+
+Shaping medians remain about 19/22 microseconds in HarfBuzz and 434/275 in
+CoreText after compression. These three-process measurements expose the
+storage/runtime tradeoff; they do not establish application-level latency or
+stable percent improvements. Load, instance and shaping timings remain separate
+in the machine-readable receipt. Compression does not claim faster drawing.
+
 Direct, unshaped base-GID access differs from normal shaped output in all
 384 comparisons per engine/font. Hidden flags are a UI recommendation, not a
 read-only mechanism ([fvar specification](https://learn.microsoft.com/en-us/typography/opentype/spec/fvar)).

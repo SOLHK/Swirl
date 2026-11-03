@@ -17,4 +17,12 @@ class SummaryTests(unittest.TestCase):
     def test_unlisted_case_rejected(self):
         s={'source_sha256':'authored','seed':77,'selection':[]}
         with self.assertRaisesRegex(ValueError,'unselected'):summarize(s,[{'identity':{'source_sha256':'authored','face_index':0,'glyph_id':3}}])
+    def test_parameter_evidence_keeps_aggregates_and_rejects_sample_payloads(self):
+        r=dict(command='fit-parameters',holdout_count=4096,holdouts_disjoint=True,
+               max_parameter_induced_error=.01,failures=0,budget=1/64,raw_regions=100,
+               encoded_regions=12,coordinates=['PRIVATE'])
+        m=metrics(r);self.assertEqual(m['parameter_holdout']['encoded_regions'],12)
+        self.assertNotIn('PRIVATE',json.dumps(m))
+        r['failures']=[{'coordinates':['PRIVATE']}]
+        with self.assertRaisesRegex(ValueError,'non_scalar'):metrics(r)
 if __name__=='__main__':unittest.main()

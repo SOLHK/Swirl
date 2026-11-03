@@ -28,6 +28,15 @@ FAILURES=('failures','topology_failures','direction_failures','closure_failures'
 
 def metrics(report):
     result={k:report[k] for k in SCALARS if k in report}
+    if report.get('command')=='fit-parameters':
+        # Keep useful parameter-stage evidence without admitting the generic
+        # failures key if a different producer puts private sample rows there.
+        keys=('holdout_count','holdouts_disjoint','max_parameter_induced_error',
+              'failures','budget','raw_regions','encoded_regions')
+        values={k:report[k]for k in keys if k in report}
+        if any(type(v)not in (int,float,bool)for v in values.values()):
+            raise ValueError('non_scalar_parameter_evidence')
+        result['parameter_holdout']=values
     for group,keys in GROUPS.items():
         if group in report:result[group]={k:report[group][k] for k in keys if k in report[group]}
     if 'engines' in report:
