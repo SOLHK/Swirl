@@ -1,10 +1,97 @@
 # Three-axis branch investigation — 2026-11-03
 
-**The two-target acceptance remains incomplete.** The original investigation
-below records failed models. The later factored reconstruction now passes a
-new 3,140-position native batch for GID 1166; GID 19177 still awaits serialized
-native verification. The limit remains 1/32 FUnit. These are single-glyph
-research fonts using standard shaping, not complete fonts or release artifacts.
+**Both targets now pass the independent sampled native acceptance below.**
+The limit remains 1/32 FUnit. Earlier sections retain the failed models and
+intermediate checkpoints; their pending status describes those earlier runs.
+These are single-glyph research fonts using standard shaping, not complete
+fonts or release artifacts. A continuous-space error bound is not claimed.
+
+## Latest two-target sampled native acceptance
+
+The final serialized candidates use factored rational projections, adaptive
+local tricubic fields, sparse unclamped-parameter maps and simultaneous avar2
+clamp ramps. Two hidden copies of each physical input provide repeated factors
+for cubic powers without coupling the three independent physical controls to
+one diagonal. CFF2 tensor blends, bounded axis-power fallback and shared operand
+subroutines encode those fields; required GSUB FeatureVariations select the
+local outline in ordinary native shaping. This changes representation, not
+just the coefficients inside the original obstructed support cells.
+
+Independent seed `2026110445` gives the following maximum Euclidean control
+errors in original source FUnits, against fresh Apple libhvf observations:
+
+| Source GID | CoreText observations / maximum | HarfBuzz observations / maximum | fontTools observations / maximum |
+| --- | --- | --- | --- |
+| 1166 | 3,153 / **0.025831485558** | 3,153 / **0.023699382672** | 271 / **0.018391232668** |
+| 19177 | 3,123 / **0.016495875619** | 3,123 / **0.014905942892** | 269 / **0.011886939910** |
+
+Every listed engine has zero outline, topology, winding and advance-comparison
+failures. Closed paths are checked; only an exactly redundant closing line is
+canonicalized. Source and candidate hashes remain unchanged. CoreText verifies
+the actual run's font tables and exact user-axis readback for every request.
+HarfBuzz 14.6.0 and fontTools 4.61.1 independently reopen the saved fonts. The
+fontTools subset is fixed before errors are measured and spans every category.
+
+There are 3,134 / 3,108 distinct physical user positions. Each glyph includes
+2,048 random triples, 192 single-axis requests, 192 requests over all dual-axis
+pairs, 125 cube-grid checks, analytic branch/clamp contacts, 384 seam-neighbour
+requests and 128 requests derived from the previous dense-model holdouts.
+All inputs are predeclared, including fractional user coordinates. The actual
+coordinates after original normalization define the source reference.
+
+All 2,048 random triples per glyph are excluded from every declared midpoint
+fitting/refinement sampling family, including local jitter and analytic chord
+contacts. The conservative exclusion certificate covers 2,836 / 2,806 total
+observations. Boundary checks that can overlap training are retained and are
+not relabelled as independent holdouts. The separate source-aligned atlas has
+its own explicit sample receipts; this midpoint certificate does not cover it.
+
+Additional comparisons draw both adjacent local glyphs at a common exact
+post-avar2 coordinate vector: 256 pairs per glyph pass in both engines. Maximum
+jumps are 0.017333984375 / 0.006652832031 FUnit in HarfBuzz and
+0.017302664490 / 0.006635054331 in fontTools. This is a patch-continuity check,
+not a replacement for physical-coordinate source accuracy.
+
+CoreText advances differ from unrounded original-source metric tables by at
+most 0.012224449 FUnit. HarfBuzz advances exactly match original-source
+HarfBuzz; its existing integer HVAR rounding differs from unrounded tables by
+up to 0.507054109 FUnit. The latter is explicitly not claimed as 1/32-accurate
+reproduction of ideal unrounded advances. fontTools metric errors remain
+below 0.006085 FUnit.
+
+| Source GID | Candidate bytes | Local cells | Maximum CFF2 stack | CFF2 regions | Global subroutines |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1166 | 62,247,684 | 2,048 | 165 | 59,582 | 32,768 |
+| 19177 | 256,080,332 | 4,096 | 197 | 43,444 | 35,302 |
+
+All main strings and subroutines stay within 65,535 bytes; added call depth is
+at most two. GID 19177 serializes directly from freshly rechecked fields in
+594.36 seconds, avoiding an uncompressed Horner intermediate. The earlier
+unfinished Horner build was superseded, not reported as a native pass. No
+field coefficients were refitted during the encoding change.
+
+The actual source, algorithms, tests and licenses of both requested upstream
+projects were inspected and their controls rebuilt and executed; see the
+[open-source comparison](SWIRL_VF_OPEN_SOURCE_INTERPOLATION_20261103.md).
+The axis-copy mechanism is useful, while neither upstream project supplies a
+more accurate HVF fitter. Swirl's factorization and adaptive fields are retained.
+No upstream source code, font contours or binaries are incorporated.
+
+The final code regression has **1,021 tests: 1,014 passed, seven skipped**;
+six parser audits also pass. Five skips require Linux-specific native APIs and
+two are separate native integration gates. The actual macOS native runs above
+are separate executed evidence, not inferred from those unit tests. Remote CI
+is not claimed. Public aggregate counts, hashes and per-engine diagnostics are
+in the [acceptance receipt](evidence/SWIRL_VF_JOINT_ACCEPTANCE_20261103.json).
+
+Remaining limits: these large one-source-glyph fonts do not establish full-font
+scalability. Hidden computational axes must stay at their defaults, and direct
+access to the unselected base GID is outside the standard-shaping acceptance.
+Arbitrary binary64 input transport and an error bound over the entire continuous
+design space remain uncertified. PR #53 stays Draft; no release, main/test
+integration, source font, extracted outline or raw private record is published.
+
+## Historical investigation and intermediate checkpoints
 
 Work starts at PR #52's `b9d8cebf1de19acb31a3e54533419b9645c47e0d` in a separate
 worktree and `work/swirlvf-joint-acceptance-20261103`. PR #49 and #51 were read

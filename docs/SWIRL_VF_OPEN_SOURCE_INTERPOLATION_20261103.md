@@ -1,5 +1,11 @@
 # Open-source interpolation comparison — 2026-11-03
 
+Latest result: both original-source target glyphs now pass the final sampled
+CoreText, HarfBuzz and fontTools acceptance at 1/32 FUnit. The earlier pending
+statements below are retained checkpoint history. See the
+[two-target acceptance](SWIRL_VF_JOINT_20261103.md#latest-two-target-sampled-native-acceptance)
+and [hash-bound aggregate receipt](evidence/SWIRL_VF_JOINT_ACCEPTANCE_20261103.json).
+
 This is a source-and-execution comparison, not a README survey. The inspected
 repositories were cloned outside Git and pinned to:
 
@@ -161,3 +167,16 @@ A preceding run exposed a fixture timestamp race during intentional TTC face
 swapping. Disabling timestamp recalculation on the reloaded authored fixture
 preserves the exact `name`-table mismatch assertion; no verifier assertion or
 precision limit changed. Failed logs remain private and retained.
+
+The completed direct GID 19177 font is 256,080,332 bytes, with 4,096 local
+cells, maximum stack 197, 43,444 CFF2 regions and 35,302 global subroutines.
+Its seed `2026110445` original-source acceptance passes 3,123 CoreText
+observations at maximum **0.016495875619**, 3,123 HarfBuzz observations at
+**0.014905942892**, and 269 fontTools observations at **0.011886939910** FUnit.
+There are 3,108 distinct user positions; all 2,048 random triples are excluded
+from the declared fitting/refinement families. All 256 additional seam pairs
+pass in HarfBuzz and fontTools. Combined with the final GID 1166 result above,
+this establishes the sampled two-target result, without a continuous-space
+error bound or full-font scalability claim. Both real candidates use the
+independently implemented axis-copy encoding together with Swirl's existing
+source-field model; no upstream font data or implementation is shipped.
