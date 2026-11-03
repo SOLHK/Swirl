@@ -3,10 +3,12 @@ import math
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
+from dataclasses import replace
 import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'platform'))
-from transform_geometry import fractional_translation, blend_transform_rows
+from transform_geometry import fractional_translation, blend_transform_rows,compile_transform_rows
 from probe_transform_stages import composite, rotation, direct_cases
 from probe_hierarchy_rules import shape_record, hvgl_table, HVGL, ExperimentalRenderer
 from batch_geometry import BatchGeometry
@@ -14,6 +16,22 @@ from tangent_geometry import resolve_path
 
 
 class TransformGeometryTests(unittest.TestCase):
+    def test_batch_cache_reuses_constants_but_not_replaced_or_mutable_parts(self):
+        table=HVGL(hvgl_table([composite(1,tm={0:[17.,-3.]}),shape_record()]))
+        renderer=BatchGeometry(table);positions=[[.123],[.891]]
+        with patch('transform_geometry.compile_transform_rows',wraps=compile_transform_rows) as compile:
+            first=renderer.render(0,positions)
+            again=renderer.render(0,positions)
+            self.assertEqual(compile.call_count,1)
+            for a,b in zip(first.paths,again.paths):self.assertEqual(a.tobytes(),b.tobytes())
+            part=table.part(0);mutable=part.translations.master_values.copy()
+            table._cache[0]=replace(part,translations=replace(part.translations,master_values=mutable))
+            renderer.render(0,positions);mutable[0,0]+=10
+            changed=renderer.render(0,positions)
+            self.assertEqual(compile.call_count,3)
+            for a,b in zip(first.paths,changed.paths):
+                np.testing.assert_allclose(b-a,np.broadcast_to([10.,0.],a.shape),atol=1e-13,rtol=0)
+
     def test_rotation_centre_formula_at_independent_fractional_weights(self):
         centre = np.array([37., -53.])
         for theta in (-1.31, -.017, .19, 2.17):

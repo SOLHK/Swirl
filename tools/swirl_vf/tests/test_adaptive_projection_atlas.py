@@ -9,6 +9,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'tools'))
 from adaptive_projection_atlas import fit, validate, branch_split, branch_probes, RecordedSource, ProjectionAtlas
 from projection_factorization import ProjectionSource
 from test_hvf_branch_cells import authored_table
+from probe_transform_stages import composite
+from probe_hierarchy_rules import hvgl_table,shape_record
+from hvf import HVGL
 
 
 class PolynomialSource:
@@ -25,6 +28,23 @@ class PolynomialSource:
 
 
 class AdaptiveProjectionTests(unittest.TestCase):
+    def test_capped_fit_checks_branches_between_internal_and_final_budgets(self):
+        class KinkSource(PolynomialSource):
+            ops=base_ops=(('rmoveto',2),)
+            width=2;gid=0
+            table=HVGL(hvgl_table([composite(1,axes=3,tree_axes=4,axis_master={0:-.09},
+                axis_extreme={(0,0):-1.,(0,1):1.}),shape_record()]))
+            def __call__(self,p):
+                k=-float(self.table.part(0).master_values[0])
+                return np.c_[.75*np.maximum(np.asarray(p)[:,0]-k,0),np.zeros(len(p))]
+        source=KinkSource()
+        grid_only=fit(source,max_boxes=8,use_source_branches=False)
+        measured=fit(source,max_boxes=8)
+        self.assertGreater(grid_only.evidence['max_refinement_error'],1/64)
+        self.assertLess(grid_only.evidence['max_refinement_error'],1/32)
+        self.assertGreater(measured.evidence['max_refinement_error'],1/32)
+        self.assertGreater(len(measured.fitting_fingerprints),len(grid_only.fitting_fingerprints))
+
     def test_every_octant_and_independent_positions_preserve_the_cubic_field(self):
         source = PolynomialSource()
         atlas = fit(source, max_boxes=8, use_source_branches=False)

@@ -23,6 +23,10 @@ def run(a):
         if a.method=='reference':
             spec=importlib.util.spec_from_file_location('retained_projection_direction',a.reference_module)
             module=importlib.util.module_from_spec(spec);sys.modules[spec.name]=module;spec.loader.exec_module(module)
+            if a.reference_batch_module:
+                bspec=importlib.util.spec_from_file_location('retained_batch_geometry',a.reference_batch_module)
+                batch=importlib.util.module_from_spec(bspec);sys.modules[bspec.name]=batch;bspec.loader.exec_module(batch)
+                module.BatchGeometry=batch.BatchGeometry
             cls=module.ProjectionSource
         with TTCollection(a.source,lazy=True) as fonts:
             f=fonts.fonts[a.face];provider=cls(HVGL(f.reader['hvgl'],f.reader['hvpm'] if 'hvpm' in f else None),a.gid)
@@ -38,15 +42,20 @@ def run(a):
     revision=subprocess.check_output(['git','rev-parse','--verify',a.reference_revision+'^{commit}'],cwd=repo,text=True).strip()
     reference=out/'reference.py';reference.write_bytes(subprocess.check_output(
         ['git','show',revision+':tools/swirl_vf/tools/projection_factorization.py'],cwd=repo))
+    if a.reference_batch:
+        batch_reference=out/'reference_batch.py';batch_reference.write_bytes(subprocess.check_output(
+            ['git','show',revision+':tools/swirl_vf/tools/batch_geometry.py'],cwd=repo))
     rows=[]
     for method in ('reference','current'):
         command=[sys.executable,__file__,'--source',str(a.source),'--source-sha256',a.source_sha256,
             '--face',str(a.face),'--gid',str(a.gid),'--samples',str(a.samples),'--seed',str(a.seed),
             '--method',method,'--reference-module',str(reference)]
+        if a.reference_batch:command+=['--reference-batch-module',str(batch_reference)]
         result=subprocess.run(command,capture_output=True,text=True);(out/(method+'.stderr.log')).write_text(result.stderr)
         result.check_returncode();rows.append(json.loads(result.stdout))
     exact=all(rows[0][key]==rows[1][key] for key in ('field_sha256','parameter_sha256'))
     report=dict(identity=identity,reference_revision=revision,rows=rows,exact_field_and_parameter_bytes_equal=exact,
+                reference_batch_geometry=a.reference_batch,
                 accuracy_acceptance=False,concurrent_host_activity_uncontrolled=True)
     (out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))
     require(exact,'projection_direction_bytes_changed')
@@ -59,6 +68,8 @@ if __name__=='__main__':
     p.add_argument('--private-output',type=Path);p.add_argument('--reference-revision')
     p.add_argument('--samples',type=int,default=16384);p.add_argument('--seed',type=int,default=2026110841)
     p.add_argument('--method',choices=('reference','current'));p.add_argument('--reference-module',type=Path)
+    p.add_argument('--reference-batch',action='store_true',help='Also compare the retained BatchGeometry implementation')
+    p.add_argument('--reference-batch-module',type=Path)
     a=p.parse_args()
     if a.samples<=0 or (not a.method and (not a.private_output or not a.reference_revision)):
         p.error('positive samples, private output and explicit reference revision required')

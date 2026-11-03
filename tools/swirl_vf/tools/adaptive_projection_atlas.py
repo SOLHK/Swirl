@@ -190,7 +190,11 @@ def fit(source, *, max_boxes=4096, budget=LIMIT/4, use_source_branches=True,
         axis = int(np.argmax([errors[mask].max() for mask in AXIS_MASKS]))
         error = float(errors.max())
         anchor = points[int(np.argmax(errors))]
-        if use_source_branches and error <= 2*budget:
+        # A capped fit can be handed to validation above the stricter internal
+        # refinement budget. Check every cell eligible for the FINAL limit,
+        # not only cells below twice the internal budget. Otherwise an unseen
+        # source kink can make a nominally passing atlas exceed LIMIT.
+        if use_source_branches and error <= LIMIT:
             extra = branch_probes(source, bounds)
             if len(extra):
                 e = source.errors(model.values(extra), evaluate(extra))
@@ -236,6 +240,7 @@ def fit(source, *, max_boxes=4096, budget=LIMIT/4, use_source_branches=True,
                     max_refinement_error=error, source_branch_cuts=source_cuts,
                     refinement_budget=budget, refinement_budget_met=error <= budget,
                     resumed_boxes=0 if initial_atlas is None else len(initial_atlas.boxes),
+                    branch_probe_gate=LIMIT if use_source_branches else None,
                     training_and_refinement_unique_positions=len(receipt), boxes=len(entries))
     return ProjectionAtlas([m for _, m in entries], evidence, receipt)
 
