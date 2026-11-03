@@ -74,3 +74,18 @@ The public benchmark driver was also executed on GID 35709: 18.477398 ->
 field and parameter hashes. Both runs are retained because host contention
 changes elapsed time. The checkpoint runs 1,058 regressions: 1,051 pass and seven
 platform skips; all six parser audits pass.
+
+## Flat specialization applicability screen
+
+The later [seeded screen](evidence/SWIRL_VF_FLAT_ELIGIBILITY_20261103.json)
+selects 16 additional GIDs uniformly without replacement from 29,219
+zero-Type2 roots outside the preselected corpus, before fitting (seed
+2026110867). Each receives the same eight-octant model, 4,096 independent
+holdouts at the unchanged 1/32 limit, and the 1/1024 whole-cell
+representation-change bound. **Zero of 16 pass both gates.** No fonts or
+native successes are claimed by this screening tool. The selected denominator,
+all failed gates, measured errors and runtime are retained.
+
+This prevents extrapolating GID 50's successful simplification to the full
+zero-factor stratum. It neither estimates a population eligibility percentage
+nor excludes better partitions or higher-order flat representations.

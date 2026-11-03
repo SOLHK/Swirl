@@ -43,8 +43,9 @@ selection. Explicit `rvrn` fixes selection but leaves high-order paths empty.
 Thus default-feature routing, avar2 mapping, and high-order execution are
 separate limitations in these tested systems. The Horner/avar1 and unshared
 controls isolate the high-order failure from avar2 and the new byte compression.
-The exact underlying DirectWrite decoder rejection is not yet traced; this
-does not prove all higher-order constructions impossible. The current CFF2
+The tiny controls below further isolate the rejection to nested blended
+operands. Its implementation mechanism is not traced, and this does not prove
+all higher-order constructions impossible. The current CFF2
 specification marks `blend` itself blendable
 ([CFF2 specification](https://learn.microsoft.com/en-us/typography/opentype/spec/cff2#charstring-variation-operators)).
 
@@ -52,6 +53,62 @@ Windows 11 **client**, original-source Windows execution, text fallback and
 installation remain NOT_RUN. Server 2025 is not relabelled Windows 11. The
 dated upstream [avar2 support matrix](https://googlefonts.github.io/how2avar2/docs/support/)
 was context; the table above comes from actual native execution.
+
+### Isolate nested blended operands
+
+[Run 41581157623](https://github.com/SOLHK/Swirl/actions/runs/41581157623)
+adds three minimal controls, retaining the same 762 requests on both server
+versions. These use one variation region, avar1, no subroutines, a drawing
+stack bound of six and a blend stack bound of four. Explicit `rvrn` selects
+the correct glyph in every case.
+
+| Minimal program | Outline failures / 762 | Maximum comparable FUnit error |
+| --- | ---: | ---: |
+| One ordinary linear blend | 0 | 0.000754395 |
+| Inner blend reused as an outer blend base, outer delta zero | 762 empty | N/A |
+| Inner blend reused as an outer blend delta | 762 empty | N/A |
+
+The second program computes the same linear function as the first. Thus the
+failure does not require a nonlinear mathematical result, avar2, a large
+stack, subroutine calls, or a large font. HarfBuzz executes all three. The
+120 exact FLOAT readback mismatches also remain in these controls; the
+[receipt](evidence/SWIRL_VF_DIRECTWRITE_MICRO_20261103.json) preserves them.
+Neither increasing sample count nor byte compression can repair this native
+execution difference. CI remains failed instead of hiding the incompatibility.
+
+### Test a standard fractional glyf/gvar alternative
+
+`probe_scaled_glyf.py` independently authors a 1,728-byte TrueType control:
+three physical axes, avar1 identity, 22 ordinary gvar tuples, and a simple
+quadratic detail glyph wrapped by a 1/32-scale component. Its coordinate
+function includes single-axis, dual-axis and three-axis products. It has no
+computed axes or GSUB dependency. All 283 requests are fixed-seed, with
+fractional user coordinates rounded to 1/16 before execution; this control
+does not test arbitrary binary64 request/readback equality.
+
+[Run 41582587871](https://github.com/SOLHK/Swirl/actions/runs/41582587871)
+executes the exact same serialized font as macOS. The observer checks actual
+glyf, loca, gvar, fvar, avar and cmap bytes, and table absence, on the run font.
+
+| Engine | Failures / 283 | Maximum original FUnit error |
+| --- | ---: | ---: |
+| HarfBuzz 14.6.0 | 0 | 0.001087562 |
+| fontTools 4.61.1 | 0 | 0.000000000000255 |
+| DirectWrite Server 2022 / 2025 | 0 / 0 | 0.020982159 / 0.020982159 |
+| CoreText macOS 26.5.1 | 282 | 0.704469768 |
+
+Selection, advances and all DirectWrite axis readbacks pass. CoreText preserves
+fractional default geometry but returns integer-unit coordinates at the
+nondefault positions in this control. Removing ROUND_XY_TO_GRID from the
+component produces the same failure counts and maximum; that flag alone is
+not the cause. Both attempts are retained in the
+[aggregate receipt](evidence/SWIRL_VF_SCALED_GLYF_20261103.json). This is evidence
+of a Windows-compatible precision mechanism for an authored function, not an
+HVF conversion or a cross-platform replacement. No real glyph is added to the
+accepted corpus. A naive unique detail-plus-wrapper per source glyph would
+also require at least 94,194 nonempty glyph records, before blanks, exceeding
+the glyph limit without additional sharing. That bound applies to this naive
+construction, not to all TrueType representations.
 
 ## Structural capacity
 
