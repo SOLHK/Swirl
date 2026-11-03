@@ -177,9 +177,10 @@ Item {
                 // platform pointer tracker and cannot acknowledge SetCursorPos.
                 // A distinct native move also covers a reused cursor position
                 // after a hide/show or a previous process at the same location.
-                if(QCursor::pos()==global){
+                const auto nativeAt=QCursor::pos();
+                if(nativeAt==global || pointerObservation.global==global){
                     const auto before=pointerObservation.moves;
-                    const auto adjacent=global+QPoint(1,0);
+                    const auto adjacent=global+(nativeAt==global+QPoint(1,0)?QPoint(-1,0):QPoint(1,0));
                     QCursor::setPos(adjacent);
                     check(QTest::qWaitFor([&]{return pointerObservation.moves>before&&pointerObservation.global==adjacent;},1000),
                         "native pointer acknowledges the distinct departure position");

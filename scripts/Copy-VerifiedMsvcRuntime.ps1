@@ -173,7 +173,9 @@ function Copy-SwirlVerifiedMsvcRuntime {
     if($compilerText -notmatch '(?m)^set\(CMAKE_CXX_COMPILER_VERSION "([0-9.]+)"\)\s*$'){throw 'The actual C++ compiler version is missing.'}
     $compilerVersion=$Matches[1]
     $redistRoot=Join-Path $vs 'VC/Redist/MSVC';Assert-SwirlPathWithoutLinks $redistRoot
-    $candidates=@(Get-ChildItem -LiteralPath $redistRoot -Directory|Where-Object {$_.Name -match '^[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?$' -and [version]$_.Name -ge $toolset}|Sort-Object @{Expression={[version]$_.Name};Descending=$true})
+    # VS redist directory labels can predate the installed compiler while their DLL file versions are newer.
+    # Select only this compiler's VS redist tree; validate every actual DLL version below.
+    $candidates=@(Get-ChildItem -LiteralPath $redistRoot -Directory|Where-Object {$_.Name -match '^[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?$'}|Sort-Object @{Expression={[version]$_.Name};Descending=$true})
     $selected=$null;$crt=$null
     foreach($candidate in $candidates) {
         Assert-SwirlPathWithoutLinks $candidate.FullName
@@ -182,7 +184,8 @@ function Copy-SwirlVerifiedMsvcRuntime {
         if($directories.Count -gt 1){throw 'Ambiguous MSVC redistributable CRT directory.'}
         if($directories.Count -eq 1){$selected=$candidate;$crt=Resolve-SwirlMsvcPath $directories[0].FullName;break}
     }
-    if($null -eq $selected){throw 'No same-toolchain x64 redistributable CRT at least as recent as the compiler toolset is installed.'}
+    if($null -eq $selected){throw ('No x64 Microsoft redistributable CRT directory was found under the actual compiler VS installation: '+$redistRoot+'; compiler toolset='+$toolset+'; numeric directory candidates='+(@($candidates|ForEach-Object {$_.Name}) -join ', '))}
+    Write-Host ('Selected same-VS x64 CRT source: '+$crt+'; directory label='+$selected.Name+'; compiler toolset='+$toolset)
     $graph=Get-SwirlMsvcPeGraph $root
     $needed=New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
     $queue=New-Object 'System.Collections.Generic.Queue[string]'
@@ -195,9 +198,10 @@ function Copy-SwirlVerifiedMsvcRuntime {
         if($image.Machine -cne '0x8664'){throw ('Wrong architecture in the x64 CRT source: '+$name)}
         $info=[Diagnostics.FileVersionInfo]::GetVersionInfo($source)
         $version=[version]('{0}.{1}.{2}.{3}' -f $info.FileMajorPart,$info.FileMinorPart,$info.FileBuildPart,$info.FilePrivatePart)
-        if($version -lt $toolset){throw ('Redistributable DLL predates the actual compiler toolset: '+$name)}
+        if($version -lt $toolset){throw ('Redistributable DLL predates the actual compiler toolset: '+$source+'; file version='+$version+'; required toolset='+$toolset)}
         $signature=Get-AuthenticodeSignature -LiteralPath $source
         if($signature.Status -ne 'Valid' -or $null -eq $signature.SignerCertificate -or $signature.SignerCertificate.Subject -notmatch '(?:^|,\s*)O=Microsoft Corporation(?:,|$)'){throw ('CRT source does not have a valid Microsoft signature: '+$name)}
+        Write-Host ('Verified Microsoft CRT source: '+$source+'; file version='+$version+'; machine='+$image.Machine+'; signature='+$signature.Status)
         $hash=Get-SwirlMsvcHash $source;$destination=Join-Path $root $name;Assert-SwirlPathWithoutLinks $destination
         [IO.File]::Copy($source,$destination,$true)
         if((Get-SwirlMsvcHash $destination) -cne $hash -or (Get-SwirlMsvcHash $source) -cne $hash){throw ('CRT source or destination changed during copy: '+$name)}
