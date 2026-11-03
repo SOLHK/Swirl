@@ -105,6 +105,12 @@ is at most two. Maximum main/subroutine sizes are 65,180 / 65,336 bytes for
 major reduction comes from the region-wide saturation certificates.
 Every one of the **32 / 247** original failed physical requests is repeated
 exactly and now passes. Failed fonts and complete logs remain private.
+An additional 33 observations (31 distinct positions) repeat the earlier 1166
+grid model's top 16 errors per engine, including its 0.030024337481-FUnit
+maximum. At the identical physical inputs, the new candidate passes all three
+engines, with maxima 0.016587741298 / 0.015014748808 / 0.014412108685 FUnit.
+This is a historical-maximum regression supplement, not another random plan;
+it is kept separate from the 6,442-position main acceptance count.
 
 ### Interfaces, coordinate execution and reproducibility
 

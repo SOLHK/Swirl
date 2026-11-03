@@ -210,7 +210,75 @@
         "all_failed_requests_recovered": true
       },
       "fractional_user_observations": 6367,
-      "strict_independent_native_passed": true
+      "strict_independent_native_passed": true,
+      "prior_grid_model_maxima_replay": {
+        "protocol": "Top 16 prior observations per engine, unioned before native execution; identical physical requests, no new random sampling.",
+        "observations": 33,
+        "independence": {
+          "proven": true,
+          "observations": 33,
+          "unique_positions": 31,
+          "overlapping_observations": 0,
+          "unique_independent_positions": 31,
+          "duplicate_observations": 2,
+          "conservative_F2_grid_exclusion": true,
+          "legacy_conservative_grid_exclusion": false
+        },
+        "engines": {
+          "CoreText": {
+            "observations": 33,
+            "independent_observations": 31,
+            "max_error": 0.016587741297059127,
+            "independent_max_error": 0.016587741297059127,
+            "failures": 0,
+            "topology_failures": 0,
+            "direction_failures": 0,
+            "closure_failures": 0,
+            "selection_failures": 0,
+            "max_explicit_closure_gap": 0.0007936037368131008,
+            "max_advance_error": 0.009100701402758204,
+            "advance_failures": 0
+          },
+          "HarfBuzz": {
+            "observations": 33,
+            "independent_observations": 31,
+            "max_error": 0.01501474880794382,
+            "independent_max_error": 0.01501474880794382,
+            "failures": 0,
+            "topology_failures": 0,
+            "direction_failures": 0,
+            "closure_failures": 0,
+            "selection_failures": 0,
+            "max_explicit_closure_gap": 0.0007424071263057911,
+            "max_advance_error": 0.0,
+            "advance_failures": 0
+          },
+          "fontTools": {
+            "observations": 33,
+            "independent_observations": 31,
+            "max_error": 0.014412108684358497,
+            "independent_max_error": 0.014412108684358497,
+            "failures": 0,
+            "topology_failures": 0,
+            "direction_failures": 0,
+            "closure_failures": 0,
+            "selection_failures": 0,
+            "max_explicit_closure_gap": 0.0007404724693917549,
+            "max_advance_error": 0.005883368299123504,
+            "advance_failures": 0
+          }
+        },
+        "candidate_sha256": "5d6be881baef4ab427f091f98adb8809a66c59e32ec53c7725d631985318a84c",
+        "artifact_hashes": {
+          "plan.json": "8bf9b1745e760b19e1e70bd67b08c11c7470d87a87f6c6736ff47fb715a887bb",
+          "manifest.json": "941beaf42788e9f21de6a07a0b3297ea56fe1c5723e36c26e440030f537f36e7",
+          "native.jsonl": "898956748c6d17c5c23593b219be1167012a0fe97e82b8d540dfe62f76ad6654",
+          "hvf-native.jsonl": "b47ec7df729e9acbaf307473aebd65c17207ce3a9344b4cb46c38bf01956730d",
+          "observations.jsonl": "f8e2d510bbf5cd1f4383d5b67f3749c718841cf55488cc479b45a7e7cb626418"
+        },
+        "verifier_sha256": "1cc7726f80354bd52ffa49c0756b50b49388a8ec331ce8f935b9b5cfe8241d18",
+        "strict_independent_native_passed": true
+      }
     },
     "19177": {
       "identity": {
