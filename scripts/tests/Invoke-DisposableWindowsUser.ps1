@@ -135,6 +135,70 @@ namespace SwirlDisposableUser {
     public static AccessGrant GrantWindowStation(string sid) {return new AccessGrant(GetProcessWindowStation(),sid,0xF037F);}
     public static AccessGrant GrantDesktop(string sid) {return new AccessGrant(GetThreadDesktop(GetCurrentThreadId()),sid,0xF01FF);}
 
+    [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern IntPtr CreateFileW(string path,uint access,uint share,IntPtr attributes,uint creation,uint flags,IntPtr template);
+    [StructLayout(LayoutKind.Sequential)] struct AttributeTag {public uint Attributes,Tag;}
+    [DllImport("kernel32.dll",SetLastError=true)] static extern bool GetFileInformationByHandleEx(IntPtr file,int type,out AttributeTag data,uint length);
+    [DllImport("advapi32.dll",SetLastError=true)] static extern bool GetKernelObjectSecurity(IntPtr handle,uint info,byte[] descriptor,uint length,out uint needed);
+    [DllImport("advapi32.dll",SetLastError=true)] static extern bool SetKernelObjectSecurity(IntPtr handle,uint info,byte[] descriptor);
+    static IntPtr OpenAclFile(string path) {
+      // Bounded test-file snapshot/restore, not normal inheritance editing.
+      // BACKUP_SEMANTICS permits directory handles; no backup/restore privilege
+      // is enabled. READ_CONTROL | WRITE_DAC | FILE_READ_ATTRIBUTES still
+      // require ordinary ACL access, including the reparse-attribute check.
+      IntPtr handle=CreateFileW(path,0x00060080,7,IntPtr.Zero,3,0x02200000,IntPtr.Zero);
+      if(handle==new IntPtr(-1))throw new Win32Exception(Marshal.GetLastWin32Error(),"Open test ACL file");
+      AttributeTag tag;
+      if(!GetFileInformationByHandleEx(handle,9,out tag,(uint)Marshal.SizeOf(typeof(AttributeTag)))) {
+        int error=Marshal.GetLastWin32Error();CloseHandle(handle);throw new Win32Exception(error,"Read test file attributes");
+      }
+      if((tag.Attributes&0x400)!=0){CloseHandle(handle);throw new InvalidOperationException("Test ACL file is a reparse point");}
+      return handle;
+    }
+    static RawSecurityDescriptor FileDescriptor(IntPtr handle) {
+      uint needed;GetKernelObjectSecurity(handle,4,null,0,out needed);
+      if(needed==0 || needed>1048576)throw new InvalidOperationException("Invalid bounded test file security descriptor");
+      var bytes=new byte[needed];
+      if(!GetKernelObjectSecurity(handle,4,bytes,needed,out needed))throw new Win32Exception(Marshal.GetLastWin32Error(),"Read test file DACL");
+      return new RawSecurityDescriptor(bytes,0);
+    }
+    static void WriteFileDescriptor(IntPtr handle,RawSecurityDescriptor descriptor) {
+      // Set-Acl/SetSecurityInfo migrates NT-style DACLs to automatic inheritance
+      // and changes D: to D:AI. Restore raw file descriptors through the handle,
+      // as documented for file-security snapshot/restore. Preserve current ACEs
+      // and control bits; do not propagate changes into existing descendants.
+      // https://learn.microsoft.com/windows/win32/fileio/file-security-and-access-rights
+      if((descriptor.ControlFlags&ControlFlags.DiscretionaryAclAutoInherited)!=0)
+        descriptor.SetFlags(descriptor.ControlFlags|ControlFlags.DiscretionaryAclAutoInheritRequired);
+      if(!SetKernelObjectSecurity(handle,4,Bytes(descriptor)))throw new Win32Exception(Marshal.GetLastWin32Error(),"Write test file DACL");
+    }
+    public static string FileAclSddl(string path) {
+      IntPtr handle=OpenAclFile(path);
+      try{return FileDescriptor(handle).GetSddlForm(AccessControlSections.Access);}finally{CloseHandle(handle);}
+    }
+    public static void GrantFileAccess(string path,string sid,int mask,bool inherit) {
+      IntPtr handle=OpenAclFile(path);
+      try {
+        var descriptor=FileDescriptor(handle);
+        if(descriptor.DiscretionaryAcl==null)return;
+        int index=0;
+        while(index<descriptor.DiscretionaryAcl.Count && (descriptor.DiscretionaryAcl[index].AceFlags&AceFlags.Inherited)==0)index++;
+        AceFlags flags=inherit ? AceFlags.ContainerInherit|AceFlags.ObjectInherit : AceFlags.None;
+        descriptor.DiscretionaryAcl.InsertAce(index,new CommonAce(flags,AceQualifier.AccessAllowed,mask|0x00100000,new SecurityIdentifier(sid),false,null));
+        WriteFileDescriptor(handle,descriptor);
+      }finally{CloseHandle(handle);}
+    }
+    public static void RemoveFileAccess(string path,string sid) {
+      IntPtr handle=OpenAclFile(path);
+      try {
+        var descriptor=FileDescriptor(handle);var identity=new SecurityIdentifier(sid);bool changed=false;
+        if(descriptor.DiscretionaryAcl!=null)for(int i=descriptor.DiscretionaryAcl.Count-1;i>=0;i--) {
+          var ace=descriptor.DiscretionaryAcl[i] as KnownAce;
+          if(ace!=null && ace.SecurityIdentifier==identity){descriptor.DiscretionaryAcl.RemoveAce(i);changed=true;}
+        }
+        if(changed)WriteFileDescriptor(handle,descriptor);
+      }finally{CloseHandle(handle);}
+    }
+
     [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)] struct Startup {
       public uint Size;public string Reserved,Desktop,Title;
       public uint X,Y,XSize,YSize,XCount,YCount,Fill,Flags;public ushort Show,ReservedSize;
@@ -240,15 +304,12 @@ $result=[ordered]@{schema=1;success=$false;scope='A real temporary local standar
     desktop_dacl_restored=$false;window_station_dacl_restored=$false
     input_acls_restored=$false;input_acl_checks=@();fixture_removed=$false;error=$null;cleanup_errors=@()}
 function Add-FixtureAccessPlan([string]$Path,[Security.AccessControl.FileSystemRights]$Rights,[bool]$Inherit) {
-    $acl=Get-Acl -LiteralPath $Path
-    $before=$acl.GetSecurityDescriptorSddlForm([Security.AccessControl.AccessControlSections]::Access)
+    $before=[SwirlDisposableUser.Native]::FileAclSddl($Path)
     $fileGrants.Add([pscustomobject]@{path=$Path;before=$before;rights=$Rights;inherit=$Inherit})
 }
 function Grant-FixtureAccess([object]$Plan) {
-    $acl=Get-Acl -LiteralPath $Plan.path
-    $flags=if($Plan.inherit){[Security.AccessControl.InheritanceFlags]'ContainerInherit,ObjectInherit'}else{[Security.AccessControl.InheritanceFlags]::None}
-    $rule=New-Object Security.AccessControl.FileSystemAccessRule ([Security.Principal.SecurityIdentifier]$userSid),$Plan.rights,$flags,([Security.AccessControl.PropagationFlags]::None),([Security.AccessControl.AccessControlType]::Allow)
-    $acl.AddAccessRule($rule);Set-Acl -LiteralPath $Plan.path -AclObject $acl
+    Assert-SwirlPathWithoutLinks $Plan.path
+    [SwirlDisposableUser.Native]::GrantFileAccess($Plan.path,$userSid,[int]$Plan.rights,$Plan.inherit)
 }
 try {
     $random=New-Object byte[] 24;$rng=[Security.Cryptography.RandomNumberGenerator]::Create()
@@ -334,18 +395,27 @@ finally {
     }
     try {
         $allFileAclsRestored=$true
+        # New evidence/bootstrap files inherit this account's ACE at creation.
+        # Remove only that fresh SID from current descriptors, without migrating
+        # other ACLs or reverting any unrelated concurrent permission edits.
+        foreach($directory in @($fixture,$evidence)){
+            foreach($entry in @(Get-ChildItem -LiteralPath $directory -Recurse -Force)){
+                Assert-SwirlPathWithoutLinks $entry.FullName
+                [SwirlDisposableUser.Native]::RemoveFileAccess($entry.FullName,$userSid)
+                if(@((Get-Acl -LiteralPath $entry.FullName).Access|Where-Object {$_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -ceq $userSid}).Count){throw 'Disposable SID remains in a generated test file ACL.'}
+            }
+        }
         foreach($grant in $fileGrants){
             if(-not (Test-Path -LiteralPath $grant.path)){continue}
-            $acl=Get-Acl -LiteralPath $grant.path
-            $acl.PurgeAccessRules([Security.Principal.SecurityIdentifier]$userSid)
-            Set-Acl -LiteralPath $grant.path -AclObject $acl
+            Assert-SwirlPathWithoutLinks $grant.path
+            [SwirlDisposableUser.Native]::RemoveFileAccess($grant.path,$userSid)
         }
         $aclChecks=New-Object 'System.Collections.Generic.List[object]'
         foreach($grant in $fileGrants){
             if(-not (Test-Path -LiteralPath $grant.path)){continue}
             $restored=Get-Acl -LiteralPath $grant.path
             $ownSidAbsent=@($restored.Access|Where-Object {$_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -ceq $userSid}).Count -eq 0
-            $after=$restored.GetSecurityDescriptorSddlForm([Security.AccessControl.AccessControlSections]::Access)
+            $after=[SwirlDisposableUser.Native]::FileAclSddl($grant.path)
             $aclChecks.Add([ordered]@{path=$grant.path;before=$grant.before;after=$after;own_sid_absent=$ownSidAbsent;restored=($after -ceq $grant.before)})
             $result.input_acl_checks=@($aclChecks.ToArray())
             if(-not $ownSidAbsent){throw 'Disposable SID remains in input/evidence ACL.'}

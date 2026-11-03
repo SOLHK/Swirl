@@ -128,7 +128,7 @@ function New-SwirlRegistryValueState {
             } else {
                 $type=11
                 if ($number -lt [decimal]'-9223372036854775808' -or $number -gt [decimal]'18446744073709551615') { throw 'QWORD value is out of range.' }
-                $bytes=if($number -lt 0){[BitConverter]::GetBytes([long]$number)}else{[BitConverter]::GetBytes([ulong]$number)}
+                $bytes=if($number -lt 0){[BitConverter]::GetBytes([long]$number)}else{[BitConverter]::GetBytes([System.UInt64]$number)}
             }
             if (-not [BitConverter]::IsLittleEndian) { [Array]::Reverse($bytes) }
         }
@@ -235,7 +235,7 @@ function Assert-SwirlIntegrationState([object]$Context,[string]$Id,[object]$Stat
         if ([Convert]::FromBase64String([string]$State.bytes).Length -gt 262144) { throw 'Shortcut snapshot exceeds its bound.' }
     } else {
         if (@($names | Where-Object { $_ -notin @('exists','type','bytes') }).Count -or $State.bytes -isnot [string] -or
-            ($State.type -isnot [int] -and $State.type -isnot [uint32] -and $State.type -isnot [long] -and $State.type -isnot [ulong]) -or
+            ($State.type -isnot [int] -and $State.type -isnot [uint32] -and $State.type -isnot [long] -and $State.type -isnot [System.UInt64]) -or
             [decimal]$State.type -lt 0 -or [decimal]$State.type -gt 4294967295) { throw 'Invalid raw registry snapshot.' }
         if ([Convert]::FromBase64String($State.bytes).Length -gt [SwirlIntegration.NativeRegistry]::MaxValueBytes) { throw 'Registry snapshot exceeds its byte bound.' }
     }
@@ -249,7 +249,11 @@ function Write-SwirlIntegrationFile([string]$Path,[byte[]]$Bytes) {
     try {
         [IO.File]::WriteAllBytes($temporary,$Bytes)
         $null = Assert-SwirlIntegrationPath $full
-        if ([IO.File]::Exists($full)) { [IO.File]::Replace($temporary,$full,$null) }
+        if ([IO.File]::Exists($full)) {
+            # The .NET backup argument needs a real null. PowerShell converts
+            # ordinary $null to an invalid empty string for string parameters.
+            [IO.File]::Replace($temporary,$full,[System.Management.Automation.Language.NullString]::Value)
+        }
         else { [IO.File]::Move($temporary,$full) }
     } finally {
         if ([IO.File]::Exists($temporary)) { [IO.File]::Delete($temporary) }
