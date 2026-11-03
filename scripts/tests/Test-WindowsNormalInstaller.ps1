@@ -151,7 +151,8 @@ function Assert-Payload([string[]]$Extra=@()) {
     Require 'no-isolated-install-marker' (-not [IO.File]::Exists((Join-Path $target '.swirl-isolated-install')))
 }
 function Save-Shortcut([string]$Path,[string]$Description) {
-    $null=Save-SwirlTestShortcut -Path $Path -Description $Description
+    $fixture=Save-SwirlTestShortcut -Path $Path -Description $Description
+    if(-not $fixture.success){throw ('Real Unicode shortcut fixture failed: '+$fixture.error)}
 }
 function Capture-States {
     $state=@{};foreach($id in $context.Targets.Keys){$state[$id]=Get-SwirlIntegrationState $context $id};return $state

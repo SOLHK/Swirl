@@ -63,8 +63,9 @@ try {
     $shortcutReport.operation=Save-SwirlTestShortcut -Path $shortcutPath -Description '用户原始快捷方式 codex-start-menu'
     # Preserve the actual final file bytes with the receipt for independent
     # artifact verification; neither the COM input nor a generated substitute.
-    [IO.File]::WriteAllBytes((Join-Path $shortcutEvidence 'final-unicode-shortcut.lnk'),[IO.File]::ReadAllBytes($shortcutPath))
+    if([IO.File]::Exists($shortcutPath)){[IO.File]::WriteAllBytes((Join-Path $shortcutEvidence 'final-unicode-shortcut.lnk'),[IO.File]::ReadAllBytes($shortcutPath))}
     $shortcutReport.success=$shortcutReport.operation.success -and $shortcutReport.operation.staging_removed
+    if(-not $shortcutReport.success){$shortcutReport.error=$shortcutReport.operation.error}
 }catch{$shortcutReport.error=$_.Exception.Message;$shortcutReport.success=$false}
 finally {
     try {

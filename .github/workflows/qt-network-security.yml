@@ -6,6 +6,11 @@ on:
   pull_request:
     paths:
       - '.github/workflows/qt-network-security.yml'
+      # Paired Rust validation, runtime deployment and acceptance helpers are
+      # part of this gate's source/dependency closure.
+      - 'core/**'
+      - 'scripts/**'
+      - 'tools/**'
       - 'src/Swirl.Quick/network/**'
       - 'src/Swirl.Quick/engine/**'
       - 'src/Swirl.Quick/tests/**'
