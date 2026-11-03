@@ -81,6 +81,10 @@ changes require their own validation and are not covered by this count.
 
 ## Remaining scope
 
+The later [capacity and native-access audit](SWIRL_VF_SCALING_COMPATIBILITY_20261103.md)
+records actual failing Windows server tests, subsetting results and a
+conditional glyph-index limit. These replace the initial NOT_RUN status below.
+
 This dictionary removes redundant storage, not the underlying patch-per-glyph
 and hidden-axis growth. The remaining 32/90 MB files are still research probes.
 Full-font applicability, direct unshaped glyph access, subset behavior, system

@@ -1,5 +1,13 @@
 # Open-source interpolation comparison — 2026-11-03
 
+Scaling-phase qualification: historical engine acceptance below is a sampled
+joint-q result, not raw user-axis equivalence. The old 59,582/43,444-region
+experiments also exceed the specification's less-than-32,768 region rule;
+their native execution is retained as evidence, not standard conformance.
+Current localized anchors use 2,499/190 regions. See the
+[capacity and actual Windows audit](SWIRL_VF_SCALING_COMPATIBILITY_20261103.md)
+and [raw-axis qualification](SWIRL_VF_SCALING_20261103.md).
+
 Latest result: both original-source target glyphs now pass the final sampled
 CoreText, HarfBuzz and fontTools acceptance at 1/32 FUnit. The earlier pending
 statements below are retained checkpoint history. See the

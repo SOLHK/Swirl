@@ -18,6 +18,8 @@ def profile(path, *, instructions=False):
     with path.open('rb') as f: digest = hashlib.file_digest(f, 'sha256').hexdigest()
     with TTFont(path, lazy=True) as font:
         cff = font['CFF2'].cff; top = cff.topDictIndex[0]
+        top.VarStore.compile()
+        store_bytes=len(top.VarStore.data)
         report = dict(font_sha256=digest, file_bytes=path.stat().st_size,
             tables={tag: entry.length for tag, entry in font.reader.tables.items()},
             glyphs=len(font.getGlyphOrder()), axes=len(font['fvar'].axes),
@@ -25,6 +27,8 @@ def profile(path, *, instructions=False):
             computational_axes=len(font['fvar'].axes)-3,
             cff2_regions=len(top.VarStore.otVarStore.VarRegionList.Region),
             cff2_data_sets=len(top.VarStore.otVarStore.VarData),
+            cff2_variation_store_payload_bytes=store_bytes,
+            cff2_variation_store_length_sentinel=store_bytes>=65535,
             avar2_regions=len(font['avar'].table.VarStore.VarRegionList.Region) if font['avar'].majorVersion==2 else 0,
             font_dicts=len(top.FDArray), program_categories={})
         patterns = Counter(); totals = Counter()
