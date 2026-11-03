@@ -111,7 +111,8 @@ the strategy reviewed in fontTools `varLib._add_gvar`: round coefficients rather
 than introducing mixed differences of separately rounded vertices. On these
 113 glyphs the maximum vertex quantization bound increases from 0.04714 to
 0.20538 original units. This is a measured tradeoff, not high-precision acceptance.
-At the same 60 independent positions, maximum saved-font control errors change
+At the same 60 verification requests (cube/default plus 32 independent random
+points), maximum saved-font control errors change
 from 6.91352/7.95539 to 6.90583/7.91874 for Text/Display. The number above the
 2-unit screen changes from 16/16 to 17/15. No claim of every-glyph improvement
 is made. The source decoder and interpolation errors are reported separately.
@@ -216,6 +217,107 @@ separately from positioned advances. HarfBuzz's
 and [shape-plan selection](https://github.com/harfbuzz/harfbuzz/blob/main/src/hb-ot-shape.cc)
 explain the size-dependent source behavior. The Windows target still does not
 implement AAT tracking; no fixed spacing substitute is claimed to be equivalent.
+
+## Full private Beta delivered locally
+
+The actual `SwirlVF.ttc` **0.1.1 Beta** is 881,682,340 bytes (840.84 MiB), SHA256
+`215b021262ab2aa77211e82f8117b686d876591f8d00b855bd0d325f1955be99`.
+It is a complete source-GID test candidate, **not a Windows-accepted release**.
+No font or private geometry is attached to this public PR.
+
+| Physical face | Source GIDs retained | Best-cmap codepoints | UPM | Source hhea ascent/descent/gap |
+|---|---:|---:|---:|---|
+| SwirlVF SC Text | 47,102 | 34,555 | 15,420 | 884 / -144 / 0, scaled 15x |
+| SwirlVF SC Display | 47,102 | 34,555 | 15,960 | 915 / -149 / 0, scaled 15x |
+| SwirlVF TC Text | 47,102 | 31,177 | 15,420 | 884 / -144 / 0, scaled 15x |
+| SwirlVF TC Display | 47,102 | 31,177 | 15,960 | 915 / -149 / 0, scaled 15x |
+
+All four faces retain wght 100–900 (default 501 Text / 499 Display), wdth
+80–120 (default 100), HGHT 1–1000 (default 500), and Light/Regular/Medium/
+Semibold/Bold at 300/400/500/600/700. No HK/MO/JA/Watch physical faces are added.
+The complete source cmap/UVS bytes and GID order are preserved. GSUB has the
+same canonical fontTools serialization as the source; its original raw byte
+ordering changes during serialization, so raw GSUB identity is not claimed.
+Each style retains the source's five empty glyphs; no failed glyph is replaced
+with a blank. All 47,102 glyph entries have variation data, including legitimate
+metric changes on the empty source glyphs.
+
+Full decoded verification checks 2,630,458 Text and 2,644,575 Display tuple maps
+against the pre-expansion IUP candidate, exactly, including supports and every
+point delta. Text has 469,311 single-axis, 1,529,453 two-axis and 631,694
+three-axis tuples; Display has 470,343 / 1,534,668 / 639,564 respectively.
+There are no omitted/IUP points. Complete HVAR/VVAR advance coefficient maps
+match gvar for 188,408 distinct glyph/metric models. SC/TC shared tables are
+verified byte-for-byte. The later 0.1.1 metadata update preserves every byte
+outside its declared metadata changes, so this geometry evidence remains
+applicable by exact identity, not by silently relabelling an old test hash.
+
+The TTC contains 38 distinct tables for 84 references. Shared glyf is
+31,391,927 bytes; Text/Display gvar are 423,015,634 / 425,649,926 bytes.
+Each HVAR is 96,503 bytes; VVAR 51; avar 10,290 / 10,938. The collection uses
+glyf/gvar, fvar, avar v1, HVAR/VVAR, STAT, cmap, GSUB, BASE and standard metadata;
+there is no hvgl, CFF2, VARC or avar2 dependency. GPOS/MVAR are not invented
+where the inspected source has none.
+
+The full fit/build took 2,648.83 seconds with six workers. Main-process peak RSS
+was 3,736,158,208 bytes; separately observed worker peak was 218,267,648 bytes.
+Explicit re-encoding and packing took 290.01 seconds **with a precomputed Text
+cache**; main-process peak RSS was 4,127,834,112 bytes. The cache was built
+concurrently with the original conversion and is not zero-cost work. These are
+per-process figures, not a measured aggregate process-tree peak. The metadata
+fix took 17.21 seconds. Removing IUP increases size from 788,052,032 bytes;
+the final font remains 8.63x the reference size and needs further size work.
+No private-font DirectWrite load-time claim is made.
+
+| Fit cohort, 16 finite holdouts plus default | Text | Display |
+|---|---:|---:|
+| Nonempty glyphs meeting 1/32 in this cohort | 7 | 7 |
+| Empty source glyphs, reported separately | 5 | 5 |
+| Above 1/32, at most 2 source units | 34,134 | 34,001 |
+| Above the 2-unit geometry screen | 12,956 | 13,089 |
+| Maximum control-point bound, source units | 33.80812 | 33.82378 |
+
+The cohort is not a continuous-space proof or visual acceptance. GIDs 1166 and
+19177 remain above the research target in this Windows representation; prior
+CFF2 success is not reused as gvar acceptance. Every GID has a private error
+record. A separate 259-GID cohort at 60 requested positions (including 32 fresh
+random points) across four faces gives
+62,160 observations, with maximum control errors 11.91002 / 11.60103. A targeted
+19-GID worst-error cohort adds 4,560 observations and reaches 39.05531 /
+39.05724. The 2,224 Apple libhvf comparisons across these cohorts have maximum
+decoder discrepancy 2.36e-12; all corresponding topology checks pass. Native
+HarfBuzz changes on all three axes are observed. Its outline differences from
+the source remain reported, not counted as research-precision passes.
+
+The final 0.1.1 user-coordinate check covers 47 glyphs and 19 positions per
+face, plus 1,216 horizontal/vertical layout runs at 12/16/24/48 pt. It finds no
+missing glyph or glyph/cluster mapping mismatch. Maximum common-sample control
+bounds are 6.22685 / 6.20962 units; native per-glyph advance differences are
+0.53125 / 0.46875 units. Positioned advances also include the unconverted AAT
+tracking difference. The original A3 coordinate hypothesis remains finite and
+unproven globally. No hinting, desktop DPI or actual pixel-equality claim is made.
+
+## Final executed checks and remaining Windows gate
+
+Local regression: **1,055 tests, 7 skipped, all remaining passed**; six additional
+audit tests pass. The new metadata/line-spacing and exact tuple-map controls pass.
+The [latest native CI run](https://github.com/SOLHK/Swirl/actions/runs/41584747080)
+executes on Server 2022/2025 and Windows 11 Enterprise 26200 ARM64 with x64
+probes. All three pass five-weight matching and the offline kit, with no line
+metric failures. The strict exact-axis and 1/32 geometry failures described
+above persist; the overall CI result is **failure**, not a green release gate.
+These Windows runs use independently authored geometry only.
+
+The complete private font has **not** run on Windows. The existing private
+self-hosted Windows inventory job remained queued; it did not establish a usable
+private host. No source or converted font was uploaded to either GitHub repo.
+The local delivery includes SHA256-pinned Windows binaries from the tested CI
+commit, a 1,748-request script, private per-GID reports and evidence manifests.
+Copy only `SwirlVF.ttc` and `windows-test/` together to an authorized Windows
+machine and run `windows-test/Run-Windows-Test.ps1`. The script records loading,
+five weights, line metrics and outlines, retaining strict failures. Actual
+installation, desktop applications, ClearType/DPI review, the large file size,
+source tracking/origin differences and remaining geometry errors are unresolved.
 
 Per-glyph work uses Python's PSF-licensed [ProcessPoolExecutor](https://github.com/python/cpython/blob/3.12/Lib/concurrent/futures/process.py),
 reviewed along with [its licence](https://github.com/python/cpython/blob/3.12/LICENSE).
