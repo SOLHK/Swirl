@@ -10,10 +10,10 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'RustProductPackagePolicy.ps1')
 
-# RegistryKey.GetValue/SetValue decode and normalize string terminators. The
-# original value may contain a missing terminator, embedded NULs, or raw bytes
-# that do not round-trip through that typed representation. Preserve the Win32
-# type and exactly the returned bytes, including a present zero-length value.
+# RegistryKey.GetValue/SetValue decode and normalize string terminators, and
+# RegSetValueExW may count a trailing NUL outside the supplied byte length.
+# Preserve the type and exact RegQueryValueExW bytes with NtSetValueKey's
+# explicit DataSize, including a missing terminator or present empty value.
 if (-not ('SwirlIntegration.NativeRegistry' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
@@ -31,6 +31,12 @@ namespace SwirlIntegration {
         private static readonly IntPtr CurrentUser = new IntPtr(unchecked((int)0x80000001));
         private const int QueryValue = 0x0001, SetValue = 0x0002, Registry32 = 0x0200;
         private const int NotFound = 2, PathNotFound = 3, MoreData = 234;
+        [StructLayout(LayoutKind.Sequential)]
+        private struct UnicodeString {
+            public UInt16 Length;
+            public UInt16 MaximumLength;
+            public IntPtr Buffer;
+        }
         [DllImport("advapi32.dll", CharSet=CharSet.Unicode, ExactSpelling=true)]
         private static extern int RegOpenKeyExW(IntPtr root, string path, int options, int access, out IntPtr key);
         [DllImport("advapi32.dll", CharSet=CharSet.Unicode, ExactSpelling=true)]
@@ -39,9 +45,11 @@ namespace SwirlIntegration {
         [DllImport("advapi32.dll", CharSet=CharSet.Unicode, ExactSpelling=true)]
         private static extern int RegQueryValueExW(IntPtr key, string name, IntPtr reserved,
             out UInt32 type, [Out] byte[] data, ref UInt32 size);
-        [DllImport("advapi32.dll", CharSet=CharSet.Unicode, ExactSpelling=true)]
-        private static extern int RegSetValueExW(IntPtr key, string name, int reserved,
-            UInt32 type, byte[] data, int size);
+        [DllImport("ntdll.dll", ExactSpelling=true)]
+        private static extern int NtSetValueKey(IntPtr key, ref UnicodeString name,
+            UInt32 titleIndex, UInt32 type, [In] byte[] data, UInt32 size);
+        [DllImport("ntdll.dll", ExactSpelling=true)]
+        private static extern UInt32 RtlNtStatusToDosError(int status);
         [DllImport("advapi32.dll", CharSet=CharSet.Unicode, ExactSpelling=true)]
         private static extern int RegDeleteValueW(IntPtr key, string name);
         [DllImport("advapi32.dll", ExactSpelling=true)]
@@ -80,12 +88,28 @@ namespace SwirlIntegration {
         public static void Write(string path, string name, UInt32 type, byte[] bytes) {
             if (bytes == null || bytes.Length > MaxValueBytes)
                 throw new InvalidOperationException("Registry snapshot exceeds its byte bound.");
+            if (name == null || name.Length > 32766 || name.IndexOf('\0') >= 0)
+                throw new InvalidOperationException("Registry value name exceeds its Unicode bound.");
             IntPtr key;
             int disposition;
             Check(RegCreateKeyExW(CurrentUser, path, 0, null, 0, SetValue | Registry32,
                                   IntPtr.Zero, out key, out disposition));
-            try { Check(RegSetValueExW(key, name, 0, type, bytes, bytes.Length)); }
-            finally { RegCloseKey(key); }
+            IntPtr nameBuffer = IntPtr.Zero;
+            try {
+                nameBuffer = Marshal.StringToHGlobalUni(name);
+                UnicodeString valueName = new UnicodeString {
+                    Length=(UInt16)(name.Length * 2),
+                    MaximumLength=(UInt16)(name.Length * 2 + 2), Buffer=nameBuffer
+                };
+                // Microsoft's ZwSetValueKey documentation specifies the Nt
+                // entry point for user mode. Unlike the Win32 string wrapper,
+                // this call sends exactly DataSize bytes to the registry.
+                int status = NtSetValueKey(key, ref valueName, 0, type, bytes, (UInt32)bytes.Length);
+                if (status < 0) throw new Win32Exception(unchecked((int)RtlNtStatusToDosError(status)));
+            } finally {
+                if (nameBuffer != IntPtr.Zero) Marshal.FreeHGlobal(nameBuffer);
+                RegCloseKey(key);
+            }
         }
         public static void Delete(string path, string name) {
             IntPtr key;
@@ -272,6 +296,11 @@ function Set-SwirlIntegrationState([object]$Context,[string]$Id,[object]$State) 
     if ($State.exists) {
         [SwirlIntegration.NativeRegistry]::Write($target.key,$target.name,[uint32]$State.type,[Convert]::FromBase64String($State.bytes))
     } else { [SwirlIntegration.NativeRegistry]::Delete($target.key,$target.name) }
+    # Recovery also uses this setter. A successful native status alone must
+    # never discard its pending receipt after a non-exact registry write.
+    if (-not (Test-SwirlIntegrationState (Get-SwirlIntegrationState $Context $Id) $State)) {
+        throw 'Raw registry write verification failed.'
+    }
 }
 
 function Get-SwirlIntegrationContainers([object]$Context) {

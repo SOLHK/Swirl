@@ -50,8 +50,46 @@ $manifestPath=Join-Path $root 'package-manifest.json'
 @{schema=1;source_sha=$ExpectedSourceSha;rust=@{source_sha=$ExpectedSourceSha};files=@()}|ConvertTo-Json -Depth 5|Set-Content -LiteralPath $manifestPath -Encoding UTF8
 $context=New-SwirlIntegrationContext $root $manifestPath '0.2.33'
 $cases=New-Object 'System.Collections.Generic.List[object]'
+$rawRoundTrips=New-Object 'System.Collections.Generic.List[object]'
+$legacyWriter=[ordered]@{scope='A test-only RegSetValueExW probe with explicit zero padding outside cbData; not a claim about unrecorded bytes in the earlier CI failure.';executed=$false;expected=$null;observed=$null;requested_byte_count=$null;observed_byte_count=$null;appended_one_utf16_null=$false}
 $negative=[ordered]@{scope='Exact old unconditional cleanup operations on synthetic standard-user integration; actual old NSIS executable is tested separately in normal lifecycle.';source_commit='b6e22aad6cdaa370c95a35abe9f935cf0d91aa81';source_sha256=(Get-SwirlIntegrationHash $LegacyInstallerSource);executed=$false;assertion='original-integration-and-later-user-edits-preserved';observed_pass=$null;required_assertion_failed=$false}
 $errorText=$null
+
+# This deliberately exercises the old Win32 API, separate from the production
+# writer. Padding makes the length-adjacent NUL observable and deterministic;
+# no byte beyond an allocated buffer is read or written by this fixture.
+if (-not ('SwirlIntegration.PolicyTests.LegacyRegistryWriter' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+
+namespace SwirlIntegration.PolicyTests {
+    public static class LegacyRegistryWriter {
+        [DllImport("advapi32.dll", CharSet=CharSet.Unicode, ExactSpelling=true)]
+        private static extern int RegOpenKeyExW(IntPtr root, string path, int options, int access, out IntPtr key);
+        [DllImport("advapi32.dll", CharSet=CharSet.Unicode, ExactSpelling=true)]
+        private static extern int RegSetValueExW(IntPtr key, string name, int reserved,
+            UInt32 type, byte[] data, int size);
+        [DllImport("advapi32.dll", ExactSpelling=true)]
+        private static extern int RegCloseKey(IntPtr key);
+
+        public static void WriteWithZeroPadding(string path, string name, UInt32 type, byte[] bytes) {
+            if (bytes == null || bytes.Length > 65536) throw new ArgumentException("Invalid test buffer.");
+            byte[] padded = new byte[bytes.Length + 2];
+            Buffer.BlockCopy(bytes, 0, padded, 0, bytes.Length);
+            IntPtr key;
+            int error = RegOpenKeyExW(new IntPtr(unchecked((int)0x80000001)), path, 0, 0x0002 | 0x0200, out key);
+            if (error != 0) throw new Win32Exception(error);
+            try {
+                error = RegSetValueExW(key, name, 0, type, padded, bytes.Length);
+                if (error != 0) throw new Win32Exception(error);
+            } finally { RegCloseKey(key); }
+        }
+    }
+}
+'@
+}
 
 function Require([string]$Name,[bool]$Passed) {
     $cases.Add([ordered]@{name=$Name;passed=$Passed})
@@ -115,14 +153,37 @@ try {
         @{name='present-zero-byte-expand-sz';type=[uint32]2;bytes=[byte[]]@()},
         @{name='sz-with-odd-byte-count';type=[uint32]1;bytes=[byte[]](65,0,66)}
     )
+    $original=Seed
+    [byte[]]$probeBytes=$rawStrings[0].bytes
+    $legacyWriter.expected=[ordered]@{exists=$true;type=[uint32]1;bytes=[Convert]::ToBase64String($probeBytes)}
+    $legacyWriter.requested_byte_count=$probeBytes.Length
+    $target=$context.Targets['display-name']
+    [SwirlIntegration.PolicyTests.LegacyRegistryWriter]::WriteWithZeroPadding($target.key,$target.name,[uint32]1,$probeBytes)
+    $legacyWriter.executed=$true
+    $legacyWriter.observed=Get-SwirlIntegrationState $context 'display-name'
+    $legacyWriter.observed_byte_count=[Convert]::FromBase64String($legacyWriter.observed.bytes).Length
+    $withTerminator=[ordered]@{exists=$true;type=[uint32]1;bytes=[Convert]::ToBase64String([byte[]]($probeBytes+0+0))}
+    $legacyWriter.appended_one_utf16_null=Test-SwirlIntegrationState $legacyWriter.observed $withTerminator
+    Require 'legacy-regsetvalueexw-probe-changes-declared-raw-bytes' ($legacyWriter.appended_one_utf16_null -and -not (Test-SwirlIntegrationState $legacyWriter.observed $legacyWriter.expected))
     foreach($case in $rawStrings){
         $original=Seed
         $rawState=[ordered]@{exists=$true;type=$case.type;bytes=[Convert]::ToBase64String([byte[]]$case.bytes)}
-        Set-SwirlIntegrationState $context 'display-name' $rawState
-        Require ('native-raw-fixture-retained-'+$case.name) (Test-SwirlIntegrationState (Get-SwirlIntegrationState $context 'display-name') $rawState)
+        $rawResult=[ordered]@{name=$case.name;expected=$rawState;after_seed=$null;after_install=$null;after_uninstall=$null;seed_exact=$false;restore_exact=$false}
+        $rawRoundTrips.Add($rawResult)
+        try { Set-SwirlIntegrationState $context 'display-name' $rawState }
+        finally {
+            $rawResult.after_seed=Get-SwirlIntegrationState $context 'display-name'
+            $rawResult.seed_exact=Test-SwirlIntegrationState $rawResult.after_seed $rawState
+        }
+        Require ('native-raw-fixture-retained-'+$case.name) $rawResult.seed_exact
         $wanted=Desired 'raw-roundtrip';$null=Install-SwirlUserIntegration $context $wanted
-        $null=Uninstall-SwirlUserIntegration $context
-        Require ('uninstall-restores-exact-raw-registry-'+$case.name) (Test-SwirlIntegrationState (Get-SwirlIntegrationState $context 'display-name') $rawState)
+        $rawResult.after_install=Get-SwirlIntegrationState $context 'display-name'
+        try { $null=Uninstall-SwirlUserIntegration $context }
+        finally {
+            $rawResult.after_uninstall=Get-SwirlIntegrationState $context 'display-name'
+            $rawResult.restore_exact=Test-SwirlIntegrationState $rawResult.after_uninstall $rawState
+        }
+        Require ('uninstall-restores-exact-raw-registry-'+$case.name) $rawResult.restore_exact
     }
 
     $original=Seed;$wanted=Desired 'v1';$null=Install-SwirlUserIntegration $context $wanted
@@ -189,7 +250,7 @@ try {
     Require 'legacy-control-fails-the-same-user-edit-preservation-assertion' $negative.required_assertion_failed
 } catch {$errorText=$_.Exception.Message}
 finally {
-    $report=[ordered]@{schema=1;source_sha=$ExpectedSourceSha;helper_sha256=$context.HelperHash;user_sid=$ExpectedUserSid;actual_non_admin_token=$true;actual_x86_powershell=$true;registry_snapshot_format='Win32 DWORD type and exact RegQueryValueExW bytes';scope='Real raw HKCU and shortcut transaction tests in a disposable standard-user profile; synthetic values and bytes, not product UI acceptance.';cases=@($cases.ToArray());negative_control=$negative;success=($null -eq $errorText -and @($cases|Where-Object {-not $_.passed}).Count -eq 0 -and $negative.required_assertion_failed);error=$errorText}
+    $report=[ordered]@{schema=1;source_sha=$ExpectedSourceSha;helper_sha256=$context.HelperHash;user_sid=$ExpectedUserSid;actual_non_admin_token=$true;actual_x86_powershell=$true;registry_snapshot_format='Win32 DWORD type and exact RegQueryValueExW bytes';registry_write_api='NtSetValueKey with exact DataSize';scope='Real raw HKCU and shortcut transaction tests in a disposable standard-user profile; synthetic values and bytes, not product UI acceptance.';cases=@($cases.ToArray());raw_registry_roundtrips=@($rawRoundTrips.ToArray());legacy_writer_probe=$legacyWriter;negative_control=$negative;success=($null -eq $errorText -and @($cases|Where-Object {-not $_.passed}).Count -eq 0 -and $negative.required_assertion_failed);error=$errorText}
     $report|ConvertTo-Json -Depth 10|Set-Content -LiteralPath (Join-Path $evidence 'integration-policy.json') -Encoding UTF8
 }
 if(-not $report.success){throw ('User integration policy regression failed: '+$errorText)}
