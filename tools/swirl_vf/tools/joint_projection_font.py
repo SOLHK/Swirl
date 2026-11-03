@@ -29,6 +29,7 @@ class LocalProjectionModel:
     factor_count: int
     ramps: int
     maximum_stack: int = 0
+    encoding: str = 'horner'
 
     @property
     def evidence(self):
@@ -37,12 +38,14 @@ class LocalProjectionModel:
 
     @property
     def supports(self):
+        if self.encoding != 'horner':
+            return self.model().supports
         return ([{}]+[{tag: (lo, lo if hi <= 0 else hi, hi)}
                       for tag, (lo, hi) in zip(TAGS, self.cell.bounds)] +
                 [{tag: triple} for tag in self.axis_tags[3:]
                  for triple in ((-1, -1, 0), (0, 1, 1))])
 
-    def charstring(self, vsindex):
+    def model(self):
         # Materialize only the current glyph; no dense per-ramp copies persist
         # across thousands of variants. A direction's ramps share one array.
         width = sum(n for _, n in self.operators)
@@ -53,8 +56,19 @@ class LocalProjectionModel:
             direction = values[..., factor+1, :]/(2*self.ramps)
             for ramp in range(self.ramps):
                 factors[self.axis_tags[3+factor*self.ramps+ramp]] = direction
-        model = PolynomialBox(self.cell.bounds, self.operators, base, self.evidence,
-                              self.axis_tags, factors, True)
+        cls = PolynomialBox
+        if self.encoding != 'horner':
+            from joint_hoi import HOIPolynomialBox, HOIAxisPowerBox
+            cls = HOIPolynomialBox if self.encoding == 'hoi' else HOIAxisPowerBox
+        return cls(self.cell.bounds, self.operators, base, self.evidence, self.axis_tags, factors, True)
+
+    def _program(self, vsindex, expression_pool=None):
+        model = self.model(); result = model._program(vsindex, expression_pool)
+        self.maximum_stack = model.evidence['maximum_operand_stack']
+        return result
+
+    def charstring(self, vsindex):
+        model = self.model()
         result = model.charstring(vsindex)
         self.maximum_stack = model.evidence['maximum_operand_stack']
         return result
@@ -81,7 +95,8 @@ def copy_metric_table(source, candidate, source_gid, tag, fields, hidden_count):
     candidate[tag] = table
 
 
-def build(template, source, source_gid, fields, ramps, field_source):
+def build(template, source, source_gid, fields, ramps, field_source, *, encoding='horner', share_expressions=False):
+    geometry.require(encoding in ('horner', 'hoi'), 'unknown_joint_polynomial_encoding')
     geometry.require(tuple(a.axisTag for a in source['fvar'].axes) == TAGS,
                      'original_three_physical_axes_required')
     geometry.require(fields.operators == field_source.ops and field_source.factors == ramps.parameter_count,
@@ -120,13 +135,30 @@ def build(template, source, source_gid, fields, ramps, field_source):
     avar.table = otTables.avar(); avar.table.Reserved = 0
     avar.table.VarStore, avar.table.VarIdxMap = ramps.var_store(TAGS, hidden)
     font['avar'] = avar
+    if encoding == 'hoi':
+        from joint_hoi import add_axis_copies
+        tags = add_axis_copies(font)
     empty = geometry.OutlineModel(tags, (), [{}], np.zeros((1, 0)), {'sampled_geometry_passed': True})
     models = dict.fromkeys(order, empty)
     for i, cell in enumerate(fields.cells):
         models[f'joint{i}'] = LocalProjectionModel(cell, fields.operators, field_source.base_ops,
-                                                  tags, field_source.factors, ramps.ramps)
+                                                  tags, field_source.factors, ramps.ramps, encoding=encoding)
+    if encoding == 'hoi':
+        leaves = [models[f'joint{i}'] for i in range(len(fields.cells))]
+        key = lambda s: tuple(sorted(s.items()))
+        for model in leaves:
+            model.encoding = 'hoi-axis'
+        reserved = {key(s) for model in leaves for s in model.supports[1:]}
+        geometry.require(len(reserved) <= 64000, 'joint_HOI_axis_region_budget_exceeded')
+        for model in leaves:
+            model.encoding = 'hoi'
+            extra = {key(s) for s in model.supports[1:]}-reserved
+            if len(reserved)+len(extra) > 64000:
+                model.encoding = 'hoi-axis'
+            else:
+                reserved.update(extra)
     models['probe'] = models['joint0']
-    font = geometry.install(font, models, release_programs=True)
+    font = geometry.install(font, models, release_programs=True, share_expressions=share_expressions)
     font['GSUB'] = buildGSUB()
     substitutions = [(('probe', f'joint{i}'),) for i in range(len(fields.cells))]
     lookups = buildSubstitutionLookups(font['GSUB'].table, substitutions, False)
@@ -137,5 +169,7 @@ def build(template, source, source_gid, fields, ramps, field_source):
     font.joint_encoding_evidence = dict(
         maximum_operand_stack=max(getattr(model, 'maximum_stack', 0) for model in models.values()),
         cff2_regions=len(top.VarStore.otVarStore.VarRegionList.Region),
-        local_glyphs=len(fields.cells), global_subroutines=len(font['CFF2'].cff.GlobalSubrs))
+        local_glyphs=len(fields.cells), global_subroutines=len(font['CFF2'].cff.GlobalSubrs),
+        polynomial_encoding=encoding, share_expressions=share_expressions,
+        expression_pool=getattr(font, '_swirl_expression_pool_report', None))
     return font

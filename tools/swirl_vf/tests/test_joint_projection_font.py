@@ -35,6 +35,43 @@ class AuthoredFields:
 
 
 class JointProjectionFontTests(unittest.TestCase):
+    def test_direct_shared_HOI_build_preserves_physical_fields_and_metric_axes(self):
+        class CurvedDirections(AuthoredFields):
+            def __call__(self, p):
+                values = super().__call__(p)
+                x, y, z = p.T
+                values[:, 8] += 5*x*x*y+3*y*y*z*z
+                values[:, 9] += 2*x*x*x*z
+                return values
+        source = CurvedDirections(); cells = refine(source, max_cells=16)
+        parameters = lambda p: (.4+.5*p[:, 0]+.25*p[:, 1]-.25*p[:, 2])[:, None]
+        ramps = encode_clamp_ramps(fit(parameters, 4), 4)
+        from p7_validate_candidate import commands
+        from probe_joint_representations import compare
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d)/'fixture.ttc'; make_fixture(path)
+            with TTCollection(path) as collection:
+                original = collection.fonts[0]
+                original['avar'].segments = {tag: {-1.: -1., 0.: 0., 1.: 1.} for tag in TAGS}
+                candidate = build(original, original, 2, cells, ramps, source, encoding='hoi', share_expressions=True)
+                stream = io.BytesIO(); candidate.save(stream)
+                self.assertGreater(candidate.joint_encoding_evidence['expression_pool']['shared_expressions'], 0)
+                with TTFont(io.BytesIO(stream.getvalue())) as saved:
+                    native = hb.Font(hb.Face(stream.getvalue())); hb.ot_font_set_funcs(native)
+                    native.scale = (saved['head'].unitsPerEm*64,)*2
+                    for p in np.random.default_rng(2026110449).uniform(-1, 1, (43, 3)):
+                        user = {a.axisTag: a.defaultValue+float(q)*(a.defaultValue-a.minValue if q < 0
+                                else a.maxValue-a.defaultValue) for a, q in zip(original['fvar'].axes, p)}
+                        native.set_variations(user)
+                        buffer = hb.Buffer(); buffer.add_str('A'); buffer.guess_segment_properties(); hb.shape(native, buffer)
+                        gid = buffer.glyph_infos[0].codepoint
+                        self.assertGreaterEqual(gid, 3)
+                        fields = source(p[None]).reshape(2, -1)
+                        expected = fields[0]+np.clip(parameters(p[None])[0, 0], 0, 1)*fields[1]
+                        self.assertTrue(compare((source.base_ops, expected), commands(native, gid))['passed'])
+                        glyph = saved.getGlyphSet(location=user)[saved.getGlyphOrder()[gid]]
+                        self.assertLess(abs(glyph.width-original.getGlyphSet(location=user)['probe'].width), geometry.LIMIT)
+
     def test_complete_candidate_uses_native_region_selection_and_copied_metrics(self):
         fields_source = AuthoredFields(); fields = refine(fields_source, max_cells=16)
         parameters = lambda p: (.4+.5*p[:, 0]+.25*p[:, 1]-.25*p[:, 2])[:, None]

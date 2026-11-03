@@ -194,6 +194,21 @@ def run(args):
                                  np.round(np.asarray(locations)*65536)) > 1e-8, axis=1)
         geometry.require(all(disjoint[i] for i, kind in enumerate(categories) if kind == 'triple'),
                          'random_acceptance_overlaps_possible_training_grid')
+        sampling_exclusion = None
+        if args.midpoint_local_seed:
+            from midpoint_sample_exclusion import excluded
+            widths = bounds[:, :, 1]-bounds[:, :, 0]
+            geometry.require(np.all(np.log2(widths) == np.round(np.log2(widths))),
+                             'midpoint_exclusion_requires_dyadic_cell_widths')
+            stencils = [np.random.default_rng(seed).uniform(0, 1, (64, 3))
+                        for seed in args.midpoint_local_seed]
+            certified = excluded(locations, stencils)
+            triples = np.asarray(categories) == 'triple'
+            geometry.require(certified[triples].all(), 'random_holdout_refinement_separation_not_certified')
+            sampling_exclusion = dict(protocol='declared_midpoint_refinement_only',
+                local_stencil_seeds=args.midpoint_local_seed,
+                observations_excluded=int(certified.sum()), random_triples_excluded=int(certified[triples].sum()),
+                includes_analytic_chord_contacts=True, source_aligned_atlas_covered=False)
         manifest = dict(font_path=str(candidate_path), font_sha256=digest(candidate_path),
             axis_defaults={a.axisTag: a.defaultValue for a in font['fvar'].axes},
             table_hashes={tag: hashlib.sha256(font.reader[tag]).hexdigest()
@@ -221,6 +236,7 @@ def run(args):
             unique_user_positions=len({tuple(r['coordinates'][t] for t in TAGS) for r in requests}),
             positions_certifiably_disjoint_from_training_grid=int(disjoint.sum()),
             independent_random_triples=sum(kind == 'triple' for kind in categories),
+            refinement_sample_exclusion=sampling_exclusion,
             engines={}, failures=[], observations=len(requests), categories={},
             input_sampling='nearest stable decimal4 from fixed three-point stencil, before native execution',
             arbitrary_binary64_transport_certified=False,
@@ -301,6 +317,8 @@ if __name__ == '__main__':
     parser.add_argument('--text', default='A')
     parser.add_argument('--seed', type=int, default=2026110411)
     parser.add_argument('--random-count', type=int, default=2048)
+    parser.add_argument('--midpoint-local-seed', type=int, action='append', default=[],
+                        help='Declare each 64-point local jitter seed used by the midpoint fitter/rechecker')
     parser.add_argument('--timeout', type=int, default=1800)
     args = parser.parse_args()
     sys.exit(0 if run(args)['passed'] else 1)

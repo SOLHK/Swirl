@@ -234,6 +234,10 @@ class RebuildTests(unittest.TestCase):
             collection = TTCollection(source)
             paths = [folder / f"face-{i}.ttf" for i in range(2)]
             for face, path in zip(collection.fonts, paths):
+                # Reloading re-enables timestamp recalculation. Keep this
+                # authored fixture byte-identical even when saves cross a
+                # wall-clock second; the intentional mutation is face order.
+                face.recalcTimestamp = False
                 face.save(path)
             candidate = folder / "candidate.ttc"
             collection.save(candidate, shareTables=True)

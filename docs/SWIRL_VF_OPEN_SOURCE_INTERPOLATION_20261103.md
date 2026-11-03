@@ -131,3 +131,33 @@ Reproduction tools: `platform/probe_open_source_interpolation.py`,
 `platform/reencode_joint_candidate.py`, and
 `platform/verify_joint_candidate.py`. All generated fonts, control coordinates,
 source coefficients and raw test records must remain outside the repository.
+
+## Direct serialization and stronger sample separation
+
+`serialize_joint_fields` now feeds checked field archives directly into the
+combined tensor/axis-power encoder and expression pool. Source identity, archive
+hashes, cell counts and the recorded error envelope are checked; serialization
+fits no new samples. The completed font still requires independent native
+acceptance. This avoids constructing the much larger Horner intermediate for
+GID 19177; its native result remains pending at this checkpoint.
+
+For the declared midpoint refinement protocol, `midpoint_sample_exclusion`
+conservatively overapproximates all possible dyadic boxes, grid nodes, declared
+local jitter stencils, axial midlines and body diagonals, including analytic
+branch contacts and their neighbours. It does not certify arbitrary
+source-aligned partitions. On the final GID 1166 acceptance plan, 2,836
+observations are excluded from every declared fitting/refinement family,
+including all 2,048 random triples. Uncertified boundary samples are retained
+as boundary checks rather than discarded or called independent holdouts.
+
+An additional common-normalized-coordinate seam probe draws both adjacent
+local glyphs, avoiding first-match substitution hiding one side. All 256 pairs
+pass: HarfBuzz maximum jump 0.017333984375, fontTools 0.017302664490 FUnit.
+This specifically checks patch continuity at a shared post-avar2 vector; the
+physical-coordinate Apple-source comparisons above remain the accuracy test.
+
+The current full regression executes **1,021 tests: 1,014 pass, seven skips**.
+A preceding run exposed a fixture timestamp race during intentional TTC face
+swapping. Disabling timestamp recalculation on the reloaded authored fixture
+preserves the exact `name`-table mismatch assertion; no verifier assertion or
+precision limit changed. Failed logs remain private and retained.
