@@ -429,9 +429,19 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
    endif()
    if(DEFINED ENV{SWIRL_SYSTEM_PROXY_TEST})
     add_test(NAME swirl-system-proxy-app-exit COMMAND SwirlSystemProxyExitTests
+     ownedSnapshotDistinguishesEmptyPacFromAbsentRegistry
+     listenerProbeDistinguishesClosedAndLivePorts
+     exclusiveListenerProbeRequiresReleasedPortAfterTraffic
+     normalApplicationExitRestoresOwnedProxy
      -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-system-proxy-app-exit.xml,xml" -o -,txt)
     set_tests_properties(swirl-system-proxy-app-exit PROPERTIES RUN_SERIAL TRUE TIMEOUT 120
      ENVIRONMENT "SWIRL_SYSTEM_PROXY_TEST=1;SWIRL_SYSTEM_PROXY_EXIT_EVIDENCE=${CMAKE_CURRENT_BINARY_DIR}/system-proxy-exit;QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11"
+     ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+    add_test(NAME swirl-system-proxy-normal-stop COMMAND SwirlSystemProxyExitTests
+     normalStopRestoresOwnedProxyWhileApplicationRemainsAlive
+     -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-system-proxy-normal-stop.xml,xml" -o -,txt)
+    set_tests_properties(swirl-system-proxy-normal-stop PROPERTIES RUN_SERIAL TRUE TIMEOUT 120 LABELS security
+     ENVIRONMENT "SWIRL_SYSTEM_PROXY_TEST=1;SWIRL_SYSTEM_PROXY_EXIT_EVIDENCE=${CMAKE_CURRENT_BINARY_DIR}/system-proxy-normal-stop;QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11"
      ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
    endif()
   endif()

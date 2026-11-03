@@ -12,6 +12,8 @@ class QQuickWindow;
 namespace SwirlSystemProxyExit {
 inline QString readyPath(const QString &root) { return QDir(root).filePath("system-proxy-exit-ready.json"); }
 inline QString waitingPath(const QString &root) { return QDir(root).filePath("system-proxy-exit-waiting.json"); }
+inline QString failedPath(const QString &root) { return QDir(root).filePath("system-proxy-stop-failed.json"); }
+inline QString stoppedPath(const QString &root) { return QDir(root).filePath("system-proxy-stopped.json"); }
 inline QString finalPath(const QString &root) { return QDir(root).filePath("system-proxy-exit-final.json"); }
 inline QString controlName(const QString &root) {
     const auto canonical=QFileInfo(root).canonicalFilePath();

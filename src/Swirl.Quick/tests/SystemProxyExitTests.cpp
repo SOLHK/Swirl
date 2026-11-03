@@ -75,6 +75,8 @@ bool preserveEvidence(const QString &root,const QString &tag,const QJsonObject &
     for(const auto &entry:QList<QPair<QString,QString>>{
         {SwirlSystemProxyExit::readyPath(root),tag+"-ready.json"},
         {SwirlSystemProxyExit::waitingPath(root),tag+"-waiting.json"},
+        {SwirlSystemProxyExit::failedPath(root),tag+"-failed.json"},
+        {SwirlSystemProxyExit::stoppedPath(root),tag+"-stopped.json"},
         {SwirlSystemProxyExit::finalPath(root),tag+"-final.json"}}){
         if(!QFile::exists(entry.first))continue;
         const auto destination=QDir(evidence).filePath(entry.second);
@@ -92,6 +94,21 @@ bool requestWindowClose(const QString &root) {
     QByteArray response;
     const bool received=QTest::qWaitFor([&]{response+=socket.readAll();return response.size()>=8;},1500);
     return received&&response==QByteArray("CLOSING\n");
+}
+QByteArray fixtureCommand(const QString &root,const QByteArray &command) {
+    QLocalSocket socket;socket.connectToServer(SwirlSystemProxyExit::controlName(root));
+    if(!socket.waitForConnected(1000)||socket.write(command)!=command.size())return {};
+    socket.flush();
+    if(socket.bytesToWrite()&&!socket.waitForBytesWritten(1000))return {};
+    QByteArray response;
+    const bool received=QTest::qWaitFor([&]{
+        response+=socket.readAll();
+        return response.endsWith('\n')||response.size()>16384||socket.state()==QLocalSocket::UnconnectedState;
+    },1500);
+    return received&&response.size()<=16384&&response.endsWith('\n')?response:QByteArray{};
+}
+QJsonObject fixtureStatus(const QString &root) {
+    return QJsonDocument::fromJson(fixtureCommand(root,"STATUS\n")).object();
 }
 bool connectTcp(QTcpSocket &socket,quint16 port) {
     socket.setProxy(QNetworkProxy::NoProxy);socket.connectToHost(QHostAddress::LocalHost,port);
@@ -622,6 +639,252 @@ private slots:
         QVERIFY2(released.listening(),"Could not exclusively bind and listen on the released Rust port; see socket and native TCP state receipts.");
         result.insert("listener_closed",true);
         completed=true;
+    }
+    void normalStopRestoresOwnedProxyWhileApplicationRemainsAlive_data() {
+        QTest::addColumn<int>("flags");QTest::addColumn<bool>("externalEdit");
+        QTest::addColumn<bool>("releaseContention");QTest::addColumn<bool>("releaseTimeout");
+        QTest::newRow("pac-only")<<5<<false<<false<<false;
+        QTest::newRow("manual-and-pac")<<7<<false<<false<<false;
+        QTest::newRow("pac-only-external-edit")<<5<<true<<false<<false;
+        QTest::newRow("manual-and-pac-external-edit")<<7<<true<<false<<false;
+        QTest::newRow("pac-only-lock-contention")<<5<<false<<true<<false;
+        QTest::newRow("pac-only-lock-timeout-retry")<<5<<false<<true<<true;
+    }
+    void normalStopRestoresOwnedProxyWhileApplicationRemainsAlive() {
+        QFETCH(int,flags);QFETCH(bool,externalEdit);QFETCH(bool,releaseContention);QFETCH(bool,releaseTimeout);
+        const auto original=SystemProxySession::snapshot();
+        QVERIFY2(!original.isEmpty(),"Could not read the original native proxy snapshot.");
+        QTemporaryDir root;QVERIFY(root.isValid());QProcess child;
+        const auto journal=root.filePath("data/system-proxy.dpapi");
+        const QString tag=QString::fromLatin1(QTest::currentDataTag());
+        QJsonObject result{{"schema",1},{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},
+            {"data_tag",tag},{"flags",flags},{"external_edit",externalEdit},
+            {"release_contention",releaseContention},{"release_timeout",releaseTimeout},{"success",false}};
+        bool completed=false;
+        const auto restore=qScopeGuard([&]{
+            if(child.state()!=QProcess::NotRunning){
+                requestWindowClose(root.path());
+                if(!QTest::qWaitFor([&]{return child.state()==QProcess::NotRunning;},5000)){
+                    child.kill();child.waitForFinished(3000);
+                }
+            }
+            const bool stopped=child.state()==QProcess::NotRunning;
+            result.insert("child_stopped",stopped);
+            if(!stopped){
+                m_orphanOwner=true;root.setAutoRemove(false);result.insert("runner_original_restored",false);
+                QTest::qFail("Could not stop the application owner; native settings were not written over a live owner.",__FILE__,__LINE__);
+                if(!preserveEvidence(root.path(),tag,result))QTest::qFail("Could not preserve safe normal-stop failure receipts.",__FILE__,__LINE__);
+                return;
+            }
+            if(QFile::exists(journal))SystemProxySession::recover(journal,nullptr,true);
+            const bool restored=SystemProxySession::apply(original)&&SystemProxySession::snapshot()==original;
+            result.insert("runner_original_restored",restored);
+            if(!restored)QTest::qFail("Could not restore the disposable runner's original native proxy; private values omitted.",__FILE__,__LINE__);
+            const auto winHttpAfter=winHttpSnapshot();
+            const bool winHttpUnchanged=!winHttpAfter.isEmpty()&&winHttpAfter==m_winHttpBefore;
+            result.insert("winhttp_unchanged",winHttpUnchanged);
+            result.insert("success",completed&&restored&&winHttpUnchanged&&!QTest::currentTestFailed());
+            result.insert("child_exit_code",child.exitCode());result.insert("child_normal_exit",child.exitStatus()==QProcess::NormalExit);
+            if(!preserveEvidence(root.path(),tag,result))QTest::qFail("Could not preserve safe normal-stop receipts.",__FILE__,__LINE__);
+        });
+
+        const auto fixture=configuredProxy(original,flags,QStringLiteral("127.0.0.1:65009"),
+            QStringLiteral("http://127.0.0.1:65010/swirl-stop-fixture.pac?revision=before"),
+            QStringLiteral("localhost;*.swirl-stop.invalid;10.42.*;[::1];<local>"));
+        QVERIFY2(SystemProxySession::apply(fixture)&&SystemProxySession::snapshot()==fixture,
+                 "The synthetic native PAC/bypass fixture was not applied exactly.");
+        QTcpServer origin;origin.setProxy(QNetworkProxy::NoProxy);QVERIFY(origin.listen(QHostAddress::LocalHost));
+        int httpRequests=0,socksRequests=0;
+        connect(&origin,&QTcpServer::newConnection,&origin,[&]{
+            while(auto *socket=origin.nextPendingConnection()){
+                connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+                const auto respond=[&,socket]{
+                    if(socket->property("answered").toBool())return;
+                    const auto bytes=socket->property("request").toByteArray()+socket->readAll();
+                    if(bytes.size()>8192){socket->abort();return;}
+                    socket->setProperty("request",bytes);if(!bytes.contains("\r\n\r\n"))return;
+                    QByteArray body;
+                    if(bytes.startsWith("GET /http-check HTTP/1.1\r\n")){++httpRequests;body="swirl-native-exit-http";}
+                    else if(bytes.startsWith("GET /socks-check HTTP/1.1\r\n")){++socksRequests;body="swirl-native-exit-socks";}
+                    else {socket->abort();return;}
+                    socket->setProperty("answered",true);
+                    socket->write("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: "+QByteArray::number(body.size())+"\r\n\r\n"+body);
+                    socket->disconnectFromHost();
+                };
+                connect(socket,&QTcpSocket::readyRead,socket,respond);if(socket->bytesAvailable())respond();
+            }
+        });
+        const auto executable=QDir(QCoreApplication::applicationDirPath()).filePath("Swirl.exe");
+        QVERIFY2(QFileInfo(executable).isFile(),"The separately built full Swirl application is missing.");
+        auto environment=QProcessEnvironment::systemEnvironment();
+        environment.insert("SWIRL_SYSTEM_PROXY_TEST","1");environment.insert("SWIRL_LIFECYCLE_SYSTEM_PROXY","1");
+        environment.insert("SWIRL_LIFECYCLE_ENGINE","rust");environment.insert("SWIRL_TEST_ROOT",root.path());
+        child.setProcessEnvironment(environment);child.setProgram(executable);child.setArguments({"--lifecycle-test"});child.setWorkingDirectory(root.path());
+        child.start();QVERIFY2(child.waitForStarted(3000),"The full Swirl lifecycle application did not start.");
+        const auto pid=child.processId();QJsonObject ready;
+        QVERIFY2(QTest::qWaitFor([&]{ready=readReceipt(SwirlSystemProxyExit::readyPath(root.path()));return !ready.isEmpty()||child.state()==QProcess::NotRunning;},15000)
+                 &&!ready.isEmpty(),"The full application did not acquire native system proxy with a healthy Rust listener.");
+        QCOMPARE(ready.value("source_sha").toString(),QStringLiteral(SWIRL_SOURCE_SHA));
+        QCOMPARE(qint64(ready.value("pid").toDouble()),pid);QCOMPARE(qint64(ready.value("runtime_pid").toDouble()),pid);
+        for(const auto *key:{"native_backend","ready","runtime_alive","runtime_healthy","proxy_owned","proxy_enabled",
+                             "native_listener_matches_rust","saved_applied_policy_matches","guard_acknowledged"})
+            QVERIFY2(ready.value(key).isBool()&&ready.value(key).toBool(),key);
+        QVERIFY(ready.value("fixture_failed").isBool()&&!ready.value("fixture_failed").toBool());
+        const auto initialEpoch=ready.value("initial_runtime_epoch").toString();QVERIFY(!initialEpoch.isEmpty());
+        const int port=ready.value("rust_port").toInt();QVERIFY(port>0&&port<=65535);
+        result.insert("runtime_port",port);result.insert("pid",double(pid));result.insert("initial_runtime_epoch",initialEpoch);
+        const auto coherent=[&](const QJsonObject &state,const QString &phase){
+            return state.value("schema").toInt()==1&&state.value("source_sha").toString()==QStringLiteral(SWIRL_SOURCE_SHA)
+                &&state.value("phase").toString()==phase&&qint64(state.value("pid").toDouble())==pid
+                &&qint64(state.value("runtime_pid").toDouble())==pid&&state.value("rust_port").toInt()==port
+                &&state.value("native_backend").isBool()&&state.value("native_backend").toBool()
+                &&state.value("ready").isBool()&&state.value("ready").toBool()
+                &&state.value("fixture_failed").isBool()&&!state.value("fixture_failed").toBool()
+                &&state.value("close_requested").isBool()&&!state.value("close_requested").toBool()
+                &&state.value("window_visible").isBool()&&state.value("window_visible").toBool()
+                &&state.value("shutdown_coordinator_completed").isBool()&&!state.value("shutdown_coordinator_completed").toBool();
+        };
+        const auto owned=SystemProxySession::snapshot();
+        const auto expectedOwned=configuredProxy(owned,3,QStringLiteral("127.0.0.1:%1").arg(port),{},owned.value("bypass").toString());
+        QVERIFY2(!owned.isEmpty()&&owned==expectedOwned,"WinINET and the raw registry do not both reference the actual Rust listener.");
+        QVERIFY2(winHttpSnapshot()==m_winHttpBefore,"Native takeover modified machine WinHTTP; private values omitted.");
+        QVERIFY(httpRoundTrip(quint16(port),origin.serverPort()));result.insert("http_roundtrip",true);
+        QVERIFY(socksRoundTrip(quint16(port),origin.serverPort()));result.insert("socks5_roundtrip",true);
+        QCOMPARE(httpRequests,1);QCOMPARE(socksRequests,1);
+        {
+            ExclusiveLoopbackListener occupied{quint16(port)};result.insert("live_listener_exclusive_probe",occupied.report());
+            QVERIFY2(occupied.rejectedOccupiedPort(),"The exclusive control did not reject the live Rust listener.");
+        }
+        auto expectedAfterStop=fixture;
+        if(externalEdit){
+            expectedAfterStop=configuredProxy(original,flags,QStringLiteral("127.0.0.1:65011"),
+                QStringLiteral("http://127.0.0.1:65012/external-stop-edit.pac?revision=after"),
+                QStringLiteral("localhost;*.later-stop.invalid;10.43.*;[::1];<local>"));
+            QVERIFY2(SystemProxySession::apply(expectedAfterStop)&&SystemProxySession::snapshot()==expectedAfterStop,
+                     "The later application's exact native proxy edit was not applied.");
+        }
+        // On every failure release our real lock before the outer cleanup asks
+        // the still-live owner to close or restores the runner's settings.
+        QLockFile releaseLock(journal+".lock");releaseLock.setStaleLockTime(0);
+        const auto unlock=qScopeGuard([&]{if(releaseLock.isLocked())releaseLock.unlock();});
+        if(releaseContention){QVERIFY(releaseLock.tryLock(0));result.insert("release_lock_acquired",true);}
+        QCOMPARE(fixtureCommand(root.path(),"STOP\n"),QByteArray("STOPPING\n"));
+        if(releaseContention){
+            QJsonObject waiting;
+            QVERIFY2(QTest::qWaitFor([&]{waiting=readReceipt(SwirlSystemProxyExit::waitingPath(root.path()));return !waiting.isEmpty()||child.state()==QProcess::NotRunning;},5000)
+                     &&coherent(waiting,QStringLiteral("normal-stop-waiting")),"Normal Stop did not publish a live native release-waiting receipt.");
+            for(const auto *key:{"proxy_owned","proxy_busy","runtime_alive","runtime_healthy","journal_present"})
+                QVERIFY2(waiting.value(key).isBool()&&waiting.value(key).toBool(),key);
+            QCOMPARE(waiting.value("normal_stop_attempts").toInt(),1);
+            QVERIFY(!waiting.value("proxy_requested").toBool());
+            QVERIFY(child.state()==QProcess::Running);result.insert("release_pending_observed",true);
+            QVERIFY2(httpRoundTrip(quint16(port),origin.serverPort()),"HTTP stopped working while normal proxy release was pending.");
+            result.insert("pending_http_roundtrip",true);
+            QVERIFY2(socksRoundTrip(quint16(port),origin.serverPort()),"SOCKS5 stopped working while normal proxy release was pending.");
+            result.insert("pending_socks5_roundtrip",true);
+            const auto pendingStatus=fixtureStatus(root.path());
+            QVERIFY(coherent(pendingStatus,QStringLiteral("normal-stop-status")));
+            for(const auto *key:{"proxy_owned","proxy_busy","runtime_alive","runtime_healthy","journal_present"})
+                QVERIFY2(pendingStatus.value(key).isBool()&&pendingStatus.value(key).toBool(),key);
+            QCOMPARE(pendingStatus.value("runtime_epoch").toString(),initialEpoch);
+            result.insert("same_runtime_epoch_while_pending",true);
+            QVERIFY2(SystemProxySession::snapshot()==owned&&QFile::exists(journal),"Pending normal Stop lost its native ownership or recovery record.");
+            if(releaseTimeout){
+                QJsonObject failed;
+                QVERIFY2(QTest::qWaitFor([&]{failed=readReceipt(SwirlSystemProxyExit::failedPath(root.path()));return !failed.isEmpty()||child.state()==QProcess::NotRunning;},5000)
+                         &&coherent(failed,QStringLiteral("normal-stop-failed")),"The real release deadline did not produce a retryable normal Stop failure.");
+                const auto elapsed=failed.value("stop_release_elapsed_ms").toDouble(-1);
+                result.insert("release_timeout_elapsed_ms",elapsed);
+                QVERIFY2(elapsed>=2000&&elapsed<=5000,"The native timeout did not retain the original two-second release deadline.");
+                for(const auto *key:{"proxy_owned","runtime_alive","runtime_healthy","journal_present","routing_error_present","proxy_error_present","stop_release_finished","stop_release_while_runtime_alive"})
+                    QVERIFY2(failed.value(key).isBool()&&failed.value(key).toBool(),key);
+                for(const auto *key:{"proxy_busy","proxy_requested","system_proxy_stopping","system_proxy_busy","stop_release_succeeded"})
+                    QVERIFY2(failed.value(key).isBool()&&!failed.value(key).toBool(),key);
+                QCOMPARE(failed.value("normal_stop_attempts").toInt(),1);
+                QCOMPARE(failed.value("stop_release_failures").toInt(),1);QCOMPARE(failed.value("stop_release_successes").toInt(),0);
+                QVERIFY(child.state()==QProcess::Running);
+                QVERIFY2(httpRoundTrip(quint16(port),origin.serverPort()),"HTTP stopped working after native release timeout while the application still owned its proxy.");
+                result.insert("failed_http_roundtrip",true);
+                QVERIFY2(socksRoundTrip(quint16(port),origin.serverPort()),"SOCKS5 stopped working after native release timeout while the application still owned its proxy.");
+                result.insert("failed_socks5_roundtrip",true);
+                const auto failedStatus=fixtureStatus(root.path());QVERIFY(coherent(failedStatus,QStringLiteral("normal-stop-status")));
+                QCOMPARE(failedStatus.value("runtime_epoch").toString(),initialEpoch);
+                for(const auto *key:{"proxy_owned","runtime_alive","runtime_healthy","journal_present"})
+                    QVERIFY2(failedStatus.value(key).isBool()&&failedStatus.value(key).toBool(),key);
+                for(const auto *key:{"proxy_busy","system_proxy_busy","system_proxy_stopping","proxy_requested"})
+                    QVERIFY2(failedStatus.value(key).isBool()&&!failedStatus.value(key).toBool(),key);
+                result.insert("same_runtime_epoch_while_failed",true);
+                QVERIFY2(SystemProxySession::snapshot()==owned&&QFile::exists(journal),"Failed normal Stop lost its exact native ownership or recovery record.");
+            }
+            releaseLock.unlock();QVERIFY(!releaseLock.isLocked());result.insert("release_lock_released",true);
+            if(releaseTimeout){
+                QCOMPARE(fixtureCommand(root.path(),"STOP\n"),QByteArray("STOPPING\n"));result.insert("retry_requested",true);
+            }
+        }
+        QJsonObject stopped;
+        QVERIFY2(QTest::qWaitFor([&]{stopped=readReceipt(SwirlSystemProxyExit::stoppedPath(root.path()));return !stopped.isEmpty()||child.state()==QProcess::NotRunning;},5000)
+                 &&coherent(stopped,QStringLiteral("normal-stopped")),"Normal Stop did not finish while the application remained alive.");
+        QCOMPARE(stopped.value("normal_stop_attempts").toInt(),releaseTimeout?2:1);
+        for(const auto *key:{"proxy_owned","proxy_busy","proxy_requested","system_proxy_busy","system_proxy_stopping","runtime_alive","runtime_healthy","journal_present"})
+            QVERIFY2(stopped.value(key).isBool()&&!stopped.value(key).toBool(),key);
+        QVERIFY(stopped.value("runtime_stopped").isBool()&&stopped.value("runtime_stopped").toBool());
+        QVERIFY(stopped.value("native_snapshot_readable").isBool()&&stopped.value("native_snapshot_readable").toBool());
+        QCOMPARE(stopped.value("snapshot_restored").toBool(),!externalEdit);
+        QCOMPARE(stopped.value("stop_release_failures").toInt(),releaseTimeout?1:0);
+        if(!externalEdit){
+            QCOMPARE(stopped.value("stop_release_successes").toInt(),1);
+            for(const auto *key:{"stop_release_finished","stop_release_succeeded","stop_release_while_runtime_alive","snapshot_restored_at_stop_release","journal_absent_at_stop_release"})
+                QVERIFY2(stopped.value(key).isBool()&&stopped.value(key).toBool(),key);
+        }
+        QVERIFY2(SystemProxySession::snapshot()==expectedAfterStop,"Normal Stop did not retain the exact expected PAC/bypass and raw registry snapshot.");
+        result.insert("exact_stop_snapshot",true);result.insert("normal_stop_completed",true);
+        result.insert("normal_stop_attempts",stopped.value("normal_stop_attempts"));
+        const auto journalCleanupComplete=[&]{
+            const bool absent=!QFile::exists(journal);
+            const auto markers=QDir(root.filePath("data")).entryList({"system-proxy.dpapi.*.ready"},QDir::Files);
+            result.insert("journal_absent_after_stop",absent);result.insert("guard_marker_count_after_stop",markers.size());
+            return absent&&markers.isEmpty();
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(journalCleanupComplete(),5000);
+        // STATUS is a fresh IPC exchange with the same owner, not a receipt
+        // written during process exit. Guard-on-process-death cannot pass this.
+        const auto stoppedStatus=fixtureStatus(root.path());
+        QVERIFY(coherent(stoppedStatus,QStringLiteral("normal-stop-status")));
+        QVERIFY(child.state()==QProcess::Running);QVERIFY(stoppedStatus.value("runtime_stopped").toBool());
+        QVERIFY(!stoppedStatus.value("runtime_alive").toBool()&&!stoppedStatus.value("proxy_owned").toBool());
+        result.insert("app_alive_after_stop",true);
+        const auto listenerProbe=probeListener(quint16(port));result.insert("listener_probe",listenerProbe.report());
+        const auto connection=observeClosedPortConnection(quint16(port));result.insert("closed_port_connection",connection);
+        const auto nativeState=tcpPortState(quint16(port));const auto nativeListener=nativeListenerPresent(nativeState);
+        result.insert("tcp_state_after_stop",nativeState);result.insert("tcp_tables_readable",nativeListener.has_value());
+        result.insert("no_listening_socket",nativeListener.has_value()&&!*nativeListener);
+        {
+            ExclusiveLoopbackListener released{quint16(port)};result.insert("exclusive_rebind_after_stop",released.report());
+            QVERIFY2(!listenerProbe.connected&&!connection.value("connected").toBool(),"A TCP connection succeeded after normal Stop.");
+            QVERIFY2(nativeListener.has_value()&&!*nativeListener,"Both native TCP tables must show no listener after normal Stop.");
+            QVERIFY2(released.listening(),"Normal Stop did not release the exact Rust endpoint for exclusive bind and listen.");
+        }
+        result.insert("listener_closed",true);
+        const auto afterProbeStatus=fixtureStatus(root.path());
+        QVERIFY(coherent(afterProbeStatus,QStringLiteral("normal-stop-status")));
+        QVERIFY(child.state()==QProcess::Running&&afterProbeStatus.value("runtime_stopped").toBool());
+        QVERIFY(!afterProbeStatus.value("proxy_requested").toBool()&&!afterProbeStatus.value("proxy_owned").toBool());
+        QVERIFY2(SystemProxySession::snapshot()==expectedAfterStop,"The live stopped application later replaced the required native proxy snapshot.");
+        result.insert("app_alive_after_listener_checks",true);
+        QCOMPARE(httpRequests,1+int(releaseContention)+int(releaseTimeout));QCOMPARE(socksRequests,httpRequests);
+        result.insert("http_requests",httpRequests);result.insert("socks5_requests",socksRequests);
+        QVERIFY(requestWindowClose(root.path()));
+        QVERIFY(QTest::qWaitFor([&]{return child.state()==QProcess::NotRunning;},10000));
+        QCOMPARE(child.exitStatus(),QProcess::NormalExit);QCOMPARE(child.exitCode(),0);
+        const auto final=readReceipt(SwirlSystemProxyExit::finalPath(root.path()));
+        QCOMPARE(final.value("source_sha").toString(),QStringLiteral(SWIRL_SOURCE_SHA));
+        QCOMPARE(final.value("phase").toString(),QStringLiteral("final"));QCOMPARE(qint64(final.value("pid").toDouble()),pid);
+        for(const auto *key:{"close_requested","shutdown_coordinator_completed","runtime_stopped","journal_absent"})
+            QVERIFY2(final.value(key).isBool()&&final.value(key).toBool(),key);
+        for(const auto *key:{"fixture_failed","proxy_owned","proxy_busy"})
+            QVERIFY2(final.value(key).isBool()&&!final.value(key).toBool(),key);
+        QVERIFY2(SystemProxySession::snapshot()==expectedAfterStop,"Closing the already-stopped app changed the exact expected native proxy snapshot.");
+        result.insert("exact_exit_snapshot",true);completed=true;
     }
 };
 

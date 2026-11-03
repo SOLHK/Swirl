@@ -369,6 +369,32 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
+      - name: Provision pinned official Windows Codex CLI
+        working-directory: .
+        shell: pwsh
+        timeout-minutes: 10
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/tests/test_codex_cli_provisioning.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/Install-CodexCli.py --destination "$env:RUNNER_TEMP/swirl-codex-cli" --evidence "$env:RUNNER_TEMP/swirl-codex-cli-evidence/provisioning.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify real Codex CLI feature management and Windows DPAPI
+        working-directory: .
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          python tools/Verify-CodexCliManagement.py --cli "$env:RUNNER_TEMP/swirl-codex-cli/codex.exe" --evidence "$env:RUNNER_TEMP/swirl-codex-cli-evidence"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve real Codex CLI management evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Codex-CLI-Management-Windows-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-codex-cli-evidence
+          if-no-files-found: error
+          retention-days: 14
       - name: Production V2 CONNECT, TLS, HTTP2 and streaming compatibility
         shell: pwsh
         env:
@@ -441,7 +467,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_subscription_capture.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python ../tools/tests/test_codex_management.py
       - name: Diagnose hosted Windows port allocation after a peer failure
         if: failure() && steps.independent_windows_peers.conclusion == 'failure'
         shell: pwsh

@@ -84,6 +84,7 @@ VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}.0"
     SetOutPath "$PLUGINSDIR"
     File /oname=Maintain-WindowsRustProduct.ps1 "${REPO_ROOT}\scripts\Maintain-WindowsRustProduct.ps1"
     File /oname=RustProductPackagePolicy.ps1 "${REPO_ROOT}\scripts\RustProductPackagePolicy.ps1"
+    File /oname=WindowsUserIntegration.ps1 "${REPO_ROOT}\scripts\WindowsUserIntegration.ps1"
     File /oname=package-manifest.json "${APP_DIST}\package-manifest.json"
 !macroend
 !macro MaintainPackage Mode ExtraArguments FailureLabel
@@ -97,6 +98,14 @@ VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}.0"
     FileWrite $9 "${Mode}: exit=$0 output=$1$\r$\n"
     FileClose $9
     !endif
+    StrCmp $0 "0" +2
+    Goto ${FailureLabel}
+!macroend
+!macro MaintainUserIntegration Mode FailureLabel
+    nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$PLUGINSDIR\WindowsUserIntegration.ps1" -Mode ${Mode} -ApplicationDirectory "$INSTDIR" -ExpectedManifest "$PLUGINSDIR\package-manifest.json" -AppVersion "${APP_VERSION}"'
+    Pop $0
+    Pop $1
+    DetailPrint "$1"
     StrCmp $0 "0" +2
     Goto ${FailureLabel}
 !macroend
@@ -166,30 +175,9 @@ Section "安装 Swirl"
     FileClose $0
     Goto install_done
     regular:
-    CreateDirectory "$SMPROGRAMS\\Swirl"
-    CreateShortCut "$SMPROGRAMS\\Swirl\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-0217-optical.ico" 0
-    !if /FileExists "${APP_DIST}\SwirlCodexLauncher.exe"
-    CreateShortCut "$SMPROGRAMS\\Swirl\\通过 Swirl 启动 Codex.lnk" "$INSTDIR\\SwirlCodexLauncher.exe" "" "$INSTDIR\\Swirl-brand-0217-optical.ico" 0
-    !endif
-    CreateShortCut "$DESKTOP\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-0217-optical.ico" 0
-    ExecWait '"$INSTDIR\SwirlProxyGuard.exe" --repair-shortcut "$DESKTOP\Swirl.lnk" "$INSTDIR\Swirl.exe" "$INSTDIR\Swirl-brand-0217-optical.ico"' $0
-    StrCmp $0 0 +2
-    DetailPrint "Swirl 桌面快捷方式属性更新失败，错误 $0。"
-    ExecWait '"$INSTDIR\SwirlProxyGuard.exe" --repair-shortcut "$SMPROGRAMS\Swirl\Swirl.lnk" "$INSTDIR\Swirl.exe" "$INSTDIR\Swirl-brand-0217-optical.ico"' $0
-    StrCmp $0 0 +2
-    DetailPrint "Swirl 开始菜单快捷方式属性更新失败，错误 $0。"
-    WriteRegStr HKCU "Software\\Swirl" "InstallDir" "$INSTDIR"
-    ExecWait '"$INSTDIR\SwirlProxyGuard.exe" --repair-owned-pins "$INSTDIR\Swirl.exe" "$INSTDIR\Swirl-brand-0217-optical.ico"' $0
-    StrCmp $0 0 +2
-    DetailPrint "Swirl 任务栏图标刷新未完成，错误 $0。"
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayName" "Swirl"
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayVersion" "${APP_VERSION}.0"
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "InstallLocation" "$INSTDIR"
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "UninstallString" '"$INSTDIR\\卸载 Swirl.exe"'
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayIcon" "$INSTDIR\\Swirl-brand-0217-optical.ico"
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "Publisher" "Swirl"
-    WriteRegDWORD HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "NoModify" 1
-    WriteRegDWORD HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "NoRepair" 1
+    ; The embedded source-bound helper owns the complete per-user transaction:
+    ; raw original types/bytes, compare-before-restore and user-edit retention.
+    !insertmacro MaintainUserIntegration Install installation_failed
     install_done:
     Goto installation_finished
     installation_failed:
@@ -200,14 +188,15 @@ SectionEnd
 Section "Uninstall"
     SetShellVarContext current
     !insertmacro PreparePackageMaintenance
+    StrCmp $IsolatedInstall "1" integration_validated
+    !insertmacro MaintainUserIntegration ValidateUninstall uninstall_failed
+    ; Preserve the source manifest and product bytes if a locked or otherwise
+    ; unavailable integration target needs a later restoration retry.
+    !insertmacro MaintainUserIntegration Uninstall uninstall_failed
+    integration_validated:
     !insertmacro MaintainPackage Uninstall '' uninstall_failed
     StrCmp $IsolatedInstall "1" isolated_uninstall
-    Delete "$DESKTOP\\Swirl.lnk"
-    Delete "$SMPROGRAMS\\Swirl\\Swirl.lnk"
-    Delete "$SMPROGRAMS\\Swirl\\通过 Swirl 启动 Codex.lnk"
-    RMDir "$SMPROGRAMS\\Swirl"
-    DeleteRegKey HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl"
-    DeleteRegKey HKCU "Software\\Swirl"
+    Delete "$INSTDIR\.swirl-user-integration.json"
     isolated_uninstall:
     ; The embedded helper removed only unchanged files owned by this build.
     Delete "$INSTDIR\.swirl-isolated-install"

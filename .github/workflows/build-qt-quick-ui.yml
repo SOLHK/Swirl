@@ -99,6 +99,16 @@ jobs:
       - name: Check package path policy with Windows PowerShell 5.1
         shell: powershell
         run: ./scripts/tests/Test-RustProductPackagePolicy.ps1
+      - name: Verify user integration transactions with an actual standard-user token
+        shell: pwsh
+        env:
+          SWIRL_DISPOSABLE_INSTALL_TEST: '1'
+        run: |
+          ./scripts/tests/Test-WindowsUserIntegration.ps1 -ExpectedSourceSha $env:GITHUB_SHA -EvidenceDirectory build-evidence/user-integration-policy
+          $policy = Get-Content -LiteralPath 'build-evidence/user-integration-policy/integration-policy.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          $runner = Get-Content -LiteralPath 'build-evidence/user-integration-policy/standard-user-runner.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($policy.schema -ne 1 -or -not $policy.success -or $policy.source_sha -cne $env:GITHUB_SHA -or -not $policy.actual_non_admin_token -or -not $policy.actual_x86_powershell -or -not $policy.negative_control.required_assertion_failed) { throw 'Actual standard-user integration transaction evidence is incomplete.' }
+          if ($runner.schema -ne 1 -or -not $runner.success -or $runner.forced_termination) { throw 'The temporary standard-user account or its native resources were not cleanly released.' }
       - name: Restore isolated Qt 6.12 SDK archives
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
@@ -184,10 +194,10 @@ jobs:
           # Clear these before configure/build, so even a compiler failure cannot
           # upload old tests as evidence for the current source identity.
           Remove-Item -LiteralPath 'build-evidence/ctest-inventory.json' -Force -ErrorAction SilentlyContinue
-          foreach ($directory in @('hero-evidence','navigation-evidence','settings-material-evidence','policy-evidence','activity-layout','liquid-glass-evidence','system-proxy-exit')) {
+          foreach ($directory in @('hero-evidence','navigation-evidence','settings-material-evidence','policy-evidence','activity-layout','liquid-glass-evidence','system-proxy-exit','system-proxy-normal-stop')) {
             Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $directory) -Recurse -Force -ErrorAction SilentlyContinue
           }
-          foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt','connection-rows.xml','swirl-telemetry-accounting.xml','swirl-system-proxy-state.xml','swirl-system-proxy-recovery.xml','swirl-system-proxy-app-exit.xml')) {
+          foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt','connection-rows.xml','swirl-telemetry-accounting.xml','swirl-system-proxy-state.xml','swirl-system-proxy-recovery.xml','swirl-system-proxy-app-exit.xml','swirl-system-proxy-normal-stop.xml','swirl-rust-qt-integration.xml')) {
             Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $file) -Force -ErrorAction SilentlyContinue
           }
           Get-ChildItem -Path 'build/swirl-quick/*-report.json','build/swirl-quick/activity-feather-*.png','build/swirl-quick/activity-data-*.png','build/swirl-quick/font-*.xml','build/swirl-quick/Release/Swirl-*.txt' -File -ErrorAction SilentlyContinue | Remove-Item -Force
@@ -318,11 +328,11 @@ jobs:
           $policyCases = @($criticalUiReport.SelectNodes('//testcase[@name="swirl-policy-ui"]'))
           if ($policyCases.Count -ne 1 -or $policyCases[0].status -ne 'run' -or $policyCases[0].SelectNodes('failure|error|skipped').Count -ne 0) { throw 'The full-application policy regression must actually pass before packaging.' }
           if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') {
-            ctest --test-dir build/swirl-quick -C Release -R "^swirl-(system-proxy-state|system-proxy-recovery|system-proxy-app-exit|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network)$" --output-on-failure --no-tests=error --output-junit $criticalNetworkJunit
+            ctest --test-dir build/swirl-quick -C Release -R "^swirl-(system-proxy-state|system-proxy-recovery|system-proxy-app-exit|system-proxy-normal-stop|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network)$" --output-on-failure --no-tests=error --output-junit $criticalNetworkJunit
             if ($LASTEXITCODE -ne 0) { throw "Critical network/security checks failed ($LASTEXITCODE)." }
             # A CTest suite-level pass must also have current native assertion
             # evidence. Missing rows or platform skips do not meet this gate.
-            foreach ($suite in @('state','recovery','app-exit')) {
+            foreach ($suite in @('state','recovery','app-exit','normal-stop')) {
               $path = "build/swirl-quick/swirl-system-proxy-$suite.xml"
               if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing native proxy assertions: $suite" }
               [xml]$report = Get-Content -LiteralPath $path -Raw
@@ -422,6 +432,61 @@ jobs:
                         if ($data.$key -isnot [bool] -or -not $data.$key) { throw "Native release-contention evidence is incomplete: $key" }
                       }
                       if ($data.fixture_failed -isnot [bool] -or $data.fixture_failed) { throw 'Native release-contention fixture failed.' }
+                    }
+                  }
+                }
+              }
+              if ($suite -eq 'normal-stop') {
+                $rows = @($report.SelectNodes('/TestCase/TestFunction[@name="normalStopRestoresOwnedProxyWhileApplicationRemainsAlive"]/Incident[@type="pass"]/DataTag'))
+                $tags = @($rows | ForEach-Object { $_.InnerText })
+                $requiredTags = @('pac-only','manual-and-pac','pac-only-external-edit','manual-and-pac-external-edit','pac-only-lock-contention','pac-only-lock-timeout-retry')
+                if ($tags.Count -ne $requiredTags.Count -or @($requiredTags | Where-Object { $_ -notin $tags }).Count -gt 0) { throw 'All six native normal-stop cases must actually pass with the application still alive.' }
+                foreach ($tag in $requiredTags) {
+                  $requiredStages = @('ready','stopped','final','result')
+                  if ($tag -in @('pac-only-lock-contention','pac-only-lock-timeout-retry')) { $requiredStages += 'waiting' }
+                  if ($tag -eq 'pac-only-lock-timeout-retry') { $requiredStages += 'failed' }
+                  foreach ($stage in $requiredStages) {
+                    $receipt = "build/swirl-quick/system-proxy-normal-stop/$tag-$stage.json"
+                    if (-not (Test-Path -LiteralPath $receipt -PathType Leaf)) { throw "Missing native normal-stop receipt: $tag/$stage" }
+                    $data = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json
+                    if ($data.schema -ne 1 -or $data.source_sha -cne $env:GITHUB_SHA) { throw "Native normal-stop receipt has the wrong source identity: $tag/$stage" }
+                    if ($stage -eq 'result') {
+                      foreach ($key in @('success','http_roundtrip','socks5_roundtrip','child_normal_exit','exact_stop_snapshot','exact_exit_snapshot','winhttp_unchanged','runner_original_restored','app_alive_after_stop','app_alive_after_listener_checks','normal_stop_completed','journal_absent_after_stop','listener_closed','tcp_tables_readable','no_listening_socket')) {
+                        if ($data.$key -isnot [bool] -or -not $data.$key) { throw "Native normal-stop result is incomplete: $tag/$key" }
+                      }
+                      if ($data.child_exit_code -ne 0 -or $null -eq $data.guard_marker_count_after_stop -or $data.guard_marker_count_after_stop -ne 0) { throw "Normal-stop process or guard cleanup failed: $tag" }
+                      Assert-NativeListenerReleased $data.listener_probe $data.tcp_state_after_stop $data.exclusive_rebind_after_stop $tag
+                      Assert-ExclusivePortOccupied $data.live_listener_exclusive_probe $tag
+                      if ($tag -in @('pac-only-lock-contention','pac-only-lock-timeout-retry')) {
+                        foreach ($key in @('pending_http_roundtrip','pending_socks5_roundtrip','same_runtime_epoch_while_pending')) {
+                          if ($data.$key -isnot [bool] -or -not $data.$key) { throw "The same Rust runtime did not serve real traffic while release was pending: $tag/$key" }
+                        }
+                      }
+                      if ($tag -eq 'pac-only-lock-timeout-retry') {
+                        foreach ($key in @('failed_http_roundtrip','failed_socks5_roundtrip','same_runtime_epoch_while_failed')) {
+                          if ($data.$key -isnot [bool] -or -not $data.$key) { throw "The same Rust runtime did not survive an actual release timeout: $tag/$key" }
+                        }
+                        if ($null -eq $data.release_timeout_elapsed_ms -or $data.release_timeout_elapsed_ms -lt 2000) { throw 'The native normal-stop test did not observe the actual two-second release deadline.' }
+                      }
+                    }
+                    if ($stage -in @('waiting','failed','stopped')) {
+                      foreach ($key in @('native_backend','ready')) {
+                        if ($data.$key -isnot [bool] -or -not $data.$key) { throw "Normal-stop fixture identity is incomplete: $tag/$stage/$key" }
+                      }
+                      if ($data.close_requested -isnot [bool] -or $data.close_requested -or $data.fixture_failed -isnot [bool] -or $data.fixture_failed) { throw "The application closed or fixture failed before normal-stop verification: $tag/$stage" }
+                    }
+                    if ($stage -in @('waiting','failed')) {
+                      foreach ($key in @('proxy_owned','runtime_alive','runtime_healthy','journal_present')) {
+                        if ($data.$key -isnot [bool] -or -not $data.$key) { throw "The owned listener was not retained during normal-stop release: $tag/$stage/$key" }
+                      }
+                      $expectedPhase = if ($stage -eq 'waiting') { 'normal-stop-waiting' } else { 'normal-stop-failed' }
+                      if ($data.phase -cne $expectedPhase -or $data.proxy_busy -isnot [bool] -or $data.proxy_busy -ne ($stage -eq 'waiting')) { throw "Normal-stop release has the wrong pending/failure state: $tag/$stage" }
+                    }
+                    if ($stage -eq 'stopped') {
+                      if ($data.phase -cne 'normal-stopped') { throw "Missing ordinary stop completion: $tag" }
+                      foreach ($key in @('proxy_owned','proxy_busy','runtime_alive')) {
+                        if ($data.$key -isnot [bool] -or $data.$key) { throw "Normal-stop did not release proxy and Core: $tag/$key" }
+                      }
                     }
                   }
                 }
@@ -769,6 +834,19 @@ jobs:
           $delivery = Get-Content -LiteralPath out/delivery.json -Raw | ConvertFrom-Json
           $delivery | Add-Member -NotePropertyName isolated_installer_lifecycle -NotePropertyValue 'passed' -Force
           $delivery | ConvertTo-Json | Set-Content -LiteralPath out/delivery.json -Encoding utf8
+      - name: Verify normal installer ownership and cleanup as an actual standard user
+        shell: pwsh
+        env:
+          SWIRL_DISPOSABLE_INSTALL_TEST: '1'
+        run: |
+          ./scripts/tests/Test-WindowsNormalInstaller.ps1 -Installer out/Swirl-Setup.exe -PackageDirectory installer-bin -ExpectedSourceSha $env:GITHUB_SHA -EvidenceDirectory build-evidence/normal-installer-lifecycle
+          $lifecycle = Get-Content -LiteralPath 'build-evidence/normal-installer-lifecycle/lifecycle.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          $runner = Get-Content -LiteralPath 'build-evidence/normal-installer-lifecycle/standard-user-runner.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($lifecycle.schema -ne 1 -or -not $lifecycle.success -or $lifecycle.source_sha -cne $env:GITHUB_SHA -or -not $lifecycle.normal_user_installation -or -not $lifecycle.non_admin_token_verified -or -not $lifecycle.negative_control.required_assertion_failed) { throw 'Actual normal standard-user installer lifecycle evidence is incomplete.' }
+          if ($runner.schema -ne 1 -or -not $runner.success -or $runner.forced_termination) { throw 'The installer left temporary standard-user processes, accounts or native resources behind.' }
+          $delivery = Get-Content -LiteralPath out/delivery.json -Raw -Encoding UTF8 | ConvertFrom-Json
+          $delivery | Add-Member -NotePropertyName normal_standard_user_installer_lifecycle -NotePropertyValue 'passed' -Force
+          $delivery | ConvertTo-Json | Set-Content -LiteralPath out/delivery.json -Encoding utf8
       - name: Upload critical-test Windows installer
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -790,11 +868,11 @@ jobs:
             if ($env:SWIRL_CI_UI_ONLY -eq 'true') {
               # UI-only changes still run all parser, policy, storage, and local
               # regressions; skip only suites whose purpose is network/TLS traffic.
-              $excludedTests += '|system-proxy-recovery|system-proxy-app-exit|node-real-chain|stream-regression|subscription-download|qt-network-policy|gateway-network'
+              $excludedTests += '|system-proxy-recovery|system-proxy-app-exit|system-proxy-normal-stop|node-real-chain|stream-regression|subscription-download|qt-network-policy|gateway-network'
               Write-Host 'Deferred for this UI-only diff: node-real-chain, stream-regression, subscription-download, qt-network-policy, gateway-network.'
             } else {
               # These network/security checks already passed before packaging.
-              $excludedTests += '|system-proxy-recovery|system-proxy-app-exit|system-proxy-state|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network'
+              $excludedTests += '|system-proxy-recovery|system-proxy-app-exit|system-proxy-normal-stop|system-proxy-state|node-real-chain|stream-regression|subscription-download|qt-network-policy|subscription-formats|import-subscription|import-boundaries|gateway-network'
             }
             $exclude = "^swirl-($excludedTests)$"
             # CTest changes directory for --test-dir. Keep the report in the
@@ -935,7 +1013,10 @@ jobs:
             build/swirl-quick/swirl-system-proxy-state.xml
             build/swirl-quick/swirl-system-proxy-recovery.xml
             build/swirl-quick/swirl-system-proxy-app-exit.xml
+            build/swirl-quick/swirl-system-proxy-normal-stop.xml
+            build/swirl-quick/swirl-rust-qt-integration.xml
             build/swirl-quick/system-proxy-exit/
+            build/swirl-quick/system-proxy-normal-stop/
             build-evidence/d3d11-frame-latency/
             build/swirl-quick/engine-contract.txt
             build/swirl-quick/engine-real.txt

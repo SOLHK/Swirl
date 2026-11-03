@@ -4,6 +4,7 @@
 #include "engine/EngineController.h"
 #include <QCoreApplication>
 #include <QDebug>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -41,8 +42,28 @@ public:
                 connect(socket,&QLocalSocket::disconnected,socket,&QObject::deleteLater);
                 connect(socket,&QLocalSocket::readyRead,socket,[this,socket]{
                     const auto bytes=socket->property("command").toByteArray()+socket->readAll();
-                    if(bytes.size()>6||!QByteArray("CLOSE\n").startsWith(bytes)){socket->abort();return;}
+                    if(bytes.size()>7||(!QByteArray("CLOSE\n").startsWith(bytes)
+                        &&!QByteArray("STOP\n").startsWith(bytes)&&!QByteArray("STATUS\n").startsWith(bytes))){socket->abort();return;}
                     socket->setProperty("command",bytes);
+                    if(bytes=="STATUS\n"){
+                        socket->write(QJsonDocument(normalStopState("normal-stop-status")).toJson(QJsonDocument::Compact)+"\n");
+                        socket->flush();socket->disconnectFromServer();return;
+                    }
+                    if(bytes=="STOP\n"){
+                        if(!m_ready||m_closeRequested||!m_controller->processAlive()||m_controller->systemProxyStopping()){
+                            socket->abort();return;
+                        }
+                        socket->write("STOPPING\n");socket->flush();socket->disconnectFromServer();
+                        QTimer::singleShot(0,this,[this]{
+                            ++m_normalStopAttempts;m_normalStopLastReleaseFinished=false;
+                            m_normalStopLastReleaseSucceeded=false;m_normalStopLastReleaseAlive=false;
+                            m_normalStopElapsed.start();
+                            // This is the same public command as the product's
+                            // system-proxy capsule. The application stays alive.
+                            m_controller->toggleSystemProxy();observeNormalStop();
+                        });
+                        return;
+                    }
                     if(bytes!="CLOSE\n")return;
                     if(!m_ready||m_closeRequested){socket->abort();return;}
                     m_closeRequested=true;
@@ -54,6 +75,17 @@ public:
             }
         });
         connect(m_controller->systemProxy(),&SystemProxySession::releaseFinished,this,[this](bool success){
+            if(m_normalStopAttempts&&!m_closeRequested){
+                m_normalStopLastReleaseFinished=true;m_normalStopLastReleaseSucceeded=success;
+                m_normalStopLastReleaseAlive=m_controller->processAlive()&&m_controller->apiHealthy();
+                m_normalStopLastReleaseElapsed=m_normalStopElapsed.elapsed();
+                m_normalStopRestoredAtRelease=SystemProxySession::snapshot()==m_initial;
+                m_normalStopJournalAbsentAtRelease=!QFile::exists(SystemProxySession::journalPath());
+                if(success)++m_normalStopReleaseSuccesses;else ++m_normalStopReleaseFailures;
+                // EngineController queues its release continuation before this
+                // observer. Record the retryable/finished state after it runs.
+                QTimer::singleShot(0,this,[this]{observeNormalStop();});
+            }
             if(!m_closeRequested)return;
             m_releaseFinished=true;m_releaseSucceeded=success;
             m_releaseWhileRuntimeAlive=m_controller->processAlive()&&m_controller->apiHealthy();
@@ -76,7 +108,7 @@ public:
             // calling any production shutdown/recovery operation ourselves.
             if(!writeReceipt(SwirlSystemProxyExit::waitingPath(m_root),report))fail("release-waiting-receipt-write-failed");
         });
-        connect(m_controller,&EngineController::statusChanged,this,[this]{observeReady();});
+        connect(m_controller,&EngineController::statusChanged,this,[this]{observeReady();observeNormalStop();});
         connect(m_controller,&EngineController::policyApplyFinished,this,[this](const QString &,bool success){
             if(!success){fail("policy-save-failed");return;}
             if(m_requested)return;
@@ -111,6 +143,58 @@ private:
             {"ready",m_ready},{"close_requested",m_closeRequested},
             {"fixture_failed",!m_failure.isEmpty()},{"failure_code",m_failure}};
     }
+    QJsonObject normalStopState(const char *phase) const {
+        auto report=common(phase);auto *proxy=m_controller->systemProxy();
+        const auto snapshot=SystemProxySession::snapshot();
+        report.insert("normal_stop_attempts",m_normalStopAttempts);
+        report.insert("proxy_owned",proxy->owned());report.insert("proxy_busy",proxy->busy());
+        report.insert("proxy_requested",m_controller->proxyRequested());
+        report.insert("system_proxy_stopping",m_controller->systemProxyStopping());
+        report.insert("system_proxy_busy",m_controller->systemProxyBusy());
+        report.insert("runtime_alive",m_controller->processAlive());
+        report.insert("runtime_healthy",m_controller->apiHealthy());
+        report.insert("runtime_stopped",!m_controller->processAlive()&&!m_controller->busy());
+        report.insert("initial_runtime_epoch",m_initialRuntimeEpoch);
+        report.insert("runtime_epoch",m_controller->policyReceipt().value("engine_epoch").toString());
+        report.insert("journal_present",QFile::exists(SystemProxySession::journalPath()));
+        report.insert("native_snapshot_readable",!snapshot.isEmpty());
+        report.insert("snapshot_restored",snapshot==m_initial);
+        report.insert("window_visible",m_window->isVisible());
+        report.insert("shutdown_coordinator_completed",QCoreApplication::instance()->property("shutdownDurationMs").isValid());
+        report.insert("routing_error_present",!m_controller->routingError().isEmpty());
+        report.insert("proxy_error_present",!proxy->error().isEmpty());
+        report.insert("stop_release_finished",m_normalStopLastReleaseFinished);
+        report.insert("stop_release_succeeded",m_normalStopLastReleaseSucceeded);
+        report.insert("stop_release_while_runtime_alive",m_normalStopLastReleaseAlive);
+        report.insert("stop_release_elapsed_ms",double(m_normalStopLastReleaseElapsed));
+        report.insert("stop_release_successes",m_normalStopReleaseSuccesses);
+        report.insert("stop_release_failures",m_normalStopReleaseFailures);
+        report.insert("snapshot_restored_at_stop_release",m_normalStopRestoredAtRelease);
+        report.insert("journal_absent_at_stop_release",m_normalStopJournalAbsentAtRelease);
+        return report;
+    }
+    void observeNormalStop() {
+        if(!m_normalStopAttempts||m_closeRequested||!m_failure.isEmpty())return;
+        auto *proxy=m_controller->systemProxy();
+        if(!m_normalStopWaitingRecorded&&proxy->owned()&&proxy->busy()){
+            m_normalStopWaitingRecorded=true;
+            if(!writeReceipt(SwirlSystemProxyExit::waitingPath(m_root),normalStopState("normal-stop-waiting")))
+                fail("normal-stop-waiting-receipt-write-failed");
+        }
+        if(m_normalStopFailureRecorded<m_normalStopAttempts&&m_normalStopLastReleaseFinished
+            &&!m_normalStopLastReleaseSucceeded&&proxy->owned()&&!proxy->busy()
+            &&!m_controller->systemProxyStopping()&&!m_controller->systemProxyBusy()){
+            m_normalStopFailureRecorded=m_normalStopAttempts;
+            if(!writeReceipt(SwirlSystemProxyExit::failedPath(m_root),normalStopState("normal-stop-failed")))
+                fail("normal-stop-failed-receipt-write-failed");
+        }
+        if(!m_normalStopCompleted&&!proxy->owned()&&!proxy->busy()
+            &&!m_controller->processAlive()&&!m_controller->busy()){
+            m_normalStopCompleted=true;
+            if(!writeReceipt(SwirlSystemProxyExit::stoppedPath(m_root),normalStopState("normal-stopped")))
+                fail("normal-stop-completed-receipt-write-failed");
+        }
+    }
     void observeReady() {
         if(m_ready||!m_failure.isEmpty()||!m_requested)return;
         auto *proxy=m_controller->systemProxy();
@@ -129,7 +213,9 @@ private:
             fail("ready-identity-mismatch");return;
         }
         m_port=port;m_runtimePid=m_controller->processId().toLongLong();m_ready=true;
+        m_initialRuntimeEpoch=m_controller->policyReceipt().value("engine_epoch").toString();
         auto report=common("ready");
+        report.insert("initial_runtime_epoch",m_initialRuntimeEpoch);
         report.insert("runtime_alive",true);report.insert("runtime_healthy",true);
         report.insert("proxy_owned",true);report.insert("proxy_enabled",true);
         report.insert("native_listener_matches_rust",nativeMatches);
@@ -171,6 +257,13 @@ private:
     QJsonObject m_initial;
     QLocalServer m_control;
     QTimer m_watchdog;
+    QElapsedTimer m_normalStopElapsed;
+    QString m_initialRuntimeEpoch;
+    qint64 m_normalStopLastReleaseElapsed=-1;
+    int m_normalStopAttempts=0,m_normalStopReleaseSuccesses=0,m_normalStopReleaseFailures=0,m_normalStopFailureRecorded=0;
+    bool m_normalStopWaitingRecorded=false,m_normalStopCompleted=false;
+    bool m_normalStopLastReleaseFinished=false,m_normalStopLastReleaseSucceeded=false,m_normalStopLastReleaseAlive=false;
+    bool m_normalStopRestoredAtRelease=false,m_normalStopJournalAbsentAtRelease=false;
     qint64 m_runtimePid=0;
     int m_port=0;
     bool m_requested=false,m_ready=false,m_closeRequested=false;
