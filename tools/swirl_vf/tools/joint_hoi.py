@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from itertools import product
 import numpy as np
-from fontTools.misc.psCharStrings import T2CharString
 from fontTools.ttLib.tables import otTables
 from fontTools.ttLib.tables._f_v_a_r import Axis
 from fontTools.varLib.builder import buildVarData, buildDeltaSetIndexMap
@@ -98,9 +97,9 @@ class HOIPolynomialBox(PolynomialBox):
                       for triple in (((-1, -1, 0), (0, 1, 1)) if self.signed_factors else ((0, 1, 1),)))
         return result
 
-    def charstring(self, vsindex):
+    def _program(self, vsindex, expression_pool=None):
         if not self.operators:
-            return T2CharString(program=[])
+            return []
         program = [vsindex, 'vsindex']; regions = len(self.supports)-1
         stack = maximum = 0
 
@@ -114,6 +113,7 @@ class HOIPolynomialBox(PolynomialBox):
             push(1); program[-1] = 1; program.append('blend'); stack -= regions+1
 
         def polynomial(c):
+            begin = len(program)
             push(c[0, 0, 0])
             if any(c[degree] != 0 for degree in self.degrees):
                 for degree in self.degrees:
@@ -121,6 +121,8 @@ class HOIPolynomialBox(PolynomialBox):
                 for _ in range(regions-len(self.degrees)):
                     push(0)
                 blend()
+            if expression_pool is not None:
+                program[begin:] = [expression_pool.intern(program[begin:], regions)]
 
         column = 0
         for operator, count in self.operators:
@@ -138,7 +140,7 @@ class HOIPolynomialBox(PolynomialBox):
             require(stack == count, 'HOI_operator_stack_mismatch')
             program.append(operator); stack = 0
         self.evidence['maximum_operand_stack'] = maximum
-        return T2CharString(program=program)
+        return program
 
 
 class HOIAxisPowerBox(HOIPolynomialBox):
@@ -158,9 +160,9 @@ class HOIAxisPowerBox(HOIPolynomialBox):
                    (((-1, -1, 0), (0, 1, 1)) if self.signed_factors else ((0, 1, 1),))]
         return [{}]+powers+factors
 
-    def charstring(self, vsindex):
+    def _program(self, vsindex, expression_pool=None):
         if not self.operators:
-            return T2CharString(program=[])
+            return []
         program = [vsindex, 'vsindex']; regions = len(self.supports)-1
         stack = maximum = 0
 
@@ -187,20 +189,26 @@ class HOIAxisPowerBox(HOIPolynomialBox):
                         push(0)
                 blend()
 
+        def operand(c):
+            begin = len(program)
+            polynomial(c)
+            if expression_pool is not None:
+                program[begin:] = [expression_pool.intern(program[begin:], regions)]
+
         column = 0
         for operator, count in self.operators:
             for _ in range(count):
-                polynomial(self.coefficients[..., column])
+                operand(self.coefficients[..., column])
                 if any(np.any(c[..., column]) for c in self.factors.values()):
                     for _ in range(9):
                         push(0)
                     for c in self.factors.values():
                         if self.signed_factors:
-                            polynomial(-c[..., column])
-                        polynomial(c[..., column])
+                            operand(-c[..., column])
+                        operand(c[..., column])
                     blend()
                 column += 1
             require(stack == count, 'HOI_power_operator_stack_mismatch')
             program.append(operator); stack = 0
         self.evidence['maximum_operand_stack'] = maximum
-        return T2CharString(program=program)
+        return program

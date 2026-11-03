@@ -43,6 +43,12 @@ def run(args):
     require(digest(args.source) == args.source_sha256, 'source_hash_mismatch')
     output.mkdir(parents=True, mode=0o700)
     start = time.monotonic()
+    # Capture at launch: another worktree/window may update source files while
+    # a long build is running. End-of-build hashes would then misidentify it.
+    provenance = {p.name: digest(p) for p in
+        [Path(__file__).resolve(), *[Path(__file__).resolve().parents[1]/'tools'/name for name in
+            ('joint_cells.py', 'joint_polynomial.py', 'projection_factorization.py',
+             'sparse_projection.py', 'joint_projection_font.py', 'cff2_geometry.py', 'cff2_subroutines.py')]]}
     def progress(value):
         print(json.dumps({**value, 'seconds': time.monotonic()-start}), flush=True)
     with TTCollection(args.source, lazy=True) as collection:
@@ -88,10 +94,7 @@ def run(args):
             report['encoding'] = font.joint_encoding_evidence
         report.update(candidate_sha256=digest(output/'candidate.otf'),
             candidate_bytes=(output/'candidate.otf').stat().st_size, seconds=time.monotonic()-start,
-            code_sha256={p.name: digest(p) for p in
-                [Path(__file__).resolve(), *[Path(__file__).resolve().parents[1]/'tools'/name for name in
-                    ('joint_cells.py', 'joint_polynomial.py', 'projection_factorization.py',
-                     'sparse_projection.py', 'joint_projection_font.py', 'cff2_geometry.py', 'cff2_subroutines.py')]]})
+            code_sha256=provenance)
         require(digest(args.source) == args.source_sha256, 'source_changed_during_build')
         (output/'build.json').write_text(json.dumps(report, indent=2, allow_nan=False))
         progress(report)

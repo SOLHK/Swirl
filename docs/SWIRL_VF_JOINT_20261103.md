@@ -194,13 +194,17 @@ acceptance seed is separate from every training/refinement seed.
 
 For the 2,048-cell GID 1166 font, seed `2026110443` gives:
 
-| Engine | Positions | Maximum outline error | Failures |
+| Engine | Observations | Maximum outline error | Failures |
 | --- | ---: | ---: | ---: |
 | CoreText | 3,140 | 0.019208595256 | 0 |
 | HarfBuzz 14.6.0 | 3,140 | 0.018971427426 | 0 |
 | fontTools 4.61.1 | 269 | 0.012548240657 | 0 |
 
 The fontTools subset is selected before comparison and spans every category.
+The 3,140 requests contain 3,121 distinct user positions. Of the observations,
+3,065 lie off the common dyadic training grid, including all 2,048 independent
+random triples. The remaining boundary/contact checks are not relabelled as
+independent training-disjoint samples.
 CoreText/standard-table advances differ by at most 0.014308618 FUnit; HarfBuzz
 advances match original-source HarfBuzz exactly. HarfBuzz versus the unrounded
 source tables differs by up to 0.50184 FUnit, an explicitly retained diagnostic:

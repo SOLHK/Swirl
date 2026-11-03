@@ -57,6 +57,15 @@ class EncodedCell:
     def supports(self):
         return self.model().supports
 
+    @property
+    def operators(self):
+        return self.source.base_ops
+
+    def _program(self, vsindex, expression_pool=None):
+        model = self.model(); result = model._program(vsindex, expression_pool)
+        self.maximum_stack = model.evidence['maximum_operand_stack']
+        return result
+
     def charstring(self, vsindex):
         model = self.model(); result = model.charstring(vsindex)
         self.maximum_stack = model.evidence['maximum_operand_stack']
@@ -71,7 +80,9 @@ def run(args):
     g.require(1024 <= args.region_budget <= 65535, 'invalid_HOI_region_budget')
     output.mkdir(parents=True, mode=0o700); started = time.monotonic()
     provenance = {p.name: digest(p) for p in (Path(__file__).resolve(),
-        Path(__file__).resolve().parents[1]/'tools'/'joint_hoi.py')}
+        *[Path(__file__).resolve().parents[1]/'tools'/name for name in
+          ('joint_hoi.py', 'joint_polynomial.py', 'cff2_geometry.py',
+           'cff2_subroutines.py', 'cff2_expression_pool.py')])}
     input_hash = digest(args.candidate)
     with TTCollection(args.source, lazy=True) as collection, TTFont(args.candidate, lazy=True) as font:
         original = collection.fonts[args.face]
@@ -106,13 +117,15 @@ def run(args):
                       scope='polynomial_basis_reencoding', refitted_samples=0,
                       tensor_cells=sum(m.mode == 'tensor' for m in models),
                       axis_power_cells=sum(m.mode == 'axis' for m in models),
+                      share_expressions=args.share_expressions,
                       reserved_regions=len(reserved), production_accepted=False, code_sha256=provenance)
         print(json.dumps(report), flush=True)
-        candidate = g.install(font, mapping, release_programs=True)
+        candidate = g.install(font, mapping, release_programs=True, share_expressions=args.share_expressions)
         candidate.save(output/'candidate.otf')
         report.update(candidate_sha256=digest(output/'candidate.otf'),
             candidate_bytes=(output/'candidate.otf').stat().st_size,
             maximum_operand_stack=max(m.maximum_stack for m in models),
+            expression_pool=getattr(candidate, '_swirl_expression_pool_report', None),
             actual_regions=len(candidate['CFF2'].cff.topDictIndex[0].VarStore.otVarStore.VarRegionList.Region),
             seconds=time.monotonic()-started)
     g.require(digest(args.candidate) == input_hash and digest(args.source) == args.source_sha256,
@@ -129,4 +142,5 @@ if __name__ == '__main__':
     parser.add_argument('--gid', type=int, required=True)
     parser.add_argument('--face', type=int, default=0)
     parser.add_argument('--region-budget', type=int, default=64000)
+    parser.add_argument('--share-expressions', action='store_true')
     run(parser.parse_args())

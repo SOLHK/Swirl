@@ -81,6 +81,40 @@ class HOITests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'missing_HOI_axis_copies'):
             HOIPolynomialBox([[0, 1]]*3, ops, np.zeros((4, 4, 4, 10)), {})
 
+    def test_expression_sharing_preserves_both_power_encodings_exactly(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d)/'fixture.ttc'; make_fixture(path)
+            with TTCollection(path) as collection:
+                for encoding in ('hoi', 'hoi-axis'):
+                    ordinary, boxes = build_control(collection.fonts[0], encoding)
+                    pooled, _ = build_control(collection.fonts[0], encoding, share_expressions=True)
+                    a, b = io.BytesIO(), io.BytesIO(); ordinary.save(a); pooled.save(b)
+                    self.assertLess(len(b.getvalue()), len(a.getvalue()))
+                    with TTFont(io.BytesIO(a.getvalue())) as left, TTFont(io.BytesIO(b.getvalue())) as right:
+                        for point in np.random.default_rng(2026110444).uniform(-1, 1, (43, 3)):
+                            location = {tag: float(v) for group, v in zip(GROUPS, point) for tag in group}
+                            location.update({f'H{i:03d}': float(v) for i, v in enumerate(point[:2].repeat(2))})
+                            index = next(i for i, box in enumerate(boxes) if np.all(
+                                (point >= box.bounds[:, 0]) & (point <= box.bounds[:, 1])))
+                            outlines = [geometry.operands(geometry.source_commands(f.getGlyphSet(
+                                location=location, normalized=True)[f'box{index}'])) for f in (left, right)]
+                            np.testing.assert_array_equal(geometry.control_points(*outlines[0]),
+                                                          geometry.control_points(*outlines[1]))
+
+    def test_dense_axis_power_directions_keep_the_single_operation_byte_guard(self):
+        # Retain the failed stress-case boundary: a small stack does not imply
+        # that every drawing operator fits in a 65,535-byte CFF2 subroutine.
+        rng = np.random.default_rng(2026110442)
+        c = np.round(rng.normal(0, 2, (4, 4, 4, 8))*65536)/65536
+        factors = {f'H{i:03d}': c/(2**(i+1)) for i in range(8)}
+        m = HOIAxisPowerBox([[0, 1]]*3, (('rmoveto', 2), ('rrcurveto', 6)), c,
+                            {'sampled_geometry_passed': True}, TAGS+tuple(factors)+COPIES, factors, True)
+        program = m.charstring(0).program
+        from cff2_subroutines import encode, MAX_BYTES
+        begin = program.index('rmoveto')+1
+        self.assertGreater(len(encode(program[begin:], None, []).bytecode), MAX_BYTES)
+        self.assertLess(m.evidence['maximum_operand_stack'], 513)
+
 
 if __name__ == '__main__':
     unittest.main()

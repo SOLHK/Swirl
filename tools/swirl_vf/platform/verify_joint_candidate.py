@@ -187,6 +187,13 @@ def run(args):
             q = source_location(source, physical)
             requests.append(dict(id=str(i), text=args.text, coordinates={**physical, **hidden}))
             locations.append(q); categories.append(kind)
+        # Cell nodes have F2DOT14 boundaries and quarter-interval nodes;
+        # parameter training is dyadic through level 15. Their union lies on
+        # this grid. Reject roundoff-sized distances as evidence of separation.
+        disjoint = np.any(np.abs(np.asarray(locations)*65536-
+                                 np.round(np.asarray(locations)*65536)) > 1e-8, axis=1)
+        geometry.require(all(disjoint[i] for i, kind in enumerate(categories) if kind == 'triple'),
+                         'random_acceptance_overlaps_possible_training_grid')
         manifest = dict(font_path=str(candidate_path), font_sha256=digest(candidate_path),
             axis_defaults={a.axisTag: a.defaultValue for a in font['fvar'].axes},
             table_hashes={tag: hashlib.sha256(font.reader[tag]).hexdigest()
@@ -211,6 +218,9 @@ def run(args):
             candidate_sha256=manifest['font_sha256'], face=args.face, seed=args.seed,
             limit=geometry.LIMIT, scope='selected_source_glyph_native_shaping',
             training_samples_consumed=0, continuous_space_proof=False,
+            unique_user_positions=len({tuple(r['coordinates'][t] for t in TAGS) for r in requests}),
+            positions_certifiably_disjoint_from_training_grid=int(disjoint.sum()),
+            independent_random_triples=sum(kind == 'triple' for kind in categories),
             engines={}, failures=[], observations=len(requests), categories={},
             input_sampling='nearest stable decimal4 from fixed three-point stencil, before native execution',
             arbitrary_binary64_transport_certified=False,
