@@ -1,0 +1,28 @@
+name: SwirlVF portable Mac handoff controls
+on:
+  push:
+    branches: [work/swirlvf-mac-final-handoff-20261103]
+    paths: ['tools/swirl_vf/**', '.github/workflows/swirl-vf-mac-handoff.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  authored-portable-data:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025, ubuntu-latest, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fonttools==4.61.1 numpy==2.2.6 uharfbuzz==0.56.3
+      - name: Authored bundle relocation integrity and three-axis evaluation
+        run: python -m unittest discover -s tools/swirl_vf/tests -p 'test_handoff*.py' -v
+      - name: Retained portable HVF parser regressions
+        run: python -m unittest discover -s tools/swirl_vf/tests -p 'test_hvf*.py' -v
