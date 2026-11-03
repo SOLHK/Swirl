@@ -12,6 +12,7 @@ $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $repo=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
 . (Join-Path $repo 'scripts/WindowsUserIntegration.ps1')
+. (Join-Path $PSScriptRoot 'WindowsProcessCapture.ps1')
 $evidence=[IO.Path]::GetFullPath($EvidenceDirectory)
 [IO.Directory]::CreateDirectory($evidence)|Out-Null
 $setup=(Resolve-Path -LiteralPath $Installer).Path
@@ -122,17 +123,18 @@ $report=[ordered]@{schema=1;source_sha=$ExpectedSourceSha;installer_sha256=(Get-
 
 function Require([string]$Name,[bool]$Passed){$checks.Add([ordered]@{name=$Name;passed=$Passed});if(-not $Passed){throw ('Normal installer regression failed: '+$Name)}}
 function Run-Process([string]$Name,[string]$Executable,[string]$Arguments,[int]$Seconds,[int]$ExpectedExit=0) {
-    $entry=[ordered]@{name=$Name;expected_exit_code=$ExpectedExit;exit_code=$null;exited=$false;elapsed_ms=$null};$processes.Add($entry)
-    $process=$null;$timer=[Diagnostics.Stopwatch]::StartNew()
+    $entry=[ordered]@{name=$Name;expected_exit_code=$ExpectedExit;exit_code=$null;exited=$false;elapsed_ms=$null;created_handle_retained=$false;output_drains_completed=$false};$processes.Add($entry)
+    $capture=$null;$timer=[Diagnostics.Stopwatch]::StartNew()
     try {
-        $start=@{FilePath=$Executable;WorkingDirectory=$evidence;PassThru=$true;RedirectStandardOutput=(Join-Path $evidence ($Name+'.stdout.log'));RedirectStandardError=(Join-Path $evidence ($Name+'.stderr.log'))}
-        if($Arguments){$start.ArgumentList=$Arguments}
-        $process=Start-Process @start
-        $entry.exited=$process.WaitForExit($Seconds*1000)
+        $capture=Start-SwirlCapturedProcess -Executable $Executable -Arguments $Arguments -WorkingDirectory $evidence -StdoutPath (Join-Path $evidence ($Name+'.stdout.log')) -StderrPath (Join-Path $evidence ($Name+'.stderr.log'))
+        $entry.exited=Wait-SwirlCapturedProcess $capture ($Seconds*1000)
         if(-not $entry.exited){throw ('Actual process timed out: '+$Name)}
-        $entry.exit_code=$process.ExitCode
+        $entry.exit_code=$capture.ExitCode
         if($entry.exit_code -ne $ExpectedExit){throw ("Actual process $Name returned $($entry.exit_code); required $ExpectedExit")}
-    }finally{$timer.Stop();$entry.elapsed_ms=$timer.Elapsed.TotalMilliseconds;if($null -ne $process){if(-not $process.HasExited){$report.forced_termination=$true;$process.Kill();$null=$process.WaitForExit(5000)};$process.Dispose()}}
+    }finally {
+        $timer.Stop();$entry.elapsed_ms=$timer.Elapsed.TotalMilliseconds
+        if($null -ne $capture){try{Close-SwirlCapturedProcess $capture}finally{$entry.exited=$capture.Exited;$entry.exit_code=$capture.ExitCode;$entry.created_handle_retained=$capture.CreatedHandleRetained;$entry.output_drains_completed=$capture.OutputsComplete;if($capture.ForcedTermination){$report.forced_termination=$true}}}
+    }
 }
 function Assert-Payload([string[]]$Extra=@()) {
     $known=@('package-manifest.json','.swirl-install-owned','卸载 Swirl.exe')+$Extra
@@ -220,21 +222,22 @@ try {
         Run-Process 'production-ui-test-hooks-disabled' $exe '--policy-self-test' 30 4
         $report.ui_test_hooks_disabled=$true
         if([IO.File]::Exists($diagnostics)){[IO.File]::Delete($diagnostics)}
-        $normal=$null
-        $normalEntry=[ordered]@{name='normal-ui-no-arguments';expected_exit_code=0;exit_code=$null;exited=$false;close_requested=$false};$processes.Add($normalEntry)
+        $normal=$null;$normalCapture=$null
+        $normalEntry=[ordered]@{name='normal-ui-no-arguments';expected_exit_code=0;exit_code=$null;exited=$false;close_requested=$false;created_handle_retained=$false;output_drains_completed=$false};$processes.Add($normalEntry)
         try {
-            $normal=Start-Process -FilePath $exe -WorkingDirectory ([Environment]::GetFolderPath('UserProfile')) -PassThru -RedirectStandardOutput (Join-Path $evidence 'normal-ui.stdout.log') -RedirectStandardError (Join-Path $evidence 'normal-ui.stderr.log')
+            $normalCapture=Start-SwirlCapturedProcess -Executable $exe -Arguments '' -WorkingDirectory ([Environment]::GetFolderPath('UserProfile')) -StdoutPath (Join-Path $evidence 'normal-ui.stdout.log') -StderrPath (Join-Path $evidence 'normal-ui.stderr.log')
+            $normal=$normalCapture.Process
             $watch=[Diagnostics.Stopwatch]::StartNew()
             do {$normal.Refresh();if($normal.HasExited){throw 'Ordinary application exited before showing its main window.'};if($normal.MainWindowHandle -ne [IntPtr]::Zero -and $normal.MainWindowTitle -ceq 'Swirl'){break};Start-Sleep -Milliseconds 100}while($watch.Elapsed.TotalSeconds -lt 15)
             Require 'normal-ui-main-window-created-without-test-arguments' ($normal.MainWindowHandle -ne [IntPtr]::Zero -and $normal.MainWindowTitle -ceq 'Swirl')
             $report.normal_ui_no_test_arguments=$true
             $normalEntry.close_requested=$normal.CloseMainWindow()
             Require 'normal-ui-accepts-user-window-close' $normalEntry.close_requested
-            $normalEntry.exited=$normal.WaitForExit(15000)
+            $normalEntry.exited=Wait-SwirlCapturedProcess $normalCapture 15000
             if(-not $normalEntry.exited){throw 'Ordinary UI close did not complete.'}
-            $normalEntry.exit_code=$normal.ExitCode
+            $normalEntry.exit_code=$normalCapture.ExitCode
             Require 'normal-ui-exits-successfully' ($normalEntry.exit_code -eq 0)
-        }finally{if($null -ne $normal){if(-not $normal.HasExited){$report.forced_termination=$true;$normal.Kill();$null=$normal.WaitForExit(5000)};$normal.Dispose()}}
+        }finally{if($null -ne $normalCapture){try{Close-SwirlCapturedProcess $normalCapture}finally{$normalEntry.exited=$normalCapture.Exited;$normalEntry.exit_code=$normalCapture.ExitCode;$normalEntry.created_handle_retained=$normalCapture.CreatedHandleRetained;$normalEntry.output_drains_completed=$normalCapture.OutputsComplete;if($normalCapture.ForcedTermination){$report.forced_termination=$true}}}}
         # Normal application startup deliberately has no test-only diagnostic
         # handler/cache marker. Its actual HWND, WM_CLOSE and natural exit above
         # are evidence; the later smoke/cache report belongs to its own process.

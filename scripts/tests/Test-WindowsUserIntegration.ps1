@@ -34,6 +34,8 @@ if (-not $ExpectedUserSid) {
     $argsPath=Join-Path $evidence 'child-arguments.json'
     @{EvidenceDirectory=$evidence;ExpectedSourceSha=$source;LegacyInstallerSource=$legacy}|ConvertTo-Json|Set-Content -LiteralPath $argsPath -Encoding UTF8
     & (Join-Path $PSScriptRoot 'Invoke-DisposableWindowsUser.ps1') -Script $PSCommandPath -ArgumentsFile $argsPath -EvidenceDirectory $evidence -TimeoutSeconds 240
+    $capturePolicy=Get-Content -LiteralPath (Join-Path $evidence 'process-capture/process-capture-policy.json') -Raw -Encoding UTF8|ConvertFrom-Json
+    if($capturePolicy.schema -ne 1 -or -not $capturePolicy.success -or $capturePolicy.source_sha -cne $source -or -not $capturePolicy.actual_non_admin_token -or -not $capturePolicy.actual_x86_powershell -or $capturePolicy.forced_termination -or -not $capturePolicy.fixture_removed -or @($capturePolicy.processes).Count -ne 5 -or @($capturePolicy.processes|Where-Object {-not $_.passed}).Count){throw 'Actual x86 standard-user process capture evidence is incomplete.'}
     $result=Get-Content -LiteralPath (Join-Path $evidence 'integration-policy.json') -Raw -Encoding UTF8|ConvertFrom-Json
     if(-not $result.success -or $result.source_sha -cne $source -or -not $result.negative_control.required_assertion_failed){throw 'Integration policy or legacy negative-control evidence is incomplete.'}
     Write-Host 'Raw registry/shortcut ownership, upgrade, recovery and legacy negative control verified in actual x86 standard-user PowerShell.'
@@ -43,6 +45,7 @@ if (-not $ExpectedUserSid) {
 $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
 $principal=New-Object Security.Principal.WindowsPrincipal $identity
 if($identity.User.Value -cne $ExpectedUserSid -or $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) -or [Environment]::Is64BitProcess){throw 'Integration child must use the actual new standard-user x86 token.'}
+& (Join-Path $PSScriptRoot 'Test-WindowsProcessCapture.ps1') -EvidenceDirectory (Join-Path $evidence 'process-capture') -ExpectedUserSid $ExpectedUserSid -ExpectedSourceSha $ExpectedSourceSha
 $root=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) ('SwirlIntegrationPolicy-'+[guid]::NewGuid().ToString('N'))
 $null=Assert-SwirlIntegrationPath $root
 [IO.Directory]::CreateDirectory($root)|Out-Null
