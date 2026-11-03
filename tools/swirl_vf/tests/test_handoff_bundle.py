@@ -10,6 +10,9 @@ import unittest
 import numpy as np
 from fontTools.fontBuilder import FontBuilder
 from fontTools.ttLib import TTFont, TTCollection, newTable
+from fontTools.ttLib.tables import otTables
+from fontTools.varLib.varStore import OnlineVarStoreBuilder
+from fontTools.varLib.builder import buildVarIdxMap
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT/'tools'), str(ROOT/'platform')]
@@ -18,7 +21,7 @@ from export_mac_handoff import compare, font_integrity
 from make_synthetic_hvf import create
 
 
-def authored_bundle(root):
+def authored_bundle(root, *, noncanonical_avar=False):
     root.mkdir()
     seed = root/'seed.ttf'
     create(seed)
@@ -28,16 +31,27 @@ def authored_bundle(root):
     builder.setupVerticalHeader(ascent=800, descent=-200)
     vorg = newTable('VORG'); vorg.majorVersion = 1; vorg.minorVersion = 0
     vorg.defaultVertOriginY = 800; vorg.VOriginRecords = {}; font['VORG'] = vorg
+    if noncanonical_avar:
+        avar = newTable('avar')
+        avar.segments = {tag: {-1.: -1., 0.: .25 if tag == 'WDTH' else 0., 1.: 1.}
+                         for tag in ('WDTH', 'wght', 'HGHT')}
+        font['avar'] = avar
+        store = OnlineVarStoreBuilder(['WDTH', 'wght', 'HGHT'])
+        store.setSupports([{}, {'WDTH': (0., 1., 1.)}])
+        index = store.storeDeltas([100])
+        table = otTables.HVAR(); table.Version = 0x10000; table.VarStore = store.finish()
+        table.AdvWidthMap = buildVarIdxMap([index], ['.notdef']); table.LsbMap = table.RsbMap = None
+        font['HVAR'] = newTable('HVAR'); font['HVAR'].table = table
     collection = TTCollection(); collection.fonts = [font]
     source = root/'source.ttc'; collection.save(source); collection.close(); seed.unlink()
     write_json(root/'catalog.json', {'glyph_count': 1, 'faces': [{'source_index': 0, 'glyph_index': 'index.jsonl.gz'}]})
-    write_rows(root/'index.jsonl.gz', [{'gid': 0, 'name': '.notdef', 'unicode': []}])
     write_json(root/'package.json', {'schema': 1, 'source': {'path': source.name, 'sha256': digest(source)},
         'catalog': 'catalog.json', 'defaults': [{'path': 'default.jsonl.gz', 'start': 0, 'count': 1}]})
     reference = Reference(root)
     try: row = reference.evaluate(0, 0, [0., 0., 0.])
     finally: reference.close()
     write_rows(root/'default.jsonl.gz', [row])
+    write_rows(root/'index.jsonl.gz', [{'gid': 0, 'name': '.notdef', 'unicode': [], 'default_metrics': row['metrics']}])
     return row
 
 
@@ -80,6 +94,17 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(result['geometry_replayed'], 1)
         self.assertFalse(result['Apple_library_called'])
         self.assertEqual(result['CoreText'], 'NOT_RUN')
+
+    def test_default_metrics_use_design_zero_not_implicit_avar_default(self):
+        from validate_handoff_reference import replay
+        root = self.base/'noncanonical-avar'
+        authored_bundle(root, noncanonical_avar=True)
+        seal(root)
+        result = replay(root)
+        self.assertEqual(result['HB_constructor_locations']['0'], [.25, 0., 0.])
+        self.assertEqual(result['default_metric_fields'], 2)
+        self.assertEqual(result['default_metric_mismatches'], 0)
+        self.assertEqual(result['status'], 'PASS_FINITE_REFERENCE_REPLAY')
 
     def test_invalid_axis_or_gid_rejected(self):
         reference = Reference(self.root); self.addCleanup(reference.close)

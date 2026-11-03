@@ -32,6 +32,7 @@ def replay(root):
               'variation_metric_fields': 0, 'variation_raw_fields_above_1_32': 0,
               'max_variation_raw_advance_difference': 0., 'variation_integer_rounded_mismatches': 0,
               'max_HB_design_readback_difference': 0., 'failures': [],
+              'HB_constructor_locations': {}, 'default_metric_design_location': [0., 0., 0.],
               'CoreText': 'NOT_RUN', 'Apple_library_called': False, 'DirectWrite': 'NOT_RUN',
               'continuous_space_acceptance': False, 'private_font_Windows_execution': 'NOT_ESTABLISHED_BY_THIS_REPORT'}
     reference = Reference(root)
@@ -42,6 +43,13 @@ def replay(root):
             index = face['source_index']; font = reference.collection.fonts[index]
             engine = hb.Font(hb.Face(blob, index)); hb.ot_font_set_funcs(engine)
             engine.scale = (font['head'].unitsPerEm*64,)*2; engines[index] = engine
+            # Font construction normalizes user defaults through avar. The
+            # source's noncanonical Display map yields nonzero design wght in
+            # HarfBuzz. A design-zero baseline must explicitly request zero;
+            # otherwise two different physical locations are compared.
+            report['HB_constructor_locations'][str(index)] = engine.get_var_coords_normalized()
+            engine.set_var_coords_normalized([0., 0., 0.])
+            require(engine.get_var_coords_normalized() == [0., 0., 0.], 'HB_design_zero_not_applied')
             for row in read_rows(relative_file(root, face['glyph_index'])):
                 if 'default_metrics' not in row: continue  # authored format-only fixture
                 gid = row['gid']; expected = row['default_metrics']
