@@ -1,10 +1,10 @@
 # Three-axis branch investigation — 2026-11-03
 
-**Partial completion. Neither GID 1166 nor GID 19177 has an accepted joint
-OpenType reconstruction. The limit remains 1/32 FUnit.** This checkpoint
-implements simultaneous-axis branch extraction and mathematical failure
-witnesses, and tests alternative encodings. It does not fix the source fit to
-acceptance, install a failed model, or certify a complete font.
+**The two-target acceptance remains incomplete.** The original investigation
+below records failed models. The later factored reconstruction now passes a
+new 3,140-position native batch for GID 1166; GID 19177 still awaits serialized
+native verification. The limit remains 1/32 FUnit. These are single-glyph
+research fonts using standard shaping, not complete fonts or release artifacts.
 
 Work starts at PR #52's `b9d8cebf1de19acb31a3e54533419b9645c47e0d` in a separate
 worktree and `work/swirlvf-joint-acceptance-20261103`. PR #49 and #51 were read
@@ -170,3 +170,60 @@ The CFF2 packer also supports releasing decoded programs after encoding, to
 bound memory while assembling many polynomial regions. Its bytecode mode is
 checked through serialization and reload, including subroutine call bias.
 Both source GIDs remain **not finally accepted**; PR #53 remains Draft.
+
+## Continuation: reusable source-field compiler and independent acceptance
+
+`joint_cells` adaptively subdivides three-dimensional octants on the exact
+F2DOT14 grid. Tricubic field probes include source-derived internal-axis and
+Type-0 contacts. Type-2 projection clamps are handled separately: a sparse
+hierarchical tensor interpolates the unclamped rational parameter, and four
+simultaneous avar2 ramps implement each clipped scalar. The original three
+physical axes and their first-stage avar maps remain intact. The polynomial
+fields are selected through required GSUB FeatureVariations in ordinary
+CoreText/HarfBuzz shaping. Absolute control quantization preserves closure.
+
+The new builder rechecks imported fields against the current evaluator before
+admitting serialization; old acceptance flags are not sufficient. Sparse
+column storage removes only exact zeros. A separate verifier consumes no fit
+samples and compares reloaded fonts to Apple libhvf, including control points,
+topology, closed contours, winding, advances, actual run tables and exact axis
+readback. It covers every single/dual-axis combination, random triples,
+boundaries, analytic branch contacts, region seams and all previous dense-model
+holdouts. Boundary checks can coincide with training endpoints; the random
+acceptance seed is separate from every training/refinement seed.
+
+For the 2,048-cell GID 1166 font, seed `2026110443` gives:
+
+| Engine | Positions | Maximum outline error | Failures |
+| --- | ---: | ---: | ---: |
+| CoreText | 3,140 | 0.019208595256 | 0 |
+| HarfBuzz 14.6.0 | 3,140 | 0.018971427426 | 0 |
+| fontTools 4.61.1 | 269 | 0.012548240657 | 0 |
+
+The fontTools subset is selected before comparison and spans every category.
+CoreText/standard-table advances differ by at most 0.014308618 FUnit; HarfBuzz
+advances match original-source HarfBuzz exactly. HarfBuzz versus the unrounded
+source tables differs by up to 0.50184 FUnit, an explicitly retained diagnostic:
+the original engine already rounds HVAR advances. This is not reported as a
+1/32-accurate reproduction of ideal unrounded advances by HarfBuzz.
+
+The measured font is 166,353,412 bytes, with a maximum CFF2 operand stack of
+60 and 2,977 global subroutines. Eight computational axes are hidden but still
+exist in fvar and must remain at their defaults. Required shaping selects the
+local outline; direct access to the unselected base GID is outside this scope.
+The size is not acceptable evidence for full-font scalability. Public aggregate
+counts, hashes and limitations are in the [factored receipt](evidence/SWIRL_VF_FACTORED_20261103.json);
+fonts, coefficients, coordinates and raw records remain private.
+
+An outward-rounded interval pass certifies that no emitted Type-0 factor
+reaches 0 or 1 anywhere in either target's root cube (20/30 factors, zero
+unresolved boxes). This is a clamp-coverage certificate, not a bound on final
+font error. Independent new source-field checks for the 4,096-cell GID 19177
+model reach 0.010775925 FUnit over 4,096 held-out positions; serialization and
+native acceptance remain separate and pending at this checkpoint.
+
+The first full continuation run executed **1,005 tests: 998 pass, seven skips**,
+and all six parser audits pass. No remote CI result is inferred. The input
+sampler predeclares fractional decimal coordinates with stable native transport;
+the exact readback guard remains unchanged. Arbitrary binary64 transport and
+continuous-space error bounds have not been certified. PR #53 remains Draft.
