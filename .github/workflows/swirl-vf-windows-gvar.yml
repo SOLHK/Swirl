@@ -1,0 +1,103 @@
+name: SwirlVF Windows glyf gvar control
+on:
+  push:
+    branches: [work/swirlvf-windows-native-20261103]
+    paths: ['tools/swirl_vf/**', '.github/workflows/swirl-vf-windows-gvar.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  directwrite:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025, windows-11-vs2026-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - run: python -m pip install fonttools==4.61.1 numpy==2.2.6 uharfbuzz==0.56.3
+      - name: Test mixed-axis compiler and generate authored four-face TTC
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tools/swirl_vf/tests -p 'test_windows*.py' -v
+          if ($LASTEXITCODE -ne 0) { throw 'Compiler regressions failed' }
+          python tools/swirl_vf/platform/windows_gvar_control.py --output build/windows-gvar/control.ttc
+          if ($LASTEXITCODE -ne 0) { throw 'Authored font failed' }
+      - name: Actual DirectWrite loading axes outlines and rasterization
+        shell: pwsh
+        run: |
+          ./tools/swirl_vf/platform/run_directwrite_probe.ps1 -Font build/windows-gvar/control.ttc -OutputDirectory build/windows-gvar/native -AllGlyphs -Render -ExportOutlines
+          if ($LASTEXITCODE -ne 0) { throw 'DirectWrite failed' }
+          python tools/swirl_vf/platform/windows_gvar_control.py --native build/windows-gvar/native --output build/windows-gvar/geometry.json
+          if ($LASTEXITCODE -ne 0) { throw 'Independent joint geometry failed' }
+      - name: Verify Medium through native family matching
+        if: always()
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw 'MSVC unavailable' }
+          $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
+          cmd /c "`"$vcvars`" && cl /nologo /std:c++17 /EHsc /W4 tools\swirl_vf\platform\windows_named_instance_probe.cpp /Fe:build\windows-gvar\medium.exe /Fo:build\windows-gvar\medium.obj /link dwrite.lib"
+          if ($LASTEXITCODE -ne 0) { throw 'Medium probe compilation failed' }
+          & build/windows-gvar/medium.exe (Resolve-Path build/windows-gvar/control.ttc).Path > build/windows-gvar/medium.json
+          if ($LASTEXITCODE -ne 0) { throw 'Native Medium matching failed' }
+      - name: Independently observe requested gvar geometry and retain axis mismatches
+        if: always()
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw 'MSVC unavailable' }
+          $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
+          cmd /c "`"$vcvars`" && cl /nologo /std:c++17 /EHsc /W4 tools\swirl_vf\platform\windows_gvar_observer.cpp /Fe:build\windows-gvar\observe.exe /Fo:build\windows-gvar\observe.obj /link dwrite.lib gdi32.lib"
+          if ($LASTEXITCODE -ne 0) { throw 'Observer compilation failed' }
+          python tools/swirl_vf/platform/windows_gvar_control.py --binary build/windows-gvar/observe.exe --output build/windows-gvar/independent
+          if ($LASTEXITCODE -ne 0) { throw 'Requested geometry or private registration failed' }
+      - name: Retain uncompressed control measurements to isolate IUP
+        if: always()
+        shell: pwsh
+        run: |
+          python tools/swirl_vf/platform/windows_gvar_control.py --binary build/windows-gvar/observe.exe --no-iup --output build/windows-gvar/uncompressed
+          if ($LASTEXITCODE -ne 0) { throw 'Uncompressed research precision gate failed' }
+      - name: Execute offline delivery kit against authored data only
+        if: always()
+        shell: pwsh
+        run: |
+          $kitRoot = Join-Path $env:RUNNER_TEMP ('swirlvf-authored-kit-' + $env:GITHUB_RUN_ID)
+          New-Item -ItemType Directory -Path $kitRoot | Out-Null
+          Copy-Item build/windows-gvar/control.ttc (Join-Path $kitRoot 'SwirlVF.ttc')
+          @{ sha256 = (Get-FileHash (Join-Path $kitRoot 'SwirlVF.ttc') -Algorithm SHA256).Hash.ToLowerInvariant(); version = 'Authored CI control'; source_gids = @(0, 1) } | ConvertTo-Json | Set-Content (Join-Path $kitRoot 'report.json') -Encoding utf8
+          python tools/swirl_vf/platform/prepare_windows_candidate.py --candidate (Join-Path $kitRoot 'SwirlVF.ttc') --artifacts build/windows-gvar
+          if ($LASTEXITCODE -ne 0) { throw 'Offline kit preparation failed' }
+          & (Join-Path $kitRoot 'windows-test/Run-Windows-Test.ps1') -OutputDirectory build/windows-gvar/kit-result
+          if ($LASTEXITCODE -ne 0) { throw 'Offline native capture failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: authored-gvar-${{ matrix.os }}-${{ github.sha }}
+          path: |
+            build/windows-gvar/observe.exe
+            build/windows-gvar/medium.exe
+            build/windows-gvar/native/build/Release/directwrite_probe.exe
+            build/windows-gvar/geometry.json
+            build/windows-gvar/medium.json
+            build/windows-gvar/independent/*.json
+            build/windows-gvar/independent/*.jsonl
+            build/windows-gvar/independent/*.log
+            build/windows-gvar/uncompressed/*.json
+            build/windows-gvar/uncompressed/*.jsonl
+            build/windows-gvar/uncompressed/*.log
+            build/windows-gvar/native/*.json
+            build/windows-gvar/native/*.jsonl
+            build/windows-gvar/native/*.png
+            build/windows-gvar/native/*.log
+            build/windows-gvar/kit-result/**
+          retention-days: 7
