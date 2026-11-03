@@ -51,7 +51,12 @@ namespace SwirlDisposableUser {
     [DllImport("netapi32.dll",CharSet=CharSet.Unicode)] static extern uint NetUserGetInfo(string server,string name,uint level,out IntPtr buffer);
     [DllImport("netapi32.dll")] static extern uint NetApiBufferFree(IntPtr buffer);
     [DllImport("netapi32.dll",CharSet=CharSet.Unicode)] static extern uint NetLocalGroupAddMembers(string server,string group,uint level,ref Member member,uint count);
-    [DllImport("userenv.dll",CharSet=CharSet.Unicode,SetLastError=true)] public static extern bool DeleteProfileW(string sid,string profile,string computer);
+    [DllImport("userenv.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern bool DeleteProfileW(string sid,string profile,string computer);
+    public static int DeleteOwnedProfile(string sid) {
+      // PowerShell converts $null passed to a string parameter to "". The
+      // computer argument must be a native NULL on supported Windows versions.
+      return DeleteProfileW(sid,null,null) ? 0 : Marshal.GetLastWin32Error();
+    }
     [DllImport("userenv.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern bool GetUserProfileDirectoryW(IntPtr token,StringBuilder path,ref uint length);
     [DllImport("advapi32.dll",SetLastError=true)] static extern bool OpenProcessToken(IntPtr process,uint access,out IntPtr token);
     [DllImport("advapi32.dll",SetLastError=true)] static extern bool GetTokenInformation(IntPtr token,int type,IntPtr buffer,uint length,out uint returned);
@@ -157,7 +162,9 @@ namespace SwirlDisposableUser {
       public string Sid,IntegritySid,ProfilePath;public bool Administrator,Elevated,System;
     }
     static TokenEvidence Token(IntPtr process) {
-      IntPtr token;if(!OpenProcessToken(process,8,out token)) throw new Win32Exception(Marshal.GetLastWin32Error(),"OpenProcessToken");
+      // WindowsPrincipal.IsInRole duplicates a primary token for its native
+      // membership check, so TOKEN_DUPLICATE is required alongside TOKEN_QUERY.
+      IntPtr token;if(!OpenProcessToken(process,0x0008|0x0002,out token)) throw new Win32Exception(Marshal.GetLastWin32Error(),"OpenProcessToken");
       try {
         var result=new TokenEvidence();
         using(var identity=new WindowsIdentity(token)) {
@@ -231,7 +238,7 @@ $result=[ordered]@{schema=1;success=$false;scope='A real temporary local standar
     profile_loaded=$false;child_completed=$false;remaining_job_processes=$null;forced_termination=$false
     account_removed=$false;profile_removed=$false;desktop_access_removed=$false;window_station_access_removed=$false
     desktop_dacl_restored=$false;window_station_dacl_restored=$false
-    input_acls_restored=$false;fixture_removed=$false;error=$null;cleanup_errors=@()}
+    input_acls_restored=$false;input_acl_checks=@();fixture_removed=$false;error=$null;cleanup_errors=@()}
 function Add-FixtureAccessPlan([string]$Path,[Security.AccessControl.FileSystemRights]$Rights,[bool]$Inherit) {
     $acl=Get-Acl -LiteralPath $Path
     $before=$acl.GetSecurityDescriptorSddlForm([Security.AccessControl.AccessControlSections]::Access)
@@ -315,7 +322,7 @@ if(-not $receipt.success){exit 1}
     $receipt=Get-Content -LiteralPath $childReceipt -Raw|ConvertFrom-Json
     if(-not $receipt.success -or $receipt.sid -cne $userSid -or $receipt.is_admin -or $receipt.is_64_bit_process){throw 'The actual child identity/result is invalid.'}
     $result.success=$true
-} catch {$result.error=$_.Exception.Message}
+} catch {$result.error=$_.Exception.Message;$result['error_detail']=$_.Exception.ToString()}
 finally {
     if($null -ne $child){
         try {if($child.ActiveProcesses -gt 0){$child.KillOwned();$result.forced_termination=$true;$result.success=$false;[void]$child.Wait(5000)}}
@@ -333,13 +340,19 @@ finally {
             $acl.PurgeAccessRules([Security.Principal.SecurityIdentifier]$userSid)
             Set-Acl -LiteralPath $grant.path -AclObject $acl
         }
+        $aclChecks=New-Object 'System.Collections.Generic.List[object]'
         foreach($grant in $fileGrants){
             if(-not (Test-Path -LiteralPath $grant.path)){continue}
             $restored=Get-Acl -LiteralPath $grant.path
-            if(@($restored.Access|Where-Object {$_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -ceq $userSid}).Count){throw 'Disposable SID remains in input/evidence ACL.'}
-            if($restored.GetSecurityDescriptorSddlForm([Security.AccessControl.AccessControlSections]::Access) -cne $grant.before){$allFileAclsRestored=$false}
+            $ownSidAbsent=@($restored.Access|Where-Object {$_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -ceq $userSid}).Count -eq 0
+            $after=$restored.GetSecurityDescriptorSddlForm([Security.AccessControl.AccessControlSections]::Access)
+            $aclChecks.Add([ordered]@{path=$grant.path;before=$grant.before;after=$after;own_sid_absent=$ownSidAbsent;restored=($after -ceq $grant.before)})
+            $result.input_acl_checks=@($aclChecks.ToArray())
+            if(-not $ownSidAbsent){throw 'Disposable SID remains in input/evidence ACL.'}
+            if($after -cne $grant.before){$allFileAclsRestored=$false}
         }
         $result.input_acls_restored=$allFileAclsRestored
+        if(-not $allFileAclsRestored){$cleanupErrors.Add('file-acl: an input DACL differs from its original state; see input_acl_checks.')}
     }catch{$cleanupErrors.Add('file-acl: '+$_.Exception.Message)}
     if($created -and $userSid){
         try {
@@ -350,8 +363,9 @@ finally {
                 if($profilePath -ieq [Environment]::GetFolderPath('UserProfile') -or [IO.Path]::GetFileName($profilePath) -notlike ($userName+'*')){throw 'Refusing a profile outside the newly created account.'}
                 $profileWatch=[Diagnostics.Stopwatch]::StartNew();$deleted=$false;$lastProfileError=0
                 do {
-                    $deleted=[SwirlDisposableUser.Native]::DeleteProfileW($userSid,$null,$null)
-                    if(-not $deleted){$lastProfileError=[Runtime.InteropServices.Marshal]::GetLastWin32Error();Start-Sleep -Milliseconds 200}
+                    $lastProfileError=[SwirlDisposableUser.Native]::DeleteOwnedProfile($userSid)
+                    $deleted=$lastProfileError -eq 0
+                    if(-not $deleted){Start-Sleep -Milliseconds 200}
                 }while(-not $deleted -and $profileWatch.Elapsed.TotalSeconds -lt 30)
                 if(-not $deleted -or (Test-Path -LiteralPath $profileKey) -or (Test-Path -LiteralPath $profilePath)){throw "Disposable profile cleanup failed (Win32 $lastProfileError)."}
             }
