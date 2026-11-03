@@ -72,6 +72,15 @@ class HandoffTests(unittest.TestCase):
             expected[:, 1] = expected[:, 1]*(1+q[2]/4)+q[1]*20
             np.testing.assert_array_equal(result, expected)
 
+    def test_offline_replay_runs_without_apple_engine(self):
+        from validate_handoff_reference import replay
+        seal(self.root)
+        result = replay(self.root)
+        self.assertEqual(result['status'], 'PASS_FINITE_REFERENCE_REPLAY')
+        self.assertEqual(result['geometry_replayed'], 1)
+        self.assertFalse(result['Apple_library_called'])
+        self.assertEqual(result['CoreText'], 'NOT_RUN')
+
     def test_invalid_axis_or_gid_rejected(self):
         reference = Reference(self.root); self.addCleanup(reference.close)
         for q in ([1.01, 0, 0], [float('nan'), 0, 0], [0, 0], [True, 0, 0]):

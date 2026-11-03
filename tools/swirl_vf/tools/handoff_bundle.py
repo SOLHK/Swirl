@@ -67,12 +67,13 @@ def read_rows(path):
 
 def relative_file(root, name):
     """Use the same path policy on Windows and POSIX, without archive extraction."""
+    root = Path(root).resolve(strict=True)  # e.g. macOS /var -> /private/var
     require(type(name) is str and name and '\\' not in name and ':' not in name,
             'invalid_relative_path')
     path = PurePosixPath(name)
     require(not path.is_absolute() and str(path) == name
             and all(part not in ('', '.', '..') for part in path.parts), 'unsafe_relative_path')
-    target = Path(root).joinpath(*path.parts)
+    target = root.joinpath(*path.parts)
     require(not any(part.is_symlink() for part in (target, *target.parents)), 'symlink_not_allowed')
     require(target.resolve().is_relative_to(Path(root).resolve()), 'path_outside_bundle')
     return target
