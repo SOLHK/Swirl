@@ -1,0 +1,471 @@
+{
+  "status": "PASS_SAMPLED_NATIVE_TARGETS",
+  "limit_source_font_units": 0.03125,
+  "production_release_accepted": false,
+  "full_font_coverage": false,
+  "continuous_space_proof": false,
+  "kernel_commit": "453b9df7e52073b0f2600c38f7a2c9b4e91bc31c",
+  "compiler_commit": "658f70b12536c16b08c66c7d65aacaca7e371c35",
+  "preserved_HOI_checkpoint": "47944e78c53b4b06747a5719650a787326bd5845",
+  "environment": {
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "python": "3.12.16",
+    "fontTools": "4.61.1",
+    "harfbuzz": "14.6.0"
+  },
+  "targets": {
+    "1166": {
+      "identity": {
+        "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "face_index": 0,
+        "glyph_id": 1166
+      },
+      "seed": 2026110503,
+      "observations": 6442,
+      "independence": {
+        "proven": true,
+        "observations": 6442,
+        "unique_positions": 5820,
+        "overlapping_observations": 102,
+        "unique_independent_positions": 5745,
+        "duplicate_observations": 622,
+        "conservative_F2_grid_exclusion": true,
+        "legacy_conservative_grid_exclusion": false,
+        "engines": {
+          "CoreText": {
+            "independent_observations": 5745,
+            "independent_max_error": 0.01946940354263893
+          },
+          "HarfBuzz": {
+            "independent_observations": 5745,
+            "independent_max_error": 0.017497873539812154
+          },
+          "fontTools": {
+            "independent_observations": 225,
+            "independent_max_error": 0.014519234519652088
+          }
+        },
+        "archive_identities_verified": true,
+        "atlas_sha256": "fc3ab1e478a301d74874b7a5caea04b57b490a9ab113f47cec859e050abc3b1d",
+        "parameter_archive_sha256": "f80cd356e5f6314125a5b7074b442c740237322baccc25c10e19ddee9e294553",
+        "original_observations_sha256": "8b4df900793816bfb78cd29234e4c0c9ad305e16a0e93cb339f0c1b9f7122bf3",
+        "fresh_triples_independent": 4096
+      },
+      "categories": {
+        "boundary_grid": 125,
+        "single": 192,
+        "dual": 192,
+        "triple_random": 4096,
+        "branch_axis_zero": 33,
+        "branch_tangent_lower": 12,
+        "branch_tangent_upper": 15,
+        "branch_wide_tangent_upper": 10,
+        "branch_wide_axis_zero": 602,
+        "branch_wide_tangent_lower": 8,
+        "patch_seam": 640,
+        "retained_failure_regression": 517
+      },
+      "engines": {
+        "CoreText": {
+          "observations": 6442,
+          "independent_observations": 5745,
+          "max_error": 0.01946940354263893,
+          "independent_max_error": 0.01946940354263893,
+          "failures": 0,
+          "topology_failures": 0,
+          "direction_failures": 0,
+          "closure_failures": 0,
+          "selection_failures": 0,
+          "max_explicit_closure_gap": 0.00149917117207836,
+          "max_advance_error": 0.019760000000019318,
+          "advance_failures": 0
+        },
+        "HarfBuzz": {
+          "observations": 6442,
+          "independent_observations": 5745,
+          "max_error": 0.017497873539812154,
+          "independent_max_error": 0.017497873539812154,
+          "failures": 0,
+          "topology_failures": 0,
+          "direction_failures": 0,
+          "closure_failures": 0,
+          "selection_failures": 0,
+          "max_explicit_closure_gap": 0.0016029900782678034,
+          "max_advance_error": 0.0,
+          "advance_failures": 0
+        },
+        "fontTools": {
+          "observations": 256,
+          "independent_observations": 225,
+          "max_error": 0.014519234519652088,
+          "independent_max_error": 0.014519234519652088,
+          "failures": 0,
+          "topology_failures": 0,
+          "direction_failures": 0,
+          "closure_failures": 0,
+          "selection_failures": 0,
+          "max_explicit_closure_gap": 0.0011649519559495162,
+          "max_advance_error": 0.006102752379774756,
+          "advance_failures": 0
+        }
+      },
+      "candidate_sha256": "5d6be881baef4ab427f091f98adb8809a66c59e32ec53c7725d631985318a84c",
+      "font_bytes": 58178796,
+      "source_oracle_sha256": "072be56bf05f71227cae79e696f0e91791d9f3c21787719eb161d19f3206d3b9",
+      "coretext_oracle_sha256": "c37533b4d8f6359f7aa461e69620cc2b12985b19ed1e3f3ee52446136d5efe86",
+      "artifact_hashes": {
+        "plan.json": "5b4e02ee35dff9610dd51f188525ab6139530958d976347136529173d0520863",
+        "manifest.json": "a76f9292ac4a24f76f1c10e83f2b70fc4b212b2bf5fab87b692196d6de6ceff9",
+        "native.jsonl": "3c30c9f800681980e128fc1a5ec704f69f56ad1d1a9c1265300b2740747c3d92",
+        "hvf-native.jsonl": "821a4ece7982bc899f2359e82deea74ff2ce34885dc2cd507cb78b1a405e720f",
+        "observations.jsonl": "8b4df900793816bfb78cd29234e4c0c9ad305e16a0e93cb339f0c1b9f7122bf3"
+      },
+      "build": {
+        "identity": {
+          "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+          "face_index": 0,
+          "glyph_id": 1166
+        },
+        "command": "build",
+        "production_accepted": false,
+        "scope": "selected_source_glyph_research_probe",
+        "source_gid": 1166,
+        "physical_axes": [
+          "WDTH",
+          "wght",
+          "HGHT"
+        ],
+        "computational_axes": 8,
+        "patch_glyphs": 2048,
+        "avar2_regions": 14442,
+        "raw_parameter_regions": 815105,
+        "certified_constant_ramps": 12607,
+        "maximum_active_ramps": 6,
+        "minimum_active_ramps": 0,
+        "clamp_certificate_padding": 0.0001220703125,
+        "serialized_native_verification": "PASS_SEPARATE_NATIVE_ACCEPTANCE",
+        "expression_pool": {
+          "shared_expressions": 32768,
+          "drawing_chunks": 12,
+          "maximum_added_subroutine_depth": 2,
+          "encoded_program_bytes": 56412582,
+          "maximum_main_bytes": 65180,
+          "maximum_subroutine_bytes": 65336,
+          "maximum_interpreter_operations": 119001,
+          "harfbuzz_14_6_operation_limit": 200000,
+          "glyphs_reaching_operation_limit": 0
+        },
+        "font_bytes": 58178796,
+        "seconds": 140.81309745799808,
+        "stage_passed": true
+      },
+      "selection": {
+        "observations": 6442,
+        "HarfBuzz_condition_mismatches": 0,
+        "CoreText_selection_differs_from_HarfBuzz": 43,
+        "CoreText_condition_mismatches_after_measuring_effective_coordinates": 0,
+        "max_effective_physical_coordinate_change": 9.659999999996672e-05,
+        "production_accepted": false,
+        "candidate_sha256": "5d6be881baef4ab427f091f98adb8809a66c59e32ec53c7725d631985318a84c",
+        "fvar_and_avar_byte_identical": true,
+        "native_transcript_sha256": "aae345b4caa01051b3d55532c54e364f3a8b316ae061dfe32c9c49a26aae23ca",
+        "passed": true
+      },
+      "shared_interface_native": {
+        "scope": "native_shared_normalized_coordinate_patch_continuity",
+        "limit": 0.03125,
+        "seed": 2026110511,
+        "pairs": 512,
+        "candidate_sha256": "5d6be881baef4ab427f091f98adb8809a66c59e32ec53c7725d631985318a84c",
+        "engines": {
+          "HarfBuzz": {
+            "observations": 512,
+            "failures": 0,
+            "max_jump": 0.015518190352028102
+          },
+          "fontTools": {
+            "observations": 512,
+            "failures": 0,
+            "max_jump": 0.015515598423969778
+          }
+        },
+        "passed": true,
+        "observations_sha256": "3f3602645e441e389da12dc60c74fe22cc0689923b84bde9a76c40cab88fee97"
+      },
+      "physical_seam_source": {
+        "observations": 6442,
+        "HarfBuzz_condition_mismatches": 0,
+        "CoreText_selection_differs_from_HarfBuzz": 43,
+        "seams": 120,
+        "adjacent_patch_comparisons": 122,
+        "max_serialized_patch_join_gap": 0.014206478837818825,
+        "max_nonselected_patch_source_error": 0.016685674318938415,
+        "nonselected_patch_failures": 0,
+        "production_accepted": false
+      },
+      "retained_failed_native_model": {
+        "observations": 6514,
+        "HarfBuzz_topology_failures": 32,
+        "same_physical_requests_repeated": 32,
+        "all_failed_requests_recovered": true
+      },
+      "fractional_user_observations": 6367,
+      "strict_independent_native_passed": true
+    },
+    "19177": {
+      "identity": {
+        "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "face_index": 0,
+        "glyph_id": 19177
+      },
+      "seed": 2026110507,
+      "observations": 7433,
+      "independence": {
+        "proven": true,
+        "observations": 7433,
+        "unique_positions": 6085,
+        "overlapping_observations": 103,
+        "unique_independent_positions": 6009,
+        "duplicate_observations": 1348,
+        "conservative_F2_grid_exclusion": true,
+        "legacy_conservative_grid_exclusion": false,
+        "engines": {
+          "CoreText": {
+            "independent_observations": 6009,
+            "independent_max_error": 0.017883106686418765
+          },
+          "HarfBuzz": {
+            "independent_observations": 6009,
+            "independent_max_error": 0.017048651459863395
+          },
+          "fontTools": {
+            "independent_observations": 204,
+            "independent_max_error": 0.00978507852011944
+          }
+        },
+        "archive_identities_verified": true,
+        "atlas_sha256": "2ad7e83e21283a42cc96e81bad42b0a3d625e1a05b24af4bcd18fa448cbcd86d",
+        "parameter_archive_sha256": "257580a3ac22474779350a01545ea175147f7b602ea101b559138aff1ba9cf37",
+        "original_observations_sha256": "e984f3bc642f65696306957ae03feba72d1ae254f42df9ac6843a4bee69876fe",
+        "fresh_triples_independent": 4096
+      },
+      "categories": {
+        "boundary_grid": 125,
+        "single": 192,
+        "dual": 192,
+        "triple_random": 4096,
+        "branch_axis_zero": 41,
+        "branch_tangent_lower": 15,
+        "branch_tangent_upper": 18,
+        "branch_wide_axis_zero": 1374,
+        "branch_wide_tangent_lower": 10,
+        "branch_wide_tangent_upper": 12,
+        "patch_seam": 640,
+        "retained_failure_regression": 718
+      },
+      "engines": {
+        "CoreText": {
+          "observations": 7433,
+          "independent_observations": 6009,
+          "max_error": 0.017883106686418765,
+          "independent_max_error": 0.017883106686418765,
+          "failures": 0,
+          "topology_failures": 0,
+          "direction_failures": 0,
+          "closure_failures": 0,
+          "selection_failures": 0,
+          "max_explicit_closure_gap": 0.0008738904457566134,
+          "max_advance_error": 0.009147552918307156,
+          "advance_failures": 0
+        },
+        "HarfBuzz": {
+          "observations": 7433,
+          "independent_observations": 6009,
+          "max_error": 0.017048651459863395,
+          "independent_max_error": 0.017048651459863395,
+          "failures": 0,
+          "topology_failures": 0,
+          "direction_failures": 0,
+          "closure_failures": 0,
+          "selection_failures": 0,
+          "max_explicit_closure_gap": 0.0011516090249092533,
+          "max_advance_error": 0.0,
+          "advance_failures": 0
+        },
+        "fontTools": {
+          "observations": 256,
+          "independent_observations": 204,
+          "max_error": 0.01391235916129798,
+          "independent_max_error": 0.00978507852011944,
+          "failures": 0,
+          "topology_failures": 0,
+          "direction_failures": 0,
+          "closure_failures": 0,
+          "selection_failures": 0,
+          "max_explicit_closure_gap": 0.00044969320152192857,
+          "max_advance_error": 0.006069218750099026,
+          "advance_failures": 0
+        }
+      },
+      "candidate_sha256": "b60798d03d1cfe0b39b5a5e8be376c4351fdea693341a3d9f1a9fc7e5602a89f",
+      "font_bytes": 196056396,
+      "source_oracle_sha256": "072be56bf05f71227cae79e696f0e91791d9f3c21787719eb161d19f3206d3b9",
+      "coretext_oracle_sha256": "c37533b4d8f6359f7aa461e69620cc2b12985b19ed1e3f3ee52446136d5efe86",
+      "artifact_hashes": {
+        "plan.json": "e4e3798d3bd1be5d291eaad5c64f56109c6fe34c4fa01eaa9e4d2e9e3ea596d5",
+        "manifest.json": "3eedc558ccd549ebeba36bfc599c2a0762601e943e42bae6c303332e2c48c4bb",
+        "native.jsonl": "b97a5dc95e510a28fcf59432a789ecbc301db5113d5ac2188681c0e1fb90567b",
+        "hvf-native.jsonl": "4a1868d271b6c707aadb61597959253aa57ef18cef138237e953fdd64d33d2a0",
+        "observations.jsonl": "e984f3bc642f65696306957ae03feba72d1ae254f42df9ac6843a4bee69876fe"
+      },
+      "build": {
+        "identity": {
+          "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+          "face_index": 0,
+          "glyph_id": 19177
+        },
+        "command": "build",
+        "production_accepted": false,
+        "scope": "selected_source_glyph_research_probe",
+        "source_gid": 19177,
+        "physical_axes": [
+          "WDTH",
+          "wght",
+          "HGHT"
+        ],
+        "computational_axes": 16,
+        "patch_glyphs": 4096,
+        "avar2_regions": 4062,
+        "raw_parameter_regions": 815105,
+        "certified_constant_ramps": 51752,
+        "maximum_active_ramps": 7,
+        "minimum_active_ramps": 0,
+        "clamp_certificate_padding": 0.0001220703125,
+        "serialized_native_verification": "PASS_SEPARATE_NATIVE_ACCEPTANCE",
+        "expression_pool": {
+          "shared_expressions": 32768,
+          "drawing_chunks": 1130,
+          "maximum_added_subroutine_depth": 2,
+          "encoded_program_bytes": 194883754,
+          "maximum_main_bytes": 65507,
+          "maximum_subroutine_bytes": 65534,
+          "maximum_interpreter_operations": 117122,
+          "harfbuzz_14_6_operation_limit": 200000,
+          "glyphs_reaching_operation_limit": 0
+        },
+        "font_bytes": 196056396,
+        "seconds": 430.3873399160075,
+        "stage_passed": true
+      },
+      "selection": {
+        "observations": 7433,
+        "HarfBuzz_condition_mismatches": 0,
+        "CoreText_selection_differs_from_HarfBuzz": 5,
+        "CoreText_condition_mismatches_after_measuring_effective_coordinates": 0,
+        "max_effective_physical_coordinate_change": 4.503348214301983e-05,
+        "production_accepted": false,
+        "candidate_sha256": "b60798d03d1cfe0b39b5a5e8be376c4351fdea693341a3d9f1a9fc7e5602a89f",
+        "fvar_and_avar_byte_identical": true,
+        "native_transcript_sha256": "a318843117a2f918e3f49c97601b4942418efe9dea92549166c9d540528e5478",
+        "passed": true
+      },
+      "shared_interface_native": {
+        "scope": "native_shared_normalized_coordinate_patch_continuity",
+        "limit": 0.03125,
+        "seed": 2026110511,
+        "pairs": 512,
+        "candidate_sha256": "b60798d03d1cfe0b39b5a5e8be376c4351fdea693341a3d9f1a9fc7e5602a89f",
+        "engines": {
+          "HarfBuzz": {
+            "observations": 512,
+            "failures": 0,
+            "max_jump": 0.009307911356807148
+          },
+          "fontTools": {
+            "observations": 512,
+            "failures": 0,
+            "max_jump": 0.009309466770622455
+          }
+        },
+        "passed": true,
+        "observations_sha256": "ffb108a29d557b246a3ef08ae5519fd7ae0294f46d71fa8f32cf2cb5c54b3b03"
+      },
+      "physical_seam_source": {
+        "observations": 7433,
+        "HarfBuzz_condition_mismatches": 0,
+        "CoreText_selection_differs_from_HarfBuzz": 5,
+        "seams": 117,
+        "adjacent_patch_comparisons": 117,
+        "max_serialized_patch_join_gap": 0.009474820940681639,
+        "max_nonselected_patch_source_error": 0.01005594802616216,
+        "nonselected_patch_failures": 0,
+        "production_accepted": false
+      },
+      "retained_failed_native_model": {
+        "observations": 6949,
+        "HarfBuzz_topology_failures": 247,
+        "same_physical_requests_repeated": 247,
+        "all_failed_requests_recovered": true
+      },
+      "fractional_user_observations": 7358,
+      "strict_independent_native_passed": true
+    }
+  },
+  "authored_control": {
+    "scope": "authored_clamp_polynomial_control_only",
+    "production_accepted": false,
+    "share_expressions": true,
+    "font_bytes": 5976,
+    "expression_pool": {
+      "shared_expressions": 20,
+      "drawing_chunks": 0,
+      "maximum_added_subroutine_depth": 1,
+      "encoded_program_bytes": 1732,
+      "maximum_main_bytes": 62,
+      "maximum_subroutine_bytes": 97,
+      "maximum_interpreter_operations": 963,
+      "harfbuzz_14_6_operation_limit": 200000,
+      "glyphs_reaching_operation_limit": 0
+    },
+    "engines": {
+      "CoreText": {
+        "failures": 0,
+        "max_error": 0.004202047236605299,
+        "observations": 155,
+        "selection_failures": 0
+      },
+      "HarfBuzz": {
+        "failures": 0,
+        "max_error": 0.0028635350746751033,
+        "observations": 155,
+        "selection_failures": 0
+      },
+      "fontTools": {
+        "failures": 0,
+        "max_error": 0.003309031055726687,
+        "observations": 155,
+        "selection_failures": 0
+      }
+    }
+  },
+  "regression": {
+    "total": 1030,
+    "passed": 1023,
+    "skipped": 7,
+    "failures": 0,
+    "errors": 0,
+    "log_sha256": "e5fd582b744c1e64fd13bd3f8a8fb750d469bea449317431d46a36cafa7c82ee",
+    "parser_audits_passed": 6,
+    "parser_audit_log_sha256": "dcd2147edfda2291b456dfb6d9f3021f0fed07760d5a1c8869fc5446f30e28fe"
+  },
+  "scope_limits": [
+    "Face 0 and source GIDs 1166/19177 only; no full-font conversion or release.",
+    "Independent samples and interface tests are not a continuous-space error bound.",
+    "Hidden computational axes remain at their defaults; native shaping must select a local patch.",
+    "Candidate fonts remain large; complete-font glyph/axis/region capacity and memory scalability are unproven.",
+    "Original-source CoreText face identity is unavailable on this host; the native source oracle is Apple libhvf.",
+    "Arbitrary binary64 user-axis transport is not certified; requests are predeclared stable fractional values.",
+    "HarfBuzz advance agreement is against the original-source HarfBuzz engine; ideal unrounded HVAR accuracy is a separate known limitation."
+  ],
+  "private_data_policy": "Aggregate measurements and hashes only. No source fonts, extracted contours, fit coefficients, physical sample coordinates, native transcripts or private failure records are included."
+}
