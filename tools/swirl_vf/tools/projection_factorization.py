@@ -79,19 +79,32 @@ def parameter_entries(table, batch):
 
 def factor_geometry(table, batch):
     paths = [path.copy() for path in batch.paths]
-    factors, parameters, identities = [], [], []
-    for pi,k,t,identity in parameter_entries(table,batch):
+    entries=list(parameter_entries(table,batch))
+    offsets=np.cumsum([0]+[1+3*(p.shape[1]//2) for p in paths])
+    parameters,identities,directions=[],[],[]
+    for pi,k,t,identity in entries:
         path=paths[pi];count=path.shape[1]//2
         world_a = path[:, 2*((k-1) % count)+1]
         world_b = path[:, 2*k+1]
         path[:, 2*k] = world_a
-        delta = [np.zeros_like(p) for p in paths]
-        delta[pi][:, 2*k] = world_b-world_a
-        factors.append(delta)
+        directions.append(world_b-world_a)
         parameters.append(t)
         identities.append(identity)
     operators, baseline = relative_cubics(paths)
-    values = np.stack([baseline] + [relative_cubics(p)[1] for p in factors], axis=1)
+    values=np.zeros((batch.sample_count,1+len(entries),baseline.shape[1]))
+    values[:,0]=baseline
+    # One changed on-curve point affects only its two elevated controls, the
+    # preceding endpoint, and possibly the contour's initial move. Form those
+    # absolute fields, then subtract adjacent values in the ORIGINAL order.
+    # Do not replace delta-delta/3 by 2*delta/3: their float64 rounding differs.
+    for field,((pi,k,_,_),delta) in enumerate(zip(entries,directions),1):
+        start=int(offsets[pi]);count=paths[pi].shape[1]//2;previous=(k-1)%count
+        third=delta/3
+        absolute={start+1+3*k:third,start+2+3*previous:third,start+3+3*previous:delta}
+        if k==0:absolute[start]=delta
+        zero=np.zeros_like(delta)
+        for index in sorted(set(absolute)|{i+1 for i in absolute if i+1<offsets[-1]}):
+            values[:,field,2*index:2*index+2]=absolute.get(index,zero)-absolute.get(index-1,zero)
     t = np.asarray(parameters).T if parameters else np.empty((batch.sample_count, 0))
     return ProjectionFactors(operators, values, t, tuple(identities))
 

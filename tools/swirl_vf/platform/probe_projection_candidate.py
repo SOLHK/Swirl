@@ -197,6 +197,9 @@ def run(args):
                          'parameter_source_identity_mismatch')
     with TTCollection(args.source, lazy=True) as collection, TTFont(args.candidate) as font, ExitStack() as cleanup:
         source = collection.fonts[args.face]
+        flat=getattr(args,'flat_candidate',False)
+        geometry.require(not flat or ('GSUB' not in font and len(font.getGlyphOrder())==3
+                         and len(font['fvar'].axes)==3),'invalid_flat_candidate_structure')
         geometry.require(font['head'].unitsPerEm == source['head'].unitsPerEm,
                          'source_font_unit_scale_changed')
         geometry.require(tuple(a.axisTag for a in font['fvar'].axes[:3]) == TAGS, 'physical_axes_changed')
@@ -248,6 +251,7 @@ def run(args):
         from audit_joint_axis_contract import compare_fonts
         report = dict(identity=identity, limit=geometry.LIMIT, independence=separation,
             acceptance_scope='joint_post_avar_q_geometry_and_reported_metrics',
+            selection_mode='direct_base_GID' if flat else 'GSUB_patch',
             axis_mapping_contract=compare_fonts(source,font),
             observations=len(requests), categories=dict(Counter(p['kind'] for p in plan)),
             engines={}, source_HarfBuzz_advance_max_error=0., production_accepted=False,
@@ -279,8 +283,11 @@ def run(args):
                 actuals = {'CoreText': (ct['glyphs'][0]['gid'], ct['glyphs'][0]['commands'], ct['glyphs'][0]['advance_width']),
                            'HarfBuzz': (selected, hb_commands(target, selected), buffer.glyph_positions[0].x_advance/64)}
                 if i in ft_indices:
-                    glyph = font.getGlyphSet(location=loc)[font.getGlyphOrder()[selected]]
-                    actuals['fontTools'] = (selected, geometry.source_commands(glyph), glyph.width)
+                    from joint_gsub_selection import select_glyph
+                    normalized=font.normalizeLocation(loc)
+                    ft_selected=select_glyph(font,normalized)
+                    glyph=font.getGlyphSet(location=normalized,normalized=True)[font.getGlyphOrder()[ft_selected]]
+                    actuals['fontTools']=(ft_selected,geometry.source_commands(glyph),glyph.width)
                 exact_width = metrics.at(args.gid, dict(zip(TAGS, q)))['advance_width']
                 same_engine_width = original.get_glyph_h_advance(args.gid)/64
                 report['source_HarfBuzz_advance_max_error'] = max(report['source_HarfBuzz_advance_max_error'],
@@ -299,7 +306,7 @@ def run(args):
                     if independent[i]: stats['independent_max_error'] = max(stats['independent_max_error'], verdict['error'] or 0.)
                     stats['failures'] += not verdict['passed']; stats['topology_failures'] += verdict['error'] is None
                     stats['direction_failures'] += not direction; stats['closure_failures'] += not closed or gap > geometry.LIMIT
-                    selected_valid = 3 <= gid < len(bounds)+3
+                    selected_valid = gid==2 if flat else 3 <= gid < len(bounds)+3
                     stats['selection_failures'] += not selected_valid
                     stats['max_explicit_closure_gap'] = max(stats['max_explicit_closure_gap'], gap)
                     stats['max_advance_error'] = max(stats['max_advance_error'], width_error)
@@ -347,6 +354,7 @@ if __name__ == '__main__':
     parser.add_argument('--replay-manifest', type=Path, action='append', default=[],
                         help='Freshly execute exact physical inputs from a retained private manifest')
     parser.add_argument('--legacy-grid-atlas', action='store_true')
+    parser.add_argument('--flat-candidate',action='store_true',help='Validate a three-GID candidate with no GSUB or computational axes')
     args = parser.parse_args()
     geometry.require(args.random > 0 and args.seams > 0 and args.fonttools > 0, 'positive_validation_coverage_required')
     result = run(args)

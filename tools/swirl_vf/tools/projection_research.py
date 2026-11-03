@@ -107,8 +107,12 @@ def run(args):
                 model = sparse_projection.SparseParameters(data['supports'], data['coefficients'],
                                                            metadata['training_nodes'])
             stages['archive_load_seconds']=time.monotonic()-stage_start;stage_start=time.monotonic()
-            candidate = build(source, args.gid, atlas, model, ramps=metadata['ramps'],
-                              eager_fields=getattr(args,'eager_fields',False))
+            if getattr(args,'flat',False):
+                from flat_joint_font import build as flat_build
+                candidate=flat_build(source,args.gid,atlas,model)
+            else:
+                candidate = build(source, args.gid, atlas, model, ramps=metadata['ramps'],
+                                  eager_fields=getattr(args,'eager_fields',False))
             stages['font_encode_seconds']=time.monotonic()-stage_start;stage_start=time.monotonic()
             candidate.save(output/'candidate.otf')
             stages['font_save_seconds']=time.monotonic()-stage_start
@@ -136,6 +140,7 @@ def main():
     parser.add_argument('--midpoint-cuts', action='store_true',
                         help='reproduce the retained midpoint-partition experiment; branch probes remain enabled')
     parser.add_argument('--eager-fields',action='store_true',help='Controlled memory baseline: materialize all output fields before encoding')
+    parser.add_argument('--flat',action='store_true',help='Require a certified collapse to ordinary CFF2 deltas; never approximate silently')
     parser.add_argument('--level', type=int, default=14)
     parser.add_argument('--max-nodes', type=int, default=1_000_000)
     parser.add_argument('--ramps', type=int, default=4)

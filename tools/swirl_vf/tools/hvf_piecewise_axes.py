@@ -31,6 +31,7 @@ class LinearPieces:
     def add_scaled(self,other,scale=1.):
         if scale==0:return self
         if np.array_equal(self.knots,other.knots):
+            require(len(self.knots)<=65536,'piecewise_axis_capacity')
             return LinearPieces(self.knots,self.values+scale*other.values)
         knots=np.union1d(self.knots,other.knots)
         require(len(knots)<=65536,'piecewise_axis_capacity')

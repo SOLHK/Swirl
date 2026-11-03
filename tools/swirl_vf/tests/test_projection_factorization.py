@@ -8,7 +8,7 @@ from unittest.mock import patch
 import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'tools'))
 from batch_geometry import GeometryBatch, GeometryNodeTrace, ContourSource
-from projection_factorization import factor_geometry, ProjectionSource
+from projection_factorization import factor_geometry, ProjectionSource, relative_cubics, parameter_entries
 from tangent_geometry import resolve_path
 from hvf_glyph_model import _commands
 from cff2_geometry import operands
@@ -16,6 +16,31 @@ from test_hvf_branch_cells import authored_table
 
 
 class ProjectionFactorTests(unittest.TestCase):
+    def test_sparse_directions_equal_dense_elevation_at_every_contour_boundary(self):
+        rng=np.random.default_rng(491)
+        paths=[];sources=[];traces=[];parts={}
+        for pi,count in enumerate((3,5,7)):
+            raw=rng.normal(size=(19,count,4))*101
+            kinds=(2,)*count
+            path=resolve_path(raw,kinds)+[pi*200,-pi*50]
+            paths.append(path);sources.append(ContourSource(pi,pi,0,0))
+            traces.append(GeometryNodeTrace(pi,pi,np.empty((19,0)),
+                np.tile(np.eye(2),(19,1,1)),np.zeros((19,2)),raw))
+            parts[pi]=SimpleNamespace(blends=kinds)
+        table=SimpleNamespace(part=parts.__getitem__)
+        batch=GeometryBatch(paths,sources,19,traces)
+        baseline=[p.copy() for p in paths];directions=[]
+        for pi,k,_,_ in parameter_entries(table,batch):
+            count=paths[pi].shape[1]//2
+            a=paths[pi][:,2*((k-1)%count)+1];b=paths[pi][:,2*k+1]
+            baseline[pi][:,2*k]=a
+            delta=[np.zeros_like(p) for p in paths];delta[pi][:,2*k]=b-a
+            directions.append(relative_cubics(delta)[1])
+        expected=np.stack([relative_cubics(baseline)[1]]+directions,axis=1)
+        actual=factor_geometry(table,batch)
+        np.testing.assert_array_equal(actual.values,expected)
+        self.assertEqual(actual.values.tobytes(),expected.tobytes())
+
     def authored(self):
         t = np.linspace(-1, 2, 101)
         raw = np.tile([[.3, 0, 0, 0], [0, 0, 100, 40],

@@ -26,6 +26,8 @@ class PiecewiseAxisTests(unittest.TestCase):
                 np.testing.assert_array_equal(a.positive(sign).at(x),np.maximum(sign*a.at(x),0.))
             np.testing.assert_array_equal(a.add_scaled(b,.37).values,a.at(knots)+.37*b.at(knots))
             self.assertEqual(a.crossings(),a._crossings(0.))
+        oversized=LinearPieces(np.linspace(-1,1,65537),np.zeros(65537))
+        with self.assertRaisesRegex(ValueError,'piecewise_axis_capacity'):oversized.add_scaled(oversized)
     def test_field_partition_omits_only_tangent_events(self):
         font=HVGL(table([composite(master=-.25,positive=.5),shape(blends=(2,1,1))],visible=1))
         full=segment_partition(font,0,[-.91],[.83])
