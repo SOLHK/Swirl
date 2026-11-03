@@ -5,6 +5,7 @@
 #include <QDir>
 #include <QFile>
 #include <QSaveFile>
+#include <QScopeGuard>
 #include <QJsonDocument>
 #include <QLockFile>
 #include <QThread>
@@ -540,19 +541,23 @@ int SystemProxySession::guard(const QString &journal) {
     if(!owner)return 3;
     const auto readyPath=guardReadyPath(journal,record.value("session").toString());QFile ready(readyPath);
     if(!ready.open(QIODevice::WriteOnly)){CloseHandle(owner);return 5;}ready.write(record.value("session").toString().toUtf8());ready.close();
+    // The owner can remove its journal and exit while this guard is waiting
+    // below. Every exit after acknowledgement must retire this session's
+    // marker, including the wake-up path where the journal is already gone.
+    // The hashed session path never aliases a subsequent session's marker.
+    const auto removeReady=qScopeGuard([&]{QFile::remove(readyPath);});
     // Handle GUI death AND engine death. No fixed delay leaves a dead localhost
     // proxy behind while the GUI still appears alive.
     for(;;) {
         const auto snapshot=read(journal);
-        if(!QFile::exists(journal)){CloseHandle(owner);QFile::remove(readyPath);return 0;}
-        if(!snapshot.isEmpty()&&snapshot.value("session")!=record.value("session")){CloseHandle(owner);QFile::remove(readyPath);return 0;}
+        if(!QFile::exists(journal)){CloseHandle(owner);return 0;}
+        if(!snapshot.isEmpty()&&snapshot.value("session")!=record.value("session")){CloseHandle(owner);return 0;}
         const auto waited=WaitForSingleObject(owner,250);
         if(waited==WAIT_FAILED){CloseHandle(owner);return 3;}
         if(waited==WAIT_OBJECT_0||!alive(record,"engine","engineTime"))break;
     }
     CloseHandle(owner);
     if(read(journal).value("session")==record.value("session")) {
-        QFile::remove(readyPath);
         return recover(journal,nullptr,false,record.value("session").toString())?0:4;
     }
     return 0;

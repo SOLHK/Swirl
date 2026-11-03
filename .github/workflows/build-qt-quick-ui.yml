@@ -394,11 +394,11 @@ jobs:
                 }
                 $rows = @($report.SelectNodes('/TestCase/TestFunction[@name="normalApplicationExitRestoresOwnedProxy"]/Incident[@type="pass"]/DataTag'))
                 $tags = @($rows | ForEach-Object { $_.InnerText })
-                $requiredTags = @('pac-only','manual-and-pac','pac-only-external-edit','manual-and-pac-external-edit','pac-only-lock-contention')
+                $requiredTags = @('pac-only','manual-and-pac','pac-only-external-edit','manual-and-pac-external-edit','pac-only-lock-contention','pac-only-lock-contention-repeat-2','pac-only-lock-contention-repeat-3','pac-only-lock-contention-repeat-4','pac-only-lock-contention-repeat-5')
                 if ($tags.Count -ne $requiredTags.Count -or @($requiredTags | Where-Object { $_ -notin $tags }).Count -gt 0) { throw 'All native application exit, external-edit and release-contention data rows must actually run.' }
                 foreach ($tag in $requiredTags) {
                   $requiredStages = @('ready','final','result')
-                  if ($tag -eq 'pac-only-lock-contention') { $requiredStages += 'waiting' }
+                  if ($tag.StartsWith('pac-only-lock-contention')) { $requiredStages += 'waiting' }
                   foreach ($stage in $requiredStages) {
                     $receipt = "build/swirl-quick/system-proxy-exit/$tag-$stage.json"
                     if (-not (Test-Path -LiteralPath $receipt -PathType Leaf)) { throw "Missing native application exit receipt: $tag/$stage" }
@@ -410,6 +410,10 @@ jobs:
                       Assert-ExclusivePortOccupied $data.live_listener_exclusive_probe $tag
                       foreach ($key in @('listener_closed','tcp_tables_readable','no_listening_socket')) {
                         if ($data.$key -isnot [bool] -or -not $data.$key) { throw "Native listener release evidence is incomplete: $tag/$key" }
+                      }
+                      if ($data.journal_absent_after_exit -isnot [bool] -or -not $data.journal_absent_after_exit -or
+                          $null -eq $data.guard_marker_count_after_exit -or $data.guard_marker_count_after_exit -ne 0) {
+                        throw "Native journal or guard marker cleanup is incomplete: $tag"
                       }
                     }
                     if ($stage -eq 'waiting') {

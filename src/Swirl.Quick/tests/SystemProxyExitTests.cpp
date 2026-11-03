@@ -412,6 +412,12 @@ private slots:
         QTest::newRow("pac-only-external-edit")<<5<<true<<false;
         QTest::newRow("manual-and-pac-external-edit")<<7<<true<<false;
         QTest::newRow("pac-only-lock-contention")<<5<<false<<true;
+        // Every repetition owns a fresh app, journal and receipt prefix. All
+        // must pass; none retries or replaces the first failed execution.
+        QTest::newRow("pac-only-lock-contention-repeat-2")<<5<<false<<true;
+        QTest::newRow("pac-only-lock-contention-repeat-3")<<5<<false<<true;
+        QTest::newRow("pac-only-lock-contention-repeat-4")<<5<<false<<true;
+        QTest::newRow("pac-only-lock-contention-repeat-5")<<5<<false<<true;
     }
     void normalApplicationExitRestoresOwnedProxy() {
         QFETCH(int,flags);QFETCH(bool,externalEdit);QFETCH(bool,releaseContention);
@@ -592,7 +598,14 @@ private slots:
         }else QVERIFY(final.value("snapshot_restored_before_exit").isBool()&&!final.value("snapshot_restored_before_exit").toBool());
         QVERIFY2(SystemProxySession::snapshot()==expectedAfterExit,"Normal exit did not preserve the exact required PAC/bypass and raw registry snapshot; private values omitted.");
         result.insert("exact_exit_snapshot",true);
-        QTRY_VERIFY_WITH_TIMEOUT(!QFile::exists(journal)&&QDir(root.filePath("data")).entryList({"system-proxy.dpapi.*.ready"},QDir::Files).isEmpty(),5000);
+        const auto journalCleanupComplete=[&]{
+            const bool absent=!QFile::exists(journal);
+            const auto markers=QDir(root.filePath("data")).entryList({"system-proxy.dpapi.*.ready"},QDir::Files);
+            result.insert("journal_absent_after_exit",absent);
+            result.insert("guard_marker_count_after_exit",markers.size());
+            return absent&&markers.isEmpty();
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(journalCleanupComplete(),5000);
         result.insert("journal_and_guard_markers_removed",true);
         const auto listenerProbe=probeListener(quint16(port));result.insert("listener_probe",listenerProbe.report());
         const auto connection=observeClosedPortConnection(quint16(port));
