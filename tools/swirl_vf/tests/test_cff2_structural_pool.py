@@ -10,13 +10,53 @@ from fontTools.ttLib import TTCollection,TTFont
 from fontTools.misc.psCharStrings import T2CharString
 sys.path[:0]=[str(Path(__file__).resolve().parents[1]/'tools'),str(Path(__file__).resolve().parents[1]/'platform')]
 from cff2_structure import tokens,programs,bytecode
-from cff2_structural_pool import candidates,rewrite,expand_local,compress
+from cff2_structural_pool import candidates,rewrite,expand_local,compress,local_call
 from probe_polynomial_clamp import build_control
 from test_coretext_extract import make_fixture
 from p7_validate_candidate import commands
 
 
 class StructuralPoolTests(unittest.TestCase):
+    def test_bias_preserving_call_encoding_boundaries(self):
+        helpers=[bytes((139,))]*1239
+        for index,width in ((0,2),(214,2),(215,3),(1238,3)):
+            call=local_call(index)
+            self.assertEqual(len(call),width)
+            self.assertEqual(list(tokens(call))[0][3]+107,index)
+            self.assertEqual(expand_local(call,helpers),helpers[index])
+        for index in (-1,1239,True,1.5):
+            with self.assertRaisesRegex(ValueError,'bias_107'):local_call(index)
+
+    def test_extended_bank_serialization_preserves_native_path(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=Path(d)/'fixture.ttc';make_fixture(path)
+            with TTCollection(path) as collection:font,_=build_control(collection.fonts[0],share_expressions=True)
+            top=font['CFF2'].cff.topDictIndex[0]
+            program=[0,0,'rmoveto']
+            for _ in range(8):
+                for j in range(1,301):program.extend((j/65536,(-1 if j%2 else 1)/64,'rlineto'))
+            for name in font.getGlyphOrder():
+                top.CharStrings[name].setProgram(program.copy())
+            before=io.BytesIO();font.save(before)
+            with TTFont(io.BytesIO(before.getvalue())) as saved:
+                original={(k,str(i)):bytecode(cs)for k,i,cs in programs(saved)}
+                proof=compress(saved,maximum_helpers=1239)
+                self.assertGreater(proof['local_helpers'],215)
+                self.assertEqual(proof['maximum_local_call_bytes'],3)
+                self.assertEqual(proof['local_subroutine_bias'],107)
+                after=io.BytesIO();saved.save(after)
+            with TTFont(io.BytesIO(after.getvalue()))as saved:
+                helpers=[bytecode(cs)for cs in saved['CFF2'].cff.topDictIndex[0].FDArray[0].Private.Subrs]
+                for k,i,cs in programs(saved):
+                    if k!='local':self.assertEqual(expand_local(bytecode(cs),helpers),original[k,str(i)])
+                glyph=saved.getGlyphID(saved.getGlyphOrder()[-1])
+            paths=[]
+            for data in (before.getvalue(),after.getvalue()):
+                h=hb.Font(hb.Face(data));hb.ot_font_set_funcs(h);h.scale=(64000,64000)
+                paths.append(commands(h,glyph))
+            self.assertGreater(len(paths[0]),2000)
+            self.assertEqual(paths[0],paths[1])
+
     def test_pattern_bytes_inside_fixed_numbers_are_not_instructions(self):
         data=b'\xff\x00\x8b\x8c\x10'+bytes((139,))*9+bytes((140,16))
         spans=list(candidates(data));self.assertTrue(all(a>=5 for a,b in spans))

@@ -2,7 +2,8 @@
 
 Unlike coefficient approximation or glyph removal, this transformation retains
 the exact expanded bytes and arithmetic order. Each helper is call-free and
-inherits the caller's variation state. A 215-entry bank has two-byte calls.
+inherits the caller's variation state. The first 215 entries use two-byte calls;
+an optional extension to 1,239 uses three-byte calls without changing bias 107.
 The per-glyph expanded execution budget is checked before mutation. This pass
 accepts the generated unhinted, single-result-blend dialect, not arbitrary CFF.
 """
@@ -31,12 +32,23 @@ def candidates(data, minimum=6, maximum=128):
     if begin is not None and len(data)-begin >= minimum: yield begin, len(data)
 
 
+def local_call(index):
+    require(type(index) is int and 0 <= index < 1239,
+            'structural_local_index_requires_bias_107')
+    operand = index-107
+    if operand <= 107:
+        return bytes((operand+139, 10))
+    # Type 2 positive two-byte integer, followed by callsubr. Keeping the
+    # bank below 1,240 preserves every existing two-byte call and bias.
+    return bytes(((operand-108)//256+247, (operand-108)%256, 10))
+
+
 def rewrite(data, selected):
     pieces, cursor, calls = [], 0, 0
     for a, b in candidates(data):
         key = data[a:b]
         if key in selected:
-            pieces.extend((data[cursor:a], bytes((selected[key]+32, 10))))
+            pieces.extend((data[cursor:a], local_call(selected[key])))
             cursor = b; calls += 1
     pieces.append(data[cursor:])
     return b''.join(pieces), calls
@@ -80,8 +92,8 @@ def analyze(data):
 
 
 def compress(font, *, maximum_helpers=215, operation_limit=200000):
-    require(type(maximum_helpers) is int and 1 <= maximum_helpers <= 215,
-            'structural_helper_bank_must_have_two_byte_calls')
+    require(type(maximum_helpers) is int and 1 <= maximum_helpers <= 1239,
+            'structural_helper_bank_must_preserve_bias_107')
     require(type(operation_limit) is int and 1 <= operation_limit <= 200000,
             'invalid_structural_execution_budget')
     cff=font['CFF2'].cff; top=cff.topDictIndex[0]
@@ -92,7 +104,14 @@ def compress(font, *, maximum_helpers=215, operation_limit=200000):
         data=bytecode(cs); counts.update(data[a:b] for a,b in candidates(data))
     scored=sorted(((len(p)-2)*n-len(p)-4,p,n) for p,n in counts.items()
                   if (len(p)-2)*n>len(p)+4)
-    chosen=sorted(scored[-maximum_helpers:],reverse=True)
+    chosen=sorted(scored[-min(maximum_helpers,215):],reverse=True)
+    if maximum_helpers > 215:
+        first={p for _,p,_ in chosen}
+        # Preserve the original bank and price the extension using its actual
+        # three-byte calls. A pattern unprofitable at that width is excluded.
+        extra=sorted(((len(p)-3)*n-len(p)-4,p,n) for p,n in counts.items()
+                     if p not in first and (len(p)-3)*n>len(p)+4)
+        chosen.extend(sorted(extra[-(maximum_helpers-215):],reverse=True))
     helpers=[p for _,p,_ in chosen]; selected={p:i for i,p in enumerate(helpers)}
     pending=[]; global_events=[]; global_counts=[]; global_insertions=[]
     for cs in cff.GlobalSubrs:
@@ -151,8 +170,11 @@ def compress(font, *, maximum_helpers=215, operation_limit=200000):
     font.recalcBBoxes=False; font.recalcTimestamp=False
     return dict(local_helpers=len(helpers),structural_helpers=sum(p[0]!=255 for p in helpers),
         literal_helpers=sum(p[0]==255 for p in helpers),
-        expected_payload_savings=sum((len(p)-2)*n-len(p) for _,p,n in chosen),
+        expected_payload_savings=sum((len(p)-len(local_call(i)))*n-len(p)
+                                     for i,(_,p,n) in enumerate(chosen)),
         maximum_original_operations=max(old_ops),maximum_compressed_operations=max(new_ops),
         maximum_operand_stack_bound=max(stacks),maximum_subroutine_depth=max(depths),
         exact_expanded_bytes_verified=True,coefficients_changed=0,operation_limit=operation_limit,
-        local_call_bytes=2,global_subroutine_indices_unchanged=True)
+        local_call_bytes=2 if len(helpers)<=215 else None,
+        minimum_local_call_bytes=2,maximum_local_call_bytes=2 if len(helpers)<=215 else 3,
+        local_subroutine_bias=107,global_subroutine_indices_unchanged=True)

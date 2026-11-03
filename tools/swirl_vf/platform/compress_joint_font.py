@@ -23,7 +23,7 @@ def run(args):
         # Saving must retain every other table. head.checkSumAdjustment alone
         # is allowed to reflect the changed whole-font checksum.
         before={t:font.reader[t] for t in font.reader.keys() if t != 'CFF2'}
-        opened=time.monotonic();report=compress(font)
+        opened=time.monotonic();report=compress(font,maximum_helpers=getattr(args,'maximum_helpers',215))
         compiled=time.monotonic();font.save(out/'candidate.otf');saved=time.monotonic()
     with TTFont(out/'candidate.otf',lazy=True) as font:
         assert set(font.reader.keys())==set(before)|{'CFF2'},'font_table_set_changed'
@@ -45,4 +45,7 @@ def run(args):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('font',type=Path)
-    p.add_argument('--private-output',type=Path,required=True);run(p.parse_args())
+    p.add_argument('--private-output',type=Path,required=True)
+    p.add_argument('--maximum-helpers',type=int,default=215,
+                   help='1..1239; above 215 uses a bias-preserving three-byte call tier')
+    run(p.parse_args())

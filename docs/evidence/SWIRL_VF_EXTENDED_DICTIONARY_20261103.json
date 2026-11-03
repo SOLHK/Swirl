@@ -1,0 +1,81 @@
+{
+  "scope": "lossless optional bias-107 dictionary extension; native receipts follow separately",
+  "maximum_helpers": 1239,
+  "default_helpers": 215,
+  "rows": [
+    {
+      "gid": 1166,
+      "compression": {
+        "local_helpers": 1239,
+        "structural_helpers": 564,
+        "literal_helpers": 675,
+        "expected_payload_savings": 29648786,
+        "maximum_original_operations": 119001,
+        "maximum_compressed_operations": 146163,
+        "maximum_operand_stack_bound": 53,
+        "maximum_subroutine_depth": 3,
+        "exact_expanded_bytes_verified": true,
+        "coefficients_changed": 0,
+        "operation_limit": 200000,
+        "local_call_bytes": null,
+        "minimum_local_call_bytes": 2,
+        "maximum_local_call_bytes": 3,
+        "local_subroutine_bias": 107,
+        "global_subroutine_indices_unchanged": true,
+        "input_sha256": "02867f5d09813c9f395839b9fb64dfe9c4c0fb8a945f094aebcc79bb10e79698",
+        "candidate_sha256": "1814870cc79ff639dac29de70d2d67c7f85a5c07ce47bc982a750c76efa67efd",
+        "input_bytes": 58178796,
+        "candidate_bytes": 28532496,
+        "load_seconds": 0.06801941597950645,
+        "compression_seconds": 31.686521124996943,
+        "save_seconds": 0.5225048340216745,
+        "seconds": 32.320173165993765,
+        "peak_rss_bytes": 377864192,
+        "all_non_CFF2_tables_unchanged": true,
+        "native_verification": "NOT_RUN",
+        "production_accepted": false
+      },
+      "native_acceptance": "RUNNING"
+    },
+    {
+      "gid": 19177,
+      "compression": {
+        "local_helpers": 1239,
+        "structural_helpers": 496,
+        "literal_helpers": 743,
+        "expected_payload_savings": 115376108,
+        "maximum_original_operations": 117122,
+        "maximum_compressed_operations": 140360,
+        "maximum_operand_stack_bound": 44,
+        "maximum_subroutine_depth": 3,
+        "exact_expanded_bytes_verified": true,
+        "coefficients_changed": 0,
+        "operation_limit": 200000,
+        "local_call_bytes": null,
+        "minimum_local_call_bytes": 2,
+        "maximum_local_call_bytes": 3,
+        "local_subroutine_bias": 107,
+        "global_subroutine_indices_unchanged": true,
+        "input_sha256": "930c1ef2d512dd24677f599eb7b30c5da5b2bde43c1054774e56388e3eda2e9b",
+        "candidate_sha256": "c63983e5cd39b5ff15f984eb1f5eb2aaa362a75e3913d9491e30f7be3df41d33",
+        "input_bytes": 196056396,
+        "candidate_bytes": 80682776,
+        "load_seconds": 0.145152417011559,
+        "compression_seconds": 113.35287558299024,
+        "save_seconds": 1.5166164170077536,
+        "seconds": 115.16258216701681,
+        "peak_rss_bytes": 1163624448,
+        "all_non_CFF2_tables_unchanged": true,
+        "native_verification": "NOT_RUN",
+        "production_accepted": false
+      },
+      "native_acceptance": "RUNNING"
+    }
+  ],
+  "regression": {
+    "tests": 1069,
+    "passed": 1062,
+    "skipped": 7
+  },
+  "production_accepted": false
+}
