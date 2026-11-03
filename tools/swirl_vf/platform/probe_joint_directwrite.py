@@ -52,17 +52,21 @@ def run(output,binary=None,variant='full'):
     if out.exists():raise ValueError('fresh_control_output_required')
     out.mkdir(parents=True)
     make_fixture(out/'authored.ttc')
+    base_variant=variant.removesuffix('_rlig').removesuffix('_requested')
     with TTCollection(out/'authored.ttc') as collection:
-        font,boxes=build_control(collection.fonts[0],share_expressions=variant!='unshared')
-    font,expected_function=control_variant(font,variant)
-    require_feature(font)
+        font,boxes=build_control(collection.fonts[0],share_expressions=base_variant!='unshared')
+    font,expected_function=control_variant(font,base_variant)
+    if variant.endswith('_rlig'):
+        for record in font['GSUB'].table.FeatureList.FeatureRecord:
+            if record.FeatureTag=='rvrn':record.FeatureTag='rlig'
+    require_feature(font,'rlig' if variant.endswith('_rlig') else 'rvrn')
     names={1:'Swirl Joint DirectWrite Control',2:'Regular',3:'SwirlJointDirectWriteControl-1',
            4:'Swirl Joint DirectWrite Control',6:'SwirlJointDirectWriteControl',
            16:'Swirl Joint DirectWrite Control',17:'Regular'}
     font['name'].names=[n for n in font['name'].names if n.nameID not in names]
     for index,value in names.items():
         font['name'].setName(value,index,3,1,0x409);font['name'].setName(value,index,1,0,0)
-    compression=compress(font) if variant=='full' else None
+    compression=compress(font) if base_variant=='full' else None
     font.save(out/'control.otf')
     points=np.r_[np.asarray(list(itertools.product((-1.,-.5,0.,.5,1.),repeat=3))),
                  np.random.default_rng(2026110719).uniform(-1,1,(256,3))]
@@ -88,7 +92,8 @@ def run(output,binary=None,variant='full'):
         stats['observations']+=1;stats['failures']+=not verdict['passed'];stats['max_error']=max(stats['max_error'],verdict['error'] or 0.)
     if binary:
         lines=[' '.join([str(r['id']),r['mode']]+[format(r['location'][t],'.17g') for t in TAGS]) for r in requests]
-        native=subprocess.run([str(binary.resolve()),str(out/'control.otf')],input='\n'.join(lines)+'\n',capture_output=True,text=True)
+        command=[str(binary.resolve()),str(out/'control.otf')]+(['rvrn'] if variant.endswith('_requested') else [])
+        native=subprocess.run(command,input='\n'.join(lines)+'\n',capture_output=True,text=True)
         (out/'native.jsonl').write_text(native.stdout);(out/'native.stderr.log').write_text(native.stderr)
         report['native_exit_code']=native.returncode
         report['native_error']=native.stderr.strip()
@@ -119,7 +124,8 @@ def run(output,binary=None,variant='full'):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',type=Path,required=True);p.add_argument('--binary',type=Path)
     p.add_argument('--matrix',action='store_true');a=p.parse_args()
-    variants=('static_cff2','flat_cff2','horner_avar1','flat_avar2','unshared','full') if a.matrix else ('full',)
+    variants=('static_cff2','flat_cff2','horner_avar1','flat_avar2','unshared','full',
+              'flat_cff2_rlig','flat_cff2_requested','full_rlig','full_requested') if a.matrix else ('full',)
     reports=[run(a.output/v,a.binary,v) if a.matrix else run(a.output,a.binary) for v in variants]
     def failed(r):
         dw=r['DirectWrite']

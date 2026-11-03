@@ -108,7 +108,7 @@ struct Renderer final:IDWriteTextRenderer {
 };
 
 int wmain(int argc,wchar_t** argv){
-    try{require(argc==2,"font_path_required");Fixture fixture(argv[1]);ComPtr<IDWriteFactory6> factory;
+    try{require(argc==2||argc==3,"font_path_required");Fixture fixture(argv[1]);ComPtr<IDWriteFactory6> factory;
         check(DWriteCreateFactory(DWRITE_FACTORY_TYPE_ISOLATED,__uuidof(IDWriteFactory6),reinterpret_cast<IUnknown**>(factory.GetAddressOf())),"CreateFactory6");
         ComPtr<IDWriteFontFile> file;check(factory->CreateFontFileReference(argv[1],nullptr,&file),"CreateFontFileReference");
         ComPtr<IDWriteFontSetBuilder1> builder;check(factory->CreateFontSetBuilder(&builder),"CreateFontSetBuilder");check(builder->AddFontFile(file.Get()),"AddFontFile");
@@ -125,6 +125,10 @@ int wmain(int argc,wchar_t** argv){
             check(format->SetAutomaticFontAxes(DWRITE_AUTOMATIC_FONT_AXES_NONE),"DisableAutomaticAxes");check(format->SetFontFallback(fallback.Get()),"SetEmptyFallback");
             ComPtr<IDWriteTextLayout> base;check(factory->CreateTextLayout(L"A",1,format.Get(),10000,10000,&base),"CreateTextLayout");ComPtr<IDWriteTextLayout4> layout;check(base.As(&layout),"TextLayout4");
             check(layout->SetFontAxisValues(supplied.data(),UINT32(supplied.size()),{0,1}),"SetFontAxisValues");check(layout->SetAutomaticFontAxes(DWRITE_AUTOMATIC_FONT_AXES_NONE),"LayoutAutomaticAxes");
+            if(argc==3){require(std::wstring(argv[2])==L"rvrn","unknown_requested_feature");ComPtr<IDWriteTypography> typography;
+                check(factory->CreateTypography(&typography),"CreateTypography");
+                check(typography->AddFontFeature({DWRITE_FONT_FEATURE_TAG(DWRITE_MAKE_OPENTYPE_TAG('r','v','r','n')),1}),"AddRequestedRvrn");
+                check(layout->SetTypography(typography.Get(),{0,1}),"SetRequestedRvrn");}
             ComPtr<Renderer> renderer;renderer.Attach(new Renderer(fixture,axes));HRESULT hr=layout->Draw(nullptr,renderer.Get(),0,0);
             if(!renderer->error.empty())throw std::runtime_error(renderer->error);check(hr,"TextLayoutDraw");require(renderer->runs==1,"missing_or_multiple_runs");
             std::cout<<std::setprecision(17)<<"{\"type\":\"sample\",\"id\":"<<id<<",\"gid\":"<<renderer->gid<<",\"advance\":"<<renderer->advance<<",\"axis_readback_failures\":"<<renderer->axisFailures<<",\"max_axis_readback_error\":"<<renderer->axisError<<",\"commands\":"<<renderer->commands<<'}'<<std::endl;++total;
