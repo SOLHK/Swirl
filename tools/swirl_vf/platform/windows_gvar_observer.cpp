@@ -94,6 +94,7 @@ int wmain(int argc, wchar_t** argv) {
                     std::cout << (i?",":"") << '"' << names[i] << "\":" << actual.value;
             }
             std::cout << "},\"axis_readback_mismatches\":" << mismatches << ",\"max_axis_readback_error\":" << maxError
+                      << ",\"line_metrics\":{\"ascent\":" << metrics.ascent << ",\"descent\":" << metrics.descent << ",\"line_gap\":" << metrics.lineGap << "}"
                       << ",\"advance_width\":" << gm.advanceWidth << ",\"commands\":" << sink->text.str() << "]}\n";
             mismatchTotal += mismatches; ++total;
         }

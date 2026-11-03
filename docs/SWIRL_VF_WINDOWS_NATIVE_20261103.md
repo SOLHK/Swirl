@@ -178,6 +178,45 @@ persistent system font. Its capture status requires subsequent geometry and
 visual review; it is not a release acceptance flag. Only independently authored
 data is permitted in the public CI test of this kit.
 
+User-coordinate/layout checks use the Apache-2.0-licensed uharfbuzz binding,
+after reading its [variation API implementation](https://github.com/harfbuzz/uharfbuzz/blob/v0.56.3/src/uharfbuzz/_font.pxi),
+[file-backed blob implementation](https://github.com/harfbuzz/uharfbuzz/blob/v0.56.3/src/uharfbuzz/_blob.pxi)
+and [shaping tests](https://github.com/harfbuzz/uharfbuzz/blob/v0.56.3/tests/test_uharfbuzz.py).
+The verifier sets actual user coordinates, reads HarfBuzz's normalized result,
+and compares source/target OpenType glyph IDs, clusters, advances and offsets
+in horizontal and vertical runs. Source normalized coordinates come from the
+explicitly retained A3 hypothesis, not an assumed equality of axis numbers.
+File-backed blobs avoid repeatedly copying the full TTC during native checks.
+
+## Windows line spacing correction
+
+The original OS/2 table has USE_TYPO_METRICS clear and typographic line metrics
+860/-140/400, while source hhea is 884/-144/0 (Text) or 915/-149/0 (Display).
+Keeping both sets without a Windows mapping leaves inconsistent line spacing.
+The target now copies each source hhea triplet into OS/2 sTypo fields and sets
+USE_TYPO_METRICS, retaining the larger original Win clipping bounds. This follows
+the [Microsoft variable-font metric guidance](https://learn.microsoft.com/en-us/typography/opentype/spec/os2#os2-table-and-opentype-font-variations).
+The [gftools metric fixer](https://github.com/googlefonts/gftools/blob/main/Lib/gftools/fix.py)
+and its Apache-2.0 license were inspected; its legacy Windows source-metric
+choice is deliberately not used for this Mac-source conversion.
+
+`windows_line_metrics.py` updates a fresh TTC copy, rewrites affected checksums,
+and verifies every byte outside OS/2, head, name and their directory checksums
+is unchanged. It therefore preserves previously audited geometry/variation data.
+The authored native control has distinct Text/Display hhea values and larger
+clipping bounds; DirectWrite records and checks actual line metrics at every
+requested location. The private original's strict CoreText baseline separately
+returned BLOCKED_SOURCE_IDENTITY (0/32 faces), so these source table values are
+not presented as newly measured CoreText global metrics.
+
+The layout diagnostic measured source tracking increments of 21, 20, 13 and
+4.578125 units at 12, 16, 24 and 48 pt. It also compares native per-glyph advances
+separately from positioned advances. HarfBuzz's
+[tracking implementation](https://github.com/harfbuzz/harfbuzz/blob/main/src/hb-aat-layout-trak-table.hh)
+and [shape-plan selection](https://github.com/harfbuzz/harfbuzz/blob/main/src/hb-ot-shape.cc)
+explain the size-dependent source behavior. The Windows target still does not
+implement AAT tracking; no fixed spacing substitute is claimed to be equivalent.
+
 Per-glyph work uses Python's PSF-licensed [ProcessPoolExecutor](https://github.com/python/cpython/blob/3.12/Lib/concurrent/futures/process.py),
 reviewed along with [its licence](https://github.com/python/cpython/blob/3.12/LICENSE).
 The project scheduler submits at most twice the worker count and streams results

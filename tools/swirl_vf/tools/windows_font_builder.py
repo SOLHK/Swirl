@@ -39,6 +39,7 @@ from target_axis_mapping import axes_from_font, source_axis_plan
 from ttc_staging_pack import pack_collection
 from windows_font_inventory import sha256
 from windows_gvar import TensorModel, TAGS, LIMIT, compile_glyph, observed_errors, require
+from windows_line_metrics import align_line_metrics
 
 SOURCE_SHA = '39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890'
 FACE_PLAN = ((0, 'SC Text'), (5, 'SC Display'), (1, 'TC Text'), (6, 'TC Display'))
@@ -237,6 +238,7 @@ def naming(font, source, label, version):
     font['OS/2'].usWidthClass = 5
     font['OS/2'].fsSelection = (font['OS/2'].fsSelection & ~(1 | 32)) | 64
     font['head'].macStyle &= ~3
+    align_line_metrics(font)
     return font
 
 

@@ -57,14 +57,16 @@ def make(output, optimize=True):
         b.setupGlyf({n: glyph for n in ('.notdef', 'A')})
         b.setupHorizontalMetrics({n: hm for n in ('.notdef', 'A')})
         b.setupVerticalMetrics({n: vm for n in ('.notdef', 'A')})
-        b.setupHorizontalHeader(ascent=884*SCALE, descent=-144*SCALE)
+        b.setupHorizontalHeader(ascent=(915 if fi % 2 else 884)*SCALE, descent=-(149 if fi % 2 else 144)*SCALE)
         b.setupVerticalHeader(ascent=500*SCALE, descent=-500*SCALE)
         family = 'SwirlVF Control '+label
         b.setupNameTable(dict(familyName=family, styleName='Regular', typographicFamily=family,
                              typographicSubfamily='Regular', fullName=family, uniqueFontIdentifier=family+'-1',
                              psName=family.replace(' ', ''), version='Version 0.1.0 Authored control'))
-        b.setupOS2(sTypoAscender=884*SCALE, sTypoDescender=-144*SCALE, usWinAscent=1060*SCALE, usWinDescent=340*SCALE,
+        b.setupOS2(version=4, sTypoAscender=884*SCALE, sTypoDescender=-144*SCALE, usWinAscent=1060*SCALE, usWinDescent=340*SCALE,
                    usWeightClass=499 if fi % 2 else 501)
+        from windows_line_metrics import align_line_metrics
+        align_line_metrics(b.font)
         b.setupPost()
         b.setupMaxp()
         b.setupFvar(face_axes(fi), [dict(stylename=n, location={'wdth': 100, 'wght': w, 'HGHT': 500})
@@ -108,11 +110,15 @@ def verify(native, output):
                   failures=failures, original_font_acceptance=False, desktop_installation='NOT_RUN')
     report['axis_readback_mismatches'] = sum(r.get('axis_readback_mismatches', 0) for r in rows if r.get('record') == 'outline')
     report['max_axis_readback_error'] = max((r.get('max_axis_readback_error', 0) for r in rows), default=0)
+    report['line_metrics_failures'] = sum(r.get('line_metrics') != dict(
+        ascent=(915 if r['face_index'] % 2 else 884)*SCALE,
+        descent=(149 if r['face_index'] % 2 else 144)*SCALE, line_gap=0)
+        for r in rows if r.get('record') == 'outline')
     if faces != set(range(4)) or count < 400:
         report['transcript_failure'] = 'missing_faces_or_positions'
     Path(output).write_text(json.dumps(report, indent=2))
     print(json.dumps({k: v for k, v in report.items() if k != 'failures'} | {'failure_count': len(failures)}))
-    return not failures and 'transcript_failure' not in report
+    return not failures and not report['line_metrics_failures'] and 'transcript_failure' not in report
 
 
 def observe(binary, output, optimize=True):

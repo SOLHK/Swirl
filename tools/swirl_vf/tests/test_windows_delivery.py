@@ -23,6 +23,7 @@ from windows_gvar_control import make, formula, face_axes, SCALE, verify
 from windows_full_audit import inspect_standard
 from windows_explicit_deltas import expand
 from windows_font_inventory import sha256
+from windows_line_metrics import patch_collection
 
 
 class DeliveryTests(unittest.TestCase):
@@ -52,7 +53,8 @@ class DeliveryTests(unittest.TestCase):
                 for case in range(100):
                     points = formula((0, 0, 0), index)*SCALE
                     commands = [[('moveTo' if j == 0 else 'lineTo'), float(x), float(-y)] for j, (x, y) in enumerate(points)]
-                    rows.append(dict(record='outline', face_index=index, axes=axes, commands=commands, case=str(case), axis_readback_mismatches=1))
+                    rows.append(dict(record='outline', face_index=index, axes=axes, commands=commands, case=str(case), axis_readback_mismatches=1,
+                        line_metrics=dict(ascent=(915 if index % 2 else 884)*SCALE, descent=(149 if index % 2 else 144)*SCALE, line_gap=0)))
             rows.append(dict(record='summary', axis_readback_mismatches=400))
             transcript = path/'outline-coordinates.jsonl'
             transcript.write_text('\n'.join(map(json.dumps, rows)))
@@ -98,9 +100,29 @@ class DeliveryTests(unittest.TestCase):
                         for font, pen in zip((a, b), pens):
                             font.getGlyphSet(location=location, normalized=True)['A'].drawPoints(pen)
                         self.assertEqual(pens[0].value, pens[1].value)
-                    checked = inspect_standard(b, [False, False])
+                    checked = inspect_standard(b, [False, False], parent=a)
                     self.assertEqual(checked['inferred_points'], 0)
                     self.assertEqual(checked['exact_metric_models'], 4)
+                    self.assertGreater(checked['exact_outline_tuple_maps'], 0)
+
+    def test_line_metric_patch_preserves_geometry_layout_axes_and_clipping(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            make(folder/'control.ttc')
+            with TTCollection(folder/'control.ttc') as c:
+                for font in c.fonts:
+                    font['OS/2'].fsSelection &= ~128
+                    font['OS/2'].sTypoLineGap = 300
+                c.save(folder/'before.ttc')
+            result = patch_collection(folder/'before.ttc', folder/'after.ttc')
+            self.assertTrue(result['all_other_bytes_identical'])
+            with TTCollection(folder/'before.ttc') as old, TTCollection(folder/'after.ttc') as new:
+                for a, b in zip(old.fonts, new.fonts):
+                    self.assertEqual(b['OS/2'].sTypoLineGap, b['hhea'].lineGap)
+                    self.assertTrue(b['OS/2'].fsSelection & 128)
+                    self.assertEqual(b['OS/2'].usWinAscent, a['OS/2'].usWinAscent)
+                    for tag in ('glyf', 'gvar', 'cmap', 'fvar', 'avar', 'HVAR', 'VVAR', 'hhea'):
+                        self.assertEqual(a.reader[tag], b.reader[tag])
 
 
 if __name__ == '__main__':

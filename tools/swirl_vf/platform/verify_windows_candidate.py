@@ -33,7 +33,7 @@ def verify(args):
     build = json.loads((folder/'report.json').read_text())
     if sha256(args.source) != SOURCE_SHA or sha256(args.candidate) != build['sha256']:
         raise ValueError('source_or_candidate_hash_mismatch')
-    blob = args.candidate.read_bytes()
+    blob = hb.Blob.from_file_path(args.candidate)
     report = dict(candidate_sha256=build['sha256'], source_sha256=SOURCE_SHA, faces=[],
                   DirectWrite='NOT_RUN', Windows_installation='NOT_RUN', production_accepted=False)
     samples = np.r_[np.zeros((1, 3)), np.asarray(list(__import__('itertools').product((-1., 0., 1.), repeat=3))),
@@ -51,6 +51,10 @@ def verify(args):
             if args.random_glyphs:
                 random = np.random.default_rng(2026110307).choice(build['source_gids'], min(args.random_glyphs, len(build['source_gids'])), replace=False)
                 selected = sorted(set(map(int, random)) | {0, 1166, 19177})
+            if args.worst_glyphs:
+                rows = json.loads((folder/(label.split()[1]+'-glyph-report.json')).read_text())['results']
+                worst = [r['gid'] for r in sorted(rows, key=lambda r: r['max_outline_control_bound'], reverse=True)[:args.worst_glyphs]]
+                selected = sorted(set(selected if args.subset or args.random_glyphs else (0, 1166, 19177)) | set(worst))
             positions = {g: build['source_gids'].index(g) for g in selected}
             stats = dict(face=label, glyphs=len(selected), observations=0, empty_mismatches=0,
                          max_source_control_error=0., max_HB_control_error=0.,
@@ -134,5 +138,6 @@ if __name__ == '__main__':
     p.add_argument('--samples', type=int, default=16)
     p.add_argument('--subset', action='store_true')
     p.add_argument('--random-glyphs', type=int, default=0)
+    p.add_argument('--worst-glyphs', type=int, default=0, help='Independently validate the largest reported fitting errors')
     p.add_argument('--oracle-all', action='store_true')
     raise SystemExit(0 if verify(p.parse_args()) else 1)

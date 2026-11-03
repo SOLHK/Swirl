@@ -41,7 +41,8 @@ def prepare(candidate, artifacts):
                     values = [float(np.float32(position[t])) for t in ('wdth', 'wght', 'HGHT')]
                     requests.append(' '.join(map(str, [len(requests), index, gid, *values])))
             plan['faces'].append(dict(face=label, glyphs=font['maxp'].numGlyphs, unicode_probes=codepoints,
-                glyphs_sampled=len(gids), positions=len(positions)))
+                glyphs_sampled=len(gids), positions=len(positions),
+                line_metrics=dict(ascent=font['hhea'].ascent, descent=-font['hhea'].descent, line_gap=font['hhea'].lineGap)))
     for name, relative in [('observe.exe', 'observe.exe'), ('medium.exe', 'medium.exe'),
                            ('directwrite_probe.exe', 'native/build/Release/directwrite_probe.exe')]:
         source = artifacts/relative
@@ -54,7 +55,7 @@ def prepare(candidate, artifacts):
     (output/'plan.json').write_text(json.dumps(plan, indent=2))
     shutil.copyfile(Path(__file__).with_name('run_windows_candidate.ps1'), output/'Run-Windows-Test.ps1')
     (output/'README.txt').write_text(
-        'Copy the entire private candidate directory to Windows 11. No font upload is needed.\n'
+        'Copy SwirlVF.ttc and the windows-test directory together to Windows 11. No font upload is needed.\n'
         'In PowerShell, run: .\\windows-test\\Run-Windows-Test.ps1\n'
         'Keep results private: they contain outline coordinates. The script records DirectWrite loading,\n'
         'Medium selection, all requested axis positions, Unicode probes and raster samples.\n'

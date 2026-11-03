@@ -34,6 +34,16 @@ try {
     $report.axis_readback_mismatches = $summary.axis_readback_mismatches
     $report.exact_axis_gate_passed = $summary.exact_axis_gate_passed
     $report.private_GDI_registered_fonts = $header.private_GDI_registered_fonts
+    $metricFailures = 0
+    Get-Content -LiteralPath (Join-Path $OutputDirectory 'outline-coordinates.jsonl') | ForEach-Object {
+        $row = $_ | ConvertFrom-Json
+        if ($row.record -eq 'outline') {
+            $expected = $plan.faces[$row.face_index].line_metrics
+            if ($row.line_metrics.ascent -ne $expected.ascent -or $row.line_metrics.descent -ne $expected.descent -or $row.line_metrics.line_gap -ne $expected.line_gap) { $metricFailures++ }
+        }
+    }
+    $report.line_metric_failures = $metricFailures
+    if ($metricFailures -ne 0) { throw 'Native line metrics differ from the hhea contract' }
     & (Join-Path $PSScriptRoot 'medium.exe') $fontPath > (Join-Path $OutputDirectory 'medium.json') 2> (Join-Path $OutputDirectory 'medium.stderr.log')
     $report.medium_exit_code = $LASTEXITCODE
     $medium = Get-Content -LiteralPath (Join-Path $OutputDirectory 'medium.json') -Raw | ConvertFrom-Json
