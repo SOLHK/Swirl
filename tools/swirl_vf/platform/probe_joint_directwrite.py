@@ -18,6 +18,7 @@ from probe_joint_representations import compare
 from p7_validate_candidate import commands
 import cff2_geometry as geometry
 from fontTools.ttLib import newTable
+from required_variation_feature import require_feature
 
 
 def control_variant(font,variant):
@@ -54,6 +55,7 @@ def run(output,binary=None,variant='full'):
     with TTCollection(out/'authored.ttc') as collection:
         font,boxes=build_control(collection.fonts[0],share_expressions=variant!='unshared')
     font,expected_function=control_variant(font,variant)
+    require_feature(font)
     names={1:'Swirl Joint DirectWrite Control',2:'Regular',3:'SwirlJointDirectWriteControl-1',
            4:'Swirl Joint DirectWrite Control',6:'SwirlJointDirectWriteControl',
            16:'Swirl Joint DirectWrite Control',17:'Regular'}
