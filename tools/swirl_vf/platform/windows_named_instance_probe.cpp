@@ -26,7 +26,8 @@ int wmain(int argc, wchar_t** argv) {
         check(factory->CreateFontCollectionFromFontSet(set.Get(), DWRITE_FONT_FAMILY_MODEL_TYPOGRAPHIC, &collection));
         if (collection->GetFontFamilyCount() != 4) throw std::runtime_error("four families required");
         for (UINT32 i = 0; i < 4; ++i) {
-            ComPtr<IDWriteFontFamily> family; check(collection->GetFontFamily(i, &family));
+            ComPtr<IDWriteFontFamily> family;
+            check(static_cast<IDWriteFontCollection*>(collection.Get())->GetFontFamily(i, &family));
             ComPtr<IDWriteFont> font;
             check(family->GetFirstMatchingFont(DWRITE_FONT_WEIGHT_MEDIUM, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL, &font));
             ComPtr<IDWriteFontFace> base; check(font->CreateFontFace(&base));

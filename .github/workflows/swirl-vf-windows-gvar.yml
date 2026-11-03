@@ -38,6 +38,7 @@ jobs:
           python tools/swirl_vf/platform/windows_gvar_control.py --native build/windows-gvar/native --output build/windows-gvar/geometry.json
           if ($LASTEXITCODE -ne 0) { throw 'Independent joint geometry failed' }
       - name: Verify Medium through native family matching
+        if: always()
         shell: pwsh
         run: |
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -48,6 +49,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Medium probe compilation failed' }
           & build/windows-gvar/medium.exe (Resolve-Path build/windows-gvar/control.ttc).Path > build/windows-gvar/medium.json
           if ($LASTEXITCODE -ne 0) { throw 'Native Medium matching failed' }
+      - name: Independently observe requested gvar geometry and retain axis mismatches
+        if: always()
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw 'MSVC unavailable' }
+          $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
+          cmd /c "`"$vcvars`" && cl /nologo /std:c++17 /EHsc /W4 tools\swirl_vf\platform\windows_gvar_observer.cpp /Fe:build\windows-gvar\observe.exe /Fo:build\windows-gvar\observe.obj /link dwrite.lib gdi32.lib"
+          if ($LASTEXITCODE -ne 0) { throw 'Observer compilation failed' }
+          python tools/swirl_vf/platform/windows_gvar_control.py --binary build/windows-gvar/observe.exe --output build/windows-gvar/independent
+          if ($LASTEXITCODE -ne 0) { throw 'Requested geometry or private registration failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -55,6 +68,9 @@ jobs:
           path: |
             build/windows-gvar/geometry.json
             build/windows-gvar/medium.json
+            build/windows-gvar/independent/*.json
+            build/windows-gvar/independent/*.jsonl
+            build/windows-gvar/independent/*.log
             build/windows-gvar/native/*.json
             build/windows-gvar/native/*.jsonl
             build/windows-gvar/native/*.png

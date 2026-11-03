@@ -8,6 +8,8 @@ import argparse
 import json
 from pathlib import Path
 import sys
+import itertools
+import subprocess
 
 import numpy as np
 from fontTools.fontBuilder import FontBuilder
@@ -21,6 +23,11 @@ from metric_variations import add_metric_variations
 AXES = [('wdth', 80, 100, 120, 'Width'), ('wght', 100, 500, 900, 'Weight'), ('HGHT', 1, 500, 1000, 'Height')]
 LABELS = ('SC Text', 'SC Display', 'TC Text', 'TC Display')
 SCALE = 15
+
+
+def face_axes(face):
+    return [(t, lo, (499 if face % 2 else 501) if t == 'wght' else d, hi, title)
+            for t, lo, d, hi, title in AXES]
 
 
 def formula(location, face):
@@ -59,12 +66,12 @@ def make(output):
         b.setupOS2(sTypoAscender=884*SCALE, sTypoDescender=-144*SCALE, usWinAscent=1060*SCALE, usWinDescent=340*SCALE)
         b.setupPost()
         b.setupMaxp()
-        b.setupFvar(AXES, [dict(stylename=n, location={'wdth': 100, 'wght': w, 'HGHT': 500})
+        b.setupFvar(face_axes(fi), [dict(stylename=n, location={'wdth': 100, 'wght': w, 'HGHT': 500})
                           for n, w in [('Light', 300), ('Regular', 400), ('Medium', 500), ('Semibold', 600), ('Bold', 700)]])
         buildStatTable(b.font, [dict(tag=t, name=title, values=(
             [dict(value=w, name=n, flags=2 if n == 'Regular' else 0) for n, w in
              [('Light', 300), ('Regular', 400), ('Medium', 500), ('Semibold', 600), ('Bold', 700)]]
-            if t == 'wght' else [dict(value=d, name='Normal', flags=2)])) for t, lo, d, hi, title in AXES])
+            if t == 'wght' else [dict(value=d, name='Normal', flags=2)])) for t, lo, d, hi, title in face_axes(fi)])
         b.font['gvar'] = newTable('gvar')
         b.font['gvar'].variations = {n: variations for n in ('.notdef', 'A')}
         b.font['avar'] = newTable('avar')
@@ -83,7 +90,7 @@ def verify(native, output):
     for row in rows:
         if row.get('record') != 'outline':
             continue
-        p = [(row['axes'][t]-d)/(d-lo if row['axes'][t] < d else hi-d) for t, lo, d, hi, _ in AXES]
+        p = [(row['axes'][t]-d)/(d-lo if row['axes'][t] < d else hi-d) for t, lo, d, hi, _ in face_axes(row['face_index'])]
         expected = formula(p, row['face_index'])
         commands = row['commands']
         points = np.asarray([[c[1], -c[2]] for c in commands if c[0] in ('moveTo', 'lineTo')])/SCALE
@@ -98,6 +105,8 @@ def verify(native, output):
     report = dict(scope='AUTHORED_NO_PRIVATE_DATA', engine='DirectWrite', observations=count,
                   faces=sorted(faces), maximum_error_source_units=maximum, threshold=LIMIT,
                   failures=failures, original_font_acceptance=False, desktop_installation='NOT_RUN')
+    report['axis_readback_mismatches'] = sum(r.get('axis_readback_mismatches', 0) for r in rows if r.get('record') == 'outline')
+    report['max_axis_readback_error'] = max((r.get('max_axis_readback_error', 0) for r in rows), default=0)
     if faces != set(range(4)) or count < 400:
         report['transcript_failure'] = 'missing_faces_or_positions'
     Path(output).write_text(json.dumps(report, indent=2))
@@ -105,11 +114,44 @@ def verify(native, output):
     return not failures and 'transcript_failure' not in report
 
 
+def observe(binary, output):
+    directory = Path(output)
+    directory.mkdir(parents=True, exist_ok=False)
+    font = directory/'control.ttc'
+    make(font)
+    positions = np.r_[np.asarray(list(itertools.product((-1., -.5, 0., .5, 1.), repeat=3))),
+                      np.random.default_rng(2026110301).uniform(-1, 1, (128, 3))]
+    lines = []
+    for face in range(4):
+        for p in positions:
+            user = [float(np.float32(d+v*(d-lo if v < 0 else hi-d))) for v, (_, lo, d, hi, _) in zip(p, face_axes(face))]
+            for gid in range(2):
+                lines.append(' '.join(map(str, [len(lines), face, gid, *user])))
+    result = subprocess.run([str(Path(binary).resolve()), str(font.resolve())], input='\n'.join(lines)+'\n',
+                            capture_output=True, text=True, timeout=300)
+    (directory/'outline-coordinates.jsonl').write_text(result.stdout)
+    (directory/'native.stderr.log').write_text(result.stderr)
+    if result.returncode:
+        raise RuntimeError('native_gvar_observer_failed: '+result.stderr)
+    rows = [json.loads(line) for line in result.stdout.splitlines()]
+    if rows[0].get('faces') != 4 or rows[-1].get('requests') != len(lines) or len(rows) != len(lines)+2:
+        raise ValueError('incomplete_native_observer_transcript')
+    if [r['id'] for r in rows[1:-1]] != list(range(len(lines))):
+        raise ValueError('native_observer_request_identity')
+    passed = verify(directory, directory/'geometry.json')
+    print(json.dumps(dict(private_GDI_registered_fonts=rows[0]['private_GDI_registered_fonts'],
+                         exact_axis_gate_passed=rows[-1]['exact_axis_gate_passed'])))
+    return passed and rows[0]['private_GDI_registered_fonts'] > 0
+
+
 if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', required=True, type=Path)
     p.add_argument('--native', type=Path)
+    p.add_argument('--binary', type=Path)
     args = p.parse_args()
+    if args.binary:
+        raise SystemExit(0 if observe(args.binary, args.output) else 1)
     if args.native:
         raise SystemExit(0 if verify(args.native, args.output) else 1)
     print(json.dumps(make(args.output)))
