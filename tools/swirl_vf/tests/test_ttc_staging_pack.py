@@ -252,6 +252,21 @@ class PackingTests(unittest.TestCase):
         self.assertEqual(validations[0]["faces_checked"], 2)
         self.assertEqual(validations[0]["status"], "PASS")
 
+    def test_standalone_contracts_survive_streaming_pack_and_validation_callback(self):
+        from ttc_staging_validate import face_contract, validate_collection
+        root, paths, output = self.fixture(2)
+        expected = []
+        for path in paths:
+            with TTFont(path) as font:
+                expected.append(face_contract(font))
+        validations = []
+        def validate(candidate):
+            self.assertFalse(output.exists())
+            validations.append(validate_collection(candidate, expected))
+        pack.pack_collection(paths, output, validate=validate)
+        self.assertEqual(validations[0]["glyphs_checked"], 14)
+        self.assertFalse(validations[0]["production_accepted"])
+
     def test_source_symlink_and_output_symlink_are_rejected(self):
         root, paths, output = self.fixture(1)
         alias = root / "alias.ttf"
