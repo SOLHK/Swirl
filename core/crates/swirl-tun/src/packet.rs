@@ -6,9 +6,27 @@ use smoltcp::{
 use std::net::{IpAddr, SocketAddr};
 
 pub(crate) struct Metadata {
+    pub source: IpAddr,
+    pub destination: IpAddr,
     pub udp_destination: Option<SocketAddr>,
     pub new_tcp: Option<(SocketAddr, SocketAddr)>,
     pub tcp_key: Option<(SocketAddr, SocketAddr)>,
+}
+
+/// Read IP addresses before allocating reassembly state. The normal inspector
+/// and smoltcp still validate the complete header, checksum and transport.
+pub(crate) fn addresses(bytes: &[u8]) -> Option<(IpAddr, IpAddr)> {
+    match bytes.first()? >> 4 {
+        4 => {
+            let packet = Ipv4Packet::new_checked(bytes).ok()?;
+            Some((packet.src_addr().into(), packet.dst_addr().into()))
+        }
+        6 => {
+            let packet = Ipv6Packet::new_checked(bytes).ok()?;
+            Some((packet.src_addr().into(), packet.dst_addr().into()))
+        }
+        _ => None,
+    }
 }
 
 pub(crate) fn inspect(bytes: &[u8]) -> Result<Metadata, ()> {
@@ -96,6 +114,8 @@ pub(crate) fn inspect(bytes: &[u8]) -> Result<Metadata, ()> {
         return Err(());
     }
     let mut result = Metadata {
+        source,
+        destination,
         udp_destination: None,
         new_tcp: None,
         tcp_key: None,

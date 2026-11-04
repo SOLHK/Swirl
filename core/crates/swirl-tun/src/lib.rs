@@ -24,6 +24,7 @@ use tokio::{
 };
 
 mod device;
+pub mod gateway;
 mod ipv6;
 mod packet;
 mod stack;
@@ -44,6 +45,9 @@ pub struct TunConfig {
     pub tcp_handshake_timeout: Duration,
     pub tcp_idle_timeout: Duration,
     pub udp_idle_timeout: Duration,
+    /// Optional LAN admission layered onto this same packet stack. The
+    /// privileged host must additionally enforce physical-ingress provenance.
+    pub gateway: Option<gateway::GatewayIngress>,
 }
 
 impl Default for TunConfig {
@@ -58,12 +62,16 @@ impl Default for TunConfig {
             tcp_handshake_timeout: Duration::from_secs(15),
             tcp_idle_timeout: Duration::from_secs(2 * 60 * 60),
             udp_idle_timeout: Duration::from_secs(60),
+            gateway: None,
         }
     }
 }
 
 impl TunConfig {
     pub fn validate(&self) -> io::Result<()> {
+        if let Some(gateway) = &self.gateway {
+            gateway.validate()?;
+        }
         let valid = (1280..=65535).contains(&self.mtu)
             && (1..=4096).contains(&self.max_tcp_flows)
             && (1..=4096).contains(&self.max_udp_endpoints)
@@ -269,6 +277,7 @@ struct Counters {
     dropped_udp_datagrams: AtomicU64,
     active_tcp_flows: AtomicUsize,
     active_udp_endpoints: AtomicUsize,
+    denied_gateway_packets: AtomicU64,
 }
 
 #[derive(Debug, Clone)]
@@ -282,6 +291,7 @@ pub struct TunStatsSnapshot {
     pub dropped_udp_datagrams: u64,
     pub active_tcp_flows: usize,
     pub active_udp_endpoints: usize,
+    pub denied_gateway_packets: u64,
 }
 
 impl TunStats {
@@ -293,6 +303,7 @@ impl TunStats {
             dropped_udp_datagrams: self.0.dropped_udp_datagrams.load(Ordering::Relaxed),
             active_tcp_flows: self.0.active_tcp_flows.load(Ordering::Relaxed),
             active_udp_endpoints: self.0.active_udp_endpoints.load(Ordering::Relaxed),
+            denied_gateway_packets: self.0.denied_gateway_packets.load(Ordering::Relaxed),
         }
     }
 }

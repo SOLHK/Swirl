@@ -16,7 +16,7 @@ use std::{
     collections::HashMap,
     future::poll_fn,
     io,
-    net::{Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     pin::Pin,
     sync::{
         Arc,
@@ -60,6 +60,9 @@ pub(crate) struct Driver {
     ipv4_udp_admission: SocketHandle,
     tcp: HashMap<FlowKey, TcpEntry>,
     udp: HashMap<SocketAddr, UdpEntry>,
+    /// Bounded pre-buffer admission prevents one LAN client from reserving the
+    /// entire shared UDP endpoint pool before dispatcher session limits apply.
+    gateway_udp: HashMap<(IpAddr, SocketAddr), Instant>,
     tcp_tx: mpsc::Sender<TcpFlow>,
     udp_tx: mpsc::Sender<UdpDatagram>,
     counters: Arc<Counters>,
@@ -124,6 +127,7 @@ impl Driver {
             ipv4_udp_admission,
             tcp: HashMap::new(),
             udp: HashMap::new(),
+            gateway_udp: HashMap::new(),
             tcp_tx,
             udp_tx,
             counters,
@@ -201,6 +205,15 @@ impl Driver {
         self.counters
             .received_packets
             .fetch_add(1, Ordering::Relaxed);
+        if self.config.gateway.as_ref().is_some_and(|gateway| {
+            packet::addresses(&bytes)
+                .is_none_or(|(source, destination)| !gateway.permits(source, destination))
+        }) {
+            self.counters
+                .denied_gateway_packets
+                .fetch_add(1, Ordering::Relaxed);
+            return;
+        }
         let bytes = match self.ipv6_input.ingest(bytes) {
             Ok(Some(bytes)) => bytes,
             Ok(None) => return,
@@ -217,6 +230,17 @@ impl Driver {
                 .fetch_add(1, Ordering::Relaxed);
             return;
         };
+        if self
+            .config
+            .gateway
+            .as_ref()
+            .is_some_and(|gateway| !gateway.permits(metadata.source, metadata.destination))
+        {
+            self.counters
+                .denied_gateway_packets
+                .fetch_add(1, Ordering::Relaxed);
+            return;
+        }
         if let Some(key) = metadata.tcp_key
             && let Some(entry) = self.tcp.get_mut(&key)
         {
@@ -228,9 +252,10 @@ impl Driver {
             self.admit_tcp(key);
         }
         if let Some(destination) = metadata.udp_destination
-            && destination.is_ipv6()
+            && (destination.is_ipv6() || self.udp.contains_key(&destination))
+            && self.admit_udp(metadata.source, destination).is_none()
         {
-            self.admit_udp(destination);
+            return;
         }
         self.device.incoming.push_back(bytes);
         // Process each newly-admitted SYN before admitting another SYN to the
@@ -240,6 +265,20 @@ impl Driver {
     }
 
     fn admit_tcp(&mut self, key: FlowKey) {
+        if self.config.gateway.as_ref().is_some_and(|gateway| {
+            gateway.source(key.0.ip()) == Some(crate::gateway::SourceKind::Lan)
+                && self
+                    .tcp
+                    .keys()
+                    .filter(|flow| flow.0.ip() == key.0.ip())
+                    .count()
+                    >= gateway.max_tcp_per_client
+        }) {
+            self.counters
+                .denied_gateway_packets
+                .fetch_add(1, Ordering::Relaxed);
+            return;
+        }
         if self.tcp.len() >= self.config.max_tcp_flows || self.tcp_tx.capacity() == 0 {
             self.counters
                 .rejected_tcp_flows
@@ -288,9 +327,37 @@ impl Driver {
             .store(self.tcp.len(), Ordering::Relaxed);
     }
 
-    fn admit_udp(&mut self, destination: SocketAddr) -> Option<SocketHandle> {
+    fn admit_udp(&mut self, source: IpAddr, destination: SocketAddr) -> Option<SocketHandle> {
+        let lan =
+            self.config.gateway.as_ref().is_some_and(|gateway| {
+                gateway.source(source) == Some(crate::gateway::SourceKind::Lan)
+            });
+        if lan && !self.gateway_udp.contains_key(&(source, destination)) {
+            let gateway = self
+                .config
+                .gateway
+                .as_ref()
+                .expect("LAN admission configuration");
+            if self.gateway_udp.len() >= self.config.max_udp_endpoints.saturating_mul(8).min(4096)
+                || self
+                    .gateway_udp
+                    .keys()
+                    .filter(|(client, _)| *client == source)
+                    .count()
+                    >= gateway.max_udp_per_client
+            {
+                self.counters
+                    .denied_gateway_packets
+                    .fetch_add(1, Ordering::Relaxed);
+                return None;
+            }
+        }
         if let Some(entry) = self.udp.get_mut(&destination) {
             entry.activity = Instant::now();
+            if lan {
+                self.gateway_udp
+                    .insert((source, destination), entry.activity);
+            }
             return Some(entry.handle);
         }
         if self.udp.len() >= self.config.max_udp_endpoints {
@@ -318,6 +385,10 @@ impl Driver {
                 activity: Instant::now(),
             },
         );
+        if lan {
+            self.gateway_udp
+                .insert((source, destination), Instant::now());
+        }
         self.counters
             .active_udp_endpoints
             .store(self.udp.len(), Ordering::Relaxed);
@@ -382,7 +453,7 @@ impl Driver {
                 payload: udp.payload().to_vec(),
             }
         };
-        if self.admit_udp(datagram.destination).is_none() {
+        if self.admit_udp(datagram.source.ip(), datagram.destination).is_none() {
             return;
         }
         // There was no destination UDP socket during ingress. Publish its first
@@ -464,12 +535,24 @@ impl Driver {
     }
 
     fn reply(&mut self, datagram: UdpDatagram) {
+        if let Some(gateway) = &self.config.gateway {
+            let client = datagram.destination.ip();
+            if !gateway.permits(client, datagram.source.ip())
+                || (gateway.source(client) == Some(crate::gateway::SourceKind::Lan)
+                    && !self.gateway_udp.contains_key(&(client, datagram.source)))
+            {
+                self.counters
+                    .denied_gateway_packets
+                    .fetch_add(1, Ordering::Relaxed);
+                return;
+            }
+        }
         if datagram.source.is_ipv6() && datagram.payload.len() + 48 > self.config.mtu {
             self.fragment_id = self.fragment_id.wrapping_add(1);
             self.ipv6_reply = UdpFragments::new(datagram, self.fragment_id);
             return;
         }
-        let Some(handle) = self.admit_udp(datagram.source) else {
+        let Some(handle) = self.admit_udp(datagram.destination.ip(), datagram.source) else {
             return;
         };
         let socket = self.sockets.get_mut::<udp::Socket>(handle);
@@ -609,6 +692,10 @@ impl Driver {
                     self.sockets.remove(entry.handle);
                 }
                 keep
+            });
+            self.gateway_udp.retain(|(_, destination), activity| {
+                self.udp.contains_key(destination)
+                    && now.duration_since(*activity) < self.config.udp_idle_timeout
             });
         }
         self.counters

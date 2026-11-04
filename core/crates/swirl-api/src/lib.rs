@@ -13,6 +13,9 @@ mod control_v2;
 mod import_ffi;
 #[cfg(windows)]
 pub mod native_packet_worker;
+#[cfg(windows)]
+mod native_gateway;
+pub mod native_gateway_control;
 pub mod native_tun;
 pub mod native_tun_control;
 pub mod native_tun_ipc;
@@ -132,6 +135,9 @@ impl Controller {
             Ok(value) => value,
             Err(_) => return json!({"ok":false,"error":"CommandInvalidOrUnsupported"}),
         };
+        if parsed.get("native_gateway_schema").is_some() {
+            return native_gateway_control::dispatch(self, input);
+        }
         if parsed.get("native_tun_schema").is_some() {
             return native_tun_control::dispatch(self, input);
         }

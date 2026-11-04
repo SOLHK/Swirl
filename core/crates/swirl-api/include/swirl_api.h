@@ -62,7 +62,21 @@ intptr_t swirl_core_build_info(uint8_t *output, size_t output_capacity);
  * before using them. Snapshot includes actual bound addresses, clients and byte
  * counts, never credentials. The system-proxy listener remains loopback-only.
  * LAN credentials are input-only; callers must not log command buffers.
- * HTTP Basic/SOCKS5 password authentication does not encrypt the transport. */
+ * HTTP Basic/SOCKS5 password authentication does not encrypt the transport.
+ *
+ * Gateway candidate control uses native_gateway_schema=1 with UUID request_id:
+ * gateway_validate(config), gateway_prepare(handle,engine_epoch,config),
+ * gateway_activate(handle,engine_epoch,preparation_id,dhcp?), gateway_status,
+ * gateway_stop, gateway_recover. Mutations require the separately launched
+ * elevated native helper; the ordinary DLL never grants helper privileges.
+ * Prepare returns phase=prepared through state, an opaque preparation_id and
+ * helper_worker_pid inside gateway. Capture/isolation are active but dedicated
+ * LAN forwarding remains off. Activate rechecks actual topology/capture and,
+ * when DHCP is requested, verifies a one-use socket duplicate targeted at that
+ * worker PID plus the owner process identity. Never log the DHCP socket token.
+ * Stop restores LAN forwarding before TUN and only then removes owned isolation.
+ * This candidate remains IPv4-only, gui_activation_available=false and
+ * real_windows_11_acceptance=false; backend availability is not acceptance. */
 intptr_t swirl_core_command(const uint8_t *input, size_t input_len,
                            uint8_t *output, size_t output_capacity);
 

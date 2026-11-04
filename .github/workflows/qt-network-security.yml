@@ -313,6 +313,8 @@ jobs:
               assert not function.findall('Skip')
               assert not any(message.get('type') == 'skip' for message in function.findall('Message'))
           print('Qt 6.12 LAN control: all required validation and lifecycle cases executed; native firewall mutation is not claimed')
+      - name: Verify isolated gateway DHCP socket and lease regressions
+        run: ctest --test-dir build/qt-product -C Release -R "^swirl-gateway-network$" --output-on-failure --no-tests=error --output-junit "${{ github.workspace }}/build/qt-product/gateway-network.xml"
       - name: Verify Windows DPAPI subscription refresh and redirects
         shell: pwsh
         run: |
@@ -423,6 +425,7 @@ jobs:
             build/qt-product/lan-firewall-native.txt
             build/qt-product/lan-firewall-evidence.json
             build/qt-product/product-xml-evidence.json
+            build/qt-product/gateway-network.xml
             build/qt-product/qt-network-policy.xml
             build/qt-product/swirl-telemetry-accounting.xml
             build/qt-product/Testing/Temporary/LastTest.log

@@ -233,7 +233,6 @@ struct Shared {
     failed: AtomicU64,
     rejected: AtomicU64,
     totals: Arc<Counters>,
-    permits: Arc<Semaphore>,
     last_error: Mutex<&'static str>,
     address: SocketAddr,
 }
@@ -264,10 +263,14 @@ struct RegisteredSession {
 }
 impl Shared {
     fn register(self: &Arc<Self>) -> Result<RegisteredSession> {
-        let permit = self.permits.clone().try_acquire_owned().map_err(|_| {
-            self.rejected.fetch_add(1, Ordering::Relaxed);
-            "ConnectionLimit"
-        })?;
+        let permit = self
+            .connection_slots
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| {
+                self.rejected.fetch_add(1, Ordering::Relaxed);
+                "ConnectionLimit"
+            })?;
         let mut sessions = self.sessions.lock().map_err(|_| "SessionState")?;
         // Serialize against the shutdown sweep. No flow may register after the
         // sweep has already sent cancellation to every previous session.
@@ -565,7 +568,6 @@ impl Core {
             failed: AtomicU64::new(0),
             rejected: AtomicU64::new(0),
             totals: Arc::new(Counters::default()),
-            permits: Arc::new(Semaphore::new(capacity)),
             last_error: Mutex::new(""),
             address,
         });
@@ -1955,6 +1957,7 @@ async fn route_flow(
     target: &NetworkTarget,
     counters: Arc<Counters>,
     native: bool,
+    boundary: Option<&dyn IngressBoundary>,
 ) -> Result<Routed> {
     if target.port == 0 || !swirl_subscription::valid_host(&target.host) {
         return Err("InvalidTarget");
@@ -1963,7 +1966,7 @@ async fn route_flow(
     if native || shared.native_tun_leases.load(Ordering::Acquire) > 0 {
         native_flow::validate_tun_dns(&plan.prepared.runtime)?;
     }
-    let routed = route(plan, target.clone(), peer.ip(), generation, true, None).await?;
+    let routed = route(plan, target.clone(), peer.ip(), generation, boundary.is_none(), boundary).await?;
     if proxy_loop(&routed.target, &routed.direct_addresses, shared.address) {
         return Err("ProxyLoop");
     }
@@ -1972,7 +1975,7 @@ async fn route_flow(
         id,
         Record {
             peer,
-            ingress: if native { "native-tun" } else { "loopback" },
+            ingress: if native { "native_tun" } else { "loopback" },
             target: target.clone(),
             trace: routed.trace.clone(),
             node: routed.node.id.clone(),
@@ -1995,15 +1998,7 @@ async fn route_flow(
     Ok(routed)
 }
 
-async fn connect_tcp_flow(
-    shared: &Arc<Shared>,
-    id: u64,
-    peer: SocketAddr,
-    target: &NetworkTarget,
-    counters: Arc<Counters>,
-    native: bool,
-) -> Result<swirl_transport::BoxStream> {
-    let routed = route_flow(shared, id, peer, target, counters, native).await?;
+async fn connect_routed_tcp(routed: &Routed) -> Result<swirl_transport::BoxStream> {
     if routed.direct_addresses.len() > 1 {
         swirl_protocol::connect_direct_resolved(routed.direct_addresses.clone(), routed.limit).await
     } else if let Some(transport) = &routed.transport {
@@ -2067,76 +2062,32 @@ async fn session(
         if let Some(ingress) = &lan {
             ingress.check_target(&request.target)?;
         }
-        let (plan, generation) = shared.admit().await?;
-        if shared.native_tun_leases.load(Ordering::Acquire) > 0 {
-            native_flow::validate_tun_dns(&plan.prepared.runtime)?;
-        }
         let boundary = lan.as_ref().map(|ingress| ingress.boundary(shared.address));
-        let mut routed = route(
-            plan,
-            request.target.clone(),
-            peer.ip(),
-            generation,
-            lan.is_none(),
+        let mut routed = route_flow(
+            &shared,
+            id,
+            peer,
+            &request.target,
+            counters.clone(),
+            false,
             boundary
                 .as_ref()
                 .map(|boundary| boundary as &dyn IngressBoundary),
         )
         .await?;
-        // The final DIRECT address comes from the existing resolver, after
-        // policy evaluation. Checking here blocks static-host/DNS rebinding
-        // without adding any separate DNS lookup or leaking proxy domains.
         if let Some(ingress) = &lan {
             ingress.check_target(&routed.target)?;
             ingress
                 .prepare_outbound(&mut routed, shared.address)
                 .await?;
+            if let Ok(mut records) = shared.records.lock()
+                && let Some(record) = records.get_mut(&id)
+            {
+                record.ingress = "lan";
+                record.trace = routed.trace.clone();
+            }
         }
-        if proxy_loop(&routed.target, &routed.direct_addresses, shared.address) {
-            return Err("ProxyLoop");
-        }
-        shared.bind(id, &routed.node.id)?;
-        shared.records.lock().map_err(|_| "StatsState")?.insert(
-            id,
-            Record {
-                peer,
-                ingress: if lan.is_some() { "lan" } else { "loopback" },
-                target: request.target.clone(),
-                trace: routed.trace.clone(),
-                node: routed.node.id.clone(),
-                category: if matches!(routed.node.outbound, Outbound::Direct {}) {
-                    "direct"
-                } else if matches!(routed.node.outbound, Outbound::Reject {}) {
-                    "reject"
-                } else {
-                    "proxy"
-                },
-                counters: counters.clone(),
-                started: Instant::now(),
-                ended: false,
-                error: "",
-            },
-        );
-        let mut upstream = if routed.direct_addresses.len() > 1 {
-            swirl_protocol::connect_direct_resolved(routed.direct_addresses.clone(), routed.limit).await?
-        } else if let Some(transport) = &routed.transport {
-            swirl_protocol::connect_with_transport(
-                &routed.node.outbound,
-                &routed.target,
-                &routed.resolver,
-                routed.limit,
-                transport,
-            )
-            .await?
-        } else {
-            swirl_protocol::connect(
-                &routed.node.outbound,
-                &routed.target,
-                &routed.resolver,
-                routed.limit,
-            )
-            .await?
-        };
+        let mut upstream = connect_routed_tcp(&routed).await?;
         drop(routed);
         reply_started = true;
         swirl_protocol::reply(&mut inbound, request.kind, true).await?;

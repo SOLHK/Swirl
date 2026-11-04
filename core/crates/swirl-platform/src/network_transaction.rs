@@ -59,11 +59,21 @@ impl InterfaceIdentity {
     }
 }
 
-/// Resource keys never refer to physical interfaces: their identity is carried
-/// once in the journal and independently checked by the Windows backend.
+/// The identity is carried once in the journal and independently checked by
+/// its backend. The TUN backend still refuses physical interfaces; the gateway
+/// backend permits only dedicated-LAN forwarding and its owned isolation guard.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Resource {
+    Forwarding {
+        ipv6: bool,
+    },
+    GatewayIsolation {
+        name: String,
+    },
+    GatewayDhcpFirewall {
+        name: String,
+    },
     Mtu {
         ipv6: bool,
     },
@@ -99,6 +109,15 @@ impl DnsProtocol {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Value {
+    Forwarding {
+        enabled: bool,
+    },
+    GatewayIsolation {
+        policy: crate::gateway_policy::GatewayIsolationPolicy,
+    },
+    GatewayDhcpFirewall {
+        scope: crate::gateway_policy::GatewayDhcpFirewallScope,
+    },
     Mtu {
         mtu: u32,
     },
@@ -129,6 +148,21 @@ pub enum Value {
 pub(crate) fn validate_value(resource: &Resource, value: &Option<Value>) -> io::Result<()> {
     match (resource, value) {
         (_, None) => Ok(()),
+        (Resource::Forwarding { .. }, Some(Value::Forwarding { .. })) => Ok(()),
+        (Resource::GatewayIsolation { name }, Some(Value::GatewayIsolation { policy })) => {
+            policy.validate()?;
+            if name != &policy.name() {
+                return Err(invalid("gateway isolation ownership name mismatch"));
+            }
+            Ok(())
+        }
+        (Resource::GatewayDhcpFirewall { name }, Some(Value::GatewayDhcpFirewall { scope })) => {
+            scope.validate()?;
+            if name != &scope.name() {
+                return Err(invalid("gateway DHCP firewall ownership name mismatch"));
+            }
+            Ok(())
+        }
         (Resource::Mtu { ipv6 }, Some(Value::Mtu { mtu })) => {
             let minimum = if *ipv6 { 1280 } else { 576 };
             if *mtu < minimum {
@@ -202,6 +236,8 @@ pub trait NetworkBackend {
 
     /// Compare immediately before writing, then read back. Never accept only
     /// the command's exit status as proof that the desired state was installed.
+    /// Return AlreadyExists only for an ownership/CAS conflict proven to occur
+    /// before any write. The journal must never adopt that actor's state.
     fn compare_exchange(
         &mut self,
         interface: &InterfaceIdentity,
@@ -219,6 +255,9 @@ pub enum ChangeState {
     Applied,
     Restored,
     Conflict,
+    /// A compare rejected a foreign value before writing, or recovery observed
+    /// ownership loss. Even a later value equal to `after` is not ours to undo.
+    NotOwned,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -242,7 +281,7 @@ pub struct Journal {
 impl Journal {
     pub fn validate(&self) -> io::Result<()> {
         self.interface.validate()?;
-        if self.version != 1
+        if !matches!(self.version, 1 | 2)
             || self.owner.len() != 32
             || !self.owner.bytes().all(|c| c.is_ascii_hexdigit())
             || self.changes.is_empty()
@@ -272,6 +311,65 @@ impl Journal {
                     || name != &dns_guard_name(&self.interface, owner, *protocol)
                 {
                     return Err(invalid("DNS guard does not belong to journal owner"));
+                }
+            }
+            if let Resource::GatewayIsolation { .. } = &change.resource {
+                let Some(Value::GatewayIsolation { policy }) =
+                    change.after.as_ref().or(change.before.as_ref())
+                else {
+                    return Err(invalid("gateway guard has no ownership value"));
+                };
+                if policy.owner != self.owner
+                    || policy.lan != self.interface
+                    || change.before.is_some()
+                {
+                    return Err(invalid("gateway guard does not belong to journal owner"));
+                }
+            }
+        }
+        let gateway = self
+            .changes
+            .iter()
+            .any(|change| matches!(change.resource, Resource::GatewayIsolation { .. }));
+        let dhcp = self
+            .changes
+            .iter()
+            .any(|change| matches!(change.resource, Resource::GatewayDhcpFirewall { .. }));
+        if dhcp && !gateway || self.version == 2 && !dhcp || self.version == 1 && dhcp {
+            return Err(invalid(
+                "gateway DHCP exception requires a version 2 gateway journal",
+            ));
+        }
+        if gateway {
+            let forwarding = self.changes.last().expect("validated nonempty journal");
+            let expected_count = if dhcp { 3 } else { 2 };
+            if self.changes.len() != expected_count
+                || !matches!(self.changes[0].resource, Resource::GatewayIsolation { .. })
+                || !matches!(forwarding.resource, Resource::Forwarding { ipv6: false })
+                || forwarding.after != Some(Value::Forwarding { enabled: true })
+                || forwarding.before != Some(Value::Forwarding { enabled: false })
+            {
+                return Err(invalid(
+                    "gateway isolation and DHCP exception must precede IPv4 forwarding",
+                ));
+            }
+            if dhcp {
+                let Some(Value::GatewayIsolation { policy }) = self.changes[0].after.as_ref()
+                else {
+                    return Err(invalid("gateway isolation has no installation policy"));
+                };
+                let change = &self.changes[1];
+                let Some(Value::GatewayDhcpFirewall { scope }) = change.after.as_ref() else {
+                    return Err(invalid("gateway DHCP exception has no installation scope"));
+                };
+                if !matches!(change.resource, Resource::GatewayDhcpFirewall { .. })
+                    || change.before.is_some()
+                    || !scope.enabled
+                    || !scope.matches_policy(policy)
+                {
+                    return Err(invalid(
+                        "gateway DHCP exception does not belong to its isolation policy",
+                    ));
                 }
             }
         }
@@ -304,7 +402,12 @@ impl Journal {
             validate_value(&resource, &before).map_err(|error| {
                 io::Error::new(error.kind(), format!("captured state validation: {error}"))
             })?;
-            if before.is_some() && !matches!(resource, Resource::Dns | Resource::Mtu { .. }) {
+            if before.is_some()
+                && !matches!(
+                    resource,
+                    Resource::Dns | Resource::Mtu { .. } | Resource::Forwarding { .. }
+                )
+            {
                 return Err(io::Error::new(
                     io::ErrorKind::AlreadyExists,
                     "TUN address, route or firewall rule already exists; refusing ownership takeover",
@@ -317,8 +420,16 @@ impl Journal {
                 state: ChangeState::Pending,
             });
         }
+        let version = if changes
+            .iter()
+            .any(|change| matches!(change.resource, Resource::GatewayDhcpFirewall { .. }))
+        {
+            2
+        } else {
+            1
+        };
         let journal = Self {
-            version: 1,
+            version,
             owner,
             interface,
             changes,
@@ -468,21 +579,67 @@ pub fn apply(
     store: &mut impl JournalStore,
     journal: &mut Journal,
 ) -> Result<(), ApplyError> {
+    if journal
+        .changes
+        .iter()
+        .any(|change| change.state != ChangeState::Pending)
+    {
+        return Err(ApplyError {
+            cause: invalid("only a fresh plan can be applied; recover existing sessions first"),
+            recovery: Ok(RecoveryReport::default()),
+        });
+    }
+    let through = journal.changes.len();
+    apply_prefix(backend, store, journal, through)
+}
+
+/// Apply a contiguous, verified prefix of a durable plan. This permits the
+/// gateway coordinator to install isolation, establish the TUN/DHCP data path,
+/// and only then enable LAN forwarding. Resumption never adopts outside writes:
+/// every already-Applied resource is read back before another write is allowed.
+/// A failure rolls back only changes attempted by this stage. An earlier stage
+/// stays owned until its coordinator has torn down dependent resources. This
+/// keeps gateway isolation alive while TUN/DHCP activation is rolled back.
+pub fn apply_prefix(
+    backend: &mut impl NetworkBackend,
+    store: &mut impl JournalStore,
+    journal: &mut Journal,
+    through: usize,
+) -> Result<(), ApplyError> {
     let mut durable = false;
+    let mut rollback_from = 0;
     let result = (|| -> io::Result<()> {
         journal.validate()?;
-        if journal
+        if through == 0 || through > journal.changes.len() {
+            return Err(invalid("invalid transaction prefix"));
+        }
+        let first_pending = journal
             .changes
             .iter()
-            .any(|c| c.state != ChangeState::Pending)
+            .position(|change| change.state != ChangeState::Applied)
+            .unwrap_or(journal.changes.len());
+        if first_pending > through
+            || journal.changes[first_pending..]
+                .iter()
+                .any(|change| change.state != ChangeState::Pending)
         {
             return Err(invalid(
-                "only a fresh plan can be applied; recover existing sessions first",
+                "only an Applied prefix and Pending suffix may be resumed",
             ));
         }
+        rollback_from = first_pending;
+        durable = first_pending > 0;
         store.save(journal)?;
         durable = true;
-        for index in 0..journal.changes.len() {
+        for change in &journal.changes[..first_pending] {
+            if backend.read(&journal.interface, &change.resource)? != change.after {
+                return Err(io::Error::new(
+                    io::ErrorKind::AlreadyExists,
+                    "applied transaction prefix changed before resumption",
+                ));
+            }
+        }
+        for index in first_pending..through {
             journal.changes[index].state = ChangeState::Applying;
             if let Err(error) = store.save(journal) {
                 // This OS write was never attempted. Even if a different actor
@@ -491,12 +648,20 @@ pub fn apply(
                 return Err(error);
             }
             let change = &journal.changes[index];
-            backend.compare_exchange(
+            if let Err(error) = backend.compare_exchange(
                 &journal.interface,
                 &change.resource,
                 &change.before,
                 &change.after,
-            )?;
+            ) {
+                if error.kind() == io::ErrorKind::AlreadyExists {
+                    journal.changes[index].state = ChangeState::NotOwned;
+                    // Preserve the in-memory loss even if persistence fails;
+                    // this recovery attempt must never perform the write.
+                    store.save(journal)?;
+                }
+                return Err(error);
+            }
             if backend.read(&journal.interface, &change.resource)? != change.after {
                 return Err(io::Error::other(
                     "network readback differs from requested state",
@@ -509,8 +674,8 @@ pub fn apply(
     })();
     result.map_err(|cause| ApplyError {
         cause,
-        recovery: if durable {
-            recover(backend, store, journal)
+        recovery: if durable && rollback_from < journal.changes.len() {
+            recover_suffix(backend, store, journal, rollback_from)
         } else {
             Ok(RecoveryReport::default())
         },
@@ -522,22 +687,67 @@ pub fn recover(
     store: &mut impl JournalStore,
     journal: &mut Journal,
 ) -> io::Result<RecoveryReport> {
+    recover_suffix(backend, store, journal, 0)
+}
+
+/// Restore only a suffix, in reverse order. Gateway shutdown first restores
+/// LAN forwarding (suffix 1), then tears down TUN, and finally restores suffix 0
+/// to relinquish isolation. The journal remains locked throughout these steps.
+pub fn recover_suffix(
+    backend: &mut impl NetworkBackend,
+    store: &mut impl JournalStore,
+    journal: &mut Journal,
+    from: usize,
+) -> io::Result<RecoveryReport> {
     journal.validate()?;
+    if from >= journal.changes.len() {
+        return Err(invalid("invalid recovery suffix"));
+    }
     let mut report = RecoveryReport::default();
     let mut persistence_error = None;
     // Routes were installed last. Remove captures before addresses/DNS.
-    for index in (0..journal.changes.len()).rev() {
+    for index in (from..journal.changes.len()).rev() {
         let change = &journal.changes[index];
-        if matches!(change.resource, Resource::DnsGuard { .. })
-            && matches!(
-                change.state,
-                ChangeState::Applying | ChangeState::Applied | ChangeState::Conflict
-            )
-            && !report.conflicts.is_empty()
+        let owns_guard = matches!(
+            change.state,
+            ChangeState::Applying
+                | ChangeState::Applied
+                | ChangeState::Conflict
+                | ChangeState::NotOwned
+        );
+        let gateway_forwarding_unresolved = matches!(
+            change.resource,
+            Resource::GatewayIsolation { .. } | Resource::GatewayDhcpFirewall { .. }
+        ) && owns_guard
+            && report.conflicts.is_empty()
+            && !matches!(
+                backend.read(&journal.interface, &Resource::Forwarding { ipv6: false }),
+                Ok(None) | Ok(Some(Value::Forwarding { enabled: false }))
+            );
+        let gateway_dhcp_unresolved = matches!(change.resource, Resource::GatewayIsolation { .. })
+            && owns_guard
+            && report.conflicts.is_empty()
+            && journal.changes.iter().any(|entry| {
+                matches!(entry.resource, Resource::GatewayDhcpFirewall { .. })
+                    && !matches!(backend.read(&journal.interface, &entry.resource), Ok(None))
+            });
+        if matches!(
+            change.resource,
+            Resource::DnsGuard { .. }
+                | Resource::GatewayIsolation { .. }
+                | Resource::GatewayDhcpFirewall { .. }
+        ) && owns_guard
+            && (!report.conflicts.is_empty()
+                || gateway_forwarding_unresolved
+                || gateway_dhcp_unresolved)
         {
             // Do not reopen a physical DNS escape path while capture recovery
-            // is unresolved. Report the retained guard for explicit recovery.
-            journal.changes[index].state = ChangeState::Conflict;
+            // is unresolved. Gateway Forwarding can also change while Pending
+            // or after our restore; reread it before removing our guard. Never
+            // disable that external value to make cleanup appear successful.
+            if change.state != ChangeState::NotOwned {
+                journal.changes[index].state = ChangeState::Conflict;
+            }
             report.conflicts.push(index);
             if let Err(error) = store.save(journal) {
                 persistence_error.get_or_insert(error);
@@ -550,16 +760,32 @@ pub fn recover(
             report.already_restored += 1;
             journal.changes[index].state = ChangeState::Restored;
         } else {
+            let ownership_lost = change.state == ChangeState::NotOwned;
             let outcome = (|| -> io::Result<bool> {
                 let current = backend.read(&journal.interface, &change.resource)?;
                 if current == change.before
                     || (current.is_none()
-                        && matches!(change.resource, Resource::Dns | Resource::Mtu { .. }))
+                        && matches!(
+                            change.resource,
+                            Resource::Dns | Resource::Mtu { .. } | Resource::Forwarding { .. }
+                        ))
                 {
                     return Ok(false);
                 }
-                if current != change.after {
-                    return Err(io::Error::other("resource no longer owned"));
+                // Forwarding is a shared boolean with no OS owner token. If a
+                // process dies (or loses its disk) at Applying, a successful
+                // write and a rejected compare against an identical external
+                // value are indistinguishable. Keep isolation and evidence;
+                // never guess ownership merely because the bit is true.
+                if change.state == ChangeState::NotOwned
+                    || (change.state == ChangeState::Applying
+                        && matches!(change.resource, Resource::Forwarding { .. }))
+                    || current != change.after
+                {
+                    return Err(io::Error::new(
+                        io::ErrorKind::AlreadyExists,
+                        "resource no longer owned",
+                    ));
                 }
                 backend.compare_exchange(
                     &journal.interface,
@@ -581,8 +807,13 @@ pub fn recover(
                     }
                     journal.changes[index].state = ChangeState::Restored;
                 }
-                Err(_) => {
-                    journal.changes[index].state = ChangeState::Conflict;
+                Err(error) => {
+                    journal.changes[index].state =
+                        if ownership_lost || error.kind() == io::ErrorKind::AlreadyExists {
+                            ChangeState::NotOwned
+                        } else {
+                            ChangeState::Conflict
+                        };
                     report.conflicts.push(index);
                 }
             }
@@ -719,6 +950,7 @@ mod tests {
     struct MockNetwork {
         values: HashMap<Resource, Value>,
         writes: usize,
+        write_order: Vec<Resource>,
         fail_write: Option<usize>,
     }
     impl NetworkBackend for MockNetwork {
@@ -737,11 +969,15 @@ mod tests {
             validate_value(key, expected)?;
             validate_value(key, desired)?;
             self.writes += 1;
+            self.write_order.push(key.clone());
             if self.fail_write == Some(self.writes) {
                 return Err(io::Error::other("injected OS failure"));
             }
             if self.values.get(key) != expected.as_ref() {
-                return Err(io::Error::other("concurrent external change"));
+                return Err(io::Error::new(
+                    io::ErrorKind::AlreadyExists,
+                    "concurrent external change",
+                ));
             }
             match desired {
                 Some(value) => {
@@ -1376,5 +1612,479 @@ mod tests {
         drop(store);
         assert!(FileJournalStore::create_new(&path).is_err());
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    fn gateway_plan(backend: &mut MockNetwork) -> Journal {
+        let policy = crate::gateway_policy::fixture();
+        let forwarding = Resource::Forwarding { ipv6: false };
+        backend
+            .values
+            .insert(forwarding.clone(), Value::Forwarding { enabled: false });
+        Journal::prepare(
+            backend,
+            policy.lan.clone(),
+            policy.owner.clone(),
+            vec![
+                (
+                    Resource::GatewayIsolation {
+                        name: policy.name(),
+                    },
+                    Some(Value::GatewayIsolation { policy }),
+                ),
+                (forwarding, Some(Value::Forwarding { enabled: true })),
+            ],
+        )
+        .unwrap()
+    }
+
+    fn gateway_dhcp_plan(backend: &mut MockNetwork) -> Journal {
+        let mut policy = crate::gateway_policy::fixture();
+        policy.dhcp = true;
+        let scope = crate::gateway_policy::GatewayDhcpFirewallScope {
+            owner: policy.owner.clone(),
+            lan: policy.lan.clone(),
+            interface_alias: "Dedicated LAN".into(),
+            program: r"C:\Program Files\Swirl\Swirl.exe".into(),
+            gateway: policy.gateway,
+            subnet: policy.subnet,
+            allowed_sources: policy.allowed_sources.clone(),
+            enabled: true,
+        };
+        let forwarding = Resource::Forwarding { ipv6: false };
+        backend
+            .values
+            .insert(forwarding.clone(), Value::Forwarding { enabled: false });
+        Journal::prepare(
+            backend,
+            policy.lan.clone(),
+            policy.owner.clone(),
+            vec![
+                (
+                    Resource::GatewayIsolation {
+                        name: policy.name(),
+                    },
+                    Some(Value::GatewayIsolation { policy }),
+                ),
+                (
+                    Resource::GatewayDhcpFirewall { name: scope.name() },
+                    Some(Value::GatewayDhcpFirewall { scope }),
+                ),
+                (forwarding, Some(Value::Forwarding { enabled: true })),
+            ],
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn gateway_dhcp_stages_and_recovery_keep_forwarding_before_exception_and_guard() {
+        let mut backend = MockNetwork::default();
+        let mut journal = gateway_dhcp_plan(&mut backend);
+        let mut store = MemoryJournal::default();
+        assert_eq!(journal.version, 2);
+        let guard = journal.changes[0].resource.clone();
+        let firewall = journal.changes[1].resource.clone();
+        let forwarding = journal.changes[2].resource.clone();
+        apply_prefix(&mut backend, &mut store, &mut journal, 1).unwrap();
+        assert!(
+            !backend.values.contains_key(&firewall),
+            "no exception before socket attestation"
+        );
+        apply_prefix(&mut backend, &mut store, &mut journal, 2).unwrap();
+        assert_eq!(
+            backend.values[&forwarding],
+            Value::Forwarding { enabled: false }
+        );
+        apply_prefix(&mut backend, &mut store, &mut journal, 3).unwrap();
+        recover_suffix(&mut backend, &mut store, &mut journal, 1).unwrap();
+        assert_eq!(
+            &backend.write_order[3..],
+            &[forwarding.clone(), firewall.clone()]
+        );
+        assert!(!backend.values.contains_key(&firewall));
+        assert!(
+            backend.values.contains_key(&guard),
+            "TUN still owns capture teardown"
+        );
+        recover(&mut backend, &mut store, &mut journal).unwrap();
+        assert_eq!(backend.write_order.last(), Some(&guard));
+        assert!(journal.is_restored());
+    }
+
+    #[test]
+    fn gateway_dhcp_failures_never_enable_forwarding_or_discard_isolation() {
+        let mut backend = MockNetwork::default();
+        let mut journal = gateway_dhcp_plan(&mut backend);
+        let mut store = MemoryJournal::default();
+        apply_prefix(&mut backend, &mut store, &mut journal, 1).unwrap();
+        backend.fail_write = Some(2);
+        assert!(apply_prefix(&mut backend, &mut store, &mut journal, 2).is_err());
+        assert_eq!(
+            backend.values[&journal.changes[2].resource],
+            Value::Forwarding { enabled: false }
+        );
+        assert!(backend.values.contains_key(&journal.changes[0].resource));
+
+        let mut backend = MockNetwork::default();
+        let mut journal = gateway_dhcp_plan(&mut backend);
+        let mut store = MemoryJournal::default();
+        apply_prefix(&mut backend, &mut store, &mut journal, 2).unwrap();
+        backend.values.remove(&journal.changes[1].resource);
+        let writes = backend.writes;
+        assert!(apply_prefix(&mut backend, &mut store, &mut journal, 3).is_err());
+        assert_eq!(backend.writes, writes);
+        assert_eq!(
+            backend.values[&journal.changes[2].resource],
+            Value::Forwarding { enabled: false }
+        );
+    }
+
+    #[test]
+    fn gateway_dhcp_recovery_retains_exception_on_forwarding_conflict_and_foreign_edits() {
+        let mut backend = MockNetwork::default();
+        let mut journal = gateway_dhcp_plan(&mut backend);
+        let mut store = MemoryJournal::default();
+        apply(&mut backend, &mut store, &mut journal).unwrap();
+        backend.fail_write = Some(4);
+        assert_eq!(
+            recover(&mut backend, &mut store, &mut journal)
+                .unwrap()
+                .conflicts,
+            vec![2, 1, 0]
+        );
+        assert!(backend.values.contains_key(&journal.changes[1].resource));
+        assert!(backend.values.contains_key(&journal.changes[0].resource));
+        backend.fail_write = None;
+        let firewall = journal.changes[1].resource.clone();
+        let Some(Value::GatewayDhcpFirewall { scope }) = backend.values.get_mut(&firewall) else {
+            panic!("expected DHCP exception")
+        };
+        scope.program = r"C:\Other\Swirl.exe".into();
+        assert_eq!(
+            recover(&mut backend, &mut store, &mut journal)
+                .unwrap()
+                .conflicts,
+            vec![1, 0]
+        );
+        assert_eq!(
+            backend.values[&journal.changes[2].resource],
+            Value::Forwarding { enabled: false }
+        );
+        assert_eq!(journal.changes[1].state, ChangeState::NotOwned);
+        backend
+            .values
+            .insert(firewall.clone(), journal.changes[1].after.clone().unwrap());
+        let writes = backend.writes;
+        assert_eq!(
+            recover(&mut backend, &mut store, &mut journal)
+                .unwrap()
+                .conflicts,
+            vec![1, 0]
+        );
+        assert_eq!(
+            backend.writes, writes,
+            "an identical later value does not restore ownership"
+        );
+    }
+
+    #[test]
+    fn gateway_dhcp_crash_after_firewall_write_recovers_exact_scope_and_legacy_journals() {
+        let mut backend = MockNetwork::default();
+        let mut journal = gateway_dhcp_plan(&mut backend);
+        let mut store = MemoryJournal::default();
+        apply_prefix(&mut backend, &mut store, &mut journal, 2).unwrap();
+        journal.changes[1].state = ChangeState::Applying;
+        let mut reopened: Journal =
+            serde_json::from_slice(&serde_json::to_vec(&journal).unwrap()).unwrap();
+        reopened.validate().unwrap();
+        assert!(
+            recover(&mut backend, &mut store, &mut reopened)
+                .unwrap()
+                .conflicts
+                .is_empty()
+        );
+        assert!(reopened.is_restored());
+        let mut legacy = gateway_plan(&mut MockNetwork::default());
+        let Some(Value::GatewayIsolation { policy }) = &mut legacy.changes[0].after else {
+            panic!("expected isolation")
+        };
+        policy.dhcp = true;
+        assert_eq!(legacy.version, 1);
+        legacy.validate().unwrap();
+        let mut invalid = journal.clone();
+        invalid.version = 1;
+        assert!(invalid.validate().is_err());
+        invalid = journal.clone();
+        invalid.changes.swap(1, 2);
+        assert!(invalid.validate().is_err());
+        invalid = journal;
+        let Some(Value::GatewayDhcpFirewall { scope }) = &mut invalid.changes[1].after else {
+            panic!("expected exception")
+        };
+        scope.allowed_sources = vec!["192.168.77.0/24".parse().unwrap()];
+        assert!(invalid.validate().is_err());
+    }
+
+    #[test]
+    fn gateway_dhcp_recreated_exception_cannot_release_isolation_after_quiesce() {
+        let mut backend = MockNetwork::default();
+        let mut journal = gateway_dhcp_plan(&mut backend);
+        let mut store = MemoryJournal::default();
+        apply(&mut backend, &mut store, &mut journal).unwrap();
+        recover_suffix(&mut backend, &mut store, &mut journal, 1).unwrap();
+        let firewall = journal.changes[1].resource.clone();
+        backend
+            .values
+            .insert(firewall, journal.changes[1].after.clone().unwrap());
+        let writes = backend.writes;
+        assert_eq!(
+            recover(&mut backend, &mut store, &mut journal)
+                .unwrap()
+                .conflicts,
+            vec![0]
+        );
+        assert_eq!(backend.writes, writes);
+        assert!(backend.values.contains_key(&journal.changes[0].resource));
+    }
+
+    #[test]
+    fn gateway_recovery_retains_isolation_until_lan_forwarding_is_restored() {
+        let mut backend = MockNetwork::default();
+        let mut journal = gateway_plan(&mut backend);
+        let mut store = MemoryJournal::default();
+        apply(&mut backend, &mut store, &mut journal).unwrap();
+        backend.fail_write = Some(3);
+        let report = recover(&mut backend, &mut store, &mut journal).unwrap();
+        assert_eq!(report.conflicts, vec![1, 0]);
+        assert!(backend.values.contains_key(&journal.changes[0].resource));
+        assert_eq!(
+            backend.values[&journal.changes[1].resource],
+            Value::Forwarding { enabled: true }
+        );
+        backend.fail_write = None;
+        assert!(
+            recover(&mut backend, &mut store, &mut journal)
+                .unwrap()
+                .conflicts
+                .is_empty()
+        );
+        assert!(journal.is_restored());
+        assert!(!backend.values.contains_key(&journal.changes[0].resource));
+        assert_eq!(
+            backend.values[&journal.changes[1].resource],
+            Value::Forwarding { enabled: false }
+        );
+    }
+
+    #[test]
+    fn gateway_preparation_activation_and_quiesce_hold_isolation_between_phases() {
+        let mut backend = MockNetwork::default();
+        let mut journal = gateway_plan(&mut backend);
+        let mut store = MemoryJournal::default();
+        let guard = journal.changes[0].resource.clone();
+        let forwarding = journal.changes[1].resource.clone();
+        apply_prefix(&mut backend, &mut store, &mut journal, 1).unwrap();
+        assert!(backend.values.contains_key(&guard));
+        assert_eq!(
+            backend.values[&forwarding],
+            Value::Forwarding { enabled: false }
+        );
+        assert_eq!(journal.changes[1].state, ChangeState::Pending);
+        assert_eq!(backend.writes, 1);
+        apply_prefix(&mut backend, &mut store, &mut journal, 2).unwrap();
+        assert_eq!(
+            backend.values[&forwarding],
+            Value::Forwarding { enabled: true }
+        );
+        assert_eq!(backend.writes, 2);
+        let report = recover_suffix(&mut backend, &mut store, &mut journal, 1).unwrap();
+        assert!(report.conflicts.is_empty());
+        assert_eq!(
+            backend.values[&forwarding],
+            Value::Forwarding { enabled: false }
+        );
+        assert!(
+            backend.values.contains_key(&guard),
+            "TUN teardown still depends on isolation"
+        );
+        assert!(!journal.is_restored());
+        recover(&mut backend, &mut store, &mut journal).unwrap();
+        assert!(journal.is_restored());
+        assert!(!backend.values.contains_key(&guard));
+    }
+
+    #[test]
+    fn failed_activation_rolls_back_only_its_stage_until_tun_teardown() {
+        let mut backend = MockNetwork::default();
+        let mut journal = gateway_plan(&mut backend);
+        let mut store = MemoryJournal::default();
+        apply_prefix(&mut backend, &mut store, &mut journal, 1).unwrap();
+        backend.fail_write = Some(2);
+        let failure = apply_prefix(&mut backend, &mut store, &mut journal, 2).unwrap_err();
+        assert!(failure.recovery.unwrap().conflicts.is_empty());
+        assert_eq!(journal.changes[0].state, ChangeState::Applied);
+        assert!(backend.values.contains_key(&journal.changes[0].resource));
+        assert_eq!(
+            backend.values[&journal.changes[1].resource],
+            Value::Forwarding { enabled: false }
+        );
+        backend.fail_write = None;
+        recover(&mut backend, &mut store, &mut journal).unwrap();
+        assert!(journal.is_restored());
+    }
+
+    #[test]
+    fn staged_resume_rechecks_isolation_and_cannot_enable_forwarding_after_removal() {
+        let mut backend = MockNetwork::default();
+        let mut journal = gateway_plan(&mut backend);
+        let mut store = MemoryJournal::default();
+        apply_prefix(&mut backend, &mut store, &mut journal, 1).unwrap();
+        backend.values.remove(&journal.changes[0].resource);
+        let writes = backend.writes;
+        assert!(apply_prefix(&mut backend, &mut store, &mut journal, 2).is_err());
+        assert_eq!(backend.writes, writes);
+        assert_eq!(
+            backend.values[&journal.changes[1].resource],
+            Value::Forwarding { enabled: false }
+        );
+        assert!(
+            !journal.is_restored(),
+            "caller still owns preparation teardown"
+        );
+    }
+
+    #[test]
+    fn quiesce_does_not_adopt_external_forwarding_from_a_prepared_session() {
+        let mut backend = MockNetwork::default();
+        let mut journal = gateway_plan(&mut backend);
+        let mut store = MemoryJournal::default();
+        apply_prefix(&mut backend, &mut store, &mut journal, 1).unwrap();
+        let forwarding = journal.changes[1].resource.clone();
+        backend
+            .values
+            .insert(forwarding.clone(), Value::Forwarding { enabled: true });
+        let writes = backend.writes;
+        // Pending is not ownership. The coordinator's explicit forwarding
+        // readback rejects this state; whole-plan recovery retains the guard.
+        recover_suffix(&mut backend, &mut store, &mut journal, 1).unwrap();
+        let report = recover(&mut backend, &mut store, &mut journal).unwrap();
+        assert_eq!(report.conflicts, vec![0]);
+        assert_eq!(backend.writes, writes);
+        assert_eq!(
+            backend.values[&forwarding],
+            Value::Forwarding { enabled: true }
+        );
+        assert!(backend.values.contains_key(&journal.changes[0].resource));
+    }
+
+    #[test]
+    fn gateway_plan_rejects_unsafe_recovery_order_and_wrong_owner() {
+        let mut journal = gateway_plan(&mut MockNetwork::default());
+        journal.changes.swap(0, 1);
+        assert!(journal.validate().is_err());
+        journal.changes.swap(0, 1);
+        journal.owner = "b".repeat(32);
+        assert!(journal.validate().is_err());
+    }
+
+    #[test]
+    fn rejected_gateway_cas_never_adopts_an_identical_external_forwarding_value() {
+        let mut backend = MockNetwork::default();
+        let mut journal = gateway_plan(&mut backend);
+        let forwarding = journal.changes[1].resource.clone();
+        // Another actor enables Forwarding after our snapshot. It happens to
+        // match the desired value, but our compare must reject without writing.
+        backend
+            .values
+            .insert(forwarding.clone(), Value::Forwarding { enabled: true });
+        let mut store = MemoryJournal::default();
+        let failure = apply(&mut backend, &mut store, &mut journal).unwrap_err();
+        assert_eq!(failure.cause.kind(), io::ErrorKind::AlreadyExists);
+        assert_eq!(failure.recovery.unwrap().conflicts, vec![1, 0]);
+        assert_eq!(journal.changes[1].state, ChangeState::NotOwned);
+        let writes = backend.writes;
+        let report = recover(&mut backend, &mut store, &mut journal).unwrap();
+        assert_eq!(report.conflicts, vec![1, 0]);
+        assert_eq!(backend.writes, writes);
+        assert_eq!(
+            backend.values[&forwarding],
+            Value::Forwarding { enabled: true }
+        );
+        // The administrator explicitly restores the original value. Recovery
+        // now relinquishes our guard without modifying that interface setting.
+        backend
+            .values
+            .insert(forwarding.clone(), Value::Forwarding { enabled: false });
+        assert!(
+            recover(&mut backend, &mut store, &mut journal)
+                .unwrap()
+                .conflicts
+                .is_empty()
+        );
+        assert!(journal.is_restored());
+        assert_eq!(backend.values.len(), 1);
+    }
+
+    #[test]
+    fn failed_not_owned_persistence_cannot_adopt_foreign_forwarding_after_restart() {
+        let mut backend = MockNetwork::default();
+        let mut journal = gateway_plan(&mut backend);
+        let forwarding = journal.changes[1].resource.clone();
+        backend
+            .values
+            .insert(forwarding.clone(), Value::Forwarding { enabled: true });
+        // Pending, guard Applying/Applied and forwarding Applying persist.
+        // NotOwned and every subsequent save fail, then the process dies.
+        let mut store = MemoryJournal {
+            fail_save: Some(5),
+            ..Default::default()
+        };
+        assert!(apply(&mut backend, &mut store, &mut journal).is_err());
+        let mut persisted = store.saved.last().unwrap().clone();
+        assert_eq!(persisted.changes[1].state, ChangeState::Applying);
+        let writes = backend.writes;
+        let report = recover(&mut backend, &mut MemoryJournal::default(), &mut persisted).unwrap();
+        assert_eq!(report.conflicts, vec![1, 0]);
+        assert_eq!(backend.writes, writes);
+        assert_eq!(
+            backend.values[&forwarding],
+            Value::Forwarding { enabled: true }
+        );
+        assert!(backend.values.contains_key(&persisted.changes[0].resource));
+    }
+
+    #[test]
+    fn gateway_guard_is_retained_when_unowned_forwarding_is_enabled() {
+        for state in [ChangeState::Pending, ChangeState::Restored] {
+            let mut backend = MockNetwork::default();
+            let mut journal = gateway_plan(&mut backend);
+            let guard = journal.changes[0].resource.clone();
+            backend
+                .values
+                .insert(guard.clone(), journal.changes[0].after.clone().unwrap());
+            journal.changes[0].state = ChangeState::Applied;
+            journal.changes[1].state = state;
+            let forwarding = journal.changes[1].resource.clone();
+            // Foreign change before our write, or after our restore. Neither
+            // case grants ownership over this shared Windows boolean.
+            backend
+                .values
+                .insert(forwarding.clone(), Value::Forwarding { enabled: true });
+            let mut store = MemoryJournal::default();
+            let report = recover(&mut backend, &mut store, &mut journal).unwrap();
+            assert_eq!(report.conflicts, vec![0]);
+            assert_eq!(backend.writes, 0);
+            assert!(backend.values.contains_key(&guard));
+            backend
+                .values
+                .insert(forwarding, Value::Forwarding { enabled: false });
+            assert!(
+                recover(&mut backend, &mut store, &mut journal)
+                    .unwrap()
+                    .conflicts
+                    .is_empty()
+            );
+            assert!(journal.is_restored());
+            assert_eq!(backend.writes, 1);
+        }
     }
 }

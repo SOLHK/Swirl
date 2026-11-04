@@ -1,5 +1,7 @@
 //! Explicit helper-owned Windows network lifecycle. No GUI/UAC code lives here.
 use super::{
+    native_gateway::{self, GatewayState},
+    native_gateway_control::{DhcpAttachment, NativeGatewayConfig},
     native_tun::{self, BridgeControl, BridgeStats},
     native_tun_control::NativeTunConfig,
 };
@@ -20,10 +22,13 @@ use swirl_core::v2::{FlowDispatcher, NativeTunLease};
 use swirl_dns::tun::{DNS_IPV4, DNS_IPV6, FakeIpStore, TunDns};
 use swirl_platform::{
     network_transaction::{
-        self as transaction, FileJournalStore, InterfaceIdentity, Journal, Resource,
-        Value as NetworkValue,
+        self as transaction, FileJournalStore, InterfaceIdentity, Journal, NetworkBackend,
+        Resource, Value as NetworkValue,
     },
-    windows_network::{self, NetworkChangeWatcher, NetworkSnapshot, WindowsNetworkBackend},
+    windows_network::{
+        self, NetworkChangeWatcher, NetworkConfigurationSnapshot, NetworkSnapshot,
+        WindowsNetworkBackend,
+    },
     wintun_device::{WintunConfig, WintunDevice, official_driver_sha256},
 };
 use swirl_transport::egress::EgressLease;
@@ -175,6 +180,17 @@ fn archive(path: &Path, journal: &Journal) -> Result<()> {
     std::fs::rename(path, restored).map_err(|_| "TunJournalArchive")
 }
 
+fn non_tun_configuration(index: u32) -> Result<NetworkConfigurationSnapshot> {
+    let mut snapshot = windows_network::snapshot_network_configuration().map_err(code)?;
+    snapshot
+        .adapters
+        .retain(|adapter| adapter.identity.index != index);
+    snapshot
+        .routes
+        .retain(|route| route.interface_index != index);
+    Ok(snapshot)
+}
+
 /// This is the only scope which owns both a live adapter and applied routes.
 struct Active {
     runtime: Handle,
@@ -193,6 +209,9 @@ struct Active {
     path: PathBuf,
     watcher: Option<NetworkChangeWatcher>,
     dns_guard: Option<DnsGuardMonitor>,
+    gateway: Option<GatewayState>,
+    gateway_network: Option<NetworkConfigurationSnapshot>,
+    tun_restored: bool,
     restored: bool,
 }
 
@@ -203,6 +222,7 @@ impl Active {
         config: &NativeTunConfig,
         directory: &Path,
         binding: &mut EgressLease,
+        gateway_config: Option<&NativeGatewayConfig>,
     ) -> Result<Self> {
         let path = journal_path(directory, &config.adapter_guid);
         if path.exists() {
@@ -220,8 +240,8 @@ impl Active {
         binding
             .update(v4.as_ref().map(|v| v.index), v6.as_ref().map(|v| v.index))
             .map_err(|_| "TunEgressUnavailable")?;
+        let mut gateway = None;
         let setup = (|| {
-            let packet = native_tun::spawn(dispatcher.clone(), dns.clone(), config.stack_config())?;
             let device = Arc::new(
                 WintunDevice::create(&WintunConfig {
                     driver_path: config.driver_path.clone(),
@@ -256,6 +276,24 @@ impl Active {
             {
                 return Err("TunEgressIsTunnel");
             }
+            let mut stack_config = config.stack_config();
+            if let Some(gateway_config) = gateway_config {
+                gateway = Some(GatewayState::prepare(gateway_config, &identity, directory)?);
+                stack_config.gateway = Some(
+                    gateway
+                        .as_ref()
+                        .ok_or("GatewayNotPrepared")?
+                        .ingress(gateway_config)?,
+                );
+            }
+            let gateway_network = if gateway.is_some() {
+                Some(non_tun_configuration(identity.index)?)
+            } else {
+                None
+            };
+            // Admission is fixed before any packet or capture route can run.
+            // Forwarding remains disabled throughout this preparation phase.
+            let packet = native_tun::spawn(dispatcher.clone(), dns.clone(), stack_config)?;
             let mut backend =
                 WindowsNetworkBackend::for_owned_interface(identity.clone()).map_err(code)?;
             let nonce = owner()?;
@@ -273,6 +311,15 @@ impl Active {
                     Some(NetworkValue::Mtu {
                         mtu: u32::from(config.mtu),
                     }),
+                ));
+            }
+            if gateway.is_some() {
+                // Windows forwards packets arriving from Wintun only when
+                // this interface allows forwarding. This is the client return
+                // path, separately owned from the dedicated LAN ingress bit.
+                desired.push((
+                    Resource::Forwarding { ipv6: false },
+                    Some(NetworkValue::Forwarding { enabled: true }),
                 ));
             }
             desired.extend(
@@ -294,12 +341,26 @@ impl Active {
                 let _ = std::fs::remove_file(&path);
                 return Err("TunJournalWrite");
             }
-            Ok((packet, device, watcher, backend, journal, store))
+            Ok((
+                packet,
+                device,
+                watcher,
+                backend,
+                journal,
+                store,
+                gateway_network,
+            ))
         })();
-        let (packet, device, watcher, backend, journal, store) = match setup {
+        let (packet, device, watcher, backend, journal, store, gateway_network) = match setup {
             Ok(value) => value,
             Err(error) => {
                 let _ = binding.suspend();
+                if gateway
+                    .as_mut()
+                    .is_some_and(|state| state.finish().is_err())
+                {
+                    return Err("GatewayRecoveryRequired");
+                }
                 return Err(error);
             }
         };
@@ -314,7 +375,7 @@ impl Active {
         let reader_drops = packet_drops.clone();
         let mtu = usize::from(config.mtu);
         let reader = thread::Builder::new()
-            .name("swirl-wintun-read".into())
+            .name("swirl-native-packet-read".into())
             .spawn(move || {
                 while !reader_closing.load(Ordering::Acquire) {
                     let mut bytes = Vec::with_capacity(mtu);
@@ -345,6 +406,12 @@ impl Active {
                 // permanently poison this adapter's next startup attempt.
                 let _ = std::fs::remove_file(&path);
                 let _ = binding.suspend();
+                if gateway
+                    .as_mut()
+                    .is_some_and(|state| state.finish().is_err())
+                {
+                    return Err("GatewayRecoveryRequired");
+                }
                 return Err(error);
             }
         };
@@ -397,6 +464,9 @@ impl Active {
             path,
             watcher: Some(watcher),
             dns_guard: None,
+            gateway,
+            gateway_network,
+            tun_restored: false,
             restored: false,
         };
         if transaction::apply(&mut active.backend, &mut active.store, &mut active.journal).is_err()
@@ -410,6 +480,9 @@ impl Active {
             move || windows_network::audit_dns_guards(&guards).is_ok(),
             DNS_GUARD_AUDIT_INTERVAL,
         )?);
+        if let Some(gateway) = &mut active.gateway {
+            gateway.ready()?;
+        }
         Ok(active)
     }
 
@@ -420,32 +493,80 @@ impl Active {
         if let Some(guard) = &self.dns_guard {
             guard.request_stop();
         }
-        if let Some(mut watcher) = self.watcher.take() {
-            // Network restoration must still run if an observer cannot close;
-            // the platform wrapper retains callback storage safely on failure.
-            let _ = watcher.close();
+        // Quiesce ingress while capture and the packet pump still exist. The
+        // persistent guard remains until every dependent TUN resource closes.
+        self.quiesce_gateway()?;
+        if !self.tun_restored {
+            if let Some(mut watcher) = self.watcher.take() {
+                // Network restoration must still run if an observer cannot close;
+                // the platform wrapper retains callback storage safely on failure.
+                let _ = watcher.close();
+            }
+            let recovered =
+                transaction::recover(&mut self.backend, &mut self.store, &mut self.journal)
+                    .map_err(|_| "TunRecoveryFailed")?;
+            if !recovered.conflicts.is_empty() || !self.journal.is_restored() {
+                return Err("TunRecoveryConflict");
+            }
+            self.closing.store(true, Ordering::Release);
+            self.device.shutdown().map_err(code)?;
+            self.runtime.block_on(self.bridge.shutdown())?;
+            if let Some(writer) = self.writer.take() {
+                writer.abort();
+                let _ = self.runtime.block_on(writer);
+            }
+            if let Some(reader) = self.reader.take() {
+                reader.join().map_err(|_| "TunReaderPanic")?;
+            }
+            archive(&self.path, &self.journal)?;
+            self.tun_restored = true;
         }
-        let recovered = transaction::recover(&mut self.backend, &mut self.store, &mut self.journal)
-            .map_err(|_| "TunRecoveryFailed")?;
-        if !recovered.conflicts.is_empty() || !self.journal.is_restored() {
-            return Err("TunRecoveryConflict");
+        if let Some(gateway) = &mut self.gateway {
+            gateway.finish()?;
         }
-        self.closing.store(true, Ordering::Release);
-        self.device.shutdown().map_err(code)?;
-        self.runtime.block_on(self.bridge.shutdown())?;
-        if let Some(writer) = self.writer.take() {
-            writer.abort();
-            let _ = self.runtime.block_on(writer);
-        }
-        if let Some(reader) = self.reader.take() {
-            reader.join().map_err(|_| "TunReaderPanic")?;
-        }
-        archive(&self.path, &self.journal)?;
         if let Some(mut guard) = self.dns_guard.take() {
             guard.join();
         }
         self.restored = true;
         Ok(())
+    }
+
+    fn quiesce_gateway(&mut self) -> Result<()> {
+        if let Some(gateway) = &mut self.gateway {
+            gateway.quiesce()?;
+        }
+        Ok(())
+    }
+
+    fn activate_gateway(
+        &mut self,
+        preparation_id: &str,
+        dhcp: Option<DhcpAttachment>,
+    ) -> Result<()> {
+        if self.failure_or_change().is_some() || self.restored {
+            return Err("GatewayTunUnavailable");
+        }
+        // The successful preparation receipt alone is not evidence that the
+        // capture routes and return forwarding remain installed at activation.
+        for change in &self.journal.changes {
+            if change.state != transaction::ChangeState::Applied
+                || self
+                    .backend
+                    .read(&self.journal.interface, &change.resource)
+                    .map_err(code)?
+                    != change.after
+            {
+                return Err("GatewayTunStateChanged");
+            }
+        }
+        self.gateway
+            .as_mut()
+            .ok_or("GatewayNotPrepared")?
+            .activate(preparation_id, dhcp)
+    }
+
+    fn gateway_failure(&mut self) -> Option<&'static str> {
+        self.gateway.as_mut().and_then(GatewayState::failure)
     }
 
     fn failure_or_change(&self) -> Option<&'static str> {
@@ -456,7 +577,18 @@ impl Active {
             .as_ref()
             .is_some_and(|watcher| watcher.take_changed())
         {
-            Some("TunNetworkChanged")
+            // Enabling our own LAN forwarding also generates an IP Helper
+            // notification. Re-read the full stable physical configuration and
+            // guard rather than blindly discarding notifications or restarting
+            // the just-activated gateway. Any external delta still stops it.
+            if let (Some(gateway), Some(expected)) = (&self.gateway, &self.gateway_network)
+                && non_tun_configuration(self.journal.interface.index).as_ref() == Ok(expected)
+                && gateway.verify().is_ok()
+            {
+                None
+            } else {
+                Some("TunNetworkChanged")
+            }
         } else {
             None
         }
@@ -473,7 +605,8 @@ impl Active {
             "packet_io_dropped":self.packet_drops.load(Ordering::Relaxed),
             "tcp_failures":self.bridge_stats.tcp_failures.load(Ordering::Relaxed),
             "udp_failures":self.bridge_stats.udp_failures.load(Ordering::Relaxed),
-            "dns_failures":self.bridge_stats.dns_failures.load(Ordering::Relaxed)
+            "dns_failures":self.bridge_stats.dns_failures.load(Ordering::Relaxed),
+            "gateway_denied":self.bridge_stats.gateway_denied.load(Ordering::Relaxed)
         })
     }
 }
@@ -496,6 +629,7 @@ impl Drop for Active {
 pub(crate) struct NativeSession {
     dispatcher: FlowDispatcher,
     config: NativeTunConfig,
+    gateway_config: Option<NativeGatewayConfig>,
     directory: PathBuf,
     dns: TunDns,
     active: Option<Active>,
@@ -512,6 +646,22 @@ pub(crate) struct NativeSession {
 
 impl NativeSession {
     pub fn start(dispatcher: FlowDispatcher, config: NativeTunConfig) -> Result<Self> {
+        Self::start_inner(dispatcher, config, None)
+    }
+
+    pub fn prepare_gateway(
+        dispatcher: FlowDispatcher,
+        config: NativeGatewayConfig,
+    ) -> Result<Self> {
+        config.validate()?;
+        Self::start_inner(dispatcher, config.tun.clone(), Some(config))
+    }
+
+    fn start_inner(
+        dispatcher: FlowDispatcher,
+        config: NativeTunConfig,
+        gateway_config: Option<NativeGatewayConfig>,
+    ) -> Result<Self> {
         config.validate()?;
         let directory = windows_network::secure_state_directory().map_err(code)?;
         let dns = TunDns::new(FakeIpStore::open(
@@ -529,6 +679,7 @@ impl NativeSession {
         let mut session = Self {
             dispatcher,
             config,
+            gateway_config,
             directory,
             dns,
             active: None,
@@ -545,9 +696,43 @@ impl NativeSession {
             &session.config,
             &session.directory,
             session.binding.as_mut().ok_or("TunEgressUnavailable")?,
+            session.gateway_config.as_ref(),
         )?);
-        session.state = "running";
+        session.state = if session.gateway_config.is_some() {
+            "prepared"
+        } else {
+            "running"
+        };
         Ok(session)
+    }
+
+    pub fn is_gateway(&self) -> bool {
+        self.gateway_config.is_some()
+    }
+
+    pub fn activate_gateway(
+        &mut self,
+        preparation_id: &str,
+        dhcp: Option<DhcpAttachment>,
+    ) -> Result<()> {
+        if !self.is_gateway() || self.state != "prepared" {
+            return Err("GatewayNotPrepared");
+        }
+        let result = self
+            .active
+            .as_mut()
+            .ok_or("GatewayNotPrepared")?
+            .activate_gateway(preparation_id, dhcp);
+        if let Err(error) = result {
+            self.last_error = Some(error);
+            // Failure after a partial OS write follows the same quiesce-first
+            // path as normal stop, including persistent conflict reporting.
+            self.stop()?;
+            return Err(error);
+        }
+        self.state = "running";
+        self.last_error = None;
+        Ok(())
     }
 
     pub fn maintain(&mut self) {
@@ -576,6 +761,20 @@ impl NativeSession {
                     error
                 },
             );
+            return;
+        }
+        if self.is_gateway() {
+            let reason = self
+                .active
+                .as_ref()
+                .and_then(Active::failure_or_change)
+                .or_else(|| self.active.as_mut().and_then(Active::gateway_failure));
+            if let Some(reason) = reason {
+                self.last_error = Some(reason);
+                // A new topology needs fresh dedicated-LAN confirmation and
+                // another prepared/activate handshake. Never silently resume.
+                let _ = self.stop();
+            }
             return;
         }
         if let Some(reason) = self.active.as_ref().and_then(Active::failure_or_change) {
@@ -613,6 +812,7 @@ impl NativeSession {
                 &self.config,
                 &self.directory,
                 binding,
+                None,
             ) {
                 Ok(active) => {
                     self.active = Some(active);
@@ -642,6 +842,9 @@ impl NativeSession {
     }
 
     fn stop_inner(&mut self) -> Result<()> {
+        if let Some(active) = &mut self.active {
+            active.quiesce_gateway()?;
+        }
         if let Some(binding) = self.binding.as_mut() {
             binding.suspend().map_err(|_| "TunEgressUnavailable")?;
         }
@@ -651,6 +854,11 @@ impl NativeSession {
         self.active = None;
         if journal_path(&self.directory, &self.config.adapter_guid).exists() {
             return Err("TunRecoveryRequired");
+        }
+        if let Some(config) = &self.gateway_config
+            && native_gateway::journal_path(&self.directory, &config.lan.lan.guid).exists()
+        {
+            return Err("GatewayRecoveryRequired");
         }
         if let Some(binding) = self.binding.take() {
             binding
@@ -663,7 +871,7 @@ impl NativeSession {
 
     pub fn status(&self) -> Value {
         let capture_active = match self.state {
-            "running" => Some(true),
+            "running" | "prepared" => Some(true),
             "stopped" | "waiting_for_network" => Some(false),
             _ => None,
         };
@@ -678,7 +886,9 @@ impl NativeSession {
             "dns_guard_audit_age_ms":dns_guard_audit_age_ms,
             "core_egress_guard_owned":self.binding.is_some(),
             "statistics":self.active.as_ref().map(Active::status),
-            "capabilities":super::native_tun_control::capabilities()})
+            "gateway":self.active.as_ref().and_then(|active| active.gateway.as_ref()).map(GatewayState::status),
+            "capabilities":if self.is_gateway() { super::native_gateway_control::capabilities() }
+                else { super::native_tun_control::capabilities() }})
     }
 }
 
@@ -693,6 +903,9 @@ impl Drop for NativeSession {
 /// read. A live owner's lock and every third-party network change are respected.
 pub(crate) fn recover_stale() -> Result<Value> {
     let directory = windows_network::secure_state_directory().map_err(code)?;
+    // Every LAN journal is quiesced and locked before any TUN capture journal
+    // is touched. A later error leaves all persistent isolation in place.
+    let gateways = native_gateway::RecoveryBatch::quiesce_all(&directory)?;
     let mut restored = 0;
     let mut active = 0;
     let mut conflicts = 0;
@@ -735,11 +948,16 @@ pub(crate) fn recover_stale() -> Result<Value> {
     if conflicts != 0 {
         return Err("TunRecoveryConflict");
     }
+    if active != 0 && !gateways.is_empty() {
+        return Err("GatewayCaptureStillOwned");
+    }
+    let gateways_restored = gateways.finish()?;
     if active == 0 {
         swirl_transport::egress::release_orphan_after_routes_restored()
             .map_err(|_| "TunEgressStillOwned")?;
     }
-    Ok(json!({"state":"recovered","journals_restored":restored,"active_owners":active}))
+    Ok(json!({"state":"recovered","journals_restored":restored,
+        "gateway_journals_restored":gateways_restored,"active_owners":active}))
 }
 
 #[cfg(test)]

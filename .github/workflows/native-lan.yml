@@ -8,6 +8,7 @@ on:
     paths:
       - 'core/**'
       - 'tools/tests/test_native_lan_abi.py'
+      - 'tools/tests/test_native_gateway_abi.py'
       - '.github/workflows/native-lan.yml'
   workflow_dispatch:
 
@@ -94,6 +95,29 @@ jobs:
               raise SystemExit('Native control ABI library is missing')
           os.environ['SWIRL_BUILT_LIBRARY'] = str(library)
           subprocess.run([sys.executable, 'tools/tests/test_native_lan_abi.py', '-v'], check=True)
+          subprocess.run([sys.executable, 'tools/tests/test_native_gateway_abi.py', '-v'], check=True)
+      - name: Scoped Windows WFP and DHCP firewall/socket ownership
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        shell: python
+        run: |
+          import ctypes, subprocess
+          if not ctypes.windll.shell32.IsUserAnAdmin():
+              raise SystemExit('Disposable Windows runner must be elevated for scoped WFP fixtures')
+          # These explicit fixtures own synthetic, absent-interface WFP IDs,
+          # a loopback-only UDP67 socket and one disabled firewall rule.
+          # They never start LAN DHCP or change default routes/profiles.
+          failures = []
+          for fixture in ['persistent_wfp_fixture_installs_verifies_ownership_and_removes_exact_objects',
+                          'real_udp67_attestation_accepts_single_interface_and_rejects_replay',
+                          'disabled_dhcp_firewall_fixture_verifies_scope_and_preserves_foreign_edits']:
+              result = subprocess.run(['cargo', 'test', '-p', 'swirl-platform', '--locked', fixture,
+                                       '--', '--ignored', '--nocapture'], cwd='core',
+                                      text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+              print(result.stdout)
+              if result.returncode or '1 passed; 0 failed; 0 ignored;' not in result.stdout:
+                  failures.append(fixture)
+          if failures:
+              raise SystemExit('Scoped fixtures failed or did not execute exactly once: ' + ', '.join(failures))
       - name: Preserve exact formatter diagnostics without weakening the gate
         if: ${{ !cancelled() && steps.format.outcome == 'failure' }}
         shell: python

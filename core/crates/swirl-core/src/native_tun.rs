@@ -15,6 +15,7 @@ use swirl_dns::tun::{TunDns, TunLookup};
 use swirl_protocol::Target;
 use swirl_tun::{
     PacketSender, TcpFlow, TunConfig, TunControl, TunStats, UdpDatagram, UdpReplySender,
+    gateway::{ClientBudget, ClientPermit, FlowClass, SourceKind},
 };
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -29,6 +30,7 @@ struct UdpSlot {
     id: u64,
     sender: mpsc::Sender<Vec<u8>>,
     failed_until: Option<Instant>,
+    _gateway_permit: Option<ClientPermit>,
 }
 const DNS_IDLE: Duration = Duration::from_secs(30);
 const UDP_IDLE: Duration = Duration::from_secs(60);
@@ -41,6 +43,7 @@ pub struct BridgeStats {
     pub udp_failures: AtomicU64,
     pub dns_failures: AtomicU64,
     pub udp_dropped: AtomicU64,
+    pub gateway_denied: AtomicU64,
 }
 
 pub struct PacketBridge {
@@ -90,6 +93,14 @@ impl Drop for BridgeControl {
 /// Wintun packet pump or a packet harness and retains control until recovery.
 pub fn spawn(dispatcher: FlowDispatcher, dns: TunDns, config: TunConfig) -> Result<PacketBridge> {
     config.validate().map_err(|_| "TunLimits")?;
+    let dispatcher = if let Some(gateway) = &config.gateway {
+        dispatcher.with_gateway_admission(
+            gateway.local_sources.clone(),
+            gateway.protected_hosts.clone(),
+        )?
+    } else {
+        dispatcher
+    };
     let lease = dispatcher.prepare_native_tun()?;
     let runtime = dispatcher.runtime_handle();
     let _entered = runtime.enter();
@@ -123,8 +134,13 @@ pub fn spawn(dispatcher: FlowDispatcher, dns: TunDns, config: TunConfig) -> Resu
 struct Lookup {
     dispatcher: FlowDispatcher,
     source: SocketAddr,
+    allow_ipv6: bool,
 }
 impl TunLookup for Lookup {
+    fn allow_ipv6(&self) -> bool {
+        self.allow_ipv6
+    }
+
     fn lookup<'a>(
         &'a self,
         name: &'a str,
@@ -138,16 +154,26 @@ impl TunLookup for Lookup {
     }
 }
 
-async fn tcp(flow: TcpFlow, dispatcher: FlowDispatcher, dns: TunDns) -> Result<()> {
+fn dns_allows_ipv6(config: &TunConfig, source: IpAddr) -> bool {
+    config
+        .gateway
+        .as_ref()
+        .is_none_or(|gateway| gateway.source(source) == Some(SourceKind::Host))
+}
+
+async fn tcp(flow: TcpFlow, dispatcher: FlowDispatcher, dns: TunDns, allow_ipv6: bool) -> Result<()> {
     let cancellation = flow.stream.abort_on_drop();
-    let result = tcp_operation(flow, dispatcher, dns).await;
-    if result.is_ok() {
-        cancellation.complete();
-    }
+    let result = tcp_operation(flow, dispatcher, dns, allow_ipv6).await;
+    if result.is_ok() { cancellation.complete(); }
     result
 }
 
-async fn tcp_operation(flow: TcpFlow, dispatcher: FlowDispatcher, dns: TunDns) -> Result<()> {
+async fn tcp_operation(
+    flow: TcpFlow,
+    dispatcher: FlowDispatcher,
+    dns: TunDns,
+    allow_ipv6: bool,
+) -> Result<()> {
     if flow.destination.port() != 53 {
         let host = dns.target_host(flow.destination.ip()).await?;
         return dispatcher
@@ -164,6 +190,7 @@ async fn tcp_operation(flow: TcpFlow, dispatcher: FlowDispatcher, dns: TunDns) -
     let lookup = Lookup {
         dispatcher,
         source: flow.source,
+        allow_ipv6,
     };
     let mut stream = flow.stream;
     loop {
@@ -259,6 +286,7 @@ async fn run(
     stats: Arc<BridgeStats>,
 ) -> Result<()> {
     let mut jobs = JoinSet::new();
+    let gateway_clients = ClientBudget::default();
     let mut udp_flows: HashMap<UdpKey, UdpSlot> = HashMap::new();
     let mut next = 0u64;
     let dns_slots = Arc::new(tokio::sync::Semaphore::new(DNS_JOBS));
@@ -291,6 +319,16 @@ async fn run(
             },
             flow = tcp_flows.recv() => {
                 let Some(flow) = flow else { break; };
+                let gateway_permit = if let Some(gateway) = &config.gateway {
+                    match gateway_clients.acquire(gateway, flow.source.ip(), flow.destination.ip(),
+                        if flow.destination.port() == 53 { FlowClass::Dns } else { FlowClass::Tcp }) {
+                        Ok(permit) => permit,
+                        Err(_) => {
+                            stats.gateway_denied.fetch_add(1, Ordering::Relaxed);
+                            continue;
+                        }
+                    }
+                } else { None };
                 if jobs.len() >= max_jobs {
                     stats.tcp_failures.fetch_add(1, Ordering::Relaxed);
                     continue;
@@ -298,24 +336,40 @@ async fn run(
                 let dispatcher = dispatcher.clone();
                 let dns = dns.clone();
                 let stats = stats.clone();
+                let allow_ipv6 = dns_allows_ipv6(&config, flow.source.ip());
                 jobs.spawn(async move {
-                    if tcp(flow, dispatcher, dns).await.is_err() { stats.tcp_failures.fetch_add(1, Ordering::Relaxed); }
+                    let _gateway_permit = gateway_permit;
+                    if tcp(flow, dispatcher, dns, allow_ipv6).await.is_err() { stats.tcp_failures.fetch_add(1, Ordering::Relaxed); }
                     None
                 });
             },
             packet = udp_packets.recv() => {
                 let Some(packet) = packet else { break; };
                 if packet.destination.port() == 53 {
+                    let gateway_permit = if let Some(gateway) = &config.gateway {
+                        match gateway_clients.acquire(gateway, packet.source.ip(), packet.destination.ip(), FlowClass::Dns) {
+                            Ok(permit) => permit,
+                            Err(_) => {
+                                stats.gateway_denied.fetch_add(1, Ordering::Relaxed);
+                                continue;
+                            }
+                        }
+                    } else { None };
                     let Ok(permit) = dns_slots.clone().try_acquire_owned() else {
                         stats.udp_dropped.fetch_add(1, Ordering::Relaxed);
                         continue;
                     };
                     if jobs.len() >= max_jobs { stats.udp_dropped.fetch_add(1, Ordering::Relaxed); continue; }
-                    let lookup = Lookup { dispatcher: dispatcher.clone(), source: packet.source };
+                    let lookup = Lookup {
+                        dispatcher: dispatcher.clone(),
+                        source: packet.source,
+                        allow_ipv6: dns_allows_ipv6(&config, packet.source.ip()),
+                    };
                     let dns = dns.clone();
                     let replies = replies.clone();
                     let stats = stats.clone();
                     jobs.spawn(async move {
+                        let _gateway_permit = gateway_permit;
                         let _permit = permit;
                         let result = async {
                             let payload = dns.answer(&packet.payload, &lookup).await?;
@@ -349,10 +403,19 @@ async fn run(
                         stats.udp_dropped.fetch_add(1, Ordering::Relaxed);
                         continue;
                     }
+                    let gateway_permit = if let Some(gateway) = &config.gateway {
+                        match gateway_clients.acquire(gateway, key.0.ip(), key.1.ip(), FlowClass::Udp) {
+                            Ok(permit) => permit,
+                            Err(_) => {
+                                stats.gateway_denied.fetch_add(1, Ordering::Relaxed);
+                                continue;
+                            }
+                        }
+                    } else { None };
                     next = next.checked_add(1).ok_or("TunFlowIdExhausted")?;
                     let id = next;
                     let (sender, receiver) = mpsc::channel(UDP_QUEUE);
-                    udp_flows.insert(key, UdpSlot { id, sender, failed_until: None });
+                    udp_flows.insert(key, UdpSlot { id, sender, failed_until: None, _gateway_permit: gateway_permit });
                     let dispatcher = dispatcher.clone();
                     let dns = dns.clone();
                     let replies = replies.clone();

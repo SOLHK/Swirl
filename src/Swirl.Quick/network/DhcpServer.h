@@ -5,11 +5,14 @@
 #include <QHash>
 #include <QHostAddress>
 #include <QVariantList>
+#include <QElapsedTimer>
+#include <QJsonObject>
 class DhcpServer final : public QObject {
     Q_OBJECT
 public:
-    struct Config { QHostAddress gateway,first,last,dns;int prefix=24,interfaceIndex=0,leaseSeconds=3600; };
+    struct Config { QHostAddress gateway,first,last,dns;int prefix=24,interfaceIndex=0,leaseSeconds=3600;bool operator==(const Config &) const = default; };
     explicit DhcpServer(bool isolated=false,QObject *parent=nullptr);
+    ~DhcpServer() override;
     void setLeaseStorePath(const QString &path){m_leasePath=path;}
     bool configure(const Config &config);
     bool start(const Config &config);
@@ -23,6 +26,11 @@ public:
     void clearReservations();
     QVariantList reservations() const;
     static bool validate(const Config &config,QString *error=nullptr);
+    // Uses parsed option 53, never a byte search through client-supplied options.
+    static QHostAddress replyAddress(const QByteArray &request,const QByteArray &response);
+    // One-use Winsock receipt for the native helper worker. It carries no
+    // authority to start a gateway and is never persisted in configuration.
+    QJsonObject ownerReceipt(quint32 helperWorkerPid,QString *error=nullptr) const;
 signals:
     void changed();
 private:
@@ -34,10 +42,16 @@ private:
     void expire();
     bool loadLeases();
     bool saveLeases();
+    bool bindProductionSocket();
     bool m_isolated=false;
+    bool m_nativeWinsock=false;
     QUdpSocket m_socket;QTimer m_expiry;
     Config m_config;QString m_error,m_leasePath;
     QHash<QByteArray,Lease> m_leases;
     QHash<quint32,qint64> m_quarantine;
     QHash<QString,QVariantMap> m_reservations;
+    QElapsedTimer m_rateClock;
+    qint64 m_rateSecond=-1;
+    int m_requestsThisSecond=0;
+    QHash<QByteArray,int> m_clientRequests;
 };

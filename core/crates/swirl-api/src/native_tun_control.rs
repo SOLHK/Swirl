@@ -258,7 +258,8 @@ pub fn capabilities() -> Value {
         "tcp":true,"udp":true,"ipv4":true,"ipv6":true,"fake_ip":true,
         "encrypted_dns_required":true,"real_windows_11_acceptance":false,
         "system_kill_switch":false,"capture_continuous_during_network_restart":false,
-        "icmp_relay":false,"arbitrary_ipv6_extensions":false,"automatic_gui_elevation":false
+        "icmp_relay":false,"arbitrary_ipv6_extensions":false,"automatic_gui_elevation":false,
+        "gateway_control":super::native_gateway_control::capabilities()
     })
 }
 
@@ -269,7 +270,7 @@ mod tests {
         json!({"native_tun_schema":1,"request_id":"60000000-0000-4000-8000-000000000001","op":op})
     }
     fn config() -> Value {
-        json!({"driver_path":"C:\\Swirl\\wintun.dll","adapter_guid":"70000000-0000-4000-8000-000000000001","adapter_name":"Swirl Native TUN"})
+        json!({"driver_path":"C:\\Swirl\\fixture-driver.dll","adapter_guid":"70000000-0000-4000-8000-000000000001","adapter_name":"Swirl Native TUN"})
     }
     #[test]
     fn validation_is_offline_and_gui_cannot_start_or_recover_network() {

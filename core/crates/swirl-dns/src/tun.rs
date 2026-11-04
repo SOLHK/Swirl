@@ -31,6 +31,13 @@ type Result<T> = std::result::Result<T, &'static str>;
 
 /// Implemented by the V2 FlowDispatcher adapter; no system DNS fallback here.
 pub trait TunLookup: Send + Sync {
+    /// Address families the admitted client can send through this ingress.
+    /// Native host TUN flows remain dual stack; an IPv4-only gateway must not
+    /// advertise synthetic IPv6 destinations that it will reject afterwards.
+    fn allow_ipv6(&self) -> bool {
+        true
+    }
+
     fn lookup<'a>(
         &'a self,
         name: &'a str,
@@ -457,6 +464,12 @@ impl TunDns {
 
     pub async fn answer(&self, request: &[u8], resolver: &dyn TunLookup) -> Result<Vec<u8>> {
         let query = question(request)?;
+        // Scope this to the admitted source, not the shared fake-IP store.
+        // NODATA requires neither an upstream lookup nor a durable allocation;
+        // host/native clients may still use the same name's IPv6 identity.
+        if query.kind == 28 && !resolver.allow_ipv6() {
+            return Ok(response(&query, 0, None));
+        }
         let Ok(permit) = self.queries.clone().try_acquire_owned() else {
             return Ok(response(&query, 2, None));
         };

@@ -1,12 +1,15 @@
 //! Native ingress for packet-stack adapters. Protocol implementations, policy
 //! transactions and accounting remain owned by the existing V2 runtime.
 use super::{
-    NetworkTarget, Outbound, PolicyDnsTransport, RegisteredSession, Result, Routed, Shared,
-    cancelled, connect_tcp_flow, route, route_flow,
+    GuardPreparation, IngressBoundary, NetworkTarget, Node, Outbound, PolicyDnsTransport,
+    RegisteredSession, Resolver, Result, Routed, Shared, cancelled, connect_routed_tcp,
+    pin_proxy_target, route, route_flow,
 };
 use crate::socks5_udp::ProxyAssociation;
+use serde_json::Value;
 use std::{
-    net::SocketAddr,
+    collections::BTreeSet,
+    net::{IpAddr, SocketAddr},
     sync::{Arc, atomic::Ordering},
     time::Duration,
 };
@@ -24,6 +27,287 @@ const UDP_QUEUE: usize = 4;
 const UDP_MAX_PAYLOAD: usize = 65_507;
 const UDP_IDLE: Duration = Duration::from_secs(60);
 
+/// An additional destination boundary for flows already admitted by the packet
+/// stack. Windows must independently prevent a LAN client from spoofing one of
+/// these host source addresses; a Wintun packet has no physical ingress tag.
+struct GatewayAdmission {
+    local_sources: BTreeSet<IpAddr>,
+    protected_hosts: BTreeSet<IpAddr>,
+    #[cfg(test)]
+    fixture_endpoints: BTreeSet<SocketAddr>,
+}
+
+struct GatewayBoundary<'a> {
+    admission: &'a Arc<GatewayAdmission>,
+    source: SocketAddr,
+}
+
+impl IngressBoundary for GatewayBoundary<'_> {
+    fn resolver(&self, resolver: &Arc<Resolver>) -> Arc<Resolver> {
+        let admission = self.admission.clone();
+        let source = self.source;
+        Arc::new(
+            resolver
+                .as_ref()
+                .clone()
+                .with_endpoint_guard(move |address| {
+                    admission
+                        .target(
+                            source,
+                            &NetworkTarget {
+                                host: address.ip().to_string(),
+                                port: address.port(),
+                            },
+                        )
+                        .is_ok()
+                }),
+        )
+    }
+
+    fn prepare_proxy_endpoint<'a>(
+        &'a self,
+        node: &'a Node,
+        resolver: &'a mut Arc<Resolver>,
+        limit: Duration,
+    ) -> GuardPreparation<'a> {
+        Box::pin(
+            self.admission
+                .prepare_proxy_endpoint(self.source, node, resolver, limit),
+        )
+    }
+}
+
+impl GatewayAdmission {
+    fn new(local_sources: Vec<IpAddr>, protected_hosts: Vec<IpAddr>) -> Result<Self> {
+        if local_sources.is_empty()
+            || local_sources.len() > 256
+            || protected_hosts.is_empty()
+            || protected_hosts.len() > 256
+        {
+            return Err("GatewayAddressInventory");
+        }
+        let normalize = swirl_routing::v2::normalize_ip;
+        let local_sources: BTreeSet<_> = local_sources.into_iter().map(normalize).collect();
+        let mut protected_hosts: BTreeSet<_> = protected_hosts.into_iter().map(normalize).collect();
+        if local_sources
+            .iter()
+            .chain(protected_hosts.iter())
+            .any(|ip| {
+                ip.is_unspecified()
+                    || ip.is_multicast()
+                    || *ip == IpAddr::V4(std::net::Ipv4Addr::BROADCAST)
+            })
+        {
+            return Err("GatewayAddressInventory");
+        }
+        protected_hosts.extend(local_sources.iter().copied());
+        Ok(Self {
+            local_sources,
+            protected_hosts,
+            #[cfg(test)]
+            fixture_endpoints: BTreeSet::new(),
+        })
+    }
+
+    fn is_lan(&self, source: SocketAddr) -> Result<bool> {
+        let source = swirl_routing::v2::normalize_ip(source.ip());
+        if self.local_sources.contains(&source) {
+            return Ok(false);
+        }
+        if !matches!(source, IpAddr::V4(ip) if ip.is_private()) {
+            return Err("GatewaySourceDenied");
+        }
+        Ok(true)
+    }
+
+    async fn prepare_proxy_endpoint(
+        self: &Arc<Self>,
+        source: SocketAddr,
+        node: &Node,
+        resolver: &mut Arc<Resolver>,
+        limit: Duration,
+    ) -> Result<()> {
+        if !self.is_lan(source)? {
+            return Ok(());
+        }
+        let (host, port) = match &node.outbound {
+            Outbound::Direct {} | Outbound::Reject {} => return Ok(()),
+            Outbound::Vmess { host, port, .. }
+            | Outbound::Vless { host, port, .. }
+            | Outbound::Shadowsocks { host, port, .. }
+            | Outbound::Socks4 { host, port, .. }
+            | Outbound::Socks5 { host, port, .. }
+            | Outbound::HttpConnect { host, port, .. }
+            | Outbound::Trojan { host, port, .. } => (host.as_str(), *port),
+            Outbound::Hysteria2(config) => (config.host.as_str(), config.port),
+            Outbound::Tuic(config) => (config.host.as_str(), config.port),
+        };
+        let host = host.to_owned();
+        self.target(
+            source,
+            &NetworkTarget {
+                host: host.clone(),
+                port,
+            },
+        )?;
+        let addresses = timeout(limit, resolver.resolve(&host, port))
+            .await
+            .map_err(|_| "GatewayOutboundDnsTimeout")??;
+        if addresses.is_empty() || addresses.len() > 16 {
+            return Err("GatewayOutboundDnsAnswers");
+        }
+        for address in &addresses {
+            self.target(
+                source,
+                &NetworkTarget {
+                    host: address.ip().to_string(),
+                    port: address.port(),
+                },
+            )?;
+        }
+        let guard = self.clone();
+        *resolver = Arc::new(
+            resolver
+                .with_pinned_addresses(
+                    &host,
+                    addresses.into_iter().map(|address| address.ip()).collect(),
+                )
+                .with_endpoint_guard(move |address| {
+                    guard
+                        .target(
+                            source,
+                            &NetworkTarget {
+                                host: address.ip().to_string(),
+                                port: address.port(),
+                            },
+                        )
+                        .is_ok()
+                }),
+        );
+        Ok(())
+    }
+
+    async fn prepare_outbound(
+        self: &Arc<Self>,
+        source: SocketAddr,
+        routed: &mut Routed,
+        pin_target: bool,
+    ) -> Result<()> {
+        if !self.is_lan(source)? {
+            return Ok(());
+        }
+        self.prepare_proxy_endpoint(source, &routed.node, &mut routed.resolver, routed.limit)
+            .await?;
+        if pin_target {
+            // Fake-IP reverse mapping restores the domain for policy routing.
+            // Do not delegate a second, unvalidated domain resolution to the
+            // proxy: bind the selected flow to a checked numeric destination.
+            pin_proxy_target(routed, |target| self.target(source, target))
+                .await
+                .map_err(|error| match error {
+                    "DnsEncryptedServerRequired" => "GatewayTargetDnsPolicyRequired",
+                    "IngressTargetDnsTimeout" => "GatewayTargetDnsTimeout",
+                    "IngressTargetDnsAnswers" => "GatewayTargetDnsAnswers",
+                    _ => error,
+                })?;
+        }
+        Ok(())
+    }
+
+    fn target(&self, source: SocketAddr, target: &NetworkTarget) -> Result<()> {
+        #[cfg(test)]
+        if let Ok(ip) = target.host.parse::<IpAddr>()
+            && self
+                .fixture_endpoints
+                .contains(&SocketAddr::new(ip, target.port))
+        {
+            self.is_lan(source)?;
+            return Ok(());
+        }
+        self.host(source, &target.host)
+    }
+
+    fn dns_host(&self, source: SocketAddr, host: &str) -> Result<()> {
+        self.host(source, host)
+    }
+
+    fn host(&self, source: SocketAddr, host: &str) -> Result<()> {
+        if !self.is_lan(source)? {
+            return Ok(());
+        }
+        let host = host.trim_end_matches('.');
+        if host.eq_ignore_ascii_case("localhost")
+            || host.to_ascii_lowercase().ends_with(".localhost")
+        {
+            return Err("GatewayHostAccessDenied");
+        }
+        let Ok(ip) = host.parse::<IpAddr>() else {
+            return Ok(());
+        };
+        let ip = swirl_routing::v2::normalize_ip(ip);
+        let unsafe_ip = match ip {
+            IpAddr::V4(ip) => {
+                ip.is_loopback()
+                    || ip.is_unspecified()
+                    || ip.is_link_local()
+                    || ip.is_multicast()
+                    || ip.is_broadcast()
+                    || ip.octets()[0] == 0
+                    || ip.octets()[0] >= 240
+                    || ip == std::net::Ipv4Addr::new(100, 100, 100, 200)
+                    || ip == std::net::Ipv4Addr::new(168, 63, 129, 16)
+            }
+            IpAddr::V6(ip) => {
+                ip.is_loopback()
+                    || ip.is_unspecified()
+                    || ip.is_multicast()
+                    || ip.is_unicast_link_local()
+                    || ip.segments()[..6] == [0; 6]
+            }
+        };
+        if unsafe_ip || self.protected_hosts.contains(&ip) {
+            return Err("GatewayHostAccessDenied");
+        }
+        // IPv4-only describes the physical LAN packet ingress. An IPv4
+        // client's domain may use an existing native IPv6 outbound after
+        // policy resolution; that does not admit an IPv6 LAN packet.
+        Ok(())
+    }
+}
+
+fn mark_gateway_record(
+    shared: &Shared,
+    id: u64,
+    admission: &GatewayAdmission,
+    source: SocketAddr,
+    trace: Option<&Value>,
+) -> Result<()> {
+    if admission.is_lan(source)?
+        && let Some(record) = shared
+            .records
+            .lock()
+            .map_err(|_| "StatsState")?
+            .get_mut(&id)
+    {
+        record.ingress = "gateway";
+        if let Some(trace) = trace {
+            record.trace = trace.clone();
+        }
+    }
+    Ok(())
+}
+
+fn gateway_target(
+    admission: &Option<Arc<GatewayAdmission>>,
+    source: SocketAddr,
+    target: &NetworkTarget,
+) -> Result<()> {
+    if let Some(admission) = admission {
+        admission.target(source, target)?;
+    }
+    Ok(())
+}
+
 /// Cloneable ingress handle, without another listener or proxy hop. Every worker
 /// runs on the core's existing runtime and shares its connection budget.
 #[derive(Clone)]
@@ -31,6 +315,7 @@ pub struct FlowDispatcher {
     shared: Arc<Shared>,
     runtime: Handle,
     probe: crate::ProbeRuntime,
+    gateway: Option<Arc<GatewayAdmission>>,
 }
 
 impl FlowDispatcher {
@@ -39,7 +324,28 @@ impl FlowDispatcher {
             shared,
             runtime,
             probe,
+            gateway: None,
         }
+    }
+
+    /// Derive a gateway-specific ingress while retaining this dispatcher's
+    /// runtime, policies, DNS and connection budget. The unmodified dispatcher
+    /// keeps its original host/TUN behavior. This is not a source ACL: the
+    /// packet stack and the Windows lease must admit physical LAN clients first.
+    pub fn with_gateway_admission(
+        &self,
+        local_sources: Vec<IpAddr>,
+        protected_hosts: Vec<IpAddr>,
+    ) -> Result<Self> {
+        if self.gateway.is_some() {
+            return Err("GatewayAdmissionAlreadySet");
+        }
+        let mut dispatcher = self.clone();
+        dispatcher.gateway = Some(Arc::new(GatewayAdmission::new(
+            local_sources,
+            protected_hosts,
+        )?));
+        Ok(dispatcher)
     }
 
     /// Schedule a packet-stack adapter on the core's existing Tokio runtime.
@@ -59,13 +365,40 @@ impl FlowDispatcher {
     ) -> Result<()> {
         let registered = self.shared.register()?;
         let shared = self.shared.clone();
+        let gateway = self.gateway.clone();
         let mut task = AbortTask(self.runtime.spawn(async move {
             let id = registered.guard.id;
             let mut cancellation = registered.cancellation.clone();
             let counters = Arc::new(Counters::default());
             let work = async {
-                let mut upstream =
-                    connect_tcp_flow(&shared, id, source, &target, counters.clone(), true).await?;
+                gateway_target(&gateway, source, &target)?;
+                let boundary = gateway
+                    .as_ref()
+                    .map(|admission| GatewayBoundary { admission, source });
+                let mut routed = route_flow(
+                    &shared,
+                    id,
+                    source,
+                    &target,
+                    counters.clone(),
+                    true,
+                    boundary
+                        .as_ref()
+                        .map(|boundary| boundary as &dyn IngressBoundary),
+                )
+                .await?;
+                if let Some(gateway) = &gateway {
+                    mark_gateway_record(&shared, id, gateway, source, None)?;
+                }
+                // Fake-IP has already been reversed by the packet adapter.
+                // Check the route's existing hosts/DNS result before any
+                // outbound socket or protocol handshake is created.
+                gateway_target(&gateway, source, &routed.target)?;
+                if let Some(gateway) = &gateway {
+                    gateway.prepare_outbound(source, &mut routed, true).await?;
+                    mark_gateway_record(&shared, id, gateway, source, Some(&routed.trace))?;
+                }
+                let mut upstream = connect_routed_tcp(&routed).await?;
                 swirl_transport::relay(&mut inbound, &mut upstream, counters, shared.totals.clone())
                     .await
                     .map_err(|error| crate::stream_failure_code(&error))
@@ -97,6 +430,7 @@ impl FlowDispatcher {
         let (replies, responses) = mpsc::channel(UDP_QUEUE);
         let (ready, started) = oneshot::channel();
         let shared = self.shared.clone();
+        let gateway = self.gateway.clone();
         // Construct before spawn: shutdown can drop a task before its first
         // poll, and that path still has to publish an authoritative close cause.
         let (mut completion, mut closed) = UdpCompletion::new(shared.clone(), &registered);
@@ -109,6 +443,7 @@ impl FlowDispatcher {
                 incoming,
                 replies,
                 ready,
+                gateway,
             )
             .await;
             completion.finish(result);
@@ -137,14 +472,21 @@ impl FlowDispatcher {
     ) -> Result<Vec<SocketAddr>> {
         let registered = self.shared.register()?;
         let shared = self.shared.clone();
+        let gateway = self.gateway.clone();
         let host = host.to_owned();
         let mut task = AbortTask(self.runtime.spawn(async move {
             let id = registered.guard.id;
             let mut cancellation = registered.cancellation.clone();
             let work = async {
+                if let Some(gateway) = &gateway {
+                    gateway.dns_host(source, &host)?;
+                }
                 let (plan, generation) = shared.admit().await?;
                 validate_tun_dns(&plan.prepared.runtime)?;
-                let routed = route(
+                let boundary = gateway
+                    .as_ref()
+                    .map(|admission| GatewayBoundary { admission, source });
+                let mut routed = route(
                     plan.clone(),
                     NetworkTarget {
                         host: host.clone(),
@@ -153,9 +495,18 @@ impl FlowDispatcher {
                     source.ip(),
                     generation,
                     false,
-                    None,
+                    boundary
+                        .as_ref()
+                        .map(|boundary| boundary as &dyn IngressBoundary),
                 )
                 .await?;
+                if let Some(gateway) = &gateway {
+                    gateway.dns_host(source, &routed.target.host)?;
+                    // This operation resolves the query name itself. Only its
+                    // proxy endpoint needs preparation here; PolicyDnsTransport
+                    // validates the actual encrypted DNS server destination.
+                    gateway.prepare_outbound(source, &mut routed, false).await?;
+                }
                 shared.bind(id, &routed.node.id)?;
                 if matches!(routed.node.outbound, Outbound::Reject {}) {
                     return Err("Rejected");
@@ -166,10 +517,16 @@ impl FlowDispatcher {
                     bootstrap: routed.resolver.clone(),
                     limit: routed.limit,
                 };
-                routed
+                let addresses = routed
                     .resolver
                     .resolve_with_transport(&host, port, &transport)
-                    .await
+                    .await?;
+                if let Some(gateway) = &gateway {
+                    for address in &addresses {
+                        gateway.dns_host(source, &address.ip().to_string())?;
+                    }
+                }
+                Ok(addresses)
             };
             let result = tokio::select! {
                 biased;
@@ -589,12 +946,36 @@ async fn run_udp(
     mut requests: mpsc::Receiver<SendRequest>,
     responses: mpsc::Sender<Vec<u8>>,
     ready: oneshot::Sender<Result<()>>,
+    gateway: Option<Arc<GatewayAdmission>>,
 ) -> Result<()> {
     let id = registered.guard.id;
     let mut cancellation = registered.cancellation.clone();
     let counters = Arc::new(Counters::default());
     let setup = async {
-        let routed = route_flow(&shared, id, source, &target, counters.clone(), true).await?;
+        gateway_target(&gateway, source, &target)?;
+        let boundary = gateway
+            .as_ref()
+            .map(|admission| GatewayBoundary { admission, source });
+        let mut routed = route_flow(
+            &shared,
+            id,
+            source,
+            &target,
+            counters.clone(),
+            true,
+            boundary
+                .as_ref()
+                .map(|boundary| boundary as &dyn IngressBoundary),
+        )
+        .await?;
+        if let Some(gateway) = &gateway {
+            mark_gateway_record(&shared, id, gateway, source, None)?;
+        }
+        gateway_target(&gateway, source, &routed.target)?;
+        if let Some(gateway) = &gateway {
+            gateway.prepare_outbound(source, &mut routed, true).await?;
+            mark_gateway_record(&shared, id, gateway, source, Some(&routed.trace))?;
+        }
         let association = timeout(routed.limit, NativeAssociation::connect(&routed))
             .await
             .map_err(|_| "UdpConnectTimeout")??;

@@ -616,14 +616,19 @@ impl LanRuntime {
                         Ok(registered) => registered,
                         Err(error) => {
                             state.rejected.fetch_add(1, Ordering::Relaxed);
-                            state.error(error);
+                            state.error(if error == "ConnectionLimit" { "CoreConnectionLimit" } else { error });
                             continue;
                         }
                     };
                     let id = registered.guard.id;
                     let lease = match state.admit(peer.ip(), id) {
                         Ok(lease) => lease,
-                        Err(error) => { state.rejected.fetch_add(1, Ordering::Relaxed); shared.rejected.fetch_add(1, Ordering::Relaxed); state.error(error); continue; }
+                        Err(error) => {
+                            state.rejected.fetch_add(1, Ordering::Relaxed);
+                            shared.rejected.fetch_add(1, Ordering::Relaxed);
+                            state.error(error);
+                            continue;
+                        }
                     };
                     let cancelled = registered.cancellation.clone();
                     let shared = shared.clone();

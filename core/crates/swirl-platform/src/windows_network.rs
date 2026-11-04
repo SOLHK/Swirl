@@ -283,6 +283,15 @@ impl WindowsNetworkBackend {
     }
 
     fn check_resource(&self, resource: &Resource) -> io::Result<()> {
+        if matches!(
+            resource,
+            Resource::GatewayIsolation { .. } | Resource::GatewayDhcpFirewall { .. }
+        ) {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "physical gateway isolation requires its dedicated backend",
+            ));
+        }
         if let Resource::DnsGuard { name } = resource {
             let prefix = format!("Swirl.NativeTun.DNS.{}.", self.owned.guid);
             let suffix = name.strip_prefix(&prefix).ok_or_else(|| {
@@ -373,7 +382,11 @@ impl NetworkBackend for WindowsNetworkBackend {
         let actual: Option<Value> = run_json(
             RESOURCE_SCRIPT,
             &json!({"mode":"compare_exchange", "interface":interface, "resource":resource, "expected":expected, "desired":desired}),
-        )?;
+        ).map_err(|error| {
+            if error.to_string().starts_with("Windows network operation failed: Network resource changed after snapshot; refusing overwrite") {
+                io::Error::new(io::ErrorKind::AlreadyExists, error)
+            } else { error }
+        })?;
         if &normalized(actual) != desired {
             return Err(io::Error::other("Windows network readback mismatch"));
         }
@@ -381,7 +394,10 @@ impl NetworkBackend for WindowsNetworkBackend {
     }
 }
 
-fn run_json<T: DeserializeOwned>(script: &str, input: &serde_json::Value) -> io::Result<T> {
+pub(crate) fn run_json<T: DeserializeOwned>(
+    script: &str,
+    input: &serde_json::Value,
+) -> io::Result<T> {
     run_json_with_timeout(script, input, COMMAND_TIMEOUT)
 }
 
@@ -577,6 +593,12 @@ try {
   function Read-State {
     if ($p.resource.kind -ne 'dns_guard' -and $null -eq (Owned-Adapter)) { return $null }
     switch ($p.resource.kind) {
+      'forwarding' {
+        $family = if ($p.resource.ipv6) { 'IPv6' } else { 'IPv4' }
+        $rows = @(Get-NetIPInterface -InterfaceIndex $index -AddressFamily $family -PolicyStore ActiveStore -ErrorAction Stop)
+        if ($rows.Count -ne 1 -or [string]$rows[0].Forwarding -notin @('Enabled','Disabled')) { throw 'Ambiguous forwarding state' }
+        return @{kind='forwarding';enabled=([string]$rows[0].Forwarding -eq 'Enabled')}
+      }
       'mtu' {
         $family = if ($p.resource.ipv6) { 'IPv6' } else { 'IPv4' }
         $rows = @(Get-NetIPInterface -InterfaceIndex $index -AddressFamily $family -PolicyStore ActiveStore -ErrorAction Stop)
@@ -640,6 +662,7 @@ try {
     if ($null -eq $a -or $null -eq $b) { return ($null -eq $a -and $null -eq $b) }
     if ($a.kind -ne $b.kind) { return $false }
     switch ($a.kind) {
+      'forwarding' { return ($a.enabled -eq $b.enabled) }
       'mtu' { return ($a.mtu -eq $b.mtu) }
       'address' { return ($a.prefix_len -eq $b.prefix_len -and $a.skip_as_source -eq $b.skip_as_source) }
       'route' { return ($a.metric -eq $b.metric) }
@@ -686,6 +709,12 @@ try {
     $value = $p.desired
     if (($p.resource.kind -ne 'dns_guard' -or $null -ne $value) -and $null -eq (Owned-Adapter)) { throw 'Owned TUN no longer exists' }
     switch ($p.resource.kind) {
+      'forwarding' {
+        if ($null -eq $value) { throw 'Interface forwarding state cannot be removed' }
+        $family = if ($p.resource.ipv6) { 'IPv6' } else { 'IPv4' }
+        $forwarding = if ($value.enabled) { 'Enabled' } else { 'Disabled' }
+        Set-NetIPInterface -InterfaceIndex $index -AddressFamily $family -Forwarding $forwarding -PolicyStore ActiveStore -ErrorAction Stop
+      }
       'mtu' {
         if ($null -eq $value) { throw 'An interface MTU cannot be removed' }
         $family = if ($p.resource.ipv6) { 'IPv6' } else { 'IPv4' }

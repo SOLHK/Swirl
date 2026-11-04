@@ -1449,11 +1449,13 @@ dependencies = [
 name = "swirl-platform"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "ipnet",
  "libloading",
  "serde",
  "serde_json",
  "sha2",
+ "socket2",
  "windows-sys 0.61.2",
  "wintun",
 ]
@@ -1540,6 +1542,7 @@ dependencies = [
 name = "swirl-tun"
 version = "0.1.0"
 dependencies = [
+ "ipnet",
  "ring",
  "smoltcp",
  "tokio",
