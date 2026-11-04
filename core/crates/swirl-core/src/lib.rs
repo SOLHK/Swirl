@@ -200,7 +200,7 @@ impl Core {
         validate_transports(&config, &transports)?;
         let transports = Arc::new(transports);
         let runtime = Builder::new_multi_thread()
-            .worker_threads(2)
+            .worker_threads(4)
             .max_blocking_threads(4)
             .thread_name("Swirl Rust Core")
             .enable_all()

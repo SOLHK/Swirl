@@ -93,7 +93,7 @@ QString privateDigest(const QJsonObject &object) {
 }
 QString subscriptionDefinitionDigest(const NodeSubscription &source) {
     return privateDigest({{"id",source.id},{"name",source.name},{"url",source.url.toString(QUrl::FullyEncoded)},
-        {"format",source.formatHint},{"scope",source.importScope},{"interval",source.intervalMinutes},{"enabled",source.enabled}});
+        {"format",source.formatHint},{"scope",source.importScope},{"downloadRoute",source.downloadRoute},{"interval",source.intervalMinutes},{"enabled",source.enabled}});
 }
 QStringList routingRuleFields(const QString &rule) {
     auto fields=rule.split(',');
@@ -165,7 +165,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     m_imports.setCatalogMutationApplier([this](const QString &operation,const QVariantMap &input,NodeImportService::ApplyCompletion completion,QString *error){
         NodeStore::ImportPlan plan;bool prepared=false;
         if(operation=="save_subscription")prepared=m_store.prepareSaveSubscription(input.value("id").toString(),input.value("name").toString(),input.value("url").toUrl(),
-            input.value("interval").toInt(),input.value("enabled").toBool(),input.value("formatHint").toString(),QStringLiteral("nodes-only"),&plan);
+            input.value("interval").toInt(),input.value("enabled").toBool(),input.value("formatHint").toString(),QStringLiteral("nodes-only"),&plan,input.value("downloadRoute").toString());
         else if(operation=="remove_subscription")prepared=m_store.prepareRemoveSubscription(input.value("id").toString(),&plan);
         else if(operation=="clean_legacy")prepared=m_store.prepareCleanLegacyNodes(&plan);
         if(!prepared){*error=m_store.error();return false;}
@@ -1569,7 +1569,7 @@ QVariantMap EngineController::reviewSubscriptionConfiguration(const QString &sou
     const auto planDigest=validation.value("plan_digest").toString();
     if(!QRegularExpression("^[0-9a-f]{64}$").match(planDigest).hasMatch())return reject(QStringLiteral("内核没有返回候选配置身份；无法确认本次应用。"));
     NodeStore::ImportPlan catalog;
-    if(!m_store.prepareSaveSubscription(source->id,source->name,source->url,source->intervalMinutes,source->enabled,source->formatHint,QStringLiteral("nodes-only"),&catalog))return reject(m_store.error());
+    if(!m_store.prepareSaveSubscription(source->id,source->name,source->url,source->intervalMinutes,source->enabled,source->formatHint,QStringLiteral("nodes-only"),&catalog,source->downloadRoute))return reject(m_store.error());
     auto network=catalog.retainedNetworkConfiguration();network.insert("policyDocumentV2",document);network.insert("dns",QJsonObject::fromVariantMap(dns));
     // This receipt is inert audit data. It is never read as future authority.
     auto outcomes=network.value("subscriptionImportResults").toObject(),outcome=outcomes.value(sourceId).toObject();

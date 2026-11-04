@@ -314,7 +314,9 @@ private slots:
             controller.stop();
         }
         EngineController reopened(std::make_unique<ConfigurationPeer>(),nullptr,path,false,std::make_unique<PolicySystemProxyBackend>());
-        QCOMPARE(QJsonObject::fromVariantMap(reopened.lanConfiguration()),QJsonObject::fromVariantMap(expected));
+        // Exercise the QML property while keeping the stop-regression suite
+        // compilable against its exact pre-LAN controller negative control.
+        QCOMPARE(QJsonObject::fromVariantMap(reopened.property("lanConfiguration").toMap()),QJsonObject::fromVariantMap(expected));
         QCOMPARE(reopened.m_options.lanPassword,secret);QVERIFY(!reopened.lanEnabled());
     }
     void preparationFailureLeavesDiskAndRunningReceiptUnchanged(){

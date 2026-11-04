@@ -354,6 +354,9 @@ fn tcp_roundtrip(client: &Client, v6: bool, fake: IpAddr) -> io::Result<()> {
                 Err(e) => return Err(e),
             }
         };
+        // Winsock accept inherits the listener's nonblocking mode. This peer
+        // uses bounded blocking IO after the deadline-controlled accept loop.
+        stream.set_nonblocking(false)?;
         stream.set_read_timeout(Some(WAIT))?;
         stream.set_write_timeout(Some(WAIT))?;
         let mut request = Vec::new();
@@ -362,7 +365,10 @@ fn tcp_roundtrip(client: &Client, v6: bool, fake: IpAddr) -> io::Result<()> {
             .read_to_end(&mut request)?;
         check(
             request == [0x6c; 1024],
-            "real TCP peer did not receive request followed by FIN",
+            &format!(
+                "real TCP peer did not receive request followed by FIN: received={} expected=1024",
+                request.len()
+            ),
         )?;
         stream.write_all(&vec![0x91; TCP_REPLY_BYTES])?;
         stream.shutdown(Shutdown::Write)?;
@@ -381,6 +387,7 @@ fn tcp_roundtrip(client: &Client, v6: bool, fake: IpAddr) -> io::Result<()> {
         )?)?;
         let mut next = None;
         let mut response = Vec::new();
+        let mut fin_sequence = None;
         let deadline = Instant::now() + WAIT;
         loop {
             check(
@@ -410,7 +417,12 @@ fn tcp_roundtrip(client: &Client, v6: bool, fake: IpAddr) -> io::Result<()> {
             )?;
             check(
                 segment.control != TcpControl::Rst,
-                "restricted Core reset TCP transfer",
+                &format!(
+                    "restricted Core reset TCP transfer: ipv6={v6} received={} expected={TCP_REPLY_BYTES} sequence={} ack={:?} next_ack={next:?}",
+                    response.len(),
+                    segment.seq_number.0,
+                    segment.ack_number.map(|number| number.0)
+                ),
             )?;
             if next.is_none() {
                 check(
@@ -461,6 +473,7 @@ fn tcp_roundtrip(client: &Client, v6: bool, fake: IpAddr) -> io::Result<()> {
             }
             let finished = segment.control == TcpControl::Fin;
             if finished {
+                fin_sequence = Some(segment.seq_number.0);
                 server = server.wrapping_add(1);
             }
             client.send_packet(tcp_packet(
@@ -478,10 +491,16 @@ fn tcp_roundtrip(client: &Client, v6: bool, fake: IpAddr) -> io::Result<()> {
         }
         check(
             response == vec![0x91; TCP_REPLY_BYTES],
-            "worker TCP half-close reply differs",
+            &format!(
+                "worker TCP half-close reply differs: ipv6={v6} received={} expected={TCP_REPLY_BYTES} fin_sequence={fin_sequence:?} next_ack={next:?}",
+                response.len()
+            ),
         )
     })();
     let peer_result = join(peer);
+    if let (Err(transfer), Err(peer)) = (&transfer, &peer_result) {
+        return Err(io::Error::other(format!("{transfer}; real peer: {peer}")));
+    }
     transfer?;
     peer_result
 }

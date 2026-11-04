@@ -43,7 +43,9 @@ function(swirl_add_font_tests)
   set(swirl_width_tests automaticWidthUsesRealAdvances automaticWidthNonmonotonicFonts
       automaticWidthShaping automaticWidthCacheAndResize qmlWidthControls)
   add_test(NAME swirl-font-native-raster COMMAND SwirlFontTests nativeGlyphsHaveNoColourFringes previewRepeatedAxesReuseResources ${swirl_width_tests} localSwirlCollectionUsesPhysicalFaces customAxesChangeRealGlyphsAtMixedCoordinates physicalIdentityRejectsMissingAndChangedOutlineTables -o "${CMAKE_CURRENT_BINARY_DIR}/font-native-raster.xml,xml" -o "-,txt")
-  set_tests_properties(swirl-font-native-raster PROPERTIES LABELS fonts TIMEOUT 30 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  # This aggregate includes native rasterization and an independently bounded
+  # identity subprocess; a cold raster pass alone used 20.8 seconds in CI.
+  set_tests_properties(swirl-font-native-raster PROPERTIES LABELS fonts TIMEOUT 60 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
   # Qt documents QT_SCALE_FACTOR as a hardware-independent application-scale
   # simulation. Its multiplier is not a physical Windows system DPI setting.
   # Run separate processes so each QGuiApplication sees its scale at startup.
@@ -529,6 +531,17 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  add_executable(SwirlSubscriptionFormatTests tests/SubscriptionFormatTests.cpp tests/ControlledNetwork.h)
  add_executable(SwirlPrivateSubscriptionInspect tools/InspectPrivateSubscription.cpp)
  target_link_libraries(SwirlPrivateSubscriptionInspect PRIVATE SwirlEngine)
+ if(SWIRL_BUILD_CORE_TESTS AND WIN32)
+  add_executable(SwirlPrivateSubscriptionAcceptance tools/PrivateSubscriptionAcceptance.cpp)
+  target_link_libraries(SwirlPrivateSubscriptionAcceptance PRIVATE SwirlEngine)
+  target_compile_definitions(SwirlPrivateSubscriptionAcceptance PRIVATE SWIRL_QA_APP_VERSION="${PROJECT_VERSION}")
+  target_compile_definitions(SwirlPrivateSubscriptionAcceptance PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+  if(MSVC)
+   target_compile_options(SwirlPrivateSubscriptionAcceptance PRIVATE /utf-8)
+  endif()
+  add_test(NAME swirl-private-acceptance-local COMMAND SwirlPrivateSubscriptionAcceptance --self-test)
+  set_tests_properties(swirl-private-acceptance-local PROPERTIES TIMEOUT 30 LABELS security)
+ endif()
  if(MSVC)
   target_compile_options(SwirlPrivateSubscriptionInspect PRIVATE /utf-8)
  endif()
@@ -682,7 +695,7 @@ endif()
 foreach(runtime_target IN ITEMS SwirlLanProxyTests SwirlProxyGuard SwirlExtensionTests SwirlTelemetryTests
  SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlSystemProxyTests SwirlSystemProxyExitTests SwirlAcceptance SwirlNodeTests
  SwirlNetworkRegressionTests SwirlImportTests SwirlSubscriptionFormatTests
- SwirlPrivateSubscriptionInspect SwirlPolicyConfigurationTests SwirlCatalogTransactionTests)
+ SwirlPrivateSubscriptionInspect SwirlPrivateSubscriptionAcceptance SwirlPolicyConfigurationTests SwirlCatalogTransactionTests)
  if(TARGET ${runtime_target})
   swirl_stage_rust_core(${runtime_target})
  endif()

@@ -73,7 +73,7 @@ Item {
     function saveSource() {
         const v2 = engineController.policyV2Active
         beginMutation("save", addDialog.sourceId, addDialog)
-        trackMutation(engineController.imports.saveSubscription(addDialog.sourceId, addDialog.sourceName, addDialog.sourceUrl, addDialog.intervalMinutes, addDialog.autoUpdate, addDialog.formatHint), v2)
+        trackMutation(engineController.imports.saveSubscription(addDialog.sourceId, addDialog.sourceName, addDialog.sourceUrl, addDialog.intervalMinutes, addDialog.autoUpdate, addDialog.formatHint, "", addDialog.downloadRoute), v2)
     }
     function confirmDelete(record, source) {
         if (!editable) return

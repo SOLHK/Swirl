@@ -837,13 +837,6 @@ fn dns_tcp_framing(v6: bool) {
     let dispatcher = core.flow_dispatcher().unwrap();
     let runtime = dispatcher.runtime_handle();
     runtime.block_on(async {
-        let mut bridge = spawn(
-            dispatcher,
-            TunDns::new(FakeIpStore::memory(8).unwrap()),
-            TunConfig::default(),
-        )
-        .unwrap();
-        let fake = fake_address(&mut bridge, name, v6).await;
         let query = dns_query(name, v6);
         let mut second_query = query.clone();
         second_query[..2].copy_from_slice(&[0x12, 0x34]);
@@ -857,6 +850,15 @@ fn dns_tcp_framing(v6: bool) {
         truncated.extend_from_slice(&queries[0][..queries[0].len() - 1]);
 
         for (case, request) in [complete, vec![0], truncated].into_iter().enumerate() {
+            // A finished flow can still have final packets queued for output.
+            // Isolate framing cases instead of assuming cross-flow packet order.
+            let mut bridge = spawn(
+                dispatcher.clone(),
+                TunDns::new(FakeIpStore::memory(8).unwrap()),
+                TunConfig::default(),
+            )
+            .unwrap();
+            let fake = fake_address(&mut bridge, name, v6).await;
             let valid = case == 0;
             let origin = source(v6, 44000 + case as u16);
             let destination =
@@ -965,14 +967,15 @@ fn dns_tcp_framing(v6: bool) {
                     .bridge_stats
                     .tcp_failures
                     .load(std::sync::atomic::Ordering::Relaxed)
-                    == case as u64
+                    == u64::from(!valid)
                     && bridge.stats.snapshot().active_tcp_flows == 0
             })
             .await;
+            assert_eq!(bridge.stats.snapshot().malformed_packets, 0);
+            bridge.control.shutdown().await.unwrap();
+            assert!(bridge.control.is_finished());
         }
-        assert_eq!(bridge.stats.snapshot().malformed_packets, 0);
         assert_eq!(core.snapshot().unwrap()["failed"], 0);
-        bridge.control.shutdown().await.unwrap();
     });
     core.stop();
 }

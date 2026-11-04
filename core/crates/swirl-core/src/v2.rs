@@ -537,7 +537,7 @@ impl Core {
         let prepared = candidate.prepare()?;
         prepared.runtime.policy.validate_start()?;
         let runtime = Builder::new_multi_thread()
-            .worker_threads(2)
+            .worker_threads(4)
             .max_blocking_threads(4)
             .thread_name("Swirl V2 Core")
             .enable_all()

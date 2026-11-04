@@ -137,11 +137,12 @@ try {
             if ($process.HasExited -or $process.StartTime.ToUniversalTime().ToString('o') -ne $initialStart) {
                 throw 'Observed process exited or its identity changed; the resource run is incomplete.'
             }
-            $samples.Add(@{elapsed_seconds=$timer.Elapsed.TotalSeconds;rss_bytes=[long]$process.WorkingSet64;
+            $sample=@{elapsed_seconds=$timer.Elapsed.TotalSeconds;rss_bytes=[long]$process.WorkingSet64;
                 private_bytes=[long]$process.PrivateMemorySize64;handles=$process.HandleCount;
-                cpu_seconds=$process.TotalProcessorTime.TotalSeconds;threads=$process.Threads.Count})
-            if ($timer.Elapsed.TotalSeconds -ge $DurationSeconds) { break }
-            Start-Sleep -Seconds ([Math]::Min($IntervalSeconds,[Math]::Max(0.05,$DurationSeconds-$timer.Elapsed.TotalSeconds)))
+                cpu_seconds=$process.TotalProcessorTime.TotalSeconds;threads=$process.Threads.Count}
+            $samples.Add($sample)
+            if ($sample.elapsed_seconds -ge $DurationSeconds) { break }
+            Start-Sleep -Seconds ([Math]::Min([double]$IntervalSeconds,[Math]::Max(0.05,$DurationSeconds-$timer.Elapsed.TotalSeconds)))
         } while ($true)
         Save-Json 'resource-samples.json' @{process_id=$ProcessId;process_start_utc=$initialStart;samples=@($samples)}
         $record.status='recorded' # The verifier computes threshold results from samples.

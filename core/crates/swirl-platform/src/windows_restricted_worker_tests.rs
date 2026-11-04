@@ -1,6 +1,212 @@
 use super::*;
 
 #[test]
+fn restricted_worker_can_reopen_its_own_objects_with_an_elevated_default_dacl() {
+    // Only a new, unassigned token is changed. No impersonation, process,
+    // desktop, host ACL or elevated broker is needed for this regression.
+    let source = open_token(
+        unsafe { GetCurrentProcess() },
+        TOKEN_QUERY | TOKEN_DUPLICATE | TOKEN_ADJUST_DEFAULT,
+    )
+    .unwrap();
+    let user = TokenBuffer::query(source.as_raw_handle(), TokenUser).unwrap();
+    let restricting = SID_AND_ATTRIBUTES {
+        Sid: user.value::<TOKEN_USER>().unwrap().User.Sid,
+        Attributes: 0,
+    };
+    let administrators = Sid::well_known(WinBuiltinAdministratorsSid).unwrap();
+    let disabled = SID_AND_ATTRIBUTES {
+        Sid: administrators.raw(),
+        Attributes: 0,
+    };
+    let mut raw = null_mut();
+    // SAFETY: all input SIDs remain live; only a new token is returned.
+    success(unsafe {
+        CreateRestrictedToken(
+            source.as_raw_handle(),
+            DISABLE_MAX_PRIVILEGE | LUA_TOKEN,
+            1,
+            &disabled,
+            0,
+            null(),
+            1,
+            &restricting,
+            &mut raw,
+        )
+    })
+    .unwrap();
+    let worker = owned(raw).unwrap();
+    // An elevated Windows token commonly grants GA only to BA and SYSTEM.
+    // Once BA is deny-only, neither matches both restricted access passes.
+    let elevated_dacl = LocalDescriptor::new("O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)").unwrap();
+    let (mut present, mut defaulted, mut acl) = (0, 0, null_mut());
+    // SAFETY: all pointers refer to our synthetic descriptor/output storage.
+    success(unsafe {
+        GetSecurityDescriptorDacl(elevated_dacl.0, &mut present, &mut acl, &mut defaulted)
+    })
+    .unwrap();
+    let initial = TOKEN_DEFAULT_DACL { DefaultDacl: acl };
+    // SAFETY: alter only the new unassigned restricted token, not its source.
+    success(unsafe {
+        SetTokenInformation(
+            worker.as_raw_handle(),
+            TokenDefaultDacl,
+            (&initial as *const TOKEN_DEFAULT_DACL).cast(),
+            size_of::<TOKEN_DEFAULT_DACL>() as u32,
+        )
+    })
+    .unwrap();
+    let profile_before = serde_json::to_value(profile(worker.as_raw_handle()).unwrap()).unwrap();
+    let mut raw = null_mut();
+    // SAFETY: query-only duplicate, never assigned to a thread or child.
+    success(unsafe {
+        DuplicateTokenEx(
+            worker.as_raw_handle(),
+            TOKEN_QUERY,
+            null(),
+            SecurityIdentification,
+            TokenImpersonation,
+            &mut raw,
+        )
+    })
+    .unwrap();
+    let observer = owned(raw).unwrap();
+    let check = |token: HANDLE| {
+        let default = TokenBuffer::query(token, TokenDefaultDacl).unwrap();
+        let mapping = GENERIC_MAPPING {
+            GenericRead: 0x0002_0001,
+            GenericWrite: 0x0002_0002,
+            GenericExecute: 0x0012_0000,
+            GenericAll: 0x001f_0003,
+        }; // Event generic rights.
+        let acl = default.value::<TOKEN_DEFAULT_DACL>().unwrap().DefaultDacl;
+        // Normalize generic ACE masks just as the object manager does when
+        // creating an event from this template. This changes only our query copy.
+        for index in 0..unsafe { (*acl).AceCount } {
+            let mut ace = null_mut();
+            // SAFETY: ordinary allow/deny ACEs share the same Mask layout.
+            unsafe {
+                success(GetAce(acl, u32::from(index), &mut ace)).unwrap();
+                MapGenericMask(&mut (*ace.cast::<ACCESS_ALLOWED_ACE>()).Mask, &mapping);
+            }
+        }
+        let mut descriptor = SECURITY_DESCRIPTOR::default();
+        // SAFETY: absolute descriptor only borrows live owned SIDs and ACL.
+        unsafe {
+            success(InitializeSecurityDescriptor(
+                (&mut descriptor as *mut SECURITY_DESCRIPTOR).cast(),
+                1,
+            ))
+            .unwrap();
+            success(SetSecurityDescriptorOwner(
+                (&mut descriptor as *mut SECURITY_DESCRIPTOR).cast(),
+                administrators.raw(),
+                0,
+            ))
+            .unwrap();
+            success(SetSecurityDescriptorGroup(
+                (&mut descriptor as *mut SECURITY_DESCRIPTOR).cast(),
+                administrators.raw(),
+                0,
+            ))
+            .unwrap();
+            success(SetSecurityDescriptorDacl(
+                (&mut descriptor as *mut SECURITY_DESCRIPTOR).cast(),
+                1,
+                default.value::<TOKEN_DEFAULT_DACL>().unwrap().DefaultDacl,
+                0,
+            ))
+            .unwrap();
+        }
+        let decision = creation_access_check(
+            (&mut descriptor as *mut SECURITY_DESCRIPTOR).cast(),
+            observer.as_raw_handle(),
+            GENERIC_ALL,
+            &mapping,
+        );
+        assert_eq!(decision.api_success, Some(true));
+        decision.allowed
+    };
+    assert_eq!(check(worker.as_raw_handle()), Some(false));
+    grant_worker_default_dacl(worker.as_raw_handle()).unwrap();
+    assert_eq!(check(worker.as_raw_handle()), Some(true));
+    assert_eq!(
+        serde_json::to_value(profile(worker.as_raw_handle()).unwrap()).unwrap(),
+        profile_before
+    );
+    let updated = TokenBuffer::query(worker.as_raw_handle(), TokenDefaultDacl).unwrap();
+    let updated_acl = updated.value::<TOKEN_DEFAULT_DACL>().unwrap().DefaultDacl;
+    // SAFETY: query returned a valid kernel-owned ACL inside updated.
+    assert_eq!(unsafe { (*updated_acl).AceCount }, 3);
+    let mut grants = Vec::new();
+    for index in 0..3 {
+        let mut ace = null_mut();
+        // SAFETY: index and ACE type/size come from this valid SDK ACL.
+        unsafe {
+            success(GetAce(updated_acl, index, &mut ace)).unwrap();
+            let allowed = &*ace.cast::<ACCESS_ALLOWED_ACE>();
+            assert_eq!(
+                (
+                    allowed.Header.AceType,
+                    allowed.Header.AceFlags,
+                    allowed.Mask
+                ),
+                (0, 0, GENERIC_ALL)
+            );
+            let sid: PSID = (&allowed.SidStart as *const u32).cast_mut().cast();
+            grants.push(
+                std::slice::from_raw_parts(sid.cast::<u8>(), GetLengthSid(sid) as usize).to_vec(),
+            );
+        }
+    }
+    let system = Sid::well_known(WinLocalSystemSid).unwrap();
+    let mut expected = [system.raw(), administrators.raw(), restricting.Sid].map(|sid| {
+        // SAFETY: all three expected SID owners remain live.
+        unsafe { std::slice::from_raw_parts(sid.cast::<u8>(), GetLengthSid(sid) as usize).to_vec() }
+    });
+    expected.sort();
+    grants.sort();
+    assert_eq!(grants, expected);
+
+    // A pre-existing explicit denial remains authoritative after the repair.
+    // This prevents a future switch to SET_ACCESS from silently removing it.
+    let mut denial = EXPLICIT_ACCESS_W {
+        grfAccessPermissions: 0x0002_0002, // Event generic-write mapping.
+        grfAccessMode: windows_sys::Win32::Security::Authorization::DENY_ACCESS,
+        ..EXPLICIT_ACCESS_W::default()
+    };
+    // SAFETY: live current-user SID and independently queried ACL.
+    unsafe { BuildTrusteeWithSidW(&mut denial.Trustee, restricting.Sid) };
+    let mut denied_acl = null_mut();
+    // SAFETY: Windows allocates a new ACL without modifying updated_acl.
+    assert_eq!(
+        unsafe { SetEntriesInAclW(1, &denial, updated_acl, &mut denied_acl) },
+        0
+    );
+    let denied_default = TOKEN_DEFAULT_DACL {
+        DefaultDacl: denied_acl,
+    };
+    // SAFETY: change only the unassigned test token, then release the ACL copy.
+    let installed = success(unsafe {
+        SetTokenInformation(
+            worker.as_raw_handle(),
+            TokenDefaultDacl,
+            (&denied_default as *const TOKEN_DEFAULT_DACL).cast(),
+            size_of::<TOKEN_DEFAULT_DACL>() as u32,
+        )
+    });
+    unsafe { LocalFree(denied_acl.cast()) };
+    installed.unwrap();
+    assert_eq!(check(worker.as_raw_handle()), Some(false));
+    grant_worker_default_dacl(worker.as_raw_handle()).unwrap();
+    assert_eq!(check(worker.as_raw_handle()), Some(false));
+    assert_eq!(
+        serde_json::to_value(profile(worker.as_raw_handle()).unwrap()).unwrap(),
+        profile_before
+    );
+}
+
+#[test]
 fn private_desktop_grants_sdk_full_access_only_to_worker_system_and_administrators() {
     let descriptor = private_desktop_descriptor("S-1-5-21-100-200-300-400").unwrap();
     let mut owner = null_mut();

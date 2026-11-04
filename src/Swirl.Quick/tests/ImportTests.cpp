@@ -4,6 +4,7 @@
 #include "engine/EngineController.h"
 #include "engine/SwirlProtocolRegistry.h"
 #include "engine/NativeNodeBridge.h"
+#include "engine/RustCoreLibrary.h"
 #include "ControlledNetwork.h"
 #include <QTest>
 #include <QSettings>
@@ -17,6 +18,8 @@
 #include <QScopeGuard>
 #include <QNetworkProxy>
 #include <QNetworkReply>
+#include <QSemaphore>
+#include <atomic>
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <wincrypt.h>
@@ -978,6 +981,65 @@ external-controller: 0.0.0.0:9090
         QVERIFY(mutated);QCOMPARE(applies,0);QCOMPARE(store.publicRows(),expected);
         QFile file(store.filePath());QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),encrypted);
         QVERIFY(service.message().contains(QStringLiteral("已丢弃旧响应")));QVERIFY(!service.message().contains("PRIVATE-TOKEN"));
+    }
+    void physicalDownloadStartupIsRevokedAndItsLateRouteIsStopped_data() {
+        QTest::addColumn<QString>("action");
+        for(const auto &action:{"cancel","timeout","shutdown","destroy"})QTest::newRow(action)<<QString::fromLatin1(action);
+    }
+    void physicalDownloadStartupIsRevokedAndItsLateRouteIsStopped() {
+        QFETCH(QString,action);
+        SubscriptionServer origin;QVERIFY(origin.listen(QHostAddress::LocalHost,0));origin.content=socks(1080);
+        QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));
+        struct PendingRoute { QSemaphore release;std::atomic<int> starts=0,stops=0;std::atomic<bool> invalid=false; };
+        const auto state=std::make_shared<PendingRoute>();
+        const auto release=qScopeGuard([state]{state->release.release();});
+        const auto targetPort=origin.serverPort(),proxyPort=freePort();
+        auto command=[state,targetPort,proxyPort](const QJsonObject &input)->QJsonObject {
+            if(input.value("op")=="stop") {
+                if(input.size()!=2||input.value("handle").toInteger()!=101)state->invalid=true;
+                ++state->stops;return {{"ok",true}};
+            }
+            if(input.size()!=3||input.value("op")!="start"||input.value("host")!="127.0.0.1"||input.value("port").toInt()!=targetPort)state->invalid=true;
+            ++state->starts;
+            if(!state->release.tryAcquire(1,40000))return {{"ok",false},{"error","FixtureStartupTimeout"}};
+            return {{"ok",true},{"handle",101},{"port",proxyPort},{"username","fixture-user"},{"password","fixture-password"}};
+        };
+        auto service=std::make_unique<NodeImportService>(&store,nullptr,std::function<qint64()>{},60000,
+            NodeImportService::SystemProxyResolver{},command);
+        auto url=origin.url();url.setScheme("https");
+        QVERIFY(service->saveSubscription({},"Physical startup",url,360,false,"auto","nodes-only","physical"));
+        const auto source=store.subscriptions().first().id;
+        QFile saved(store.filePath());QVERIFY(saved.open(QIODevice::ReadOnly));const auto before=saved.readAll();saved.close();
+        service->refreshSubscription(source);QTRY_COMPARE_WITH_TIMEOUT(state->starts.load(),1,3000);QVERIFY(service->busy());
+        bool pulse=false;QTimer::singleShot(0,service.get(),[&pulse]{pulse=true;});QTRY_VERIFY_WITH_TIMEOUT(pulse,1000);
+        if(action=="cancel")QVERIFY(service->cancelRefresh(source));
+        else if(action=="shutdown")service->shutdown();
+        else if(action=="destroy")service.reset();
+        else {QTRY_VERIFY_WITH_TIMEOUT(!service->busy(),35000);QVERIFY(service->message().contains(QStringLiteral("30 秒")));}
+        if(service)QVERIFY(!service->busy());
+        state->release.release();QTRY_COMPARE_WITH_TIMEOUT(state->stops.load(),1,3000);
+        QVERIFY(!state->invalid.load());QCOMPARE(origin.count,0);QVERIFY(store.nodes().isEmpty());
+        QVERIFY(saved.open(QIODevice::ReadOnly));QCOMPARE(saved.readAll(),before);
+    }
+    void nativePhysicalDownloadRejectsUnsupportedTargetsWithoutFallback_data() {
+        QTest::addColumn<QString>("scheme");
+        QTest::newRow("http-not-connect-capable")<<QString("http");
+        QTest::newRow("https-loopback-not-public")<<QString("https");
+    }
+    void nativePhysicalDownloadRejectsUnsupportedTargetsWithoutFallback() {
+        QFETCH(QString,scheme);
+        QVERIFY(RustCoreLibrary::instance().load());QVERIFY(RustCoreLibrary::instance().downloadRoute());
+        SubscriptionServer origin;QVERIFY(origin.listen(QHostAddress::LocalHost,0));origin.content=socks(1080);
+        QSignalSpy accepted(&origin,&QTcpServer::newConnection);
+        auto url=origin.url();url.setScheme(scheme);
+        QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));std::atomic<int> systemQueries=0;
+        NodeImportService service(&store,nullptr,{},60000,[&systemQueries](const QNetworkProxyQuery &){++systemQueries;return QList<QNetworkProxy>{QNetworkProxy(QNetworkProxy::NoProxy)};});
+        QVERIFY(service.saveSubscription({},"Physical invalid target",url,360,false,"auto","nodes-only","physical"));
+        QFile saved(store.filePath());QVERIFY(saved.open(QIODevice::ReadOnly));const auto before=saved.readAll();saved.close();
+        service.refreshSubscription(store.subscriptions().first().id);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),4000);
+        QCOMPARE(accepted.count(),0);QCOMPARE(systemQueries.load(),0);QVERIFY(store.nodes().isEmpty());
+        QVERIFY(service.message().contains(scheme=="http"?QStringLiteral("仅支持 HTTPS"):QStringLiteral("通道不可用")));
+        QVERIFY(saved.open(QIODevice::ReadOnly));QCOMPARE(saved.readAll(),before);
     }
     void subscriptionHttpStatusAndQtErrorsAreDifferentNamespaces() {
         SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));server.content=socks(1080);

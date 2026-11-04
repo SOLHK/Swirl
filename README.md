@@ -20,7 +20,7 @@ Swirl 是面向 Windows 的网络工具，桌面界面使用 **C++23、Qt 6 Quic
 
 [浅色界面](docs/screenshots/apec-activity-light.png) · [深色界面](docs/screenshots/apec-activity-dark.png) · [截图来源与历史索引](docs/screenshots/README.md)
 
-两张截图来自同一份 0.2.32 真实 Windows 构建，使用隔离空配置，未连接代理。未添加演示节点、出口 IP、延迟或流量；运行中的祥云结也不会出现在未连接状态。截图展示界面，不代表真实远端网络或私有订阅已通过验收。
+两张截图来自同一份 0.2.36 真实 Windows 构建（源码 `f0be1baa`），使用隔离空配置，未连接代理。未添加演示节点、出口 IP、延迟或流量；运行中的祥云结也不会出现在未连接状态。截图展示界面，不代表真实远端网络或私有订阅已通过验收。
 
 ## 界面与交互
 

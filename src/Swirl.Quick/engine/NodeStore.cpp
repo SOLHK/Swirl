@@ -327,8 +327,10 @@ bool NodeStore::decodeCatalogSnapshot(const QJsonObject &snapshot,ImportPlan *ou
         s.formatHint=o.value("formatHint").toString("auto");
         if(o.contains("importScope") && !o.value("importScope").isString()){m_error=QStringLiteral("保存的订阅导入范围无效；未覆盖原文件。");return false;}
         s.importScope=o.value("importScope").toString("full-profile");
+        if(o.contains("downloadRoute") && !o.value("downloadRoute").isString()){m_error=QStringLiteral("保存的订阅下载路径无效；未覆盖原文件。");return false;}
+        s.downloadRoute=o.value("downloadRoute").toString("system");
         s.intervalMinutes=o.value("interval").toInt();s.enabled=o.value("enabled").toBool();s.lastSuccess=o.value("lastSuccess").toInteger();
-        if(QUuid(s.id).isNull() || sourceIds.contains(s.id) || !allowedSubscriptionUrl(s.url) || !subscriptionFormats().contains(s.formatHint) || !subscriptionScopes().contains(s.importScope) || s.name.isEmpty() || s.name.size()>128 || s.intervalMinutes<15 || s.intervalMinutes>10080 || subscriptions.size()>=32){m_error=QStringLiteral("保存的订阅参数无效；未覆盖原文件。");return false;}
+        if(QUuid(s.id).isNull() || sourceIds.contains(s.id) || !allowedSubscriptionUrl(s.url) || !subscriptionFormats().contains(s.formatHint) || !subscriptionScopes().contains(s.importScope) || !subscriptionDownloadRoutes().contains(s.downloadRoute) || s.name.isEmpty() || s.name.size()>128 || s.intervalMinutes<15 || s.intervalMinutes>10080 || subscriptions.size()>=32){m_error=QStringLiteral("保存的订阅参数无效；未覆盖原文件。");return false;}
         sourceIds.insert(s.id);subscriptions.append(s);
     }
     // An older version may have removed the subscription record while leaving
@@ -392,7 +394,7 @@ QString encodeCatalog(const StoreSnapshot &data,const std::shared_ptr<std::atomi
         array.append(stored);
     }
     QJsonArray sources;
-    for(const auto &s:subscriptions)sources.append(QJsonObject{{"id",s.id},{"name",s.name},{"formatHint",s.formatHint},{"importScope",s.importScope},{"url",s.url.toString(QUrl::FullyEncoded)},{"interval",s.intervalMinutes},{"enabled",s.enabled},{"lastSuccess",s.lastSuccess}});
+    for(const auto &s:subscriptions)sources.append(QJsonObject{{"id",s.id},{"name",s.name},{"formatHint",s.formatHint},{"importScope",s.importScope},{"downloadRoute",s.downloadRoute},{"url",s.url.toString(QUrl::FullyEncoded)},{"interval",s.intervalMinutes},{"enabled",s.enabled},{"lastSuccess",s.lastSuccess}});
     QJsonObject snapshot{{"schema",1},{"catalogVersion",2},{"selected",selected},{"nodes",array},{"subscriptions",sources}};
     if(!networkConfiguration.isEmpty()) {
         if(networkConfiguration.value("schema").toInt()!=1){return QStringLiteral("网络配置版本无效。");}
@@ -549,15 +551,15 @@ QVariantList NodeStore::publicSubscriptions() const {
     QVariantList rows;
     for(const auto &s:m_subscriptions){
         int count=0;for(const auto &n:m_nodes)if(n.sourceId==s.id)++count;
-        rows.append(QVariantMap{{"id",s.id},{"name",s.name},{"formatHint",s.formatHint},{"importScope",s.importScope},{"source",QStringLiteral("订阅地址已加密隐藏")},{"nodes",count},{"intervalMinutes",s.intervalMinutes},{"enabled",s.enabled},
+        rows.append(QVariantMap{{"id",s.id},{"name",s.name},{"formatHint",s.formatHint},{"importScope",s.importScope},{"downloadRoute",s.downloadRoute},{"source",QStringLiteral("订阅地址已加密隐藏")},{"nodes",count},{"intervalMinutes",s.intervalMinutes},{"enabled",s.enabled},
             {"lastSuccess",s.lastSuccess},{"update",s.lastSuccess?QDateTime::fromSecsSinceEpoch(s.lastSuccess).toLocalTime().toString("yyyy-MM-dd HH:mm"):QStringLiteral("尚未成功更新")}});
     }
     return rows;
 }
-bool NodeStore::saveSubscription(const QString &id,const QString &name,const QUrl &url,int interval,bool enabled,const QString &formatHint,const QString &importScope) {
-    ImportPlan plan;return prepareSaveSubscription(id,name,url,interval,enabled,formatHint,importScope,&plan)&&commitImport(plan);
+bool NodeStore::saveSubscription(const QString &id,const QString &name,const QUrl &url,int interval,bool enabled,const QString &formatHint,const QString &importScope,const QString &downloadRoute) {
+    ImportPlan plan;return prepareSaveSubscription(id,name,url,interval,enabled,formatHint,importScope,&plan,downloadRoute)&&commitImport(plan);
 }
-bool NodeStore::prepareSaveSubscription(const QString &id,const QString &name,const QUrl &url,int interval,bool enabled,const QString &formatHint,const QString &importScope,ImportPlan *output) {
+bool NodeStore::prepareSaveSubscription(const QString &id,const QString &name,const QUrl &url,int interval,bool enabled,const QString &formatHint,const QString &importScope,ImportPlan *output,const QString &downloadRoute) {
     if(!allowMutation())return false;
     auto sources=m_subscriptions;int index=-1;
     for(int i=0;i<sources.size();++i)if(sources[i].id==id)index=i;
@@ -567,8 +569,10 @@ bool NodeStore::prepareSaveSubscription(const QString &id,const QString &name,co
     s.name=name.trimmed();if(!url.isEmpty())s.url=url;s.intervalMinutes=interval;s.enabled=enabled;
     if(!formatHint.isEmpty())s.formatHint=formatHint;
     if(!importScope.isEmpty())s.importScope=importScope;
+    if(!downloadRoute.isEmpty())s.downloadRoute=downloadRoute;
     if(!subscriptionFormats().contains(s.formatHint)){m_error=QStringLiteral("订阅格式无效。");return false;}
     if(!subscriptionScopes().contains(s.importScope)){m_error=QStringLiteral("订阅导入范围无效。");return false;}
+    if(!subscriptionDownloadRoutes().contains(s.downloadRoute)){m_error=QStringLiteral("订阅下载路径无效。");return false;}
     if(s.name.isEmpty() || s.name.size()>128 || s.name.contains(QRegularExpression("[\\x00-\\x1f]")) || !allowedSubscriptionUrl(s.url) || interval<15 || interval>10080){m_error=QStringLiteral("需要有效名称、HTTPS 订阅地址及 15–10080 分钟更新间隔（仅本机测试允许 HTTP）。");return false;}
     for(const auto &existing:sources)if(existing.id!=s.id&&existing.url==s.url){m_error=QStringLiteral("此订阅地址已存在；请更新已有订阅，避免重复节点来源。");return false;}
     if(index<0){if(sources.size()>=32){m_error=QStringLiteral("最多保存 32 个订阅。");return false;}sources.append(s);}else sources[index]=s;

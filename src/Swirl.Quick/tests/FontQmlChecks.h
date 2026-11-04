@@ -420,8 +420,10 @@ void FontTests::qmlWidthControls()
     QStringList warnings;
     QScopedPointer<QObject> serviceObject;
     QQmlEngine engine;
-    auto importPaths = engine.importPathList();
-    importPaths.removeAll(QCoreApplication::applicationDirPath());
+    // Keep the source-registered fixture away from the product module's qmldir.
+    auto importPaths = QLibraryInfo::paths(QLibraryInfo::QmlImportsPath);
+    importPaths.removeIf([](const QString &path) { return QFile::exists(path + "/SwirlQuick/qmldir"); });
+    importPaths.append({QStringLiteral("qrc:/qt/qml"), QStringLiteral("qrc:/qt-project.org/imports")});
     engine.setImportPathList(importPaths);
     QObject::connect(&engine, &QQmlEngine::warnings, &engine, [&](const QList<QQmlError> &errors) {
         for (const auto &error : errors) warnings.append(error.toString());
@@ -529,7 +531,10 @@ ApplicationWindow {
         const double extra = owner->property("width").toDouble() - text->width()
             + text->property("leftPadding").toDouble() + text->property("rightPadding").toDouble();
         QVERIFY(owner->setProperty("width", preferred + extra - 8));
-        QTRY_VERIFY(font(text).variableAxisValue(widthTag) < 100.f);
+        QTRY_VERIFY2(font(text).variableAxisValue(widthTag) < 100.f,
+            qPrintable(QStringLiteral("%1: owner=%2 text=%3 natural=%4 wdth=%5")
+                .arg(QString::fromLatin1(name)).arg(owner->property("width").toDouble())
+                .arg(text->width()).arg(preferred).arg(font(text).variableAxisValue(widthTag))));
         QCOMPARE(font(text).pixelSize(), defaultFont.pixelSize());
         QCOMPARE(font(text).weight(), defaultFont.weight());
         QCOMPARE(font(text).hintingPreference(), defaultFont.hintingPreference());
@@ -586,9 +591,13 @@ ApplicationWindow {
 
     auto *dialog = object("widthDialog");
     QVERIFY(dialog);
-    auto *header = firstText(qobject_cast<QQuickItem *>(dialog->property("header").value<QObject *>()));
+    auto *headerItem = qobject_cast<QQuickItem *>(dialog->property("header").value<QObject *>());
+    auto *header = firstText(headerItem);
     QVERIFY(header);
-    QTRY_VERIFY(header->property("widthFitting").toBool());
+    QVERIFY(!header->property("widthFitting").toBool());
+    QTRY_COMPARE(header->property("lineCount").toInt(), 1);
+    const auto wideDialogWidth = dialog->property("width").toDouble();
+    const auto singleLineHeaderHeight = headerItem->implicitHeight();
     const double dialogNatural = natural(header);
     QVERIFY(dialog->setProperty("width", dialogNatural + dialog->property("leftPadding").toDouble()
         + dialog->property("rightPadding").toDouble() - 8));
@@ -596,11 +605,20 @@ ApplicationWindow {
     for (int i = 0; i < 6; ++i) {
         QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
         QTRY_VERIFY(dialog->property("opened").toBool());
-        QTRY_VERIFY(font(header).variableAxisValue(widthTag) < 100.f);
+        // Dialog titles retain the newer wrapping contract: narrowing grows the
+        // complete title instead of fitting it as a single-line eliding label.
+        QCOMPARE(header->property("text").toString(), QStringLiteral("AAAAAAAA"));
+        QVERIFY(!header->property("truncated").toBool());
+        QTRY_VERIFY(header->property("lineCount").toInt() > 1);
+        QTRY_VERIFY(headerItem->implicitHeight() > singleLineHeaderHeight);
+        QTRY_COMPARE(font(header).variableAxisValue(widthTag), 100.f);
         QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
         QTRY_VERIFY(!dialog->property("visible").toBool());
         QCOMPARE(retainedHeader.data(), header);
     }
+    QVERIFY(dialog->setProperty("width", wideDialogWidth));
+    QTRY_COMPARE(header->property("lineCount").toInt(), 1);
+    QTRY_VERIFY(qAbs(headerItem->implicitHeight() - singleLineHeaderHeight) < .001);
     // Reuse these same live objects through static fallback and re-selection.
     const auto widthFamily = manager.currentFamily();
     for (int i = 0; i < 4; ++i) {

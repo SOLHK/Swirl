@@ -3,6 +3,8 @@
 import copy
 import importlib.util
 import json
+import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,6 +17,57 @@ SOURCE = "0123456789abcdef0123456789abcdef01234567"
 
 
 class EvidenceTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("pwsh"), "PowerShell 7 is required to execute the collector loop")
+    def test_collector_does_not_finish_on_a_clock_read_newer_than_its_recorded_sample(self):
+        # Execute the actual collector do/while AST with two distinct clock
+        # reads straddling the deadline. No host process/network state is read.
+        script = self.root / "collector-deadline.ps1"
+        script.write_text(r'''
+param([string]$Collector)
+$ErrorActionPreference='Stop'
+[Console]::Error.WriteLine('collector-fixture:entered')
+$tokens=$null;$errors=$null
+$ast=[Management.Automation.Language.Parser]::ParseFile($Collector,[ref]$tokens,[ref]$errors)
+if($errors.Count){throw 'Collector parsing failed'}
+$loops=@($ast.FindAll({param($node) $node -is [Management.Automation.Language.DoWhileStatementAst]},$true))
+if($loops.Count -ne 1){throw 'Expected the actual collector sample loop'}
+[Console]::Error.WriteLine('collector-fixture:parsed')
+$process=[pscustomobject]@{HasExited=$false;StartTime=[datetime]'2026-01-01T00:00:00Z';WorkingSet64=1024;PrivateMemorySize64=1024;HandleCount=1;TotalProcessorTime=[timespan]::Zero;Threads=@(1)}
+$process|Add-Member ScriptMethod Refresh {}
+$initialStart=$process.StartTime.ToUniversalTime().ToString('o')
+$timer=[pscustomobject]@{reads=0}
+$timer|Add-Member ScriptProperty Elapsed {
+  $times=@(0.999,1.001,1.050)
+  $value=$times[[Math]::Min($this.reads,2)];$this.reads+=1
+  [timespan]::FromSeconds($value)
+}
+$samples=[Collections.Generic.List[object]]::new()
+$DurationSeconds=1;$IntervalSeconds=1;$script:sleeps=0;$script:minimumSleep=[double]1000
+function Start-Sleep {param([double]$Seconds) $script:minimumSleep=[Math]::Min($script:minimumSleep,$Seconds);$script:sleeps+=1;if($script:sleeps -gt 4){throw 'Collector failed to stop within bounded fake clock'}}
+[Console]::Error.WriteLine('collector-fixture:loop-start')
+& ([scriptblock]::Create($loops[0].Extent.Text))
+[Console]::Error.WriteLine('collector-fixture:loop-complete')
+@{last=$samples[-1].elapsed_seconds;count=$samples.Count;minimum_sleep=$script:minimumSleep}|ConvertTo-Json -Compress
+''', encoding="utf-8")
+        try:
+            result = subprocess.run([shutil.which("pwsh"), "-NoProfile", "-NonInteractive",
+                                     "-File", str(script), "-Collector",
+                                     str(ROOT / "tools/Collect-NativeTunAcceptance.ps1")],
+                                    capture_output=True, text=True, encoding="utf-8", timeout=15)
+        except subprocess.TimeoutExpired as error:
+            stderr = error.stderr or b""
+            if isinstance(stderr, bytes):
+                stderr = stderr.decode("utf-8", errors="replace")
+            stages = [stage for stage in ("entered", "parsed", "loop-start", "loop-complete")
+                      if "collector-fixture:" + stage in stderr]
+            self.fail("Collector fixture exceeded 15 seconds; last stage: "
+                      + (stages[-1] if stages else "PowerShell did not enter script"))
+        self.assertEqual(result.returncode, 0, "Actual collector loop failed in the bounded fixture")
+        observed = json.loads(result.stdout)
+        self.assertGreaterEqual(observed["last"], 1.0)
+        self.assertGreaterEqual(observed["minimum_sleep"], 0.05)
+        self.assertLessEqual(observed["minimum_sleep"], 1.0)
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)

@@ -49,7 +49,9 @@ and reject conflicting or unsupported requirements.
 After the Rust changes, the complete `swirl-subscription` package actually ran:
 **305 tests passed, zero failed or ignored** (163 unit tests and 142 integration
 tests). `cargo clippy -p swirl-subscription --all-targets -- -D warnings`, scoped
-formatting and changed-file whitespace checks passed. Exact Qt final-build
-results are recorded by the delivery owner after rebuilding the paired Rust
-DLL and test executable. This report does not claim a real node connection,
+formatting and changed-file whitespace checks passed. After rebuilding the
+paired Rust DLL and Qt test executable, the delivery owner ran the complete
+`SwirlSubscriptionFormatTests` suite: **9/9 passed**, including both new Loon
+cases through the typed Rust projection. The related Node UI suite subsequently
+passed **645 checks, zero failures**. This report does not claim a real node connection,
 provider download success or full Loon configuration compatibility.

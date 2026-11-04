@@ -290,6 +290,67 @@ mod tests {
     use crate::network_transaction::InterfaceIdentity;
     use serde::Deserialize;
 
+    // New-NetFirewallRule resolves a current interface alias. A hidden or
+    // disconnected hardware record can exist in NetAdapter without a usable
+    // IPv4 interface, so it is unsuitable even for a disabled real-rule fixture.
+    const FIXTURE_ADAPTER: &str = r#"
+$ErrorActionPreference='Stop';[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
+try{
+  $visible=@(Get-NetAdapter -Physical -ErrorAction Stop | Where-Object {$_.HardwareInterface -and [uint32]$_.InterfaceType -eq 6 -and [string]$_.Status -eq 'Up'})
+  $ipv4=@(Get-NetIPInterface -AddressFamily IPv4 -PolicyStore ActiveStore -ErrorAction Stop)
+  $eligible=@(foreach($adapter in $visible){
+    $interfaces=@($ipv4 | Where-Object {[uint32]$_.InterfaceIndex -eq [uint32]$adapter.ifIndex -and [string]$_.InterfaceAlias -ceq [string]$adapter.Name -and [string]$_.ConnectionState -eq 'Connected'})
+    if($interfaces.Count -eq 1){$adapter}
+  })
+  $a=@($eligible | Sort-Object ifIndex | Select-Object -First 1)
+  if($a.Count -ne 1){throw 'A visible connected physical Ethernet IPv4 adapter is required for this disabled-rule fixture'}
+  ConvertTo-Json -InputObject @{identity=@{index=[uint32]$a[0].ifIndex;guid=([guid]$a[0].InterfaceGuid).ToString('D').ToLowerInvariant()};alias=[string]$a[0].Name;visible=$true;up=$true;ipv4_connected=$true;ipv4_alias_matches=$true;hardware=[bool]$a[0].HardwareInterface;interface_type=[uint32]$a[0].InterfaceType} -Compress -Depth 4
+}catch{[Console]::Error.WriteLine($_.Exception.Message);exit 1}
+"#;
+
+    fn fixture_adapter_mock(available: bool) -> io::Result<serde_json::Value> {
+        const MOCK: &str = r#"
+$p=[Console]::In.ReadToEnd() | ConvertFrom-Json
+function Get-NetAdapter {
+  param([switch]$Physical,[switch]$IncludeHidden,$ErrorAction)
+  if(-not $Physical){throw 'fixture must require physical NICs'}
+  if($IncludeHidden){[pscustomobject]@{Name='Hidden';ifIndex=1;InterfaceGuid='10000000-0000-4000-8000-000000000001';HardwareInterface=$true;InterfaceType=6;Status='Up'}}
+  [pscustomobject]@{Name='Disconnected';ifIndex=2;InterfaceGuid='20000000-0000-4000-8000-000000000002';HardwareInterface=$true;InterfaceType=6;Status='Disconnected'}
+  [pscustomobject]@{Name='No IPv4';ifIndex=3;InterfaceGuid='30000000-0000-4000-8000-000000000003';HardwareInterface=$true;InterfaceType=6;Status='Up'}
+  [pscustomobject]@{Name='Stale Alias';ifIndex=4;InterfaceGuid='40000000-0000-4000-8000-000000000004';HardwareInterface=$true;InterfaceType=6;Status='Up'}
+  [pscustomobject]@{Name='Usable';ifIndex=5;InterfaceGuid='50000000-0000-4000-8000-000000000005';HardwareInterface=$true;InterfaceType=6;Status='Up'}
+}
+function Get-NetIPInterface {
+  param($InterfaceIndex,$AddressFamily,$PolicyStore,$ErrorAction)
+  if($AddressFamily -ne 'IPv4' -or $PolicyStore -ne 'ActiveStore'){throw 'fixture must inspect current IPv4 interface'}
+  [pscustomobject]@{InterfaceIndex=1;InterfaceAlias='Hidden';ConnectionState='Connected'}
+  [pscustomobject]@{InterfaceIndex=4;InterfaceAlias='Foreign Alias';ConnectionState='Connected'}
+  if($p.available){[pscustomobject]@{InterfaceIndex=5;InterfaceAlias='Usable';ConnectionState='Connected'}}
+}
+function New-NetFirewallRule {throw 'read-only adapter selection must not create rules'}
+function Remove-NetFirewallRule {throw 'read-only adapter selection must not remove rules'}
+"#;
+        run_json(
+            &(MOCK.to_owned() + FIXTURE_ADAPTER),
+            &json!({"available":available}),
+        )
+    }
+
+    #[test]
+    fn disabled_firewall_fixture_selects_current_visible_connected_ipv4_identity() {
+        let adapter = fixture_adapter_mock(true).unwrap();
+        assert_eq!(
+            adapter,
+            json!({"identity":{"index":5,"guid":"50000000-0000-4000-8000-000000000005"},"alias":"Usable","visible":true,"up":true,"ipv4_connected":true,"ipv4_alias_matches":true,"hardware":true,"interface_type":6})
+        );
+    }
+
+    #[test]
+    fn disabled_firewall_fixture_refuses_stale_or_unavailable_interfaces() {
+        let error = fixture_adapter_mock(false).unwrap_err().to_string();
+        assert!(error.contains("visible connected physical Ethernet IPv4 adapter is required"));
+    }
+
     fn fixture() -> (GatewayIsolationPolicy, GatewayDhcpFirewallScope) {
         let mut policy = crate::gateway_policy::fixture();
         policy.dhcp = true;
@@ -534,14 +595,14 @@ function Remove-NetFirewallRule {throw 'Unexpected network mutation in read-only
         struct Adapter {
             identity: InterfaceIdentity,
             alias: String,
+            visible: bool,
+            up: bool,
+            ipv4_connected: bool,
+            ipv4_alias_matches: bool,
+            hardware: bool,
+            interface_type: u32,
         }
-        let adapter: Adapter = run_json(r#"
-$ErrorActionPreference='Stop';[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
-try{$a=@(Get-NetAdapter -IncludeHidden -ErrorAction Stop | Where-Object {$_.HardwareInterface -and [uint32]$_.InterfaceType -eq 6} | Select-Object -First 1)
-if($a.Count -ne 1){throw 'A physical Ethernet adapter is required for this disabled-rule fixture'}
-ConvertTo-Json -InputObject @{identity=@{index=[uint32]$a[0].ifIndex;guid=([guid]$a[0].InterfaceGuid).ToString('D').ToLowerInvariant()};alias=[string]$a[0].Name} -Compress -Depth 4
-}catch{[Console]::Error.WriteLine($_.Exception.Message);exit 1}
-"#,&json!({})).unwrap();
+        let adapter: Adapter = run_json(FIXTURE_ADAPTER, &json!({})).unwrap();
         // Safe selection evidence for a real NetSecurity failure: retain no
         // program path or adapter alias in CI, but make the bound NIC and alias
         // identity distinguishable across runner images.
@@ -553,6 +614,9 @@ ConvertTo-Json -InputObject @{identity=@{index=[uint32]$a[0].ifIndex;guid=([guid
                 "interface_guid":adapter.identity.guid,
                 "alias_utf16_length":adapter.alias.encode_utf16().count(),
                 "alias_sha256_utf8":format!("{alias_digest:x}"),
+                "visible":adapter.visible,"up":adapter.up,
+                "ipv4_connected":adapter.ipv4_connected,"ipv4_alias_matches":adapter.ipv4_alias_matches,
+                "hardware":adapter.hardware,"interface_type":adapter.interface_type,
             })
         );
         let (mut policy, mut scope) = fixture();

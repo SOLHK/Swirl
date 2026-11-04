@@ -21,7 +21,7 @@ ComboBox {
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     contentItem: SwirlText {renderType:Text.NativeRendering;
         id: valueLabel
-        textRole:"input"
+        textRole:"label"
         fitWidth: true; fitInFixedWidth: true
         text: AppState.zh(control.displayText)
         color: control.enabled ? Theme.text : Theme.muted
