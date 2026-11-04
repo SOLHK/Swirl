@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "evidence_class": "Windows Server scoped SDK components; overall workflow failed",
+  "development_sha": "744d10a4c697866c563f77344504d42b10a42803",
+  "actual_checkout_sha": "fedd4098b1815beb94ab66a593972cf6d7be6111",
+  "source_tree": "c97c0276f4e31dfdf4645dbdb0a5da5d2ef147e7",
+  "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41289423233",
+  "job_id": 124797381023,
+  "runner_label": "windows-2025",
+  "overall_status": "failed",
+  "wintun_status": "passed; scoped traffic and restoration only",
+  "wfp": {
+    "status": "passed",
+    "rules": 4,
+    "transaction_error_rollback": true,
+    "nonce_conflict_refused": true,
+    "persistent_across_engine_reopen": true,
+    "control_endpoints_unchanged": true,
+    "other_application_unchanged": true,
+    "owned_policy_removed": true,
+    "new_flow_block_ipv4_ipv6_tcp_udp": true,
+    "existing_tcp_echo_after_commit": [false, false],
+    "existing_udp_echo_after_commit": [false, false],
+    "existing_flow_revocation_guarantee": false,
+    "boot_acceptance": false,
+    "system_kill_switch_acceptance": false
+  },
+  "restricted_process": {
+    "status": "failed",
+    "unsigned_exit": 3221225794,
+    "hex_exit": "0xc0000142",
+    "rust_main_marker_seen": false,
+    "stdout_bytes": 0,
+    "stderr_bytes": 0,
+    "conclusion": "DLL initialization failure before the Rust-main marker; specific DLL/access cause unresolved. No isolation relaxed."
+  },
+  "artifact_id": 13077145649,
+  "artifact_zip_sha256": "16d791198c5345c975a4298935b168dc9bb6f463ce381195ea3b2953a98c10d2",
+  "files": [
+    {"path": "windows-wfp-744d10a-passed.log", "bytes": 920, "sha256": "87b4204a04559f79ca55632e0ee66dcae47831d87355a23dcfe065e97734faa3"},
+    {"path": "windows-wfp-744d10a-receipt.json", "bytes": 690, "sha256": "b3d51338148187e471f3b3f333c02b3274890aa7652d999b0866033469466b0c"},
+    {"path": "windows-restricted-744d10a-failed.log", "bytes": 734, "sha256": "6b46bda1abdcb794a2f2d9a7418a925a31554b1e198e989597866ceb654605bd"}
+  ],
+  "normalization": "none; original ZIP-entry bytes",
+  "physical_windows_11_acceptance": false
+}

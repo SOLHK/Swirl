@@ -4,7 +4,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -59,11 +59,28 @@ struct Job {
     next: tokio::time::Instant,
     active: bool,
 }
+
+struct ActiveHealthProbe(Arc<AtomicUsize>);
+
+impl ActiveHealthProbe {
+    fn new(in_flight: &Arc<AtomicUsize>) -> Self {
+        in_flight.fetch_add(1, Ordering::AcqRel);
+        Self(in_flight.clone())
+    }
+}
+
+impl Drop for ActiveHealthProbe {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
 pub(super) struct PolicyRuntime {
     document: Arc<PolicyDocument>,
     profiles: BTreeMap<String, String>,
     registry: Arc<Mutex<Registry>>,
     worker: Mutex<Option<JoinHandle<()>>>,
+    in_flight: Arc<AtomicUsize>,
     jobs: Mutex<Option<Vec<Job>>>,
     resolver: Arc<Resolver>,
     runtime: Handle,
@@ -127,6 +144,7 @@ impl PolicyRuntime {
             profiles,
             registry: Arc::new(Mutex::new(Registry::default())),
             worker: Mutex::new(None),
+            in_flight: Arc::new(AtomicUsize::new(0)),
             jobs: Mutex::new(Some(jobs.into_values().collect())),
             resolver,
             runtime,
@@ -197,9 +215,15 @@ impl PolicyRuntime {
                 self.paused.clone(),
                 self.resumed.clone(),
                 self.stop.subscribe(),
+                self.in_flight.clone(),
             )))
         }
         Ok(())
+    }
+    /// Native TUN acquisition must exclude sockets from automatic health jobs,
+    /// which are separate from ordinary admissions and the manual probe task.
+    pub fn quiescent(&self) -> bool {
+        self.in_flight.load(Ordering::Acquire) == 0
     }
     pub fn pause(&self, paused: bool) {
         self.paused.store(paused, Ordering::Release);
@@ -502,6 +526,7 @@ async fn run(
     paused: Arc<AtomicBool>,
     resumed: Arc<Notify>,
     mut stopped: watch::Receiver<bool>,
+    in_flight: Arc<AtomicUsize>,
 ) {
     let permits = Arc::new(Semaphore::new(4));
     let mut active = JoinSet::new();
@@ -521,7 +546,11 @@ async fn run(
                 let options = job.probe.legacy();
                 let transport = job.transport.clone();
                 let resolver = resolver.clone();
+                // Register before spawn, hence before any DNS/socket IO. The
+                // guard is also dropped if cancellation precedes the first poll.
+                let probe = ActiveHealthProbe::new(&in_flight);
                 active.spawn(async move {
+                    let _probe = probe;
                     let _permit = permit;
                     let result = if let Some(transport) = transport {
                         swirl_protocol::health_probe_with_transport(

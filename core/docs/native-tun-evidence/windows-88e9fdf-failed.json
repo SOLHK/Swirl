@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "evidence_class": "Windows Server scoped WFP and restricted process failure",
+  "development_sha": "88e9fdf8fe129402312d27340303a716b201405f",
+  "actual_checkout_sha": "6d81b3855f62500f9a9732dce766cbefe88e4fc5",
+  "source_tree": "63cae78f4e30cf619d8c376d34cbf03ab70f824d",
+  "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/41287491541",
+  "job_id": 124791660743,
+  "runner_label": "windows-2025",
+  "artifact_id": 13076177186,
+  "artifact_zip_sha256": "d5696d6978b646e042b2ad6dba0f4f7e51f3ec5c32c15e6e7279d12d70702fc6",
+  "status": "failed",
+  "wintun_step": "passed; scoped Server traffic and cleanup only",
+  "wfp": {
+    "status": "failed",
+    "phase": "verify filter index=0",
+    "flags": {"expected": 1, "actual": 65},
+    "displayed_conditions_action_weight_keys_metadata_equal": true,
+    "fix": "Explicitly request PERSISTENT|INDEXED and retain exact flags comparison; real rerun required."
+  },
+  "restricted_process": {
+    "status": "failed",
+    "phase": "child capability probe exit check",
+    "stdout_bytes": 0,
+    "stderr_bytes": 0,
+    "child_exit_code": null,
+    "cause": "Original fixture did not print the exit code. Empty outputs alone cannot identify loader, CRT, desktop, token or handle cause.",
+    "fix_status": "Unresolved; exact unsigned/hex exit and Rust-main-entry diagnostics added, no token/desktop/job relaxation."
+  },
+  "system_kill_switch_acceptance": false,
+  "physical_windows_11_acceptance": false,
+  "files": [
+    {"path": "windows-wfp-88e9fdf.log", "bytes": 1648, "sha256": "30ae1d81c151c4798db8ae3ec8dfc0248fcb2427ed36f95626702e6329dc9d9e"},
+    {"path": "windows-restricted-88e9fdf.log", "bytes": 604, "sha256": "fdd8f82e1f1479de7b0f287af61ebb2676e814d52f6243e51725a48371945823"},
+    {"path": "windows-restricted-88e9fdf-child-stdout.log", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    {"path": "windows-restricted-88e9fdf-child-stderr.log", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+  ],
+  "normalization": "none; original ZIP-entry bytes, including actual empty child outputs"
+}

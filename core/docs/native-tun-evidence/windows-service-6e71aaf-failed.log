@@ -1,0 +1,4 @@
+    Finished `release` profile [optimized] target(s) in 0.08s
+     Running `target\release\examples\windows-service-identity-smoke.exe --disposable-services --directory D:\a\_temp\swirl-service-identity-smoke`
+service identity smoke failed: OpenProcessToken: sdk_code=Some(5); Access is denied. (os error 5)
+error: process didn't exit successfully: `target\release\examples\windows-service-identity-smoke.exe --disposable-services --directory D:\a\_temp\swirl-service-identity-smoke` (exit code: 1)

@@ -1,5 +1,5 @@
 {
-  "scope": "Cargo.lock resolved dependencies, including target-specific and build dependencies",
+  "scope": "Cargo.lock resolved dependencies, including target-specific and build dependencies; separately distributed runtime artifacts are listed independently",
   "packages": [
     {
       "name": "aes",
@@ -203,7 +203,8 @@
       "repository": "https://github.com/BurntSushi/byteorder",
       "notices": [
         "COPYING",
-        "LICENSE-MIT"
+        "LICENSE-MIT",
+        "UNLICENSE"
       ]
     },
     {
@@ -214,6 +215,34 @@
       "repository": "https://github.com/tokio-rs/bytes",
       "notices": [
         "LICENSE"
+      ]
+    },
+    {
+      "name": "c2rust-bitfields",
+      "version": "0.18.0",
+      "license": "BSD-3-Clause",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "repository": "https://github.com/immunant/c2rust/",
+      "notices": [],
+      "notice_sources": [
+        "https://github.com/immunant/c2rust/blob/308da97f8ea6f76fc63d39e0fa84f0b28ee17622/LICENSE"
+      ],
+      "supplemental_notices": [
+        "crates/swirl-platform/licenses/C2RUST-BITFIELDS-0.18.0.txt"
+      ]
+    },
+    {
+      "name": "c2rust-bitfields-derive",
+      "version": "0.18.0",
+      "license": "BSD-3-Clause",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "repository": "https://github.com/immunant/c2rust/",
+      "notices": [],
+      "notice_sources": [
+        "https://github.com/immunant/c2rust/blob/308da97f8ea6f76fc63d39e0fa84f0b28ee17622/LICENSE"
+      ],
+      "supplemental_notices": [
+        "crates/swirl-platform/licenses/C2RUST-BITFIELDS-0.18.0.txt"
       ]
     },
     {
@@ -362,7 +391,7 @@
     },
     {
       "name": "ctutils",
-      "version": "0.4.3",
+      "version": "0.4.4",
       "license": "Apache-2.0 OR MIT",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "repository": "https://github.com/RustCrypto/utils",
@@ -391,14 +420,6 @@
         "LICENSE-APACHE",
         "LICENSE-MIT"
       ]
-    },
-    {
-      "name": "defmt",
-      "version": "0.3.101",
-      "license": "MIT OR Apache-2.0",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "repository": "https://github.com/knurling-rs/defmt",
-      "notices": []
     },
     {
       "name": "defmt",
@@ -786,7 +807,7 @@
     },
     {
       "name": "heapless",
-      "version": "0.8.0",
+      "version": "0.9.3",
       "license": "MIT OR Apache-2.0",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "repository": "https://github.com/rust-embedded/heapless",
@@ -1020,6 +1041,16 @@
       ]
     },
     {
+      "name": "libloading",
+      "version": "0.8.9",
+      "license": "ISC",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "repository": "https://github.com/nagisa/rust_libloading/",
+      "notices": [
+        "LICENSE"
+      ]
+    },
+    {
       "name": "litemap",
       "version": "0.8.3",
       "license": "Unicode-3.0",
@@ -1027,6 +1058,17 @@
       "repository": "https://github.com/unicode-org/icu4x",
       "notices": [
         "LICENSE"
+      ]
+    },
+    {
+      "name": "log",
+      "version": "0.4.34",
+      "license": "MIT OR Apache-2.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "repository": "https://github.com/rust-lang/log",
+      "notices": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
       ]
     },
     {
@@ -1070,7 +1112,8 @@
       "repository": "https://github.com/BurntSushi/memchr",
       "notices": [
         "COPYING",
-        "LICENSE-MIT"
+        "LICENSE-MIT",
+        "UNLICENSE"
       ]
     },
     {
@@ -1354,7 +1397,7 @@
     },
     {
       "name": "rustls-webpki",
-      "version": "0.103.15",
+      "version": "0.103.16",
       "license": "ISC",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "repository": "https://github.com/rustls/webpki",
@@ -1528,7 +1571,7 @@
     },
     {
       "name": "smoltcp",
-      "version": "0.12.0",
+      "version": "0.14.0",
       "license": "0BSD",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "repository": "https://github.com/smoltcp-rs/smoltcp.git",
@@ -1592,6 +1635,17 @@
     },
     {
       "name": "syn",
+      "version": "1.0.109",
+      "license": "MIT OR Apache-2.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "repository": "https://github.com/dtolnay/syn",
+      "notices": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "name": "syn",
       "version": "2.0.119",
       "license": "MIT OR Apache-2.0",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -1624,7 +1678,29 @@
     },
     {
       "name": "thiserror",
+      "version": "1.0.69",
+      "license": "MIT OR Apache-2.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "repository": "https://github.com/dtolnay/thiserror",
+      "notices": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "name": "thiserror",
       "version": "2.0.21",
+      "license": "MIT OR Apache-2.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "repository": "https://github.com/dtolnay/thiserror",
+      "notices": [
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+      ]
+    },
+    {
+      "name": "thiserror-impl",
+      "version": "1.0.69",
       "license": "MIT OR Apache-2.0",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "repository": "https://github.com/dtolnay/thiserror",
@@ -1877,7 +1953,7 @@
     },
     {
       "name": "webpki-roots",
-      "version": "1.0.9",
+      "version": "1.0.10",
       "license": "CDLA-Permissive-2.0",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "repository": "https://github.com/rustls/webpki-roots",
@@ -2018,6 +2094,17 @@
       ]
     },
     {
+      "name": "wintun",
+      "version": "0.5.1",
+      "license": "MIT",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "repository": "https://github.com/nulldotblack/wintun",
+      "notices": [
+        "LICENSE",
+        "wintun/LICENSE.txt"
+      ]
+    },
+    {
       "name": "writeable",
       "version": "0.6.4",
       "license": "Unicode-3.0",
@@ -2141,8 +2228,8 @@
     },
     {
       "name": "zstd",
-      "version": "0.13.3",
-      "license": "MIT",
+      "version": "0.14.3",
+      "license": "BSD-3-Clause",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "repository": "https://github.com/gyscos/zstd-rs",
       "notices": [
@@ -2151,30 +2238,51 @@
     },
     {
       "name": "zstd-safe",
-      "version": "7.2.4",
-      "license": "MIT OR Apache-2.0",
+      "version": "8.2.0",
+      "license": "BSD-3-Clause",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "repository": "https://github.com/gyscos/zstd-rs",
       "notices": [
-        "LICENSE",
-        "LICENSE.Apache-2.0",
-        "LICENSE.Mit"
+        "LICENSE"
       ]
     },
     {
       "name": "zstd-sys",
-      "version": "2.0.16+zstd.1.5.7",
-      "license": "MIT/Apache-2.0",
+      "version": "2.1.2+zstd.1.5.7",
+      "license": "BSD-3-Clause",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "repository": "https://github.com/gyscos/zstd-rs",
       "notices": [
         "LICENSE",
-        "LICENSE.Apache-2.0",
         "LICENSE.BSD-3-Clause",
-        "LICENSE.Mit",
         "zstd/COPYING",
         "zstd/LICENSE"
       ]
+    }
+  ],
+  "runtime_artifacts": [
+    {
+      "name": "Wintun official signed DLL",
+      "version": "0.14.1",
+      "license": "LicenseRef-Wintun-Prebuilt-Binaries",
+      "source": "https://www.wintun.net/builds/wintun-0.14.1.zip",
+      "archive_sha256": "07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51",
+      "notices": [
+        "crates/swirl-platform/licenses/WINTUN-0.14.1.txt"
+      ],
+      "artifacts": [
+        {
+          "target": "x86_64-pc-windows",
+          "archive_path": "wintun/bin/amd64/wintun.dll",
+          "sha256": "e5da8447dc2c320edc0fc52fa01885c103de8c118481f683643cacc3220dafce"
+        },
+        {
+          "target": "aarch64-pc-windows",
+          "archive_path": "wintun/bin/arm64/wintun.dll",
+          "sha256": "f7ba89005544be9d85231a9e0d5f23b2d15b3311667e2dad0debd344918a3f80"
+        }
+      ],
+      "distribution_note": "Unmodified official signed binary, used only through its permitted API and distributed alongside the application with its complete prebuilt-binaries license. The Rust wintun crate MIT license does not replace this binary license."
     }
   ]
 }

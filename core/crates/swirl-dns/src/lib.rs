@@ -4,6 +4,7 @@
 mod association;
 mod dot;
 mod stub;
+pub mod tun;
 mod wire;
 pub use association::{Association, DNS_IPV4, DNS_IPV6, Mapping, RecordKind, TUN_IPV4, TUN_IPV6};
 use std::{
@@ -36,7 +37,7 @@ impl QueryTransport for DirectQueryTransport {
         address: SocketAddr,
     ) -> Pin<Box<dyn Future<Output = Result<BoxStream, &'static str>> + Send + '_>> {
         Box::pin(async move {
-            let stream = tokio::net::TcpStream::connect(address)
+            let stream = swirl_transport::connect_tcp(address)
                 .await
                 .map_err(|_| "DnsTlsConnect")?;
             Ok(Box::new(stream) as BoxStream)

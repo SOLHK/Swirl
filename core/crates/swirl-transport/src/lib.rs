@@ -1,4 +1,5 @@
 //! Fixed-buffer full-duplex transfer with independent half-close and live counters.
+pub mod egress;
 pub mod grpc;
 mod h2_stream;
 pub mod http2;
@@ -7,6 +8,7 @@ pub mod quic;
 pub mod reality;
 mod udp;
 pub mod xhttp;
+pub use egress::connect_tcp;
 pub use udp::bind_udp;
 
 use std::{

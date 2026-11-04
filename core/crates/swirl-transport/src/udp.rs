@@ -31,6 +31,7 @@ fn reserve_datagram_buffers(socket: &UdpSocket) -> io::Result<()> {
 /// caller. This changes only this socket; system-wide network limits are intact.
 pub async fn bind_udp(address: SocketAddr) -> io::Result<UdpSocket> {
     let socket = UdpSocket::bind(address).await?;
+    crate::egress::pin_udp(&socket, address)?;
     reserve_datagram_buffers(&socket)?;
     Ok(socket)
 }

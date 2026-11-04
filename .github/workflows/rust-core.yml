@@ -1,12 +1,17 @@
 name: Swirl Rust Core
 on:
   push:
-    branches: [test, main, work/core-completion-20261017, work/core-rule-routing-20261021, work/rust-core-network-fixes-20261021, work/xray-v2ray-json-import-20261021]
+    branches: [test, main, work/core-completion-20261017, work/core-rule-routing-20261021, work/rust-core-network-fixes-20261021, work/xray-v2ray-json-import-20261021, work/native-tun-windows-20261030-isolated]
   pull_request:
     branches: [test, main]
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  # Only this repository's isolated TUN branch replaces stale/duplicate
+  # push + PR runs. Other branches retain their independent executions.
+  group: swirl-rust-${{ github.workflow }}-${{ (github.head_ref || github.ref_name) == 'work/native-tun-windows-20261030-isolated' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'native-tun-development' || github.run_id }}
+  cancel-in-progress: ${{ (github.head_ref || github.ref_name) == 'work/native-tun-windows-20261030-isolated' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
 jobs:
   portable-rust:
     strategy:

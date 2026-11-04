@@ -1,5 +1,38 @@
 use super::*;
 use swirl_subscription::v2::{ClassificationDns, DEFAULT_POLICY_ID, DefaultPolicy, Group, Mode};
+
+#[test]
+fn automatic_health_jobs_are_counted_before_poll_and_released_on_early_abort() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
+    let in_flight = Arc::new(AtomicUsize::new(0));
+    let polled = Arc::new(AtomicBool::new(false));
+    let mut tasks = JoinSet::new();
+    {
+        let _entered = runtime.enter();
+        for _ in 0..4 {
+            let probe = ActiveHealthProbe::new(&in_flight);
+            let polled = polled.clone();
+            tasks.spawn(async move {
+                let _probe = probe;
+                polled.store(true, Ordering::Release);
+                std::future::pending::<()>().await;
+            });
+        }
+    }
+    assert_eq!(in_flight.load(Ordering::Acquire), 4);
+    assert!(!polled.load(Ordering::Acquire));
+    tasks.abort_all();
+    runtime.block_on(async {
+        while let Some(result) = tasks.join_next().await {
+            assert!(result.unwrap_err().is_cancelled());
+        }
+    });
+    assert!(!polled.load(Ordering::Acquire));
+    assert_eq!(in_flight.load(Ordering::Acquire), 0);
+}
+
 fn id(n: u32) -> String {
     format!("20000000-0000-4000-8000-{n:012}")
 }

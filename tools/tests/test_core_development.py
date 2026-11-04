@@ -1098,6 +1098,21 @@ class CoreDevelopmentTests(unittest.TestCase):
             with self.subTest(source=source[-80:]), self.assertRaises(ValueError):
                 development.updated_workflow(source)
 
+    def test_native_tun_branch_preserves_reviewed_push_gates_and_rejects_drift(self):
+        checked_in = (Path(__file__).resolve().parents[2] / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
+        branch = "work/native-tun-windows-20261030-isolated"
+        self.assertIn(branch, checked_in)
+        self.assertEqual(development.updated_workflow(checked_in), checked_in)
+        previous = checked_in.replace(", " + branch, "", 1)
+        self.assertEqual(development.updated_workflow(previous), previous)
+        for changed in (
+            checked_in.replace(branch, "work/unreviewed-native-tun", 1),
+            checked_in.replace(branch, branch + ", " + branch, 1),
+            checked_in.replace("  push:\n", "  push:\n    branches: [test, main]\n  push:\n", 1),
+        ):
+            with self.subTest(branch_form=changed[:320]), self.assertRaises(ValueError):
+                development.updated_workflow(changed)
+
     def test_partial_or_duplicate_new_test_menu_fails_closed(self):
         for injected in (
             "          python ../tools/tests/test_dns_https.py\n",
