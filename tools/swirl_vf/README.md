@@ -181,3 +181,25 @@ Primary references and licensing boundaries are recorded in
 [technical comparison](research/TECHNICAL_COMPARISON.md) and
 [licensing review](research/LICENSING_REVIEW.md). Those dated documents retain
 historical observations; current tested state is in the detailed handoff above.
+
+## Joint interpolation scaling checkpoint — 2026-11-03
+
+The separate CFF2/avar2 joint compiler is a research representation, not the
+completed full-font product builder described above. Its
+[14-case corpus](../../docs/SWIRL_VF_CORPUS_20261103.md) has nine qualified
+joint-q passes and five retained failures. Six additional unique GIDs pass
+serialized CoreText/HarfBuzz/fontTools tests at 1/32 FUnit.
+
+[Sparse streaming and exact instruction sharing](../../docs/SWIRL_VF_SCALING_20261103.md)
+reduce compiler RSS and font size. The optional
+[`--maximum-helpers 1239` dictionary](../../docs/SWIRL_VF_EXTENDED_DICTIONARY_20261103.md)
+reduces the two anchor probes to 28,532,496 / 80,682,776 bytes with complete
+native revalidation; the default bank remains 215. It adds an explicit drawing
+cost, recorded with the storage benefit. The corpus tools retain failure costs,
+source hashes, independent-sample counts and stage timings.
+
+[Capacity and compatibility limits](../../docs/SWIRL_VF_SCALING_COMPATIBILITY_20261103.md)
+include original physical-axis mapping, per-cell GID growth, shaping dependence
+and actual failing DirectWrite controls. The Windows fractional glyf alternative
+passes authored server controls but fails CoreText. These results do not
+certify full-font or Windows 11 acceptance. PR #53 remains Draft.

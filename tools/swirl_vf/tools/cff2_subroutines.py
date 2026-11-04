@@ -28,7 +28,7 @@ def encode(program, private, subroutines):
     return result
 
 
-def pack(font, *, byte_limit=MAX_BYTES):
+def pack(font, *, byte_limit=MAX_BYTES, release_programs=False):
     """Pack a detached, generated unhinted CFF2 font without changing its GIDs.
 
     A smaller byte_limit is permitted for authored boundary tests, never a
@@ -37,6 +37,7 @@ def pack(font, *, byte_limit=MAX_BYTES):
     The caller should discard its detached candidate if a format guard fails.
     """
     require(type(byte_limit) is int and 32 <= byte_limit <= MAX_BYTES, 'invalid_cff2_byte_limit')
+    require(type(release_programs) is bool, 'invalid_cff2_program_memory_policy')
     cff = font['CFF2'].cff
     top = cff.topDictIndex[0]
     globals_ = cff.GlobalSubrs
@@ -45,6 +46,15 @@ def pack(font, *, byte_limit=MAX_BYTES):
               'maximum_input_bytes': 0, 'maximum_output_bytes': 0, 'maximum_subroutine_bytes': 0}
     for name in font.getGlyphOrder():
         cs = top.CharStrings[name]
+        # An already encoded, bounded main needs no transformation. In
+        # particular, do not recursively decompile all shared operand helpers
+        # just to measure the caller's byte length. This is the same length
+        # contract as the decoded branch below, with byte-for-byte preservation.
+        if cs.bytecode is not None and len(cs.bytecode) <= byte_limit:
+            size = len(cs.bytecode)
+            report['maximum_input_bytes'] = max(report['maximum_input_bytes'], size)
+            report['maximum_output_bytes'] = max(report['maximum_output_bytes'], size)
+            continue
         cs.decompile()
         program = list(cs.program)
         original = encode(program, cs.private, globals_)
@@ -52,6 +62,8 @@ def pack(font, *, byte_limit=MAX_BYTES):
         report['maximum_input_bytes'] = max(report['maximum_input_bytes'], size)
         if size <= byte_limit:
             report['maximum_output_bytes'] = max(report['maximum_output_bytes'], size)
+            if release_programs:
+                cs.setBytecode(original.bytecode)
             continue
         require(not len(globals_) and not getattr(cs.private, 'Subrs', ()),
                 'oversized_external_subroutine_program_unsupported')
@@ -75,6 +87,9 @@ def pack(font, *, byte_limit=MAX_BYTES):
             chunk.extend(block); chunk_size += size
         if chunk:
             chunks.append(chunk)
+        if release_programs:
+            chunks = [encode(chunk, cs.private, globals_) for chunk in chunks]
+            cs.setBytecode(original.bytecode)
         pending.append((cs, prefix, chunks))
     if not pending:
         return report
@@ -82,7 +97,7 @@ def pack(font, *, byte_limit=MAX_BYTES):
     for cs, prefix, chunks in pending:
         selected = []
         for chunk in chunks:
-            sub = encode(chunk, cs.private, globals_)
+            sub = chunk if isinstance(chunk, T2CharString) else encode(chunk, cs.private, globals_)
             key = sub.bytecode
             if key not in indices:
                 require(len(programs) < 65536, 'cff2_subroutine_call_index_overflow')
@@ -102,11 +117,14 @@ def pack(font, *, byte_limit=MAX_BYTES):
         compiled = encode(program, cs.private, globals_)
         require(len(compiled.bytecode) <= byte_limit, 'cff2_subroutine_caller_too_large')
         report['maximum_output_bytes'] = max(report['maximum_output_bytes'], len(compiled.bytecode))
-        replacements.append((cs, program))
+        replacements.append((cs, compiled.bytecode if release_programs else program))
     for program in programs:
         globals_.append(program)
     for cs, program in replacements:
-        cs.setProgram(program)
+        if release_programs:
+            cs.setBytecode(program)
+        else:
+            cs.setProgram(program)
     report['glyphs_repacked'] = len(replacements)
     report['global_subroutines_added'] = len(programs)
     return report

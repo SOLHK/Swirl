@@ -1,0 +1,1066 @@
+{
+  "run_id": 41581157623,
+  "commit_sha": "ece1d8ebc273e8035632e815c74adb919673bedb",
+  "url": "https://github.com/SOLHK/Swirl/actions/runs/41581157623",
+  "jobs": [
+    {
+      "job_id": 125736062417,
+      "name": "native (windows-2025)",
+      "conclusion": "failure",
+      "reports": [
+        {
+          "scope": "authored_control_only",
+          "variant": "static_cff2",
+          "os": "Windows-2025Server-10.0.26100-SP0",
+          "font_sha256": "ce1f6fc09058916bfca1504adf12faa3b74bede049e5131b2a7be031a71ef0f5",
+          "font_bytes": 3516,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0,
+            "selection_failures": 762,
+            "advance_failures": 0,
+            "empty_outlines": 0,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 26100,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "flat_cff2",
+          "os": "Windows-2025Server-10.0.26100-SP0",
+          "font_sha256": "c439ab6474bc757952128a0f08c93b65c9e6109179c6d2aa7afe11389134a107",
+          "font_bytes": 3704,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007622896550003588,
+            "selection_failures": 762,
+            "advance_failures": 0,
+            "empty_outlines": 0,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007622896550003588
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 26100,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "horner_avar1",
+          "os": "Windows-2025Server-10.0.26100-SP0",
+          "font_sha256": "e8aeabae8f98627b5097d5325fa74feca3a7e068965b2ed39217bc51b1621b43",
+          "font_bytes": 5372,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 762,
+            "max_error": 0,
+            "selection_failures": 762,
+            "advance_failures": 0,
+            "empty_outlines": 762,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0029212422576406815
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 26100,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "flat_avar2",
+          "os": "Windows-2025Server-10.0.26100-SP0",
+          "font_sha256": "fc68f345cd774ab2a31bb61992b4c4c0f2380f3666976238483a4e0e21dacde4",
+          "font_bytes": 5140,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 754,
+            "max_error": 18.028167547491808,
+            "selection_failures": 762,
+            "advance_failures": 0,
+            "empty_outlines": 0,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.001972688867718848
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 26100,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "unshared",
+          "os": "Windows-2025Server-10.0.26100-SP0",
+          "font_sha256": "328095c4565aec7a53cd61d1a66bbd62c2097e39239b9e9cbe650ecfea77884f",
+          "font_bytes": 13424,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 762,
+            "max_error": 0,
+            "selection_failures": 762,
+            "advance_failures": 0,
+            "empty_outlines": 762,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0037383652607562543
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 26100,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "full",
+          "os": "Windows-2025Server-10.0.26100-SP0",
+          "font_sha256": "85d2e74c6d106f9af20719154343f00c2cdbf5696c4652c8af019a37dcef8f4a",
+          "font_bytes": 5276,
+          "requests": 762,
+          "compression": {
+            "local_helpers": 8,
+            "structural_helpers": 8,
+            "literal_helpers": 0,
+            "expected_payload_savings": 651,
+            "maximum_original_operations": 963,
+            "maximum_compressed_operations": 1035,
+            "maximum_operand_stack_bound": 28,
+            "maximum_subroutine_depth": 2,
+            "exact_expanded_bytes_verified": true,
+            "coefficients_changed": 0,
+            "operation_limit": 200000,
+            "local_call_bytes": 2,
+            "global_subroutine_indices_unchanged": true
+          },
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 762,
+            "max_error": 0,
+            "selection_failures": 762,
+            "advance_failures": 0,
+            "empty_outlines": 762,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0037383652607562543
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 26100,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "flat_cff2_rlig",
+          "os": "Windows-2025Server-10.0.26100-SP0",
+          "font_sha256": "1608ffd89bd3930a64d997eb947985d3aa143646afe445f353c3a2c9d36031f8",
+          "font_bytes": 3704,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007622896550003588,
+            "selection_failures": 762,
+            "advance_failures": 0,
+            "empty_outlines": 0,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007622896550003588
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 26100,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "flat_cff2_requested",
+          "os": "Windows-2025Server-10.0.26100-SP0",
+          "font_sha256": "c439ab6474bc757952128a0f08c93b65c9e6109179c6d2aa7afe11389134a107",
+          "font_bytes": 3704,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007622896550003588,
+            "selection_failures": 0,
+            "advance_failures": 0,
+            "empty_outlines": 0,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007622896550003588
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 26100,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "full_rlig",
+          "os": "Windows-2025Server-10.0.26100-SP0",
+          "font_sha256": "a4b94e57f91e6e880ac0fb995a8c0040ea36ff0565c76cb33b40aba9088700c3",
+          "font_bytes": 5276,
+          "requests": 762,
+          "compression": {
+            "local_helpers": 8,
+            "structural_helpers": 8,
+            "literal_helpers": 0,
+            "expected_payload_savings": 651,
+            "maximum_original_operations": 963,
+            "maximum_compressed_operations": 1035,
+            "maximum_operand_stack_bound": 28,
+            "maximum_subroutine_depth": 2,
+            "exact_expanded_bytes_verified": true,
+            "coefficients_changed": 0,
+            "operation_limit": 200000,
+            "local_call_bytes": 2,
+            "global_subroutine_indices_unchanged": true
+          },
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 762,
+            "max_error": 0,
+            "selection_failures": 762,
+            "advance_failures": 0,
+            "empty_outlines": 762,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0037383652607562543
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 26100,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "full_requested",
+          "os": "Windows-2025Server-10.0.26100-SP0",
+          "font_sha256": "85d2e74c6d106f9af20719154343f00c2cdbf5696c4652c8af019a37dcef8f4a",
+          "font_bytes": 5276,
+          "requests": 762,
+          "compression": {
+            "local_helpers": 8,
+            "structural_helpers": 8,
+            "literal_helpers": 0,
+            "expected_payload_savings": 651,
+            "maximum_original_operations": 963,
+            "maximum_compressed_operations": 1035,
+            "maximum_operand_stack_bound": 28,
+            "maximum_subroutine_depth": 2,
+            "exact_expanded_bytes_verified": true,
+            "coefficients_changed": 0,
+            "operation_limit": 200000,
+            "local_call_bytes": 2,
+            "global_subroutine_indices_unchanged": true
+          },
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 762,
+            "max_error": 0,
+            "selection_failures": 0,
+            "advance_failures": 0,
+            "empty_outlines": 762,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0037383652607562543
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 26100,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "micro_linear_requested",
+          "os": "Windows-2025Server-10.0.26100-SP0",
+          "font_sha256": "8bb298da2d4f19980b46af987894f057992fce18cce8164822c00f7b033503aa",
+          "font_bytes": 2976,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007543945312704636,
+            "selection_failures": 0,
+            "advance_failures": 0,
+            "empty_outlines": 0,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007543945312704636
+          },
+          "micro_isolation": {
+            "variation_regions": 1,
+            "subroutine_calls": 0,
+            "avar_version": 1,
+            "maximum_blend_stack": 4,
+            "maximum_drawing_stack": 6,
+            "nested_operand": null
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 26100,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "micro_nested_base_requested",
+          "os": "Windows-2025Server-10.0.26100-SP0",
+          "font_sha256": "e809fc8218f3765310430b8b85d1e395688cd70a1026ef0b92a89531cc59c2d8",
+          "font_bytes": 3008,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 762,
+            "max_error": 0,
+            "selection_failures": 0,
+            "advance_failures": 0,
+            "empty_outlines": 762,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007543945312704636
+          },
+          "micro_isolation": {
+            "variation_regions": 1,
+            "subroutine_calls": 0,
+            "avar_version": 1,
+            "maximum_blend_stack": 4,
+            "maximum_drawing_stack": 6,
+            "nested_operand": "base"
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 26100,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "micro_nested_delta_requested",
+          "os": "Windows-2025Server-10.0.26100-SP0",
+          "font_sha256": "6bcb2db94c6ca3bf6d73eed64667e3a5dbd4cf4cbd95748c84e1f504ff2d8298",
+          "font_bytes": 3008,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 762,
+            "max_error": 0,
+            "selection_failures": 0,
+            "advance_failures": 0,
+            "empty_outlines": 762,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.001281954269416019
+          },
+          "micro_isolation": {
+            "variation_regions": 1,
+            "subroutine_calls": 0,
+            "avar_version": 1,
+            "maximum_blend_stack": 4,
+            "maximum_drawing_stack": 6,
+            "nested_operand": "delta"
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 26100,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        }
+      ]
+    },
+    {
+      "job_id": 125736062763,
+      "name": "native (windows-2022)",
+      "conclusion": "failure",
+      "reports": [
+        {
+          "scope": "authored_control_only",
+          "variant": "static_cff2",
+          "os": "Windows-2022Server-10.0.20348-SP0",
+          "font_sha256": "ce1f6fc09058916bfca1504adf12faa3b74bede049e5131b2a7be031a71ef0f5",
+          "font_bytes": 3516,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0,
+            "selection_failures": 762,
+            "advance_failures": 0,
+            "empty_outlines": 0,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 20348,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "flat_cff2",
+          "os": "Windows-2022Server-10.0.20348-SP0",
+          "font_sha256": "c439ab6474bc757952128a0f08c93b65c9e6109179c6d2aa7afe11389134a107",
+          "font_bytes": 3704,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007622896550003588,
+            "selection_failures": 762,
+            "advance_failures": 0,
+            "empty_outlines": 0,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007622896550003588
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 20348,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "horner_avar1",
+          "os": "Windows-2022Server-10.0.20348-SP0",
+          "font_sha256": "e8aeabae8f98627b5097d5325fa74feca3a7e068965b2ed39217bc51b1621b43",
+          "font_bytes": 5372,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 762,
+            "max_error": 0,
+            "selection_failures": 762,
+            "advance_failures": 0,
+            "empty_outlines": 762,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0029212422576406815
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 20348,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "flat_avar2",
+          "os": "Windows-2022Server-10.0.20348-SP0",
+          "font_sha256": "fc68f345cd774ab2a31bb61992b4c4c0f2380f3666976238483a4e0e21dacde4",
+          "font_bytes": 5140,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 754,
+            "max_error": 18.028167547491808,
+            "selection_failures": 762,
+            "advance_failures": 0,
+            "empty_outlines": 0,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.001972688867718848
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 20348,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "unshared",
+          "os": "Windows-2022Server-10.0.20348-SP0",
+          "font_sha256": "328095c4565aec7a53cd61d1a66bbd62c2097e39239b9e9cbe650ecfea77884f",
+          "font_bytes": 13424,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 762,
+            "max_error": 0,
+            "selection_failures": 762,
+            "advance_failures": 0,
+            "empty_outlines": 762,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0037383652607562543
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 20348,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "full",
+          "os": "Windows-2022Server-10.0.20348-SP0",
+          "font_sha256": "85d2e74c6d106f9af20719154343f00c2cdbf5696c4652c8af019a37dcef8f4a",
+          "font_bytes": 5276,
+          "requests": 762,
+          "compression": {
+            "local_helpers": 8,
+            "structural_helpers": 8,
+            "literal_helpers": 0,
+            "expected_payload_savings": 651,
+            "maximum_original_operations": 963,
+            "maximum_compressed_operations": 1035,
+            "maximum_operand_stack_bound": 28,
+            "maximum_subroutine_depth": 2,
+            "exact_expanded_bytes_verified": true,
+            "coefficients_changed": 0,
+            "operation_limit": 200000,
+            "local_call_bytes": 2,
+            "global_subroutine_indices_unchanged": true
+          },
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 762,
+            "max_error": 0,
+            "selection_failures": 762,
+            "advance_failures": 0,
+            "empty_outlines": 762,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0037383652607562543
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 20348,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "flat_cff2_rlig",
+          "os": "Windows-2022Server-10.0.20348-SP0",
+          "font_sha256": "1608ffd89bd3930a64d997eb947985d3aa143646afe445f353c3a2c9d36031f8",
+          "font_bytes": 3704,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007622896550003588,
+            "selection_failures": 762,
+            "advance_failures": 0,
+            "empty_outlines": 0,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007622896550003588
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 20348,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "flat_cff2_requested",
+          "os": "Windows-2022Server-10.0.20348-SP0",
+          "font_sha256": "c439ab6474bc757952128a0f08c93b65c9e6109179c6d2aa7afe11389134a107",
+          "font_bytes": 3704,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007622896550003588,
+            "selection_failures": 0,
+            "advance_failures": 0,
+            "empty_outlines": 0,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007622896550003588
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 20348,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "full_rlig",
+          "os": "Windows-2022Server-10.0.20348-SP0",
+          "font_sha256": "a4b94e57f91e6e880ac0fb995a8c0040ea36ff0565c76cb33b40aba9088700c3",
+          "font_bytes": 5276,
+          "requests": 762,
+          "compression": {
+            "local_helpers": 8,
+            "structural_helpers": 8,
+            "literal_helpers": 0,
+            "expected_payload_savings": 651,
+            "maximum_original_operations": 963,
+            "maximum_compressed_operations": 1035,
+            "maximum_operand_stack_bound": 28,
+            "maximum_subroutine_depth": 2,
+            "exact_expanded_bytes_verified": true,
+            "coefficients_changed": 0,
+            "operation_limit": 200000,
+            "local_call_bytes": 2,
+            "global_subroutine_indices_unchanged": true
+          },
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 762,
+            "max_error": 0,
+            "selection_failures": 762,
+            "advance_failures": 0,
+            "empty_outlines": 762,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0037383652607562543
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 20348,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "full_requested",
+          "os": "Windows-2022Server-10.0.20348-SP0",
+          "font_sha256": "85d2e74c6d106f9af20719154343f00c2cdbf5696c4652c8af019a37dcef8f4a",
+          "font_bytes": 5276,
+          "requests": 762,
+          "compression": {
+            "local_helpers": 8,
+            "structural_helpers": 8,
+            "literal_helpers": 0,
+            "expected_payload_savings": 651,
+            "maximum_original_operations": 963,
+            "maximum_compressed_operations": 1035,
+            "maximum_operand_stack_bound": 28,
+            "maximum_subroutine_depth": 2,
+            "exact_expanded_bytes_verified": true,
+            "coefficients_changed": 0,
+            "operation_limit": 200000,
+            "local_call_bytes": 2,
+            "global_subroutine_indices_unchanged": true
+          },
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 762,
+            "max_error": 0,
+            "selection_failures": 0,
+            "advance_failures": 0,
+            "empty_outlines": 762,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0037383652607562543
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 20348,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "micro_linear_requested",
+          "os": "Windows-2022Server-10.0.20348-SP0",
+          "font_sha256": "8bb298da2d4f19980b46af987894f057992fce18cce8164822c00f7b033503aa",
+          "font_bytes": 2976,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007543945312704636,
+            "selection_failures": 0,
+            "advance_failures": 0,
+            "empty_outlines": 0,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007543945312704636
+          },
+          "micro_isolation": {
+            "variation_regions": 1,
+            "subroutine_calls": 0,
+            "avar_version": 1,
+            "maximum_blend_stack": 4,
+            "maximum_drawing_stack": 6,
+            "nested_operand": null
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 20348,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "micro_nested_base_requested",
+          "os": "Windows-2022Server-10.0.20348-SP0",
+          "font_sha256": "e809fc8218f3765310430b8b85d1e395688cd70a1026ef0b92a89531cc59c2d8",
+          "font_bytes": 3008,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 762,
+            "max_error": 0,
+            "selection_failures": 0,
+            "advance_failures": 0,
+            "empty_outlines": 762,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.0007543945312704636
+          },
+          "micro_isolation": {
+            "variation_regions": 1,
+            "subroutine_calls": 0,
+            "avar_version": 1,
+            "maximum_blend_stack": 4,
+            "maximum_drawing_stack": 6,
+            "nested_operand": "base"
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 20348,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        },
+        {
+          "scope": "authored_control_only",
+          "variant": "micro_nested_delta_requested",
+          "os": "Windows-2022Server-10.0.20348-SP0",
+          "font_sha256": "6bcb2db94c6ca3bf6d73eed64667e3a5dbd4cf4cbd95748c84e1f504ff2d8298",
+          "font_bytes": 3008,
+          "requests": 762,
+          "compression": null,
+          "production_accepted": false,
+          "original_font_acceptance": false,
+          "Windows_11_acceptance": "NOT_RUN",
+          "DirectWrite": {
+            "observations": 762,
+            "failures": 762,
+            "max_error": 0,
+            "selection_failures": 0,
+            "advance_failures": 0,
+            "empty_outlines": 762,
+            "axis_readback_failures": 120,
+            "max_axis_readback_error": 0.00000762939453125
+          },
+          "HarfBuzz": {
+            "observations": 762,
+            "failures": 0,
+            "max_error": 0.001281954269416019
+          },
+          "micro_isolation": {
+            "variation_regions": 1,
+            "subroutine_calls": 0,
+            "avar_version": 1,
+            "maximum_blend_stack": 4,
+            "maximum_drawing_stack": 6,
+            "nested_operand": "delta"
+          },
+          "native_exit_code": 0,
+          "native_error": "",
+          "native_metadata": {
+            "type": "metadata",
+            "Windows_build": 20348,
+            "product_type": 3,
+            "backend": "DirectWrite_TextLayout4"
+          }
+        }
+      ]
+    }
+  ],
+  "original_font_acceptance": false,
+  "Windows_11_acceptance": "NOT_RUN",
+  "empty_outline_error_note": "max_error=0 when all outlines are empty means no comparable geometry, not zero error."
+}

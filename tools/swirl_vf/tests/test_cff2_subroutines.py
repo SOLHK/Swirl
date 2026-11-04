@@ -5,6 +5,8 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+from contextlib import ExitStack
 
 import numpy as np
 from fontTools.ttLib import TTCollection, TTFont
@@ -18,6 +20,19 @@ from test_coretext_extract import make_fixture
 
 
 class CFF2SubroutineTests(unittest.TestCase):
+    def test_streamed_program_storage_preserves_the_serialized_font(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source=Path(tmp)/'source.ttc'; make_fixture(source)
+            with TTCollection(source) as collection:
+                font,_=convert(collection.fonts[0],.25)
+                ordinary=copy.deepcopy(font)
+                a=pack(font,byte_limit=256,release_programs=True)
+                b=pack(ordinary,byte_limit=256)
+                self.assertEqual(a,b)
+                streamed=io.BytesIO();font.save(streamed)
+                retained=io.BytesIO();ordinary.save(retained)
+                self.assertEqual(streamed.getvalue(),retained.getvalue())
+
     def test_large_variable_contours_survive_serialization_without_point_loss(self):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp)/'source.ttc'; make_fixture(source)
@@ -83,3 +98,44 @@ class CFF2SubroutineTests(unittest.TestCase):
         for limit in (0,31,65536,65535.0,True):
             with self.assertRaisesRegex(ValueError,'invalid_cff2_byte_limit'):
                 pack(None,byte_limit=limit)
+
+    def test_bytecode_memory_mode_preserves_reloaded_geometry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)/'source.ttc'; make_fixture(source)
+            with TTCollection(source) as collection:
+                font, models = convert(collection.fonts[0], .25)
+                report = pack(font, byte_limit=256, release_programs=True)
+                self.assertGreater(report['glyphs_repacked'], 0)
+                top = font['CFF2'].cff.topDictIndex[0]
+                self.assertTrue(all(not cs.program and cs.bytecode is not None
+                                    for cs in top.CharStrings.values()))
+                stream = io.BytesIO(); font.save(stream)
+                with TTFont(io.BytesIO(stream.getvalue())) as saved:
+                    for point in GRID + HOLDOUTS:
+                        for name, model in models.items():
+                            ops, values = geometry.operands(geometry.source_commands(
+                                saved.getGlyphSet(location=point, normalized=True)[name]))
+                            self.assertEqual(ops, model.operators)
+                            np.testing.assert_allclose(geometry.control_points(ops, values),
+                                                       model.evaluate(point), atol=1e-9, rtol=0)
+
+    def test_program_memory_policy_is_explicit_boolean(self):
+        for value in (0, 1, None, 'yes'):
+            with self.assertRaisesRegex(ValueError, 'invalid_cff2_program_memory_policy'):
+                pack(None, release_programs=value)
+
+    def test_bounded_bytecode_is_not_expanded_again_to_measure_its_size(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory)/'source.ttc'; make_fixture(source)
+            with TTCollection(source) as collection:
+                font, _ = convert(collection.fonts[0], .25)
+                pack(font, byte_limit=256, release_programs=True)
+                strings = list(font['CFF2'].cff.topDictIndex[0].CharStrings.values())
+                before = [cs.bytecode for cs in strings]
+                with ExitStack() as guard:
+                    for cs in strings:
+                        guard.enter_context(patch.object(cs, 'decompile', side_effect=AssertionError('expanded shared operands')))
+                    report = pack(font, byte_limit=256, release_programs=True)
+                self.assertEqual(report['glyphs_repacked'], 0)
+                self.assertEqual([cs.bytecode for cs in strings], before)
+                self.assertTrue(all(not cs.program for cs in strings))

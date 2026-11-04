@@ -53,6 +53,10 @@ class BatchGeometry:
     def __init__(self, table: HVGL, *, isolated_tangents: bool = False):
         self.table = table
         self.isolated_tangents = isolated_tangents
+        # Parsed source arrays are read-only views of immutable table bytes.
+        # Bound the per-renderer cache; never cache mutable authored inputs.
+        from collections import OrderedDict
+        self._transform_plans = OrderedDict()
 
     def render(self, glyph_id: int, design_locations, *, capture_trace=False) -> GeometryBatch:
         root = self.table.part(glyph_id)
@@ -75,8 +79,19 @@ class BatchGeometry:
         point_count = 0
 
         def compose_transforms(part, base, weights):
-            from transform_geometry import blend_transform_rows
-            for row, delta in blend_transform_rows(part, weights).items():
+            from transform_geometry import compile_transform_rows,blend_compiled_rows
+            arrays=[a for record in (part.translations,part.rotations) for a in
+                (record.master_rows,record.master_values,record.extreme_indices,record.extreme_values)]
+            immutable=all(not a.flags.writeable for a in arrays)
+            saved=self._transform_plans.get(part.index) if immutable else None
+            if saved is None or saved[0] is not part:
+                plan=compile_transform_rows(part)
+                if immutable:
+                    self._transform_plans[part.index]=(part,plan)
+                    if len(self._transform_plans)>512:self._transform_plans.popitem(last=False)
+            else:
+                plan=saved[1];self._transform_plans.move_to_end(part.index)
+            for row, delta in blend_compiled_rows(plan,part.axis_count,weights).items():
                 target = base + 1 + row
                 cosine, sine = np.cos(delta[:, 2]), np.sin(delta[:, 2])
                 old = translations[:, target].copy()

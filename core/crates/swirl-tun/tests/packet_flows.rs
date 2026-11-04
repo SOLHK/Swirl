@@ -143,7 +143,13 @@ async fn gateway_fragmented_ipv4_udp_shared_endpoint_preserves_each_client_reply
         )
         .unwrap();
         assert_eq!(
-            (source, target, protocol, packet.src_port(), packet.dst_port()),
+            (
+                source,
+                target,
+                protocol,
+                packet.src_port(),
+                packet.dst_port()
+            ),
             (
                 destination.ip(),
                 client.ip(),
