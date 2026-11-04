@@ -37,3 +37,34 @@ Local Windows GNU validation on 2026-11-05:
 This local result does not replace a new-head Linux CI run. All execution used
 controlled packet/loopback fixtures; no provider, real node, driver installation,
 host route, system proxy, DNS, or TUN setting was changed.
+
+## Follow-up: portable TCP/UDP allocation contract
+
+The new-head Linux isolated packet/Core step passed on `8ad5f8507e0afdb9440317ea6767e03d0c0dd75b`.
+Its [Windows Rust Core job](https://github.com/SOLHK/Swirl/actions/runs/41869694887/job/126713076163)
+then exposed an independent Python fixture assertion in
+`test_portable_pairs_use_os_allocation_without_querying_netsh`: a valid bind
+collision led to two TCP port-zero requests, but the test required exactly one.
+The allocator already permits bounded EADDRINUSE/10048 retries. Its final pair
+had succeeded; the primary failure was this assertion, while later missing
+artifact steps were consequences of the early exit.
+
+The fixture now requires every TCP request to use the correct loopback host and
+port zero, then verifies both live sockets have the same actual endpoint and
+close afterward. A deterministic first-UDP-EADDRINUSE case covers Linux/Darwin
+selection and both IP families, proves prior socket owners are closed, and
+proves the successful pair stays owned without querying netsh. The existing
+eight-collision budget, exclusion ownership, and unknown-access-denial checks
+remain. `loopback_ports.py` and production code are unchanged. This follows
+the [CPython socket-test approach](https://github.com/python/cpython/issues/82878)
+of retaining a bound OS-allocated socket rather than assuming an available port.
+
+The exact original `8ad5f850` fixture was executed with a controlled first UDP
+collision: all four platform/family subcases failed its one-request assertion,
+with no errors. The current two portable tests passed. The complete DNS-negative,
+DoT, DoH and Shadowsocks modules executed 73 tests: 72 passed and one existing
+Qt Shadowsocks integration test was skipped because no Qt executable was supplied.
+The native Shadowsocks cases ran. These loopback-only tests used the frozen
+exact-`8ad5f850` Rust harness, with no Cargo/Ninja build or external node traffic;
+the run lasted 133.809 seconds and completed at 2026-11-05 01:09:14 +08.
+New-head Windows CI remains required before claiming the CI failure resolved.
