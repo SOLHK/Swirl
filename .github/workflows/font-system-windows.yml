@@ -2,7 +2,7 @@ name: Font system Windows Qt 6.10.3
 
 on:
   push:
-    branches: [work/core-completion-20261017]
+    branches: [work/core-completion-20261017, work/vf-smart-width-w1]
     paths:
       - '.github/workflows/font-system-windows.yml'
       - 'src/Swirl.Quick/CMakeLists.txt'
@@ -33,7 +33,7 @@ jobs:
   font-tests:
     # Standard public runners only. A visibility change must not silently start
     # consuming private-repository paid minutes or activate a larger runner.
-    if: github.ref == 'refs/heads/work/core-completion-20261017' && !github.event.repository.private
+    if: (github.ref == 'refs/heads/work/core-completion-20261017' || github.ref == 'refs/heads/work/vf-smart-width-w1') && !github.event.repository.private
     runs-on: windows-2022
     timeout-minutes: 40
     env:

@@ -10,7 +10,7 @@ Item {
  component GatewayMenuItem:MenuItem{
   implicitHeight:visible?Theme.dp(26):0;height:implicitHeight;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(12)
   background:Rectangle{radius:Theme.dp(6);color:parent.highlighted?Theme.accent:"transparent"}
-  contentItem:SwirlText {text:parent.text;leftPadding:Theme.dp(8);rightPadding:Theme.dp(8);font.family:parent.font.family;font.pixelSize:parent.font.pixelSize;font.weight:parent.font.weight;color:parent.highlighted?Theme.primaryButtonText:parent.enabled?Theme.text:Theme.muted;verticalAlignment:Text.AlignVCenter;elide:Text.ElideRight}
+  contentItem:SwirlText {textRole:"label";fitInFixedWidth:true;text:parent.text;leftPadding:Theme.dp(8);rightPadding:Theme.dp(8);font.family:parent.font.family;font.pixelSize:parent.font.pixelSize;font.weight:parent.font.weight;color:parent.highlighted?Theme.primaryButtonText:parent.enabled?Theme.text:Theme.muted;verticalAlignment:Text.AlignVCenter;elide:Text.ElideRight}
  }
  id:page;readonly property Item motionTitle:heading.titleItem;readonly property bool compact:width<Theme.dp(620);property string selectedId:"";property int sortIndex:3
  readonly property var lanSnapshot:engineController.lanStatus
