@@ -25,11 +25,13 @@ class EvidenceTests(unittest.TestCase):
         script.write_text(r'''
 param([string]$Collector)
 $ErrorActionPreference='Stop'
+[Console]::Error.WriteLine('collector-fixture:entered')
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile($Collector,[ref]$tokens,[ref]$errors)
 if($errors.Count){throw 'Collector parsing failed'}
 $loops=@($ast.FindAll({param($node) $node -is [Management.Automation.Language.DoWhileStatementAst]},$true))
 if($loops.Count -ne 1){throw 'Expected the actual collector sample loop'}
+[Console]::Error.WriteLine('collector-fixture:parsed')
 $process=[pscustomobject]@{HasExited=$false;StartTime=[datetime]'2026-01-01T00:00:00Z';WorkingSet64=1024;PrivateMemorySize64=1024;HandleCount=1;TotalProcessorTime=[timespan]::Zero;Threads=@(1)}
 $process|Add-Member ScriptMethod Refresh {}
 $initialStart=$process.StartTime.ToUniversalTime().ToString('o')
@@ -42,12 +44,24 @@ $timer|Add-Member ScriptProperty Elapsed {
 $samples=[Collections.Generic.List[object]]::new()
 $DurationSeconds=1;$IntervalSeconds=1;$script:sleeps=0
 function Start-Sleep {param([double]$Seconds) $script:sleeps+=1;if($script:sleeps -gt 4){throw 'Collector failed to stop within bounded fake clock'}}
+[Console]::Error.WriteLine('collector-fixture:loop-start')
 & ([scriptblock]::Create($loops[0].Extent.Text))
+[Console]::Error.WriteLine('collector-fixture:loop-complete')
 @{last=$samples[-1].elapsed_seconds;count=$samples.Count}|ConvertTo-Json -Compress
 ''', encoding="utf-8")
-        result = subprocess.run([shutil.which("pwsh"), "-NoProfile", "-File", str(script),
-                                 "-Collector", str(ROOT / "tools/Collect-NativeTunAcceptance.ps1")],
-                                capture_output=True, text=True, encoding="utf-8", timeout=15)
+        try:
+            result = subprocess.run([shutil.which("pwsh"), "-NoProfile", "-NonInteractive",
+                                     "-File", str(script), "-Collector",
+                                     str(ROOT / "tools/Collect-NativeTunAcceptance.ps1")],
+                                    capture_output=True, text=True, encoding="utf-8", timeout=15)
+        except subprocess.TimeoutExpired as error:
+            stderr = error.stderr or b""
+            if isinstance(stderr, bytes):
+                stderr = stderr.decode("utf-8", errors="replace")
+            stages = [stage for stage in ("entered", "parsed", "loop-start", "loop-complete")
+                      if "collector-fixture:" + stage in stderr]
+            self.fail("Collector fixture exceeded 15 seconds; last stage: "
+                      + (stages[-1] if stages else "PowerShell did not enter script"))
         self.assertEqual(result.returncode, 0, "Actual collector loop failed in the bounded fixture")
         observed = json.loads(result.stdout)
         self.assertGreaterEqual(observed["last"], 1.0)

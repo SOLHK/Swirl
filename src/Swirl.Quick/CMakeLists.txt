@@ -43,7 +43,9 @@ function(swirl_add_font_tests)
   set(swirl_width_tests automaticWidthUsesRealAdvances automaticWidthNonmonotonicFonts
       automaticWidthShaping automaticWidthCacheAndResize qmlWidthControls)
   add_test(NAME swirl-font-native-raster COMMAND SwirlFontTests nativeGlyphsHaveNoColourFringes previewRepeatedAxesReuseResources ${swirl_width_tests} localSwirlCollectionUsesPhysicalFaces customAxesChangeRealGlyphsAtMixedCoordinates physicalIdentityRejectsMissingAndChangedOutlineTables -o "${CMAKE_CURRENT_BINARY_DIR}/font-native-raster.xml,xml" -o "-,txt")
-  set_tests_properties(swirl-font-native-raster PROPERTIES LABELS fonts TIMEOUT 30 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  # This aggregate includes native rasterization and an independently bounded
+  # identity subprocess; a cold raster pass alone used 20.8 seconds in CI.
+  set_tests_properties(swirl-font-native-raster PROPERTIES LABELS fonts TIMEOUT 60 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
   # Qt documents QT_SCALE_FACTOR as a hardware-independent application-scale
   # simulation. Its multiplier is not a physical Windows system DPI setting.
   # Run separate processes so each QGuiApplication sees its scale at startup.
