@@ -1,0 +1,134 @@
+name: Swirl VF D1 Windows axis precision
+
+on:
+  push:
+    branches: [work/vf-windows-d1]
+    paths:
+      - '.github/workflows/swirl-vf-windows-d1.yml'
+      - 'tools/swirl_vf/platform/win_axis_precision*'
+      - 'tools/swirl_vf/platform/win_axis_precision/**'
+      - 'tools/swirl_vf/platform/make_win_axis_precision_fixture.py'
+      - 'tools/swirl_vf/platform/run_win_axis_precision.ps1'
+      - 'tools/swirl_vf/platform/analyze_win_axis_precision.py'
+      - 'tools/swirl_vf/tests/test_windows_axis_precision.py'
+      - 'tools/swirl_vf/tests/test_windows_d2_state.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swirl-vf-windows-d1-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows-precision:
+    # Hosted Server VMs are actual Windows evidence, never Windows 11 evidence.
+    if: github.ref == 'refs/heads/work/vf-windows-d1' && !github.event.repository.private
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      QT_FORCE_STDERR_LOGGING: '1'
+      D1_RUNNER_LABEL: ${{ matrix.os }}
+    steps:
+      - name: Check out the exact D1 source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate and generate authored fixtures
+        run: |
+          python -m pip install fonttools==4.61.1
+          if ($LASTEXITCODE -ne 0) { throw 'Fixture dependency installation failed' }
+          python -m unittest discover -s tools/swirl_vf/tests -p test_windows_axis_precision.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'D1 fixture regression failed' }
+          python -m unittest discover -s tools/swirl_vf/tests -p test_windows_d2_state.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'D2 evidence regression failed' }
+          python tools/swirl_vf/platform/make_win_axis_precision_fixture.py build/d1-fixtures
+          if ($LASTEXITCODE -ne 0) { throw 'Authored fixture generation failed' }
+      - name: Install the same Qt SDK as the Swirl font workflow
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.3'
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          cache: false
+          setup-python: false
+      - name: Compile and run Windows precision, installation and Qt probes
+        run: |
+          ./tools/swirl_vf/platform/run_win_axis_precision.ps1 -FixtureDirectory build/d1-fixtures -OutputDirectory build/d1-evidence -InstallPerUserFont
+          if ($LASTEXITCODE -ne 0) { throw 'Native D1 precision experiment failed; inspect preserved evidence' }
+      - name: Compare complete source-bound native observations
+        if: always()
+        run: |
+          if ((Test-Path -LiteralPath build/d1-evidence/windows-axis-precision-run.json) -and (Test-Path -LiteralPath build/d1-evidence/fixture-manifest.json)) {
+            python tools/swirl_vf/platform/analyze_win_axis_precision.py build/d1-evidence --expected-source-sha $env:GITHUB_SHA
+            if ($LASTEXITCODE -ne 0) { throw 'D1 cross-process analysis failed; incomplete or unequal evidence is not accepted' }
+          } else {
+            Write-Output 'D1 analysis NOT_RUN: native harness failed before creating the source-bound manifests.'
+          }
+      - name: Read the exact Qt and bundled FreeType implementation for D2
+        if: always()
+        uses: actions/checkout@v4
+        with:
+          repository: qt/qtbase
+          ref: 7ddbc87d8e14ce51d2957ea72d0a6077593d5ff4
+          path: build/d2-qtbase
+          persist-credentials: false
+          sparse-checkout: |
+            src/gui/text
+            src/3rdparty/freetype
+      - name: Prepare and build isolated D2 diagnostic only
+        if: always()
+        run: |
+          $env:D2_QTBASE_SOURCE = (Resolve-Path build/d2-qtbase).Path
+          $env:D2_PREPARED = [IO.Path]::GetFullPath('build/d2-prepared')
+          python tools/swirl_vf/platform/win_axis_precision/d2_state.py prepare $env:D2_QTBASE_SOURCE $env:D2_PREPARED
+          if ($LASTEXITCODE -ne 0) { throw 'D2 source identity/accessor preparation failed' }
+          cmake -S tools/swirl_vf/platform/win_axis_precision -B build/d1-evidence/build *> build/d2-prepared/configure.log
+          if ($LASTEXITCODE -ne 0) { Get-Content build/d2-prepared/configure.log; throw 'D2 configure failed' }
+          cmake --build build/d1-evidence/build --config Release --target win_axis_precision_d2 --parallel 2 *> build/d2-prepared/build.log
+          if ($LASTEXITCODE -ne 0) { Get-Content build/d2-prepared/build.log; throw 'D2 native build failed' }
+      - name: Run D2 exact state, path, cache and pixel comparisons
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/win_axis_precision/d2_state.py run build/d1-evidence/build/Release/win_axis_precision_d2.exe build/d1-fixtures/ordinary.ttf build/d2-evidence $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'D2 isolation is not validated; inspect retained evidence' }
+      - name: Publish source-bound evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-VF-D1-${{ matrix.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            build/d1-evidence/**/*.json
+            build/d1-evidence/**/*.jsonl
+            build/d1-evidence/**/*.log
+            build/d1-evidence/**/*.txt
+            build/d1-evidence/**/*.png
+            build/d1-evidence/**/*.tsv
+            build/d1-evidence/**/*.pgm
+            build/d1-evidence/**/*.bin
+            build/d1-fixtures/manifest.json
+            build/d1-fixtures/requests.tsv
+            build/d2-evidence/**
+            build/d2-prepared/**
+            tools/swirl_vf/platform/win_axis_precision/**
+            tools/swirl_vf/platform/win_axis_precision_qt.cpp
+            tools/swirl_vf/platform/make_win_axis_precision_fixture.py
+            tools/swirl_vf/platform/analyze_win_axis_precision.py
+            tools/swirl_vf/tests/test_windows_axis_precision.py
+            tools/swirl_vf/tests/test_windows_d2_state.py
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 9
