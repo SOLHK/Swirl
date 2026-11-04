@@ -537,7 +537,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
             downloadChoice->setProperty("currentIndex",0);
         }
         fill("subscriptionName","Edited subscription fixture");click("saveSubscription");
-        check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->imports()->providers().first().toMap().value("name").toString()=="Edited subscription fixture"&&subscriptionRequests==2,"editing preserves encrypted URL and refreshes the real source");
+        check(QTest::qWaitFor([&]{return !controller->imports()->busy()&&controller->imports()->providers().first().toMap().value("name").toString()=="Edited subscription fixture"&&subscriptionRequests==2;},8000),"editing preserves encrypted URL and refreshes the real source");
         check(card&&item("subscriptionCard-"+id)==card,"subscription refresh keeps the same card delegate and expanded state");
         eval("AppState.navigate('proxies')");QTest::qWait(350);
         check(eval("pageLoader.item.countries.length===1 && pageLoader.item.countries[0].code==='JP' && pageLoader.item.countryCode==='' && pageLoader.item.resultCount===1").toBool(),"subscription refresh replaces country options and clears an obsolete country selection");

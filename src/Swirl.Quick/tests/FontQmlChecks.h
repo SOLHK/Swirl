@@ -420,8 +420,10 @@ void FontTests::qmlWidthControls()
     QStringList warnings;
     QScopedPointer<QObject> serviceObject;
     QQmlEngine engine;
-    auto importPaths = engine.importPathList();
-    importPaths.removeAll(QCoreApplication::applicationDirPath());
+    // Keep the source-registered fixture away from the product module's qmldir.
+    auto importPaths = QLibraryInfo::paths(QLibraryInfo::QmlImportsPath);
+    importPaths.removeIf([](const QString &path) { return QFile::exists(path + "/SwirlQuick/qmldir"); });
+    importPaths.append({QStringLiteral("qrc:/qt/qml"), QStringLiteral("qrc:/qt-project.org/imports")});
     engine.setImportPathList(importPaths);
     QObject::connect(&engine, &QQmlEngine::warnings, &engine, [&](const QList<QQmlError> &errors) {
         for (const auto &error : errors) warnings.append(error.toString());
