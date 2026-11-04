@@ -204,7 +204,7 @@ async fn pump<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
     local: &AtomicU64,
     total: &AtomicU64,
 ) -> io::Result<()> {
-    let mut buffer = [0u8; 16 * 1024];
+    let mut buffer = [0u8; 32 * 1024];
     loop {
         let n = reader.read(&mut buffer).await?;
         if n == 0 {

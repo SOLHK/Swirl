@@ -42,12 +42,12 @@ $timer|Add-Member ScriptProperty Elapsed {
   [timespan]::FromSeconds($value)
 }
 $samples=[Collections.Generic.List[object]]::new()
-$DurationSeconds=1;$IntervalSeconds=1;$script:sleeps=0
-function Start-Sleep {param([double]$Seconds) $script:sleeps+=1;if($script:sleeps -gt 4){throw 'Collector failed to stop within bounded fake clock'}}
+$DurationSeconds=1;$IntervalSeconds=1;$script:sleeps=0;$script:minimumSleep=[double]1000
+function Start-Sleep {param([double]$Seconds) $script:minimumSleep=[Math]::Min($script:minimumSleep,$Seconds);$script:sleeps+=1;if($script:sleeps -gt 4){throw 'Collector failed to stop within bounded fake clock'}}
 [Console]::Error.WriteLine('collector-fixture:loop-start')
 & ([scriptblock]::Create($loops[0].Extent.Text))
 [Console]::Error.WriteLine('collector-fixture:loop-complete')
-@{last=$samples[-1].elapsed_seconds;count=$samples.Count}|ConvertTo-Json -Compress
+@{last=$samples[-1].elapsed_seconds;count=$samples.Count;minimum_sleep=$script:minimumSleep}|ConvertTo-Json -Compress
 ''', encoding="utf-8")
         try:
             result = subprocess.run([shutil.which("pwsh"), "-NoProfile", "-NonInteractive",
@@ -65,6 +65,8 @@ function Start-Sleep {param([double]$Seconds) $script:sleeps+=1;if($script:sleep
         self.assertEqual(result.returncode, 0, "Actual collector loop failed in the bounded fixture")
         observed = json.loads(result.stdout)
         self.assertGreaterEqual(observed["last"], 1.0)
+        self.assertGreaterEqual(observed["minimum_sleep"], 0.05)
+        self.assertLessEqual(observed["minimum_sleep"], 1.0)
 
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
