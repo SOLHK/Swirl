@@ -135,7 +135,8 @@ def generate(output):
                     for font in original.fonts:
                         _, models = convert(font, .25)
                         collection.fonts.append(geometry.install(prepare_from_truetype(font),
-                            {name: geometry.factor(model) for name, model in models.items()}))
+                            {name: geometry.factor(model) for name, model in models.items()},
+                            experimental_nested=True))
                     collection.save(path)
             else:
                 with TTCollection(flat, recalcTimestamp=False) as collection:

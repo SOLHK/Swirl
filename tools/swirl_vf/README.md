@@ -8,6 +8,11 @@ rights; availability of this code does not grant rights to redistribute fonts.
 ## Current status — 2026-11-02
 
 Formal output is exactly **SwirlVF.ttc**. No accepted final font exists.
+The [interruption recovery and CFF2 coefficient report](../../docs/SWIRL_VF_RESTART_20261102.md)
+records the recovered piecewise source slices, exact serialization verification,
+native nested-blend admission guard, actual Windows CI and remaining delivery
+gates. Draft PR 51 preserves and merges the concurrently recovered PR 49 source;
+neither slice success nor authored fixture success is full-font acceptance.
 The [delivery checkpoint](../../docs/SWIRL_VF_DELIVERY_20261102.md) and
 [branch recovery](../../docs/SWIRL_VF_RECOVERY_20261102.md) preserve P8's 228
 experimental models and the already-merged C1/D1 tools; these are not complete

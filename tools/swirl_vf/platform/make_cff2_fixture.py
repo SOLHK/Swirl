@@ -20,6 +20,7 @@ from fontTools.ttLib import TTCollection
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import cff2_geometry as geometry
 from cff2_metrics import prepare_from_truetype
+from cff2_certificate import certify
 from test_coretext_extract import make_fixture
 
 TAGS = ('WDTH', 'wght', 'HGHT')
@@ -57,7 +58,8 @@ def convert(font, translation=0., *, factored=False, compact=False, repeat_conto
                              records(font, name, held, translation, repeat_contours=repeat_contours), held, TAGS)
         models[name] = (geometry.factor(model) if factored else
                         geometry.compact(model) if compact else model)
-    return geometry.install(prepare_from_truetype(font), models), models
+    return geometry.install(prepare_from_truetype(font), models,
+                            experimental_nested=factored), models
 
 
 def write_fixture(path, *, factored=False, compact=False, repeat_contours=1):
@@ -74,16 +76,22 @@ def write_fixture(path, *, factored=False, compact=False, repeat_contours=1):
             result = TTCollection(); result.fonts = [font for font, _ in conversions]
             output = Path(tmp) / 'authored-cff2.ttc'; result.save(output)
             # A serialized read is required before exposing even an authored control.
+            certificates = []
             with TTCollection(output) as saved:
                 if len(saved.fonts) != 2 or not all('CFF2' in font and
                         font['maxp'].numGlyphs == 3 for font in saved.fonts):
                     raise ValueError('authored_cff2_serialized_coverage_changed')
+                if not factored:
+                    for font, (_, models) in zip(saved.fonts, conversions):
+                        certificates.append(certify(font, models))
             output.replace(path)
     return {'scope': 'authored CFF2 control, not original-font conversion',
             'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
             'bytes': path.stat().st_size, 'faces': 2, 'glyphs_per_face': 3,
             'axes': list(TAGS), 'factored_blends': factored, 'compact_blends': compact,
-            'repeat_contours': repeat_contours, 'production_accepted': False}
+            'repeat_contours': repeat_contours,
+            'serialized_coefficient_certificates': certificates,
+            'production_accepted': False}
 
 
 if __name__ == '__main__':
