@@ -125,7 +125,7 @@ def native_windows_version():
     return {key: int(getattr(value, key)) for key in ('major', 'minor', 'build', 'product_type')}
 
 
-def validate_transcript(contract, rows, native_report, native_exit, directory):
+def validate_transcript(contract, rows, native_report, native_exit, directory, *, all_glyphs=False):
     """Fail closed on truncated, mismatched or relaxed native evidence.
 
     Exact axis equality here means identical binary32 input/readback values,
@@ -151,6 +151,8 @@ def validate_transcript(contract, rows, native_report, native_exit, directory):
             and type(terminal.get('faces_passed')) is int and terminal['faces_passed'] == count
             and type(terminal.get('faces_failed')) is int and terminal['faces_failed'] == 0,
             'native_final_summary_failed')
+    require(type(terminal.get('all_glyphs')) is bool
+            and terminal['all_glyphs'] == all_glyphs, 'native_glyph_coverage_mode_mismatch')
     require(all(r.get('record') in {'header', 'face', 'instance', 'face_result', 'raster', 'summary'}
                 for r in rows), 'unknown_native_record')
     comparisons = instances = sampled = 0
@@ -173,6 +175,10 @@ def validate_transcript(contract, rows, native_report, native_exit, directory):
                             for field in ('min', 'default', 'max')), 'native_fvar_axes_mismatch')
         require(type(face.get('probed_glyph_count')) is int and face['probed_glyph_count'] > 0,
                 'no_sampled_glyphs')
+        require(face['probed_glyph_count'] <= expected['glyph_count'], 'invalid_probed_glyph_count')
+        if all_glyphs:
+            require(face['probed_glyph_count'] == expected['glyph_count'],
+                    'all_glyph_coverage_incomplete')
         jobs = [r for r in grouped if r.get('record') == 'instance']
         n = len(expected['axes'])
         expected_jobs = 1 + 6 * n + (3 ** n if n <= 4 else 0) + 16
@@ -229,6 +235,7 @@ def validate_transcript(contract, rows, native_report, native_exit, directory):
         with path.open('rb') as stream:
             require(stream.read(8) == b'\x89PNG\r\n\x1a\n', 'native_raster_not_PNG')
     return {'status': 'PASS_LOCAL_DIRECTWRITE_PROTOCOL_ONLY', 'physical_faces': count,
+            'glyph_coverage': 'ALL_GIDS' if all_glyphs else 'SAMPLED_GIDS',
             'sampled_glyphs_across_faces': sampled, 'native_instances': instances,
             'strict_binary32_axis_comparisons': comparisons, 'raster_captures': len(rasters),
             'cmap_probe_pairs': len(PROBES) * count, 'font_only_equivalence_accepted': False,
@@ -250,6 +257,8 @@ def main(argv=None):
     parser.add_argument('--font-scope', required=True, choices=('authored_control', 'original_derived_candidate'))
     parser.add_argument('--expected-glyphs', type=int, default=47102)
     parser.add_argument('--expected-faces', type=int, default=1)
+    parser.add_argument('--all-glyphs', action='store_true',
+                        help='Check every GID of every face at every native axis position.')
     parser.add_argument('--output', type=Path)
     args = parser.parse_args(argv)
     output = args.output or Path(r'D:\Codex\Swirl-VF-private\P8') / datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
@@ -263,6 +272,7 @@ def main(argv=None):
     output.mkdir(parents=True, exist_ok=False)
     report = {'schema': 1, 'status': 'NOT_RUN', 'font_scope': args.font_scope,
               'input_sha256': contract['sha256'], 'static_contract': contract,
+              'all_glyphs_requested': args.all_glyphs,
               'Windows11': 'NOT_RUN', 'Windows_Server': 'NOT_RUN', 'Qt_Swirl': 'NOT_RUN',
               'font_only_equivalence_accepted': False, 'private_outputs_only': True}
     code = 77
@@ -278,6 +288,8 @@ def main(argv=None):
             environment = dict(os.environ, TEMP=str(temporary), TMP=str(temporary), PYTHONDONTWRITEBYTECODE='1')
             command = [powershell, '-NoProfile', '-File', str(PLATFORM / 'run_directwrite_probe.ps1'),
                        '-Font', str(args.font.resolve()), '-OutputDirectory', str(output / 'native'), '-Render']
+            if args.all_glyphs:
+                command.append('-AllGlyphs')
             report['command'] = command
             with (output / 'wrapper.stdout').open('xb') as stdout, (output / 'wrapper.stderr').open('xb') as stderr:
                 process = subprocess.run(command, stdout=stdout, stderr=stderr, env=environment, cwd=REPO)
@@ -287,7 +299,8 @@ def main(argv=None):
             scope = windows_scope(report['native_Windows_version'], native.get('windows_product', ''))
             report['Windows_scope'] = scope
             report['Windows_caption'] = native.get('windows_product', 'UNRESOLVED')
-            report['observations'] = validate_transcript(contract, rows, native, code, output / 'native')
+            report['observations'] = validate_transcript(contract, rows, native, code, output / 'native',
+                                                          all_glyphs=args.all_glyphs)
             report['status'] = report['observations']['status']
             if scope == 'WINDOWS_11_CLIENT':
                 report['Windows11'] = 'NATIVE_LOCAL_PROBE_PASSED_NOT_FINAL_FONT_ACCEPTANCE'

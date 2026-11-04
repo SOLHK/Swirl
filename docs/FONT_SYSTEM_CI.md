@@ -2,11 +2,26 @@
 
 ## Scope and source identity
 
+The 2026-11-02 continuation updates the SDK request and every version assertion
+to Qt 6.12.0, matching the current CMake requirement. All existing CTest, strict
+XML report, native Windows raster, full-application push build and isolated
+navigation checks remain in place. The job still uses a standard public Windows
+Server runner and is disabled for private repositories; it cannot certify
+Windows 11 or the final converted font. `source.json` explicitly identifies the
+font input as authored fixtures and keeps final `SwirlVF.ttc` acceptance and
+Windows 11 as `NOT_RUN`. The new exact-SHA Windows CI result is **PENDING** until
+GitHub actually executes this version of the workflow. Local macOS Qt 6.12
+results are recorded separately in
+[evidence/SWIRL_VF_QT_20261102.json](evidence/SWIRL_VF_QT_20261102.json).
+
+
 `font-system-windows.yml` responds to font/QML changes on
-`work/core-completion-20261017` and `work/vf-smart-width-w1`, and checks out the
-triggering **commit SHA**, not a moving branch tip. It never writes a branch, edits an App, uses private
+`work/core-completion-20261017`, `work/vf-smart-width-w1`, `work/swirlvf-delivery-20261102` and `test`,
+and on pull requests from either named development branch into `test`. It checks
+out the triggering **commit SHA**, including the PR merge candidate, rather than
+a moving branch tip. It never writes a branch, edits an App, uses private
 subscription archives, or reads a private font. It also declares a manual trigger
-on those permitted branches; `build_full_application=false` omits the extra full
+on the same three push branches; `build_full_application=false` omits the extra full
 application compilation and application navigation smoke, not the font test
 targets. The initial execution uses
 the development-branch push. GitHub's manual-run UI depends on default-branch
@@ -15,8 +30,13 @@ exists only on the development branch. No main-branch change is made to expose
 that button; API dispatch availability must be verified after the first run.
 
 The implementation is independent Swirl code. The dependency installation
-follows the existing repository's `jurplel/install-qt-action@v4` convention. The
-corresponding references are:
+reuses the product CI's [verified Qt SDK installer](../tools/Install-QtSdk.py)
+and [pinned requirements](../tools/requirements-qt-sdk.txt). It checks the official
+architecture-specific metadata, archive SHA-256 values and installed SDK files;
+no hash checks are bypassed. The default aqt 3.3.0 discovery was actually tested
+and requests the obsolete shared Windows metadata directory for Qt 6.12, so this
+job uses the repository's existing correction. The initial implementation references below retain their historical Qt 6.10.3
+source versions; they are not Qt 6.12 execution evidence:
 
 - [Qt 6.10 Windows supported configurations](https://doc.qt.io/qt-6.10/windows.html).
 - [install-qt-action's documented MSVC 2022 architecture](https://github.com/jurplel/install-qt-action/tree/v4).
@@ -35,7 +55,7 @@ needs Qt Quick, Quick Controls 2 and Test. Both this path and the existing
 `SWIRL_BUILD_UI_TESTS` path call the same font-target registration function. There
 is no second copy of the test implementation and no modified pixel tolerance.
 
-The hosted job uses Qt **6.10.3** `win64_msvc2022_64`, the **Visual Studio 17 2022**
+The hosted job uses Qt **6.12.0** `win64_msvc2022_64`, the **Visual Studio 17 2022**
 CMake generator and **x64**. Before compilation it checks both the SDK's reported
 version and CMake's actual Qt version, compiler ID and pointer size. It saves the
 actual compiler version, language standard and generator in `font-toolchain.txt`.
@@ -143,7 +163,7 @@ coordinate need not equal a Linux fractional-metrics coordinate when both
 produce the same minimum advance. Neither safety assertions nor the strict
 endpoint assertion are removed to accommodate this difference.
 
-Only the test step sets `QT_FORCE_STDERR_LOGGING=1`. In Qt 6.10.3, the Windows
+Only the test step sets `QT_FORCE_STDERR_LOGGING=1`. In the previously inspected Qt 6.10.3, the Windows
 [plain test logger](https://github.com/qt/qtbase/blob/v6.10.3/src/testlib/qplaintestlogger.cpp)
 can send its nominal stdout output to `OutputDebugStringA` when no console is
 attached. The

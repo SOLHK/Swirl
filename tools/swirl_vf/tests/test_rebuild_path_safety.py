@@ -19,7 +19,7 @@ class RebuildPathSafetyTests(unittest.TestCase):
         self.source.write_bytes(b'private-source-sentinel-not-a-font')
         self.before = self.source.read_bytes()
         self.oracle = self.root / 'native-oracle'
-        self.output = self.root / 'Swirl-VF.ttc'
+        self.output = self.root / 'SwirlVF.ttc'
         self.report = self.root / 'report.json'
 
     def assert_early_block(self, report):

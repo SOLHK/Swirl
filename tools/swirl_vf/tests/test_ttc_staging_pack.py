@@ -234,7 +234,8 @@ class PackingTests(unittest.TestCase):
 
     def test_production_filename_is_reserved_even_for_valid_synthetic_input(self):
         root, paths, _ = self.fixture(1)
-        for name in ("Swirl-VF.ttc", "swirl-vf.TTC", "SWIRL-VF.TTC"):
+        for name in ("SwirlVF.ttc", "swirlvf.TTC", "SWIRLVF.TTC",
+                     "Swirl-VF.ttc", "swirl-vf.TTC", "SWIRL-VF.TTC"):
             output = root / name
             with self.subTest(name=name), self.assertRaisesRegex(StagingError, "production_filename_reserved"):
                 pack.pack_collection(paths, output)

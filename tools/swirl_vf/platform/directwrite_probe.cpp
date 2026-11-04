@@ -2,7 +2,7 @@
 // Original code using Microsoft-documented interfaces; no font payload included.
 // Build: cl /std:c++17 /EHsc /W4 /utf-8 directwrite_probe.cpp
 //        /link dwrite.lib d2d1.lib windowscodecs.lib ole32.lib bcrypt.lib
-// Usage: directwrite_probe.exe FONT OUTPUT_DIRECTORY [--all-glyphs] [--render]
+// Usage: directwrite_probe.exe FONT OUTPUT_DIRECTORY [--all-glyphs] [--render] [--outline-coordinates]
 // A PASS_NATIVE_PROBE verdict is deliberately scoped: it does not compare an
 // original CoreText/HVF oracle, validate shaping, or certify real Swirl layout.
 #include <cstdio>
@@ -31,6 +31,7 @@ int main() {
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <initializer_list>
 #include <limits>
 #include <map>
 #include <set>
@@ -177,9 +178,28 @@ static ComPtr<IDWriteFontFace5> instance(IDWriteFontResource *resource, const st
 }
 
 struct GeometrySink final : IDWriteGeometrySink {
+    struct Command { unsigned kind, count; std::array<float,6> values; };
     std::atomic<ULONG> refs{1};
     uint64_t hash = 14695981039346656037ull, points = 0;
     bool finite = true;
+    bool collect = false, overflow = false;
+    std::vector<Command> commands;
+    void record(unsigned kind, std::initializer_list<float> values) {
+        if (!collect) return;
+        if (commands.size() >= 1000000) { overflow=true; return; }
+        Command c{kind,unsigned(values.size()),{}};
+        std::copy(values.begin(),values.end(),c.values.begin());commands.push_back(c);
+    }
+    void writeCommands(std::ostream &out) const {
+        static const char *names[]={"moveTo","lineTo","curveTo","closePath"};
+        out << '[';
+        for(size_t i=0;i<commands.size();++i){const auto &c=commands[i];
+            out << (i?",":"") << '[' << quoted(names[c.kind]);
+            for(unsigned n=0;n<c.count;++n)out << ',' << c.values[n];
+            out << ']';
+        }
+        out << ']';
+    }
     float xmin = FLT_MAX, ymin = FLT_MAX, xmax = -FLT_MAX, ymax = -FLT_MAX;
     void word(uint32_t value) { for(unsigned i=0;i<4;++i){ hash ^= uint8_t(value >> (8*i)); hash *= 1099511628211ull; } }
     void point(D2D1_POINT_2F p) {
@@ -196,14 +216,16 @@ struct GeometrySink final : IDWriteGeometrySink {
     ULONG STDMETHODCALLTYPE Release() override { ULONG n=--refs; if(!n) delete this; return n; }
     void STDMETHODCALLTYPE SetFillMode(D2D1_FILL_MODE mode) override { word(1); word(uint32_t(mode)); }
     void STDMETHODCALLTYPE SetSegmentFlags(D2D1_PATH_SEGMENT flags) override { word(2); word(uint32_t(flags)); }
-    void STDMETHODCALLTYPE BeginFigure(D2D1_POINT_2F p,D2D1_FIGURE_BEGIN begin) override { word(3); word(uint32_t(begin)); point(p); }
-    void STDMETHODCALLTYPE AddLines(const D2D1_POINT_2F *p, UINT32 count) override { word(4); word(count); for(UINT32 i=0;i<count;++i) point(p[i]); }
-    void STDMETHODCALLTYPE AddBeziers(const D2D1_BEZIER_SEGMENT *b, UINT32 count) override { word(5); word(count); for(UINT32 i=0;i<count;++i){point(b[i].point1);point(b[i].point2);point(b[i].point3);} }
-    void STDMETHODCALLTYPE EndFigure(D2D1_FIGURE_END end) override { word(6); word(uint32_t(end)); }
-    HRESULT STDMETHODCALLTYPE Close() override { return finite ? S_OK : E_FAIL; }
+    void STDMETHODCALLTYPE BeginFigure(D2D1_POINT_2F p,D2D1_FIGURE_BEGIN begin) override { word(3); word(uint32_t(begin)); point(p);record(0,{p.x,p.y}); }
+    void STDMETHODCALLTYPE AddLines(const D2D1_POINT_2F *p, UINT32 count) override { word(4); word(count); for(UINT32 i=0;i<count;++i){point(p[i]);record(1,{p[i].x,p[i].y});} }
+    void STDMETHODCALLTYPE AddBeziers(const D2D1_BEZIER_SEGMENT *b, UINT32 count) override { word(5); word(count); for(UINT32 i=0;i<count;++i){point(b[i].point1);point(b[i].point2);point(b[i].point3);record(2,{b[i].point1.x,b[i].point1.y,b[i].point2.x,b[i].point2.y,b[i].point3.x,b[i].point3.y});} }
+    void STDMETHODCALLTYPE EndFigure(D2D1_FIGURE_END end) override { word(6); word(uint32_t(end));if(collect&&end!=D2D1_FIGURE_END_CLOSED)finite=false;record(3,{}); }
+    HRESULT STDMETHODCALLTYPE Close() override { return finite && !overflow ? S_OK : E_FAIL; }
 };
 struct Snapshot { uint64_t hash=14695981039346656037ull, points=0, nonempty=0; double totalAdvance=0; };
-static Snapshot snapshot(IDWriteFontFace5 *face,const std::vector<UINT16> &glyphs) {
+static Snapshot snapshot(IDWriteFontFace5 *face,const std::vector<UINT16> &glyphs,
+        std::ostream *coordinates,UINT32 faceIndex,const std::string &caseName,
+        const std::vector<DWRITE_FONT_AXIS_VALUE> &requested) {
     DWRITE_FONT_METRICS global{}; static_cast<IDWriteFontFace *>(face)->GetMetrics(&global);
     if (!global.designUnitsPerEm) throw std::runtime_error("Invalid unitsPerEm");
     std::vector<DWRITE_GLYPH_METRICS> metrics(glyphs.size());
@@ -211,8 +233,17 @@ static Snapshot snapshot(IDWriteFontFace5 *face,const std::vector<UINT16> &glyph
     Snapshot result;
     for(size_t i=0;i<glyphs.size();++i){
         ComPtr<GeometrySink> sink; sink.Attach(new GeometrySink);
+        sink->collect = coordinates != nullptr;
         checked(face->GetGlyphRunOutline(float(global.designUnitsPerEm), &glyphs[i], nullptr, nullptr, 1, FALSE, FALSE, sink.Get()), "GetGlyphRunOutline");
         checked(sink->Close(), "Outline finite coordinates");
+        if(coordinates){
+            *coordinates << "{\"record\":\"outline\",\"face_index\":" << faceIndex
+                << ",\"glyph_id\":" << glyphs[i] << ",\"case\":" << quoted(caseName)
+                << ",\"upm\":" << global.designUnitsPerEm << ",\"axes\":" << axisValuesJSON(requested)
+                << ",\"coordinate_frame\":\"x_right_y_down_font_units\",\"commands\":";
+            sink->writeCommands(*coordinates);*coordinates << "}\n";
+            if(!*coordinates)throw std::runtime_error("Outline evidence write failed");
+        }
         sink->word(metrics[i].advanceWidth); sink->word(uint32_t(metrics[i].leftSideBearing)); sink->word(uint32_t(metrics[i].rightSideBearing));
         sink->word(metrics[i].advanceHeight); sink->word(uint32_t(metrics[i].topSideBearing)); sink->word(uint32_t(metrics[i].bottomSideBearing));
         result.hash ^= sink->hash; result.hash *= 1099511628211ull;
@@ -285,14 +316,21 @@ static void raster(IDWriteFontFace5 *face, const fs::path &path, float dpi, bool
 
 int wmain(int argc,wchar_t **argv){
     if(argc<3){std::fputs("Usage: directwrite_probe.exe FONT OUTPUT_DIRECTORY [--all-glyphs] [--render]\n",stderr);return 2;}
-    bool all=false,render=false;
-    for(int i=3;i<argc;++i){if(!std::wcscmp(argv[i],L"--all-glyphs"))all=true;else if(!std::wcscmp(argv[i],L"--render"))render=true;else{std::fputs("Unknown option\n",stderr);return 2;}}
+    bool all=false,render=false,exportOutlines=false;
+    for(int i=3;i<argc;++i){if(!std::wcscmp(argv[i],L"--all-glyphs"))all=true;else if(!std::wcscmp(argv[i],L"--render"))render=true;else if(!std::wcscmp(argv[i],L"--outline-coordinates"))exportOutlines=true;else{std::fputs("Unknown option\n",stderr);return 2;}}
     fs::path input=fs::absolute(argv[1]),output=fs::absolute(argv[2]);
     fs::create_directories(output);
     fs::path reportPath=output/L"directwrite.jsonl";
     if(fs::exists(reportPath)){std::fputs("Use a new output directory\n",stderr);return 2;}
     std::ofstream log(reportPath);log<<std::setprecision(9);
     if(!log){std::fputs("Cannot create evidence report\n",stderr);return 2;}
+    std::ofstream coordinates;
+    if(exportOutlines){
+        const fs::path path=output/L"outline-coordinates.jsonl";
+        if(fs::exists(path)){std::fputs("Use a new outline evidence path\n",stderr);return 2;}
+        coordinates.open(path);coordinates<<std::setprecision(9);
+        if(!coordinates){std::fputs("Cannot create outline evidence\n",stderr);return 2;}
+    }
     HRESULT apartment=CoInitializeEx(nullptr,COINIT_MULTITHREADED);
     struct Uninit {bool yes;~Uninit(){if(yes)CoUninitialize();}} uninit{SUCCEEDED(apartment)};
     try{
@@ -302,8 +340,35 @@ int wmain(int argc,wchar_t **argv){
         ComPtr<IDWriteFontFile> file;checked(factory->CreateFontFileReference(input.c_str(),nullptr,&file),"CreateFontFileReference");
         BOOL supported=FALSE;DWRITE_FONT_FILE_TYPE type{};DWRITE_FONT_FACE_TYPE faceType{};UINT32 faces=0;
         checked(file->Analyze(&supported,&type,&faceType,&faces),"Font Analyze");
+        // IsWow64Process2 reports UNKNOWN for a non-WOW64 process. In the
+        // Windows 11 ARM runner even an x64 executable returns that value;
+        // UNKNOWN must not be interpreted as proof of native execution.
+        // Retain the raw API result and the compiler's independent target.
+        constexpr USHORT compiledMachine =
+#if defined(_M_ARM64EC)
+            0xA641;
+#elif defined(_M_ARM64)
+            IMAGE_FILE_MACHINE_ARM64;
+#elif defined(_M_X64)
+            IMAGE_FILE_MACHINE_AMD64;
+#elif defined(_M_IX86)
+            IMAGE_FILE_MACHINE_I386;
+#else
+            IMAGE_FILE_MACHINE_UNKNOWN;
+#endif
+        using QueryMachine = BOOL(WINAPI *)(HANDLE, USHORT *, USHORT *);
+        auto queryMachine = reinterpret_cast<QueryMachine>(GetProcAddress(
+            GetModuleHandleW(L"kernel32.dll"), "IsWow64Process2"));
+        USHORT processMachine=0, nativeMachine=0;
+        const bool machineKnown = queryMachine && queryMachine(GetCurrentProcess(), &processMachine, &nativeMachine);
+        const bool emulationKnown = machineKnown && nativeMachine && compiledMachine && compiledMachine != 0xA641;
         log<<"{\"record\":\"header\",\"schema\":1,\"input_sha256\":"<<quoted(locked.sha256)<<",\"input_bytes\":"<<locked.bytes
            <<",\"directwrite_supported\":"<<(supported?"true":"false")<<",\"physical_face_count\":"<<faces<<",\"all_glyphs\":"<<(all?"true":"false")
+           <<",\"outline_coordinates_exported\":"<<(exportOutlines?"true":"false")
+           <<",\"architecture_query_succeeded\":"<<(machineKnown?"true":"false")
+           <<",\"process_machine\":"<<processMachine<<",\"native_machine\":"<<nativeMachine
+           <<",\"compiled_machine\":"<<compiledMachine
+           <<",\"process_emulated\":"<<(emulationKnown?(compiledMachine!=nativeMachine?"true":"false"):"null")
            <<",\"original_equality\":\"NOT_TESTED\",\"swirl_ui\":\"NOT_TESTED\",\"system_install\":\"NOT_TESTED\"}\n";
         if(!supported||!faces)throw std::runtime_error("DirectWrite rejected the input font file");
         UINT32 passed=0,failed=0;
@@ -339,7 +404,8 @@ int wmain(int argc,wchar_t **argv){
                 std::vector<std::set<uint64_t>> sweepHashes(axes.size());
                 auto jobs=positions(axes);
                 for(const auto &job:jobs){
-                    auto face=instance(resource.Get(),job.values);auto measured=snapshot(face.Get(),glyphs);
+                    auto face=instance(resource.Get(),job.values);auto measured=snapshot(face.Get(),glyphs,
+                        exportOutlines?&coordinates:nullptr,faceIndex,job.name,job.values);
                     std::vector<DWRITE_FONT_AXIS_VALUE> applied(face->GetFontAxisValueCount());checked(face->GetFontAxisValues(applied.data(),UINT32(applied.size())),"Applied axes");
                     if(job.sweep>=0)sweepHashes[size_t(job.sweep)].insert(measured.hash);
                     log<<"{\"record\":\"instance\",\"face_index\":"<<faceIndex<<",\"case\":"<<quoted(job.name)<<",\"requested\":"<<axisValuesJSON(job.values)

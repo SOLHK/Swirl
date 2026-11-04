@@ -5,7 +5,24 @@ tools. This directory contains no Apple font, converted Apple font or extracted
 Apple outlines. A locally supplied font requires appropriate use/modification
 rights; availability of this code does not grant rights to redistribute fonts.
 
-## Current status
+## Current status — 2026-11-02
+
+Formal output is exactly **SwirlVF.ttc**. No accepted final font exists.
+The [delivery checkpoint](../../docs/SWIRL_VF_DELIVERY_20261102.md) and
+[branch recovery](../../docs/SWIRL_VF_RECOVERY_20261102.md) preserve P8's 228
+experimental models and the already-merged C1/D1 tools; these are not complete
+variable-face coverage. The [root-cause continuation](../../docs/SWIRL_VF_ROOT_CAUSE_20261102.md)
+verifies all 32 exact-source CoreText identities in an independent macOS 27
+resident-source environment. Local external-file loading still returns 103;
+byte-identical copy controls isolate a location-dependent HVGL loading boundary.
+The production HVF comparator passes 1088/1088 finite cases, while the strict
+native vertical metric test still fails. Bounded new interpolation/default-grid
+measurements explain why the existing expanded-simple representation cannot
+meet the unchanged point-precision contract for selected real glyphs. Authored
+Qt 6.12 integration passes on macOS; final-font and Windows 11 acceptance remain
+NOT_RUN. See the linked exact-scope evidence and draft PR 49 before continuing.
+
+## Historical source mapping checkpoint — 2026-10-20
 
 The exact-source normalized-design geometry gate now passes: **1088/1088**, zero
 failures, at the unchanged **1/32 FUnit** threshold. Native run 39306798698 used
@@ -23,7 +40,7 @@ batches / 5,824 glyph observations with exact replay, then stopped at face 0 /
 GID 0 because the observed vertical X origin cannot be represented by vmtx alone.
 Training sample 1 at `WDTH=1, wght=501, HGHT=500` has a 100-FUnit absolute
 representation error, retained against the unchanged 1e-5 condition.
-Zero original glyph models/faces are complete. No accepted `Swirl-VF.ttc` exists.
+Zero original glyph models/faces are complete. No accepted `SwirlVF.ttc` exists.
 
 The new HVAR diagnosis measured 3048 user locations / 12192 advances across 32
 faces. Raw-order avar evaluation with zero-normalized coordinates preserved
@@ -107,19 +124,23 @@ Do not substitute a different installed PingFang release.
 After resolving the source-oracle gates, run privately:
 
 ```sh
-python tools/rebuild.py /private/PingFangUI.ttc \
+python tools/build_swirlvf.py /private/PingFangUI.ttc \
+  --expected-source-sha256 39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890 \
   --oracle /private/build/coretext_extract \
-  --output /private/output/Swirl-VF.ttc \
-  --report /private/output/reconstruction.json
+  --output /private/output/SwirlVF.ttc \
+  --report /private/output/reconstruction.json \
+  --checkpoint-dir /private/build/verified-faces
 ```
 
 The current builder is **native-instance approximation**, not lossless format
 translation. It retains original GIDs, face coverage, axis tags/ranges, and uses
 standard glyf/gvar with explicit metric phantoms and equivalent HVAR/VVAR.
-Its original total outline and metric budgets are 1 FUnit each, including
-training/default rounding, independent holdouts and the 0.05-unit cubic allowance
-when needed. Those are distinct from the source decoder's 1/32 FUnit gate;
-neither budget was loosened in the geometry repair.
+The product entry point fixes both total outline and metric budgets at
+**1/32 FUnit**. Cubic approximation consumes at most 1/64 of that same outline
+budget; point/encoding error is added before checking the total. Source identity
+is mandatory. Historical `rebuild.py` experiment defaults remain 1 FUnit with
+a 0.05-unit cubic allowance, and must not be used for product acceptance.
+Both entry points call the same reconstruction and serialization implementation.
 
 The builder does not overwrite input or previous output. Missing data, topology
 changes, unrepresentable metrics or remaining holdout error block publication.
