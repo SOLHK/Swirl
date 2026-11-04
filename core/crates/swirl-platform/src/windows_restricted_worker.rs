@@ -33,8 +33,9 @@ use windows_sys::{
         },
         Security::{
             Authorization::{
-                ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW,
-                SDDL_REVISION_1,
+                BuildTrusteeWithSidW, ConvertSidToStringSidW,
+                ConvertStringSecurityDescriptorToSecurityDescriptorW, EXPLICIT_ACCESS_W,
+                GRANT_ACCESS, SDDL_REVISION_1, SetEntriesInAclW,
             },
             *,
         },
@@ -588,6 +589,49 @@ fn creation_access_preflight(primary: HANDLE, desktop: HDESK) -> serde_json::Val
     })
 }
 
+fn grant_worker_default_dacl(token: HANDLE) -> io::Result<()> {
+    let user = TokenBuffer::query(token, TokenUser)?;
+    let default = TokenBuffer::query(token, TokenDefaultDacl)?;
+    let mut entry = EXPLICIT_ACCESS_W {
+        grfAccessPermissions: GENERIC_ALL,
+        grfAccessMode: GRANT_ACCESS,
+        ..EXPLICIT_ACCESS_W::default()
+    };
+    // An elevated default DACL can grant write access only to BA and SYSTEM.
+    // BA is now deny-only, so the worker cannot reopen objects it creates with
+    // that DACL during DLL initialization. The token user is already enabled
+    // in both access-check passes; grant it access only to new worker objects.
+    // Preserve existing ACEs, including denials; do not add a broad group SID.
+    // SAFETY: the trustee borrows the live queried token-user SID.
+    unsafe { BuildTrusteeWithSidW(&mut entry.Trustee, user.value::<TOKEN_USER>()?.User.Sid) };
+    let mut acl = null_mut();
+    // SAFETY: live token DACL and trustee; Windows allocates the merged ACL.
+    let error = unsafe {
+        SetEntriesInAclW(
+            1,
+            &entry,
+            default.value::<TOKEN_DEFAULT_DACL>()?.DefaultDacl,
+            &mut acl,
+        )
+    };
+    if error != 0 {
+        return Err(io::Error::from_raw_os_error(error as i32));
+    }
+    let updated = TOKEN_DEFAULT_DACL { DefaultDacl: acl };
+    // SAFETY: copies the live merged ACL into this newly restricted token.
+    let result = success(unsafe {
+        SetTokenInformation(
+            token,
+            TokenDefaultDacl,
+            (&updated as *const TOKEN_DEFAULT_DACL).cast(),
+            size_of::<TOKEN_DEFAULT_DACL>() as u32,
+        )
+    });
+    // SAFETY: exactly the ACL allocation returned by SetEntriesInAclW.
+    unsafe { LocalFree(acl.cast()) };
+    result
+}
+
 fn restricted_token() -> io::Result<OwnedHandle> {
     // SAFETY: current process pseudo handle is valid for token query.
     let source = open_token(
@@ -657,6 +701,7 @@ fn restricted_token() -> io::Result<OwnedHandle> {
         )
     })?;
     let token = owned(raw)?;
+    grant_worker_default_dacl(token.as_raw_handle())?;
     let low = Sid::well_known(WinLowLabelSid)?;
     let label = TOKEN_MANDATORY_LABEL {
         Label: SID_AND_ATTRIBUTES {
