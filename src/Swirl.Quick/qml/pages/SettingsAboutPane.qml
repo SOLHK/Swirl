@@ -35,6 +35,9 @@ ColumnLayout {
             model: [
                 {name: qsTr("版本"), value: Qt.application.version.replace("-preview", qsTr(" · 开发版"))},
                 {name: qsTr("开发者"), value: "SOLHK"},
+                {name: qsTr("原作者"), value: "SOLHK"},
+                {name: qsTr("原项目"), value: "Swirl · https://github.com/SOLHK/Swirl"},
+                {name: qsTr("版权"), value: "Copyright (c) 2026 SOLHK"},
                 {name: qsTr("界面框架"), value: "Qt 6 Quick"},
                 {name: qsTr("平台"), value: qsTr("Windows 64 位")}
             ]
