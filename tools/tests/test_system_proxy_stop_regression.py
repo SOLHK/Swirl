@@ -42,6 +42,14 @@ def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def locate_test_executable(build: Path) -> Path:
+    for relative in ("Release/SwirlPolicyConfigurationTests.exe", "SwirlPolicyConfigurationTests.exe"):
+        executable = build / relative
+        if executable.is_file():
+            return executable
+    raise FileNotFoundError("Built SwirlPolicyConfigurationTests.exe is missing from Release and build root")
+
+
 def check_report(path: Path, exit_code: int, negative: bool) -> dict:
     root = ET.parse(path).getroot()
     assert root.tag == "TestCase" and root.get("name") == "PolicyConfigurationTests", "Unexpected QTest suite"
@@ -81,7 +89,6 @@ def main() -> int:
     build = args.build_dir.resolve()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
-    executable = build / "Release/SwirlPolicyConfigurationTests.exe"
     summary = {"schema": 1, "baseline_controller_commit": BASELINE,
                "scope": "Exact old controller blobs with current tests and dependencies; isolated backend, not Windows Desktop acceptance",
                "success": False, "candidate_restored": False, "errors": []}
@@ -113,6 +120,7 @@ def main() -> int:
         code = run(["cmake", "--build", str(build), "--config", "Release", "--target",
                     "SwirlPolicyConfigurationTests", "--parallel", "4"], f"{label}-build", 900)
         assert code == 0, f"{label} controller build failed: {code}; compilation failure is not an expected test failure"
+        executable = locate_test_executable(build)
         xml = output / f"{label}.xml"
         code = run([str(executable), *CASES, "-o", f"{xml},xml", "-o",
                     f"{output / (label + '.txt')},txt"], label, 120)

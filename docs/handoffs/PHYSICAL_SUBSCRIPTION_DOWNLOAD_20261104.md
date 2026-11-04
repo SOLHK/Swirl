@@ -13,8 +13,8 @@ Non-Windows clients retain the setting but cannot save/use this Windows route.
   30-second total deadline, cancellation and failed-update transaction. Physical
   mode explicitly rejects plain HTTP. No alternative HTTP/TLS implementation or
   external proxy program was introduced.
-- `swirl_download_route_v1` accepts only `{op:start, host, port}` and
-  `{op:stop, handle}`. A caller provides a fixed output buffer of at least 4096
+- `swirl_download_route_v1` accepts `{op:start, host, port}`, the optional
+  `{op:start_once, host, port}`, and `{op:stop, handle}`. A caller provides a fixed output buffer of at least 4096
   bytes in one call. Smaller buffers/size queries fail before listener/task
   creation. Start returns a positive signed-64-bit-compatible handle, ephemeral
   loopback port and random Basic-auth credentials. Stop is idempotent.
@@ -44,6 +44,15 @@ Non-Windows clients retain the setting but cannot save/use this Windows route.
   No Core egress lease, host proxy, firewall, route, DNS or third-party TUN
   configuration is modified.
 
+`start_once` adds a one-upstream budget after authentication and exact-target
+validation. Failed credentials or a different target do not consume it. An
+atomic claim lets one concurrent authenticated request proceed; later CONNECTs
+receive 403 before DNS or origin access. The budget stays consumed after failure
+or EOF. Ordinary `start` keeps its existing multi-tunnel behavior, including the
+four-connection limit; the Qt production service's redirect/negotiation policy
+is unchanged. A caller needing a single authorized attempt explicitly selects
+`start_once` and fails closed if that operation is unavailable.
+
 Winsock documents that binding a source resolves a scoped IPv6 destination with
 scope ID zero; current code also pins and verifies the selected IPv6 interface.
 The source snapshot excludes link-local sources. A real network using a
@@ -65,6 +74,12 @@ then passing through real loopback sockets. Final local GNU Windows checks ran:
   observed failing `fec0::1` case before the fix, followed by **12/12** native
   tests passing again. Scoped Clippy, workspace formatting and whitespace checks
   passed after that final production change.
+- Subsequent `start_once` tests observed the unsupported ABI fail and, before
+  enforcement, a second successful CONNECT plus four concurrent successes.
+  After the atomic budget guard, **15/15** native tests passed, including all
+  previous default-mode cases, wrong-auth/target budget preservation, one origin
+  from four concurrent requests and the actual fixed-buffer `start_once` ABI.
+  Scoped API Clippy, workspace formatting and whitespace checks passed.
 - The two read-only firewall fixture-selector tests passed, and the two affected
   Core multi-address DIRECT DNS regressions passed.
 - API/platform/Core library-and-test Clippy with `-D warnings`, workspace

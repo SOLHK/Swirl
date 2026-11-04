@@ -8,6 +8,13 @@ use tokio::{
 const WAIT: Duration = Duration::from_secs(3);
 
 async fn setup(host: &str) -> (SocketAddr, TcpListener, JoinHandle<io::Result<()>>) {
+    setup_mode(host, false).await
+}
+
+async fn setup_mode(
+    host: &str,
+    once: bool,
+) -> (SocketAddr, TcpListener, JoinHandle<io::Result<()>>) {
     let origin = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -24,6 +31,8 @@ async fn setup(host: &str) -> (SocketAddr, TcpListener, JoinHandle<io::Result<()
             interface: 1,
         }],
         resolved: tokio::sync::OnceCell::new(),
+        once,
+        upstream_used: AtomicBool::new(false),
     });
     (address, origin, tokio::spawn(serve(listener, route, WAIT)))
 }
@@ -412,4 +421,118 @@ fn bridge_abi_start_authentication_and_idempotent_stop_need_no_system_resolution
         json!({"ok":true})
     );
     assert!(std::net::TcpStream::connect_timeout(&address, WAIT).is_err());
+}
+
+#[cfg(windows)]
+#[test]
+fn bridge_abi_start_once_creates_a_cancellable_authenticated_route() {
+    let input = br#"{"op":"start_once","host":"not-resolved.fixture.invalid","port":443}"#;
+    assert_eq!(response(input, 4095).unwrap_err(), -1);
+    let (_, bytes) = response(input, 4096).unwrap();
+    let value: serde_json::Value = serde_json::from_slice(&bytes.unwrap()).unwrap();
+    assert_eq!(value["ok"], true);
+    let handle = value["handle"].as_u64().unwrap();
+    let address = SocketAddr::from(([127, 0, 0, 1], value["port"].as_u64().unwrap() as u16));
+    let (_, header) = runtime().unwrap().block_on(request(
+        address,
+        "not-resolved.fixture.invalid:443",
+        "wrong:credentials",
+    ));
+    assert!(header.starts_with("HTTP/1.1 407 "));
+    assert_eq!(
+        execute(Command::Stop { handle }).unwrap(),
+        json!({"ok":true})
+    );
+    assert!(std::net::TcpStream::connect_timeout(&address, WAIT).is_err());
+}
+
+#[tokio::test]
+async fn once_bad_auth_and_target_do_not_consume_the_single_upstream_budget() {
+    let (address, origin, task) = setup_mode("fixture.invalid", true).await;
+    let (_, header) = request(address, "fixture.invalid:443", "fixture-user:wrong").await;
+    assert!(header.starts_with("HTTP/1.1 407 "));
+    let (_, header) = request(
+        address,
+        "another.invalid:443",
+        "fixture-user:fixture-secret",
+    )
+    .await;
+    assert!(header.starts_with("HTTP/1.1 403 "));
+    assert!(
+        timeout(Duration::from_millis(40), origin.accept())
+            .await
+            .is_err()
+    );
+    let (mut client, header) = request(
+        address,
+        "fixture.invalid:443",
+        "fixture-user:fixture-secret",
+    )
+    .await;
+    assert!(header.starts_with("HTTP/1.1 200 "));
+    let (mut peer, _) = timeout(WAIT, origin.accept()).await.unwrap().unwrap();
+    let (_, header) = request(
+        address,
+        "fixture.invalid:443",
+        "fixture-user:fixture-secret",
+    )
+    .await;
+    assert!(
+        header.starts_with("HTTP/1.1 403 "),
+        "a second authenticated CONNECT must be refused"
+    );
+    assert!(
+        timeout(Duration::from_millis(40), origin.accept())
+            .await
+            .is_err()
+    );
+    client.write_all(b"only-request").await.unwrap();
+    client.shutdown().await.unwrap();
+    let mut received = Vec::new();
+    timeout(WAIT, peer.read_to_end(&mut received))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(received, b"only-request");
+    peer.write_all(b"only-reply").await.unwrap();
+    peer.shutdown().await.unwrap();
+    let mut reply = Vec::new();
+    timeout(WAIT, client.read_to_end(&mut reply))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(reply, b"only-reply");
+    task.abort();
+}
+
+#[tokio::test]
+async fn once_four_authenticated_clients_open_exactly_one_upstream() {
+    let (address, origin, task) = setup_mode("fixture.invalid", true).await;
+    let mut attempts = Vec::new();
+    for _ in 0..4 {
+        attempts.push(tokio::spawn(request(
+            address,
+            "fixture.invalid:443",
+            "fixture-user:fixture-secret",
+        )));
+    }
+    let mut clients = Vec::new();
+    let mut accepted = 0;
+    let mut refused = 0;
+    for attempt in attempts {
+        let (client, header) = timeout(WAIT, attempt).await.unwrap().unwrap();
+        accepted += usize::from(header.starts_with("HTTP/1.1 200 "));
+        refused += usize::from(header.starts_with("HTTP/1.1 403 "));
+        clients.push(client);
+    }
+    assert_eq!((accepted, refused), (1, 3));
+    let (peer, _) = timeout(WAIT, origin.accept()).await.unwrap().unwrap();
+    assert!(
+        timeout(Duration::from_millis(40), origin.accept())
+            .await
+            .is_err()
+    );
+    drop(peer);
+    drop(clients);
+    task.abort();
 }

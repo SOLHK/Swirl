@@ -646,7 +646,7 @@ static int physicalPublicHttps(const QUrl &url) {
     QTextStream(stdout)<<QJsonDocument(result).toJson(QJsonDocument::Compact)<<Qt::endl;
     return ok?0:1;
 }
-static bool physicalPublicTlsProbe(const QUrl &url) {
+static bool physicalPublicTlsProbe(const QUrl &url,bool onceHead=false) {
     auto &library=RustCoreLibrary::instance();
     const auto call=[&library](const QJsonObject &input){
         if(!library.load()||!library.downloadRoute())return QJsonObject{};
@@ -656,7 +656,7 @@ static bool physicalPublicTlsProbe(const QUrl &url) {
             reinterpret_cast<unsigned char *>(output.data()),size_t(output.size()));
         return size>0&&size<=output.size()?QJsonDocument::fromJson(output.first(size)).object():QJsonObject{};
     };
-    const auto route=call({{"op","start"},{"host",url.host()},{"port",443}});
+    const auto route=call({{"op",onceHead?"start_once":"start"},{"host",url.host()},{"port",443}});
     const auto handle=route.value("handle").toInteger();QJsonArray tlsErrors;
     int httpStatus=0,qtError=-1,peerChainLength=0;bool encrypted=false;
     QNetworkAccessManager manager;
@@ -665,7 +665,8 @@ static bool physicalPublicTlsProbe(const QUrl &url) {
             route.value("username").toString(),route.value("password").toString()));
         QNetworkRequest request(url);SwirlNetwork::applyHttp1OnlyPolicy(request);
         request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);request.setTransferTimeout(15000);
-        auto *reply=manager.get(request);reply->setReadBufferSize(64*1024);qint64 received=0;QEventLoop loop;QTimer timeout;timeout.setSingleShot(true);
+        if(onceHead){request.setRawHeader("User-Agent","Swirl-Core-URLTest/1");request.setRawHeader("Accept","*/*");request.setRawHeader("Connection","close");}
+        auto *reply=onceHead?manager.head(request):manager.get(request);reply->setReadBufferSize(64*1024);qint64 received=0;QEventLoop loop;QTimer timeout;timeout.setSingleShot(true);
         QObject::connect(reply,&QNetworkReply::sslErrors,&loop,[&](const QList<QSslError> &errors){for(const auto &error:errors)if(tlsErrors.size()<8)tlsErrors.append(int(error.error()));});
         QObject::connect(reply,&QNetworkReply::readyRead,&loop,[reply,&received]{received+=reply->readAll().size();if(received>NodeImporter::MaximumBytes)reply->abort();});
         QObject::connect(reply,&QNetworkReply::finished,&loop,&QEventLoop::quit);
@@ -676,13 +677,16 @@ static bool physicalPublicTlsProbe(const QUrl &url) {
     }
     const bool stopped=handle>0&&call({{"op","stop"},{"handle",handle}}).value("ok").toBool();
     const bool ok=httpStatus==200&&qtError==0&&tlsErrors.isEmpty()&&encrypted&&stopped;
-    const QJsonObject result{{"schema",1},{"test","physical-public-qt-tls-probe"},{"public_host",url.host()},
+    const QJsonObject result{{"schema",1},{"test",onceHead?"physical-public-head-once":"physical-public-qt-tls-probe"},{"public_host",url.host()},
+        {"method",onceHead?"HEAD":"GET"},{"one_shot_upstream",onceHead},
         {"passed",ok},{"http_status",httpStatus},{"qt_error",qtError},{"tls_error_codes",tlsErrors},
         {"encrypted",encrypted},{"peer_chain_length",peerChainLength},{"route_stopped",stopped}};
     QTextStream(stdout)<<QJsonDocument(result).toJson(QJsonDocument::Compact)<<Qt::endl;return ok;
 }
 int main(int argc,char **argv) {
     QCoreApplication application(argc,argv);
+    if(application.arguments().contains(QStringLiteral("--physical-public-head-once")))
+        return application.arguments().size()==2&&physicalPublicTlsProbe(QUrl(QStringLiteral("https://www.cloudflare.com/robots.txt")),true)?0:1;
     if(application.arguments().contains(QStringLiteral("--physical-public-https"))){
         if(application.arguments().size()!=2)return 2;
         int result=0;

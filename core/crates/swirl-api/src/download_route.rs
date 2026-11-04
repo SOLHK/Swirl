@@ -7,7 +7,10 @@ use std::{
     collections::HashMap,
     io,
     net::{IpAddr, SocketAddr},
-    sync::{Arc, Mutex, OnceLock},
+    sync::{
+        Arc, Mutex, OnceLock,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 use swirl_subscription::Credentials;
@@ -33,6 +36,8 @@ struct Route {
     credentials: Credentials,
     endpoints: Vec<Endpoint>,
     resolved: tokio::sync::OnceCell<Result<Vec<Endpoint>, &'static str>>,
+    once: bool,
+    upstream_used: AtomicBool,
 }
 
 async fn connect(endpoint: &Endpoint) -> io::Result<TcpStream> {
@@ -69,15 +74,22 @@ async fn tunnel(mut client: TcpStream, route: Arc<Route>) -> io::Result<()> {
         (Err(_), Err(_)) => request.target.host.eq_ignore_ascii_case(&route.host),
         _ => false,
     };
-    if !matches!(request.kind, swirl_protocol::InboundKind::HttpConnect)
+    let rejection = if !matches!(request.kind, swirl_protocol::InboundKind::HttpConnect)
         || !host_matches
         || request.target.port != route.port
         || request.udp
     {
+        Some("PhysicalRouteTargetRejected")
+    } else if route.once && route.upstream_used.swap(true, Ordering::AcqRel) {
+        Some("PhysicalRouteRequestConsumed")
+    } else {
+        None
+    };
+    if let Some(code) = rejection {
         client
             .write_all(b"HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n")
             .await?;
-        return Err(io::Error::other("PhysicalRouteTargetRejected"));
+        return Err(io::Error::other(code));
     }
     let endpoints = route
         .resolved
@@ -307,6 +319,7 @@ async fn resolve(_: &str, _: u16) -> io::Result<Vec<Endpoint>> {
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 enum Command {
     Start { host: String, port: u16 },
+    StartOnce { host: String, port: u16 },
     Stop { handle: u64 },
 }
 #[derive(Default)]
@@ -330,6 +343,7 @@ fn runtime() -> io::Result<&'static Runtime> {
 
 fn execute(command: Command) -> io::Result<serde_json::Value> {
     let runtime = runtime()?;
+    let once = matches!(&command, Command::StartOnce { .. });
     match command {
         Command::Stop { handle } => {
             let task = ROUTES
@@ -344,7 +358,7 @@ fn execute(command: Command) -> io::Result<serde_json::Value> {
             }
             Ok(json!({"ok":true}))
         }
-        Command::Start { host, port } => {
+        Command::Start { host, port } | Command::StartOnce { host, port } => {
             if port == 0
                 || host.len() > 253
                 || !host.is_ascii()
@@ -381,6 +395,8 @@ fn execute(command: Command) -> io::Result<serde_json::Value> {
                 },
                 endpoints: Vec::new(),
                 resolved: tokio::sync::OnceCell::new(),
+                once,
+                upstream_used: AtomicBool::new(false),
             });
             let listener = runtime.block_on(TcpListener::bind("127.0.0.1:0"))?;
             let port = listener.local_addr()?.port();
