@@ -55,11 +55,11 @@ def run(output):
         report['binary_sha256'] = hashlib.sha256(binary.read_bytes()).hexdigest()
         source = output / 'authored-source.ttc'; make_fixture(source)
         with TTCollection(source) as original:
-            for kind in ('flat', 'factored', 'compact', 'flat_long'):
+            for kind in ('flat', 'factored', 'compact', 'flat_long', 'adaptive', 'ramp', 'hierarchical'):
                 path = output / f'authored-cff2-{kind}.ttc'
                 repeats = 512 if kind == 'flat_long' else 1
                 fixture = write_fixture(path, factored=kind == 'factored', compact=kind == 'compact',
-                                        repeat_contours=repeats)
+                                        repeat_contours=repeats, adaptive=kind == 'adaptive',ramp=kind == 'ramp',hierarchical=kind == 'hierarchical')
                 native = NativeOracle(binary, path, output / f'{kind}-native.log')
                 result = {'fixture': fixture, 'native_identity': native.metadata,
                           'max_cubic_control_error': 0., 'max_metric_errors': {},
@@ -97,7 +97,7 @@ def run(output):
                                                 actual=metrics[key], expected=expected[key], error=error))
                                 name = original.fonts[face].getGlyphOrder()[gid]
                                 wanted = records(original.fonts[face], name, [normalized_location(location)], .25,
-                                                 repeat_contours=repeats)[0]
+                                                 repeat_contours=repeats, nonlinear=kind in ('adaptive','ramp','hierarchical'))[0]
                                 expected_ops, expected_values = geometry.operands(wanted)
                                 actual_ops, actual_values = geometry.operands(row['commands'])
                                 if actual_ops != expected_ops:

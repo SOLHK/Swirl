@@ -170,8 +170,9 @@ static ComPtr<IDWriteFontFace5> instance(IDWriteFontResource *resource, const st
     checked(face->GetFontAxisValues(applied.data(), UINT32(applied.size())), "GetFontAxisValues");
     for (const auto &request : requested) {
         auto found = std::find_if(applied.begin(), applied.end(), [&](auto x){ return x.axisTag == request.axisTag; });
-        float tolerance = std::max(1e-5f, std::abs(request.value) * 1e-6f);
-        if (found == applied.end() || !std::isfinite(found->value) || std::abs(found->value - request.value) > tolerance)
+        // The request is already a FLOAT. Compare its exact value, not an
+        // epsilon that can conceal decimal-width readback quantization.
+        if (found == applied.end() || !std::isfinite(found->value) || found->value != request.value)
             throw std::runtime_error("Axis value was ignored/clamped: " + axisTag(request.axisTag));
     }
     return face;

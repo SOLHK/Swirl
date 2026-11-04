@@ -80,6 +80,135 @@ async fn gateway_udp_preserves_each_client_endpoint_in_both_directions() {
 }
 
 #[tokio::test]
+async fn gateway_fragmented_ipv4_udp_shared_endpoint_preserves_each_client_reply() {
+    let mut stack = spawn(gateway_config()).unwrap();
+    let destination: SocketAddr = "203.0.113.20:443".parse().unwrap();
+    let first: SocketAddr = "192.168.77.10:50000".parse().unwrap();
+    stack
+        .ingress
+        .send(udp_packet(first, destination, b"create-shared-endpoint"))
+        .await
+        .unwrap();
+    assert_eq!(
+        timeout(WAIT, stack.udp.recv()).await.unwrap().unwrap(),
+        UdpDatagram {
+            source: first,
+            destination,
+            payload: b"create-shared-endpoint".to_vec(),
+        }
+    );
+    for (address, identity, reverse) in [
+        ("192.168.77.11:50000", 110, false),
+        ("192.168.77.12:50000", 111, true),
+    ] {
+        let client: SocketAddr = address.parse().unwrap();
+        let payload = vec![identity as u8; 5000];
+        let mut fragments = ipv4_fragments(&udp_packet(client, destination, &payload), identity);
+        if reverse {
+            fragments.reverse();
+        }
+        for fragment in fragments {
+            stack.ingress.send(fragment).await.unwrap();
+        }
+        assert_eq!(
+            timeout(WAIT, stack.udp.recv()).await.unwrap().unwrap(),
+            UdpDatagram {
+                source: client,
+                destination,
+                payload,
+            }
+        );
+        // No unfragmented packet from this client may establish admission for
+        // it before its first reply. Reassembly must preserve that ownership.
+        stack
+            .udp_reply
+            .send(UdpDatagram {
+                source: destination,
+                destination: client,
+                payload: b"fragmented-ack".to_vec(),
+            })
+            .await
+            .unwrap();
+        let bytes = timeout(WAIT, stack.egress.recv())
+            .await
+            .expect("a reassembled client sharing an endpoint lost its reply admission")
+            .unwrap();
+        let (source, target, protocol, payload) = ip_payload(&bytes);
+        let packet = UdpPacket::new_checked(payload).unwrap();
+        UdpRepr::parse(
+            &packet,
+            &source.into(),
+            &target.into(),
+            &ChecksumCapabilities::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            (source, target, protocol, packet.src_port(), packet.dst_port()),
+            (
+                destination.ip(),
+                client.ip(),
+                IpProtocol::Udp,
+                destination.port(),
+                client.port(),
+            )
+        );
+        assert_eq!(packet.payload(), b"fragmented-ack");
+    }
+    assert_eq!(stack.stats.snapshot().active_udp_endpoints, 1);
+    assert_eq!(stack.stats.snapshot().denied_gateway_packets, 0);
+    assert!(stack.udp.try_recv().is_err());
+    stack.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn gateway_fragmented_ipv4_udp_existing_endpoint_enforces_client_budget() {
+    let mut config = gateway_config();
+    config.gateway.as_mut().unwrap().max_udp_per_client = 1;
+    let mut stack = spawn(config).unwrap();
+    let first: SocketAddr = "192.168.77.10:50000".parse().unwrap();
+    let second: SocketAddr = "192.168.77.11:50000".parse().unwrap();
+    let first_target: SocketAddr = "203.0.113.20:443".parse().unwrap();
+    let second_target: SocketAddr = "203.0.113.21:443".parse().unwrap();
+    for (client, destination) in [(first, first_target), (second, second_target)] {
+        stack
+            .ingress
+            .send(udp_packet(client, destination, b"occupy-client-budget"))
+            .await
+            .unwrap();
+        assert_eq!(
+            timeout(WAIT, stack.udp.recv()).await.unwrap().unwrap(),
+            UdpDatagram {
+                source: client,
+                destination,
+                payload: b"occupy-client-budget".to_vec(),
+            }
+        );
+    }
+    for (client, identity) in [(first, 112), (second, 113)] {
+        for fragment in ipv4_fragments(
+            &udp_packet(client, second_target, &vec![identity as u8; 5000]),
+            identity,
+        ) {
+            stack.ingress.send(fragment).await.unwrap();
+        }
+    }
+    // Both messages use the same existing UDP socket. Its next published
+    // datagram must belong to the admitted client, after rejecting the first.
+    assert_eq!(
+        timeout(WAIT, stack.udp.recv()).await.unwrap().unwrap(),
+        UdpDatagram {
+            source: second,
+            destination: second_target,
+            payload: vec![113; 5000],
+        }
+    );
+    assert_eq!(stack.stats.snapshot().denied_gateway_packets, 1);
+    assert_eq!(stack.stats.snapshot().active_udp_endpoints, 2);
+    assert!(stack.udp.try_recv().is_err());
+    stack.shutdown().await.unwrap();
+}
+
+#[tokio::test]
 async fn gateway_rejects_untrusted_sources_host_services_and_ipv6_before_allocation() {
     let mut stack = spawn(gateway_config()).unwrap();
     let attempts = [
