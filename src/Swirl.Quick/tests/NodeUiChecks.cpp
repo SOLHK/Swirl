@@ -32,7 +32,21 @@
 int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     if(!window||!controller)return 1;
     int checks=0,failures=0;
-    const auto check=[&](bool ok,const char *label){++checks;if(!ok)++failures;qInfo()<<(ok?"PASS":"FAIL")<<label;return ok;};
+    const auto check=[&](bool ok,const char *label){
+        ++checks;if(!ok)++failures;qInfo()<<(ok?"PASS":"FAIL")<<label;
+        if(!ok){
+            qInfo().noquote()<<"Node failure state"<<QJsonDocument(QJsonObject{
+                {"nodes",controller->nodes().size()},{"nodeError",controller->nodeError()},
+                {"nodeBusy",controller->nodeBusy()},{"canStart",controller->canStart()},
+                {"processAlive",controller->processAlive()},{"policyBusy",controller->policyBusy()},
+                {"policyApplyState",controller->policyApplyState()},{"policyError",controller->policyError()},
+                {"policyRequestId",controller->policyRequestId()}}).toJson(QJsonDocument::Compact);
+            if(auto *dialog=window->findChild<QObject *>("proxyAddDialog"))
+                qInfo()<<"Node editor failure state"<<"visible"<<dialog->property("visible")
+                       <<"opened"<<dialog->property("opened")<<"dismissing"<<dialog->property("dismissing");
+        }
+        return ok;
+    };
     auto *proxyBackend=dynamic_cast<PolicySystemProxyBackend *>(controller->systemProxy()->backend());
     if(!check(proxyBackend!=nullptr,"node acceptance uses a per-instance system-proxy sandbox before any input"))return 2;
     std::function<QQuickItem *(QQuickItem *,const QString &)> find;
@@ -52,8 +66,12 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         QPointer<QQuickItem> target;
         const bool ready=QTest::qWaitFor([&]{
             auto *hero=item("nodeHero");
+            auto *editor=window->findChild<QObject *>("proxyAddDialog");
             target=findInput(window->contentItem(),n);
-            return !(hero&&hero->property("moving").toBool())&&target;
+            // A completed save can still be closing its modal editor. The
+            // underlying detail button is visible during that exit transition.
+            const bool editorBlocksDelete=n=="nodeDeleteButton"&&editor&&editor->property("visible").toBool();
+            return !(hero&&hero->property("moving").toBool())&&!editorBlocksDelete&&target;
         },3500);
         if(!ready){
             int matches=0;
@@ -72,10 +90,22 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
             qInfo()<<"Node input readiness matches"<<n<<matches;
         }
         if(!check(ready,"node input is visible after motion settles"))return;
+        std::unique_ptr<QSignalSpy> deleteClicks;
+        QVariant deleteEditorVisible,deleteEditorDismissing;
+        if(n=="nodeDeleteButton"&&target){
+            deleteClicks=std::make_unique<QSignalSpy>(target,SIGNAL(clicked()));
+            if(auto *dialog=window->findChild<QObject *>("proxyAddDialog")){
+                deleteEditorVisible=dialog->property("visible");
+                deleteEditorDismissing=dialog->property("dismissing");
+            }
+        }
         if(check(target&&target->isEnabled(),"node input exists and is enabled"))
             QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,target->mapToScene(QPointF(target->width()/2,target->height()/2)).toPoint());
         QTest::qWait(300);
         if(n=="nodeSaveButton"||n=="nodeDeleteButton")check(QTest::qWaitFor([&]{return !controller->policyBusy();},10000),"node mutation waits for its real configuration completion");
+        if(deleteClicks&&deleteClicks->isValid()&&deleteClicks->isEmpty())
+            qInfo()<<"Node delete input was not delivered"<<"editorVisibleAtClick"<<deleteEditorVisible
+                   <<"editorDismissingAtClick"<<deleteEditorDismissing;
     };
     const auto fill=[&](const QString &n,const QString &v){auto *t=item(n);if(check(t!=nullptr,"node field exists"))t->setProperty("text",v);};
     std::function<QQuickItem *(QQuickItem *,const QString &)> findNodeRow;
@@ -424,6 +454,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         QObject::connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
     }});
     check(subscriptions.listen(QHostAddress::LocalHost,0),"subscription HTTPS fixture listens");
+    const auto failedSourceUrl=QUrl(QString("https://localhost:%1/fixture").arg(subscriptions.serverPort()));
     eval("AppState.navigate('subscriptions')");QTest::qWait(350);
     click("addSubscription");fill("subscriptionName","Subscription fixture");fill("subscriptionUrl",QString("https://localhost:%1/fixture").arg(subscriptions.serverPort()));click("saveSubscription");
     const auto pendingProviders=controller->imports()->providers();
@@ -514,11 +545,23 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         check(eval("pageLoader.item.listed.length===1").toBool(),"clearing source search restores the real subscription");
         subscriptions.close();click("refreshSubscription-"+id);
         check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&!controller->imports()->providers().first().toMap().value("error").toString().isEmpty()&&controller->nodes().size()==1,"failed real refresh displays an error and retains imported nodes");
+        check(QTest::qWaitFor([&]{auto *failure=item("subscriptionFailure-"+id);return failure&&failure->property("text").toString()==QStringLiteral("更新失败 · 已保留 1 个已保存节点");},3000),"failed refresh reports the actual retained source-node count");
         if(!qa.isEmpty())window->grabWindow().save(qa+"/subscription-failure.png");
         click("moreSubscription-"+id);click("deleteSubscription-"+id);QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(250);
         check(controller->imports()->providers().size()==1,"Escape cancels destructive subscription confirmation");
         click("moreSubscription-"+id);click("deleteSubscription-"+id);click("confirmSubscriptionDelete");
         check(QTest::qWaitFor([&]{return !controller->imports()->busy()&&!controller->policyBusy()&&controller->imports()->providers().isEmpty()&&controller->nodes().isEmpty();},10000),"confirmed deletion removes the source's owned nodes after commit and revocation receipt");
+    }
+    check(controller->imports()->saveSubscription({},"First failed source",failedSourceUrl,360,false),"first-failure source is saved without any nodes");
+    check(QTest::qWaitFor([&]{return !controller->imports()->busy()&&controller->imports()->providers().size()==1;},8000),"first-failure source metadata commit completes");
+    if(!controller->imports()->providers().isEmpty()){
+        const auto firstId=controller->imports()->providers().first().toMap().value("id").toString();
+        controller->imports()->refreshSubscription(firstId);
+        check(QTest::qWaitFor([&]{return !controller->imports()->busy()&&controller->imports()->providers().first().toMap().value("status").toString()==QStringLiteral("更新失败");},8000),"first source update fails without importing any node");
+        click("expandSubscription-"+firstId);
+        check(QTest::qWaitFor([&]{auto *failure=item("subscriptionFailure-"+firstId);return failure&&failure->isVisible()&&effectiveOpacity(failure)>0.95&&failure->property("text").toString()==QStringLiteral("更新失败 · 此来源尚无已保存节点");},3000)&&controller->nodes().isEmpty(),"first failed import does not claim to retain earlier valid nodes");
+        check(controller->imports()->removeSubscription(firstId),"first-failure fixture source is removed");
+        check(QTest::qWaitFor([&]{return !controller->imports()->busy()&&controller->imports()->providers().isEmpty();},8000),"first-failure fixture removal completes");
     }
     // Large-list layout/transfer fixture uses reserved local endpoints only.
     QString batch="proxies:\n";

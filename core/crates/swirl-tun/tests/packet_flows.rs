@@ -1,4 +1,5 @@
 //! Packet-level tests: no TUN driver, host routing or system DNS is touched.
+use ring::digest::{SHA256, digest};
 use smoltcp::{
     phy::ChecksumCapabilities,
     wire::{
@@ -110,13 +111,18 @@ async fn gateway_fragmented_ipv4_udp_shared_endpoint_preserves_each_client_reply
         for fragment in fragments {
             stack.ingress.send(fragment).await.unwrap();
         }
+        let received = timeout(WAIT, stack.udp.recv()).await.unwrap().unwrap();
         assert_eq!(
-            timeout(WAIT, stack.udp.recv()).await.unwrap().unwrap(),
-            UdpDatagram {
-                source: client,
-                destination,
-                payload,
-            }
+            (
+                received.source,
+                received.destination,
+                received.payload.len()
+            ),
+            (client, destination, payload.len())
+        );
+        assert_eq!(
+            digest(&SHA256, &received.payload).as_ref(),
+            digest(&SHA256, &payload).as_ref()
         );
         // No unfragmented packet from this client may establish admission for
         // it before its first reply. Reassembly must preserve that ownership.
@@ -200,13 +206,18 @@ async fn gateway_fragmented_ipv4_udp_existing_endpoint_enforces_client_budget() 
     }
     // Both messages use the same existing UDP socket. Its next published
     // datagram must belong to the admitted client, after rejecting the first.
+    let received = timeout(WAIT, stack.udp.recv()).await.unwrap().unwrap();
     assert_eq!(
-        timeout(WAIT, stack.udp.recv()).await.unwrap().unwrap(),
-        UdpDatagram {
-            source: second,
-            destination: second_target,
-            payload: vec![113; 5000],
-        }
+        (
+            received.source,
+            received.destination,
+            received.payload.len()
+        ),
+        (second, second_target, 5000)
+    );
+    assert_eq!(
+        digest(&SHA256, &received.payload).as_ref(),
+        digest(&SHA256, &vec![113; 5000]).as_ref()
     );
     assert_eq!(stack.stats.snapshot().denied_gateway_packets, 1);
     assert_eq!(stack.stats.snapshot().active_udp_endpoints, 2);

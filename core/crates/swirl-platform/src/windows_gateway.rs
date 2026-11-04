@@ -7,8 +7,8 @@ use crate::{
     gateway_policy::GatewayIsolationPolicy,
     network_transaction::{InterfaceIdentity, NetworkBackend, Resource, Value, validate_value},
     windows_dhcp_attachment, windows_dhcp_probe, windows_gateway_firewall,
-    windows_network::{SystemRoute, run_json},
     windows_gateway_wfp as windows_wfp,
+    windows_network::{SystemRoute, run_json},
 };
 use serde::Deserialize;
 use serde_json::json;

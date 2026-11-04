@@ -355,14 +355,17 @@ void NodeImportService::startDownload(const QUrl &url,int redirects,const QList<
         // which may contain the full credential-bearing request URL.
         if(code>=400){
             const auto reason=code==400?QStringLiteral("请求被服务器拒绝；请检查认证参数与订阅格式协商"):
-                code==401||code==403?QStringLiteral("服务器拒绝认证或访问权限"):QStringLiteral("服务器返回错误响应");
-            finish(QStringLiteral("订阅下载失败：HTTP %1，%2（Qt %3，代码 %4；非 HTTP 状态码）。旧节点保持不变。").arg(code).arg(reason,errorName).arg(int(error)));return;
+                code==401?QStringLiteral("服务器拒绝认证；请核对订阅链接或凭证"):
+                code==403?QStringLiteral("服务器或 CDN 拒绝访问；请核对订阅链接及服务商访问限制"):QStringLiteral("服务器返回错误响应");
+            finish(QStringLiteral("订阅下载失败：HTTP %1，%2（Qt %3；Qt 错误码 %4）。现有数据保持不变。").arg(code).arg(reason,errorName).arg(int(error)));return;
         }
         if(error!=QNetworkReply::NoError){
             const auto stage=error==QNetworkReply::SslHandshakeFailedError?QStringLiteral("TLS 校验或握手失败"):
+                error==QNetworkReply::RemoteHostClosedError?QStringLiteral("远端在响应完成前关闭连接"):
                 error==QNetworkReply::TimeoutError?QStringLiteral("网络请求超时"):
                 error==QNetworkReply::TooManyRedirectsError||error==QNetworkReply::InsecureRedirectError?QStringLiteral("重定向失败"):QStringLiteral("网络连接失败");
-            finish(QStringLiteral("订阅下载失败：%1（Qt %2，代码 %3；HTTP %4）。旧节点保持不变。").arg(stage,errorName).arg(int(error)).arg(code));return;
+            const auto response=code>0?QStringLiteral("HTTP %1").arg(code):QStringLiteral("未收到 HTTP 响应");
+            finish(QStringLiteral("订阅下载失败：%1（Qt %2；Qt 错误码 %3；%4）。现有数据保持不变。").arg(stage,errorName).arg(int(error)).arg(response));return;
         }
         if(code!=200){finish(QStringLiteral("订阅下载失败：服务器返回 HTTP %1；旧节点保持不变。").arg(code));return;}
         m_deadline.stop();parse(*bytes);

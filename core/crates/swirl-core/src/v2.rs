@@ -226,6 +226,7 @@ struct Shared {
     native_tun_leases: AtomicUsize,
     stopped: AtomicBool,
     sessions: Mutex<BTreeMap<u64, SessionControl>>,
+    connection_slots: Arc<Semaphore>,
     sessions_changed: Notify,
     records: Mutex<BTreeMap<u64, Record>>,
     accepted: AtomicU64,
@@ -561,6 +562,7 @@ impl Core {
             native_tun_leases: AtomicUsize::new(0),
             stopped: AtomicBool::new(false),
             sessions: Mutex::new(BTreeMap::new()),
+            connection_slots: Arc::new(Semaphore::new(capacity)),
             sessions_changed: Notify::new(),
             records: Mutex::new(BTreeMap::new()),
             accepted: AtomicU64::new(0),
@@ -1966,7 +1968,15 @@ async fn route_flow(
     if native || shared.native_tun_leases.load(Ordering::Acquire) > 0 {
         native_flow::validate_tun_dns(&plan.prepared.runtime)?;
     }
-    let routed = route(plan, target.clone(), peer.ip(), generation, boundary.is_none(), boundary).await?;
+    let routed = route(
+        plan,
+        target.clone(),
+        peer.ip(),
+        generation,
+        boundary.is_none(),
+        boundary,
+    )
+    .await?;
     if proxy_loop(&routed.target, &routed.direct_addresses, shared.address) {
         return Err("ProxyLoop");
     }
@@ -1992,7 +2002,7 @@ async fn route_flow(
             error: "",
         },
     );
-    if matches!(routed.node.outbound, Outbound::Reject {}) {
+    if native && matches!(routed.node.outbound, Outbound::Reject {}) {
         return Err("Rejected");
     }
     Ok(routed)

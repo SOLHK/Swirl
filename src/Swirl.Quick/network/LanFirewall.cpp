@@ -332,7 +332,7 @@ QJsonObject ruleSummary(const QJsonObject &record) {
 bool firewall(Com<INetFwPolicy2> &policy, Com<INetFwRules> &rules, QString *error,
               ComCall *diagnostic = nullptr) {
     ComCall call;
-    auto hr = CoCreateInstance(CLSID_NetFwPolicy2, nullptr, CLSCTX_INPROC_SERVER, IID_INetFwPolicy2,
+    auto hr = CoCreateInstance(__uuidof(NetFwPolicy2), nullptr, CLSCTX_INPROC_SERVER, __uuidof(INetFwPolicy2),
                               reinterpret_cast<void **>(policy.out()));
     call.set("CoCreateInstance", "FirewallPolicy", hr, "INetFwPolicy2*");
     if (SUCCEEDED(hr)) {
@@ -604,7 +604,7 @@ bool applyRule(INetFwRules *rules, const QJsonObject &record, QString *error,
     context.verification = before.call.json();
     context.verification.insert("snapshot_complete", false);
     Com<INetFwRule> rule;
-    auto hr = CoCreateInstance(CLSID_NetFwRule, nullptr, CLSCTX_INPROC_SERVER, IID_INetFwRule,
+    auto hr = CoCreateInstance(__uuidof(NetFwRule), nullptr, CLSCTX_INPROC_SERVER, __uuidof(INetFwRule),
                               reinterpret_cast<void **>(rule.out()));
     context.call.set("CoCreateInstance", "Rule", hr, "INetFwRule*");
     if (FAILED(hr)) return ruleFailure(context, error, diagnostic);
@@ -1265,8 +1265,8 @@ LanFirewall::Result LanFirewall::exerciseNativeFixture(FixtureCase scenario) {
             // Establish the original HRESULT independently on a transient real
             // INetFwRule. This control object is never passed to Add.
             Com<INetFwRule> control;
-            const auto created = CoCreateInstance(CLSID_NetFwRule, nullptr, CLSCTX_INPROC_SERVER,
-                IID_INetFwRule, reinterpret_cast<void **>(control.out()));
+            const auto created = CoCreateInstance(__uuidof(NetFwRule), nullptr, CLSCTX_INPROC_SERVER,
+                __uuidof(INetFwRule), reinterpret_cast<void **>(control.out()));
             if (!check(SUCCEEDED(created) && control.value,
                        "Cannot create the native invalid-property positive control.")) return false;
             // Description text validation may be deferred until Add by the

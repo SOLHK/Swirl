@@ -453,7 +453,10 @@ impl Driver {
                 payload: udp.payload().to_vec(),
             }
         };
-        if self.admit_udp(datagram.source.ip(), datagram.destination).is_none() {
+        if self
+            .admit_udp(datagram.source.ip(), datagram.destination)
+            .is_none()
+        {
             return;
         }
         // There was no destination UDP socket during ingress. Publish its first
@@ -498,20 +501,35 @@ impl Driver {
     }
 
     fn collect_udp(&mut self) {
-        for (&destination, entry) in &mut self.udp {
-            let socket = self.sockets.get_mut::<udp::Socket>(entry.handle);
+        let endpoints: Vec<_> = self
+            .udp
+            .iter()
+            .map(|(&destination, entry)| (destination, entry.handle))
+            .collect();
+        for (destination, handle) in endpoints {
             for _ in 0..UDP_PACKET_SLOTS {
-                let Ok((payload, metadata)) = socket.recv() else {
-                    break;
+                let datagram = {
+                    let socket = self.sockets.get_mut::<udp::Socket>(handle);
+                    let Ok((payload, metadata)) = socket.recv() else {
+                        break;
+                    };
+                    // recv() preserves datagram boundaries, including empty payloads.
+                    UdpDatagram {
+                        source: metadata.endpoint.into(),
+                        destination,
+                        payload: payload.to_vec(),
+                    }
                 };
-                entry.activity = Instant::now();
-                let source = metadata.endpoint.into();
-                // recv() preserves datagram boundaries, including empty payloads.
-                let datagram = UdpDatagram {
-                    source,
-                    destination,
-                    payload: payload.to_vec(),
-                };
+                // Reassembled IPv4 can enter an existing shared UDP socket
+                // without exposing its destination during packet inspection.
+                // Admit its actual client before publication, including budget
+                // enforcement and activity refresh; never replay the raw copy.
+                if self
+                    .admit_udp(datagram.source.ip(), datagram.destination)
+                    .is_none()
+                {
+                    continue;
+                }
                 if self.udp_tx.try_send(datagram).is_err() {
                     self.counters
                         .dropped_udp_datagrams

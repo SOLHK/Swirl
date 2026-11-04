@@ -108,7 +108,7 @@ Item {
             id: details
             width: parent.width; spacing: Theme.dp(8)
             SwirlText { Layout.fillWidth: true; text: row.record.enabled ? qsTr("下次更新  %1").arg(row.record.nextUpdate) : qsTr("自动更新已关闭，可随时手动更新。"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); wrapMode: Text.Wrap }
-            SwirlText { Layout.fillWidth: true; text: qsTr("更新失败 · 已保留上次有效节点"); visible: row.failed; color: Theme.red; font.pixelSize: Theme.fontSize(12); font.weight: Font.Medium }
+            SwirlText { objectName: "subscriptionFailure-" + row.record.id; Layout.fillWidth: true; text: Number(row.record.nodes) > 0 ? qsTr("更新失败 · 已保留 %1 个已保存节点").arg(row.record.nodes) : qsTr("更新失败 · 此来源尚无已保存节点"); visible: row.failed; color: Theme.red; font.pixelSize: Theme.fontSize(12); font.weight: Font.Medium }
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; text: row.record.error || ""; visible: text.length > 0; textFormat: Text.PlainText; color: Theme.red; font.pixelSize: Theme.fontSize(12) }
             SwirlText { Layout.fillWidth: true; text: qsTr("更新说明"); visible: String(row.record.warning || "").length > 0; color: Theme.text; font.pixelSize: Theme.fontSize(12); font.weight: Font.Medium }
             SwirlText { Layout.fillWidth: true; wrapMode: Text.Wrap; text: row.record.warning || ""; visible: text.length > 0; textFormat: Text.PlainText; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }

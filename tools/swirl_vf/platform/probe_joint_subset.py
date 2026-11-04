@@ -5,7 +5,7 @@ Not a source-accuracy certificate: compare the same serialized font before and
 after subsetting, including shuffled reuse of a mutable native font instance.
 All input/output fonts remain private. A failed subset is recorded, not hidden.
 """
-import argparse,hashlib,json,resource,sys,time
+import argparse,hashlib,json,sys,time
 from pathlib import Path
 import numpy as np
 import uharfbuzz as hb
@@ -16,6 +16,7 @@ from projection_research import fresh_private
 from p7_validate_candidate import commands
 from probe_joint_representations import compare,implicit_closures
 from cff2_geometry import operands
+from windows_font_builder import peak_rss
 
 
 def run(path,out,*,samples=512,seed=2026110823):
@@ -55,7 +56,7 @@ def run(path,out,*,samples=512,seed=2026110823):
         report['passed']=not any(stats[k] for k in ('failures','exact_outline_mismatches','advance_mismatches','mutable_cache_mismatches'))
     except Exception as error:
         report['error']=f'{type(error).__name__}: {error}'
-    report.update(seconds=time.perf_counter()-start,peak_rss_bytes=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss*(1 if sys.platform=='darwin' else 1024))
+    report.update(seconds=time.perf_counter()-start,peak_rss_bytes=peak_rss())
     (out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report),flush=True)
     return report
 

@@ -2,7 +2,7 @@ name: Swirl Native LAN
 
 on:
   push:
-    branches: [work/native-lan-proxy-20261031, work/native-lan-gateway-20261031]
+    branches: [test, main, work/native-lan-proxy-20261031, work/native-lan-gateway-20261031]
   pull_request:
     branches: [test]
     paths:

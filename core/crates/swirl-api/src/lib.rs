@@ -12,10 +12,10 @@ use swirl_subscription::Config;
 mod control_v2;
 mod import_ffi;
 #[cfg(windows)]
-pub mod native_packet_worker;
-#[cfg(windows)]
 mod native_gateway;
 pub mod native_gateway_control;
+#[cfg(windows)]
+pub mod native_packet_worker;
 pub mod native_tun;
 pub mod native_tun_control;
 pub mod native_tun_ipc;

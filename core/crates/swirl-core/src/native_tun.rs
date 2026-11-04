@@ -161,10 +161,17 @@ fn dns_allows_ipv6(config: &TunConfig, source: IpAddr) -> bool {
         .is_none_or(|gateway| gateway.source(source) == Some(SourceKind::Host))
 }
 
-async fn tcp(flow: TcpFlow, dispatcher: FlowDispatcher, dns: TunDns, allow_ipv6: bool) -> Result<()> {
+async fn tcp(
+    flow: TcpFlow,
+    dispatcher: FlowDispatcher,
+    dns: TunDns,
+    allow_ipv6: bool,
+) -> Result<()> {
     let cancellation = flow.stream.abort_on_drop();
     let result = tcp_operation(flow, dispatcher, dns, allow_ipv6).await;
-    if result.is_ok() { cancellation.complete(); }
+    if result.is_ok() {
+        cancellation.complete();
+    }
     result
 }
 

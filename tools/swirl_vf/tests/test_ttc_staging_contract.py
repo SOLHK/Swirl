@@ -1,9 +1,8 @@
-"""C1 safe failures, production closure, and original shared-entry reproducers.
+"""C1 safe failures, production closure, and shared-entry regressions.
 
-The two SharedEntryReproducerTests document present limitations of unchanged
-rebuild.py.  Their passing result means the limitation was reproduced, NOT
-that it was fixed or accepted.  All font bytes are original analytic fixtures
-created in TemporaryDirectory.  No Apple font/native platform is involved.
+The two shared-entry regressions retain the original analytic cases against the
+current checkpoint locking and unremapped-GDEF admission guard. Their passing result does not
+accept a production font. No Apple font/native platform is involved.
 """
 import contextlib
 import hashlib
@@ -176,8 +175,8 @@ class PreflightTests(unittest.TestCase):
 
 
 class SharedEntryReproducerTests(unittest.TestCase):
-    def test_reproducer_shared_checkpoint_stale_writer_drops_prior_index(self):
-        """The old mutable manifest has no writer lease or CAS; C1 must not reuse it."""
+    def test_shared_checkpoint_stale_writer_retains_prior_index(self):
+        """Both stale writer instances must preserve previously published faces."""
         with tempfile.TemporaryDirectory(prefix="c1-original-writers-") as tmp:
             root = Path(tmp)
             source = root / "original-checkpoint-fixture.ttc"
@@ -208,18 +207,17 @@ class SharedEntryReproducerTests(unittest.TestCase):
                     "native_summary_eof_exit_accepted": True,
                     "request_count": 1, "successful_glyph_count": 3, "summary": summary}
                 report = {"face_index": index, "glyph_count": 3, "glyphs_completed": 3,
+                          "serialized_model_sha256": rebuild.sha256(face_paths[index]),
                           "serialized_model_verification": {"status": "PASS", "glyphs_checked": 3},
                           "native_face_transcript": transcript}
                 writer.save(index, face_paths[index], report)
                 state = json.loads(writer.manifest.read_text(encoding="utf-8"))
-                # This captures today's defect; no attempt is made to accept
-                # the loss or repair the shared entry without owner approval.
-                self.assertEqual(set(state["faces"]), {str(index)})
+                self.assertEqual(set(state["faces"]), {str(i) for i in range(index + 1)})
             self.assertEqual(len(list(first.directory.glob("face-*.ttf"))), 2)
-            self.assertNotIn("0", json.loads(first.manifest.read_text())["faces"])
+            self.assertEqual(set(json.loads(first.manifest.read_text())["faces"]), {"0", "1"})
 
-    def test_reproducer_unremapped_gdef_changes_layout_after_shared_rebuild(self):
-        """Known open defect: a PASS here means the current omission is reproduced."""
+    def test_unremapped_gdef_is_rejected_before_replacing_avar(self):
+        """The original positioning defect must not become a generated candidate."""
         with tempfile.TemporaryDirectory(prefix="c1-original-gdef-") as tmp:
             root = Path(tmp)
             source = root / "original-gdef-fixture.ttc"
@@ -248,14 +246,16 @@ class SharedEntryReproducerTests(unittest.TestCase):
                 subtable.ValueFormat |= 0x40
                 collection.save(source)
             before = hashlib.sha256(source.read_bytes()).hexdigest()
-            output = root / "Swirl-VF.ttc"
+            output = root / "SwirlVF.ttc"
             with mock.patch.object(rebuild, "NativeOracle", return_value=OriginalAnalyticOracle(source)), \
                  contextlib.redirect_stderr(io.StringIO()):
-                result = rebuild.run(source, root / "synthetic-oracle", output,
-                                     root / "report.json", batch_size=2)
-            self.assertEqual(result["status"], "RECONSTRUCTION_SAMPLED_PASS_PLATFORM_UNVERIFIED")
+                with self.assertRaisesRegex(rebuild.ReconstructionError,
+                                           "GDEF variable layout requires independent remapping"):
+                    rebuild.run(source, root / "synthetic-oracle", output,
+                                root / "report.json", batch_size=2)
+            self.assertFalse(output.exists())
             deltas = []
-            for path in (source, output):
+            for path in (source,):
                 with TTCollection(path) as collection:
                     font = collection.fonts[0]
                     location = normalizeLocation({"WDTH": 500, "wght": 700, "HGHT": 500}, AXES)
@@ -265,7 +265,7 @@ class SharedEntryReproducerTests(unittest.TestCase):
                     index = (device.StartSize << 16) | device.EndSize
                     deltas.append(VarStoreInstancer(font["GDEF"].table.VarStore,
                                   font["fvar"].axes, normalized)[index])
-            self.assertEqual(deltas, [25.0, 50.0])
+            self.assertEqual(deltas, [25.0])
             self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), before)
 
 

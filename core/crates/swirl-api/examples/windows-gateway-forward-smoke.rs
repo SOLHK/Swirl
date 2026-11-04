@@ -781,7 +781,7 @@ mod windows {
             })?;
             // Never call PacketBridge.input here. This is an NDIS receive into
             // Windows on A; the B driver's reader must independently see it.
-            send_packet(&self.lan.device()?, bytes)?;
+            send_packet(self.lan.device()?.as_ref(), bytes)?;
             self.injected_packets += 1;
             self.check_pumps()
         }

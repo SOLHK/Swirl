@@ -26,6 +26,8 @@ pub mod windows_gateway;
 #[cfg(windows)]
 mod windows_gateway_firewall;
 #[cfg(windows)]
+mod windows_gateway_wfp;
+#[cfg(windows)]
 pub mod windows_network;
 #[cfg(windows)]
 mod windows_notify;
@@ -35,8 +37,6 @@ pub mod windows_packet_resources;
 pub mod windows_restricted_worker;
 #[cfg(windows)]
 pub mod windows_wfp;
-#[cfg(windows)]
-mod windows_gateway_wfp;
 #[cfg(windows)]
 pub mod wintun_device;
 #[cfg(windows)]
