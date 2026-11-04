@@ -24,9 +24,9 @@ concurrency:
 jobs:
   build-qt-ui:
     runs-on: windows-2022
-    # Cold UI + independent production compilation takes about 38 minutes.
-    # Leave time for the complete regression, DPR checks and compiler cache.
-    timeout-minutes: 75
+    # Cold build plus five real standard-user installer cases used 75 minutes.
+    # Keep the remaining regression and DPR gates inside the job budget.
+    timeout-minutes: 120
     permissions:
       contents: read
     steps:
