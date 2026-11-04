@@ -47,7 +47,15 @@ static QByteArray makeDib(const QImage &source, int size)
 
 int main(int argc, char *argv[])
 {
+    std::fprintf(stderr, "SwirlIconBuilder: initializing Qt (requested QPA=%s)\n",
+                 qgetenv("QT_QPA_PLATFORM").constData());
+    std::fprintf(stderr, "SwirlIconBuilder: Qt runtime=%s, platform plugin directory=%s\n",
+                 qVersion(), qgetenv("QT_QPA_PLATFORM_PLUGIN_PATH").constData());
+    std::fflush(stderr);
     QGuiApplication app(argc, argv);
+    std::fprintf(stderr, "SwirlIconBuilder: Qt initialized (actual QPA=%s)\n",
+                 QGuiApplication::platformName().toUtf8().constData());
+    std::fflush(stderr);
     if (app.arguments().size() != 3) {
         std::fprintf(stderr, "Usage: SwirlIconBuilder source.svg output.ico\n");
         return 2;
@@ -58,7 +66,11 @@ int main(int argc, char *argv[])
         return 3;
     }
     const auto &sizes = swirlBrandIconSizes;
+    std::fprintf(stderr, "SwirlIconBuilder: scanning canonical SVG bounds\n");
+    std::fflush(stderr);
     const auto content = swirlBrandContentBounds(renderer);
+    std::fprintf(stderr, "SwirlIconBuilder: rasterizing %zu unchanged native frames\n", sizes.size());
+    std::fflush(stderr);
     QVector<QByteArray> frames;
     for (int size : sizes) frames.append(makeDib(swirlBrandRaster(renderer,size,content), size));
     QByteArray icon;
@@ -75,11 +87,15 @@ int main(int argc, char *argv[])
         offset += quint32(frame.size());
     }
     for (const auto &frame : frames) icon.append(frame);
+    std::fprintf(stderr, "SwirlIconBuilder: writing ICO (%lld bytes)\n", static_cast<long long>(icon.size()));
+    std::fflush(stderr);
     QFile file(app.arguments().at(2));
     if (!file.open(QIODevice::WriteOnly) || file.write(icon) != icon.size()) {
         std::fprintf(stderr, "Unable to write Swirl icon\n");
         return 4;
     }
     file.close();
+    std::fprintf(stderr, "SwirlIconBuilder: generation complete\n");
+    std::fflush(stderr);
     return 0;
 }

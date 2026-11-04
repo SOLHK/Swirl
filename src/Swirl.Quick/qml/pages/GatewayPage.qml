@@ -13,7 +13,9 @@ Item {
   contentItem:SwirlText {text:parent.text;leftPadding:Theme.dp(8);rightPadding:Theme.dp(8);font.family:parent.font.family;font.pixelSize:parent.font.pixelSize;font.weight:parent.font.weight;color:parent.highlighted?Theme.primaryButtonText:parent.enabled?Theme.text:Theme.muted;verticalAlignment:Text.AlignVCenter;elide:Text.ElideRight}
  }
  id:page;readonly property Item motionTitle:heading.titleItem;readonly property bool compact:width<Theme.dp(620);property string selectedId:"";property int sortIndex:3
- readonly property var records:{if(!visible)return [];let rows=gatewayProvider.devices.map(r=>Object.assign({},r));if(sortIndex===0)rows.sort((a,b)=>b.total-a.total);else if(sortIndex===1)rows.sort((a,b)=>b.speed-a.speed);else if(sortIndex===2)rows.sort((a,b)=>a.name.localeCompare(b.name));else if(sortIndex===3)rows.sort((a,b)=>ipNumber(a.ip)-ipNumber(b.ip));else if(sortIndex===4)rows.sort((a,b)=>b.lastSeen-a.lastSeen);return rows}
+ readonly property var lanSnapshot:engineController.lanStatus
+ function lanStateText(){if(engineController.lanBusy)return qsTr("正在启动、停止或恢复");if(lanSnapshot.error)return lanSnapshot.error;if(engineController.lanEnabled&&!lanSnapshot.status_confirmed)return qsTr("监听状态未确认，请重试停止并检查内核");if(engineController.lanEnabled)return qsTr("%1 · HTTP %2 / SOCKS5 %3 · %4 个连接").arg(lanSnapshot.listen_ip||"—").arg(lanSnapshot.http_port||0).arg(lanSnapshot.socks_port||0).arg(lanSnapshot.active_connections||0);if(!engineController.lanSupported)return qsTr("当前平台或内核未提供 LAN 安全集成");if(engineController.lanRecoveryNeeded)return qsTr("有待恢复的防火墙记录");return qsTr("已关闭")}
+ readonly property var records:{if(!visible)return [];let rows=gatewayProvider.devices.map(r=>Object.assign({},r));for(const client of(lanSnapshot.clients||[])){let row=rows.find(r=>r.ip===client.ip);if(!row){row={id:"lan:"+client.ip,name:client.ip,ip:client.ip,mac:"",lastSeen:0,speed:0,speedText:"—"};rows.push(row)}row.upload=engineController.telemetry.formatBytes(client.uploaded||0);row.download=engineController.telemetry.formatBytes(client.downloaded||0);row.total=(client.uploaded||0)+(client.downloaded||0);row.status=qsTr("LAN · %1 个当前连接").arg(client.active_connections||0)}if(sortIndex===0)rows.sort((a,b)=>b.total-a.total);else if(sortIndex===1)rows.sort((a,b)=>b.speed-a.speed);else if(sortIndex===2)rows.sort((a,b)=>a.name.localeCompare(b.name));else if(sortIndex===3)rows.sort((a,b)=>ipNumber(a.ip)-ipNumber(b.ip));else if(sortIndex===4)rows.sort((a,b)=>b.lastSeen-a.lastSeen);return rows}
  property bool detailHasSelection:selected!==null
  onDetailHasSelectionChanged:{if(visible)detailClock.moveTo(detailHasSelection?1:0);else{detailClock.destination=detailHasSelection?1:0;detailClock.finish()}}
  SwirlTransitionCoordinator {id:detailClock;duration:SwirlMotion.dialogDuration}
@@ -30,10 +32,24 @@ Item {
  function openGatewayMenu(){gatewayMenu.showAt(gearButton,Theme.dp(12),Theme.dp(10))}
  ColumnLayout {
   anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap
-  SwirlPageHeader {id:heading;Layout.fillWidth:true;title:qsTr("设备");description:qsTr("已记录的设备与客户端配置。当前尚不支持 TUN 网关转发。");metadata:qsTr("%1 台设备").arg(page.records.length)
+  SwirlPageHeader {id:heading;Layout.fillWidth:true;title:qsTr("设备");description:qsTr("原生局域网代理、设备记录与客户端配置。透明网关仍待验收。");metadata:qsTr("%1 台设备").arg(page.records.length)
    SwirlComboBox {id:deviceSort;objectName:"deviceSortPicker";Layout.preferredWidth:Theme.dp(208);model:["按流量排序","按速度排序","按名称排序","按 IP 排序","按 DHCP 最后出现时间排序"];currentIndex:page.sortIndex;onActivated:page.sortIndex=currentIndex;Accessible.name:qsTr("设备排序")}
    SwirlIconButton {id:gearButton;objectName:"gatewaySettings";quiet:true;iconName:"settings";tooltip:qsTr("网关与客户端配置");onClicked:page.openGatewayMenu()}
   }
+  GridLayout {
+   Layout.fillWidth:true;columns:page.compact?1:2;columnSpacing:Theme.sectionGap;rowSpacing:Theme.dp(8)
+   ColumnLayout {Layout.fillWidth:true;spacing:Theme.dp(5)
+    SwirlText {text:qsTr("原生局域网代理");color:Theme.text;font.pixelSize:Theme.fontSize(14);font.weight:Font.DemiBold}
+    SwirlText {objectName:"lanProxyState";text:page.lanStateText();textFormat:Text.PlainText;color:page.lanSnapshot.error?Theme.orange:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+    SwirlText {visible:engineController.lanEnabled;text:qsTr("上传 %1 · 下载 %2").arg(engineController.telemetry.formatBytes(page.lanSnapshot.uploaded||0)).arg(engineController.telemetry.formatBytes(page.lanSnapshot.downloaded||0));color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+   }
+   RowLayout {Layout.alignment:Qt.AlignRight;spacing:Theme.dp(12)
+    SwirlButton {objectName:"lanProxyConfigure";quiet:true;text:qsTr("配置 LAN");onClicked:lanDialog.open()}
+    SwirlToggle {objectName:"lanProxyToggle";checked:engineController.lanEnabled;enabled:!engineController.lanBusy&&(engineController.lanEnabled||(engineController.lanSupported&&!engineController.busy&&!engineController.policyBusy));onToggled:{const wanted=checked;if(wanted&&!engineController.lanConfigured)lanDialog.open();else if(!engineController.setLanEnabled(wanted))AppState.notice(engineController.networkConfigurationError);checked=Qt.binding(()=>engineController.lanEnabled)}Accessible.name:qsTr("原生局域网代理")}
+   }
+  }
+  SwirlText {text:qsTr("HTTP Basic 与 SOCKS5 认证不加密传输，请仅在可信局域网使用。");Layout.fillWidth:true;color:Theme.muted;font.pixelSize:Theme.fontSize(11);wrapMode:Text.Wrap}
+  Rectangle {Layout.fillWidth:true;Layout.preferredHeight:Theme.borderWidth;color:Theme.separator}
   GridLayout {Layout.fillWidth:true;Layout.fillHeight:true;columns:page.compact?1:2;columnSpacing:Theme.sectionGap;rowSpacing:Theme.sectionGap
    Item {Layout.fillWidth:true;Layout.preferredWidth:3;Layout.fillHeight:true;Layout.minimumHeight:Theme.dp(100)
     SwirlDataTable {id:deviceTable;objectName:"deviceTable";visible:page.records.length>0;anchors.fill:parent;incrementalRows:true;animateRowChanges:false;rows:page.records;selectedId:page.selectedId;minimal:true;itemHeight:Theme.dp(42);columns:[{key:"name",label:qsTr("设备"),w:210},{key:"ip",label:qsTr("IP 地址"),w:165}];onRowSelected:r=>{page.selectedId=r.id;deviceDetailSurface.present(deviceTable.selectedItem)}}
@@ -63,6 +79,8 @@ Item {
   }
  }
  SwirlContextMenu{id:gatewayMenu;objectName:"gatewayMenu";items:[];popupType:Popup.Item;padding:Theme.dp(5);implicitWidth:Theme.dp(215)
+   GatewayMenuItem{text:"配置原生 LAN 代理…";onTriggered:lanDialog.open()}
+   GatewayMenuItem{text:"恢复 LAN 防火墙规则";visible:engineController.lanRecoveryNeeded&&!engineController.lanEnabled;enabled:!engineController.lanBusy;onTriggered:engineController.recoverLan()}
    GatewayMenuItem{text:"DHCP 服务器："+(gatewayProvider.running?"已启用":"未启用");enabled:false}
    GatewayMenuItem{text:"Swirl 网关："+(gatewayProvider.running?"已启用":"未启用");enabled:false}
    MenuSeparator{implicitHeight:Theme.dp(10);contentItem:Rectangle{implicitWidth:Theme.dp(165);implicitHeight:Theme.dp(1);color:Theme.border}}
@@ -86,6 +104,60 @@ Item {
    SwirlText {text:gatewayProvider.error;Layout.fillWidth:true;color:Theme.orange;font.pixelSize:Theme.fontSize(12);wrapMode:Text.WordWrap}
    RowLayout{Layout.alignment:Qt.AlignRight;SwirlButton{text:"取消";onClicked:gatewayDialog.close()}SwirlButton{text:"保存";primary:true;enabled:dedicatedLan.checked&&lanInterface.currentIndex>=0&&gatewayProvider.interfaces.length>0;onClicked:{if(gatewayProvider.configure({interfaceIndex:gatewayProvider.interfaces[lanInterface.currentIndex].index,gateway:gatewayIp.text,prefix:Number(prefix.text),first:firstAddress.text,last:lastAddress.text,dns:gatewayDns.text,leaseSeconds:3600,dedicatedLan:true}))gatewayDialog.close()}}}
   }
+  }
+ }
+ SwirlDialog {
+  id:lanDialog;objectName:"lanProxyDialog";dismissBlocked:awaitingSave;ownerItem:page;title:qsTr("局域网代理 · IPv4");width:Math.floor(Math.min(Theme.dp(560),parent?parent.width-Theme.dp(40):Theme.dp(560)))
+  property bool awaitingSave:false
+  function completeSave(){
+   if(!awaitingSave||engineController.policyBusy)return
+   awaitingSave=false
+   if(engineController.policyError){AppState.notice(engineController.policyError);return}
+   lanPassword.clear();markSaved();close()
+  }
+  Connections {target:engineController;function onPolicyChanged(){lanDialog.completeSave()}}
+  height:Math.min(Theme.dp(690),parent?parent.height-Theme.dp(32):Theme.dp(690))
+  onOpened:{
+   const config=engineController.lanConfiguration
+   const choices=engineController.lanInterfaces
+   lanProxyInterface.currentIndex=choices.findIndex(r=>r.ip===config.listen_ip)
+   lanHttp.text=String(config.http_port||7899);lanSocks.text=String(config.socks_port||7899)
+   lanUdpFirst.text=String(config.udp_port_start||7900);lanUdpLast.text=String(config.udp_port_end||7915)
+   lanAllowed.text=(config.allowed_cidrs||[]).join("\n")
+   lanUsername.text=engineController.lanUsername||"swirl";lanPassword.clear();lanDialog.markSaved()
+  }
+  onClosed:lanPassword.clear()
+  contentItem:ScrollView {
+   id:lanScroll;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
+   ColumnLayout {
+    width:lanScroll.availableWidth;spacing:Theme.dp(12)
+    SwirlText {text:qsTr("启用后，其他设备使用所选地址和端口连接。认证与客户端 CIDR 同时生效；IPv6 监听尚未开放。代理域名访问需要已配置 DoH/DoT，否则连接会被拒绝以保护本机服务。HTTP/SOCKS5 用户名密码不提供链路加密，请只在可信局域网使用。");Layout.fillWidth:true;wrapMode:Text.WordWrap;color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+    SwirlText {visible:!engineController.elevated;text:qsTr("启用与恢复需要以管理员身份运行 Swirl，以管理精确的防火墙规则。");Layout.fillWidth:true;wrapMode:Text.WordWrap;color:Theme.orange;font.pixelSize:Theme.fontSize(12)}
+    SwirlComboBox {id:lanProxyInterface;objectName:"lanProxyInterface";Layout.fillWidth:true;model:engineController.lanInterfaces;textRole:"label";enabled:!engineController.lanEnabled&&!engineController.lanBusy;onActivated:{const entry=engineController.lanInterfaces[currentIndex];if(entry)lanAllowed.text=entry.cidr}}
+    SwirlText {visible:engineController.lanInterfaces.length===0;text:qsTr("没有可用的局域网 IPv4 地址。启用时还会核验 Windows 网络类别，公共网络将被拒绝。");Layout.fillWidth:true;wrapMode:Text.WordWrap;color:Theme.orange;font.pixelSize:Theme.fontSize(12)}
+    GridLayout {columns:2;Layout.fillWidth:true;columnSpacing:Theme.dp(12);rowSpacing:Theme.dp(8);enabled:!engineController.lanEnabled&&!engineController.lanBusy
+     SwirlText {text:qsTr("HTTP 端口");color:Theme.text}SwirlTextField{id:lanHttp;objectName:"lanProxyHttpPort";Layout.fillWidth:true;validator:IntValidator{bottom:1;top:65535}}
+     SwirlText {text:qsTr("SOCKS5 端口");color:Theme.text}SwirlTextField{id:lanSocks;objectName:"lanProxySocksPort";Layout.fillWidth:true;validator:IntValidator{bottom:1;top:65535}}
+     SwirlText {text:qsTr("UDP 端口范围");color:Theme.text}RowLayout{Layout.fillWidth:true;SwirlTextField{id:lanUdpFirst;Layout.fillWidth:true;validator:IntValidator{bottom:1;top:65535}}SwirlText{text:"—";color:Theme.muted}SwirlTextField{id:lanUdpLast;Layout.fillWidth:true;validator:IntValidator{bottom:1;top:65535}}}
+    }
+    SwirlText {text:qsTr("允许的客户端 CIDR（每行一项，必须位于所选接口子网）");Layout.fillWidth:true;wrapMode:Text.WordWrap;color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+    SwirlTextArea{id:lanAllowed;objectName:"lanProxyAllowedCidrs";Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(80);placeholderText:"192.168.1.0/24";enabled:!engineController.lanEnabled&&!engineController.lanBusy}
+    SwirlTextField{id:lanUsername;objectName:"lanProxyUsername";Layout.fillWidth:true;placeholderText:qsTr("用户名");enabled:!engineController.lanEnabled&&!engineController.lanBusy}
+    SwirlTextField{id:lanPassword;objectName:"lanProxyPassword";Layout.fillWidth:true;echoMode:TextInput.Password;placeholderText:engineController.lanConfigured?qsTr("留空保留已有密码"):qsTr("密码（至少 12 UTF-8 字节）");enabled:!engineController.lanEnabled&&!engineController.lanBusy}
+    SwirlText {visible:engineController.lanEnabled;text:qsTr("活跃连接 %1 · 上传 %2 · 下载 %3").arg(engineController.lanStatus.active_connections||0).arg(engineController.telemetry.formatBytes(engineController.lanStatus.uploaded||0)).arg(engineController.telemetry.formatBytes(engineController.lanStatus.downloaded||0));Layout.fillWidth:true;wrapMode:Text.WordWrap;color:Theme.text;font.pixelSize:Theme.fontSize(12)}
+    SwirlText {text:engineController.networkConfigurationError||engineController.lanStatus.error||engineController.policyError||"";color:Theme.orange;Layout.fillWidth:true;wrapMode:Text.WordWrap;font.pixelSize:Theme.fontSize(12)}
+    RowLayout {Layout.fillWidth:true
+     SwirlButton {text:qsTr("恢复防火墙");visible:engineController.lanRecoveryNeeded&&!engineController.lanEnabled;enabled:!engineController.lanBusy;onClicked:engineController.recoverLan()}
+     Item {Layout.fillWidth:true}
+     SwirlButton {text:qsTr("关闭");enabled:!lanDialog.awaitingSave;onClicked:lanDialog.requestDismiss()}
+     SwirlButton {text:lanDialog.awaitingSave?qsTr("正在保存"):qsTr("保存");primary:true;enabled:!lanDialog.awaitingSave&&!engineController.lanEnabled&&!engineController.lanBusy&&!engineController.policyBusy&&lanProxyInterface.currentIndex>=0;onClicked:{
+      const entry=engineController.lanInterfaces[lanProxyInterface.currentIndex];if(!entry)return
+      const config=Object.assign({},engineController.lanConfiguration,{listen_ip:entry.ip,http_port:Number(lanHttp.text),socks_port:Number(lanSocks.text),udp_port_start:Number(lanUdpFirst.text),udp_port_end:Number(lanUdpLast.text),allowed_cidrs:lanAllowed.text.split(/[\n,]+/).map(v=>v.trim()).filter(v=>v.length>0),username:lanUsername.text,password:lanPassword.text})
+      lanDialog.awaitingSave=true
+      if(engineController.configureLanAccess(config))lanDialog.completeSave();else lanDialog.awaitingSave=false
+     }}
+    }
+   }
   }
  }
  FileDialog{id:clientExport;parentWindow:page.Window.window;title:"导出客户端配置";fileMode:FileDialog.SaveFile;nameFilters:["CSV 文件 (*.csv)"];defaultSuffix:"csv";onAccepted:if(!gatewayProvider.exportClients(selectedFile))AppState.notice(gatewayProvider.error)}

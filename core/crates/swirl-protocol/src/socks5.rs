@@ -160,6 +160,9 @@ impl UdpAssociation {
         if !valid_relay(address) {
             return Err("Socks5UdpRelayAddress");
         }
+        if !resolver.endpoint_allowed(address) {
+            return Err("Socks5UdpRelayForbidden");
+        }
         let socket = within(deadline, "UpstreamProtocolTimeout", async {
             // The validated relay, not the TCP control peer, determines whether
             // this UDP socket qualifies for the explicit loopback exemption.

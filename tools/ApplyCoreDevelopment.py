@@ -811,8 +811,15 @@ def _previous_workflow(source: str) -> str:
     native_tun_branch_list = xray_branch_list.replace(
         "]\n", ", work/native-tun-windows-20261030-isolated]\n"
     )
+    native_lan_branch_list = xray_branch_list.replace(
+        "]\n", ", work/native-lan-proxy-20261031]\n"
+    )
+    native_tun_lan_branch_list = native_tun_branch_list.replace(
+        "]\n", ", work/native-lan-proxy-20261031]\n"
+    )
     if (source.count(current_branch_list) + source.count(network_fixes_branch_list)
-            + source.count(xray_branch_list) + source.count(native_tun_branch_list)) == 1:
+            + source.count(xray_branch_list) + source.count(native_tun_branch_list)
+            + source.count(native_lan_branch_list) + source.count(native_tun_lan_branch_list)) == 1:
         if source.count("  push:\n") != 1:
             raise ValueError("Rust CI push branch list has drifted or is ambiguous; review required")
     else:
