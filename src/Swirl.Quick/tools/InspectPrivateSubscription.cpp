@@ -143,7 +143,7 @@ int main(int argc,char **argv) {
 #else
     const bool existing=app.arguments()[1]=="--node-store";
     const auto path=app.arguments()[2];
-    QByteArray before;QList<ProxyNode> saved;QString selected;
+    QByteArray before;QList<ProxyNode> saved;QString selected;qsizetype parsedNodeRecords=0;
     if(existing){
         before=readFile(path,1024*1024);
         if(!before.startsWith("SWIRLNODE1\n"))return error(output,"NodeStoreInputInvalid",3);
@@ -156,6 +156,7 @@ int main(int argc,char **argv) {
         QByteArray plain(reinterpret_cast<char *>(out.pbData),out.cbData);SecureZeroMemory(out.pbData,out.cbData);LocalFree(out.pbData);
         auto result=NodeImporter::parse(plain);plain.fill('\0');
         if(!result)return error(output,"SubscriptionParseFailed",5,result.error);
+        parsedNodeRecords=result.nodes.size();
         NodeStore store(path);
         if(!store.importNodes(result.nodes))return error(output,"NodeStoreImportFailed",6);
         saved=store.nodes();selected=store.selectedId();before=readFile(path,1024*1024);
@@ -183,6 +184,8 @@ int main(int argc,char **argv) {
         {"inputMode",existing?"existing-node-store":"encrypted-response-to-new-store"},
         {"offlineOnly",true},{"networkRequests",0},{"inputUnchanged",true},
         {"encryptedSaveReload",existing?"reload-only":"passed"},{"nodes",nodes.size()},
+        {"parsedNodeRecords",existing?QJsonValue():QJsonValue(parsedNodeRecords)},
+        {"coalescedNodeRecords",existing?QJsonValue():QJsonValue(parsedNodeRecords-nodes.size())},
         {"nativeTcpCandidates",candidates},{"incompleteNodes",incomplete},{"protocols",protocols},{"cases",rows}}).toJson(QJsonDocument::Compact)<<Qt::endl;
     return 0;
 #endif

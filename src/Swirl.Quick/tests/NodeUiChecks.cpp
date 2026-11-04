@@ -522,6 +522,20 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         click("moreSubscription-"+id);click("editSubscription-"+id);QTest::qWait(250);
         if(!qa.isEmpty())window->grabWindow().save(qa+"/subscription-edit.png");
         check(item("subscriptionUrl")&&item("subscriptionUrl")->property("text").toString().isEmpty(),"editing subscription keeps its protected URL hidden");
+        auto *downloadChoice=item("subscriptionDownloadRoute");auto *sourceDialog=window->findChild<QObject *>("subscriptionDialog");
+        check(downloadChoice&&downloadChoice->property("currentIndex").toInt()==0,"existing sources keep system networking as their default download route");
+        if(downloadChoice&&sourceDialog){
+            const auto autoUpdate=sourceDialog->property("autoUpdate").toBool();downloadChoice->setProperty("currentIndex",1);
+#ifdef Q_OS_WIN
+            constexpr bool physicalAvailable=true;
+#else
+            constexpr bool physicalAvailable=false;
+#endif
+            check(sourceDialog->property("downloadRoute").toString()=="physical"&&sourceDialog->property("downloadRouteSupported").toBool()==physicalAvailable&&downloadChoice->property("currentText").toString().contains(physicalAvailable?QStringLiteral("绕过系统代理"):QStringLiteral("仅 Windows")),"physical download choice describes its route and actual platform availability");
+            check(item("saveSubscription")&&item("saveSubscription")->isEnabled()==physicalAvailable,"unsupported physical download choices cannot be saved");
+            check(sourceDialog->property("autoUpdate").toBool()==autoUpdate&&sourceDialog->property("sourceUrl").toString().isEmpty(),"choosing a download route does not alter automatic updates or expose the saved URL");
+            downloadChoice->setProperty("currentIndex",0);
+        }
         fill("subscriptionName","Edited subscription fixture");click("saveSubscription");
         check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->imports()->providers().first().toMap().value("name").toString()=="Edited subscription fixture"&&subscriptionRequests==2,"editing preserves encrypted URL and refreshes the real source");
         check(card&&item("subscriptionCard-"+id)==card,"subscription refresh keeps the same card delegate and expanded state");

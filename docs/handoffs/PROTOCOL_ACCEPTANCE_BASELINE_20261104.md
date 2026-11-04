@@ -89,3 +89,33 @@ each iteration, so an empty filter cannot count as a pass. Scoped rustfmt,
 x86_64-pc-windows-gnu -- -D warnings`, and changed-file whitespace checks passed.
 This is local GNU evidence; rerun the original Windows CI gate at the final
 commit. It does not fix or satisfy restricted-worker loader isolation.
+
+## Subsequent verified observations
+
+The PR candidate containing `a2dd8d041421163cfd0f4675baf8aee0811b5bef`
+passed all three jobs in
+[isolated Native TUN run 41846192666](https://github.com/SOLHK/Swirl/actions/runs/41846192666):
+Linux packet/Core checks, Windows packet/Core checks, and Windows WFP, worker
+and service-identity security. This supersedes the loader blocker for that CI
+candidate; it does not establish physical Windows routing or GUI TUN acceptance.
+
+The manually dispatched
+[font source run 41843068237](https://github.com/SOLHK/Swirl/actions/runs/41843068237)
+completed the Linux authored suite: 1,568 tests, zero failures, two skips, plus
+six audit tests with no failures. The same run's native CoreText/DirectWrite
+experiments failed; those failures remain recorded and cannot be represented
+as general font acceptance. The Windows Qt font run exposed a separate merged
+ComboBox display-role regression, addressed by the 0.2.35 candidate.
+
+A frozen executable built from `f4efe047858c9470b64071aeb620809316e75db7`
+completed the existing controlled loopback TLS/SSE workload for 3,600.047
+seconds with sixteen connections, no reconnects and zero workload errors.
+Independent client/server byte hashes, completion records, TLS shutdown and
+listener cleanup were checked. This is a baseline network result, not evidence
+for the subsequent download bridge or real-provider/application performance.
+
+Its separate 3,550-second resource collection did **not** pass the strict
+verifier: the final recorded sample was 3,549.998885 seconds. The 1.115-ms
+shortfall is preserved as a failure. Observed memory/handle values are
+descriptive only; the sampling cutoff must be corrected and independently
+validated without editing the original evidence or relaxing its threshold.

@@ -18,6 +18,8 @@ mod windows_dhcp_attachment;
 mod windows_dhcp_probe;
 
 #[cfg(windows)]
+pub mod physical_network;
+#[cfg(windows)]
 mod socket_pin;
 #[cfg(windows)]
 mod windows_command;

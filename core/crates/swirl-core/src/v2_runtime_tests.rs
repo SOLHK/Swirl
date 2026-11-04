@@ -240,7 +240,26 @@ fn dns_peer(answers: Vec<IpAddr>, dual: bool) -> (SocketAddr, thread::JoinHandle
 fn direct_dns_fallback(ipv6: bool) {
     use swirl_subscription::DnsQueryFamily;
 
-    let listener = StdListener::bind(if ipv6 { "[::1]:0" } else { "127.0.0.1:0" }).unwrap();
+    // Reserve the refused candidate without listening. An ephemeral port on
+    // 127.0.0.1 can already have a listener on 127.0.0.2 in a parallel test.
+    // macOS normally has no 127.0.0.2 alias; AddrNotAvailable itself makes that
+    // candidate unusable, without changing the machine's interface setup.
+    let (listener, _refused_socket) = (0..32)
+        .find_map(|_| {
+            let listener = StdListener::bind(if ipv6 { "[::1]:0" } else { "127.0.0.1:0" }).unwrap();
+            let unavailable =
+                SocketAddr::from(([127, 0, 0, 2], listener.local_addr().unwrap().port()));
+            let socket = tokio::net::TcpSocket::new_v4().unwrap();
+            match socket.bind(unavailable) {
+                Ok(()) => Some((listener, Some(socket))),
+                Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => None,
+                Err(error) if error.kind() == std::io::ErrorKind::AddrNotAvailable => {
+                    Some((listener, None))
+                }
+                Err(error) => panic!("reserve refused DNS candidate: {error}"),
+            }
+        })
+        .expect("reserve a usable and a refused endpoint on the same port");
     let live = listener.local_addr().unwrap();
     let port = live.port();
     let unavailable: SocketAddr = format!("127.0.0.2:{port}").parse().unwrap();

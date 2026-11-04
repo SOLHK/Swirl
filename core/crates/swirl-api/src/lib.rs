@@ -10,6 +10,8 @@ use swirl_core::Core;
 use swirl_subscription::Config;
 
 mod control_v2;
+mod download_route;
+pub use download_route::swirl_download_route_v1;
 mod import_ffi;
 #[cfg(windows)]
 mod native_gateway;
