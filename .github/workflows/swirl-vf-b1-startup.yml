@@ -1,0 +1,71 @@
+name: Swirl VF B1 original startup and private-location control
+
+on:
+  push:
+    branches: [work/vf-metrics-b1]
+    paths:
+      - '.github/workflows/swirl-vf-b1-startup.yml'
+      - 'tools/swirl_vf/platform/b1_original_startup.py'
+      - 'tools/swirl_vf/platform/b1_original_startup_probe.swift'
+      - 'tools/swirl_vf/tests/test_metric_b1_startup.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swirl-vf-b1-startup-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate startup refusal accounting and unchanged source suite
+        run: |
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          python -m unittest discover -s tools/swirl_vf/tests -v
+          python -m unittest discover -s tools/swirl_vf/audit -p 'test_*.py' -v
+
+  apple-startup:
+    needs: python
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Record native environment and compile the independent startup probe
+        run: |
+          mkdir -p build/b1-startup-environment
+          git rev-parse HEAD > build/b1-startup-environment/commit.txt
+          sw_vers > build/b1-startup-environment/macos.txt
+          xcodebuild -version > build/b1-startup-environment/xcode.txt
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          xcrun swiftc -O tools/swirl_vf/platform/b1_original_startup_probe.swift -o build/b1-startup-probe
+      - name: Observe source binding with zero glyph or metric requests
+        run: |
+          python tools/swirl_vf/platform/b1_original_startup.py \
+            --source /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --binary "$PWD/build/b1-startup-probe" \
+            --output build/b1-startup
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-b1-original-startup-${{ github.sha }}
+          path: |
+            build/b1-startup-environment/*.txt
+            build/b1-startup/*.json
+          retention-days: 90
