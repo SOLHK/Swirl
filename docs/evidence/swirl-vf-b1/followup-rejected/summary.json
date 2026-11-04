@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "status": "B1_FOLLOWUP_FAILED",
+  "source_commit": "03c34a68a6ad52035097d123a9e5ecd2948e310f",
+  "platform": "macOS-27.0.1-arm64-arm-64bit",
+  "started_utc": "2026-10-20T09:35:04.683210+00:00",
+  "model_status": "POST_STAGE1_INFERENCE_FROZEN_BEFORE_FOLLOWUP_NATIVE",
+  "first_stage_run": 39399674995,
+  "strict_budget_font_units": 0.03125,
+  "measurement_correction_applied": false,
+  "original_font_acceptance": "NOT_ESTABLISHED",
+  "original_faces_reconstructed": 0,
+  "production_oracle_modified": false,
+  "production_rebuilder_modified": false,
+  "manifest_sha256_before_native": "744e5dcd5483ed2eb72f6c2ce0b71528422e52a71aba828fcd6c37a7d303acc6",
+  "fixture_count": 16,
+  "planned_unique_observations": 550,
+  "binary_sha256": "ab86a5bb1f51b73c08fd2f7b3414c530315f5ba647d5d6216952408fa59509f1",
+  "probe_source_sha256": "1c9a80a7a7e62104925818edf63634d20a666d2f4bb2025016a80780c135d597",
+  "error": {
+    "type": "ValueError",
+    "message": "native_process_failed:followup-upem1000-gvar-forward:B1 metric diagnostic failed: native_axis_readback_not_exact:HGHT\n"
+  },
+  "observed_metrics": []
+}
