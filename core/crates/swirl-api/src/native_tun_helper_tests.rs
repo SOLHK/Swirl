@@ -78,9 +78,23 @@ fn stalled_worker_is_terminated_and_reaped_before_recovery_can_run() {
 #[test]
 fn live_control_heartbeats_extend_the_worker_deadline_without_reaching_the_client() {
     // Signal readiness from the producer loop and exit after its flushed final
-    // response, keeping PowerShell pipeline startup/teardown out of this deadline.
+    // response. Native self-termination excludes managed-host DLL teardown from
+    // this fixture, which owns no Core or network recovery resources.
     let mut child = spawn_worker(
         r#"
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class SwirlHeartbeatFixtureExit {
+    [DllImport("kernel32.dll", ExactSpelling = true)]
+    public static extern IntPtr GetCurrentProcess();
+    [DllImport("kernel32.dll", ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool TerminateProcess(IntPtr process, uint exitCode);
+}
+'@
+$fixtureProcess = [SwirlHeartbeatFixtureExit]::GetCurrentProcess()
 $output = [Console]::Out
 $heartbeat = '{"native_tun_worker_heartbeat":1}' + [char]10
 for ($iteration = 0; $iteration -lt 10; $iteration++) {
@@ -91,7 +105,8 @@ for ($iteration = 0; $iteration -lt 10; $iteration++) {
 }
 $output.WriteLine('{"ok":true}')
 $output.Flush()
-[Environment]::Exit(0)
+[void][SwirlHeartbeatFixtureExit]::TerminateProcess($fixtureProcess, 0)
+throw 'Native heartbeat fixture termination returned unexpectedly'
 "#,
         r#"printf 'ready\n'; for i in 1 2 3 4 5 6 7 8 9 10; do printf '{"native_tun_worker_heartbeat":1}\n'; sleep .1; done; printf '{"ok":true}\n'"#,
     );
