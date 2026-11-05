@@ -579,7 +579,23 @@ Item {
                                 pressObservation.exec();
                                 const bool initialContractedWithin40ms=submittedContraction();
                                 QJsonArray initialFrames;
-                                {QMutexLocker lock(&presented->mutex);initialFrames=presented->frames;}
+                                QJsonObject initialObservation;
+                                {
+                                    QMutexLocker lock(&presented->mutex);
+                                    initialFrames=presented->frames;
+                                    initialObservation={{"elapsedMs",std::chrono::duration<qreal,std::milli>(std::chrono::steady_clock::now()-presented->start).count()},
+                                        {"latestFrameBeginMs",presented->latestFrameBeginMs},{"pending",presented->pending}};
+                                    // A frame waiting for Present is not in frames yet. Only
+                                    // expose its phase values when this arm has a paired sync;
+                                    // otherwise those values can belong to the previous press.
+                                    if(presented->pending)initialObservation.insert("pendingFrame",QJsonObject{
+                                        {"frame",qint64(presented->frame)},{"frameBeginMs",presented->frameBeginMs},
+                                        {"synchronizedMs",presented->synchronizedMs},{"geometryCapturedMs",presented->geometryCapturedMs},
+                                        {"renderStartMs",presented->renderStartMs},{"renderEndMs",presented->renderEndMs},
+                                        {"hasSceneGraphNodes",presented->hasSceneGraphNodes},{"geometryValid",presented->geometryValid},
+                                        {"surfaceScale",presented->surfaceScale},{"contentScale",presented->contentScale},
+                                        {"surfaceScaleY",presented->surfaceScaleY},{"contentScaleY",presented->contentScaleY}});
+                                }
                                 const bool initialObservedDown=control->property("down").toBool();
                                 const bool initialClockRunning=nativeClock->running();
                                 // Preserve this phase before the later arm clears its frames.
@@ -588,7 +604,8 @@ Item {
                                 qInfo().noquote()<<"NATIVE_PRESS_REVERSAL_INITIAL"<<QJsonDocument(QJsonObject{
                                     {"inputDelivered",initialInputDelivered},{"inputDown",initialInputDown},
                                     {"observedDown",initialObservedDown},{"nativeClockRunningAtObservation",initialClockRunning},
-                                    {"contractedWithin40ms",initialContractedWithin40ms},{"frames",initialFrames}
+                                    {"contractedWithin40ms",initialContractedWithin40ms},{"frames",initialFrames},
+                                    {"observation",initialObservation}
                                 }).toJson(QJsonDocument::Compact);
                                 check(initialContractedWithin40ms,"native reversal fixture observes a submitted paired contraction within the first40ms");
                                 // These values came from existing SG nodes after sync. The
