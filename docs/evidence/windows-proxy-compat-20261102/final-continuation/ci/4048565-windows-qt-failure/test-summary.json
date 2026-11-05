@@ -1,0 +1,19 @@
+{
+  "tests_run": 5,
+  "failures": 4,
+  "errors": 0,
+  "skipped": 0,
+  "successful": false,
+  "product_mode": "qt-dpapi",
+  "provider_connection": false,
+  "protocol": "vless+reality+vision",
+  "fingerprint": "chrome",
+  "selected_qt_tests": [
+    "test_actual_qt_import_dpapi_select_route_and_recreate",
+    "test_actual_qt_tls12_never_enters_vision_direct",
+    "test_actual_qt_bad_credentials_never_reach_origin_or_spare",
+    "test_actual_qt_cancels_authenticated_stream_and_releases_listener",
+    "test_actual_qt_domain_and_match_reject_a_proven_reachable_origin"
+  ],
+  "client_hello_profile": "chrome_133"
+}

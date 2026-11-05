@@ -1,0 +1,200 @@
+{
+  "schema": 1,
+  "test": "production_v2_authenticated_socks5_verified_tls_sse_soak",
+  "requested_duration_seconds": 300,
+  "connections": 8,
+  "event_interval_seconds": 1,
+  "expected_events_per_connection": 301,
+  "peer_read_idle_budget_seconds": 340,
+  "client_origin_io_timeout_seconds": 8,
+  "core_handshake_timeout_ms": 3000,
+  "reconnection_permitted": false,
+  "platform": "linux",
+  "scope": "controlled_local_network_no_desktop_acceptance",
+  "resource_observation_limit": "RSS and FD samples do not prove absence of leaks",
+  "client_results": [
+    {
+      "connection": 0,
+      "events": 301,
+      "sha256": "217ffd062400e515f860f08b3ad7213af5f4aa58dcfbed5f2f195cf592d3075e",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 1,
+      "events": 301,
+      "sha256": "c3023cd7840ad8677432fbc660e32c91a7f2ca6d8ac114ceafaad6ac08493c85",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 2,
+      "events": 301,
+      "sha256": "f058edf8621819e37aa8f7bc274a162cace0f9f7146f6cb534c4c64b599533c3",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 3,
+      "events": 301,
+      "sha256": "79162f48467806e8f7530c0ec105ad67582d033b06c59a0d3b843aa28307689d",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 4,
+      "events": 301,
+      "sha256": "21bcca8e0c28906b64f0a05b3dae57678352d95bcb96ebc5477e1ed31c53dbfb",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 5,
+      "events": 301,
+      "sha256": "a81f82b0b683993817bcaaffbebfd6ed70c94543efbaf772a40e6d4525fa4ed4",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 6,
+      "events": 301,
+      "sha256": "36e12c829134582509a1ad685df75f24c66149cdf4122037896ef784d91baa7d",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 7,
+      "events": 301,
+      "sha256": "db264989563edd621a69ad1be6c551f87876abf467f2278d9ad8582f445aebf6",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    }
+  ],
+  "origin_results": [
+    {
+      "connection": 0,
+      "events": 301,
+      "sha256": "217ffd062400e515f860f08b3ad7213af5f4aa58dcfbed5f2f195cf592d3075e",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 1,
+      "events": 301,
+      "sha256": "c3023cd7840ad8677432fbc660e32c91a7f2ca6d8ac114ceafaad6ac08493c85",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 2,
+      "events": 301,
+      "sha256": "f058edf8621819e37aa8f7bc274a162cace0f9f7146f6cb534c4c64b599533c3",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 3,
+      "events": 301,
+      "sha256": "79162f48467806e8f7530c0ec105ad67582d033b06c59a0d3b843aa28307689d",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 4,
+      "events": 301,
+      "sha256": "21bcca8e0c28906b64f0a05b3dae57678352d95bcb96ebc5477e1ed31c53dbfb",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 5,
+      "events": 301,
+      "sha256": "a81f82b0b683993817bcaaffbebfd6ed70c94543efbaf772a40e6d4525fa4ed4",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 6,
+      "events": 301,
+      "sha256": "36e12c829134582509a1ad685df75f24c66149cdf4122037896ef784d91baa7d",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    },
+    {
+      "connection": 7,
+      "events": 301,
+      "sha256": "db264989563edd621a69ad1be6c551f87876abf467f2278d9ad8582f445aebf6",
+      "tls_close_notify": true,
+      "tcp_eof": true
+    }
+  ],
+  "binary_sha256": "45cbf38444d650e39898b38b677c43cbe76a2a29fa6ae1d1dfaac1b921fd9eed",
+  "core_pid": 40458,
+  "observed_stream_seconds": 300.024764,
+  "final_core": {
+    "active": 0,
+    "accepted": 8,
+    "failed": 0,
+    "upload": 13800,
+    "download": 214145,
+    "ended_records": 8
+  },
+  "listener_closed": true,
+  "ready_connections": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "delivered_connections": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "independent_fixture_errors": [],
+  "errors": [],
+  "passed": true,
+  "raw_evidence_sha256": "1fb2e1fa05b7fec6f146f21a243910ea7763062de4c24f29c51d53d7276e8056",
+  "snapshot_count": 302,
+  "sample_summary": {
+    "active": {
+      "min": 8,
+      "max": 8
+    },
+    "accepted": {
+      "min": 8,
+      "max": 8
+    },
+    "rss_kib": {
+      "min": 21836,
+      "max": 21836
+    },
+    "fd_count": {
+      "min": 23,
+      "max": 23
+    }
+  },
+  "first_snapshot": {
+    "elapsed_seconds": 0.001,
+    "active": 8,
+    "accepted": 8,
+    "rss_kib": 21836,
+    "fd_count": 23
+  },
+  "last_snapshot": {
+    "elapsed_seconds": 300.025,
+    "active": 8,
+    "accepted": 8,
+    "rss_kib": 21836,
+    "fd_count": 23
+  }
+}

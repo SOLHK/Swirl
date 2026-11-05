@@ -100,6 +100,11 @@ API 方向的处理由 Apple 的函数说明及 HarfBuzz 的 CoreText 后端交�
 
 ## 原生回归测试
 
+2026-10-21 的[本机基线](../../../docs/SWIRL_VF_MAC_CORETEXT_BASELINE_20261021.md)
+在 macOS 26.3 上确认指定原件三个原生加载入口均失败，物理面核验为 0/32。
+`diagnose_axis_readback.py` 现将此情况保存为 `BLOCKED_SOURCE_IDENTITY` 并返回 2，
+不再因顶层 Swift 异常丢失报告。原件轴/字形未测；原有 macOS 27 证据仍属于原环境。
+
 ```bash
 python platform/test_coretext_extract.py --output /private/test-output --require-native
 ```

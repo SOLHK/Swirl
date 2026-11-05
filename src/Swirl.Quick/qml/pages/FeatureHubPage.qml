@@ -26,6 +26,7 @@ Item {
         padding: Theme.dp(featured ? 20 : 14)
         hoverEnabled: true
         focusPolicy: Qt.StrongFocus
+        synchronizedPressGeometry: false // This entry owns its independent feedback/spring below.
         motionScale: 1 - (1 - SwirlMotion.pressScale) * feedback.contact
         SwirlInteractionMotion { id: feedback; hovered: entry.hovered; pressed: entry.down; focused: entry.visualFocus; controlEnabled: entry.enabled }
         background: SwirlGlassPanel {

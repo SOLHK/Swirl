@@ -328,6 +328,28 @@ class QuicCoreTests(unittest.TestCase):
                 self.assertEqual(self.udp_exchange(fresh, udp, b"new-association"), b"new-association")
                 self.stop()
 
+    def test_hysteria2_empty_udp_drops_only_that_packet_and_preserves_association(self):
+        self.start(self.peer("hysteria2"))
+        origin = self.origin(udp=True)
+        expected = []
+        for established in (False, True):
+            with self.subTest(established=established):
+                association = self.associate()
+                if established:
+                    expected.append(b"before-empty")
+                    self.assertEqual(self.udp_exchange(association, origin, expected[-1]), expected[-1])
+                dropped = self.command(op="status")["status"]["udp_dropped"]
+                _, client, relay = association
+                client.sendto(packet("127.0.0.1", origin.server_address[1], b""), relay)
+                deadline = time.monotonic() + 3
+                while self.command(op="status")["status"]["udp_dropped"] == dropped and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertEqual(self.command(op="status")["status"]["udp_dropped"], dropped + 1)
+                expected.append(b"after-empty")
+                self.assertEqual(self.udp_exchange(association, origin, expected[-1]), expected[-1])
+                self.assertEqual(origin.received, expected)
+        self.stop()
+
     def test_wrong_credentials_never_forward_tcp_or_udp_and_existing_session_survives_selection(self):
         for protocol in ("tuic-native", "tuic-quic", "hysteria2"):
             with self.subTest(protocol=protocol):

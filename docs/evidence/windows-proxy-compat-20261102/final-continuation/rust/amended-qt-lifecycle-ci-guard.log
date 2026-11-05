@@ -1,0 +1,6 @@
+test_qt_lifecycle_guard_is_required_only_in_explicit_chrome_vision_product_group (tools.tests.test_core_development.CoreDevelopmentTests.test_qt_lifecycle_guard_is_required_only_in_explicit_chrome_vision_product_group) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.005s
+
+OK

@@ -1,0 +1,669 @@
+{
+  "scope": "isolated profiles of default-215-helper corpus probes; includes metric failures; optional extended banks have a separate receipt",
+  "rows": [
+    {
+      "face": 0,
+      "gid": 0,
+      "helper_limit": 215,
+      "font_sha256": "016f707a3f43aecaf0ca16100595fad2e8a3d4f90be79ad71109f72ad4514766",
+      "file_bytes": 29896,
+      "tables": {
+        "head": 54,
+        "hhea": 36,
+        "maxp": 6,
+        "OS/2": 96,
+        "hmtx": 24,
+        "cmap": 60,
+        "name": 633,
+        "post": 32,
+        "CFF2": 26624,
+        "GSUB": 558,
+        "HVAR": 1233,
+        "STAT": 44,
+        "avar": 78,
+        "fvar": 76,
+        "vhea": 36,
+        "vmtx": 24
+      },
+      "glyphs": 11,
+      "axes": 3,
+      "flagged_hidden_axes": 2,
+      "computational_axes": 0,
+      "cff2_regions": 6,
+      "cff2_data_sets": 9,
+      "cff2_variation_store_payload_bytes": 258,
+      "cff2_variation_store_length_sentinel": false,
+      "avar2_regions": 0,
+      "font_dicts": 1,
+      "program_categories": {
+        "main": {
+          "count": 11,
+          "bytes": 19272,
+          "maximum_bytes": 2688
+        },
+        "global": {
+          "count": 194,
+          "bytes": 5500,
+          "maximum_bytes": 47
+        },
+        "local": {
+          "count": 157,
+          "bytes": 795,
+          "maximum_bytes": 9
+        }
+      },
+      "cff2_program_payload_bytes": 25567,
+      "cff2_other_bytes": 1057,
+      "seconds": 0.041252082999562845,
+      "peak_rss_bytes": 35766272
+    },
+    {
+      "face": 0,
+      "gid": 1166,
+      "helper_limit": 215,
+      "font_sha256": "de0fe82895e5c0a3d7d1318d4cba118f451d7e3159294756899e4f5a17174e0c",
+      "file_bytes": 32200320,
+      "tables": {
+        "head": 54,
+        "hhea": 36,
+        "maxp": 6,
+        "OS/2": 96,
+        "hmtx": 4104,
+        "cmap": 60,
+        "name": 1233,
+        "post": 32,
+        "CFF2": 30753557,
+        "GSUB": 134646,
+        "HVAR": 1617,
+        "STAT": 108,
+        "avar": 1300110,
+        "fvar": 236,
+        "vhea": 36,
+        "vmtx": 4104
+      },
+      "glyphs": 2051,
+      "axes": 11,
+      "flagged_hidden_axes": 10,
+      "computational_axes": 8,
+      "cff2_regions": 2499,
+      "cff2_data_sets": 2049,
+      "cff2_variation_store_payload_bytes": 212832,
+      "cff2_variation_store_length_sentinel": true,
+      "avar2_regions": 14442,
+      "font_dicts": 1,
+      "program_categories": {
+        "main": {
+          "count": 2051,
+          "bytes": 28710832,
+          "maximum_bytes": 40740
+        },
+        "global": {
+          "count": 32780,
+          "bytes": 1717283,
+          "maximum_bytes": 28705
+        },
+        "local": {
+          "count": 215,
+          "bytes": 5550,
+          "maximum_bytes": 117
+        }
+      },
+      "cff2_program_payload_bytes": 30433665,
+      "cff2_other_bytes": 319892,
+      "seconds": 0.5344855000148527,
+      "peak_rss_bytes": 161054720
+    },
+    {
+      "face": 0,
+      "gid": 117,
+      "helper_limit": 215,
+      "font_sha256": "054553b32b0f8aa1031c7ecf55d8dc8e2f69fc267498eba9e49edf82cd44418f",
+      "file_bytes": 7616,
+      "tables": {
+        "head": 54,
+        "hhea": 36,
+        "maxp": 6,
+        "OS/2": 96,
+        "hmtx": 32,
+        "cmap": 60,
+        "name": 633,
+        "post": 32,
+        "CFF2": 4096,
+        "GSUB": 790,
+        "HVAR": 1233,
+        "STAT": 44,
+        "avar": 78,
+        "fvar": 76,
+        "vhea": 36,
+        "vmtx": 32
+      },
+      "glyphs": 15,
+      "axes": 3,
+      "flagged_hidden_axes": 2,
+      "computational_axes": 0,
+      "cff2_regions": 7,
+      "cff2_data_sets": 13,
+      "cff2_variation_store_payload_bytes": 340,
+      "cff2_variation_store_length_sentinel": false,
+      "avar2_regions": 0,
+      "font_dicts": 1,
+      "program_categories": {
+        "main": {
+          "count": 15,
+          "bytes": 2817,
+          "maximum_bytes": 232
+        },
+        "global": {
+          "count": 31,
+          "bytes": 755,
+          "maximum_bytes": 28
+        },
+        "local": {
+          "count": 3,
+          "bytes": 16,
+          "maximum_bytes": 6
+        }
+      },
+      "cff2_program_payload_bytes": 3588,
+      "cff2_other_bytes": 508,
+      "seconds": 0.051084790989989415,
+      "peak_rss_bytes": 35782656
+    },
+    {
+      "face": 0,
+      "gid": 19177,
+      "helper_limit": 215,
+      "font_sha256": "538569d7243ee99a08ab9e2acd27111fd4744eeefaeb52a60abef8b90d4a9a20",
+      "file_bytes": 89678604,
+      "tables": {
+        "head": 54,
+        "hhea": 36,
+        "maxp": 6,
+        "OS/2": 96,
+        "hmtx": 8200,
+        "cmap": 60,
+        "name": 1851,
+        "post": 32,
+        "CFF2": 88800381,
+        "GSUB": 230846,
+        "HVAR": 2001,
+        "STAT": 172,
+        "avar": 625956,
+        "fvar": 396,
+        "vhea": 36,
+        "vmtx": 8200
+      },
+      "glyphs": 4099,
+      "axes": 19,
+      "flagged_hidden_axes": 18,
+      "computational_axes": 16,
+      "cff2_regions": 190,
+      "cff2_data_sets": 4097,
+      "cff2_variation_store_payload_bytes": 142354,
+      "cff2_variation_store_length_sentinel": true,
+      "avar2_regions": 4062,
+      "font_dicts": 1,
+      "program_categories": {
+        "main": {
+          "count": 4099,
+          "bytes": 67957742,
+          "maximum_bytes": 53858
+        },
+        "global": {
+          "count": 33898,
+          "bytes": 20542372,
+          "maximum_bytes": 59567
+        },
+        "local": {
+          "count": 215,
+          "bytes": 5408,
+          "maximum_bytes": 128
+        }
+      },
+      "cff2_program_payload_bytes": 88505522,
+      "cff2_other_bytes": 294859,
+      "seconds": 0.3628270000044722,
+      "peak_rss_bytes": 310296576
+    },
+    {
+      "face": 0,
+      "gid": 30592,
+      "helper_limit": 215,
+      "font_sha256": "b4eea19969c0dbf2a8236e2184ed95fb8afc65ec13807ed00df1d74ec636f410",
+      "file_bytes": 975332,
+      "tables": {
+        "head": 54,
+        "hhea": 36,
+        "maxp": 6,
+        "OS/2": 96,
+        "hmtx": 108,
+        "cmap": 60,
+        "name": 633,
+        "post": 32,
+        "CFF2": 969409,
+        "GSUB": 3038,
+        "HVAR": 1233,
+        "STAT": 44,
+        "avar": 78,
+        "fvar": 76,
+        "vhea": 36,
+        "vmtx": 108
+      },
+      "glyphs": 53,
+      "axes": 3,
+      "flagged_hidden_axes": 2,
+      "computational_axes": 0,
+      "cff2_regions": 22,
+      "cff2_data_sets": 51,
+      "cff2_variation_store_payload_bytes": 1218,
+      "cff2_variation_store_length_sentinel": false,
+      "avar2_regions": 0,
+      "font_dicts": 1,
+      "program_categories": {
+        "main": {
+          "count": 53,
+          "bytes": 735843,
+          "maximum_bytes": 17423
+        },
+        "global": {
+          "count": 7708,
+          "bytes": 207415,
+          "maximum_bytes": 115
+        },
+        "local": {
+          "count": 215,
+          "bytes": 1135,
+          "maximum_bytes": 16
+        }
+      },
+      "cff2_program_payload_bytes": 944393,
+      "cff2_other_bytes": 25016,
+      "seconds": 0.0603568329825066,
+      "peak_rss_bytes": 40353792
+    },
+    {
+      "face": 0,
+      "gid": 39285,
+      "helper_limit": 215,
+      "font_sha256": "f4532cc4335a78134a925bcc646ae79a7ad76ae7de0d41531a517aa3f1730351",
+      "file_bytes": 87520336,
+      "tables": {
+        "head": 54,
+        "hhea": 36,
+        "maxp": 6,
+        "OS/2": 96,
+        "hmtx": 9224,
+        "cmap": 60,
+        "name": 1233,
+        "post": 32,
+        "CFF2": 87139462,
+        "GSUB": 283326,
+        "HVAR": 1617,
+        "STAT": 108,
+        "avar": 75302,
+        "fvar": 236,
+        "vhea": 36,
+        "vmtx": 9224
+      },
+      "glyphs": 4611,
+      "axes": 11,
+      "flagged_hidden_axes": 10,
+      "computational_axes": 8,
+      "cff2_regions": 3160,
+      "cff2_data_sets": 4609,
+      "cff2_variation_store_payload_bytes": 322414,
+      "cff2_variation_store_length_sentinel": true,
+      "avar2_regions": 834,
+      "font_dicts": 1,
+      "program_categories": {
+        "main": {
+          "count": 4611,
+          "bytes": 78742870,
+          "maximum_bytes": 30578
+        },
+        "global": {
+          "count": 33194,
+          "bytes": 7952357,
+          "maximum_bytes": 32149
+        },
+        "local": {
+          "count": 215,
+          "bytes": 3279,
+          "maximum_bytes": 81
+        }
+      },
+      "cff2_program_payload_bytes": 86698506,
+      "cff2_other_bytes": 440956,
+      "seconds": 0.8645997919957153,
+      "peak_rss_bytes": 337870848
+    },
+    {
+      "face": 0,
+      "gid": 39903,
+      "helper_limit": 215,
+      "font_sha256": "cfa0f945937673161835e923d01eb04cfc731862aad918316c0d2e51765a7a90",
+      "file_bytes": 20575616,
+      "tables": {
+        "head": 54,
+        "hhea": 36,
+        "maxp": 6,
+        "OS/2": 96,
+        "hmtx": 4104,
+        "cmap": 60,
+        "name": 1233,
+        "post": 32,
+        "CFF2": 20288817,
+        "GSUB": 125782,
+        "HVAR": 1617,
+        "STAT": 108,
+        "avar": 149012,
+        "fvar": 236,
+        "vhea": 36,
+        "vmtx": 4104
+      },
+      "glyphs": 2051,
+      "axes": 11,
+      "flagged_hidden_axes": 10,
+      "computational_axes": 8,
+      "cff2_regions": 1387,
+      "cff2_data_sets": 2049,
+      "cff2_variation_store_payload_bytes": 144044,
+      "cff2_variation_store_length_sentinel": true,
+      "avar2_regions": 1653,
+      "font_dicts": 1,
+      "program_categories": {
+        "main": {
+          "count": 2051,
+          "bytes": 18930917,
+          "maximum_bytes": 17857
+        },
+        "global": {
+          "count": 32768,
+          "bytes": 1102497,
+          "maximum_bytes": 384
+        },
+        "local": {
+          "count": 215,
+          "bytes": 4335,
+          "maximum_bytes": 99
+        }
+      },
+      "cff2_program_payload_bytes": 20037749,
+      "cff2_other_bytes": 251068,
+      "seconds": 0.33696545800194144,
+      "peak_rss_bytes": 122847232
+    },
+    {
+      "face": 0,
+      "gid": 46459,
+      "helper_limit": 215,
+      "font_sha256": "d31f8aad69aef253340296db3c93e05bcbcf32a6fcefd0e1aa40f5654e7025a6",
+      "file_bytes": 68870804,
+      "tables": {
+        "head": 54,
+        "hhea": 36,
+        "maxp": 6,
+        "OS/2": 96,
+        "hmtx": 2450,
+        "cmap": 60,
+        "name": 633,
+        "post": 32,
+        "CFF2": 68790428,
+        "GSUB": 72806,
+        "HVAR": 1233,
+        "STAT": 44,
+        "avar": 78,
+        "fvar": 76,
+        "vhea": 36,
+        "vmtx": 2450
+      },
+      "glyphs": 1224,
+      "axes": 3,
+      "flagged_hidden_axes": 2,
+      "computational_axes": 0,
+      "cff2_regions": 546,
+      "cff2_data_sets": 1222,
+      "cff2_variation_store_payload_bytes": 29386,
+      "cff2_variation_store_length_sentinel": false,
+      "avar2_regions": 0,
+      "font_dicts": 1,
+      "program_categories": {
+        "main": {
+          "count": 1224,
+          "bytes": 29810578,
+          "maximum_bytes": 54263
+        },
+        "global": {
+          "count": 33962,
+          "bytes": 38807732,
+          "maximum_bytes": 55298
+        },
+        "local": {
+          "count": 215,
+          "bytes": 1471,
+          "maximum_bytes": 27
+        }
+      },
+      "cff2_program_payload_bytes": 68619781,
+      "cff2_other_bytes": 170647,
+      "seconds": 0.2408505830098875,
+      "peak_rss_bytes": 195477504
+    },
+    {
+      "face": 0,
+      "gid": 4985,
+      "helper_limit": 215,
+      "font_sha256": "c928df7a094dee64bf3b49a74959d134666ec2b3b53e8ea21798a7ae7ce9c270",
+      "file_bytes": 86553280,
+      "tables": {
+        "head": 54,
+        "hhea": 36,
+        "maxp": 6,
+        "OS/2": 96,
+        "hmtx": 6152,
+        "cmap": 60,
+        "name": 1539,
+        "post": 32,
+        "CFF2": 85919013,
+        "GSUB": 188302,
+        "HVAR": 1809,
+        "STAT": 140,
+        "avar": 429256,
+        "fvar": 316,
+        "vhea": 36,
+        "vmtx": 6152
+      },
+      "glyphs": 3075,
+      "axes": 15,
+      "flagged_hidden_axes": 14,
+      "computational_axes": 12,
+      "cff2_regions": 2036,
+      "cff2_data_sets": 3073,
+      "cff2_variation_store_payload_bytes": 256162,
+      "cff2_variation_store_length_sentinel": true,
+      "avar2_regions": 3515,
+      "font_dicts": 1,
+      "program_categories": {
+        "main": {
+          "count": 3075,
+          "bytes": 61327795,
+          "maximum_bytes": 41467
+        },
+        "global": {
+          "count": 33954,
+          "bytes": 24181713,
+          "maximum_bytes": 46004
+        },
+        "local": {
+          "count": 215,
+          "bytes": 4710,
+          "maximum_bytes": 117
+        }
+      },
+      "cff2_program_payload_bytes": 85514218,
+      "cff2_other_bytes": 404795,
+      "seconds": 0.6115635000169277,
+      "peak_rss_bytes": 311033856
+    },
+    {
+      "face": 0,
+      "gid": 50,
+      "helper_limit": 215,
+      "font_sha256": "d78d57a61b3a4e5fabf7e3bab14c9fb38c530598284c3954020d6fe39d44da00",
+      "file_bytes": 5316,
+      "tables": {
+        "head": 54,
+        "hhea": 36,
+        "maxp": 6,
+        "OS/2": 96,
+        "hmtx": 24,
+        "cmap": 60,
+        "name": 633,
+        "post": 32,
+        "CFF2": 2043,
+        "GSUB": 558,
+        "HVAR": 1233,
+        "STAT": 44,
+        "avar": 78,
+        "fvar": 76,
+        "vhea": 36,
+        "vmtx": 24
+      },
+      "glyphs": 11,
+      "axes": 3,
+      "flagged_hidden_axes": 2,
+      "computational_axes": 0,
+      "cff2_regions": 6,
+      "cff2_data_sets": 9,
+      "cff2_variation_store_payload_bytes": 258,
+      "cff2_variation_store_length_sentinel": false,
+      "avar2_regions": 0,
+      "font_dicts": 1,
+      "program_categories": {
+        "main": {
+          "count": 11,
+          "bytes": 1053,
+          "maximum_bytes": 117
+        },
+        "global": {
+          "count": 28,
+          "bytes": 584,
+          "maximum_bytes": 23
+        }
+      },
+      "cff2_program_payload_bytes": 1637,
+      "cff2_other_bytes": 406,
+      "seconds": 0.046382416010601446,
+      "peak_rss_bytes": 35635200
+    },
+    {
+      "face": 31,
+      "gid": 19177,
+      "helper_limit": 215,
+      "font_sha256": "e81eaaac1a028501f519bcc7b872a9e56f4a56665bad8278e049d6b73ae61cab",
+      "file_bytes": 89678600,
+      "tables": {
+        "head": 54,
+        "hhea": 36,
+        "maxp": 6,
+        "OS/2": 96,
+        "hmtx": 8200,
+        "cmap": 60,
+        "name": 1851,
+        "post": 32,
+        "CFF2": 88800381,
+        "GSUB": 230846,
+        "HVAR": 2001,
+        "STAT": 172,
+        "avar": 625952,
+        "fvar": 396,
+        "vhea": 36,
+        "vmtx": 8200
+      },
+      "glyphs": 4099,
+      "axes": 19,
+      "flagged_hidden_axes": 18,
+      "computational_axes": 16,
+      "cff2_regions": 190,
+      "cff2_data_sets": 4097,
+      "cff2_variation_store_payload_bytes": 142354,
+      "cff2_variation_store_length_sentinel": true,
+      "avar2_regions": 4062,
+      "font_dicts": 1,
+      "program_categories": {
+        "main": {
+          "count": 4099,
+          "bytes": 67957742,
+          "maximum_bytes": 53858
+        },
+        "global": {
+          "count": 33898,
+          "bytes": 20542372,
+          "maximum_bytes": 59567
+        },
+        "local": {
+          "count": 215,
+          "bytes": 5408,
+          "maximum_bytes": 128
+        }
+      },
+      "cff2_program_payload_bytes": 88505522,
+      "cff2_other_bytes": 294859,
+      "seconds": 0.41351070898235776,
+      "peak_rss_bytes": 310296576
+    },
+    {
+      "face": 31,
+      "gid": 50,
+      "helper_limit": 215,
+      "font_sha256": "25694201d6754eb32400b346a2a8ec5d6e36f8778634a33492449bc36c0ce5a6",
+      "file_bytes": 5312,
+      "tables": {
+        "head": 54,
+        "hhea": 36,
+        "maxp": 6,
+        "OS/2": 96,
+        "hmtx": 24,
+        "cmap": 60,
+        "name": 633,
+        "post": 32,
+        "CFF2": 2043,
+        "GSUB": 558,
+        "HVAR": 1233,
+        "STAT": 44,
+        "avar": 74,
+        "fvar": 76,
+        "vhea": 36,
+        "vmtx": 24
+      },
+      "glyphs": 11,
+      "axes": 3,
+      "flagged_hidden_axes": 2,
+      "computational_axes": 0,
+      "cff2_regions": 6,
+      "cff2_data_sets": 9,
+      "cff2_variation_store_payload_bytes": 258,
+      "cff2_variation_store_length_sentinel": false,
+      "avar2_regions": 0,
+      "font_dicts": 1,
+      "program_categories": {
+        "main": {
+          "count": 11,
+          "bytes": 1053,
+          "maximum_bytes": 117
+        },
+        "global": {
+          "count": 28,
+          "bytes": 584,
+          "maximum_bytes": 23
+        }
+      },
+      "cff2_program_payload_bytes": 1637,
+      "cff2_other_bytes": 406,
+      "seconds": 0.04232595898793079,
+      "peak_rss_bytes": 35569664
+    }
+  ],
+  "production_accepted": false,
+  "full_font_size_estimated": false
+}

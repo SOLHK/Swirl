@@ -10,6 +10,7 @@
 #include <QQmlContext>
 #include <QQmlExpression>
 #include <QQmlComponent>
+#include <QQmlIncubationController>
 #include <QQmlEngine>
 #include <QQmlProperty>
 #include <QTest>
@@ -20,8 +21,10 @@
 #include <QImage>
 #include <QFile>
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QJSValue>
+#include <QSet>
 #include <cstdio>
 #include <functional>
 #include <memory>
@@ -29,7 +32,21 @@
 int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     if(!window||!controller)return 1;
     int checks=0,failures=0;
-    const auto check=[&](bool ok,const char *label){++checks;if(!ok)++failures;qInfo()<<(ok?"PASS":"FAIL")<<label;return ok;};
+    const auto check=[&](bool ok,const char *label){
+        ++checks;if(!ok)++failures;qInfo()<<(ok?"PASS":"FAIL")<<label;
+        if(!ok){
+            qInfo().noquote()<<"Node failure state"<<QJsonDocument(QJsonObject{
+                {"nodes",controller->nodes().size()},{"nodeError",controller->nodeError()},
+                {"nodeBusy",controller->nodeBusy()},{"canStart",controller->canStart()},
+                {"processAlive",controller->processAlive()},{"policyBusy",controller->policyBusy()},
+                {"policyApplyState",controller->policyApplyState()},{"policyError",controller->policyError()},
+                {"policyRequestId",controller->policyRequestId()}}).toJson(QJsonDocument::Compact);
+            if(auto *dialog=window->findChild<QObject *>("proxyAddDialog"))
+                qInfo()<<"Node editor failure state"<<"visible"<<dialog->property("visible")
+                       <<"opened"<<dialog->property("opened")<<"dismissing"<<dialog->property("dismissing");
+        }
+        return ok;
+    };
     auto *proxyBackend=dynamic_cast<PolicySystemProxyBackend *>(controller->systemProxy()->backend());
     if(!check(proxyBackend!=nullptr,"node acceptance uses a per-instance system-proxy sandbox before any input"))return 2;
     std::function<QQuickItem *(QQuickItem *,const QString &)> find;
@@ -49,8 +66,12 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         QPointer<QQuickItem> target;
         const bool ready=QTest::qWaitFor([&]{
             auto *hero=item("nodeHero");
+            auto *editor=window->findChild<QObject *>("proxyAddDialog");
             target=findInput(window->contentItem(),n);
-            return !(hero&&hero->property("moving").toBool())&&target;
+            // A completed save can still be closing its modal editor. The
+            // underlying detail button is visible during that exit transition.
+            const bool editorBlocksDelete=n=="nodeDeleteButton"&&editor&&editor->property("visible").toBool();
+            return !(hero&&hero->property("moving").toBool())&&!editorBlocksDelete&&target;
         },3500);
         if(!ready){
             int matches=0;
@@ -69,10 +90,22 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
             qInfo()<<"Node input readiness matches"<<n<<matches;
         }
         if(!check(ready,"node input is visible after motion settles"))return;
+        std::unique_ptr<QSignalSpy> deleteClicks;
+        QVariant deleteEditorVisible,deleteEditorDismissing;
+        if(n=="nodeDeleteButton"&&target){
+            deleteClicks=std::make_unique<QSignalSpy>(target,SIGNAL(clicked()));
+            if(auto *dialog=window->findChild<QObject *>("proxyAddDialog")){
+                deleteEditorVisible=dialog->property("visible");
+                deleteEditorDismissing=dialog->property("dismissing");
+            }
+        }
         if(check(target&&target->isEnabled(),"node input exists and is enabled"))
             QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,target->mapToScene(QPointF(target->width()/2,target->height()/2)).toPoint());
         QTest::qWait(300);
         if(n=="nodeSaveButton"||n=="nodeDeleteButton")check(QTest::qWaitFor([&]{return !controller->policyBusy();},10000),"node mutation waits for its real configuration completion");
+        if(deleteClicks&&deleteClicks->isValid()&&deleteClicks->isEmpty())
+            qInfo()<<"Node delete input was not delivered"<<"editorVisibleAtClick"<<deleteEditorVisible
+                   <<"editorDismissingAtClick"<<deleteEditorDismissing;
     };
     const auto fill=[&](const QString &n,const QString &v){auto *t=item(n);if(check(t!=nullptr,"node field exists"))t->setProperty("text",v);};
     std::function<QQuickItem *(QQuickItem *,const QString &)> findNodeRow;
@@ -251,13 +284,15 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                                 const auto detail=capsule->property("detail").toString();
                                 const auto accessibleName=QQmlProperty::read(capsule,QStringLiteral("Accessible.name"),qmlContext(capsule));
                                 const auto accessibleDescription=QQmlProperty::read(capsule,QStringLiteral("Accessible.description"),qmlContext(capsule));
+                                // Qt separates the visible control name from its
+                                // full state/action description; neither may be lost.
                                 return label==QStringLiteral("系统代理")&&capsule->isEnabled()
                                     &&capsule->property("proxyEnabled").toBool()==enabled&&capsule->property("proxyOwned").toBool()==enabled
                                     &&capsule->property("tone").toString()==(enabled?"success":"neutral")
                                     &&capsule->property("activityPhase").toString()==(enabled?"succeeded":"idle")
                                     &&detail.contains(enabled?QStringLiteral("已接管系统代理"):QStringLiteral("点击启动已保存策略"))
                                     &&detail.contains(enabled?QStringLiteral("点击恢复原设置并停止内核"):QStringLiteral("通过 Swirl 开启代理"))
-                                    &&accessibleName.isValid()&&accessibleName.toString()==label+QStringLiteral("，")+detail
+                                    &&accessibleName.isValid()&&accessibleName.toString()==label
                                     &&accessibleDescription.isValid()&&accessibleDescription.toString()==detail;
                             };
                             QSignalSpy clicked(capsule,SIGNAL(clicked()));
@@ -419,6 +454,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         QObject::connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
     }});
     check(subscriptions.listen(QHostAddress::LocalHost,0),"subscription HTTPS fixture listens");
+    const auto failedSourceUrl=QUrl(QString("https://localhost:%1/fixture").arg(subscriptions.serverPort()));
     eval("AppState.navigate('subscriptions')");QTest::qWait(350);
     click("addSubscription");fill("subscriptionName","Subscription fixture");fill("subscriptionUrl",QString("https://localhost:%1/fixture").arg(subscriptions.serverPort()));click("saveSubscription");
     const auto pendingProviders=controller->imports()->providers();
@@ -467,13 +503,18 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         check(card&&collapsedHeight<=100*eval("Theme.uiScale").toReal(),"subscription source uses a compact list row instead of a dashboard card");
         const auto originalSize=window->size();
         window->resize(window->minimumWidth(),window->minimumHeight());QTest::qWait(250);
-        auto *title=item("subscriptionTitle-"+id),*refresh=item("refreshSubscription-"+id),*more=item("moreSubscription-"+id);
+        auto *title=item("subscriptionTitle-"+id),*use=item("useSubscription-"+id),*refresh=item("refreshSubscription-"+id),*more=item("moreSubscription-"+id);
         check(title&&title->width()>=60*eval("Theme.uiScale").toReal(),"subscription title keeps readable width at minimum window size");
         check(refresh&&more&&refresh->isVisible()&&refresh->isEnabled()&&more->isVisible()&&more->isEnabled(),"subscription actions stay visible and enabled at minimum window size");
+        check(use&&use->isVisible()&&use->isEnabled(),"subscription selection stays visible and enabled at minimum window size");
         if(title&&refresh&&more){
             const QRectF bounds(0,0,window->width(),window->height());
             const QRectF titleRect(title->mapToScene(QPointF()),title->size()),refreshRect(refresh->mapToScene(QPointF()),refresh->size()),moreRect(more->mapToScene(QPointF()),more->size());
             check(bounds.contains(titleRect)&&bounds.contains(refreshRect)&&bounds.contains(moreRect)&&!titleRect.intersects(refreshRect)&&!titleRect.intersects(moreRect)&&!refreshRect.intersects(moreRect),"subscription title and actions remain inside the minimum window without overlap");
+            if(use){
+                const QRectF useRect(use->mapToScene(QPointF()),use->size());
+                check(bounds.contains(useRect)&&!useRect.intersects(titleRect)&&!useRect.intersects(refreshRect)&&!useRect.intersects(moreRect),"subscription selection remains inside the minimum window without overlapping title or actions");
+            }
         }
         if(!qa.isEmpty())window->grabWindow().save(qa+"/subscription-minimum.png");
         window->resize(originalSize);QTest::qWait(250);
@@ -486,8 +527,22 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         click("moreSubscription-"+id);click("editSubscription-"+id);QTest::qWait(250);
         if(!qa.isEmpty())window->grabWindow().save(qa+"/subscription-edit.png");
         check(item("subscriptionUrl")&&item("subscriptionUrl")->property("text").toString().isEmpty(),"editing subscription keeps its protected URL hidden");
+        auto *downloadChoice=item("subscriptionDownloadRoute");auto *sourceDialog=window->findChild<QObject *>("subscriptionDialog");
+        check(downloadChoice&&downloadChoice->property("currentIndex").toInt()==0,"existing sources keep system networking as their default download route");
+        if(downloadChoice&&sourceDialog){
+            const auto autoUpdate=sourceDialog->property("autoUpdate").toBool();downloadChoice->setProperty("currentIndex",1);
+#ifdef Q_OS_WIN
+            constexpr bool physicalAvailable=true;
+#else
+            constexpr bool physicalAvailable=false;
+#endif
+            check(sourceDialog->property("downloadRoute").toString()=="physical"&&sourceDialog->property("downloadRouteSupported").toBool()==physicalAvailable&&downloadChoice->property("currentText").toString().contains(physicalAvailable?QStringLiteral("绕过系统代理"):QStringLiteral("仅 Windows")),"physical download choice describes its route and actual platform availability");
+            check(item("saveSubscription")&&item("saveSubscription")->isEnabled()==physicalAvailable,"unsupported physical download choices cannot be saved");
+            check(sourceDialog->property("autoUpdate").toBool()==autoUpdate&&sourceDialog->property("sourceUrl").toString().isEmpty(),"choosing a download route does not alter automatic updates or expose the saved URL");
+            downloadChoice->setProperty("currentIndex",0);
+        }
         fill("subscriptionName","Edited subscription fixture");click("saveSubscription");
-        check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->imports()->providers().first().toMap().value("name").toString()=="Edited subscription fixture"&&subscriptionRequests==2,"editing preserves encrypted URL and refreshes the real source");
+        check(QTest::qWaitFor([&]{return !controller->imports()->busy()&&controller->imports()->providers().first().toMap().value("name").toString()=="Edited subscription fixture"&&subscriptionRequests==2;},8000),"editing preserves encrypted URL and refreshes the real source");
         check(card&&item("subscriptionCard-"+id)==card,"subscription refresh keeps the same card delegate and expanded state");
         eval("AppState.navigate('proxies')");QTest::qWait(350);
         check(eval("pageLoader.item.countries.length===1 && pageLoader.item.countries[0].code==='JP' && pageLoader.item.countryCode==='' && pageLoader.item.resultCount===1").toBool(),"subscription refresh replaces country options and clears an obsolete country selection");
@@ -509,11 +564,23 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         check(eval("pageLoader.item.listed.length===1").toBool(),"clearing source search restores the real subscription");
         subscriptions.close();click("refreshSubscription-"+id);
         check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&!controller->imports()->providers().first().toMap().value("error").toString().isEmpty()&&controller->nodes().size()==1,"failed real refresh displays an error and retains imported nodes");
+        check(QTest::qWaitFor([&]{auto *failure=item("subscriptionFailure-"+id);return failure&&failure->property("text").toString()==QStringLiteral("更新失败 · 已保留 1 个已保存节点");},3000),"failed refresh reports the actual retained source-node count");
         if(!qa.isEmpty())window->grabWindow().save(qa+"/subscription-failure.png");
         click("moreSubscription-"+id);click("deleteSubscription-"+id);QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(250);
         check(controller->imports()->providers().size()==1,"Escape cancels destructive subscription confirmation");
         click("moreSubscription-"+id);click("deleteSubscription-"+id);click("confirmSubscriptionDelete");
         check(QTest::qWaitFor([&]{return !controller->imports()->busy()&&!controller->policyBusy()&&controller->imports()->providers().isEmpty()&&controller->nodes().isEmpty();},10000),"confirmed deletion removes the source's owned nodes after commit and revocation receipt");
+    }
+    check(controller->imports()->saveSubscription({},"First failed source",failedSourceUrl,360,false),"first-failure source is saved without any nodes");
+    check(QTest::qWaitFor([&]{return !controller->imports()->busy()&&controller->imports()->providers().size()==1;},8000),"first-failure source metadata commit completes");
+    if(!controller->imports()->providers().isEmpty()){
+        const auto firstId=controller->imports()->providers().first().toMap().value("id").toString();
+        controller->imports()->refreshSubscription(firstId);
+        check(QTest::qWaitFor([&]{return !controller->imports()->busy()&&controller->imports()->providers().first().toMap().value("status").toString()==QStringLiteral("更新失败");},8000),"first source update fails without importing any node");
+        click("expandSubscription-"+firstId);
+        check(QTest::qWaitFor([&]{auto *failure=item("subscriptionFailure-"+firstId);return failure&&failure->isVisible()&&effectiveOpacity(failure)>0.95&&failure->property("text").toString()==QStringLiteral("更新失败 · 此来源尚无已保存节点");},3000)&&controller->nodes().isEmpty(),"first failed import does not claim to retain earlier valid nodes");
+        check(controller->imports()->removeSubscription(firstId),"first-failure fixture source is removed");
+        check(QTest::qWaitFor([&]{return !controller->imports()->busy()&&controller->imports()->providers().isEmpty();},8000),"first-failure fixture removal completes");
     }
     // Large-list layout/transfer fixture uses reserved local endpoints only.
     QString batch="proxies:\n";
@@ -552,7 +619,38 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         QTest::qWait(5);
         eval(QString("pageLoader.item.inspectRow(engineController.nodes[%1])").arg(i));
     }
-    check(QTest::qWaitFor([&]{return hero&&!hero->property("moving").toBool();},3500),"180 rapid node selections settle");
+    auto *incubation=qmlEngine(window)->incubationController();
+    const auto incubationCount=[&]{return incubation?incubation->incubatingObjectCount():0;};
+    const auto loadingSources=[&]{
+        QJsonArray loading;
+        QList<QObject *> objects;QSet<QObject *> visited;
+        std::function<void(QObject *)> collect=[&](QObject *parent){
+            if(!parent||visited.contains(parent))return;visited.insert(parent);objects.append(parent);
+            for(auto *child:parent->children())collect(child);
+            if(auto *visual=qobject_cast<QQuickItem *>(parent))for(auto *child:visual->childItems())collect(child);
+        };
+        collect(window);collect(window->contentItem());
+        for(auto *object:objects){
+            if(!object->inherits("QQuickLoader")||object->property("status").toInt()!=2)continue;
+            QStringList parents;QString route;
+            for(auto *ancestor=object;ancestor;ancestor=ancestor->parent()){
+                parents.append(QString::fromLatin1(ancestor->metaObject()->className())+":"+ancestor->objectName());
+                if(route.isEmpty()&&ancestor->property("routeId").isValid())route=ancestor->property("routeId").toString();
+            }
+            const auto *context=qmlContext(object);
+            loading.append(QJsonObject{{"class",QString::fromLatin1(object->metaObject()->className())},{"name",object->objectName()},
+                {"route",route},{"source",object->property("source").toUrl().toString()},{"context",context?context->baseUrl().toString():QString()},
+                {"active",object->property("active").toBool()},{"asynchronous",object->property("asynchronous").toBool()},{"parents",parents.join(" / ")}});
+        }
+        return loading;
+    };
+    const auto initialIncubations=incubationCount();const auto initialLoading=loadingSources();
+    check(QTest::qWaitFor([&]{return hero&&!hero->property("moving").toBool()&&incubationCount()==0;},3500),"180 rapid node selections settle");
+    const auto finalIncubations=incubationCount();const auto finalLoading=loadingSources();
+    qInfo()<<"NODE_INCUBATION_LIFECYCLE"<<QJsonDocument(QJsonObject{{"controllerPresent",incubation!=nullptr},
+        {"initialCount",initialIncubations},{"finalCount",finalIncubations},{"initialLoadingSources",initialLoading},{"finalLoadingSources",finalLoading},
+        {"scope","Public incubation-controller count and live Loader sources only; this does not prove the engine's broader in-progress-creation counter is empty."}}).toJson(QJsonDocument::Compact);
+    check(finalIncubations==0&&finalLoading.isEmpty(),"rapid node selection leaves no pending public incubation or Loading Loader before shutdown");
     check(eval("pageLoader.item.selected.name.indexOf('179')>=0").toBool(),"last of 180 rapid detail retargets retains its selected node");
     auto *identity=item("nodeIdentitySurface");
     check(identity&&identity->parentItem()!=hero->parentItem(),"settled node details return to scroll ownership");

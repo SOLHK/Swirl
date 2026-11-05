@@ -1,0 +1,408 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-29T19:47:15.658672+00:00",
+  "source_commit": "7d5c16623c8dfa7f1016b5d27ed605635b80f681",
+  "cargo_lock_sha256": "a2adc62304af61b3d9c4faf7935b5572783f295510719f45fef9d74185175941",
+  "environment": {
+    "host": "x86_64-unknown-linux-gnu",
+    "rustc": "1.99.1 (58cf8f9c3 2026-10-13)",
+    "network": "real local IPv4/IPv6 loopback sockets; no host route, DNS or driver changes"
+  },
+  "command": "cargo test --offline --locked --workspace --all-targets",
+  "exit_code": 0,
+  "totals": {
+    "passed": 867,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered": 0
+  },
+  "test_targets": [
+    {
+      "target": "unittests src/lib.rs",
+      "passed": 50,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/main.rs",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/bin/swirl-diagnose.rs",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/bin/swirl-inspect.rs",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/bin/swirl-tun-helper.rs",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_boundary.rs",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_cli.rs",
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/windows-tun-smoke.rs",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "passed": 60,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/china_rules.rs",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/network.rs",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/socks5_udp.rs",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_import.rs",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/transport-runtime.rs",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "passed": 27,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "passed": 127,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/quic_preflight.rs",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/vision.rs",
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/vision_record.rs",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/vision_stream.rs",
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/vision_tls.rs",
+      "passed": 26,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/hysteria2-client.rs",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/hysteria2-lifecycle.rs",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/ss2022-client.rs",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/transport-client.rs",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/tuic-client.rs",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/vision-client.rs",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "passed": 160,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_adversarial.rs",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_conversion.rs",
+      "passed": 18,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_conversion_auth.rs",
+      "passed": 19,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_conversion_password.rs",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_conversion_security.rs",
+      "passed": 27,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_native.rs",
+      "passed": 23,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_native_selection.rs",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_native_transports.rs",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/xray_structure.rs",
+      "passed": 27,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "passed": 120,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/client_hello_customizer.rs",
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/reality-client.rs",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests examples/reality-hello.rs",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "target": "tests/packet_flows.rs",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    }
+  ],
+  "clippy": {
+    "command": "cargo clippy --offline --locked --workspace --all-targets -- -D warnings",
+    "exit_code": 0
+  },
+  "rustfmt": {
+    "command": "cargo fmt --all -- --check",
+    "exit_code": 0
+  },
+  "rustsec": {
+    "tool": "cargo-audit 0.22.2",
+    "database_commit": "ee1a49a2769a24a596afc1c20cb33748d2769586",
+    "advisories": 1386,
+    "vulnerabilities": 0,
+    "warnings": {},
+    "ignore": [],
+    "deny": "warnings",
+    "exit_code": 0
+  },
+  "scope_notes": [
+    "An initial sandboxed attempt could not bind local sockets (EPERM). This recorded complete rerun used authorized loopback access and kept all original assertions.",
+    "Packet simulation and local socket integration do not prove Windows driver integration, public proxy interoperability, application acceptance, sleep/wake or pressure measurements.",
+    "Real Windows 11 Wintun and application acceptance has not run.",
+    "The tests named xray cover retained import/compatibility behavior; they do not use Xray as the Swirl runtime.",
+    "Includes the Windows read-write fake-IP journal fix, deterministic native UDP completion and bounded helper output fixes. This Linux run compiles only the non-Windows smoke entry guard; it does not execute the Windows driver example."
+  ],
+  "log_sha256": "d9b2aa093ae2b076defe8455afac84b89726de68d0c699b13c59cfc6823bb208"
+}

@@ -867,7 +867,7 @@ private slots:
      const auto greeting=QByteArray::fromHex("050100");QCOMPARE(denied.write(greeting),greeting.size());
      QVERIFY(QTest::qWaitFor([&]{response+=denied.readAll();return response.size()>=2||denied.state()==QAbstractSocket::UnconnectedState;},5000));QCOMPARE(response,QByteArray::fromHex("0500"));response.clear();
      auto message=QByteArray::fromHex("050100017f000001");message.append(char(rejectOrigin.serverPort()>>8));message.append(char(rejectOrigin.serverPort()&255));QCOMPARE(denied.write(message),message.size());
-     QVERIFY(QTest::qWaitFor([&]{response+=denied.readAll();return response.size()>=10||denied.state()==QAbstractSocket::UnconnectedState;},5000));QCOMPARE(response,QByteArray::fromHex("05050001000000000000"));
+     QVERIFY(QTest::qWaitFor([&]{response+=denied.readAll();return response.size()>=10||denied.state()==QAbstractSocket::UnconnectedState;},5000));QCOMPARE(response,QByteArray::fromHex("05020001000000000000"));
     }
     denied.abort();QCOMPARE(leakedConnections,0);QVERIFY(!rejectOrigin.hasPendingConnections());
    }
@@ -940,7 +940,14 @@ private slots:
     auto request=QByteArray::fromHex("05010003");request.append(char(host.toUtf8().size()));request+=host.toUtf8();request.append(char(targetPort>>8));request.append(char(targetPort&255));response.clear();
     if(socket.write(request)!=request.size())return false;
     if(!QTest::qWaitFor([&]{response+=socket.readAll();return response.size()>=10||socket.state()==QAbstractSocket::UnconnectedState;},5000))return false;
-    success=QByteArray::fromHex("05000001000000000000");failure=QByteArray::fromHex("05050001000000000000");check["proxy_status"]=response==success?0:response==failure?5:-1;
+    // RFC 1928 distinguishes policy denial (2) from an upstream handshake
+    // failure (1). Neither condition is a target TCP refusal (5).
+    success=QByteArray::fromHex("05000001000000000000");
+    failure=QByteArray::fromHex(check["phase"].toString()=="reject"?"05020001000000000000":"05010001000000000000");
+    // Preserve the numeric REP for a canonical reply even if its semantics
+    // are wrong, without accepting it or recording arbitrary peer bytes.
+    const bool canonical=response.size()==10&&response[0]==char(5)&&response.mid(2)==QByteArray::fromHex("0001000000000000");
+    check["proxy_status"]=canonical?int(quint8(response[1])):-1;
    }
    check["frontend_response_valid"]=response==success||response==failure;check["tunnel_accepted"]=response==success;return response==success;
   };

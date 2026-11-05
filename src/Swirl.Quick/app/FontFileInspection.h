@@ -89,7 +89,7 @@ inline Inspection inspect(QFile &file)
         result.faces.append(face);
     }
     // Recognize the actual Apple-only format before asking a Windows/FreeType
-    // engine to load it. Renaming the source to Swirl-VF.ttc is not conversion.
+    // engine to load it. Renaming the source to SwirlVF.ttc is not conversion.
     if (result.hvfOnly)
         return invalid(QStringLiteral("Apple HVGL outlines require a verified standard OpenType conversion."));
 

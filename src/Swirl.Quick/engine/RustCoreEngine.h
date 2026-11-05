@@ -1,6 +1,7 @@
 #pragma once
 #include "ProxyEngine.h"
 #include "RustCoreLibrary.h"
+#include "NativeTunBrokerClient.h"
 #include <QTimer>
 #include <QElapsedTimer>
 #include <QSet>
@@ -17,6 +18,7 @@ public:
  void selectNode(const QString &) override;
  void setRoutingMode(const QString &) override;
  void configurationCommand(const QJsonObject &) override;
+ void lanCommand(const QJsonObject &) override;
  void probeNode(const QUrl &) override;
  Status status() const override {return m_status;}
  QString probeFailureStage() const override {return m_probeFailureStage;}
@@ -30,10 +32,14 @@ public:
  static QJsonObject validateConfigurationV2(const EngineStartOptions &,const QJsonObject &policy,const QString &requestId);
  static QString validateNetworkConfiguration(const QList<ProxyNode> &,const QVariantMap &,const QStringList &,const QVariantList &,bool nativePrivateRouting=false);
  static QString validatePolicyGroups(const QList<ProxyNode> &,const QVariantList &);
+ static bool nativeTunAvailable();
 private:
  friend class PolicyConfigurationTests;
  using Command=qintptr(*)(const unsigned char *,size_t,unsigned char *,size_t);
  QJsonObject call(QJsonObject);
+ QJsonObject tunCommand(const QString &operation);
+ void updateTunStatus(const QJsonObject &);
+ bool recoverTunConnection(QString *);
  void startV2(const EngineStartOptions &);
  void ingestConfigurationReceipt(const QJsonObject &);
  void retainPublicNodeIdentities();
@@ -45,6 +51,7 @@ private:
  void recordForwardingFailures(const QJsonObject &);
  RustCoreLibrary &m_library = RustCoreLibrary::instance();
  Command m_command=nullptr;
+ NativeTunBrokerClient m_tunBroker;
  quint64 m_handle=0;
  EngineStartOptions m_options;
  Status m_status;
@@ -55,7 +62,7 @@ private:
  qint64 m_probeOutboundConnectMs=-1,m_probeOriginTlsMs=-1;
  QSet<quint64> m_reportedForwardingFailures;
  bool m_forwardingFailureLimitReported=false;
- bool m_v2=false;
+ bool m_v2=false,m_lanTracked=false,m_brokerSession=false;
  QString m_engineEpoch;
  QJsonObject m_preparedPolicy,m_previousPolicy;
  bool m_configurationRollback=false;

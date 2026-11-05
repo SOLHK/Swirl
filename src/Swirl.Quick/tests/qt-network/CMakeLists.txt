@@ -29,6 +29,10 @@ add_executable(SwirlQtNetworkPolicyTests
  "${SWIRL_QUICK_SOURCE}/engine/NativeNodeBridge.cpp"
  "${SWIRL_QUICK_SOURCE}/engine/RustCoreEngine.cpp"
  "${SWIRL_QUICK_SOURCE}/engine/RustCoreLibrary.cpp"
+ "${SWIRL_QUICK_SOURCE}/engine/NativeTunBrokerClient.cpp"
+ "${SWIRL_QUICK_SOURCE}/engine/NativeTunBrokerClient.h"
+ "${SWIRL_QUICK_SOURCE}/app/NativeTunRecovery.cpp"
+ "${SWIRL_QUICK_SOURCE}/app/NativeTunRecovery.h"
  "${SWIRL_QUICK_SOURCE}/engine/ProxyEngine.h")
 target_include_directories(SwirlQtNetworkPolicyTests PRIVATE "${SWIRL_QUICK_SOURCE}")
 target_compile_definitions(SwirlQtNetworkPolicyTests PRIVATE
@@ -39,7 +43,7 @@ swirl_pair_rust_core(SwirlQtNetworkPolicyTests)
 swirl_stage_rust_core(SwirlQtNetworkPolicyTests)
 if(WIN32)
  target_compile_definitions(SwirlQtNetworkPolicyTests PRIVATE NOMINMAX)
- target_link_libraries(SwirlQtNetworkPolicyTests PRIVATE crypt32)
+ target_link_libraries(SwirlQtNetworkPolicyTests PRIVATE crypt32 advapi32 ole32 shell32)
 endif()
 if(MSVC)
  target_compile_options(SwirlQtNetworkPolicyTests PRIVATE /utf-8)

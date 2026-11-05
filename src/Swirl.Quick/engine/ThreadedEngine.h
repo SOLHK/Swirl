@@ -29,6 +29,10 @@ public:
                 const auto epoch=m_workerEpoch;
                 QMetaObject::invokeMethod(this,[this,module,code,message,epoch]{if(epoch==m_epoch)emit diagnostic(module,code,message);},Qt::QueuedConnection);
             });
+            connect(m_engine,&ProxyEngine::lanCommandFinished,m_context,[this](const QString &requestId,const QJsonObject &response){
+                const auto epoch=m_workerEpoch;
+                QMetaObject::invokeMethod(this,[this,requestId,response,epoch]{if(epoch==m_epoch)emit lanCommandFinished(requestId,response);},Qt::QueuedConnection);
+            });
             connect(m_engine,&ProxyEngine::configurationCommandFinished,m_context,[this](const QString &requestId,const QJsonObject &response){
                 const auto epoch=m_workerEpoch;
                 QMetaObject::invokeMethod(this,[this,requestId,response,epoch]{if(epoch==m_epoch)emit configurationCommandFinished(requestId,response);},Qt::QueuedConnection);
@@ -71,6 +75,7 @@ public:
     }
     void setRoutingMode(const QString &mode) override {post([this,mode](auto *engine){m_workerProbeTag=0;engine->setRoutingMode(mode);});}
     void configurationCommand(const QJsonObject &command) override {post([command](auto *engine){engine->configurationCommand(command);});}
+    void lanCommand(const QJsonObject &command) override {post([command](auto *engine){engine->lanCommand(command);});}
     Status status() const override{return m_status;}
     QString configurationSummary() const override{return m_summary;}
     QVariantList routingRules() const override{return m_rules;}

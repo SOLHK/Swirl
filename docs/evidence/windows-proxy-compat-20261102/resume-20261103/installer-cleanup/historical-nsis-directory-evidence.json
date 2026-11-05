@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "scope": "Historical artifact bytecode inspection, not a Windows execution result.",
+  "source_head_sha": "24af5838e39b4612321a7ee2b1be11d78fb9b6dd",
+  "checkout_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+  "installer_sha256": "082c6e60ffa968d0e6d3d8766a055e7dc49b5a6263de1f66c74352218b6ea84b",
+  "manifest_sha256": "95e57c627ba3948422075ea22b731dc3bb77e386719e91cbf2450fb6a0758003",
+  "header_sha256": "eabc59830295157cbe30daa9d271e44ac1b2d64e3cf67c441a915a535742db97",
+  "header_offset": 553984,
+  "header_size": 120506,
+  "entry_count": 2280,
+  "payload_directory_commands": 66,
+  "directories_without_manifest_descendants": [
+    {
+      "entry_index": 727,
+      "opcode": 11,
+      "set_output_path": true,
+      "string_offset": 3967,
+      "relative_path": "qml/QtQml/DesignSupport",
+      "has_manifest_descendant": false
+    },
+    {
+      "entry_index": 736,
+      "opcode": 11,
+      "set_output_path": true,
+      "string_offset": 4080,
+      "relative_path": "qml/QtQml/XmlListModel",
+      "has_manifest_descendant": false
+    },
+    {
+      "entry_index": 1903,
+      "opcode": 11,
+      "set_output_path": true,
+      "string_offset": 21966,
+      "relative_path": "qml/QtQuick/Controls/Native",
+      "has_manifest_descendant": false
+    },
+    {
+      "entry_index": 2129,
+      "opcode": 11,
+      "set_output_path": true,
+      "string_offset": 23264,
+      "relative_path": "qml/QtQuick/LocalStorage",
+      "has_manifest_descendant": false
+    },
+    {
+      "entry_index": 2134,
+      "opcode": 11,
+      "set_output_path": true,
+      "string_offset": 23348,
+      "relative_path": "qml/QtQuick/NativeStyle/controls",
+      "has_manifest_descendant": false
+    },
+    {
+      "entry_index": 2135,
+      "opcode": 11,
+      "set_output_path": true,
+      "string_offset": 23384,
+      "relative_path": "qml/QtQuick/NativeStyle/util",
+      "has_manifest_descendant": false
+    },
+    {
+      "entry_index": 2136,
+      "opcode": 11,
+      "set_output_path": true,
+      "string_offset": 23416,
+      "relative_path": "qml/QtQuick/Particles",
+      "has_manifest_descendant": false
+    },
+    {
+      "entry_index": 2141,
+      "opcode": 11,
+      "set_output_path": true,
+      "string_offset": 23483,
+      "relative_path": "qml/QtQuick/Shapes/DesignHelpers",
+      "has_manifest_descendant": false
+    },
+    {
+      "entry_index": 2146,
+      "opcode": 11,
+      "set_output_path": true,
+      "string_offset": 23572,
+      "relative_path": "qml/QtQuick/VectorImage",
+      "has_manifest_descendant": false
+    },
+    {
+      "entry_index": 2147,
+      "opcode": 11,
+      "set_output_path": true,
+      "string_offset": 23599,
+      "relative_path": "qml/QtQuick/VectorImage/Helpers",
+      "has_manifest_descendant": false
+    },
+    {
+      "entry_index": 2152,
+      "opcode": 11,
+      "set_output_path": true,
+      "string_offset": 23699,
+      "relative_path": "qml/QtQuick/tooling",
+      "has_manifest_descendant": false
+    }
+  ],
+  "conclusion": "The reviewed installer contains directory-creation commands for 11 paths with no owned file descendants. Their actual post-uninstall remainder requires the Windows diagnostic workflow.",
+  "format_sources": [
+    "https://github.com/NSIS-Dev/nsis/blob/master/Source/exehead/exec.c",
+    "https://nsis.sourceforge.io/Docs/Chapter4.html#4.9.1.10"
+  ]
+}

@@ -61,12 +61,22 @@ class UdpHandler(socketserver.BaseRequestHandler):
     def handle(self):
         payload, sock = self.request
         self.server.received.append(payload)
+        observer = getattr(self.server, "datagram_observer", None)
+        if observer is not None:
+            observer("received", payload, self.client_address)
         if self.server.dns:
             # A bounded authoritative fixture responds to the real wire query.
             if len(payload) < 12 or payload[4:6] != b"\x00\x01":
                 return
             payload = payload[:2] + b"\x81\x80" + payload[4:6] + b"\x00\x01\x00\x00\x00\x00" + payload[12:] + b"\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x3c\x00\x04\xc0\x00\x02\x01"
-        sock.sendto(payload, self.client_address)
+        try:
+            sent = sock.sendto(payload, self.client_address)
+        except OSError as error:
+            if observer is not None:
+                observer("reply_error", payload, self.client_address, error)
+            raise
+        if observer is not None:
+            observer("reply_sent", payload[:sent], self.client_address)
 
 
 class TuicReferenceTests(unittest.TestCase):

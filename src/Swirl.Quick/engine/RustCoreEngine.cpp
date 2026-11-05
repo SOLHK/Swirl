@@ -3,7 +3,10 @@
 #include "XrayJsonBridge.h"
 #include "NativeNodeBridge.h"
 #include "RouteObservation.h"
+#include "app/NativeTunRecovery.h"
 #include <QCoreApplication>
+#include <QDir>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QDateTime>
@@ -269,8 +272,8 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
  if(!o.policyDocument.isEmpty())return configurationV2(o,o.policyDocument,output);
  if(o.proxyPort==0&&!o.internalProbeListener)return "本机代理端口无效，请设置 1 至 65535 之间的端口。";
  if(o.internalProbeListener&&o.proxyPort!=0)return "内部节点检测监听必须由 Rust 自动分配端口。";
- if(o.tunEnabled||o.gatewayForwarding)return "当前会话要求增强模式或网关转发，但 Rust 版尚未支持。请在“概览”关闭增强模式后重试。";
- if(o.allowLan)return "当前会话要求局域网代理，但 Rust 版尚未支持。请在“概览”关闭局域网代理后重试。";
+ if(o.tunEnabled||o.gatewayForwarding)return "旧版策略入口不支持 TUN 或网关转发。请在“概览”关闭增强模式与网关转发后重试。";
+ if(o.allowLan)return "旧版 allowLan 选项不能扩大本机监听范围；请使用独立的原生局域网代理入口。";
  if(o.meteredNetwork)return "当前会话要求计费网络模式，但 Rust 版尚未支持。请在“设置”关闭计费网络模式后重试。";
  if(o.routingMode!="global"&&o.routingMode!="rule"&&o.routingMode!="direct")return "Rust 路由模式无效。";
  QJsonObject dns;const auto dnsError=dnsConfiguration(o,&dns);if(!dnsError.isEmpty())return dnsError;
@@ -325,6 +328,10 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
 }
 QString RustCoreEngine::configurationV2(const EngineStartOptions &options,const QJsonObject &policy,QJsonObject *output){
  if(QJsonDocument(policy).toJson(QJsonDocument::Compact).size()>1024*1024)return QStringLiteral("策略文档超过控制协议上限，未截断配置。");
+#ifndef Q_OS_WIN
+ if(options.tunEnabled)return QStringLiteral("当前平台尚未接入原生 TUN。");
+#endif
+ if(options.gatewayForwarding)return QStringLiteral("网关转发尚未接入本产品入口。");
  QSet<QString> referenced,missing;
  const std::function<void(const QJsonValue &)> visit=[&](const QJsonValue &value){
   if(value.isArray()){for(const auto &entry:value.toArray())visit(entry);return;}
@@ -334,9 +341,11 @@ QString RustCoreEngine::configurationV2(const EngineStartOptions &options,const 
  };
  visit(policy);
  for(const auto &entry:policy.value("missing_targets").toArray())if(entry.toObject().value("kind")==QJsonValue("node"))missing.insert(entry.toObject().value("id").toString());
- auto base=options;base.policyDocument={};base.routingMode="global";base.directSession=true;base.smartRouting=false;
+ auto base=options;base.policyDocument={};base.routingMode="global";base.directSession=true;base.smartRouting=false;base.tunEnabled=false;
  base.customGroups.clear();base.customRules.clear();QJsonObject config;
  const auto baseError=configuration(base,&config);if(!baseError.isEmpty())return baseError;
+ if(options.tunEnabled&&config.value("dns").toObject().value("tls_servers").toArray().isEmpty())
+  return QStringLiteral("原生 TUN 需要加密 DNS。请先在 DNS 页面填写 DoH 或 DoT，并保存端点所需的精确 IP 映射。");
  QJsonArray nodes;QJsonObject sources;
  auto ordered=referenced.values();std::sort(ordered.begin(),ordered.end());
  for(const auto &id:ordered){
@@ -370,12 +379,47 @@ QJsonObject RustCoreEngine::validateConfigurationV2(const EngineStartOptions &op
  return document.object();
 }
 QJsonObject RustCoreEngine::call(QJsonObject command){
+ if(m_brokerSession)return m_tunBroker.running()?m_tunBroker.command(command):QJsonObject{{"ok",false},{"error","TunBrokerDisconnected"}};
  if(!m_command)return {{"ok",false},{"error","RustLibraryUnavailable"}};
  auto input=QJsonDocument(command).toJson(QJsonDocument::Compact);QByteArray output(1024*1024,Qt::Uninitialized);
  if(input.size()>1024*1024){input.fill('\0');return {{"ok",false},{"error","RequestTooLarge"},{"code","RequestTooLarge"}};}
  const auto count=m_command(reinterpret_cast<const unsigned char *>(input.constData()),size_t(input.size()),reinterpret_cast<unsigned char *>(output.data()),size_t(output.size()));input.fill('\0');
  if(count<=0||count>output.size())return {{"ok",false},{"error","RustAbiFailure"}};
  output.resize(count);return QJsonDocument::fromJson(output).object();
+}
+bool RustCoreEngine::nativeTunAvailable(){
+#ifdef Q_OS_WIN
+ const QDir directory(QCoreApplication::applicationDirPath());
+ for(const auto &name:{"swirl-tun-broker.exe","swirl-tun-helper.exe","wintun.dll"})
+  if(!QFileInfo(directory.filePath(QString::fromLatin1(name))).isFile())return false;
+ return true;
+#else
+ return false;
+#endif
+}
+QJsonObject RustCoreEngine::tunCommand(const QString &operation){
+ return call({{"native_tun_schema",1},{"op",operation},{"request_id",QUuid::createUuid().toString(QUuid::WithoutBraces)},
+  {"handle",QString::number(m_handle)},{"engine_epoch",m_engineEpoch}});
+}
+void RustCoreEngine::updateTunStatus(const QJsonObject &result){
+ m_status.tunEnabled=result.value("ok").toBool()&&result.value("state")==QJsonValue("running")
+  &&result.value("capture_active").toBool()&&result.value("core_egress_guard_owned").toBool()
+  &&result.value("dns_guard_active").toBool();
+ if(!m_status.tunEnabled){
+  m_status.state=State::Degraded;
+  m_status.message=QStringLiteral("原生 TUN 状态尚未确认：")+result.value("last_error").toString(result.value("error").toString(result.value("state").toString("TunStatusUnconfirmed")));
+ }
+}
+bool RustCoreEngine::recoverTunConnection(QString *error){
+ const bool closed=m_tunBroker.close(error);
+ if((!closed&&m_tunBroker.running())||!m_tunBroker.launch(error))return false;
+ m_brokerSession=true;
+ const auto result=call({{"native_tun_schema",1},{"op","native_tun_recover"},{"request_id",QUuid::createUuid().toString(QUuid::WithoutBraces)}});
+ if(!result.value("ok").toBool()||result.value("state")!=QJsonValue("recovered")||
+    !result.value("active_owners").isDouble()||result.value("active_owners").toInteger()!=0){
+  *error=QStringLiteral("TUN 恢复仍未确认：")+result.value("error").toString("TunRecoveryStillOwned");return false;
+ }
+ m_handle=0;m_status.tunEnabled=false;return true;
 }
 void RustCoreEngine::resetProbeState(){
  m_probeRequestId=0;m_probeFailureStage.clear();m_probeOutboundConnectMs=m_probeOriginTlsMs=-1;
@@ -432,6 +476,9 @@ void RustCoreEngine::updateProbe(const QJsonObject &probe){
 }
 void RustCoreEngine::fail(Error error,const QString &reason){cancelProbe();m_status.state=State::Failed;m_status.error=error;m_status.message=reason;m_status.apiHealthy=false;emit diagnostic("SwirlRust","CoreFailure",reason);emit statusChanged();}
 void RustCoreEngine::start(const EngineStartOptions &options){
+ if(!m_handle&&(m_brokerSession||m_tunBroker.running())){
+  fail(Error::OwnershipFailed,QStringLiteral("原 TUN 会话的停止或恢复尚未确认，请先重试关闭代理。"));return;
+ }
  if(!options.policyDocument.isEmpty()){startV2(options);return;}
  QJsonObject config;const auto reason=configuration(options,&config);
  if(m_handle){
@@ -499,35 +546,57 @@ void RustCoreEngine::ingestConfigurationReceipt(const QJsonObject &response){
  }
 }
 void RustCoreEngine::startV2(const EngineStartOptions &options){
- if(m_handle){emit diagnostic("SwirlRust","CoreStartRejected",QStringLiteral("运行中的 V2 策略必须通过配置事务更新。"));return;}
+ if(m_handle){emit diagnostic("SwirlRust","CoreStartRejected",QStringLiteral("运行中的 V2 策略必须通过配置事务更新。"));emit statusChanged();return;}
  QJsonObject candidate;const auto reason=configurationV2(options,options.policyDocument,&candidate);
  if(!reason.isEmpty()){fail(Error::InvalidOptions,reason);return;}
  if(!m_command){if(!m_library.load()){fail(Error::MissingExecutable,m_library.errorString());return;}m_command=m_library.command();}
  if(!m_library.supportsConfigurationV2()){fail(Error::ConfigurationFailed,QStringLiteral("内核不支持 V2 配置事务，未降级为旧路由语义。"));return;}
+ if(options.tunEnabled){
+  QString error;
+  if(!nativeTunAvailable()){fail(Error::MissingExecutable,QStringLiteral("TUN 启动组件或驱动缺失，请重新安装完整测试包。"));return;}
+  if(!m_tunBroker.launch(&error)){fail(Error::ConfigurationFailed,error);return;}
+  m_brokerSession=true;
+ }
  auto request=QJsonObject{{"control_schema",2},{"op","start_v2"},{"request_id",options.configurationRequestId},
   {"store_id",options.configurationStoreId},{"saved_revision",options.configurationRevision},{"candidate",candidate}};
  if(!options.configurationDigest.isEmpty())request.insert("plan_digest",options.configurationDigest);
  const auto response=call(request);
- if(!response.value("ok").toBool()){fail(Error::ConfigurationFailed,response.value("error").toString(response.value("code").toString("ConfigurationRejected")));return;}
+ if(!response.value("ok").toBool()){if(m_tunBroker.close())m_brokerSession=false;fail(Error::ConfigurationFailed,response.value("error").toString(response.value("code").toString("ConfigurationRejected")));return;}
  bool handleOk=false;const auto handle=response.value("handle").toString().toULongLong(&handleOk);
  const auto address=response.value("status").toObject().value("address").toString();
  const auto bound=QRegularExpression("\\A127\\.0\\.0\\.1:([1-9][0-9]{0,4})\\z").match(address);
  const auto port=bound.hasMatch()?bound.captured(1).toUInt():0u;
  if(!handleOk||handle==0||port==0||port>65535||port!=options.proxyPort){
   if(handleOk&&handle)call({{"op","stop"},{"handle",qint64(handle)}});
+  if(m_tunBroker.close())m_brokerSession=false;
   fail(Error::InvalidResponse,QStringLiteral("Rust 未返回有效 V2 运行身份和监听地址。"));return;
  }
- m_options=options;retainPublicNodeIdentities();m_handle=handle;m_v2=true;m_status={};m_status.engineName="Swirl Core Rust";m_status.engineKind="rust";
+ m_options=options;retainPublicNodeIdentities();m_handle=handle;m_v2=true;m_status={};m_status.processAlive=true;m_status.engineName="Swirl Core Rust";m_status.engineKind="rust";
  ingestConfigurationReceipt(response);
  if(m_status.configurationReceipt.isEmpty()||m_status.configurationReceipt.value("applied_revision").toString()!=options.configurationRevision||
     (!options.configurationDigest.isEmpty()&&m_status.configurationReceipt.value("plan_digest").toString()!=options.configurationDigest)){
   stop();fail(Error::InvalidResponse,QStringLiteral("Rust 启动回执与已保存配置不一致；保持断开。"));return;
  }
+ if(options.tunEnabled){
+  QString markerError;
+  if(!setNativeTunRecoveryPending(true,&markerError)){
+   stop();fail(Error::ConfigurationFailed,markerError);return;
+  }
+  auto request=QJsonObject{{"native_tun_schema",1},{"op","native_tun_start"},{"request_id",QUuid::createUuid().toString(QUuid::WithoutBraces)},
+   {"handle",QString::number(m_handle)},{"engine_epoch",m_engineEpoch},
+   {"config",QJsonObject{{"driver_path",QDir(QCoreApplication::applicationDirPath()).filePath("wintun.dll")},
+    {"adapter_guid","4f9ba9f8-81ea-4c7c-bcf5-b9e47e4ba3cc"},{"adapter_name","Swirl Native TUN"}}}};
+  const auto result=call(request);
+  if(!result.value("ok").toBool()){
+   const auto error=result.value("error").toString("TunStartRejected");
+   stop();fail(Error::ConfigurationFailed,QStringLiteral("原生 TUN 启动未完成：")+error);return;
+  }
+ }
  const auto target=options.policyDocument.value("default_policy").toObject().value("target").toObject();
  m_status.selectedNodeId=target.value("kind")==QJsonValue("node")?target.value("id").toString():QString();
  m_status.proxyPort=int(port);m_status.sessionId=QUuid::createUuid().toString(QUuid::WithoutBraces);
- m_status.processId=QCoreApplication::applicationPid();m_status.version="Swirl Core Rust "+m_library.diagnostics().value("package_version").toString();
- m_status.controlEndpoint="in-process://SwirlRust/v2";m_uptime.start();m_rateClock.start();m_poll.start();refresh();
+ m_status.processId=options.tunEnabled?m_tunBroker.processId():QCoreApplication::applicationPid();m_status.version="Swirl Core Rust "+m_library.diagnostics().value("package_version").toString();
+ m_status.controlEndpoint=options.tunEnabled?"local-pipe://SwirlRust/v2":"in-process://SwirlRust/v2";m_uptime.start();m_rateClock.start();m_poll.start();refresh();
 }
 void RustCoreEngine::retainPublicNodeIdentities(){
  // V2 forwarding owns the immutable compiled secrets in Rust. The Qt worker
@@ -536,7 +605,7 @@ void RustCoreEngine::retainPublicNodeIdentities(){
  QList<ProxyNode> identities;identities.reserve(m_options.nodes.size());
  for(const auto &node:m_options.nodes){ProxyNode identity;identity.id=node.id;identity.name=node.name;identities.append(std::move(identity));}
  m_options.nodes=std::move(identities);m_options.dnsConfig.clear();m_options.customRules.clear();m_options.customGroups.clear();
- m_options.inboundUsername.clear();m_options.inboundPassword.clear();m_options.lanUsername.clear();m_options.lanPassword.clear();
+ m_options.inboundUsername.clear();m_options.inboundPassword.clear();m_options.lanUsername.clear();m_options.lanPassword.clear();m_options.lanConfiguration.clear();
 }
 void RustCoreEngine::configurationCommand(const QJsonObject &input){
  auto request=input;const auto requestId=request.value("request_id").toString(),op=request.value("op").toString();
@@ -565,19 +634,65 @@ void RustCoreEngine::configurationCommand(const QJsonObject &input){
  }
  emit configurationCommandFinished(requestId,result);emit statusChanged();
 }
+void RustCoreEngine::lanCommand(const QJsonObject &input){
+ const auto requestId=input.value("request_id").toString(),op=input.value("op").toString();
+ if(op=="lan_capabilities"){
+  // Library/source identity and optional-schema negotiation run on the engine
+  // worker even when no policy listener is running. Capability discovery must
+  // not require enabling system proxy or starting a network session first.
+  const bool loaded=m_library.load();if(loaded)m_command=m_library.command();
+  emit lanCommandFinished(requestId,{{"ok",loaded},{"request_id",requestId},{"available",loaded&&m_library.supportsLanProxy()}});
+  emit statusChanged();return;
+ }
+ if(!QStringList{"lan_start","lan_stop","lan_status"}.contains(op)||!m_handle||!m_v2||!m_library.supportsLanProxy()){
+  emit lanCommandFinished(requestId,{{"ok",false},{"request_id",requestId},{"code",!m_library.supportsLanProxy()?"UnsupportedCapability":"CoreUnavailable"}});return;
+ }
+ auto request=input;request.insert("control_schema",2);request.insert("handle",QString::number(m_handle));request.insert("engine_epoch",m_engineEpoch);
+ const auto response=call(request);m_lanTracked=true;
+ if(response.value("ok").toBool()&&response.value("lan").isObject()){
+  m_status.lan=response.value("lan").toObject();m_status.allowLan=m_status.lan.value("running").toBool();
+ }
+ emit lanCommandFinished(requestId,response);emit statusChanged();
+}
 void RustCoreEngine::stop(){
+ const bool stoppedBroker=m_brokerSession;
  m_poll.stop();cancelProbe();
+ if(m_brokerSession&&!m_tunBroker.running()){
+  QString error;
+  if(!recoverTunConnection(&error)){
+   m_status.state=State::Degraded;m_status.apiHealthy=false;m_status.message=error;emit statusChanged();return;
+  }
+ }
  if(m_handle){
   const auto finalSnapshot=call({{"op","snapshot"},{"handle",qint64(m_handle)}});
   if(finalSnapshot.value("ok").toBool())recordForwardingFailures(finalSnapshot.value("status").toObject());
   const auto stopped=call({{"op","stop"},{"handle",qint64(m_handle)}});
-  if(!stopped.value("ok").toBool()&&stopped.value("error").toString()!="UnknownHandle"){
-   m_status.state=State::Degraded;m_status.apiHealthy=false;m_status.message=QStringLiteral("内核停止回执未确认，未声明资源已释放。");
+  // Helper Controller::stop first restores its native session. Keep the Core
+  // alive on restoration failure; a missing handle is insufficient proof.
+  const auto stopError=stopped.value("error").toString();
+  if(!stopped.value("ok").toBool()&&(m_brokerSession||stopError!="UnknownHandle")){
+   QString recoveryError;
+   if(m_brokerSession&&(stopError.startsWith("TunBroker")||stopError=="UnknownHandle")&&recoverTunConnection(&recoveryError))m_handle=0;
+   else{
+   m_status.state=State::Degraded;m_status.apiHealthy=false;m_status.message=QStringLiteral("内核与网络恢复回执未确认，未声明资源已释放。")+recoveryError;
    emit diagnostic("SwirlRust","StopUnconfirmed",m_status.message);emit statusChanged();return;
+   }
   }
   m_handle=0;
+  m_status.tunEnabled=false;
  }
- m_v2=false;m_engineEpoch.clear();m_status.configurationReceipt={};m_preparedPolicy={};m_previousPolicy={};m_configurationRollback=false;
+ QString brokerError;
+ if(!m_tunBroker.close(&brokerError)){
+  m_status.state=State::Degraded;m_status.apiHealthy=false;m_status.message=brokerError;
+  emit statusChanged();return;
+ }
+ m_brokerSession=false;
+ if(stoppedBroker){
+  QString markerError;
+  m_status.message=setNativeTunRecoveryPending(false,&markerError)?QString():markerError;
+  if(!markerError.isEmpty())emit diagnostic("SwirlRust","TunRecoveryMarkerUnconfirmed",markerError);
+ }
+ m_v2=false;m_lanTracked=false;m_status.allowLan=false;m_status.lan={{"running",false}};m_engineEpoch.clear();m_status.configurationReceipt={};m_preparedPolicy={};m_previousPolicy={};m_configurationRollback=false;
  m_status.state=State::Stopped;m_status.processAlive=false;m_status.apiHealthy=false;m_status.nodeBusy=false;m_status.proxyPort=0;m_status.connections.clear();emit statusChanged();
 }
 void RustCoreEngine::refresh(){
@@ -587,6 +702,13 @@ void RustCoreEngine::refresh(){
  const auto state=response["status"].toObject();const auto elapsed=m_rateClock.restart();
  if(m_v2)ingestConfigurationReceipt(state.value("configuration").toObject());
  recordForwardingFailures(state);
+ if(m_v2&&m_lanTracked&&m_library.supportsLanProxy()){
+  const auto lan=call({{"control_schema",2},{"op","lan_status"},{"request_id",QUuid::createUuid().toString(QUuid::WithoutBraces)},
+    {"handle",QString::number(m_handle)},{"engine_epoch",m_engineEpoch}});
+  if(lan.value("ok").toBool()&&lan.value("lan").isObject()){
+   m_status.lan=lan.value("lan").toObject();m_status.allowLan=m_status.lan.value("running").toBool();
+  }else m_status.lan.insert("health_error","LanStatusUnconfirmed");
+ }
  const auto up=state["upload"].toInteger(),down=state["download"].toInteger();
  m_status.uploadRate=elapsed>0?double(up-m_status.uploadTotal)*1000/elapsed:0;m_status.downloadRate=elapsed>0?double(down-m_status.downloadTotal)*1000/elapsed:0;
  m_status.uploadTotal=up;m_status.downloadTotal=down;
@@ -594,6 +716,7 @@ void RustCoreEngine::refresh(){
  m_status.rustLastErrorStage=state["last_error_stage"].toString();
  m_status.processAlive=state["running"].toBool();m_status.apiHealthy=m_status.processAlive;
  m_status.state=m_status.processAlive?State::Running:State::Failed;m_status.uptimeSeconds=m_uptime.elapsed()/1000;
+ if(m_options.tunEnabled)updateTunStatus(tunCommand("native_tun_status"));
  m_status.connectionsAt=m_status.trafficAt=qMax(QDateTime::currentMSecsSinceEpoch(),m_status.connectionsAt+1);m_status.connections.clear();
  for(const auto &value:state["connections"].toArray()){
   const auto row=value.toObject();const auto node=row["node"].toString(),category=row["category"].toString();
@@ -623,7 +746,7 @@ void RustCoreEngine::recordForwardingFailures(const QJsonObject &state){
  static const QSet<QString> codes{
   "HandshakeTimeout","InboundClosed","InboundAuthentication","InboundReply",
   "UpstreamDnsTimeout","DnsLookupFailed","RouteDnsTimeout","UpstreamTcpTimeout","UpstreamConnectFailed","UpstreamAddressLimit",
-  "UpstreamConnectionRefused","UpstreamConnectionReset","UpstreamConnectionAborted","UpstreamNetworkUnreachable","UpstreamPermissionDenied",
+  "UpstreamConnectionRefused","UpstreamConnectionReset","UpstreamConnectionAborted","UpstreamNetworkUnreachable","UpstreamHostUnreachable","UpstreamPermissionDenied",
   "UpstreamTlsTimeout","TlsCertificateExpired","TlsCertificateNotValidYet","TlsCertificateNameMismatch","TlsCertificateUnknownIssuer",
   "TlsCertificateRevoked","TlsCertificateInvalid","TlsCertificateMissing","TlsVerificationOrHandshake","TlsHandshakeEof","TlsConnectionReset","TlsConnectionAborted","TlsConnectionRefused","TlsHandshakeIoTimeout","TlsHandshakeBrokenPipe",
   "UpstreamProtocolTimeout","UpstreamAuthentication","UpstreamRejected","UpstreamHeaderTooLarge","VmessHandshakeWrite","VlessHandshakeWrite","TrojanHandshakeWrite",

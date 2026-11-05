@@ -93,7 +93,14 @@ QString privateDigest(const QJsonObject &object) {
 }
 QString subscriptionDefinitionDigest(const NodeSubscription &source) {
     return privateDigest({{"id",source.id},{"name",source.name},{"url",source.url.toString(QUrl::FullyEncoded)},
-        {"format",source.formatHint},{"scope",source.importScope},{"interval",source.intervalMinutes},{"enabled",source.enabled}});
+        {"format",source.formatHint},{"scope",source.importScope},{"downloadRoute",source.downloadRoute},{"interval",source.intervalMinutes},{"enabled",source.enabled}});
+}
+QList<ProxyNode> scopedNodes(QList<ProxyNode> nodes,const QJsonObject &network) {
+    if(network.contains("activeSubscriptionId")) {
+        const auto source=network.value("activeSubscriptionId").toString();
+        nodes.removeIf([&](const auto &node){return node.sourceId!=source;});
+    }
+    return nodes;
 }
 QStringList routingRuleFields(const QString &rule) {
     auto fields=rule.split(',');
@@ -122,6 +129,8 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     // Runtime acceptance counts explicit requests. Its own periodic probes
     // would add unrelated Rust connections and corrupt per-request deltas.
     : QObject(parent), m_engine(std::move(engine)), m_store(storePath),m_imports(&m_store,this),m_systemProxy(this,{},std::move(proxyBackend)),m_telemetry(storePath.isEmpty()?QString():storePath+".telemetry",storePath.isEmpty()&&!realAcceptance) {
+    m_lanSession=std::make_unique<LanProxySession>(m_engine.get(),storePath.isEmpty()?QString():storePath+".lan-firewall/session.dpapi",this);
+    connect(m_lanSession.get(),&LanProxySession::changed,this,[this]{m_networkError=m_lanSession->error();emit optionsChanged();emit statusChanged();});
     const auto retainedNodeConfiguration=[this](const QString &sourceId,bool nodesOnly) {
         auto retained=m_store.networkConfiguration();
         if(nodesOnly && !sourceId.isEmpty() && retained.contains("importedConfiguration") &&
@@ -163,7 +172,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     m_imports.setCatalogMutationApplier([this](const QString &operation,const QVariantMap &input,NodeImportService::ApplyCompletion completion,QString *error){
         NodeStore::ImportPlan plan;bool prepared=false;
         if(operation=="save_subscription")prepared=m_store.prepareSaveSubscription(input.value("id").toString(),input.value("name").toString(),input.value("url").toUrl(),
-            input.value("interval").toInt(),input.value("enabled").toBool(),input.value("formatHint").toString(),QStringLiteral("nodes-only"),&plan);
+            input.value("interval").toInt(),input.value("enabled").toBool(),input.value("formatHint").toString(),QStringLiteral("nodes-only"),&plan,input.value("downloadRoute").toString());
         else if(operation=="remove_subscription")prepared=m_store.prepareRemoveSubscription(input.value("id").toString(),&plan);
         else if(operation=="clean_legacy")prepared=m_store.prepareCleanLegacyNodes(&plan);
         if(!prepared){*error=m_store.error();return false;}
@@ -252,7 +261,10 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             m_modeBeforeMetered=configuration.value("modeBeforeMetered").toString("rule");
             m_options.lanUsername=configuration.value("lanUsername").toString();
             m_options.lanPassword=QString::fromUtf8(protectLanPassword(QByteArray::fromBase64(configuration.value("lanPasswordProtected").toString().toLatin1()),true));
-            m_options.allowLan=configuration.value("allowLan").toBool(false)&&lanConfigured();
+            // LAN exposure always needs a fresh explicit user action and current
+            // interface/profile/firewall validation. A saved switch is not authority.
+            m_options.allowLan=false;
+            m_options.lanConfiguration=configuration.value("lanConfiguration").toObject().toVariantMap();
             m_options.dnsConfig=configuration.value("dns").toObject().toVariantMap();
             for(const auto &rule:configuration.value("rules").toArray())m_options.customRules.append(rule.toString());
             m_options.customGroups=configuration.value("groups").toArray().toVariantList();
@@ -275,6 +287,19 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         emit statusChanged();
     });
     connect(&m_systemProxy,&SystemProxySession::releaseFinished,this,[this](bool success) {
+        if(m_shuttingDown) {
+            // All release observers must see the live listener before stop.
+            // A failed/timed-out attempt also completes this bounded wait;
+            // SystemProxySession retains its recovery journal and guard.
+            QTimer::singleShot(0,this,[this]{finishShutdownAfterProxyRelease();});
+            return;
+        }
+        if(m_stopPhase==StopPhase::ReleasingProxy) {
+            // Keep the listener alive through every release observer. The
+            // queued continuation also rechecks policy and shutdown ownership.
+            QTimer::singleShot(0,this,[this]{finishStopAfterProxyRelease();});
+            return;
+        }
         if(!success)return;
         // A new listener may have become ready while a guard held the restore
         // lock. Resume the still-current intent without requiring another core
@@ -323,14 +348,16 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         }
         if(s.state==ProxyEngine::State::Stopping||s.state==ProxyEngine::State::Stopped||s.state==ProxyEngine::State::Failed) {
             cancelSystemProxyCheck();
-            m_systemProxy.disable();
+            // Shutdown already owns the restore attempt. In particular, stop
+            // after its timeout must not start another asynchronous release.
+            if(!m_shuttingDown)m_systemProxy.disable();
             if(s.state==ProxyEngine::State::Failed)m_proxyRequested=false;
         } else if(s.state==ProxyEngine::State::Running&&s.apiHealthy&&m_proxyRequested&&!m_systemProxy.owned()&&!m_proxyChecking)setSystemProxy(true);
     });
-    if(m_options.tunEnabled)m_routingError=QStringLiteral("已保存的增强模式配置尚不受 Rust Core 支持；请明确关闭后再连接。配置保持原值。");
+    if(m_options.tunEnabled&&!tunSupported())m_routingError=QStringLiteral("TUN 启动组件或驱动缺失，请重新安装完整测试包，或先关闭已保存的增强模式。");
     connect(m_engine.get(), &ProxyEngine::statusChanged, this, &EngineController::statusChanged);
     connect(m_engine.get(),&ProxyEngine::configurationCommandFinished,this,&EngineController::policyCommandCompleted);
-    m_options.nodes=m_store.nodes();
+    m_options.nodes=availableNodes();
     connect(&m_store,&NodeStore::changed,this,[this]{
         const auto nodes=m_store.nodes();QSet<QString> present,removed,removedNames;
         for(const auto &node:nodes)present.insert(node.id);
@@ -347,12 +374,17 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             // Revocation closes the Rust snapshot before it can continue using
             // deleted credentials. Do not roll back a pending choice to a node
             // that has just been removed, or automatically pick another exit.
-            m_pendingSelection.clear();m_previousSelection.clear();stop();
+            m_pendingSelection.clear();m_previousSelection.clear();
+            // Revocation is a security stop, not a retryable user disconnect:
+            // an owned proxy must not extend the lifetime of deleted secrets.
+            m_proxyRequested=false;m_connectionRequested=false;m_restartPending=false;
+            m_stopPhase=StopPhase::StoppingCore;m_routingError.clear();cancelSystemProxyCheck();m_systemProxy.disable();
+            m_options.selectedNodeId.clear();m_options.directSession=false;m_engine->stop();m_stopPhase=StopPhase::Idle;
             m_nodeError=QStringLiteral("正在使用的节点或策略依赖已删除；相应连接已停止，请重新选择节点。");
             emit diagnostic("EngineController","NodeSourceRevoked",m_nodeError);
         }
         if(!m_connectionRequested) {
-            m_options.nodes=nodes;m_options.selectedNodeId=m_store.selectedId();
+            m_options.nodes=availableNodes();m_options.selectedNodeId=m_store.selectedId();
             const auto configuration=m_store.networkConfiguration();
             if(!removed.isEmpty()&&configuration.value("schema").toInt()==1) {
                 m_options.customRules.clear();for(const auto &rule:configuration.value("rules").toArray())m_options.customRules.append(rule.toString());
@@ -396,6 +428,9 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     });
     connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this,[this]{shutdown();});
     initializePolicyConfiguration();
+    QTimer::singleShot(0,this,[this]{
+        if(!m_shuttingDown)m_engine->lanCommand({{"op","lan_capabilities"},{"request_id",QUuid::createUuid().toString(QUuid::WithoutBraces)}});
+    });
     auto *interfaces=new QTimer(this);interfaces->setInterval(15000);
     connect(interfaces,&QTimer::timeout,this,&EngineController::refreshLanAddresses);interfaces->start();
     QTimer::singleShot(0,this,&EngineController::refreshLanAddresses);
@@ -443,30 +478,80 @@ QString EngineController::errorCode() const {
 }
 bool EngineController::busy() const {
     const auto state = m_engine->status().state;
-    return state == ProxyEngine::State::Validating || state == ProxyEngine::State::Starting || state == ProxyEngine::State::Stopping;
+    return m_stopPhase==StopPhase::ReleasingProxy||m_stopPhase==StopPhase::StoppingCore
+        ||(m_stopAfterPolicy&&m_stopPhase!=StopPhase::ReleaseFailed)
+        ||state == ProxyEngine::State::Validating || state == ProxyEngine::State::Starting || state == ProxyEngine::State::Stopping;
 }
 void EngineController::start() { if(canStart())startConfiguredSession(); }
 void EngineController::stop() {
+    if(m_shuttingDown||m_stopPhase==StopPhase::StoppingCore)return;
+    if(m_stopPhase==StopPhase::ReleasingProxy) {
+        // changed/status observers can re-enter while disable() is still
+        // emitting its release result. Never stop from inside that emission.
+        QTimer::singleShot(0,this,[this]{finishStopAfterProxyRelease();});
+        return;
+    }
+    if(m_stopPhase==StopPhase::ReleaseFailed)m_routingError.clear();
+    m_stopPhase=StopPhase::ReleasingProxy;
+    if(m_lanSession)m_lanSession->stop();
     m_proxyRequested=false;m_connectionRequested=false;m_restartPending=false;cancelSystemProxyCheck();m_systemProxy.disable();
     if(m_policyBusy){
         m_stopAfterPolicy=true;
-        if(m_policyState=="preparing"&&!m_policyIntentDurable&&!m_policyRestartRecovery)finishPolicyMutation(false,QStringLiteral("用户停止，候选尚未写入或激活。"));
+        if(m_policyWaitingForStop)finishStopAfterProxyRelease();
+        else if(m_policyState=="preparing"&&!m_policyIntentDurable&&!m_policyRestartRecovery)finishPolicyMutation(false,QStringLiteral("用户停止，候选尚未写入或激活。"));
         else if(m_policyState=="reconciling"&&!m_policyDiskWrite)recoverPolicyConfiguration();
+        finishStopAfterProxyRelease();
         emit statusChanged();return;
     }
-    rollbackPendingSelection(QStringLiteral("节点切换已取消，保留原选择。"));m_diagnostics.noteEvent(QStringLiteral("Swirl 操作"),QStringLiteral("用户停止引擎，现有本机代理连接将关闭。"));m_options.selectedNodeId.clear();m_options.directSession=false;emit statusChanged();m_engine->stop();
+    finishStopAfterProxyRelease();
+}
+void EngineController::finishStopAfterProxyRelease() {
+    if(m_shuttingDown||m_stopPhase!=StopPhase::ReleasingProxy||m_systemProxy.busy())return;
+    if(m_systemProxy.owned()) {
+        // The owner process stays alive after a normal stop request. Its guard
+        // cannot recover a dead in-process listener while that owner still runs.
+        // Keep serving the owned endpoint, preserve recovery evidence, and let
+        // the same stop control retry without reacquiring or restarting Core.
+        m_stopPhase=StopPhase::ReleaseFailed;
+        m_routingError=(processAlive()
+            ?QStringLiteral("系统代理尚未恢复，内核保持运行；请重试关闭代理。")
+            :QStringLiteral("系统代理尚未恢复，内核已停止；请重试恢复系统设置。"))+m_systemProxy.error();
+        emit statusChanged();return;
+    }
+    // A durable policy transaction may need the Core stopped to reconcile its
+    // receipt. That explicit waiting state is safe to advance; other phases
+    // retain their existing completion/admission gates.
+    if(m_policyBusy&&!m_policyWaitingForStop)return;
+    m_stopPhase=StopPhase::StoppingCore;
+    rollbackPendingSelection(QStringLiteral("节点切换已取消，保留原选择。"));
+    if(m_shuttingDown)return;
+    m_diagnostics.noteEvent(QStringLiteral("Swirl 操作"),QStringLiteral("用户停止引擎，现有本机代理连接将关闭。"));
+    m_options.selectedNodeId.clear();m_options.directSession=false;
+    const auto state=m_engine->status().state;
+    if(state!=ProxyEngine::State::Stopped&&state!=ProxyEngine::State::Stopping)m_engine->stop();
+    m_stopPhase=StopPhase::Idle;
+    emit statusChanged();
 }
 void EngineController::shutdown() {
     if(m_shuttingDown)return;
     rollbackPendingSelection(QStringLiteral("节点切换已取消，保留原选择。"));
-    m_shuttingDown=true;m_connectionRequested=false;m_restartPending=false;m_proxyRequested=false;
+    m_shuttingDown=true;m_stopPhase=StopPhase::Idle;m_connectionRequested=false;m_restartPending=false;m_proxyRequested=false;
     cancelSystemProxyCheck();
-    m_imports.shutdown();m_tests.cancel();m_systemProxy.disable();m_engine->stop();
+    if(m_lanSession)m_lanSession->stop();
+    m_imports.shutdown();m_tests.cancel();
+    m_shutdownAwaitingProxyRelease=true;
+    m_systemProxy.disable();
+    if(!m_systemProxy.busy())finishShutdownAfterProxyRelease();
+}
+void EngineController::finishShutdownAfterProxyRelease() {
+    if(!m_shuttingDown||!m_shutdownAwaitingProxyRelease||m_systemProxy.busy())return;
+    m_shutdownAwaitingProxyRelease=false;
+    m_engine->stop();
 }
 void EngineController::refresh() { m_engine->refresh(); }
 
 QVariantList EngineController::nodes() const {
-    auto rows=m_store.publicRows(); const auto status=m_engine->status();
+    auto rows=nodeCatalog(); const auto status=m_engine->status();
     for (auto &value : rows) {
         auto row=value.toMap(); const bool active=processAlive() && row.value("id").toString()==status.selectedNodeId;
         row.insert("address",row.value("host").toString().isEmpty()?QStringLiteral("协议扩展配置"):row.value("host").toString()+":"+row.value("port").toString());
@@ -494,6 +579,73 @@ QVariantList EngineController::nodes() const {
         value=row;
     }
     return rows;
+}
+QList<ProxyNode> EngineController::availableNodes() const {
+    return scopedNodes(m_store.nodes(),m_store.networkConfiguration());
+}
+QVariantList EngineController::nodeCatalog() const {
+    auto rows=m_store.publicRows();
+    if(subscriptionScopeEnabled()) {
+        const auto source=activeSubscriptionId();
+        rows.removeIf([&](const auto &row){return row.toMap().value("sourceId").toString()!=source;});
+    }
+    return rows;
+}
+bool EngineController::selectSubscription(const QString &id) {
+    if(subscriptionScopeEnabled()&&activeSubscriptionId()==id)return true;
+    if(!m_store.configurationV2()) {m_policyError=QStringLiteral("请先确认并保存策略配置，再选择当前订阅。");emit policyChanged();return false;}
+    NodeStore::ImportPlan plan;
+    if(!m_store.prepareSelectSubscription(id,&plan)){m_policyError=m_store.error();emit policyChanged();return false;}
+    auto network=plan.retainedNetworkConfiguration();QSet<QString> allowed;
+    for(const auto &node:scopedNodes(plan.nodes(),network))allowed.insert(node.id);
+    auto snapshots=network.value("subscriptionPolicySnapshots").toObject();
+    if(!snapshots.contains("base"))snapshots.insert("base",m_policyDocument);
+    auto sourcePolicies=snapshots.value("sources").toObject();
+    const auto sources=m_store.subscriptions();
+    if(subscriptionScopeEnabled()&&(activeSubscriptionId().isEmpty()||std::any_of(sources.cbegin(),sources.cend(),
+        [this](const auto &source){return source.id==activeSubscriptionId();})))sourcePolicies.insert(activeSubscriptionId(),m_policyDocument);
+    const auto original=sourcePolicies.contains(id)?sourcePolicies.value(id).toObject():snapshots.value("base").toObject();
+    snapshots.insert("sources",sourcePolicies);network.insert("subscriptionPolicySnapshots",snapshots);
+    QSet<QString> groups;for(const auto &entry:original.value("groups").toArray())groups.insert(entry.toObject().value("id").toString());
+    const std::function<QJsonValue(const QJsonValue &)> restrictTarget=[&](const QJsonValue &value)->QJsonValue {
+        if(value.isArray()){QJsonArray result;for(const auto &entry:value.toArray())result.append(restrictTarget(entry));return result;}
+        if(!value.isObject())return value;
+        auto object=value.toObject();
+        if(object.value("kind")==QJsonValue("node")&&!allowed.contains(object.value("id").toString()))return QJsonObject{{"kind","reject"}};
+        if(object.value("kind")==QJsonValue("group")&&!groups.contains(object.value("id").toString()))return QJsonObject{{"kind","reject"}};
+        if(object.contains("members")) {
+            QJsonArray members;
+            for(const auto &entry:object.value("members").toArray()) {
+                const auto target=entry.toObject();
+                if(target.value("kind")!=QJsonValue("node")||allowed.contains(target.value("id").toString()))members.append(entry);
+            }
+            object.insert("members",members);
+            if(object.contains("selected")&&!members.contains(object.value("selected")))object.remove("selected");
+        }
+        for(auto it=object.begin();it!=object.end();++it)if(it.key()!="missing_targets")it.value()=restrictTarget(it.value());
+        return object;
+    };
+    auto document=restrictTarget(original).toObject();QSet<QString> changedGroups;
+    const auto originalGroups=original.value("groups").toArray(),restrictedGroups=document.value("groups").toArray();
+    for(qsizetype index=0;index<originalGroups.size();++index)if(originalGroups[index]!=restrictedGroups[index])changedGroups.insert(originalGroups[index].toObject().value("id").toString());
+    for(qsizetype pass=0;pass<restrictedGroups.size();++pass){const auto count=changedGroups.size();
+        for(const auto &entry:restrictedGroups){const auto group=entry.toObject();
+            for(const auto &member:group.value("members").toArray())if(member.toObject().value("kind")==QJsonValue("group")&&changedGroups.contains(member.toObject().value("id").toString()))changedGroups.insert(group.value("id").toString());
+        }
+        if(changedGroups.size()==count)break;
+    }
+    const auto previousDefault=original.value("default_policy").toObject().value("target").toObject();
+    if((previousDefault.value("kind")==QJsonValue("group")&&(!groups.contains(previousDefault.value("id").toString())||changedGroups.contains(previousDefault.value("id").toString())))||
+       (previousDefault.value("kind")==QJsonValue("node")&&!allowed.contains(previousDefault.value("id").toString()))){
+        auto policy=document.value("default_policy").toObject();policy.insert("target",QJsonObject{{"kind","unconfigured"}});document.insert("default_policy",policy);
+    }
+    document.insert("missing_targets",QJsonArray{});
+    network.insert("policyDocumentV2",document);
+    const bool accepted=applyCatalogTransaction(plan,network,[this](bool ok,const QString &error){
+        m_nodeError=ok?QString():error;emit nodesChanged();emit nodeCatalogChanged();emit optionsChanged();
+    },&m_policyError);
+    if(accepted)m_tests.cancel();
+    return accepted;
 }
 QVariantList EngineController::nodeDiagnosticRows() const {
     QVariantList result;
@@ -578,7 +730,7 @@ bool EngineController::chooseNode(const QString &id) {
         // A running session owns its original node snapshot. A refreshed or
         // newly imported node only becomes eligible after an explicit reconnect.
         auto candidate=active?m_options:EngineStartOptions{};
-        if(!active){candidate.nodes=m_store.nodes();candidate.routingMode="global";}
+        if(!active){candidate.nodes=availableNodes();candidate.routingMode="global";}
         candidate.selectedNodeId=id;candidate.directSession=false;
         // DIRECT bypasses node translation for traffic, but a saved selection
         // must still be eligible when the user later leaves explicit DIRECT.
@@ -618,24 +770,24 @@ void EngineController::connectNode(const QString &id) {
     // also check the user's actual routing and network options before changing
     // engine state. Do not silently replace saved rule mode with global mode.
     auto candidate=m_options;
-    candidate.nodes=m_store.nodes();candidate.selectedNodeId=id;candidate.directSession=false;
+    candidate.nodes=availableNodes();candidate.selectedNodeId=id;candidate.directSession=false;
     QJsonObject configuration;
     m_nodeError=RustCoreEngine::configuration(candidate,&configuration);
     if(!m_nodeError.isEmpty()){
         m_connectionRequested=false;emit selectionChanged();emit statusChanged();return;
     }
     m_connectionRequested=true;
-    m_options.nodes=m_store.nodes();m_options.selectedNodeId=id;m_options.directSession=false;
+    m_options.nodes=availableNodes();m_options.selectedNodeId=id;m_options.directSession=false;
     if(processAlive()){m_restartPending=true;m_engine->stop();}
     else m_engine->start(m_options);
 }
 void EngineController::startConfiguredSession() {
-    if(m_shuttingDown)return;
+    if(m_shuttingDown||m_stopPhase!=StopPhase::Idle||m_stopAfterPolicy)return;
     if(m_store.configurationV2()){
         if(m_policyBusy||m_store.configurationRecoveryRequired()||m_policyDocument.isEmpty()){
             m_policyError=QStringLiteral("配置仍在保存或恢复，未启动连接。");emit policyChanged();return;
         }
-        auto candidate=m_options;candidate.nodes=m_store.nodes();candidate.policyDocument=m_policyDocument;
+        auto candidate=m_options;candidate.nodes=availableNodes();candidate.policyDocument=m_policyDocument;
         candidate.configurationStoreId=m_store.configurationStoreId();candidate.configurationRevision=m_store.configurationRevision();
         const auto saved=m_store.configurationReceipt();candidate.configurationDigest=saved.value("plan_digest").toString();
         candidate.configurationRequestId=newPolicyId();candidate.routingMode=m_policyDocument.value("mode").toString();candidate.directSession=candidate.routingMode=="direct";
@@ -649,7 +801,7 @@ void EngineController::startConfiguredSession() {
         m_nodeError=QStringLiteral("未选择可用节点；请选择节点或明确启用直接连接模式。未自动切换 DIRECT。");emit selectionChanged();emit statusChanged();return;
     }
     auto candidate=m_options;
-    candidate.nodes=m_store.nodes();candidate.selectedNodeId=m_store.selectedId();
+    candidate.nodes=availableNodes();candidate.selectedNodeId=m_store.selectedId();
     candidate.directSession=candidate.routingMode=="direct";
     QJsonObject configuration;
     const auto reason=RustCoreEngine::configuration(candidate,&configuration);
@@ -658,16 +810,16 @@ void EngineController::startConfiguredSession() {
     }
     m_nodeError.clear();
     m_connectionRequested=true;
-    m_options.nodes=m_store.nodes();m_options.selectedNodeId=m_store.selectedId();
+    m_options.nodes=availableNodes();m_options.selectedNodeId=m_store.selectedId();
     m_options.directSession=m_options.routingMode=="direct";
     if(processAlive()){cancelSystemProxyCheck();m_systemProxy.disable();m_restartPending=true;m_engine->stop();}
     else m_engine->start(m_options);
     emit statusChanged();
 }
 void EngineController::testNode(const QUrl &url) { if(!nodeBusy())m_engine->probeNode(url); }
-void EngineController::testAllNodes(const QUrl &url) { if(m_shuttingDown)return;if(m_store.configurationRecoveryRequired()||m_policyState=="reconciling"||(m_policyCatalog&&!m_policyCatalog->removedNodeIds().isEmpty())){m_nodeError=QStringLiteral("正在撤销或恢复节点，等待凭据撤销与测试内核释放后可重新测速。");emit selectionChanged();return;} auto options=m_options;options.nodes=m_store.nodes();QStringList ids;for(const auto &node:options.nodes)ids.append(node.id);m_tests.start(options,ids,url); }
-void EngineController::testNodes(const QStringList &ids,const QUrl &url) { if(m_shuttingDown)return;if(m_store.configurationRecoveryRequired()||m_policyState=="reconciling"||(m_policyCatalog&&!m_policyCatalog->removedNodeIds().isEmpty())){m_nodeError=QStringLiteral("正在撤销或恢复节点，等待凭据撤销与测试内核释放后可重新测速。");emit selectionChanged();return;} auto options=m_options;options.nodes=m_store.nodes();m_tests.start(options,ids,url); }
-void EngineController::testSelectedNode(const QString &id,const QUrl &url) { if(m_shuttingDown)return;if(m_store.configurationRecoveryRequired()||m_policyState=="reconciling"||(m_policyCatalog&&!m_policyCatalog->removedNodeIds().isEmpty())){m_nodeError=QStringLiteral("正在撤销或恢复节点，等待凭据撤销与测试内核释放后可重新测速。");emit selectionChanged();return;} auto options=m_options;options.nodes=m_store.nodes();m_tests.start(options,{id},url); }
+void EngineController::testAllNodes(const QUrl &url) { if(m_shuttingDown)return;if(m_policyBusy||m_store.configurationRecoveryRequired()||m_policyState=="reconciling"){m_nodeError=QStringLiteral("正在切换、撤销或恢复节点，等待配置与测试内核释放后可重新测速。");emit selectionChanged();return;} auto options=m_options;options.nodes=availableNodes();QStringList ids;for(const auto &node:options.nodes)ids.append(node.id);m_tests.start(options,ids,url); }
+void EngineController::testNodes(const QStringList &ids,const QUrl &url) { if(m_shuttingDown)return;if(m_policyBusy||m_store.configurationRecoveryRequired()||m_policyState=="reconciling"){m_nodeError=QStringLiteral("正在切换、撤销或恢复节点，等待配置与测试内核释放后可重新测速。");emit selectionChanged();return;} auto options=m_options;options.nodes=availableNodes();m_tests.start(options,ids,url); }
+void EngineController::testSelectedNode(const QString &id,const QUrl &url) { if(m_shuttingDown)return;if(m_policyBusy||m_store.configurationRecoveryRequired()||m_policyState=="reconciling"){m_nodeError=QStringLiteral("正在切换、撤销或恢复节点，等待配置与测试内核释放后可重新测速。");emit selectionChanged();return;} auto options=m_options;options.nodes=availableNodes();m_tests.start(options,{id},url); }
 void EngineController::disconnectNode() { stop(); }
 
 void EngineController::setRoutingMode(const QString &mode) {
@@ -682,7 +834,7 @@ void EngineController::setRoutingMode(const QString &mode) {
     }
     if(processAlive()){
         auto candidate=m_options;candidate.routingMode=mode;candidate.directSession=mode=="direct";
-        candidate.nodes=m_store.nodes();candidate.selectedNodeId=m_store.selectedId();
+        candidate.nodes=availableNodes();candidate.selectedNodeId=m_store.selectedId();
         QJsonObject configuration;const auto reason=RustCoreEngine::configuration(candidate,&configuration);
         if(!reason.isEmpty()){m_routingError=reason;emit statusChanged();return;}
     }
@@ -787,7 +939,7 @@ QString EngineController::proxyEnvironmentAdvice() const {
         "$env:HTTP_PROXY='http://127.0.0.1:%1'\n$env:HTTPS_PROXY='http://127.0.0.1:%1'\n"
         "$env:ALL_PROXY='http://127.0.0.1:%1'\n$env:NO_PROXY='localhost,127.0.0.1,::1'\n"
         "Codex 是否读取系统代理或这些变量取决于具体版本。完全退出后从该会话重新启动，已有进程不会自动继承。"
-        "当前 Rust Core 构建不提供 TUN；忽略代理设置的应用无法通过本页接入。"
+        "忽略系统代理的应用可先在概览配置 TUN，再从活动页开启代理并授权；实际接管以 TUN 运行状态为准。"
         "本页只提供建议，不写入环境变量、.codex 配置文件或密钥。").arg(m_options.proxyPort);
 }
 
@@ -820,17 +972,22 @@ bool EngineController::replaceNetworkConfiguration(const QVariantMap &input) {
     m_options.dnsConfig=canonical.value("dns").toMap();m_options.customRules=canonical.value("rules").toStringList();m_options.customGroups=canonical.value("groups").toList();
     if(saveNetworkConfiguration()){updateRoutingFlags();return true;}m_options.dnsConfig=previous.value("dns").toMap();m_options.customRules=previous.value("rules").toStringList();m_options.customGroups=previous.value("groups").toList();emit optionsChanged();return false;
 }
-QJsonObject EngineController::serializedNetworkConfiguration() {
-    const auto protectedPassword=m_options.lanPassword.isEmpty()?QByteArray():protectLanPassword(m_options.lanPassword.toUtf8(),false);
-    if(!m_options.lanPassword.isEmpty()&&protectedPassword.isEmpty()){m_networkError=QStringLiteral("无法加密局域网代理密码。");return {};}
-    auto snapshot=QJsonObject{{"schema",1},{"metered",m_options.meteredNetwork},{"meteredAllowlist",QJsonArray::fromStringList(m_options.meteredAllowlist)},{"tunBeforeMetered",m_tunBeforeMetered},{"modeBeforeMetered",m_modeBeforeMetered},{"allowLan",m_options.allowLan},{"lanUsername",m_options.lanUsername},{"lanPasswordProtected",QString::fromLatin1(protectedPassword.toBase64())},{"tun",m_options.tunEnabled},{"dns",QJsonObject::fromVariantMap(m_options.dnsConfig)},
-        {"rules",QJsonArray::fromStringList(m_options.customRules)},{"groups",QJsonArray::fromVariantList(m_options.customGroups)}};
+QJsonObject EngineController::serializedNetworkConfiguration(const EngineStartOptions *candidate) {
+    const auto &options=candidate?*candidate:m_options;
+    const auto protectedPassword=options.lanPassword.isEmpty()?QByteArray():protectLanPassword(options.lanPassword.toUtf8(),false);
+    if(!options.lanPassword.isEmpty()&&protectedPassword.isEmpty()){m_networkError=QStringLiteral("无法加密局域网代理密码。");return {};}
+    auto snapshot=QJsonObject{{"schema",1},{"metered",options.meteredNetwork},{"meteredAllowlist",QJsonArray::fromStringList(options.meteredAllowlist)},{"tunBeforeMetered",m_tunBeforeMetered},{"modeBeforeMetered",m_modeBeforeMetered},{"allowLan",false},{"lanConfiguration",QJsonObject::fromVariantMap(options.lanConfiguration)},{"lanUsername",options.lanUsername},{"lanPasswordProtected",QString::fromLatin1(protectedPassword.toBase64())},{"tun",options.tunEnabled},{"dns",QJsonObject::fromVariantMap(options.dnsConfig)},
+        {"rules",QJsonArray::fromStringList(options.customRules)},{"groups",QJsonArray::fromVariantList(options.customGroups)}};
     if(m_nativeDocumentRouting)snapshot.insert("nativeDocumentRouting",true);
-    if(!m_options.policyDocument.isEmpty())snapshot.insert("policyDocumentV2",m_options.policyDocument);
+    if(!options.policyDocument.isEmpty())snapshot.insert("policyDocumentV2",options.policyDocument);
     const auto original=m_store.networkConfiguration().value("importedConfiguration");
     if(!original.isUndefined())snapshot.insert("importedConfiguration",original);
     const auto outcomes=m_store.networkConfiguration().value("subscriptionImportResults");
     if(outcomes.isObject())snapshot.insert("subscriptionImportResults",outcomes);
+    const auto activeSource=m_store.networkConfiguration().value("activeSubscriptionId");
+    if(!activeSource.isUndefined())snapshot.insert("activeSubscriptionId",activeSource);
+    const auto sourcePolicies=m_store.networkConfiguration().value("subscriptionPolicySnapshots");
+    if(sourcePolicies.isObject())snapshot.insert("subscriptionPolicySnapshots",sourcePolicies);
     return snapshot;
 }
 bool EngineController::saveNetworkConfiguration() {
@@ -994,7 +1151,7 @@ bool EngineController::configureDns(const QVariantMap &input) {
     QVariantMap configured{{"mode",mode},{"servers",servers.join(',')},{"encrypted",encrypted},{"hosts",hosts},
         {"useHosts",input.value("useHosts",true).toBool()},{"respectRules",input.value("respectRules",false).toBool()}};
     if(requested.contains("queryFamily"))configured.insert("queryFamily",requested.value("queryFamily"));
-    if(m_store.configurationV2()){auto candidate=m_options;candidate.nodes=m_store.nodes();candidate.dnsConfig=configured;return applyPolicyConfiguration(m_policyDocument,candidate);}
+    if(m_store.configurationV2()){auto candidate=m_options;candidate.nodes=availableNodes();candidate.dnsConfig=configured;return applyPolicyConfiguration(m_policyDocument,candidate);}
     const auto before=m_options.dnsConfig;m_options.dnsConfig=configured;
     if(saveNetworkConfiguration())return true;m_options.dnsConfig=before;emit optionsChanged();return false;
 }
@@ -1101,15 +1258,21 @@ bool EngineController::elevated() const {
     return false;
 #endif
 }
+bool EngineController::tunSupported() const {return RustCoreEngine::nativeTunAvailable();}
 bool EngineController::setTunEnabled(bool enabled) {
     m_routingError.clear();
-    if(enabled){m_routingError=QStringLiteral("Rust Core 暂不支持 TUN 增强模式；已保存配置保持不变。");emit statusChanged();return false;}
+    if(enabled&&!tunSupported()){m_routingError=QStringLiteral("TUN 启动组件或驱动缺失，请重新安装完整测试包。");emit statusChanged();return false;}
     if(!enabled&&m_options.meteredNetwork){m_routingError=QStringLiteral("计费网络模式正在使用增强模式，请先关闭计费网络模式。");emit statusChanged();return false;}
-    if(enabled&&!elevated()){m_routingError=QStringLiteral("请退出 Swirl，并以管理员身份运行后开启增强模式。");emit statusChanged();return false;}
-    if(busy()||nodeBusy()||routingBusy()){m_routingError=QStringLiteral("请先选择一个可用代理节点，并等待当前操作结束。");emit statusChanged();return false;}
+    if(processAlive()||m_systemProxy.owned()||m_systemProxy.busy()||busy()||nodeBusy()||routingBusy()){
+        m_routingError=QStringLiteral("请先在活动页关闭代理，等待网络恢复完成后再切换 TUN。");emit statusChanged();return false;
+    }
+    if(enabled&&!m_store.configurationV2()){m_routingError=QStringLiteral("请先在策略页确认并保存出口配置。");emit statusChanged();return false;}
+    if(m_store.configurationV2()){
+        auto candidate=m_options;candidate.nodes=availableNodes();candidate.tunEnabled=enabled;
+        return applyPolicyConfiguration(m_policyDocument,candidate);
+    }
     const bool previous=m_options.tunEnabled;m_options.tunEnabled=enabled;
     if(!saveNetworkConfiguration()){m_options.tunEnabled=previous;return false;}
-    if(enabled||processAlive())startConfiguredSession();
     emit statusChanged();return true;
 }
 
@@ -1133,7 +1296,7 @@ void EngineController::refreshLanAddresses(){
     connect(watcher,&QFutureWatcher<QList<QNetworkInterface>>::finished,this,[this,watcher]{
         m_interfaces=watcher->result();watcher->deleteLater();m_lanScanPending=false;
         QStringList addresses;for(const auto &iface:m_interfaces)for(const auto &entry:iface.addressEntries()){const auto address=entry.ip();if(address.protocol()==QAbstractSocket::IPv4Protocol&&!address.isLoopback()&&!address.isNull())addresses.append(address.toString());}
-        if(addresses!=m_lanAddresses){m_lanAddresses=addresses;emit lanAddressesChanged();}
+        m_lanAddresses=addresses;emit lanAddressesChanged();
         emit interfacesChanged();
     });
     watcher->setFuture(promise->future());
@@ -1141,26 +1304,104 @@ void EngineController::refreshLanAddresses(){
         promise->start();promise->addResult(QNetworkInterface::allInterfaces());promise->finish();
     });
 }
-bool EngineController::configureLan(const QString &username,const QString &password) {
-    if(!networkEditAllowed())return false;
-    if(!QRegularExpression("^[A-Za-z0-9_.-]{1,64}$").match(username).hasMatch()||password.size()<8||password.size()>128||password.contains(QRegularExpression("[:\\r\\n]"))){
-        m_networkError=QStringLiteral("用户名仅支持字母、数字、点和横线；密码需为 8 至 128 字符且不能包含冒号或换行。");emit optionsChanged();return false;
+bool EngineController::lanSupported() const {
+#ifdef Q_OS_WIN
+    return RustCoreLibrary::instance().supportsLanProxy();
+#else
+    return false;
+#endif
+}
+QVariantMap EngineController::lanConfiguration() const {
+    if(!m_options.lanConfiguration.isEmpty()){auto value=m_options.lanConfiguration;for(const auto &key:{"auth","username","password","host_addresses"})value.remove(QLatin1String(key));return value;}
+    return {{"listen_ip",""},{"http_port",7899},{"socks_port",7899},{"udp_port_start",7900},{"udp_port_end",7915},
+        {"allowed_cidrs",QStringList{}},{"max_connections",128},{"max_connections_per_client",16},{"auth_failures_per_minute",10},{"idle_timeout_secs",300}};
+}
+QVariantMap EngineController::lanStatus() const {
+    auto status=m_engine->status().lan.toVariantMap();
+    status.insert("status_confirmed",processAlive()&&apiHealthy()&&m_engine->status().lan.value("health_error").toString().isEmpty());
+    status.insert("phase",m_lanSession?m_lanSession->phase():QStringLiteral("idle"));
+    status.insert("firewall_recovery_needed",lanRecoveryNeeded());
+    status.insert("error",m_lanSession?m_lanSession->error():QString());
+    return status;
+}
+QVariantList EngineController::lanInterfaces() const {
+    QVariantList rows;
+    for(const auto &iface:m_interfaces){
+        if(!iface.flags().testFlag(QNetworkInterface::IsUp)||iface.flags().testFlag(QNetworkInterface::IsLoopBack))continue;
+        for(const auto &entry:iface.addressEntries()){
+            const auto ip=entry.ip().toString();if(!LanFirewall::privateIpv4(ip)||entry.prefixLength()<1)continue;
+            const auto subnet=QHostAddress::parseSubnet(ip+'/'+QString::number(entry.prefixLength()));
+            rows.append(QVariantMap{{"index",iface.index()},{"ip",ip},{"prefix",entry.prefixLength()},
+                {"cidr",subnet.first.toString()+'/'+QString::number(subnet.second)},{"name",iface.humanReadableName()},
+                {"label",iface.humanReadableName()+" · "+ip}});
+        }
     }
-    const auto oldUser=m_options.lanUsername,oldPassword=m_options.lanPassword;m_options.lanUsername=username;m_options.lanPassword=password;
-    if(saveNetworkConfiguration())return true;m_options.lanUsername=oldUser;m_options.lanPassword=oldPassword;emit optionsChanged();return false;
+    return rows;
+}
+bool EngineController::configureLan(const QString &username,const QString &password) {
+    auto configuration=lanConfiguration();configuration.insert("username",username);configuration.insert("password",password);
+    return configureLanAccess(configuration);
+}
+bool EngineController::configureLanAccess(const QVariantMap &input) {
+    if(lanBusy()||lanEnabled()||m_policyBusy||m_imports.busy()){
+        m_networkError=QStringLiteral("请先停止局域网代理，并等待配置事务结束；现有本机连接保持运行。");emit optionsChanged();return false;
+    }
+    auto values=QJsonObject::fromVariantMap(input);
+    const auto username=values.take("username").toString();
+    const auto provided=values.take("password").toString();
+    const auto password=provided.isEmpty()?m_options.lanPassword:provided;
+    values.insert("auth",QJsonObject{{"username",username},{"password",password}});
+    values.remove("host_addresses"); // The native preflight supplies fresh OS identities.
+    QJsonObject canonical;
+    if(!LanFirewall::validateConfiguration(values,&canonical,&m_networkError)){emit optionsChanged();return false;}
+    bool assigned=false;
+    for(const auto &entry:lanInterfaces())if(entry.toMap().value("ip").toString()==canonical.value("listen_ip").toString())assigned=true;
+    if(!assigned){m_networkError=QStringLiteral("请选择当前存在且已启用的局域网 IPv4 接口。");emit optionsChanged();return false;}
+    canonical.remove("auth");
+    if(m_store.configurationV2()){
+        // Use the existing durable V2 transaction for preferences as well.
+        // The runtime plan is identical and established flows stay alive; no
+        // direct NodeStore write bypasses its receipt/recovery barrier.
+        auto candidate=m_options;candidate.lanConfiguration=canonical.toVariantMap();
+        candidate.lanUsername=username;candidate.lanPassword=password;candidate.allowLan=false;
+        const bool accepted=applyPolicyConfiguration(m_policyDocument,candidate);
+        m_networkError=accepted?QString():m_policyError;emit optionsChanged();return accepted;
+    }
+    const auto previous=m_options.lanConfiguration;const auto oldUser=m_options.lanUsername,oldPassword=m_options.lanPassword;
+    m_options.lanConfiguration=canonical.toVariantMap();m_options.lanUsername=username;m_options.lanPassword=password;
+    m_options.allowLan=false;m_networkError.clear();
+    if(saveNetworkConfiguration()){emit statusChanged();return true;}
+    m_options.lanConfiguration=previous;m_options.lanUsername=oldUser;m_options.lanPassword=oldPassword;emit optionsChanged();return false;
 }
 bool EngineController::setLanEnabled(bool enabled) {
     m_networkError.clear();
-    if(enabled){m_networkError=QStringLiteral("Rust Core 暂不支持局域网代理；地址和认证配置保持不变。");emit optionsChanged();return false;}
-    if(enabled&&!lanConfigured()){m_networkError=QStringLiteral("请先设置局域网代理用户名和密码。");emit optionsChanged();return false;}
-    if(busy()||nodeBusy()||routingBusy()){m_networkError=QStringLiteral("请先选择代理节点，并等待当前操作结束。");emit optionsChanged();return false;}
-    const bool previous=m_options.allowLan;m_options.allowLan=enabled;if(!saveNetworkConfiguration()){m_options.allowLan=previous;return false;}
-    if(enabled||processAlive())startConfiguredSession();
+    if(!enabled)return m_lanSession->stop();
+    if(!lanSupported()){m_networkError=QStringLiteral("当前构建或平台未提供原生局域网代理安全集成；未开启监听。");emit optionsChanged();return false;}
+    if(!elevated()){m_networkError=QStringLiteral("局域网代理需要管理员权限，以创建和恢复精确的 Windows 防火墙规则。");emit optionsChanged();return false;}
+    if(!m_store.configurationV2()){m_networkError=QStringLiteral("请先完成现有策略迁移，再启用局域网代理；未改变已有连接。");emit optionsChanged();return false;}
+    if(!lanConfigured()){m_networkError=QStringLiteral("请先配置局域网接口、端口、允许的客户端 CIDR 和认证。");emit optionsChanged();return false;}
+    if(m_policyBusy||routingBusy()||busy()||m_imports.busy()){
+        m_networkError=QStringLiteral("请等待当前内核或配置操作完成后，再启用局域网代理。");emit optionsChanged();return false;
+    }
+    const bool startCore=!processAlive();
+    if(startCore&&!canStart()){m_networkError=QStringLiteral("Rust Core 当前无法启动，未开启局域网代理。");emit optionsChanged();return false;}
+    auto configuration=QJsonObject::fromVariantMap(m_options.lanConfiguration);
+    configuration.insert("auth",QJsonObject{{"username",m_options.lanUsername},{"password",m_options.lanPassword}});
+    if(!m_lanSession->start(configuration)){m_networkError=m_lanSession->error();emit optionsChanged();return false;}
+    // This starts only the existing policy runtime. It never requests WinINET
+    // ownership, enables TUN, or changes the user's selected outbound.
+    if(startCore){startConfiguredSession();if(!processAlive()&&!busy()){
+        m_lanSession->stop();m_networkError=!m_policyError.isEmpty()?m_policyError:!m_nodeError.isEmpty()?m_nodeError:QStringLiteral("Rust Core 无法启动，未开启局域网代理。");emit optionsChanged();return false;
+    }}
     emit statusChanged();return true;
+}
+bool EngineController::recoverLan(){
+    if(!elevated()){m_networkError=QStringLiteral("恢复 LAN 防火墙规则需要管理员权限。");emit optionsChanged();return false;}
+    return m_lanSession->recover();
 }
 
 bool EngineController::setGatewayForwarding(bool enabled) {
-    if(enabled){m_routingError=QStringLiteral("Rust Core 暂不支持 TUN 网关转发；网关配置保持不变。");emit statusChanged();return false;}
+    if(enabled){m_routingError=QStringLiteral("本测试版尚未接入 TUN 网关启动与恢复组件，暂无法开启。网关配置保持不变。");emit statusChanged();return false;}
     if(enabled&&m_options.meteredNetwork){m_routingError=QStringLiteral("请先关闭计费网络模式，再开启局域网网关。");emit statusChanged();return false;}
     if(enabled){if(m_options.gatewayForwarding)return true;m_tunBeforeGateway=m_options.tunEnabled;m_options.gatewayForwarding=true;
         if(setTunEnabled(true))return true;m_options.gatewayForwarding=false;return false;}
@@ -1228,9 +1469,9 @@ QVariantList EngineController::policyGroups() const {
 }
 QVariantList EngineController::policyTargetOptions() const {
     QVariantList result{{QVariantMap{{"kind","direct"},{"id",""},{"name","DIRECT"},{"available",true}}}};
-    for(const auto &row:m_store.publicRows()){
+    for(const auto &row:nodeCatalog()){
         const auto node=row.toMap();result.append(QVariantMap{{"kind","node"},{"id",node.value("id")},{"name",node.value("name")},
-            {"available",node.value("nativeExecutable")},{"reason",node.value("unsupportedReason")}});
+            {"sourceName",node.value("sourceName")},{"available",node.value("nativeExecutable")},{"reason",node.value("unsupportedReason")}});
     }
     for(const auto &entry:m_policyDocument.value("groups").toArray()){
         const auto group=entry.toObject();result.append(QVariantMap{{"kind","group"},{"id",group.value("id").toString()},
@@ -1412,7 +1653,7 @@ QVariantMap EngineController::reviewSubscriptionConfiguration(const QString &sou
     const auto planDigest=validation.value("plan_digest").toString();
     if(!QRegularExpression("^[0-9a-f]{64}$").match(planDigest).hasMatch())return reject(QStringLiteral("内核没有返回候选配置身份；无法确认本次应用。"));
     NodeStore::ImportPlan catalog;
-    if(!m_store.prepareSaveSubscription(source->id,source->name,source->url,source->intervalMinutes,source->enabled,source->formatHint,QStringLiteral("nodes-only"),&catalog))return reject(m_store.error());
+    if(!m_store.prepareSaveSubscription(source->id,source->name,source->url,source->intervalMinutes,source->enabled,source->formatHint,QStringLiteral("nodes-only"),&catalog,source->downloadRoute))return reject(m_store.error());
     auto network=catalog.retainedNetworkConfiguration();network.insert("policyDocumentV2",document);network.insert("dns",QJsonObject::fromVariantMap(dns));
     // This receipt is inert audit data. It is never read as future authority.
     auto outcomes=network.value("subscriptionImportResults").toObject(),outcome=outcomes.value(sourceId).toObject();
@@ -1454,7 +1695,7 @@ bool EngineController::applyReviewedSubscriptionConfiguration(NodeImportService:
     return accepted;
 }
 QVariantMap EngineController::validatePolicyDocument(const QVariantMap &input) {
-    auto options=m_options;options.nodes=m_store.nodes();
+    auto options=m_options;options.nodes=availableNodes();
     const auto response=RustCoreEngine::validateConfigurationV2(options,QJsonObject::fromVariantMap(input),newPolicyId());
     auto result=response.toVariantMap();const auto conflicts=response.value("validation").toObject().value("conflicts");
     if(conflicts.isArray())result.insert("conflicts",conflicts.toArray().toVariantList());
@@ -1467,7 +1708,7 @@ bool EngineController::confirmPolicyMigration() {
     m_policyError.clear();m_policyMigrationConfirmed=true;return applyPolicyDocument(m_policyDocument.toVariantMap());
 }
 bool EngineController::applyPolicyDocument(const QVariantMap &input) {
-    auto options=m_options;options.nodes=m_store.nodes();return applyPolicyConfiguration(QJsonObject::fromVariantMap(input),options);
+    auto options=m_options;options.nodes=availableNodes();return applyPolicyConfiguration(QJsonObject::fromVariantMap(input),options);
 }
 bool EngineController::applyCatalogTransaction(const NodeStore::ImportPlan &plan,const QJsonObject &retained,
                                               NodeImportService::ApplyCompletion completion,QString *error) {
@@ -1492,13 +1733,13 @@ bool EngineController::applyCatalogTransaction(const NodeStore::ImportPlan &plan
         tombstones.append(QJsonObject{{"kind","node"},{"id",id},{"safe_label",label},{"reason",sourceOwned?"missing_source":"deleted_target"}});
     }
     document.insert("missing_targets",tombstones);network.insert("policyDocumentV2",document);
-    auto options=m_options;options.nodes=plan.nodes();m_policyCatalog=plan;m_policyCatalogCompletion=std::move(completion);m_policyCandidateNetwork=network;
+    auto options=m_options;options.nodes=scopedNodes(plan.nodes(),network);m_policyCatalog=plan;m_policyCatalogCompletion=std::move(completion);m_policyCandidateNetwork=network;
     const bool accepted=applyPolicyConfiguration(document,options);
     if(!accepted){if(error)*error=m_policyError;m_policyCatalog.reset();m_policyCatalogCompletion={};}
     else if(!removedIds.isEmpty())m_tests.cancel();
     return accepted;
 }
-bool EngineController::applyPolicyConfiguration(const QJsonObject &document,const EngineStartOptions &options) {
+bool EngineController::applyPolicyConfiguration(const QJsonObject &document,const EngineStartOptions &inputOptions) {
     const auto reject=[this](const QString &error){m_policyError=error;emit policyChanged();return false;};
     if(m_shuttingDown||m_policyBusy||busy()||(!m_policyCatalog&&m_imports.busy())||m_store.saving())return reject(QStringLiteral("配置正在处理另一项修改，请等待完成后重试。"));
     if(m_moduleOverlayActive)return reject(QStringLiteral("请先停用配置模块，再编辑基础策略。"));
@@ -1519,16 +1760,23 @@ bool EngineController::applyPolicyConfiguration(const QJsonObject &document,cons
         if((kind=="node"&&removedNodes.contains(id))||(kind=="group"&&previousGroups.contains(id)&&!nextGroups.contains(id)))continue;
         return reject(QStringLiteral("缺失出口记录只能来自已保存的撤销记录或当前明确删除的节点、来源与策略组。"));
     }
+    auto network=m_policyCatalog?m_policyCandidateNetwork:serializedNetworkConfiguration(&inputOptions);if(network.isEmpty())return reject(m_networkError);
+    auto options=inputOptions;options.nodes=scopedNodes(options.nodes,network);
     QJsonObject candidate;const auto error=RustCoreEngine::configurationV2(options,document,&candidate);
     if(!error.isEmpty())return reject(error);
     const auto revision=m_store.issueConfigurationRevision();if(revision.isEmpty())return reject(m_store.error());
-    auto network=m_policyCatalog?m_policyCandidateNetwork:serializedNetworkConfiguration();if(network.isEmpty())return reject(m_networkError);
     network.insert("policyDocumentV2",document);network.insert("dns",QJsonObject::fromVariantMap(options.dnsConfig));network.insert("proxyPort",int(options.proxyPort));
     if(!m_store.reserveConfigurationLease())return reject(m_store.error());
     m_policyBusy=true;m_policyOnline=processAlive();m_policyRollingBack=false;m_stopAfterPolicy=false;m_policyRecoveryAttempts=0;m_policyIntentDurable=false;
     m_policyWaitingForProbes=false;m_policyWaitingForStop=false;m_policyRestartRecovery=false;m_policyRecoveryAction.clear();
     m_policyRequestId=newPolicyId();m_policyCandidateRevision=revision;m_policyCandidate=document;m_policyRuntimeCandidate=candidate;
     m_policyCandidateOptions=options;m_policyCandidateOptions.policyDocument=document;m_policyCandidateNetwork=network;
+    m_policyRevokedNodeIds.clear();
+    if(m_policyCatalog)m_policyRevokedNodeIds=m_policyCatalog->removedNodeIds();
+    if(network.value("activeSubscriptionId")!=m_store.networkConfiguration().value("activeSubscriptionId")) {
+        QSet<QString> allowed;for(const auto &node:options.nodes)allowed.insert(node.id);
+        for(const auto &node:availableNodes())if(!allowed.contains(node.id)&&!m_policyRevokedNodeIds.contains(node.id))m_policyRevokedNodeIds.append(node.id);
+    }
     m_policyBaseReceipt=m_store.configurationReceipt();m_policyPrepared=m_engine->status().configurationReceipt;m_policyPrepared.remove("prepared_token");
     m_policyError.clear();m_policyState="preparing";emit policyChanged();emit statusChanged();
     dispatchPolicyCommand(m_policyOnline?QStringLiteral("prepare_configuration_v2"):QStringLiteral("validate_configuration_v2"));
@@ -1541,7 +1789,7 @@ QJsonObject EngineController::policyCommand(const QString &operation) const {
         request.insert("store_id",m_store.configurationStoreId());request.insert("base_saved_revision",m_store.configurationRevision());
         request.insert("candidate_revision",m_policyCandidateRevision);request.insert("expected_generation",m_policyPrepared.value("generation"));
         request.insert("base_applied_revision",m_policyPrepared.value("applied_revision"));request.insert("candidate",m_policyRuntimeCandidate);
-        if(m_policyCatalog&&!m_policyCatalog->removedNodeIds().isEmpty())request.insert("revoked_node_ids",QJsonArray::fromStringList(m_policyCatalog->removedNodeIds()));
+        if(!m_policyRevokedNodeIds.isEmpty())request.insert("revoked_node_ids",QJsonArray::fromStringList(m_policyRevokedNodeIds));
     }else if(operation=="activate_configuration_v2"){
         request.insert("prepared_token",m_policyPrepared.value("prepared_token"));request.insert("plan_digest",m_policyPrepared.value("plan_digest"));
         request.insert("expected_generation",m_policyPrepared.value("expected_generation"));request.insert("candidate_revision",m_policyCandidateRevision);
@@ -1577,11 +1825,15 @@ void EngineController::finishPolicyMutation(bool success,const QString &error) {
     // copies must not outlive their result, especially after credential revoke.
     m_policyCandidateOptions={};m_policyRuntimeCandidate={};m_policyCandidateNetwork={};m_policyCandidate={};
     m_policyPrepared={};m_policyBaseReceipt={};
-    const auto requestId=m_policyRequestId;const bool stopAfter=m_stopAfterPolicy;m_stopAfterPolicy=false;
+    m_policyRevokedNodeIds.clear();
+    const auto requestId=m_policyRequestId;const bool stopAfter=m_stopAfterPolicy;
     emit policyChanged();emit optionsChanged();emit selectionChanged();emit statusChanged();
     emit policyApplyFinished(requestId,success);
     if(catalogCompletion)catalogCompletion(success,error);
-    if(stopAfter)stop();
+    m_stopAfterPolicy=false;
+    // A failed restore remains explicitly retryable; finishing a transaction
+    // must not silently restart the failed release attempt or stop its listener.
+    if(stopAfter&&m_stopPhase!=StopPhase::ReleaseFailed)stop();
 }
 void EngineController::failPolicyMutation(const QString &error) {
     m_policyError=error;
@@ -1693,7 +1945,7 @@ void EngineController::policyCommandCompleted(const QString &requestId,const QJs
                 m_policyState="reconciling";m_policyError=QStringLiteral("内核最终回执与磁盘配置不一致，新请求应用结果待恢复。");emit policyChanged();return;
             }
             if(!m_policyRollingBack)m_policyReceipt=actual;
-            if(!m_policyRollingBack&&m_policyCatalog&&!m_policyCatalog->removedNodeIds().isEmpty()&&m_tests.busy()){
+            if(!m_policyRollingBack&&!m_policyRevokedNodeIds.isEmpty()&&m_tests.busy()){
                 m_policyWaitingForProbes=true;m_policyState="committing";emit policyChanged();return;
             }
             finishPolicyMutation(!m_policyRollingBack,m_policyRollingBack?m_policyError:QString());return;
@@ -1714,7 +1966,7 @@ void EngineController::connectConfiguredPolicy() {
 void EngineController::completePolicySavedOnly() {
     adoptDurableCatalogCache();
     m_policyOnline=false;m_policyReceipt=m_store.configurationReceipt();
-    if(m_policyCatalog&&!m_policyCatalog->removedNodeIds().isEmpty()&&m_tests.busy()){
+    if(!m_policyRevokedNodeIds.isEmpty()&&m_tests.busy()){
         m_policyWaitingForProbes=true;m_policyState="committing";emit policyChanged();return;
     }
     finishPolicyMutation(true);
@@ -1723,14 +1975,14 @@ void EngineController::adoptDurableCatalogCache() {
     if(!m_policyCatalog)return;
     // Disk adoption is authoritative even if the following finish ACK is lost.
     // Do not publish the candidate policy/mode as applied before its receipt.
-    m_options.nodes=m_store.nodes();m_policyCandidateOptions.nodes=m_options.nodes;
+    m_options.nodes=availableNodes();m_policyCandidateOptions.nodes=m_options.nodes;
 }
 bool EngineController::recoverPolicyConfiguration() {
     if(m_policyDiskWrite){m_policyError=QStringLiteral("原子保存仍在执行，等待其真实结果后才能恢复。");emit policyChanged();return false;}
     if(m_store.configurationRecoveryRequired()&&!m_policyBusy){
         NodeStore::ImportPlan plan;QJsonObject network;
         if(!m_store.configurationRecoveryPlan(&plan,&network)){m_policyError=m_store.error();emit policyChanged();return false;}
-        const auto pending=m_store.pendingConfigurationReceipt();auto options=m_options;options.nodes=plan.nodes();
+        const auto pending=m_store.pendingConfigurationReceipt();auto options=m_options;options.nodes=scopedNodes(plan.nodes(),network);
         options.dnsConfig=network.value("dns").toObject().toVariantMap();
         const auto document=network.value("policyDocumentV2").toObject();QJsonObject runtime;
         const auto error=RustCoreEngine::configurationV2(options,document,&runtime);
@@ -1746,7 +1998,10 @@ bool EngineController::recoverPolicyConfiguration() {
     if(m_store.configurationReceipt().value("request_id").toString()==m_policyRequestId)m_policyRecoveryAction="validate_committed";
     else if(m_policyIntentDurable&&m_policyCatalog&&!m_policyCatalog->removedNodeIds().isEmpty())m_policyRecoveryAction="validate_pending";
     else m_policyRecoveryAction=m_policyIntentDurable?"abort_pending":"cancel_unwritten";
-    m_policyState="reconciling";m_policyWaitingForStop=true;m_engine->stop();
+    m_policyState="reconciling";m_policyWaitingForStop=true;
+    const bool revokingCredentials=m_policyCatalog&&!m_policyCatalog->removedNodeIds().isEmpty();
+    if(m_stopAfterPolicy&&!revokingCredentials)finishStopAfterProxyRelease();
+    else m_engine->stop(); // Credential revocation must still fail closed immediately.
     QMetaObject::invokeMethod(this,[this]{
         if(m_policyWaitingForStop&&!processAlive()&&m_engine->status().state==ProxyEngine::State::Stopped)continuePolicyRecoveryAfterStop();
     },Qt::QueuedConnection);

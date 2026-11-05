@@ -514,46 +514,56 @@ fn inspected_outbound(source: &str, expected: &str) -> Value {
 fn quic_and_ss2022_source_imports_survive_abi_configuration_and_selection() {
     let _serial = serialized_lifecycle();
     let tcp = loopback_peer();
-    let endpoint = tcp.local_addr().unwrap();
-    let udp = UdpSocket::bind(endpoint).unwrap();
+    let tcp_endpoint = tcp.local_addr().unwrap();
+    // TCP and UDP have separate port allocations and exclusions. A port reserved
+    // by TCP bind(:0) is not necessarily available to UDP on Windows. Keep each
+    // transport's own ephemeral socket open for the complete ABI lifecycle.
+    let udp = UdpSocket::bind("127.0.0.1:0").expect("reserve the QUIC fixture's UDP port");
     udp.set_nonblocking(true).unwrap();
-    let port = endpoint.port();
+    let udp_endpoint = udp.local_addr().unwrap();
+    let tcp_port = tcp_endpoint.port();
+    let udp_port = udp_endpoint.port();
     let groups = [
         (
             "hysteria2",
+            udp_endpoint,
             vec![
-                format!("hy2://{PASSWORD}@{endpoint}/?sni=localhost"),
-                format!("hysteria2://{PASSWORD}@{endpoint}/?sni=localhost"),
+                format!("hy2://{PASSWORD}@{udp_endpoint}/?sni=localhost"),
+                format!("hysteria2://{PASSWORD}@{udp_endpoint}/?sni=localhost"),
                 format!(
-                    "proxies:\n  - name: boundary\n    type: hysteria2\n    server: 127.0.0.1\n    port: {port}\n    password: {PASSWORD}\n    sni: localhost\n"
+                    "proxies:\n  - name: boundary\n    type: hysteria2\n    server: 127.0.0.1\n    port: {udp_port}\n    password: {PASSWORD}\n    sni: localhost\n"
                 ),
             ],
         ),
         (
             "tuic",
+            udp_endpoint,
             vec![
-                format!("tuic://{UUID}:{PASSWORD}@{endpoint}/?sni=localhost&alpn=h3"),
+                format!("tuic://{UUID}:{PASSWORD}@{udp_endpoint}/?sni=localhost&alpn=h3"),
                 format!(
-                    "proxies:\n  - name: boundary\n    type: tuic\n    server: 127.0.0.1\n    port: {port}\n    uuid: {UUID}\n    password: {PASSWORD}\n    sni: localhost\n    alpn: [h3]\n"
+                    "proxies:\n  - name: boundary\n    type: tuic\n    server: 127.0.0.1\n    port: {udp_port}\n    uuid: {UUID}\n    password: {PASSWORD}\n    sni: localhost\n    alpn: [h3]\n"
                 ),
             ],
         ),
         (
             "shadowsocks",
+            tcp_endpoint,
             vec![
                 format!(
-                    "ss://2022-blake3-aes-128-gcm:{}@{endpoint}/",
+                    "ss://2022-blake3-aes-128-gcm:{}@{tcp_endpoint}/",
                     SS2022_PSK.replace('=', "%3D")
                 ),
                 format!(
-                    "proxies:\n  - name: boundary\n    type: ss\n    server: 127.0.0.1\n    port: {port}\n    cipher: 2022-blake3-aes-128-gcm\n    password: {SS2022_PSK}\n"
+                    "proxies:\n  - name: boundary\n    type: ss\n    server: 127.0.0.1\n    port: {tcp_port}\n    cipher: 2022-blake3-aes-128-gcm\n    password: {SS2022_PSK}\n"
                 ),
             ],
         ),
     ];
     let mut native = json!({"schema":1,"listen":"127.0.0.1:0","selected":"node0","nodes":[]});
-    for (index, (protocol, sources)) in groups.iter().enumerate() {
+    for (index, (protocol, endpoint, sources)) in groups.iter().enumerate() {
         let first = inspected_outbound(&sources[0], protocol);
+        assert_eq!(first["host"], endpoint.ip().to_string(), "{protocol}");
+        assert_eq!(first["port"], endpoint.port(), "{protocol}");
         for source in &sources[1..] {
             // Different subscription dialects must produce identical native IR.
             assert_eq!(inspected_outbound(source, protocol), first);

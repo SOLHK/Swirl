@@ -1,12 +1,17 @@
 name: Swirl Rust Core
 on:
   push:
-    branches: [test, main, work/core-completion-20261017, work/core-rule-routing-20261021, work/rust-core-network-fixes-20261021, work/xray-v2ray-json-import-20261021]
+    branches: [test, main, work/core-completion-20261017, work/core-rule-routing-20261021, work/rust-core-network-fixes-20261021, work/xray-v2ray-json-import-20261021, work/native-tun-windows-20261030-isolated, work/native-lan-proxy-20261031]
   pull_request:
     branches: [test, main]
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  # Only this repository's isolated TUN branch replaces stale/duplicate
+  # push + PR runs. Other branches retain their independent executions.
+  group: swirl-rust-${{ github.workflow }}-${{ (github.head_ref || github.ref_name) == 'work/native-tun-windows-20261030-isolated' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'native-tun-development' || github.run_id }}
+  cancel-in-progress: ${{ (github.head_ref || github.ref_name) == 'work/native-tun-windows-20261030-isolated' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
 jobs:
   portable-rust:
     strategy:
@@ -31,6 +36,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
+      - name: Production V2 CONNECT, TLS, HTTP2 and streaming compatibility
+        shell: bash
+        env:
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api
+          SWIRL_PROXY_COMPAT_EVIDENCE: ${{ runner.temp }}/swirl-proxy-compat
+        run: |
+          set -euo pipefail
+          python -m pip install -r ../tools/requirements-network-fixtures.txt
+          python ../tools/tests/test_windows_proxy_compat.py
+          python ../tools/tests/test_proxy_stream_soak.py --duration-seconds 120 --connections 8 --output "$SWIRL_PROXY_COMPAT_EVIDENCE/soak.json"
+      - name: Preserve concurrent proxy stream evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Proxy-Compatibility-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-proxy-compat
+          if-no-files-found: error
+          retention-days: 14
       - name: Independent portable protocol peers
         run: |
           python -m pip install cryptography==50.0.2
@@ -324,6 +347,14 @@ jobs:
         working-directory: core
     steps:
       - uses: actions/checkout@v4
+      - name: Verify read-only proxy evidence with Windows PowerShell 5.1
+        working-directory: .
+        shell: powershell
+        run: ./tools/tests/Test-CodexNetworkEvidence.ps1
+      - name: Verify read-only proxy evidence with PowerShell 7
+        working-directory: .
+        shell: pwsh
+        run: ./tools/tests/Test-CodexNetworkEvidence.ps1
       - name: Install stable Rust tools
         run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
       - run: cargo fmt --all -- --check
@@ -343,6 +374,52 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
+      - name: Provision pinned official Windows Codex CLI
+        working-directory: .
+        shell: pwsh
+        timeout-minutes: 10
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/tests/test_codex_cli_provisioning.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/Install-CodexCli.py --destination "$env:RUNNER_TEMP/swirl-codex-cli" --evidence "$env:RUNNER_TEMP/swirl-codex-cli-evidence/provisioning.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify real Codex CLI feature management and Windows DPAPI
+        working-directory: .
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          python tools/Verify-CodexCliManagement.py --cli "$env:RUNNER_TEMP/swirl-codex-cli/codex.exe" --evidence "$env:RUNNER_TEMP/swirl-codex-cli-evidence"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve real Codex CLI management evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Codex-CLI-Management-Windows-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-codex-cli-evidence
+          if-no-files-found: error
+          retention-days: 14
+      - name: Production V2 CONNECT, TLS, HTTP2 and streaming compatibility
+        shell: pwsh
+        env:
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api.exe
+          SWIRL_PROXY_COMPAT_EVIDENCE: ${{ runner.temp }}/swirl-proxy-compat
+        run: |
+          python -m pip install -r ../tools/requirements-network-fixtures.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python ../tools/tests/test_windows_proxy_compat.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python ../tools/tests/test_proxy_stream_soak.py --duration-seconds 120 --connections 8 --output "$env:SWIRL_PROXY_COMPAT_EVIDENCE/soak.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve concurrent proxy stream evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Proxy-Compatibility-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-proxy-compat
+          if-no-files-found: error
+          retention-days: 14
       - name: Independent TLS and protocol peers
         id: independent_windows_peers
         shell: pwsh
@@ -395,7 +472,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_subscription_capture.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python ../tools/tests/test_codex_management.py
       - name: Diagnose hosted Windows port allocation after a peer failure
         if: failure() && steps.independent_windows_peers.conclusion == 'failure'
         shell: pwsh
@@ -668,6 +744,92 @@ jobs:
           if ($runtimeConfigureExit -eq 0) { throw 'Removed runtime option was accepted.' }
           if (-not (Select-String -LiteralPath build/removed-runtime/rejection.log -Pattern 'SWIRL_USE_RUST_CORE=OFF is no longer supported' -SimpleMatch -Quiet)) { throw 'Configure failed before the Rust-only runtime guard.' }
           exit 0
+      - name: Offline captured subscription through the native DPAPI inspector
+        working-directory: .
+        shell: pwsh
+        env:
+          SWIRL_CAPTURE_INSPECTOR: ${{ github.workspace }}/build/rust-qt/Release/SwirlPrivateSubscriptionInspect.exe
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $IsWindows -or -not (Test-Path -LiteralPath $env:SWIRL_CAPTURE_INSPECTOR -PathType Leaf)) { throw 'Required Windows Qt capture inspector is missing.' }
+          ./scripts/Copy-VerifiedOpenSslRuntime.ps1 -OpenSslRoot $env:SWIRL_OPENSSL_ROOT -ApplicationDirectory build/rust-qt/Release -Target VC-WIN64A
+          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_CAPTURE_INSPECTOR"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest tools.tests.test_subscription_capture.CaptureTests.test_offline_cpp_import_and_existing_store_protection -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Fetch hash-pinned independent QUIC server fixtures
+        working-directory: .
+        shell: pwsh
+        run: |
+          python tools/Fetch-NativeProtocolPeers.py --output "$env:RUNNER_TEMP/swirl-qt-quic-peers"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Qt persisted Hysteria2 and TUIC TCP, UDP and rejection fixtures
+        working-directory: .
+        shell: pwsh
+        env:
+          SWIRL_RUST_QT_TESTS: ${{ github.workspace }}/build/rust-qt/Release/SwirlRustCoreTests.exe
+          SWIRL_SINGBOX_QUIC_EVIDENCE: ${{ runner.temp }}/swirl-qt-quic-product
+          SWIRL_TEST_ROOT: ${{ runner.temp }}/swirl-qt-quic-tests
+          QT_FORCE_STDERR_LOGGING: '1'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $IsWindows) { throw 'The QUIC product fixture requires native Windows DPAPI.' }
+          foreach ($binary in @($env:SWIRL_RUST_QT_TESTS, $env:HY2_SERVER, $env:SWIRL_TUIC_SERVER)) {
+            if ([string]::IsNullOrWhiteSpace($binary) -or -not (Test-Path -LiteralPath $binary -PathType Leaf)) { throw 'Required QUIC fixture binary missing.' }
+          }
+          windeployqt --release --openssl-root $env:SWIRL_OPENSSL_ROOT --include-plugins qopensslbackend "$env:SWIRL_RUST_QT_TESTS"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Evidence is never restored from a cache or mixed with another run.
+          if (Test-Path -LiteralPath $env:SWIRL_SINGBOX_QUIC_EVIDENCE) { throw 'QUIC evidence directory already exists.' }
+          New-Item -ItemType Directory -Path $env:SWIRL_SINGBOX_QUIC_EVIDENCE | Out-Null
+          New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
+          Copy-Item -LiteralPath "$env:RUNNER_TEMP/swirl-qt-quic-peers/manifest.json" -Destination "$env:SWIRL_SINGBOX_QUIC_EVIDENCE/peer-manifest.json"
+          $source = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $source -ne $env:GITHUB_SHA) { throw 'QUIC checkout identity mismatch.' }
+          $trackedChanges = @(git status --porcelain --untracked-files=no)
+          if ($LASTEXITCODE -ne 0 -or $trackedChanges.Count -ne 0) { throw 'QUIC test source is not the clean checkout.' }
+          $qtDirectory = Split-Path -Parent $env:SWIRL_RUST_QT_TESTS
+          $rust = Get-Content -LiteralPath "$qtDirectory/swirl-rust-build.json" -Raw | ConvertFrom-Json
+          if ($rust.source_sha -ne $source -or $rust.target -ne 'x86_64-pc-windows-msvc') { throw 'QUIC paired Rust source identity mismatch.' }
+          $qtHash = (Get-FileHash -LiteralPath $env:SWIRL_RUST_QT_TESTS -Algorithm SHA256).Hash.ToLowerInvariant()
+          $dllHash = (Get-FileHash -LiteralPath "$qtDirectory/swirl_api.dll" -Algorithm SHA256).Hash.ToLowerInvariant()
+          $expectedCases = @('test_hy2_bad_auth_never_reaches_origin', 'test_hy2_salamander_tcp_udp', 'test_hy2_tcp_udp', 'test_tuic_bad_auth_never_reaches_origin', 'test_tuic_native_tcp_udp', 'test_tuic_quic_tcp_udp')
+          python tools/tests/test_singbox_quic_product.py -v 2>&1 | Tee-Object -FilePath "$env:SWIRL_SINGBOX_QUIC_EVIDENCE/tests.log"
+          $testExit = $LASTEXITCODE
+          $summary = [ordered]@{ schema=1; source_sha=$source; github_run_id=$env:GITHUB_RUN_ID; github_run_attempt=$env:GITHUB_RUN_ATTEMPT; expected_qt_version='6.12.0'; qt_sha256=$qtHash; rust_dll_sha256=$dllHash; rust=$rust; fixture_sha256=(Get-FileHash tools/tests/test_singbox_quic_product.py -Algorithm SHA256).Hash.ToLowerInvariant(); peer_lock_sha256=(Get-FileHash tools/tests/native-protocol-peer-lock.json -Algorithm SHA256).Hash.ToLowerInvariant(); expected_cases=$expectedCases; verified_cases=@(); test_exit_code=$testExit; success=$false; scope='Windows Qt import, DPAPI, native Rust and hash-pinned loopback HY2/TUIC servers; no provider or desktop acceptance' }
+          try {
+            if ($testExit -ne 0) { throw 'The six native Qt QUIC fixtures failed.' }
+            foreach ($case in $expectedCases) {
+              $record = Get-Content -LiteralPath "$env:SWIRL_SINGBOX_QUIC_EVIDENCE/$case.json" -Raw | ConvertFrom-Json
+              if ($record.case -ne $case -or $record.qt_sha256 -ne $qtHash -or $record.rust_dll_sha256 -ne $dllHash -or $record.rust.source_sha -ne $source -or $record.rust.build_id -ne $rust.build_id) { throw 'QUIC fixture binary or source identity mismatch.' }
+              [xml]$report = Get-Content -LiteralPath "$env:SWIRL_SINGBOX_QUIC_EVIDENCE/$case.xml" -Raw
+              $incidents = @($report.SelectNodes('//Incident'))
+              if ($report.TestCase.Environment.QtVersion -ne '6.12.0' -or $incidents.Count -eq 0 -or @($incidents | Where-Object { $_.type -ne 'pass' }).Count -ne 0 -or $report.SelectNodes("//*[@type='skip']").Count -ne 0 -or $report.SelectNodes("//TestFunction[@name='singBoxQuicProductChainAgainstIndependentPeer']/Incident[@type='pass']").Count -ne 1) { throw 'Required Qt 6.12 QUIC fixture was failed, skipped or omitted.' }
+              $summary.verified_cases += $case
+            }
+            $summary.success = $true
+          } finally {
+            $summary | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath "$env:SWIRL_SINGBOX_QUIC_EVIDENCE/test-summary.json" -Encoding utf8
+          }
+      - name: Preserve healthy Hysteria2 UDP associations after an empty packet
+        working-directory: .
+        shell: pwsh
+        env:
+          SWIRL_NATIVE_LIBRARY: ${{ github.workspace }}/build/rust-qt/Release/swirl_api.dll
+          SWIRL_QUIC_CORE_EVIDENCE: ${{ runner.temp }}/swirl-qt-quic-product/hysteria2-empty-socks.json
+        run: |
+          python tools/tests/test_quic_core.py QuicCoreTests.test_hysteria2_empty_udp_drops_only_that_packet_and_preserves_association -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/tests/run_native_hy2_udp.py --report "$env:RUNNER_TEMP/swirl-qt-quic-product/hysteria2-empty-native.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve exact-source native Qt QUIC fixture evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-QUIC-Product-Windows-qt-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-qt-quic-product
+          if-no-files-found: error
+          retention-days: 14
       - name: Run Qt to Rust integration without Mihomo
         working-directory: .
         env:

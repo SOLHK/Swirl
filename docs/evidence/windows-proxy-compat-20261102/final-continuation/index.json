@@ -1,0 +1,412 @@
+{
+  "schema": 1,
+  "snapshot_at_utc": "2026-11-02T15:42:10.735300+00:00",
+  "scope": "Focused continuation evidence. Original logs are verbatim; intermediate snapshots retain their dates and do not establish final CI or Windows desktop acceptance.",
+  "hash_algorithm": "SHA-256",
+  "hashes_exclude": [
+    "index.json",
+    "../../../WINDOWS_PROXY_COMPAT_CONTINUATION_20261102.md"
+  ],
+  "files": [
+    {
+      "path": "ci/4048565-partial-verified-artifacts.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "ci4048565/partial-verified-artifacts.json",
+      "scope": "Partial 4048565 artifact snapshot, now includes all three120s soaks; overall Rust workflow remains FAILURE due later Windows Qt stage.",
+      "bytes": 8350,
+      "sha256": "ac4914dccd86b3d2c699064111748e134742f56296e7d95cb37dbd99c33308f7"
+    },
+    {
+      "path": "ci/4048565-windows-qt-failure-summary.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "ci4048565/windows-qt-failure-summary.json",
+      "scope": "Completed failed Windows Rust workflow integration stage. Workspace success must not be treated as whole workflow success.",
+      "bytes": 7469,
+      "sha256": "68e65d99cd2aeb4f191a6d211c7ea1068da99ece4a83c72be905f3e957adc75a"
+    },
+    {
+      "path": "ci/4048565-windows-qt-failure/bad-public-key-qt.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "ci4048565/13155587931/test_actual_qt_bad_credentials_never_reach_origin_or_spare-1793633555366063600/bad-public-key-qt.json",
+      "scope": "Actual Windows Qt6.12/DPAPI controlled REALITY/Vision/Chrome133 failure. No provider configuration or generated peer private-key files copied.",
+      "bytes": 1304,
+      "sha256": "5d59c48ad440f25d5d084d0be81c8ff64590ecf9ef50a5ca311286eb9aeaf012"
+    },
+    {
+      "path": "ci/4048565-windows-qt-failure/bad-public-key-qt.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "ci4048565/13155587931/test_actual_qt_bad_credentials_never_reach_origin_or_spare-1793633555366063600/bad-public-key-qt.log",
+      "scope": "Actual Windows Qt6.12/DPAPI controlled REALITY/Vision/Chrome133 failure. No provider configuration or generated peer private-key files copied.",
+      "bytes": 616,
+      "sha256": "16e69980629056f37d5ac181ff6a86cc1de878bc78ec32a1b99a0edf34b25992"
+    },
+    {
+      "path": "ci/4048565-windows-qt-failure/bad-servername-qt.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "ci4048565/13155587931/test_actual_qt_bad_credentials_never_reach_origin_or_spare-1793633555366063600/bad-servername-qt.json",
+      "scope": "Actual Windows Qt6.12/DPAPI controlled REALITY/Vision/Chrome133 failure. No provider configuration or generated peer private-key files copied.",
+      "bytes": 1304,
+      "sha256": "50904ae67aec7a0011deb8272ef42b009fcd99b8a464137f6adcc8211c12353b"
+    },
+    {
+      "path": "ci/4048565-windows-qt-failure/bad-servername-qt.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "ci4048565/13155587931/test_actual_qt_bad_credentials_never_reach_origin_or_spare-1793633555366063600/bad-servername-qt.log",
+      "scope": "Actual Windows Qt6.12/DPAPI controlled REALITY/Vision/Chrome133 failure. No provider configuration or generated peer private-key files copied.",
+      "bytes": 616,
+      "sha256": "1983b4a8e6c49003920fed94bd5de818054cfa56140e42c138486f406fdc79e4"
+    },
+    {
+      "path": "ci/4048565-windows-qt-failure/bad-short-id-qt.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "ci4048565/13155587931/test_actual_qt_bad_credentials_never_reach_origin_or_spare-1793633555366063600/bad-short-id-qt.json",
+      "scope": "Actual Windows Qt6.12/DPAPI controlled REALITY/Vision/Chrome133 failure. No provider configuration or generated peer private-key files copied.",
+      "bytes": 1304,
+      "sha256": "166bfce8e686dfb56cff75aed5144afea01440deb6ebcf3d912ae06efd7ba31e"
+    },
+    {
+      "path": "ci/4048565-windows-qt-failure/bad-short-id-qt.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "ci4048565/13155587931/test_actual_qt_bad_credentials_never_reach_origin_or_spare-1793633555366063600/bad-short-id-qt.log",
+      "scope": "Actual Windows Qt6.12/DPAPI controlled REALITY/Vision/Chrome133 failure. No provider configuration or generated peer private-key files copied.",
+      "bytes": 616,
+      "sha256": "d6a38885d4f8a969fba3dc640e20dd03ed2baf13a8f8739f85aa183510bc160a"
+    },
+    {
+      "path": "ci/4048565-windows-qt-failure/reject-qt.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "ci4048565/13155587931/test_actual_qt_domain_and_match_reject_a_proven_reachable_origin-1793633562483142000/reject-qt.json",
+      "scope": "Actual Windows Qt6.12/DPAPI controlled REALITY/Vision/Chrome133 failure. No provider configuration or generated peer private-key files copied.",
+      "bytes": 4061,
+      "sha256": "faf4a11d493419e82b2ee73026ddbcd04a757e6bbe12121a634f3323580d3d8c"
+    },
+    {
+      "path": "ci/4048565-windows-qt-failure/reject-qt.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "ci4048565/13155587931/test_actual_qt_domain_and_match_reject_a_proven_reachable_origin-1793633562483142000/reject-qt.log",
+      "scope": "Actual Windows Qt6.12/DPAPI controlled REALITY/Vision/Chrome133 failure. No provider configuration or generated peer private-key files copied.",
+      "bytes": 627,
+      "sha256": "6170c4f75958f1d92a1cea276f217aad7164e592e5f75163c542c320c7350611"
+    },
+    {
+      "path": "ci/4048565-windows-qt-failure/test-summary.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "ci4048565/13155587931/test-summary.json",
+      "scope": "Actual Windows Qt6.12/DPAPI controlled REALITY/Vision/Chrome133 failure. No provider configuration or generated peer private-key files copied.",
+      "bytes": 634,
+      "sha256": "8b19a178fc647295e1eb0600cef9657d4aa2b5b8cf54080e64c386a629264401"
+    },
+    {
+      "path": "ci/4048565-windows-qt-failure/tests.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "ci4048565/13155587931/tests.log",
+      "scope": "Actual Windows Qt6.12/DPAPI controlled REALITY/Vision/Chrome133 failure. No provider configuration or generated peer private-key files copied.",
+      "bytes": 7326,
+      "sha256": "0193aca5e96429f3f9c8e6a70dad1bf27b183d09aa5d53902a8ed10c74c4a5c5"
+    },
+    {
+      "path": "ci/progress-snapshot.json",
+      "kind": "derived-progress-snapshot",
+      "source_evidence": "Verified source objects, checked workflow metadata and sibling CI/Rust audit reports at stated snapshot time.",
+      "scope": "Intermediate states are not final acceptance.",
+      "bytes": 2676,
+      "sha256": "783c086473b3924ff220fb97a005d59805c804342b7781da4d08c6e096369565"
+    },
+    {
+      "path": "ci/verified1327-summary.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "ci/verified1327-summary.json",
+      "scope": "Rechecked 1327 exact historical artifacts, not final candidate CI.",
+      "bytes": 7543,
+      "sha256": "f230d21f7d105d0952600e644aa4cdff94cc5c1dffea28b389bb1284e9b763be"
+    },
+    {
+      "path": "qml/1327-full-app-policy-ui.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "qt1327/build/swirl-quick/policy-evidence/policy-ui.json",
+      "scope": "Original full application Windows Qt 6.12 failure; 527 checks, one failure, in-memory system proxy adapter.",
+      "bytes": 83590,
+      "sha256": "d5d0ac9cf08f9d23e1b4bf3b47f83662284d84ffe842467bcff98384053fb93b"
+    },
+    {
+      "path": "qml/1327-full-regression.xml",
+      "kind": "verbatim-copy",
+      "source_evidence": "qt1327/build-evidence/full-regression.xml",
+      "scope": "Original 22 full regression CTest cases, swirl-policy-ui failed. Critical gates were separate.",
+      "bytes": 6479,
+      "sha256": "890633e2a7303c4ec54879dd412184c31fc702020e312a93144e86d649d5373a"
+    },
+    {
+      "path": "qml/local-baseline/junit.xml",
+      "kind": "verbatim-copy",
+      "source_evidence": "qt-policy-final-local/policy-form-p62qnquz/baseline/junit.xml",
+      "scope": "Baseline1327 expects only new synchronous viewport case to fail; candidate expects every case pass. This is not full application acceptance.",
+      "bytes": 1447,
+      "sha256": "63a7f1bc7b8bf05807e1c0dd04541516079ae8a9bd619badfcc18e581fffd3ed"
+    },
+    {
+      "path": "qml/local-baseline/stderr.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "qt-policy-final-local/policy-form-p62qnquz/baseline/stderr.log",
+      "scope": "Baseline1327 expects only new synchronous viewport case to fail; candidate expects every case pass. This is not full application acceptance.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "qml/local-baseline/stdout.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "qt-policy-final-local/policy-form-p62qnquz/baseline/stdout.log",
+      "scope": "Baseline1327 expects only new synchronous viewport case to fail; candidate expects every case pass. This is not full application acceptance.",
+      "bytes": 1108,
+      "sha256": "1cd01e8153645d55bf46747db255645e92c071f106ab2dbcb26b5e4c7e656481"
+    },
+    {
+      "path": "qml/local-candidate/junit.xml",
+      "kind": "verbatim-copy",
+      "source_evidence": "qt-policy-final-local/policy-form-p62qnquz/candidate/junit.xml",
+      "scope": "Baseline1327 expects only new synchronous viewport case to fail; candidate expects every case pass. This is not full application acceptance.",
+      "bytes": 1357,
+      "sha256": "0ca1ab6ab739938182010470f03c81036155bda8846d6667fa7fe6a744922ba7"
+    },
+    {
+      "path": "qml/local-candidate/stderr.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "qt-policy-final-local/policy-form-p62qnquz/candidate/stderr.log",
+      "scope": "Baseline1327 expects only new synchronous viewport case to fail; candidate expects every case pass. This is not full application acceptance.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "qml/local-candidate/stdout.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "qt-policy-final-local/policy-form-p62qnquz/candidate/stdout.log",
+      "scope": "Baseline1327 expects only new synchronous viewport case to fail; candidate expects every case pass. This is not full application acceptance.",
+      "bytes": 938,
+      "sha256": "446b49c01253e077ef1d0f0fad91dd3de62a932985f489a962b6c626e6f8a6d3"
+    },
+    {
+      "path": "qml/local-result.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "qt-policy-final-local/result.json",
+      "scope": "Linux offscreen Qt 6.12 Quick Test through PySide6 launcher; real production form with presentation-only theme doubles.",
+      "bytes": 1774,
+      "sha256": "f4fbfedee57fadb0527fea8c2aa3b817836916a74a4410232042b88f4c383a02"
+    },
+    {
+      "path": "rust/amended-clippy.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/amended-clippy.log",
+      "scope": "Linux local uncommitted candidate on 4048565; exact frozen core tree f4dbcd2. No Windows desktop acceptance.",
+      "bytes": 5214,
+      "sha256": "73ad3402e687841128041b7d54b38af20d305f870c2358383251dcb39b0b930b"
+    },
+    {
+      "path": "rust/amended-command-results.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/amended-command-results.json",
+      "scope": "Linux local uncommitted candidate on 4048565; exact frozen core tree f4dbcd2. No Windows desktop acceptance.",
+      "bytes": 856,
+      "sha256": "857560ee163b473e46ea847c6bb641bf7062a1c8cff028bb498307dfd282ac38"
+    },
+    {
+      "path": "rust/amended-connectivity-diagnostics-full.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/amended-connectivity-diagnostics-full.log",
+      "scope": "Linux local uncommitted candidate on 4048565; exact frozen core tree f4dbcd2. No Windows desktop acceptance.",
+      "bytes": 4410,
+      "sha256": "0a54270977d19a41c5f56fdc9a9ad26709af0ec59cdb4e0ce46afb40ddc8106a"
+    },
+    {
+      "path": "rust/amended-fmt.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/amended-fmt.log",
+      "scope": "Linux local uncommitted candidate on 4048565; exact frozen core tree f4dbcd2. No Windows desktop acceptance.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "rust/amended-network-binary-identity.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/amended-network-binary-identity.json",
+      "scope": "Linux local uncommitted candidate on 4048565; exact frozen core tree f4dbcd2. No Windows desktop acceptance.",
+      "bytes": 747,
+      "sha256": "17215589a23ed61765cf288d9a7836609369be185dd3f60bacbf08d69bf00fda"
+    },
+    {
+      "path": "rust/amended-qt-lifecycle-ci-guard.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/amended-qt-lifecycle-ci-guard.log",
+      "scope": "Test contract correction and mandatory CI guard validation. Full rebuilt native Windows chain remains pending.",
+      "bytes": 323,
+      "sha256": "8a5c9e1f34a2118bc71888fd4314ecbe50d90eafbfb36c49f2902c1a9b32f776"
+    },
+    {
+      "path": "rust/amended-qt-lifecycle-validator.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/amended-qt-lifecycle-validator.log",
+      "scope": "Focused Python lifecycle validator negative control and fix; native Windows Qt chain must be rebuilt and rerun.",
+      "bytes": 1865,
+      "sha256": "0a6e6549539f89791a8026bfe299a3eda5f6ad66c60c6036fed39a877f54c919"
+    },
+    {
+      "path": "rust/amended-release-build.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/amended-release-build.log",
+      "scope": "Linux local uncommitted candidate on 4048565; exact frozen core tree f4dbcd2. No Windows desktop acceptance.",
+      "bytes": 6056,
+      "sha256": "88895d9a283dabc07f2641f55d02fb79370d6e94790f513bca0a06ffc9083abc"
+    },
+    {
+      "path": "rust/amended-source-identity.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/amended-source-identity.json",
+      "scope": "Linux local uncommitted candidate on 4048565; exact frozen core tree f4dbcd2. No Windows desktop acceptance.",
+      "bytes": 36580,
+      "sha256": "79fe8241e5f229f1de03066188d51cebb5ade24c28cb882622db4e55c3909498"
+    },
+    {
+      "path": "rust/amended-v2-network.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/amended-v2-network.log",
+      "scope": "Linux local uncommitted candidate on 4048565; exact frozen core tree f4dbcd2. No Windows desktop acceptance.",
+      "bytes": 1108,
+      "sha256": "5dcec88151eca54b11622f3404653ef37c7b6200d26dc45f79dcf3184728d274"
+    },
+    {
+      "path": "rust/amended-validation-summary.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/amended-validation-summary.json",
+      "scope": "Updated authoritative local candidate summary including completed1800s soak. Native final CI remains pending.",
+      "bytes": 6376,
+      "sha256": "43b3837759723e39e24be4903c8bc1c26f9799dbe406f29ffe597ce9efc93060"
+    },
+    {
+      "path": "rust/amended-workspace-tests.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/amended-workspace-tests.log",
+      "scope": "Linux local uncommitted candidate on 4048565; exact frozen core tree f4dbcd2. No Windows desktop acceptance.",
+      "bytes": 80933,
+      "sha256": "1861ff8f09a94115712bf925a05c11fb1fde489a095fb3dba5e041bc9c5c781f"
+    },
+    {
+      "path": "rust/baseline-4048565-qt-lifecycle-validator.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/baseline-4048565-qt-lifecycle-validator.log",
+      "scope": "Focused Python lifecycle validator negative control and fix; native Windows Qt chain must be rebuilt and rerun.",
+      "bytes": 6458,
+      "sha256": "badd5004c9a9aa7831e09196bd33f06be1652a96fc9f2301ac639ea25dce1de4"
+    },
+    {
+      "path": "rust/baseline-host-diagnostic-allowlist.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/baseline-host-diagnostic-allowlist.log",
+      "scope": "Expected old-code failures; controlled fixtures. See continuation document for replay scope.",
+      "bytes": 1410,
+      "sha256": "badecc89886afb6fbda9528ec4682881df1c6572143d8e5754d2048fb324641a"
+    },
+    {
+      "path": "rust/baseline-host-unreachable-complete.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/baseline-host-unreachable-complete.log",
+      "scope": "Expected old-code failures; controlled fixtures. See continuation document for replay scope.",
+      "bytes": 2384,
+      "sha256": "3aaef65fd280bf6d4a81a759876783d3663be1eb15ebfdb25239223a6aabee65"
+    },
+    {
+      "path": "rust/baseline-legacy-socks5-fresh.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/baseline-legacy-socks5-fresh.log",
+      "scope": "Expected old-code failures; controlled fixtures. See continuation document for replay scope.",
+      "bytes": 7311,
+      "sha256": "5788c5e41053f63da23da32755d4574e1e0508d8df2a0b3f26678aa18515f399"
+    },
+    {
+      "path": "rust/baseline-socks5-route-denial.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/baseline-socks5-route-denial.log",
+      "scope": "Expected old-code failures; controlled fixtures. See continuation document for replay scope.",
+      "bytes": 1155,
+      "sha256": "2d7aba85011990b4c87f1d6bfd16f504d0b6cca595002708eaa360b0d48e60df"
+    },
+    {
+      "path": "rust/baseline-socks5-wire.log",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/baseline-socks5-wire.log",
+      "scope": "Expected old-code failures; controlled fixtures. See continuation document for replay scope.",
+      "bytes": 2312,
+      "sha256": "71dfa82acc0cfcb3b17df9fc141d7c3c826a5b064bbc25b09ea5433e3d3ec475"
+    },
+    {
+      "path": "rust/baseline-source.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/baseline-source.json",
+      "scope": "Expected old-code failures; controlled fixtures. See continuation document for replay scope.",
+      "bytes": 508,
+      "sha256": "fc863bc44837b39ae05110fa3d334fe0987437a21dca242d9fc3aa4961c81cf1"
+    },
+    {
+      "path": "rust/qt-lifecycle-reply-fix-summary.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/qt-lifecycle-reply-fix-summary.json",
+      "scope": "Test contract correction and mandatory CI guard validation. Full rebuilt native Windows chain remains pending.",
+      "bytes": 1934,
+      "sha256": "b5079e1eb07eec04be9c8d738cec302a570b2d19476f9ef2ce9ea5b149ccad44"
+    },
+    {
+      "path": "rust/qt-lifecycle-validator-source.json",
+      "kind": "derived-source-identity",
+      "source_evidence": "Current tracked source bytes and git show 4048565; local logs referenced beside this file.",
+      "scope": "File identity only, not native Windows acceptance.",
+      "bytes": 1225,
+      "sha256": "ab479b5c5e06e8603be4aae3bbefb4a1e3ef6aa6c2b79ab676e605ec408f8815"
+    },
+    {
+      "path": "soak/amended-soak-1800-run.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/amended-soak-1800-run.json",
+      "scope": "Completed Linux controlled V2/TLS/SSE soak for frozen uncommitted core f4dbcd2; no Windows desktop/provider acceptance. Source commit stays null; harness identity records its actual later capture time.",
+      "bytes": 1458,
+      "sha256": "129711d0be84d200a84f79ae0cc842c4b412397e1760b420f6b17f71997b008a"
+    },
+    {
+      "path": "soak/amended-soak-1800-summary.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/amended-soak-1800-summary.json",
+      "scope": "Completed Linux controlled V2/TLS/SSE soak for frozen uncommitted core f4dbcd2; no Windows desktop/provider acceptance. Source commit stays null; harness identity records its actual later capture time.",
+      "bytes": 1536,
+      "sha256": "23329c7158f9c89f1b1cf9bec4d3259f98586a4a61774ea854750398b2dd5c34"
+    },
+    {
+      "path": "soak/amended-soak-1800.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/amended-soak-1800.json",
+      "scope": "Completed Linux controlled V2/TLS/SSE soak for frozen uncommitted core f4dbcd2; no Windows desktop/provider acceptance. Source commit stays null; harness identity records its actual later capture time.",
+      "bytes": 240591,
+      "sha256": "b4469c9adcaa82726bda10e6b219d4eb71634e7dbed1292c0c082e609f9fe875"
+    },
+    {
+      "path": "soak/amended-soak-harness-identity.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/amended-soak-harness-identity.json",
+      "scope": "Completed Linux controlled V2/TLS/SSE soak for frozen uncommitted core f4dbcd2; no Windows desktop/provider acceptance. Source commit stays null; harness identity records its actual later capture time.",
+      "bytes": 1683,
+      "sha256": "75562af44c93b2ba40287fb80308035f80cd3897dc5f65c168c3a5205f44b4c1"
+    },
+    {
+      "path": "soak/historical-1800s-summary.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "previous-workspace/docs/evidence/windows-proxy-compat-20261102/soak-1800s-summary.json",
+      "scope": "Original historical summary retained exactly; original raw 1800s JSON is unavailable and cannot be rehashed.",
+      "bytes": 4828,
+      "sha256": "6c9e4a62bda34e054027b0df98b1bed6cc642ed2ca0b2069c1ce7333e75825c6"
+    },
+    {
+      "path": "soak/historical-recheck.json",
+      "kind": "verbatim-copy",
+      "source_evidence": "rust/historical-soak-recheck.json",
+      "scope": "Rechecks surviving historical summary only; does not claim raw-evidence hash verification.",
+      "bytes": 772,
+      "sha256": "83ef1ceae4a4611bc6954ff260968330dd588b491f93aa3cf438f2368e226c3c"
+    }
+  ]
+}

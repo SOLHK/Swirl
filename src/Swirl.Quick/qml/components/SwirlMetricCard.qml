@@ -18,7 +18,7 @@ SwirlGlassPanel {
             Layout.preferredWidth:Theme.dp(46); Layout.preferredHeight:Theme.dp(46); radius:Math.min(width,height)/2; color:Theme.withAlpha(card.chartColor,0.09)
             SwirlIcon { anchors.centerIn:parent; name:card.iconName; size:Theme.dp(27); color:card.chartColor }
         }
-        SwirlText { textRole:"smallLabel"; text:card.label; color:Theme.muted; font.pixelSize:Theme.fontSize(17); Layout.fillWidth:true; elide:Text.ElideRight }
+        SwirlText { textRole:"label"; text:card.label; color:Theme.muted; font.pixelSize:Theme.fontSize(17); Layout.fillWidth:true; elide:Text.ElideRight }
     }
     SwirlText { textRole:"data"; x:Theme.dp(25); y:Theme.dp(61); width:Math.round(parent.width-Theme.dp(40)); text:card.value; color:card.valueColor; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(32); font.weight:Font.DemiBold; elide:Text.ElideRight }
     SwirlSparkline { x:Math.round(parent.width*0.31); y:Math.round(parent.height-Theme.dp(54)); width:Math.round(parent.width*0.63); height:Theme.dp(43); lineColor:card.chartColor; bars:card.bars }

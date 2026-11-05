@@ -1,0 +1,1644 @@
+{
+  "status": "PARTIAL_TARGETED_RESEARCH",
+  "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+  "python_tests": {
+    "run": 953,
+    "failures": 0,
+    "skipped": 7
+  },
+  "os": "macOS-26.5.1-arm64-arm-64bit",
+  "python": "3.12.16 (main, Oct 25 2026, 18:24:37) [Clang 21.0.0 (clang-2100.3.34.2)]",
+  "geometry": {
+    "scope": "six_full_axis_slices_through_previous_failed_positions_not_global_three_dimensional_model",
+    "limit": 0.03125,
+    "holdouts_per_slice": 512,
+    "native_positions_per_slice": 35,
+    "cases": [
+      {
+        "gid": 1166,
+        "axis": "WDTH",
+        "knots": 49,
+        "old_uniform_nine_knots_error": 0.6063755494070824,
+        "new_holdout_error": 0.004984997985222888,
+        "pass_at_samples": true
+      },
+      {
+        "gid": 1166,
+        "axis": "wght",
+        "knots": 80,
+        "old_uniform_nine_knots_error": 5.639471689444844,
+        "new_holdout_error": 0.007065696960260983,
+        "pass_at_samples": true
+      },
+      {
+        "gid": 1166,
+        "axis": "HGHT",
+        "knots": 27,
+        "old_uniform_nine_knots_error": 2.3972874898359255,
+        "new_holdout_error": 0.007705035894372643,
+        "pass_at_samples": true
+      },
+      {
+        "gid": 19177,
+        "axis": "WDTH",
+        "knots": 11,
+        "old_uniform_nine_knots_error": 0.2450328979785644,
+        "new_holdout_error": 0.005774796096398801,
+        "pass_at_samples": true
+      },
+      {
+        "gid": 19177,
+        "axis": "wght",
+        "knots": 181,
+        "old_uniform_nine_knots_error": 2.790351645432472,
+        "new_holdout_error": 0.007142869186859774,
+        "pass_at_samples": true
+      },
+      {
+        "gid": 19177,
+        "axis": "HGHT",
+        "knots": 28,
+        "old_uniform_nine_knots_error": 1.1427846178986922,
+        "new_holdout_error": 0.004193691220452037,
+        "pass_at_samples": true
+      }
+    ],
+    "native": [
+      {
+        "gid": 1166,
+        "axis": "WDTH",
+        "points": 35,
+        "serialization_error": 0.00461583079660069,
+        "coretext_error": 0.004530200609721444,
+        "Apple_HVF_checks": 11,
+        "portable_HVF_error": 3.419659933238432e-13,
+        "CoreText_HVF_error": 0.0034913923691190806,
+        "experimental_font_sha256": "ea0a3571c5b74a0dd7162a04674a38d3fbaeccda4a81f4d367600ed3c1580acc"
+      },
+      {
+        "gid": 1166,
+        "axis": "wght",
+        "points": 35,
+        "serialization_error": 0.0070805359649801095,
+        "coretext_error": 0.007291194441537984,
+        "Apple_HVF_checks": 11,
+        "portable_HVF_error": 2.8421709430404007e-13,
+        "CoreText_HVF_error": 0.006637447452910939,
+        "experimental_font_sha256": "248d09b676f7bdc8e434b3ae8584710e7077d2552c3eeee948f709d54d599ddf"
+      },
+      {
+        "gid": 1166,
+        "axis": "HGHT",
+        "points": 35,
+        "serialization_error": 0.007674299351414043,
+        "coretext_error": 0.00773214151072002,
+        "Apple_HVF_checks": 11,
+        "portable_HVF_error": 2.5579538487363607e-13,
+        "CoreText_HVF_error": 0.006658437977400529,
+        "experimental_font_sha256": "feb7ae8ba79cd39a6bbc4f1d9f828a5181f3eddd74e6081114fcafc20c9460e1"
+      },
+      {
+        "gid": 19177,
+        "axis": "WDTH",
+        "points": 35,
+        "serialization_error": 0.005708984451214113,
+        "coretext_error": 0.005700208634400454,
+        "Apple_HVF_checks": 11,
+        "portable_HVF_error": 4.556909288805765e-13,
+        "CoreText_HVF_error": 0.003956735416508598,
+        "experimental_font_sha256": "9cda9d02dace895994edf384b08cfc2567bb0bcd0e5057997b2dfb50442f21bc"
+      },
+      {
+        "gid": 19177,
+        "axis": "wght",
+        "points": 35,
+        "serialization_error": 0.005714622261041896,
+        "coretext_error": 0.005569008565465097,
+        "Apple_HVF_checks": 11,
+        "portable_HVF_error": 4.549693413077341e-13,
+        "CoreText_HVF_error": 0.004048465892849583,
+        "experimental_font_sha256": "31879922d9af84cc41041ba5d1b1a6f8f60437ae009319a9a0f8c70016917386"
+      },
+      {
+        "gid": 19177,
+        "axis": "HGHT",
+        "points": 35,
+        "serialization_error": 0.004196387240034289,
+        "coretext_error": 0.004195490125239067,
+        "Apple_HVF_checks": 11,
+        "portable_HVF_error": 4.1039706086814524e-13,
+        "CoreText_HVF_error": 0.004192579812665538,
+        "experimental_font_sha256": "3be0bebbb2445159d3b4f664c9023b67793c019694b6b8eef2f5e5e976c34d01"
+      }
+    ],
+    "full_three_dimensional_acceptance": false,
+    "failed_axis_aligned_partition_trials": [
+      {
+        "gid": 1166,
+        "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "cells": 16000,
+        "samples": 184653,
+        "max_probe_error": 0.17074578983355518,
+        "max_holdout_error": 0.29654270014868744,
+        "failures": 409,
+        "seconds": 168.6540014580023
+      },
+      {
+        "gid": 1166,
+        "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "cells": 16000,
+        "samples": 186075,
+        "max_probe_error": 0.17647247912595312,
+        "max_holdout_error": 0.2965427001488019,
+        "failures": 414,
+        "seconds": 172.35725387499406
+      },
+      {
+        "gid": 19177,
+        "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "cells": 16000,
+        "samples": 218432,
+        "max_probe_error": 0.8721481901701178,
+        "max_holdout_error": 0.2897242128577444,
+        "failures": 349,
+        "seconds": 538.2139129999996
+      }
+    ]
+  },
+  "metrics": {
+    "raw_limit": 0.03125,
+    "routes": [
+      {
+        "upm": 1000,
+        "route": "gvar",
+        "observations": [
+          {
+            "location": {
+              "WDTH": 1.0,
+              "wght": 100.0,
+              "HGHT": 1.0
+            },
+            "table": {
+              "advance_width": 570.0,
+              "advance_height": 850.0,
+              "vertical_origin_x": 285.0,
+              "vertical_origin_y": 760.0
+            },
+            "native": {
+              "advance_width": 569.9920654296875,
+              "advance_height": 849,
+              "vertical_origin_x": 284.99603271484375,
+              "vertical_origin_y": 760
+            },
+            "error": {
+              "advance_width": -0.0079345703125,
+              "advance_height": -1.0,
+              "vertical_origin_x": -0.00396728515625,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 760.0,
+            "phantom_bottom": -90.0
+          },
+          {
+            "location": {
+              "WDTH": 500.0,
+              "wght": 400.0,
+              "HGHT": 500.0
+            },
+            "table": {
+              "advance_width": 700.0,
+              "advance_height": 1000.0,
+              "vertical_origin_x": 350.0,
+              "vertical_origin_y": 820.0
+            },
+            "native": {
+              "advance_width": 700,
+              "advance_height": 1000,
+              "vertical_origin_x": 350,
+              "vertical_origin_y": 820
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 820.0,
+            "phantom_bottom": -180.0
+          },
+          {
+            "location": {
+              "WDTH": 631.25,
+              "wght": 523.75,
+              "HGHT": 711.125
+            },
+            "table": {
+              "advance_width": 734.78340625,
+              "advance_height": 1063.3375,
+              "vertical_origin_x": 367.391703125,
+              "vertical_origin_y": 845.335
+            },
+            "native": {
+              "advance_width": 734.9853515625,
+              "advance_height": 1062,
+              "vertical_origin_x": 367.49267578125,
+              "vertical_origin_y": 845
+            },
+            "error": {
+              "advance_width": 0.20194531250001546,
+              "advance_height": -1.337500000000091,
+              "vertical_origin_x": 0.10097265625000773,
+              "vertical_origin_y": -0.3350000000000364
+            },
+            "phantom_top": 845.335,
+            "phantom_bottom": -218.00250000000005
+          }
+        ]
+      },
+      {
+        "upm": 1000,
+        "route": "HVAR",
+        "observations": [
+          {
+            "location": {
+              "WDTH": 1.0,
+              "wght": 100.0,
+              "HGHT": 1.0
+            },
+            "table": {
+              "advance_width": 570.0,
+              "advance_height": 850.0,
+              "vertical_origin_x": 285.0,
+              "vertical_origin_y": 760.0
+            },
+            "native": {
+              "advance_width": 570,
+              "advance_height": 849,
+              "vertical_origin_x": 285,
+              "vertical_origin_y": 760
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": -1.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 760.0,
+            "phantom_bottom": -90.0
+          },
+          {
+            "location": {
+              "WDTH": 500.0,
+              "wght": 400.0,
+              "HGHT": 500.0
+            },
+            "table": {
+              "advance_width": 700.0,
+              "advance_height": 1000.0,
+              "vertical_origin_x": 350.0,
+              "vertical_origin_y": 820.0
+            },
+            "native": {
+              "advance_width": 700,
+              "advance_height": 1000,
+              "vertical_origin_x": 350,
+              "vertical_origin_y": 820
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 820.0,
+            "phantom_bottom": -180.0
+          },
+          {
+            "location": {
+              "WDTH": 631.25,
+              "wght": 523.75,
+              "HGHT": 711.125
+            },
+            "table": {
+              "advance_width": 734.78340625,
+              "advance_height": 1063.3375,
+              "vertical_origin_x": 367.391703125,
+              "vertical_origin_y": 845.335
+            },
+            "native": {
+              "advance_width": 734.784582182765,
+              "advance_height": 1062,
+              "vertical_origin_x": 367.3922910913825,
+              "vertical_origin_y": 845
+            },
+            "error": {
+              "advance_width": 0.0011759327650224805,
+              "advance_height": -1.337500000000091,
+              "vertical_origin_x": 0.0005879663825112402,
+              "vertical_origin_y": -0.3350000000000364
+            },
+            "phantom_top": 845.335,
+            "phantom_bottom": -218.00250000000005
+          }
+        ]
+      },
+      {
+        "upm": 1000,
+        "route": "VVAR",
+        "observations": [
+          {
+            "location": {
+              "WDTH": 1.0,
+              "wght": 100.0,
+              "HGHT": 1.0
+            },
+            "table": {
+              "advance_width": 570.0,
+              "advance_height": 850.0,
+              "vertical_origin_x": 285.0,
+              "vertical_origin_y": 760.0
+            },
+            "native": {
+              "advance_width": 569.9920654296875,
+              "advance_height": 850,
+              "vertical_origin_x": 284.99603271484375,
+              "vertical_origin_y": 760
+            },
+            "error": {
+              "advance_width": -0.0079345703125,
+              "advance_height": 0.0,
+              "vertical_origin_x": -0.00396728515625,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 760.0,
+            "phantom_bottom": -90.0
+          },
+          {
+            "location": {
+              "WDTH": 500.0,
+              "wght": 400.0,
+              "HGHT": 500.0
+            },
+            "table": {
+              "advance_width": 700.0,
+              "advance_height": 1000.0,
+              "vertical_origin_x": 350.0,
+              "vertical_origin_y": 820.0
+            },
+            "native": {
+              "advance_width": 700,
+              "advance_height": 1000,
+              "vertical_origin_x": 350,
+              "vertical_origin_y": 820
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 820.0,
+            "phantom_bottom": -180.0
+          },
+          {
+            "location": {
+              "WDTH": 631.25,
+              "wght": 523.75,
+              "HGHT": 711.125
+            },
+            "table": {
+              "advance_width": 734.78340625,
+              "advance_height": 1063.3375,
+              "vertical_origin_x": 367.391703125,
+              "vertical_origin_y": 845.335
+            },
+            "native": {
+              "advance_width": 734.9853515625,
+              "advance_height": 1063,
+              "vertical_origin_x": 367.49267578125,
+              "vertical_origin_y": 845
+            },
+            "error": {
+              "advance_width": 0.20194531250001546,
+              "advance_height": -0.33750000000009095,
+              "vertical_origin_x": 0.10097265625000773,
+              "vertical_origin_y": -0.3350000000000364
+            },
+            "phantom_top": 845.335,
+            "phantom_bottom": -218.00250000000005
+          }
+        ]
+      },
+      {
+        "upm": 1000,
+        "route": "HVAR_VVAR",
+        "observations": [
+          {
+            "location": {
+              "WDTH": 1.0,
+              "wght": 100.0,
+              "HGHT": 1.0
+            },
+            "table": {
+              "advance_width": 570.0,
+              "advance_height": 850.0,
+              "vertical_origin_x": 285.0,
+              "vertical_origin_y": 760.0
+            },
+            "native": {
+              "advance_width": 570,
+              "advance_height": 850,
+              "vertical_origin_x": 285,
+              "vertical_origin_y": 760
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 760.0,
+            "phantom_bottom": -90.0
+          },
+          {
+            "location": {
+              "WDTH": 500.0,
+              "wght": 400.0,
+              "HGHT": 500.0
+            },
+            "table": {
+              "advance_width": 700.0,
+              "advance_height": 1000.0,
+              "vertical_origin_x": 350.0,
+              "vertical_origin_y": 820.0
+            },
+            "native": {
+              "advance_width": 700,
+              "advance_height": 1000,
+              "vertical_origin_x": 350,
+              "vertical_origin_y": 820
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 820.0,
+            "phantom_bottom": -180.0
+          },
+          {
+            "location": {
+              "WDTH": 631.25,
+              "wght": 523.75,
+              "HGHT": 711.125
+            },
+            "table": {
+              "advance_width": 734.78340625,
+              "advance_height": 1063.3375,
+              "vertical_origin_x": 367.391703125,
+              "vertical_origin_y": 845.335
+            },
+            "native": {
+              "advance_width": 734.784582182765,
+              "advance_height": 1063,
+              "vertical_origin_x": 367.3922910913825,
+              "vertical_origin_y": 845
+            },
+            "error": {
+              "advance_width": 0.0011759327650224805,
+              "advance_height": -0.33750000000009095,
+              "vertical_origin_x": 0.0005879663825112402,
+              "vertical_origin_y": -0.3350000000000364
+            },
+            "phantom_top": 845.335,
+            "phantom_bottom": -218.00250000000005
+          }
+        ]
+      },
+      {
+        "upm": 1024,
+        "route": "gvar",
+        "observations": [
+          {
+            "location": {
+              "WDTH": 1.0,
+              "wght": 100.0,
+              "HGHT": 1.0
+            },
+            "table": {
+              "advance_width": 570.0,
+              "advance_height": 850.0,
+              "vertical_origin_x": 285.0,
+              "vertical_origin_y": 760.0
+            },
+            "native": {
+              "advance_width": 570,
+              "advance_height": 850,
+              "vertical_origin_x": 285,
+              "vertical_origin_y": 760
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 760.0,
+            "phantom_bottom": -90.0
+          },
+          {
+            "location": {
+              "WDTH": 500.0,
+              "wght": 400.0,
+              "HGHT": 500.0
+            },
+            "table": {
+              "advance_width": 700.0,
+              "advance_height": 1000.0,
+              "vertical_origin_x": 350.0,
+              "vertical_origin_y": 820.0
+            },
+            "native": {
+              "advance_width": 700,
+              "advance_height": 1000,
+              "vertical_origin_x": 350,
+              "vertical_origin_y": 820
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 820.0,
+            "phantom_bottom": -180.0
+          },
+          {
+            "location": {
+              "WDTH": 631.25,
+              "wght": 523.75,
+              "HGHT": 711.125
+            },
+            "table": {
+              "advance_width": 734.78340625,
+              "advance_height": 1063.3375,
+              "vertical_origin_x": 367.391703125,
+              "vertical_origin_y": 845.335
+            },
+            "native": {
+              "advance_width": 735,
+              "advance_height": 1063,
+              "vertical_origin_x": 367.5,
+              "vertical_origin_y": 845
+            },
+            "error": {
+              "advance_width": 0.21659375000001546,
+              "advance_height": -0.33750000000009095,
+              "vertical_origin_x": 0.10829687500000773,
+              "vertical_origin_y": -0.3350000000000364
+            },
+            "phantom_top": 845.335,
+            "phantom_bottom": -218.00250000000005
+          }
+        ]
+      },
+      {
+        "upm": 1024,
+        "route": "HVAR",
+        "observations": [
+          {
+            "location": {
+              "WDTH": 1.0,
+              "wght": 100.0,
+              "HGHT": 1.0
+            },
+            "table": {
+              "advance_width": 570.0,
+              "advance_height": 850.0,
+              "vertical_origin_x": 285.0,
+              "vertical_origin_y": 760.0
+            },
+            "native": {
+              "advance_width": 570,
+              "advance_height": 850,
+              "vertical_origin_x": 285,
+              "vertical_origin_y": 760
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 760.0,
+            "phantom_bottom": -90.0
+          },
+          {
+            "location": {
+              "WDTH": 500.0,
+              "wght": 400.0,
+              "HGHT": 500.0
+            },
+            "table": {
+              "advance_width": 700.0,
+              "advance_height": 1000.0,
+              "vertical_origin_x": 350.0,
+              "vertical_origin_y": 820.0
+            },
+            "native": {
+              "advance_width": 700,
+              "advance_height": 1000,
+              "vertical_origin_x": 350,
+              "vertical_origin_y": 820
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 820.0,
+            "phantom_bottom": -180.0
+          },
+          {
+            "location": {
+              "WDTH": 631.25,
+              "wght": 523.75,
+              "HGHT": 711.125
+            },
+            "table": {
+              "advance_width": 734.78340625,
+              "advance_height": 1063.3375,
+              "vertical_origin_x": 367.391703125,
+              "vertical_origin_y": 845.335
+            },
+            "native": {
+              "advance_width": 734.784582182765,
+              "advance_height": 1063,
+              "vertical_origin_x": 367.3922910913825,
+              "vertical_origin_y": 845
+            },
+            "error": {
+              "advance_width": 0.0011759327650224805,
+              "advance_height": -0.33750000000009095,
+              "vertical_origin_x": 0.0005879663825112402,
+              "vertical_origin_y": -0.3350000000000364
+            },
+            "phantom_top": 845.335,
+            "phantom_bottom": -218.00250000000005
+          }
+        ]
+      },
+      {
+        "upm": 1024,
+        "route": "VVAR",
+        "observations": [
+          {
+            "location": {
+              "WDTH": 1.0,
+              "wght": 100.0,
+              "HGHT": 1.0
+            },
+            "table": {
+              "advance_width": 570.0,
+              "advance_height": 850.0,
+              "vertical_origin_x": 285.0,
+              "vertical_origin_y": 760.0
+            },
+            "native": {
+              "advance_width": 570,
+              "advance_height": 850,
+              "vertical_origin_x": 285,
+              "vertical_origin_y": 760
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 760.0,
+            "phantom_bottom": -90.0
+          },
+          {
+            "location": {
+              "WDTH": 500.0,
+              "wght": 400.0,
+              "HGHT": 500.0
+            },
+            "table": {
+              "advance_width": 700.0,
+              "advance_height": 1000.0,
+              "vertical_origin_x": 350.0,
+              "vertical_origin_y": 820.0
+            },
+            "native": {
+              "advance_width": 700,
+              "advance_height": 1000,
+              "vertical_origin_x": 350,
+              "vertical_origin_y": 820
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 820.0,
+            "phantom_bottom": -180.0
+          },
+          {
+            "location": {
+              "WDTH": 631.25,
+              "wght": 523.75,
+              "HGHT": 711.125
+            },
+            "table": {
+              "advance_width": 734.78340625,
+              "advance_height": 1063.3375,
+              "vertical_origin_x": 367.391703125,
+              "vertical_origin_y": 845.335
+            },
+            "native": {
+              "advance_width": 735,
+              "advance_height": 1063,
+              "vertical_origin_x": 367.5,
+              "vertical_origin_y": 845
+            },
+            "error": {
+              "advance_width": 0.21659375000001546,
+              "advance_height": -0.33750000000009095,
+              "vertical_origin_x": 0.10829687500000773,
+              "vertical_origin_y": -0.3350000000000364
+            },
+            "phantom_top": 845.335,
+            "phantom_bottom": -218.00250000000005
+          }
+        ]
+      },
+      {
+        "upm": 1024,
+        "route": "HVAR_VVAR",
+        "observations": [
+          {
+            "location": {
+              "WDTH": 1.0,
+              "wght": 100.0,
+              "HGHT": 1.0
+            },
+            "table": {
+              "advance_width": 570.0,
+              "advance_height": 850.0,
+              "vertical_origin_x": 285.0,
+              "vertical_origin_y": 760.0
+            },
+            "native": {
+              "advance_width": 570,
+              "advance_height": 850,
+              "vertical_origin_x": 285,
+              "vertical_origin_y": 760
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 760.0,
+            "phantom_bottom": -90.0
+          },
+          {
+            "location": {
+              "WDTH": 500.0,
+              "wght": 400.0,
+              "HGHT": 500.0
+            },
+            "table": {
+              "advance_width": 700.0,
+              "advance_height": 1000.0,
+              "vertical_origin_x": 350.0,
+              "vertical_origin_y": 820.0
+            },
+            "native": {
+              "advance_width": 700,
+              "advance_height": 1000,
+              "vertical_origin_x": 350,
+              "vertical_origin_y": 820
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 820.0,
+            "phantom_bottom": -180.0
+          },
+          {
+            "location": {
+              "WDTH": 631.25,
+              "wght": 523.75,
+              "HGHT": 711.125
+            },
+            "table": {
+              "advance_width": 734.78340625,
+              "advance_height": 1063.3375,
+              "vertical_origin_x": 367.391703125,
+              "vertical_origin_y": 845.335
+            },
+            "native": {
+              "advance_width": 734.784582182765,
+              "advance_height": 1063,
+              "vertical_origin_x": 367.3922910913825,
+              "vertical_origin_y": 845
+            },
+            "error": {
+              "advance_width": 0.0011759327650224805,
+              "advance_height": -0.33750000000009095,
+              "vertical_origin_x": 0.0005879663825112402,
+              "vertical_origin_y": -0.3350000000000364
+            },
+            "phantom_top": 845.335,
+            "phantom_bottom": -218.00250000000005
+          }
+        ]
+      },
+      {
+        "upm": 1128,
+        "route": "gvar",
+        "observations": [
+          {
+            "location": {
+              "WDTH": 1.0,
+              "wght": 100.0,
+              "HGHT": 1.0
+            },
+            "table": {
+              "advance_width": 570.0,
+              "advance_height": 850.0,
+              "vertical_origin_x": 285.0,
+              "vertical_origin_y": 760.0
+            },
+            "native": {
+              "advance_width": 569.98974609375,
+              "advance_height": 849,
+              "vertical_origin_x": 284.994873046875,
+              "vertical_origin_y": 760
+            },
+            "error": {
+              "advance_width": -0.01025390625,
+              "advance_height": -1.0,
+              "vertical_origin_x": -0.005126953125,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 760.0,
+            "phantom_bottom": -90.0
+          },
+          {
+            "location": {
+              "WDTH": 500.0,
+              "wght": 400.0,
+              "HGHT": 500.0
+            },
+            "table": {
+              "advance_width": 700.0,
+              "advance_height": 1000.0,
+              "vertical_origin_x": 350.0,
+              "vertical_origin_y": 820.0
+            },
+            "native": {
+              "advance_width": 700,
+              "advance_height": 1000,
+              "vertical_origin_x": 350,
+              "vertical_origin_y": 820
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 820.0,
+            "phantom_bottom": -180.0
+          },
+          {
+            "location": {
+              "WDTH": 631.25,
+              "wght": 523.75,
+              "HGHT": 711.125
+            },
+            "table": {
+              "advance_width": 734.78340625,
+              "advance_height": 1063.3375,
+              "vertical_origin_x": 367.391703125,
+              "vertical_origin_y": 845.335
+            },
+            "native": {
+              "advance_width": 734.983154296875,
+              "advance_height": 1062,
+              "vertical_origin_x": 367.4915771484375,
+              "vertical_origin_y": 845
+            },
+            "error": {
+              "advance_width": 0.19974804687501546,
+              "advance_height": -1.337500000000091,
+              "vertical_origin_x": 0.09987402343750773,
+              "vertical_origin_y": -0.3350000000000364
+            },
+            "phantom_top": 845.335,
+            "phantom_bottom": -218.00250000000005
+          }
+        ]
+      },
+      {
+        "upm": 1128,
+        "route": "HVAR",
+        "observations": [
+          {
+            "location": {
+              "WDTH": 1.0,
+              "wght": 100.0,
+              "HGHT": 1.0
+            },
+            "table": {
+              "advance_width": 570.0,
+              "advance_height": 850.0,
+              "vertical_origin_x": 285.0,
+              "vertical_origin_y": 760.0
+            },
+            "native": {
+              "advance_width": 570,
+              "advance_height": 849,
+              "vertical_origin_x": 285,
+              "vertical_origin_y": 760
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": -1.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 760.0,
+            "phantom_bottom": -90.0
+          },
+          {
+            "location": {
+              "WDTH": 500.0,
+              "wght": 400.0,
+              "HGHT": 500.0
+            },
+            "table": {
+              "advance_width": 700.0,
+              "advance_height": 1000.0,
+              "vertical_origin_x": 350.0,
+              "vertical_origin_y": 820.0
+            },
+            "native": {
+              "advance_width": 700,
+              "advance_height": 1000,
+              "vertical_origin_x": 350,
+              "vertical_origin_y": 820
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 820.0,
+            "phantom_bottom": -180.0
+          },
+          {
+            "location": {
+              "WDTH": 631.25,
+              "wght": 523.75,
+              "HGHT": 711.125
+            },
+            "table": {
+              "advance_width": 734.78340625,
+              "advance_height": 1063.3375,
+              "vertical_origin_x": 367.391703125,
+              "vertical_origin_y": 845.335
+            },
+            "native": {
+              "advance_width": 734.784582182765,
+              "advance_height": 1062,
+              "vertical_origin_x": 367.3922910913825,
+              "vertical_origin_y": 845
+            },
+            "error": {
+              "advance_width": 0.0011759327650224805,
+              "advance_height": -1.337500000000091,
+              "vertical_origin_x": 0.0005879663825112402,
+              "vertical_origin_y": -0.3350000000000364
+            },
+            "phantom_top": 845.335,
+            "phantom_bottom": -218.00250000000005
+          }
+        ]
+      },
+      {
+        "upm": 1128,
+        "route": "VVAR",
+        "observations": [
+          {
+            "location": {
+              "WDTH": 1.0,
+              "wght": 100.0,
+              "HGHT": 1.0
+            },
+            "table": {
+              "advance_width": 570.0,
+              "advance_height": 850.0,
+              "vertical_origin_x": 285.0,
+              "vertical_origin_y": 760.0
+            },
+            "native": {
+              "advance_width": 569.98974609375,
+              "advance_height": 850,
+              "vertical_origin_x": 284.994873046875,
+              "vertical_origin_y": 760
+            },
+            "error": {
+              "advance_width": -0.01025390625,
+              "advance_height": 0.0,
+              "vertical_origin_x": -0.005126953125,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 760.0,
+            "phantom_bottom": -90.0
+          },
+          {
+            "location": {
+              "WDTH": 500.0,
+              "wght": 400.0,
+              "HGHT": 500.0
+            },
+            "table": {
+              "advance_width": 700.0,
+              "advance_height": 1000.0,
+              "vertical_origin_x": 350.0,
+              "vertical_origin_y": 820.0
+            },
+            "native": {
+              "advance_width": 700,
+              "advance_height": 1000,
+              "vertical_origin_x": 350,
+              "vertical_origin_y": 820
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 820.0,
+            "phantom_bottom": -180.0
+          },
+          {
+            "location": {
+              "WDTH": 631.25,
+              "wght": 523.75,
+              "HGHT": 711.125
+            },
+            "table": {
+              "advance_width": 734.78340625,
+              "advance_height": 1063.3375,
+              "vertical_origin_x": 367.391703125,
+              "vertical_origin_y": 845.335
+            },
+            "native": {
+              "advance_width": 734.983154296875,
+              "advance_height": 1063,
+              "vertical_origin_x": 367.4915771484375,
+              "vertical_origin_y": 845
+            },
+            "error": {
+              "advance_width": 0.19974804687501546,
+              "advance_height": -0.33750000000009095,
+              "vertical_origin_x": 0.09987402343750773,
+              "vertical_origin_y": -0.3350000000000364
+            },
+            "phantom_top": 845.335,
+            "phantom_bottom": -218.00250000000005
+          }
+        ]
+      },
+      {
+        "upm": 1128,
+        "route": "HVAR_VVAR",
+        "observations": [
+          {
+            "location": {
+              "WDTH": 1.0,
+              "wght": 100.0,
+              "HGHT": 1.0
+            },
+            "table": {
+              "advance_width": 570.0,
+              "advance_height": 850.0,
+              "vertical_origin_x": 285.0,
+              "vertical_origin_y": 760.0
+            },
+            "native": {
+              "advance_width": 570,
+              "advance_height": 850,
+              "vertical_origin_x": 285,
+              "vertical_origin_y": 760
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 760.0,
+            "phantom_bottom": -90.0
+          },
+          {
+            "location": {
+              "WDTH": 500.0,
+              "wght": 400.0,
+              "HGHT": 500.0
+            },
+            "table": {
+              "advance_width": 700.0,
+              "advance_height": 1000.0,
+              "vertical_origin_x": 350.0,
+              "vertical_origin_y": 820.0
+            },
+            "native": {
+              "advance_width": 700,
+              "advance_height": 1000,
+              "vertical_origin_x": 350,
+              "vertical_origin_y": 820
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 820.0,
+            "phantom_bottom": -180.0
+          },
+          {
+            "location": {
+              "WDTH": 631.25,
+              "wght": 523.75,
+              "HGHT": 711.125
+            },
+            "table": {
+              "advance_width": 734.78340625,
+              "advance_height": 1063.3375,
+              "vertical_origin_x": 367.391703125,
+              "vertical_origin_y": 845.335
+            },
+            "native": {
+              "advance_width": 734.784582182765,
+              "advance_height": 1063,
+              "vertical_origin_x": 367.3922910913825,
+              "vertical_origin_y": 845
+            },
+            "error": {
+              "advance_width": 0.0011759327650224805,
+              "advance_height": -0.33750000000009095,
+              "vertical_origin_x": 0.0005879663825112402,
+              "vertical_origin_y": -0.3350000000000364
+            },
+            "phantom_top": 845.335,
+            "phantom_bottom": -218.00250000000005
+          }
+        ]
+      },
+      {
+        "upm": 16384,
+        "route": "gvar",
+        "observations": [
+          {
+            "location": {
+              "WDTH": 1.0,
+              "wght": 100.0,
+              "HGHT": 1.0
+            },
+            "table": {
+              "advance_width": 570.0,
+              "advance_height": 850.0,
+              "vertical_origin_x": 285.0,
+              "vertical_origin_y": 760.0
+            },
+            "native": {
+              "advance_width": 570,
+              "advance_height": 850,
+              "vertical_origin_x": 285,
+              "vertical_origin_y": 760
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 760.0,
+            "phantom_bottom": -90.0
+          },
+          {
+            "location": {
+              "WDTH": 500.0,
+              "wght": 400.0,
+              "HGHT": 500.0
+            },
+            "table": {
+              "advance_width": 700.0,
+              "advance_height": 1000.0,
+              "vertical_origin_x": 350.0,
+              "vertical_origin_y": 820.0
+            },
+            "native": {
+              "advance_width": 700,
+              "advance_height": 1000,
+              "vertical_origin_x": 350,
+              "vertical_origin_y": 820
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 820.0,
+            "phantom_bottom": -180.0
+          },
+          {
+            "location": {
+              "WDTH": 631.25,
+              "wght": 523.75,
+              "HGHT": 711.125
+            },
+            "table": {
+              "advance_width": 734.78340625,
+              "advance_height": 1063.3375,
+              "vertical_origin_x": 367.391703125,
+              "vertical_origin_y": 845.335
+            },
+            "native": {
+              "advance_width": 735,
+              "advance_height": 1063,
+              "vertical_origin_x": 367.5,
+              "vertical_origin_y": 845
+            },
+            "error": {
+              "advance_width": 0.21659375000001546,
+              "advance_height": -0.33750000000009095,
+              "vertical_origin_x": 0.10829687500000773,
+              "vertical_origin_y": -0.3350000000000364
+            },
+            "phantom_top": 845.335,
+            "phantom_bottom": -218.00250000000005
+          }
+        ]
+      },
+      {
+        "upm": 16384,
+        "route": "HVAR",
+        "observations": [
+          {
+            "location": {
+              "WDTH": 1.0,
+              "wght": 100.0,
+              "HGHT": 1.0
+            },
+            "table": {
+              "advance_width": 570.0,
+              "advance_height": 850.0,
+              "vertical_origin_x": 285.0,
+              "vertical_origin_y": 760.0
+            },
+            "native": {
+              "advance_width": 570,
+              "advance_height": 850,
+              "vertical_origin_x": 285,
+              "vertical_origin_y": 760
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 760.0,
+            "phantom_bottom": -90.0
+          },
+          {
+            "location": {
+              "WDTH": 500.0,
+              "wght": 400.0,
+              "HGHT": 500.0
+            },
+            "table": {
+              "advance_width": 700.0,
+              "advance_height": 1000.0,
+              "vertical_origin_x": 350.0,
+              "vertical_origin_y": 820.0
+            },
+            "native": {
+              "advance_width": 700,
+              "advance_height": 1000,
+              "vertical_origin_x": 350,
+              "vertical_origin_y": 820
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 820.0,
+            "phantom_bottom": -180.0
+          },
+          {
+            "location": {
+              "WDTH": 631.25,
+              "wght": 523.75,
+              "HGHT": 711.125
+            },
+            "table": {
+              "advance_width": 734.78340625,
+              "advance_height": 1063.3375,
+              "vertical_origin_x": 367.391703125,
+              "vertical_origin_y": 845.335
+            },
+            "native": {
+              "advance_width": 734.784582182765,
+              "advance_height": 1063,
+              "vertical_origin_x": 367.3922910913825,
+              "vertical_origin_y": 845
+            },
+            "error": {
+              "advance_width": 0.0011759327650224805,
+              "advance_height": -0.33750000000009095,
+              "vertical_origin_x": 0.0005879663825112402,
+              "vertical_origin_y": -0.3350000000000364
+            },
+            "phantom_top": 845.335,
+            "phantom_bottom": -218.00250000000005
+          }
+        ]
+      },
+      {
+        "upm": 16384,
+        "route": "VVAR",
+        "observations": [
+          {
+            "location": {
+              "WDTH": 1.0,
+              "wght": 100.0,
+              "HGHT": 1.0
+            },
+            "table": {
+              "advance_width": 570.0,
+              "advance_height": 850.0,
+              "vertical_origin_x": 285.0,
+              "vertical_origin_y": 760.0
+            },
+            "native": {
+              "advance_width": 570,
+              "advance_height": 850,
+              "vertical_origin_x": 285,
+              "vertical_origin_y": 760
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 760.0,
+            "phantom_bottom": -90.0
+          },
+          {
+            "location": {
+              "WDTH": 500.0,
+              "wght": 400.0,
+              "HGHT": 500.0
+            },
+            "table": {
+              "advance_width": 700.0,
+              "advance_height": 1000.0,
+              "vertical_origin_x": 350.0,
+              "vertical_origin_y": 820.0
+            },
+            "native": {
+              "advance_width": 700,
+              "advance_height": 1000,
+              "vertical_origin_x": 350,
+              "vertical_origin_y": 820
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 820.0,
+            "phantom_bottom": -180.0
+          },
+          {
+            "location": {
+              "WDTH": 631.25,
+              "wght": 523.75,
+              "HGHT": 711.125
+            },
+            "table": {
+              "advance_width": 734.78340625,
+              "advance_height": 1063.3375,
+              "vertical_origin_x": 367.391703125,
+              "vertical_origin_y": 845.335
+            },
+            "native": {
+              "advance_width": 735,
+              "advance_height": 1063,
+              "vertical_origin_x": 367.5,
+              "vertical_origin_y": 845
+            },
+            "error": {
+              "advance_width": 0.21659375000001546,
+              "advance_height": -0.33750000000009095,
+              "vertical_origin_x": 0.10829687500000773,
+              "vertical_origin_y": -0.3350000000000364
+            },
+            "phantom_top": 845.335,
+            "phantom_bottom": -218.00250000000005
+          }
+        ]
+      },
+      {
+        "upm": 16384,
+        "route": "HVAR_VVAR",
+        "observations": [
+          {
+            "location": {
+              "WDTH": 1.0,
+              "wght": 100.0,
+              "HGHT": 1.0
+            },
+            "table": {
+              "advance_width": 570.0,
+              "advance_height": 850.0,
+              "vertical_origin_x": 285.0,
+              "vertical_origin_y": 760.0
+            },
+            "native": {
+              "advance_width": 570,
+              "advance_height": 850,
+              "vertical_origin_x": 285,
+              "vertical_origin_y": 760
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 760.0,
+            "phantom_bottom": -90.0
+          },
+          {
+            "location": {
+              "WDTH": 500.0,
+              "wght": 400.0,
+              "HGHT": 500.0
+            },
+            "table": {
+              "advance_width": 700.0,
+              "advance_height": 1000.0,
+              "vertical_origin_x": 350.0,
+              "vertical_origin_y": 820.0
+            },
+            "native": {
+              "advance_width": 700,
+              "advance_height": 1000,
+              "vertical_origin_x": 350,
+              "vertical_origin_y": 820
+            },
+            "error": {
+              "advance_width": 0.0,
+              "advance_height": 0.0,
+              "vertical_origin_x": 0.0,
+              "vertical_origin_y": 0.0
+            },
+            "phantom_top": 820.0,
+            "phantom_bottom": -180.0
+          },
+          {
+            "location": {
+              "WDTH": 631.25,
+              "wght": 523.75,
+              "HGHT": 711.125
+            },
+            "table": {
+              "advance_width": 734.78340625,
+              "advance_height": 1063.3375,
+              "vertical_origin_x": 367.391703125,
+              "vertical_origin_y": 845.335
+            },
+            "native": {
+              "advance_width": 734.784582182765,
+              "advance_height": 1063,
+              "vertical_origin_x": 367.3922910913825,
+              "vertical_origin_y": 845
+            },
+            "error": {
+              "advance_width": 0.0011759327650224805,
+              "advance_height": -0.33750000000009095,
+              "vertical_origin_x": 0.0005879663825112402,
+              "vertical_origin_y": -0.3350000000000364
+            },
+            "phantom_top": 845.335,
+            "phantom_bottom": -218.00250000000005
+          }
+        ]
+      }
+    ],
+    "origin_gap_100": {
+      "scope": "authored_100_FUnit_origin_gap",
+      "raw_API_equivalence": "FAIL_BY_CONSTRUCTION",
+      "necessary_bound": {
+        "necessary_condition_satisfied": false,
+        "gap": 100.0,
+        "maximum_gap_within_raw_contract": 0.046875,
+        "layout_or_visual_impossibility_asserted": false
+      },
+      "HarfBuzz": {
+        "observations": 56,
+        "maximum_placement_error": 0.0
+      },
+      "CoreText_layout": {
+        "default/ltr": {
+          "checks": 7,
+          "max_X_error": 0.0,
+          "max_Y_change": 0.0,
+          "raw_metrics_unchanged": true,
+          "base_advances_unchanged": true,
+          "positioned_advance_vectors_changed": 0
+        },
+        "default/ttb": {
+          "checks": 7,
+          "max_X_error": 0.0,
+          "max_Y_change": 0.0,
+          "raw_metrics_unchanged": true,
+          "base_advances_unchanged": true,
+          "positioned_advance_vectors_changed": 7
+        },
+        "enabled/ltr": {
+          "checks": 7,
+          "max_X_error": 0.0,
+          "max_Y_change": 0.0,
+          "raw_metrics_unchanged": true,
+          "base_advances_unchanged": true,
+          "positioned_advance_vectors_changed": 0
+        },
+        "enabled/ttb": {
+          "checks": 7,
+          "max_X_error": 0.0,
+          "max_Y_change": 0.0,
+          "raw_metrics_unchanged": true,
+          "base_advances_unchanged": true,
+          "positioned_advance_vectors_changed": 7
+        },
+        "disabled/ltr": {
+          "checks": 7,
+          "max_X_error": 0.0,
+          "max_Y_change": 0.0,
+          "raw_metrics_unchanged": true,
+          "base_advances_unchanged": true,
+          "positioned_advance_vectors_changed": 0
+        },
+        "disabled/ttb": {
+          "checks": 7,
+          "max_X_error": 0.0,
+          "max_Y_change": 0.0,
+          "raw_metrics_unchanged": true,
+          "base_advances_unchanged": true,
+          "positioned_advance_vectors_changed": 0
+        }
+      },
+      "raster_strict_acceptance": "NOT_ESTABLISHED",
+      "raster_units_per_pixel": 2.6666666666666665
+    },
+    "DirectWrite_new_origin_control": "PENDING_CI",
+    "fractional_vertical_advance": "FAIL_RETAINED"
+  },
+  "formal_font_generated": false,
+  "merge_to_test_requested_this_stage": false,
+  "private_source_or_font_payload_in_commit": false,
+  "implementation_sha256": {
+    "tools/swirl_vf/tools/batch_geometry.py": "8b671189081bededafd628f7427d398db7edc2c1af43509a9edd5d9b08a969cb",
+    "tools/swirl_vf/tools/cff2_geometry.py": "67e1630a5b9623cf5476d0ead359c6ac0440a35e2162c79f051f16b41176906c",
+    "tools/swirl_vf/tools/hvf_piecewise_axes.py": "574fb552d30a2a1f1c027c58293192071b67ffb52427b9419d7d48985c45d7c5",
+    "tools/swirl_vf/tools/piecewise_geometry.py": "b5d03a637f14a0bf61ee4da0e447b5d4be9bfbf465e595615571c9da7b5f05c0",
+    "tools/swirl_vf/tools/origin_gpos.py": "9cf27977a1c0555c3ce0c178f9e9daaccc7f18016d603e8bab816d5fc96d3c38",
+    "tools/swirl_vf/tools/vertical_metrics.py": "6dd46d840d1432c3531c1368f40cd7040e01f264fc9f65d6bec5fce47e7f35f8"
+  }
+}

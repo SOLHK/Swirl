@@ -1,0 +1,74 @@
+[
+  {
+    "artifact_id": 13156478841,
+    "name": "Swirl-Proxy-Compatibility-Linux-ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd-1",
+    "status": "PASS",
+    "zip_digest": "sha256:384c1faccfd3289654e539984130d3bd1bec66ae510dedd071684191c5453110",
+    "raw_sha256": "397130d72a2f3344765442c570ee8a8563a391a90edaeeed22e0bc8935d0c498",
+    "platform": "linux",
+    "binary_sha256": "9b23ead2ba0d8955edaa816d48d73072c83c4dfdb0e378bade4e7ce44766df78",
+    "seconds": 120.003424,
+    "connections": 8,
+    "events_each": 121,
+    "total_events": 968,
+    "tls_close_notify": true,
+    "tcp_eof": true,
+    "listener_closed": true,
+    "final_core": {
+      "active": 0,
+      "accepted": 8,
+      "failed": 0,
+      "upload": 5688,
+      "download": 88789,
+      "ended_records": 8
+    }
+  },
+  {
+    "artifact_id": 13157268410,
+    "name": "Swirl-Proxy-Compatibility-Windows-ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd-1",
+    "status": "PASS",
+    "zip_digest": "sha256:7053ce770ba12f95b727428a6e91fbc92f4f20c4e2003d1fbbdf0037d8ab5295",
+    "raw_sha256": "96229b27f4b30d31997a12e1bcead2ed8108d11595c2343aa1b58920388e2e31",
+    "platform": "win32",
+    "binary_sha256": "d6c442ebe2d8edf9ab2b2c565cc86e9a839c1957012ba5537f1409c0a00ade1c",
+    "seconds": 120.02914,
+    "connections": 8,
+    "events_each": 121,
+    "total_events": 968,
+    "tls_close_notify": true,
+    "tcp_eof": true,
+    "listener_closed": true,
+    "final_core": {
+      "active": 0,
+      "accepted": 8,
+      "failed": 0,
+      "upload": 13800,
+      "download": 97514,
+      "ended_records": 8
+    }
+  },
+  {
+    "artifact_id": 13157468041,
+    "name": "Swirl-Proxy-Compatibility-macOS-ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd-1",
+    "status": "PASS",
+    "zip_digest": "sha256:6e7f48015f26cc62f2fcdb03b09fa36585f1d2679f274dfc49c2fdaf356a183f",
+    "raw_sha256": "c9352cb92b50e6e59e4fd6579203bf1d2d6d346bdf248d429898f30d10fb2a36",
+    "platform": "darwin",
+    "binary_sha256": "26828d1d658786c096815ba35975852d4972cb3082c74025cb8e38ebcd7c36e0",
+    "seconds": 120.190268,
+    "connections": 8,
+    "events_each": 121,
+    "total_events": 968,
+    "tls_close_notify": true,
+    "tcp_eof": true,
+    "listener_closed": true,
+    "final_core": {
+      "active": 0,
+      "accepted": 8,
+      "failed": 0,
+      "upload": 13800,
+      "download": 97495,
+      "ended_records": 8
+    }
+  }
+]

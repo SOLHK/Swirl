@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory=$true)][ValidateSet('Upgrade','Verify','Uninstall')][string]$Mode,
     [Parameter(Mandatory=$true)][string]$ApplicationDirectory,
     [Parameter(Mandatory=$true)][string]$ExpectedManifest,
@@ -21,7 +21,7 @@ function Get-PayloadHash([string]$Path) {
 function Read-OwnedManifest([string]$Path) {
     Assert-SwirlPathWithoutLinks $Path
     if ((Get-Item -LiteralPath $Path).Length -gt 16777216) { throw 'Package manifest exceeds the bounded size.' }
-    $manifest = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    $manifest = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($manifest.schema -ne 1 -or $manifest.source_sha -notmatch '^[0-9a-f]{40}$' -or
         $manifest.rust.source_sha -cne $manifest.source_sha -or
         @($manifest.files).Count -eq 0 -or @($manifest.files).Count -gt 50000) {
@@ -33,7 +33,7 @@ function Read-OwnedManifest([string]$Path) {
         if (-not $relative -or $relative.Length -gt 900 -or
             $relative -match '[:\\\x00-\x1f"$*?<>|]' -or $relative.StartsWith('/') -or
             @($relative.Split('/') | Where-Object { $_ -in @('','.', '..') -or $_.EndsWith('.') -or $_.EndsWith(' ') }).Count -or
-            $relative -in @('package-manifest.json','.swirl-install-owned','.swirl-isolated-install','卸载 Swirl.exe') -or
+            $relative -in @('package-manifest.json','.swirl-install-owned','.swirl-isolated-install','.swirl-user-integration.json','卸载 Swirl.exe') -or
             (Test-SwirlForbiddenProductPath $relative) -or $paths.ContainsKey($relative) -or
             [string]$entry.sha256 -notmatch '^[0-9a-fA-F]{64}$') {
             throw 'Unsafe package ownership manifest entry.'

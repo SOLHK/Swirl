@@ -9,6 +9,7 @@
 #include "TelemetryService.h"
 #include "NodeTestService.h"
 #include "ConnectionDiagnostics.h"
+#include "../network/LanProxySession.h"
 #include <memory>
 #include <QJsonArray>
 #include <optional>
@@ -37,6 +38,8 @@ class EngineController final : public QObject {
     Q_PROPERTY(QString controlEndpoint READ controlEndpoint NOTIFY statusChanged)
     Q_PROPERTY(QVariantList nodes READ nodes NOTIFY nodesChanged)
     Q_PROPERTY(QVariantList nodeCatalog READ nodeCatalog NOTIFY nodeCatalogChanged)
+    Q_PROPERTY(QString activeSubscriptionId READ activeSubscriptionId NOTIFY optionsChanged)
+    Q_PROPERTY(bool subscriptionScopeEnabled READ subscriptionScopeEnabled NOTIFY optionsChanged)
     Q_PROPERTY(QString selectedNodeId READ selectedNodeId NOTIFY selectionChanged)
     Q_PROPERTY(QString selectedNodeName READ selectedNodeName NOTIFY selectionChanged)
     Q_PROPERTY(bool connected READ connected NOTIFY statusChanged)
@@ -64,11 +67,18 @@ class EngineController final : public QObject {
     Q_PROPERTY(bool meteredEnabled READ meteredEnabled NOTIFY statusChanged)
     Q_PROPERTY(QStringList meteredAllowlist READ meteredAllowlist NOTIFY optionsChanged)
     Q_PROPERTY(bool lanEnabled READ lanEnabled NOTIFY statusChanged)
+    Q_PROPERTY(bool lanSupported READ lanSupported NOTIFY statusChanged)
+    Q_PROPERTY(bool lanBusy READ lanBusy NOTIFY statusChanged)
+    Q_PROPERTY(bool lanRecoveryNeeded READ lanRecoveryNeeded NOTIFY statusChanged)
+    Q_PROPERTY(QVariantMap lanConfiguration READ lanConfiguration NOTIFY optionsChanged)
+    Q_PROPERTY(QVariantMap lanStatus READ lanStatus NOTIFY statusChanged)
+    Q_PROPERTY(QVariantList lanInterfaces READ lanInterfaces NOTIFY lanAddressesChanged)
     Q_PROPERTY(bool lanConfigured READ lanConfigured NOTIFY optionsChanged)
     Q_PROPERTY(QString lanUsername READ lanUsername NOTIFY optionsChanged)
     Q_PROPERTY(QStringList lanAddresses READ lanAddresses NOTIFY lanAddressesChanged)
     Q_PROPERTY(bool tunRequested READ tunRequested NOTIFY statusChanged)
     Q_PROPERTY(bool tunEnabled READ tunEnabled NOTIFY statusChanged)
+    Q_PROPERTY(bool tunSupported READ tunSupported CONSTANT)
     Q_PROPERTY(bool elevated READ elevated CONSTANT)
     Q_PROPERTY(QVariantMap dnsConfiguration READ dnsConfiguration NOTIFY optionsChanged)
     Q_PROPERTY(QVariantList policyGroups READ policyGroups NOTIFY optionsChanged)
@@ -129,7 +139,10 @@ public:
     Q_INVOKABLE void refresh();
     QVariantList nodes() const;
     QVariantList nodeDiagnosticRows() const;
-    QVariantList nodeCatalog() const { return m_store.publicRows(); }
+    QVariantList nodeCatalog() const;
+    QString activeSubscriptionId() const { return m_store.networkConfiguration().value("activeSubscriptionId").toString(); }
+    bool subscriptionScopeEnabled() const { return m_store.networkConfiguration().contains("activeSubscriptionId"); }
+    Q_INVOKABLE bool selectSubscription(const QString &id);
     QString selectedNodeId() const { return m_store.selectedId(); }
     QString selectedNodeName() const;
     bool connected() const { const auto s=m_engine->status();return s.apiHealthy&&s.processAlive&&(!s.selectedNodeId.isEmpty()||s.directSession||!m_options.policyDocument.isEmpty()); }
@@ -167,6 +180,7 @@ public:
     ConnectionDiagnostics *diagnostics() {return &m_diagnostics;}
     QString proxyEnvironmentAdvice() const;
     bool tunRequested() const { return m_options.tunEnabled; }
+    bool tunSupported() const;
     Q_INVOKABLE void setCaptureProxyPort(int port);
     bool tunEnabled() const { return m_engine->status().tunEnabled&&apiHealthy()&&processAlive(); }
     bool elevated() const;
@@ -174,8 +188,18 @@ public:
     QStringList meteredAllowlist() const { return m_options.meteredAllowlist; }
     Q_INVOKABLE bool setMeteredEnabled(bool enabled);
     Q_INVOKABLE bool configureMeteredAllowlist(const QStringList &processes);
-    bool lanEnabled() const { return m_engine->status().allowLan && processAlive() && apiHealthy(); }
-    bool lanConfigured() const { return !m_options.lanUsername.isEmpty() && !m_options.lanPassword.isEmpty(); }
+    // Retain the last positive Rust receipt until a stopped receipt arrives.
+    // Loss of API health is an unconfirmed state, never proof of a closed port.
+    bool lanEnabled() const { return m_engine->status().allowLan; }
+    bool lanSupported() const;
+    bool lanBusy() const { return m_lanSession && m_lanSession->busy(); }
+    bool lanRecoveryNeeded() const { return m_lanSession && m_lanSession->recoveryNeeded(); }
+    bool lanConfigured() const { return !m_options.lanUsername.isEmpty() && !m_options.lanPassword.isEmpty() && !m_options.lanConfiguration.isEmpty(); }
+    QVariantMap lanConfiguration() const;
+    QVariantMap lanStatus() const;
+    QVariantList lanInterfaces() const;
+    Q_INVOKABLE bool configureLanAccess(const QVariantMap &configuration);
+    Q_INVOKABLE bool recoverLan();
     QString lanUsername() const { return m_options.lanUsername; }
     QStringList lanAddresses() const;
     QList<QNetworkInterface> networkInterfaces() const { return m_interfaces; }
@@ -198,8 +222,12 @@ public:
     Q_INVOKABLE void setSystemProxy(bool enabled);
     Q_INVOKABLE void toggleSystemProxy();
     bool proxyRequested() const { return m_proxyRequested; }
-    bool systemProxyStopping() const { return m_stopAfterPolicy||m_engine->status().state==ProxyEngine::State::Stopping; }
-    bool systemProxyBusy() const { return m_proxyChecking||m_systemProxy.busy()||(m_proxyRequested&&busy())||systemProxyStopping(); }
+    bool systemProxyStopping() const {
+        return m_stopPhase==StopPhase::ReleasingProxy||m_stopPhase==StopPhase::StoppingCore
+            ||(m_stopAfterPolicy&&m_stopPhase!=StopPhase::ReleaseFailed)
+            ||m_engine->status().state==ProxyEngine::State::Stopping;
+    }
+    bool systemProxyBusy() const { return m_shutdownAwaitingProxyRelease||m_proxyChecking||m_systemProxy.busy()||(m_proxyRequested&&busy())||systemProxyStopping(); }
     QVariantMap policyDocument() const { return m_policyDocument.toVariantMap(); }
     bool policyV2Active() const { return m_store.configurationV2(); }
     QVariantMap defaultPolicy() const { return m_policyDocument.value("default_policy").toObject().toVariantMap(); }
@@ -240,15 +268,22 @@ signals:
 private:
     friend class PolicyConfigurationTests;
     QString nodeConnectionState(const QString &id) const;
+    QList<ProxyNode> availableNodes() const;
     void refreshLanAddresses();
     QStringList m_lanAddresses;
     QList<QNetworkInterface> m_interfaces;
     bool m_lanScanPending=false;
     bool m_shuttingDown=false;
+    bool m_shutdownAwaitingProxyRelease=false;
+    void finishShutdownAfterProxyRelease();
+    enum class StopPhase { Idle, ReleasingProxy, ReleaseFailed, StoppingCore };
+    StopPhase m_stopPhase=StopPhase::Idle;
+    void finishStopAfterProxyRelease();
     bool m_ingestingEngineStatus=false;
     bool m_meteredPending=false,m_meteredOldTun=false;
     QString m_meteredOldMode;
     std::unique_ptr<ProxyEngine> m_engine;
+    std::unique_ptr<LanProxySession> m_lanSession;
     EngineStartOptions m_options;
     NodeStore m_store;
     NodeImportService m_imports;
@@ -259,7 +294,7 @@ private:
     QString m_previousProxyState;
     QVariantList m_previousNodePresentation;
     ProxyEngine::State m_previousEngineState=ProxyEngine::State::Stopped;
-    QJsonObject serializedNetworkConfiguration();
+    QJsonObject serializedNetworkConfiguration(const EngineStartOptions *candidate=nullptr);
     bool saveNetworkConfiguration();
     bool commitRoutingConfiguration(const QStringList &rules,const QVariantList &groups);
     bool networkEditAllowed();
@@ -317,6 +352,7 @@ private:
     int m_policyRecoveryAttempts=0;
     QJsonObject m_policyCandidateNetwork,m_policyObservedReceipt,m_policyRuntimeCandidate;
     QString m_policyOperation,m_policyMigrationError;
+    QStringList m_policyRevokedNodeIds;
     bool m_policyRollingBack=false;
     bool m_policyDiskWrite=false;
     std::optional<NodeStore::ImportPlan> m_policyCatalog;

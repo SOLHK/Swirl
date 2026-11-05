@@ -39,6 +39,12 @@ use tokio::{
 };
 type Result<T> = std::result::Result<T, &'static str>;
 
+#[path = "native_flow.rs"]
+mod native_flow;
+pub use native_flow::{FlowDispatcher, NativeTunLease, NativeUdpFlow};
+#[path = "v2_lan.rs"]
+mod lan_runtime;
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RuntimeConfig {
@@ -217,8 +223,10 @@ struct Shared {
     live: Mutex<Live>,
     notify: Notify,
     waiting: AtomicUsize,
+    native_tun_leases: AtomicUsize,
     stopped: AtomicBool,
     sessions: Mutex<BTreeMap<u64, SessionControl>>,
+    connection_slots: Arc<Semaphore>,
     sessions_changed: Notify,
     records: Mutex<BTreeMap<u64, Record>>,
     accepted: AtomicU64,
@@ -237,6 +245,7 @@ impl Drop for Waiting<'_> {
 }
 struct Record {
     peer: SocketAddr,
+    ingress: &'static str,
     target: NetworkTarget,
     trace: Value,
     node: String,
@@ -246,7 +255,62 @@ struct Record {
     ended: bool,
     error: &'static str,
 }
+struct RegisteredSession {
+    // Rust drops fields in declaration order. Release the admission budget
+    // before SessionGuard publishes the fully ended session to observers.
+    _permit: OwnedSemaphorePermit,
+    guard: SessionGuard,
+    cancellation: watch::Receiver<bool>,
+}
 impl Shared {
+    fn register(self: &Arc<Self>) -> Result<RegisteredSession> {
+        let permit = self
+            .connection_slots
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| {
+                self.rejected.fetch_add(1, Ordering::Relaxed);
+                "ConnectionLimit"
+            })?;
+        let mut sessions = self.sessions.lock().map_err(|_| "SessionState")?;
+        // Serialize against the shutdown sweep. No flow may register after the
+        // sweep has already sent cancellation to every previous session.
+        if self.stopped.load(Ordering::Acquire) {
+            return Err("CoreStopped");
+        }
+        let id = self.accepted.fetch_add(1, Ordering::Relaxed) + 1;
+        let (cancel, cancellation) = watch::channel(false);
+        sessions.insert(
+            id,
+            SessionControl {
+                cancel,
+                nodes: BTreeSet::new(),
+                preparing: 1,
+            },
+        );
+        self.active.fetch_add(1, Ordering::Relaxed);
+        Ok(RegisteredSession {
+            guard: SessionGuard {
+                shared: self.clone(),
+                id,
+            },
+            _permit: permit,
+            cancellation,
+        })
+    }
+
+    fn failure(&self, id: u64, error: &'static str) {
+        self.failed.fetch_add(1, Ordering::Relaxed);
+        if let Ok(mut last) = self.last_error.lock() {
+            *last = error;
+        }
+        if let Ok(mut records) = self.records.lock()
+            && let Some(record) = records.get_mut(&id)
+        {
+            record.error = error;
+        }
+    }
+
     async fn admit(&self) -> Result<(Arc<Plan>, u64)> {
         let start = Instant::now();
         let mut waiting = None;
@@ -373,11 +437,9 @@ struct SessionGuard {
 }
 impl Drop for SessionGuard {
     fn drop(&mut self) {
-        self.shared.active.fetch_sub(1, Ordering::Relaxed);
         if let Ok(mut sessions) = self.shared.sessions.lock() {
             sessions.remove(&self.id);
         }
-        self.shared.sessions_changed.notify_waiters();
         if let Ok(mut records) = self.shared.records.lock() {
             if let Some(record) = records.get_mut(&self.id) {
                 record.ended = true;
@@ -391,6 +453,10 @@ impl Drop for SessionGuard {
                 records.remove(id);
             }
         }
+        // active == 0 now implies registry/record cleanup and permit release,
+        // rather than advertising free capacity before it is actually reusable.
+        self.shared.active.fetch_sub(1, Ordering::Release);
+        self.shared.sessions_changed.notify_waiters();
     }
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -456,6 +522,7 @@ pub struct Core {
     store_id: String,
     epoch: u64,
     address: SocketAddr,
+    lan: Option<lan_runtime::LanRuntime>,
 }
 impl Core {
     pub fn start(
@@ -470,7 +537,7 @@ impl Core {
         let prepared = candidate.prepare()?;
         prepared.runtime.policy.validate_start()?;
         let runtime = Builder::new_multi_thread()
-            .worker_threads(2)
+            .worker_threads(4)
             .max_blocking_threads(4)
             .thread_name("Swirl V2 Core")
             .enable_all()
@@ -492,8 +559,10 @@ impl Core {
             }),
             notify: Notify::new(),
             waiting: AtomicUsize::new(0),
+            native_tun_leases: AtomicUsize::new(0),
             stopped: AtomicBool::new(false),
             sessions: Mutex::new(BTreeMap::new()),
+            connection_slots: Arc::new(Semaphore::new(capacity)),
             sessions_changed: Notify::new(),
             records: Mutex::new(BTreeMap::new()),
             accepted: AtomicU64::new(0),
@@ -505,8 +574,42 @@ impl Core {
             address,
         });
         let (stop, mut stopped) = watch::channel(false);
-        let task=runtime.spawn({let shared=shared.clone();async move{let permits=Arc::new(Semaphore::new(capacity));let mut sessions=JoinSet::new();loop{tokio::select!{biased;_=stopped.changed()=>break,Some(_)=sessions.join_next(),if !sessions.is_empty()=>{},accepted=listener.accept()=>{let Ok((socket,peer))=accepted else{break};let Ok(permit)=permits.clone().try_acquire_owned()else{shared.rejected.fetch_add(1,Ordering::Relaxed);continue};let id=shared.accepted.fetch_add(1,Ordering::Relaxed)+1;let(cancel,cancelled)=watch::channel(false);if let Ok(mut registry)=shared.sessions.lock(){registry.insert(id,SessionControl{cancel,nodes:BTreeSet::new(),preparing:1});}else{break}shared.active.fetch_add(1,Ordering::Relaxed);let shared=shared.clone();sessions.spawn(async move{let _permit=permit;let _guard=SessionGuard{shared:shared.clone(),id};if let Err(error)=session(socket,peer,shared.clone(),id,cancelled).await{shared.failed.fetch_add(1,Ordering::Relaxed);if let Ok(mut last)=shared.last_error.lock(){*last=error;}
-if let Ok(mut records)=shared.records.lock()&& let Some(record)=records.get_mut(&id){record.error=error;}}});}}}if let Ok(registry)=shared.sessions.lock(){for session in registry.values(){let _=session.cancel.send(true);}}while sessions.join_next().await.is_some(){}}});
+        let task = runtime.spawn({
+            let shared = shared.clone();
+            async move {
+                let mut sessions = JoinSet::new();
+                loop {
+                    tokio::select! {
+                        biased;
+                        _ = stopped.changed() => break,
+                        Some(_) = sessions.join_next(), if !sessions.is_empty() => {},
+                        accepted = listener.accept() => {
+                            let Ok((socket, peer)) = accepted else { break };
+                            let registered = match shared.register() {
+                                Ok(registered) => registered,
+                                Err("ConnectionLimit") => continue,
+                                Err(_) => break,
+                            };
+                            let shared = shared.clone();
+                            sessions.spawn(async move {
+                                let id = registered.guard.id;
+                                let cancellation = registered.cancellation.clone();
+                                if let Err(error) = session(socket, peer, shared.clone(), id, cancellation, None).await {
+                                    shared.failure(id, error);
+                                }
+                                drop(registered);
+                            });
+                        }
+                    }
+                }
+                if let Ok(registry) = shared.sessions.lock() {
+                    for session in registry.values() {
+                        let _ = session.cancel.send(true);
+                    }
+                }
+                while sessions.join_next().await.is_some() {}
+            }
+        });
         let transactions = Arc::new(Mutex::new(Transactions {
             pending: None,
             recent: None,
@@ -534,7 +637,57 @@ if let Ok(mut records)=shared.records.lock()&& let Some(record)=records.get_mut(
             store_id,
             epoch,
             address,
+            lan: None,
         })
+    }
+    /// A protocol-independent ingress into this runtime. Native TUN flows share
+    /// listener admission, policies, DNS, accounting and node-revocation barriers.
+    pub fn flow_dispatcher(&self) -> Result<FlowDispatcher> {
+        Ok(FlowDispatcher::new(
+            self.shared.clone(),
+            self.runtime.as_ref().ok_or("CoreStopped")?.handle().clone(),
+            self.probe.clone(),
+        ))
+    }
+
+    pub fn prepare_native_tun(&self) -> Result<NativeTunLease> {
+        self.flow_dispatcher()?.prepare_native_tun()
+    }
+
+    pub fn lan_start(&mut self, config: crate::lan::LanConfig) -> Result<Value> {
+        if self.shared.stopped.load(Ordering::Acquire) {
+            return Err("CoreStopped");
+        }
+        if self.lan.as_ref().is_some_and(|lan| lan.running()) {
+            return Err("LanAlreadyRunning");
+        }
+        let lan = lan_runtime::LanRuntime::start(
+            self.runtime.as_ref().ok_or("CoreStopped")?,
+            self.shared.clone(),
+            config,
+        )?;
+        let status = lan.snapshot()?;
+        self.lan = Some(lan);
+        Ok(status)
+    }
+    pub fn lan_stop(&mut self) -> Result<Value> {
+        if let Some(lan) = self.lan.as_mut() {
+            lan.stop(self.runtime.as_ref().ok_or("CoreStopped")?)
+        } else {
+            self.lan_status()
+        }
+    }
+    pub fn lan_status(&self) -> Result<Value> {
+        match &self.lan {
+            Some(lan) => lan.snapshot(),
+            None => Ok(
+                json!({"running":false,"ipv4_only":true,"ipv6_targets":true,"encrypted_transport":false,
+                "listen_ip":null,"http_port":null,"socks_port":null,
+                "udp_port_start":null,"udp_port_end":null,"active_connections":0,
+                "accepted":0,"rejected":0,"auth_failures":0,"uploaded":0,"downloaded":0,
+                "clients":[],"last_error":""}),
+            ),
+        }
     }
     pub fn epoch(&self) -> u64 {
         self.epoch
@@ -545,6 +698,7 @@ if let Ok(mut records)=shared.records.lock()&& let Some(record)=records.get_mut(
     pub fn address(&self) -> SocketAddr {
         self.address
     }
+
     fn fields(&self, request_id: &str, state: &str) -> Result<Value> {
         let live = self.shared.live.lock().map_err(|_| "ConfigState")?;
         let state = if state == "committing"
@@ -652,6 +806,9 @@ if let Ok(mut records)=shared.records.lock()&& let Some(record)=records.get_mut(
         {
             return Err("RevisionConflict");
         }
+        if self.shared.native_tun_leases.load(Ordering::Acquire) > 0 {
+            native_flow::validate_tun_dns(&prepared.runtime)?;
+        }
         let old = &live.plan.prepared.runtime;
         if prepared.runtime.listen != old.listen
             || prepared.runtime.limits.max_connections != old.limits.max_connections
@@ -747,6 +904,9 @@ if let Ok(mut records)=shared.records.lock()&& let Some(record)=records.get_mut(
             || live.closed
         {
             return Err("RevisionConflict");
+        }
+        if self.shared.native_tun_leases.load(Ordering::Acquire) > 0 {
+            native_flow::validate_tun_dns(&pending.candidate.prepared.runtime)?;
         }
         let generation = live.generation.checked_add(1).ok_or("GenerationLimit")?;
         live.plan.policies.pause(true);
@@ -942,12 +1102,13 @@ if let Ok(mut records)=shared.records.lock()&& let Some(record)=records.get_mut(
         let generation = live.generation.to_string();
         drop(live);
         let records = self.shared.records.lock().map_err(|_| "StatsState")?;
-        let connections:Vec<_>=records.iter().rev().take(128).map(|(id,r)|json!({"id":id,"source_ip":r.peer.ip().to_string(),"source_port":r.peer.port(),"host":r.target.host,"port":r.target.port,"node":r.node,"matched_rule":r.trace["rule_id"],"route":r.trace,"category":r.category,"transport_state":if r.ended{"closed"}else{"active"},"ended":r.ended,"error":r.error,"failure_stage":swirl_protocol::failure_stage(r.error),"upload":r.counters.upload.load(Ordering::Relaxed),"download":r.counters.download.load(Ordering::Relaxed),"elapsed_ms":r.started.elapsed().as_millis().min(u128::from(u64::MAX))as u64})).collect();
+        let connections:Vec<_>=records.iter().rev().take(128).map(|(id,r)|json!({"id":id,"source_ip":r.peer.ip().to_string(),"source_port":r.peer.port(),"ingress":r.ingress,"host":r.target.host,"port":r.target.port,"node":r.node,"matched_rule":r.trace["rule_id"],"route":r.trace,"category":r.category,"transport_state":if r.ended{"closed"}else{"active"},"ended":r.ended,"error":r.error,"failure_stage":swirl_protocol::failure_stage(r.error),"upload":r.counters.upload.load(Ordering::Relaxed),"download":r.counters.download.load(Ordering::Relaxed),"elapsed_ms":r.started.elapsed().as_millis().min(u128::from(u64::MAX))as u64})).collect();
         Ok(
-            json!({"schema":2,"engine":"swirl-rust","address":self.address,"generation":generation,"selected":selected,"selectors":{},"policies":policies,"configuration":configuration,"running":self.task.as_ref().is_some_and(|t|!t.is_finished()),"active":self.shared.active.load(Ordering::Relaxed),"accepted":self.shared.accepted.load(Ordering::Relaxed),"failed":self.shared.failed.load(Ordering::Relaxed),"rejected":self.shared.rejected.load(Ordering::Relaxed),"upload":self.shared.totals.upload.load(Ordering::Relaxed),"download":self.shared.totals.download.load(Ordering::Relaxed),"udp_dropped":self.shared.totals.udp_dropped.load(Ordering::Relaxed),"last_error":*self.shared.last_error.lock().map_err(|_|"StatsState")?,"connections":connections,"connection_records_total":records.len(),"connections_truncated":records.len()>128}),
+            json!({"schema":2,"engine":"swirl-rust","address":self.address,"generation":generation,"selected":selected,"selectors":{},"policies":policies,"configuration":configuration,"lan":self.lan_status()?,"running":self.task.as_ref().is_some_and(|t|!t.is_finished()),"active":self.shared.active.load(Ordering::Acquire),"accepted":self.shared.accepted.load(Ordering::Relaxed),"failed":self.shared.failed.load(Ordering::Relaxed),"rejected":self.shared.rejected.load(Ordering::Relaxed),"upload":self.shared.totals.upload.load(Ordering::Relaxed),"download":self.shared.totals.download.load(Ordering::Relaxed),"udp_dropped":self.shared.totals.udp_dropped.load(Ordering::Relaxed),"last_error":*self.shared.last_error.lock().map_err(|_|"StatsState")?,"connections":connections,"connection_records_total":records.len(),"connections_truncated":records.len()>128}),
         )
     }
     pub fn stop(&mut self) {
+        let _ = self.lan_stop();
         self.shared.stopped.store(true, Ordering::Release);
         self.shared.notify.notify_waiters();
         let _ = self.probe.invalidate();
@@ -989,7 +1150,8 @@ if let Ok(mut records)=shared.records.lock()&& let Some(record)=records.get_mut(
         timeout_ms: Option<u64>,
         expected_status: Option<u16>,
     ) -> Result<ProbeStatus> {
-        if self.shared.live.lock().map_err(|_| "ConfigState")?.closed {
+        let live = self.shared.live.lock().map_err(|_| "ConfigState")?;
+        if live.closed {
             return Err("Reconfiguring");
         }
         let options = swirl_subscription::HealthProbe {
@@ -1019,6 +1181,8 @@ if let Ok(mut records)=shared.records.lock()&& let Some(record)=records.get_mut(
                 target,
                 "127.0.0.1".parse().map_err(|_| failed("ProbeSource"))?,
                 generation,
+                false,
+                None,
             )
             .await
             .map_err(failed)?;
@@ -1104,6 +1268,9 @@ async fn expire_prepared(
 struct Routed {
     node: Node,
     target: NetworkTarget,
+    // DNS answers that keep the already selected DIRECT leaf and exact rule.
+    // Proxy routes and static/literal targets never acquire fallback exits.
+    direct_addresses: Vec<SocketAddr>,
     resolver: Arc<Resolver>,
     transport: Option<Transport>,
     trace: Value,
@@ -1124,6 +1291,12 @@ impl swirl_dns::QueryTransport for PolicyDnsTransport {
         Box<dyn std::future::Future<Output = Result<swirl_transport::BoxStream>> + Send + '_>,
     > {
         Box::pin(async move {
+            // Ingress resolver views may restrict learned physical endpoints.
+            // DNS carried through a selected proxy is still an outbound target
+            // and must not become a path to a protected host service.
+            if !self.bootstrap.endpoint_allowed(address) {
+                return Err("DnsEndpointForbidden");
+            }
             let target = NetworkTarget {
                 host: address.ip().to_string(),
                 port: address.port(),
@@ -1144,53 +1317,178 @@ impl swirl_dns::QueryTransport for PolicyDnsTransport {
         })
     }
 }
-async fn classify(plan: &Plan, host: &str, port: u16) -> Result<Vec<SocketAddr>> {
+/// Pin an unresolved ingress target through the existing encrypted DNS and
+/// the already selected outbound. The proxy receives a checked address, never
+/// another opportunity to resolve a client-controlled name. Domain routing and
+/// application TLS/HTTP Host remain based on the original request.
+async fn pin_proxy_target(
+    routed: &mut Routed,
+    check: impl Fn(&NetworkTarget) -> Result<()>,
+) -> Result<()> {
+    if matches!(
+        routed.node.outbound,
+        Outbound::Direct {} | Outbound::Reject {}
+    ) || routed.target.host.parse::<IpAddr>().is_ok()
+    {
+        return Ok(());
+    }
+    let original = routed.target.clone();
+    let transport = PolicyDnsTransport {
+        node: routed.node.clone(),
+        transport: routed.transport.clone(),
+        bootstrap: routed.resolver.clone(),
+        limit: routed.limit,
+    };
+    let addresses = timeout(
+        routed.limit,
+        routed
+            .resolver
+            .resolve_with_transport(&original.host, original.port, &transport),
+    )
+    .await
+    .map_err(|_| "IngressTargetDnsTimeout")??;
+    if addresses.is_empty() || addresses.len() > 16 {
+        return Err("IngressTargetDnsAnswers");
+    }
+    for address in &addresses {
+        check(&NetworkTarget {
+            host: address.ip().to_string(),
+            port: address.port(),
+        })?;
+    }
+    let selected = addresses[0].ip().to_string();
+    routed.target.host = selected.clone();
+    routed.trace["target_domain"] = json!(original.host);
+    routed.trace["chosen_ip"] = json!(selected);
+    routed.trace["dns_path"] = json!("configured_encrypted_via_selected_outbound");
+    routed.trace["dns_profile"] = json!("target");
+    Ok(())
+}
+
+// Routing DNS may perform I/O before the final outbound is prepared. Keep its
+// configured servers and classification proxy inside the ingress boundary.
+// Ordinary host requests supply no boundary and retain their existing behavior.
+type GuardPreparation<'a> =
+    std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>>;
+trait IngressBoundary: Sync {
+    fn resolver(&self, resolver: &Arc<Resolver>) -> Arc<Resolver>;
+    fn prepare_proxy_endpoint<'a>(
+        &'a self,
+        node: &'a Node,
+        resolver: &'a mut Arc<Resolver>,
+        limit: Duration,
+    ) -> GuardPreparation<'a>;
+}
+
+struct ClassificationDnsTransport<'a> {
+    transport: PolicyDnsTransport,
+    boundary: Option<&'a dyn IngressBoundary>,
+}
+impl swirl_dns::QueryTransport for ClassificationDnsTransport<'_> {
+    fn connect(
+        &self,
+        address: SocketAddr,
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<swirl_transport::BoxStream>> + Send + '_>,
+    > {
+        Box::pin(async move {
+            let mut bootstrap = self.transport.bootstrap.clone();
+            if let Some(boundary) = self.boundary {
+                // Run only when Resolver actually needs a DNS connection.
+                // A cached classification answer must not trigger proxy
+                // hostname bootstrap or consume another lookup budget.
+                boundary
+                    .prepare_proxy_endpoint(
+                        &self.transport.node,
+                        &mut bootstrap,
+                        self.transport.limit,
+                    )
+                    .await
+                    .map_err(|_| "DnsEndpointForbidden")?;
+            }
+            let transport = PolicyDnsTransport {
+                node: self.transport.node.clone(),
+                transport: self.transport.transport.clone(),
+                bootstrap,
+                limit: self.transport.limit,
+            };
+            swirl_dns::QueryTransport::connect(&transport, address).await
+        })
+    }
+}
+
+async fn classify(
+    plan: &Plan,
+    host: &str,
+    port: u16,
+    boundary: Option<&dyn IngressBoundary>,
+) -> Result<Vec<SocketAddr>> {
     let resolver = plan
         .prepared
         .classification
         .as_ref()
         .ok_or("ClassificationDnsUnavailable")?;
-    if plan.prepared.runtime.policy.classification_dns == ClassificationDns::ViaDefaultPolicy {
-        let selected = plan.policies.resolve(
-            &plan.prepared.runtime.policy.default_policy.target,
-            "policy:default",
-            "classification-dns",
-        )?;
-        let node = plan
-            .prepared
-            .base
-            .nodes
-            .iter()
-            .find(|node| node.id == selected.leaf)
-            .ok_or("MissingTarget")?
-            .clone();
-        let transport = PolicyDnsTransport {
-            transport: plan.prepared.runtime.transports.get(&node.id).cloned(),
-            node,
-            bootstrap: plan.prepared.resolver.clone(),
-            limit: Duration::from_millis(plan.prepared.runtime.limits.handshake_timeout_ms),
+    let resolver =
+        boundary.map_or_else(|| resolver.clone(), |boundary| boundary.resolver(resolver));
+    let result =
+        if plan.prepared.runtime.policy.classification_dns == ClassificationDns::ViaDefaultPolicy {
+            let selected = plan.policies.resolve(
+                &plan.prepared.runtime.policy.default_policy.target,
+                "policy:default",
+                "classification-dns",
+            )?;
+            let node = plan
+                .prepared
+                .base
+                .nodes
+                .iter()
+                .find(|node| node.id == selected.leaf)
+                .ok_or("MissingTarget")?
+                .clone();
+            let limit = Duration::from_millis(plan.prepared.runtime.limits.handshake_timeout_ms);
+            let bootstrap = boundary.map_or_else(
+                || plan.prepared.resolver.clone(),
+                |boundary| boundary.resolver(&plan.prepared.resolver),
+            );
+            let transport = ClassificationDnsTransport {
+                transport: PolicyDnsTransport {
+                    transport: plan.prepared.runtime.transports.get(&node.id).cloned(),
+                    node,
+                    bootstrap,
+                    limit,
+                },
+                boundary,
+            };
+            resolver
+                .resolve_with_transport(host, port, &transport)
+                .await
+        } else {
+            resolver.resolve(host, port).await
         };
-        resolver
-            .resolve_with_transport(host, port, &transport)
-            .await
-    } else {
-        resolver.resolve(host, port).await
-    }
+    result.map_err(|error| match error {
+        "DnsEndpointForbidden" => "ClassificationIngressDenied",
+        _ => error,
+    })
 }
 async fn route(
     plan: Arc<Plan>,
     target: NetworkTarget,
     source: IpAddr,
     generation: u64,
+    direct_tcp_fallback: bool,
+    boundary: Option<&dyn IngressBoundary>,
 ) -> Result<Routed> {
     let runtime = &plan.prepared.runtime;
     let policy = &runtime.policy;
-    let mut known = plan
-        .prepared
-        .resolver
+    let resolver = boundary.map_or_else(
+        || plan.prepared.resolver.clone(),
+        |boundary| boundary.resolver(&plan.prepared.resolver),
+    );
+    let mut known = resolver
         .mapped_host(&target.host)
         .or_else(|| target.host.parse().ok());
     let mut classification_attempted = false;
+    let mut resolved_addresses = Vec::new();
     let configured_path = if !runtime.dns.tls_servers.is_empty() {
         "configured_encrypted"
     } else if !runtime.dns.servers.is_empty() {
@@ -1236,12 +1534,9 @@ async fn route(
         }
         let resolution = async {
             if classification_attempted {
-                classify(&plan, &target.host, target.port).await
+                classify(&plan, &target.host, target.port, boundary).await
             } else {
-                plan.prepared
-                    .resolver
-                    .resolve(&target.host, target.port)
-                    .await
+                resolver.resolve(&target.host, target.port).await
             }
         };
         match timeout(
@@ -1252,12 +1547,17 @@ async fn route(
         {
             Ok(Ok(addresses)) => {
                 known = Some(addresses.first().ok_or("RouteDnsEmpty")?.ip());
+                resolved_addresses = addresses;
                 dns_path = if classification_attempted {
                     classification_path.unwrap_or("unavailable")
                 } else {
                     configured_path
                 };
             }
+            // A denied ingress endpoint is a security boundary, not an
+            // optional classification lookup failure that may be bypassed.
+            Ok(Err("ClassificationIngressDenied")) => return Err("ClassificationIngressDenied"),
+            Ok(Err("DnsEndpointForbidden")) => return Err("DnsEndpointForbidden"),
             _ if classification_attempted => {}
             _ => return Err("MandatoryRuleDnsUnavailable"),
         }
@@ -1302,28 +1602,348 @@ async fn route(
         routed.host = ip.to_string();
     } else if matches!(node.outbound, Outbound::Direct {}) {
         dns_path = configured_path;
-        let addresses = plan
-            .prepared
-            .resolver
-            .resolve(&target.host, target.port)
-            .await?;
+        let addresses = resolver.resolve(&target.host, target.port).await?;
         let address = addresses.first().ok_or("RouteDnsEmpty")?;
         if swirl_routing::v2::forbidden_ip(address.ip()) {
             return Err("InvalidTarget");
         };
         routed.host = address.ip().to_string();
         chosen_ip = Some(address.ip());
+        resolved_addresses = addresses;
     }
-    let trace = json!({"revision":plan.revision.to_string(),"generation":generation.to_string(),"mode":policy.mode.as_str(),"rule_id":decision.rule_id,"tier":decision.tier,"service_policy_id":decision.service_policy_id,"catalog_key":decision.catalog_key,"group_chain":resolved.chain,"leaf_node_id":node.id,"source_id":runtime.node_sources.get(&node.id),"chosen_ip":chosen_ip.map(|ip|ip.to_string()),"dns_profile":if classification_attempted{"classification"}else if resolved_for_rule{"mandatory_rules"}else{"target"},"dns_path":dns_path,"classification_dns_path":classification_path,"classification_state":decision.classification_state,"rejection_code":if matches!(node.outbound,Outbound::Reject{}){Some("Rejected")}else{None},"affinity_reason":resolved.affinity_reason});
+    let direct_addresses = if direct_tcp_fallback && matches!(node.outbound, Outbound::Direct {}) {
+        direct_candidates(
+            resolved_addresses,
+            policy,
+            &target,
+            source,
+            &decision,
+            classification_attempted,
+            china,
+        )
+    } else {
+        Vec::new()
+    };
+    // The scheduler chooses the connected address later. Do not label the
+    // first DNS answer as the actual selected IP when fallback is possible.
+    if direct_addresses.len() > 1 {
+        chosen_ip = None;
+    }
+    let trace = json!({"revision":plan.revision.to_string(),"generation":generation.to_string(),"mode":policy.mode.as_str(),"rule_id":decision.rule_id,"tier":decision.tier,"service_policy_id":decision.service_policy_id,"catalog_key":decision.catalog_key,"group_chain":resolved.chain,"leaf_node_id":node.id,"source_id":runtime.node_sources.get(&node.id),"chosen_ip":chosen_ip.map(|ip|ip.to_string()),"direct_candidate_count":direct_addresses.len(),"dns_profile":if classification_attempted{"classification"}else if resolved_for_rule{"mandatory_rules"}else{"target"},"dns_path":dns_path,"classification_dns_path":classification_path,"classification_state":decision.classification_state,"rejection_code":if matches!(node.outbound,Outbound::Reject{}){Some("Rejected")}else{None},"affinity_reason":resolved.affinity_reason});
     Ok(Routed {
         transport: runtime.transports.get(&node.id).cloned(),
         node,
         target: routed,
-        resolver: plan.prepared.resolver.clone(),
+        direct_addresses,
+        resolver,
         trace,
         generation,
         limit: Duration::from_millis(runtime.limits.handshake_timeout_ms),
     })
+}
+
+fn direct_candidates(
+    addresses: Vec<SocketAddr>,
+    policy: &PolicyDocument,
+    target: &NetworkTarget,
+    source: IpAddr,
+    selected: &swirl_routing::v2::RouteDecision,
+    classification_attempted: bool,
+    china: Option<(&ChinaRules, &ChinaRules)>,
+) -> Vec<SocketAddr> {
+    // A DIRECT rule may have been selected before its eventual DNS lookup,
+    // when classification was disabled/unavailable. Knowing the first public
+    // IP changes that diagnostic state to non_china_ip without changing the
+    // route. Admit this one-field transition only; every semantic field must
+    // still equal the already selected decision. Never resolve a policy group
+    // or replace the originally selected leaf here.
+    let reference = addresses.first().and_then(|address| {
+        let first_decision = swirl_routing::v2::select(
+            policy,
+            &target.host,
+            target.port,
+            source,
+            Some(address.ip()),
+            classification_attempted,
+            china,
+        )
+        .ok()?;
+        let mut admitted = selected.clone();
+        admitted.classification_state = first_decision.classification_state;
+        (admitted == first_decision).then_some(first_decision)
+    });
+    let mut candidates = Vec::new();
+    for (index, address) in addresses.into_iter().enumerate() {
+        // Preserve the first answer already admitted by route(). Subsequent
+        // answers must match the entire decision, including rule identity,
+        // service/group target and classification. Resolving the policy again
+        // here would advance selectors or permit a different proxy/direct exit.
+        if address.port() != target.port || swirl_routing::v2::forbidden_ip(address.ip()) {
+            continue;
+        }
+        let equivalent = index == 0
+            || reference.as_ref().is_some_and(|reference| {
+                swirl_routing::v2::select(
+                    policy,
+                    &target.host,
+                    target.port,
+                    source,
+                    Some(address.ip()),
+                    classification_attempted,
+                    china,
+                )
+                .is_ok_and(|decision| decision == *reference)
+            });
+        if equivalent && !candidates.contains(&address) {
+            candidates.push(address);
+        }
+    }
+    candidates
+}
+
+fn proxy_loop(target: &NetworkTarget, candidates: &[SocketAddr], listener: SocketAddr) -> bool {
+    (target.port == listener.port()
+        && target
+            .host
+            .parse::<IpAddr>()
+            .ok()
+            .is_some_and(|ip| swirl_routing::v2::normalize_ip(ip).is_loopback()))
+        || candidates.iter().any(|address| {
+            address.port() == listener.port()
+                && swirl_routing::v2::normalize_ip(address.ip()).is_loopback()
+        })
+}
+
+#[cfg(test)]
+mod direct_candidate_tests {
+    use super::*;
+    use swirl_subscription::{Matcher, v2::PolicyRule};
+
+    fn policy() -> PolicyDocument {
+        PolicyDocument {
+            schema: 2,
+            mode: Mode::Rule,
+            default_policy: swirl_subscription::v2::DefaultPolicy {
+                id: swirl_subscription::v2::DEFAULT_POLICY_ID.into(),
+                target: Target::Node {
+                    id: "10000000-0000-4000-8000-000000000001".into(),
+                },
+            },
+            service_policies: vec![],
+            groups: vec![],
+            explicit_direct_rules: vec![],
+            custom_rules: vec![],
+            missing_targets: vec![],
+            classification_dns: ClassificationDns::Disabled,
+        }
+    }
+
+    #[test]
+    fn post_route_dns_may_update_only_diagnostic_classification_for_fallback() {
+        let (domains, ips) = swirl_routing::shared_bundled_rules().unwrap();
+        let china = Some((domains.as_ref(), ips.as_ref()));
+        let target = NetworkTarget {
+            host: "fallback.fixture.invalid".into(),
+            port: 443,
+        };
+        let source = "127.0.0.1".parse().unwrap();
+        let first: SocketAddr = "192.0.2.1:443".parse().unwrap();
+        let second = "198.51.100.1:443".parse().unwrap();
+        let cn = "114.114.114.114:443".parse().unwrap();
+        let local = "127.0.0.1:443".parse().unwrap();
+        for (attempted, dns, expected_state) in [
+            (false, ClassificationDns::Disabled, "disabled"),
+            (true, ClassificationDns::ViaDefaultPolicy, "unavailable"),
+        ] {
+            let mut policy = policy();
+            policy.classification_dns = dns;
+            policy.custom_rules.push(PolicyRule {
+                id: "30000000-0000-4000-8000-000000000003".into(),
+                name: "Direct after classification".into(),
+                enabled: true,
+                priority: 0,
+                matcher: Matcher::Match {},
+                target: Target::Direct {},
+            });
+            let selected = swirl_routing::v2::select(
+                &policy,
+                &target.host,
+                target.port,
+                source,
+                None,
+                attempted,
+                china,
+            )
+            .unwrap();
+            assert_eq!(selected.classification_state, expected_state);
+            let first_decision = swirl_routing::v2::select(
+                &policy,
+                &target.host,
+                target.port,
+                source,
+                Some(first.ip()),
+                attempted,
+                china,
+            )
+            .unwrap();
+            assert_eq!(first_decision.classification_state, "non_china_ip");
+            let mut only_diagnostic_change = selected.clone();
+            only_diagnostic_change.classification_state = "non_china_ip";
+            assert_eq!(only_diagnostic_change, first_decision);
+            assert_eq!(
+                direct_candidates(
+                    vec![first, cn, second, local],
+                    &policy,
+                    &target,
+                    source,
+                    &selected,
+                    attempted,
+                    china,
+                ),
+                vec![first, second]
+            );
+            // If the first DNS address would change the actual rule (here to
+            // CN-IP), keep its existing pinned path but do not use the original
+            // custom DIRECT rule to admit different later addresses.
+            assert_eq!(
+                direct_candidates(
+                    vec![cn, first, second],
+                    &policy,
+                    &target,
+                    source,
+                    &selected,
+                    attempted,
+                    china,
+                ),
+                vec![cn]
+            );
+        }
+    }
+
+    #[test]
+    fn fallback_cannot_cross_rule_identity_even_to_the_same_direct_leaf() {
+        let mut policy = policy();
+        policy.explicit_direct_rules.push(PolicyRule {
+            id: "30000000-0000-4000-8000-000000000001".into(),
+            name: "Fixture direct range".into(),
+            enabled: true,
+            priority: 0,
+            matcher: Matcher::Cidr {
+                value: "192.0.2.0/24".parse().unwrap(),
+                resolve: true,
+            },
+            target: Target::Direct {},
+        });
+        policy.custom_rules.push(PolicyRule {
+            id: "30000000-0000-4000-8000-000000000002".into(),
+            name: "Different rule, same DIRECT leaf".into(),
+            enabled: true,
+            priority: 0,
+            matcher: Matcher::Match {},
+            target: Target::Direct {},
+        });
+        let (domains, ips) = swirl_routing::shared_bundled_rules().unwrap();
+        let china = Some((domains.as_ref(), ips.as_ref()));
+        let target = NetworkTarget {
+            host: "fallback.fixture.invalid".into(),
+            port: 443,
+        };
+        let source = "127.0.0.1".parse().unwrap();
+        let first: SocketAddr = "192.0.2.1:443".parse().unwrap();
+        let other_rule = "198.51.100.1:443".parse().unwrap();
+        let same_rule = "192.0.2.2:443".parse().unwrap();
+        let selected = swirl_routing::v2::select(
+            &policy,
+            &target.host,
+            target.port,
+            source,
+            Some(first.ip()),
+            false,
+            china,
+        )
+        .unwrap();
+        assert_eq!(
+            direct_candidates(
+                vec![first, other_rule, same_rule, first],
+                &policy,
+                &target,
+                source,
+                &selected,
+                false,
+                china,
+            ),
+            vec![first, same_rule]
+        );
+    }
+
+    #[test]
+    fn fallback_cannot_cross_china_classification_or_use_forbidden_targets() {
+        let policy = policy();
+        let (domains, ips) = swirl_routing::shared_bundled_rules().unwrap();
+        let china = Some((domains.as_ref(), ips.as_ref()));
+        let target = NetworkTarget {
+            host: "fallback.fixture.invalid".into(),
+            port: 443,
+        };
+        let source = "127.0.0.1".parse().unwrap();
+        let first: SocketAddr = "114.114.114.114:443".parse().unwrap();
+        let same_rule = "114.114.114.115:443".parse().unwrap();
+        let selected = swirl_routing::v2::select(
+            &policy,
+            &target.host,
+            target.port,
+            source,
+            Some(first.ip()),
+            true,
+            china,
+        )
+        .unwrap();
+        assert_eq!(selected.rule_id, "builtin:cn-ip");
+        assert_eq!(
+            direct_candidates(
+                vec![
+                    first,
+                    "8.8.8.8:443".parse().unwrap(),
+                    "0.0.0.0:443".parse().unwrap(),
+                    "224.0.0.1:443".parse().unwrap(),
+                    "255.255.255.255:443".parse().unwrap(),
+                    "[::ffff:0.0.0.0]:443".parse().unwrap(),
+                    "114.114.114.115:80".parse().unwrap(),
+                    same_rule,
+                ],
+                &policy,
+                &target,
+                source,
+                &selected,
+                true,
+                china,
+            ),
+            vec![first, same_rule]
+        );
+    }
+
+    #[test]
+    fn proxy_loop_checks_every_candidate_and_normalizes_mapped_loopback() {
+        let target = NetworkTarget {
+            host: "192.0.2.1".into(),
+            port: 7890,
+        };
+        let listener = "127.0.0.1:7890".parse().unwrap();
+        let first = "192.0.2.1:7890".parse().unwrap();
+        assert!(!proxy_loop(&target, &[first], listener));
+        for later in ["127.0.0.1:7890", "[::1]:7890", "[::ffff:127.0.0.1]:7890"] {
+            assert!(proxy_loop(
+                &target,
+                &[first, later.parse().unwrap()],
+                listener
+            ));
+        }
+        assert!(!proxy_loop(
+            &target,
+            &[first, "127.0.0.1:7891".parse().unwrap()],
+            listener,
+        ));
+    }
 }
 
 async fn cancelled(receiver: &mut watch::Receiver<bool>) {
@@ -1332,80 +1952,154 @@ async fn cancelled(receiver: &mut watch::Receiver<bool>) {
     }
     let _ = receiver.changed().await;
 }
+async fn route_flow(
+    shared: &Arc<Shared>,
+    id: u64,
+    peer: SocketAddr,
+    target: &NetworkTarget,
+    counters: Arc<Counters>,
+    native: bool,
+    boundary: Option<&dyn IngressBoundary>,
+) -> Result<Routed> {
+    if target.port == 0 || !swirl_subscription::valid_host(&target.host) {
+        return Err("InvalidTarget");
+    }
+    let (plan, generation) = shared.admit().await?;
+    if native || shared.native_tun_leases.load(Ordering::Acquire) > 0 {
+        native_flow::validate_tun_dns(&plan.prepared.runtime)?;
+    }
+    let routed = route(
+        plan,
+        target.clone(),
+        peer.ip(),
+        generation,
+        boundary.is_none(),
+        boundary,
+    )
+    .await?;
+    if proxy_loop(&routed.target, &routed.direct_addresses, shared.address) {
+        return Err("ProxyLoop");
+    }
+    shared.bind(id, &routed.node.id)?;
+    shared.records.lock().map_err(|_| "StatsState")?.insert(
+        id,
+        Record {
+            peer,
+            ingress: if native { "native_tun" } else { "loopback" },
+            target: target.clone(),
+            trace: routed.trace.clone(),
+            node: routed.node.id.clone(),
+            category: if matches!(routed.node.outbound, Outbound::Direct {}) {
+                "direct"
+            } else if matches!(routed.node.outbound, Outbound::Reject {}) {
+                "reject"
+            } else {
+                "proxy"
+            },
+            counters,
+            started: Instant::now(),
+            ended: false,
+            error: "",
+        },
+    );
+    if native && matches!(routed.node.outbound, Outbound::Reject {}) {
+        return Err("Rejected");
+    }
+    Ok(routed)
+}
+
+async fn connect_routed_tcp(routed: &Routed) -> Result<swirl_transport::BoxStream> {
+    if routed.direct_addresses.len() > 1 {
+        swirl_protocol::connect_direct_resolved(routed.direct_addresses.clone(), routed.limit).await
+    } else if let Some(transport) = &routed.transport {
+        swirl_protocol::connect_with_transport(
+            &routed.node.outbound,
+            &routed.target,
+            &routed.resolver,
+            routed.limit,
+            transport,
+        )
+        .await
+    } else {
+        swirl_protocol::connect(
+            &routed.node.outbound,
+            &routed.target,
+            &routed.resolver,
+            routed.limit,
+        )
+        .await
+    }
+}
+
 async fn session(
     mut inbound: TcpStream,
     peer: SocketAddr,
     shared: Arc<Shared>,
     id: u64,
     mut cancellation: watch::Receiver<bool>,
+    lan: Option<lan_runtime::Ingress>,
 ) -> Result<()> {
     inbound.set_nodelay(true).map_err(|_| "SocketOptions")?;
     let (auth, limit) = {
         let live = shared.live.lock().map_err(|_| "ConfigState")?;
         (
-            live.plan.prepared.runtime.inbound_auth.clone(),
+            lan.as_ref()
+                .map(|ingress| ingress.config.auth.clone())
+                .or_else(|| live.plan.prepared.runtime.inbound_auth.clone()),
             Duration::from_millis(live.plan.prepared.runtime.limits.handshake_timeout_ms),
         )
     };
-    let request = tokio::select! {biased;_=cancelled(&mut cancellation)=>return Err("SessionRevoked"),request=timeout(limit,swirl_protocol::accept(&mut inbound,&auth))=>request.map_err(|_|"HandshakeTimeout")??};
-    drop(auth);
-    if request.udp {
-        return udp_associate(inbound, peer, request, shared, id, cancellation).await;
-    }
-    let counters = Arc::new(Counters::default());
-    let work = async {
-        let (plan, generation) = shared.admit().await?;
-        let routed = route(plan, request.target.clone(), peer.ip(), generation).await?;
-        if routed.target.port == shared.address.port()
-            && routed
-                .target
-                .host
-                .parse::<IpAddr>()
-                .ok()
-                .is_some_and(|ip| ip.is_loopback())
-        {
-            return Err("ProxyLoop");
+    let handshake = async {
+        if let Some(ingress) = &lan {
+            ingress.check_protocol(&inbound).await?;
         }
-        shared.bind(id, &routed.node.id)?;
-        shared.records.lock().map_err(|_| "StatsState")?.insert(
+        swirl_protocol::accept(&mut inbound, &auth).await
+    };
+    let request = tokio::select! {biased;_=cancelled(&mut cancellation)=>return Err("SessionRevoked"),request=timeout(limit,handshake)=>request.map_err(|_|"HandshakeTimeout")??};
+    drop(auth);
+    if let Some(ingress) = &lan {
+        ingress.authenticated();
+    }
+    if request.udp {
+        return udp_associate(inbound, peer, request, shared, id, cancellation, lan).await;
+    }
+    let counters = lan.as_ref().map_or_else(
+        || Arc::new(Counters::default()),
+        |ingress| ingress.counters.clone(),
+    );
+    let mut reply_started = false;
+    let work = async {
+        if let Some(ingress) = &lan {
+            ingress.check_target(&request.target)?;
+        }
+        let boundary = lan.as_ref().map(|ingress| ingress.boundary(shared.address));
+        let mut routed = route_flow(
+            &shared,
             id,
-            Record {
-                peer,
-                target: request.target.clone(),
-                trace: routed.trace.clone(),
-                node: routed.node.id.clone(),
-                category: if matches!(routed.node.outbound, Outbound::Direct {}) {
-                    "direct"
-                } else if matches!(routed.node.outbound, Outbound::Reject {}) {
-                    "reject"
-                } else {
-                    "proxy"
-                },
-                counters: counters.clone(),
-                started: Instant::now(),
-                ended: false,
-                error: "",
-            },
-        );
-        let mut upstream = if let Some(transport) = &routed.transport {
-            swirl_protocol::connect_with_transport(
-                &routed.node.outbound,
-                &routed.target,
-                &routed.resolver,
-                routed.limit,
-                transport,
-            )
-            .await?
-        } else {
-            swirl_protocol::connect(
-                &routed.node.outbound,
-                &routed.target,
-                &routed.resolver,
-                routed.limit,
-            )
-            .await?
-        };
+            peer,
+            &request.target,
+            counters.clone(),
+            false,
+            boundary
+                .as_ref()
+                .map(|boundary| boundary as &dyn IngressBoundary),
+        )
+        .await?;
+        if let Some(ingress) = &lan {
+            ingress.check_target(&routed.target)?;
+            ingress
+                .prepare_outbound(&mut routed, shared.address)
+                .await?;
+            if let Ok(mut records) = shared.records.lock()
+                && let Some(record) = records.get_mut(&id)
+            {
+                record.ingress = "lan";
+                record.trace = routed.trace.clone();
+            }
+        }
+        let mut upstream = connect_routed_tcp(&routed).await?;
         drop(routed);
+        reply_started = true;
         swirl_protocol::reply(&mut inbound, request.kind, true).await?;
         if matches!(request.kind, swirl_protocol::InboundKind::HttpForward) {
             return Box::pin(swirl_protocol::http_single::forward(
@@ -1438,7 +2132,21 @@ async fn session(
             .await
             .map_err(|error| super::stream_failure_code(&error))
     };
-    tokio::select! {biased;_=cancelled(&mut cancellation)=>Err("SessionRevoked"),result=work=>result}
+    let result = tokio::select! {biased;_=cancelled(&mut cancellation)=>Err("SessionRevoked"),_=lan_runtime::idle(&lan)=>Err("LanIdleTimeout"),result=work=>result};
+    if let Err(error) = result
+        && !reply_started
+        && error != "SessionRevoked"
+    {
+        // Once the request has been parsed, routing and dial failures have a
+        // protocol response. Preserve the actual failure code, and keep stop /
+        // revocation responsive even when a client refuses to read the reply.
+        tokio::select! {
+            biased;
+            _ = cancelled(&mut cancellation) => return Err("SessionRevoked"),
+            _ = timeout(limit, swirl_protocol::reply_failure(&mut inbound, request.kind, error)) => {}
+        }
+    }
+    result
 }
 
 struct PreparationGuard {
@@ -1510,6 +2218,7 @@ struct UdpPrepared {
     permit: OwnedSemaphorePermit,
     payload_len: usize,
 }
+#[allow(clippy::too_many_arguments)]
 async fn prepare_udp(
     shared: Arc<Shared>,
     id: u64,
@@ -1518,6 +2227,7 @@ async fn prepare_udp(
     payload: Vec<u8>,
     existing: Option<Arc<UdpFlow>>,
     permit: OwnedSemaphorePermit,
+    lan: Option<lan_runtime::Ingress>,
 ) -> Result<UdpPrepared> {
     let key = target.authority();
     let flow = if let Some(flow) = existing {
@@ -1528,16 +2238,32 @@ async fn prepare_udp(
             id,
             active: true,
         };
+        if let Some(ingress) = &lan {
+            ingress.check_target(&target)?;
+        }
         let (plan, generation) = shared.admit().await?;
-        let routed = route(plan, target.clone(), peer, generation).await?;
-        if routed.target.port == shared.address.port()
-            && routed
-                .target
-                .host
-                .parse::<IpAddr>()
-                .ok()
-                .is_some_and(|ip| ip.is_loopback())
-        {
+        if shared.native_tun_leases.load(Ordering::Acquire) > 0 {
+            native_flow::validate_tun_dns(&plan.prepared.runtime)?;
+        }
+        let boundary = lan.as_ref().map(|ingress| ingress.boundary(shared.address));
+        let mut routed = route(
+            plan,
+            target.clone(),
+            peer,
+            generation,
+            false,
+            boundary
+                .as_ref()
+                .map(|boundary| boundary as &dyn IngressBoundary),
+        )
+        .await?;
+        if let Some(ingress) = &lan {
+            ingress.check_target(&routed.target)?;
+            ingress
+                .prepare_outbound(&mut routed, shared.address)
+                .await?;
+        }
+        if proxy_loop(&routed.target, &routed.direct_addresses, shared.address) {
             return Err("ProxyLoop");
         };
         shared.bind(id, &routed.node.id)?;
@@ -1599,6 +2325,7 @@ async fn prepare_udp(
         payload_len,
     })
 }
+#[allow(clippy::too_many_arguments)]
 async fn udp_associate(
     mut control: TcpStream,
     peer: SocketAddr,
@@ -1606,6 +2333,7 @@ async fn udp_associate(
     shared: Arc<Shared>,
     id: u64,
     mut cancellation: watch::Receiver<bool>,
+    lan: Option<lan_runtime::Ingress>,
 ) -> Result<()> {
     shared.end_preparation(id);
     let requested: IpAddr = request
@@ -1616,12 +2344,35 @@ async fn udp_associate(
     if !requested.is_unspecified() && requested != peer.ip() {
         return Err("UdpClientAddress");
     }
-    let relay = swirl_transport::bind_udp(SocketAddr::new(peer.ip(), 0))
-        .await
-        .map_err(|_| "UdpBind")?;
+    let local_ip = control.local_addr().map_err(|_| "UdpLocalAddress")?.ip();
+    let lan_relay = match lan.as_ref().map(|ingress| ingress.bind_udp()).transpose() {
+        Ok(relay) => relay,
+        Err(error) => {
+            let _ = swirl_protocol::reply(&mut control, request.kind, false).await;
+            return Err(error);
+        }
+    };
+    let local_relay = if lan_relay.is_none() {
+        // An inbound relay binds the accepted local address, never the remote
+        // peer address and never an outbound physical-interface constraint.
+        Some(
+            swirl_transport::bind_udp_inbound(SocketAddr::new(local_ip, 0))
+                .await
+                .map_err(|_| "UdpBind")?,
+        )
+    } else {
+        None
+    };
+    let relay = lan_relay
+        .as_ref()
+        .map(|lease| lease.socket())
+        .or(local_relay.as_ref())
+        .ok_or("UdpBind")?;
     let v4 = swirl_transport::bind_udp(SocketAddr::from(([0, 0, 0, 0], 0)))
         .await
         .map_err(|_| "UdpBind")?;
+    // IPv4 ingress does not restrict IPv6 destinations. Preserve the existing
+    // outbound family sockets; IPv6 listener exposure remains disabled.
     let v6 = swirl_transport::bind_udp(SocketAddr::from(([0u16; 8], 0)))
         .await
         .map_err(|_| "UdpBindV6")?;
@@ -1633,11 +2384,15 @@ async fn udp_associate(
     }
     .encode(&mut response)?;
     control.write_all(&response).await.map_err(|_| "UdpReply")?;
-    let counters = Arc::new(Counters::default());
+    let counters = lan.as_ref().map_or_else(
+        || Arc::new(Counters::default()),
+        |ingress| ingress.counters.clone(),
+    );
     shared.records.lock().map_err(|_| "StatsState")?.insert(
         id,
         Record {
             peer,
+            ingress: if lan.is_some() { "lan" } else { "loopback" },
             target: request.target.clone(),
             trace: json!({"rule_id":"per_datagram","mode":"pending"}),
             node: String::new(),
@@ -1655,27 +2410,39 @@ async fn udp_associate(
     let mut pending: JoinSet<Result<UdpPrepared>> = JoinSet::new();
     let slots = Arc::new(Semaphore::new(4));
     let mut pool = socks5_udp::Pool::dynamic(counters.clone(), shared.totals.clone());
-    let (mut incoming, mut from_v4, mut from_v6) = ([0u8; 65535], [0u8; 65535], [0u8; 65535]);
+    let (mut incoming, mut from_v4, mut from_v6) =
+        (vec![0u8; 65535], vec![0u8; 65535], vec![0u8; 65535]);
     let mut closed = [0u8; 1];
+    let idle = lan_runtime::idle(&lan);
+    tokio::pin!(idle);
     let outcome = loop {
         tokio::select! {biased;
                     _=cancelled(&mut cancellation)=>break Err("SessionRevoked"),
+                    _= &mut idle=>break Err("LanIdleTimeout"),
                     _=control.read(&mut closed)=>break Ok(()),
                     Some(prepared)=pending.join_next(),if !pending.is_empty()=>{
-                        let prepared=match prepared{Ok(Ok(prepared))=>prepared,_=>{super::udp_drop(&counters,&shared.totals);continue}};flows.retain(|_,(at,_)|at.elapsed()<Duration::from_secs(30));if flows.len()>=64&&!flows.contains_key(&prepared.key){super::udp_drop(&counters,&shared.totals);continue}
+                        let prepared = match prepared {
+                            Ok(Ok(prepared)) => prepared,
+                            Ok(Err(error)) => {
+                                if let Some(ingress) = &lan { ingress.error(error); }
+                                super::udp_drop(&counters, &shared.totals);
+                                continue;
+                            }
+                            Err(_) => { super::udp_drop(&counters, &shared.totals); continue; }
+                        };flows.retain(|_,(at,_)|at.elapsed()<Duration::from_secs(30));if flows.len()>=64&&!flows.contains_key(&prepared.key){super::udp_drop(&counters,&shared.totals);continue}
                         flows.insert(prepared.key,(Instant::now(),prepared.flow.clone()));if let Ok(mut records)=shared.records.lock()&& let Some(record)=records.get_mut(&id){record.node=prepared.flow.routed.node.id.clone();record.trace=prepared.flow.routed.trace.clone();record.target=prepared.flow.routed.target.clone();}
                         match prepared.packet{
                             UdpPacket::Proxy(target,payload)=>pool.send_with_plan(socks5_udp::Flow{plan:prepared.flow.plan.clone(),generation:prepared.flow.routed.generation,node_id:prepared.flow.routed.node.id.clone(),cancellation:Some(cancellation.clone())},target,payload,prepared.permit),
                             UdpPacket::Datagram(address,packet)=>{destinations.retain(|_,(at,_)|at.elapsed()<Duration::from_secs(30));if(destinations.len()>=64&&!destinations.contains_key(&address))||destinations.get(&address).is_some_and(|(_,old)|old.routed.node.id!=prepared.flow.routed.node.id||old.routed.generation!=prepared.flow.routed.generation){super::udp_drop(&counters,&shared.totals);continue}let socket=if address.is_ipv4(){&v4}else{&v6};let sent=tokio::select!{biased;_=cancelled(&mut cancellation)=>break Err("SessionRevoked"),sent=socket.send_to(&packet,address)=>sent};if sent.is_err(){super::udp_drop(&counters,&shared.totals);continue}destinations.insert(address,(Instant::now(),prepared.flow));counters.upload.fetch_add(prepared.payload_len as u64,Ordering::Relaxed);shared.totals.upload.fetch_add(prepared.payload_len as u64,Ordering::Relaxed);drop(prepared.permit);}
                         }
                     },
-                    Some(reply)=pool.next_reply()=>{if let Some(client)=client{let sent=tokio::select!{biased;_=cancelled(&mut cancellation)=>break Err("SessionRevoked"),_=control.read(&mut closed)=>break Ok(()),sent=reply.send_to(&relay,client)=>sent};match sent{Ok(size)=>{counters.download.fetch_add(size as u64,Ordering::Relaxed);shared.totals.download.fetch_add(size as u64,Ordering::Relaxed);},Err(())=>super::udp_drop(&counters,&shared.totals)}}},
+                    Some(reply)=pool.next_reply()=>{if let Some(client)=client{let sent=tokio::select!{biased;_=cancelled(&mut cancellation)=>break Err("SessionRevoked"),_=control.read(&mut closed)=>break Ok(()),sent=reply.send_to(relay,client)=>sent};match sent{Ok(size)=>{counters.download.fetch_add(size as u64,Ordering::Relaxed);shared.totals.download.fetch_add(size as u64,Ordering::Relaxed);},Err(())=>super::udp_drop(&counters,&shared.totals)}}},
                     received=relay.recv_from(&mut incoming)=>{
                         let(n,source)=match received{Ok(packet)=>packet,Err(error)if super::transient_udp(&error)=>{super::udp_drop(&counters,&shared.totals);continue},Err(_)=>break Err("UdpReceive")};if source.ip()!=peer.ip()||client.is_some_and(|client|client!=source)||n<4||incoming[..3]!=[0,0,0]{continue}let mut cursor=&incoming[3..n];let Ok(target)=swirl_protocol::read_target(&mut cursor,false).await else{continue};client=Some(source);let Ok(permit)=slots.clone().try_acquire_owned()else{super::udp_drop(&counters,&shared.totals);continue};flows.retain(|_,(at,_)|at.elapsed()<Duration::from_secs(30));let existing=flows.get(&target.authority()).map(|(_,flow)|flow.clone());if existing.is_none(){if flows.len()>=64{super::udp_drop(&counters,&shared.totals);continue}
-        if shared.begin_preparation(id).is_err(){break Err("SessionRevoked")}}pending.spawn(prepare_udp(shared.clone(),id,peer.ip(),target,cursor.to_vec(),existing,permit));
+        if shared.begin_preparation(id).is_err(){break Err("SessionRevoked")}}pending.spawn(prepare_udp(shared.clone(),id,peer.ip(),target,cursor.to_vec(),existing,permit,lan.clone()));
                     },
-                    received=v4.recv_from(&mut from_v4)=>{if let Ok((n,source))=received&& let Err(code)=udp_response(&relay,client,source,&from_v4[..n],&destinations,&counters,&shared.totals).await{break Err(code)}},
-                    received=v6.recv_from(&mut from_v6)=>{if let Ok((n,source))=received&& let Err(code)=udp_response(&relay,client,source,&from_v6[..n],&destinations,&counters,&shared.totals).await{break Err(code)}}
+                    received=v4.recv_from(&mut from_v4)=>{if let Ok((n,source))=received{let response=tokio::select!{biased;_=cancelled(&mut cancellation)=>break Err("SessionRevoked"),_=control.read(&mut closed)=>break Ok(()),result=timeout(Duration::from_secs(3),udp_response(relay,client,source,&from_v4[..n],&destinations,&counters,&shared.totals))=>result.map_err(|_|"UdpSendTimeout")};match response{Ok(Ok(()))=>{},Ok(Err(code))|Err(code)=>break Err(code)}}},
+                    received=v6.recv_from(&mut from_v6)=>{if let Ok((n,source))=received{let response=tokio::select!{biased;_=cancelled(&mut cancellation)=>break Err("SessionRevoked"),_=control.read(&mut closed)=>break Ok(()),result=timeout(Duration::from_secs(3),udp_response(relay,client,source,&from_v6[..n],&destinations,&counters,&shared.totals))=>result.map_err(|_|"UdpSendTimeout")};match response{Ok(Ok(()))=>{},Ok(Err(code))|Err(code)=>break Err(code)}}}
                 }
     };
     pending.abort_all();

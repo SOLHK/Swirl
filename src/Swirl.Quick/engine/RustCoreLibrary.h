@@ -32,8 +32,10 @@ public:
     Command importXray() const { QMutexLocker lock(&m_mutex); return m_importXray; }
     Command importNode() const { QMutexLocker lock(&m_mutex); return m_importNode; }
     Command importProfile() const { QMutexLocker lock(&m_mutex); return m_importProfile; }
+    Command downloadRoute() const { QMutexLocker lock(&m_mutex); return m_downloadRoute; }
     bool isReady() const { QMutexLocker lock(&m_mutex); return m_command != nullptr; }
     bool supportsConfigurationV2() const { QMutexLocker lock(&m_mutex); return m_configurationV2; }
+    bool supportsLanProxy() const { QMutexLocker lock(&m_mutex); return m_lanProxy; }
     QJsonObject diagnostics() const { QMutexLocker lock(&m_mutex); return m_diagnostics; }
     QString errorString() const;
 
@@ -52,7 +54,8 @@ private:
     Command m_importXray = nullptr;
     Command m_importNode = nullptr;
     Command m_importProfile = nullptr;
+    Command m_downloadRoute = nullptr;
     QJsonObject m_diagnostics;
-    bool m_configurationV2=false;
+    bool m_configurationV2=false,m_lanProxy=false;
     QString m_message;
 };

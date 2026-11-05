@@ -584,6 +584,10 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
             && fields[0].eq_ignore_ascii_case("shadowsocks")
             && fields.len() >= 7
             && (3..7).all(|index| quoted[index] || !fields[index].contains('='));
+        let loon_vmess = !qx
+            && kind == "vmess"
+            && fields.len() >= 5
+            && (3..5).all(|index| quoted[index] || !fields[index].contains('='));
         let mut positional = 0;
         let mut seen = std::collections::HashSet::new();
         for (index, field) in fields[start..].iter().enumerate() {
@@ -610,11 +614,15 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
                 let canonical = match key {
                     "tag" if qx => "name",
                     "encrypt-method" | "method" => "cipher",
+                    "tls-host" | "tls-name" | "sni" if kind == "vmess" => "servername",
                     "tls-host" | "tls-name" => "sni",
                     "udp-relay" => "udp",
                     "over-tls" => "tls",
                     "fast-open" => "tfo",
                     "obfs-name" => "obfs",
+                    "transport" => "network",
+                    "alterid" | "alterId" => "alterId",
+                    "ws-path" => "path",
                     _ => key,
                 };
                 if !seen.insert(canonical)
@@ -639,6 +647,11 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
                 let key = match (kind, positional) {
                     ("ss", 0) => "cipher",
                     ("ss", 1) | ("trojan", 0) => "password",
+                    ("vmess", 0) if loon_vmess => "cipher",
+                    ("vmess", 1) if loon_vmess => "uuid",
+                    ("vmess" | "vless", 0) => "uuid",
+                    ("http" | "socks5", 0) => "username",
+                    ("http" | "socks5", 1) => "password",
                     ("ss", 2) if loon_obfs => "obfs",
                     ("ss", 3) if loon_obfs => "obfs-host",
                     _ => "unmapped-positional",
@@ -662,6 +675,19 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
                 return Err("ConflictingIniTls");
             }
             n["tls"] = true.into();
+        }
+        if n.get("network").and_then(Value::as_str) == Some("ws")
+            && (n.get("path").is_some() || n.get("host").is_some())
+        {
+            if n.get("ws-opts").is_some() {
+                return Err("DuplicateIniParameter");
+            }
+            let object = n.as_object_mut().ok_or("IniFields")?;
+            let path = object.remove("path").unwrap_or_else(|| json!("/"));
+            let headers = object
+                .remove("host")
+                .map_or_else(|| json!({}), |host| json!({"Host":host}));
+            object.insert("ws-opts".into(), json!({"path":path,"headers":headers}));
         }
         nodes.push(n);
     }

@@ -1,0 +1,52 @@
+name: Core offline development kit
+on:
+  push:
+    branches: [work/core-buildkit-20261017]
+permissions:
+  contents: read
+jobs:
+  kit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Export only public core source and integration fixtures
+        run: |
+          mkdir -p kit/source
+          git archive HEAD core tools docs AGENTS.md .github src/Swirl.Quick/engine src/Swirl.Quick/tests src/Swirl.Quick/CMakeLists.txt | tar -x -C kit/source
+          git rev-parse HEAD > kit/source/BASE_COMMIT
+          tar -czf core-source.tar.gz -C kit/source .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Core-source-snapshot
+          path: core-source.tar.gz
+          retention-days: 3
+      - name: Prepare compiler and offline dependency cache
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+          cd core
+          cargo fetch --locked
+          cd ..
+          # Generic HTTP/2 primitives for the upcoming native DoH transport.
+          # This does not alter the tracked workspace or its lockfile.
+          mkdir -p /tmp/swirl-extra/src
+          printf '[package]\nname="swirl-extra"\nversion="0.0.0"\nedition="2024"\n[dependencies]\nh2="0.4"\nhttp="1"\nbytes="1"\n' > /tmp/swirl-extra/Cargo.toml
+          printf 'fn main() {}\n' > /tmp/swirl-extra/src/main.rs
+          cargo fetch --manifest-path /tmp/swirl-extra/Cargo.toml
+          cp -a "$(rustc --print sysroot)" kit/rust
+          mkdir -p kit/cargo-home
+          cp -a "$HOME/.cargo/registry" kit/cargo-home/registry
+          cp /tmp/swirl-extra/Cargo.lock kit/EXTRA_DEPENDENCIES.lock
+          rustc -Vv > kit/RUST_VERSION.txt
+          tar --zstd -cf core-offline-kit.tar.zst -C kit .
+          sha256sum core-offline-kit.tar.zst > core-offline-kit.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Core-offline-buildkit
+          path: |
+            core-offline-kit.tar.zst
+            core-offline-kit.sha256
+          compression-level: 0
+          retention-days: 3

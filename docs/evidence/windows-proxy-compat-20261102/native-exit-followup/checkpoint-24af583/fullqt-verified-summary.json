@@ -1,0 +1,711 @@
+{
+  "head_sha": "24af5838e39b4612321a7ee2b1be11d78fb9b6dd",
+  "checkout_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+  "tree_sha": "13a24de79dbab26098059286a1c74b291ed23084",
+  "workflow_run": 41475106009,
+  "job": 125388033401,
+  "conclusion": "success",
+  "run_url": "https://github.com/SOLHK/Swirl/actions/runs/41475106009",
+  "raw_job_log_sha256": "5410a53023ac488fc937410ae8367f9aa5b3774492ac910d364c2d179a8faa59",
+  "junit": {
+    "critical-ui.xml": {
+      "tests": 9,
+      "failures": 0,
+      "skipped": 0,
+      "disabled": 0,
+      "names": [
+        "swirl-appearance-ui",
+        "swirl-node-ui",
+        "swirl-engine-ui",
+        "swirl-motion",
+        "swirl-apec-motion",
+        "swirl-apec-glass",
+        "swirl-hero",
+        "swirl-settings-material",
+        "swirl-navigation-ui"
+      ],
+      "sha256": "d86409fca36801d6432c980333035f0c597a22ce62eb7233368004734c17f01f"
+    },
+    "critical-network.xml": {
+      "tests": 10,
+      "failures": 0,
+      "skipped": 0,
+      "disabled": 0,
+      "names": [
+        "swirl-system-proxy-state",
+        "swirl-system-proxy-recovery",
+        "swirl-node-real-chain",
+        "swirl-stream-regression",
+        "swirl-subscription-download",
+        "swirl-qt-network-policy",
+        "swirl-subscription-formats",
+        "swirl-import-subscription",
+        "swirl-import-boundaries",
+        "swirl-gateway-network"
+      ],
+      "sha256": "bc25c0417595b7024d7fc242586197967c8e51a840753196e4db20644355e487"
+    },
+    "full-regression.xml": {
+      "tests": 22,
+      "failures": 0,
+      "skipped": 0,
+      "disabled": 0,
+      "names": [
+        "swirl-storage-paths",
+        "swirl-window-shadow",
+        "swirl-node-view-model",
+        "swirl-node-section-model",
+        "swirl-connection-rows",
+        "swirl-policy-configuration",
+        "swirl-catalog-transaction",
+        "swirl-font-selection",
+        "swirl-font-axis-policy",
+        "swirl-font-native-raster",
+        "swirl-rust-library-loader",
+        "swirl-rust-qt-integration",
+        "swirl-codex-proxy-launcher",
+        "swirl-local-extensions",
+        "swirl-telemetry-accounting",
+        "swirl-diagnostic-export",
+        "swirl-activity-layout",
+        "swirl-activity-details",
+        "swirl-activity-perf-600",
+        "swirl-activity-perf-2000",
+        "swirl-policy-ui",
+        "swirl-liquid-glass"
+      ],
+      "sha256": "27ee82012982c795d470f67ffdc9ceff9aecc1fc016ee200a6bb857f0352d19f"
+    }
+  },
+  "coverage": {
+    "configured_ctest_tests": 44,
+    "executed_unique_junit_tests": 41,
+    "direct_deployed_application_checks": {
+      "swirl-overview-input": "Overview input checks against deployed Qt runtime",
+      "swirl-all-pages": "Startup and all-pages smoke against deployed Qt runtime",
+      "swirl-capture-network": "Loopback HTTP capture checks against deployed Qt runtime"
+    },
+    "uncovered_configured_tests": []
+  },
+  "policy_ui": {
+    "ctest_case": {
+      "name": "swirl-policy-ui",
+      "classname": "swirl-policy-ui",
+      "time": "59.1586",
+      "status": "run"
+    },
+    "json_sha256": "be9d09c31d2ced7fcb80ccaaf35045fad0974f5e954bc2f2c5377bc69ece2ae9",
+    "checks": 537,
+    "failed_checks": 0,
+    "source_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+    "embedded_form_sha256": "875bd9b43c832e64c3ae66386a4cc2b62e4e42f7917b764531961cf9f0316eaf",
+    "minimum_window": {
+      "width": 760,
+      "height": 672
+    },
+    "observed_dpr": 1,
+    "requested_wait_ms": 120,
+    "actual_wait_ms": 136.501,
+    "owner_window_matches": true,
+    "original_assertion_reachable": true,
+    "timeline": [
+      {
+        "activeFocus": false,
+        "contentY": 0,
+        "elapsedMs": 0.9487,
+        "event": "before-resize",
+        "formHeight": 543,
+        "viewportHeight": 543
+      },
+      {
+        "activeFocus": true,
+        "contentY": 0,
+        "elapsedMs": 3.8441,
+        "event": "field-focus",
+        "formHeight": 543,
+        "viewportHeight": 543
+      },
+      {
+        "activeFocus": true,
+        "contentY": 0,
+        "elapsedMs": 3.871,
+        "event": "after-animating",
+        "formHeight": 543,
+        "viewportHeight": 543
+      },
+      {
+        "activeFocus": true,
+        "contentY": 81,
+        "elapsedMs": 35.1195,
+        "event": "content-y",
+        "formHeight": 543,
+        "viewportHeight": 543
+      },
+      {
+        "activeFocus": true,
+        "contentY": 81,
+        "elapsedMs": 36.7318,
+        "event": "form-height",
+        "formHeight": 499,
+        "viewportHeight": 543
+      },
+      {
+        "activeFocus": true,
+        "contentY": 125,
+        "elapsedMs": 36.7969,
+        "event": "content-y",
+        "formHeight": 499,
+        "viewportHeight": 499
+      },
+      {
+        "activeFocus": true,
+        "contentY": 125,
+        "elapsedMs": 36.8133,
+        "event": "viewport-height",
+        "formHeight": 499,
+        "viewportHeight": 499
+      },
+      {
+        "activeFocus": true,
+        "contentY": 125,
+        "elapsedMs": 51.6071,
+        "event": "after-animating",
+        "formHeight": 499,
+        "viewportHeight": 499
+      },
+      {
+        "activeFocus": true,
+        "contentY": 125,
+        "elapsedMs": 82.3567,
+        "event": "after-animating",
+        "formHeight": 499,
+        "viewportHeight": 499
+      },
+      {
+        "activeFocus": true,
+        "contentY": 125,
+        "elapsedMs": 111.7437,
+        "event": "frame-swapped",
+        "formHeight": 499,
+        "viewportHeight": 499
+      },
+      {
+        "activeFocus": true,
+        "contentY": 125,
+        "elapsedMs": 111.8493,
+        "event": "after-animating",
+        "formHeight": 499,
+        "viewportHeight": 499
+      },
+      {
+        "activeFocus": true,
+        "contentY": 125,
+        "elapsedMs": 140.1765,
+        "event": "frame-swapped",
+        "formHeight": 499,
+        "viewportHeight": 499
+      },
+      {
+        "activeFocus": true,
+        "contentY": 125,
+        "elapsedMs": 140.1936,
+        "event": "frame-swapped",
+        "formHeight": 499,
+        "viewportHeight": 499
+      },
+      {
+        "activeFocus": true,
+        "contentY": 125,
+        "elapsedMs": 141.5697,
+        "event": "original-assertion",
+        "formHeight": 499,
+        "viewportHeight": 499
+      }
+    ],
+    "before_resize": {
+      "window_width": 1080,
+      "window_height": 760,
+      "active_focus_name": "policyGroupAdvanced",
+      "field_active_focus": false,
+      "field_scene_rect": {
+        "height": 32,
+        "width": 484,
+        "x": 358,
+        "y": 696
+      },
+      "form": {
+        "availableHeight": 543,
+        "bodyHeight": 644,
+        "bodyImplicitHeight": 644,
+        "bodyPresent": true,
+        "contentHeight": 644,
+        "contentY": 0,
+        "sceneRect": {
+          "height": 543,
+          "width": 604,
+          "x": 238,
+          "y": 110
+        },
+        "viewportHeight": 543,
+        "viewportPresent": true
+      }
+    },
+    "after_original_wait": {
+      "window_width": 760,
+      "window_height": 672,
+      "active_focus_name": "policyProbeTolerance",
+      "field_active_focus": true,
+      "field_scene_rect": {
+        "height": 32,
+        "width": 484,
+        "x": 198,
+        "y": 549
+      },
+      "form": {
+        "availableHeight": 499,
+        "bodyHeight": 644,
+        "bodyImplicitHeight": 644,
+        "bodyPresent": true,
+        "contentHeight": 644,
+        "contentY": 125,
+        "sceneRect": {
+          "height": 499,
+          "width": 604,
+          "x": 78,
+          "y": 88
+        },
+        "viewportHeight": 499,
+        "viewportPresent": true
+      }
+    },
+    "viewport_only": {
+      "afterSynchronousRestore": {
+        "window_width": 760,
+        "window_height": 672,
+        "active_focus_name": "policyProbeTolerance",
+        "field_active_focus": true,
+        "field_scene_rect": {
+          "height": 32,
+          "width": 484,
+          "x": 198,
+          "y": 529
+        },
+        "form": {
+          "availableHeight": 499,
+          "bodyHeight": 644,
+          "bodyImplicitHeight": 644,
+          "bodyPresent": true,
+          "contentHeight": 644,
+          "contentY": 145,
+          "sceneRect": {
+            "height": 499,
+            "width": 604,
+            "x": 78,
+            "y": 88
+          },
+          "viewportHeight": 499,
+          "viewportPresent": true
+        }
+      },
+      "afterSynchronousShrink": {
+        "window_width": 760,
+        "window_height": 672,
+        "active_focus_name": "policyProbeTolerance",
+        "field_active_focus": true,
+        "field_scene_rect": {
+          "height": 32,
+          "width": 484,
+          "x": 198,
+          "y": 505
+        },
+        "form": {
+          "availableHeight": 455,
+          "bodyHeight": 644,
+          "bodyImplicitHeight": 644,
+          "bodyPresent": true,
+          "contentHeight": 644,
+          "contentY": 169,
+          "sceneRect": {
+            "height": 499,
+            "width": 604,
+            "x": 78,
+            "y": 88
+          },
+          "viewportHeight": 455,
+          "viewportPresent": true
+        }
+      },
+      "before": {
+        "window_width": 760,
+        "window_height": 672,
+        "active_focus_name": "policyProbeTolerance",
+        "field_active_focus": true,
+        "field_scene_rect": {
+          "height": 32,
+          "width": 484,
+          "x": 198,
+          "y": 549
+        },
+        "form": {
+          "availableHeight": 499,
+          "bodyHeight": 644,
+          "bodyImplicitHeight": 644,
+          "bodyPresent": true,
+          "contentHeight": 644,
+          "contentY": 125,
+          "sceneRect": {
+            "height": 499,
+            "width": 604,
+            "x": 78,
+            "y": 88
+          },
+          "viewportHeight": 499,
+          "viewportPresent": true
+        }
+      }
+    },
+    "focused_checks": [
+      {
+        "name": "Viewport scroll observation uses a valid QML context",
+        "passed": true
+      },
+      {
+        "name": "Keyboard focus reveals the last advanced field at minimum window size",
+        "passed": true
+      },
+      {
+        "name": "Viewport regression uses the actual focused advanced field and production form",
+        "passed": true
+      },
+      {
+        "name": "The entire focused advanced field is visible through every clip at minimum window size",
+        "passed": true
+      },
+      {
+        "name": "Viewport regression observes outer geometry, content extent and focus signals",
+        "passed": true
+      },
+      {
+        "name": "Viewport inset uses a reversible binding on the actual policy form",
+        "passed": true
+      },
+      {
+        "name": "The viewport inset would clip the field without a new reveal",
+        "passed": true
+      },
+      {
+        "name": "The viewport inset activates without replacing the original binding",
+        "passed": true
+      },
+      {
+        "name": "The actual viewport shrinks by the required inset",
+        "passed": true
+      },
+      {
+        "name": "Viewport shrink preserves outer dimensions, field geometry, content extent and keyboard focus",
+        "passed": true
+      },
+      {
+        "name": "Viewport shrink reveals the complete unchanged focused field before another event turn",
+        "passed": true
+      },
+      {
+        "name": "Viewport inset restores the original padding binding",
+        "passed": true
+      },
+      {
+        "name": "Restoring the viewport retains the entire focused field and the original geometry",
+        "passed": true
+      }
+    ],
+    "scope": "Isolated real Qt input, committed policy receipts, Rust runtime and controlled loopback peers. System-proxy ownership uses a per-instance in-memory adapter. No private-provider, host proxy, TUN or DNS mutations.",
+    "system_proxy_fixture": {
+      "backend": "per-instance-memory",
+      "last_pid": 6764,
+      "last_port": 63483,
+      "restores": 3,
+      "takeovers": 3
+    },
+    "timeline_scope": "Observed final-candidate full-application sequence. The old 4048565 diagnostic observer crashed before emitting its timeline; do not infer an exact old deferred-callback stall from these final timestamps."
+  },
+  "production_startup": {
+    "source_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+    "head_sha": "24af5838e39b4612321a7ee2b1be11d78fb9b6dd",
+    "application_sha256": "d7581841f897133b397125da60c2cce228ba8e694bd1983e17f07414db6dea16",
+    "ui_tests_compiled": false,
+    "qpa": "windows",
+    "requested_rhi": "d3d11",
+    "launches": [
+      {
+        "phase": "cold-qml-cache",
+        "startedUtc": "2026-11-02T16:19:20.0777336Z",
+        "finishedUtc": "2026-11-02T16:19:34.7015005Z",
+        "durationMs": 14622.1044,
+        "exited": true,
+        "exitCode": 0,
+        "warningsOrErrors": false,
+        "completedPages": 61,
+        "readyPages": 61,
+        "cacheHitVerified": false,
+        "cacheObservation": "no-runtime-disk-cache-files-observed; AOT-or-no-disk-write-not-distinguished",
+        "passed": true
+      },
+      {
+        "phase": "warm-same-qml-cache",
+        "startedUtc": "2026-11-02T16:19:34.7673461Z",
+        "finishedUtc": "2026-11-02T16:19:49.2600568Z",
+        "durationMs": 14492.1628,
+        "exited": true,
+        "exitCode": 0,
+        "warningsOrErrors": false,
+        "completedPages": 61,
+        "readyPages": 61,
+        "cacheHitVerified": false,
+        "cacheObservation": "no-runtime-disk-cache-files-observed; AOT-or-no-disk-write-not-distinguished",
+        "passed": true
+      }
+    ],
+    "cache_evidence_scope": "Actual process-reported QML cache identity and before/after file inventories under its isolated root. Reusing a directory or observing files does not prove cache hits; QML AOT may produce no runtime disk-cache files. Startup duration excludes inventory hashing and is not a benchmark.",
+    "ordinary_user_session_verified": false,
+    "physical_windows11_dpi_gpu_acceptance": "not-run"
+  },
+  "toolchain": {
+    "qt_version": "6.12.0",
+    "qmake_version": "6.12.0",
+    "arch": "win64_msvc2022_64",
+    "sdk_metadata_url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6120/qt6_6120_msvc2022_64/Updates.xml",
+    "sdk_metadata_sha256": "ba09f355a6e42e1373b939d26d7742df7348f298a465420083b3cfd28ed2914b",
+    "sdk_archive_count": 9,
+    "qt6core_dll_sha256": "39175459c4837c8cc0f709a637fb6eadb25d696785109c8393559ec876f02703",
+    "msvc": "14.44.35207",
+    "windows_sdk": "10.0.26100.0\\",
+    "cxx_standard": 23,
+    "cxx_standard_required": true,
+    "cxx_standard_evidence": "Exact checked-out src/Swirl.Quick/CMakeLists.txt sets CMAKE_CXX_STANDARD 23 and CMAKE_CXX_STANDARD_REQUIRED ON; native build and independent production build succeeded.",
+    "rust": "rustc 1.99.1 (58cf8f9c3 2026-10-13)"
+  },
+  "delivery": {
+    "source_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+    "version": "0.2.32",
+    "qt": "6.12.0",
+    "installer_sha256": "082c6e60ffa968d0e6d3d8766a055e7dc49b5a6263de1f66c74352218b6ea84b",
+    "regression_scope": "full",
+    "critical_ui_tests": "passed",
+    "network_regression": "passed",
+    "desktop_dpi_acceptance": "manual",
+    "physical_refresh_rate_acceptance": "unverified",
+    "scoped_full_regression": "passed",
+    "activity_dpr_simulation": "passed"
+  },
+  "production_rust_self_test": {
+    "connect_response_verified": true,
+    "core_started": true,
+    "download_bytes": 213,
+    "failure": "",
+    "http_response_verified": true,
+    "library": {
+      "abi_version": 1,
+      "actual_abi": 1,
+      "build_id": "0b285d29579917c4a34a744e06de52a5d05345d244dff991ee498ba2ba3f4bdc",
+      "code": "Ok",
+      "dependencies": "load_time_dependencies_resolved",
+      "exists": true,
+      "expected_abi": 1,
+      "expected_build_id": "0b285d29579917c4a34a744e06de52a5d05345d244dff991ee498ba2ba3f4bdc",
+      "expected_source_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+      "file_size": 12294656,
+      "image_architecture": "x86_64",
+      "image_machine": "0x8664",
+      "import_node_available": true,
+      "import_profile_available": true,
+      "import_xray_available": true,
+      "missing_exports": [],
+      "package_version": "0.1.0",
+      "path": "D:/a/Swirl/Swirl/installer-bin/swirl_api.dll",
+      "process_architecture": "x86_64",
+      "qt_error": "",
+      "ready": true,
+      "source_revision_available": true,
+      "source_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+      "stage": "ready",
+      "target": "x86_64-pc-windows-msvc",
+      "windows_error": null,
+      "windows_error_context": "not_attempted"
+    },
+    "listener_port": 65270,
+    "listener_released": true,
+    "origin_requests": 3,
+    "private_subscription_tested": false,
+    "schema": 1,
+    "scope": "packaged-executable-loopback",
+    "socks5_response_verified": true,
+    "success": true,
+    "upload_bytes": 382
+  },
+  "production_tls_runtime": {
+    "backend": "openssl",
+    "client_alpn_supported": true,
+    "expected_version": "3.5.9",
+    "libraries": {
+      "Qt6Network.dll": {
+        "inside_application": true,
+        "sha256": "9825558f184c64f639c4b8663650cee0ae8ffe01c18d98ff76f006a02389965f"
+      },
+      "libcrypto-3-x64.dll": {
+        "inside_application": true,
+        "sha256": "6898974b8dfca10a0e2386deb62a8ccdc9f1d77c9778665e0ffa8240c1a5aea1"
+      },
+      "libssl-3-x64.dll": {
+        "inside_application": true,
+        "sha256": "df9d8e1a591aaf1dcff68ce6ed220c195f313b86f7862d57e4a070409ebb2909"
+      },
+      "tls/qopensslbackend.dll": {
+        "inside_application": true,
+        "sha256": "febe901f9accf2d0cb4972ff9dd4e75bacc1406e8832d0b1694df9518050fe2b"
+      }
+    },
+    "network_requests": 0,
+    "qt_build_version": "6.12.0",
+    "qt_runtime_version": "6.12.0",
+    "runtime_version": "OpenSSL 3.5.9 29 Sep 2026",
+    "schema": 1,
+    "success": true
+  },
+  "nsis_actual_payload": {
+    "source_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+    "rust": {
+      "abi_version": 1,
+      "build_id": "0b285d29579917c4a34a744e06de52a5d05345d244dff991ee498ba2ba3f4bdc",
+      "source_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+      "target": "x86_64-pc-windows-msvc"
+    },
+    "manifest_file_count": 1519,
+    "verified_file_count": 1519,
+    "manifest_duplicate_identical": true,
+    "identities": {
+      "Swirl.exe": {
+        "sha256": "d7581841f897133b397125da60c2cce228ba8e694bd1983e17f07414db6dea16",
+        "bytes": 38407168
+      },
+      "swirl_api.dll": {
+        "sha256": "4ca6c9c9a1a56b65b1d3ba698fde70777bbf810abc2d9bbbd1b19dfd1d425f6a",
+        "bytes": 12294656
+      },
+      "Qt6Core.dll": {
+        "sha256": "39175459c4837c8cc0f709a637fb6eadb25d696785109c8393559ec876f02703",
+        "bytes": 10472760
+      },
+      "libssl-3-x64.dll": {
+        "sha256": "df9d8e1a591aaf1dcff68ce6ed220c195f313b86f7862d57e4a070409ebb2909",
+        "bytes": 1296896
+      },
+      "libcrypto-3-x64.dll": {
+        "sha256": "6898974b8dfca10a0e2386deb62a8ccdc9f1d77c9778665e0ffa8240c1a5aea1",
+        "bytes": 7011840
+      },
+      "package-manifest.json": {
+        "sha256": "95e57c627ba3948422075ea22b731dc3bb77e386719e91cbf2450fb6a0758003",
+        "bytes": 276904
+      },
+      "Swirl-Setup.exe": {
+        "sha256": "082c6e60ffa968d0e6d3d8766a055e7dc49b5a6263de1f66c74352218b6ea84b",
+        "bytes": 79148856
+      }
+    },
+    "failures": []
+  },
+  "cross_artifact_identity_verified": true,
+  "artifacts": [
+    {
+      "id": 13159068329,
+      "name": "Swirl-Engine-Test-Evidence",
+      "sha256": "d800d9c2b23024f504de9af2406560ada4a86df11f45f84c500dd70a39436a26",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/41475106009/artifacts/13159068329"
+    },
+    {
+      "id": 13158878463,
+      "name": "Swirl-Qt612-Package-Evidence",
+      "sha256": "5f50429c05dfee1c3d675c2ab72c279f5dc252f3e3e4adb9a239f1e206639c60",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/41475106009/artifacts/13158878463"
+    },
+    {
+      "id": 13160021695,
+      "name": "Swirl-Windows-Installer-EXE",
+      "sha256": "1b3974f92455fc86404a0473f44bc497048ebc8603618025df39f864031fcc40",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/41475106009/artifacts/13160021695"
+    }
+  ],
+  "physical_windows11_codex_desktop": "NOT_RUN",
+  "activity_dpr_matrix": {
+    "source_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+    "nativeBaselineDpr": 1.0,
+    "result": "passed",
+    "samples": [
+      {
+        "percent": 100,
+        "expectedDpr": 1.0,
+        "actualDpr": 1,
+        "qtScaleFactor": "",
+        "reusedNativeBaseline": true,
+        "report": "activity-layout-report.json",
+        "passed": true,
+        "report_sha256": "b81e740cd1b0de5085041fc3d7f3b492910f5b9dc6eeda683e81a29167d620d5",
+        "checks": 465,
+        "failures": 0
+      },
+      {
+        "percent": 125,
+        "expectedDpr": 1.25,
+        "actualDpr": 1.25,
+        "qtScaleFactor": "1.25",
+        "reusedNativeBaseline": false,
+        "report": "dpi-125/activity-layout-report.json",
+        "passed": true,
+        "report_sha256": "0503a0d13d4df0a90a8766185b1fa036150f1b4d45f160a57f7bb07105fa00f6",
+        "checks": 467,
+        "failures": 0
+      },
+      {
+        "percent": 150,
+        "expectedDpr": 1.5,
+        "actualDpr": 1.5,
+        "qtScaleFactor": "1.5",
+        "reusedNativeBaseline": false,
+        "report": "dpi-150/activity-layout-report.json",
+        "passed": true,
+        "report_sha256": "9b63f925c935ce0d99c954caa7f6194910b2be6f69535cb421e86eb74322354f",
+        "checks": 468,
+        "failures": 0
+      },
+      {
+        "percent": 175,
+        "expectedDpr": 1.75,
+        "actualDpr": 1.75,
+        "qtScaleFactor": "1.75",
+        "reusedNativeBaseline": false,
+        "report": "dpi-175/activity-layout-report.json",
+        "passed": true,
+        "report_sha256": "08a0d718e23a8288d39421cd0c7f8696b30104a304f1f53af24b347c608b0c5e",
+        "checks": 467,
+        "failures": 0
+      },
+      {
+        "percent": 200,
+        "expectedDpr": 2.0,
+        "actualDpr": 2,
+        "qtScaleFactor": "2",
+        "reusedNativeBaseline": false,
+        "report": "dpi-200/activity-layout-report.json",
+        "passed": true,
+        "report_sha256": "49dbc7fc0b66052c8cb87fb6b4b31b43184cac7131910e607b7578bd15e397de",
+        "checks": 467,
+        "failures": 0
+      }
+    ],
+    "method": "Actual QQuickWindow DPR, Win32 client and full RHI readback; unchanged five-card layout, ESC, interruption and resize checks using Qt scale-factor simulation. The test HWND may extend beyond the hosted desktop.",
+    "physical_windows11_display_scaling": "not-run",
+    "cross_monitor_dpi": "not-run",
+    "physical_gpu_presentation": "not-run"
+  },
+  "native_system_proxy_audit": "system-proxy-summary.json"
+}

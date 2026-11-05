@@ -10,6 +10,7 @@
 #include <QQueue>
 #include <functional>
 #include <optional>
+#include <memory>
 
 class QNetworkReply;
 class NodeImportService final : public QObject {
@@ -25,8 +26,10 @@ class NodeImportService final : public QObject {
     Q_PROPERTY(QVariantMap configurationReview READ configurationReview NOTIFY changed)
 public:
     using SystemProxyResolver=std::function<QList<QNetworkProxy>(const QNetworkProxyQuery &)>;
+    using DownloadRouteCommand=std::function<QJsonObject(const QJsonObject &)>;
     explicit NodeImportService(NodeStore *store,QObject *parent=nullptr,
-        std::function<qint64()> clock={}, int pollIntervalMs=60000,SystemProxyResolver systemProxies={});
+        std::function<qint64()> clock={}, int pollIntervalMs=60000,SystemProxyResolver systemProxies={},DownloadRouteCommand downloadRoute={});
+    ~NodeImportService() override;
     QVariantList providers() const;
     bool busy() const { return m_busy; }
     QString message() const { return m_message; }
@@ -52,7 +55,7 @@ public:
     Q_INVOKABLE void importNodesOnlyClipboard();
     Q_INVOKABLE void importNodesOnlyFile(const QUrl &file);
     Q_INVOKABLE void importNodesOnlyUrl(const QUrl &url);
-    Q_INVOKABLE bool saveSubscription(const QString &id,const QString &name,const QUrl &url,int intervalMinutes,bool enabled,const QString &formatHint={},const QString &importScope={});
+    Q_INVOKABLE bool saveSubscription(const QString &id,const QString &name,const QUrl &url,int intervalMinutes,bool enabled,const QString &formatHint={},const QString &importScope={},const QString &downloadRoute={});
     Q_INVOKABLE bool removeSubscription(const QString &id);
     Q_INVOKABLE bool cleanLegacyNodes();
     Q_INVOKABLE void refreshSubscription(const QString &id);
@@ -84,6 +87,8 @@ private:
     void checkDue();
     void next();
     void download(const QUrl &url,int redirects=0);
+    void downloadPhysical(const QUrl &url,int redirects);
+    void stopDownloadRoute();
     void startDownload(const QUrl &url,int redirects,const QList<QNetworkProxy> &proxies);
     void parseText(const QString &text,const QString &origin,bool nodesOnly);
     void startFile(const QUrl &file,bool nodesOnly);
@@ -113,6 +118,9 @@ private:
     QHash<QString,qint64> m_attempts;
     std::function<qint64()> m_clock;
     SystemProxyResolver m_systemProxyResolver;
+    DownloadRouteCommand m_downloadRouteCommand;
+    struct DownloadRouteLease;
+    std::shared_ptr<DownloadRouteLease> m_downloadRoute;
     QString m_message,m_source,m_formatHint="auto";
     QString m_appliedMode,m_applicationNotice;
     QString m_importSource;

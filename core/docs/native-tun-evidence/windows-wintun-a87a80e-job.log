@@ -1,0 +1,1504 @@
+﻿2026-10-30T03:37:01.4343977Z Current runner version: '2.338.0'
+2026-10-30T03:37:01.4370603Z ##[group]Runner Image Provisioner
+2026-10-30T03:37:01.4371744Z Hosted Compute Agent
+2026-10-30T03:37:01.4372321Z Version: 20261021.618
+2026-10-30T03:37:01.4372977Z Commit: 21505ad2541d5be6135ed84fc33697146cf75b8e
+2026-10-30T03:37:01.4373738Z Build Date: 2026-10-21T00:45:21Z
+2026-10-30T03:37:01.4374632Z Worker ID: {7a3a5408-bb14-4c41-8942-abd8308a8f8f}
+2026-10-30T03:37:01.4375375Z Region: eastus
+2026-10-30T03:37:01.4375889Z Cloud: Azure
+2026-10-30T03:37:01.4376383Z ##[endgroup]
+2026-10-30T03:37:01.4377905Z ##[group]Operating System
+2026-10-30T03:37:01.4378654Z Microsoft Windows Server 2025
+2026-10-30T03:37:01.4379266Z 10.0.26100
+2026-10-30T03:37:01.4379818Z Datacenter
+2026-10-30T03:37:01.4380383Z ##[endgroup]
+2026-10-30T03:37:01.4380918Z ##[group]Runner Image
+2026-10-30T03:37:01.4381527Z Image: windows-2025-vs2026
+2026-10-30T03:37:01.4382101Z Version: 20261021.278.1
+2026-10-30T03:37:01.4384086Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20261021.278/images/windows/Windows2025-VS2026-Readme.md
+2026-10-30T03:37:01.4387579Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20261021.278
+2026-10-30T03:37:01.4389744Z ##[endgroup]
+2026-10-30T03:37:01.4391774Z ##[group]GITHUB_TOKEN Permissions
+2026-10-30T03:37:01.4394327Z Contents: read
+2026-10-30T03:37:01.4395213Z Metadata: read
+2026-10-30T03:37:01.4396133Z ##[endgroup]
+2026-10-30T03:37:01.4399058Z Secret source: Actions
+2026-10-30T03:37:01.4400504Z Cache mode: write
+2026-10-30T03:37:01.4401576Z Prepare workflow directory
+2026-10-30T03:37:01.4932714Z Prepare all required actions
+2026-10-30T03:37:01.4983920Z Getting action download info
+2026-10-30T03:37:01.6754594Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-10-30T03:37:01.8130852Z Download action repository 'Swatinem/rust-cache@v2' (SHA:d1527c8f67ef9af357290475d4af4b0fab8f12e0)
+2026-10-30T03:37:02.0186077Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-10-30T03:37:02.3726056Z Complete job name: windows-2025 native packet and core tests
+2026-10-30T03:37:02.5351985Z ##[group]Run actions/checkout@v4
+2026-10-30T03:37:02.5353101Z with:
+2026-10-30T03:37:02.5353663Z   repository: SOLHK/Swirl
+2026-10-30T03:37:02.5357686Z   token: ***
+2026-10-30T03:37:02.5358240Z   ssh-strict: true
+2026-10-30T03:37:02.5358763Z   ssh-user: git
+2026-10-30T03:37:02.5359831Z   persist-credentials: true
+2026-10-30T03:37:02.5360466Z   clean: true
+2026-10-30T03:37:02.5360976Z   sparse-checkout-cone-mode: true
+2026-10-30T03:37:02.5361553Z   fetch-depth: 1
+2026-10-30T03:37:02.5362081Z   fetch-tags: false
+2026-10-30T03:37:02.5362590Z   show-progress: true
+2026-10-30T03:37:02.5363091Z   lfs: false
+2026-10-30T03:37:02.5363572Z   submodules: false
+2026-10-30T03:37:02.5364106Z   set-safe-directory: true
+2026-10-30T03:37:02.5364686Z   allow-unsafe-pr-checkout: false
+2026-10-30T03:37:02.5365607Z env:
+2026-10-30T03:37:02.5366220Z   SWIRL_SOURCE_SHA: 8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e
+2026-10-30T03:37:02.5366940Z ##[endgroup]
+2026-10-30T03:37:02.6920295Z Syncing repository: SOLHK/Swirl
+2026-10-30T03:37:02.6921990Z ##[group]Getting Git version info
+2026-10-30T03:37:02.6922605Z Working directory is 'D:\a\Swirl\Swirl'
+2026-10-30T03:37:02.7807850Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-30T03:37:03.1708685Z git version 2.56.0.windows.2
+2026-10-30T03:37:03.1755143Z ##[endgroup]
+2026-10-30T03:37:03.1774498Z Temporarily overriding HOME='D:\a\_temp\3051cbdf-f917-47df-9dbd-242edbdf927a' before making global git config changes
+2026-10-30T03:37:03.1776667Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-30T03:37:03.1785113Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\Swirl\Swirl
+2026-10-30T03:37:03.2481238Z Deleting the contents of 'D:\a\Swirl\Swirl'
+2026-10-30T03:37:03.2488223Z ##[group]Initializing the repository
+2026-10-30T03:37:03.2496653Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\Swirl\Swirl
+2026-10-30T03:37:03.3562549Z Initialized empty Git repository in D:/a/Swirl/Swirl/.git/
+2026-10-30T03:37:03.3605220Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/SOLHK/Swirl
+2026-10-30T03:37:03.4439452Z ##[endgroup]
+2026-10-30T03:37:03.4442494Z ##[group]Disabling automatic garbage collection
+2026-10-30T03:37:03.4448205Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-10-30T03:37:03.4838291Z ##[endgroup]
+2026-10-30T03:37:03.4840044Z ##[group]Setting up auth
+2026-10-30T03:37:03.4851214Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-30T03:37:03.5267979Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-30T03:37:05.0867794Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-30T03:37:05.1233924Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-30T03:37:05.6615902Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-30T03:37:05.6979793Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-30T03:37:06.2282494Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-10-30T03:37:06.2654805Z ##[endgroup]
+2026-10-30T03:37:06.2655631Z ##[group]Fetching the repository
+2026-10-30T03:37:06.2670502Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e:refs/remotes/pull/42/merge
+2026-10-30T03:37:08.4064631Z From https://github.com/SOLHK/Swirl
+2026-10-30T03:37:08.4065433Z  * [new ref]         8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e -> pull/42/merge
+2026-10-30T03:37:08.4103076Z ##[endgroup]
+2026-10-30T03:37:08.4103730Z ##[group]Determining the checkout info
+2026-10-30T03:37:08.4106080Z ##[endgroup]
+2026-10-30T03:37:08.4115339Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-10-30T03:37:08.4632094Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-10-30T03:37:08.5002705Z ##[group]Checking out the ref
+2026-10-30T03:37:08.5011269Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force refs/remotes/pull/42/merge
+2026-10-30T03:37:09.4737704Z Note: switching to 'refs/remotes/pull/42/merge'.
+2026-10-30T03:37:09.4738228Z 
+2026-10-30T03:37:09.4738472Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-10-30T03:37:09.4739389Z changes and commit them, and you can discard any commits you make in this
+2026-10-30T03:37:09.4740249Z state without impacting any branches by switching back to a branch.
+2026-10-30T03:37:09.4741521Z 
+2026-10-30T03:37:09.4742252Z If you want to create a new branch to retain commits you create, you may
+2026-10-30T03:37:09.4743215Z do so (now or later) by using -c with the switch command. Example:
+2026-10-30T03:37:09.4743511Z 
+2026-10-30T03:37:09.4743642Z   git switch -c <new-branch-name>
+2026-10-30T03:37:09.4743840Z 
+2026-10-30T03:37:09.4743940Z Or undo this operation with:
+2026-10-30T03:37:09.4744137Z 
+2026-10-30T03:37:09.4744235Z   git switch -
+2026-10-30T03:37:09.4744357Z 
+2026-10-30T03:37:09.4744566Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-10-30T03:37:09.4747021Z 
+2026-10-30T03:37:09.4747765Z HEAD is now at 8e0ec5c Merge a87a80e8785dcf06de1a97e927018d5d84b239d6 into 9d35542e092474056f6c154af351dbd84bf7fff4
+2026-10-30T03:37:09.4855420Z ##[endgroup]
+2026-10-30T03:37:09.5327229Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-10-30T03:37:09.5661963Z 8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e
+2026-10-30T03:37:09.6093293Z ##[group]Run rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+2026-10-30T03:37:09.6094100Z [36;1mrustup toolchain install stable --profile minimal --component rustfmt --component clippy[0m
+2026-10-30T03:37:09.6954742Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-30T03:37:09.6955201Z env:
+2026-10-30T03:37:09.6955522Z   SWIRL_SOURCE_SHA: 8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e
+2026-10-30T03:37:09.6955926Z ##[endgroup]
+2026-10-30T03:37:14.9172415Z info: syncing channel updates for stable-x86_64-pc-windows-msvc
+2026-10-30T03:37:15.5141934Z info: latest update on 2026-10-15 for version 1.99.1 (58cf8f9c3 2026-10-13)
+2026-10-30T03:37:15.5452236Z info: component clippy is up to date
+2026-10-30T03:37:15.5452784Z info: component rustfmt is up to date
+2026-10-30T03:37:15.5474003Z 
+2026-10-30T03:37:15.5675865Z   stable-x86_64-pc-windows-msvc unchanged - rustc 1.99.1 (58cf8f9c3 2026-10-13)
+2026-10-30T03:37:15.5676301Z 
+2026-10-30T03:37:15.7205088Z ##[group]Run Swatinem/rust-cache@v2
+2026-10-30T03:37:15.7205409Z with:
+2026-10-30T03:37:15.7205589Z   workspaces: core
+2026-10-30T03:37:15.7205787Z   key: native-tun-isolated
+2026-10-30T03:37:15.7206008Z   cache-on-failure: true
+2026-10-30T03:37:15.7206234Z   prefix-key: v0-rust
+2026-10-30T03:37:15.7206430Z   add-job-id-key: true
+2026-10-30T03:37:15.7206642Z   add-rust-environment-hash-key: true
+2026-10-30T03:37:15.7206892Z   cache-targets: true
+2026-10-30T03:37:15.7207091Z   cache-all-crates: false
+2026-10-30T03:37:15.7207308Z   cache-workspace-crates: false
+2026-10-30T03:37:15.7207525Z   save-if: true
+2026-10-30T03:37:15.7207721Z   cache-provider: github
+2026-10-30T03:37:15.7207920Z   cache-bin: true
+2026-10-30T03:37:15.7208095Z   lookup-only: false
+2026-10-30T03:37:15.7208273Z   cmd-format: {0}
+2026-10-30T03:37:15.7208440Z env:
+2026-10-30T03:37:15.7208670Z   SWIRL_SOURCE_SHA: 8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e
+2026-10-30T03:37:15.7208972Z ##[endgroup]
+2026-10-30T03:37:19.3804914Z ##[group]Cache Configuration
+2026-10-30T03:37:19.3805420Z Cache Provider:
+2026-10-30T03:37:19.3805725Z     github
+2026-10-30T03:37:19.3805998Z Workspaces:
+2026-10-30T03:37:19.3806295Z     D:\a\Swirl\Swirl\core
+2026-10-30T03:37:19.3806648Z Cache Paths:
+2026-10-30T03:37:19.3806973Z     C:\Users\runneradmin\.cargo\bin
+2026-10-30T03:37:19.3807436Z     C:\Users\runneradmin\.cargo\.crates.toml
+2026-10-30T03:37:19.3807945Z     C:\Users\runneradmin\.cargo\.crates2.json
+2026-10-30T03:37:19.3808420Z     C:\Users\runneradmin\.cargo\registry
+2026-10-30T03:37:19.3808848Z     C:\Users\runneradmin\.cargo\git
+2026-10-30T03:37:19.3809294Z     D:\a\Swirl\Swirl\core\target
+2026-10-30T03:37:19.3809683Z Restore Key:
+2026-10-30T03:37:19.3810155Z     v0-rust-native-tun-isolated-backend-Windows_NT-x64-15d0a0c1
+2026-10-30T03:37:19.3810748Z Cache Key:
+2026-10-30T03:37:19.3811640Z     v0-rust-native-tun-isolated-backend-Windows_NT-x64-15d0a0c1-f2e3a6a4
+2026-10-30T03:37:19.3812327Z .. Prefix:
+2026-10-30T03:37:19.3812746Z   - v0-rust-native-tun-isolated-backend-Windows_NT-x64
+2026-10-30T03:37:19.3813918Z .. Environment considered:
+2026-10-30T03:37:19.3814329Z   - Rust Versions:
+2026-10-30T03:37:19.3814809Z     - 1.99.1 x86_64-pc-windows-msvc 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-10-30T03:37:19.3815469Z   - CARGO_INCREMENTAL
+2026-10-30T03:37:19.3815813Z .. Lockfiles considered:
+2026-10-30T03:37:19.3816184Z   - D:\a\Swirl\Swirl\core\Cargo.lock
+2026-10-30T03:37:19.3816677Z   - D:\a\Swirl\Swirl\core\crates\swirl-api\Cargo.toml
+2026-10-30T03:37:19.3817259Z   - D:\a\Swirl\Swirl\core\crates\swirl-core\Cargo.toml
+2026-10-30T03:37:19.3818595Z   - D:\a\Swirl\Swirl\core\crates\swirl-dns\Cargo.toml
+2026-10-30T03:37:19.3819198Z   - D:\a\Swirl\Swirl\core\crates\swirl-platform\Cargo.toml
+2026-10-30T03:37:19.3819783Z   - D:\a\Swirl\Swirl\core\crates\swirl-protocol\Cargo.toml
+2026-10-30T03:37:19.3820370Z   - D:\a\Swirl\Swirl\core\crates\swirl-routing\Cargo.toml
+2026-10-30T03:37:19.3820978Z   - D:\a\Swirl\Swirl\core\crates\swirl-subscription\Cargo.toml
+2026-10-30T03:37:19.3821616Z   - D:\a\Swirl\Swirl\core\crates\swirl-transport\Cargo.toml
+2026-10-30T03:37:19.3822234Z   - D:\a\Swirl\Swirl\core\crates\swirl-tun\Cargo.toml
+2026-10-30T03:37:19.3822941Z   - D:\a\Swirl\Swirl\core\rust-toolchain.toml
+2026-10-30T03:37:19.3823730Z ##[endgroup]
+2026-10-30T03:37:19.3823915Z 
+2026-10-30T03:37:19.3824041Z ... Restoring cache ...
+2026-10-30T03:37:19.6085341Z Cache hit for: v0-rust-native-tun-isolated-backend-Windows_NT-x64-15d0a0c1-f2e3a6a4
+2026-10-30T03:37:20.6849327Z Received 188743680 of 226396490 (83.4%), 176.3 MBs/sec
+2026-10-30T03:37:20.8903643Z Received 226396490 of 226396490 (100.0%), 176.1 MBs/sec
+2026-10-30T03:37:20.8907053Z Cache Size: ~216 MB (226396490 B)
+2026-10-30T03:37:20.9016453Z [command]"C:\Program Files\Git\usr\bin\tar.exe" -xf D:/a/_temp/8a8dda8a-b76c-4066-87ff-9e18495c1f80/cache.tzst -P -C D:/a/Swirl/Swirl --force-local --use-compress-program "zstd -d"
+2026-10-30T03:37:25.1335683Z Cache restored successfully
+2026-10-30T03:37:25.1469033Z Restored from cache key "v0-rust-native-tun-isolated-backend-Windows_NT-x64-15d0a0c1-f2e3a6a4" full match: true.
+2026-10-30T03:37:25.1758019Z ##[group]Run cargo fmt --all -- --check
+2026-10-30T03:37:25.1758395Z [36;1mcargo fmt --all -- --check[0m
+2026-10-30T03:37:25.1826592Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-30T03:37:25.1826935Z env:
+2026-10-30T03:37:25.1827183Z   SWIRL_SOURCE_SHA: 8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e
+2026-10-30T03:37:25.1827497Z   CACHE_ON_FAILURE: true
+2026-10-30T03:37:25.1827698Z   CARGO_INCREMENTAL: 0
+2026-10-30T03:37:25.1827899Z ##[endgroup]
+2026-10-30T03:37:29.1662025Z ##[group]Run cargo metadata --locked --format-version 1 > "D:\a\_temp/swirl-native-metadata.json"
+2026-10-30T03:37:29.1662810Z [36;1mcargo metadata --locked --format-version 1 > "D:\a\_temp/swirl-native-metadata.json"[0m
+2026-10-30T03:37:29.1664027Z [36;1mpython ../tools/Collect-RustDependencies.py --metadata "D:\a\_temp/swirl-native-metadata.json" --inventory "D:\a\_temp/swirl-native-notices/DEPENDENCIES.json" --notices "D:\a\_temp/swirl-native-notices" --supplemental-inventory DEPENDENCIES.json[0m
+2026-10-30T03:37:29.1666543Z [36;1mpython -c "import json,pathlib,sys; p=pathlib.Path(sys.argv[1]); source=json.loads(pathlib.Path('DEPENDENCIES.json').read_text(encoding='utf-8')); built=json.loads((p/'DEPENDENCIES.json').read_text(encoding='utf-8')); assert source==built; notices=[n for a in source['runtime_artifacts'] for n in a['notices']]+[n for a in source['packages'] for n in a.get('supplemental_notices',[])]; assert all(pathlib.Path(n).read_bytes()==(p/n).read_bytes() for n in notices)" "D:\a\_temp/swirl-native-notices"[0m
+2026-10-30T03:37:29.1735561Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-30T03:37:29.1736138Z env:
+2026-10-30T03:37:29.1736394Z   SWIRL_SOURCE_SHA: 8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e
+2026-10-30T03:37:29.1736713Z   CACHE_ON_FAILURE: true
+2026-10-30T03:37:29.1736920Z   CARGO_INCREMENTAL: 0
+2026-10-30T03:37:29.1737124Z ##[endgroup]
+2026-10-30T03:37:30.2793254Z     Updating crates.io index
+2026-10-30T03:37:48.5221941Z {"packages": 207, "packagesWithNotices": 203, "runtimeArtifacts": 1, "extraNotices": 2}
+2026-10-30T03:37:48.7063409Z ##[group]Run $parseTokens = $null
+2026-10-30T03:37:48.7063966Z [36;1m$parseTokens = $null[0m
+2026-10-30T03:37:48.7064365Z [36;1m$parseErrors = $null[0m
+2026-10-30T03:37:48.7065624Z [36;1m[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path ../scripts/Stage-WindowsRustProduct.ps1), [ref]$parseTokens, [ref]$parseErrors) | Out-Null[0m
+2026-10-30T03:37:48.7067474Z [36;1mif ($parseErrors.Count) { throw ($parseErrors | Out-String) }[0m
+2026-10-30T03:37:48.7172178Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-30T03:37:48.7172532Z env:
+2026-10-30T03:37:48.7172781Z   SWIRL_SOURCE_SHA: 8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e
+2026-10-30T03:37:48.7173099Z   CACHE_ON_FAILURE: true
+2026-10-30T03:37:48.7173310Z   CARGO_INCREMENTAL: 0
+2026-10-30T03:37:48.7173508Z ##[endgroup]
+2026-10-30T03:37:49.7052150Z ##[group]Run cargo clippy --locked -p swirl-tun -p swirl-platform -p swirl-dns -p swirl-transport -p swirl-protocol -p swirl-core -p swirl-api --all-targets -- -D warnings
+2026-10-30T03:37:49.7053431Z [36;1mcargo clippy --locked -p swirl-tun -p swirl-platform -p swirl-dns -p swirl-transport -p swirl-protocol -p swirl-core -p swirl-api --all-targets -- -D warnings[0m
+2026-10-30T03:37:49.7124462Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-30T03:37:49.7124811Z env:
+2026-10-30T03:37:49.7125077Z   SWIRL_SOURCE_SHA: 8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e
+2026-10-30T03:37:49.7125404Z   CACHE_ON_FAILURE: true
+2026-10-30T03:37:49.7125635Z   CARGO_INCREMENTAL: 0
+2026-10-30T03:37:49.7125833Z ##[endgroup]
+2026-10-30T03:37:51.7809220Z    Compiling rustls v0.23.46 (D:\a\Swirl\Swirl\core\vendor\rustls)
+2026-10-30T03:37:51.7858360Z     Checking swirl-subscription v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-subscription)
+2026-10-30T03:37:51.7866420Z     Checking swirl-platform v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-platform)
+2026-10-30T03:37:51.7900639Z     Checking swirl-tun v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-tun)
+2026-10-30T03:38:03.1393394Z    Compiling swirl-api v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-api)
+2026-10-30T03:38:03.9833093Z     Checking swirl-routing v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-routing)
+2026-10-30T03:38:09.3213282Z     Checking quinn-proto v0.11.19
+2026-10-30T03:38:09.3214162Z     Checking tokio-rustls v0.26.6
+2026-10-30T03:38:11.0028217Z     Checking quinn v0.11.12
+2026-10-30T03:38:11.4823806Z     Checking swirl-transport v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-transport)
+2026-10-30T03:38:11.4824912Z     Checking h3-quinn v0.0.10
+2026-10-30T03:38:12.6542073Z     Checking swirl-dns v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-dns)
+2026-10-30T03:38:13.3615889Z     Checking swirl-protocol v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-protocol)
+2026-10-30T03:38:15.5446255Z     Checking swirl-core v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-core)
+2026-10-30T03:38:21.2657677Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 30.47s
+2026-10-30T03:38:21.4558228Z ##[group]Run cargo test --locked -p swirl-tun -p swirl-platform -p swirl-dns -p swirl-transport -p swirl-protocol -p swirl-core -p swirl-api
+2026-10-30T03:38:21.4559284Z [36;1mcargo test --locked -p swirl-tun -p swirl-platform -p swirl-dns -p swirl-transport -p swirl-protocol -p swirl-core -p swirl-api[0m
+2026-10-30T03:38:21.4626183Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-30T03:38:21.4626987Z env:
+2026-10-30T03:38:21.4627268Z   SWIRL_SOURCE_SHA: 8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e
+2026-10-30T03:38:21.4627591Z   CACHE_ON_FAILURE: true
+2026-10-30T03:38:21.4627804Z   CARGO_INCREMENTAL: 0
+2026-10-30T03:38:21.4628008Z ##[endgroup]
+2026-10-30T03:38:22.0483213Z warning: output filename collision at D:\a\Swirl\Swirl\core\target\debug\deps\swirl_api.pdb
+2026-10-30T03:38:22.0484378Z   |
+2026-10-30T03:38:22.0486219Z   = note: the bin target `swirl-api` in package `swirl-api v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-api)` has the same output filename as the lib target `swirl_api` in package `swirl-api v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-api)`
+2026-10-30T03:38:22.0489384Z   = note: if this looks unexpected, it may be a bug in Cargo. Please file a bug report at https://github.com/rust-lang/cargo/issues/ with as much information as you can provide.
+2026-10-30T03:38:22.0491380Z   = note: cargo 1.99.1 (5f94df478 2026-08-27) running on `x86_64-pc-windows-msvc` target `x86_64-pc-windows-msvc`
+2026-10-30T03:38:22.0496829Z   = note: first unit: Unit { pkg: Package { id: PackageId { name: "swirl-api", version: "0.1.0", source: "D:\\a\\Swirl\\Swirl\\core\\crates\\swirl-api" }, ..: ".." }, target: TargetInner { name: "swirl-api", doc: true, ..: with_path("D:\\a\\Swirl\\Swirl\\core\\crates\\swirl-api\\src\\main.rs", Edition2024) }, profile: Profile { name: "test", debuginfo: Resolved(Full), debug_assertions: true, overflow_checks: true, ..: default() }, kind: Host, mode: Build, features: [], rustflags: [], rustdocflags: [], links_overrides: {}, artifact: false, artifact_target_for_features: None, is_std: false, dep_hash: 11891052260601507687 }
+2026-10-30T03:38:22.0504279Z   = note: second unit: Unit { pkg: Package { id: PackageId { name: "swirl-api", version: "0.1.0", source: "D:\\a\\Swirl\\Swirl\\core\\crates\\swirl-api" }, ..: ".." }, target: TargetInner { name_inferred: true, ..: lib_target("swirl_api", ["cdylib", "rlib"], "D:\\a\\Swirl\\Swirl\\core\\crates\\swirl-api\\src\\lib.rs", Edition2024) }, profile: Profile { name: "test", debuginfo: Resolved(Full), debug_assertions: true, overflow_checks: true, ..: default() }, kind: Host, mode: Build, features: [], rustflags: [], rustdocflags: [], links_overrides: {}, artifact: false, artifact_target_for_features: None, is_std: false, dep_hash: 12241985034437293178 }
+2026-10-30T03:38:22.2048884Z    Compiling rustls v0.23.46 (D:\a\Swirl\Swirl\core\vendor\rustls)
+2026-10-30T03:38:22.2106325Z    Compiling swirl-subscription v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-subscription)
+2026-10-30T03:38:22.2110817Z    Compiling swirl-platform v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-platform)
+2026-10-30T03:38:22.2180048Z    Compiling swirl-tun v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-tun)
+2026-10-30T03:38:25.1063525Z    Compiling swirl-api v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-api)
+2026-10-30T03:38:27.9565384Z    Compiling quinn-proto v0.11.19
+2026-10-30T03:38:27.9846218Z    Compiling tokio-rustls v0.26.6
+2026-10-30T03:38:28.3687524Z    Compiling swirl-routing v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-routing)
+2026-10-30T03:38:37.0727088Z    Compiling quinn v0.11.12
+2026-10-30T03:38:37.9094826Z    Compiling swirl-transport v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-transport)
+2026-10-30T03:38:37.9095577Z    Compiling h3-quinn v0.0.10
+2026-10-30T03:38:39.9156405Z    Compiling swirl-dns v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-dns)
+2026-10-30T03:38:40.7413456Z    Compiling swirl-protocol v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-protocol)
+2026-10-30T03:38:54.2911197Z    Compiling swirl-core v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-core)
+2026-10-30T03:40:19.4270819Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 57s
+2026-10-30T03:40:19.4696802Z      Running unittests src\lib.rs (target\debug\deps\swirl_api-b1f45acad2e71a06.exe)
+2026-10-30T03:40:19.4827593Z 
+2026-10-30T03:40:19.4827960Z running 52 tests
+2026-10-30T03:40:19.4849381Z test control_v2::tests::duplicate_nested_keys_and_unknown_secrets_never_fall_back_or_echo ... ok
+2026-10-30T03:40:19.4911740Z test control_v2::tests::offline_validation_is_pure_and_draft_default_is_not_a_listener ... ok
+2026-10-30T03:40:19.4983624Z test control_v2::tests::legacy_mutations_cannot_bypass_v2_but_read_only_and_stop_work ... ok
+2026-10-30T03:40:19.4985399Z test control_v2::tests::stale_epoch_and_noncanonical_revision_do_not_prepare ... ok
+2026-10-30T03:40:19.4987426Z test control_v2::tests::prepared_failure_discards_only_after_old_receipt_reconciles ... ok
+2026-10-30T03:40:19.4988684Z test control_v2::tests::activation_requires_durable_finish_and_returns_actual_revision ... ok
+2026-10-30T03:40:19.5091613Z test native_tun::tests::packet_bridge_ipv4_udp_preserves_empty_datagram_and_packet_boundaries ... ok
+2026-10-30T03:40:19.5101533Z test native_tun::tests::packet_bridge_ipv4_dns_fake_ip_tcp_half_close_reaches_real_core_socket ... ok
+2026-10-30T03:40:19.5103900Z test native_tun::tests::packet_bridge_ipv6_dns_fake_ip_tcp_half_close_reaches_real_core_socket ... ok
+2026-10-30T03:40:19.5106297Z test native_tun::tests::packet_bridge_ipv4_tcp_dns_frames_finish_and_truncation_resets ... ok
+2026-10-30T03:40:19.5123357Z test native_tun_control::tests::unsupported_schema_and_unknown_options_never_fall_back ... ok
+2026-10-30T03:40:19.5136638Z test native_tun_control::tests::validation_is_offline_and_gui_cannot_start_or_recover_network ... ok
+2026-10-30T03:40:19.5159904Z test native_tun::tests::packet_bridge_ipv6_udp_preserves_empty_datagram_and_packet_boundaries ... ok
+2026-10-30T03:40:19.5220333Z test native_tun::tests::packet_bridge_ipv6_tcp_dns_frames_finish_and_truncation_resets ... ok
+2026-10-30T03:40:19.5228312Z test node_import::tests::independent_concurrent_calls_have_no_runtime_or_credential_state ... ok
+2026-10-30T03:40:19.5271361Z test node_import::tests::product_optional_shape_and_empty_tls_name_aliases_remain_compatible ... ok
+2026-10-30T03:40:19.5273827Z test node_import::tests::previous_http_and_socks_protocols_preserve_authentication_dns_and_udp ... ok
+2026-10-30T03:40:19.5337071Z test node_import::tests::security_aliases_unknown_fields_and_malformed_authentication_fail_closed ... ok
+2026-10-30T03:40:19.5341947Z test node_import::tests::quic_protocols_preserve_authentication_bandwidth_obfs_and_udp_controls ... ok
+2026-10-30T03:40:19.5343779Z test node_import::tests::clash_stream_transports_reuse_native_xray_ir_and_runtime_validation ... ok
+2026-10-30T03:40:19.5361428Z test node_import::tests::size_query_undersized_output_overlap_and_limits_preserve_buffer_contract ... ok
+2026-10-30T03:40:19.5367964Z test node_import::tests::shadowsocks_aead_and_2022_key_are_not_downgraded ... ok
+2026-10-30T03:40:19.5382304Z test node_import::tests::single_node_boundary_rejects_global_policy_documents_multiple_nodes_and_duplicates ... ok
+2026-10-30T03:40:19.5403778Z test node_import::tests::tfo_fallback_is_reported_without_changing_outbound_or_certificate_policy ... ok
+2026-10-30T03:40:19.5419760Z test node_import::tests::vless_and_trojan_preserve_udp_and_tls_instead_of_using_old_cpp_whitelist ... ok
+2026-10-30T03:40:19.5447747Z test node_import::tests::vmess_websocket_tls_and_security_reach_existing_native_schema ... ok
+2026-10-30T03:40:19.5468330Z test profile_import::tests::complete_ini_document_is_validated_in_portable_rust_including_rejected_sections ... ok
+2026-10-30T03:40:19.5481128Z test node_import::tests::stream_controls_without_equivalent_semantics_are_never_dropped ... ok
+2026-10-30T03:40:19.5482723Z test profile_import::tests::complete_profiles_have_bounded_abi_and_explicit_failures ... ok
+2026-10-30T03:40:19.5495197Z test profile_import::tests::foreign_global_data_grants_only_node_extraction_never_native_configuration ... ok
+2026-10-30T03:40:19.5509215Z test tests::build_identity_is_bounded_and_matches_compiled_inputs ... ok
+2026-10-30T03:40:19.5514968Z test tests::rejects_unknown_and_redacts_secrets ... ok
+2026-10-30T03:40:19.5516888Z test probe_tests::ffi_probe_starts_without_waiting_for_headers_and_returns_redacted_status ... ok
+2026-10-30T03:40:19.5520389Z test profile_import::tests::data_only_extraction_does_not_authorize_foreign_profile_execution ... ok
+2026-10-30T03:40:19.5522389Z test xray_import::tests::abi_rejects_null_overlap_and_pointer_range_overflow_without_writes ... ok
+2026-10-30T03:40:19.5528558Z test xray_import::tests::duplicate_keys_and_error_responses_never_echo_input_secrets ... ok
+2026-10-30T03:40:19.5534402Z test xray_import::tests::abi_projection_preserves_unicode_authentication_and_separates_four_states ... ok
+2026-10-30T03:40:19.5576855Z test xray_import::tests::expanded_candidates_keep_server_account_and_local_action_indices ... ok
+2026-10-30T03:40:19.5814536Z test xray_import::tests::authoritative_transport_candidates_keep_options_and_reject_unsupported_controls ... ok
+2026-10-30T03:40:19.5836229Z test xray_import::tests::imports_are_independent_across_threads ... ok
+2026-10-30T03:40:19.5837323Z test xray_import::tests::inbounds_never_become_remote_nodes_or_configure_listeners ... ok
+2026-10-30T03:40:19.5849514Z test xray_import::tests::insufficient_buffer_is_untouched_and_reports_exact_size ... ok
+2026-10-30T03:40:19.5854974Z test xray_import::tests::invalid_uuid_and_zero_port_are_parameter_failures_not_json_successful_execution ... ok
+2026-10-30T03:40:19.5865800Z test xray_import::tests::imported_native_candidates_reach_real_core_abi_lifecycle_and_reject_changes_atomically ... ok
+2026-10-30T03:40:19.5921801Z test xray_import::tests::native_capability_reuses_existing_rust_mapper_and_preserves_reality_vision ... ok
+2026-10-30T03:40:19.8030242Z test xray_import::tests::maximum_input_is_bounded_before_pointer_access ... ok
+2026-10-30T03:40:19.8068590Z test xray_import::tests::password_candidates_preserve_unicode_nul_and_exact_cipher_without_claiming_network ... ok
+2026-10-30T03:40:19.8123342Z test xray_import::tests::six_protocol_names_and_local_actions_are_not_renamed ... ok
+2026-10-30T03:40:19.9563987Z test xray_import::tests::structural_errors_budgets_and_invalid_utf8_use_the_strict_parser ... ok
+2026-10-30T03:40:20.2791140Z test native_tun::tests::packet_bridge_reject_records_core_decision_and_never_dials_proxy_or_replies_with_data ... ok
+2026-10-30T03:40:20.3464107Z test xray_import::tests::multiple_accounts_do_not_duplicate_the_raw_outbound ... ok
+2026-10-30T03:40:22.1048716Z test xray_import::tests::output_serialization_limit_is_enforced_before_allocation_or_writing ... ok
+2026-10-30T03:40:22.1049475Z 
+2026-10-30T03:40:22.1049896Z test result: ok. 52 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.62s
+2026-10-30T03:40:22.1050542Z 
+2026-10-30T03:40:22.1100867Z      Running unittests src\main.rs (target\debug\deps\swirl_api-8081fe57adf49c31.exe)
+2026-10-30T03:40:22.1202631Z 
+2026-10-30T03:40:22.1202927Z running 0 tests
+2026-10-30T03:40:22.1203253Z 
+2026-10-30T03:40:22.1203753Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-30T03:40:22.1204847Z 
+2026-10-30T03:40:22.1220478Z      Running unittests src\bin\swirl-diagnose.rs (target\debug\deps\swirl_diagnose-5022d0dadc143248.exe)
+2026-10-30T03:40:22.1315441Z 
+2026-10-30T03:40:22.1315713Z running 3 tests
+2026-10-30T03:40:22.1326310Z test tests::stdin_preserves_small_budgets_and_normalizes_ipv6 ... ok
+2026-10-30T03:40:22.1329061Z test tests::diagnostic_uses_product_dns_validation ... ok
+2026-10-30T03:40:22.1333254Z test tests::stdin_rejects_ambiguous_input_and_never_echoes_private_values ... ok
+2026-10-30T03:40:22.1333981Z 
+2026-10-30T03:40:22.1334567Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-30T03:40:22.1334948Z 
+2026-10-30T03:40:22.1350052Z      Running unittests src\bin\swirl-inspect.rs (target\debug\deps\swirl_inspect-d2f182fda9ff39ed.exe)
+2026-10-30T03:40:22.1444340Z 
+2026-10-30T03:40:22.1444600Z running 0 tests
+2026-10-30T03:40:22.1444858Z 
+2026-10-30T03:40:22.1445338Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-30T03:40:22.1445774Z 
+2026-10-30T03:40:22.1460387Z      Running unittests src\bin\swirl-tun-helper.rs (target\debug\deps\swirl_tun_helper-336cb1d6e6ee1351.exe)
+2026-10-30T03:40:22.1557151Z 
+2026-10-30T03:40:22.1557407Z running 4 tests
+2026-10-30T03:40:22.1666755Z test tests::failed_output_forwarding_cannot_bypass_recovery ... ok
+2026-10-30T03:40:22.1873879Z test tests::blocked_worker_response_times_out_and_cannot_reuse_a_stale_ack ... ok
+2026-10-30T03:40:22.1875313Z test tests::failed_wait_restores_before_blocked_output_and_does_not_report_into_it ... ok
+2026-10-30T03:40:22.1898073Z test tests::blocked_final_report_cannot_delay_a_completed_network_recovery ... ok
+2026-10-30T03:40:22.1898533Z 
+2026-10-30T03:40:22.1898841Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+2026-10-30T03:40:22.1899236Z 
+2026-10-30T03:40:22.1914578Z      Running tests\xray_boundary.rs (target\debug\deps\xray_boundary-c17c4c4634e17a0d.exe)
+2026-10-30T03:40:22.2033215Z 
+2026-10-30T03:40:22.2033511Z running 8 tests
+2026-10-30T03:40:22.2377109Z test c_abi_refuses_xray_archives_unknown_fields_and_invalid_vmess_ir ... ok
+2026-10-30T03:40:22.2467121Z test modern_vmess_import_roundtrips_through_c_abi_without_claiming_network_verification ... ok
+2026-10-30T03:40:22.3166522Z test persisted_http_transports_cross_actual_c_abi_and_invalid_reconfigure_is_atomic ... ok
+2026-10-30T03:40:22.3434206Z test c_abi_revalidates_security_and_failed_configure_keeps_running_generation ... ok
+2026-10-30T03:40:22.3789553Z test quic_and_ss2022_source_imports_survive_abi_configuration_and_selection ... ok
+2026-10-30T03:40:22.4608157Z test quic_trust_and_ss2022_key_rejections_are_atomic_at_exported_abi ... ok
+2026-10-30T03:40:22.4727312Z test reloaded_legacy_vmess_and_conflicting_source_security_have_no_abi_export ... ok
+2026-10-30T03:40:22.4964687Z test restored_native_config_crosses_actual_c_abi_start_configure_snapshot_stop ... ok
+2026-10-30T03:40:22.4965769Z 
+2026-10-30T03:40:22.4966823Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+2026-10-30T03:40:22.4967495Z 
+2026-10-30T03:40:22.4998120Z      Running tests\xray_cli.rs (target\debug\deps\xray_cli-3f906882d710e231.exe)
+2026-10-30T03:40:22.5106926Z 
+2026-10-30T03:40:22.5107148Z running 9 tests
+2026-10-30T03:40:22.5330429Z test explicit_private_mode_preserves_bom_raw_archive_and_all_native_candidates ... ok
+2026-10-30T03:40:22.5338777Z test input_limit_uses_strict_xray_budget ... ok
+2026-10-30T03:40:22.5405123Z test legacy_vmess_is_preserved_but_native_export_is_rejected_without_private_payload ... ok
+2026-10-30T03:40:22.5444841Z test explicit_native_export_selects_second_account_without_implicit_first_selection ... ok
+2026-10-30T03:40:22.5578059Z test modern_vmess_cli_export_preserves_aead_and_separates_execution_from_evidence ... ok
+2026-10-30T03:40:22.5705320Z test no_flag_and_legacy_private_pipeline_keep_their_existing_output ... ok
+2026-10-30T03:40:22.5805624Z test xray_public_mode_reports_distinct_states_and_safe_source_indices ... ok
+2026-10-30T03:40:22.5881851Z test strict_parser_errors_are_not_downgraded_or_echoed ... ok
+2026-10-30T03:40:22.6747875Z test malformed_or_unknown_flags_never_enable_private_output ... ok
+2026-10-30T03:40:22.6748242Z 
+2026-10-30T03:40:22.6748551Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+2026-10-30T03:40:22.6748945Z 
+2026-10-30T03:40:22.6771787Z      Running unittests src\lib.rs (target\debug\deps\swirl_core-b2cf670a11a69635.exe)
+2026-10-30T03:40:22.6889811Z 
+2026-10-30T03:40:22.6890444Z running 67 tests
+2026-10-30T03:40:22.6908395Z test policy::tests::fallback_keeps_member_priority_and_fails_closed_when_health_expires ... ok
+2026-10-30T03:40:22.6910592Z test policy::tests::alternate_address_check_reads_only_the_already_pinned_policy ... ok
+2026-10-30T03:40:22.6911735Z test policy::tests::round_robin_advances_only_once_per_used_policy_and_session ... ok
+2026-10-30T03:40:22.6915083Z test policy::tests::scheduler_skips_active_members_and_never_enqueues_catchup_rounds ... ok
+2026-10-30T03:40:22.6918308Z test policy::tests::url_test_hysteresis_and_expiration_are_explicit ... ok
+2026-10-30T03:40:22.6921743Z test policy::tests::accepted_policy_views_do_not_change_when_live_health_changes ... ok
+2026-10-30T03:40:22.6944100Z test policy_v2::tests::parent_profile_cannot_approve_child_failed_leaf ... ok
+2026-10-30T03:40:22.6946429Z test policy_v2::tests::automatic_health_jobs_are_counted_before_poll_and_released_on_early_abort ... ok
+2026-10-30T03:40:22.6947757Z test policy_v2::tests::manual_child_does_not_bypass_ancestor_health_constraint ... ok
+2026-10-30T03:40:22.6956574Z test probe::tests::cancellation_and_new_generation_discard_late_probe_results ... ok
+2026-10-30T03:40:22.6994010Z test probe::tests::selecting_configuring_and_stopping_invalidate_running_probes ... ok
+2026-10-30T03:40:22.6995202Z test policy_v2::tests::all_sixteen_parent_child_strategies_keep_both_constraints ... ok
+2026-10-30T03:40:22.6998873Z test route_tests::rejected_first_answer_never_falls_back_to_direct ... ok
+2026-10-30T03:40:22.7003876Z test route_tests::same_direct_node_under_different_rule_is_not_a_fallback ... ok
+2026-10-30T03:40:22.7011343Z test socks5_udp::tests::dynamic_pool_shutdown_joins_cancelled_workers_and_drains_replies ... ok
+2026-10-30T03:40:22.7033887Z test policy_v2::tests::same_service_load_balance_stays_fixed_across_hostnames ... ok
+2026-10-30T03:40:22.7040381Z test socks5_udp::tests::queued_reply_revoked_before_worker_exit_cannot_forward ... ok
+2026-10-30T03:40:22.7046730Z test socks5_udp::tests::queued_reply_with_closed_revocation_owner_cannot_forward ... ok
+2026-10-30T03:40:22.7055603Z test socks5_udp::tests::queued_reply_with_live_owner_and_no_revocation_preserves_payload ... ok
+2026-10-30T03:40:22.7071967Z test transport_tests::explicit_replacement_keeps_accepted_session_transport_immutable ... ok
+2026-10-30T03:40:22.7074858Z test transport_tests::forwarding_failures_preserve_observed_kind_without_exporting_error_text ... ok
+2026-10-30T03:40:22.7086395Z test transport_tests::invalid_quic_trust_is_rejected_before_core_activation ... ok
+2026-10-30T03:40:22.7093928Z test transport_tests::invalid_transport_configuration_is_rejected_before_listener_start ... ok
+2026-10-30T03:40:22.7099304Z test transport_tests::native_tls_trust_errors_precede_listener_allocation ... ok
+2026-10-30T03:40:22.7112776Z test transport_tests::rejected_reconfiguration_preserves_generation_probes_and_transport ... ok
+2026-10-30T03:40:22.7126058Z test transport_tests::selecting_and_legacy_configuring_preserve_the_explicit_transport ... ok
+2026-10-30T03:40:22.7166159Z test v2::native_flow::tests::cancelled_automatic_health_releases_native_admission_after_task_drop ... ok
+2026-10-30T03:40:22.7295960Z test v2::native_flow::tests::native_and_system_proxy_share_one_connection_budget_and_drop_releases_it ... ok
+2026-10-30T03:40:22.7318513Z test v2::native_flow::tests::native_dns_requires_encrypted_upstream_before_any_network_lookup ... ok
+2026-10-30T03:40:22.7341127Z test v2::native_flow::tests::native_ingress_rejects_ipv4_mapped_ipv6_proxy_loop ... ok
+2026-10-30T03:40:22.7364224Z test v2::native_flow::tests::native_lease_blocks_dns_downgrade_in_prepare_and_preexisting_activation ... ok
+2026-10-30T03:40:22.7403202Z test v2::native_flow::tests::native_proxy_rejection_preserves_original_error_without_dns_or_direct_retry ... ok
+2026-10-30T03:40:22.7555465Z test socks5_udp::tests::queued_reply_cannot_outlive_its_control_worker ... ok
+2026-10-30T03:40:22.7594588Z test v2::native_flow::tests::native_start_waits_for_automatic_policy_health_socket_to_be_released ... ok
+2026-10-30T03:40:22.7623316Z test v2::native_flow::tests::native_start_waits_for_running_probe_socket_to_be_released ... ok
+2026-10-30T03:40:22.7674572Z test v2::native_flow::tests::native_tcp_real_loopback_dual_stack_preserves_half_close_and_accounting ... ok
+2026-10-30T03:40:22.7734235Z test v2::native_flow::tests::native_udp_real_loopback_dual_stack_keeps_empty_datagrams_and_rejects_truncation ... ok
+2026-10-30T03:40:22.7767214Z test v2::native_flow::tests::retained_tun_lease_allows_bridge_rebuild_without_reopening_dns_downgrade ... ok
+2026-10-30T03:40:22.7793720Z test v2::native_flow::tests::stopping_core_revokes_idle_udp_and_retained_dispatcher ... ok
+2026-10-30T03:40:22.7832796Z test v2::native_flow::tests::successful_automatic_health_releases_native_admission_after_response ... ok
+2026-10-30T03:40:22.7836991Z test v2::native_flow::tests::udp_download_counters_are_visible_at_response_wake ... ok
+2026-10-30T03:40:22.7841929Z test v2::native_flow::tests::udp_full_closed_and_oversized_responses_do_not_count_successful_bytes ... ok
+2026-10-30T03:40:22.8029692Z test v2::native_flow::tests::udp_request_eof_waits_for_the_terminal_reason ... ok
+2026-10-30T03:40:22.8158340Z test v2::native_flow::tests::udp_response_eof_waits_for_the_terminal_reason ... ok
+2026-10-30T03:40:22.8348754Z test v2::native_flow::tests::udp_send_completion_eof_waits_for_the_terminal_reason ... ok
+2026-10-30T03:40:22.8353650Z test v2::native_flow::tests::udp_send_counters_are_visible_at_completion_wake_including_failures ... ok
+2026-10-30T03:40:22.8374184Z test v2::native_flow::tests::udp_terminal_state_survives_unpolled_worker_drop_and_keeps_first_error ... ok
+2026-10-30T03:40:22.8408847Z test v2::runtime_tests::cancelled_admission_waiters_release_capacity_and_limit_is_exact ... ok
+2026-10-30T03:40:22.8483991Z test v2::runtime_tests::candidate_gate_delivers_no_new_bytes_until_matching_durable_receipt ... ok
+2026-10-30T03:40:22.8854124Z test v2::runtime_tests::classification_dns_uses_default_proxy_then_verified_tls_without_direct_or_plaintext_fallback ... ok
+2026-10-30T03:40:22.9000232Z test v2::runtime_tests::expired_prepared_plan_is_released_without_traffic_or_revision_reuse ... ok
+2026-10-30T03:40:22.9029091Z test v2::runtime_tests::generation_overflow_fails_before_closing_gate_or_changing_plan ... ok
+2026-10-30T03:40:22.9061635Z test v2::runtime_tests::idempotent_finish_and_prepare_reject_changed_token_receipt_or_revocation_set ... ok
+2026-10-30T03:40:22.9385157Z test v2::runtime_tests::native_dns_uses_selected_proxy_verified_tls_without_direct_or_plaintext_fallback ... ok
+2026-10-30T03:40:22.9465893Z test v2::runtime_tests::native_tcp_reuses_proxy_policy_admission_pinning_and_catalogue_revocation ... ok
+2026-10-30T03:40:22.9528582Z test v2::runtime_tests::native_udp_reuses_shadowsocks_outbound_and_revokes_an_idle_session ... ok
+2026-10-30T03:40:22.9623378Z test v2::runtime_tests::ordinary_closure_change_preserves_old_tunnel_but_explicit_catalogue_revoke_closes_it ... ok
+2026-10-30T03:40:22.9628423Z test route_tests::direct_resolved_candidates_fall_back_across_families_under_same_rule ... ok
+2026-10-30T03:40:22.9674589Z test v2::runtime_tests::preparation_and_activation_cannot_start_candidate_health_probes ... ok
+2026-10-30T03:40:22.9754242Z test v2::runtime_tests::rollback_keeps_gate_closed_until_old_disk_receipt_is_reconciled ... ok
+2026-10-30T03:40:22.9838568Z test v2::runtime_tests::ordinary_http_preserves_framed_bodies_and_cannot_pipeline_a_second_request ... ok
+2026-10-30T03:40:22.9895911Z test v2::runtime_tests::udp_new_destination_waits_for_receipt_old_destination_stays_pinned_and_catalogue_revoke_closes_flow ... ok
+2026-10-30T03:40:22.9899000Z test v2::tests::decimal_identities_reject_lossy_or_noncanonical_numbers ... ok
+2026-10-30T03:40:22.9905460Z test v2::tests::runtime_schema_rejects_legacy_fields_instead_of_falling_back ... ok
+2026-10-30T03:40:22.9974321Z test v2::runtime_tests::websocket_requires_actual_authenticated_upgrade_before_opaque_tunnel ... ok
+2026-10-30T03:40:23.1336975Z test route_tests::mixed_china_dns_answers_pin_the_first_address_and_its_outbound ... ok
+2026-10-30T03:40:23.1358829Z test v2::native_flow::tests::native_reject_does_not_fall_back_to_direct ... ok
+2026-10-30T03:40:23.1359395Z 
+2026-10-30T03:40:23.1359831Z test result: ok. 67 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+2026-10-30T03:40:23.1360447Z 
+2026-10-30T03:40:23.1407030Z      Running tests\china_rules.rs (target\debug\deps\china_rules-71836841754665eb.exe)
+2026-10-30T03:40:23.1532666Z 
+2026-10-30T03:40:23.1532844Z running 4 tests
+2026-10-30T03:40:23.1602385Z test explicit_missing_directory_fails_without_bundled_fallback ... ok
+2026-10-30T03:40:23.1625828Z test explicit_partial_directory_rejects_each_missing_file ... ok
+2026-10-30T03:40:23.5789122Z test explicit_tampered_or_truncated_rules_fail_closed ... ok
+2026-10-30T03:40:23.9471417Z test explicit_valid_directory_loads_real_domain_and_ip_rules ... ok
+2026-10-30T03:40:23.9471770Z 
+2026-10-30T03:40:23.9472058Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.79s
+2026-10-30T03:40:23.9472417Z 
+2026-10-30T03:40:23.9496060Z      Running tests\network.rs (target\debug\deps\network-0934907043607c80.exe)
+2026-10-30T03:40:23.9617198Z 
+2026-10-30T03:40:23.9617390Z running 14 tests
+2026-10-30T03:40:23.9711323Z test atomic_update_preserves_existing_stream_and_rejects_new ... ok
+2026-10-30T03:40:23.9746301Z test disabled_smart_routing_ignores_missing_rules_and_keeps_direct_route ... ok
+2026-10-30T03:40:23.9792736Z test failed_socks_auth_never_reaches_target_or_direct ... ok
+2026-10-30T03:40:23.9974351Z test automatic_udp_association_retains_choices_after_policy_replacement ... ok
+2026-10-30T03:40:24.0015966Z test manual_selector_updates_only_new_streams_and_rejects_non_members ... ok
+2026-10-30T03:40:24.0112620Z test resolving_cidr_pins_destination_and_rule_updates_preserve_stream ... ok
+2026-10-30T03:40:24.3050232Z test inbound_authentication_and_resource_limit ... ok
+2026-10-30T03:40:24.3088099Z test socks5_fragmented_ipv6_and_bad_command ... ok
+2026-10-30T03:40:24.3242316Z test tcp_large_transfer_halfclose_and_exact_counters ... ok
+2026-10-30T03:40:24.3283193Z test udp_associate_preserves_boundaries_and_rejects_fragments ... ok
+2026-10-30T03:40:24.3497908Z test configure_enables_and_disables_default_china_rules_on_live_core ... ok
+2026-10-30T03:40:24.4131567Z test udp_reject_dns_and_icmp_do_not_kill_association_or_change_snapshot ... ok
+2026-10-30T03:40:26.3021581Z test automatic_health_generation_manual_selection_and_stop_preserve_lifetimes ... ok
+2026-10-30T03:40:29.3821278Z test smart_routing_executes_direct_proxy_and_reject_with_real_loopback_sockets ... ok
+2026-10-30T03:40:29.3821708Z 
+2026-10-30T03:40:29.3821971Z test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.42s
+2026-10-30T03:40:29.3822346Z 
+2026-10-30T03:40:29.3863780Z      Running tests\socks5_udp.rs (target\debug\deps\socks5_udp-992fcaa8b0e9e94f.exe)
+2026-10-30T03:40:29.3989981Z 
+2026-10-30T03:40:29.3990266Z running 2 tests
+2026-10-30T03:40:29.5299123Z test association_reuses_control_keeps_old_route_and_closes_with_inbound ... ok
+2026-10-30T03:40:29.8301355Z test closed_proxy_never_reconnects_or_sends_direct_and_other_routes_survive ... ok
+2026-10-30T03:40:29.8301811Z 
+2026-10-30T03:40:29.8302109Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+2026-10-30T03:40:29.8302568Z 
+2026-10-30T03:40:29.8327880Z      Running tests\xray_import.rs (target\debug\deps\xray_import-b07e0c9ad66b096a.exe)
+2026-10-30T03:40:29.8453631Z 
+2026-10-30T03:40:29.8453872Z running 6 tests
+2026-10-30T03:40:29.8511503Z test legacy_vmess_and_unsupported_transport_never_produce_a_runtime_or_socket ... ok
+2026-10-30T03:40:29.8704598Z test xray_http_selected_account_survives_archive_and_halfclose_to_origin ... ok
+2026-10-30T03:40:29.8706385Z test xray_socks4a_case_alias_preserves_remote_name_and_userid_to_origin ... ok
+2026-10-30T03:40:29.8713900Z test xray_socks5_selected_server_and_account_halfclose_to_origin ... ok
+2026-10-30T03:40:29.8729854Z test xray_socks4_empty_account_survives_archive_and_halfclose_to_origin ... ok
+2026-10-30T03:40:29.8799112Z test xray_vless_selected_uuid_survives_archive_and_halfclose_to_origin ... ok
+2026-10-30T03:40:29.8799450Z 
+2026-10-30T03:40:29.8799914Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+2026-10-30T03:40:29.8801025Z 
+2026-10-30T03:40:29.8826228Z      Running unittests src\lib.rs (target\debug\deps\swirl_dns-6cc16caaff848fc2.exe)
+2026-10-30T03:40:29.8951755Z 
+2026-10-30T03:40:29.8951963Z running 27 tests
+2026-10-30T03:40:29.8970212Z test dot::doh::tests::strict_http_metadata_and_cache_hints ... ok
+2026-10-30T03:40:29.8972224Z test query_transport_tests::invalid_policy_dns_target_is_rejected_before_transport ... ok
+2026-10-30T03:40:29.8975119Z test dot::doh::tests::chunked_body_is_exact_and_bounded ... ok
+2026-10-30T03:40:29.8979108Z test query_transport_tests::policy_transport_does_not_accept_plaintext_only_configuration ... ok
+2026-10-30T03:40:29.8980147Z test tests::cached_ip_sets_share_hosts_and_attach_each_requested_port ... ok
+2026-10-30T03:40:29.8987888Z test tests::failure_cache_preserves_code_deadline_and_successful_answers ... ok
+2026-10-30T03:40:29.8996200Z test tests::host_maps_are_case_insensitive_and_generations_share_only_budget ... ok
+2026-10-30T03:40:29.8998792Z test query_transport_tests::encrypted_policy_transport_failure_never_tries_direct_endpoint_or_system_fallback ... ok
+2026-10-30T03:40:29.9003191Z test tests::hosts_file_aliases_comments_and_duplicate_priority ... ok
+2026-10-30T03:40:29.9007741Z test tests::failure_cache_is_bounded_and_excludes_local_and_invalid_response_errors ... ok
+2026-10-30T03:40:29.9011068Z test tests::ipv4_query_policy_preserves_literal_and_static_ipv6_without_os_fallback ... ok
+2026-10-30T03:40:29.9026959Z test tests::cancelled_upstream_query_does_not_create_failure_cache ... ok
+2026-10-30T03:40:29.9028189Z test tests::negative_cache_is_shared_across_ports_but_not_configurations ... ok
+2026-10-30T03:40:29.9029140Z test tun::tests::capacity_expiry_and_late_packets_do_not_alias_domains ... ok
+2026-10-30T03:40:29.9037082Z test tun::tests::failure_nxdomain_nodata_and_bad_queries_are_distinct ... ok
+2026-10-30T03:40:29.9047397Z test tun::tests::dual_stack_answers_preserve_question_and_recover_domain ... ok
+2026-10-30T03:40:29.9051729Z test wire::tests::cname_denials_belong_to_the_terminal_name_and_obey_alias_ttl ... ok
+2026-10-30T03:40:29.9057659Z test wire::tests::family_merge_never_confuses_nodata_name_error_or_transport_failure ... ok
+2026-10-30T03:40:29.9062956Z test wire::tests::ipv6_and_cname_only_responses_preserve_ttl ... ok
+2026-10-30T03:40:29.9064240Z test tests::ipv4_ipv6_and_system_localhost ... ok
+2026-10-30T03:40:29.9068432Z test wire::tests::rejects_alias_loops_compression_cycles_and_foreign_answers ... ok
+2026-10-30T03:40:29.9071482Z test wire::tests::soa_mailbox_local_part_is_a_dns_label_not_a_hostname ... ok
+2026-10-30T03:40:29.9074828Z test wire::tests::soa_rdata_names_must_fit_the_record_and_use_valid_compression ... ok
+2026-10-30T03:40:29.9079082Z test wire::tests::negative_responses_require_complete_matching_messages_and_applicable_soa ... ok
+2026-10-30T03:40:29.9079792Z test wire::tests::validates_identity_question_and_all_truncations ... ok
+2026-10-30T03:40:29.9531586Z test tun::tests::durable_sequence_survives_reopen_and_torn_append ... ok
+2026-10-30T03:40:29.9686468Z test tun::tests::journal_reopen_and_renewal_preserve_complete_record_prefix ... ok
+2026-10-30T03:40:29.9687196Z 
+2026-10-30T03:40:29.9687675Z test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+2026-10-30T03:40:29.9688339Z 
+2026-10-30T03:40:29.9709346Z      Running unittests src\lib.rs (target\debug\deps\swirl_platform-15d5a34b31a19fc5.exe)
+2026-10-30T03:40:29.9816923Z 
+2026-10-30T03:40:29.9817112Z running 44 tests
+2026-10-30T03:40:29.9836508Z test network_transaction::tests::disk_failure_during_apply_does_not_block_network_rollback ... ok
+2026-10-30T03:40:29.9838633Z test network_transaction::tests::dual_stack_apply_and_restore_retains_external_routes ... ok
+2026-10-30T03:40:29.9839817Z test network_transaction::tests::dns_guard_is_retained_when_capture_recovery_conflicts ... ok
+2026-10-30T03:40:29.9840939Z test network_transaction::tests::dns_guards_and_both_mtu_values_are_owned_and_restored ... ok
+2026-10-30T03:40:29.9845534Z test network_transaction::tests::installed_mtu_family_boundaries_apply_and_restore_exact_originals ... ok
+2026-10-30T03:40:29.9849911Z test network_transaction::tests::large_mtu_recovery_preserves_later_external_change_and_reports_conflict ... ok
+2026-10-30T03:40:29.9855748Z test network_transaction::tests::journal_roundtrip_rejects_unknown_fields_duplicate_keys_and_bad_identity ... ok
+2026-10-30T03:40:29.9857399Z test network_transaction::tests::no_network_write_without_a_durable_first_journal ... ok
+2026-10-30T03:40:29.9861379Z test network_transaction::tests::os_mtu_snapshots_below_family_minimum_remain_invalid ... ok
+2026-10-30T03:40:29.9865859Z test network_transaction::tests::oversized_installed_mtu_is_rejected_before_writes_and_in_loaded_journals ... ok
+2026-10-30T03:40:29.9869292Z test network_transaction::tests::partial_apply_failure_restores_large_mtu_without_clamping ... ok
+2026-10-30T03:40:29.9870706Z test network_transaction::tests::partial_os_failure_rolls_back_only_applied_resources ... ok
+2026-10-30T03:40:29.9874433Z test network_transaction::tests::pending_or_restored_changes_never_adopt_identical_external_values ... ok
+2026-10-30T03:40:29.9876255Z test network_transaction::tests::recovery_handles_crash_between_os_write_and_journal_marker ... ok
+2026-10-30T03:40:29.9879496Z test network_transaction::tests::refuses_to_adopt_existing_route ... ok
+2026-10-30T03:40:29.9881236Z test network_transaction::tests::recovery_preserves_later_vpn_dns_changes_and_reports_conflict ... ok
+2026-10-30T03:40:29.9883811Z test network_transaction::tests::snapshot_type_mismatch_identifies_the_returned_resource_and_value ... ok
+2026-10-30T03:40:29.9885164Z test network_transaction::tests::snapshot_validation_errors_identify_stage_resource_field_and_value ... ok
+2026-10-30T03:40:30.0153757Z test network_transaction::tests::journal_lock_survives_reopen_and_prevents_parallel_owner ... ok
+2026-10-30T03:40:30.0212737Z test windows_command::tests::failure_before_assignment_reaps_the_suspended_child ... ok
+2026-10-30T03:40:30.3021776Z test network_transaction::tests::large_os_mtu_snapshots_survive_disk_reopen_and_exact_dual_stack_restore ... ok
+2026-10-30T03:40:30.3025295Z test windows_network::tests::address_snapshot_preserves_raw_nullable_instance_id_without_defaults ... ok
+2026-10-30T03:40:30.3028545Z test windows_network::tests::configuration_normalization_preserves_raw_mtu_dns_priority_scope_and_duplicates ... ok
+2026-10-30T03:40:32.9716781Z test windows_command::tests::closing_last_job_handle_terminates_running_child_before_late_write ... ok
+2026-10-30T03:40:32.9722749Z test windows_network::tests::different_interface_guid_or_index_is_rejected_before_network_commands ... ok
+2026-10-30T03:40:33.0941983Z test windows_command::tests::command_is_suspended_before_assignment_and_runs_only_after_ownership ... ok
+2026-10-30T03:40:33.1109686Z test windows_network::tests::invalid_json_reports_raw_null_location_without_network_values ... ok
+2026-10-30T03:40:33.5354348Z test windows_command::tests::normal_exit_terminates_descendants_and_closes_inherited_stdout ... ok
+2026-10-30T03:40:36.6875542Z test windows_network::tests::missing_owned_resource_is_json_null_on_system_powershell ... ok
+2026-10-30T03:40:36.9924367Z test windows_network::tests::mtu_snapshot_reads_cim_nlmtu_instead_of_cmdlet_parameter_name ... ok
+2026-10-30T03:40:36.9929751Z test windows_network::tests::physical_egress_ignores_disconnected_hardware_default_routes ... ok
+2026-10-30T03:40:36.9934997Z test windows_network::tests::physical_egress_rejects_existing_vpn_capture ... ok
+2026-10-30T03:40:37.1723892Z test windows_network::tests::fixed_helper_scripts_parse_without_executing_network_commands ... ok
+2026-10-30T03:40:38.1701486Z test windows_network::tests::mtu_snapshot_rejects_missing_or_null_cim_property_without_inventing_zero ... ok
+2026-10-30T03:40:38.3655755Z test windows_network::tests::real_net_ip_interface_exposes_non_null_cim_nlmtu_read_only ... ok
+2026-10-30T03:40:38.3658264Z test windows_notify::tests::notifications_coalesce_and_ignore_owned_tun_changes ... ok
+2026-10-30T03:40:38.3698034Z test windows_notify::tests::registering_and_cancelling_does_not_modify_windows_network ... ok
+2026-10-30T03:40:38.3700467Z test windows_notify::tests::watcher_is_send_sync_without_custom_unsafe_impls ... ok
+2026-10-30T03:40:38.3703098Z test wintun_device::tests::device_can_cross_threads_without_custom_unsafe_impls ... ok
+2026-10-30T03:40:38.3706953Z test wintun_device::tests::rejects_arbitrary_library_before_loading_or_creating_adapter ... ok
+2026-10-30T03:40:38.3710406Z test wintun_device::tests::rejects_unbounded_ring_before_driver_access ... ok
+2026-10-30T03:40:38.5655607Z test windows_network::tests::configuration_snapshot_reads_system_state_without_network_writes ... ok
+2026-10-30T03:40:39.2655508Z test windows_network::tests::socket_interface_options_roundtrip_on_windows_loopback ... ok
+2026-10-30T03:40:40.2254676Z test windows_network::tests::unread_stdin_cannot_block_the_control_deadline ... ok
+2026-10-30T03:40:40.2255579Z 
+2026-10-30T03:40:40.2255843Z test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.24s
+2026-10-30T03:40:40.2256205Z 
+2026-10-30T03:40:40.2279334Z      Running unittests src\lib.rs (target\debug\deps\swirl_protocol-ed114346fda28f15.exe)
+2026-10-30T03:40:40.2403544Z 
+2026-10-30T03:40:40.2405067Z running 127 tests
+2026-10-30T03:40:40.2412010Z test diagnostics::tests::quic_authentication_is_distinct_from_dns_tcp_and_tls ... ok
+2026-10-30T03:40:40.2418744Z test connect_tests::public_connect_futures_have_bounded_inline_storage ... ok
+2026-10-30T03:40:40.2435684Z test dial::failure_tests::mixed_address_failures_are_ambiguous_regardless_of_completion_order ... ok
+2026-10-30T03:40:40.2437551Z test dial::failure_tests::uniform_os_failure_categories_reach_the_product_without_private_error_text ... ok
+2026-10-30T03:40:40.2442790Z test dial::tests::address_limit_is_checked_before_any_socket_attempt ... ok
+2026-10-30T03:40:40.2446241Z test dial::tests::a_single_address_retains_the_original_budget ... ok
+2026-10-30T03:40:40.2450781Z test dial::tests::caller_cancellation_drops_all_pending_dials ... ok
+2026-10-30T03:40:40.2453146Z test connect_tests::shadowsocks_obfs_does_not_wait_for_application_response_during_connect ... ok
+2026-10-30T03:40:40.2455527Z test connect_tests::shadowsocks_initial_write_reports_plain_and_obfs_failures_separately ... ok
+2026-10-30T03:40:40.2457471Z test dial::tests::diagnostic_classifies_os_failures_without_preserving_error_messages ... ok
+2026-10-30T03:40:40.2462662Z test dial::tests::diagnostic_counts_unique_families_and_records_cancelled_loser ... ok
+2026-10-30T03:40:40.2463964Z test dial::tests::diagnostic_dns_error_has_a_fixed_redacted_category ... ok
+2026-10-30T03:40:40.2465619Z test dial::tests::diagnostic_dns_cap_prevents_tcp_and_total_cap_can_be_shorter ... ok
+2026-10-30T03:40:40.2466766Z test dial::tests::diagnostic_dns_time_reduces_tcp_budget_and_counts_unattempted_addresses ... ok
+2026-10-30T03:40:40.2470008Z test dial::tests::diagnostic_invalid_budget_does_not_poll_dns_or_dial ... ok
+2026-10-30T03:40:40.2475840Z test dial::tests::diagnostic_slot_timeout_and_winner_cancellation_remain_distinct ... ok
+2026-10-30T03:40:40.2477098Z test dial::tests::external_cancellation_updates_trace_and_drops_all_connects ... ok
+2026-10-30T03:40:40.2479247Z test dial::tests::hanging_first_family_does_not_block_other_family_and_losers_drop ... ok
+2026-10-30T03:40:40.2486286Z test dial::tests::protocol_phases_use_the_same_deadline_without_renewing_it ... ok
+2026-10-30T03:40:40.2490481Z test dial::tests::refusal_and_expiration_are_distinct_and_no_new_dial_passes_deadline ... ok
+2026-10-30T03:40:40.2493422Z test dial::tests::refused_first_address_does_not_spend_a_short_budget_waiting_for_stagger ... ok
+2026-10-30T03:40:40.2502099Z test dial::tests::diagnostic_real_loopback_connect_closes_without_application_data ... ok
+2026-10-30T03:40:40.2506826Z test dial::tests::two_stalled_addresses_release_a_slot_for_the_third ... ok
+2026-10-30T03:40:40.2511039Z test http_single::tests::complete_http_frame_reaches_a_buffered_transport_before_waiting_for_reply ... ok
+2026-10-30T03:40:40.2718777Z test dial::tests::resolved_direct_expired_budget_prevents_socket_attempt ... ok
+2026-10-30T03:40:40.5335563Z test dial::tests::resolved_direct_uses_fallback_without_sending_application_bytes ... ok
+2026-10-30T03:40:40.5336631Z test dial::tests::real_tcp_refusal_falls_back_without_sending_application_bytes ... ok
+2026-10-30T03:40:40.5338046Z test hysteria2::authentication_tests::normal_request_stop_preserves_rejected_auth_response ... ok
+2026-10-30T03:40:40.5342087Z test hysteria2::rate::tests::rate_bound_counts_wire_bytes_and_does_not_accumulate_idle_credit ... ok
+2026-10-30T03:40:40.5350139Z test hysteria2::salamander::tests::blake2b_256_password_then_salt_known_vector ... ok
+2026-10-30T03:40:40.5356147Z test hysteria2::salamander::tests::salt_changes_ciphertext_and_gro_segments_keep_packet_boundaries ... ok
+2026-10-30T03:40:40.5362043Z test hysteria2::salamander::tests::short_packets_and_inconsistent_gro_lengths_are_rejected ... ok
+2026-10-30T03:40:40.5367918Z test hysteria2::tests::reassembly_memory_and_malformed_datagrams_are_bounded ... ok
+2026-10-30T03:40:40.5372509Z test hysteria2::tests::reordered_fragments_duplicates_conflicts_and_expiry ... ok
+2026-10-30T03:40:40.5378685Z test hysteria2::tests::response_parser_bounds_and_rejection ... ok
+2026-10-30T03:40:40.5383649Z test hysteria2::tests::varint_boundaries_match_quic_encoding ... ok
+2026-10-30T03:40:40.5401077Z test inbound_http_tests::http10_connect_accepts_authority_without_host_and_preserves_tunnel_bytes ... ok
+2026-10-30T03:40:40.5450302Z test inbound_http_tests::http10_connect_compatibility_does_not_accept_unknown_versions_or_forwarding ... ok
+2026-10-30T03:40:40.5470889Z test inbound_http_tests::http10_connect_preserves_ipv6_authority_and_proxy_authentication ... ok
+2026-10-30T03:40:40.5554545Z test inbound_http_tests::http10_connect_rejects_bodies_ambiguous_framing_and_invalid_authorities ... ok
+2026-10-30T03:40:40.5575257Z test probe::probe_tests::health_probe_preserves_get_request_and_header_timing ... ok
+2026-10-30T03:40:40.5807680Z test probe::probe_tests::url_test_head_authenticates_https_and_reports_origin_tls_phase ... ok
+2026-10-30T03:40:40.5821327Z test probe::probe_tests::url_test_head_optional_expected_status_is_exact ... ok
+2026-10-30T03:40:40.5996240Z test probe::probe_tests::url_test_head_rejects_untrusted_https_certificate_at_origin_tls ... ok
+2026-10-30T03:40:40.6177569Z test probe::probe_tests::url_test_head_rejects_wrong_certificate_name_without_sending_http ... ok
+2026-10-30T03:40:40.6192114Z test probe::probe_tests::url_test_head_reports_http_status_failure_without_latency ... ok
+2026-10-30T03:40:40.6204366Z test probe::probe_tests::url_test_head_reports_truncated_headers_as_response_failure ... ok
+2026-10-30T03:40:40.6217454Z test probe::probe_tests::url_test_head_returns_before_peer_body_or_close ... ok
+2026-10-30T03:40:40.6981906Z test hysteria2::authentication_tests::session_rejects_404_after_peer_stops_request_normally ... ok
+2026-10-30T03:40:40.6989674Z test probe::tests::fragmented_interim_responses_require_a_complete_final_status ... ok
+2026-10-30T03:40:40.6993643Z test probe::tests::header_completion_does_not_wait_for_a_response_body ... ok
+2026-10-30T03:40:40.7003200Z test probe::tests::interim_headers_share_one_total_byte_and_count_budget ... ok
+2026-10-30T03:40:40.7006862Z test probe::tests::malformed_truncated_redirect_and_upgrade_responses_are_unhealthy ... ok
+2026-10-30T03:40:40.7014699Z test shadowsocks::tests::coalesced_http_header_and_ciphertext_are_buffered_without_loss ... ok
+2026-10-30T03:40:40.7017522Z test shadowsocks::tests::nonce_overflow_fails_closed ... ok
+2026-10-30T03:40:40.7020131Z test shadowsocks::tests::replay_is_key_scoped ... ok
+2026-10-30T03:40:40.7027872Z test socks5::tests::authentication_is_shared_strict_and_does_not_downgrade ... ok
+2026-10-30T03:40:40.7036926Z test socks5::tests::datagram_boundaries_addresses_and_fragments ... ok
+2026-10-30T03:40:40.7750630Z test probe::probe_tests::url_test_tls_timeout_keeps_partial_outbound_timing ... ok
+2026-10-30T03:40:40.7812348Z test socks5::tests::malformed_associate_replies_are_rejected ... ok
+2026-10-30T03:40:40.8664296Z test hysteria2::authentication_tests::normal_request_stop_preserves_successful_auth_response ... ok
+2026-10-30T03:40:40.8667201Z test ss2022::tests::clocks_are_bounded_in_both_directions ... ok
+2026-10-30T03:40:40.8675511Z test ss2022::tests::nonces_packet_ids_and_datagram_sizes_never_wrap_or_grow_unbounded ... ok
+2026-10-30T03:40:40.8678159Z test ss2022::tests::replay_window_handles_out_of_order_wrap_boundaries_and_large_jumps ... ok
+2026-10-30T03:40:40.8686087Z test ss2022::tests::tcp_accepts_full_65535_byte_payload_and_record_boundary_fin ... ok
+2026-10-30T03:40:40.8690520Z test ss2022::tests::tcp_partial_initial_header_and_payload_truncation_are_sticky_errors ... ok
+2026-10-30T03:40:40.8696061Z test ss2022::tests::tcp_partial_record_timeout_is_bounded_but_idle_read_is_preserved ... ok
+2026-10-30T03:40:40.8700457Z test ss2022::tests::tcp_response_binding_type_timestamp_and_aead_are_required_before_delivery ... ok
+2026-10-30T03:40:40.8704561Z test ss2022::tests::udp_authentication_errors_do_not_poison_valid_packet_ids ... ok
+2026-10-30T03:40:40.8707995Z test ss2022::tests::udp_server_restarts_retain_two_sessions_without_unbounded_growth ... ok
+2026-10-30T03:40:40.8711971Z test ss2022::tests::udp_wrong_clock_binding_direction_address_and_reflection_are_rejected ... ok
+2026-10-30T03:40:40.8718455Z test stream_udp::tests::address_families_empty_and_bounded_payloads ... ok
+2026-10-30T03:40:40.8837256Z test stream_udp::tests::cancelling_a_partial_receive_preserves_its_framing ... ok
+2026-10-30T03:40:40.8977045Z test stream_udp::tests::cancelling_a_partial_write_prevents_further_packets ... ok
+2026-10-30T03:40:40.8980231Z test socks5::tests::disabled_tls_and_handshake_timeout_fail_closed ... ok
+2026-10-30T03:40:40.8983746Z test stream_udp::tests::complete_and_partial_frames_preserve_datagram_boundaries ... ok
+2026-10-30T03:40:40.8984761Z test stream_udp::tests::different_targets_cannot_reuse_a_vless_carrier ... ok
+2026-10-30T03:40:40.8986908Z test stream_udp::tests::malformed_address_and_separator_are_rejected ... ok
+2026-10-30T03:40:40.8989610Z test timing::tests::cancelled_phase_retains_elapsed_without_a_success_claim ... ok
+2026-10-30T03:40:40.8994803Z test timing::tests::scopes_are_isolated_and_spawned_drivers_do_not_inherit_them ... ok
+2026-10-30T03:40:40.8997795Z test timing::tests::tcp_attempt_count_and_winner_do_not_include_the_resolution_delay ... ok
+2026-10-30T03:40:40.9001504Z test transport::tests::raw_alias_and_unsupported_options_fail_closed ... ok
+2026-10-30T03:40:40.9004662Z test tuic::tests::address_types_are_tuic_not_socks ... ok
+2026-10-30T03:40:40.9007085Z test transport::tests::reality_prior_knowledge_does_not_accept_incompatible_alpn ... ok
+2026-10-30T03:40:40.9015208Z test tuic::tests::incomplete_reassembly_is_bounded ... ok
+2026-10-30T03:40:40.9018178Z test tuic::tests::malformed_and_truncated_packets_are_rejected ... ok
+2026-10-30T03:40:40.9023119Z test tuic::tests::fragmentation_reorders_without_leaking_protocol_bytes ... ok
+2026-10-30T03:40:40.9025691Z test vision::stream::direct_tests::abort_pending_direct_flush_drops_the_only_owner ... ok
+2026-10-30T03:40:40.9030056Z test vision::stream::direct_tests::direct_request_at_partial_inner_record_refuses_and_releases_both_directions ... ok
+2026-10-30T03:40:40.9042123Z test vision::stream::direct_tests::direct_read_keeps_terminal_tail_engine_residual_and_raw_bytes_in_order ... ok
+2026-10-30T03:40:40.9054728Z test vision::stream::direct_tests::first_peer_frame_can_establish_read_eligibility_and_direct_boundary ... ok
+2026-10-30T03:40:40.9291808Z test vision::stream::direct_tests::no_direct_transition_until_terminal_padding_is_complete ... ok
+2026-10-30T03:40:40.9297868Z test vision::stream::direct_tests::write_half_close_does_not_drop_later_direct_downlink ... ok
+2026-10-30T03:40:40.9301415Z test vless::tests::canonical_uuid_and_domain_wire_layout ... ok
+2026-10-30T03:40:40.9304648Z test vision::stream::direct_tests::direct_write_flush_is_cancellation_safe_and_never_replays_or_interleaves ... ok
+2026-10-30T03:40:40.9307224Z test vless::tests::unsupported_request_flow_is_a_static_error_instead_of_empty_addons ... ok
+2026-10-30T03:40:40.9311604Z test vless::tests::vision_and_unchanged_empty_addons_complete_request_layouts ... ok
+2026-10-30T03:40:40.9325055Z test vmess::tests::altered_data_or_terminal_tags_cannot_be_accepted_as_payload_or_eof ... ok
+2026-10-30T03:40:40.9332294Z test vmess::tests::altered_response_header_fails_and_failure_is_sticky ... ok
+2026-10-30T03:40:40.9335214Z test vmess::tests::body_nonce_exhaustion_never_reuses_a_nonce ... ok
+2026-10-30T03:40:40.9353323Z test vmess::tests::body_prefix_and_ciphertext_drips_have_a_fixed_authentication_deadline ... ok
+2026-10-30T03:40:40.9356062Z test vmess::tests::checksum_known_answers ... ok
+2026-10-30T03:40:40.9358790Z test vmess::tests::hmac_primitive_matches_rfc4231_case_one ... ok
+2026-10-30T03:40:40.9372324Z test vmess::tests::logical_half_close_retains_download_and_authenticates_terminal_record ... ok
+2026-10-30T03:40:40.9927422Z test vmess::tests::partial_response_times_out_but_idle_application_does_not ... ok
+2026-10-30T03:40:40.9929953Z test vless::tests::partial_response_header_has_deadline_without_timing_out_idle_application ... ok
+2026-10-30T03:40:40.9942450Z test vmess::tests::response_header_length_is_bounded_before_allocation ... ok
+2026-10-30T03:40:40.9946328Z test vmess::tests::unsupported_security_and_legacy_authentication_are_not_downgraded ... ok
+2026-10-30T03:40:40.9949744Z test websocket::tests::close_codes_and_utf8_are_validated ... ok
+2026-10-30T03:40:40.9950616Z test vmess::tests::truncated_body_and_unauthenticated_eof_are_rejected ... ok
+2026-10-30T03:40:40.9955274Z test websocket::tests::closed_control_receiver_fails_without_waiting_or_releasing_payload ... ok
+2026-10-30T03:40:40.9959158Z test websocket::tests::custom_headers_cannot_replace_handshake_or_inject_requests ... ok
+2026-10-30T03:40:40.9960909Z test websocket::tests::coalesced_ping_burst_backpressures_the_bounded_control_queue ... ok
+2026-10-30T03:40:40.9964909Z test websocket::tests::early_data_is_rejected_before_any_handshake_bytes ... ok
+2026-10-30T03:40:40.9977271Z test websocket::tests::custom_path_ipv6_authority_headers_and_coalesced_binary_payload ... ok
+2026-10-30T03:40:40.9981430Z test websocket::tests::handshake_token_and_unsolicited_extensions ... ok
+2026-10-30T03:40:40.9996895Z test websocket::tests::idle_has_no_deadline_and_drop_cancels_blocked_drivers ... ok
+2026-10-30T03:40:41.0001712Z test websocket::tests::invalid_server_frame_headers_fail_before_releasing_data ... ok
+2026-10-30T03:40:41.0014866Z test websocket::tests::local_eof_flushes_queued_data_and_answers_ping_until_peer_close ... ok
+2026-10-30T03:40:41.0026434Z test websocket::tests::local_shutdown_bounds_a_previously_backpressured_data_frame ... ok
+2026-10-30T03:40:41.0036694Z test websocket::tests::one_close_deadline_covers_write_flush_peer_reply_and_shutdown ... ok
+2026-10-30T03:40:41.0045274Z test websocket::tests::peer_close_behind_a_full_control_queue_has_a_deadline ... ok
+2026-10-30T03:40:41.0054783Z test websocket::tests::silent_peer_and_repeated_shutdown_cannot_extend_the_close_budget ... ok
+2026-10-30T03:40:41.0063911Z test websocket::tests::transport_eof_without_peer_close_is_never_reported_as_success ... ok
+2026-10-30T03:40:41.0314448Z test hysteria2::authentication_tests::abnormal_request_stop_remains_authentication_write_failure ... ok
+2026-10-30T03:40:41.0853119Z test websocket::tests::full_duplex_fragmented_transfer_and_ping_survive_backpressure ... ok
+2026-10-30T03:40:41.1200568Z test socks5::tests::relay_uses_bound_address_configured_dns_and_control_lifetime ... ok
+2026-10-30T03:40:41.1201318Z 
+2026-10-30T03:40:41.1201826Z test result: ok. 127 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s
+2026-10-30T03:40:41.1202623Z 
+2026-10-30T03:40:41.1239595Z      Running tests\quic_preflight.rs (target\debug\deps\quic_preflight-8e552d44152bf8f0.exe)
+2026-10-30T03:40:41.1363501Z 
+2026-10-30T03:40:41.1363720Z running 1 test
+2026-10-30T03:40:41.1914666Z test invalid_quic_trust_anchor_is_rejected_before_tcp_or_udp_dns ... ok
+2026-10-30T03:40:41.1915333Z 
+2026-10-30T03:40:41.1915863Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+2026-10-30T03:40:41.1916322Z 
+2026-10-30T03:40:41.1941232Z      Running tests\socks5_egress.rs (target\debug\deps\socks5_egress-ab6b818ff7feaf6f.exe)
+2026-10-30T03:40:41.2087388Z 
+2026-10-30T03:40:41.2087736Z running 2 tests
+2026-10-30T03:40:41.2153062Z test socks5_udp_keeps_empty_and_full_ipv4_ipv6_datagrams ... ok
+2026-10-30T03:40:41.2193207Z test suspended_socks5_keeps_loopback_but_rejects_advertised_external_relays ... ok
+2026-10-30T03:40:41.2193911Z 
+2026-10-30T03:40:41.2194160Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-10-30T03:40:41.2194513Z 
+2026-10-30T03:40:41.2210542Z      Running tests\ss2022_egress.rs (target\debug\deps\ss2022_egress-08bc7f045b3bd2ca.exe)
+2026-10-30T03:40:41.2329381Z 
+2026-10-30T03:40:41.2329605Z running 2 tests
+2026-10-30T03:40:41.2393280Z test suspended_ss2022_rejects_external_peers_and_keeps_explicit_loopback ... ok
+2026-10-30T03:40:41.2421139Z test ss2022_udp_keeps_authenticated_empty_and_full_ipv4_ipv6_datagrams ... ok
+2026-10-30T03:40:41.2421647Z 
+2026-10-30T03:40:41.2421928Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-10-30T03:40:41.2422275Z 
+2026-10-30T03:40:41.2438478Z      Running tests\tuic_egress.rs (target\debug\deps\tuic_egress-fd322b09e048a705.exe)
+2026-10-30T03:40:41.2554694Z 
+2026-10-30T03:40:41.2554972Z running 3 tests
+2026-10-30T03:40:41.2954135Z test network_change_during_real_quic_handshake_rejects_completed_client ... ok
+2026-10-30T03:40:41.3435245Z test live_tcp_requests_reuse_one_authenticated_quic_connection ... ok
+2026-10-30T03:40:41.3890497Z test suspended_and_released_epochs_cannot_reuse_a_live_old_client ... ok
+2026-10-30T03:40:41.3890848Z 
+2026-10-30T03:40:41.3891096Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+2026-10-30T03:40:41.3891429Z 
+2026-10-30T03:40:41.3917766Z      Running tests\vision.rs (target\debug\deps\vision-1f30f2a3b34bcd3f.exe)
+2026-10-30T03:40:41.4019355Z 
+2026-10-30T03:40:41.4019551Z running 21 tests
+2026-10-30T03:40:41.4027070Z test advertised_maximum_lengths_do_not_require_the_body_to_be_buffered ... ok
+2026-10-30T03:40:41.4029297Z test direct_is_only_an_event_after_all_content_and_padding ... ok
+2026-10-30T03:40:41.4031477Z test content_and_padding_eof_are_distinguished_at_every_partial_offset ... ok
+2026-10-30T03:40:41.4034079Z test directions_keep_independent_uuid_and_terminal_state ... ok
+2026-10-30T03:40:41.4035479Z test empty_and_complete_frame_eof_are_legal_and_idempotent ... ok
+2026-10-30T03:40:41.4038879Z test empty_decode_is_not_an_eof_signal ... ok
+2026-10-30T03:40:41.4039804Z test encoder_enforces_both_wire_limits_before_changing_first_frame_state ... ok
+2026-10-30T03:40:41.4045000Z test encoders_reject_frames_after_either_terminal_command ... ok
+2026-10-30T03:40:41.4045797Z test encoder_matches_ten_independent_python_wire_vectors ... ok
+2026-10-30T03:40:41.4048967Z test every_unknown_command_is_rejected_without_returning_payload ... ok
+2026-10-30T03:40:41.4052500Z test later_partial_headers_are_not_mistaken_for_clean_eof ... ok
+2026-10-30T03:40:41.4053339Z test first_uuid_is_mandatory_and_all_mismatch_positions_poison_decoder ... ok
+2026-10-30T03:40:41.4057415Z test payload_header_lookalikes_are_never_reinterpreted_as_framing ... ok
+2026-10-30T03:40:41.4058758Z test decoder_accepts_independent_vectors_at_every_split_and_bytewise ... ok
+2026-10-30T03:40:41.4059847Z test padding_only_frames_make_bounded_progress_without_payload_or_extra_events ... ok
+2026-10-30T03:40:41.4062340Z test request_addons_match_independent_protobuf_vectors ... ok
+2026-10-30T03:40:41.4064282Z test maximum_content_and_padding_are_accepted_without_decoder_buffering ... ok
+2026-10-30T03:40:41.4066043Z test terminal_boundary_does_not_consume_or_forward_pending_transport_bytes ... ok
+2026-10-30T03:40:41.4067259Z test several_frames_in_one_read_keep_boundaries_and_payload_order ... ok
+2026-10-30T03:40:41.4068057Z test unknown_flows_cannot_silently_become_empty_addons ... ok
+2026-10-30T03:40:41.4068861Z test uuid_and_header_eof_are_distinguished_at_every_partial_offset ... ok
+2026-10-30T03:40:41.4069418Z 
+2026-10-30T03:40:41.4069864Z test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-30T03:40:41.4070481Z 
+2026-10-30T03:40:41.4086128Z      Running tests\vision_record.rs (target\debug\deps\vision_record-f3ae989b61ea5499.exe)
+2026-10-30T03:40:41.4197239Z 
+2026-10-30T03:40:41.4197424Z running 5 tests
+2026-10-30T03:40:41.4219112Z test partial_header_survives_cancelled_read_and_write_half_close ... ok
+2026-10-30T03:40:41.4649553Z test oversized_record_is_rejected_without_reading_its_body ... ok
+2026-10-30T03:40:41.4650394Z test tampered_outer_direct_record_remains_an_authentication_failure ... ok
+2026-10-30T03:40:41.5198348Z test real_tls_close_notify_is_required_even_at_record_boundaries ... ok
+2026-10-30T03:40:41.5396585Z test both_boundaries_deliver_authenticated_direct_request_before_coalesced_raw_tls ... ok
+2026-10-30T03:40:41.5397062Z 
+2026-10-30T03:40:41.5397353Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+2026-10-30T03:40:41.5397706Z 
+2026-10-30T03:40:41.5422545Z      Running tests\vision_stream.rs (target\debug\deps\vision_stream-6bf77e32c88c417b.exe)
+2026-10-30T03:40:41.5536456Z 
+2026-10-30T03:40:41.5536678Z running 16 tests
+2026-10-30T03:40:41.5875884Z test abort_releases_partial_inner_tls_hello_and_pending_frame_memory ... ok
+2026-10-30T03:40:41.5881395Z test client_component_uses_real_vless_flow_request_and_lazy_response_prefix ... ok
+2026-10-30T03:40:41.5885475Z test direct_command_drops_owned_stream_and_never_releases_terminal_tail ... ok
+2026-10-30T03:40:41.5891605Z test eof_in_every_partial_frame_position_remains_an_error ... ok
+2026-10-30T03:40:41.5896098Z test incomplete_direct_frame_is_rejected_before_releasing_terminal_content ... ok
+2026-10-30T03:40:41.5899991Z test invalid_uuid_or_command_is_fatal_in_both_directions ... ok
+2026-10-30T03:40:41.5904711Z test invalid_vless_response_cannot_be_reinterpreted_as_vision_payload ... ok
+2026-10-30T03:40:41.5908840Z test cancelling_flush_keeps_the_exact_partial_wire_offset ... ok
+2026-10-30T03:40:41.5912748Z test outer_tls_truncation_is_not_converted_to_clean_framing_eof ... ok
+2026-10-30T03:40:41.5953406Z test abort_releases_paused_transport_and_cannot_resume ... ok
+2026-10-30T03:40:41.6190708Z test cancelling_read_keeps_partial_uuid_and_padding_state ... ok
+2026-10-30T03:40:41.6198658Z test upload_half_close_keeps_downlink_alive_and_cannot_be_reopened ... ok
+2026-10-30T03:40:41.6202878Z test write_zero_drops_owner_instead_of_reencoding_or_spinning ... ok
+2026-10-30T03:40:41.6902182Z test paused_reader_limits_writer_to_one_owned_frame_and_resumes_without_replay ... ok
+2026-10-30T03:40:41.7550168Z test terminal_frame_tail_and_many_padding_frames_keep_exact_order ... ok
+2026-10-30T03:40:42.4040416Z test large_bidirectional_transfer_survives_partial_writes_and_backpressure ... ok
+2026-10-30T03:40:42.4040810Z 
+2026-10-30T03:40:42.4041379Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.85s
+2026-10-30T03:40:42.4041761Z 
+2026-10-30T03:40:42.4060928Z      Running tests\vision_tls.rs (target\debug\deps\vision_tls-b71f2ce40e5812ec.exe)
+2026-10-30T03:40:42.4163650Z 
+2026-10-30T03:40:42.4163853Z running 26 tests
+2026-10-30T03:40:42.4174981Z test encrypted_record_is_complete_only_after_its_last_byte ... ok
+2026-10-30T03:40:42.4176279Z test duplicate_extensions_and_trailing_or_short_lengths_fail_closed ... ok
+2026-10-30T03:40:42.4180037Z test hello_retry_request_never_becomes_a_final_server_hello ... ok
+2026-10-30T03:40:42.4184598Z test advertised_limits_reject_without_allocating_untrusted_body ... ok
+2026-10-30T03:40:42.4185743Z test random_and_unknown_extension_patterns_cannot_claim_tls13 ... ok
+2026-10-30T03:40:42.4210224Z test randomized_bidirectional_slices_preserve_hello_and_record_state ... ok
+2026-10-30T03:40:42.4215645Z test incomplete_hellos_never_become_candidates ... ok
+2026-10-30T03:40:42.4222632Z test retry_ccs_rejects_bad_values_and_interleaved_hello_fragments ... ok
+2026-10-30T03:40:42.4229224Z test retry_cookie_only_keeps_the_original_key_share ... ok
+2026-10-30T03:40:42.4237404Z test retry_never_changes_the_original_sni_session_or_selected_cipher ... ok
+2026-10-30T03:40:42.4243533Z test retry_never_grants_direct_eligibility_for_uninspected_psk_updates ... ok
+2026-10-30T03:40:42.4249307Z test retry_preserves_partial_ccs_header_after_the_first_server_flight ... ok
+2026-10-30T03:40:42.4254804Z test retry_rejects_a_server_psk_without_a_client_psk ... ok
+2026-10-30T03:40:42.4260180Z test retry_rejects_an_already_sent_share_and_repeated_retry_before_clienthello2 ... ok
+2026-10-30T03:40:42.4266713Z test retry_rejects_repeated_retry_and_changed_client_random ... ok
+2026-10-30T03:40:42.4275092Z test retry_rejects_unrequested_share_and_missing_or_changed_cookie ... ok
+2026-10-30T03:40:42.4281549Z test retry_requires_early_data_to_be_removed_from_clienthello2 ... ok
+2026-10-30T03:40:42.4371823Z test retry_cannot_share_a_record_with_the_final_serverhello_at_any_read_split ... ok
+2026-10-30T03:40:42.4376891Z test session_id_echo_and_tls13_legacy_fields_are_checked ... ok
+2026-10-30T03:40:42.4383835Z test supported_suites_require_exact_client_offer_and_reject_short_tag_cipher ... ok
+2026-10-30T03:40:42.4389126Z test tls12_and_missing_client_tls13_offer_are_not_candidates ... ok
+2026-10-30T03:40:42.4394502Z test valid_retry_requires_both_complete_second_flight_hellos ... ok
+2026-10-30T03:40:42.4398343Z test wrong_message_type_and_mid_hello_non_handshake_record_are_rejected ... ok
+2026-10-30T03:40:42.4430232Z test repeated_retry_is_rejected_at_every_read_split_and_record_boundary ... ok
+2026-10-30T03:40:42.4503571Z test retry_second_flight_and_ccs_are_independent_of_every_read_split ... ok
+2026-10-30T03:40:42.4750400Z test both_hellos_work_at_every_network_split_and_one_byte_records ... ok
+2026-10-30T03:40:42.4750832Z 
+2026-10-30T03:40:42.4751104Z test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+2026-10-30T03:40:42.4751462Z 
+2026-10-30T03:40:42.4768369Z      Running unittests src\lib.rs (target\debug\deps\swirl_transport-346436759ebecb2c.exe)
+2026-10-30T03:40:42.4889399Z 
+2026-10-30T03:40:42.4889587Z running 123 tests
+2026-10-30T03:40:42.4896246Z test egress::tests::loopback_keeps_local_access_but_never_an_old_pool_epoch ... ok
+2026-10-30T03:40:42.4898381Z test egress::tests::families_are_atomic_and_missing_family_fails_closed ... ok
+2026-10-30T03:40:42.4899780Z test egress::tests::orphan_recovery_does_not_resurrect_any_previous_pool_epoch ... ok
+2026-10-30T03:40:42.4900846Z test egress::tests::pooled_tokens_expire_on_suspend_and_same_interface_rebuild ... ok
+2026-10-30T03:40:42.4907471Z test grpc::tests::known_wire_bytes_singular_last_value_multi_concatenation_and_unknown_fields ... ok
+2026-10-30T03:40:42.4917336Z test grpc::tests::oversized_compressed_truncated_envelopes_fail ... ok
+2026-10-30T03:40:42.4924899Z test grpc::tests::paths_follow_xray_normal_and_custom_service_semantics ... ok
+2026-10-30T03:40:42.4931863Z test grpc::tests::protocol_is_bidirectional_post_and_headers_cannot_replace_framing ... ok
+2026-10-30T03:40:42.4933544Z test egress::tests::ordinary_tcp_still_transfers_with_half_close ... ok
+2026-10-30T03:40:42.4942482Z test grpc::tests::write_then_read_without_flush_delivers_pending_frame ... ok
+2026-10-30T03:40:42.4958786Z test h2_stream::tests::cancelling_one_stream_resets_it_without_poisoning_session ... ok
+2026-10-30T03:40:42.4960494Z test grpc::tests::early_response_preserves_reverse_bytes_with_a_blocked_upload ... ok
+2026-10-30T03:40:42.4970534Z test h2_stream::tests::goaway_rejects_new_stream_without_replaying_bytes ... ok
+2026-10-30T03:40:42.4974866Z test h2_stream::tests::early_response_no_error_reset_does_not_hide_grpc_status ... ok
+2026-10-30T03:40:42.4985378Z test h2_stream::tests::grpc_nonzero_terminal_trailer_is_not_successful_eof ... ok
+2026-10-30T03:40:42.4989757Z test h2_stream::tests::initial_grpc_status_does_not_mask_missing_terminal_trailers ... ok
+2026-10-30T03:40:42.5012601Z test h2_stream::tests::non_success_http_grpc_status_and_rst_are_errors ... ok
+2026-10-30T03:40:42.5115788Z test h2_stream::tests::one_connection_serves_concurrent_independent_streams ... ok
+2026-10-30T03:40:42.5119113Z test h2_stream::tests::reserved_and_injected_headers_are_rejected ... ok
+2026-10-30T03:40:42.5129618Z test h2_stream::tests::response_can_wait_for_first_request_bytes ... ok
+2026-10-30T03:40:42.5463481Z test h2_stream::tests::response_deadline_cancels_an_unresponsive_peer ... ok
+2026-10-30T03:40:42.5475440Z test h2_stream::tests::response_first_then_shutdown_drop_delivers_request_end_stream ... ok
+2026-10-30T03:40:42.6834303Z test grpc::tests::arbitrary_envelope_fragmentation_preserves_binary_stream ... ok
+2026-10-30T03:40:42.6838462Z test http2::tests::legacy_method_host_and_decoded_path_match_upstream ... ok
+2026-10-30T03:40:42.6841216Z test http2::tests::path_and_host_cannot_inject_http_fields ... ok
+2026-10-30T03:40:42.7281448Z test httpupgrade::tests::preserves_upgrade_tail_and_raw_bidirectional_half_close ... ok
+2026-10-30T03:40:42.7284518Z test httpupgrade::tests::rejects_wrong_status_protocol_and_framing ... ok
+2026-10-30T03:40:42.7311130Z test httpupgrade::tests::response_size_is_bounded ... ok
+2026-10-30T03:40:42.7527453Z test httpupgrade::tests::stalled_server_times_out_and_owned_stream_closes ... ok
+2026-10-30T03:40:42.7535537Z test httpupgrade::tests::validates_headers_and_literal_path ... ok
+2026-10-30T03:40:42.7819918Z test quic::shutdown_tests::peer_stop_is_not_reported_as_a_clean_shutdown ... ok
+2026-10-30T03:40:42.8227240Z test quic::shutdown_tests::shutdown_after_complete_response_and_zero_stop_remains_an_error ... ok
+2026-10-30T03:40:42.8259515Z test h2_stream::tests::multi_megabyte_duplex_and_half_close_obey_flow_control ... ok
+2026-10-30T03:40:42.8481601Z test quic::shutdown_tests::shutdown_before_response_completion_and_zero_stop_remains_an_error ... ok
+2026-10-30T03:40:42.8484662Z test quic::tests::invalid_parameters_fail_before_socket_creation ... ok
+2026-10-30T03:40:42.8487498Z test quic::tests::pins_are_exactly_sha256_hex ... ok
+2026-10-30T03:40:42.8579007Z test reality::backend::tests::actual_clienthello_has_bound_authentication_and_only_native_tls13_profile ... ok
+2026-10-30T03:40:42.8625507Z test quic::shutdown_tests::shutdown_waits_for_fin_ack_and_preserves_the_response_half ... ok
+2026-10-30T03:40:42.8704838Z test reality::backend::tests::alpn_limits_preserve_raw_values_order_and_exact_boundaries ... ok
+2026-10-30T03:40:42.9319960Z test reality::backend::tests::chrome_authentication_uses_standalone_key_and_binds_every_hello_byte ... ok
+2026-10-30T03:40:43.0262756Z test reality::backend::tests::chrome_certificate_authentication_and_certificate_verify_stay_strict ... ok
+2026-10-30T03:40:43.0514751Z test reality::backend::tests::chrome_both_owned_key_branches_complete_real_tls_data_and_close ... ok
+2026-10-30T03:40:43.0615554Z test reality::backend::tests::chrome_profile_rejects_unsupported_names_and_alpn_without_constructing_a_connection ... ok
+2026-10-30T03:40:43.0697195Z test reality::backend::tests::encrypted_flight_tampering_fails_before_application_plaintext ... ok
+2026-10-30T03:40:43.0756431Z test reality::backend::tests::chrome_finished_and_unimplemented_alps_fail_with_valid_record_authentication ... ok
+2026-10-30T03:40:43.0758093Z test reality::backend::tests::failed_constructor_and_unwind_drop_untransferred_material ... ok
+2026-10-30T03:40:43.0839191Z test reality::backend::tests::first_flight_rejects_partial_records_extra_records_and_unknown_framing ... ok
+2026-10-30T03:40:43.0875486Z test reality::backend::tests::modifying_only_queued_network_bytes_cannot_match_the_tls_transcript ... ok
+2026-10-30T03:40:43.0924931Z test reality::backend::tests::preview_has_no_completion_or_server_authentication_capability ... ok
+2026-10-30T03:40:43.0927584Z test reality::backend::tests::reentry_and_key_start_order_are_bounded_without_owner_aliases ... ok
+2026-10-30T03:40:43.0930223Z test reality::backend::tests::scoped_rng_refuses_wrong_shape_extra_calls_and_outside_calls ... ok
+2026-10-30T03:40:43.1187272Z test reality::backend::tests::native_three_suite_profile_authenticates_cv_finished_data_and_close ... ok
+2026-10-30T03:40:43.1189886Z test reality::backend::tests::simultaneous_connections_get_distinct_randoms_sessions_and_keys ... ok
+2026-10-30T03:40:43.1275586Z test reality::backend::tests::valid_der_and_possession_do_not_replace_certificate_authentication ... ok
+2026-10-30T03:40:43.1285159Z test reality::backend::tests::valid_certificate_mac_does_not_replace_real_certificateverify_transcript ... ok
+2026-10-30T03:40:43.1289603Z test reality::certificate::tests::all_three_ed25519_algorithm_identifiers_require_absent_parameters ... ok
+2026-10-30T03:40:43.1297321Z test reality::certificate::tests::bit_strings_require_exact_key_and_mac_lengths_and_no_unused_bits ... ok
+2026-10-30T03:40:43.1299927Z test reality::certificate::tests::certificate_chain_and_ocsp_are_explicitly_rejected ... ok
+2026-10-30T03:40:43.1308558Z test reality::certificate::tests::certificate_mac_and_public_key_tampering_are_rejected ... ok
+2026-10-30T03:40:43.1311592Z test reality::certificate::tests::certificate_verify_never_accepts_an_unauthenticated_key ... ok
+2026-10-30T03:40:43.1321524Z test reality::certificate::tests::debug_redacts_authentication_key ... ok
+2026-10-30T03:40:43.1335373Z test reality::certificate::tests::every_truncated_certificate_and_trailing_data_are_rejected ... ok
+2026-10-30T03:40:43.1345300Z test reality::certificate::tests::independent_certificate_hmac_and_upstream_minimal_profile_are_accepted ... ok
+2026-10-30T03:40:43.1370924Z test reality::certificate::tests::independent_sha256_and_sha384_certificate_verify_transcripts_are_accepted ... ok
+2026-10-30T03:40:43.1381688Z test reality::certificate::tests::malformed_year_one_placeholder_is_not_accepted_as_arbitrary_time ... ok
+2026-10-30T03:40:43.1392666Z test reality::certificate::tests::nested_trailing_fields_and_nonminimal_lengths_are_rejected ... ok
+2026-10-30T03:40:43.1403382Z test reality::certificate::tests::ordinary_valid_certificate_and_unsupported_mldsa_have_no_fallback ... ok
+2026-10-30T03:40:43.1407947Z test reality::certificate::tests::certificate_verify_rejects_modified_transcript_context_and_signature ... ok
+2026-10-30T03:40:43.1666523Z test reality::certificate::tests::rustls_rejects_tampered_encrypted_server_flight_before_plaintext ... ok
+2026-10-30T03:40:43.1675375Z test reality::certificate::tests::rustls_rejects_wrong_reality_authentication_before_plaintext ... ok
+2026-10-30T03:40:43.1684748Z test reality::certificate::tests::tls12_and_other_certificate_verify_algorithms_are_rejected ... ok
+2026-10-30T03:40:43.1694579Z test reality::certificate::tests::wrong_authentication_key_is_rejected ... ok
+2026-10-30T03:40:43.1750179Z test reality::client::tests::a_blocked_partial_record_is_resumable_without_reauthentication ... ok
+2026-10-30T03:40:43.1800530Z test reality::client::tests::debug_output_contains_no_keys_session_or_server_identity ... ok
+2026-10-30T03:40:43.1895910Z test reality::client::tests::fatal_read_and_write_errors_preserve_the_first_error_and_end_the_attempt ... ok
+2026-10-30T03:40:43.1921339Z test reality::certificate::tests::rustls_verifier_and_classical_hybrid_component_complete_tls13_data_and_close ... ok
+2026-10-30T03:40:43.1995436Z test reality::client::tests::first_flight_budgets_and_trailing_plaintext_are_rejected ... ok
+2026-10-30T03:40:43.2161625Z test reality::client::tests::first_flight_does_not_treat_ccs_or_ciphertext_as_authenticated_data ... ok
+2026-10-30T03:40:43.2213943Z test reality::client::tests::hrr_is_rejected_without_emitting_a_second_clienthello ... ok
+2026-10-30T03:40:43.2262866Z test reality::client::tests::initial_flight_partial_and_blocked_writes_preserve_all_bytes ... ok
+2026-10-30T03:40:43.2318069Z test reality::client::tests::interrupted_read_and_write_remain_resumable ... ok
+2026-10-30T03:40:43.2368694Z test reality::client::tests::invalid_session_echo_fails_before_backend_and_poison_is_sticky ... ok
+2026-10-30T03:40:43.2526895Z test reality::client::tests::fragmented_record_and_handshake_eof_are_failures ... ok
+2026-10-30T03:40:43.2582306Z test reality::client::tests::no_application_or_negotiated_success_before_finished ... ok
+2026-10-30T03:40:43.2661919Z test reality::client::tests::server_hello_input_never_consumes_bytes_from_the_next_record ... ok
+2026-10-30T03:40:43.2774186Z test reality::client::tests::malformed_record_headers_fail_before_payload_allocation ... ok
+2026-10-30T03:40:43.2822945Z test reality::client::tests::zero_write_with_pending_flight_fails_instead_of_spinning ... ok
+2026-10-30T03:40:43.2925422Z test reality::stream::tests::bare_outer_eof_is_not_a_tls_close ... ok
+2026-10-30T03:40:43.3143201Z test reality::client::tests::server_hello_record_fragmentation_preserves_the_exact_message ... ok
+2026-10-30T03:40:43.3204786Z test reality::stream::tests::cancellation_releases_pending_handshake_without_detached_tasks ... ok
+2026-10-30T03:40:43.3307964Z test reality::stream::tests::downlink_raw_transition_remains_available_after_upload_half_close ... ok
+2026-10-30T03:40:43.3398880Z test reality::stream::tests::failed_authentication_releases_transport_and_returns_no_stream ... ok
+2026-10-30T03:40:43.3462889Z test reality::stream::tests::cancelled_partial_record_cannot_be_reinterpreted_as_raw ... ok
+2026-10-30T03:40:43.3530630Z test reality::stream::tests::raw_handoff_preserves_tls_tail_and_raw_suffix_without_outer_close_alert ... ok
+2026-10-30T03:40:43.3969922Z test reality::tests::all_aad_bytes_are_authenticated_and_records_are_not_in_the_transcript ... ok
+2026-10-30T03:40:43.4127882Z test reality::tests::authentication_matches_independent_python_vectors_byte_for_byte ... ok
+2026-10-30T03:40:43.4199957Z test reality::tests::client_hello_extension_semantics_never_silently_downgrade ... ok
+2026-10-30T03:40:43.4289863Z test reality::tests::client_hello_requires_owned_random_keys_name_and_zero_session_id ... ok
+2026-10-30T03:40:43.4398150Z test reality::tests::corrupted_mlkem_ciphertext_requires_later_finished_rejection ... ok
+2026-10-30T03:40:43.4453339Z test reality::tests::every_truncated_client_hello_is_rejected_without_panic ... ok
+2026-10-30T03:40:43.4596604Z test reality::tests::fresh_key_owners_do_not_reuse_random_or_either_share ... ok
+2026-10-30T03:40:43.4648428Z test reality::tests::grease_key_shares_must_follow_the_unique_supported_group_order ... ok
+2026-10-30T03:40:43.4998528Z test h2_stream::tests::graceful_drop_bounds_an_unfinished_response_and_keeps_session_usable ... ok
+2026-10-30T03:40:43.5138081Z test reality::tests::key_group_advertises_only_tls13_and_retains_the_classical_owner ... ok
+2026-10-30T03:40:43.5284330Z test reality::tests::nested_client_hello_vectors_reject_truncation_with_correct_outer_lengths ... ok
+2026-10-30T03:40:43.5335949Z test reality::tests::optional_classical_share_must_follow_hybrid_and_use_same_key ... ok
+2026-10-30T03:40:43.5390793Z test reality::tests::ordinary_low_order_server_authentication_key_is_rejected ... ok
+2026-10-30T03:40:43.5494182Z test reality::tests::real_mlkem_ciphertext_matches_independent_openssl_shared_secret ... ok
+2026-10-30T03:40:43.5624602Z test h2_stream::tests::shutdown_then_drop_keeps_final_data_with_an_unread_response ... ok
+2026-10-30T03:40:43.5630641Z test reality::tests::hybrid_key_share_lengths_and_noncontributory_peers_fail ... ok
+2026-10-30T03:40:43.5640027Z test tests::eof_keeps_reverse_direction_alive ... ok
+2026-10-30T03:40:43.5646398Z test tests::tls_context_reuses_trust_policy_and_rejects_invalid_material_before_io ... ok
+2026-10-30T03:40:43.5650620Z test tls_failure_tests::certificate_context_is_classified_without_exporting_private_names_or_messages ... ok
+2026-10-30T03:40:43.5705093Z test tls_failure_tests::secure_preserves_typed_transport_failures_instead_of_claiming_bad_certificates ... ok
+2026-10-30T03:40:43.5713538Z test udp::tests::buffer_setup_retains_larger_existing_values ... ok
+2026-10-30T03:40:43.5763321Z test udp::tests::full_datagrams_survive_small_buffers_and_address_families ... ok
+2026-10-30T03:40:43.5764849Z test reality::tests::server_hello_rejects_truncation_echo_hrr_tls12_and_unoffered_cipher ... ok
+2026-10-30T03:40:43.5769741Z test reality::tests::server_hello_matches_independent_sha256_and_sha384_checkpoints ... ok
+2026-10-30T03:40:43.5770870Z test xhttp::tests::path_and_ipv6_authority_are_preserved ... ok
+2026-10-30T03:40:43.5774344Z test xhttp::tests::oversized_or_injected_request_fields_are_rejected ... ok
+2026-10-30T03:40:43.5775330Z test xhttp::tests::stream_one_has_raw_body_semantics_and_default_padding_headers ... ok
+2026-10-30T03:40:43.5776734Z test xhttp::tests::unsupported_modes_and_ambiguous_headers_are_rejected ... ok
+2026-10-30T03:40:45.9051444Z test reality::stream::tests::tiny_partial_io_and_backpressure_preserve_data_and_authenticated_half_close ... ok
+2026-10-30T03:40:45.9052285Z 
+2026-10-30T03:40:45.9052595Z test result: ok. 123 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.42s
+2026-10-30T03:40:45.9052952Z 
+2026-10-30T03:40:45.9088649Z      Running tests\client_hello_customizer.rs (target\debug\deps\client_hello_customizer-3363c353fc0582ca.exe)
+2026-10-30T03:40:45.9209520Z 
+2026-10-30T03:40:45.9209772Z running 9 tests
+2026-10-30T03:40:45.9262009Z test advertised_brotli_is_real_and_enforces_exact_output_length ... ok
+2026-10-30T03:40:45.9271709Z test callback_cannot_change_configured_identity_application_or_decompression ... ok
+2026-10-30T03:40:45.9273382Z test callback_cannot_replace_fresh_random_session_id_or_key_material ... ok
+2026-10-30T03:40:45.9281375Z test callback_rejects_tls12_engine_and_early_data_before_running ... ok
+2026-10-30T03:40:45.9287409Z test unchanged_callback_sends_the_exact_transcript_input ... ok
+2026-10-30T03:40:45.9291986Z test hello_retry_request_never_runs_a_second_customization ... ok
+2026-10-30T03:40:45.9294304Z test unconfigured_client_keeps_upstream_constructor ... ok
+2026-10-30T03:40:45.9300988Z test unknown_grease_is_preserved_in_the_actual_wire_encoding ... ok
+2026-10-30T03:40:45.9310311Z test callback_rejects_malformed_oversize_duplicate_and_protocol_state_extensions ... ok
+2026-10-30T03:40:45.9310822Z 
+2026-10-30T03:40:45.9311084Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-10-30T03:40:45.9311439Z 
+2026-10-30T03:40:45.9327560Z      Running unittests src\lib.rs (target\debug\deps\swirl_tun-44711dec093ff01e.exe)
+2026-10-30T03:40:45.9428819Z 
+2026-10-30T03:40:45.9429237Z running 2 tests
+2026-10-30T03:40:45.9440140Z test ipv6::tests::overlapping_ipv6_fragments_poison_the_whole_set_until_expiry ... ok
+2026-10-30T03:40:45.9447066Z test ipv6::tests::ipv6_reassembly_slots_are_bounded_and_expire ... ok
+2026-10-30T03:40:45.9447617Z 
+2026-10-30T03:40:45.9448210Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-30T03:40:45.9448924Z 
+2026-10-30T03:40:45.9465517Z      Running tests\packet_flows.rs (target\debug\deps\packet_flows-90e4860c22a82fea.exe)
+2026-10-30T03:40:45.9593287Z 
+2026-10-30T03:40:45.9593723Z running 14 tests
+2026-10-30T03:40:45.9602083Z test invalid_memory_budget_is_rejected_before_spawn ... ok
+2026-10-30T03:40:45.9647797Z test dispatcher_failure_before_client_ack_sends_reset ... ok
+2026-10-30T03:40:45.9650516Z test ipv4_udp_empty_datagram_bad_packet_and_reply ... ok
+2026-10-30T03:40:45.9653401Z test ipv4_tcp_handshake_payload_and_half_close ... ok
+2026-10-30T03:40:45.9659298Z test equal_ports_at_different_destination_ips_cannot_cross_streams ... ok
+2026-10-30T03:40:45.9752251Z test ipv6_tcp_handshake_payload_and_half_close ... ok
+2026-10-30T03:40:45.9762205Z test ipv6_udp_empty_datagram_bad_packet_and_reply ... ok
+2026-10-30T03:40:45.9763695Z test malformed_syn_checksum_does_not_consume_flow_capacity ... ok
+2026-10-30T03:40:45.9764390Z test mtu_validation_and_shutdown_work_with_full_egress ... ok
+2026-10-30T03:40:45.9765087Z test simultaneous_clients_to_one_destination_are_isolated ... ok
+2026-10-30T03:40:45.9765882Z test syn_retransmission_does_not_allocate_another_flow_and_limit_rejects ... ok
+2026-10-30T03:40:45.9901437Z test ipv6_udp_fragmentation_and_out_of_order_reassembly ... ok
+2026-10-30T03:40:46.0040267Z test ipv4_udp_fragmentation_and_out_of_order_reassembly ... ok
+2026-10-30T03:40:46.1369263Z test megabyte_reply_with_small_buffers_and_queue_preserves_every_byte ... ok
+2026-10-30T03:40:46.1370256Z 
+2026-10-30T03:40:46.1370938Z test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+2026-10-30T03:40:46.1371558Z 
+2026-10-30T03:40:46.1389020Z    Doc-tests swirl_api
+2026-10-30T03:40:46.8364263Z 
+2026-10-30T03:40:46.8364921Z running 0 tests
+2026-10-30T03:40:46.8365239Z 
+2026-10-30T03:40:46.8365831Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-10-30T03:40:46.8366339Z 
+2026-10-30T03:40:46.8453861Z    Doc-tests swirl_core
+2026-10-30T03:40:47.0613176Z 
+2026-10-30T03:40:47.0613844Z running 0 tests
+2026-10-30T03:40:47.0614144Z 
+2026-10-30T03:40:47.0614585Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-30T03:40:47.0615163Z 
+2026-10-30T03:40:47.0701031Z    Doc-tests swirl_dns
+2026-10-30T03:40:47.1768138Z 
+2026-10-30T03:40:47.1768851Z running 0 tests
+2026-10-30T03:40:47.1769117Z 
+2026-10-30T03:40:47.1769796Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-30T03:40:47.1770425Z 
+2026-10-30T03:40:47.1854463Z    Doc-tests swirl_platform
+2026-10-30T03:40:47.3504753Z 
+2026-10-30T03:40:47.3505200Z running 0 tests
+2026-10-30T03:40:47.3505513Z 
+2026-10-30T03:40:47.3505948Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-30T03:40:47.3506541Z 
+2026-10-30T03:40:47.3589159Z    Doc-tests swirl_protocol
+2026-10-30T03:40:47.5828561Z 
+2026-10-30T03:40:47.5829068Z running 0 tests
+2026-10-30T03:40:47.5829296Z 
+2026-10-30T03:40:47.5829701Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-30T03:40:47.5830074Z 
+2026-10-30T03:40:47.5917805Z    Doc-tests swirl_transport
+2026-10-30T03:40:47.7942694Z 
+2026-10-30T03:40:47.7943265Z running 1 test
+2026-10-30T03:40:48.1430620Z test crates\swirl-transport\src\reality\mod.rs - reality::ClientKeys::authenticate (line 127) - compile fail ... ok
+2026-10-30T03:40:48.1431528Z 
+2026-10-30T03:40:48.1431990Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+2026-10-30T03:40:48.1432640Z 
+2026-10-30T03:40:48.1510328Z    Doc-tests swirl_tun
+2026-10-30T03:40:48.2123332Z 
+2026-10-30T03:40:48.2123756Z running 0 tests
+2026-10-30T03:40:48.2124002Z 
+2026-10-30T03:40:48.2124383Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-30T03:40:48.2124752Z 
+2026-10-30T03:40:48.3500856Z ##[group]Run cargo build --locked -p swirl-api --lib --bin swirl-tun-helper --release
+2026-10-30T03:40:48.3501577Z [36;1mcargo build --locked -p swirl-api --lib --bin swirl-tun-helper --release[0m
+2026-10-30T03:40:48.3574580Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-30T03:40:48.3574934Z env:
+2026-10-30T03:40:48.3575180Z   SWIRL_SOURCE_SHA: 8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e
+2026-10-30T03:40:48.3575491Z   CACHE_ON_FAILURE: true
+2026-10-30T03:40:48.3575718Z   CARGO_INCREMENTAL: 0
+2026-10-30T03:40:48.3575918Z ##[endgroup]
+2026-10-30T03:40:48.9880564Z    Compiling proc-macro2 v1.0.107
+2026-10-30T03:40:48.9881052Z    Compiling quote v1.0.47
+2026-10-30T03:40:48.9881510Z    Compiling unicode-ident v1.0.27
+2026-10-30T03:40:48.9883323Z    Compiling cfg-if v1.0.5
+2026-10-30T03:40:49.1046149Z    Compiling getrandom v0.4.3
+2026-10-30T03:40:49.1683925Z    Compiling shlex v2.0.1
+2026-10-30T03:40:49.3553006Z    Compiling find-msvc-tools v0.1.14
+2026-10-30T03:40:49.4265373Z    Compiling typenum v1.20.1
+2026-10-30T03:40:49.6192107Z    Compiling jobserver v0.1.35
+2026-10-30T03:40:49.9989808Z    Compiling cc v1.8.0
+2026-10-30T03:40:50.6427308Z    Compiling zeroize v1.9.1
+2026-10-30T03:40:50.8859981Z    Compiling syn v3.0.9
+2026-10-30T03:40:51.2970767Z    Compiling stable_deref_trait v1.2.1
+2026-10-30T03:40:51.3513016Z    Compiling windows-link v0.2.1
+2026-10-30T03:40:51.3630376Z    Compiling pin-project-lite v0.2.17
+2026-10-30T03:40:51.4056846Z    Compiling version_check v0.9.5
+2026-10-30T03:40:51.4409337Z    Compiling rand_core v0.10.1
+2026-10-30T03:40:51.6188926Z    Compiling subtle v2.6.1
+2026-10-30T03:40:51.7868084Z    Compiling generic-array v0.14.7
+2026-10-30T03:40:51.8085806Z    Compiling windows-sys v0.61.2
+2026-10-30T03:40:52.0387866Z    Compiling bytes v1.12.1
+2026-10-30T03:40:52.8266413Z    Compiling ring v0.17.14
+2026-10-30T03:40:53.4989239Z    Compiling syn v2.0.119
+2026-10-30T03:40:56.4902878Z    Compiling synstructure v0.14.0
+2026-10-30T03:40:57.6566168Z    Compiling socket2 v0.6.5
+2026-10-30T03:40:58.9094870Z    Compiling zerofrom-derive v0.1.8
+2026-10-30T03:40:58.9787581Z    Compiling yoke-derive v0.8.4
+2026-10-30T03:40:59.7818402Z    Compiling zerovec-derive v0.11.6
+2026-10-30T03:41:00.6416134Z    Compiling displaydoc v0.2.7
+2026-10-30T03:41:00.7510505Z    Compiling once_cell v1.21.4
+2026-10-30T03:41:00.9924199Z    Compiling zerofrom v0.1.8
+2026-10-30T03:41:01.0714176Z    Compiling cmov v0.5.4
+2026-10-30T03:41:01.1365034Z    Compiling yoke v0.8.3
+2026-10-30T03:41:01.3998709Z    Compiling memchr v2.8.3
+2026-10-30T03:41:01.4044997Z    Compiling writeable v0.6.4
+2026-10-30T03:41:01.4730233Z    Compiling zerovec v0.11.8
+2026-10-30T03:41:01.6810906Z    Compiling rustversion v1.0.23
+2026-10-30T03:41:01.8073500Z    Compiling litemap v0.8.3
+2026-10-30T03:41:02.0754296Z    Compiling serde_core v1.0.229
+2026-10-30T03:41:02.1412606Z    Compiling zerotrie v0.2.5
+2026-10-30T03:41:02.4230846Z    Compiling tinystr v0.8.4
+2026-10-30T03:41:02.5090866Z    Compiling potential_utf v0.1.6
+2026-10-30T03:41:02.6704188Z    Compiling icu_locale_core v2.1.1
+2026-10-30T03:41:02.6956119Z    Compiling ctutils v0.4.4
+2026-10-30T03:41:02.8141679Z    Compiling tokio-macros v2.7.2
+2026-10-30T03:41:03.0151740Z    Compiling mio v1.2.4
+2026-10-30T03:41:03.6028283Z    Compiling crypto-common v0.1.7
+2026-10-30T03:41:03.7293389Z    Compiling getrandom v0.2.17
+2026-10-30T03:41:03.7296767Z    Compiling itoa v1.0.18
+2026-10-30T03:41:03.8914590Z    Compiling untrusted v0.9.0
+2026-10-30T03:41:04.0118412Z    Compiling autocfg v1.5.1
+2026-10-30T03:41:04.0509694Z    Compiling slab v0.4.12
+2026-10-30T03:41:04.2921821Z    Compiling cpufeatures v0.3.1
+2026-10-30T03:41:04.3569185Z    Compiling icu_normalizer_data v2.1.1
+2026-10-30T03:41:04.5902258Z    Compiling futures-sink v0.3.34
+2026-10-30T03:41:04.5995673Z    Compiling icu_properties_data v2.1.2
+2026-10-30T03:41:04.6904183Z    Compiling futures-core v0.3.34
+2026-10-30T03:41:04.8472751Z    Compiling smallvec v1.16.3
+2026-10-30T03:41:04.8585430Z    Compiling alloc-no-stdlib v2.0.4
+2026-10-30T03:41:04.9781939Z    Compiling alloc-stdlib v0.2.4
+2026-10-30T03:41:05.1330572Z    Compiling num-traits v0.2.19
+2026-10-30T03:41:05.1544676Z    Compiling icu_provider v2.1.1
+2026-10-30T03:41:05.3555716Z    Compiling tokio v1.53.3
+2026-10-30T03:41:05.7320095Z    Compiling hybrid-array v0.4.15
+2026-10-30T03:41:06.3413975Z    Compiling icu_collections v2.1.1
+2026-10-30T03:41:08.1929202Z    Compiling rustls-pki-types v1.15.1
+2026-10-30T03:41:09.5394906Z    Compiling cfg_aliases v0.2.2
+2026-10-30T03:41:09.6007623Z    Compiling encoding_rs v0.8.42
+2026-10-30T03:41:10.2774771Z    Compiling brotli-decompressor v5.0.3
+2026-10-30T03:41:11.0873310Z    Compiling tracing-core v0.1.36
+2026-10-30T03:41:11.9749006Z    Compiling block-buffer v0.10.4
+2026-10-30T03:41:12.1538335Z    Compiling zmij v1.0.23
+2026-10-30T03:41:12.5676760Z    Compiling windows_x86_64_msvc v0.52.6
+2026-10-30T03:41:12.7678271Z    Compiling rustls v0.23.46 (D:\a\Swirl\Swirl\core\vendor\rustls)
+2026-10-30T03:41:12.7982068Z    Compiling syn v1.0.109
+2026-10-30T03:41:12.9729439Z    Compiling futures-io v0.3.34
+2026-10-30T03:41:13.1786665Z    Compiling serde v1.0.229
+2026-10-30T03:41:13.3344412Z    Compiling digest v0.10.7
+2026-10-30T03:41:13.5703306Z    Compiling tracing v0.1.44
+2026-10-30T03:41:13.6606437Z    Compiling brotli v8.0.4
+2026-10-30T03:41:14.0746343Z    Compiling icu_properties v2.1.2
+2026-10-30T03:41:16.8269174Z    Compiling icu_normalizer v2.1.1
+2026-10-30T03:41:18.7627759Z    Compiling rustls-webpki v0.103.16
+2026-10-30T03:41:18.8039100Z    Compiling crypto-common v0.2.2
+2026-10-30T03:41:20.0638288Z    Compiling http v1.5.0
+2026-10-30T03:41:20.7792887Z    Compiling serde_derive v1.0.229
+2026-10-30T03:41:21.2333136Z    Compiling semver v1.0.28
+2026-10-30T03:41:21.6176339Z    Compiling core_detect v1.0.0
+2026-10-30T03:41:21.8353014Z    Compiling scopeguard v1.2.0
+2026-10-30T03:41:21.9527530Z    Compiling simdutf8 v0.1.5
+2026-10-30T03:41:22.2977798Z    Compiling libc v0.2.190
+2026-10-30T03:41:22.8663887Z    Compiling thiserror v2.0.21
+2026-10-30T03:41:23.0857734Z    Compiling multiversion_no_op v1.0.0
+2026-10-30T03:41:23.1354199Z    Compiling serde_json v1.0.154
+2026-10-30T03:41:23.4012955Z    Compiling rustc_version v0.4.1
+2026-10-30T03:41:23.7570894Z    Compiling idna_adapter v1.2.1
+2026-10-30T03:41:26.6359633Z    Compiling quinn-udp v0.5.16
+2026-10-30T03:41:27.0651904Z    Compiling chacha20 v0.10.2
+2026-10-30T03:41:27.4547999Z    Compiling thiserror-impl v2.0.21
+2026-10-30T03:41:29.3363025Z    Compiling cpufeatures v0.2.17
+2026-10-30T03:41:29.3934798Z    Compiling pkg-config v0.3.32
+2026-10-30T03:41:30.1464895Z    Compiling thiserror v1.0.69
+2026-10-30T03:41:30.4901482Z    Compiling utf8_iter v1.0.4
+2026-10-30T03:41:30.6738581Z    Compiling anstyle v1.0.14
+2026-10-30T03:41:30.6872928Z    Compiling unicode-width v0.2.2
+2026-10-30T03:41:31.0090168Z    Compiling percent-encoding v2.3.2
+2026-10-30T03:41:31.0382643Z    Compiling arraydeque v0.5.1
+2026-10-30T03:41:31.2666911Z    Compiling granit-parser v2.0.0
+2026-10-30T03:41:31.3578642Z    Compiling form_urlencoded v1.2.2
+2026-10-30T03:41:31.6622582Z    Compiling annotate-snippets v0.12.16
+2026-10-30T03:41:32.2058240Z    Compiling c2rust-bitfields-derive v0.18.0
+2026-10-30T03:41:32.8908518Z    Compiling idna v1.1.0
+2026-10-30T03:41:33.2438753Z    Compiling zstd-sys v2.1.2+zstd.1.5.7
+2026-10-30T03:41:33.7777420Z    Compiling rand v0.10.3
+2026-10-30T03:41:35.0309788Z    Compiling ipnet v2.12.2
+2026-10-30T03:41:36.5194989Z    Compiling encoding_rs_io v0.1.8
+2026-10-30T03:41:36.7595715Z    Compiling windows-targets v0.52.6
+2026-10-30T03:41:37.0743911Z    Compiling curve25519-dalek v5.0.0
+2026-10-30T03:41:37.5680591Z    Compiling digest v0.11.3
+2026-10-30T03:41:37.7156932Z    Compiling quinn v0.11.12
+2026-10-30T03:41:38.0406602Z    Compiling futures-channel v0.3.34
+2026-10-30T03:41:38.3720928Z    Compiling thiserror-impl v1.0.69
+2026-10-30T03:41:40.1156665Z    Compiling der_derive v0.8.0
+2026-10-30T03:41:40.3882380Z    Compiling futures-macro v0.3.34
+2026-10-30T03:41:41.0619618Z    Compiling rand_pcg v0.10.2
+2026-10-30T03:41:41.2506828Z    Compiling keccak v0.2.2
+2026-10-30T03:41:41.3838971Z    Compiling rustc-hash v2.1.3
+2026-10-30T03:41:41.4796313Z    Compiling tinyvec v1.13.3
+2026-10-30T03:41:41.5003678Z    Compiling sponge-cursor v0.1.0
+2026-10-30T03:41:41.6347832Z    Compiling flagset v0.4.7
+2026-10-30T03:41:41.7809689Z    Compiling lru-slab v0.1.3
+2026-10-30T03:41:41.8175569Z    Compiling futures-task v0.3.34
+2026-10-30T03:41:41.9181305Z    Compiling const-oid v0.10.2
+2026-10-30T03:41:42.0078621Z    Compiling futures-util v0.3.34
+2026-10-30T03:41:42.1878252Z    Compiling quinn-proto v0.11.19
+2026-10-30T03:41:45.8620217Z    Compiling der v0.8.2
+2026-10-30T03:41:47.3462424Z    Compiling windows-sys v0.52.0
+2026-10-30T03:41:50.0607249Z    Compiling serde-saphyr v2.0.0
+2026-10-30T03:42:06.9375046Z    Compiling url v2.5.8
+2026-10-30T03:42:08.4450285Z    Compiling c2rust-bitfields v0.18.0
+2026-10-30T03:42:08.7410749Z    Compiling sha2 v0.10.9
+2026-10-30T03:42:11.6576863Z    Compiling tokio-util v0.7.20
+2026-10-30T03:42:13.0339916Z    Compiling curve25519-dalek-derive v0.1.1
+2026-10-30T03:42:13.6322840Z    Compiling libloading v0.8.9
+2026-10-30T03:42:13.8238415Z    Compiling equivalent v1.0.3
+2026-10-30T03:42:14.1185510Z    Compiling log v0.4.34
+2026-10-30T03:42:14.1740272Z    Compiling base64 v0.22.1
+2026-10-30T03:42:14.4421728Z    Compiling httparse v1.10.1
+2026-10-30T03:42:14.9003627Z    Compiling hashbrown v0.17.1
+2026-10-30T03:42:15.0217220Z    Compiling swirl-subscription v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-subscription)
+2026-10-30T03:42:16.3395069Z    Compiling indexmap v2.14.2
+2026-10-30T03:42:17.9854711Z    Compiling wintun v0.5.1
+2026-10-30T03:42:20.3475892Z    Compiling spki v0.8.1
+2026-10-30T03:42:20.9313210Z    Compiling shake v0.1.0
+2026-10-30T03:42:21.0481381Z    Compiling sha3 v0.12.0
+2026-10-30T03:42:22.8718898Z    Compiling kem v0.3.0
+2026-10-30T03:42:23.1019047Z    Compiling module-lattice v0.2.3
+2026-10-30T03:42:23.6077524Z    Compiling zstd-safe v8.2.0
+2026-10-30T03:42:23.9730243Z    Compiling fnv v1.0.7
+2026-10-30T03:42:24.1630681Z    Compiling atomic-waker v1.1.2
+2026-10-30T03:42:24.3512553Z    Compiling h2 v0.4.20
+2026-10-30T03:42:26.4450597Z    Compiling ml-kem v0.3.3
+2026-10-30T03:42:28.0218525Z    Compiling x509-cert v0.3.0
+2026-10-30T03:42:30.4694683Z    Compiling x25519-dalek v3.0.0
+2026-10-30T03:42:30.6395862Z    Compiling swirl-platform v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-platform)
+2026-10-30T03:42:38.7149576Z    Compiling futures-executor v0.3.34
+2026-10-30T03:42:40.6532540Z    Compiling tokio-rustls v0.26.6
+2026-10-30T03:42:41.8028725Z    Compiling webpki-roots v1.0.10
+2026-10-30T03:42:42.2715016Z    Compiling inout v0.1.4
+2026-10-30T03:42:42.6613666Z    Compiling blake3 v1.8.7
+2026-10-30T03:42:44.4288738Z    Compiling heapless v0.9.3
+2026-10-30T03:42:44.8638742Z    Compiling byteorder v1.5.0
+2026-10-30T03:42:45.1776009Z    Compiling fastrand v2.5.0
+2026-10-30T03:42:45.7280227Z    Compiling h3 v0.0.8
+2026-10-30T03:42:46.3849831Z    Compiling hash32 v0.3.1
+2026-10-30T03:42:51.3257223Z    Compiling cipher v0.4.4
+2026-10-30T03:42:51.6350116Z    Compiling swirl-transport v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-transport)
+2026-10-30T03:42:52.7987962Z    Compiling futures v0.3.34
+2026-10-30T03:42:53.5496187Z    Compiling smoltcp v0.14.0
+2026-10-30T03:42:54.3873212Z    Compiling constant_time_eq v0.4.2
+2026-10-30T03:42:54.7996388Z    Compiling arrayvec v0.7.8
+2026-10-30T03:42:55.3509603Z    Compiling swirl-dns v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-dns)
+2026-10-30T03:42:57.6894747Z    Compiling zstd v0.14.3
+2026-10-30T03:42:58.9518260Z    Compiling h3-quinn v0.0.10
+2026-10-30T03:43:00.0210563Z    Compiling aes v0.8.4
+2026-10-30T03:43:02.8442169Z    Compiling blake2 v0.10.6
+2026-10-30T03:43:04.0309414Z    Compiling md-5 v0.10.6
+2026-10-30T03:43:04.4402958Z    Compiling bitflags v1.3.2
+2026-10-30T03:43:04.5264215Z    Compiling managed v0.8.0
+2026-10-30T03:43:04.6604437Z    Compiling swirl-protocol v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-protocol)
+2026-10-30T03:43:13.3390761Z    Compiling swirl-routing v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-routing)
+2026-10-30T03:43:14.7767601Z    Compiling swirl-api v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-api)
+2026-10-30T03:43:15.7562783Z    Compiling swirl-core v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-core)
+2026-10-30T03:43:18.4752495Z    Compiling swirl-tun v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-tun)
+2026-10-30T03:45:57.2928826Z     Finished `release` profile [optimized] target(s) in 5m 08s
+2026-10-30T03:45:57.4513926Z ##[group]Run $smokeIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
+2026-10-30T03:45:57.4514798Z [36;1m$smokeIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()[0m
+2026-10-30T03:45:57.4515440Z [36;1m$smokePrincipal = [Security.Principal.WindowsPrincipal]::new($smokeIdentity)[0m
+2026-10-30T03:45:57.4516196Z [36;1mif (-not $smokePrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {[0m
+2026-10-30T03:45:57.4517050Z [36;1m  throw 'The explicitly scoped driver smoke requires an elevated disposable runner; it must not be silently skipped.'[0m
+2026-10-30T03:45:57.4517652Z [36;1m}[0m
+2026-10-30T03:45:57.4517998Z [36;1m$smokeArchive = Join-Path $env:RUNNER_TEMP 'wintun-0.14.1.zip'[0m
+2026-10-30T03:45:57.4518704Z [36;1mInvoke-WebRequest 'https://www.wintun.net/builds/wintun-0.14.1.zip' -OutFile $smokeArchive[0m
+2026-10-30T03:45:57.4519869Z [36;1mif ((Get-FileHash $smokeArchive -Algorithm SHA256).Hash -ne '07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51') {[0m
+2026-10-30T03:45:57.4520581Z [36;1m  throw 'Official Wintun archive hash mismatch.'[0m
+2026-10-30T03:45:57.4520945Z [36;1m}[0m
+2026-10-30T03:45:57.4521346Z [36;1m$smokeDirectory = Join-Path $env:RUNNER_TEMP 'swirl-wintun-smoke'[0m
+2026-10-30T03:45:57.4521935Z [36;1mExpand-Archive -LiteralPath $smokeArchive -DestinationPath $smokeDirectory[0m
+2026-10-30T03:45:57.4522531Z [36;1m$smokeDriver = Join-Path $smokeDirectory 'wintun/bin/amd64/wintun.dll'[0m
+2026-10-30T03:45:57.4523549Z [36;1mcargo run --locked --release -p swirl-api --example windows-tun-smoke -- --disposable-network --wintun $smokeDriver 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'swirl-wintun-smoke.log')[0m
+2026-10-30T03:45:57.4524662Z [36;1mif ($LASTEXITCODE -ne 0) { throw "Scoped Wintun smoke failed with exit code $LASTEXITCODE" }[0m
+2026-10-30T03:45:57.4602173Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-30T03:45:57.4602588Z env:
+2026-10-30T03:45:57.4602910Z   SWIRL_SOURCE_SHA: 8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e
+2026-10-30T03:45:57.4603298Z   CACHE_ON_FAILURE: true
+2026-10-30T03:45:57.4603616Z   CARGO_INCREMENTAL: 0
+2026-10-30T03:45:57.4604429Z ##[endgroup]
+2026-10-30T03:45:59.7280836Z [31;1m   Compiling swirl-api v0.1.0 (D:\a\Swirl\Swirl\core\crates\swirl-api)[0m
+2026-10-30T03:47:14.5131301Z [31;1m    Finished `release` profile [optimized] target(s) in 1m 15s[0m
+2026-10-30T03:47:14.5261914Z [31;1m     Running `target\release\examples\windows-tun-smoke.exe --disposable-network --wintun D:\a\_temp\swirl-wintun-smoke\wintun\bin\amd64\wintun.dll`[0m
+2026-10-30T03:47:20.0172223Z [31;1mWintun smoke: PASS durable dual-stack Fake-IP close/reopen identity[0m
+2026-10-30T03:47:20.0173517Z [31;1mWintun smoke: creating an owned adapter and applying exact test routes[0m
+2026-10-30T03:47:23.9953664Z [31;1mWintun smoke: pre-validation snapshot {"observed":{"kind":"mtu","mtu":65535},"requested":{"kind":"mtu","mtu":1500},"resource":{"ipv6":false,"kind":"mtu"}}[0m
+2026-10-30T03:47:26.3067104Z [31;1mWintun smoke: pre-validation snapshot {"observed":{"kind":"mtu","mtu":65535},"requested":{"kind":"mtu","mtu":1500},"resource":{"ipv6":true,"kind":"mtu"}}[0m
+2026-10-30T03:47:28.3738322Z [31;1mWintun smoke: pre-validation snapshot {"observed":null,"requested":{"kind":"address","prefix_len":30,"skip_as_source":false},"resource":{"address":"198.18.0.1","kind":"address"}}[0m
+2026-10-30T03:47:30.4694796Z [31;1mWintun smoke: pre-validation snapshot {"observed":null,"requested":{"kind":"address","prefix_len":126,"skip_as_source":false},"resource":{"address":"fd53:7769:726c::1","kind":"address"}}[0m
+2026-10-30T03:47:32.5980077Z [31;1mWintun smoke: pre-validation snapshot {"observed":null,"requested":{"kind":"route","metric":5},"resource":{"destination":"198.18.1.0/32","kind":"route","next_hop":"0.0.0.0"}}[0m
+2026-10-30T03:47:34.6950687Z [31;1mWintun smoke: pre-validation snapshot {"observed":null,"requested":{"kind":"route","metric":5},"resource":{"destination":"fd53:7769:726c::101/128","kind":"route","next_hop":"::"}}[0m
+2026-10-30T03:48:13.3040849Z [31;1mWintun smoke: IPv4 DNS identity[0m
+2026-10-30T03:48:13.3045364Z [31;1mWintun smoke: PASS IPv4 UDP DNS identity and TTL[0m
+2026-10-30T03:48:13.3394877Z [31;1mWintun smoke: PASS IPv4 TCP DNS framing, identity and TTL[0m
+2026-10-30T03:48:13.3398533Z [31;1mWintun smoke: IPv4 TCP payload and half-close[0m
+2026-10-30T03:48:13.3492627Z [31;1mWintun smoke: PASS IPv4 TCP payload and half-close[0m
+2026-10-30T03:48:13.7265802Z [31;1mWintun smoke: PASS IPv4 exact Windows SO_LINGER=0 RST tuple and independent flow cleanup[0m
+2026-10-30T03:48:14.1216573Z [31;1mWintun smoke: PASS IPv4 64 rounds on one TCP connection across a second connection reset[0m
+2026-10-30T03:48:14.1220812Z [31;1mWintun smoke: IPv4 empty and full UDP datagrams[0m
+2026-10-30T03:48:14.1226444Z [31;1mWintun smoke: PASS IPv4 empty and full UDP datagrams[0m
+2026-10-30T03:48:14.1230770Z [31;1mWintun smoke: IPv6 DNS identity[0m
+2026-10-30T03:48:14.1235158Z [31;1mWintun smoke: PASS IPv6 UDP DNS identity and TTL[0m
+2026-10-30T03:48:14.1659736Z [31;1mWintun smoke: PASS IPv6 TCP DNS framing, identity and TTL[0m
+2026-10-30T03:48:14.1664958Z [31;1mWintun smoke: IPv6 TCP payload and half-close[0m
+2026-10-30T03:48:14.1729801Z [31;1mWintun smoke: PASS IPv6 TCP payload and half-close[0m
+2026-10-30T03:48:14.5810059Z [31;1mWintun smoke: PASS IPv6 exact Windows SO_LINGER=0 RST tuple and independent flow cleanup[0m
+2026-10-30T03:48:14.9106443Z [31;1mWintun smoke: PASS IPv6 64 rounds on one TCP connection across a second connection reset[0m
+2026-10-30T03:48:14.9109774Z [31;1mWintun smoke: IPv6 empty and full UDP datagrams[0m
+2026-10-30T03:48:14.9114536Z [31;1mWintun smoke: PASS IPv6 empty and full UDP datagrams[0m
+2026-10-30T03:48:14.9172035Z [31;1mWintun smoke: PASS verified DoT A/AAAA resolver fixture[0m
+2026-10-30T03:48:14.9176308Z [31;1mWintun smoke: IPv4 proxy with reachable DIRECT controls[0m
+2026-10-30T03:48:14.9520350Z [31;1mWintun smoke: PASS IPv4 proxy, exact Core outcome and reachable DIRECT trap controls[0m
+2026-10-30T03:48:14.9524779Z [31;1mWintun smoke: IPv4 reject with reachable DIRECT controls[0m
+2026-10-30T03:48:15.0823378Z [31;1mWintun smoke: PASS IPv4 reject, exact Core outcome and reachable DIRECT trap controls[0m
+2026-10-30T03:48:15.0825626Z [31;1mWintun smoke: IPv4 proxy_rejected with reachable DIRECT controls[0m
+2026-10-30T03:48:15.1107786Z [31;1mWintun smoke: PASS IPv4 proxy_rejected, exact Core outcome and reachable DIRECT trap controls[0m
+2026-10-30T03:48:15.1110611Z [31;1mWintun smoke: IPv4 proxy_unavailable with reachable DIRECT controls[0m
+2026-10-30T03:48:19.1894311Z [31;1mWintun smoke: PASS IPv4 proxy_unavailable, exact Core outcome and reachable DIRECT trap controls[0m
+2026-10-30T03:48:19.1897017Z [31;1mWintun smoke: IPv6 proxy with reachable DIRECT controls[0m
+2026-10-30T03:48:19.2237766Z [31;1mWintun smoke: PASS IPv6 proxy, exact Core outcome and reachable DIRECT trap controls[0m
+2026-10-30T03:48:19.2240506Z [31;1mWintun smoke: IPv6 reject with reachable DIRECT controls[0m
+2026-10-30T03:48:19.3241500Z [31;1mWintun smoke: PASS IPv6 reject, exact Core outcome and reachable DIRECT trap controls[0m
+2026-10-30T03:48:19.3244514Z [31;1mWintun smoke: IPv6 proxy_rejected with reachable DIRECT controls[0m
+2026-10-30T03:48:19.3539781Z [31;1mWintun smoke: PASS IPv6 proxy_rejected, exact Core outcome and reachable DIRECT trap controls[0m
+2026-10-30T03:48:19.3542529Z [31;1mWintun smoke: IPv6 proxy_unavailable with reachable DIRECT controls[0m
+2026-10-30T03:48:23.4208693Z [31;1mWintun smoke: PASS IPv6 proxy_unavailable, exact Core outcome and reachable DIRECT trap controls[0m
+2026-10-30T03:48:23.4210540Z [31;1mWintun smoke: IPv4 UDP proxy with reachable DIRECT controls[0m
+2026-10-30T03:48:23.4320268Z [31;1mWintun smoke: UDP client stage {"case":"proxy","family":4,"host":"ipv4.wintun.smoke.invalid","port":59342,"stage":"direct_before_received"}[0m
+2026-10-30T03:48:23.4391180Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59342,"stage":"register control listener and relay"}[0m
+2026-10-30T03:48:23.4697917Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59342,"stage":"accept TCP control"}[0m
+2026-10-30T03:48:23.4708818Z [31;1mWintun smoke: UDP client stage {"context":{"baseline":44,"case":"proxy","configuration":{"address":"127.0.0.1:50847","applied_mode":"global","applied_revision":"27","engine_epoch":"1421313452792142513","expected_generation":"27","generation":"27","last_receipt":{"address":"127.0.0.1:50847","applied_mode":"global","applied_revision":"27","candidate_digest":"81e3d03de1d2db407c772dbb2c2a7b91b7b2c55960057a568c135030ee819cca","candidate_revision":"27","durable_receipt":{"plan_digest":"81e3d03de1d2db407c772dbb2c2a7b91b7b2c55960057a568c135030ee819cca","request_id":"d1000000-0000-4000-8000-00000000001b","saved_revision":"27","store_id":"a1000000-0000-4000-8000-000000000001"},"engine_epoch":"1421313452792142513","expected_generation":"27","generation":"27","ok":true,"outcome":"applied","plan_digest":"81e3d03de1d2db407c772dbb2c2a7b91b7b2c55960057a568c135030ee819cca","request_id":"d1000000-0000-4000-8000-00000000001b","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"ok":true,"plan_digest":"81e3d03de1d2db407c772dbb2c2a7b91b7b2c55960057a568c135030ee819cca","request_id":"","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"destination":"198.18.1.0:59342","family":4,"host":"ipv4.wintun.smoke.invalid","port":59342,"proxy_control":"127.0.0.1:51186","proxy_relay":"127.0.0.1:59343","source":"198.18.0.1:59346"},"stage":"initial_empty_sent"}[0m
+2026-10-30T03:48:23.4716011Z [31;1mWintun smoke: SOCKS5 UDP stage {"control_local":"127.0.0.1:51186","host":"ipv4.wintun.smoke.invalid","port":59342,"relay":"127.0.0.1:59343","source":"127.0.0.1:51188","stage":"control_accepted"}[0m
+2026-10-30T03:48:23.4717149Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59342,"stage":"read TCP greeting"}[0m
+2026-10-30T03:48:23.4719252Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59342,"stage":"write TCP greeting selection"}[0m
+2026-10-30T03:48:23.4721111Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59342,"stage":"read TCP ASSOCIATE header"}[0m
+2026-10-30T03:48:23.4723082Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59342,"stage":"read TCP ASSOCIATE address and port"}[0m
+2026-10-30T03:48:23.4725160Z [31;1mWintun smoke: SOCKS5 UDP stage {"address_bytes":6,"command":[5,3,0,1],"host":"ipv4.wintun.smoke.invalid","port":59342,"stage":"associate_request_validated"}[0m
+2026-10-30T03:48:23.4727423Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59342,"stage":"write TCP ASSOCIATE reply"}[0m
+2026-10-30T03:48:23.4731234Z [31;1mWintun smoke: SOCKS5 UDP stage {"host":"ipv4.wintun.smoke.invalid","port":59342,"relay":"127.0.0.1:59343","reply_code":0,"stage":"associate_reply_written"}[0m
+2026-10-30T03:48:23.4733343Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59342,"stage":"receive empty UDP relay datagram"}[0m
+2026-10-30T03:48:23.4735734Z [31;1mWintun smoke: SOCKS5 UDP stage {"expected_payload_bytes":0,"host":"ipv4.wintun.smoke.invalid","port":59342,"relay":"127.0.0.1:59343","source":"127.0.0.1:59347","stage":"relay_received","wire_bytes":32}[0m
+2026-10-30T03:48:23.4737472Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59342,"stage":"send empty UDP relay reply"}[0m
+2026-10-30T03:48:23.4738611Z [31;1mWintun smoke: SOCKS5 UDP stage {"host":"ipv4.wintun.smoke.invalid","payload_bytes":0,"port":59342,"source":"127.0.0.1:59347","stage":"relay_reply_sent","wire_bytes":32}[0m
+2026-10-30T03:48:23.4741074Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59342,"stage":"receive full UDP relay datagram"}[0m
+2026-10-30T03:48:23.4744008Z [31;1mWintun smoke: UDP client stage {"bytes":0,"case":"proxy","family":4,"sender":"198.18.1.0:59342","source":"198.18.0.1:59346","stage":"empty_reply_received"}[0m
+2026-10-30T03:48:23.4746996Z [31;1mWintun smoke: SOCKS5 UDP stage {"expected_payload_bytes":1200,"host":"ipv4.wintun.smoke.invalid","port":59342,"relay":"127.0.0.1:59343","source":"127.0.0.1:59347","stage":"relay_received","wire_bytes":1232}[0m
+2026-10-30T03:48:23.4749788Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59342,"stage":"send full UDP relay reply"}[0m
+2026-10-30T03:48:23.4752889Z [31;1mWintun smoke: SOCKS5 UDP stage {"host":"ipv4.wintun.smoke.invalid","payload_bytes":1200,"port":59342,"source":"127.0.0.1:59347","stage":"relay_reply_sent","wire_bytes":1232}[0m
+2026-10-30T03:48:23.4756894Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59342,"stage":"wait for Windows to receive both UDP replies"}[0m
+2026-10-30T03:48:23.4758848Z [31;1mWintun smoke: UDP client stage {"bytes":1200,"case":"proxy","family":4,"sender":"198.18.1.0:59342","source":"198.18.0.1:59346","stage":"full_reply_received"}[0m
+2026-10-30T03:48:23.4761667Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59342,"stage":"shutdown TCP control"}[0m
+2026-10-30T03:48:23.4861413Z [31;1mWintun smoke: PASS UDP policy {"blocked_retry_payload_bytes":1200,"case":"proxy","category":"proxy","core_admissions_during_retry":0,"core_record_id":45,"direct_trap_controls":2,"download":1200,"ended":true,"error":"Socks5UdpControlClosed","family":4,"host":"ipv4.wintun.smoke.invalid","initial_empty_datagram":true,"node":"c1000000-0000-4000-8000-000000000001","port":59342,"proxy_payload_lengths":[0,1200],"same_tuple_retry_after_direct_switch_dropped":true,"source":"198.18.0.1:59346","unexpected_trap_datagrams":0,"upload":1200}[0m
+2026-10-30T03:48:23.4863603Z [31;1mWintun smoke: IPv4 UDP reject with reachable DIRECT controls[0m
+2026-10-30T03:48:23.4951967Z [31;1mWintun smoke: UDP client stage {"case":"reject","family":4,"host":"ipv4.wintun.smoke.invalid","port":59350,"stage":"direct_before_received"}[0m
+2026-10-30T03:48:23.5710174Z [31;1mWintun smoke: UDP client stage {"context":{"baseline":47,"case":"reject","configuration":{"address":"127.0.0.1:50847","applied_mode":"rule","applied_revision":"31","engine_epoch":"1421313452792142513","expected_generation":"31","generation":"31","last_receipt":{"address":"127.0.0.1:50847","applied_mode":"rule","applied_revision":"31","candidate_digest":"ca85636b5be4854ef6e5b25c30ee753c83ee4fe29fc8e91bba40d16521a0e421","candidate_revision":"31","durable_receipt":{"plan_digest":"ca85636b5be4854ef6e5b25c30ee753c83ee4fe29fc8e91bba40d16521a0e421","request_id":"d1000000-0000-4000-8000-00000000001f","saved_revision":"31","store_id":"a1000000-0000-4000-8000-000000000001"},"engine_epoch":"1421313452792142513","expected_generation":"31","generation":"31","ok":true,"outcome":"applied","plan_digest":"ca85636b5be4854ef6e5b25c30ee753c83ee4fe29fc8e91bba40d16521a0e421","request_id":"d1000000-0000-4000-8000-00000000001f","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"ok":true,"plan_digest":"ca85636b5be4854ef6e5b25c30ee753c83ee4fe29fc8e91bba40d16521a0e421","request_id":"","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"destination":"198.18.1.0:59350","family":4,"host":"ipv4.wintun.smoke.invalid","port":59350,"proxy_control":"127.0.0.1:51190","proxy_relay":"127.0.0.1:59351","source":"198.18.0.1:59354"},"stage":"initial_empty_sent"}[0m
+2026-10-30T03:48:23.6104558Z [31;1mWintun smoke: PASS UDP policy {"blocked_retry_payload_bytes":1200,"case":"reject","category":"reject","core_admissions_during_retry":0,"core_record_id":48,"direct_trap_controls":2,"download":0,"ended":true,"error":"Rejected","family":4,"host":"ipv4.wintun.smoke.invalid","initial_empty_datagram":true,"node":"SWIRL_V2_REJECT","port":59350,"proxy_payload_lengths":[],"same_tuple_retry_after_direct_switch_dropped":true,"source":"198.18.0.1:59354","unexpected_trap_datagrams":0,"upload":0}[0m
+2026-10-30T03:48:23.6106965Z [31;1mWintun smoke: IPv4 UDP proxy_rejected with reachable DIRECT controls[0m
+2026-10-30T03:48:23.6260528Z [31;1mWintun smoke: UDP client stage {"case":"proxy_rejected","family":4,"host":"ipv4.wintun.smoke.invalid","port":59357,"stage":"direct_before_received"}[0m
+2026-10-30T03:48:23.6368301Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59357,"stage":"register control listener and relay"}[0m
+2026-10-30T03:48:23.6391086Z [31;1mWintun smoke: UDP client stage {"context":{"baseline":50,"case":"proxy_rejected","configuration":{"address":"127.0.0.1:50847","applied_mode":"global","applied_revision":"35","engine_epoch":"1421313452792142513","expected_generation":"35","generation":"35","last_receipt":{"address":"127.0.0.1:50847","applied_mode":"global","applied_revision":"35","candidate_digest":"45c571cda2b00dfe1881ffe883d2bf1fe5451da4b803e70338ddeb573a485c83","candidate_revision":"35","durable_receipt":{"plan_digest":"45c571cda2b00dfe1881ffe883d2bf1fe5451da4b803e70338ddeb573a485c83","request_id":"d1000000-0000-4000-8000-000000000023","saved_revision":"35","store_id":"a1000000-0000-4000-8000-000000000001"},"engine_epoch":"1421313452792142513","expected_generation":"35","generation":"35","ok":true,"outcome":"applied","plan_digest":"45c571cda2b00dfe1881ffe883d2bf1fe5451da4b803e70338ddeb573a485c83","request_id":"d1000000-0000-4000-8000-000000000023","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"ok":true,"plan_digest":"45c571cda2b00dfe1881ffe883d2bf1fe5451da4b803e70338ddeb573a485c83","request_id":"","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"destination":"198.18.1.0:59357","family":4,"host":"ipv4.wintun.smoke.invalid","port":59357,"proxy_control":"127.0.0.1:51193","proxy_relay":"127.0.0.1:59358","source":"198.18.0.1:59361"},"stage":"initial_empty_sent"}[0m
+2026-10-30T03:48:23.6402085Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59357,"stage":"accept TCP control"}[0m
+2026-10-30T03:48:23.6403288Z [31;1mWintun smoke: SOCKS5 UDP stage {"control_local":"127.0.0.1:51193","host":"ipv4.wintun.smoke.invalid","port":59357,"relay":"127.0.0.1:59358","source":"127.0.0.1:51195","stage":"control_accepted"}[0m
+2026-10-30T03:48:23.6404434Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59357,"stage":"read TCP greeting"}[0m
+2026-10-30T03:48:23.6406614Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59357,"stage":"write TCP greeting selection"}[0m
+2026-10-30T03:48:23.6408145Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59357,"stage":"read TCP ASSOCIATE header"}[0m
+2026-10-30T03:48:23.6409170Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59357,"stage":"read TCP ASSOCIATE address and port"}[0m
+2026-10-30T03:48:23.6410231Z [31;1mWintun smoke: SOCKS5 UDP stage {"address_bytes":6,"command":[5,3,0,1],"host":"ipv4.wintun.smoke.invalid","port":59357,"stage":"associate_request_validated"}[0m
+2026-10-30T03:48:23.6411233Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv4.wintun.smoke.invalid","port":59357,"stage":"write TCP ASSOCIATE reply"}[0m
+2026-10-30T03:48:23.6412240Z [31;1mWintun smoke: SOCKS5 UDP stage {"host":"ipv4.wintun.smoke.invalid","port":59357,"relay":"127.0.0.1:59358","reply_code":2,"stage":"associate_reply_written"}[0m
+2026-10-30T03:48:23.6728545Z [31;1mWintun smoke: PASS UDP policy {"blocked_retry_payload_bytes":1200,"case":"proxy_rejected","category":"proxy","core_admissions_during_retry":0,"core_record_id":51,"direct_trap_controls":2,"download":0,"ended":true,"error":"UpstreamRejected","family":4,"host":"ipv4.wintun.smoke.invalid","initial_empty_datagram":true,"node":"c1000000-0000-4000-8000-000000000001","port":59357,"proxy_payload_lengths":[],"same_tuple_retry_after_direct_switch_dropped":true,"source":"198.18.0.1:59361","unexpected_trap_datagrams":0,"upload":0}[0m
+2026-10-30T03:48:23.6730758Z [31;1mWintun smoke: IPv4 UDP proxy_unavailable with reachable DIRECT controls[0m
+2026-10-30T03:48:25.7084990Z [31;1mWintun smoke: UDP client stage {"case":"proxy_unavailable","family":4,"host":"ipv4.wintun.smoke.invalid","port":59364,"stage":"direct_before_received"}[0m
+2026-10-30T03:48:25.7174929Z [31;1mWintun smoke: UDP client stage {"context":{"baseline":53,"case":"proxy_unavailable","configuration":{"address":"127.0.0.1:50847","applied_mode":"global","applied_revision":"39","engine_epoch":"1421313452792142513","expected_generation":"39","generation":"39","last_receipt":{"address":"127.0.0.1:50847","applied_mode":"global","applied_revision":"39","candidate_digest":"addc0647920d00587440d649613bb415d3ab7030ef22639674eb42eb530328aa","candidate_revision":"39","durable_receipt":{"plan_digest":"addc0647920d00587440d649613bb415d3ab7030ef22639674eb42eb530328aa","request_id":"d1000000-0000-4000-8000-000000000027","saved_revision":"39","store_id":"a1000000-0000-4000-8000-000000000001"},"engine_epoch":"1421313452792142513","expected_generation":"39","generation":"39","ok":true,"outcome":"applied","plan_digest":"addc0647920d00587440d649613bb415d3ab7030ef22639674eb42eb530328aa","request_id":"d1000000-0000-4000-8000-000000000027","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"ok":true,"plan_digest":"addc0647920d00587440d649613bb415d3ab7030ef22639674eb42eb530328aa","request_id":"","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"destination":"198.18.1.0:59364","family":4,"host":"ipv4.wintun.smoke.invalid","port":59364,"proxy_control":"127.0.0.1:51198","proxy_relay":"127.0.0.1:59365","source":"198.18.0.1:59368"},"stage":"initial_empty_sent"}[0m
+2026-10-30T03:48:27.7670179Z [31;1mWintun smoke: PASS UDP policy {"blocked_retry_payload_bytes":1200,"case":"proxy_unavailable","category":"proxy","core_admissions_during_retry":0,"core_record_id":54,"direct_trap_controls":2,"download":0,"ended":true,"error":"UpstreamConnectionRefused","family":4,"host":"ipv4.wintun.smoke.invalid","initial_empty_datagram":true,"node":"c1000000-0000-4000-8000-000000000001","port":59364,"proxy_payload_lengths":[],"same_tuple_retry_after_direct_switch_dropped":true,"source":"198.18.0.1:59368","unexpected_trap_datagrams":0,"upload":0}[0m
+2026-10-30T03:48:27.7672443Z [31;1mWintun smoke: IPv6 UDP proxy with reachable DIRECT controls[0m
+2026-10-30T03:48:27.7761626Z [31;1mWintun smoke: UDP client stage {"case":"proxy","family":6,"host":"ipv6.wintun.smoke.invalid","port":59371,"stage":"direct_before_received"}[0m
+2026-10-30T03:48:27.7828750Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59371,"stage":"register control listener and relay"}[0m
+2026-10-30T03:48:27.7851007Z [31;1mWintun smoke: UDP client stage {"context":{"baseline":56,"case":"proxy","configuration":{"address":"127.0.0.1:50847","applied_mode":"global","applied_revision":"43","engine_epoch":"1421313452792142513","expected_generation":"43","generation":"43","last_receipt":{"address":"127.0.0.1:50847","applied_mode":"global","applied_revision":"43","candidate_digest":"23bd89e2e46f2147c45f5d21c646a460a155d36b817d1aeb18fc06b36b612bf4","candidate_revision":"43","durable_receipt":{"plan_digest":"23bd89e2e46f2147c45f5d21c646a460a155d36b817d1aeb18fc06b36b612bf4","request_id":"d1000000-0000-4000-8000-00000000002b","saved_revision":"43","store_id":"a1000000-0000-4000-8000-000000000001"},"engine_epoch":"1421313452792142513","expected_generation":"43","generation":"43","ok":true,"outcome":"applied","plan_digest":"23bd89e2e46f2147c45f5d21c646a460a155d36b817d1aeb18fc06b36b612bf4","request_id":"d1000000-0000-4000-8000-00000000002b","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"ok":true,"plan_digest":"23bd89e2e46f2147c45f5d21c646a460a155d36b817d1aeb18fc06b36b612bf4","request_id":"","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"destination":"[fd53:7769:726c::101]:59371","family":6,"host":"ipv6.wintun.smoke.invalid","port":59371,"proxy_control":"[::1]:51203","proxy_relay":"[::1]:59372","source":"[fd53:7769:726c::1]:59375"},"stage":"initial_empty_sent"}[0m
+2026-10-30T03:48:27.7860967Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59371,"stage":"accept TCP control"}[0m
+2026-10-30T03:48:27.7862980Z [31;1mWintun smoke: SOCKS5 UDP stage {"control_local":"[::1]:51203","host":"ipv6.wintun.smoke.invalid","port":59371,"relay":"[::1]:59372","source":"[::1]:51205","stage":"control_accepted"}[0m
+2026-10-30T03:48:27.7865563Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59371,"stage":"read TCP greeting"}[0m
+2026-10-30T03:48:27.7867771Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59371,"stage":"write TCP greeting selection"}[0m
+2026-10-30T03:48:27.7869522Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59371,"stage":"read TCP ASSOCIATE header"}[0m
+2026-10-30T03:48:27.7871472Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59371,"stage":"read TCP ASSOCIATE address and port"}[0m
+2026-10-30T03:48:27.7873980Z [31;1mWintun smoke: SOCKS5 UDP stage {"address_bytes":18,"command":[5,3,0,4],"host":"ipv6.wintun.smoke.invalid","port":59371,"stage":"associate_request_validated"}[0m
+2026-10-30T03:48:27.7876145Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59371,"stage":"write TCP ASSOCIATE reply"}[0m
+2026-10-30T03:48:27.7878650Z [31;1mWintun smoke: SOCKS5 UDP stage {"host":"ipv6.wintun.smoke.invalid","port":59371,"relay":"[::1]:59372","reply_code":0,"stage":"associate_reply_written"}[0m
+2026-10-30T03:48:27.7880647Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59371,"stage":"receive empty UDP relay datagram"}[0m
+2026-10-30T03:48:27.7885000Z [31;1mWintun smoke: SOCKS5 UDP stage {"expected_payload_bytes":0,"host":"ipv6.wintun.smoke.invalid","port":59371,"relay":"[::1]:59372","source":"[::1]:59376","stage":"relay_received","wire_bytes":32}[0m
+2026-10-30T03:48:27.7887315Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59371,"stage":"send empty UDP relay reply"}[0m
+2026-10-30T03:48:27.7889850Z [31;1mWintun smoke: SOCKS5 UDP stage {"host":"ipv6.wintun.smoke.invalid","payload_bytes":0,"port":59371,"source":"[::1]:59376","stage":"relay_reply_sent","wire_bytes":32}[0m
+2026-10-30T03:48:27.7893474Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59371,"stage":"receive full UDP relay datagram"}[0m
+2026-10-30T03:48:27.7896927Z [31;1mWintun smoke: UDP client stage {"bytes":0,"case":"proxy","family":6,"sender":"[fd53:7769:726c::101]:59371","source":"[fd53:7769:726c::1]:59375","stage":"empty_reply_received"}[0m
+2026-10-30T03:48:27.7899768Z [31;1mWintun smoke: SOCKS5 UDP stage {"expected_payload_bytes":1200,"host":"ipv6.wintun.smoke.invalid","port":59371,"relay":"[::1]:59372","source":"[::1]:59376","stage":"relay_received","wire_bytes":1232}[0m
+2026-10-30T03:48:27.7902123Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59371,"stage":"send full UDP relay reply"}[0m
+2026-10-30T03:48:27.7906117Z [31;1mWintun smoke: SOCKS5 UDP stage {"host":"ipv6.wintun.smoke.invalid","payload_bytes":1200,"port":59371,"source":"[::1]:59376","stage":"relay_reply_sent","wire_bytes":1232}[0m
+2026-10-30T03:48:27.7908777Z [31;1mWintun smoke: UDP client stage {"bytes":1200,"case":"proxy","family":6,"sender":"[fd53:7769:726c::101]:59371","source":"[fd53:7769:726c::1]:59375","stage":"full_reply_received"}[0m
+2026-10-30T03:48:27.7912457Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59371,"stage":"wait for Windows to receive both UDP replies"}[0m
+2026-10-30T03:48:27.7915053Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59371,"stage":"shutdown TCP control"}[0m
+2026-10-30T03:48:27.8285022Z [31;1mWintun smoke: PASS UDP policy {"blocked_retry_payload_bytes":1200,"case":"proxy","category":"proxy","core_admissions_during_retry":0,"core_record_id":57,"direct_trap_controls":2,"download":1200,"ended":true,"error":"Socks5UdpControlClosed","family":6,"host":"ipv6.wintun.smoke.invalid","initial_empty_datagram":true,"node":"c1000000-0000-4000-8000-000000000001","port":59371,"proxy_payload_lengths":[0,1200],"same_tuple_retry_after_direct_switch_dropped":true,"source":"[fd53:7769:726c::1]:59375","unexpected_trap_datagrams":0,"upload":1200}[0m
+2026-10-30T03:48:27.8287287Z [31;1mWintun smoke: IPv6 UDP reject with reachable DIRECT controls[0m
+2026-10-30T03:48:27.8373870Z [31;1mWintun smoke: UDP client stage {"case":"reject","family":6,"host":"ipv6.wintun.smoke.invalid","port":59379,"stage":"direct_before_received"}[0m
+2026-10-30T03:48:27.9114148Z [31;1mWintun smoke: UDP client stage {"context":{"baseline":59,"case":"reject","configuration":{"address":"127.0.0.1:50847","applied_mode":"rule","applied_revision":"47","engine_epoch":"1421313452792142513","expected_generation":"47","generation":"47","last_receipt":{"address":"127.0.0.1:50847","applied_mode":"rule","applied_revision":"47","candidate_digest":"ec7182d84eef76c791ae2f1d2fca27854b750cf0a3ef77b64f3f396212153a6b","candidate_revision":"47","durable_receipt":{"plan_digest":"ec7182d84eef76c791ae2f1d2fca27854b750cf0a3ef77b64f3f396212153a6b","request_id":"d1000000-0000-4000-8000-00000000002f","saved_revision":"47","store_id":"a1000000-0000-4000-8000-000000000001"},"engine_epoch":"1421313452792142513","expected_generation":"47","generation":"47","ok":true,"outcome":"applied","plan_digest":"ec7182d84eef76c791ae2f1d2fca27854b750cf0a3ef77b64f3f396212153a6b","request_id":"d1000000-0000-4000-8000-00000000002f","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"ok":true,"plan_digest":"ec7182d84eef76c791ae2f1d2fca27854b750cf0a3ef77b64f3f396212153a6b","request_id":"","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"destination":"[fd53:7769:726c::101]:59379","family":6,"host":"ipv6.wintun.smoke.invalid","port":59379,"proxy_control":"[::1]:51207","proxy_relay":"[::1]:59380","source":"[fd53:7769:726c::1]:59383"},"stage":"initial_empty_sent"}[0m
+2026-10-30T03:48:27.9550964Z [31;1mWintun smoke: PASS UDP policy {"blocked_retry_payload_bytes":1200,"case":"reject","category":"reject","core_admissions_during_retry":0,"core_record_id":60,"direct_trap_controls":2,"download":0,"ended":true,"error":"Rejected","family":6,"host":"ipv6.wintun.smoke.invalid","initial_empty_datagram":true,"node":"SWIRL_V2_REJECT","port":59379,"proxy_payload_lengths":[],"same_tuple_retry_after_direct_switch_dropped":true,"source":"[fd53:7769:726c::1]:59383","unexpected_trap_datagrams":0,"upload":0}[0m
+2026-10-30T03:48:27.9553510Z [31;1mWintun smoke: IPv6 UDP proxy_rejected with reachable DIRECT controls[0m
+2026-10-30T03:48:27.9646885Z [31;1mWintun smoke: UDP client stage {"case":"proxy_rejected","family":6,"host":"ipv6.wintun.smoke.invalid","port":59386,"stage":"direct_before_received"}[0m
+2026-10-30T03:48:27.9724204Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59386,"stage":"register control listener and relay"}[0m
+2026-10-30T03:48:27.9727368Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59386,"stage":"accept TCP control"}[0m
+2026-10-30T03:48:27.9748151Z [31;1mWintun smoke: UDP client stage {"context":{"baseline":62,"case":"proxy_rejected","configuration":{"address":"127.0.0.1:50847","applied_mode":"global","applied_revision":"51","engine_epoch":"1421313452792142513","expected_generation":"51","generation":"51","last_receipt":{"address":"127.0.0.1:50847","applied_mode":"global","applied_revision":"51","candidate_digest":"38122212ecd258f9a42642402baa673da58d99c173e83b1f310854b7f0e42dc9","candidate_revision":"51","durable_receipt":{"plan_digest":"38122212ecd258f9a42642402baa673da58d99c173e83b1f310854b7f0e42dc9","request_id":"d1000000-0000-4000-8000-000000000033","saved_revision":"51","store_id":"a1000000-0000-4000-8000-000000000001"},"engine_epoch":"1421313452792142513","expected_generation":"51","generation":"51","ok":true,"outcome":"applied","plan_digest":"38122212ecd258f9a42642402baa673da58d99c173e83b1f310854b7f0e42dc9","request_id":"d1000000-0000-4000-8000-000000000033","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"ok":true,"plan_digest":"38122212ecd258f9a42642402baa673da58d99c173e83b1f310854b7f0e42dc9","request_id":"","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"destination":"[fd53:7769:726c::101]:59386","family":6,"host":"ipv6.wintun.smoke.invalid","port":59386,"proxy_control":"[::1]:51210","proxy_relay":"[::1]:59387","source":"[fd53:7769:726c::1]:59390"},"stage":"initial_empty_sent"}[0m
+2026-10-30T03:48:27.9758458Z [31;1mWintun smoke: SOCKS5 UDP stage {"control_local":"[::1]:51210","host":"ipv6.wintun.smoke.invalid","port":59386,"relay":"[::1]:59387","source":"[::1]:51212","stage":"control_accepted"}[0m
+2026-10-30T03:48:27.9759900Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59386,"stage":"read TCP greeting"}[0m
+2026-10-30T03:48:27.9761567Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59386,"stage":"write TCP greeting selection"}[0m
+2026-10-30T03:48:27.9762582Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59386,"stage":"read TCP ASSOCIATE header"}[0m
+2026-10-30T03:48:27.9763591Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59386,"stage":"read TCP ASSOCIATE address and port"}[0m
+2026-10-30T03:48:27.9764694Z [31;1mWintun smoke: SOCKS5 UDP stage {"address_bytes":18,"command":[5,3,0,4],"host":"ipv6.wintun.smoke.invalid","port":59386,"stage":"associate_request_validated"}[0m
+2026-10-30T03:48:27.9765759Z [31;1mWintun smoke: SOCKS5 UDP pending {"host":"ipv6.wintun.smoke.invalid","port":59386,"stage":"write TCP ASSOCIATE reply"}[0m
+2026-10-30T03:48:27.9766919Z [31;1mWintun smoke: SOCKS5 UDP stage {"host":"ipv6.wintun.smoke.invalid","port":59386,"relay":"[::1]:59387","reply_code":2,"stage":"associate_reply_written"}[0m
+2026-10-30T03:48:28.0076508Z [31;1mWintun smoke: PASS UDP policy {"blocked_retry_payload_bytes":1200,"case":"proxy_rejected","category":"proxy","core_admissions_during_retry":0,"core_record_id":63,"direct_trap_controls":2,"download":0,"ended":true,"error":"UpstreamRejected","family":6,"host":"ipv6.wintun.smoke.invalid","initial_empty_datagram":true,"node":"c1000000-0000-4000-8000-000000000001","port":59386,"proxy_payload_lengths":[],"same_tuple_retry_after_direct_switch_dropped":true,"source":"[fd53:7769:726c::1]:59390","unexpected_trap_datagrams":0,"upload":0}[0m
+2026-10-30T03:48:28.0079036Z [31;1mWintun smoke: IPv6 UDP proxy_unavailable with reachable DIRECT controls[0m
+2026-10-30T03:48:30.0219883Z [31;1mWintun smoke: UDP client stage {"case":"proxy_unavailable","family":6,"host":"ipv6.wintun.smoke.invalid","port":59393,"stage":"direct_before_received"}[0m
+2026-10-30T03:48:30.0314610Z [31;1mWintun smoke: UDP client stage {"context":{"baseline":65,"case":"proxy_unavailable","configuration":{"address":"127.0.0.1:50847","applied_mode":"global","applied_revision":"55","engine_epoch":"1421313452792142513","expected_generation":"55","generation":"55","last_receipt":{"address":"127.0.0.1:50847","applied_mode":"global","applied_revision":"55","candidate_digest":"9dab01fb35bd80181a949a62d9bd18529af49b8a36cf6cb8f3f8600634e244ac","candidate_revision":"55","durable_receipt":{"plan_digest":"9dab01fb35bd80181a949a62d9bd18529af49b8a36cf6cb8f3f8600634e244ac","request_id":"d1000000-0000-4000-8000-000000000037","saved_revision":"55","store_id":"a1000000-0000-4000-8000-000000000001"},"engine_epoch":"1421313452792142513","expected_generation":"55","generation":"55","ok":true,"outcome":"applied","plan_digest":"9dab01fb35bd80181a949a62d9bd18529af49b8a36cf6cb8f3f8600634e244ac","request_id":"d1000000-0000-4000-8000-000000000037","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"ok":true,"plan_digest":"9dab01fb35bd80181a949a62d9bd18529af49b8a36cf6cb8f3f8600634e244ac","request_id":"","store_id":"a1000000-0000-4000-8000-000000000001","transaction_state":"idle"},"destination":"[fd53:7769:726c::101]:59393","family":6,"host":"ipv6.wintun.smoke.invalid","port":59393,"proxy_control":"[::1]:51215","proxy_relay":"[::1]:59394","source":"[fd53:7769:726c::1]:59397"},"stage":"initial_empty_sent"}[0m
+2026-10-30T03:48:32.2019260Z [31;1mWintun smoke: PASS UDP policy {"blocked_retry_payload_bytes":1200,"case":"proxy_unavailable","category":"proxy","core_admissions_during_retry":0,"core_record_id":66,"direct_trap_controls":2,"download":0,"ended":true,"error":"UpstreamConnectionRefused","family":6,"host":"ipv6.wintun.smoke.invalid","initial_empty_datagram":true,"node":"c1000000-0000-4000-8000-000000000001","port":59393,"proxy_payload_lengths":[],"same_tuple_retry_after_direct_switch_dropped":true,"source":"[fd53:7769:726c::1]:59397","unexpected_trap_datagrams":0,"upload":0}[0m
+2026-10-30T03:48:32.2023438Z [31;1mWintun smoke: restoring owned network state[0m
+2026-10-30T03:49:10.8758948Z [31;1mWintun smoke: recovery report {"already_restored":0,"conflicts":[],"restored":6}[0m
+2026-10-30T03:49:12.9427418Z [31;1mWintun smoke: restored raw state {"before":{"kind":"mtu","mtu":65535},"exact":true,"observed":{"kind":"mtu","mtu":65535},"resource":{"ipv6":false,"kind":"mtu"},"state":"restored"}[0m
+2026-10-30T03:49:15.0100433Z [31;1mWintun smoke: restored raw state {"before":{"kind":"mtu","mtu":65535},"exact":true,"observed":{"kind":"mtu","mtu":65535},"resource":{"ipv6":true,"kind":"mtu"},"state":"restored"}[0m
+2026-10-30T03:49:17.1024119Z [31;1mWintun smoke: restored raw state {"before":null,"exact":true,"observed":null,"resource":{"address":"198.18.0.1","kind":"address"},"state":"restored"}[0m
+2026-10-30T03:49:19.1747137Z [31;1mWintun smoke: restored raw state {"before":null,"exact":true,"observed":null,"resource":{"address":"fd53:7769:726c::1","kind":"address"},"state":"restored"}[0m
+2026-10-30T03:49:21.3185974Z [31;1mWintun smoke: restored raw state {"before":null,"exact":true,"observed":null,"resource":{"destination":"198.18.1.0/32","kind":"route","next_hop":"0.0.0.0"},"state":"restored"}[0m
+2026-10-30T03:49:23.4111474Z [31;1mWintun smoke: restored raw state {"before":null,"exact":true,"observed":null,"resource":{"destination":"fd53:7769:726c::101/128","kind":"route","next_hop":"::"},"state":"restored"}[0m
+2026-10-30T03:49:23.4701889Z [31;1mWintun smoke: PASS packet resources released[0m
+2026-10-30T03:49:25.5650344Z [31;1mWintun smoke: PASS default/split-default routes unchanged[0m
+2026-10-30T03:49:25.5651409Z [31;1mWintun smoke: PASS owned Wintun adapter removed[0m
+2026-10-30T03:49:28.2925341Z [31;1mWintun smoke: exact network configuration verification {"adapters_after":8,"adapters_before":8,"adapters_equal":true,"all_routes_equal":true,"routes_after":26,"routes_before":26}[0m
+2026-10-30T03:49:28.2958245Z {"adapter_removed":true,"additional_cases":{"direct_trap_controls_before_and_after":true,"dns_tcp_ipv4":true,"dns_tcp_ipv6":true,"dns_ttl":30,"fake_ip_persisted_reopen":true,"long_duration_soak_acceptance":false,"native_http_connect_ipv4":true,"native_http_connect_ipv6":true,"original_network_configuration_exact":true,"proxy_failure_cases":["http_403_rejected","connection_refused"],"proxy_failure_no_direct_ipv4":true,"proxy_failure_no_direct_ipv6":true,"reject_tcp_ipv4":true,"reject_tcp_ipv6":true,"tcp_policy":{"direct":true,"families":[4,6],"proxy":true,"proxy_failure_no_direct":["UpstreamRejected","UpstreamConnectionRefused"],"reject":true,"transport":"native_http_connect"},"tcp_reuse_payload_bytes_each_round":4096,"tcp_reuse_rounds_each_family":64,"udp_policy":{"direct":true,"failed_source_tuple_no_redial_after_direct_switch":true,"families":[4,6],"proxy":true,"proxy_failure_no_direct":["UpstreamRejected","UpstreamConnectionRefused","Socks5UdpControlClosed"],"proxy_payload_lengths":[0,1200],"reject":true,"results":[{"blocked_retry_payload_bytes":1200,"case":"proxy","category":"proxy","core_admissions_during_retry":0,"core_record_id":45,"direct_trap_controls":2,"download":1200,"ended":true,"error":"Socks5UdpControlClosed","family":4,"host":"ipv4.wintun.smoke.invalid","initial_empty_datagram":true,"node":"c1000000-0000-4000-8000-000000000001","port":59342,"proxy_payload_lengths":[0,1200],"same_tuple_retry_after_direct_switch_dropped":true,"source":"198.18.0.1:59346","unexpected_trap_datagrams":0,"upload":1200},{"blocked_retry_payload_bytes":1200,"case":"reject","category":"reject","core_admissions_during_retry":0,"core_record_id":48,"direct_trap_controls":2,"download":0,"ended":true,"error":"Rejected","family":4,"host":"ipv4.wintun.smoke.invalid","initial_empty_datagram":true,"node":"SWIRL_V2_REJECT","port":59350,"proxy_payload_lengths":[],"same_tuple_retry_after_direct_switch_dropped":true,"source":"198.18.0.1:59354","unexpected_trap_datagrams":0,"upload":0},{"blocked_retry_payload_bytes":1200,"case":"proxy_rejected","category":"proxy","core_admissions_during_retry":0,"core_record_id":51,"direct_trap_controls":2,"download":0,"ended":true,"error":"UpstreamRejected","family":4,"host":"ipv4.wintun.smoke.invalid","initial_empty_datagram":true,"node":"c1000000-0000-4000-8000-000000000001","port":59357,"proxy_payload_lengths":[],"same_tuple_retry_after_direct_switch_dropped":true,"source":"198.18.0.1:59361","unexpected_trap_datagrams":0,"upload":0},{"blocked_retry_payload_bytes":1200,"case":"proxy_unavailable","category":"proxy","core_admissions_during_retry":0,"core_record_id":54,"direct_trap_controls":2,"download":0,"ended":true,"error":"UpstreamConnectionRefused","family":4,"host":"ipv4.wintun.smoke.invalid","initial_empty_datagram":true,"node":"c1000000-0000-4000-8000-000000000001","port":59364,"proxy_payload_lengths":[],"same_tuple_retry_after_direct_switch_dropped":true,"source":"198.18.0.1:59368","unexpected_trap_datagrams":0,"upload":0},{"blocked_retry_payload_bytes":1200,"case":"proxy","category":"proxy","core_admissions_during_retry":0,"core_record_id":57,"direct_trap_controls":2,"download":1200,"ended":true,"error":"Socks5UdpControlClosed","family":6,"host":"ipv6.wintun.smoke.invalid","initial_empty_datagram":true,"node":"c1000000-0000-4000-8000-000000000001","port":59371,"proxy_payload_lengths":[0,1200],"same_tuple_retry_after_direct_switch_dropped":true,"source":"[fd53:7769:726c::1]:59375","unexpected_trap_datagrams":0,"upload":1200},{"blocked_retry_payload_bytes":1200,"case":"reject","category":"reject","core_admissions_during_retry":0,"core_record_id":60,"direct_trap_controls":2,"download":0,"ended":true,"error":"Rejected","family":6,"host":"ipv6.wintun.smoke.invalid","initial_empty_datagram":true,"node":"SWIRL_V2_REJECT","port":59379,"proxy_payload_lengths":[],"same_tuple_retry_after_direct_switch_dropped":true,"source":"[fd53:7769:726c::1]:59383","unexpected_trap_datagrams":0,"upload":0},{"blocked_retry_payload_bytes":1200,"case":"proxy_rejected","category":"proxy","core_admissions_during_retry":0,"core_record_id":63,"direct_trap_controls":2,"download":0,"ended":true,"error":"UpstreamRejected","family":6,"host":"ipv6.wintun.smoke.invalid","initial_empty_datagram":true,"node":"c1000000-0000-4000-8000-000000000001","port":59386,"proxy_payload_lengths":[],"same_tuple_retry_after_direct_switch_dropped":true,"source":"[fd53:7769:726c::1]:59390","unexpected_trap_datagrams":0,"upload":0},{"blocked_retry_payload_bytes":1200,"case":"proxy_unavailable","category":"proxy","core_admissions_during_retry":0,"core_record_id":66,"direct_trap_controls":2,"download":0,"ended":true,"error":"UpstreamConnectionRefused","family":6,"host":"ipv6.wintun.smoke.invalid","initial_empty_datagram":true,"node":"c1000000-0000-4000-8000-000000000001","port":59393,"proxy_payload_lengths":[],"same_tuple_retry_after_direct_switch_dropped":true,"source":"[fd53:7769:726c::1]:59397","unexpected_trap_datagrams":0,"upload":0}],"transport":"native_socks5_udp"},"verified_dot_fixture":true,"windows_tcp_rst_ipv4":true,"windows_tcp_rst_ipv6":true},"default_routes_unchanged":true,"dns_a":true,"dns_aaaa":true,"driver_sha256":"e5da8447dc2c320edc0fc52fa01885c103de8c118481f683643cacc3220dafce","driver_version":"0.14.1","evidence":"Windows Wintun scoped loopback smoke","firewall_modified":false,"interface_index":20,"ok":true,"owned_network_state_restored":true,"physical_dns_modified":false,"source_sha":"8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e","tcp_ipv4":true,"tcp_ipv6":true,"tcp_payload_bytes_each_family":262144,"tcp_reply_after_client_fin":true,"udp_ipv4":true,"udp_ipv6":true,"udp_payload_lengths":[0,1200],"windows_11_application_acceptance":false,"wintun_received_packets":1998,"wintun_sent_packets":1737}
+2026-10-30T03:49:28.3567100Z ##[group]Run actions/upload-artifact@v4
+2026-10-30T03:49:28.3567777Z with:
+2026-10-30T03:49:28.3568328Z   name: native-tun-backend-Windows-8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e
+2026-10-30T03:49:28.3569547Z   path: core/target/release/swirl_api.dll
+core/target/release/libswirl_api.so
+core/target/release/swirl-tun-helper.exe
+core/target/release/swirl-tun-helper
+D:\a\_temp/swirl-native-notices/
+D:\a\_temp/swirl-wintun-smoke.log
+
+2026-10-30T03:49:28.3570555Z   if-no-files-found: error
+2026-10-30T03:49:28.3570839Z   retention-days: 7
+2026-10-30T03:49:28.3571112Z   compression-level: 6
+2026-10-30T03:49:28.3571409Z   overwrite: false
+2026-10-30T03:49:28.3571676Z   include-hidden-files: false
+2026-10-30T03:49:28.3571963Z env:
+2026-10-30T03:49:28.3572267Z   SWIRL_SOURCE_SHA: 8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e
+2026-10-30T03:49:28.3572644Z   CACHE_ON_FAILURE: true
+2026-10-30T03:49:28.3572940Z   CARGO_INCREMENTAL: 0
+2026-10-30T03:49:28.3573199Z ##[endgroup]
+2026-10-30T03:49:28.5523559Z (node:3764) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-30T03:49:28.5524971Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-30T03:49:28.8003017Z Multiple search paths detected. Calculating the least common ancestor of all paths
+2026-10-30T03:49:28.8006721Z The least common ancestor is D:\a. This will be the root directory of the artifact
+2026-10-30T03:49:28.8007949Z With the provided path, there will be 393 files uploaded
+2026-10-30T03:49:28.8014018Z Artifact name is valid!
+2026-10-30T03:49:28.8016065Z Root directory input is valid!
+2026-10-30T03:49:29.0242966Z Beginning upload of artifact content to blob storage
+2026-10-30T03:49:29.7878951Z (node:3764) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-10-30T03:49:30.0700464Z Uploaded bytes 8388608
+2026-10-30T03:49:30.4360317Z Uploaded bytes 12081544
+2026-10-30T03:49:30.4523523Z Finished uploading artifact content to blob storage!
+2026-10-30T03:49:30.4526088Z SHA256 digest of uploaded artifact zip is 5ff440b07eb9fd434729dd32bb07ad9856803075a233fe4f754873dd06b58b10
+2026-10-30T03:49:30.4528720Z Finalizing artifact upload
+2026-10-30T03:49:30.8660000Z Artifact native-tun-backend-Windows-8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e.zip successfully finalized. Artifact ID 12952608036
+2026-10-30T03:49:30.8661746Z Artifact native-tun-backend-Windows-8e0ec5c8ab163f77e3f357e17ffcf9b02d12d74e has been successfully uploaded! Final size is 12081544 bytes. Artifact ID is 12952608036
+2026-10-30T03:49:30.8671869Z Artifact download URL: https://github.com/SOLHK/Swirl/actions/runs/40998240151/artifacts/12952608036
+2026-10-30T03:49:30.9187122Z Post job cleanup.
+2026-10-30T03:49:31.0677742Z Cache up-to-date.
+2026-10-30T03:49:31.0991444Z Post job cleanup.
+2026-10-30T03:49:31.2919812Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-30T03:49:31.3264312Z git version 2.56.0.windows.2
+2026-10-30T03:49:31.3343517Z Temporarily overriding HOME='D:\a\_temp\fa1d94fe-7277-47b0-92cd-4d1850327a83' before making global git config changes
+2026-10-30T03:49:31.3345176Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-30T03:49:31.3356651Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\Swirl\Swirl
+2026-10-30T03:49:31.3786414Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-30T03:49:31.4211135Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-30T03:49:31.9573329Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-30T03:49:31.9933500Z http.https://github.com/.extraheader
+2026-10-30T03:49:31.9985873Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-10-30T03:49:32.0364657Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-30T03:49:32.5736768Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-30T03:49:32.6103531Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-30T03:49:33.1713521Z Cleaning up orphan processes
+2026-10-30T03:49:33.1879644Z Terminate orphan process: pid (9028) (vctip)
+2026-10-30T03:49:33.2353290Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

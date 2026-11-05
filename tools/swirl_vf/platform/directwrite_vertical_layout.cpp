@@ -2,7 +2,7 @@
 // Build: cl /std:c++17 /EHsc /W4 /utf-8 directwrite_vertical_layout.cpp
 //        /link dwrite.lib d2d1.lib bcrypt.lib
 // The Python driver supplies only its independent geometric-symbol fixture.
-// stdin: id H|V zh-CN|zh-HK vert|vrt2|vkrn default|enabled|disabled
+// stdin: id H|V zh-CN|zh-HK vert|vrt2|vkrn|vpal|dist default|enabled|disabled
 //        WDTH wght HGHT mixed|single_han (one request per line).
 // This observes real TextLayout::Draw callbacks, not a reconstructed glyph run.
 // It does not certify rasterization, Windows 11, Qt, or an Apple conversion.
@@ -88,24 +88,32 @@ static std::string axisJSON(const std::vector<DWRITE_FONT_AXIS_VALUE>& axes) {
     for (size_t i=0;i<axes.size();++i) out << (i?",":"") << quoted(tagString(axes[i].axisTag)) << ':' << axes[i].value;
     return out.str()+'}';
 }
-static void verifyAxes(const std::vector<DWRITE_FONT_AXIS_VALUE>& actual,
-                       const std::vector<DWRITE_FONT_AXIS_VALUE>& requested) {
+static bool verifyAxes(const std::vector<DWRITE_FONT_AXIS_VALUE>& actual,
+                       const std::vector<DWRITE_FONT_AXIS_VALUE>& requested, bool observeMismatch=false) {
     std::set<UINT32> seen;
+    bool equal=true;
     for (const auto& a : actual) require(std::isfinite(a.value) && seen.insert(a.axisTag).second, "invalid_or_duplicate_axis_observation");
     for (const auto& wanted : requested) {
         auto found = std::find_if(actual.begin(),actual.end(),[&](auto a){return a.axisTag == wanted.axisTag;});
-        require(found != actual.end() && found->value == wanted.value, "actual_layout_face_axis_ignored_or_clamped");
+        require(found != actual.end(), "actual_layout_face_axis_missing");
+        equal = equal && found->value == wanted.value;
     }
+    if (!equal && !observeMismatch)
+        throw ProbeError("actual_layout_face_axis_ignored_or_clamped:requested="+axisJSON(requested)+";actual="+axisJSON(actual));
+    return equal;
 }
 
 // Denying writes and deletion binds hashing, collection loading and all callback
 // identities to the same physical input. Keys and raw table bytes stay private.
 struct LockedFixture {
     HANDLE handle = INVALID_HANDLE_VALUE;
+    bool cff2Control = false;
+    UINT16 unitsPerEm = 1000;
     std::vector<uint8_t> bytes;
     std::map<UINT32,std::pair<UINT32,UINT32>> tables;
     std::string digest;
-    explicit LockedFixture(const wchar_t* path) {
+    explicit LockedFixture(const wchar_t* path, bool isCFF2Control=false, bool scaledControl=false)
+        : cff2Control(isCFF2Control), unitsPerEm(scaledControl ? 16000 : 1000) {
         handle = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
         require(handle != INVALID_HANDLE_VALUE, "cannot_lock_fixture");
         try {
@@ -113,7 +121,8 @@ struct LockedFixture {
             require(GetFileSizeEx(handle,&size) && size.QuadPart >= 12 && size.QuadPart <= 8*1024*1024, "fixture_size_out_of_scope");
             bytes.resize(size_t(size.QuadPart)); DWORD count = 0;
             require(ReadFile(handle,bytes.data(),DWORD(bytes.size()),&count,nullptr) && count == bytes.size(), "fixture_read_failed");
-            require(be32(bytes.data()) == 0x00010000, "single_TrueType_fixture_required");
+            require(be32(bytes.data()) == (cff2Control ? 0x4f54544f : 0x00010000),
+                    "explicit_authored_outline_format_required");
             UINT32 n = be16(bytes.data()+4); require(n && 12+16*n <= bytes.size(), "invalid_sfnt_directory");
             for (UINT32 i=0;i<n;++i) {
                 const uint8_t* p = bytes.data()+12+16*i;
@@ -126,7 +135,14 @@ struct LockedFixture {
                 return bytes.data()+found->second.first;
             };
             require(be16(get(DWRITE_MAKE_OPENTYPE_TAG('m','a','x','p'),6)+4)==8, "fixture_requires_eight_glyphs");
-            require(be16(get(DWRITE_MAKE_OPENTYPE_TAG('h','e','a','d'),20)+18)==1000, "fixture_requires_UPM_1000");
+            if (cff2Control) {
+                require(be32(get(DWRITE_MAKE_OPENTYPE_TAG('m','a','x','p'),6))==0x00005000
+                        && get(DWRITE_MAKE_OPENTYPE_TAG('C','F','F','2'),5)[0]==2
+                        && !tables.count(DWRITE_MAKE_OPENTYPE_TAG('g','l','y','f'))
+                        && !tables.count(DWRITE_MAKE_OPENTYPE_TAG('g','v','a','r')),
+                        "authored_CFF2_structure_mismatch");
+            }
+            require(be16(get(DWRITE_MAKE_OPENTYPE_TAG('h','e','a','d'),20)+18)==unitsPerEm, "fixture_UPM_differs_from_explicit_control");
             const auto fvar = tables.at(DWRITE_MAKE_OPENTYPE_TAG('f','v','a','r'));
             const uint8_t* p = get(DWRITE_MAKE_OPENTYPE_TAG('f','v','a','r'),16);
             UINT32 offset = be16(p+4), stride = be16(p+10);
@@ -172,7 +188,7 @@ struct Request {
         require(bool(in>>parsedId>>direction>>locale>>route>>policy>>requested[0]>>requested[1]>>requested[2]>>textKind) && !(in>>extra), "invalid_request_fields");
         require(parsedId>0 && parsedId<=100000, "request_id_out_of_scope"); id=unsigned(parsedId);
         require((direction=="H" || direction=="V") && (locale=="zh-CN" || locale=="zh-HK")
-                && (route=="vert" || route=="vrt2" || route=="vkrn")
+                && (route=="vert" || route=="vrt2" || route=="vkrn" || route=="vpal" || route=="dist")
                 && (policy=="default" || policy=="enabled" || policy=="disabled")
                 && (textKind=="mixed" || textKind=="single_han"),"unsupported_layout_request");
         for (unsigned i=0;i<3;++i) {
@@ -185,6 +201,7 @@ struct Request {
 
 struct Environment {
     const LockedFixture& source;
+    bool observeAxisEcho = false;
     ComPtr<IDWriteFactory6> factory;
     ComPtr<ID2D1Factory> d2d;
     ComPtr<IDWriteTextAnalyzer2> analyzer;
@@ -193,7 +210,7 @@ struct Environment {
     ComPtr<IDWriteFontFallback> noFallback;
     ComPtr<IUnknown> loaderIdentity;
     std::vector<uint8_t> fileKey;
-    explicit Environment(const LockedFixture& input,const wchar_t* path) : source(input) {
+    explicit Environment(const LockedFixture& input,const wchar_t* path,bool observe=false) : source(input), observeAxisEcho(observe) {
         checked(DWriteCreateFactory(DWRITE_FACTORY_TYPE_ISOLATED,__uuidof(IDWriteFactory6),reinterpret_cast<IUnknown**>(factory.GetAddressOf())),"DWriteCreateFactory6");
         checked(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED,d2d.GetAddressOf()),"D2D1CreateFactory");
         ComPtr<IDWriteTextAnalyzer> baseAnalyzer;
@@ -202,7 +219,8 @@ struct Environment {
         checked(factory->CreateFontFileReference(path,nullptr,file.GetAddressOf()),"CreateFontFileReference");
         BOOL supported=FALSE; DWRITE_FONT_FILE_TYPE fileType{}; DWRITE_FONT_FACE_TYPE faceType{}; UINT32 faces=0;
         checked(file->Analyze(&supported,&fileType,&faceType,&faces),"Analyze");
-        require(supported && faces==1 && faceType==DWRITE_FONT_FACE_TYPE_TRUETYPE,"single_supported_TrueType_face_required");
+        const auto expectedFace=source.cff2Control ? DWRITE_FONT_FACE_TYPE_CFF : DWRITE_FONT_FACE_TYPE_TRUETYPE;
+        require(supported && faces==1 && faceType==expectedFace,"single_supported_authored_face_type_required");
         const void* key=nullptr; UINT32 size=0;
         checked(file->GetReferenceKey(&key,&size),"GetReferenceKey");
         require(key && size,"empty_reference_key");
@@ -223,7 +241,8 @@ struct Environment {
         checked(fallbackBuilder->CreateFontFallback(noFallback.GetAddressOf()),"CreateEmptyFontFallback");
     }
     std::vector<DWRITE_FONT_AXIS_VALUE> verifyFace(IDWriteFontFace* face,const Request& request) const {
-        require(face && face->GetIndex()==0 && face->GetGlyphCount()==8 && face->GetSimulations()==DWRITE_FONT_SIMULATIONS_NONE,
+        require(face && face->GetType()==(source.cff2Control ? DWRITE_FONT_FACE_TYPE_CFF : DWRITE_FONT_FACE_TYPE_TRUETYPE)
+                && face->GetIndex()==0 && face->GetGlyphCount()==8 && face->GetSimulations()==DWRITE_FONT_SIMULATIONS_NONE,
                 "wrong_physical_face_or_font_simulation");
         UINT32 count=0; checked(face->GetFiles(&count,nullptr),"GetFiles(count)"); require(count==1,"layout_face_file_count_mismatch");
         ComPtr<IDWriteFontFile> actualFile;
@@ -236,12 +255,12 @@ struct Environment {
         checked(loader.As(&identity),"QueryInterface(actual loader identity)");
         require(identity.Get()==loaderIdentity.Get(),"layout_font_loader_mismatch");
         source.verifyTables(face);
-        DWRITE_FONT_METRICS metrics{}; face->GetMetrics(&metrics); require(metrics.designUnitsPerEm==1000,"layout_UPM_mismatch");
+        DWRITE_FONT_METRICS metrics{}; face->GetMetrics(&metrics); require(metrics.designUnitsPerEm==source.unitsPerEm,"layout_UPM_mismatch");
         ComPtr<IDWriteFontFace5> axisFace; checked(face->QueryInterface(IID_PPV_ARGS(axisFace.GetAddressOf())),"QueryInterface(actual layout FontFace5)");
         require(axisFace->HasVariations(),"static_face_fallback");
         std::vector<DWRITE_FONT_AXIS_VALUE> values(axisFace->GetFontAxisValueCount());
         checked(axisFace->GetFontAxisValues(values.data(),UINT32(values.size())),"GetFontAxisValues(actual_layout_face)");
-        verifyAxes(values,request.axes); return values;
+        verifyAxes(values,request.axes,observeAxisEcho); return values;
     }
 };
 
@@ -313,6 +332,7 @@ struct Renderer final : IDWriteTextRenderer1 {
                 << ",\"is_sideways\":" << (run->isSideways?"true":"false") << ",\"bidi_level\":" << run->bidiLevel
                 << ",\"measuring_mode\":" << unsigned(mode) << ",\"font_em_size\":" << run->fontEmSize
                 << ",\"source_identity_verified\":true,\"physical_face_index\":0,\"simulations\":0,\"actual_face_axes\":" << axisJSON(values)
+                << ",\"raw_axis_echo_matches\":" << (verifyAxes(values,request.axes,true)?"true":"false")
                 << ",\"orientation_transform\":[" << orientation.m11 << ',' << orientation.m12 << ',' << orientation.m21 << ',' << orientation.m22 << ',' << orientation.dx << ',' << orientation.dy
                 << "],\"local_ink_bounds\":" << local << ",\"layout_ink_bounds\":" << placed << ",\"baseline_relative_ink_bounds\":" << relative << ",\"cluster_map\":[";
             for (UINT32 i=0;i<desc->stringLength;++i) { require(desc->clusterMap[i]<run->glyphCount,"cluster_map_out_of_bounds"); out << (i?",":"") << desc->clusterMap[i]; }
@@ -391,15 +411,21 @@ static std::string observe(const Environment& env,const Request& request) {
 int wmain(int argc,wchar_t** argv) {
     unsigned currentId=0, requests=0, glyphs=0;
     try {
-        require(argc==2,"usage_directwrite_vertical_layout_FONT");
+        const bool cff2Control=argc>=3 && std::wstring(argv[2])==L"--authored-cff2";
+        const bool observeEcho=argc>=4 && cff2Control && std::wstring(argv[3])==L"--observe-axis-echo";
+        const bool scaledControl=argc==5 && observeEcho && std::wstring(argv[4])==L"--authored-upm16";
+        require(argc==2 || (argc==3 && cff2Control) || (argc==4 && observeEcho) || scaledControl,
+                "usage_directwrite_vertical_layout_FONT_optional_authored_cff2_observe_axis_echo_authored_upm16");
         const auto path=std::filesystem::absolute(argv[1]);
-        LockedFixture source(path.c_str()); Environment env(source,path.c_str());
+        LockedFixture source(path.c_str(),cff2Control,scaledControl); Environment env(source,path.c_str(),observeEcho);
         OSVERSIONINFOEXW version{}; version.dwOSVersionInfoSize=sizeof(version);
         using VersionFn=LONG (WINAPI*)(OSVERSIONINFOW*);
         auto versionFn=reinterpret_cast<VersionFn>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"),"RtlGetVersion"));
         require(versionFn && versionFn(reinterpret_cast<OSVERSIONINFOW*>(&version))==0,"cannot_observe_Windows_version");
         std::cout << "{\"type\":\"metadata\",\"backend\":\"DirectWrite_TextLayout4_TextRenderer1\",\"source_sha256\":" << quoted(source.digest)
-            << ",\"source_bytes\":" << source.bytes.size() << ",\"physical_face_count\":1,\"glyph_count\":8,\"units_per_em\":1000,\"font_em_size_DIP\":1000"
+            << ",\"authored_outline_kind\":" << quoted(cff2Control ? "CFF2" : "TrueType")
+            << ",\"axis_echo_policy\":" << quoted(observeEcho ? "OBSERVE_RAW_FAILURES" : "STRICT")
+            << ",\"source_bytes\":" << source.bytes.size() << ",\"physical_face_count\":1,\"glyph_count\":8,\"units_per_em\":" << source.unitsPerEm << ",\"font_em_size_DIP\":1000"
             << ",\"font_family\":\"Swirl Original GPOS Laboratory\",\"custom_collection_only\":true,\"empty_fallback\":true,\"pixel_snapping_disabled\":true"
             << ",\"Windows_version\":{\"major\":" << version.dwMajorVersion << ",\"minor\":" << version.dwMinorVersion << ",\"build\":" << version.dwBuildNumber
             << ",\"product_type\":" << unsigned(version.wProductType) << "},\"windows_11_acceptance\":\"NOT_RUN\",\"Qt_acceptance\":\"NOT_RUN\"}" << std::endl;

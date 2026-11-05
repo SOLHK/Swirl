@@ -1,0 +1,333 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-30T03:32:47.764630+00:00",
+  "branch_head": "ab0cde76115b3da97029b1042466e1beb8663fa1",
+  "checked_out_source_sha": "f2e26c7260ab0780d576259d4ea166c6a8e8dfd6",
+  "source_tree": "034fcfce716e4c69befc912a7350f9d020eb9c81",
+  "ci": {
+    "run_id": 40996154340,
+    "job_id": 123870094093,
+    "run_url": "https://github.com/SOLHK/Swirl/actions/runs/40996154340",
+    "job_url": "https://github.com/SOLHK/Swirl/actions/runs/40996154340/job/123870094093",
+    "conclusion": "failure"
+  },
+  "raw_log": {
+    "file": "windows-wintun-ab0cde7-failed-job.log",
+    "sha256": "06f5ecd2c8fef19aa0cb1c68254f89f13cfcb907d0f9bc5de615b00f9ad1bc2a",
+    "bytes": 135546,
+    "preservation": "Complete decoded GitHub job text. Windows CRLF is normalized to LF for repository text storage; all entries, values, timestamps, BOM and ANSI sequences are retained. SHA-256 and byte length refer to the stored UTF-8 text, not an HTTP archive or pre-normalization byte stream."
+  },
+  "selected_package_test_totals": {
+    "passed": 592,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered": 0
+  },
+  "selected_package_result_groups": 34,
+  "driver_result": {
+    "ok": false,
+    "last_started_case": {
+      "family": 6,
+      "transport": "UDP",
+      "case": "proxy"
+    },
+    "completed_udp_policy_cases": [
+      {
+        "blocked_retry_payload_bytes": 1200,
+        "case": "proxy",
+        "category": "proxy",
+        "core_admissions_during_retry": 0,
+        "core_record_id": 45,
+        "direct_trap_controls": 2,
+        "download": 1200,
+        "ended": true,
+        "error": "Socks5UdpControlClosed",
+        "family": 4,
+        "host": "ipv4.wintun.smoke.invalid",
+        "initial_empty_datagram": true,
+        "node": "c1000000-0000-4000-8000-000000000001",
+        "port": 55094,
+        "proxy_payload_lengths": [
+          0,
+          1200
+        ],
+        "same_tuple_retry_after_direct_switch_dropped": true,
+        "source": "198.18.0.1:55098",
+        "unexpected_trap_datagrams": 0,
+        "upload": 1200
+      },
+      {
+        "blocked_retry_payload_bytes": 1200,
+        "case": "reject",
+        "category": "reject",
+        "core_admissions_during_retry": 0,
+        "core_record_id": 48,
+        "direct_trap_controls": 2,
+        "download": 0,
+        "ended": true,
+        "error": "Rejected",
+        "family": 4,
+        "host": "ipv4.wintun.smoke.invalid",
+        "initial_empty_datagram": true,
+        "node": "SWIRL_V2_REJECT",
+        "port": 55102,
+        "proxy_payload_lengths": [],
+        "same_tuple_retry_after_direct_switch_dropped": true,
+        "source": "198.18.0.1:55106",
+        "unexpected_trap_datagrams": 0,
+        "upload": 0
+      },
+      {
+        "blocked_retry_payload_bytes": 1200,
+        "case": "proxy_rejected",
+        "category": "proxy",
+        "core_admissions_during_retry": 0,
+        "core_record_id": 51,
+        "direct_trap_controls": 2,
+        "download": 0,
+        "ended": true,
+        "error": "UpstreamRejected",
+        "family": 4,
+        "host": "ipv4.wintun.smoke.invalid",
+        "initial_empty_datagram": true,
+        "node": "c1000000-0000-4000-8000-000000000001",
+        "port": 55109,
+        "proxy_payload_lengths": [],
+        "same_tuple_retry_after_direct_switch_dropped": true,
+        "source": "198.18.0.1:55113",
+        "unexpected_trap_datagrams": 0,
+        "upload": 0
+      },
+      {
+        "blocked_retry_payload_bytes": 1200,
+        "case": "proxy_unavailable",
+        "category": "proxy",
+        "core_admissions_during_retry": 0,
+        "core_record_id": 54,
+        "direct_trap_controls": 2,
+        "download": 0,
+        "ended": true,
+        "error": "UpstreamConnectionRefused",
+        "family": 4,
+        "host": "ipv4.wintun.smoke.invalid",
+        "initial_empty_datagram": true,
+        "node": "c1000000-0000-4000-8000-000000000001",
+        "port": 55116,
+        "proxy_payload_lengths": [],
+        "same_tuple_retry_after_direct_switch_dropped": true,
+        "source": "198.18.0.1:55120",
+        "unexpected_trap_datagrams": 0,
+        "upload": 0
+      }
+    ],
+    "failure_lines": [
+      "2026-10-30T03:26:47.0640870Z Wintun smoke: peer failure [SOCKS5 UDP host=ipv6.wintun.smoke.invalid reject=false]: An existing connection was forcibly closed by the remote host. (os error 10054)",
+      "2026-10-30T03:27:43.9886083Z windows-tun-smoke failed: data tests: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond. (os error 10060)"
+    ],
+    "diagnostic_boundary": "The Windows client reported WSAETIMEDOUT (10060) during IPv6 UDP proxy. The protocol peer reported WSAECONNRESET (10054) at cleanup. This log does not identify which SOCKS5 protocol stage or first/full reply stalled; stage-specific diagnostics are required. Four IPv4 UDP policy cases passed; zero IPv6 UDP policy cases passed. Do not count the run as acceptance success."
+  },
+  "pre_validation_resources": [
+    {
+      "observed": {
+        "kind": "mtu",
+        "mtu": 65535
+      },
+      "requested": {
+        "kind": "mtu",
+        "mtu": 1500
+      },
+      "resource": {
+        "ipv6": false,
+        "kind": "mtu"
+      }
+    },
+    {
+      "observed": {
+        "kind": "mtu",
+        "mtu": 65535
+      },
+      "requested": {
+        "kind": "mtu",
+        "mtu": 1500
+      },
+      "resource": {
+        "ipv6": true,
+        "kind": "mtu"
+      }
+    },
+    {
+      "observed": null,
+      "requested": {
+        "kind": "address",
+        "prefix_len": 30,
+        "skip_as_source": false
+      },
+      "resource": {
+        "address": "198.18.0.1",
+        "kind": "address"
+      }
+    },
+    {
+      "observed": null,
+      "requested": {
+        "kind": "address",
+        "prefix_len": 126,
+        "skip_as_source": false
+      },
+      "resource": {
+        "address": "fd53:7769:726c::1",
+        "kind": "address"
+      }
+    },
+    {
+      "observed": null,
+      "requested": {
+        "kind": "route",
+        "metric": 5
+      },
+      "resource": {
+        "destination": "198.18.1.0/32",
+        "kind": "route",
+        "next_hop": "0.0.0.0"
+      }
+    },
+    {
+      "observed": null,
+      "requested": {
+        "kind": "route",
+        "metric": 5
+      },
+      "resource": {
+        "destination": "fd53:7769:726c::101/128",
+        "kind": "route",
+        "next_hop": "::"
+      }
+    }
+  ],
+  "recovery_report": {
+    "already_restored": 0,
+    "conflicts": [],
+    "restored": 6
+  },
+  "restored_resources": [
+    {
+      "before": {
+        "kind": "mtu",
+        "mtu": 65535
+      },
+      "exact": true,
+      "observed": {
+        "kind": "mtu",
+        "mtu": 65535
+      },
+      "resource": {
+        "ipv6": false,
+        "kind": "mtu"
+      },
+      "state": "restored"
+    },
+    {
+      "before": {
+        "kind": "mtu",
+        "mtu": 65535
+      },
+      "exact": true,
+      "observed": {
+        "kind": "mtu",
+        "mtu": 65535
+      },
+      "resource": {
+        "ipv6": true,
+        "kind": "mtu"
+      },
+      "state": "restored"
+    },
+    {
+      "before": null,
+      "exact": true,
+      "observed": null,
+      "resource": {
+        "address": "198.18.0.1",
+        "kind": "address"
+      },
+      "state": "restored"
+    },
+    {
+      "before": null,
+      "exact": true,
+      "observed": null,
+      "resource": {
+        "address": "fd53:7769:726c::1",
+        "kind": "address"
+      },
+      "state": "restored"
+    },
+    {
+      "before": null,
+      "exact": true,
+      "observed": null,
+      "resource": {
+        "destination": "198.18.1.0/32",
+        "kind": "route",
+        "next_hop": "0.0.0.0"
+      },
+      "state": "restored"
+    },
+    {
+      "before": null,
+      "exact": true,
+      "observed": null,
+      "resource": {
+        "destination": "fd53:7769:726c::101/128",
+        "kind": "route",
+        "next_hop": "::"
+      },
+      "state": "restored"
+    }
+  ],
+  "network_configuration_comparison": {
+    "adapters_after": 8,
+    "adapters_before": 8,
+    "adapters_equal": true,
+    "all_routes_equal": true,
+    "routes_after": 26,
+    "routes_before": 26
+  },
+  "pass_markers": [
+    "2026-10-30T03:25:23.9166314Z Wintun smoke: PASS durable dual-stack Fake-IP close/reopen identity",
+    "2026-10-30T03:26:17.5732149Z Wintun smoke: PASS IPv4 UDP DNS identity and TTL",
+    "2026-10-30T03:26:17.6076584Z Wintun smoke: PASS IPv4 TCP DNS framing, identity and TTL",
+    "2026-10-30T03:26:17.6152005Z Wintun smoke: PASS IPv4 TCP payload and half-close",
+    "2026-10-30T03:26:17.9718513Z Wintun smoke: PASS IPv4 exact Windows SO_LINGER=0 RST tuple and independent flow cleanup",
+    "2026-10-30T03:26:18.3697862Z Wintun smoke: PASS IPv4 64 rounds on one TCP connection across a second connection reset",
+    "2026-10-30T03:26:18.3706809Z Wintun smoke: PASS IPv4 empty and full UDP datagrams",
+    "2026-10-30T03:26:18.3718088Z Wintun smoke: PASS IPv6 UDP DNS identity and TTL",
+    "2026-10-30T03:26:18.4153909Z Wintun smoke: PASS IPv6 TCP DNS framing, identity and TTL",
+    "2026-10-30T03:26:18.4215163Z Wintun smoke: PASS IPv6 TCP payload and half-close",
+    "2026-10-30T03:26:18.8201891Z Wintun smoke: PASS IPv6 exact Windows SO_LINGER=0 RST tuple and independent flow cleanup",
+    "2026-10-30T03:26:19.2525477Z Wintun smoke: PASS IPv6 64 rounds on one TCP connection across a second connection reset",
+    "2026-10-30T03:26:19.2532933Z Wintun smoke: PASS IPv6 empty and full UDP datagrams",
+    "2026-10-30T03:26:19.2597832Z Wintun smoke: PASS verified DoT A/AAAA resolver fixture",
+    "2026-10-30T03:26:19.3177414Z Wintun smoke: PASS IPv4 proxy, exact Core outcome and reachable DIRECT trap controls",
+    "2026-10-30T03:26:19.4337932Z Wintun smoke: PASS IPv4 reject, exact Core outcome and reachable DIRECT trap controls",
+    "2026-10-30T03:26:19.4530023Z Wintun smoke: PASS IPv4 proxy_rejected, exact Core outcome and reachable DIRECT trap controls",
+    "2026-10-30T03:26:23.5103753Z Wintun smoke: PASS IPv4 proxy_unavailable, exact Core outcome and reachable DIRECT trap controls",
+    "2026-10-30T03:26:23.5363115Z Wintun smoke: PASS IPv6 proxy, exact Core outcome and reachable DIRECT trap controls",
+    "2026-10-30T03:26:23.6299896Z Wintun smoke: PASS IPv6 reject, exact Core outcome and reachable DIRECT trap controls",
+    "2026-10-30T03:26:23.6509691Z Wintun smoke: PASS IPv6 proxy_rejected, exact Core outcome and reachable DIRECT trap controls",
+    "2026-10-30T03:26:27.7151916Z Wintun smoke: PASS IPv6 proxy_unavailable, exact Core outcome and reachable DIRECT trap controls",
+    "2026-10-30T03:26:27.7663594Z Wintun smoke: PASS UDP policy {\"blocked_retry_payload_bytes\":1200,\"case\":\"proxy\",\"category\":\"proxy\",\"core_admissions_during_retry\":0,\"core_record_id\":45,\"direct_trap_controls\":2,\"download\":1200,\"ended\":true,\"error\":\"Socks5UdpControlClosed\",\"family\":4,\"host\":\"ipv4.wintun.smoke.invalid\",\"initial_empty_datagram\":true,\"node\":\"c1000000-0000-4000-8000-000000000001\",\"port\":55094,\"proxy_payload_lengths\":[0,1200],\"same_tuple_retry_after_direct_switch_dropped\":true,\"source\":\"198.18.0.1:55098\",\"unexpected_trap_datagrams\":0,\"upload\":1200}",
+    "2026-10-30T03:26:27.9040948Z Wintun smoke: PASS UDP policy {\"blocked_retry_payload_bytes\":1200,\"case\":\"reject\",\"category\":\"reject\",\"core_admissions_during_retry\":0,\"core_record_id\":48,\"direct_trap_controls\":2,\"download\":0,\"ended\":true,\"error\":\"Rejected\",\"family\":4,\"host\":\"ipv4.wintun.smoke.invalid\",\"initial_empty_datagram\":true,\"node\":\"SWIRL_V2_REJECT\",\"port\":55102,\"proxy_payload_lengths\":[],\"same_tuple_retry_after_direct_switch_dropped\":true,\"source\":\"198.18.0.1:55106\",\"unexpected_trap_datagrams\":0,\"upload\":0}",
+    "2026-10-30T03:26:27.9502220Z Wintun smoke: PASS UDP policy {\"blocked_retry_payload_bytes\":1200,\"case\":\"proxy_rejected\",\"category\":\"proxy\",\"core_admissions_during_retry\":0,\"core_record_id\":51,\"direct_trap_controls\":2,\"download\":0,\"ended\":true,\"error\":\"UpstreamRejected\",\"family\":4,\"host\":\"ipv4.wintun.smoke.invalid\",\"initial_empty_datagram\":true,\"node\":\"c1000000-0000-4000-8000-000000000001\",\"port\":55109,\"proxy_payload_lengths\":[],\"same_tuple_retry_after_direct_switch_dropped\":true,\"source\":\"198.18.0.1:55113\",\"unexpected_trap_datagrams\":0,\"upload\":0}",
+    "2026-10-30T03:26:32.0176571Z Wintun smoke: PASS UDP policy {\"blocked_retry_payload_bytes\":1200,\"case\":\"proxy_unavailable\",\"category\":\"proxy\",\"core_admissions_during_retry\":0,\"core_record_id\":54,\"direct_trap_controls\":2,\"download\":0,\"ended\":true,\"error\":\"UpstreamConnectionRefused\",\"family\":4,\"host\":\"ipv4.wintun.smoke.invalid\",\"initial_empty_datagram\":true,\"node\":\"c1000000-0000-4000-8000-000000000001\",\"port\":55116,\"proxy_payload_lengths\":[],\"same_tuple_retry_after_direct_switch_dropped\":true,\"source\":\"198.18.0.1:55120\",\"unexpected_trap_datagrams\":0,\"upload\":0}",
+    "2026-10-30T03:27:39.1302084Z Wintun smoke: PASS packet resources released",
+    "2026-10-30T03:27:41.2318848Z Wintun smoke: PASS default/split-default routes unchanged",
+    "2026-10-30T03:27:41.2321792Z Wintun smoke: PASS owned Wintun adapter removed"
+  ],
+  "scope_notes": [
+    "Original DNS/TCP/RST/half-close/DIRECT UDP and all eight TCP policy cases passed for both families before the new UDP failure.",
+    "All six owned resource readbacks were exact after this failure; owned adapter removal and default-route preservation passed. This is teardown-on-test-failure evidence, not a forced helper/worker crash or reboot experiment.",
+    "Only a disposable Windows Server runner with exact synthetic routes and real loopback upstreams was used; Windows 11 and physical full-capture acceptance remain untested."
+  ]
+}

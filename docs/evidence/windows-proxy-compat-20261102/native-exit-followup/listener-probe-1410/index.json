@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "historical_failure": true,
+  "run_id": 41491137276,
+  "job_id": 125441364105,
+  "artifact_id": 13167097461,
+  "artifact_zip_sha256": "ba2b4b520fea24d62f75f7c9aab8481a62c3b74025d670d7582543a890e31322",
+  "head_sha": "1410ee9f1d9158f32534892ccb7062ecab30be7f",
+  "checkout_sha": "ec7e54fced672561f8f06f958b75f1364403184e",
+  "tree_sha": "972953bc88cadf82930e570c7c48b5c670599210",
+  "conclusion": "FAIL: all four app-exit rows reach normal exit, real HTTP/SOCKS and exact native restoration/external-edit preservation, then the old 1500ms boolean closed-port probe returns false. No socket state/error was captured, so this alone does not establish a listener leak.",
+  "files": [
+    {
+      "path": "critical-network.xml",
+      "bytes": 2318,
+      "sha256": "6dc7b68331c7ea5d0dd4f9482e7b7d4fd14a3b36b75e391f4922f3bfda246b80"
+    },
+    {
+      "path": "critical-ui.xml",
+      "bytes": 1741,
+      "sha256": "ca950fb15437a2229ad3bee470eb3796750d327b02d5fccf39491c39e2fb1d4a"
+    },
+    {
+      "path": "manual-and-pac-external-edit-final.json",
+      "bytes": 768,
+      "sha256": "40d3748ae0490f5d3e7413ff117b8746f3a019475c3a612b4bed88f00181b41f"
+    },
+    {
+      "path": "manual-and-pac-external-edit-ready.json",
+      "bytes": 552,
+      "sha256": "a0d26bb3a8950a351b58d84a67b30effbe9a2413122e065f1914cb043bfab61f"
+    },
+    {
+      "path": "manual-and-pac-external-edit-result.json",
+      "bytes": 483,
+      "sha256": "d7c1d84535bd22423c0ebde64262fde975f7be4c1c2e40bd74fb9b5807700c57"
+    },
+    {
+      "path": "manual-and-pac-final.json",
+      "bytes": 766,
+      "sha256": "9b2c2af6a2f05f031f37854e26c189d1e25c5ed751916d1cba92ac14383b4544"
+    },
+    {
+      "path": "manual-and-pac-ready.json",
+      "bytes": 552,
+      "sha256": "aa17851901bd6ff479f6f3c68744670f451aeeb3d19458e93dd964a915d90ecb"
+    },
+    {
+      "path": "manual-and-pac-result.json",
+      "bytes": 470,
+      "sha256": "2a5f53522a8281f0fbb18b073ff7c0dc0eda0696d651b6ae544adc6d8d01b210"
+    },
+    {
+      "path": "pac-only-external-edit-final.json",
+      "bytes": 768,
+      "sha256": "7304cbdcc477c991f1716ce7f25d50febde945880ddd7d2126276f04daca6b59"
+    },
+    {
+      "path": "pac-only-external-edit-ready.json",
+      "bytes": 552,
+      "sha256": "b7eb0c4e01b927455a08aedfc8954e14f401e523ac5f4556acafc49cf341a593"
+    },
+    {
+      "path": "pac-only-external-edit-result.json",
+      "bytes": 477,
+      "sha256": "586964b27ed418e11fa993e813e7326cd69bdd795560a1a34ab91a405b128e1e"
+    },
+    {
+      "path": "pac-only-final.json",
+      "bytes": 766,
+      "sha256": "78eea5000a5f8ff1ead3f4820b1f2d24033ec8e5101a7a45dde2017971119765"
+    },
+    {
+      "path": "pac-only-ready.json",
+      "bytes": 552,
+      "sha256": "fcc21706ac401c025cfdf9e728ebea4877d22e6910ceb08a11c873fb6771f552"
+    },
+    {
+      "path": "pac-only-result.json",
+      "bytes": 464,
+      "sha256": "2469850bd8b9505ae4d6461bd04e5329280a0ef49d4c303948c383d4b45b59ba"
+    },
+    {
+      "path": "swirl-system-proxy-app-exit.xml",
+      "bytes": 2384,
+      "sha256": "129eb13298a8ce2f7cae967a3f6c3caaa57232a30b0605e39c2bb3549909995e"
+    },
+    {
+      "path": "system-proxy-summary.json",
+      "bytes": 20578,
+      "sha256": "dd8dd72b58d5c56abd2da3940e03387559d75c5ed2cf1a6b90cc83042c2e15f0"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+   Compiling rustls v0.23.46 (/workspace/scratch/d849c9bea5b5/Swirl-baseline/core/vendor/rustls)
+   Compiling quinn-proto v0.11.19
+   Compiling tokio-rustls v0.26.6
+   Compiling quinn v0.11.12
+   Compiling swirl-transport v0.1.0 (/workspace/scratch/d849c9bea5b5/Swirl-baseline/core/crates/swirl-transport)
+   Compiling h3-quinn v0.0.10
+   Compiling swirl-dns v0.1.0 (/workspace/scratch/d849c9bea5b5/Swirl-baseline/core/crates/swirl-dns)
+   Compiling swirl-protocol v0.1.0 (/workspace/scratch/d849c9bea5b5/Swirl-baseline/core/crates/swirl-protocol)
+   Compiling swirl-core v0.1.0 (/workspace/scratch/d849c9bea5b5/Swirl-baseline/core/crates/swirl-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.62s
+     Running unittests src/lib.rs (/workspace/scratch/d849c9bea5b5/rust-target/debug/deps/swirl_core-bc079a38f3eed821)
+
+running 2 tests
+first DNS candidate: Os { code: 111, kind: ConnectionRefused, message: "Connection refused" }
+first DNS candidate: Os { code: 111, kind: ConnectionRefused, message: "Connection refused" }
+
+thread 'v2::runtime_tests::direct_dns_falls_back_across_address_families_without_disabling_ipv6' (44320) panicked at crates/swirl-core/src/v2_runtime_tests.rs:277:14:
+v2 must try a route-equivalent DNS answer after an unusable first candidate: Error { kind: UnexpectedEof, message: "failed to fill whole buffer" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'v2::runtime_tests::direct_dns_falls_back_to_a_second_ipv4_answer_without_changing_policy' (44321) panicked at crates/swirl-core/src/v2_runtime_tests.rs:277:14:
+v2 must try a route-equivalent DNS answer after an unusable first candidate: Error { kind: UnexpectedEof, message: "failed to fill whole buffer" }
+test v2::runtime_tests::direct_dns_falls_back_across_address_families_without_disabling_ipv6 ... FAILED
+test v2::runtime_tests::direct_dns_falls_back_to_a_second_ipv4_answer_without_changing_policy ... FAILED
+
+failures:
+
+failures:
+    v2::runtime_tests::direct_dns_falls_back_across_address_families_without_disabling_ipv6
+    v2::runtime_tests::direct_dns_falls_back_to_a_second_ipv4_answer_without_changing_policy
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 45 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p swirl-core --lib`

@@ -4,6 +4,7 @@
 #include "engine/EngineController.h"
 #include "engine/SwirlProtocolRegistry.h"
 #include "engine/NativeNodeBridge.h"
+#include "engine/RustCoreLibrary.h"
 #include "ControlledNetwork.h"
 #include <QTest>
 #include <QSettings>
@@ -17,6 +18,8 @@
 #include <QScopeGuard>
 #include <QNetworkProxy>
 #include <QNetworkReply>
+#include <QSemaphore>
+#include <atomic>
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <wincrypt.h>
@@ -24,12 +27,13 @@
 
 class SubscriptionServer:public QTcpServer {
 public:
-    QByteArray content,location,lastRequest,successPath,acceptedAgent;QList<QByteArray> requests;int count=0,code=200,acceptedCode=200;bool hanging=false;
+    QByteArray content,location,lastRequest,successPath,acceptedAgent;QList<QByteArray> requests;int count=0,code=200,acceptedCode=200;bool hanging=false,closeWithoutResponse=false;
     SubscriptionServer(){connect(this,&QTcpServer::newConnection,this,[this]{while(hasPendingConnections()){
         auto *socket=nextPendingConnection();auto data=std::make_shared<QByteArray>();
         connect(socket,&QTcpSocket::readyRead,socket,[this,socket,data]{data->append(socket->readAll());if(!data->contains("\r\n\r\n"))return;
             if(socket->property("done").toBool())return;socket->setProperty("done",true);++count;lastRequest=*data;requests.append(*data);
             if(hanging)return;
+            if(closeWithoutResponse){socket->disconnectFromHost();return;}
             const auto status=!acceptedAgent.isEmpty()&&data->toLower().contains("\r\nuser-agent: "+acceptedAgent.toLower()+"\r\n")?acceptedCode:
                 !successPath.isEmpty()&&data->startsWith("GET "+successPath)?200:code;
             socket->write("HTTP/1.1 "+QByteArray::number(status)+" Result\r\n"+(location.isEmpty()||status==200?QByteArray():"Location: "+location+"\r\n")+"Content-Length: "+QByteArray::number(content.size())+"\r\nConnection: close\r\n\r\n"+content);socket->disconnectFromHost();});
@@ -978,6 +982,65 @@ external-controller: 0.0.0.0:9090
         QFile file(store.filePath());QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),encrypted);
         QVERIFY(service.message().contains(QStringLiteral("已丢弃旧响应")));QVERIFY(!service.message().contains("PRIVATE-TOKEN"));
     }
+    void physicalDownloadStartupIsRevokedAndItsLateRouteIsStopped_data() {
+        QTest::addColumn<QString>("action");
+        for(const auto &action:{"cancel","timeout","shutdown","destroy"})QTest::newRow(action)<<QString::fromLatin1(action);
+    }
+    void physicalDownloadStartupIsRevokedAndItsLateRouteIsStopped() {
+        QFETCH(QString,action);
+        SubscriptionServer origin;QVERIFY(origin.listen(QHostAddress::LocalHost,0));origin.content=socks(1080);
+        QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));
+        struct PendingRoute { QSemaphore release;std::atomic<int> starts=0,stops=0;std::atomic<bool> invalid=false; };
+        const auto state=std::make_shared<PendingRoute>();
+        const auto release=qScopeGuard([state]{state->release.release();});
+        const auto targetPort=origin.serverPort(),proxyPort=freePort();
+        auto command=[state,targetPort,proxyPort](const QJsonObject &input)->QJsonObject {
+            if(input.value("op")=="stop") {
+                if(input.size()!=2||input.value("handle").toInteger()!=101)state->invalid=true;
+                ++state->stops;return {{"ok",true}};
+            }
+            if(input.size()!=3||input.value("op")!="start"||input.value("host")!="127.0.0.1"||input.value("port").toInt()!=targetPort)state->invalid=true;
+            ++state->starts;
+            if(!state->release.tryAcquire(1,40000))return {{"ok",false},{"error","FixtureStartupTimeout"}};
+            return {{"ok",true},{"handle",101},{"port",proxyPort},{"username","fixture-user"},{"password","fixture-password"}};
+        };
+        auto service=std::make_unique<NodeImportService>(&store,nullptr,std::function<qint64()>{},60000,
+            NodeImportService::SystemProxyResolver{},command);
+        auto url=origin.url();url.setScheme("https");
+        QVERIFY(service->saveSubscription({},"Physical startup",url,360,false,"auto","nodes-only","physical"));
+        const auto source=store.subscriptions().first().id;
+        QFile saved(store.filePath());QVERIFY(saved.open(QIODevice::ReadOnly));const auto before=saved.readAll();saved.close();
+        service->refreshSubscription(source);QTRY_COMPARE_WITH_TIMEOUT(state->starts.load(),1,3000);QVERIFY(service->busy());
+        bool pulse=false;QTimer::singleShot(0,service.get(),[&pulse]{pulse=true;});QTRY_VERIFY_WITH_TIMEOUT(pulse,1000);
+        if(action=="cancel")QVERIFY(service->cancelRefresh(source));
+        else if(action=="shutdown")service->shutdown();
+        else if(action=="destroy")service.reset();
+        else {QTRY_VERIFY_WITH_TIMEOUT(!service->busy(),35000);QVERIFY(service->message().contains(QStringLiteral("30 秒")));}
+        if(service)QVERIFY(!service->busy());
+        state->release.release();QTRY_COMPARE_WITH_TIMEOUT(state->stops.load(),1,3000);
+        QVERIFY(!state->invalid.load());QCOMPARE(origin.count,0);QVERIFY(store.nodes().isEmpty());
+        QVERIFY(saved.open(QIODevice::ReadOnly));QCOMPARE(saved.readAll(),before);
+    }
+    void nativePhysicalDownloadRejectsUnsupportedTargetsWithoutFallback_data() {
+        QTest::addColumn<QString>("scheme");
+        QTest::newRow("http-not-connect-capable")<<QString("http");
+        QTest::newRow("https-loopback-not-public")<<QString("https");
+    }
+    void nativePhysicalDownloadRejectsUnsupportedTargetsWithoutFallback() {
+        QFETCH(QString,scheme);
+        QVERIFY(RustCoreLibrary::instance().load());QVERIFY(RustCoreLibrary::instance().downloadRoute());
+        SubscriptionServer origin;QVERIFY(origin.listen(QHostAddress::LocalHost,0));origin.content=socks(1080);
+        QSignalSpy accepted(&origin,&QTcpServer::newConnection);
+        auto url=origin.url();url.setScheme(scheme);
+        QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));std::atomic<int> systemQueries=0;
+        NodeImportService service(&store,nullptr,{},60000,[&systemQueries](const QNetworkProxyQuery &){++systemQueries;return QList<QNetworkProxy>{QNetworkProxy(QNetworkProxy::NoProxy)};});
+        QVERIFY(service.saveSubscription({},"Physical invalid target",url,360,false,"auto","nodes-only","physical"));
+        QFile saved(store.filePath());QVERIFY(saved.open(QIODevice::ReadOnly));const auto before=saved.readAll();saved.close();
+        service.refreshSubscription(store.subscriptions().first().id);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),4000);
+        QCOMPARE(accepted.count(),0);QCOMPARE(systemQueries.load(),0);QVERIFY(store.nodes().isEmpty());
+        QVERIFY(service.message().contains(scheme=="http"?QStringLiteral("仅支持 HTTPS"):QStringLiteral("通道不可用")));
+        QVERIFY(saved.open(QIODevice::ReadOnly));QCOMPARE(saved.readAll(),before);
+    }
     void subscriptionHttpStatusAndQtErrorsAreDifferentNamespaces() {
         SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));server.content=socks(1080);
         QTemporaryDir directory;NodeStore store(directory.filePath("nodes"));NodeImportService service(&store);
@@ -990,7 +1053,7 @@ external-controller: 0.0.0.0:9090
         QFile file(store.filePath());QVERIFY(file.open(QIODevice::ReadOnly));const auto saved=file.readAll();file.close();
         server.code=400;service.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);
         QVERIFY(service.message().contains("HTTP 400"));QVERIFY(service.message().contains("ProtocolInvalidOperationError"));
-        QVERIFY(service.message().contains("302"));QVERIFY(service.message().contains(QStringLiteral("非 HTTP 状态码")));
+        QVERIFY(service.message().contains(QStringLiteral("Qt 错误码 302")));QVERIFY(!service.message().contains(QStringLiteral("非 HTTP 状态码")));
         QVERIFY(!service.message().contains(QStringLiteral("重定向失败")));QVERIFY(!service.message().contains("PRIVATE-TOKEN"));
         QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),saved);file.close();
         QCOMPARE(store.nodes().size(),1);QCOMPARE(store.subscriptions().first().lastSuccess,NodeStore(store.filePath()).subscriptions().first().lastSuccess);
@@ -1006,6 +1069,37 @@ external-controller: 0.0.0.0:9090
         QTest::newRow("bad-request")<<400;
         QTest::newRow("not-acceptable")<<406;
         QTest::newRow("unsupported-media")<<415;
+    }
+    void firstSubscriptionFailureReportsTheActualResponse_data() {
+        QTest::addColumn<bool>("closed");
+        QTest::newRow("http-forbidden")<<false;
+        QTest::newRow("remote-close-without-http")<<true;
+    }
+    void firstSubscriptionFailureReportsTheActualResponse() {
+        QFETCH(bool,closed);
+        SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));
+        server.code=403;server.closeWithoutResponse=closed;
+        QTemporaryDir directory;NodeStore store(directory.filePath("nodes"));NodeImportService service(&store);
+        catalogOnlyFixtureApplier(service,store);
+        QVERIFY(service.saveSubscription({},"First import",server.url(),360,false,"auto"));
+        const auto source=store.subscriptions().first().id;
+        QFile file(store.filePath());QVERIFY(file.open(QIODevice::ReadOnly));const auto saved=file.readAll();file.close();
+        service.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);
+        const auto row=service.providers().first().toMap();
+        QCOMPARE(row.value("nodes").toInt(),0);QCOMPARE(row.value("lastSuccess").toLongLong(),0);
+        QCOMPARE(row.value("status").toString(),QStringLiteral("更新失败"));
+        const auto message=row.value("error").toString();
+        if(closed){
+            QVERIFY(message.contains("RemoteHostClosedError"));
+            QVERIFY(message.contains(QStringLiteral("远端在响应完成前关闭连接")));
+            QVERIFY(message.contains(QStringLiteral("未收到 HTTP 响应")));QVERIFY(!message.contains("HTTP 0"));
+        }else{
+            QCOMPARE(server.count,1);QVERIFY(message.contains("HTTP 403"));
+            QVERIFY(message.contains("ContentAccessDenied"));QVERIFY(message.contains(QStringLiteral("Qt 错误码 201")));
+            QVERIFY(message.contains(QStringLiteral("服务器或 CDN 拒绝访问")));QVERIFY(!message.contains(QStringLiteral("非 HTTP 状态码")));
+        }
+        QVERIFY(!message.contains("PRIVATE-TOKEN"));QVERIFY(!message.contains("127.0.0.1"));
+        QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),saved);
     }
     void automaticDownloadRetriesLegacyNegotiationWithoutChangingSignedUrl() {
         QFETCH(int,status);

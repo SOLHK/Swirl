@@ -24,7 +24,7 @@ MAX_BUDGET_MS = 10000
 OUTCOMES = {"success", "refused", "timeout", "unreachable", "other", "cancelled"}
 TCP_ERRORS = {"UpstreamAddressLimit", "UpstreamTcpTimeout", "UpstreamConnectFailed",
               "UpstreamConnectionRefused", "UpstreamConnectionReset", "UpstreamConnectionAborted",
-              "UpstreamNetworkUnreachable", "UpstreamPermissionDenied"}
+              "UpstreamNetworkUnreachable", "UpstreamHostUnreachable", "UpstreamPermissionDenied"}
 ERRORS = {None, "UpstreamDnsTimeout", "DnsLookupFailed", "DnsEmpty",
           "SocketOptions", "InvalidDiagnosticInput", "DiagnosticProcessFailed",
           "DiagnosticProcessTimeout", "DiagnosticOutputInvalid", "DnsInvalidTarget",

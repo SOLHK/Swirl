@@ -123,13 +123,70 @@ class LoopbackPortSelectionTests(unittest.TestCase):
                             tcp_factory, lambda address: UDP(address, socketserver.BaseRequestHandler),
                             ipv6=ipv6)
                     try:
-                        self.assertEqual(requested, [('::1' if ipv6 else '127.0.0.1', 0)])
+                        # A UDP collision may require another OS-allocated TCP port.
+                        expected = ('::1' if ipv6 else '127.0.0.1', 0)
+                        self.assertTrue(requested)
+                        self.assertTrue(all(address == expected for address in requested))
                         self.assertGreater(tcp.server_address[1], 0)
                         self.assertEqual(tcp.socket.getsockname(), udp.socket.getsockname())
+                        self.assertNotEqual(tcp.socket.fileno(), -1)
+                        self.assertNotEqual(udp.socket.fileno(), -1)
                         query.assert_not_called()
                     finally:
                         tcp.server_close()
                         udp.server_close()
+                    self.assertEqual((tcp.socket.fileno(), udp.socket.fileno()), (-1, -1))
+
+    def test_portable_pair_udp_collision_closes_old_owners_and_keeps_the_new_pair(self):
+        original = socketserver.TCPServer.server_bind
+        for platform in ('linux', 'darwin'):
+            for ipv6 in (False, True):
+                with self.subTest(platform=platform, ipv6=ipv6):
+                    family = socket.AF_INET6 if ipv6 else socket.AF_INET
+                    host = '::1' if ipv6 else '127.0.0.1'
+                    created, rejected, requested = [], [], []
+
+                    class TCP(socketserver.TCPServer):
+                        address_family = family
+
+                    class UDP(socketserver.UDPServer):
+                        address_family = family
+
+                    def bind(server):
+                        created.append(server)
+                        if server.socket_type == socket.SOCK_STREAM:
+                            requested.append(server.server_address)
+                        else:
+                            owner = created[-2]
+                            self.assertNotEqual(owner.socket.fileno(), -1)
+                            self.assertEqual(owner.server_address[:2], server.server_address[:2])
+                            if not rejected:
+                                rejected.append(server)
+                                raise OSError(errno.EADDRINUSE, 'controlled first UDP collision')
+                        original(server)
+
+                    with mock.patch('loopback_ports.sys.platform', platform), \
+                            mock.patch('loopback_ports.subprocess.run') as query, \
+                            mock.patch.object(socketserver.TCPServer, 'server_bind', bind):
+                        tcp, udp = reserve_tcp_udp(
+                            lambda address: TCP(address, socketserver.BaseRequestHandler),
+                            lambda address: UDP(address, socketserver.BaseRequestHandler),
+                            ipv6=ipv6)
+                    try:
+                        self.assertEqual(len(rejected), 1)
+                        self.assertTrue(all(address == (host, 0) for address in requested))
+                        self.assertGreaterEqual(len(requested), 2)
+                        self.assertEqual((tcp, udp), tuple(created[-2:]))
+                        self.assertTrue(all(server.socket.fileno() == -1 for server in created[:-2]))
+                        self.assertGreater(tcp.server_address[1], 0)
+                        self.assertEqual(tcp.socket.getsockname(), udp.socket.getsockname())
+                        self.assertNotEqual(tcp.socket.fileno(), -1)
+                        self.assertNotEqual(udp.socket.fileno(), -1)
+                        query.assert_not_called()
+                    finally:
+                        tcp.server_close()
+                        udp.server_close()
+                    self.assertTrue(all(server.socket.fileno() == -1 for server in created))
 
 
 class LoopbackPairOwnershipTests(unittest.TestCase):

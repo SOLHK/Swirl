@@ -1,0 +1,396 @@
+{
+  "schema": 1,
+  "role": "Validated 24af583 historical checkpoint; a later candidate is being prepared for additional full-process system-proxy exit coverage",
+  "verified_at_utc": "2026-11-02T16:37:42.068472+00:00",
+  "rust_workflow": {
+    "id": 41475106020,
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/41475106020",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "candidate_commit": "24af5838e39b4612321a7ee2b1be11d78fb9b6dd",
+  "actual_ci_checkout": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+  "source_tree": "13a24de79dbab26098059286a1c74b291ed23084",
+  "core_tree": "f4dbcd2bd4c565f92c0aae836fa7504fcd43efde",
+  "candidate_and_pr_merge_full_tree_identical": true,
+  "platforms": [
+    {
+      "job_id": 125378477384,
+      "name": "portable-rust (ubuntu-latest)",
+      "workspace": {
+        "passed": 822,
+        "failed": 0,
+        "ignored": 0,
+        "summary_count": 40
+      },
+      "fmt_check_clippy_release": "PASS",
+      "required_v2_tests_passed": 6,
+      "required_rfc1928_regressions_passed": 9,
+      "preserved_dns_connect_halfclose_regressions_passed": 11,
+      "checkout_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+      "full_log_file": "job-125378477384.log",
+      "full_log_sha256": "be2173a956b82e547b5f405500f1e69349d5e1f752d546b06bc7f26fba839ecd"
+    },
+    {
+      "job_id": 125378477414,
+      "name": "portable-rust (macos-latest)",
+      "workspace": {
+        "passed": 822,
+        "failed": 0,
+        "ignored": 0,
+        "summary_count": 40
+      },
+      "fmt_check_clippy_release": "PASS",
+      "required_v2_tests_passed": 6,
+      "required_rfc1928_regressions_passed": 9,
+      "preserved_dns_connect_halfclose_regressions_passed": 11,
+      "checkout_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+      "full_log_file": "job-125378477414.log",
+      "full_log_sha256": "590a90d93e692e636603c3abb6b7984921f54479c72975c7e657ae61c702ccb8"
+    },
+    {
+      "job_id": 125378477066,
+      "name": "windows-rust",
+      "workspace": {
+        "passed": 823,
+        "failed": 0,
+        "ignored": 0,
+        "summary_count": 40
+      },
+      "fmt_check_clippy_release": "PASS",
+      "required_v2_tests_passed": 6,
+      "required_rfc1928_regressions_passed": 9,
+      "preserved_dns_connect_halfclose_regressions_passed": 11,
+      "checkout_sha": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd",
+      "full_log_file": "job-125378477066.log",
+      "full_log_sha256": "bc7811c693d6e9a8c7b19275c86277d42b4dd14ac1ba392cbdd9f7cc34d71a51"
+    }
+  ],
+  "native_runtime_profiles": {
+    "darwin": [
+      {
+        "artifact_id": 13157738752,
+        "protocol": "vless+reality+vision",
+        "fingerprint": "rustls",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "artifact_id": 13158556534,
+        "protocol": "vless+reality+vision",
+        "fingerprint": "chrome",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "artifact_id": 13157574132,
+        "protocol": "vless+reality",
+        "fingerprint": "rustls",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "artifact_id": 13157329627,
+        "protocol": "vless+reality",
+        "fingerprint": "chrome",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "win32": [
+      {
+        "artifact_id": 13157594779,
+        "protocol": "vless+reality",
+        "fingerprint": "rustls",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "artifact_id": 13158735748,
+        "protocol": "vless+reality+vision",
+        "fingerprint": "chrome",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "artifact_id": 13158442234,
+        "protocol": "vless+reality",
+        "fingerprint": "chrome",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "artifact_id": 13157164830,
+        "protocol": "vless+reality+vision",
+        "fingerprint": "rustls",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "linux": [
+      {
+        "artifact_id": 13156889604,
+        "protocol": "vless+reality+vision",
+        "fingerprint": "chrome",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "artifact_id": 13157124354,
+        "protocol": "vless+reality",
+        "fingerprint": "chrome",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "artifact_id": 13157334320,
+        "protocol": "vless+reality+vision",
+        "fingerprint": "rustls",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "artifact_id": 13158076521,
+        "protocol": "vless+reality",
+        "fingerprint": "rustls",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ]
+  },
+  "ci_soaks": [
+    {
+      "artifact_id": 13156478841,
+      "status": "PASS",
+      "platform": "linux",
+      "binary_sha256": "9b23ead2ba0d8955edaa816d48d73072c83c4dfdb0e378bade4e7ce44766df78",
+      "raw_soak_sha256": "397130d72a2f3344765442c570ee8a8563a391a90edaeeed22e0bc8935d0c498",
+      "observed_stream_seconds": 120.003424,
+      "connections": 8,
+      "events_per_connection": 121,
+      "total_events": 968,
+      "samples": 122,
+      "all_peer_and_expected_hashes_match": true,
+      "all_peers_tls_close_notify_and_tcp_eof": true,
+      "final_core": {
+        "active": 0,
+        "accepted": 8,
+        "failed": 0,
+        "upload": 5688,
+        "download": 88789,
+        "ended_records": 8
+      },
+      "listener_closed": true,
+      "scope": "Controlled CI local fixtures; not physical Windows11 Codex/provider acceptance"
+    },
+    {
+      "artifact_id": 13157268410,
+      "status": "PASS",
+      "platform": "win32",
+      "binary_sha256": "d6c442ebe2d8edf9ab2b2c565cc86e9a839c1957012ba5537f1409c0a00ade1c",
+      "raw_soak_sha256": "96229b27f4b30d31997a12e1bcead2ed8108d11595c2343aa1b58920388e2e31",
+      "observed_stream_seconds": 120.02914,
+      "connections": 8,
+      "events_per_connection": 121,
+      "total_events": 968,
+      "samples": 122,
+      "all_peer_and_expected_hashes_match": true,
+      "all_peers_tls_close_notify_and_tcp_eof": true,
+      "final_core": {
+        "active": 0,
+        "accepted": 8,
+        "failed": 0,
+        "upload": 13800,
+        "download": 97514,
+        "ended_records": 8
+      },
+      "listener_closed": true,
+      "scope": "Controlled CI local fixtures; not physical Windows11 Codex/provider acceptance"
+    },
+    {
+      "artifact_id": 13157468041,
+      "status": "PASS",
+      "platform": "darwin",
+      "binary_sha256": "26828d1d658786c096815ba35975852d4972cb3082c74025cb8e38ebcd7c36e0",
+      "raw_soak_sha256": "c9352cb92b50e6e59e4fd6579203bf1d2d6d346bdf248d429898f30d10fb2a36",
+      "observed_stream_seconds": 120.190268,
+      "connections": 8,
+      "events_per_connection": 121,
+      "total_events": 968,
+      "samples": 112,
+      "all_peer_and_expected_hashes_match": true,
+      "all_peers_tls_close_notify_and_tcp_eof": true,
+      "final_core": {
+        "active": 0,
+        "accepted": 8,
+        "failed": 0,
+        "upload": 13800,
+        "download": 97495,
+        "ended_records": 8
+      },
+      "listener_closed": true,
+      "scope": "Controlled CI local fixtures; not physical Windows11 Codex/provider acceptance"
+    }
+  ],
+  "local_1800s_soak_linkage": {
+    "observed_at_utc": "2026-11-02T15:49:14.991567+00:00",
+    "commit": "24af5838e39b4612321a7ee2b1be11d78fb9b6dd",
+    "tree": "13a24de79dbab26098059286a1c74b291ed23084",
+    "core_tree": "f4dbcd2bd4c565f92c0aae836fa7504fcd43efde",
+    "source_core_files_match_passed_soak": true,
+    "soak_raw_sha256": "b4469c9adcaa82726bda10e6b219d4eb71634e7dbed1292c0c082e609f9fe875",
+    "soak_binary_sha256": "5cc28d77b90e86863f2dbdad90e403fce2200be47eed2111124df39f918f76f3",
+    "scope": "Commit linkage for the core subtree only; full candidate CI pending",
+    "workflow_run_id": 41475106020,
+    "expected_pr_checkout": "ceafbef537b9f9f30a0bc13b1dc24f7ff16addfd"
+  },
+  "qt_native": {
+    "qt_version": "6.12.0",
+    "qt_tests_exe_sha256": "66d58cfd3b966235b47a2b9520687ec9aca4940ee89727a68ca8dc1f7d4065a4",
+    "runtime_profile_tests": [
+      1,
+      1,
+      5
+    ],
+    "runtime_profile_failures": 0,
+    "runtime_profile_skipped": 0,
+    "lifecycle_native_invocations": 8,
+    "lifecycle_frontend_checks": 22,
+    "invalid_uuid": "Frontend success ACK followed by closed stream and no HTTP application success, as allowed by delayed VLESS authentication",
+    "positive_controls_no_origin_or_spare_leak": "PASS",
+    "public_requests_passed": 8,
+    "public_product_states": {
+      "imported": true,
+      "encrypted_store_reloaded": true,
+      "parameters_preserved": true,
+      "in_process_rust": true,
+      "node_switch_verified": true,
+      "selected_node_restored": true,
+      "match_reject_verified": true,
+      "stopped": true,
+      "listener_released": true
+    },
+    "qt_dpapi_subscription_test": {
+      "tests": 1,
+      "failures": 0,
+      "skipped": 0
+    },
+    "qt_offline_dpapi_inspector": "Explicit native Windows PASS",
+    "final_complete_Swirl_application_build": "PASS; Swirl.exe linked 2026-11-02T16:32:16.8378474Z",
+    "raw_xml": [
+      {
+        "file": "artifacts/13159659152/rust-qt/swirl-rust-qt-integration.xml",
+        "suite": "RustCoreTests",
+        "qt_version": "6.12.0",
+        "incidents": {
+          "pass": 95,
+          "skip": 10
+        },
+        "sha256": "116b3965da773e892649242a5f0e025a80f454a1420d7d02abc842aaab091b16",
+        "skipped_functions": [
+          "subscriptionProductChainAgainstIndependentPeer",
+          "publicRealityProductChainAgainstIndependentPeer",
+          "realityLifecycleProductChainAgainstIndependentPeer",
+          "singBoxQuicProductChainAgainstIndependentPeer",
+          "socks5UdpThroughIndependentPeer",
+          "socks4ThroughIndependentPeer",
+          "webSocketThroughIndependentPeer",
+          "vlessThroughIndependentPeer",
+          "shadowsocksThroughIndependentPeer",
+          "loonShadowsocksThroughIndependentPeer"
+        ]
+      },
+      {
+        "file": "artifacts/13159659152/rust-qt/swirl-import-boundaries.xml",
+        "suite": "ImportTests",
+        "qt_version": "6.12.0",
+        "incidents": {
+          "pass": 17
+        },
+        "sha256": "efe407b63c05291b9c5aa9b5e321228f9266c2d738b8dc4340d4de1839ac4f84",
+        "skipped_functions": []
+      }
+    ],
+    "detail_file": "qt-native-replies-and-public-audit.json",
+    "socks5_ruleset_rep": 2,
+    "socks5_reality_handshake_failure_rep": 1
+  },
+  "public_network_scope": {
+    "linux_proxy_profiles": 4,
+    "linux_proxy_requests_passed": 8,
+    "linux_explicit_direct_https_and_native_doh_checks": 3,
+    "windows_qt_public_requests_passed": 8,
+    "macos_public_network_steps": "SKIPPED by existing Linux-only workflow conditions; not counted as passed",
+    "provider_connection": false,
+    "physical_windows_verified": false
+  },
+  "skip_boundaries": {
+    "workspace_ignored": 0,
+    "portable_python_skips_each": 7,
+    "portable_python_qt_skips_each": 6,
+    "portable_python_windows_powershell_guard_skip_each": 1,
+    "matching_six_qt_functions_explicitly_pass_on_windows": [
+      "test_vless_qt_data_path",
+      "test_qt_facade_http_obfs_with_udp_declared",
+      "test_qt_imported_socks4_and_4a_data_path",
+      "test_qt_vless_websocket_data_path",
+      "test_qt_imported_socks5_udp_data_path",
+      "test_actual_product_import_persist_select_route_and_recreate"
+    ],
+    "windows_powershell_guard_and_new_reply_guards_explicitly_pass": [
+      "test_removed_runtime_gate_requires_the_actual_rejection_reason",
+      "test_policy_reject_requires_ruleset_reply_not_refusal_or_handshake_failure",
+      "test_authentication_reject_requires_general_failure_not_refusal_or_policy_denial"
+    ],
+    "windows_normal_qt_suite": "95 pass, 0 fail, 10 fixture skips; later explicit harnesses cover nine fixture functions",
+    "remaining_optional_or_separate_fixture_not_run_in_this_workflow": [
+      "singBoxQuicProductChainAgainstIndependentPeer",
+      "test_offline_cpp_import_and_existing_store_protection",
+      "test_installed_cli_apply_and_rollback_only_in_temporary_home"
+    ],
+    "whole_workflow_zero_skips_claimed": false
+  },
+  "system_proxy_full_process_normal_exit_with_held_proxy": "Not claimed by this Rust workflow; owner is adding targeted full-Swirl lifecycle gates in the later candidate",
+  "native_windows_standalone_artifact": {
+    "artifact_id": 13158975525,
+    "inventory_file": "artifacts/13158975525-inventory.json",
+    "api_exe_matches_same_run_soak": true,
+    "cargo_lock_matches_candidate": true,
+    "dll_sha256": "eb01a367be3feabb3710c61da7c2dac8e4076ac96f5eac7f37cc2b4adb428b39",
+    "scope": "Standalone Cargo artifact; Qt production DLL pairing requires its own build_id/source_sha manifest, not cross-workflow hash equality"
+  },
+  "evidence_integrity": {
+    "downloaded_zip_archives_rehashed": 30,
+    "extracted_files_rehashed": 729,
+    "github_artifacts_catalogued": 39,
+    "temporary_signed_url_descriptors_remaining": 0
+  },
+  "physical_windows11_codex_clash_swirl_ab": "NOT_RUN",
+  "merge_authorization_gate": "Not satisfied by these CI results; real Windows11 Codex/Desktop acceptance remains required",
+  "source_mutations_by_this_auditor": false,
+  "identity_scope": "Immutable candidate and PR merge Git objects plus clean CI worktree reports; parent may prepare later tests in the shared working tree."
+}

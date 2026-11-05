@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "scope": "Exact validator functions with controlled files; no Windows installer is executed.",
+  "previous_commit": "ae083d7f0dc73c5d34802d872d124a34fb4e465d",
+  "previous_script_git_blob": "aef36420ca9cfe8fda182d5b454fe02254a8ebe3",
+  "current_script_sha256": "c066b5060dfcbf00b931c43752450b38cd96f822feb045d5670a8b97b7e45db6",
+  "checks": [
+    {
+      "name": "exact-manifest-files-and-ancestor-directories",
+      "passed": true
+    },
+    {
+      "name": "negative-control-old-validator-misses-real-empty-directory-shape",
+      "passed": true
+    },
+    {
+      "name": "current-validator-rejects-unowned-empty-directory-tree",
+      "passed": true
+    },
+    {
+      "name": "normalized-fixture-retains-valid-owned-qml-tree",
+      "passed": true
+    },
+    {
+      "name": "unowned-root-empty-directory",
+      "passed": true
+    },
+    {
+      "name": "tampered-runtime",
+      "passed": true
+    },
+    {
+      "name": "unlisted-runtime",
+      "passed": true
+    },
+    {
+      "name": "missing-runtime",
+      "passed": true
+    },
+    {
+      "name": "missing-isolation-marker",
+      "passed": true
+    },
+    {
+      "name": "mismatching-installed-manifest",
+      "passed": true
+    },
+    {
+      "name": "linked-installed-entry",
+      "passed": true
+    }
+  ],
+  "success": true
+}

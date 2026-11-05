@@ -51,13 +51,17 @@ add_library(SwirlXrayProduct STATIC
     "${SWIRL_QUICK_SOURCE}/engine/RustCoreLibrary.h"
     "${SWIRL_QUICK_SOURCE}/engine/RustCoreLibrary.cpp"
     "${SWIRL_QUICK_SOURCE}/engine/RustCoreEngine.h"
-    "${SWIRL_QUICK_SOURCE}/engine/RustCoreEngine.cpp")
+    "${SWIRL_QUICK_SOURCE}/engine/RustCoreEngine.cpp"
+    "${SWIRL_QUICK_SOURCE}/engine/NativeTunBrokerClient.h"
+    "${SWIRL_QUICK_SOURCE}/engine/NativeTunBrokerClient.cpp"
+    "${SWIRL_QUICK_SOURCE}/app/NativeTunRecovery.h"
+    "${SWIRL_QUICK_SOURCE}/app/NativeTunRecovery.cpp")
 target_include_directories(SwirlXrayProduct PUBLIC "${SWIRL_QUICK_SOURCE}")
 swirl_pair_rust_core(SwirlXrayProduct)
 target_link_libraries(SwirlXrayProduct PUBLIC Qt6::Core Qt6::Network Qt6::Gui)
 if(WIN32)
     target_compile_definitions(SwirlXrayProduct PUBLIC NOMINMAX)
-    target_link_libraries(SwirlXrayProduct PRIVATE crypt32 wininet iphlpapi ws2_32)
+    target_link_libraries(SwirlXrayProduct PRIVATE crypt32 wininet iphlpapi ws2_32 advapi32 ole32 shell32)
 endif()
 if(MSVC)
     target_compile_options(SwirlXrayProduct PRIVATE /utf-8)

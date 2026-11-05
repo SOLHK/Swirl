@@ -506,6 +506,7 @@ print(json.dumps(report), flush=True)
                 ("UpstreamConnectionReset", "other"),
                 ("UpstreamConnectionAborted", "other"),
                 ("UpstreamNetworkUnreachable", "unreachable"),
+                ("UpstreamHostUnreachable", "unreachable"),
                 ("UpstreamPermissionDenied", "other")):
             with self.subTest(code=code):
                 report = successful_report("swirl-rust")

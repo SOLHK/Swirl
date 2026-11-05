@@ -1,4 +1,8 @@
 //! Rust-owned runtime, sockets, scheduling, statistics and immutable session plans.
+pub mod lan;
+#[cfg(feature = "native-tun")]
+pub mod native_tun;
+pub mod native_tun_ipc;
 mod policy;
 mod policy_v2;
 mod probe;
@@ -196,7 +200,7 @@ impl Core {
         validate_transports(&config, &transports)?;
         let transports = Arc::new(transports);
         let runtime = Builder::new_multi_thread()
-            .worker_threads(2)
+            .worker_threads(4)
             .max_blocking_threads(4)
             .thread_name("Swirl Rust Core")
             .enable_all()
@@ -590,7 +594,11 @@ async fn session(
                         counters: counters.clone(),
                     },
                 );
-                let _ = swirl_protocol::reply(&mut inbound, request.kind, false).await;
+                let _ = timeout(
+                    limit,
+                    swirl_protocol::reply_failure(&mut inbound, request.kind, error),
+                )
+                .await;
                 return Err(error);
             }
         };
@@ -633,7 +641,11 @@ async fn session(
     let mut upstream = match connected {
         Ok(s) => s,
         Err(e) => {
-            let _ = swirl_protocol::reply(&mut inbound, request.kind, false).await;
+            let _ = timeout(
+                limit,
+                swirl_protocol::reply_failure(&mut inbound, request.kind, e),
+            )
+            .await;
             return Err(e);
         }
     };
@@ -951,7 +963,8 @@ async fn udp_associate(
     if !requested_ip.is_unspecified() && requested_ip != peer.ip() {
         return Err("UdpClientAddress");
     }
-    let relay = bind_udp(SocketAddr::new(peer.ip(), 0))
+    let local_ip = control.local_addr().map_err(|_| "UdpLocalAddress")?.ip();
+    let relay = swirl_transport::bind_udp_inbound(SocketAddr::new(local_ip, 0))
         .await
         .map_err(|_| "UdpBind")?;
     let v4 = bind_udp(SocketAddr::from(([0, 0, 0, 0], 0)))

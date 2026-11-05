@@ -1,4 +1,5 @@
 #include "FontManager.h"
+#include "FontWidthFit.h"
 #include "FontAxisPolicy.h"
 #include "FontFileInspection.h"
 #include <QCryptographicHash>
@@ -56,7 +57,7 @@ FontManager::FontManager(QObject *parent, const QString &storageDirectory) : QOb
     QString localSwirlFamily;
     auto discover=[&](const QString &path){
         const int id=loadFontFile(path);
-        if(id<0||QFileInfo(path).fileName()!=QStringLiteral("Swirl-VF.ttc"))return;
+        if(id<0||QFileInfo(path).fileName()!=QStringLiteral("SwirlVF.ttc"))return;
         const auto names=QFontDatabase::applicationFontFamilies(id);
         // Swirl's UI is Simplified Chinese. Other regional faces remain
         // individually selectable; never collapse them to the SC family.
@@ -66,7 +67,7 @@ FontManager::FontManager(QObject *parent, const QString &storageDirectory) : QOb
     for(const auto &file:directory.entryList({"*.ttf","*.otf","*.ttc","*.otc"},QDir::Files))
         discover(directory.filePath(file));
     // Local user-supplied asset only. The repository/release does not bundle it.
-    for(const auto &relative:{"fonts/Swirl-VF.ttc","Swirl-VF.ttc"}){
+    for(const auto &relative:{"fonts/SwirlVF.ttc","SwirlVF.ttc"}){
         const auto path=QDir(QCoreApplication::applicationDirPath()).filePath(relative);
         if(QFileInfo::exists(path))discover(path);
     }
@@ -446,43 +447,30 @@ QVariantMap FontManager::fittedText(const QFont &font, const QString &text,
     auto advance=[&](const QFont &f){
         QByteArray key;QDataStream stream(&key,QIODevice::WriteOnly);stream<<f<<text<<dpi;
         if(const auto *cached=m_textWidths.object(key))return *cached;
+#ifdef SWIRL_UI_TESTS
+        ++m_textWidthMeasurements;
+#endif
         const qreal value=QFontMetricsF(f,&device).horizontalAdvance(text);
         m_textWidths.insert(key,new qreal(value));return value;
     };
-    const bool plain=!text.contains('\n')&&!text.contains('\r')&&!Qt::mightBeRichText(text);
+    // Match Qt Quick's hard-line and multi-length-string exclusions even for
+    // direct C++/Q_INVOKABLE callers that do not use SwirlText's QML guard.
+    const bool plain=!text.contains('\n')&&!text.contains('\r')
+        &&!text.contains(QChar(0x2028))&&!text.contains(QChar(0x2029))
+        &&!text.contains(QChar(0x009c))&&!Qt::mightBeRichText(text);
     const double natural=plain?advance(measured):0;
     QVariantMap result{{"axes",axes},{"naturalWidth",natural},{"fitted",false}};
     if(!plain||text.isEmpty()||!std::isfinite(availableWidth)||availableWidth<=0
         ||(font.family()==m_family&&!m_automatic)
-        ||!QStringList{"button","navigation","pageTitle"}.contains(role))return result;
+        ||!QStringList{"button","navigation","pageTitle","largeTitle","label"}.contains(role)
+        ||!axes.contains("wdth"))return result;
     QVariantMap widthAxis;
     for(const auto &record:axesFor(font.family()))if(record.toMap().value("tag")=="wdth")widthAxis=record.toMap();
     if(widthAxis.isEmpty())return result;
     const double normal=widthAxis.value("defaultValue").toDouble();
-    // At most 10% of the designer's width coordinate; legal ranges can narrow
-    // this further. A non-percent or nonpositive custom default is not guessed.
-    if(normal<=0)return result;
-    const double minimum=qMax(widthAxis.value("minimum").toDouble(),normal*.90);
-    if(minimum>=normal)return result;
-    const bool wasNarrow=std::isfinite(previousWidth)&&previousWidth>=minimum&&previousWidth<normal;
-    // Four logical pixels to enter/leave fitting, two pixels inside each band.
-    // Small layout jitter therefore keeps the previous coordinate.
-    if((!wasNarrow&&natural<=availableWidth+4)||(wasNarrow&&natural<=availableWidth-4))return result;
     auto widthAt=[&](double coordinate){auto f=measured;f.setVariableAxis(QFont::Tag("wdth"),float(coordinate));return advance(f);};
-    if(wasNarrow){
-        const auto current=widthAt(previousWidth);
-        const auto wider=qMin(normal,previousWidth+normal*.02);
-        if(current<=availableWidth+2&&widthAt(wider)>availableWidth-2){axes["wdth"]=previousWidth;result["axes"]=axes;result["fitted"]=true;return result;}
-    }
-    double chosen=normal;
-    for(int step=1;step<=5;++step){
-        const double candidate=qMax(minimum,normal*(1.-step*.02));
-        const double width=widthAt(candidate);
-        // Some fonts expose wdth but keep advances invariant. Do not claim a
-        // layout fit or distort their outlines when they offer no useful space.
-        if(width<natural-.5)chosen=candidate;
-        if(width<=availableWidth-2||candidate==minimum)break;
-    }
+    const double chosen=FontWidthFit::solve(widthAxis.value("minimum").toDouble(),normal,
+        widthAxis.value("maximum").toDouble(),natural,availableWidth,previousWidth,widthAt);
     if(chosen<normal){axes["wdth"]=chosen;result["axes"]=axes;result["fitted"]=true;}
     return result;
 }

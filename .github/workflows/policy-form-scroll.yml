@@ -1,0 +1,58 @@
+name: Policy form viewport regression
+on:
+  pull_request:
+    branches: [test, main]
+    paths:
+      - src/Swirl.Quick/qml/components/PolicyFormScroll.qml
+      - src/Swirl.Quick/qml/controls/SwirlScrollBar.qml
+      - tools/tests/test_policy_form_scroll.py
+      - .github/workflows/policy-form-scroll.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-qt-viewport:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install SDK downloader dependencies
+        run: python -m pip install -r tools/requirements-qt-sdk.txt
+      - name: Restore verified Qt SDK archives
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/swirl-qt-6.12.0
+          key: qt-sdk-${{ runner.os }}-6.12.0-msvc2022-${{ hashFiles('tools/Install-QtSdk.py', 'tools/requirements-qt-sdk.txt') }}
+      - name: Verify official Qt 6.12 and replay old production code
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+          QSG_RHI_BACKEND: d3d11
+          QT_QUICK_CONTROLS_STYLE: Basic
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sdkOutput = Join-Path $env:RUNNER_TEMP 'swirl-qt-6.12.0'
+          python tools/Install-QtSdk.py --version 6.12.0 --arch win64_msvc2022_64 --output $sdkOutput
+          if ($LASTEXITCODE -ne 0) { throw 'Official Qt SDK verification failed.' }
+          $sdk = Get-Content -LiteralPath (Join-Path $sdkOutput 'sdk-install-result.json') -Raw | ConvertFrom-Json
+          $qtRoot = (Resolve-Path -LiteralPath $sdk.kit_root).Path
+          $version = (& (Join-Path $qtRoot 'bin/qmake.exe') -query QT_VERSION).Trim()
+          if ($LASTEXITCODE -ne 0 -or $version -ne '6.12.0' -or $sdk.arch -ne 'win64_msvc2022_64') { throw 'Unexpected Qt version or ABI.' }
+          $baseline = '1327cb4d587eddc60563c926672f67a6da5c16ce'
+          git fetch --no-tags --depth=1 origin $baseline
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch pinned negative-control source.' }
+          python tools/tests/test_policy_form_scroll.py --qmltestrunner (Join-Path $qtRoot 'bin/qmltestrunner.exe') --output build-evidence/policy-form-scroll --regression-baseline $baseline
+          if ($LASTEXITCODE -ne 0) { throw 'Production QML viewport regression or old-code negative control failed.' }
+      - name: Preserve native Qt results including negative-control failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Policy-Form-Viewport-${{ github.sha }}-${{ github.run_attempt }}
+          path: build-evidence/policy-form-scroll
+          if-no-files-found: error
+          retention-days: 14

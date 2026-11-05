@@ -141,6 +141,12 @@ impl Pool {
             udp_drop(&self.counters, &self.total);
             return;
         };
+        // Hysteria2 cannot encode an empty UDP payload. Reject this packet
+        // before creating or touching a worker, preserving the association.
+        if payload.is_empty() && matches!(&node.outbound, Outbound::Hysteria2(_)) {
+            udp_drop(&self.counters, &self.total);
+            return;
+        }
         // Classic VLESS UDP binds its stream to one destination. Include that
         // destination in the same bounded pool, never reuse a different target.
         let key = (
@@ -288,7 +294,7 @@ async fn run(
     discard_pending(&mut requests, &counters, &total);
 }
 
-enum ProxyAssociation {
+pub(super) enum ProxyAssociation {
     Hysteria2(swirl_protocol::hysteria2::UdpAssociation),
     Tuic(swirl_protocol::tuic::UdpAssociation),
     Shadowsocks2022(Box<swirl_protocol::ss2022::UdpAssociation>),
@@ -296,7 +302,7 @@ enum ProxyAssociation {
 }
 
 impl ProxyAssociation {
-    async fn connect(
+    pub(super) async fn connect(
         outbound: &Outbound,
         resolver: &Resolver,
         transport: Option<&Transport>,
@@ -335,7 +341,11 @@ impl ProxyAssociation {
         }
     }
 
-    async fn send(&mut self, target: &Target, payload: &[u8]) -> Result<(), &'static str> {
+    pub(super) async fn send(
+        &mut self,
+        target: &Target,
+        payload: &[u8],
+    ) -> Result<(), &'static str> {
         match self {
             Self::Hysteria2(value) => value.send(target, payload).await,
             Self::Tuic(value) => value.send(target, payload).await,
@@ -344,7 +354,7 @@ impl ProxyAssociation {
         }
     }
 
-    async fn recv(&mut self) -> Result<(Target, Vec<u8>), &'static str> {
+    pub(super) async fn recv(&mut self) -> Result<(Target, Vec<u8>), &'static str> {
         match self {
             Self::Hysteria2(value) => value.recv().await,
             Self::Tuic(value) => value.recv().await,

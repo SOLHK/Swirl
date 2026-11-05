@@ -140,7 +140,7 @@ ColumnLayout {
                         }
                         SwirlText { Layout.fillWidth: true; leftPadding: Theme.dp(8); tabularFigures: true; visible: row.record.strategy !== "manual"; text: row.observation.connections ? qsTr("%1 个活动连接").arg(row.observation.connections) : qsTr("按策略自动选择"); color: Theme.muted; font.pixelSize: Theme.fontSize(12); elide: Text.ElideRight }
                     }
-                    SubscriptionAction { id: more; objectName: "policyGroupMore-" + row.record.id; iconName: "ellipsis"; Layout.preferredWidth: Theme.dp(36); Layout.preferredHeight: Theme.dp(44); enabled: groups.editable; Accessible.name: qsTr("%1 的更多操作").arg(row.record.name); tooltip: Accessible.name; tooltipEnabled: !moreMenu.visible; onClicked: moreMenu.showAt() }
+                    SubscriptionAction { id: more; objectName: "policyGroupMore-" + row.record.id; iconName: "ellipsis"; Layout.preferredWidth: Theme.dp(36); Layout.preferredHeight: Theme.dp(44); enabled: groups.editable; Accessible.name: qsTr("%1 的更多操作").arg(row.record.name); tooltip: Accessible.name; onClicked: moreMenu.showAt() }
                 }
                 SwirlContextMenu {
                     id: moreMenu; popupType: Popup.Item; parent: more; x: more.width - width; y: more.height; transformOrigin: Item.TopRight

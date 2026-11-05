@@ -63,10 +63,10 @@ Item {
             }
             AccessRow {
                 title: qsTr("增强模式")
-                description: qsTr("当前 Rust Core 尚未实现 TUN 数据通路，无法接管不遵循系统代理的应用。")
-                status: active ? qsTr("已启用") : qsTr("尚未支持")
-                active: page.engineController.tunEnabled; available: active && !page.engineController.busy
-                onToggled: on => { if (!page.engineController.setTunEnabled(!page.engineController.tunRequested)) AppState.notice(page.engineController.routingError || page.engineController.networkConfigurationError) }
+                description: qsTr("先配置加密 DNS，并在关闭代理后选择 TUN；开启代理时将请求管理员授权。")
+                status: page.engineController.tunEnabled ? qsTr("已启用") : page.engineController.tunRequested ? qsTr("待开启代理") : page.engineController.tunSupported ? qsTr("未启用") : qsTr("组件缺失")
+                active: page.engineController.tunRequested; available: page.engineController.tunSupported && !page.engineController.busy && !page.engineController.policyBusy
+                onToggled: on => { if (!page.engineController.setTunEnabled(on)) AppState.notice(page.engineController.routingError || page.engineController.policyError) }
             }
             SwirlSectionTitle { Layout.fillWidth: true; Layout.topMargin: Theme.dp(16); title: qsTr("局域网与设备"); description: qsTr("地址、认证与客户端配置可以保留；当前未支持的接管能力无法开启。") }
             AccessRow {
@@ -79,7 +79,7 @@ Item {
             }
             AccessRow {
                 title: qsTr("网关模式")
-                description: qsTr("管理网关配置、客户端记录与 CSV。当前 Rust Core 不支持 TUN 网关转发。")
+                description: qsTr("管理网关配置、客户端记录与 CSV。本测试版尚未接入 TUN 网关启动与恢复组件。")
                 status: gatewayProvider.busy ? qsTr("正在配置") : gatewayProvider.running ? qsTr("启用") : gatewayProvider.configured ? qsTr("配置已保留，转发尚未支持") : qsTr("尚未配置，转发尚未支持")
                 active: gatewayProvider.running; available: active && !gatewayProvider.busy; configurable: true; configureLabel: qsTr("管理设备")
                 onConfigure: AppState.navigate("gateway")

@@ -1,0 +1,212 @@
+{
+  "schema_version": 1,
+  "kind": "swirl_vf_a3_prereadback_native_evidence",
+  "branch": "work/vf-axis-a3",
+  "scope": "Immutable actual Apple reports: new independent design-stage experiment plus unchanged-default native protocol regression. Finite diagnostic completion is not production or whole-font acceptance.",
+  "original_source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+  "strict_limit_font_units": 0.03125,
+  "original_141_subset_rerun": false,
+  "production_mapping_changed": false,
+  "production_constructor_changed": false,
+  "production_mapping_accepted": false,
+  "continuous_space_accepted": false,
+  "final_font_accepted": false,
+  "archives": [
+    {
+      "id": "prereadback_6d6a7b5",
+      "archive": "axis_a3_prereadback_native_6d6a7b5.zip",
+      "archive_bytes": 210310,
+      "archive_sha256": "f14dc7d77ca586d3cd3b4774f1332ec66ac885f5fe273779b2d770ebf136ac7c",
+      "report_member": "prereadback.json",
+      "report_bytes": 9080199,
+      "report_sha256": "b5631489f8c95445264af848956d7e5bbc4748d209895d90b0786d21d58d8d08",
+      "source_commit": "6d6a7b5eec6e2c7a630dfd4f692e29a7ecc52115",
+      "ci_run_id": 39407084146,
+      "ci_url": "https://github.com/SOLHK/Swirl/actions/runs/39407084146",
+      "ci_status": "completed",
+      "ci_conclusion": "success",
+      "artifact_id": 12257063377,
+      "native_job_id": 118575682081,
+      "reported_status": "COMPLETED_NATIVE_A3_PREREADBACK_DIAGNOSIS_NOT_ACCEPTANCE",
+      "native_records": 5600,
+      "native_processes": 4,
+      "constructor_entry_records": 1120,
+      "opposite_order_pairs": 2800,
+      "replay_batches": 560,
+      "native_HVF_unique_calls": 128,
+      "labelled_cases": 140,
+      "unique_face_locations": 140,
+      "new_holdout_labels": 124,
+      "historical_control_labels": 16,
+      "strict_replay_failed_batches": 52,
+      "classifier_counts": {
+        "STRICT_REPLAY_ALREADY_PASSED": 508,
+        "REJECTED": 52
+      },
+      "rejection_counts": {
+        "native_replay_payload_not_exact": 48,
+        "native_readback_replay_not_exactly_stable": 4
+      },
+      "all_flags_remain_diagnostic_only": true
+    },
+    {
+      "id": "arithmetic_protocol_6d6a7b5",
+      "archive": "axis_a3_prereadback_protocol_6d6a7b5.zip",
+      "archive_bytes": 253358,
+      "archive_sha256": "c7a6767a15e91073c959c6c836556c5a8c9f1db2930e82bb2788abb31af3d1f7",
+      "report_member": "arithmetic.json",
+      "report_bytes": 12202758,
+      "report_sha256": "5809374e5f10fcf5220f4c3d8245dba39294863791994dd01f6b99d1a4ab9e2a",
+      "source_commit": "6d6a7b5eec6e2c7a630dfd4f692e29a7ecc52115",
+      "ci_run_id": 39407084001,
+      "ci_url": "https://github.com/SOLHK/Swirl/actions/runs/39407084001",
+      "ci_status": "completed",
+      "ci_conclusion": "success",
+      "artifact_id": 12257293380,
+      "native_job_id": 118575647238,
+      "reported_status": "COMPLETED_NATIVE_A3_ARITHMETIC_DIAGNOSIS_NOT_ACCEPTANCE",
+      "native_records": 8040,
+      "native_processes": 4,
+      "constructor_entry_records": 1608,
+      "opposite_order_pairs": 4020,
+      "replay_batches": 804,
+      "native_HVF_unique_calls": 160,
+      "labelled_cases": 201,
+      "unique_face_locations": 193,
+      "new_holdout_labels": 160,
+      "historical_control_labels": 41,
+      "strict_replay_failed_batches": 56,
+      "classifier_counts": {
+        "STRICT_REPLAY_ALREADY_PASSED": 748,
+        "REJECTED": 8,
+        "DEFAULT_OMISSION_EQUIVALENT_FOR_THIS_BATCH": 48
+      },
+      "rejection_counts": {
+        "native_readback_replay_not_exactly_stable": 4,
+        "native_replay_payload_not_exact": 4
+      },
+      "all_flags_remain_diagnostic_only": true
+    }
+  ],
+  "protocol_repeat_relation": {
+    "reference_archive": "axis_a3_arithmetic_native_9c2fd00.zip",
+    "reference_source_commit": "9c2fd0092284edc7d346b0c9e1d1208095429b39",
+    "reference_report_sha256": "d5ea884cdd1c7ffdf0efdf2dd264c3ee05d69550b55d2319565c6d5ebe9201c6",
+    "repeat": "arithmetic_protocol_6d6a7b5",
+    "only_changed_paths": [
+      "source_commit"
+    ],
+    "all_other_report_values_exactly_equal": true,
+    "strict_replay_failures_unchanged": true
+  },
+  "model_results_per_constructor": {
+    "canonical_identity_negative_endpoint32_positive64_normalized16_truncate": {
+      "HVAR": {
+        "checks": 140,
+        "exact_matches": 135,
+        "outside_1_32": 0,
+        "maximum_error": 0.01220703125
+      },
+      "HVAR_by_cohort": {
+        "holdouts": {
+          "checks": 124,
+          "exact_matches": 119,
+          "outside_1_32": 0,
+          "maximum_error": 0.01220703125
+        },
+        "historical_controls": {
+          "checks": 16,
+          "exact_matches": 16,
+          "outside_1_32": 0,
+          "maximum_error": 0.0
+        }
+      },
+      "direct_HVF_positions": 68,
+      "direct_HVF_exact_positions": 56,
+      "direct_HVF_glyph_comparisons": 136,
+      "direct_HVF_exact_glyphs": 112,
+      "direct_HVF_maximum_point_error": 0.012252664064817509,
+      "portable_glyph_comparisons": 700,
+      "portable_nonzero_glyphs": 695,
+      "portable_maximum_point_error": 0.012252664064703822
+    },
+    "prereadback_once_all_axes_endpoint_normalized16_truncate": {
+      "HVAR": {
+        "checks": 140,
+        "exact_matches": 140,
+        "outside_1_32": 0,
+        "maximum_error": 0.0
+      },
+      "HVAR_by_cohort": {
+        "holdouts": {
+          "checks": 124,
+          "exact_matches": 124,
+          "outside_1_32": 0,
+          "maximum_error": 0.0
+        },
+        "historical_controls": {
+          "checks": 16,
+          "exact_matches": 16,
+          "outside_1_32": 0,
+          "maximum_error": 0.0
+        }
+      },
+      "direct_HVF_positions": 68,
+      "direct_HVF_exact_positions": 68,
+      "direct_HVF_glyph_comparisons": 136,
+      "direct_HVF_exact_glyphs": 136,
+      "direct_HVF_maximum_point_error": 0.0,
+      "portable_glyph_comparisons": 700,
+      "portable_nonzero_glyphs": 694,
+      "portable_maximum_point_error": 6.821210263296962e-13
+    },
+    "prereadback_once_identity_axes_endpoint_normalized16_truncate": {
+      "HVAR": {
+        "checks": 140,
+        "exact_matches": 139,
+        "outside_1_32": 0,
+        "maximum_error": 0.0032958984375
+      },
+      "HVAR_by_cohort": {
+        "holdouts": {
+          "checks": 124,
+          "exact_matches": 123,
+          "outside_1_32": 0,
+          "maximum_error": 0.0032958984375
+        },
+        "historical_controls": {
+          "checks": 16,
+          "exact_matches": 16,
+          "outside_1_32": 0,
+          "maximum_error": 0.0
+        }
+      },
+      "direct_HVF_positions": 68,
+      "direct_HVF_exact_positions": 67,
+      "direct_HVF_glyph_comparisons": 136,
+      "direct_HVF_exact_glyphs": 134,
+      "direct_HVF_maximum_point_error": 0.005370084551486798,
+      "portable_glyph_comparisons": 700,
+      "portable_nonzero_glyphs": 694,
+      "portable_maximum_point_error": 0.005554199218863687
+    }
+  },
+  "original_replay_numeric_comparison": {
+    "batches": 560,
+    "payload_different_batches": 48,
+    "readback_different_batches": 4,
+    "payload_different_glyph_pairs": 240,
+    "readback_different_glyph_pairs": 20,
+    "maximum_advance_difference": 0.01220703125,
+    "maximum_numeric_geometry_difference": 0.012252664064817509,
+    "source_of_distances": "Actual original versus replay CoreText records, not HVF reference errors."
+  },
+  "experiment_interpretation": {
+    "once_all_axes_is_finite_native_supported_candidate": true,
+    "once_identity_only_refuted_by_new_nonidentity_weight_holdout": true,
+    "readback_remains_lossy_instance_key": true,
+    "private_CoreText_operation_order_uniquely_proven": false,
+    "portable_nonzero_errors_retained": true,
+    "production_integration_requires_owner_review": true
+  }
+}

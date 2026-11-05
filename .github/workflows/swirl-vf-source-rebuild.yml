@@ -58,7 +58,7 @@ jobs:
                   raise ValueError('source_hash_mismatch')
               with tempfile.TemporaryDirectory(prefix='swirl-original-rebuild-') as tmp:
                   private = pathlib.Path(tmp)
-                  candidate, report = private/'Swirl-VF.ttc', private/'rebuild.json'
+                  candidate, report = private/'SwirlVF.ttc', private/'rebuild.json'
                   oracle = make_launcher(private/'verified-axis-oracle', pathlib.Path(os.environ['NATIVE_BINARY']))
                   summary.update(native_binary_sha256=digest(pathlib.Path(os.environ['NATIVE_BINARY'])),
                       verified_axis_launcher_sha256=digest(oracle),

@@ -635,6 +635,9 @@ void ini(Result &r,const QString &document){
         if(qx){r.format="Quantumult X";if(!endpoint(clean(fields.takeFirst()),host,port)){r.error="Quantumult X 节点地址无效。";return;}n["type"]=protocol(left);if(left.compare("https",Qt::CaseInsensitive)==0||left.compare("socks5-tls",Qt::CaseInsensitive)==0)n["tls"]=true;}
         else {n["name"]=left;const auto type=clean(fields.takeFirst());n["type"]=protocol(type);if(type.compare("https",Qt::CaseInsensitive)==0||type.compare("socks5-tls",Qt::CaseInsensitive)==0)n["tls"]=true;if(QStringList{"direct","reject","reject-tinygif"}.contains(n.value("type").toString())){preserve();continue;}if(fields.size()<2){r.error="INI 节点缺少服务器或端口。";return;}host=clean(fields.takeFirst());port=clean(fields.takeFirst()).toInt();}
         n["server"]=host;n["port"]=port;const auto p=n.value("type").toString();
+        // Loon supplies cipher, UUID; Surge uses named username=UUID. Keep
+        // legacy single-UUID entries while rejecting ambiguous mixed aliases.
+        const bool loonVmess=!qx&&p=="vmess"&&fields.size()>=2&&assignment(fields[0])<0&&assignment(fields[1])<0;
         auto setNetwork=[&](const QString &value){
             if(value.isEmpty() || (networkSet && network!=value)){r.error="INI 传输参数冲突或为空；未应用配置。";return false;}
             network=value;networkSet=true;return true;
@@ -669,7 +672,10 @@ void ini(Result &r,const QString &document){
                     else n[key]=field;
                 }
                 else {
-                    const auto key=p=="trojan"&&positional==0?QString("password"):(p=="vless"||p=="vmess")&&positional==0?QString("uuid"):(p=="http"||p=="socks5")&&positional<2?(positional==0?QString("username"):QString("password")):QString();
+                    const auto key=p=="trojan"&&positional==0?QString("password"):
+                        loonVmess&&positional<2?(positional==0?QString("cipher"):QString("uuid")):
+                        (p=="vless"||p=="vmess")&&positional==0?QString("uuid"):
+                        (p=="http"||p=="socks5")&&positional<2?(positional==0?QString("username"):QString("password")):QString();
                     ++positional;
                     if(key.isEmpty())issue(issues,"INI 节点存在未映射的位置参数。");
                     else {if(seenKeys.contains(key)||n.contains(key)){r.error="INI 节点含重复参数，无法安全确定配置。";return;}seenKeys.insert(key);n[key]=field;}
@@ -677,7 +683,7 @@ void ini(Result &r,const QString &document){
                 continue;
             }
             const auto key=field.left(at).trimmed().toLower(),value=clean(field.mid(at+1));
-            const auto canonical=key=="encrypt-method"||key=="method"?QString("cipher"):key=="tls-host"||key=="tls-name"?QString("sni"):key=="over-tls"?QString("tls"):key=="udp-relay"?QString("udp"):key=="fast-open"?QString("tfo"):key=="tls-verification"?QString("skip-cert-verify"):key=="obfs-name"&&p=="ss"?QString("obfs"):p=="vmess"&&(key=="username"||(qx&&key=="password"))?QString("uuid"):key=="ws-path"||(key=="obfs-uri"&&p!="ss")?QString("path"):key;
+            const auto canonical=key=="encrypt-method"||key=="method"?QString("cipher"):key=="tls-host"||key=="tls-name"?QString("sni"):key=="over-tls"?QString("tls"):key=="udp-relay"?QString("udp"):key=="fast-open"?QString("tfo"):key=="tls-verification"?QString("skip-cert-verify"):key=="obfs-name"&&p=="ss"?QString("obfs"):p=="vmess"&&(key=="username"||(qx&&key=="password"))?QString("uuid"):key=="ws-path"||(key=="obfs-uri"&&p!="ss")?QString("path"):key=="ws-headers"||(key=="obfs-host"&&p!="ss")?QString("host"):key;
             if(seenKeys.contains(canonical)){r.error="INI 节点含重复参数，无法安全确定配置。";return;}seenKeys.insert(canonical);
             const bool isBoolean=QStringList{"tls","over-tls","skip-cert-verify","tls-verification","udp-relay","udp","tfo","fast-open","ws","aead"}.contains(key);
             const auto parsedBoolean=boolean(value);
@@ -707,7 +713,8 @@ void ini(Result &r,const QString &document){
             else if(key=="underlying-proxy")n["dialer-proxy"]=value;
             else if(key=="ws"){if(!setNetwork(enabled?"ws":"tcp"))return;}
             else if(key=="obfs-uri"&&p=="ss"){auto opts=n.value("plugin-opts").toObject();opts[key]=value;n["plugin-opts"]=opts;issue(issues,"INI Shadowsocks 混淆路径尚未支持，原始配置已保留。");}
-            else if(key=="ws-path"||key=="obfs-uri")path=value;
+            else if(key=="ws-path"||key=="obfs-uri"||key=="path")path=value;
+            else if(key=="host")wsHost=value;
             else if(key=="ws-headers"){
                 const auto header=value.section(':',0,0);if(header.compare("Host",Qt::CaseInsensitive)==0)wsHost=value.section(':',1);else issue(issues,"INI WebSocket 头部映射尚未完成。");
             }else if(key=="obfs"||(key=="obfs-name"&&p=="ss")){
@@ -715,7 +722,11 @@ void ini(Result &r,const QString &document){
                 else if(value=="ws"||value=="wss"){if(!setNetwork("ws"))return;if(value=="wss"&&!setTls(true))return;}else issue(issues,"INI 节点的伪装传输尚未映射。");
             }else if(key=="obfs-host"){
                 if(p=="ss"){auto opts=n.value("plugin-opts").toObject();opts["host"]=value;n["plugin-opts"]=opts;}else wsHost=value;
-            }else if(key=="alterid")n["alterId"]=value.toInt();
+            }else if(key=="alterid"){
+                bool ok=false;const auto aid=value.toUInt(&ok);
+                if(!ok||!QRegularExpression("^[0-9]+$").match(value).hasMatch()){r.error="INI VMess alterId 必须为无符号整数；未应用配置。";return;}
+                n["alterId"]=qint64(aid);
+            }
             else if(key=="aead"){if(!enabled)issue(issues,"旧 VMess 非 AEAD 行为需要原生 Clash 配置。");}
             else if(key!="group")issue(issues,"INI 节点包含未映射选项，原始配置已保留。");
         }

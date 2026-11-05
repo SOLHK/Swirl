@@ -4,7 +4,6 @@ from pathlib import Path
 import struct
 import sys
 import tempfile
-import tracemalloc
 from types import SimpleNamespace
 import unittest
 from unittest import mock
@@ -165,12 +164,28 @@ class PackingTests(unittest.TestCase):
             table_size = len(font["TEST"].data)
             font.save(paths[0])
         del font
-        tracemalloc.start()
-        try:
-            report = pack.pack_collection([paths[0], paths[0]], output, chunk_size=4096)
-            _, peak = tracemalloc.get_traced_memory()
-        finally:
-            tracemalloc.stop()
+        # Isolate the writer's allocation measurement from the suite's global
+        # intern dictionary. With many preceding font tests, pathlib's
+        # sys.intern can resize that unrelated dictionary by 1.9 MB here.
+        # The child measures all writer allocations with the unchanged limit;
+        # no allocator/filter/threshold in the production code is modified.
+        import json
+        import subprocess
+        script = '''
+import json, sys, tracemalloc
+sys.path.insert(0, sys.argv[1])
+import ttc_staging_pack as pack
+tracemalloc.start()
+report = pack.pack_collection([sys.argv[2], sys.argv[2]], sys.argv[3], chunk_size=4096)
+_, peak = tracemalloc.get_traced_memory()
+tracemalloc.stop()
+print(json.dumps(dict(report=report, peak=peak)))
+'''
+        measured = subprocess.run([sys.executable, '-c', script,
+            str(Path(pack.__file__).parent), str(paths[0]), str(output)],
+            capture_output=True, text=True, check=True, timeout=30)
+        result = json.loads(measured.stdout)
+        report, peak = result['report'], result['peak']
         self.assertLess(peak, table_size // 2, "writer buffered a complete large table")
         self.assertEqual(report["copy_chunk_bytes"], 4096)
         self.assertGreater(report["table_references_shared"], 0)
@@ -234,7 +249,8 @@ class PackingTests(unittest.TestCase):
 
     def test_production_filename_is_reserved_even_for_valid_synthetic_input(self):
         root, paths, _ = self.fixture(1)
-        for name in ("Swirl-VF.ttc", "swirl-vf.TTC", "SWIRL-VF.TTC"):
+        for name in ("SwirlVF.ttc", "swirlvf.TTC", "SWIRLVF.TTC",
+                     "Swirl-VF.ttc", "swirl-vf.TTC", "SWIRL-VF.TTC"):
             output = root / name
             with self.subTest(name=name), self.assertRaisesRegex(StagingError, "production_filename_reserved"):
                 pack.pack_collection(paths, output)
@@ -251,6 +267,21 @@ class PackingTests(unittest.TestCase):
         pack.pack_collection(paths, output, validate=validate)
         self.assertEqual(validations[0]["faces_checked"], 2)
         self.assertEqual(validations[0]["status"], "PASS")
+
+    def test_standalone_contracts_survive_streaming_pack_and_validation_callback(self):
+        from ttc_staging_validate import face_contract, validate_collection
+        root, paths, output = self.fixture(2)
+        expected = []
+        for path in paths:
+            with TTFont(path) as font:
+                expected.append(face_contract(font))
+        validations = []
+        def validate(candidate):
+            self.assertFalse(output.exists())
+            validations.append(validate_collection(candidate, expected))
+        pack.pack_collection(paths, output, validate=validate)
+        self.assertEqual(validations[0]["glyphs_checked"], 14)
+        self.assertFalse(validations[0]["production_accepted"])
 
     def test_source_symlink_and_output_symlink_are_rejected(self):
         root, paths, output = self.fixture(1)

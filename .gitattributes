@@ -3,3 +3,7 @@
 *.ico binary
 # Captured command output is retained byte-for-byte, including blank log lines.
 docs/evidence/** -whitespace
+# Continuation evidence hashes identify the original captured bytes, including CRLF.
+docs/evidence/windows-proxy-compat-20261102/final-continuation/** -text
+docs/evidence/windows-proxy-compat-20261102/native-exit-followup/** -text
+docs/evidence/windows-proxy-compat-20261102/resume-20261103/installer-cleanup/** -text

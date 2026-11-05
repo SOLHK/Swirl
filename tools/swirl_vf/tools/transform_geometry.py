@@ -20,6 +20,11 @@ def fractional_translation(translation, angle: float, weights):
     w = np.asarray(weights, dtype=np.float64)
     if t.shape != (2,) or not np.isfinite(t).all() or not np.isfinite(angle) or not np.isfinite(w).all():
         raise ValueError('invalid rigid-transform input')
+    if angle == 0:
+        result=w[...,None]*t
+        if not np.isfinite(result).all():
+            raise ValueError('nonfinite fractional rigid transform')
+        return result
     half = angle / 2
     ratio = w * np.sinc(w * half / np.pi) / np.sinc(half / np.pi)
     phase = (w - 1) * half
@@ -30,21 +35,31 @@ def fractional_translation(translation, angle: float, weights):
     return result
 
 
-def blend_transform_rows(part, weights):
-    """Return sparse row -> (..., tx/ty/angle), without mutating any input."""
-    w = np.asarray(weights, dtype=np.float64)
-    if w.ndim not in (1, 2) or w.shape[-1] != 2 * part.axis_count or not np.isfinite(w).all():
-        raise ValueError('invalid extremum weights')
+def compile_transform_rows(part):
+    """Compile only source constants, preserving their stored addition order."""
     master, extremes = {}, {}
     for record, section in ((part.translations, slice(0, 2)), (part.rotations, slice(2, 3))):
         for row, vector in zip(record.master_rows, record.master_values):
             master.setdefault(int(row), np.zeros(3))[section] += vector
         for (row, col), vector in zip(record.extreme_indices, record.extreme_values):
             extremes.setdefault(int(row), {}).setdefault(int(col), np.zeros(3))[section] += vector
-    result = {}
+    rows=[]
     for row in sorted(master.keys() | extremes.keys()):
-        current = np.broadcast_to(master.get(row, np.zeros(3)), (*w.shape[:-1], 3)).copy()
-        for column, value in sorted(extremes.get(row, {}).items()):
+        base=master.get(row,np.zeros(3));base.setflags(write=False)
+        entries=tuple(sorted(extremes.get(row,{}).items()))
+        for _,value in entries:value.setflags(write=False)
+        rows.append((row,base,entries))
+    return tuple(rows)
+
+
+def blend_compiled_rows(rows, axis_count, weights):
+    w=np.asarray(weights,dtype=np.float64)
+    if w.ndim not in (1,2) or w.shape[-1]!=2*axis_count or not np.isfinite(w).all():
+        raise ValueError('invalid extremum weights')
+    result={}
+    for row,base,entries in rows:
+        current=np.broadcast_to(base,(*w.shape[:-1],3)).copy()
+        for column,value in entries:
             weight = w[..., column]
             delta = fractional_translation(value[:2], float(value[2]), weight)
             c, s = np.cos(current[..., 2]), np.sin(current[..., 2])
@@ -55,3 +70,8 @@ def blend_transform_rows(part, weights):
             raise ValueError('nonfinite blended rigid transform')
         result[row] = current
     return result
+
+
+def blend_transform_rows(part, weights):
+    """Return sparse row -> (..., tx/ty/angle), without mutating any input."""
+    return blend_compiled_rows(compile_transform_rows(part),part.axis_count,weights)

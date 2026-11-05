@@ -30,7 +30,8 @@ def complete(mode):
                        "stage": "complete", "frontend_response_valid": True, "tunnel_accepted": accepted,
                        "expected_result_observed": True, "closed": True, "socket_error": -1,
                        "tls_error_count": 0, "elapsed_ms": 5,
-                       "proxy_status": (200 if accepted else 502) if frontend == "http-connect" else (0 if accepted else 5)}
+                       "proxy_status": ((200 if accepted else 502) if frontend == "http-connect" else
+                                        (0 if accepted else 2 if phase == "reject" else 1))}
                 if mode == "cancel":
                     row.update(echo_verified=True, cancelled_after_echo=True, echo_bytes=len(gate.QT_CANCEL_PAYLOAD))
                 elif accepted:
@@ -112,6 +113,23 @@ class QtLifecycleEvidenceTests(unittest.TestCase):
         value["checks"][0]["http_status"] = 200
         with self.assertRaises(AssertionError):
             gate.validate_qt_lifecycle_report(value, "authentication-failure", 12345)
+
+    def test_policy_reject_requires_ruleset_reply_not_refusal_or_handshake_failure(self):
+        for status in (-1, 0, 1, 3, 4, 5, 6, 7, 8):
+            value = complete("reject")
+            for row in value["checks"]:
+                if row["frontend"] == "socks5" and row["phase"] == "reject":
+                    row["proxy_status"] = status
+            with self.subTest(status=status), self.assertRaisesRegex(AssertionError, "Qt policy reply"):
+                gate.validate_qt_lifecycle_report(value, "reject", 12345)
+
+    def test_authentication_reject_requires_general_failure_not_refusal_or_policy_denial(self):
+        for status in (-1, 0, 2, 3, 4, 5, 6, 7, 8):
+            value = complete("authentication-failure")
+            row = next(row for row in value["checks"] if row["frontend"] == "socks5")
+            row["proxy_status"] = status
+            with self.subTest(status=status), self.assertRaisesRegex(AssertionError, "Qt authentication reply"):
+                gate.validate_qt_lifecycle_report(value, "authentication-failure", 12345)
 
     def test_failed_or_timed_out_child_preserves_partial_typed_evidence(self):
         for timeout in (False, True):

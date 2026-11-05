@@ -1,0 +1,22 @@
+{
+  "summary_sha256": "6c9e4a62bda34e054027b0df98b1bed6cc642ed2ca0b2069c1ce7333e75825c6",
+  "recorded_raw_sha256": "c47df0a47a24fbfc4cc6e251d67cffc87468dc5b2a1b31ec3e875a72ba964dda",
+  "raw_file_found": false,
+  "summary_only": true,
+  "scope": "controlled_local_network_no_desktop_acceptance",
+  "duration": 1800.026379,
+  "connections": 8,
+  "matching_peer_and_expected_hashes": true,
+  "expected_events": 14408,
+  "final_core": {
+    "active": 0,
+    "accepted": 8,
+    "failed": 0,
+    "upload": 13800,
+    "download": 1198970,
+    "ended_records": 8
+  },
+  "listener_closed": true,
+  "resource_samples": 1798,
+  "source_scope": "Local portable Rust revision built before commit 86b73d3; exact executable hash recorded separately. Not a Windows desktop acceptance."
+}
