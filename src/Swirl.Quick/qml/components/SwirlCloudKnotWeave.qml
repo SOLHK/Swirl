@@ -204,15 +204,21 @@ Item {
             opacity:pose.opacity
             transform:Matrix4x4 {matrix:Qt.matrix4x4(piece.pose.a,piece.pose.c,0,piece.pose.tx,piece.pose.b,piece.pose.d,0,piece.pose.ty,0,0,1,0,0,0,0,1)}
     }
+    // Repeater stacks its delegates as siblings. Keep the delegate in that
+    // layer and move only its decorative child between the visual layers.
     Repeater {
         parent:restView
         model:weave.materials
-        delegate:FeatherBody {
+        delegate:Item {
+            id:featherEntry
             required property var modelData
-            material:modelData
-            objectName:"cloudFeather-"+modelData.key
-            z:modelData.index
-            parent:weave.freeFlight?flightView:restView
+            Accessible.ignored:true
+            FeatherBody {
+                material:featherEntry.modelData
+                objectName:"cloudFeather-"+material.key
+                z:material.index
+                parent:weave.freeFlight?flightView:restView
+            }
         }
     }
     Repeater {
@@ -231,30 +237,33 @@ Item {
     Repeater {
         model:weave.cardItems
         delegate:Item {
-            id:cardFlight
+            id:cardEntry
             required property var modelData
             required property int index
-            objectName:"cloudKnotCardFlight-"+index
-            parent:modelData.decorationLayer
-            anchors.fill:parent
-            visible:weave.visible && weave.freeFlight
-            opacity:weave.opacity*weave.releaseOpacity
-            enabled:false;Accessible.ignored:true
+            Accessible.ignored:true
             Item {
-                id:cardGeometry
-                width:weave.frontLayer.width;height:weave.frontLayer.height
-                readonly property matrix4x4 sceneTransform:{
-                    weave.geometryRevision;cardFlight.modelData.lift;
-                    return weave.layerTransform(weave.frontLayer,cardFlight.modelData.decorationLayer);
-                }
-                transform:Matrix4x4 {matrix:cardGeometry.sceneTransform}
-                Repeater {
-                    model:weave.materials
-                    delegate:FeatherBody {
-                        required property var modelData
-                        material:modelData
-                        objectName:"cloudFeatherCard-"+cardFlight.index+"-"+modelData.key
-                        z:modelData.index
+                objectName:"cloudKnotCardFlight-"+cardEntry.index
+                parent:cardEntry.modelData.decorationLayer
+                anchors.fill:parent
+                visible:weave.visible && weave.freeFlight
+                opacity:weave.opacity*weave.releaseOpacity
+                enabled:false;Accessible.ignored:true
+                Item {
+                    id:cardGeometry
+                    width:weave.frontLayer.width;height:weave.frontLayer.height
+                    readonly property matrix4x4 sceneTransform:{
+                        weave.geometryRevision;cardEntry.modelData.lift;
+                        return weave.layerTransform(weave.frontLayer,cardEntry.modelData.decorationLayer);
+                    }
+                    transform:Matrix4x4 {matrix:cardGeometry.sceneTransform}
+                    Repeater {
+                        model:weave.materials
+                        delegate:FeatherBody {
+                            required property var modelData
+                            material:modelData
+                            objectName:"cloudFeatherCard-"+cardEntry.index+"-"+modelData.key
+                            z:modelData.index
+                        }
                     }
                 }
             }
@@ -266,30 +275,35 @@ Item {
         parent:restView
         model:[{part:0,x:335,y:460,w:74,h:72},{part:1,x:449,y:535,w:66,h:61},{part:2,x:485,y:568,w:68,h:70},{part:3,x:485,y:572,w:58,h:54}]
         delegate:Item {
-            id:overpass
+            id:overpassEntry
             required property var modelData
-            readonly property var material:weave.materials[modelData.part]
-            readonly property real blend:Knot.phaseEase(.94,.98,weave.progress)*(1-Knot.phaseEase(0,.25,weave.release))
-            readonly property point origin:weave.freeFlight?Qt.point(weave.knotRect.x+weave.localOrigin.x,weave.knotRect.y+weave.localOrigin.y):weave.localOrigin
-            readonly property var pose:weave.poses[modelData.part]
-            parent:weave.freeFlight?frontGeometry:restView
-            z:20+modelData.part
-            visible:blend>0
-            opacity:blend
-            x:origin.x+modelData.x*weave.artScale;y:origin.y+modelData.y*weave.artScale
-            width:modelData.w*weave.artScale;height:modelData.h*weave.artScale
-            clip:true
-            WholeFeatherItem {
-                width:1024;height:1024
-                sourcePath:overpass.material.record.path
-                sourceRoot:Qt.point(overpass.material.sourceRoot.x,overpass.material.sourceRoot.y)
-                sourceTip:Qt.point(overpass.material.sourceTip.x,overpass.material.sourceTip.y)
-                targetPath:overpass.material.targetPath
-                targetRoot:Qt.point(overpass.material.targetRoot.x,overpass.material.targetRoot.y)
-                targetTip:Qt.point(overpass.material.targetTip.x,overpass.material.targetTip.y)
-                morphProgress:overpass.pose.morph
-                ink:Theme.increaseContrast?Theme.text:overpass.material.ink
-                transform:Matrix4x4 {matrix:Qt.matrix4x4(overpass.pose.a,overpass.pose.c,0,overpass.pose.tx-overpass.x,overpass.pose.b,overpass.pose.d,0,overpass.pose.ty-overpass.y,0,0,1,0,0,0,0,1)}
+            Accessible.ignored:true
+            Item {
+                id:overpass
+                readonly property var region:overpassEntry.modelData
+                readonly property var material:weave.materials[region.part]
+                readonly property real blend:Knot.phaseEase(.94,.98,weave.progress)*(1-Knot.phaseEase(0,.25,weave.release))
+                readonly property point origin:weave.freeFlight?Qt.point(weave.knotRect.x+weave.localOrigin.x,weave.knotRect.y+weave.localOrigin.y):weave.localOrigin
+                readonly property var pose:weave.poses[region.part]
+                parent:weave.freeFlight?frontGeometry:restView
+                z:20+region.part
+                visible:blend>0
+                opacity:blend
+                x:origin.x+region.x*weave.artScale;y:origin.y+region.y*weave.artScale
+                width:region.w*weave.artScale;height:region.h*weave.artScale
+                clip:true
+                WholeFeatherItem {
+                    width:1024;height:1024
+                    sourcePath:overpass.material.record.path
+                    sourceRoot:Qt.point(overpass.material.sourceRoot.x,overpass.material.sourceRoot.y)
+                    sourceTip:Qt.point(overpass.material.sourceTip.x,overpass.material.sourceTip.y)
+                    targetPath:overpass.material.targetPath
+                    targetRoot:Qt.point(overpass.material.targetRoot.x,overpass.material.targetRoot.y)
+                    targetTip:Qt.point(overpass.material.targetTip.x,overpass.material.targetTip.y)
+                    morphProgress:overpass.pose.morph
+                    ink:Theme.increaseContrast?Theme.text:overpass.material.ink
+                    transform:Matrix4x4 {matrix:Qt.matrix4x4(overpass.pose.a,overpass.pose.c,0,overpass.pose.tx-overpass.x,overpass.pose.b,overpass.pose.d,0,overpass.pose.ty-overpass.y,0,0,1,0,0,0,0,1)}
+                }
             }
         }
     }

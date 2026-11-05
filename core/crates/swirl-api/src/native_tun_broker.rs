@@ -225,7 +225,7 @@ mod windows {
     use crate::native_worker_output::BoundedOutput;
     use std::{
         io::{BufReader, Write},
-        path::Path,
+        path::{Component, Path, Prefix},
         process::{Child, Command, Stdio},
         sync::mpsc,
         thread,
@@ -249,6 +249,16 @@ mod windows {
     }
     fn helper_command(path: &Path) -> io::Result<Command> {
         let windows = windows_directory()?;
+        let mut components = windows.components();
+        let Some(Component::Prefix(prefix)) = components.next() else {
+            return Err(invalid("BrokerWindowsDirectory"));
+        };
+        let system_drive = match (prefix.kind(), components.next()) {
+            (Prefix::Disk(letter) | Prefix::VerbatimDisk(letter), Some(Component::RootDir)) => {
+                format!("{}:", char::from(letter))
+            }
+            _ => return Err(invalid("BrokerWindowsDirectory")),
+        };
         let system = windows.join("System32");
         let mut process = Command::new(path);
         // No inherited SWIRL_*, PowerShell/.NET preload, PATH or journal-root
@@ -257,6 +267,8 @@ mod windows {
             .env_clear()
             .env("SystemRoot", &windows)
             .env("WINDIR", &windows)
+            // Windows Known Folder lookup expands %SystemDrive% for ProgramData.
+            .env("SystemDrive", system_drive)
             .env("PATH", &system)
             .env("ComSpec", system.join("cmd.exe"))
             .current_dir(
