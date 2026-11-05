@@ -939,7 +939,7 @@ QString EngineController::proxyEnvironmentAdvice() const {
         "$env:HTTP_PROXY='http://127.0.0.1:%1'\n$env:HTTPS_PROXY='http://127.0.0.1:%1'\n"
         "$env:ALL_PROXY='http://127.0.0.1:%1'\n$env:NO_PROXY='localhost,127.0.0.1,::1'\n"
         "Codex 是否读取系统代理或这些变量取决于具体版本。完全退出后从该会话重新启动，已有进程不会自动继承。"
-        "本测试版尚未接入 TUN 启动与恢复组件，暂无法开启。忽略代理设置的应用无法通过本页接入。"
+        "忽略系统代理的应用可先在概览配置 TUN，再从活动页开启代理并授权；实际接管以 TUN 运行状态为准。"
         "本页只提供建议，不写入环境变量、.codex 配置文件或密钥。").arg(m_options.proxyPort);
 }
 
