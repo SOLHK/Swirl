@@ -213,7 +213,7 @@ jobs:
           foreach ($directory in @('hero-evidence','navigation-evidence','settings-material-evidence','policy-evidence','activity-layout','liquid-glass-evidence','system-proxy-exit','system-proxy-normal-stop','node-ui-evidence','node-ui-native-evidence')) {
             Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $directory) -Recurse -Force -ErrorAction SilentlyContinue
           }
-          foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt','connection-rows.xml','policy-configuration.xml','policy-configuration.txt','swirl-telemetry-accounting.xml','swirl-system-proxy-state.xml','swirl-system-proxy-recovery.xml','swirl-system-proxy-app-exit.xml','swirl-system-proxy-normal-stop.xml','swirl-rust-qt-integration.xml')) {
+          foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','node-chain.xml','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt','connection-rows.xml','policy-configuration.xml','policy-configuration.txt','swirl-telemetry-accounting.xml','swirl-system-proxy-state.xml','swirl-system-proxy-recovery.xml','swirl-system-proxy-app-exit.xml','swirl-system-proxy-normal-stop.xml','swirl-rust-qt-integration.xml')) {
             Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $file) -Force -ErrorAction SilentlyContinue
           }
           Get-ChildItem -Path 'build/swirl-quick/*-report.json','build/swirl-quick/activity-feather-*.png','build/swirl-quick/activity-data-*.png','build/swirl-quick/font-*.xml','build/swirl-quick/Release/Swirl-*.txt' -File -ErrorAction SilentlyContinue | Remove-Item -Force
@@ -589,6 +589,45 @@ jobs:
               }
             }
           }
+      - name: Preserve node probe regression after an early UI failure
+        if: ${{ !cancelled() && steps.critical_ui.outcome == 'failure' }}
+        shell: pwsh
+        run: |
+          # An early UI failure otherwise prevents the changed DNS/probe and
+          # section-model assertions from running. Keep the failed gate failed,
+          # but collect these independent results without repeating a suite
+          # that the normal critical-network stage has already executed.
+          if (Test-Path -LiteralPath 'build-evidence/critical-network.xml') {
+            Write-Host 'The normal critical-network stage already ran; retain its original results.'
+            exit 0
+          }
+          $junit = Join-Path $env:GITHUB_WORKSPACE 'build-evidence/node-diagnostic-regression.xml'
+          ctest --test-dir build/swirl-quick -C Release -R '^swirl-(node-real-chain|node-section-model)$' --output-on-failure --no-tests=error --output-junit $junit
+          $testExit = $LASTEXITCODE
+          if (-not (Test-Path -LiteralPath $junit -PathType Leaf)) { throw 'Independent node regression evidence is missing.' }
+          if ($testExit -ne 0) { throw "Independent node diagnostic regression failed ($testExit)." }
+          [xml]$report = Get-Content -LiteralPath $junit -Raw
+          foreach ($name in @('swirl-node-real-chain','swirl-node-section-model')) {
+            $cases = @($report.SelectNodes("//testcase[@name='$name']"))
+            if ($cases.Count -ne 1 -or $cases[0].status -ne 'run' -or $cases[0].SelectNodes('failure|error|skipped').Count -ne 0) { throw "Independent node regression did not execute successfully: $name" }
+          }
+      - name: Upload current node regression evidence before production builds
+        if: ${{ !cancelled() && steps.critical_ui.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-Node-Regression-Evidence
+          path: |
+            build-evidence/critical-ui.xml
+            build-evidence/critical-network.xml
+            build-evidence/node-diagnostic-regression.xml
+            build/swirl-quick/node-chain.txt
+            build/swirl-quick/node-chain.xml
+            build/swirl-quick/node-ui-evidence/node-probe-geometry.json
+            build/swirl-quick/node-ui-evidence/nodes-probe-status-updates.png
+            build/swirl-quick/node-ui-native-evidence/node-probe-geometry.json
+            build/swirl-quick/node-ui-native-evidence/nodes-probe-status-updates.png
+          if-no-files-found: warn
+          retention-days: 14
       - name: Overview input checks against deployed Qt runtime
         id: overview_input
         if: ${{ !cancelled() && (success() || steps.critical_ui.outcome == 'failure') }}
@@ -1112,6 +1151,7 @@ jobs:
             build-evidence/critical-ui.xml
             build-evidence/critical-policy-evidence/
             build-evidence/critical-network.xml
+            build-evidence/node-diagnostic-regression.xml
             build-evidence/native-tun-broker-control.xml
             build-evidence/native-tun-broker-control.json
             build-evidence/native-tun-broker-control-fixture.json

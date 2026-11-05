@@ -650,9 +650,20 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         const bool attached=viewport&&table->setProperty("externalModel",QVariant::fromValue(static_cast<QObject *>(&probeSections)));
         check(attached,"probe geometry fixture uses the real table with an isolated public-data model");
         if(attached){
-            struct Geometry { QHash<QString,QRectF> cells; bool valid=false; int rows=0; };
+            struct Geometry {
+                QHash<QString,QRectF> cells;
+                QHash<QString,QString> texts,rawValues,expectedNames,expectedStatuses;
+                QJsonArray rowIssues,rowStates;
+                QSizeF viewportSize;
+                qreal contentY=0,originY=0;
+                bool valid=false;
+                int rows=0;
+            };
             const auto capture=[&]{
                 Geometry result;
+                result.viewportSize=viewport->size();
+                result.contentY=viewport->property("contentY").toReal();
+                result.originY=viewport->property("originY").toReal();
                 auto *content=qobject_cast<QQuickItem *>(viewport->property("contentItem").value<QObject *>());
                 if(!content)return result;
                 const QRectF clip(0,0,viewport->width(),viewport->height());
@@ -685,6 +696,10 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                             if(rect.intersects(clip)){
                                 if(result.cells.contains(cellKey))valid=false;
                                 result.cells.insert(cellKey,rect);
+                                result.texts.insert(cellKey,text);
+                                result.rawValues.insert(cellKey,child->property("raw").toString());
+                                result.expectedNames.insert(cellKey,expected.value(section?"sectionName":"name").toString());
+                                result.expectedStatuses.insert(cellKey,status);
                                 bounds=bounds.isNull()?rect:bounds.united(rect);
                             }
                         }
@@ -692,16 +707,48 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                     };
                     collectText(row);
                     if(bounds.isNull())continue;
+                    // Keep the actual delegate index separate from the expected
+                    // model position when diagnosing reuse/retirement failures.
+                    QQmlExpression delegateIndex(qmlContext(row),row,QStringLiteral("index"));
+                    const auto displayedIndex=delegateIndex.evaluate();
+                    result.rowStates.append(QJsonObject{
+                        {"key",key},{"modelRow",modelRow},{"delegateIndex",displayedIndex.toInt()},
+                        {"delegateIndexError",delegateIndex.hasError()?delegateIndex.error().toString():QString()},
+                        {"rowX",row->x()},{"rowY",row->y()},{"rowWidth",row->width()},{"rowHeight",row->height()},
+                        {"textTop",bounds.top()},{"textBottom",bounds.bottom()},
+                        {"opacity",effectiveOpacity(row)},{"scale",row->scale()},
+                        {"visualOffsetY",row->property("visualOffsetY").toReal()},
+                        {"expectedName",expected.value(section?"sectionName":"name").toString()},
+                        {"expectedStatus",status},{"recordName",record.value("name").toString()},
+                        {"recordStatus",record.value("status").toString()},
+                        {"foundName",foundName},{"foundStatus",foundStatus}});
                     // Do not discard retired delegates here: a painted duplicate
                     // or stale label must fail the check after motion settles.
-                    valid&=modelRow>=0&&!keys.contains(key)&&foundName&&(section||foundStatus)
+                    const bool rowValid=modelRow>=0&&!keys.contains(key)&&foundName&&(section||foundStatus)
                         &&effectiveOpacity(row)>0.99&&qAbs(row->scale()-1)<0.001
                         &&qAbs(row->property("visualOffsetY").toReal())<0.25;
+                    if(!rowValid)result.rowIssues.append(QJsonObject{
+                        {"key",key},{"modelRow",modelRow},{"duplicate",keys.contains(key)},
+                        {"foundName",foundName},{"foundStatus",foundStatus},{"section",section},
+                        {"opacity",effectiveOpacity(row)},{"scale",row->scale()},
+                        {"visualOffsetY",row->property("visualOffsetY").toReal()},
+                        {"expectedStatus",status},{"recordStatus",record.value("status").toString()},
+                        {"detailPresent",expected.contains("statusDetail")},
+                        {"expectedDetail",expected.value("statusDetail").toString()},
+                        {"recordDetail",record.value("statusDetail").toString()}});
+                    valid&=rowValid;
                     keys.insert(key);rowBounds.append(QPair<int,QRectF>(modelRow,bounds));
                 }
                 std::sort(rowBounds.begin(),rowBounds.end(),[](const auto &a,const auto &b){return a.second.top()<b.second.top();});
-                for(int i=1;i<rowBounds.size();++i)
-                    valid&=rowBounds[i-1].first<rowBounds[i].first&&rowBounds[i-1].second.bottom()<=rowBounds[i].second.top()+0.5;
+                for(int i=1;i<rowBounds.size();++i){
+                    const bool ordered=rowBounds[i-1].first<rowBounds[i].first;
+                    const bool separate=rowBounds[i-1].second.bottom()<=rowBounds[i].second.top()+0.5;
+                    if(!ordered||!separate)result.rowIssues.append(QJsonObject{
+                        {"previousModelRow",rowBounds[i-1].first},{"nextModelRow",rowBounds[i].first},
+                        {"previousBottom",rowBounds[i-1].second.bottom()},{"nextTop",rowBounds[i].second.top()},
+                        {"ordered",ordered},{"nonoverlapping",separate}});
+                    valid&=ordered&&separate;
+                }
                 result.rows=rowBounds.size();
                 result.valid=valid&&result.rows>=3&&!result.cells.isEmpty();
                 return result;
@@ -729,8 +776,34 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                     }
                     return true;
                 };
+                const auto geometryEvidence=[&](const Geometry &now){
+                    const auto rectValue=[](const QRectF &rect){return QJsonObject{
+                        {"x",rect.x()},{"y",rect.y()},{"width",rect.width()},{"height",rect.height()}};};
+                    QJsonArray cells;
+                    QSet<QString> keys;
+                    for(auto it=before.cells.cbegin();it!=before.cells.cend();++it)keys.insert(it.key());
+                    for(auto it=now.cells.cbegin();it!=now.cells.cend();++it)keys.insert(it.key());
+                    auto sortedKeys=keys.values();std::sort(sortedKeys.begin(),sortedKeys.end());
+                    for(const auto &key:sortedKeys)cells.append(QJsonObject{
+                        {"key",key},{"beforePresent",before.cells.contains(key)},{"afterPresent",now.cells.contains(key)},
+                        {"before",rectValue(before.cells.value(key))},{"after",rectValue(now.cells.value(key))},
+                        {"beforeText",before.texts.value(key)},{"afterText",now.texts.value(key)},
+                        {"beforeRaw",before.rawValues.value(key)},{"afterRaw",now.rawValues.value(key)},
+                        {"beforeExpectedName",before.expectedNames.value(key)},{"afterExpectedName",now.expectedNames.value(key)},
+                        {"beforeExpectedStatus",before.expectedStatuses.value(key)},{"afterExpectedStatus",now.expectedStatuses.value(key)}});
+                    return QJsonObject{{"beforeValid",before.valid},{"afterValid",now.valid},
+                        {"beforeRows",before.rows},{"afterRows",now.rows},
+                        {"beforeCells",before.cells.size()},{"afterCells",now.cells.size()},
+                        {"beforeViewport",QJsonObject{{"width",before.viewportSize.width()},{"height",before.viewportSize.height()},
+                            {"contentY",before.contentY},{"originY",before.originY}}},
+                        {"afterViewport",QJsonObject{{"width",now.viewportSize.width()},{"height",now.viewportSize.height()},
+                            {"contentY",now.contentY},{"originY",now.originY}}},
+                        {"beforeRowsState",before.rowStates},{"afterRowsState",now.rowStates},
+                        {"beforeRowIssues",before.rowIssues},{"afterRowIssues",now.rowIssues},{"cells",cells}};
+                };
                 bool continuous=true;
                 int firstUnstableBatch=-1;
+                QJsonObject firstFailure;
                 for(int batchIndex=0;batchIndex<12;++batchIndex){
                     for(int i=0;i<probeValues.size();++i){
                         auto row=probeValues[i].toMap();
@@ -742,17 +815,34 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                     }
                     probeRows.updateRows(probeValues);
                     QTest::qWait(35); // Faster than the production 50 ms row refresh.
-                    const bool stable=sameGeometry(capture());
+                    const auto sample=capture();
+                    const bool stable=sameGeometry(sample);
                     continuous&=stable;
-                    if(!stable&&firstUnstableBatch<0)firstUnstableBatch=batchIndex;
+                    if(!stable&&firstUnstableBatch<0){
+                        firstUnstableBatch=batchIndex;firstFailure=geometryEvidence(sample);
+                        firstFailure.insert("batch",batchIndex);
+                    }
                 }
                 QTest::qWait(250);
-                check(continuous&&sameGeometry(capture()),"probe bursts update real status text without moving or overlapping cells and section labels");
+                const auto finalGeometry=capture();
+                const bool finalStable=sameGeometry(finalGeometry);
+                check(continuous&&finalStable,"probe bursts update real status text without moving or overlapping cells and section labels");
                 check(scrollChanges.isEmpty()&&qAbs(viewport->property("contentY").toReal()-scrollBefore)<0.5,
                     "value-only probe updates never reposition a partially scrolled node viewport");
                 qInfo()<<"NODE_PROBE_GEOMETRY"<<"cells"<<before.cells.size()<<"rows"<<before.rows
-                       <<"scrollChanges"<<scrollChanges.size()<<"firstUnstableBatch"<<firstUnstableBatch;
-                if(!qa.isEmpty())window->grabWindow().save(qa+"/nodes-probe-status-updates.png");
+                       <<"scrollChanges"<<scrollChanges.size()<<"firstUnstableBatch"<<firstUnstableBatch
+                       <<"finalStable"<<finalStable;
+                const QJsonObject geometryReport{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},
+                    {"platform",QGuiApplication::platformName()},{"graphics_api",int(graphicsApi)},
+                    {"device_pixel_ratio",window->devicePixelRatio()},{"scrollChanges",scrollChanges.size()},
+                    {"firstUnstableBatch",firstUnstableBatch},{"firstFailure",firstFailure},
+                    {"finalStable",finalStable},{"finalGeometry",geometryEvidence(finalGeometry)}};
+                if(!continuous||!finalStable)qInfo().noquote()<<"NODE_PROBE_GEOMETRY_FAILURE"<<QJsonDocument(geometryReport).toJson(QJsonDocument::Compact);
+                if(!qa.isEmpty()){
+                    QFile report(qa+"/node-probe-geometry.json");
+                    if(report.open(QIODevice::WriteOnly))report.write(QJsonDocument(geometryReport).toJson(QJsonDocument::Indented));
+                    window->grabWindow().save(qa+"/nodes-probe-status-updates.png");
+                }
                 probeRows.setFilters({{"sourceKind","subscription"},{"sort","name"},{"descending",true}});
                 QTest::qWait(35);
                 check(QTest::qWaitFor(settled,3500),"real node reordering still settles into unique, ordered, nonoverlapping rendered labels");
