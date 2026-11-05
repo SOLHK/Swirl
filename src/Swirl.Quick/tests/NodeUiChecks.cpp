@@ -678,30 +678,44 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                     const auto value=row->property("record");
                     const auto record=value.metaType()==QMetaType::fromType<QJSValue>()?value.value<QJSValue>().toVariant().toMap():value.toMap();
                     const auto key=record.value("displayKey").toString();
-                    if(key.isEmpty()||!row->isVisible()||row->property("pooled").toBool()||effectiveOpacity(row)<0.01)continue;
+                    if(key.isEmpty())continue;
+                    QQmlExpression delegateIndex(qmlContext(row),row,QStringLiteral("index"));
+                    const auto displayedIndex=delegateIndex.evaluate();
+                    bool indexValid=false;
+                    const int viewIndex=displayedIndex.toInt(&indexValid);
+                    QQmlExpression modelEntry(qmlContext(row),row,
+                        QStringLiteral("model && model.entry ? String(model.entry.displayKey || model.entry.id || '') : ''"));
+                    const auto modelEntryKey=modelEntry.evaluate().toString();
+                    const auto *renderState=QQuickItemPrivate::get(row);
                     // Qt 6.12 initItem() parents asynchronous cache delegates
                     // before layout and marks them culled. They can report
                     // visible=true with y=0 and unfinished column positions,
                     // but the scene graph does not paint them. Preserve that
                     // evidence; never confuse those objects with rendered rows.
-                    if(QQuickItemPrivate::get(row)->culled){
-                        result.culledRows.append(QJsonObject{{"key",key},
-                            {"delegateIndex",row->property("delegateIndex").toInt()},
+                    if(renderState->culled){
+                        result.culledRows.append(QJsonObject{{"key",key},{"objectName",row->objectName()},
+                            {"delegateIndex",viewIndex},{"indexError",delegateIndex.hasError()?delegateIndex.error().toString():QString()},
+                            {"modelEntryKey",modelEntryKey},{"modelEntryError",modelEntry.hasError()?modelEntry.error().toString():QString()},
+                            {"componentComplete",bool(renderState->componentComplete)},{"culled",true},
+                            {"source",QStringLiteral("Qt 6.12 QQuickItemPrivate::culled (scene-graph hide reference)")},
+                            {"visible",row->isVisible()},{"pooled",row->property("pooled").toBool()},
                             {"componentReady",row->property("componentReady").toBool()},
-                            {"rowY",row->y()},{"rowHeight",row->height()}});
+                            {"rowX",row->x()},{"rowY",row->y()},{"rowWidth",row->width()},{"rowHeight",row->height()}});
                         continue;
                     }
+                    if(!row->isVisible()||effectiveOpacity(row)<0.01)continue;
                     const int modelRow=probeSections.rowForDisplayKey(key);
                     const auto expected=probeSections.get(modelRow);
                     const bool section=record.value("rowKind")=="section";
-                    const auto status=expected.value("statusDetail",expected.value("status")).toString();
+                    const auto detail=expected.value("statusDetail").toString();
+                    const auto status=detail.isEmpty()?expected.value("status").toString():detail;
                     bool foundName=false,foundStatus=false;
                     QRectF bounds;
                     QList<QRectF> columnBounds;
                     int cellIndex=0;
                     std::function<void(QQuickItem *)> collectText;
                     collectText=[&](QQuickItem *child){
-                        if(!child->isVisible()||effectiveOpacity(child)<0.01)return;
+                        if(!child->isVisible()||QQuickItemPrivate::get(child)->culled||effectiveOpacity(child)<0.01)return;
                         // These are rendered Text items, including their actual
                         // parent transforms, rather than the delegate's layout y.
                         if(child->inherits("QQuickText")&&(section||child->property("raw").isValid())){
@@ -731,14 +745,15 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                         columnsSeparate&=columnBounds[i-1].right()<=columnBounds[i].left()+0.5;
                     // Keep the actual delegate index separate from the expected
                     // model position when diagnosing reuse/retirement failures.
-                    QQmlExpression delegateIndex(qmlContext(row),row,QStringLiteral("index"));
-                    const auto displayedIndex=delegateIndex.evaluate();
                     QQuickItem *registeredRow=nullptr;
                     const bool registered=QMetaObject::invokeMethod(viewport,"itemAtIndex",
-                        Q_RETURN_ARG(QQuickItem *,registeredRow),Q_ARG(int,displayedIndex.toInt()))&&registeredRow==row;
+                        Q_RETURN_ARG(QQuickItem *,registeredRow),Q_ARG(int,viewIndex))&&registeredRow==row;
                     result.rowStates.append(QJsonObject{
-                        {"key",key},{"modelRow",modelRow},{"delegateIndex",displayedIndex.toInt()},
+                        {"key",key},{"objectName",row->objectName()},{"modelRow",modelRow},{"delegateIndex",viewIndex},
+                        {"indexValid",indexValid&&!delegateIndex.hasError()},
                         {"delegateIndexError",delegateIndex.hasError()?delegateIndex.error().toString():QString()},
+                        {"modelEntryKey",modelEntryKey},{"modelEntryError",modelEntry.hasError()?modelEntry.error().toString():QString()},
+                        {"componentComplete",bool(renderState->componentComplete)},{"culled",false},{"pooled",row->property("pooled").toBool()},
                         {"registered",registered},{"componentReady",row->property("componentReady").toBool()},
                         {"rowX",row->x()},{"rowY",row->y()},{"rowWidth",row->width()},{"rowHeight",row->height()},
                         {"textTop",bounds.top()},{"textBottom",bounds.bottom()},
@@ -746,18 +761,22 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                         {"visualOffsetY",row->property("visualOffsetY").toReal()},
                         {"expectedName",expected.value(section?"sectionName":"name").toString()},
                         {"expectedStatus",status},{"recordName",record.value("name").toString()},
-                        {"recordStatus",record.value("status").toString()},
+                        {"recordStatus",record.value("status").toString()},{"recordDetail",record.value("statusDetail").toString()},
                         {"foundName",foundName},{"foundStatus",foundStatus},{"columnsSeparate",columnsSeparate}});
                     // Do not discard retired delegates here: a painted duplicate
                     // or stale label must fail the check after motion settles.
-                    const bool rowValid=modelRow>=0&&!delegateIndex.hasError()&&displayedIndex.toInt()==modelRow
+                    const bool rowValid=modelRow>=0&&indexValid&&!delegateIndex.hasError()&&viewIndex==modelRow
+                        &&renderState->componentComplete&&!row->property("pooled").toBool()
+                        &&!modelEntry.hasError()&&modelEntryKey==key
                         &&registered&&row->property("componentReady").toBool()
                         &&!keys.contains(key)&&foundName&&(section||foundStatus)&&columnsSeparate
                         &&effectiveOpacity(row)>0.99&&qAbs(row->scale()-1)<0.001
                         &&qAbs(row->property("visualOffsetY").toReal())<0.25;
                     if(!rowValid)result.rowIssues.append(QJsonObject{
-                        {"key",key},{"modelRow",modelRow},{"duplicate",keys.contains(key)},
-                        {"delegateIndex",displayedIndex.toInt()},{"registered",registered},
+                        {"key",key},{"objectName",row->objectName()},{"modelRow",modelRow},{"duplicate",keys.contains(key)},
+                        {"delegateIndex",viewIndex},{"indexValid",indexValid&&!delegateIndex.hasError()},{"registered",registered},
+                        {"modelEntryKey",modelEntryKey},{"modelEntryError",modelEntry.hasError()?modelEntry.error().toString():QString()},
+                        {"componentComplete",bool(renderState->componentComplete)},{"pooled",row->property("pooled").toBool()},
                         {"foundName",foundName},{"foundStatus",foundStatus},{"section",section},{"columnsSeparate",columnsSeparate},
                         {"opacity",effectiveOpacity(row)},{"scale",row->scale()},
                         {"visualOffsetY",row->property("visualOffsetY").toReal()},
@@ -794,74 +813,188 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                 result.valid=valid&&complete&&result.rows>=3&&!result.cells.isEmpty();
                 return result;
             };
-            const auto settled=[&]{return viewport->property("count").toInt()==probeSections.rowCount()&&capture().valid;};
-            const bool ready=check(QTest::qWaitFor(settled,3500),"node table settles with complete, unique, ordered, nonoverlapping rendered labels");
-            if(!ready){
-                const auto initial=capture();
-                const QJsonObject initialReport{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},
-                    {"nodeCount",probeCount},{"rows",initial.rowStates},{"rowIssues",initial.rowIssues},
-                    {"culledRows",initial.culledRows},{"contentY",initial.contentY},{"originY",initial.originY}};
-                qInfo().noquote()<<"NODE_PROBE_INITIAL_FAILURE"<<QJsonDocument(initialReport).toJson(QJsonDocument::Compact);
-                if(!qa.isEmpty()){
-                    QFile report(qa+QString("/node-probe-initial-%1.json").arg(probeCount));
-                    if(report.open(QIODevice::WriteOnly))report.write(QJsonDocument(initialReport).toJson(QJsonDocument::Indented));
+            const auto geometryMatches=[](const Geometry &before,const Geometry &now){
+                if(!now.valid||now.cells.size()!=before.cells.size())return false;
+                for(auto it=before.cells.cbegin();it!=before.cells.cend();++it){
+                    if(!now.cells.contains(it.key()))return false;
+                    const auto rect=now.cells.value(it.key());
+                    if(qAbs(rect.left()-it->left())>0.5||qAbs(rect.top()-it->top())>0.5
+                        ||qAbs(rect.width()-it->width())>0.5||qAbs(rect.height()-it->height())>0.5)return false;
                 }
-            }
+                return true;
+            };
+            auto *probeIncubation=qmlEngine(window)->incubationController();
+            const auto incubationIdle=[&]{return !probeIncubation||probeIncubation->incubatingObjectCount()==0;};
+            const auto settled=[&]{return viewport->property("count").toInt()==probeSections.rowCount()&&incubationIdle()&&capture().valid;};
+            const auto settleInitialLayout=[&]{
+                Geometry previous;
+                int stableSamples=0;
+                return QTest::qWaitFor([&]{
+                    const auto current=capture();
+                    const bool ready=viewport->property("count").toInt()==probeSections.rowCount()&&incubationIdle()&&current.valid;
+                    stableSamples=ready&&previous.valid&&geometryMatches(previous,current)?stableSamples+1:0;
+                    previous=current;
+                    return stableSamples>=2;
+                },3500);
+            };
+            const auto saveSetupFailure=[&](const QString &phase){
+                const auto state=capture();
+                QJsonArray cells;
+                auto cellKeys=state.cells.keys();std::sort(cellKeys.begin(),cellKeys.end());
+                for(const auto &key:cellKeys){
+                    const auto rect=state.cells.value(key);
+                    cells.append(QJsonObject{{"key",key},{"text",state.texts.value(key)},{"raw",state.rawValues.value(key)},
+                        {"expectedName",state.expectedNames.value(key)},{"expectedStatus",state.expectedStatuses.value(key)},
+                        {"x",rect.x()},{"y",rect.y()},{"width",rect.width()},{"height",rect.height()}});
+                }
+                const QJsonObject report{{"phase",phase},{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"nodeCount",probeCount},
+                    {"platform",QGuiApplication::platformName()},{"graphics_api",int(graphicsApi)},
+                    {"device_pixel_ratio",window->devicePixelRatio()},{"valid",state.valid},
+                    {"modelCount",probeSections.rowCount()},{"viewCount",viewport->property("count").toInt()},
+                    {"incubating",probeIncubation?probeIncubation->incubatingObjectCount():0},
+                    {"width",state.viewportSize.width()},{"height",state.viewportSize.height()},
+                    {"contentY",state.contentY},{"originY",state.originY},{"rows",state.rows},{"cells",state.cells.size()},
+                    {"cellStates",cells},{"rowStates",state.rowStates},{"rowIssues",state.rowIssues},
+                    {"culledCount",state.culledRows.size()},{"culledRows",state.culledRows}};
+                qInfo().noquote()<<"NODE_PROBE_SETUP_FAILURE"<<QJsonDocument(report).toJson(QJsonDocument::Compact);
+                if(!qa.isEmpty()){
+                    const auto suffix=probeCount==104?QString():QString("-%1").arg(probeCount);
+                    for(const auto &path:{qa+QString("/node-probe-initial-%1.json").arg(probeCount),qa+"/node-probe-geometry"+suffix+".json"}){
+                        QFile file(path);
+                        if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(report).toJson(QJsonDocument::Indented));
+                    }
+                    window->grabWindow().save(qa+"/nodes-probe-status-updates"+suffix+".png");
+                }
+            };
+            // Finish model replacement and initial scrolling before measuring
+            // probe updates. Neither forceLayout nor this wait runs in the burst.
+            QMetaObject::invokeMethod(viewport,"forceLayout");
+            const bool ready=check(settleInitialLayout(),"node table settles with matching delegate identities and complete nonoverlapping rendered labels");
             if(ready){
                 QMetaObject::invokeMethod(viewport,"positionViewAtIndex",Q_ARG(int,0),Q_ARG(int,0));
-                QTest::qWait(30);
+                QMetaObject::invokeMethod(viewport,"forceLayout");
                 viewport->setProperty("contentY",viewport->property("originY").toReal()+13);
-                check(QTest::qWaitFor(settled,3500),"partially scrolled fixture has matching, fully materialized visible identities");
+                QMetaObject::invokeMethod(viewport,"forceLayout");
+            }
+            const bool positioned=ready&&check(settleInitialLayout(),"initial partial-row scroll and delegate incubation settle before probe measurement");
+            if(!positioned)saveSetupFailure(ready?QStringLiteral("initial-scroll"):QStringLiteral("initial-settle"));
+            if(positioned){
                 const auto before=capture();
+                const auto sameGeometry=[&](const Geometry &now){return geometryMatches(before,now);};
+                // An unowned, nonculled duplicate must still be detected. This
+                // prevents culling-aware sampling from hiding retiring rows or
+                // turning into an itemAtIndex-only scan.
+                QJsonObject negativeControl;
+                const int duplicateIndex=probeSections.indexOfNode("probe-ui-0");
+                const auto duplicateKey=probeSections.get(duplicateIndex).value("displayKey").toString();
+                const auto duplicateName=QStringLiteral("nodeProbePaintedDuplicate");
+                QQuickItem *managedRow=nullptr;
+                const bool located=QMetaObject::invokeMethod(viewport,"itemAtIndex",Q_RETURN_ARG(QQuickItem *,managedRow),Q_ARG(int,duplicateIndex));
+                auto *content=qobject_cast<QQuickItem *>(viewport->property("contentItem").value<QObject *>());
+                QQmlComponent duplicateComponent(qmlEngine(window));
+                duplicateComponent.setData(QByteArrayLiteral(R"QML(
+import QtQuick
+Item {
+    objectName: "nodeProbePaintedDuplicate"
+    property var record: ({})
+    property var model: ({entry: record})
+    property int index: -1
+    property bool pooled: false
+    property bool componentReady: true
+    property int delegateIndex: index
+    property real visualOffsetY: 0
+    Text { property string raw: String(parent.record.name || ""); text: raw; width: parent.width / 2; height: parent.height; verticalAlignment: Text.AlignVCenter; renderType: Text.NativeRendering }
+    Text { property string raw: String(parent.record.statusDetail || parent.record.status || ""); text: raw; x: parent.width / 2; width: parent.width / 2; height: parent.height; verticalAlignment: Text.AlignVCenter; renderType: Text.NativeRendering }
+}
+)QML"),QUrl(QStringLiteral("qrc:/tests/NodeProbeOverlap.qml")));
+                std::unique_ptr<QObject> duplicate;
+                if(located&&managedRow&&content)duplicate.reset(duplicateComponent.createWithInitialProperties({
+                    {"record",probeSections.get(duplicateIndex)},{"index",duplicateIndex},
+                    {"x",managedRow->x()},{"y",managedRow->y()},{"z",managedRow->z()+1},{"width",managedRow->width()},{"height",managedRow->height()}}));
+                auto *duplicateRow=qobject_cast<QQuickItem *>(duplicate.get());
+                bool culledIgnored=false,visibleRejected=false,retiredRejected=false;
+                negativeControl.insert("created",duplicateRow!=nullptr);
+                QStringList creationErrors;for(const auto &error:duplicateComponent.errors())creationErrors.append(error.toString());
+                negativeControl.insert("creationErrors",creationErrors.join(QStringLiteral("\n")));
+                check(duplicateRow!=nullptr,"painted duplicate negative control is created in the actual node viewport");
+                if(duplicateRow){
+                    QQmlEngine::setObjectOwnership(duplicateRow,QQmlEngine::CppOwnership);
+                    duplicateRow->setParentItem(content);
+                    QQuickItemPrivate::get(duplicateRow)->setCulled(true);
+                    QTest::qWait(20);
+                    const auto culledState=capture();
+                    QJsonObject culledSample;
+                    for(const auto &value:culledState.culledRows){
+                        const auto row=value.toObject();
+                        if(row.value("objectName").toString()==duplicateName){culledSample=row;break;}
+                    }
+                    culledIgnored=culledSample.value("key").toString()==duplicateKey&&culledSample.value("culled").toBool()
+                        &&sameGeometry(culledState);
+                    negativeControl.insert("culledSample",culledSample);
+                    check(culledIgnored,"a Qt-culled duplicate is recorded but cannot affect painted geometry");
+                    QQuickItemPrivate::get(duplicateRow)->setCulled(false);
+                    const auto duplicateFrame=window->grabWindow();
+                    negativeControl.insert("imageCaptured",!duplicateFrame.isNull());
+                    QQuickItem *lookupRow=nullptr;
+                    const bool lookedUp=QMetaObject::invokeMethod(viewport,"itemAtIndex",Q_RETURN_ARG(QQuickItem *,lookupRow),Q_ARG(int,duplicateIndex));
+                    const bool outsideLookup=lookedUp&&lookupRow==managedRow&&lookupRow!=duplicateRow;
+                    const bool paintable=!duplicateFrame.isNull()&&duplicateRow->isVisible()&&!QQuickItemPrivate::get(duplicateRow)->culled
+                        &&QQuickItemPrivate::get(duplicateRow)->componentComplete&&effectiveOpacity(duplicateRow)>0.99;
+                    const auto counterexampleEvidence=[&](const Geometry &state,int expectedIndex){
+                        QJsonObject sampled;
+                        for(const auto &value:state.rowStates){
+                            const auto row=value.toObject();
+                            if(row.value("objectName").toString()==duplicateName){sampled=row;break;}
+                        }
+                        const bool identityCorrect=!sampled.isEmpty()&&sampled.value("key").toString()==duplicateKey
+                            &&sampled.value("modelRow").toInt()==duplicateIndex&&sampled.value("delegateIndex").toInt()==expectedIndex
+                            &&sampled.value("indexValid").toBool()&&sampled.value("delegateIndexError").toString().isEmpty()
+                            &&sampled.value("modelEntryKey").toString()==duplicateKey&&sampled.value("modelEntryError").toString().isEmpty()
+                            &&sampled.value("componentComplete").toBool()&&sampled.value("componentReady").toBool()
+                            &&!sampled.value("registered").toBool()&&!sampled.value("culled").toBool()&&!sampled.value("pooled").toBool()
+                            &&sampled.value("foundName").toBool()&&sampled.value("foundStatus").toBool()&&sampled.value("columnsSeparate").toBool()
+                            &&sampled.value("opacity").toDouble()>0.99&&qAbs(sampled.value("scale").toDouble()-1)<0.001
+                            &&qAbs(sampled.value("visualOffsetY").toDouble())<0.25;
+                        bool duplicateDetected=false,overlapDetected=false;
+                        for(const auto &value:state.rowIssues){
+                            const auto issue=value.toObject();
+                            duplicateDetected|=issue.value("key").toString()==duplicateKey&&issue.value("duplicate").toBool();
+                            overlapDetected|=issue.contains("previousModelRow")&&issue.value("previousModelRow").toInt()==duplicateIndex
+                                &&issue.value("nextModelRow").toInt()==duplicateIndex&&!issue.value("nonoverlapping").toBool();
+                        }
+                        return QJsonObject{{"identityCorrect",identityCorrect},{"duplicateDetected",duplicateDetected},
+                            {"overlapDetected",overlapDetected},{"sampled",sampled},{"rowIssues",state.rowIssues}};
+                    };
+                    const auto specificallyRejected=[](const QJsonObject &evidence){
+                        return evidence.value("identityCorrect").toBool()&&evidence.value("duplicateDetected").toBool()
+                            &&evidence.value("overlapDetected").toBool();
+                    };
+                    const auto duplicateState=capture();
+                    const auto visibleEvidence=counterexampleEvidence(duplicateState,duplicateIndex);
+                    visibleRejected=outsideLookup&&paintable&&!duplicateState.valid&&specificallyRejected(visibleEvidence);
+                    negativeControl.insert("outsideViewLookup",outsideLookup);
+                    negativeControl.insert("culled",bool(QQuickItemPrivate::get(duplicateRow)->culled));
+                    negativeControl.insert("paintable",paintable);
+                    negativeControl.insert("visible",visibleEvidence);
+                    check(visibleRejected,"nonculled duplicate outside ListView ownership is rejected by rendered-row checks");
+                    duplicateRow->setProperty("index",-1);
+                    const auto retiredState=capture();
+                    const auto retiredEvidence=counterexampleEvidence(retiredState,-1);
+                    retiredRejected=paintable&&!retiredState.valid&&specificallyRejected(retiredEvidence);
+                    negativeControl.insert("retired",retiredEvidence);
+                    check(retiredRejected,"a nonculled retiring duplicate remains part of overlap detection");
+                }
+                duplicate.reset();
+                const bool negativeRestored=check(settleInitialLayout()&&sameGeometry(capture()),"removing the painted duplicate restores valid node geometry before probes");
+                negativeControl.insert("culledIgnored",culledIgnored);
+                negativeControl.insert("visibleRejected",visibleRejected);
+                negativeControl.insert("retiredRejected",retiredRejected);
+                negativeControl.insert("restored",negativeRestored);
                 const auto scrollBefore=viewport->property("contentY").toReal();
                 QSignalSpy scrollChanges(viewport,SIGNAL(contentYChanged()));
                 check(before.valid&&scrollChanges.isValid()
                     &&qAbs(scrollBefore-viewport->property("originY").toReal()-13)<0.5,
                     "probe fixture starts with readable cells and a partially clipped section header");
-                const auto sameGeometry=[&](const Geometry &now){
-                    if(!now.valid||now.cells.size()!=before.cells.size())return false;
-                    for(auto it=before.cells.cbegin();it!=before.cells.cend();++it){
-                        if(!now.cells.contains(it.key()))return false;
-                        const auto rect=now.cells.value(it.key());
-                        if(qAbs(rect.left()-it->left())>0.5||qAbs(rect.top()-it->top())>0.5
-                            ||qAbs(rect.width()-it->width())>0.5||qAbs(rect.height()-it->height())>0.5)return false;
-                    }
-                    return true;
-                };
-                // Negative control: excluding Qt's unpainted cache objects must
-                // not hide a real duplicate at the same rendered coordinates.
-                QQmlComponent duplicateComponent(qmlEngine(window));
-                duplicateComponent.setData(R"(
-                    import QtQuick
-                    Item {
-                        property var record: ({})
-                        property bool pooled: false
-                        property bool componentReady: true
-                        property int index: 1
-                        property int delegateIndex: index
-                        Text { width: parent.width/2; height: parent.height
-                            property string raw: parent.record.name || ""; text: raw }
-                        Text { x: parent.width/2; width: parent.width/2; height: parent.height
-                            property string raw: parent.record.status || ""; text: raw }
-                    }
-                )",QUrl());
-                std::unique_ptr<QObject> duplicateObject(duplicateComponent.create(qmlContext(table)));
-                auto *duplicate=qobject_cast<QQuickItem *>(duplicateObject.get());
-                if(check(duplicate!=nullptr,"geometry negative-control delegate is created")){
-                    duplicate->setProperty("record",probeSections.get(1));
-                    duplicate->setSize(QSizeF(viewport->width(),table->property("itemHeight").toReal()));
-                    duplicate->setY(table->property("sectionHeight").toReal());
-                    duplicate->setParentItem(qobject_cast<QQuickItem *>(viewport->property("contentItem").value<QObject *>()));
-                    QQuickItemPrivate::get(duplicate)->setCulled(true);
-                    check(sameGeometry(capture()),"a Qt-culled duplicate is recorded but cannot affect painted geometry");
-                    QQuickItemPrivate::get(duplicate)->setCulled(false);
-                    const auto paintedDuplicate=capture();
-                    bool duplicateReported=false;
-                    for(const auto &issue:paintedDuplicate.rowIssues)duplicateReported|=issue.toObject().value("duplicate").toBool();
-                    check(!paintedDuplicate.valid&&duplicateReported,"the same unculled duplicate is rejected by the rendered-row assertions");
-                    duplicate->setParentItem(nullptr);duplicateObject.reset();
-                    check(sameGeometry(capture()),"removing the negative control restores the original painted geometry");
-                }
                 const auto geometryEvidence=[&](const Geometry &now){
                     const auto rectValue=[](const QRectF &rect){return QJsonObject{
                         {"x",rect.x()},{"y",rect.y()},{"width",rect.width()},{"height",rect.height()}};};
@@ -885,6 +1018,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                         {"afterViewport",QJsonObject{{"width",now.viewportSize.width()},{"height",now.viewportSize.height()},
                             {"contentY",now.contentY},{"originY",now.originY}}},
                         {"beforeRowsState",before.rowStates},{"afterRowsState",now.rowStates},
+                        {"beforeCulledCount",before.culledRows.size()},{"afterCulledCount",now.culledRows.size()},
                         {"beforeCulledRows",before.culledRows},{"afterCulledRows",now.culledRows},
                         {"beforeRowIssues",before.rowIssues},{"afterRowIssues",now.rowIssues},{"cells",cells}};
                 };
@@ -903,12 +1037,12 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                         firstFailure.insert("sample",QString::fromLatin1(origin));
                     }
                 };
-                // Inspect the GUI geometry after each submitted frame, including
-                // the numeric latency animation between successive result bursts.
-                // The local context also owns any still queued frame callbacks.
+                // Sample current GUI geometry when a submitted-frame notification
+                // arrives. Queued delivery does not make this a snapshot of that
+                // GPU frame. The local context owns still queued callbacks.
                 QObject frameCaptureContext;
                 const auto frameConnection=QObject::connect(window,&QQuickWindow::frameSwapped,
-                    &frameCaptureContext,[&]{if(samplingFrames){++renderedSamples;sampleGeometry("frame");}},Qt::QueuedConnection);
+                    &frameCaptureContext,[&]{if(samplingFrames){++renderedSamples;sampleGeometry("frame-notification");}},Qt::QueuedConnection);
                 for(int batchIndex=0;batchIndex<12;++batchIndex){
                     activeBatch=batchIndex;
                     for(int i=0;i<probeValues.size();++i){
@@ -929,14 +1063,16 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                 const auto finalGeometry=capture();
                 const bool finalStable=sameGeometry(finalGeometry);
                 check(continuous&&finalStable,"probe bursts update real status text without moving or overlapping cells and section labels");
-                check(renderedSamples>0,"probe geometry is sampled during actually submitted animation frames");
+                check(renderedSamples>0,"probe GUI geometry is sampled when submitted-frame notifications arrive");
                 check(scrollChanges.isEmpty()&&qAbs(viewport->property("contentY").toReal()-scrollBefore)<0.5,
                     "value-only probe updates never reposition a partially scrolled node viewport");
                 qInfo()<<"NODE_PROBE_GEOMETRY"<<"cells"<<before.cells.size()<<"rows"<<before.rows
                        <<"scrollChanges"<<scrollChanges.size()<<"firstUnstableBatch"<<firstUnstableBatch
                        <<"finalStable"<<finalStable<<"renderedSamples"<<renderedSamples;
-                const QJsonObject geometryReport{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},
+                const QJsonObject geometryReport{{"phase",culledIgnored&&visibleRejected&&retiredRejected&&negativeRestored?"probe-workload":"negative-control"},
+                    {"negativeControl",negativeControl},{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},
                     {"nodeCount",probeCount},{"renderedSamples",renderedSamples},
+                    {"frameSampleSemantics","GUI geometry at queued frameSwapped delivery"},
                     {"platform",QGuiApplication::platformName()},{"graphics_api",int(graphicsApi)},
                     {"device_pixel_ratio",window->devicePixelRatio()},{"scrollChanges",scrollChanges.size()},
                     {"firstUnstableBatch",firstUnstableBatch},{"firstFailure",firstFailure},
@@ -968,9 +1104,9 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                 for(const int index:{probeCount-2,3,probeCount/2,0,probeCount-1,5,probeCount/3,0}){
                     QMetaObject::invokeMethod(viewport,"positionViewAtIndex",Q_ARG(int,index),Q_ARG(int,0));
                     QTest::qWait(35);
-                    // Synchronize and capture the actual submitted scroll frame;
-                    // an arbitrary between-frame incubation state is not a
-                    // claim about pixels that the user could have seen.
+                    // Save the scroll image, then inspect current GUI geometry.
+                    // The geometry records the state after grabWindow returns;
+                    // it does not reconstruct the submitted image's scene graph.
                     const auto scrolledFrame=window->grabWindow();
                     const auto scrolledGeometry=capture();
                     const bool readable=!scrolledFrame.isNull()&&scrolledGeometry.valid;
