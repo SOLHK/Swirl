@@ -4,6 +4,7 @@ All DNS and origin traffic stays on loopback. No private subscription, system
 DNS, certificate store or external proxy core is used. Existing UDP/DoT/DoH
 fixtures supply transport framing only; this file independently encodes denials.
 """
+from contextlib import ExitStack
 import errno
 import json
 import os
@@ -18,7 +19,7 @@ import types
 import unittest
 from unittest import mock
 
-from loopback_ports import parse_exclusions, reserve_tcp_udp, windows_exclusions
+from loopback_ports import ExclusiveLoopbackBind, parse_exclusions, reserve_tcp_udp, windows_exclusions
 from dns_peer import DnsPeer, name
 from test_dns_tls import DotPeer
 from test_dns_https import DohPeer
@@ -470,6 +471,12 @@ class DnsPeerAllocationTests(unittest.TestCase):
                 self.assertTrue(all(server.socket.fileno() == -1 for server in created))
 
     def test_pair_retries_collision_and_releases_failed_sockets(self):
+        class HeldTCP(ExclusiveLoopbackBind, socketserver.TCPServer):
+            pass
+
+        class HeldUDP(ExclusiveLoopbackBind, socketserver.UDPServer):
+            pass
+
         original = socketserver.TCPServer.server_bind
         for collision_kind in (socket.SOCK_DGRAM, socket.SOCK_STREAM):
             for windows in (False, True):
@@ -481,26 +488,58 @@ class DnsPeerAllocationTests(unittest.TestCase):
                         if windows:
                             failure.winerror = 10048
 
-                        def collide(server):
-                            created.append(server)
-                            if server.socket_type == collision_kind and len(rejected) < fail_count:
-                                rejected.append(server)
-                                raise failure
-                            original(server)
+                        with ExitStack() as held:
+                            # Reserve a real pair before injecting collisions. The
+                            # final attempt must test recovery, not another random
+                            # TCP/UDP port collision with its retry budget spent.
+                            tcp, udp = reserve_tcp_udp(
+                                lambda address: HeldTCP(address, socketserver.BaseRequestHandler),
+                                lambda address: HeldUDP(address, socketserver.BaseRequestHandler),
+                                label='DNS allocation test held pair')
+                            held.enter_context(tcp)
+                            held.enter_context(udp)
+                            holders = {socket.SOCK_STREAM: tcp, socket.SOCK_DGRAM: udp}
+                            sockets = {kind: holder.socket for kind, holder in holders.items()}
+                            for stream in sockets.values():
+                                held.callback(stream.close)
 
-                        with mock.patch.object(socketserver.TCPServer, 'server_bind', collide):
-                            peer = DnsPeer()
-                        try:
-                            self.assertEqual(len(rejected), fail_count)
-                            self.assertEqual(peer.udp.server_address[1], peer.tcp.server_address[1])
-                            self.assertTrue(all(server.socket.fileno() == -1 for server in created[:-2]))
-                            for server in (peer.udp, peer.tcp):
-                                self.assertFalse(server.allow_reuse_address)
-                                self.assertFalse(server.allow_reuse_port)
-                            self.assert_pair_forwards(peer)
-                        finally:
-                            peer.close()
-                        self.assertTrue(all(server.socket.fileno() == -1 for server in created))
+                            def collide(server):
+                                created.append(server)
+                                if server.socket_type == collision_kind and len(rejected) < fail_count:
+                                    rejected.append(server)
+                                    raise failure
+                                if len(rejected) < fail_count:
+                                    # A TCP bind preceding an injected UDP failure
+                                    # still owns a real descriptor for cleanup.
+                                    original(server)
+                                    return
+                                holder = holders[server.socket_type]
+                                self.assertIs(holder.socket, sockets[server.socket_type])
+                                self.assertEqual(server.server_address[0], holder.server_address[0])
+                                self.assertEqual(server.server_address[1],
+                                                 0 if server.socket_type == socket.SOCK_STREAM else tcp.server_address[1])
+                                # Transfer the held socket without closing/rebinding
+                                # it; the holder now owns the unused new descriptor.
+                                server.socket, holder.socket = holder.socket, server.socket
+                                server.server_address = server.socket.getsockname()
+
+                            with mock.patch.object(socketserver.TCPServer, 'server_bind', collide):
+                                peer = DnsPeer()
+                            try:
+                                self.assertEqual(len(rejected), fail_count)
+                                self.assertEqual(peer.udp.server_address[1], peer.tcp.server_address[1])
+                                self.assertIs(peer.tcp.socket, sockets[socket.SOCK_STREAM])
+                                self.assertIs(peer.udp.socket, sockets[socket.SOCK_DGRAM])
+                                self.assertTrue(all(server.socket.fileno() == -1 for server in created[:-2]))
+                                for server in (peer.udp, peer.tcp):
+                                    self.assertFalse(server.allow_reuse_address)
+                                    self.assertFalse(server.allow_reuse_port)
+                                self.assert_pair_forwards(peer)
+                            finally:
+                                peer.close()
+                            self.assertTrue(all(server.socket.fileno() == -1 for server in created))
+                        self.assertTrue(all(stream.fileno() == -1 for stream in sockets.values()))
+                        self.assertTrue(all(holder.socket.fileno() == -1 for holder in holders.values()))
 
     def test_pair_allocation_stops_after_bounded_collisions(self):
         self.isolate_bind_effects()
