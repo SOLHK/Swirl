@@ -191,6 +191,9 @@ private slots:
         QCOMPARE(stored.value("committed").toObject().value("snapshot").toObject().value("networkConfiguration").toObject().value("policyDocumentV2").toObject(),document());
         QCOMPARE(engine->operations,QStringList{"validate_configuration_v2"});QVERIFY(!bytes(dir.filePath("nodes.dpapi")).contains("default_policy"));
     }
+#ifndef SWIRL_PROXY_STOP_NEGATIVE_CONTROL
+    // The pinned proxy-stop controller predates subscription selection. Its
+    // negative control still compiles and runs the six unchanged stop cases.
     void subscriptionChoiceScopesCandidatesRuntimeAndColdReloadWithoutDeletingIndependentImports(){
         QTemporaryDir dir;const auto path=dir.filePath("sources.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
         {
@@ -254,6 +257,7 @@ private slots:
         const auto saved=envelope(path).value("committed").toObject().value("snapshot").toObject();
         QCOMPARE(saved.value("networkConfiguration").toObject().value("activeSubscriptionId").toString(),pool.b);QCOMPARE(saved.value("nodes").toArray().size(),4);
     }
+#endif
     void acceptedMutationRejectsAConcurrentWriterWithoutReplacingItsRequest(){
         QTemporaryDir dir;EngineController controller(std::make_unique<ConfigurationPeer>(),nullptr,dir.filePath("nodes.dpapi"));
         QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));const auto request=controller.policyRequestId();
