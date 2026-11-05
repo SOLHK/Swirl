@@ -8,6 +8,9 @@ use swirl_core::v2::{decimal, identity_uuid};
 
 type Result<T> = std::result::Result<T, &'static str>;
 
+/// Identity of the supervisor's final recovery receipt, never a GUI command.
+pub const SUPERVISOR_RECOVERY_REQUEST_ID: &str = "70000000-0000-4000-8000-000000000001";
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct NativeTunConfig {

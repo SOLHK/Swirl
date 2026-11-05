@@ -148,9 +148,9 @@ ApplicationWindow {
                 SwirlStatusCapsule {
                     id: tunCapsule; objectName: "tunCapsule"
                     Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.toolbarHeight
-                    label: engineController.tunEnabled ? qsTr("TUN · 已开") : qsTr("TUN · 未开启")
+                    label: engineController.tunEnabled ? qsTr("TUN · 已开") : engineController.tunRequested ? qsTr("TUN · 待启用") : qsTr("TUN · 未开启")
                     detail: engineController.routingError || (engineController.tunEnabled
-                        ? qsTr("TUN 模式已开启，点击关闭") : qsTr("本测试版尚未接入 TUN 启动与恢复组件，暂无法开启。"))
+                        ? qsTr("TUN 模式已开启，关闭代理后可切换模式") : engineController.tunSupported ? qsTr("先配置加密 DNS，再选择 TUN；开启代理时将请求管理员授权。") : qsTr("TUN 组件或驱动缺失，请重新安装完整测试包。"))
                     tone: engineController.tunEnabled ? "success" : "neutral"
                     enabled: !engineController.busy
                     onClicked: {

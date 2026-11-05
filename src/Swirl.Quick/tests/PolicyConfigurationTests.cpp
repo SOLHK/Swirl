@@ -191,6 +191,8 @@ private slots:
         QCOMPARE(stored.value("committed").toObject().value("snapshot").toObject().value("networkConfiguration").toObject().value("policyDocumentV2").toObject(),document());
         QCOMPARE(engine->operations,QStringList{"validate_configuration_v2"});QVERIFY(!bytes(dir.filePath("nodes.dpapi")).contains("default_policy"));
     }
+#ifndef SWIRL_PROXY_STOP_NEGATIVE_CONTROL
+    // The pinned controller predates these APIs; its six stop cases stay intact.
     void subscriptionChoiceScopesCandidatesRuntimeAndColdReloadWithoutDeletingIndependentImports(){
         QTemporaryDir dir;const auto path=dir.filePath("sources.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
         {
@@ -254,6 +256,34 @@ private slots:
         const auto saved=envelope(path).value("committed").toObject().value("snapshot").toObject();
         QCOMPARE(saved.value("networkConfiguration").toObject().value("activeSubscriptionId").toString(),pool.b);QCOMPARE(saved.value("nodes").toArray().size(),4);
     }
+    void tunRequiresExplicitEncryptedDnsAndNeverEnablesGatewayAsASideEffect(){
+        QTemporaryDir dir;const auto path=dir.filePath("tun-configuration.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
+        NodeStore store(path);EngineStartOptions options;options.nodes=store.nodes();options.proxyPort=1080;options.tunEnabled=true;
+        const auto policy=sourcePolicy(pool);QJsonObject runtime;
+#ifdef Q_OS_WIN
+        QVERIFY(!RustCoreEngine::configurationV2(options,policy,&runtime).isEmpty());
+        options.dnsConfig={{"mode",2},{"servers","1.1.1.1"}};
+        QVERIFY(!RustCoreEngine::configurationV2(options,policy,&runtime).isEmpty());
+        options.dnsConfig={{"mode",0},{"encrypted","https://1.1.1.1/dns-query"}};
+        QVERIFY(RustCoreEngine::configurationV2(options,policy,&runtime).isEmpty());
+        QVERIFY(runtime.value("dns").toObject().value("servers").toArray().isEmpty());
+        QCOMPARE(runtime.value("dns").toObject().value("tls_servers").toArray().size(),1);
+        options.gatewayForwarding=true;
+        QVERIFY(!RustCoreEngine::configurationV2(options,policy,&runtime).isEmpty());
+#else
+        QVERIFY(!RustCoreEngine::configurationV2(options,policy,&runtime).isEmpty());
+#endif
+    }
+    void tunPreferenceCannotSwitchControllersWhileTheCurrentCoreIsAlive(){
+        QTemporaryDir dir;const auto path=dir.filePath("tun-live-choice.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
+        auto peer=std::make_unique<ConfigurationPeer>();EngineController controller(std::move(peer),nullptr,path);
+        QVERIFY(controller.applyPolicyDocument(sourcePolicy(pool).toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        controller.connectConfiguredPolicy();QVERIFY(controller.processAlive());
+        controller.m_options.tunEnabled=true;const auto before=bytes(path);
+        QVERIFY(!controller.setTunEnabled(false));QVERIFY(controller.tunRequested());QVERIFY(controller.processAlive());
+        QCOMPARE(bytes(path),before);QVERIFY(!controller.routingError().isEmpty());
+    }
+#endif
     void acceptedMutationRejectsAConcurrentWriterWithoutReplacingItsRequest(){
         QTemporaryDir dir;EngineController controller(std::make_unique<ConfigurationPeer>(),nullptr,dir.filePath("nodes.dpapi"));
         QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));const auto request=controller.policyRequestId();

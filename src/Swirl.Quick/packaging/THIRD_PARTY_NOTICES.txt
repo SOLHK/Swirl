@@ -98,7 +98,9 @@ does not assert that its binary is included or installed by this package.
 
 The Native TUN TCP/IP library smoltcp is licensed under 0BSD. The Rust Wintun
 binding is MIT-licensed; that license does not cover the Wintun driver binary.
-The separate official Wintun 0.14.1 prebuilt-binary redistribution terms are in
+The package includes the unmodified official AMD64 Wintun 0.14.1 DLL, verified
+against its pinned upstream archive and binary hashes. Its separate
+prebuilt-binary redistribution terms are in
 licenses/rust/crates/swirl-platform/licenses/WINTUN-0.14.1.txt.
 The c2rust-bitfields 0.18.0 crates omit their license file from their archives;
 the BSD-3-Clause notice from their exact upstream revision is retained in

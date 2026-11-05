@@ -38,6 +38,8 @@ pub mod windows_packet_resources;
 #[cfg(windows)]
 pub mod windows_restricted_worker;
 #[cfg(windows)]
+pub mod windows_tun_broker;
+#[cfg(windows)]
 pub mod windows_wfp;
 #[cfg(windows)]
 pub mod wintun_device;

@@ -22,7 +22,6 @@ const WORKER_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(1);
 // not a separate thread which could remain alive while the loop is deadlocked.
 const WORKER_STALL: Duration = Duration::from_secs(300);
 const HEARTBEAT_FRAME: &[u8] = b"{\"native_tun_worker_heartbeat\":1}\n";
-const RECOVER: &[u8] = br#"{"native_tun_schema":1,"request_id":"70000000-0000-4000-8000-000000000001","op":"native_tun_recover"}"#;
 
 fn emit(value: &serde_json::Value) -> io::Result<()> {
     let stdout = io::stdout();
@@ -36,13 +35,22 @@ mod native_worker_output;
 use native_worker_output::BoundedOutput;
 
 fn recover() -> serde_json::Value {
-    swirl_api::Controller::for_native_tun_helper().dispatch(RECOVER)
+    let request = serde_json::json!({"native_tun_schema":1,
+        "request_id":swirl_api::native_tun_control::SUPERVISOR_RECOVERY_REQUEST_ID,
+        "op":"native_tun_recover"});
+    swirl_api::Controller::for_native_tun_helper().dispatch(request.to_string().as_bytes())
 }
 
 fn main() {
     let mode = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "--capabilities".into());
+    if mode == "--build-info" {
+        let mut identity = swirl_api::build_info();
+        identity["role"] = serde_json::json!("swirl_tun_helper");
+        let _ = emit(&identity);
+        return;
+    }
     if mode == "--capabilities" {
         let _ = emit(&swirl_api::native_tun_control::capabilities());
         return;

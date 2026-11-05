@@ -75,6 +75,7 @@ function Test-SwirlForbiddenProductPath {
     $path = $RelativePath.Replace('\','/')
     $name = ($path -split '/')[-1]
     return ($name -match '^(mihomo|clash|xray|sing-box)([.-]|$)' -or
+        $name -match '^(swirl-tun-packet-worker|windows-tun-smoke|windows-gateway-forward-smoke)([.-]|$)' -or
         $name -match '(Tests|Fixture)\.(exe|dll)$' -or
         $name -match '^swirl_loader_fixture_[0-9]+\.(dll|so|dylib)$' -or
         $name -match '^Swirl(?:-[a-z0-9-]+)?-diagnostics\.txt$' -or
@@ -192,6 +193,90 @@ function Assert-SwirlTlsPayload {
             (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ine $record.sha256) {
             throw "TLS runtime receipt digest mismatch: $($entry.Value)"
         }
+    }
+    return $receipt
+}
+
+function Get-SwirlWintunArtifact {
+    $repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+    $inventory = Get-Content -LiteralPath (Join-Path $repo 'core/DEPENDENCIES.json') -Raw | ConvertFrom-Json
+    $drivers = @($inventory.runtime_artifacts | Where-Object { $_.name -ceq 'Wintun official signed DLL' })
+    if ($drivers.Count -ne 1) { throw 'Expected one reviewed Wintun runtime artifact.' }
+    $driver = $drivers[0]
+    $images = @($driver.artifacts | Where-Object { $_.target -ceq 'x86_64-pc-windows' })
+    if ($driver.version -cne '0.14.1' -or $driver.source -cne 'https://www.wintun.net/builds/wintun-0.14.1.zip' -or
+        $driver.archive_sha256 -cnotmatch '^[0-9a-f]{64}$' -or $images.Count -ne 1 -or
+        $images[0].archive_path -cne 'wintun/bin/amd64/wintun.dll' -or $images[0].sha256 -cnotmatch '^[0-9a-f]{64}$') {
+        throw 'Unreviewed Wintun version, source or AMD64 identity.'
+    }
+    return [pscustomobject]@{version=$driver.version;url=$driver.source;archive_sha256=$driver.archive_sha256;
+        archive_path=$images[0].archive_path;sha256=$images[0].sha256;
+        notice=(Join-Path $repo 'core/crates/swirl-platform/licenses/WINTUN-0.14.1.txt')}
+}
+
+function Assert-SwirlAmd64Image {
+    param([Parameter(Mandatory=$true)][string]$Path)
+    Assert-SwirlPathWithoutLinks $Path
+    $stream = [IO.File]::OpenRead($Path)
+    $reader = New-Object IO.BinaryReader $stream
+    try {
+        if ($stream.Length -lt 64 -or $reader.ReadUInt16() -ne 0x5a4d) { throw 'Invalid deployable DOS header.' }
+        $stream.Position = 60
+        $offset = $reader.ReadInt32()
+        if ($offset -lt 64 -or $offset -gt $stream.Length - 26) { throw 'Invalid deployable PE header offset.' }
+        $stream.Position = $offset
+        if ($reader.ReadUInt32() -ne 0x4550 -or $reader.ReadUInt16() -ne 0x8664) { throw 'Product TUN requires an AMD64 PE image.' }
+        $stream.Position = $offset + 24
+        if ($reader.ReadUInt16() -ne 0x20b) { throw 'Product TUN requires a PE32+ image.' }
+    } finally { $reader.Dispose(); $stream.Dispose() }
+}
+
+# Called by current staging/finalization, separately from the historical manifest
+# ownership reader used to maintain older installed products.
+function Assert-SwirlTunPayload {
+    param(
+        [Parameter(Mandatory=$true)][string]$ApplicationDirectory,
+        [Parameter(Mandatory=$true)][string]$ExpectedSourceSha,
+        [Parameter(Mandatory=$true)][string]$ExpectedBuildId,
+        [string]$ExpectedTarget = 'x86_64-pc-windows-msvc'
+    )
+    $root = (Resolve-Path -LiteralPath $ApplicationDirectory).Path
+    $manifest = Get-Content -LiteralPath (Join-Path $root 'package-manifest.json') -Raw | ConvertFrom-Json
+    $required = @('swirl-tun-broker.exe','swirl-tun-helper.exe','wintun.dll','tun-runtime.json',
+        'licenses/rust/crates/swirl-platform/licenses/WINTUN-0.14.1.txt')
+    foreach ($name in $required) {
+        $file = Join-Path $root $name
+        Assert-SwirlPathWithoutLinks $file
+        if ($name -cnotin @($manifest.files.path) -or -not (Test-Path -LiteralPath $file -PathType Leaf)) {
+            throw "Missing product TUN payload entry: $name"
+        }
+    }
+    $receipt = Get-Content -LiteralPath (Join-Path $root 'tun-runtime.json') -Raw | ConvertFrom-Json
+    if ($receipt.schema -ne 1 -or $receipt.kind -cne 'windows-native-tun-payload' -or
+        $receipt.source_sha -cne $ExpectedSourceSha -or $receipt.build_id -cne $ExpectedBuildId -or
+        $receipt.target -cne $ExpectedTarget) { throw 'Product TUN payload identity mismatch.' }
+    foreach ($entry in @(@{name='swirl-tun-broker.exe';role='swirl_tun_broker'},@{name='swirl-tun-helper.exe';role='swirl_tun_helper'})) {
+        $file = Join-Path $root $entry.name
+        $record = $receipt.binaries.PSObject.Properties[$entry.name].Value
+        $identity = $record.identity
+        if ($record.sha256 -cnotmatch '^[0-9a-f]{64}$' -or
+            (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ine $record.sha256 -or
+            $identity.abi_version -ne 1 -or $identity.role -cne $entry.role -or
+            $identity.source_sha -cne $ExpectedSourceSha -or $identity.build_id -cne $ExpectedBuildId -or
+            $identity.target -cne $ExpectedTarget) { throw ('Product TUN executable pairing mismatch: '+$entry.name) }
+        Assert-SwirlAmd64Image $file
+    }
+    $driver = Get-SwirlWintunArtifact
+    if ($receipt.driver.version -cne $driver.version -or $receipt.driver.source -cne $driver.url -or
+        $receipt.driver.archive_sha256 -cne $driver.archive_sha256 -or $receipt.driver.sha256 -cne $driver.sha256 -or
+        (Get-FileHash -LiteralPath (Join-Path $root 'wintun.dll') -Algorithm SHA256).Hash -ine $driver.sha256) {
+        throw 'Product Wintun payload differs from the reviewed official binary.'
+    }
+    Assert-SwirlAmd64Image (Join-Path $root 'wintun.dll')
+    $notice = Join-Path $root $required[-1]
+    if (([IO.File]::ReadAllText($notice).Replace([string][char]13,'')) -cne
+        ([IO.File]::ReadAllText($driver.notice).Replace([string][char]13,''))) {
+        throw 'The complete official Wintun prebuilt-binaries license is required.'
     }
     return $receipt
 }

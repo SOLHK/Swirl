@@ -38,6 +38,7 @@ foreach ($directory in (Get-ChildItem -LiteralPath $root -Directory -Recurse -Fo
         throw 'Package contains empty directories; use fresh product staging before packaging.'
     }
 }
+$tun=Assert-SwirlTunPayload -ApplicationDirectory $root -ExpectedSourceSha $sha -ExpectedBuildId $manifest.rust.build_id
 if (Test-Path -LiteralPath $list) { throw 'Uninstall include already exists.' }
 # Runtime cleanup uses the embedded manifest and hash-aware maintenance helper.
 # Never generate unconditional Delete instructions for potentially modified files.
@@ -47,6 +48,7 @@ $lines = @('; Generated only after exact payload and source verification.',
 New-Item -ItemType Directory -Force -Path ([IO.Path]::GetDirectoryName($list)) | Out-Null
 $lines | Set-Content -LiteralPath $list -Encoding utf8
 @{ source_sha=$sha; files=@($manifest.files).Count; exact_inventory=$true; all_hashes_verified=$true;
-   tls_version=$tls.version; tls_source_sha256=$tls.source.sha256; tls_closure_verified=$true; no_empty_directories=$true } |
+   tls_version=$tls.version; tls_source_sha256=$tls.source.sha256; tls_closure_verified=$true; no_empty_directories=$true;
+   tun_payload_verified=$true; tun_build_id=$tun.build_id; wintun_version=$tun.driver.version; wintun_sha256=$tun.driver.sha256 } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'final-package-verification.json') -Encoding utf8
 Write-Host "Final payload inventory and hashes verified: $sha"

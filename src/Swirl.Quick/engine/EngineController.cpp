@@ -354,7 +354,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             if(s.state==ProxyEngine::State::Failed)m_proxyRequested=false;
         } else if(s.state==ProxyEngine::State::Running&&s.apiHealthy&&m_proxyRequested&&!m_systemProxy.owned()&&!m_proxyChecking)setSystemProxy(true);
     });
-    if(m_options.tunEnabled)m_routingError=QStringLiteral("本测试版尚未接入 TUN 启动与恢复组件，暂无法开启。请先关闭已保存的增强模式设置后再连接。");
+    if(m_options.tunEnabled&&!tunSupported())m_routingError=QStringLiteral("TUN 启动组件或驱动缺失，请重新安装完整测试包，或先关闭已保存的增强模式。");
     connect(m_engine.get(), &ProxyEngine::statusChanged, this, &EngineController::statusChanged);
     connect(m_engine.get(),&ProxyEngine::configurationCommandFinished,this,&EngineController::policyCommandCompleted);
     m_options.nodes=availableNodes();
@@ -1258,15 +1258,21 @@ bool EngineController::elevated() const {
     return false;
 #endif
 }
+bool EngineController::tunSupported() const {return RustCoreEngine::nativeTunAvailable();}
 bool EngineController::setTunEnabled(bool enabled) {
     m_routingError.clear();
-    if(enabled){m_routingError=QStringLiteral("本测试版尚未接入 TUN 启动与恢复组件，暂无法开启。已保存配置保持不变。");emit statusChanged();return false;}
+    if(enabled&&!tunSupported()){m_routingError=QStringLiteral("TUN 启动组件或驱动缺失，请重新安装完整测试包。");emit statusChanged();return false;}
     if(!enabled&&m_options.meteredNetwork){m_routingError=QStringLiteral("计费网络模式正在使用增强模式，请先关闭计费网络模式。");emit statusChanged();return false;}
-    if(enabled&&!elevated()){m_routingError=QStringLiteral("请退出 Swirl，并以管理员身份运行后开启增强模式。");emit statusChanged();return false;}
-    if(busy()||nodeBusy()||routingBusy()){m_routingError=QStringLiteral("请先选择一个可用代理节点，并等待当前操作结束。");emit statusChanged();return false;}
+    if(processAlive()||m_systemProxy.owned()||m_systemProxy.busy()||busy()||nodeBusy()||routingBusy()){
+        m_routingError=QStringLiteral("请先在活动页关闭代理，等待网络恢复完成后再切换 TUN。");emit statusChanged();return false;
+    }
+    if(enabled&&!m_store.configurationV2()){m_routingError=QStringLiteral("请先在策略页确认并保存出口配置。");emit statusChanged();return false;}
+    if(m_store.configurationV2()){
+        auto candidate=m_options;candidate.nodes=availableNodes();candidate.tunEnabled=enabled;
+        return applyPolicyConfiguration(m_policyDocument,candidate);
+    }
     const bool previous=m_options.tunEnabled;m_options.tunEnabled=enabled;
     if(!saveNetworkConfiguration()){m_options.tunEnabled=previous;return false;}
-    if(enabled||processAlive())startConfiguredSession();
     emit statusChanged();return true;
 }
 

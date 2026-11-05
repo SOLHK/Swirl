@@ -78,6 +78,7 @@ class EngineController final : public QObject {
     Q_PROPERTY(QStringList lanAddresses READ lanAddresses NOTIFY lanAddressesChanged)
     Q_PROPERTY(bool tunRequested READ tunRequested NOTIFY statusChanged)
     Q_PROPERTY(bool tunEnabled READ tunEnabled NOTIFY statusChanged)
+    Q_PROPERTY(bool tunSupported READ tunSupported CONSTANT)
     Q_PROPERTY(bool elevated READ elevated CONSTANT)
     Q_PROPERTY(QVariantMap dnsConfiguration READ dnsConfiguration NOTIFY optionsChanged)
     Q_PROPERTY(QVariantList policyGroups READ policyGroups NOTIFY optionsChanged)
@@ -179,6 +180,7 @@ public:
     ConnectionDiagnostics *diagnostics() {return &m_diagnostics;}
     QString proxyEnvironmentAdvice() const;
     bool tunRequested() const { return m_options.tunEnabled; }
+    bool tunSupported() const;
     Q_INVOKABLE void setCaptureProxyPort(int port);
     bool tunEnabled() const { return m_engine->status().tunEnabled&&apiHealthy()&&processAlive(); }
     bool elevated() const;

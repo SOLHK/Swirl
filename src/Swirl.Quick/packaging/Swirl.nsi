@@ -109,6 +109,53 @@ VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}.0"
     StrCmp $0 "0" +2
     Goto ${FailureLabel}
 !macroend
+!macro RequireNativeTunRecovery FailureLabel
+    ; Query the exact REG_DWORD in the same explicit 32-bit view as the GUI.
+    ; A missing marker does not launch anything or request elevation.
+    System::Call 'advapi32::RegOpenKeyExW(p 0x80000001, w "Software\SOLHK\Swirl\NativeTun", i 0, i 0x201, *p.r1) i.r0'
+    StrCmp $0 "2" native_tun_checked
+    StrCmp $0 "0" 0 ${FailureLabel}
+    StrCpy $5 "4"
+    System::Call 'advapi32::RegQueryValueExW(p r1, w "recoveryPending", p 0, *i.r2, *i.r3, *i r5r5) i.r0'
+    System::Call 'advapi32::RegCloseKey(p r1)'
+    StrCmp $0 "2" native_tun_checked
+    StrCmp $0 "0" 0 ${FailureLabel}
+    StrCmp $2 "4" 0 ${FailureLabel}
+    StrCmp $5 "4" 0 ${FailureLabel}
+    StrCmp $3 "0" native_tun_checked
+    StrCmp $3 "1" 0 ${FailureLabel}
+    ; A genuinely fresh destination has no old recovery payload to overwrite.
+    IfFileExists "$INSTDIR\Swirl.exe" native_tun_owned
+    IfFileExists "$INSTDIR\swirl-tun-broker.exe" ${FailureLabel}
+    IfFileExists "$INSTDIR\swirl-tun-helper.exe" ${FailureLabel}
+    IfFileExists "$INSTDIR\package-manifest.json" ${FailureLabel}
+    IfFileExists "$INSTDIR\.swirl-install-owned" ${FailureLabel}
+    Goto native_tun_checked
+    native_tun_owned:
+    IfFileExists "$INSTDIR\.swirl-install-owned" 0 ${FailureLabel}
+    IfFileExists "$INSTDIR\package-manifest.json" 0 ${FailureLabel}
+    IfFileExists "$INSTDIR\swirl-tun-broker.exe" 0 ${FailureLabel}
+    IfFileExists "$INSTDIR\swirl-tun-helper.exe" 0 ${FailureLabel}
+    IfFileExists "$INSTDIR\wintun.dll" 0 ${FailureLabel}
+    IfFileExists "$INSTDIR\tun-runtime.json" 0 ${FailureLabel}
+    ; Verify the currently installed owner and bytes before executing its
+    ; maintenance entry. The new package's manifest describes another version.
+    nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$PLUGINSDIR\Maintain-WindowsRustProduct.ps1" -Mode Verify -ApplicationDirectory "$INSTDIR" -ExpectedManifest "$INSTDIR\package-manifest.json"'
+    Pop $0
+    Pop $1
+    DetailPrint "$1"
+    StrCmp $0 "0" 0 ${FailureLabel}
+    ClearErrors
+    ExecWait '"$INSTDIR\Swirl.exe" --recover-tun' $0
+    IfErrors ${FailureLabel}
+    StrCmp $0 "0" 0 ${FailureLabel}
+    SetRegView 32
+    ClearErrors
+    ReadRegDWORD $0 HKCU "Software\SOLHK\Swirl\NativeTun" "recoveryPending"
+    IfErrors ${FailureLabel}
+    StrCmp $0 "0" 0 ${FailureLabel}
+    native_tun_checked:
+!macroend
 Function .onInit
     StrCpy $IsolatedInstall "0"
     ${GetParameters} $Parameters
@@ -157,6 +204,7 @@ Section "安装 Swirl"
     ready_to_copy:
     !insertmacro PreparePackageMaintenance
     !insertmacro MaintainPackage Upgrade '-PrepareOnly -PreviousManifest "$PLUGINSDIR\previous-package-manifest.json"' installation_failed
+    !insertmacro RequireNativeTunRecovery installation_failed
     SetOverwrite on
     ClearErrors
     SetOutPath "$INSTDIR"
@@ -182,12 +230,23 @@ Section "安装 Swirl"
     Goto installation_finished
     installation_failed:
     SetErrorLevel 2
-    Abort "Swirl 正在运行或文件无法写入，更新未完成。"
+    Abort "Swirl 正在运行、TUN 恢复未确认或文件无法写入，更新未完成。请保留现有恢复文件后重试。"
     installation_finished:
 SectionEnd
 Section "Uninstall"
     SetShellVarContext current
+    uninstall_check_running:
+    IfFileExists "$INSTDIR\Swirl.exe" 0 uninstall_gui_stopped
+    System::Call 'kernel32::CreateFileW(w "$INSTDIR\Swirl.exe", i 0x40000000, i 1, p 0, i 3, i 0, p 0) p.r0'
+    StrCmp $0 "-1" uninstall_running
+    System::Call 'kernel32::CloseHandle(p r0)'
+    Goto uninstall_gui_stopped
+    uninstall_running:
+    IfSilent uninstall_failed
+    MessageBox MB_RETRYCANCEL|MB_ICONINFORMATION "请先退出 Swirl 并等待网络恢复，再点击重试。" IDRETRY uninstall_check_running IDCANCEL uninstall_failed
+    uninstall_gui_stopped:
     !insertmacro PreparePackageMaintenance
+    !insertmacro RequireNativeTunRecovery uninstall_failed
     StrCmp $IsolatedInstall "1" integration_validated
     !insertmacro MaintainUserIntegration ValidateUninstall uninstall_failed
     ; Preserve the source manifest and product bytes if a locked or otherwise
@@ -206,6 +265,6 @@ Section "Uninstall"
     Goto uninstall_finished
     uninstall_failed:
     SetErrorLevel 2
-    Abort "安装文件归属或路径验证失败，卸载未完成。您的未验证文件已保留。"
+    Abort "网络恢复、安装文件归属或路径未能确认安全，卸载已停止。请保留现有文件后重试。"
     uninstall_finished:
 SectionEnd
