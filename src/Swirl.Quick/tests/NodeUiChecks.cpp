@@ -654,14 +654,16 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         check(attached,"probe geometry fixture uses the real table with an isolated public-data model");
         if(attached){
             struct Geometry {
-                QHash<QString,QRectF> cells;
+                QHash<QString,QRectF> cells,contentRects;
                 QHash<QString,QString> texts,rawValues,expectedNames,expectedStatuses;
-                QJsonArray rowIssues,rowStates,culledRows;
+                QJsonArray rowIssues,rowStates,culledRows,backgroundRows;
                 QSizeF viewportSize;
                 qreal contentY=0,originY=0;
                 bool valid=false;
                 int rows=0;
             };
+            const auto rectJson=[](const QRectF &rect){return QJsonObject{
+                {"x",rect.x()},{"y",rect.y()},{"width",rect.width()},{"height",rect.height()}};};
             const auto capture=[&]{
                 Geometry result;
                 result.viewportSize=viewport->size();
@@ -675,10 +677,10 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                 QSet<QString> keys;
                 bool valid=true;
                 for(auto *row:content->childItems()){
+                    if(row->metaObject()->indexOfProperty("record")<0)continue;
                     const auto value=row->property("record");
                     const auto record=value.metaType()==QMetaType::fromType<QJSValue>()?value.value<QJSValue>().toVariant().toMap():value.toMap();
                     const auto key=record.value("displayKey").toString();
-                    if(key.isEmpty())continue;
                     QQmlExpression delegateIndex(qmlContext(row),row,QStringLiteral("index"));
                     const auto displayedIndex=delegateIndex.evaluate();
                     bool indexValid=false;
@@ -704,6 +706,24 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                         continue;
                     }
                     if(!row->isVisible()||effectiveOpacity(row)<0.01)continue;
+                    QQuickItem *registeredRow=nullptr;
+                    const bool registered=QMetaObject::invokeMethod(viewport,"itemAtIndex",
+                        Q_RETURN_ARG(QQuickItem *,registeredRow),Q_ARG(int,viewIndex))&&registeredRow==row;
+                    const auto layoutRect=row->mapRectToItem(viewport,QRectF(QPointF(),row->size()));
+                    // A registered row can cover the viewport with only its
+                    // empty cell margin visible. Coverage uses its layout;
+                    // text sampling below still includes unregistered retirees.
+                    if(registered&&layoutRect.intersects(clip)){
+                        layoutBounds.append(layoutRect);
+                        if(key.isEmpty()||!indexValid||delegateIndex.hasError()||!renderState->componentComplete
+                            ||!row->property("componentReady").toBool()||row->property("pooled").toBool()){
+                            valid=false;
+                            result.rowIssues.append(QJsonObject{{"key",key},{"delegateIndex",viewIndex},
+                                {"missingRecord",key.isEmpty()},{"layoutReady",bool(renderState->componentComplete)},
+                                {"indexValid",indexValid&&!delegateIndex.hasError()},
+                                {"componentReady",row->property("componentReady").toBool()},{"pooled",row->property("pooled").toBool()}});
+                        }
+                    }
                     const int modelRow=probeSections.rowForDisplayKey(key);
                     const auto expected=probeSections.get(modelRow);
                     const bool section=record.value("rowKind")=="section";
@@ -711,6 +731,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                     const auto status=detail.isEmpty()?expected.value("status").toString():detail;
                     bool foundName=false,foundStatus=false;
                     QRectF bounds;
+                    QJsonArray textItems;
                     QList<QRectF> columnBounds;
                     int cellIndex=0;
                     std::function<void(QQuickItem *)> collectText;
@@ -723,10 +744,18 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                             foundName|=text==expected.value(section?"sectionName":"name").toString();
                             foundStatus|=text==status;
                             const auto rect=child->mapRectToItem(viewport,QRectF(0,0,child->width(),child->height()));
+                            // QQuickText::boundingRect() includes text alignment.
+                            // It decides visibility; the full cell remains the
+                            // stable geometry when status or numeric widths vary.
+                            const auto contentRect=child->mapRectToItem(viewport,child->boundingRect());
+                            const bool contentVisible=contentRect.intersects(clip);
                             const auto cellKey=key+":"+QString::number(cellIndex++);
-                            if(rect.intersects(clip)){
+                            textItems.append(QJsonObject{{"key",cellKey},{"text",text},{"raw",child->property("raw").toString()},
+                                {"cell",rectJson(rect)},{"content",rectJson(contentRect)},{"contentVisible",contentVisible}});
+                            if(contentVisible){
                                 if(result.cells.contains(cellKey))valid=false;
                                 result.cells.insert(cellKey,rect);
+                                result.contentRects.insert(cellKey,contentRect);
                                 result.texts.insert(cellKey,text);
                                 result.rawValues.insert(cellKey,child->property("raw").toString());
                                 result.expectedNames.insert(cellKey,expected.value(section?"sectionName":"name").toString());
@@ -738,16 +767,26 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                         for(auto *nested:child->childItems())collectText(nested);
                     };
                     collectText(row);
-                    if(bounds.isNull())continue;
+                    if(bounds.isNull()){
+                        if(layoutRect.intersects(clip))result.backgroundRows.append(QJsonObject{
+                            {"key",key},{"objectName",row->objectName()},{"delegateIndex",viewIndex},{"modelRow",modelRow},
+                            {"modelEntryKey",modelEntryKey},{"viewKey",probeSections.get(viewIndex).value("displayKey").toString()},
+                            {"registered",registered},{"culled",false},{"recordName",record.value("name").toString()},
+                            {"layout",rectJson(layoutRect)},{"textItems",textItems}});
+                        // An empty live row in the middle is missing content,
+                        // not a harmless clipped cell margin.
+                        if(registered&&clip.contains(layoutRect.center())){
+                            valid=false;
+                            result.rowIssues.append(QJsonObject{{"key",key},{"delegateIndex",viewIndex},{"missingVisibleText",true}});
+                        }
+                        continue;
+                    }
                     std::sort(columnBounds.begin(),columnBounds.end(),[](const auto &a,const auto &b){return a.left()<b.left();});
                     bool columnsSeparate=true;
                     for(int i=1;i<columnBounds.size();++i)
                         columnsSeparate&=columnBounds[i-1].right()<=columnBounds[i].left()+0.5;
                     // Keep the actual delegate index separate from the expected
                     // model position when diagnosing reuse/retirement failures.
-                    QQuickItem *registeredRow=nullptr;
-                    const bool registered=QMetaObject::invokeMethod(viewport,"itemAtIndex",
-                        Q_RETURN_ARG(QQuickItem *,registeredRow),Q_ARG(int,viewIndex))&&registeredRow==row;
                     result.rowStates.append(QJsonObject{
                         {"key",key},{"objectName",row->objectName()},{"modelRow",modelRow},{"delegateIndex",viewIndex},
                         {"indexValid",indexValid&&!delegateIndex.hasError()},
@@ -786,7 +825,6 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                         {"recordDetail",record.value("statusDetail").toString()}});
                     valid&=rowValid;
                     keys.insert(key);rowBounds.append(QPair<int,QRectF>(modelRow,bounds));
-                    layoutBounds.append(row->mapRectToItem(viewport,QRectF(QPointF(),row->size())));
                 }
                 std::sort(rowBounds.begin(),rowBounds.end(),[](const auto &a,const auto &b){return a.second.top()<b.second.top();});
                 for(int i=1;i<rowBounds.size();++i){
@@ -845,6 +883,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                     const auto rect=state.cells.value(key);
                     cells.append(QJsonObject{{"key",key},{"text",state.texts.value(key)},{"raw",state.rawValues.value(key)},
                         {"expectedName",state.expectedNames.value(key)},{"expectedStatus",state.expectedStatuses.value(key)},
+                        {"content",rectJson(state.contentRects.value(key))},
                         {"x",rect.x()},{"y",rect.y()},{"width",rect.width()},{"height",rect.height()}});
                 }
                 const QJsonObject report{{"phase",phase},{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"nodeCount",probeCount},
@@ -854,7 +893,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                     {"incubating",probeIncubation?probeIncubation->incubatingObjectCount():0},
                     {"width",state.viewportSize.width()},{"height",state.viewportSize.height()},
                     {"contentY",state.contentY},{"originY",state.originY},{"rows",state.rows},{"cells",state.cells.size()},
-                    {"cellStates",cells},{"rowStates",state.rowStates},{"rowIssues",state.rowIssues},
+                    {"cellStates",cells},{"rowStates",state.rowStates},{"rowIssues",state.rowIssues},{"backgroundRows",state.backgroundRows},
                     {"culledCount",state.culledRows.size()},{"culledRows",state.culledRows}};
                 qInfo().noquote()<<"NODE_PROBE_SETUP_FAILURE"<<QJsonDocument(report).toJson(QJsonDocument::Compact);
                 if(!qa.isEmpty()){
@@ -912,7 +951,7 @@ Item {
                     {"record",probeSections.get(duplicateIndex)},{"index",duplicateIndex},
                     {"x",managedRow->x()},{"y",managedRow->y()},{"z",managedRow->z()+1},{"width",managedRow->width()},{"height",managedRow->height()}}));
                 auto *duplicateRow=qobject_cast<QQuickItem *>(duplicate.get());
-                bool culledIgnored=false,visibleRejected=false,retiredRejected=false;
+                bool culledIgnored=false,boundaryIgnored=false,visibleRejected=false,retiredRejected=false;
                 negativeControl.insert("created",duplicateRow!=nullptr);
                 QStringList creationErrors;for(const auto &error:duplicateComponent.errors())creationErrors.append(error.toString());
                 negativeControl.insert("creationErrors",creationErrors.join(QStringLiteral("\n")));
@@ -932,7 +971,32 @@ Item {
                         &&sameGeometry(culledState);
                     negativeControl.insert("culledSample",culledSample);
                     check(culledIgnored,"a Qt-culled duplicate is recorded but cannot affect painted geometry");
+                    duplicateRow->setY(viewport->property("contentY").toReal()+viewport->height()-2);
                     QQuickItemPrivate::get(duplicateRow)->setCulled(false);
+                    const auto boundaryFrame=window->grabWindow();
+                    const auto boundaryState=capture();
+                    QJsonObject boundarySample;
+                    for(const auto &value:boundaryState.backgroundRows){
+                        const auto row=value.toObject();
+                        if(row.value("objectName").toString()==duplicateName){boundarySample=row;break;}
+                    }
+                    const auto boundaryTexts=boundarySample.value("textItems").toArray();
+                    bool contentOutside=boundaryTexts.size()==2;
+                    for(const auto &value:boundaryTexts){
+                        const auto text=value.toObject();
+                        const auto contentRect=text.value("content").toObject();
+                        contentOutside&=!text.value("contentVisible").toBool()&&!text.value("text").toString().isEmpty()
+                            &&contentRect.value("width").toDouble()>0&&contentRect.value("height").toDouble()>0;
+                    }
+                    const auto boundaryLayout=duplicateRow->mapRectToItem(viewport,QRectF(QPointF(),duplicateRow->size()));
+                    const auto visibleMargin=boundaryLayout.intersected(QRectF(0,0,viewport->width(),viewport->height())).height();
+                    boundaryIgnored=!boundaryFrame.isNull()&&duplicateRow->isVisible()&&!QQuickItemPrivate::get(duplicateRow)->culled
+                        &&effectiveOpacity(duplicateRow)>0.99&&boundarySample.value("key").toString()==duplicateKey
+                        &&qAbs(visibleMargin-2)<0.5&&contentOutside&&sameGeometry(boundaryState);
+                    negativeControl.insert("backgroundOnly",QJsonObject{{"sample",boundarySample},{"visibleMargin",visibleMargin},
+                        {"contentOutside",contentOutside},{"imageCaptured",!boundaryFrame.isNull()}});
+                    check(boundaryIgnored,"a nonculled Text row showing only 2 px of empty cell margin adds no visible text");
+                    duplicateRow->setY(managedRow->y());
                     const auto duplicateFrame=window->grabWindow();
                     negativeControl.insert("imageCaptured",!duplicateFrame.isNull());
                     QQuickItem *lookupRow=nullptr;
@@ -987,6 +1051,7 @@ Item {
                 duplicate.reset();
                 const bool negativeRestored=check(settleInitialLayout()&&sameGeometry(capture()),"removing the painted duplicate restores valid node geometry before probes");
                 negativeControl.insert("culledIgnored",culledIgnored);
+                negativeControl.insert("boundaryIgnored",boundaryIgnored);
                 negativeControl.insert("visibleRejected",visibleRejected);
                 negativeControl.insert("retiredRejected",retiredRejected);
                 negativeControl.insert("restored",negativeRestored);
@@ -1006,6 +1071,7 @@ Item {
                     for(const auto &key:sortedKeys)cells.append(QJsonObject{
                         {"key",key},{"beforePresent",before.cells.contains(key)},{"afterPresent",now.cells.contains(key)},
                         {"before",rectValue(before.cells.value(key))},{"after",rectValue(now.cells.value(key))},
+                        {"beforeContent",rectValue(before.contentRects.value(key))},{"afterContent",rectValue(now.contentRects.value(key))},
                         {"beforeText",before.texts.value(key)},{"afterText",now.texts.value(key)},
                         {"beforeRaw",before.rawValues.value(key)},{"afterRaw",now.rawValues.value(key)},
                         {"beforeExpectedName",before.expectedNames.value(key)},{"afterExpectedName",now.expectedNames.value(key)},
@@ -1018,6 +1084,7 @@ Item {
                         {"afterViewport",QJsonObject{{"width",now.viewportSize.width()},{"height",now.viewportSize.height()},
                             {"contentY",now.contentY},{"originY",now.originY}}},
                         {"beforeRowsState",before.rowStates},{"afterRowsState",now.rowStates},
+                        {"beforeBackgroundRows",before.backgroundRows},{"afterBackgroundRows",now.backgroundRows},
                         {"beforeCulledCount",before.culledRows.size()},{"afterCulledCount",now.culledRows.size()},
                         {"beforeCulledRows",before.culledRows},{"afterCulledRows",now.culledRows},
                         {"beforeRowIssues",before.rowIssues},{"afterRowIssues",now.rowIssues},{"cells",cells}};
@@ -1069,7 +1136,7 @@ Item {
                 qInfo()<<"NODE_PROBE_GEOMETRY"<<"cells"<<before.cells.size()<<"rows"<<before.rows
                        <<"scrollChanges"<<scrollChanges.size()<<"firstUnstableBatch"<<firstUnstableBatch
                        <<"finalStable"<<finalStable<<"renderedSamples"<<renderedSamples;
-                const QJsonObject geometryReport{{"phase",culledIgnored&&visibleRejected&&retiredRejected&&negativeRestored?"probe-workload":"negative-control"},
+                const QJsonObject geometryReport{{"phase",culledIgnored&&boundaryIgnored&&visibleRejected&&retiredRejected&&negativeRestored?"probe-workload":"negative-control"},
                     {"negativeControl",negativeControl},{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},
                     {"nodeCount",probeCount},{"renderedSamples",renderedSamples},
                     {"frameSampleSemantics","GUI geometry at queued frameSwapped delivery"},

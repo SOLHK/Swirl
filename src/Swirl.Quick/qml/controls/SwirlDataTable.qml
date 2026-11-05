@@ -44,7 +44,7 @@ Item {
         return -1
     }
     function currentPresentation(item) {
-        if(!item||!item.currentModelRow)return false
+        if(!item||!item.currentModelRow||!item.presentationKey)return false
         const index=item.delegateIndex
         // Qt parents asynchronous cache delegates to contentItem before they
         // have finished creation or joined the view's laid-out item list.
@@ -250,7 +250,9 @@ Item {
                     enabled:currentModelRow
                     z:1
                     width:list.width; height:sectionRow?table.sectionHeight:table.itemHeight
-                    property var record:table.externalModel!==null||table.incrementalRows?model.entry:modelData
+                    // Model replacement can invalidate an outgoing context
+                    // before its delegate and action loader are destroyed.
+                    property var record:(table.externalModel!==null||table.incrementalRows?model.entry:modelData)||({id:"",name:""})
                     readonly property bool sectionRow:table.sectioned&&record&&record.rowKind==="section"
                     readonly property string presentationKey:table.displayKey(record,index)
                     property bool pooled:false
@@ -272,7 +274,7 @@ Item {
                     Connections {target:SwirlMotion;function onReducedChanged(){if(SwirlMotion.reduced)recordRow.clearPresentation()}}
                     property Item titleElement:null
                     Accessible.role:sectionRow?Accessible.Button:Accessible.ListItem
-                    Accessible.selected:!sectionRow&&table.selectedId===String(record.id||record.name)
+                    Accessible.selected:!sectionRow&&!!presentationKey&&!!(record.id||record.name)&&table.selectedId===String(record.id||record.name)
                     Accessible.name:sectionRow?String(record.sectionName)+"，"+String(record.matchedCount)+"，"+(record.expanded?qsTr("已展开"):qsTr("已收起")):table.columns.map(c=>c.label+"："+table.cellText(recordRow.record,c.key)).join("，")
                     Accessible.onPressAction:table.chooseRow(recordRow,true)
                     Rectangle {
@@ -281,7 +283,7 @@ Item {
                     radius:table.minimal?Theme.dp(10):0
                     border.width:Theme.increaseContrast && table.sectioned?Theme.dp(1):0
                     border.color:Theme.text
-                    color:!recordRow.sectionRow&&table.selectedId===String(recordRow.record.id||recordRow.record.name) ? (table.minimal?(table.rowActions!==null?Theme.navigationSelected:Theme.withAlpha(Theme.accent,0.12)):Theme.selected) :
+                    color:!recordRow.sectionRow&&!!recordRow.presentationKey&&!!(recordRow.record.id||recordRow.record.name)&&table.selectedId===String(recordRow.record.id||recordRow.record.name) ? (table.minimal?(table.rowActions!==null?Theme.navigationSelected:Theme.withAlpha(Theme.accent,0.12)):Theme.selected) :
                           mouse.containsMouse ? (table.minimal?(table.rowActions!==null?Theme.hover:Theme.withAlpha(Theme.accent,0.055)):Theme.hover) : table.minimal?"transparent":(index%2?Theme.field:Theme.surface)
                     Behavior on color { enabled:!SwirlMotion.reduced;ColorAnimation { duration:SwirlMotion.hoverDuration } }
                     Rectangle { anchors.bottom:parent.bottom; width:parent.width; height:Theme.dp(1); color:Theme.border; opacity:table.fillEmptyRows||table.minimal?0:0.6 }
