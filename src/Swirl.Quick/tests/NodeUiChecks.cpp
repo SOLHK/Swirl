@@ -645,6 +645,13 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
             QVariantMap{{"id","b"},{"name",QStringLiteral("测试来源 B")}}});
         probeSections.setSource(&probeRows);
         QQmlEngine::setObjectOwnership(&probeSections,QQmlEngine::CppOwnership);
+        QObject lifecycleContext;
+        QJsonArray lifecycleWarnings;
+        QString lifecyclePhase=QStringLiteral("replace-model");
+        QObject::connect(qmlEngine(window),&QQmlEngine::warnings,&lifecycleContext,[&](const QList<QQmlError> &warnings){
+            for(const auto &warning:warnings)lifecycleWarnings.append(QJsonObject{
+                {"phase",lifecyclePhase},{"warning",warning.toString()}});
+        });
         const auto originalModel=table->property("externalModel");
         const auto originalScroll=table->property("scrollPosition");
         auto *viewport=find(table,"tableRowsViewport");
@@ -794,6 +801,8 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                         {"modelEntryKey",modelEntryKey},{"modelEntryError",modelEntry.hasError()?modelEntry.error().toString():QString()},
                         {"componentComplete",bool(renderState->componentComplete)},{"culled",false},{"pooled",row->property("pooled").toBool()},
                         {"registered",registered},{"componentReady",row->property("componentReady").toBool()},
+                        {"currentModelRow",row->property("currentModelRow").toBool()},
+                        {"sourceRecordAvailable",row->property("sourceRecordAvailable").toBool()},
                         {"rowX",row->x()},{"rowY",row->y()},{"rowWidth",row->width()},{"rowHeight",row->height()},
                         {"textTop",bounds.top()},{"textBottom",bounds.bottom()},
                         {"opacity",effectiveOpacity(row)},{"scale",row->scale()},
@@ -808,6 +817,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                         &&renderState->componentComplete&&!row->property("pooled").toBool()
                         &&!modelEntry.hasError()&&modelEntryKey==key
                         &&registered&&row->property("componentReady").toBool()
+                        &&row->property("currentModelRow").toBool()
                         &&!keys.contains(key)&&foundName&&(section||foundStatus)&&columnsSeparate
                         &&effectiveOpacity(row)>0.99&&qAbs(row->scale()-1)<0.001
                         &&qAbs(row->property("visualOffsetY").toReal())<0.25;
@@ -929,6 +939,36 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                 const auto duplicateName=QStringLiteral("nodeProbePaintedDuplicate");
                 QQuickItem *managedRow=nullptr;
                 const bool located=QMetaObject::invokeMethod(viewport,"itemAtIndex",Q_RETURN_ARG(QQuickItem *,managedRow),Q_ARG(int,duplicateIndex));
+                if(located&&managedRow){
+                    auto *actionsLoader=find(managedRow,QStringLiteral("tableRowActions"));
+                    auto *actions=actionsLoader?qvariant_cast<QObject *>(actionsLoader->property("item")):nullptr;
+                    auto *actualNodes=window->findChild<NodeViewModel *>("nodeViewModel");
+                    const auto actual=actualNodes?actualNodes->get(0):QVariantMap{};
+                    const auto savedRecord=managedRow->property("recordSnapshot");
+                    const auto clipboardBefore=QGuiApplication::clipboard()->text();
+                    QVariant allowed;
+                    const bool readyForInput=actions&&!actual.isEmpty();
+                    check(readyForInput,"stale-row action regression uses the real production action component");
+                    if(readyForInput){
+                        // Keep the registered row/index/model intact but give
+                        // it another real resource's display snapshot, as in a
+                        // stale reused context. No action may use that old ID.
+                        managedRow->setProperty("recordSnapshot",actual);
+                        const bool rejected=QMetaObject::invokeMethod(actionsLoader,"acceptsInteraction",Q_RETURN_ARG(QVariant,allowed))&&!allowed.toBool();
+                        const bool invoked=QMetaObject::invokeMethod(actions,"favoriteRequested")
+                            &&QMetaObject::invokeMethod(actions,"copyRequested");
+                        check(rejected&&invoked&&actualNodes->find(actual.value("id").toString()).value("favorite")==actual.value("favorite")
+                            &&QGuiApplication::clipboard()->text()==clipboardBefore,
+                            "stale same-model row actions cannot favorite or copy another resource");
+                        managedRow->setProperty("recordSnapshot",QVariantMap{});
+                        check(QMetaObject::invokeMethod(actionsLoader,"acceptsInteraction",Q_RETURN_ARG(QVariant,allowed))&&!allowed.toBool(),
+                            "an empty display snapshot cannot accept row actions");
+                        managedRow->setProperty("recordSnapshot",savedRecord);
+                        QGuiApplication::clipboard()->setText(clipboardBefore);
+                        check(QMetaObject::invokeMethod(actionsLoader,"acceptsInteraction",Q_RETURN_ARG(QVariant,allowed))&&allowed.toBool(),
+                            "restoring the owned row restores interaction without disabling delegate reuse");
+                    }
+                }
                 auto *content=qobject_cast<QQuickItem *>(viewport->property("contentItem").value<QObject *>());
                 QQmlComponent duplicateComponent(qmlEngine(window));
                 duplicateComponent.setData(QByteArrayLiteral(R"QML(
@@ -1155,6 +1195,7 @@ Item {
                 // These are isolated public row fixtures; protocol/cancellation
                 // execution is covered by the separate real-chain tests.
                 int dynamicBatch=0;
+                lifecyclePhase=QStringLiteral("dynamic-projection");
                 QTimer resultUpdates;
                 resultUpdates.setInterval(35);
                 QObject::connect(&resultUpdates,&QTimer::timeout,&frameCaptureContext,[&]{
@@ -1214,6 +1255,7 @@ Item {
                 resultUpdates.stop();
             }
         }
+        lifecyclePhase=QStringLiteral("restore-controller-model");
         table->setProperty("externalModel",originalModel);
         QTest::qWait(300); // Keep fixture models alive until outgoing delegates retire.
         if(viewport)viewport->setProperty("currentIndex",originalIndex);
@@ -1222,6 +1264,14 @@ Item {
         check(viewport&&viewport->property("count").toInt()==originalCount
             &&qAbs(table->property("scrollPosition").toReal()-originalScroll.toReal())<0.5,
             "real controller model and scroll position are restored after isolated probe geometry checks");
+        check(lifecycleWarnings.isEmpty(),"node model replacement, reuse and retirement produce no QML warnings");
+        const QJsonObject lifecycleReport{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},
+            {"nodeCount",probeCount},{"warnings",lifecycleWarnings}};
+        if(!lifecycleWarnings.isEmpty())qInfo().noquote()<<"NODE_PROBE_LIFECYCLE_FAILURE"<<QJsonDocument(lifecycleReport).toJson(QJsonDocument::Compact);
+        if(!qa.isEmpty()){
+            QFile report(qa+QString("/node-probe-lifecycle-%1.json").arg(probeCount));
+            if(report.open(QIODevice::WriteOnly))report.write(QJsonDocument(lifecycleReport).toJson(QJsonDocument::Indented));
+        }
     }
     for(int i=0;i<180;++i){
         auto *viewport=item("tableRowsViewport");

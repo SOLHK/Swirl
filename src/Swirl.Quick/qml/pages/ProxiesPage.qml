@@ -140,11 +140,11 @@ Item {
                             record:parent.record
                             editable:!record.sourceId&&engineController.canStart&&!page.nodeSavePending&&!page.nodeDeletePending
                             testable:!engineController.tests.busy&&/^https?:\/\/\S+$/i.test(testUrl.text.trim())
-                            onFavoriteRequested:nodes.toggleFavorite(record.id)
-                            onDetailsRequested:page.inspectRow(record)
-                            onEditRequested:page.edit(record)
-                            onTestRequested:engineController.testSelectedNode(record.id,testUrl.text.trim())
-                            onCopyRequested:nodes.copySafeInfo(record.id)
+                            onFavoriteRequested:if(parent.acceptsInteraction())nodes.toggleFavorite(record.id)
+                            onDetailsRequested:if(parent.acceptsInteraction())page.inspectRow(record)
+                            onEditRequested:if(parent.acceptsInteraction())page.edit(record)
+                            onTestRequested:if(parent.acceptsInteraction())engineController.testSelectedNode(record.id,testUrl.text.trim())
+                            onCopyRequested:if(parent.acceptsInteraction())nodes.copySafeInfo(record.id)
                         }
                     }
                     anchors.fill:parent;anchors.margins:Theme.dp(6);externalModel:sections;selectedId:page.focusedId

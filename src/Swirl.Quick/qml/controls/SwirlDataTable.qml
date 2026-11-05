@@ -244,15 +244,34 @@ Item {
                     // Removed delegates can remain visible until the next model
                     // polish. Their retired contexts must not receive input.
                     property bool componentReady:false
-                    Component.onCompleted:componentReady=true
+                    property var recordModel:null
+                    Component.onCompleted:{recordModel=table.externalModel;refreshRecord();componentReady=true}
                     readonly property int delegateIndex:index
                     readonly property bool currentModelRow:componentReady&&delegateIndex>=0&&!pooled
+                        &&sourceRecordAvailable&&recordModel===table.externalModel
                     enabled:currentModelRow
                     z:1
                     width:list.width; height:sectionRow?table.sectionHeight:table.itemHeight
-                    // Model replacement can invalidate an outgoing context
-                    // before its delegate and action loader are destroyed.
-                    property var record:(table.externalModel!==null||table.incrementalRows?model.entry:modelData)||({id:"",name:""})
+                    // A revoked role can outlive its model while Qt retires the
+                    // delegate. Preserve only its last display value for exit
+                    // motion; never bind children to that transient undefined.
+                    property var recordSnapshot:({})
+                    readonly property var record:recordSnapshot
+                    readonly property var sourceRecord:{
+                        if(delegateIndex<0)return null
+                        return table.externalModel!==null||table.incrementalRows
+                            ? (typeof model!=="undefined"&&model?model.entry:null)
+                            : (typeof modelData!=="undefined"?modelData:null)
+                    }
+                    readonly property bool sourceRecordAvailable:sourceRecord!==undefined&&sourceRecord!==null
+                    function refreshRecord(){
+                        const source=sourceRecord
+                        if(source===undefined||source===null||(componentReady&&recordModel!==table.externalModel))return
+                        const snapshot={}
+                        for(const key of Object.keys(source))snapshot[key]=source[key]
+                        recordSnapshot=snapshot
+                    }
+                    onSourceRecordChanged:refreshRecord()
                     readonly property bool sectionRow:table.sectioned&&record&&record.rowKind==="section"
                     readonly property string presentationKey:table.displayKey(record,index)
                     property bool pooled:false
@@ -268,11 +287,19 @@ Item {
                     function presentFrom(offset){positionShift.stop();visualOffsetY=offset;if(Math.abs(offset)>0.25){positionShift.to=0;positionShift.start()}else visualOffsetY=0}
                     SmoothedAnimation {id:positionShift;target:recordRow;property:"visualOffsetY";to:0;duration:SwirlMotion.duration;velocity:-1}
                     onPresentationKeyChanged:{clearPresentation();if(table.selectedItem===recordRow)table.selectedItem=null}
+                    onCurrentModelRowChanged:if(componentReady&&!currentModelRow){
+                        // Closing detached popups must not reset opacity/scale
+                        // and interrupt the outgoing row's removal transition.
+                        if(contextMenu)contextMenu.close()
+                        if(actionsLoader.item&&actionsLoader.item.closeMenu)actionsLoader.item.closeMenu()
+                        if(table.selectedItem===recordRow)table.selectedItem=null
+                    }
                     onVisibleChanged:if(!visible)clearPresentation()
                     ListView.onPooled:{pooled=true;clearPresentation();if(table.selectedItem===recordRow)table.selectedItem=null}
-                    ListView.onReused:{pooled=false;clearPresentation()}
+                    ListView.onReused:{recordModel=table.externalModel;refreshRecord();pooled=false;clearPresentation()}
                     Connections {target:SwirlMotion;function onReducedChanged(){if(SwirlMotion.reduced)recordRow.clearPresentation()}}
                     property Item titleElement:null
+                    Accessible.ignored:!currentModelRow
                     Accessible.role:sectionRow?Accessible.Button:Accessible.ListItem
                     Accessible.selected:!sectionRow&&!!presentationKey&&!!(record.id||record.name)&&table.selectedId===String(record.id||record.name)
                     Accessible.name:sectionRow?String(record.sectionName)+"，"+String(record.matchedCount)+"，"+(record.expanded?qsTr("已展开"):qsTr("已收起")):table.columns.map(c=>c.label+"："+table.cellText(recordRow.record,c.key)).join("，")
@@ -341,11 +368,12 @@ Item {
                         cursorShape:Qt.PointingHandCursor
                         acceptedButtons:Qt.LeftButton|Qt.RightButton
                         onClicked:function(event){
+                            if(!table.currentPresentation(recordRow))return
                             list.forceActiveFocus();list.currentIndex=index
                             table.chooseRow(recordRow,event.button===Qt.LeftButton&&(recordRow.sectionRow||table.activateOnSingleClick))
                             if(event.button===Qt.RightButton&&!recordRow.sectionRow){if(actionsLoader.item&&actionsLoader.item.openMenu)actionsLoader.item.openMenu();else contextMenu.showAt(mouse,event.x,event.y)}
                         }
-                        onDoubleClicked:if(!recordRow.sectionRow){if(table.activateOnSingleClick)table.rowEdited(recordRow.record,recordRow);else table.chooseRow(recordRow,true)}
+                        onDoubleClicked:if(!recordRow.sectionRow&&table.currentPresentation(recordRow)){if(table.activateOnSingleClick)table.rowEdited(recordRow.record,recordRow);else table.chooseRow(recordRow,true)}
                         SwirlContextMenu {
                             id:contextMenu
                             parent:mouse
@@ -356,10 +384,12 @@ Item {
                     }
                     Loader {
                         id:actionsLoader
+                        objectName:"tableRowActions"
                         z:2; anchors.right:parent.right; width:table.actionWidth; height:parent.height
                         active:!recordRow.sectionRow&&!recordRow.pooled&&table.rowActions!==null
                         sourceComponent:table.rowActions
                         readonly property var record:recordRow.record
+                        function acceptsInteraction(){return table.currentPresentation(recordRow)}
                     }
                     }
                 }
