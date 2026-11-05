@@ -54,6 +54,17 @@ jobs:
           path: ${{ runner.temp }}/swirl-proxy-compat
           if-no-files-found: error
           retention-days: 14
+      - name: VMess official peer HTTP HTTPS and transport lifecycle
+        working-directory: .
+        run: python tools/tests/run_vmess_ci_acceptance.py --evidence "${{ runner.temp }}/swirl-vmess-acceptance"
+      - name: Preserve current VMess official peer evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-VMess-Acceptance-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-vmess-acceptance
+          if-no-files-found: error
+          retention-days: 14
       - name: Independent portable protocol peers
         run: |
           python -m pip install cryptography==50.0.2
@@ -83,17 +94,6 @@ jobs:
           python ../tools/tests/test_connectivity_diagnostics.py
           python ../tools/tests/test_subscription_import.py
           python ../tools/tests/test_socks5_udp.py
-      - name: VMess official peer HTTP HTTPS and transport lifecycle
-        working-directory: .
-        run: python tools/tests/run_vmess_ci_acceptance.py --evidence "${{ runner.temp }}/swirl-vmess-acceptance"
-      - name: Preserve current VMess official peer evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: Swirl-VMess-Acceptance-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/swirl-vmess-acceptance
-          if-no-files-found: error
-          retention-days: 14
       - name: Subscription to native proxy and target
         working-directory: .
         shell: bash
@@ -432,6 +432,17 @@ jobs:
           path: ${{ runner.temp }}/swirl-proxy-compat
           if-no-files-found: error
           retention-days: 14
+      - name: VMess official peer HTTP HTTPS and transport lifecycle
+        working-directory: .
+        run: python tools/tests/run_vmess_ci_acceptance.py --evidence "${{ runner.temp }}/swirl-vmess-acceptance"
+      - name: Preserve current VMess official peer evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-VMess-Acceptance-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-vmess-acceptance
+          if-no-files-found: error
+          retention-days: 14
       - name: Independent TLS and protocol peers
         id: independent_windows_peers
         shell: pwsh
@@ -502,17 +513,6 @@ jobs:
           # Keep local endpoint/state/PID evidence without process command lines.
           Get-NetTCPConnection -ErrorAction Continue | Sort-Object LocalPort,LocalAddress | Select-Object LocalAddress,LocalPort,State,OwningProcess | Format-Table -AutoSize
           Get-NetUDPEndpoint -ErrorAction Continue | Sort-Object LocalPort,LocalAddress | Select-Object LocalAddress,LocalPort,OwningProcess | Format-Table -AutoSize
-      - name: VMess official peer HTTP HTTPS and transport lifecycle
-        working-directory: .
-        run: python tools/tests/run_vmess_ci_acceptance.py --evidence "${{ runner.temp }}/swirl-vmess-acceptance"
-      - name: Preserve current VMess official peer evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: Swirl-VMess-Acceptance-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/swirl-vmess-acceptance
-          if-no-files-found: error
-          retention-days: 14
       - name: Subscription to native proxy and target
         working-directory: .
         shell: pwsh
