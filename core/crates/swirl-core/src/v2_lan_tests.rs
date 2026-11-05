@@ -182,22 +182,26 @@ fn config(nodes: Vec<Node>, selected: &str) -> RuntimeConfig {
 
 fn fixture_ip() -> IpAddr {
     if cfg!(target_os = "macos") {
-        "127.0.0.1"
+        "127.0.0.1".parse().unwrap()
     } else {
-        "127.0.0.2"
+        // These hosts route all of 127/8 to loopback. Give each fixture its
+        // own bind address: ports selected and then released during setup
+        // must not be claimed by another parallel LAN fixture on that address.
+        static NEXT: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(1);
+        let [high, low] = NEXT.fetch_add(1, Ordering::Relaxed).to_be_bytes();
+        std::net::Ipv4Addr::new(127, 64, high, low).into()
     }
-    .parse()
-    .unwrap()
 }
 
 fn lan_config(separate: bool) -> LanConfig {
-    let address = SocketAddr::new(fixture_ip(), 0);
+    let listen_ip = fixture_ip();
+    let address = SocketAddr::new(listen_ip, 0);
     let http = StdListener::bind(address).unwrap();
     let socks = StdListener::bind(address).unwrap();
     let udp = StdUdpSocket::bind(address).unwrap();
     let udp_port = udp.local_addr().unwrap().port();
     LanConfig {
-        listen_ip: fixture_ip(),
+        listen_ip,
         http_port: http.local_addr().unwrap().port(),
         socks_port: if separate {
             socks.local_addr().unwrap().port()
@@ -215,7 +219,7 @@ fn lan_config(separate: bool) -> LanConfig {
         max_connections_per_client: 8,
         auth_failures_per_minute: 5,
         idle_timeout_secs: 60,
-        host_addresses: vec![fixture_ip()],
+        host_addresses: vec![listen_ip],
     }
 }
 
@@ -641,7 +645,7 @@ fn authenticated_udp_is_bound_to_local_interface_pinned_bounded_and_released() {
     control.write_all(&request).unwrap();
     let mut response = [0; 10];
     control.read_exact(&mut response).unwrap();
-    let IpAddr::V4(local_ip) = fixture_ip() else {
+    let IpAddr::V4(local_ip) = lan.listen_ip else {
         unreachable!()
     };
     assert_eq!(&response[..4], &[5, 0, 0, 1]);
@@ -840,7 +844,12 @@ fn direct_and_rule_modes_use_real_dual_stack_tcp_and_udp_targets() {
             drop(tcp_client);
             core.lan_stop().unwrap();
             assert_eq!(core.lan_status().unwrap()["active_connections"], 0);
-            assert!(StdUdpSocket::bind(relay).is_ok());
+            let rebound = StdUdpSocket::bind(relay);
+            assert!(
+                rebound.is_ok(),
+                "released relay {relay}: {:?}",
+                rebound.err()
+            );
             core.stop();
         }
     }
@@ -1827,6 +1836,11 @@ fn simultaneous_udp_clients_have_distinct_relays_and_cannot_cross_associations()
         control.write_all(&request).unwrap();
         let mut response = [0; 10];
         control.read_exact(&mut response).unwrap();
+        if response[1] != 0 {
+            // The reply is written before the session publishes its error.
+            // Preserve that cause without retrying or accepting a failed bind.
+            wait(|| core.lan_status().unwrap()["last_error"] != "");
+        }
         assert_eq!(
             response[1],
             0,
