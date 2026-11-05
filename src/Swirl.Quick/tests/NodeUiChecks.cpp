@@ -18,6 +18,7 @@
 #include <QQmlProperty>
 #include <QTest>
 #include <QTimer>
+#include <QElapsedTimer>
 #include <QSignalSpy>
 #include <QClipboard>
 #include <QGuiApplication>
@@ -1191,6 +1192,185 @@ Item {
                     if(report.open(QIODevice::WriteOnly))report.write(QJsonDocument(geometryReport).toJson(QJsonDocument::Indented));
                     window->grabWindow().save(qa+"/nodes-probe-status-updates"+suffix+".png");
                 }
+                // Transitional text safety is independent of settled identity,
+                // opacity, scale and position. Inspect every paintable row,
+                // including unregistered removal delegates, without treating
+                // ordinary animation values as failures.
+                struct TransitionText {
+                    qint64 instance=0;
+                    QString key,id,text;
+                    QRectF rect;
+                    int index=-1;
+                    qreal opacity=0,offset=0,scale=1;
+                    bool registered=false,retired=false;
+                };
+                struct TransitionTrace {
+                    QString scenario;
+                    bool active=false;
+                    int samples=0,frames=0,ticks=0,populated=0,retired=0,moving=0,fading=0,fixture=0,controller=0;
+                    QJsonObject firstOverlap;
+                } transition;
+                QHash<QQuickItem *,qint64> transitionInstances;
+                qint64 nextTransitionInstance=0;
+                QElapsedTimer transitionClock;
+                QObject transitionContext;
+                QTimer transitionTicks;
+                transitionTicks.setInterval(8);transitionTicks.setTimerType(Qt::PreciseTimer);
+                const auto objectValue=[](const QVariant &value){return value.metaType()==QMetaType::fromType<QJSValue>()
+                    ?value.value<QJSValue>().toQObject():qvariant_cast<QObject *>(value);};
+                const auto sampleTransition=[&](const char *origin){
+                    if(!transition.active)return;
+                    ++transition.samples;
+                    if(qstrcmp(origin,"frame-notification")==0)++transition.frames;
+                    if(qstrcmp(origin,"timer")==0)++transition.ticks;
+                    auto *content=objectValue(viewport->property("contentItem"));
+                    auto *contentItem=qobject_cast<QQuickItem *>(content);
+                    if(!contentItem)return;
+                    const QRectF clip(0,0,viewport->width(),viewport->height());
+                    QList<TransitionText> texts;
+                    bool sawRetired=false,sawMoving=false,sawFading=false;
+                    for(auto *row:contentItem->childItems()){
+                        if(row->metaObject()->indexOfProperty("record")<0||!row->isVisible()
+                            ||QQuickItemPrivate::get(row)->culled||effectiveOpacity(row)<0.01)continue;
+                        const auto value=row->property("record");
+                        const auto record=value.metaType()==QMetaType::fromType<QJSValue>()?value.value<QJSValue>().toVariant().toMap():value.toMap();
+                        auto instance=transitionInstances.value(row);
+                        if(!instance){instance=++nextTransitionInstance;transitionInstances.insert(row,instance);}
+                        const int index=row->property("delegateIndex").toInt();
+                        QQuickItem *registeredRow=nullptr;
+                        const bool registered=QMetaObject::invokeMethod(viewport,"itemAtIndex",
+                            Q_RETURN_ARG(QQuickItem *,registeredRow),Q_ARG(int,index))&&registeredRow==row;
+                        const bool retired=!registered||!row->property("currentModelRow").toBool();
+                        const qreal offset=row->property("visualOffsetY").toReal();
+                        const bool section=record.value("rowKind")=="section";
+                        std::function<void(QQuickItem *)> collect;
+                        collect=[&](QQuickItem *child){
+                            const auto opacity=effectiveOpacity(child);
+                            if(!child->isVisible()||QQuickItemPrivate::get(child)->culled||opacity<0.01)return;
+                            if(child->inherits("QQuickText")&&(section||child->property("raw").isValid())){
+                                const auto text=child->property("text").toString();
+                                auto rect=child->mapRectToItem(viewport,child->boundingRect()).intersected(clip);
+                                for(auto *ancestor=child;ancestor&&ancestor!=viewport;ancestor=ancestor->parentItem())
+                                    if(ancestor->clip())rect=rect.intersected(ancestor->mapRectToItem(viewport,QRectF(QPointF(),ancestor->size())));
+                                if(!text.isEmpty()&&!rect.isEmpty()){
+                                    texts.append(TransitionText{instance,record.value("displayKey").toString(),record.value("id").toString(),text,
+                                        rect,index,opacity,offset,row->scale(),registered,retired});
+                                    sawRetired|=retired;sawMoving|=!retired&&qAbs(offset)>0.25;
+                                    sawFading|=opacity<0.99||qAbs(row->scale()-1)>0.001;
+                                }
+                            }
+                            for(auto *childItem:child->childItems())collect(childItem);
+                        };
+                        collect(row);
+                    }
+                    if(texts.size()>=2){
+                        ++transition.populated;
+                        auto *model=objectValue(table->property("externalModel"));
+                        if(model==&probeSections)++transition.fixture;
+                        if(model==objectValue(originalModel))++transition.controller;
+                    }
+                    if(sawRetired)++transition.retired;
+                    if(sawMoving)++transition.moving;
+                    if(sawFading)++transition.fading;
+                    if(!transition.firstOverlap.isEmpty())return;
+                    const auto describe=[&](const TransitionText &text){return QJsonObject{
+                        {"instance",text.instance},{"key",text.key},{"id",text.id},{"text",text.text},
+                        {"delegateIndex",text.index},{"registered",text.registered},{"retired",text.retired},
+                        {"opacity",text.opacity},{"visualOffsetY",text.offset},{"scale",text.scale},{"content",rectJson(text.rect)}};};
+                    for(int a=0;a<texts.size();++a)for(int b=a+1;b<texts.size();++b){
+                        if(texts[a].instance==texts[b].instance)continue;
+                        const auto overlap=texts[a].rect.intersected(texts[b].rect);
+                        if(overlap.width()>0.5&&overlap.height()>0.5){
+                            transition.firstOverlap={{"elapsedMs",transitionClock.elapsed()},{"sample",QString::fromLatin1(origin)},
+                                {"first",describe(texts[a])},{"second",describe(texts[b])},{"intersection",rectJson(overlap)}};
+                            return;
+                        }
+                    }
+                };
+                QObject::connect(&transitionTicks,&QTimer::timeout,&transitionContext,[&]{sampleTransition("timer");});
+                const auto transitionFrames=QObject::connect(window,&QQuickWindow::frameSwapped,&transitionContext,
+                    [&]{sampleTransition("frame-notification");},Qt::QueuedConnection);
+                const auto beginTransition=[&](const QString &scenario){
+                    transition=TransitionTrace{};transition.scenario=scenario;transition.active=true;
+                    transitionInstances.clear();nextTransitionInstance=0;
+                    transitionClock.start();sampleTransition("before-change");transitionTicks.start();
+                };
+                const auto finishTransition=[&](bool requireRetirement,bool requireBothModels){
+                    sampleTransition("after-settle");transitionTicks.stop();transition.active=false;
+                    const bool observed=transition.frames>0&&transition.ticks>0&&transition.populated>2
+                        &&(!requireRetirement||(transition.retired>0&&transition.moving>0))
+                        &&(!requireBothModels||(transition.fixture>0&&transition.controller>0));
+                    check(observed,"transition sampling observes real frames and the required visible lifecycle states");
+                    check(transition.firstOverlap.isEmpty(),"visible text from distinct row instances never overlaps during structural transitions");
+                    const QJsonObject report{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"nodeCount",probeCount},
+                        {"scenario",transition.scenario},{"sampleSemantics","GUI text geometry at timer or queued frameSwapped delivery; not GPU frame reconstruction"},
+                        {"samples",transition.samples},{"frameSamples",transition.frames},{"timerSamples",transition.ticks},
+                        {"populatedSamples",transition.populated},{"retiredSamples",transition.retired},{"movingSamples",transition.moving},
+                        {"fadingSamples",transition.fading},{"fixtureSamples",transition.fixture},{"controllerSamples",transition.controller},
+                        {"observed",observed},{"firstOverlap",transition.firstOverlap}};
+                    qInfo().noquote()<<"NODE_PROBE_TRANSITION"<<QJsonDocument(report).toJson(QJsonDocument::Compact);
+                    if(!qa.isEmpty()){
+                        QFile file(qa+QString("/node-probe-transition-%1-%2.json").arg(transition.scenario).arg(probeCount));
+                        if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(report).toJson(QJsonDocument::Indented));
+                    }
+                };
+                const auto waitProjection=[&](const QString &phase,const char *label){
+                    QJsonObject firstUnsettled;
+                    const bool completed=QTest::qWaitFor([&]{
+                        const bool ready=settled();
+                        if(!ready&&firstUnsettled.isEmpty())firstUnsettled=geometryEvidence(capture());
+                        return ready;
+                    },3500);
+                    if(!check(completed,label)){
+                        const QJsonObject report{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"nodeCount",probeCount},{"phase",phase},
+                            {"sampleSemantics","GUI geometry; first unsettled sample is diagnostic and does not by itself fail a transition"},
+                            {"firstUnsettled",firstUnsettled},{"finalGeometry",geometryEvidence(capture())}};
+                        qInfo().noquote()<<"NODE_PROBE_PROJECTION_FAILURE"<<QJsonDocument(report).toJson(QJsonDocument::Compact);
+                        if(!qa.isEmpty()){
+                            const auto base=qa+QString("/node-probe-projection-%1-%2").arg(phase).arg(probeCount);
+                            QFile file(base+".json");if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(report).toJson(QJsonDocument::Indented));
+                            window->grabWindow().save(base+"-after-failure.png");
+                        }
+                    }
+                    return completed;
+                };
+                // Prove this independent transition sampler detects the exact
+                // inserted Qt Text instance, not merely an unrelated failure.
+                QQuickItem *overlapTarget=nullptr;
+                const int overlapIndex=probeSections.indexOfNode("probe-ui-0");
+                QMetaObject::invokeMethod(viewport,"itemAtIndex",Q_RETURN_ARG(QQuickItem *,overlapTarget),Q_ARG(int,overlapIndex));
+                beginTransition(QStringLiteral("sampler-negative-control"));
+                const bool cleanTransitionBaseline=transition.firstOverlap.isEmpty();
+                std::unique_ptr<QObject> overlapFixture;
+                if(overlapTarget&&content)overlapFixture.reset(duplicateComponent.createWithInitialProperties({
+                    {"record",probeSections.get(overlapIndex)},{"index",overlapIndex},
+                    {"x",overlapTarget->x()},{"y",overlapTarget->y()},{"z",overlapTarget->z()+1},
+                    {"width",overlapTarget->width()},{"height",overlapTarget->height()}}));
+                auto *overlapRow=qobject_cast<QQuickItem *>(overlapFixture.get());
+                bool exactOverlapDetected=false;
+                if(overlapRow){
+                    QQmlEngine::setObjectOwnership(overlapRow,QQmlEngine::CppOwnership);
+                    overlapRow->setParentItem(content);QQuickItemPrivate::get(overlapRow)->setCulled(false);
+                    const auto observedFrame=window->grabWindow();
+                    sampleTransition("negative-control");
+                    const auto first=transition.firstOverlap.value("first").toObject().value("instance").toInteger();
+                    const auto second=transition.firstOverlap.value("second").toObject().value("instance").toInteger();
+                    const auto inserted=transitionInstances.value(overlapRow),owned=transitionInstances.value(overlapTarget);
+                    exactOverlapDetected=!observedFrame.isNull()&&inserted>0&&owned>0&&inserted!=owned
+                        &&((first==inserted&&second==owned)||(first==owned&&second==inserted));
+                }
+                transitionTicks.stop();transition.active=false;
+                check(cleanTransitionBaseline&&exactOverlapDetected,"transition sampler rejects a real overlapping Text duplicate with distinct row instances");
+                const QJsonObject transitionControl{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"nodeCount",probeCount},
+                    {"sampleSemantics","GUI text geometry; this deliberate duplicate is a sampler negative control"},
+                    {"baselineClear",cleanTransitionBaseline},{"exactOverlapDetected",exactOverlapDetected},{"firstOverlap",transition.firstOverlap}};
+                qInfo().noquote()<<"NODE_PROBE_TRANSITION_NEGATIVE_CONTROL"<<QJsonDocument(transitionControl).toJson(QJsonDocument::Compact);
+                if(!qa.isEmpty()){
+                    QFile file(qa+QString("/node-probe-transition-negative-control-%1.json").arg(probeCount));
+                    if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(transitionControl).toJson(QJsonDocument::Indented));
+                }
+                overlapFixture.reset();transition=TransitionTrace{};transitionInstances.clear();
+                check(QTest::qWaitFor(settled,3500),"removing the transition negative control restores the unchanged steady geometry gate");
                 // Continue result traffic while the user changes the view.
                 // These are isolated public row fixtures; protocol/cancellation
                 // execution is covered by the separate real-chain tests.
@@ -1236,23 +1416,47 @@ Item {
                 probeRows.setFilters({{"sourceKind","subscription"},{"sort","name"},{"descending",true}});
                 QTest::qWait(35);
                 check(QTest::qWaitFor(settled,3500),"real node reordering still settles into unique, ordered, nonoverlapping rendered labels");
+                QMetaObject::invokeMethod(viewport,"positionViewAtIndex",
+                    Q_ARG(int,probeSections.rowForDisplayKey("section:subscription:a")),Q_ARG(int,0));
+                QMetaObject::invokeMethod(viewport,"forceLayout");
+                const bool transitionReady=waitProjection(QStringLiteral("before-collapse"),"visible source rows settle before transitional text sampling");
+                bool sourceVisible=false;
+                for(const auto &value:capture().rowStates){
+                    const auto key=value.toObject().value("key").toString();
+                    sourceVisible|=key=="node:probe-ui-0"||key=="node:probe-ui-1"||key=="node:probe-ui-2";
+                }
+                check(transitionReady&&sourceVisible,"collapse transition removes actual visible source-a text instead of offscreen rows");
+                beginTransition(QStringLiteral("collapse-sort"));
                 probeSections.toggleSection("subscription:a");
                 // Interrupt removal with another real projection to exercise
                 // retired delegate handling while exit motion is still active.
                 QTest::qWait(20);
                 probeRows.setFilters({{"sourceKind","subscription"},{"sort","name"}});
                 QTest::qWait(35);
-                check(QTest::qWaitFor(settled,3500),"collapse followed by reorder leaves no retired labels over live node rows");
+                waitProjection(QStringLiteral("collapse-sort"),"collapse followed by reorder leaves no retired labels over live node rows");
+                finishTransition(true,false);
                 probeSections.toggleSection("subscription:a");
                 check(QTest::qWaitFor(settled,3500),"expanding a source during probe results preserves complete row geometry");
                 probeRows.setFilters({{"sourceKind","subscription"},{"sort","name"},{"protocol","trojan"}});
-                check(QTest::qWaitFor(settled,3500),"protocol filtering during probe results preserves rendered row identities");
+                waitProjection(QStringLiteral("protocol-filter"),"protocol filtering during probe results preserves rendered row identities");
                 probeRows.setFilters({{"sourceKind","subscription"},{"sort","name"}});
                 probeValues.removeLast();probeValues.removeAt(1);probeRows.updateRows(probeValues);
                 QTest::qWait(20);
                 probeRows.setFilters({{"sourceKind","subscription"},{"sort","name"},{"descending",true}});
-                check(QTest::qWaitFor(settled,3500),"node removal interrupted by sorting during results leaves no stale rendered labels");
+                waitProjection(QStringLiteral("remove-sort"),"node removal interrupted by sorting during results leaves no stale rendered labels");
                 resultUpdates.stop();
+                lifecyclePhase=QStringLiteral("model-replacement-transition");
+                beginTransition(QStringLiteral("model-replace-restore"));
+                table->setProperty("externalModel",originalModel);
+                check(QTest::qWaitFor([&]{return viewport->property("count").toInt()==originalCount&&transition.controller>0;},3500),
+                    "replacement model produces visible text while transition sampling is active");
+                table->setProperty("externalModel",QVariant::fromValue(static_cast<QObject *>(&probeSections)));
+                QMetaObject::invokeMethod(viewport,"forceLayout");
+                waitProjection(QStringLiteral("model-restore"),"fixture model is restored with stable row identities after transition sampling");
+                // setModel() clears old Qt delegates; this path must observe
+                // both models, but it need not paint an outgoing delegate.
+                finishTransition(false,true);
+                QObject::disconnect(transitionFrames);
             }
         }
         lifecyclePhase=QStringLiteral("restore-controller-model");
