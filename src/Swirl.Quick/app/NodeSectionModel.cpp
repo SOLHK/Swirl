@@ -181,29 +181,28 @@ void NodeSectionModel::rebuild() {
             return displayKey(left)==displayKey(right);
         }));
     const QPointer<NodeSectionModel> guard(this);
-    if(projectionChanges&&m_projectionDelayMs>0&&!m_rows.isEmpty()) {
+    if(projectionChanges) {
+        const bool delayed=m_projectionDelayMs>0&&!m_rows.isEmpty();
+        // Even a zero-delay projection must own its latest snapshot before
+        // notifying observers. A callback can change the source/filter while
+        // aboutToSync or projectionCommitting is being delivered.
         m_pendingRows=std::move(next);m_projectionPending=true;++m_pendingVersion;
-        m_projectionTimer.start(m_projectionDelayMs);
+        if(delayed)m_projectionTimer.start(m_projectionDelayMs);
         m_notifyingProjection=true;
         emit aboutToSync();
         if(!guard)return;
-        m_notifyingProjection=false;
         emit projectionPendingChanged();
         if(!guard)return;
-        if(m_flushRequested||!m_projectionDelayMs){m_flushRequested=false;commitPendingProjection();}
-        if(guard)emit this->changed();
+        m_notifyingProjection=false;
+        if(!delayed||m_flushRequested||!m_projectionDelayMs) {
+            m_flushRequested=false;
+            commitPendingProjection();
+        } else emit this->changed();
         return;
-    }
-    if(projectionChanges) {
-        emit aboutToSync();
-        if(!guard)return;
-        emit projectionCommitting();
-        if(!guard)return;
     }
     if(rowChanges)syncRows(next);
     if(!guard)return;
-    if(projectionChanges)emit synced();
-    if(guard)emit this->changed();
+    emit this->changed();
 }
 
 void NodeSectionModel::commitPendingProjection() {

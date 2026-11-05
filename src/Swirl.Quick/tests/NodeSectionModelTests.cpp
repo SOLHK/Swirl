@@ -127,6 +127,69 @@ private slots:
         for(int iteration=0;iteration<20;++iteration)source.updateRows(rows);
         model.setProviders({});QCOMPARE(about.size(),0);QCOMPARE(synced.size(),0);QCOMPARE(changed.size(),0);
     }
+    void synchronousProjectionCommitsLatestReentrantQuery() {
+        NodeViewModel source;source.updateRows({node("a","Alpha"),node("b","Beta"),node("c","Gamma")});
+        NodeSectionModel model;model.setSource(&source);
+        QAbstractItemModelTester tester(&model,QAbstractItemModelTester::FailureReportingMode::QtTest);
+        QCOMPARE(model.projectionDelayMs(),0);
+        QSignalSpy about(&model,&NodeSectionModel::aboutToSync),committing(&model,&NodeSectionModel::projectionCommitting),
+            synced(&model,&NodeSectionModel::synced);
+        bool retargeted=false;
+        connect(&model,&NodeSectionModel::projectionCommitting,&model,[&]{
+            if(!retargeted){retargeted=true;source.setQuery("Gamma");}
+        });
+        source.setQuery("Beta");
+        // No event-loop turn is needed when reentry precedes row mutation.
+        QVERIFY(retargeted);QVERIFY(!model.projectionPending());QCOMPARE(source.query(),QString("Gamma"));
+        QCOMPARE(model.nodeIds(),QStringList({"c"}));QCOMPARE(keys(model),QStringList({"section:manual","node:c"}));
+        QCOMPARE(model.get(1).value("id").toString(),QString("c"));QCOMPARE(model.indexOfNode("b"),-1);
+        QCOMPARE(about.size(),1);QCOMPARE(committing.size(),1);QCOMPARE(synced.size(),1);
+    }
+    void firstFillCommitsLatestReentrantSourceSynchronously() {
+        NodeViewModel first,latest;first.updateRows({node("b","Beta")});latest.updateRows({node("c","Gamma")});
+        NodeSectionModel model;model.setProjectionDelayMs(80);
+        QAbstractItemModelTester tester(&model,QAbstractItemModelTester::FailureReportingMode::QtTest);
+        QSignalSpy about(&model,&NodeSectionModel::aboutToSync),synced(&model,&NodeSectionModel::synced);
+        bool replaced=false;
+        connect(&model,&NodeSectionModel::projectionCommitting,&model,[&]{
+            if(!replaced){replaced=true;model.setSource(&latest);}
+        });
+        model.setSource(&first);
+        QVERIFY(replaced);QVERIFY(!model.projectionPending());QCOMPARE(model.source(),&latest);
+        QCOMPARE(model.nodeIds(),QStringList({"c"}));QCOMPARE(keys(model),QStringList({"section:manual","node:c"}));
+        QCOMPARE(about.size(),1);QCOMPARE(synced.size(),1);
+        QTest::qWait(100);QCOMPARE(synced.size(),1);
+    }
+    void synchronousRowNotificationReentryWaitsForLatestCommit() {
+        NodeViewModel source;source.updateRows({node("a","Alpha"),node("b","Beta"),node("c","Gamma")});
+        NodeSectionModel model;model.setSource(&source);
+        QAbstractItemModelTester tester(&model,QAbstractItemModelTester::FailureReportingMode::QtTest);
+        QSignalSpy about(&model,&NodeSectionModel::aboutToSync),committing(&model,&NodeSectionModel::projectionCommitting),
+            synced(&model,&NodeSectionModel::synced);
+        bool retargeted=false,hidden=false,notificationsProtected=true;
+        int transactionDepth=0,maximumDepth=0;
+        connect(&model,&NodeSectionModel::projectionCommitting,&model,[&]{hidden=true;});
+        connect(&model,&NodeSectionModel::synced,&model,[&]{hidden=false;});
+        connect(&model,&QAbstractItemModel::rowsAboutToBeRemoved,&model,[&]{
+            maximumDepth=std::max(maximumDepth,++transactionDepth);
+            notificationsProtected&=model.projectionPending()&&hidden;
+            if(!retargeted){retargeted=true;source.setQuery("Gamma");}
+        });
+        connect(&model,&QAbstractItemModel::rowsRemoved,&model,[&]{
+            notificationsProtected&=model.projectionPending()&&hidden;
+            --transactionDepth;
+        });
+        source.setQuery("Beta");
+        // Finish the current Qt transaction before applying the new snapshot.
+        // The view remains hidden/pending; it must not receive an early synced.
+        QVERIFY(retargeted);QVERIFY(model.projectionPending());QVERIFY(hidden);
+        QCOMPARE(model.nodeIds(),QStringList({"c"}));QCOMPARE(model.get(1).value("id").toString(),QString("b"));
+        QCOMPARE(synced.size(),0);QCOMPARE(transactionDepth,0);QCOMPARE(maximumDepth,1);
+        QVERIFY(QTest::qWaitFor([&]{return !model.projectionPending();},1000));
+        QVERIFY(notificationsProtected);QVERIFY(!hidden);QCOMPARE(transactionDepth,0);QCOMPARE(maximumDepth,1);
+        QCOMPARE(keys(model),QStringList({"section:manual","node:c"}));QCOMPARE(model.nodeIds(),QStringList({"c"}));
+        QCOMPARE(about.size(),1);QCOMPARE(committing.size(),2);QCOMPARE(synced.size(),1);
+    }
     void stagedProjectionPreservesDisplaySnapshotAndLogicalSelection() {
         NodeViewModel source;QVariantList rows{node("a","Alpha"),node("b","Beta"),node("c","Gamma")};
         source.updateRows(rows);NodeSectionModel model;model.setSource(&source);

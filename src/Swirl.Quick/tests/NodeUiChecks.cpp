@@ -20,6 +20,7 @@
 #include <QTimer>
 #include <QElapsedTimer>
 #include <QSignalSpy>
+#include <QScopeGuard>
 #include <QClipboard>
 #include <QGuiApplication>
 #include <QDir>
@@ -600,7 +601,22 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     for(int i=0;i<180;++i)batch+=QString("  - {name: 'Node %1 long readable name', type: http, server: 127.0.0.1, port: %2}\n").arg(i,3,10,QChar('0')).arg(26000+i);
     controller->imports()->importText(batch);
     check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->nodes().size()==180,"180-node fixture imported");
-    eval("AppState.navigate('proxies');Theme.reduceMotion=false");QTest::qWait(400);
+    const bool savedReduceMotion=eval("Theme.reduceMotion").toBool();
+    const bool savedFollowSystemMotion=eval("Theme.followSystemMotion").toBool();
+    bool motionSettingsRestored=false;
+    const auto restoreMotionSettings=[&]{
+        if(motionSettingsRestored)return;
+        motionSettingsRestored=true;
+        eval(QString("Theme.reduceMotion=%1;Theme.followSystemMotion=%2")
+            .arg(savedReduceMotion?"true":"false",savedFollowSystemMotion?"true":"false"));
+        check(eval("Theme.reduceMotion").toBool()==savedReduceMotion
+            &&eval("Theme.followSystemMotion").toBool()==savedFollowSystemMotion,
+            "animated node fixtures restore both original motion preferences");
+    };
+    const auto restoreMotionOnExit=qScopeGuard(restoreMotionSettings);
+    eval("Theme.reduceMotion=false;Theme.followSystemMotion=false;AppState.navigate('proxies')");
+    check(eval("!SwirlMotion.reduced").toBool(),"large-list, 104/88-node and rapid-selection fixtures exercise actual animations independently of system motion preferences");
+    QTest::qWait(400);
     window->resize(window->minimumWidth(),window->minimumHeight());QTest::qWait(250);
     auto *table=item("realNodeTable"),*hero=item("nodeHero");
     check(table&&table->property("gridWidth").toReal()<=table->width()+1,"all four columns fit minimum-width node viewport");
@@ -1540,5 +1556,6 @@ Item {
     auto *identity=item("nodeIdentitySurface");
     check(identity&&identity->parentItem()!=hero->parentItem(),"settled node details return to scroll ownership");
     if(!qa.isEmpty())window->grabWindow().save(qa+"/nodes-selected-minimum.png");
+    restoreMotionSettings();
     qInfo()<<"Node UI checks:"<<checks<<"checks,"<<failures<<"failures";return failures?2:0;
 }
