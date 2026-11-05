@@ -622,10 +622,10 @@ jobs:
             build-evidence/node-diagnostic-regression.xml
             build/swirl-quick/node-chain.txt
             build/swirl-quick/node-chain.xml
-            build/swirl-quick/node-ui-evidence/node-probe-geometry.json
-            build/swirl-quick/node-ui-evidence/nodes-probe-status-updates.png
-            build/swirl-quick/node-ui-native-evidence/node-probe-geometry.json
-            build/swirl-quick/node-ui-native-evidence/nodes-probe-status-updates.png
+            build/swirl-quick/node-ui-evidence/node-probe-*.json
+            build/swirl-quick/node-ui-evidence/*probe*.png
+            build/swirl-quick/node-ui-native-evidence/node-probe-*.json
+            build/swirl-quick/node-ui-native-evidence/*probe*.png
           if-no-files-found: warn
           retention-days: 14
       - name: Overview input checks against deployed Qt runtime

@@ -43,17 +43,27 @@ Item {
         for(let i=0;i<list.count;++i)if(displayKey(recordAt(i),i)===key)return i
         return -1
     }
+    function currentPresentation(item) {
+        if(!item||!item.currentModelRow)return false
+        const index=item.delegateIndex
+        // Qt parents asynchronous cache delegates to contentItem before they
+        // have finished creation or joined the view's laid-out item list.
+        // A reused context can also retain its previous record briefly.
+        return list.itemAtIndex(index)===item
+            &&displayKey(recordAt(index),index)===item.presentationKey
+    }
     function saveViewport() {
         wasAtEnd=list.atYEnd
         const index=list.indexAt(1,list.contentY+1)
         const item=index>=0?list.itemAtIndex(index):null
-        anchorKey=item?displayKey(item.record,index):""
-        anchorOffset=item?item.y-list.contentY:0
+        const current=currentPresentation(item)
+        anchorKey=current?displayKey(item.record,index):""
+        anchorOffset=current?item.y-list.contentY:0
     }
     function animateVisibleRows() {
         if(!sectioned||!animateRowChanges||SwirlMotion.reduced||list.moving)return
         for(const item of list.contentItem.children) {
-            if(!item.presentationKey||!item.currentModelRow||item.y+item.height<list.contentY||item.y>list.contentY+list.height)continue
+            if(!item.presentationKey||!currentPresentation(item)||item.y+item.height<list.contentY||item.y>list.contentY+list.height)continue
             const before=visiblePositions[item.presentationKey]
             if(before!==undefined)item.presentFrom(before-(item.y-list.contentY))
         }
@@ -86,7 +96,7 @@ Item {
         const positions={}
         if(sectioned&&animateRowChanges&&!SwirlMotion.reduced&&!list.moving)
             for(const item of list.contentItem.children)
-                if(item.presentationKey&&item.currentModelRow&&item.y+item.height>=list.contentY&&item.y<=list.contentY+list.height)
+                if(item.presentationKey&&currentPresentation(item)&&item.y+item.height>=list.contentY&&item.y<=list.contentY+list.height)
                     positions[item.presentationKey]=item.y+item.visualOffsetY-list.contentY
         visiblePositions=positions
     }
@@ -147,7 +157,7 @@ Item {
         return Theme.dp(column.min||12)+Math.round(flexible*(before+column.w)/totalWidth)-Math.round(flexible*before/totalWidth)
     }
     function chooseRow(row,activate) {
-        if(!row||!row.enabled)return
+        if(!row||!row.enabled||!currentPresentation(row))return
         if(row.sectionRow){if(activate)sectionActivated(String(row.record.sectionKey));return}
         selectedItem=row
         if(!incrementalRows&&!managedSelection)selectedId=String(row.record.id||row.record.name)
@@ -233,7 +243,10 @@ Item {
                     id:recordRow
                     // Removed delegates can remain visible until the next model
                     // polish. Their retired contexts must not receive input.
-                    readonly property bool currentModelRow:index>=0&&!pooled
+                    property bool componentReady:false
+                    Component.onCompleted:componentReady=true
+                    readonly property int delegateIndex:index
+                    readonly property bool currentModelRow:componentReady&&delegateIndex>=0&&!pooled
                     enabled:currentModelRow
                     z:1
                     width:list.width; height:sectionRow?table.sectionHeight:table.itemHeight
