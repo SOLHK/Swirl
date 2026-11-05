@@ -12,7 +12,11 @@ bool hasContentFilter(const QVariantMap &filters) {
 }
 }
 
-NodeSectionModel::NodeSectionModel(QObject *parent):QAbstractListModel(parent) {}
+NodeSectionModel::NodeSectionModel(QObject *parent):QAbstractListModel(parent),m_projectionTimer(this) {
+    m_projectionTimer.setSingleShot(true);
+    m_projectionTimer.setTimerType(Qt::PreciseTimer);
+    connect(&m_projectionTimer,&QTimer::timeout,this,&NodeSectionModel::commitPendingProjection);
+}
 int NodeSectionModel::rowCount(const QModelIndex &parent) const { return parent.isValid()?0:m_rows.size(); }
 QVariant NodeSectionModel::data(const QModelIndex &index,int role) const {
     if(!index.isValid()||index.column()!=0||index.row()<0||index.row()>=m_rows.size()||role!=Qt::UserRole)return {};
@@ -25,6 +29,17 @@ Qt::ItemFlags NodeSectionModel::flags(const QModelIndex &index) const {
 QVariantMap NodeSectionModel::get(int row) const { return row>=0&&row<m_rows.size()?m_rows.at(row):QVariantMap{}; }
 int NodeSectionModel::indexOfNode(const QString &id) const { return id.isEmpty()?-1:rowForDisplayKey("node:"+id); }
 int NodeSectionModel::rowForDisplayKey(const QString &key) const { return m_rowByKey.value(key,-1); }
+
+void NodeSectionModel::setProjectionDelayMs(int value) {
+    value=std::max(0,value);
+    if(m_projectionDelayMs==value)return;
+    m_projectionDelayMs=value;
+    const QPointer<NodeSectionModel> guard(this);
+    // Disabling motion or detaching the opt-in view publishes the latest rows
+    // immediately; an obsolete timer must never bring an old layout back.
+    if(!value)commitPendingProjection();
+    if(guard)emit projectionDelayMsChanged();
+}
 
 void NodeSectionModel::setSource(NodeViewModel *value) {
     if(m_source==value)return;
@@ -49,8 +64,9 @@ QString NodeSectionModel::sectionKey(const QVariantMap &row) {
     return kind=="subscription"||(!sourceId.isEmpty()&&kind.isEmpty())?"subscription:"+sourceId:"manual";
 }
 void NodeSectionModel::toggleSection(const QString &key) {
-    const int row=rowForDisplayKey("section:"+key);
-    if(row<0||!get(row).value("collapsible").toBool())return;
+    const auto &logicalRows=m_projectionPending?m_pendingRows:m_rows;
+    const auto found=std::find_if(logicalRows.cbegin(),logicalRows.cend(),[&](const auto &row){return displayKey(row)=="section:"+key;});
+    if(found==logicalRows.cend()||!found->value("collapsible").toBool())return;
     if(m_collapsed.contains(key))m_collapsed.remove(key);else m_collapsed.insert(key);
     rebuild();
 }
@@ -143,9 +159,19 @@ void NodeSectionModel::rebuild() {
         nodeIds.append(ids);
         if(expanded)for(const auto &id:ids)next.append(m_cachedNodes.constFind(id)->entry);
     }
-    const bool rowChanges=next!=m_rows;
+    const bool rowChanges=next!=(m_projectionPending?m_pendingRows:m_rows);
     const bool changed=rowChanges||nodeIds!=m_nodeIds||total!=m_total;
     if(!changed)return;
+    // Filtered testing always follows the latest logical source, even while a
+    // view is fading its previous, read-only display snapshot out.
+    m_nodeIds=std::move(nodeIds);m_total=total;++m_revision;
+    if(m_projectionPending) {
+        m_pendingRows=std::move(next);++m_pendingVersion;
+        // Keep the first deadline: neither probe values nor another structural
+        // request may indefinitely postpone the next visible layout.
+        emit this->changed();
+        return;
+    }
     // Probe results only change cell data. Saving/restoring the viewport and
     // replaying row-position animations for each result interrupts scrolling
     // and repeatedly retargets delegates while their text is being updated.
@@ -154,11 +180,63 @@ void NodeSectionModel::rebuild() {
         !std::equal(next.cbegin(),next.cend(),m_rows.cbegin(),[](const auto &left,const auto &right){
             return displayKey(left)==displayKey(right);
         }));
-    if(projectionChanges)emit aboutToSync();
+    const QPointer<NodeSectionModel> guard(this);
+    if(projectionChanges&&m_projectionDelayMs>0&&!m_rows.isEmpty()) {
+        m_pendingRows=std::move(next);m_projectionPending=true;++m_pendingVersion;
+        m_projectionTimer.start(m_projectionDelayMs);
+        m_notifyingProjection=true;
+        emit aboutToSync();
+        if(!guard)return;
+        m_notifyingProjection=false;
+        emit projectionPendingChanged();
+        if(!guard)return;
+        if(m_flushRequested||!m_projectionDelayMs){m_flushRequested=false;commitPendingProjection();}
+        if(guard)emit this->changed();
+        return;
+    }
+    if(projectionChanges) {
+        emit aboutToSync();
+        if(!guard)return;
+        emit projectionCommitting();
+        if(!guard)return;
+    }
     if(rowChanges)syncRows(next);
-    m_nodeIds=std::move(nodeIds);m_total=total;++m_revision;
+    if(!guard)return;
     if(projectionChanges)emit synced();
-    emit this->changed();
+    if(guard)emit this->changed();
+}
+
+void NodeSectionModel::commitPendingProjection() {
+    if(!m_projectionPending||m_committingProjection)return;
+    // Every aboutToSync listener must see the outgoing layout before a listener
+    // that disables motion can cause the corresponding commit.
+    if(m_notifyingProjection){m_flushRequested=true;return;}
+    m_projectionTimer.stop();m_committingProjection=true;
+    const QPointer<NodeSectionModel> guard(this);
+    // Timers and GUI animation ticks need not run in the same order. Force the
+    // view's final zero opacity synchronously before any Qt row notification.
+    emit projectionCommitting();
+    if(!guard)return;
+    const auto next=m_pendingRows;
+    const auto version=m_pendingVersion;
+    syncRows(next);
+    if(!guard)return;
+    m_committingProjection=false;
+    if(version!=m_pendingVersion) {
+        // A source callback during a row notification queued a newer snapshot.
+        // Finish this Qt transaction, then publish it while the view is hidden.
+        m_projectionTimer.start(0);
+        return;
+    }
+    m_projectionPending=false;m_pendingRows.clear();m_flushRequested=false;
+    ++m_revision;
+    emit projectionPendingChanged();
+    if(!guard)return;
+    emit synced();
+    if(!guard)return;
+    // Display-index consumers must recheck after the delayed commit, as well as
+    // when the logical filter first changed.
+    emit changed();
 }
 
 void NodeSectionModel::rebuildIndex() {

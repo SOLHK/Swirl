@@ -689,13 +689,26 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                     const auto value=row->property("record");
                     const auto record=value.metaType()==QMetaType::fromType<QJSValue>()?value.value<QJSValue>().toVariant().toMap():value.toMap();
                     const auto key=record.value("displayKey").toString();
-                    QQmlExpression delegateIndex(qmlContext(row),row,QStringLiteral("index"));
-                    const auto displayedIndex=delegateIndex.evaluate();
+                    auto *context=qmlContext(row);
+                    const bool contextValid=context&&context->isValid();
+                    auto displayedIndex=row->property("delegateIndex");
+                    bool indexError=!contextValid,entryError=!contextValid;
+                    QString indexErrorMessage=contextValid?QString():QStringLiteral("QML context retired");
+                    QString entryErrorMessage=indexErrorMessage,modelEntryKey;
+                    // A retired delegate can remain a visible Item after its
+                    // context is revoked. Inspect its pixels and cached index,
+                    // but never execute JavaScript in that invalid context.
+                    if(contextValid){
+                        QQmlExpression delegateIndex(context,row,QStringLiteral("index"));
+                        displayedIndex=delegateIndex.evaluate();indexError=delegateIndex.hasError();
+                        if(indexError)indexErrorMessage=delegateIndex.error().toString();
+                        QQmlExpression modelEntry(context,row,
+                            QStringLiteral("model && model.entry ? String(model.entry.displayKey || model.entry.id || '') : ''"));
+                        modelEntryKey=modelEntry.evaluate().toString();entryError=modelEntry.hasError();
+                        if(entryError)entryErrorMessage=modelEntry.error().toString();
+                    }
                     bool indexValid=false;
                     const int viewIndex=displayedIndex.toInt(&indexValid);
-                    QQmlExpression modelEntry(qmlContext(row),row,
-                        QStringLiteral("model && model.entry ? String(model.entry.displayKey || model.entry.id || '') : ''"));
-                    const auto modelEntryKey=modelEntry.evaluate().toString();
                     const auto *renderState=QQuickItemPrivate::get(row);
                     // Qt 6.12 initItem() parents asynchronous cache delegates
                     // before layout and marks them culled. They can report
@@ -704,8 +717,8 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                     // evidence; never confuse those objects with rendered rows.
                     if(renderState->culled){
                         result.culledRows.append(QJsonObject{{"key",key},{"objectName",row->objectName()},
-                            {"delegateIndex",viewIndex},{"indexError",delegateIndex.hasError()?delegateIndex.error().toString():QString()},
-                            {"modelEntryKey",modelEntryKey},{"modelEntryError",modelEntry.hasError()?modelEntry.error().toString():QString()},
+                            {"delegateIndex",viewIndex},{"contextValid",contextValid},{"indexError",indexErrorMessage},
+                            {"modelEntryKey",modelEntryKey},{"modelEntryError",entryErrorMessage},
                             {"componentComplete",bool(renderState->componentComplete)},{"culled",true},
                             {"source",QStringLiteral("Qt 6.12 QQuickItemPrivate::culled (scene-graph hide reference)")},
                             {"visible",row->isVisible()},{"pooled",row->property("pooled").toBool()},
@@ -723,12 +736,12 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                     // text sampling below still includes unregistered retirees.
                     if(registered&&layoutRect.intersects(clip)){
                         layoutBounds.append(layoutRect);
-                        if(key.isEmpty()||!indexValid||delegateIndex.hasError()||!renderState->componentComplete
+                        if(key.isEmpty()||!indexValid||indexError||!renderState->componentComplete
                             ||!row->property("componentReady").toBool()||row->property("pooled").toBool()){
                             valid=false;
                             result.rowIssues.append(QJsonObject{{"key",key},{"delegateIndex",viewIndex},
                                 {"missingRecord",key.isEmpty()},{"layoutReady",bool(renderState->componentComplete)},
-                                {"indexValid",indexValid&&!delegateIndex.hasError()},
+                                {"indexValid",indexValid&&!indexError},{"contextValid",contextValid},
                                 {"componentReady",row->property("componentReady").toBool()},{"pooled",row->property("pooled").toBool()}});
                         }
                     }
@@ -779,7 +792,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                         if(layoutRect.intersects(clip))result.backgroundRows.append(QJsonObject{
                             {"key",key},{"objectName",row->objectName()},{"delegateIndex",viewIndex},{"modelRow",modelRow},
                             {"modelEntryKey",modelEntryKey},{"viewKey",probeSections.get(viewIndex).value("displayKey").toString()},
-                            {"registered",registered},{"culled",false},{"recordName",record.value("name").toString()},
+                            {"registered",registered},{"culled",false},{"contextValid",contextValid},{"recordName",record.value("name").toString()},
                             {"layout",rectJson(layoutRect)},{"textItems",textItems}});
                         // An empty live row in the middle is missing content,
                         // not a harmless clipped cell margin.
@@ -797,9 +810,9 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                     // model position when diagnosing reuse/retirement failures.
                     result.rowStates.append(QJsonObject{
                         {"key",key},{"objectName",row->objectName()},{"modelRow",modelRow},{"delegateIndex",viewIndex},
-                        {"indexValid",indexValid&&!delegateIndex.hasError()},
-                        {"delegateIndexError",delegateIndex.hasError()?delegateIndex.error().toString():QString()},
-                        {"modelEntryKey",modelEntryKey},{"modelEntryError",modelEntry.hasError()?modelEntry.error().toString():QString()},
+                        {"indexValid",indexValid&&!indexError},{"contextValid",contextValid},
+                        {"delegateIndexError",indexErrorMessage},
+                        {"modelEntryKey",modelEntryKey},{"modelEntryError",entryErrorMessage},
                         {"componentComplete",bool(renderState->componentComplete)},{"culled",false},{"pooled",row->property("pooled").toBool()},
                         {"registered",registered},{"componentReady",row->property("componentReady").toBool()},
                         {"currentModelRow",row->property("currentModelRow").toBool()},
@@ -814,9 +827,9 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                         {"foundName",foundName},{"foundStatus",foundStatus},{"columnsSeparate",columnsSeparate}});
                     // Do not discard retired delegates here: a painted duplicate
                     // or stale label must fail the check after motion settles.
-                    const bool rowValid=modelRow>=0&&indexValid&&!delegateIndex.hasError()&&viewIndex==modelRow
+                    const bool rowValid=modelRow>=0&&indexValid&&!indexError&&viewIndex==modelRow
                         &&renderState->componentComplete&&!row->property("pooled").toBool()
-                        &&!modelEntry.hasError()&&modelEntryKey==key
+                        &&!entryError&&modelEntryKey==key
                         &&registered&&row->property("componentReady").toBool()
                         &&row->property("currentModelRow").toBool()
                         &&!keys.contains(key)&&foundName&&(section||foundStatus)&&columnsSeparate
@@ -824,8 +837,8 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
                         &&qAbs(row->property("visualOffsetY").toReal())<0.25;
                     if(!rowValid)result.rowIssues.append(QJsonObject{
                         {"key",key},{"objectName",row->objectName()},{"modelRow",modelRow},{"duplicate",keys.contains(key)},
-                        {"delegateIndex",viewIndex},{"indexValid",indexValid&&!delegateIndex.hasError()},{"registered",registered},
-                        {"modelEntryKey",modelEntryKey},{"modelEntryError",modelEntry.hasError()?modelEntry.error().toString():QString()},
+                        {"delegateIndex",viewIndex},{"indexValid",indexValid&&!indexError},{"contextValid",contextValid},{"registered",registered},
+                        {"modelEntryKey",modelEntryKey},{"modelEntryError",entryErrorMessage},
                         {"componentComplete",bool(renderState->componentComplete)},{"pooled",row->property("pooled").toBool()},
                         {"foundName",foundName},{"foundStatus",foundStatus},{"section",section},{"columnsSeparate",columnsSeparate},
                         {"opacity",effectiveOpacity(row)},{"scale",row->scale()},
@@ -874,7 +887,9 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
             };
             auto *probeIncubation=qmlEngine(window)->incubationController();
             const auto incubationIdle=[&]{return !probeIncubation||probeIncubation->incubatingObjectCount()==0;};
-            const auto settled=[&]{return viewport->property("count").toInt()==probeSections.rowCount()&&incubationIdle()&&capture().valid;};
+            const auto settled=[&]{return !probeSections.projectionPending()
+                &&table->property("projectionPhase").toString()==QStringLiteral("idle")
+                &&viewport->property("count").toInt()==probeSections.rowCount()&&incubationIdle()&&capture().valid;};
             const auto settleInitialLayout=[&]{
                 Geometry previous;
                 int stableSamples=0;
@@ -1202,12 +1217,12 @@ Item {
                     QRectF rect;
                     int index=-1;
                     qreal opacity=0,offset=0,scale=1;
-                    bool registered=false,retired=false;
+                    bool registered=false,retired=false,outgoing=false;
                 };
                 struct TransitionTrace {
                     QString scenario;
                     bool active=false;
-                    int samples=0,frames=0,ticks=0,populated=0,retired=0,moving=0,fading=0,fixture=0,controller=0;
+                    int samples=0,frames=0,ticks=0,populated=0,retired=0,outgoing=0,outgoingFading=0,moving=0,fading=0,fixture=0,controller=0;
                     QJsonObject firstOverlap;
                 } transition;
                 QHash<QQuickItem *,qint64> transitionInstances;
@@ -1228,7 +1243,7 @@ Item {
                     if(!contentItem)return;
                     const QRectF clip(0,0,viewport->width(),viewport->height());
                     QList<TransitionText> texts;
-                    bool sawRetired=false,sawMoving=false,sawFading=false;
+                    bool sawRetired=false,sawOutgoing=false,sawOutgoingFading=false,sawMoving=false,sawFading=false;
                     for(auto *row:contentItem->childItems()){
                         if(row->metaObject()->indexOfProperty("record")<0||!row->isVisible()
                             ||QQuickItemPrivate::get(row)->culled||effectiveOpacity(row)<0.01)continue;
@@ -1241,6 +1256,7 @@ Item {
                         const bool registered=QMetaObject::invokeMethod(viewport,"itemAtIndex",
                             Q_RETURN_ARG(QQuickItem *,registeredRow),Q_ARG(int,index))&&registeredRow==row;
                         const bool retired=!registered||!row->property("currentModelRow").toBool();
+                        const bool outgoing=row->property("presentationOutgoing").toBool();
                         const qreal offset=row->property("visualOffsetY").toReal();
                         const bool section=record.value("rowKind")=="section";
                         std::function<void(QQuickItem *)> collect;
@@ -1254,8 +1270,10 @@ Item {
                                     if(ancestor->clip())rect=rect.intersected(ancestor->mapRectToItem(viewport,QRectF(QPointF(),ancestor->size())));
                                 if(!text.isEmpty()&&!rect.isEmpty()){
                                     texts.append(TransitionText{instance,record.value("displayKey").toString(),record.value("id").toString(),text,
-                                        rect,index,opacity,offset,row->scale(),registered,retired});
-                                    sawRetired|=retired;sawMoving|=!retired&&qAbs(offset)>0.25;
+                                        rect,index,opacity,offset,row->scale(),registered,retired,outgoing});
+                                    sawRetired|=retired;sawOutgoing|=outgoing;
+                                    sawOutgoingFading|=outgoing&&opacity<0.99;
+                                    sawMoving|=!retired&&!outgoing&&qAbs(offset)>0.25;
                                     sawFading|=opacity<0.99||qAbs(row->scale()-1)>0.001;
                                 }
                             }
@@ -1270,12 +1288,14 @@ Item {
                         if(model==objectValue(originalModel))++transition.controller;
                     }
                     if(sawRetired)++transition.retired;
+                    if(sawOutgoing)++transition.outgoing;
+                    if(sawOutgoingFading)++transition.outgoingFading;
                     if(sawMoving)++transition.moving;
                     if(sawFading)++transition.fading;
                     if(!transition.firstOverlap.isEmpty())return;
                     const auto describe=[&](const TransitionText &text){return QJsonObject{
                         {"instance",text.instance},{"key",text.key},{"id",text.id},{"text",text.text},
-                        {"delegateIndex",text.index},{"registered",text.registered},{"retired",text.retired},
+                        {"delegateIndex",text.index},{"registered",text.registered},{"retired",text.retired},{"outgoing",text.outgoing},
                         {"opacity",text.opacity},{"visualOffsetY",text.offset},{"scale",text.scale},{"content",rectJson(text.rect)}};};
                     for(int a=0;a<texts.size();++a)for(int b=a+1;b<texts.size();++b){
                         if(texts[a].instance==texts[b].instance)continue;
@@ -1295,10 +1315,10 @@ Item {
                     transitionInstances.clear();nextTransitionInstance=0;
                     transitionClock.start();sampleTransition("before-change");transitionTicks.start();
                 };
-                const auto finishTransition=[&](bool requireRetirement,bool requireBothModels){
+                const auto finishTransition=[&](bool requireOutgoingPhase,bool requireBothModels){
                     sampleTransition("after-settle");transitionTicks.stop();transition.active=false;
                     const bool observed=transition.frames>0&&transition.ticks>0&&transition.populated>2
-                        &&(!requireRetirement||(transition.retired>0&&transition.moving>0))
+                        &&(!requireOutgoingPhase||(transition.outgoing>0&&transition.outgoingFading>0&&transition.moving>0))
                         &&(!requireBothModels||(transition.fixture>0&&transition.controller>0));
                     check(observed,"transition sampling observes real frames and the required visible lifecycle states");
                     check(transition.firstOverlap.isEmpty(),"visible text from distinct row instances never overlaps during structural transitions");
@@ -1306,6 +1326,7 @@ Item {
                         {"scenario",transition.scenario},{"sampleSemantics","GUI text geometry at timer or queued frameSwapped delivery; not GPU frame reconstruction"},
                         {"samples",transition.samples},{"frameSamples",transition.frames},{"timerSamples",transition.ticks},
                         {"populatedSamples",transition.populated},{"retiredSamples",transition.retired},{"movingSamples",transition.moving},
+                        {"outgoingSamples",transition.outgoing},{"outgoingFadingSamples",transition.outgoingFading},
                         {"fadingSamples",transition.fading},{"fixtureSamples",transition.fixture},{"controllerSamples",transition.controller},
                         {"observed",observed},{"firstOverlap",transition.firstOverlap}};
                     qInfo().noquote()<<"NODE_PROBE_TRANSITION"<<QJsonDocument(report).toJson(QJsonDocument::Compact);
@@ -1428,8 +1449,8 @@ Item {
                 check(transitionReady&&sourceVisible,"collapse transition removes actual visible source-a text instead of offscreen rows");
                 beginTransition(QStringLiteral("collapse-sort"));
                 probeSections.toggleSection("subscription:a");
-                // Interrupt removal with another real projection to exercise
-                // retired delegate handling while exit motion is still active.
+                // A second structural request must coalesce while actual old
+                // text is fading, without extending the outgoing deadline.
                 QTest::qWait(20);
                 probeRows.setFilters({{"sourceKind","subscription"},{"sort","name"}});
                 QTest::qWait(35);
