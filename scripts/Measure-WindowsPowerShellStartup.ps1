@@ -1,7 +1,7 @@
 param([Parameter(Mandatory=$true)][string]$OutputPath)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-if (-not $IsWindows) { throw 'Windows PowerShell startup observation requires Windows.' }
+if (-not $IsWindows -or $env:GITHUB_ACTIONS -cne 'true') { throw 'This observation requires a GitHub Windows runner.' }
 $windows = [Environment]::GetFolderPath('Windows')
 $system = Join-Path $windows 'System32'
 $executable = Join-Path $system 'WindowsPowerShell/v1.0/powershell.exe'
@@ -9,9 +9,15 @@ $modules = Join-Path $system 'WindowsPowerShell/v1.0/Modules'
 if (-not [IO.Path]::IsPathFullyQualified($windows) -or -not (Test-Path -LiteralPath $executable -PathType Leaf)) {
     throw 'Fixed system Windows PowerShell is unavailable.'
 }
+$systemDrive = [IO.Path]::GetPathRoot($windows).TrimEnd('\')
+$commandText = @'
+$p = [Environment]::GetFolderPath([Environment+SpecialFolder]::CommonApplicationData)
+$valid = -not [string]::IsNullOrWhiteSpace($p) -and [IO.Path]::GetPathRoot($p) -match '^[A-Za-z]:\\$'
+[Console]::Write('SWIRL_PS_BOOT_OK|' + [int]$valid)
+'@
 $results = [Collections.Generic.List[object]]::new()
 try {
-    foreach ($case in @('inherited-system-modules','broker-four-variable-plus-system-modules')) {
+    foreach ($case in @('inherited-system-modules','broker-four-variable-plus-system-modules','broker-with-system-drive')) {
         $start = [Diagnostics.ProcessStartInfo]::new()
         $start.FileName = $executable
         $start.UseShellExecute = $false
@@ -19,15 +25,16 @@ try {
         $start.RedirectStandardInput = $true
         $start.RedirectStandardOutput = $true
         $start.RedirectStandardError = $true
-        foreach ($argument in @('-NoLogo','-NoProfile','-NonInteractive','-Command','[Console]::Write("SWIRL_PS_BOOT_OK")')) {
+        foreach ($argument in @('-NoLogo','-NoProfile','-NonInteractive','-Command',$commandText)) {
             $start.ArgumentList.Add($argument)
         }
-        if ($case -eq 'broker-four-variable-plus-system-modules') {
+        if ($case -ne 'inherited-system-modules') {
             $start.Environment.Clear()
             $start.Environment['SystemRoot'] = $windows
             $start.Environment['WINDIR'] = $windows
             $start.Environment['PATH'] = $system
             $start.Environment['ComSpec'] = Join-Path $system 'cmd.exe'
+            if ($case -eq 'broker-with-system-drive') { $start.Environment['SystemDrive'] = $systemDrive }
         }
         $start.Environment['PSModulePath'] = $modules
         $process = [Diagnostics.Process]::new()
@@ -46,7 +53,8 @@ try {
             $errText = if ($errDone) { $stderr.Result } else { '' }
             $hresults = @([regex]::Matches($errText,'(?i)\b(?:0x[0-9a-f]{8}|8009001d)\b') | ForEach-Object { $_.Value.ToUpperInvariant() } | Sort-Object -Unique)
             $results.Add([ordered]@{case=$case;exitCode=$(if ($exited) { $process.ExitCode } else { $null });
-                timedOut=$timedOut;markerOk=($outDone -and $outText -ceq 'SWIRL_PS_BOOT_OK');
+                timedOut=$timedOut;markerOk=($outDone -and $outText -cin @('SWIRL_PS_BOOT_OK|0','SWIRL_PS_BOOT_OK|1'));
+                knownFolderValid=($outDone -and $outText -ceq 'SWIRL_PS_BOOT_OK|1');
                 stderrHRESULT=$hresults;stdoutLength=$outText.Length;stderrLength=$errText.Length})
             if (-not $exited -or -not $outDone -or -not $errDone) { throw 'PowerShell observation did not finish bounded cleanup.' }
         } finally { $process.Dispose() }
