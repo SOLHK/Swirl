@@ -12,6 +12,7 @@
 #endif
 #include <QQmlApplicationEngine>
 #ifdef SWIRL_UI_TESTS
+#include "SwirlBuildIdentity.h"
 #include <QQmlDebuggingEnabler>
 #include <QtQml/private/qqmlengine_p.h>
 #include <QtQml/private/qqmldata_p.h>
