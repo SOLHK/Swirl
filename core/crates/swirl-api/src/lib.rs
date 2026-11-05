@@ -25,6 +25,8 @@ pub mod native_tun_control;
 pub mod native_tun_ipc;
 #[cfg(windows)]
 mod native_windows;
+#[cfg(windows)]
+mod native_worker_output;
 mod node_import;
 pub use node_import::swirl_import_node_v1;
 mod profile_import;

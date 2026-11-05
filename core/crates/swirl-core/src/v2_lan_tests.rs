@@ -382,6 +382,9 @@ fn failed_auth_rate_limit_and_client_acl_open_no_outbound() {
     assert_eq!(core.lan_status().unwrap()["auth_failures"], 2);
     assert_eq!(peer.requests.load(Ordering::Relaxed), 0);
     core.lan_stop().unwrap();
+    // ACL admission is an independent fixture. The unused UDP port selected
+    // before the authentication phase was not reserved during those requests.
+    lan = lan_config(false);
     core.lan = Some(
         LanRuntime::start_bound(
             core.runtime.as_ref().unwrap(),
@@ -394,6 +397,7 @@ fn failed_auth_rate_limit_and_client_acl_open_no_outbound() {
     let mut denied = stream(SocketAddr::new(lan.listen_ip, lan.http_port));
     assert!(denied.read(&mut byte).map_or(true, |n| n == 0));
     wait(|| core.lan_status().unwrap()["last_error"] == "LanClientDenied");
+    assert_eq!(peer.requests.load(Ordering::Relaxed), 0);
     core.stop();
 }
 

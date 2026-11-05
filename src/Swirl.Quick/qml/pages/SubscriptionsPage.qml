@@ -150,7 +150,7 @@ Item {
             Layout.fillWidth: true; spacing: Theme.dp(12)
             SwirlText { text: qsTr("订阅来源"); leftPadding: Theme.dp(8); Layout.fillWidth: true; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
             SwirlText { text: qsTr("节点"); Layout.preferredWidth: Theme.dp(48); horizontalAlignment: Text.AlignRight; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
-            SwirlText { text: qsTr("最近更新"); Layout.preferredWidth: Theme.dp(126); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
+            SwirlText { text: qsTr("最近更新"); Layout.preferredWidth: Theme.dp(subscriptionList.width < Theme.dp(560) ? 84 : 126); color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
             Item { Layout.preferredWidth: Theme.dp(190) }
         }
         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: Theme.borderWidth; color: Theme.border }

@@ -79,7 +79,7 @@ ComboBox {
         function requestDismiss(){close()}
         parent:control.Overlay.overlay
         property point anchorPoint:Qt.point(0,0)
-        readonly property real edgeMargin:Theme.dp(8)
+        readonly property real edgeMargin:Theme.dp(20)
         readonly property real below:parent?Math.max(0,parent.height-anchorPoint.y-control.height-Theme.dp(4)-edgeMargin):0
         readonly property real above:Math.max(0,anchorPoint.y-Theme.dp(4)-edgeMargin)
         readonly property real desiredHeight:Math.min(Theme.dp(290),contentItem.implicitHeight+topPadding+bottomPadding)
@@ -108,7 +108,7 @@ ComboBox {
         margins:edgeMargin
         enter:reveal.enterTransition
         exit:reveal.exitTransition
-        background: SwirlCardSurface { transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
+        background: SwirlCardSurface { floating:true;transform:Translate{x:reveal.xOffset;y:reveal.yOffset}
             cornerRadius:Theme.menuRadius }
         contentItem: ListView { pixelAligned: true;
             id:popupList

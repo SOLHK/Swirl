@@ -150,12 +150,9 @@ fn same_bundled_driver(given: &str, trusted: &str) -> bool {
 }
 
 #[cfg(windows)]
-#[path = "native_worker_output.rs"]
-mod broker_output;
-
-#[cfg(windows)]
 mod windows {
     use super::*;
+    use crate::native_worker_output::BoundedOutput;
     use std::{
         io::{BufReader, Write},
         path::Path,
@@ -328,7 +325,7 @@ mod windows {
     }
     struct Helper {
         child: Child,
-        input: Option<super::broker_output::BoundedOutput>,
+        input: Option<BoundedOutput>,
         output: mpsc::Receiver<io::Result<Vec<u8>>>,
         closed: bool,
     }
@@ -339,7 +336,7 @@ mod windows {
                 .stdin
                 .take()
                 .ok_or_else(|| invalid("BrokerHelperStdin"))?;
-            let input = Some(super::broker_output::BoundedOutput::new(move |value| {
+            let input = Some(BoundedOutput::new(move |value| {
                 write_frame(&mut stdin, value)
             })?);
             let output = responses(

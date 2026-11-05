@@ -1,6 +1,6 @@
 //! Experimental inherited-pipe endpoint. Token validation is not broker or
 //! service-principal authentication; no product/WFP capability is enabled here.
-use crate::Controller;
+use crate::{Controller, native_worker_output::BoundedOutput};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{
@@ -28,10 +28,6 @@ use swirl_platform::{
 };
 use swirl_transport::egress::EgressLease;
 use swirl_tun::{TunConfig, TunStats};
-
-#[path = "native_worker_output.rs"]
-mod native_worker_output;
-use native_worker_output::BoundedOutput;
 
 const MAX_FRAME: usize = 1024 * 1024;
 const OUTPUT_DRAIN: Duration = Duration::from_secs(2);

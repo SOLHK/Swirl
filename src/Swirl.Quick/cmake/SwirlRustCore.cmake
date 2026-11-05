@@ -122,7 +122,7 @@ file(CONFIGURE OUTPUT "${SWIRL_BUILD_IDENTITY_DIRECTORY}/SwirlBuildIdentity.h"
 add_custom_target(SwirlRustCore
  COMMAND "${CMAKE_COMMAND}" -E env
   "SWIRL_BUILD_ID=${SWIRL_RUST_BUILD_ID}" "SWIRL_SOURCE_SHA=${SWIRL_SOURCE_SHA}"
-  "${SWIRL_CARGO}" build --release --locked --lib ${SWIRL_RUST_PRODUCT_BINS} --target "${SWIRL_RUST_TRIPLE}"
+  "${SWIRL_CARGO}" build --release --locked --lib --target "${SWIRL_RUST_TRIPLE}" ${SWIRL_RUST_PRODUCT_BINS}
   --manifest-path "${SWIRL_RUST_SOURCE}/Cargo.toml" --target-dir "${SWIRL_RUST_TARGET}" -p swirl-api
  COMMAND "${CMAKE_COMMAND}" "-DSWIRL_LIBRARY=${SWIRL_RUST_LIBRARY}"
   "-DSWIRL_BROKER=${SWIRL_TUN_BROKER}" "-DSWIRL_HELPER=${SWIRL_TUN_HELPER}"
