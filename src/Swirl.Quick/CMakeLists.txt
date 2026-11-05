@@ -368,7 +368,9 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  endif()
  target_link_libraries(SwirlPolicyConfigurationTests PRIVATE SwirlEngine Qt6::Test)
  target_include_directories(SwirlPolicyConfigurationTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
- add_test(NAME swirl-policy-configuration COMMAND SwirlPolicyConfigurationTests)
+ add_test(NAME swirl-policy-configuration COMMAND SwirlPolicyConfigurationTests
+  -o "${CMAKE_CURRENT_BINARY_DIR}/policy-configuration.xml,xml"
+  -o "${CMAKE_CURRENT_BINARY_DIR}/policy-configuration.txt,txt" -o -,txt)
  set_tests_properties(swirl-policy-configuration PROPERTIES TIMEOUT 60)
  qt_add_executable(SwirlCatalogTransactionTests tests/CatalogTransactionTests.cpp)
  target_link_libraries(SwirlCatalogTransactionTests PRIVATE SwirlEngine Qt6::Test)

@@ -886,6 +886,7 @@ fn shared_connection_budget_covers_local_and_lan_sessions() {
 
 struct DnsPeer {
     address: SocketAddr,
+    _tcp_reservation: StdListener,
     queries: Arc<AtomicUsize>,
     stop: Arc<AtomicBool>,
     task: Option<thread::JoinHandle<()>>,
@@ -897,7 +898,29 @@ impl DnsPeer {
     }
 
     fn with_ttl(answers: Vec<std::net::Ipv4Addr>, ttl: u32) -> Self {
-        let socket = StdUdpSocket::bind("127.0.0.1:0").unwrap();
+        // The ingress guard rejects a DNS endpoint at the Core listener port.
+        // Reserve both protocols so a later TCP port-zero bind cannot claim it.
+        let mut pair = None;
+        let mut reserved = Vec::new();
+        let mut failures = Vec::new();
+        for _ in 0..16 {
+            let tcp = StdListener::bind("127.0.0.1:0").unwrap();
+            let address = tcp.local_addr().unwrap();
+            match StdUdpSocket::bind(address) {
+                Ok(udp) => {
+                    pair = Some((tcp, udp));
+                    break;
+                }
+                Err(error) => {
+                    failures.push((address.port(), error.kind(), error.raw_os_error()));
+                    reserved.push(tcp);
+                }
+            }
+        }
+        let (tcp_reservation, socket) = pair.unwrap_or_else(|| {
+            panic!("no available DNS fixture TCP/UDP port pair; failed candidates={failures:?}")
+        });
+        drop(reserved);
         socket
             .set_read_timeout(Some(Duration::from_millis(50)))
             .unwrap();
@@ -947,6 +970,7 @@ impl DnsPeer {
         });
         Self {
             address,
+            _tcp_reservation: tcp_reservation,
             queries,
             stop,
             task: Some(task),
@@ -1679,7 +1703,22 @@ fn real_dns_rebinding_is_rechecked_before_each_direct_connection() {
     );
     let mut first = stream(SocketAddr::new(lan.listen_ip, lan.http_port));
     first.write_all(request.as_bytes()).unwrap();
-    assert!(header(&mut first).unwrap().starts_with(b"HTTP/1.1 200"));
+    let first_response = header(&mut first).unwrap();
+    assert!(
+        first_response.starts_with(b"HTTP/1.1 200"),
+        "first CONNECT status={:?}, header_bytes={}, dns_queries={}, last_error={}, dns_port={}, core_port={}, lan_http_port={}, origin_port={}",
+        first_response
+            .get(9..12)
+            .and_then(|status| std::str::from_utf8(status).ok())
+            .and_then(|status| status.parse::<u16>().ok()),
+        first_response.len(),
+        dns.queries.load(Ordering::Acquire),
+        core.lan_status().unwrap()["last_error"],
+        dns.address.port(),
+        core.shared.address.port(),
+        lan.http_port,
+        destination.port()
+    );
     first.write_all(b"ping").unwrap();
     let mut bytes = [0; 4];
     first.read_exact(&mut bytes).unwrap();

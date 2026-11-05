@@ -198,6 +198,8 @@ private slots:
         {
             EngineController controller(std::make_unique<ConfigurationPeer>(),nullptr,path);
             QVERIFY(!controller.subscriptionScopeEnabled());QCOMPARE(controller.nodes().size(),4);
+            QVERIFY(controller.policyMigrationRequired());QVERIFY(controller.confirmPolicyMigration());
+            QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
             QVERIFY(controller.applyPolicyDocument(sourcePolicy(pool).toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
             QVERIFY(controller.selectSubscription(pool.a));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY(controller.policyError().isEmpty());
             QVERIFY(controller.subscriptionScopeEnabled());QCOMPARE(controller.activeSubscriptionId(),pool.a);QCOMPARE(controller.nodes().size(),2);QCOMPARE(controller.nodeCatalog().size(),2);
@@ -228,6 +230,8 @@ private slots:
     void returningToASubscriptionRestoresItsChosenGroupAndServiceInsteadOfDeletingThem(){
         QTemporaryDir dir;const auto path=dir.filePath("source-policy-snapshots.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
         EngineController controller(std::make_unique<ConfigurationPeer>(),nullptr,path);
+        QVERIFY(controller.policyMigrationRequired());QVERIFY(controller.confirmPolicyMigration());
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
         QVERIFY(controller.applyPolicyDocument(sourcePolicy(pool).toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
         QVERIFY(controller.selectSubscription(pool.a));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
         auto policyA=controller.policyDocument();auto fallback=policyA.value("default_policy").toMap();
@@ -243,6 +247,8 @@ private slots:
     void runningSubscriptionSwitchRevokesOnlyTheOldPoolAndKeepsFailedChoiceAtomic(){
         QTemporaryDir dir;const auto path=dir.filePath("online-sources.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
         auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();EngineController controller(std::move(peer),nullptr,path);
+        QVERIFY(controller.policyMigrationRequired());QVERIFY(controller.confirmPolicyMigration());
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
         QVERIFY(controller.applyPolicyDocument(sourcePolicy(pool).toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
         QVERIFY(controller.selectSubscription(pool.a));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY(controller.policyError().isEmpty());
         controller.connectConfiguredPolicy();QVERIFY(controller.processAlive());const auto oldPolicy=controller.policyDocument();const auto oldBytes=bytes(path);
@@ -277,6 +283,8 @@ private slots:
     void tunPreferenceCannotSwitchControllersWhileTheCurrentCoreIsAlive(){
         QTemporaryDir dir;const auto path=dir.filePath("tun-live-choice.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
         auto peer=std::make_unique<ConfigurationPeer>();EngineController controller(std::move(peer),nullptr,path);
+        QVERIFY(controller.policyMigrationRequired());QVERIFY(controller.confirmPolicyMigration());
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
         QVERIFY(controller.applyPolicyDocument(sourcePolicy(pool).toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
         controller.connectConfiguredPolicy();QVERIFY(controller.processAlive());
         controller.m_options.tunEnabled=true;const auto before=bytes(path);

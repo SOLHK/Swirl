@@ -213,7 +213,7 @@ jobs:
           foreach ($directory in @('hero-evidence','navigation-evidence','settings-material-evidence','policy-evidence','activity-layout','liquid-glass-evidence','system-proxy-exit','system-proxy-normal-stop')) {
             Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $directory) -Recurse -Force -ErrorAction SilentlyContinue
           }
-          foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt','connection-rows.xml','swirl-telemetry-accounting.xml','swirl-system-proxy-state.xml','swirl-system-proxy-recovery.xml','swirl-system-proxy-app-exit.xml','swirl-system-proxy-normal-stop.xml','swirl-rust-qt-integration.xml')) {
+          foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt','connection-rows.xml','policy-configuration.xml','policy-configuration.txt','swirl-telemetry-accounting.xml','swirl-system-proxy-state.xml','swirl-system-proxy-recovery.xml','swirl-system-proxy-app-exit.xml','swirl-system-proxy-normal-stop.xml','swirl-rust-qt-integration.xml')) {
             Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $file) -Force -ErrorAction SilentlyContinue
           }
           Get-ChildItem -Path 'build/swirl-quick/*-report.json','build/swirl-quick/activity-feather-*.png','build/swirl-quick/activity-data-*.png','build/swirl-quick/font-*.xml','build/swirl-quick/Release/Swirl-*.txt' -File -ErrorAction SilentlyContinue | Remove-Item -Force
@@ -389,7 +389,7 @@ jobs:
           # Run affected UI checks before packaging. The remaining registered suite
           # runs after the test installer is uploaded; these names are excluded there
           # so a required check is never repeated just to change stage ordering.
-          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(appearance-ui|node-ui|engine-ui|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|policy-ui)$" --output-on-failure --no-tests=error --output-junit $criticalUiJunit
+          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(appearance-ui|node-ui|engine-ui|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|policy-ui|policy-configuration)$" --output-on-failure --no-tests=error --output-junit $criticalUiJunit
           $criticalUiExitCode = $LASTEXITCODE
           # Failure diagnostics rerun policy with the same output directory.
           # Preserve this first execution, including partial failure evidence,
@@ -967,7 +967,7 @@ jobs:
             Remove-Item -LiteralPath 'build/swirl-quick/activity-layout/activity-layout-report.json' -ErrorAction SilentlyContinue
             # Critical tests have already passed before packaging. Exclude only
             # those exact tests here to avoid paying for a second execution.
-            $excludedTests = 'appearance-ui|node-ui|engine-ui|overview-input|all-pages|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|policy-ui|capture-network|native-tun-broker-control'
+            $excludedTests = 'appearance-ui|node-ui|engine-ui|overview-input|all-pages|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|policy-ui|policy-configuration|capture-network|native-tun-broker-control'
             if ($env:SWIRL_CI_UI_ONLY -eq 'true') {
               # UI-only changes still run all parser, policy, storage, and local
               # regressions; skip only suites whose purpose is network/TLS traffic.
@@ -1116,6 +1116,8 @@ jobs:
             build-evidence/ctest-inventory.json
             build-evidence/activity-diagnostic-regression.xml
             build/swirl-quick/connection-rows.xml
+            build/swirl-quick/policy-configuration.xml
+            build/swirl-quick/policy-configuration.txt
             build/swirl-quick/swirl-telemetry-accounting.xml
             build/swirl-quick/swirl-system-proxy-state.xml
             build/swirl-quick/swirl-system-proxy-recovery.xml
