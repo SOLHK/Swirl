@@ -19,7 +19,7 @@ concurrency:
   # The isolated network development PRs replace only their own obsolete
   # builds. An old icon-tool stall must not keep the corrected installer queued.
   # Other product branches retain their cache and installer evidence unchanged.
-  cancel-in-progress: ${{ contains(fromJSON('["work/native-tun-windows-20261030-isolated", "work/native-lan-proxy-20261031", "work/native-lan-gateway-20261031"]'), github.head_ref || github.ref_name) }}
+  cancel-in-progress: ${{ contains(fromJSON('["work/native-tun-windows-20261030-isolated", "work/native-lan-proxy-20261031", "work/native-lan-gateway-20261031", "work/node-probe-render-20261105"]'), github.head_ref || github.ref_name) }}
 
 jobs:
   build-qt-ui:
