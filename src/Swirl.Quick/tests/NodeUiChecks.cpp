@@ -1408,6 +1408,145 @@ Item {
                 }
                 overlapFixture.reset();transition=TransitionTrace{};transitionInstances.clear();
                 check(QTest::qWaitFor(settled,3500),"removing the transition negative control restores the unchanged steady geometry gate");
+                // A structural producer must not wait for its own silence
+                // before any newly committed ordering can be read.
+                {
+                    const auto latencySavedValues=probeValues;
+                    const auto latencySavedFilters=probeRows.filters();
+                    const qreal latencySavedScroll=viewport->property("contentY").toReal();
+                    lifecyclePhase=QStringLiteral("continuous-latency-sort");
+                    for(int i=0;i<probeValues.size();++i){
+                        auto row=probeValues[i].toMap();row["latency"]=QString::number(20+i);probeValues[i]=row;
+                    }
+                    probeRows.updateRows(probeValues);
+                    probeRows.setFilters({{"sourceKind","subscription"},{"sort","latency"}});
+                    const bool latencyReady=check(QTest::qWaitFor(settled,3500),
+                        "continuous latency ordering starts from a fully readable animated layout");
+                    const auto visibleNodeOrder=[](const Geometry &state){
+                        QList<QPair<qreal,QString>> positions;
+                        for(const auto &value:state.rowStates){
+                            const auto row=value.toObject();const auto key=row.value("key").toString();
+                            if(key.startsWith(QStringLiteral("node:")))positions.append({row.value("textTop").toDouble(),key});
+                        }
+                        std::sort(positions.begin(),positions.end(),[](const auto &a,const auto &b){return a.first<b.first;});
+                        QStringList order;for(const auto &position:positions)order.append(position.second);
+                        return order;
+                    };
+                    const auto initialLatencyOrder=visibleNodeOrder(capture());
+                    if(!latencyReady){
+                        const QJsonObject report{{"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"nodeCount",probeCount},
+                            {"phase","continuous-latency-setup"},{"pending",probeSections.projectionPending()},
+                            {"projectionPhase",table->property("projectionPhase").toString()},
+                            {"viewCount",viewport->property("count").toInt()},{"modelCount",probeSections.rowCount()},
+                            {"incubating",probeIncubation?probeIncubation->incubatingObjectCount():0},
+                            {"geometry",geometryEvidence(capture())}};
+                        qInfo().noquote()<<"NODE_PROBE_CONTINUOUS_LATENCY_SETUP_FAILURE"<<QJsonDocument(report).toJson(QJsonDocument::Compact);
+                        if(!qa.isEmpty()){
+                            QFile file(qa+QString("/node-probe-continuous-latency-%1.json").arg(probeCount));
+                            if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(report).toJson(QJsonDocument::Indented));
+                        }
+                    }
+                    if(latencyReady){
+                        beginTransition(QStringLiteral("continuous-latency-sort"));
+                        QObject latencyContext;
+                        QTimer latencyProducer,latencyObserver;
+                        latencyProducer.setInterval(10);latencyProducer.setTimerType(Qt::PreciseTimer);
+                        latencyObserver.setInterval(8);latencyObserver.setTimerType(Qt::PreciseTimer);
+                        QElapsedTimer latencyClock;
+                        int latencyBatches=0,frameSamples=0,timerSamples=0,readableFrames=0,readableTimers=0;
+                        bool latencySampling=true;
+                        Geometry lastLatencyGeometry;
+                        QJsonArray latencySamples;
+                        QJsonObject lastLatencyObservation,firstReadableFrame,firstReadableTimer;
+                        QObject::connect(&latencyProducer,&QTimer::timeout,&latencyContext,[&]{
+                            ++latencyBatches;
+                            const int rotation=latencyBatches%2?1:2;
+                            const int rotatingCount=static_cast<int>(probeValues.size())-3;
+                            for(int i=0;i<probeValues.size();++i){
+                                auto row=probeValues[i].toMap();
+                                // A alternates between two non-initial visible
+                                // orders; B rotates independently, so batching
+                                // cannot repeatedly alias the original layout.
+                                const int rank=i<3?10+(i+rotation)%3
+                                    :20+(i-3+latencyBatches)%rotatingCount;
+                                row["latency"]=QString::number(rank);probeValues[i]=row;
+                            }
+                            probeRows.updateRows(probeValues);
+                        });
+                        const auto sampleLatency=[&](const char *origin){
+                            if(!latencySampling||!latencyProducer.isActive())return;
+                            const bool frame=qstrcmp(origin,"frame-notification")==0;
+                            if(frame)++frameSamples;else ++timerSamples;
+                            const auto now=capture();
+                            const auto order=visibleNodeOrder(now);
+                            const bool changedOrder=!order.isEmpty()&&order!=initialLatencyOrder;
+                            // capture.valid retains the original opacity>0.99,
+                            // offset<0.25 and complete 0.5 geometry/identity gate.
+                            // A readable outgoing snapshot may be valid without
+                            // passing through an observable idle phase.
+                            const bool readable=now.valid&&changedOrder&&latencyBatches>=8;
+                            QJsonObject observation{
+                                {"sample",QString::fromLatin1(origin)},{"elapsedMs",latencyClock.elapsed()},
+                                {"producerActive",latencyProducer.isActive()},{"updates",latencyBatches},
+                                {"phase",table->property("projectionPhase").toString()},
+                                {"opacity",table->property("projectionOpacity").toReal()},
+                                {"offset",table->property("projectionOffsetY").toReal()},
+                                {"pending",probeSections.projectionPending()},
+                                {"viewCount",viewport->property("count").toInt()},{"modelCount",probeSections.rowCount()},
+                                {"valid",now.valid},{"changedVisibleOrder",changedOrder},{"readable",readable},
+                                {"visibleOrder",QJsonArray::fromStringList(order)}};
+                            lastLatencyGeometry=now;lastLatencyObservation=observation;
+                            if(latencySamples.size()<128)latencySamples.append(observation);
+                            if(readable){
+                                auto &first=frame?firstReadableFrame:firstReadableTimer;
+                                if(first.isEmpty()){first=observation;first.insert("geometry",geometryEvidence(now));}
+                                if(frame)++readableFrames;else ++readableTimers;
+                            }
+                        };
+                        QObject::connect(&latencyObserver,&QTimer::timeout,&latencyContext,[&]{sampleLatency("timer");});
+                        const auto latencyFrames=QObject::connect(window,&QQuickWindow::frameSwapped,&latencyContext,
+                            [&]{sampleLatency("frame-notification");},Qt::QueuedConnection);
+                        latencyClock.start();latencyProducer.start();latencyObserver.start();
+                        const bool readableWhileProducing=QTest::qWaitFor([&]{
+                            return latencyProducer.isActive()&&latencyBatches>=8&&readableFrames>0&&readableTimers>0;
+                        },3500);
+                        const bool producerStillActive=latencyProducer.isActive();
+                        latencySampling=false;latencyObserver.stop();latencyProducer.stop();
+                        QObject::disconnect(latencyFrames);
+                        check(readableWhileProducing&&producerStillActive,
+                            "continuous latency sorting exposes readable new orderings before the producer stops");
+                        const QJsonObject latencyReport{
+                            {"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"nodeCount",probeCount},
+                            {"phase","continuous-latency-sort"},{"producerIntervalMs",10},{"observerIntervalMs",8},
+                            {"sampleSemantics","GUI text geometry at timer or queued frameSwapped delivery; not GPU frame reconstruction"},
+                            {"initialVisibleOrder",QJsonArray::fromStringList(initialLatencyOrder)},
+                            {"updates",latencyBatches},{"frameSamples",frameSamples},{"timerSamples",timerSamples},
+                            {"readableFrameSamples",readableFrames},{"readableTimerSamples",readableTimers},
+                            {"producerActiveAtDecision",producerStillActive},{"readableWhileProducing",readableWhileProducing},
+                            {"samples",latencySamples},{"lastObservation",lastLatencyObservation},
+                            {"firstReadableFrame",firstReadableFrame},{"firstReadableTimer",firstReadableTimer},
+                            {"lastGeometry",geometryEvidence(lastLatencyGeometry)},
+                            {"geometryReference","Original probe fixture baseline; not the latency-sort pass condition"}};
+                        qInfo().noquote()<<"NODE_PROBE_CONTINUOUS_LATENCY"<<QJsonDocument(latencyReport).toJson(QJsonDocument::Compact);
+                        if(!qa.isEmpty()){
+                            const auto base=qa+QString("/node-probe-continuous-latency-%1").arg(probeCount);
+                            QFile report(base+".json");
+                            if(report.open(QIODevice::WriteOnly))report.write(QJsonDocument(latencyReport).toJson(QJsonDocument::Indented));
+                            // The workload's result is already fixed and every
+                            // recorded sample was captured before producer stop.
+                            if(!readableWhileProducing)window->grabWindow().save(base+"-after-stop.png");
+                        }
+                    }
+                    probeValues=latencySavedValues;probeRows.updateRows(probeValues);
+                    probeRows.setFilters(latencySavedFilters);
+                    const bool latencyRestored=QTest::qWaitFor(settled,3500);
+                    viewport->setProperty("contentY",latencySavedScroll);
+                    check(latencyRestored&&probeRows.filters()==latencySavedFilters
+                        &&QTest::qWaitFor(settled,3500)
+                        &&qAbs(viewport->property("contentY").toReal()-latencySavedScroll)<0.5,
+                        "continuous latency fixture restores the original data projection and scroll");
+                    if(latencyReady)finishTransition(false,false);
+                }
                 // Continue result traffic while the user changes the view.
                 // These are isolated public row fixtures; protocol/cancellation
                 // execution is covered by the separate real-chain tests.

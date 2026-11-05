@@ -14,6 +14,10 @@
 #ifdef SWIRL_UI_TESTS
 #include <QQmlDebuggingEnabler>
 #include <QtQml/private/qqmlengine_p.h>
+#include <QtQml/private/qqmldata_p.h>
+#include <QtQml/private/qqmlcontextdata_p.h>
+#include <QElapsedTimer>
+#include <QScopedValueRollback>
 #include <QtQuickTemplates2/private/qquickcontrol_p_p.h>
 #include <QJsonArray>
 #include <QSet>
@@ -110,6 +114,124 @@ public:
         return QGuiApplication::notify(receiver,event);
     }
 };
+
+struct QmlVmeWarningCapture {
+    const char *phase="setup-before-main-load";
+    QElapsedTimer firstMatch;
+    QSet<const QObject *> observedObjects;
+    bool reporting=false;
+};
+
+static QString qmlWarningAddress(const void *value)
+{
+    return value?QString::number(reinterpret_cast<quintptr>(value),16):QString();
+}
+
+static QJsonObject qmlWarningObjectState(QObject *object)
+{
+    QJsonObject result{{"present",object!=nullptr},{"address",qmlWarningAddress(object)}};
+    if(!object)return result;
+    const auto *objectState=QObjectPrivate::get(object);
+    result.insert("wasDeleted",bool(objectState->wasDeleted));
+    result.insert("isDeletingChildren",bool(objectState->isDeletingChildren));
+    if(objectState->wasDeleted || objectState->isDeletingChildren)return result;
+    result.insert("type",QString::fromLatin1(object->metaObject()->className()));
+    // QObject::objectName() can register a binding dependency and allocate ExtraData.
+    // Read only its already-stored value, without invoking that getter.
+    result.insert("objectName",objectState->extraData
+                  ?objectState->extraData->objectName.valueBypassingBindings():QString());
+    result.insert("parentAddress",qmlWarningAddress(object->parent()));
+    result.insert("ownership",QQmlEngine::objectOwnership(object)==QQmlEngine::CppOwnership
+                  ?QStringLiteral("CppOwnership"):QStringLiteral("JavaScriptOwnership"));
+    const auto *data=QQmlData::get(object,false);
+    result.insert("qmlDataPresent",data!=nullptr);
+    if(data)result.insert("qmlData",QJsonObject{
+        {"indestructible",bool(data->indestructible)},
+        {"explicitIndestructibleSet",bool(data->explicitIndestructibleSet)},
+        {"isQueuedForDeletion",bool(data->isQueuedForDeletion)},
+        {"rootObjectInCreation",bool(data->rootObjectInCreation)},
+        {"hasVMEMetaObject",bool(data->hasVMEMetaObject)},
+        {"jsWrapperAllocated",data->jsWrapper.valueRef()!=nullptr},
+        {"jsWrapperUndefined",data->jsWrapper.isUndefined()}});
+    return result;
+}
+
+static QJsonObject qmlWarningContextChain(QQmlContextData *context)
+{
+    QJsonArray entries;
+    constexpr int maximumContexts=8;
+    while(context && entries.size()<maximumContexts){
+        const auto parent=context->parent();
+        entries.append(QJsonObject{
+            {"address",qmlWarningAddress(context)},
+            {"valid",context->isValid()},
+            {"rootObjectInCreation",context->isRootObjectInCreation()},
+            {"contextObject",qmlWarningObjectState(context->contextObject())},
+            {"parentContextAddress",qmlWarningAddress(parent.data())}});
+        context=parent.data();
+    }
+    return QJsonObject{{"entries",entries},{"truncated",context!=nullptr}};
+}
+
+static void recordQmlVmeWarningContext(QQmlApplicationEngine &engine,
+                                      QmlVmeWarningCapture &capture,
+                                      const QList<QQmlError> &warnings)
+{
+    // Only inspect the first bounded cluster. This records C++/QML ownership
+    // metadata and never reads a QML property, evaluates JavaScript, drains an
+    // incubator, or creates a public QQmlContext wrapper.
+    if(capture.reporting)return;
+    constexpr int maximumObjects=16;
+    constexpr qint64 firstClusterMs=250;
+    for(const auto &warning:warnings){
+        const auto description=warning.description();
+        const bool matches=description.contains(QStringLiteral("Cannot find member data"))
+            ||(description.contains(QStringLiteral("is not a function"))
+               &&(description.contains(QStringLiteral("'scheduleRefresh'"))
+                  ||description.contains(QStringLiteral("'contourPath'"))));
+        if(!matches)continue;
+        if(!capture.firstMatch.isValid())capture.firstMatch.start();
+        if(capture.firstMatch.elapsed()>firstClusterMs
+            ||capture.observedObjects.size()>=maximumObjects)return;
+        auto *object=warning.object();
+        if(capture.observedObjects.contains(object))continue;
+        capture.observedObjects.insert(object);
+        QScopedValueRollback<bool> reporting(capture.reporting,true);
+        const auto *engineState=QQmlEnginePrivate::get(&engine);
+        const int inProgressBefore=engineState->inProgressCreations;
+        auto *controller=engine.incubationController();
+        QJsonArray parents;
+        const auto *objectState=object?QObjectPrivate::get(object):nullptr;
+        const bool objectAlive=objectState&&!objectState->wasDeleted&&!objectState->isDeletingChildren;
+        auto *parent=objectAlive?object->parent():nullptr;
+        constexpr int maximumParents=16;
+        while(parent && parents.size()<maximumParents){
+            parents.append(qmlWarningObjectState(parent));
+            const auto *parentState=QObjectPrivate::get(parent);
+            if(parentState->wasDeleted || parentState->isDeletingChildren)break;
+            parent=parent->parent();
+        }
+        const auto *data=objectAlive?QQmlData::get(object,false):nullptr;
+        const auto url=warning.url();
+        const QJsonObject record{
+            {"phase",QString::fromLatin1(capture.phase)},
+            {"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},
+            {"elapsedMs",capture.firstMatch.elapsed()},
+            {"captureLimit",maximumObjects},{"clusterWindowMs",firstClusterMs},
+            {"capturedObjects",static_cast<int>(capture.observedObjects.size())},
+            {"description",description},{"url",url.scheme()==QStringLiteral("qrc")?url.toString():url.fileName()},
+            {"line",warning.line()},{"column",warning.column()},
+            {"object",qmlWarningObjectState(object)},
+            {"parents",parents},{"parentsTruncated",parent!=nullptr},
+            {"context",qmlWarningContextChain(data?data->context:nullptr)},
+            {"outerContext",qmlWarningContextChain(data?data->outerContext:nullptr)},
+            {"inProgressCreations",inProgressBefore},
+            {"publicIncubators",controller?controller->incubatingObjectCount():0},
+            {"inProgressAfterObservation",engineState->inProgressCreations},
+            {"scope",QStringLiteral("First matching warning cluster in isolated node UI checks; raw metadata only. No QML property evaluation or warning suppression.")}};
+        qInfo().noquote()<<"QML_VME_WARNING_CONTEXT"<<QJsonDocument(record).toJson(QJsonDocument::Compact);
+    }
+}
 
 static void recordQmlCreationLifecycle(QQmlApplicationEngine &engine, const char *phase)
 {
@@ -431,6 +553,10 @@ int main(int argc, char *argv[])
     SystemDataProvider systemData(&capture,&engineController,&diagnostics);
     MotionPolicy motionPolicy;
     DismissalController dismissals;
+#ifdef SWIRL_UI_TESTS
+    // Declared before the engine so warning callbacks cannot outlive this state.
+    QmlVmeWarningCapture qmlVmeWarnings;
+#endif
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("fontManager", &fontManager);
     engine.rootContext()->setContextProperty("motionPolicy", &motionPolicy);
@@ -447,8 +573,15 @@ int main(int argc, char *argv[])
     bool xrayUiCompleted = false;
     bool xrayUiTimedOut = false;
     QObject::connect(&engine, &QQmlEngine::warnings, &app,
-                     [&qmlWarnings, smoke, interaction, captureTest, windowTest](const QList<QQmlError> &warnings) {
+                     [&qmlWarnings, smoke, interaction, captureTest, windowTest
+#ifdef SWIRL_UI_TESTS
+                      , &engine, &qmlVmeWarnings, nodeTest
+#endif
+                     ](const QList<QQmlError> &warnings) {
                          if (!warnings.isEmpty()) qmlWarnings = true;
+#ifdef SWIRL_UI_TESTS
+                         if(nodeTest)recordQmlVmeWarningContext(engine,qmlVmeWarnings,warnings);
+#endif
                      });
     const QStringList arguments = app.arguments();
     const auto argumentValue = [&arguments](const QString &prefix) {
@@ -529,8 +662,12 @@ int main(int argc, char *argv[])
 #ifdef SWIRL_UI_TESTS
     if(hdrTest)return runHdrChecks();
 #endif
+#ifdef SWIRL_UI_TESTS
+    qmlVmeWarnings.phase="main-load";
+#endif
     engine.loadFromModule("SwirlQuick", "Main");
 #ifdef SWIRL_UI_TESTS
+    qmlVmeWarnings.phase="after-main-load";
     recordQmlCreationLifecycle(engine,"after-main-load");
 #endif
     if (engine.rootObjects().isEmpty())
@@ -679,7 +816,12 @@ int main(int argc, char *argv[])
 #endif
     if(nodeTest) {
 #ifdef SWIRL_UI_TESTS
-        QTimer::singleShot(400,&app,[&app,rootWindow,&engineController]{app.exit(runNodeUiChecks(rootWindow,&engineController));});
+        QTimer::singleShot(400,&app,[&app,rootWindow,&engineController,&qmlVmeWarnings]{
+            qmlVmeWarnings.phase="node-self-test";
+            const int result=runNodeUiChecks(rootWindow,&engineController);
+            qmlVmeWarnings.phase="after-node-self-test";
+            app.exit(result);
+        });
 #else
         return 4;
 #endif
@@ -943,14 +1085,18 @@ int main(int argc, char *argv[])
     }
     const int result = app.exec();
 #ifdef SWIRL_UI_TESTS
+    qmlVmeWarnings.phase="after-event-loop";
     recordQmlCreationLifecycle(engine,"after-event-loop");
+    qmlVmeWarnings.phase="existing-incubation-drain";
 #endif
     // Drain any lazy Qt Controls creation before the engine is destroyed.
     // This also keeps scripted page-navigation shutdown free of incubation warnings.
     if (auto *controller = engine.incubationController())
         controller->incubateFor(100);
 #ifdef SWIRL_UI_TESTS
+    qmlVmeWarnings.phase="after-existing-incubation-drain";
     recordQmlCreationLifecycle(engine,"after-existing-incubation-drain");
+    qmlVmeWarnings.phase="main-return";
 #endif
     const int finalResult=(xrayUiTest || heroTest || radiusTest || nodeTest || policyTest || motionTest || activityLayoutTest || previewMode || engineTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
     if(xrayUiTest) {

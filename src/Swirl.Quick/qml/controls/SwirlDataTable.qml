@@ -142,6 +142,10 @@ Item {
         } finally {if(observer)observer.mark(9,false)}
     }
     function beginProjection() {
+        // The next model deadline is already running. Finish the previous
+        // incoming pose before fading it out again, so continuous structural
+        // updates cannot recursively restart the exit from a near-zero alpha.
+        if(stagedProjection&&projectionPhase==="in"&&projectionEnter)projectionEnter.complete()
         ++projectionGeneration
         if(!projectionBlocked)saveViewport()
         if(stagedProjection) {
