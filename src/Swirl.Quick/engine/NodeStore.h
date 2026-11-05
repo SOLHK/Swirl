@@ -73,6 +73,7 @@ public:
     bool prepareRemoveNode(const QString &,ImportPlan *);
     bool prepareSaveSubscription(const QString &id,const QString &name,const QUrl &,int intervalMinutes,bool enabled,const QString &formatHint,const QString &importScope,ImportPlan *,const QString &downloadRoute={});
     bool prepareRemoveSubscription(const QString &,ImportPlan *);
+    bool prepareSelectSubscription(const QString &,ImportPlan *);
     bool prepareCleanLegacyNodes(ImportPlan *);
     bool commitImport(const ImportPlan &plan, const QJsonObject &networkConfiguration = {});
     // Returns whether the immutable plan was queued. On rejection no callback

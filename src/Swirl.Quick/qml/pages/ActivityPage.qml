@@ -449,6 +449,7 @@ Item {
                 knotTarget: statusEmblem
                 cardViewport: scroll
                 behindCards: page.ribbonBack; frontLayer: page.ribbonFront
+                cardItems: [statusCard, trafficCard, sourcesCard, diagnosticCard, connectionsCard]
                 proxyAnchor: page.proxyAnchor; sidebarAnchor: page.sidebarAnchor; wingScene: page.wingScene
                 toolbarItems: page.toolbarItems
                 wide: page.wide; gap: content.gap

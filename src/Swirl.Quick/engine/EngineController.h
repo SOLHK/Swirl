@@ -38,6 +38,8 @@ class EngineController final : public QObject {
     Q_PROPERTY(QString controlEndpoint READ controlEndpoint NOTIFY statusChanged)
     Q_PROPERTY(QVariantList nodes READ nodes NOTIFY nodesChanged)
     Q_PROPERTY(QVariantList nodeCatalog READ nodeCatalog NOTIFY nodeCatalogChanged)
+    Q_PROPERTY(QString activeSubscriptionId READ activeSubscriptionId NOTIFY optionsChanged)
+    Q_PROPERTY(bool subscriptionScopeEnabled READ subscriptionScopeEnabled NOTIFY optionsChanged)
     Q_PROPERTY(QString selectedNodeId READ selectedNodeId NOTIFY selectionChanged)
     Q_PROPERTY(QString selectedNodeName READ selectedNodeName NOTIFY selectionChanged)
     Q_PROPERTY(bool connected READ connected NOTIFY statusChanged)
@@ -76,6 +78,7 @@ class EngineController final : public QObject {
     Q_PROPERTY(QStringList lanAddresses READ lanAddresses NOTIFY lanAddressesChanged)
     Q_PROPERTY(bool tunRequested READ tunRequested NOTIFY statusChanged)
     Q_PROPERTY(bool tunEnabled READ tunEnabled NOTIFY statusChanged)
+    Q_PROPERTY(bool tunSupported READ tunSupported CONSTANT)
     Q_PROPERTY(bool elevated READ elevated CONSTANT)
     Q_PROPERTY(QVariantMap dnsConfiguration READ dnsConfiguration NOTIFY optionsChanged)
     Q_PROPERTY(QVariantList policyGroups READ policyGroups NOTIFY optionsChanged)
@@ -136,7 +139,10 @@ public:
     Q_INVOKABLE void refresh();
     QVariantList nodes() const;
     QVariantList nodeDiagnosticRows() const;
-    QVariantList nodeCatalog() const { return m_store.publicRows(); }
+    QVariantList nodeCatalog() const;
+    QString activeSubscriptionId() const { return m_store.networkConfiguration().value("activeSubscriptionId").toString(); }
+    bool subscriptionScopeEnabled() const { return m_store.networkConfiguration().contains("activeSubscriptionId"); }
+    Q_INVOKABLE bool selectSubscription(const QString &id);
     QString selectedNodeId() const { return m_store.selectedId(); }
     QString selectedNodeName() const;
     bool connected() const { const auto s=m_engine->status();return s.apiHealthy&&s.processAlive&&(!s.selectedNodeId.isEmpty()||s.directSession||!m_options.policyDocument.isEmpty()); }
@@ -174,6 +180,7 @@ public:
     ConnectionDiagnostics *diagnostics() {return &m_diagnostics;}
     QString proxyEnvironmentAdvice() const;
     bool tunRequested() const { return m_options.tunEnabled; }
+    bool tunSupported() const;
     Q_INVOKABLE void setCaptureProxyPort(int port);
     bool tunEnabled() const { return m_engine->status().tunEnabled&&apiHealthy()&&processAlive(); }
     bool elevated() const;
@@ -261,6 +268,7 @@ signals:
 private:
     friend class PolicyConfigurationTests;
     QString nodeConnectionState(const QString &id) const;
+    QList<ProxyNode> availableNodes() const;
     void refreshLanAddresses();
     QStringList m_lanAddresses;
     QList<QNetworkInterface> m_interfaces;
@@ -344,6 +352,7 @@ private:
     int m_policyRecoveryAttempts=0;
     QJsonObject m_policyCandidateNetwork,m_policyObservedReceipt,m_policyRuntimeCandidate;
     QString m_policyOperation,m_policyMigrationError;
+    QStringList m_policyRevokedNodeIds;
     bool m_policyRollingBack=false;
     bool m_policyDiskWrite=false;
     std::optional<NodeStore::ImportPlan> m_policyCatalog;

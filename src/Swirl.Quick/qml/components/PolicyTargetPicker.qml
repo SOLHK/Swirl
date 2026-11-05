@@ -34,8 +34,8 @@ SwirlDialog {
     onClosed:search.clear()
     stateFingerprint:Qt.md5(JSON.stringify(selectedTarget))
     dismissBlocked:pending
-    width:Math.floor(Math.min(Theme.dp(600),parent?parent.width-Theme.dp(36):Theme.dp(600)))
-    height:Math.floor(Math.min(Theme.dp(580),parent?parent.height-Theme.dp(36):Theme.dp(580)))
+    width:Math.floor(Math.min(Theme.dp(600),parent?parent.width-2*margins:Theme.dp(600)))
+    height:Math.floor(Math.min(Theme.dp(580),parent?parent.height-2*margins:Theme.dp(580)))
     contentItem:ColumnLayout {
         spacing:Theme.dp(12)
         RowLayout {
@@ -58,9 +58,10 @@ SwirlDialog {
             delegate:SwirlMotionButton {
                 id:option;required property var modelData;required property int index
                 objectName:modelData.kind==="node"?"policyNode-"+modelData.id:"policyTarget-group-"+modelData.id
-                width:Math.floor(ListView.view.width);height:Theme.dp(48);padding:Theme.dp(10);hoverEnabled:true
+                width:Math.floor(ListView.view.width);height:Theme.dp(modelData.kind==="node"?56:48);padding:Theme.dp(10);hoverEnabled:true
                 enabled:Boolean(modelData.available)&&!picker.pending
                 Accessible.name:String(modelData.name)+(modelData.available?"":qsTr("，当前不可用"))
+                Accessible.description:String(modelData.sourceName||"")
                 background:SwirlControlSurface {
                     radius:Theme.pillRadius(height)
                     quiet:true
@@ -72,7 +73,11 @@ SwirlDialog {
                 }
                 contentItem:RowLayout {
                     spacing:Theme.dp(10)
-                    SwirlText {Layout.fillWidth:true;Layout.minimumWidth:0;Layout.alignment:Qt.AlignBaseline;text:String(option.modelData.name);textFormat:Text.PlainText;color:option.enabled?Theme.text:Theme.muted;font.pixelSize:Theme.fontSize(13);elide:Text.ElideRight}
+                    ColumnLayout {
+                        Layout.fillWidth:true;Layout.minimumWidth:0;spacing:Theme.dp(2)
+                        SwirlText {Layout.fillWidth:true;Layout.minimumWidth:0;text:String(option.modelData.name);textFormat:Text.PlainText;color:option.enabled?Theme.text:Theme.muted;font.pixelSize:Theme.fontSize(13);elide:Text.ElideRight}
+                        SwirlText {Layout.fillWidth:true;visible:option.modelData.kind==="node";text:String(option.modelData.sourceName||"");textFormat:Text.PlainText;color:Theme.muted;font.pixelSize:Theme.fontSize(10);elide:Text.ElideRight}
+                    }
                     SwirlText {visible:!option.modelData.available;Layout.alignment:Qt.AlignBaseline;text:qsTr("当前不可用");color:Theme.muted;font.pixelSize:Theme.fontSize(11)}
                     SwirlIcon {name:"checkmark";opacity:Policy.sameTarget(picker.selectedTarget,option.modelData)?1:0;size:Theme.dp(16);color:Theme.text;Accessible.ignored:true}
                 }

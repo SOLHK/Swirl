@@ -15,7 +15,19 @@ Set-StrictMode -Version Latest
 # Preserve the type and exact RegQueryValueExW bytes with NtSetValueKey's
 # explicit DataSize, including a missing terminator or present empty value.
 if (-not ('SwirlIntegration.NativeRegistry' -as [type])) {
-    Add-Type -TypeDefinition @'
+    # NSIS runs the uninstall helper from its plugin directory, which contains
+    # a native System.dll. Windows PowerShell's CodeDOM compiler searches that
+    # working directory before the framework for bare assembly references.
+    # Rooted references replace its same-named defaults; use assemblies already
+    # loaded by this runtime, without changing directories or relaxing checks.
+    $nativeRegistryTypeArguments = @{}
+    if ($PSVersionTable.PSEdition -eq 'Desktop') {
+        $nativeRegistryTypeArguments.ReferencedAssemblies = @(
+            [System.ComponentModel.Win32Exception].Assembly.Location
+            [System.Linq.Enumerable].Assembly.Location
+        )
+    }
+    Add-Type @nativeRegistryTypeArguments -TypeDefinition @'
 using System;
 using System.ComponentModel;
 using System.Runtime.InteropServices;

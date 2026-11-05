@@ -2,8 +2,9 @@
 
 Run only in the disposable Windows CI checkout after its Qt runtime is deployed.
 The negative control replaces only EngineController.cpp/.h with exact Git blobs;
-the tests, SystemProxySession, Rust library and toolchain stay the same. Restore
-the candidate bytes and rebuild before any product test or packaging continues.
+the tests, SystemProxySession, Rust library and toolchain stay the same. A private
+test-target definition excludes later subscription APIs from the old control.
+Restore candidate bytes and the full test target before continuing.
 """
 from __future__ import annotations
 
@@ -18,6 +19,7 @@ import xml.etree.ElementTree as ET
 
 
 BASELINE = "0a38491d2b87ba9790ebe4e9b797d30680c9e960"
+CONTROL_DEFINITION = "SWIRL_PROXY_STOP_NEGATIVE_CONTROL"
 CONTROLLER_FILES = (
     "src/Swirl.Quick/engine/EngineController.cpp",
     "src/Swirl.Quick/engine/EngineController.h",
@@ -90,8 +92,9 @@ def main() -> int:
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     summary = {"schema": 1, "baseline_controller_commit": BASELINE,
-               "scope": "Exact old controller blobs with current tests and dependencies; isolated backend, not Windows Desktop acceptance",
-               "success": False, "candidate_restored": False, "errors": []}
+               "scope": "Exact old controller blobs with the same six stop cases and dependencies; later subscription APIs excluded only from the old test target; isolated backend, not Windows Desktop acceptance",
+               "success": False, "candidate_restored": False,
+               "candidate_test_configuration_restored": False, "errors": []}
     snapshots = {name: (repo / name).read_bytes() for name in (*CONTROLLER_FILES, *UNCHANGED_FILES)}
     summary["candidate_file_sha256"] = {name: digest(data) for name, data in snapshots.items()}
     process_tree_safe = True
@@ -126,6 +129,15 @@ def main() -> int:
                     f"{output / (label + '.txt')},txt"], label, 120)
         return check_report(xml, code, negative)
 
+    def configure_control(negative: bool) -> None:
+        label = "baseline" if negative else "candidate"
+        enabled = "ON" if negative else "OFF"
+        code = run(["cmake", "-S", str(repo / "src/Swirl.Quick"), "-B", str(build),
+                    f"-D{CONTROL_DEFINITION}:BOOL={enabled}"], f"{label}-configure", 300)
+        assert code == 0, f"{label} test-target configuration failed: {code}"
+        cache = (build / "CMakeCache.txt").read_text(encoding="utf-8")
+        assert f"{CONTROL_DEFINITION}:BOOL={enabled}" in cache.splitlines(), "Wrong test-target control definition"
+
     try:
         summary["source_sha"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
         subprocess.run(["git", "diff", "--exit-code", "HEAD", "--", *snapshots], cwd=repo, check=True)
@@ -136,6 +148,7 @@ def main() -> int:
         try:
             for name, data in baseline.items():
                 (repo / name).write_bytes(data)
+            configure_control(True)
             summary["negative_control"] = execute("baseline", True)
         except Exception as error:
             summary["errors"].append(f"negative_control: {type(error).__name__}: {error}")
@@ -143,8 +156,14 @@ def main() -> int:
             if process_tree_safe:
                 for name in CONTROLLER_FILES:
                     (repo / name).write_bytes(snapshots[name])
+                try:
+                    configure_control(False)
+                    summary["candidate_test_configuration_restored"] = True
+                except Exception as error:
+                    summary["errors"].append(f"candidate_configuration: {type(error).__name__}: {error}")
             summary["candidate_restored"] = all((repo / name).read_bytes() == data for name, data in snapshots.items())
         assert summary["candidate_restored"], "Current production source or tests were not restored exactly"
+        assert summary["candidate_test_configuration_restored"], "Candidate's full test target was not restored"
         assert "timed_out_command" not in summary, "A timed-out build/test cannot proceed to candidate execution"
         summary["candidate"] = execute("candidate", False)
         subprocess.run(["git", "diff", "--exit-code", "HEAD", "--", *snapshots], cwd=repo, check=True)

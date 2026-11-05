@@ -5,6 +5,7 @@ SwirlCardSurface {
     id: card
     property Item titleItem: null
     property string title: ""
+    readonly property Item decorationLayer: decorations
     property bool keyboardPressed: false
     property bool keyboardFocus: false
     signal activated()
@@ -51,5 +52,13 @@ SwirlCardSurface {
         cursorShape: Qt.PointingHandCursor
         onClicked: { card.forceActiveFocus(Qt.MouseFocusReason); card.keyboardFocus = false; card.activated() }
     }
-    Item { id: body; anchors.fill: parent }
+    Item {
+        id: decorations
+        parent: card
+        // Stay inside the continuous rounded fill, leaving its edge clear.
+        x: card.radius * 0.25; y: x
+        width: card.width - 2 * x; height: card.height - 2 * y
+        clip: true; enabled: false; Accessible.ignored: true
+    }
+    Item { id: body; objectName: "activityCardContent"; anchors.fill: parent; z: 1 }
 }

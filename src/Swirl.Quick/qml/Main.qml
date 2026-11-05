@@ -148,9 +148,9 @@ ApplicationWindow {
                 SwirlStatusCapsule {
                     id: tunCapsule; objectName: "tunCapsule"
                     Layout.preferredWidth: implicitWidth; Layout.preferredHeight: Theme.toolbarHeight
-                    label: engineController.tunEnabled ? qsTr("TUN · 已开") : qsTr("TUN · 未开启")
+                    label: engineController.tunEnabled ? qsTr("TUN · 已开") : engineController.tunRequested ? qsTr("TUN · 待启用") : qsTr("TUN · 未开启")
                     detail: engineController.routingError || (engineController.tunEnabled
-                        ? qsTr("TUN 模式已开启，点击关闭") : qsTr("当前 Rust Core 暂不支持 TUN 模式"))
+                        ? qsTr("TUN 模式已开启，关闭代理后可切换模式") : engineController.tunSupported ? qsTr("先配置加密 DNS，再选择 TUN；开启代理时将请求管理员授权。") : qsTr("TUN 组件或驱动缺失，请重新安装完整测试包。"))
                     tone: engineController.tunEnabled ? "success" : "neutral"
                     enabled: !engineController.busy
                     onClicked: {
@@ -180,6 +180,10 @@ ApplicationWindow {
             SwirlPageHost {
                 routeKey:AppState.currentPage==="requestlogs" || AppState.currentPage==="dashboard" ? "activity" : AppState.currentPage
                 id:pageLoader; objectName:"pageLoader";insetRoutes:AppState.settingsRoutes;routeInset:0; x:Theme.dp(0); y:AppState.currentPage==="activity"?Theme.dp(12):Theme.dp(48); width:parent.width; height:parent.height-y-Theme.dp(12)
+                onRouteFailed:(failedRoute,fallbackRoute)=>{
+                    if(AppState.currentPage===failedRoute){if(AppState.canGoBack)AppState.goBack();else if(fallbackRoute.length)AppState.navigate(fallbackRoute)}
+                    AppState.notice(qsTr("无法加载此页面，请重试。"))
+                }
                 sourceComponent:AppState.currentPage==="overview" ? overview :
                                 AppState.currentPage==="activity" || AppState.currentPage==="requestlogs" || AppState.currentPage==="dashboard" ? activity :
                                 AppState.currentPage==="capture" ? capturePage :

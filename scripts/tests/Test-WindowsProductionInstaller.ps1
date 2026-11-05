@@ -28,6 +28,10 @@ $target = Join-Path $root 'install'
 Assert-SwirlPathWithoutLinks $root
 New-Item -ItemType Directory -Path $root | Out-Null
 $processes = New-Object 'System.Collections.Generic.List[object]'
+$tunMaintenance = $env:SWIRL_NATIVE_TUN_ACCEPTANCE -eq '1'
+$preserveTunRecoveryFiles = $false
+$tunMarkerBefore = $null
+$tunJournal = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'Swirl/NativeTun'
 $result = [ordered]@{
     schema=1; source_sha=$source; installer_sha256=(Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
     scope='Actual production NSIS isolated install, installed runtime and uninstall on a disposable Windows runner.'
@@ -39,6 +43,8 @@ $result = [ordered]@{
     installed_empty_directories=@(); remaining_installation_entries=$null
     user_integration_unchanged=$false; remaining_owned_processes=$null; fixture_removed=$false
     failure_diagnostics_preserved=$false
+    tun_pending_uninstall=[ordered]@{requested=$tunMaintenance;scope='test marker only and empty fixed journal; no native_tun_start, adapter or WAN traffic';
+        marker_set=$false;marker_cleared_by_maintenance=$false;journal_empty_after=$false;original_marker_restored=$false;verified=$false;recovery_files_retained=$false}
     forced_termination=$false; processes=$processes; success=$false; error=$null
 }
 $savedEnvironment = @{}
@@ -84,6 +90,35 @@ function Get-OwnedProcesses {
         $_.ExecutablePath -and ([string]$_.ExecutablePath).StartsWith($root + '\',[StringComparison]::OrdinalIgnoreCase)
     })
 }
+function Read-TunRecoveryMarker {
+    $hive=[Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::CurrentUser,[Microsoft.Win32.RegistryView]::Registry32)
+    $key=$null
+    try {
+        $key=$hive.OpenSubKey('Software\SOLHK\Swirl\NativeTun',$false)
+        if ($null -eq $key -or 'recoveryPending' -notin $key.GetValueNames()) { return @{exists=$false;value=0} }
+        if ($key.GetValueKind('recoveryPending') -ne [Microsoft.Win32.RegistryValueKind]::DWord) { throw 'Unexpected preexisting TUN recovery marker type.' }
+        $value=$key.GetValue('recoveryPending')
+        if ($value -notin @(0,1)) { throw 'Unexpected TUN recovery marker value.' }
+        return @{exists=$true;value=[int]$value}
+    } finally { if($null -ne $key){$key.Dispose()};$hive.Dispose() }
+}
+function Write-TunRecoveryMarker([object]$State) {
+    $hive=[Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::CurrentUser,[Microsoft.Win32.RegistryView]::Registry32)
+    $key=$null
+    try {
+        $key=$hive.CreateSubKey('Software\SOLHK\Swirl\NativeTun',$true)
+        if ($State.exists) { $key.SetValue('recoveryPending',[int]$State.value,[Microsoft.Win32.RegistryValueKind]::DWord) }
+        else { $key.DeleteValue('recoveryPending',$false) }
+        $key.Flush()
+    } finally { if($null -ne $key){$key.Dispose()};$hive.Dispose() }
+}
+function Assert-EmptyTunJournal {
+    Assert-SwirlPathWithoutLinks $tunJournal
+    if ((Test-Path -LiteralPath $tunJournal) -and
+        (-not (Test-Path -LiteralPath $tunJournal -PathType Container) -or @(Get-ChildItem -LiteralPath $tunJournal -Force).Count)) {
+        throw 'Existing TUN journals or active owners must not enter an empty-journal installer check.'
+    }
+}
 function Run-InstalledProcess([string]$Name,[string]$Executable,[string]$Arguments,[int]$TimeoutSeconds) {
     $entry = [ordered]@{name=$Name; started_utc=[DateTime]::UtcNow.ToString('o'); elapsed_ms=$null; exited=$false; exit_code=$null}
     $processes.Add($entry)
@@ -101,8 +136,11 @@ function Run-InstalledProcess([string]$Name,[string]$Executable,[string]$Argumen
         $watch.Stop(); $entry.elapsed_ms = $watch.Elapsed.TotalMilliseconds
         if ($null -ne $process) {
             if (-not $process.HasExited) {
-                $result.forced_termination = $true
-                $process.Kill($true); $null = $process.WaitForExit(5000)
+                if ($preserveTunRecoveryFiles) { $entry['recovery_process_preserved']=$true }
+                else {
+                    $result.forced_termination = $true
+                    $process.Kill($true); $null = $process.WaitForExit(5000)
+                }
             }
             $process.Dispose()
         }
@@ -153,6 +191,16 @@ function Get-InstalledLayout {
 $before = $null
 try {
     $before = Snapshot-UserIntegration
+    if ($tunMaintenance) {
+        $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
+        try {
+            $principal=[Security.Principal.WindowsPrincipal]::new($identity)
+            if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Pending TUN uninstall CI requires an already-elevated token.' }
+        } finally {$identity.Dispose()}
+        Assert-EmptyTunJournal
+        $tunMarkerBefore=Read-TunRecoveryMarker
+        if ($tunMarkerBefore.exists -and $tunMarkerBefore.value -ne 0) { throw 'Preexisting pending TUN recovery must be preserved, not adopted by CI.' }
+    }
     $env:SWIRL_ISOLATED_INSTALL_ROOT = $root
     $env:SWIRL_TEST_ROOT = Join-Path $root 'runtime-state'
     New-Item -ItemType Directory -Path $env:SWIRL_TEST_ROOT | Out-Null
@@ -214,7 +262,22 @@ try {
     if (@(Get-OwnedProcesses).Count) { throw 'Installed product left a process running after normal exit.' }
     $uninstaller = Join-Path $root 'uninstall-runner.exe'
     Copy-Item -LiteralPath (Join-Path $target '卸载 Swirl.exe') -Destination $uninstaller
+    if ($tunMaintenance) {
+        Assert-EmptyTunJournal
+        $preserveTunRecoveryFiles=$true
+        Write-TunRecoveryMarker @{exists=$true;value=1}
+        $marker=Read-TunRecoveryMarker
+        if (-not $marker.exists -or $marker.value -ne 1) { throw 'The test-only pending marker was not durably written.' }
+        $result.tun_pending_uninstall.marker_set=$true
+    }
     $result.uninstaller_exit_code = Run-InstalledProcess 'uninstall' $uninstaller "/S _?=$target" 120
+    if ($tunMaintenance) {
+        $marker=Read-TunRecoveryMarker
+        if (-not $marker.exists -or $marker.value -ne 0) { throw 'The real production maintenance entry did not clear the pending DWORD.' }
+        $result.tun_pending_uninstall.marker_cleared_by_maintenance=$true
+        Assert-EmptyTunJournal
+        $result.tun_pending_uninstall.journal_empty_after=$true
+    }
     # Keep the actual remainder before fixture cleanup. File-only manifests
     # cannot reveal directories copied by NSIS that were empty from the start.
     $remainder = @(Get-InstalledLayout)
@@ -222,6 +285,14 @@ try {
     ConvertTo-Json -InputObject $remainder -Depth 6 | Set-Content -LiteralPath (Join-Path $evidence 'uninstall-remainder.json') -Encoding utf8
     $result.install_directory_removed = -not (Test-Path -LiteralPath $target)
     if (-not $result.install_directory_removed) { throw 'The actual production uninstaller left owned installation files behind.' }
+    if ($tunMaintenance) {
+        Write-TunRecoveryMarker $tunMarkerBefore
+        $restored=Read-TunRecoveryMarker
+        if ($restored.exists -ne $tunMarkerBefore.exists -or $restored.value -ne $tunMarkerBefore.value) { throw 'Original recovery marker state was not restored after verified maintenance.' }
+        $result.tun_pending_uninstall.original_marker_restored=$true
+        $result.tun_pending_uninstall.verified=$true
+        $preserveTunRecoveryFiles=$false
+    }
     $result.success = $true
 } catch {
     $result.error = $_.Exception.Message; $result.success = $false
@@ -244,11 +315,14 @@ try {
         $remaining = @(Get-OwnedProcesses)
         $result.remaining_owned_processes = $remaining.Count
         if ($remaining.Count) {
-            $result.success = $false; $result.forced_termination = $true
+            $result.success = $false
             if (-not $result.error) { $result.error = 'Owned installer or product processes remained after the normal lifecycle.' }
-            foreach ($entry in $remaining) {
-                $owned = [Diagnostics.Process]::GetProcessById([int]$entry.ProcessId)
-                try { if (-not $owned.HasExited) { $owned.Kill($true); $null = $owned.WaitForExit(5000) } } finally { $owned.Dispose() }
+            if (-not $preserveTunRecoveryFiles) {
+                $result.forced_termination=$true
+                foreach ($entry in $remaining) {
+                    $owned = [Diagnostics.Process]::GetProcessById([int]$entry.ProcessId)
+                    try { if (-not $owned.HasExited) { $owned.Kill($true); $null = $owned.WaitForExit(5000) } } finally { $owned.Dispose() }
+                }
             }
         }
         if ($null -ne $before) {
@@ -259,9 +333,14 @@ try {
         foreach ($entry in (Get-ChildItem -LiteralPath $root -Recurse -Force)) {
             if (($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Refusing to clean a linked installer fixture.' }
         }
-        Remove-Item -LiteralPath $root -Recurse -Force
-        $result.fixture_removed = -not (Test-Path -LiteralPath $root)
-        if (-not $result.fixture_removed) { $result.success = $false; $result.error = 'The unique installer fixture could not be removed.' }
+        if ($preserveTunRecoveryFiles) {
+            $result.tun_pending_uninstall.recovery_files_retained=Test-Path -LiteralPath $target
+            $result['retained_fixture']=$root
+        } else {
+            Remove-Item -LiteralPath $root -Recurse -Force
+            $result.fixture_removed = -not (Test-Path -LiteralPath $root)
+            if (-not $result.fixture_removed) { $result.success = $false; $result.error = 'The unique installer fixture could not be removed.' }
+        }
     } catch {
         $result.success = $false; $result.error = 'Installer lifecycle cleanup failed: ' + $_.Exception.Message
     } finally {

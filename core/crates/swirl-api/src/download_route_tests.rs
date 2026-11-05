@@ -245,16 +245,29 @@ async fn physical_dns_uses_pinned_source_and_rejects_replayed_transaction() {
 #[tokio::test]
 async fn truncated_physical_dns_udp_uses_the_same_pinned_tcp_server() {
     // Reserve the protocol pair together. Windows may exclude a port for only
-    // one transport, so retry the fixture allocation before starting either peer.
+    // one transport. Hold failed TCP candidates so port zero cannot select the
+    // same unavailable UDP port again before starting either peer.
     let mut pair = None;
+    let mut reserved = Vec::new();
+    let mut failures = Vec::new();
     for _ in 0..16 {
         let tcp = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        if let Ok(udp) = tokio::net::UdpSocket::bind(tcp.local_addr().unwrap()).await {
-            pair = Some((tcp, udp));
-            break;
+        let address = tcp.local_addr().unwrap();
+        match tokio::net::UdpSocket::bind(address).await {
+            Ok(udp) => {
+                pair = Some((tcp, udp));
+                break;
+            }
+            Err(error) => {
+                failures.push((address.port(), error.kind(), error.raw_os_error()));
+                reserved.push(tcp);
+            }
         }
     }
-    let (tcp, udp) = pair.expect("no available TCP/UDP fixture port pair");
+    let (tcp, udp) = pair.unwrap_or_else(|| {
+        panic!("no available TCP/UDP fixture port pair; failed candidates={failures:?}")
+    });
+    drop(reserved);
     let endpoint = Endpoint {
         address: tcp.local_addr().unwrap(),
         source: "127.0.0.1".parse().unwrap(),

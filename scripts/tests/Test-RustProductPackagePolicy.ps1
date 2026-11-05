@@ -2,14 +2,14 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot '../RustProductPackagePolicy.ps1')
 $allowed = @('licenses/LGPL-3.0-only.txt','Swirl.exe','swirl_api.dll','Qt6Core.dll',
-    'rules/cn-domain.mrs','rules/cn-ip.mrs','THIRD_PARTY_NOTICES.txt')
+    'rules/cn-domain.mrs','rules/cn-ip.mrs','THIRD_PARTY_NOTICES.txt','swirl-tun-broker.exe','swirl-tun-helper.exe','wintun.dll')
 $denied = @('mihomo.exe','engine/mihomo-windows-amd64.exe','licenses/mihomo.exe',
     'licenses/mihomo-GPL-3.0.txt','licenses\mihomo-GPL-3.0.txt','LICENSES/MIHOMO-GPL-3.0.TXT',
     'licenses/mihomo-GPL-3.0.txt.exe','mihomo-GPL-3.0.txt','other/licenses/mihomo-GPL-3.0.txt',
     'Mihomo.dll','clash.exe','xray.exe','sing-box.exe','mihomo-manifest.json',
     'SwirlRustCoreTests.exe','SwirlEngineFixture.exe','swirl_loader_fixture_1.dll',
     'swirl_loader_fixture_10.dll','nodes.dpapi','subscriptions.private',
-    'Swirl-diagnostics.txt','Swirl-motion-diagnostics.txt')
+    'Swirl-diagnostics.txt','Swirl-motion-diagnostics.txt','swirl-tun-packet-worker.exe','windows-tun-smoke.exe','windows-gateway-forward-smoke.exe')
 foreach ($path in $allowed) {
     if (Test-SwirlForbiddenProductPath $path) { throw "Allowed package entry was rejected: $path" }
 }
@@ -178,6 +178,7 @@ function Write-TlsFixturePe {
     [BitConverter]::GetBytes([uint32]64).CopyTo($bytes,60)
     [BitConverter]::GetBytes([uint32]0x4550).CopyTo($bytes,64)
     [BitConverter]::GetBytes($Machine).CopyTo($bytes,68)
+    [BitConverter]::GetBytes([uint16]0x20b).CopyTo($bytes,88)
     [IO.File]::WriteAllBytes($Path,$bytes)
 }
 
@@ -216,7 +217,7 @@ function New-TlsFixture {
         $records[$entry.Key]=@{sha256=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant();size=(Get-Item -LiteralPath $file).Length}
     }
     $runtimeTarget = if ($RustTarget -eq 'x86_64-pc-windows-msvc') { 'VC-WIN64A' } else { 'mingw64' }
-    $fixture = @{Root=$directory;Manifest=@{schema=1;source_sha=$tlsApplicationSha;rust=@{source_sha=$tlsApplicationSha;target=$RustTarget};files=@()};
+    $fixture = @{Root=$directory;Manifest=@{schema=1;source_sha=$tlsApplicationSha;rust=@{source_sha=$tlsApplicationSha;target=$RustTarget;build_id=('b'*64)};files=@()};
         Receipt=@{schema_version=1;status='success';version='3.5.9';source=@{sha256=$tlsSourceSha};target=$runtimeTarget;files=$records}}
     Write-TlsFixtureReceipt $fixture
     return $fixture
@@ -314,6 +315,43 @@ try {
         Assert-TlsFixtureRejected $fixture 'linked TLS directory' 'Linked package or output path is forbidden.'
     } finally { [IO.Directory]::Delete($link) }
 
+    # Synthetic PE images never execute. The genuine pinned driver is required
+    # for a successful product stage; this offline fixture exercises rejection.
+    $driver = Get-SwirlWintunArtifact
+    foreach ($fault in @('wrong-role','wrong-build','wrong-source','arm64-helper','changed-helper','untrusted-driver')) {
+        $fixture = New-TlsFixture
+        $binaries = [ordered]@{}
+        foreach ($program in @(@{name='swirl-tun-broker.exe';role='swirl_tun_broker'},@{name='swirl-tun-helper.exe';role='swirl_tun_helper'})) {
+            $file = Join-Path $fixture.Root $program.name
+            Write-TlsFixturePe $file
+            $binaries[$program.name] = @{sha256=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant();
+                identity=@{abi_version=1;role=$program.role;source_sha=$tlsApplicationSha;build_id=('b'*64);target='x86_64-pc-windows-msvc'}}
+        }
+        Write-TlsFixturePe (Join-Path $fixture.Root 'wintun.dll')
+        $notice = Join-Path $fixture.Root 'licenses/rust/crates/swirl-platform/licenses/WINTUN-0.14.1.txt'
+        New-Item -ItemType Directory -Force -Path ([IO.Path]::GetDirectoryName($notice)) | Out-Null
+        Copy-Item -LiteralPath $driver.notice -Destination $notice
+        $tun = @{schema=1;kind='windows-native-tun-payload';source_sha=$tlsApplicationSha;build_id=('b'*64);target='x86_64-pc-windows-msvc';
+            binaries=$binaries;driver=@{version=$driver.version;source=$driver.url;archive_sha256=$driver.archive_sha256;sha256=$driver.sha256}}
+        switch ($fault) {
+            'wrong-role' { $binaries['swirl-tun-broker.exe'].identity.role='swirl_tun_helper' }
+            'wrong-build' { $binaries['swirl-tun-helper.exe'].identity.build_id=('c'*64) }
+            'wrong-source' { $binaries['swirl-tun-helper.exe'].identity.source_sha=('a'*40) }
+            'arm64-helper' {
+                $file=Join-Path $fixture.Root 'swirl-tun-helper.exe';Write-TlsFixturePe $file 0xaa64
+                $binaries['swirl-tun-helper.exe'].sha256=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+            'changed-helper' { [IO.File]::AppendAllText((Join-Path $fixture.Root 'swirl-tun-helper.exe'),'changed after pairing') }
+        }
+        $tun | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $fixture.Root 'tun-runtime.json') -Encoding utf8
+        Write-TlsFixtureManifest $fixture
+        $failure=$null
+        try { $null=Assert-SwirlTunPayload -ApplicationDirectory $fixture.Root -ExpectedSourceSha $tlsApplicationSha -ExpectedBuildId ('b'*64) } catch { $failure=$_.Exception.Message }
+        $expected=if($fault -eq 'arm64-helper'){'Product TUN requires an AMD64 PE image.'}elseif($fault -eq 'untrusted-driver'){'Product Wintun payload differs from the reviewed official binary.'}else{'Product TUN executable pairing mismatch:*'}
+        if (-not $failure -or $failure -notlike $expected) { throw "TUN payload accepted $fault or rejected for another reason: $failure" }
+    }
+    Write-Host 'Product TUN payload: 6 offline rejection scenarios passed.'
+
     # Reproduce the ten empty Qt directories from the native NSIS failure
     # through the actual final packaging entry point. The generic historical
     # manifest reader remains compatible; finalization must reject this tree
@@ -369,12 +407,13 @@ try {
         (Get-Item -LiteralPath (Join-Path $fixture.Root 'kept/zero.bin')).Length -ne 0) {
         throw 'Staging changed a payload file, zero-length file, or the manifest.'
     }
-    & $finalizer -ApplicationDirectory $fixture.Root -EvidenceDirectory $finalEvidence -UninstallList $finalInclude
-    $finalReport = Get-Content -LiteralPath (Join-Path $finalEvidence 'final-package-verification.json') -Raw | ConvertFrom-Json
-    if (-not $finalReport.no_empty_directories -or (Get-FinalizationFixtureFileIdentity $fixture.Root) -cne $before) {
-        throw 'The real final packaging gate did not verify the pruned, byte-identical stage.'
+    $failure = $null
+    try { & $finalizer -ApplicationDirectory $fixture.Root -EvidenceDirectory $finalEvidence -UninstallList $finalInclude } catch { $failure=$_.Exception.Message }
+    if ($failure -cne 'Missing product TUN payload entry: swirl-tun-broker.exe' -or
+        (Test-Path -LiteralPath $finalInclude) -or (Get-FinalizationFixtureFileIdentity $fixture.Root) -cne $before) {
+        throw 'A TLS-only fixture must not authorize a current product package without the TUN payload.'
     }
-    Write-Host 'Finalization empty-directory regression: 2 entry-point scenarios passed.'
+    Write-Host 'Finalization empty-directory and required TUN payload regressions: 2 entry-point scenarios passed.'
 } finally {
     if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($tlsTestRoot)) -ne [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\','/')) { throw 'Unexpected TLS fixture cleanup path.' }
     Remove-Item -LiteralPath $tlsTestRoot -Recurse -Force

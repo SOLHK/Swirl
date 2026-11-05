@@ -63,6 +63,17 @@ jobs:
           else {
             Write-Host "Core, network, security, build, or mixed change set ($($changed.Count) files); require focused network/security tests and full regression."
           }
+      - name: Observe fixed Windows PowerShell startup environments
+        if: env.SWIRL_CI_NETWORK_CHANGE == 'true'
+        shell: pwsh
+        run: ./scripts/Measure-WindowsPowerShellStartup.ps1 -OutputPath build-evidence/powershell-startup.json
+      - name: Preserve early PowerShell startup observation
+        if: always() && env.SWIRL_CI_NETWORK_CHANGE == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-WindowsPowerShell-Startup-Observation
+          path: build-evidence/powershell-startup.json
+          if-no-files-found: error
       - name: Validate scoped Codex proxy launcher
         shell: pwsh
         run: ./tools/tests/Test-CodexProxyLauncher.ps1
@@ -202,7 +213,7 @@ jobs:
           foreach ($directory in @('hero-evidence','navigation-evidence','settings-material-evidence','policy-evidence','activity-layout','liquid-glass-evidence','system-proxy-exit','system-proxy-normal-stop')) {
             Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $directory) -Recurse -Force -ErrorAction SilentlyContinue
           }
-          foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt','connection-rows.xml','swirl-telemetry-accounting.xml','swirl-system-proxy-state.xml','swirl-system-proxy-recovery.xml','swirl-system-proxy-app-exit.xml','swirl-system-proxy-normal-stop.xml','swirl-rust-qt-integration.xml')) {
+          foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt','connection-rows.xml','policy-configuration.xml','policy-configuration.txt','swirl-telemetry-accounting.xml','swirl-system-proxy-state.xml','swirl-system-proxy-recovery.xml','swirl-system-proxy-app-exit.xml','swirl-system-proxy-normal-stop.xml','swirl-rust-qt-integration.xml')) {
             Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $file) -Force -ErrorAction SilentlyContinue
           }
           Get-ChildItem -Path 'build/swirl-quick/*-report.json','build/swirl-quick/activity-feather-*.png','build/swirl-quick/activity-data-*.png','build/swirl-quick/font-*.xml','build/swirl-quick/Release/Swirl-*.txt' -File -ErrorAction SilentlyContinue | Remove-Item -Force
@@ -219,7 +230,7 @@ jobs:
           if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') {
             # Enable CMake registration without leaking this opt-in into other
             # application tests, which exercise the proxy UI in an isolated fake.
-            cmake -E env SWIRL_SYSTEM_PROXY_TEST=1 cmake @configureArgs
+            cmake -E env SWIRL_SYSTEM_PROXY_TEST=1 SWIRL_NATIVE_TUN_ACCEPTANCE=1 cmake @configureArgs
           } else {
             cmake @configureArgs
           }
@@ -287,12 +298,56 @@ jobs:
           if ((Get-FileHash -LiteralPath 'dist/msvc-runtime.json' -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath 'build/swirl-quick/Release/msvc-runtime.json' -Algorithm SHA256).Hash) { throw 'Test runtime CRT metadata differs from the verified deployment.' }
           & dist/Swirl.exe --tls-runtime-self-test build-evidence/ui-tls-runtime.json
           if ($LASTEXITCODE -ne 0) { throw 'The bundled UI TLS runtime is incomplete or borrowed from PATH.' }
+      - name: Verify authenticated product broker control without starting TUN
+        if: env.SWIRL_CI_NETWORK_CHANGE == 'true'
+        shell: pwsh
+        run: |
+          # This managed Windows runner must already have its administrator
+          # token. Never open a new UAC prompt or recover an existing owner.
+          $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+          try {
+            $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+            if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Broker control CI requires an already-elevated runner token.' }
+          } finally { $identity.Dispose() }
+          . ./scripts/RustProductPackagePolicy.ps1
+          $journal = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'Swirl/NativeTun'
+          Assert-SwirlPathWithoutLinks $journal
+          if ((Test-Path -LiteralPath $journal) -and
+              (-not (Test-Path -LiteralPath $journal -PathType Container) -or @(Get-ChildItem -LiteralPath $journal -Force).Count -ne 0)) {
+            throw 'Existing Swirl TUN state must not enter this control-only CI fixture.'
+          }
+          $fixture = Join-Path $env:GITHUB_WORKSPACE 'build/swirl-quick/native-tun-broker-control'
+          $report = Join-Path $fixture 'report.json'
+          try {
+            # The separate test fixture truthfully retains UI hooks. Its files
+            # and manifest never replace the later production-hooks-OFF stage.
+            ./scripts/New-NativeTunBrokerControlFixture.ps1 -BuildDirectory build/swirl-quick -UiRuntimeDirectory dist -WintunArchivePath build/swirl-product/dependency-cache/wintun-0.14.1.zip
+            $junit = Join-Path $env:GITHUB_WORKSPACE 'build-evidence/native-tun-broker-control.xml'
+            ctest --test-dir build/swirl-quick -C Release -R '^swirl-native-tun-broker-control$' --output-on-failure --no-tests=error --output-junit $junit
+            if ($LASTEXITCODE -ne 0) { throw 'Authenticated broker control checks failed.' }
+            $result = Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
+            if (-not $result.success -or $result.kind -cne 'native-tun-broker-control-test' -or
+                $result.source_sha -cne $env:GITHUB_SHA -or -not $result.ui_test_hooks -or $result.native_tun_start_invoked -ne $false) {
+              throw 'Broker control evidence is missing its exact source or test-only scope.'
+            }
+            Write-Host 'Authenticated broker and loopback Core control passed; adapter creation and TUN forwarding were not exercised.'
+          } finally {
+            if (Test-Path -LiteralPath $report -PathType Leaf) { Copy-Item -LiteralPath $report -Destination build-evidence/native-tun-broker-control.json }
+            $marker = Join-Path $fixture 'fixture.json'
+            if (Test-Path -LiteralPath $marker -PathType Leaf) { Copy-Item -LiteralPath $marker -Destination build-evidence/native-tun-broker-control-fixture.json }
+          }
       - name: Prove normal proxy-stop ordering against the old production controller
         shell: pwsh
         run: |
           git fetch --no-tags --depth=1 origin 0a38491d2b87ba9790ebe4e9b797d30680c9e960
           if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch the exact proxy-stop negative-control source.' }
-          python tools/tests/test_system_proxy_stop_regression.py --build-dir build/swirl-quick --output build-evidence/system-proxy-stop
+          if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') {
+            # The control reconfigures CMake twice. Preserve the initial native
+            # test registration opt-ins in both subprocess configurations.
+            cmake -E env SWIRL_SYSTEM_PROXY_TEST=1 SWIRL_NATIVE_TUN_ACCEPTANCE=1 python tools/tests/test_system_proxy_stop_regression.py --build-dir build/swirl-quick --output build-evidence/system-proxy-stop
+          } else {
+            python tools/tests/test_system_proxy_stop_regression.py --build-dir build/swirl-quick --output build-evidence/system-proxy-stop
+          }
           if ($LASTEXITCODE -ne 0) { throw 'Normal proxy-stop candidate or old-code negative control failed.' }
       # Qt's offscreen QPA font database reads appdir/lib/fonts and does not
       # automatically discover the fonts installed on a Windows CI runner.
@@ -334,7 +389,7 @@ jobs:
           # Run affected UI checks before packaging. The remaining registered suite
           # runs after the test installer is uploaded; these names are excluded there
           # so a required check is never repeated just to change stage ordering.
-          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(appearance-ui|node-ui|engine-ui|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|policy-ui)$" --output-on-failure --no-tests=error --output-junit $criticalUiJunit
+          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(appearance-ui|node-ui|engine-ui|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|policy-ui|policy-configuration)$" --output-on-failure --no-tests=error --output-junit $criticalUiJunit
           $criticalUiExitCode = $LASTEXITCODE
           # Failure diagnostics rerun policy with the same output directory.
           # Preserve this first execution, including partial failure evidence,
@@ -868,11 +923,19 @@ jobs:
         env:
           SWIRL_DISPOSABLE_INSTALL_TEST: '1'
         run: |
+          $env:SWIRL_NATIVE_TUN_ACCEPTANCE = if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') { '1' } else { '0' }
           ./scripts/tests/Test-WindowsProductionInstaller.ps1 -Installer out/Swirl-Setup.exe -PackageDirectory installer-bin -ExpectedSourceSha $env:GITHUB_SHA -EvidenceDirectory build-evidence/installer-lifecycle
           $lifecycle = Get-Content -LiteralPath 'build-evidence/installer-lifecycle/lifecycle.json' -Raw | ConvertFrom-Json
           if (-not $lifecycle.success -or $lifecycle.source_sha -cne $env:GITHUB_SHA) { throw 'Actual production installer lifecycle evidence is incomplete.' }
+          if ($env:SWIRL_NATIVE_TUN_ACCEPTANCE -eq '1' -and
+              (-not $lifecycle.tun_pending_uninstall.verified -or -not $lifecycle.tun_pending_uninstall.marker_cleared_by_maintenance -or
+               -not $lifecycle.tun_pending_uninstall.journal_empty_after -or -not $lifecycle.tun_pending_uninstall.original_marker_restored)) {
+            throw 'Production TUN pending-marker uninstall did not prove its empty-journal maintenance boundary.'
+          }
           $delivery = Get-Content -LiteralPath out/delivery.json -Raw | ConvertFrom-Json
           $delivery | Add-Member -NotePropertyName isolated_installer_lifecycle -NotePropertyValue 'passed' -Force
+          $maintenance = if ($env:SWIRL_NATIVE_TUN_ACCEPTANCE -eq '1') { 'passed-empty-journal-only' } else { 'not-run-ui-only' }
+          $delivery | Add-Member -NotePropertyName native_tun_maintenance_uninstall -NotePropertyValue $maintenance -Force
           $delivery | ConvertTo-Json | Set-Content -LiteralPath out/delivery.json -Encoding utf8
       - name: Verify normal installer ownership and cleanup as an actual standard user
         shell: pwsh
@@ -904,7 +967,7 @@ jobs:
             Remove-Item -LiteralPath 'build/swirl-quick/activity-layout/activity-layout-report.json' -ErrorAction SilentlyContinue
             # Critical tests have already passed before packaging. Exclude only
             # those exact tests here to avoid paying for a second execution.
-            $excludedTests = 'appearance-ui|node-ui|engine-ui|overview-input|all-pages|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|policy-ui|capture-network'
+            $excludedTests = 'appearance-ui|node-ui|engine-ui|overview-input|all-pages|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|policy-ui|policy-configuration|capture-network|native-tun-broker-control'
             if ($env:SWIRL_CI_UI_ONLY -eq 'true') {
               # UI-only changes still run all parser, policy, storage, and local
               # regressions; skip only suites whose purpose is network/TLS traffic.
@@ -1045,11 +1108,16 @@ jobs:
             build-evidence/critical-ui.xml
             build-evidence/critical-policy-evidence/
             build-evidence/critical-network.xml
+            build-evidence/native-tun-broker-control.xml
+            build-evidence/native-tun-broker-control.json
+            build-evidence/native-tun-broker-control-fixture.json
             build-evidence/system-proxy-stop/
             build-evidence/overview-input.log
             build-evidence/ctest-inventory.json
             build-evidence/activity-diagnostic-regression.xml
             build/swirl-quick/connection-rows.xml
+            build/swirl-quick/policy-configuration.xml
+            build/swirl-quick/policy-configuration.txt
             build/swirl-quick/swirl-telemetry-accounting.xml
             build/swirl-quick/swirl-system-proxy-state.xml
             build/swirl-quick/swirl-system-proxy-recovery.xml

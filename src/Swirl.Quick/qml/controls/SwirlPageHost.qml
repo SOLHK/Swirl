@@ -12,6 +12,7 @@ Item {
  property var activeLoader:null
  property var leavingLoader:null
  property var pendingLoader:null
+ property var pendingFallback:null
  property bool preparing:false
  property int generation:0
  property bool initialized:false
@@ -21,6 +22,7 @@ Item {
  property real routeInset:0
  function insetFor(key){return insetRoutes.indexOf(key)>=0?routeInset:0}
  property int transitionToken:0
+ signal routeFailed(string failedRoute,string fallbackRoute)
  readonly property Item item:activeLoader?activeLoader.item:null
  readonly property int cachedPageCount:Object.keys(pages).length
  readonly property bool moving:travel.running||commit.running
@@ -54,7 +56,7 @@ Item {
  function trimCache(){
   if(cachedPageCount<=maximumCachedPages)return
   const next=Object.assign({},pages),saved=Object.assign({},savedPages)
-  for(const key of accessOrder){if(Object.keys(next).length<=maximumCachedPages)break;const loader=next[key];if(!loader || loader===activeLoader || loader===leavingLoader || loader===pendingLoader || !loader.item || !loader.item.exportCacheState || (SwirlMotion.returnShared && SwirlMotion.returnShared.previous===key))continue;saved[key]=loader.item.exportCacheState();loader.destroy();delete next[key]}
+  for(const key of accessOrder){if(Object.keys(next).length<=maximumCachedPages)break;const loader=next[key];if(!loader || loader===activeLoader || loader===leavingLoader || loader===pendingLoader || loader===pendingFallback || !loader.item || !loader.item.exportCacheState || (SwirlMotion.returnShared && SwirlMotion.returnShared.previous===key))continue;saved[key]=loader.item.exportCacheState();loader.destroy();delete next[key]}
   pages=next;savedPages=saved
  }
  function releaseShared(){SwirlMotion.shared=null}
@@ -84,10 +86,36 @@ Item {
   if(heroData && heroData.key==="settings" && heroData.returning && leavingLoader)
    leavingLoader.endShift=Qt.point(leavingLoader.startShift.x+surfaceEnd.x-surfaceStart.x,leavingLoader.startShift.y+surfaceEnd.y-surfaceStart.y)
  }
+ function restorePage(loader){
+  if(!loader.stateRestored && loader.item){if(savedPages[loader.routeId]&&loader.item.restoreCacheState)loader.item.restoreCacheState(savedPages[loader.routeId]);loader.stateRestored=true}
+ }
+ function completePending(loader){
+  if(loader!==pendingLoader)return
+  // A failed cold route is terminal for this request. Retrying it here would
+  // recreate its Error cache entry until it fails again on the next frame.
+  if(loader.status===Loader.Error){
+   const fallback=loader===activeLoader?pendingFallback:activeLoader
+   pendingLoader=null;pendingFallback=null;activeLoader=fallback
+   releaseShared();finish()
+   const failedRoute=loader.routeId,copy=Object.assign({},pages)
+   delete copy[failedRoute];pages=copy;loader.destroy()
+   routeFailed(failedRoute,fallback?fallback.routeId:"");return
+  }
+  if(loader.status!==Loader.Ready)return
+  if(loader!==activeLoader){requestRoute();return}
+  const fallback=pendingFallback
+  pendingLoader=null;pendingFallback=null
+  if(!loader.item){activeLoader=fallback;finish();const failedRoute=loader.routeId,copy=Object.assign({},pages);delete copy[failedRoute];pages=copy;loader.destroy();routeFailed(failedRoute,fallback?fallback.routeId:"");return}
+  restorePage(loader);loader.item.ensurePolished()
+  if(hero.active && heroData && heroData.key==="settings" && !heroData.returning)hero.targetItem=loader.settingsTitle
+ }
  function requestRoute(){
   if(!initialized || !sourceComponent || !routeKey.length)return
   const token=++generation
   let next=pages[routeKey]
+  // An abandoned cold request may fail after a newer route took ownership.
+  // Recreate that failed cache entry on its next request, without a dead click.
+  if(next && next.status===Loader.Error){const copy=Object.assign({},pages);delete copy[routeKey];pages=copy;next.destroy();next=null}
   if(!next){
    // Incubate cold pages across frames while the current live page stays
    // visible. The initial page remains synchronous so startup has content.
@@ -95,12 +123,17 @@ Item {
    if(!next){releaseShared();return}
    const copy=Object.assign({},pages);copy[routeKey]=next;pages=copy
   }
-  if(next.status===Loader.Loading){pendingLoader=next;return}
-  pendingLoader=null
-  if(!next.item){const copy=Object.assign({},pages);delete copy[routeKey];pages=copy;next.destroy();releaseShared();return}
-  if(!next.stateRestored){if(savedPages[routeKey]&&next.item.restoreCacheState)next.item.restoreCacheState(savedPages[routeKey]);next.stateRestored=true}
-  if(next===activeLoader){releaseShared();if(preparing)finish();return}
   const request=SwirlMotion.shared,back=SwirlMotion.returnShared
+  const loading=next.status===Loader.Loading
+  // The settings card already has a live surface and title. Start that
+  // expansion now; its body can incubate independently of visual feedback.
+  const expandingCold=loading && request && request.targetKey==="settings"
+  if(loading && !expandingCold){pendingLoader=next;pendingFallback=null;return}
+  pendingLoader=loading?next:null;pendingFallback=null
+  if(!next.item && !expandingCold){const copy=Object.assign({},pages);delete copy[routeKey];pages=copy;next.destroy();releaseShared();return}
+  restorePage(next)
+  if(next===activeLoader){releaseShared();if(preparing)finish();return}
+  if(expandingCold){next.loadingTitleText=request.source.text||"";next.loadingDescription=request.card.motionDescription||""}
   releaseShared()
   // Reverse the same two live trees without visiting either endpoint.
   if(moving && next===leavingLoader){
@@ -124,6 +157,7 @@ Item {
   releaseSurfaces();sourceSurface=null;targetSurface=null;heroData=null
   const previous=activeLoader
   if(previous)motionPolicy.leavePage(previous.item)
+  if(expandingCold)pendingFallback=previous
   leavingLoader=previous;activeLoader=next
   preparing=true
   // A synchronous preparation observer may request another route and return
@@ -133,12 +167,12 @@ Item {
   progress=0
   if(!previous || SwirlMotion.reduced || !animateRoutes){finish();return}
   // Let normal Qt polish settle layouts once. No recursive per-item polishing.
-  next.item.ensurePolished()
+  if(next.item)next.item.ensurePolished()
   Qt.callLater(function(){
    if(token!==generation || activeLoader!==next)return
    let from=null,to=null,source=null,target=null
-   if(request){from=request.surface;to=request.targetKey==="settings"?next.settingsSurface:surfaceFor(next.item,request.targetKey);source=request.source;target=request.targetKey==="settings"?next.item.motionTitle:next.item.heroTargets?next.item.heroTargets[request.targetKey]:null}
-   else if(back && back.previous===routeKey && back.route===previous.routeId){from=back.targetKey==="settings"?previous.settingsSurface:surfaceFor(previous.item,back.targetKey);to=back.surface;source=back.targetKey==="settings"?previous.item.motionTitle:previous.item.heroTargets?previous.item.heroTargets[back.targetKey]:null;target=back.source}
+   if(request){from=request.surface;to=request.targetKey==="settings"?next.settingsSurface:surfaceFor(next.item,request.targetKey);source=request.source;target=request.targetKey==="settings"?next.settingsTitle:next.item.heroTargets?next.item.heroTargets[request.targetKey]:null}
+   else if(back && back.previous===routeKey && back.route===previous.routeId){from=back.targetKey==="settings"?previous.settingsSurface:surfaceFor(previous.item,back.targetKey);to=back.surface;source=back.targetKey==="settings"?previous.settingsTitle:previous.item.heroTargets?previous.item.heroTargets[back.targetKey]:null;target=back.source}
    if(valid(from)&&valid(to)){
     sourceSurface=from;targetSurface=to;surfaceKind=request?request.targetKey:back.targetKey
     // Page content can grow inside its fixed layout viewport. Measure that
@@ -161,7 +195,7 @@ Item {
    if(activeLoader)activeLoader.arcBend=-SwirlMotion.pageArc*direction
    if(leavingLoader){leavingLoader.endShift=Qt.point(-SwirlMotion.pageDistance*0.5*direction,0);leavingLoader.arcBend=SwirlMotion.pageArc*0.5*direction}
   }
-  SwirlTransitionRegistry.setActive(transitionToken,true);travel.from=progress;travel.to=1;travel.easing.type=heroData&&heroData.key==="settings"?Easing.Linear:Easing.OutCubic;travel.duration=Math.max(1,(heroData?SwirlMotion.expandDuration*(heroData.key==="settings"?1.15:1):SwirlMotion.pageDuration)*(1-progress));travel.start()
+  SwirlTransitionRegistry.setActive(transitionToken,true);travel.from=progress;travel.to=1;travel.easing.type=heroData&&heroData.key==="settings"?Easing.Linear:Easing.OutCubic;travel.duration=Math.max(1,(heroData&&heroData.key!=="settings"?SwirlMotion.expandDuration:SwirlMotion.pageDuration)*(1-progress));travel.start()
  }
  function retargetGeometry(){
   if(!moving || !heroData || !valid(targetSurface))return
@@ -184,6 +218,9 @@ Item {
   readonly property alias status:pageContent.status
   readonly property alias item:pageContent.item
   readonly property Item settingsSurface:settingsCanvas
+  readonly property Item settingsTitle:item && item.motionTitle?item.motionTitle:loadingTitle
+  property string loadingTitleText:""
+  property string loadingDescription:""
   property bool stateRestored:false
   property real startOpacity:0
   property real endOpacity:0
@@ -234,7 +271,22 @@ Item {
     // already captured on retarget, so rapid reversals preserve this scale too.
     scale:host.insetRoutes.indexOf(cachedLoader.routeId)>=0?host.interpolate(0.985,1,cachedLoader.opacity):1
     transformOrigin:Item.Center
-    onStatusChanged:if(cachedLoader===host.pendingLoader && status!==Loader.Loading)Qt.callLater(host.requestRoute)
+    onStatusChanged:if(cachedLoader===host.pendingLoader && status!==Loader.Loading){
+     // Install the real title's shared opacity in the same turn it appears.
+     if(cachedLoader===host.activeLoader)host.completePending(cachedLoader)
+     else Qt.callLater(function(){host.completePending(cachedLoader)})
+    }
+    SwirlText {
+     id:loadingTitle;x:Theme.pagePadding;y:Theme.pagePadding;width:parent.width-2*Theme.pagePadding
+     text:cachedLoader.loadingTitleText;textRole:"pageTitle";fitWidth:false
+     font.pixelSize:Theme.pageTitleSize;font.weight:Font.DemiBold;wrapMode:Text.Wrap
+     visible:pageContent.status!==Loader.Ready && !hero.active
+    }
+    SwirlText {
+     x:loadingTitle.x;y:loadingTitle.y+loadingTitle.height+Theme.dp(7);width:loadingTitle.width
+     text:pageContent.status===Loader.Error?qsTr("无法加载此页面，请返回后重试。"):cachedLoader.loadingDescription;font.pixelSize:Theme.captionSize;color:Theme.muted;wrapMode:Text.Wrap
+     visible:loadingTitle.visible
+    }
    }
   }
  }}

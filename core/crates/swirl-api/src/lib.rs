@@ -19,10 +19,14 @@ pub mod native_gateway_control;
 #[cfg(windows)]
 pub mod native_packet_worker;
 pub mod native_tun;
+#[cfg(any(windows, test))]
+pub mod native_tun_broker;
 pub mod native_tun_control;
 pub mod native_tun_ipc;
 #[cfg(windows)]
 mod native_windows;
+#[cfg(windows)]
+mod native_worker_output;
 mod node_import;
 pub use node_import::swirl_import_node_v1;
 mod profile_import;
@@ -262,6 +266,21 @@ pub extern "C" fn swirl_core_abi_version() -> u32 {
     1
 }
 
+/// Immutable identity shared by the C ABI and paired product executables.
+pub fn build_info() -> Value {
+    json!({
+        "abi_version": swirl_core_abi_version(),
+        "build_id": env!("SWIRL_BUILD_ID"),
+        "source_sha": env!("SWIRL_SOURCE_SHA"),
+        "package_version": env!("CARGO_PKG_VERSION"),
+        "target": env!("SWIRL_BUILD_TARGET"),
+        "control_schemas": [1,2],
+        "config_schemas": [1,2],
+        "capabilities": control_v2::capabilities(),
+        "limits": {"command_bytes":MAX_COMMAND,"response_bytes":OUTPUT_CAPACITY,"runtime_nodes":512,"policy_groups":128,"policy_edges":4096,"admission_waiters":64,"admission_timeout_ms":2000},
+    })
+}
+
 /// Read immutable, non-secret build identity before invoking runtime commands.
 /// Returns the UTF-8 byte count (without a NUL terminator), -1 for a null/short
 /// output buffer, or -2 for a panic. A 4096-byte caller buffer is sufficient.
@@ -274,17 +293,7 @@ pub unsafe extern "C" fn swirl_core_build_info(output: *mut u8, output_capacity:
         return -1;
     }
     std::panic::catch_unwind(|| {
-        let metadata = json!({
-            "abi_version": swirl_core_abi_version(),
-            "build_id": env!("SWIRL_BUILD_ID"),
-            "source_sha": env!("SWIRL_SOURCE_SHA"),
-            "package_version": env!("CARGO_PKG_VERSION"),
-            "target": env!("SWIRL_BUILD_TARGET"),
-            "control_schemas": [1,2],
-            "config_schemas": [1,2],
-            "capabilities": control_v2::capabilities(),
-            "limits": {"command_bytes":MAX_COMMAND,"response_bytes":OUTPUT_CAPACITY,"runtime_nodes":512,"policy_groups":128,"policy_edges":4096,"admission_waiters":64,"admission_timeout_ms":2000},
-        });
+        let metadata = build_info();
         let bytes = metadata.to_string().into_bytes();
         if bytes.len() > output_capacity {
             return -1;

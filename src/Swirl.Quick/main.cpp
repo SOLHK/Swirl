@@ -2,6 +2,7 @@
 #include "engine/RustCoreSelfTest.h"
 #include "network/TlsRuntimeSelfTest.h"
 #include "app/SingleInstance.h"
+#include "app/NativeTunRecovery.h"
 #include "app/ShutdownCoordinator.h"
 #include "app/FontManager.h"
 #include "app/StoragePaths.h"
@@ -59,6 +60,9 @@
 #endif
 #ifdef SWIRL_UI_TESTS
 #include "tests/OverviewChecks.h"
+#ifdef Q_OS_WIN
+#include "tests/NativeTunBrokerChecks.h"
+#endif
 #include "tests/RuntimeEvidence.h"
 #include "tests/CaptureChecks.h"
 #include "tests/GatewayChecks.h"
@@ -214,6 +218,20 @@ int main(int argc, char *argv[])
     // Package verification runs the real EXE/DLL, before any UI, NodeStore,
     // system-proxy ownership, or persisted settings are opened.
     for (int i = 1; i < argc; ++i) {
+        if (QByteArray(argv[i]) == "--recover-tun") {
+            if (argc != 2) return 64;
+            QCoreApplication maintenance(argc, argv);
+            return recoverNativeTunForMaintenance();
+        }
+        if (QByteArray(argv[i]) == "--native-tun-broker-self-test") {
+#if defined(SWIRL_UI_TESTS) && defined(Q_OS_WIN)
+            QCoreApplication selfTest(argc, argv);
+            if (i + 1 >= argc) return 64;
+            return runNativeTunBrokerChecks(QString::fromLocal8Bit(argv[i + 1]));
+#else
+            return 64;
+#endif
+        }
         if (QByteArray(argv[i]) == "--tls-runtime-self-test") {
             QCoreApplication selfTest(argc, argv);
             if (i + 1 >= argc) return 64;

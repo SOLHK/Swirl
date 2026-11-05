@@ -34,7 +34,7 @@ Assert-SwirlPathWithoutLinks $stage
 if (Test-Path -LiteralPath $stage) { throw 'Packaging requires a fresh destination.' }
 $sourceSha = (& git -C $repo rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $sourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Source identity is missing.' }
-$files = @('Swirl.exe','swirl_api.dll','swirl-rust-build.json','SwirlProxyGuard.exe',
+$files = @('Swirl.exe','swirl_api.dll','swirl-rust-build.json','swirl-tun-broker.exe','swirl-tun-helper.exe','SwirlProxyGuard.exe',
     'SwirlGatewayGuard.exe','SwirlScriptRunner.exe','SwirlCodexLauncher.exe',
     'SwirlCodexManage.py','SubscriptionCapture.py')
 foreach ($name in $files) {
@@ -47,6 +47,14 @@ if ($expected.source_sha -ne $sourceSha -or $expected.target -ne 'x86_64-pc-wind
 }
 if ((Get-FileHash -LiteralPath $rustLibrary -Algorithm SHA256).Hash -ne
     (Get-FileHash -LiteralPath (Join-Path $bin 'swirl_api.dll') -Algorithm SHA256).Hash) { throw 'Deployed Rust DLL is stale.' }
+foreach ($artifact in @(@{cache='SWIRL_TUN_BROKER';name='swirl-tun-broker.exe'},@{cache='SWIRL_TUN_HELPER';name='swirl-tun-helper.exe'})) {
+    if ($cache -notmatch ('(?m)^'+$artifact.cache+':INTERNAL=(.+)$')) { throw ('Paired Rust executable path is missing: '+$artifact.name) }
+    $output = $Matches[1].Trim()
+    if ((Get-FileHash -LiteralPath $output -Algorithm SHA256).Hash -ne
+        (Get-FileHash -LiteralPath (Join-Path $bin $artifact.name) -Algorithm SHA256).Hash) {
+        throw ('Deployed Rust executable is stale: '+$artifact.name)
+    }
+}
 New-Item -ItemType Directory -Path $stage | Out-Null
 foreach ($name in $files) { Copy-Item -LiteralPath (Join-Path $bin $name) -Destination $stage }
 & (Join-Path $PSScriptRoot 'Copy-VerifiedChinaRules.ps1') `
@@ -65,6 +73,7 @@ $licenseDirectory = Join-Path $stage 'licenses/rust'
     --metadata $licenseMetadataPath --inventory (Join-Path $licenseDirectory 'DEPENDENCIES.json') `
     --notices $licenseDirectory --supplemental-inventory (Join-Path $repo 'core/DEPENDENCIES.json')
 if ($LASTEXITCODE -ne 0) { throw 'Rust dependency notice staging failed.' }
+$wintun = & (Join-Path $PSScriptRoot 'Copy-VerifiedWintunRuntime.ps1') -ArchivePath (Join-Path $build 'dependency-cache/wintun-0.14.1.zip') -ApplicationDirectory $stage
 Copy-Item -LiteralPath (Join-Path $repo 'src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt') -Destination $stage
 Copy-Item -LiteralPath (Join-Path $repo 'src/Swirl.Quick/packaging/README-RustProductPreview.txt') -Destination (Join-Path $stage 'README.txt')
 foreach ($name in @('Swirl-brand-phase3.ico','Swirl-brand-0217-optical.ico')) {
@@ -89,6 +98,30 @@ if ($forbidden.Count) { throw ('Forbidden package entries: ' + ($forbidden -join
 # Preserve the report in the evidence path even when the executable fails.
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('swirl-package-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $scratch | Out-Null
+function Read-SwirlTunBuildIdentity([string]$Name,[string]$Role) {
+    $file = Join-Path $stage $Name
+    Assert-SwirlAmd64Image $file
+    $output = Join-Path $scratch ($Role+'-build-info.json')
+    $stderr = Join-Path $scratch ($Role+'-build-info.stderr')
+    # These commands only report compiled identity. They do not elevate,
+    # recover a journal, load Wintun or change host networking.
+    $process = Start-Process -FilePath $file -ArgumentList @('--build-info') -WorkingDirectory $scratch -WindowStyle Hidden -PassThru -RedirectStandardOutput $output -RedirectStandardError $stderr
+    if (-not $process.WaitForExit(10000)) { $process.Kill(); throw ('TUN build identity timed out: '+$Name) }
+    if ($process.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $output -PathType Leaf) -or
+        (Get-Item -LiteralPath $output).Length -gt 65536) { throw ('Cannot verify TUN build identity: '+$Name) }
+    $identity = Get-Content -LiteralPath $output -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($identity.abi_version -ne 1 -or $identity.role -cne $Role -or $identity.source_sha -cne $sourceSha -or
+        $identity.build_id -cne $buildId -or $identity.target -cne $expected.target) {
+        throw ('TUN executable was not built from the paired source and target: '+$Name)
+    }
+    return [ordered]@{sha256=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant();identity=$identity}
+}
+$tunPayload = [ordered]@{schema=1;kind='windows-native-tun-payload';source_sha=$sourceSha;build_id=$buildId;
+    target=$expected.target;driver=$wintun;binaries=[ordered]@{
+        'swirl-tun-broker.exe'=(Read-SwirlTunBuildIdentity 'swirl-tun-broker.exe' 'swirl_tun_broker')
+        'swirl-tun-helper.exe'=(Read-SwirlTunBuildIdentity 'swirl-tun-helper.exe' 'swirl_tun_helper')
+    }}
+$tunPayload | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath (Join-Path $stage 'tun-runtime.json') -Encoding utf8
 $reportPath = Join-Path $stage 'rust-self-test.json'
 $process = Start-Process -FilePath (Join-Path $stage 'Swirl.exe') `
     -ArgumentList @('--rust-core-self-test', ('"' + $reportPath + '"')) -WorkingDirectory $scratch -WindowStyle Hidden -PassThru
@@ -116,6 +149,7 @@ foreach ($file in (Get-ChildItem -LiteralPath $stage -Recurse -File | Sort-Objec
         sha256=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
 }
 $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stage 'package-manifest.json') -Encoding utf8
+$null=Assert-SwirlTunPayload -ApplicationDirectory $stage -ExpectedSourceSha $sourceSha -ExpectedBuildId $buildId
 $tlsLock=Get-Content -LiteralPath (Join-Path $repo 'tools/openssl-runtime.lock.json') -Raw | ConvertFrom-Json
 $null=Assert-SwirlTlsPayload -ApplicationDirectory $stage -ExpectedVersion $tlsLock.version -ExpectedSourceSha256 $tlsLock.source.sha256
 $tlsReport=Join-Path $build ('tls-runtime-'+$sourceSha+'.json')

@@ -95,6 +95,13 @@ QString subscriptionDefinitionDigest(const NodeSubscription &source) {
     return privateDigest({{"id",source.id},{"name",source.name},{"url",source.url.toString(QUrl::FullyEncoded)},
         {"format",source.formatHint},{"scope",source.importScope},{"downloadRoute",source.downloadRoute},{"interval",source.intervalMinutes},{"enabled",source.enabled}});
 }
+QList<ProxyNode> scopedNodes(QList<ProxyNode> nodes,const QJsonObject &network) {
+    if(network.contains("activeSubscriptionId")) {
+        const auto source=network.value("activeSubscriptionId").toString();
+        nodes.removeIf([&](const auto &node){return node.sourceId!=source;});
+    }
+    return nodes;
+}
 QStringList routingRuleFields(const QString &rule) {
     auto fields=rule.split(',');
     for(auto &field:fields)field=field.trimmed();
@@ -347,10 +354,10 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             if(s.state==ProxyEngine::State::Failed)m_proxyRequested=false;
         } else if(s.state==ProxyEngine::State::Running&&s.apiHealthy&&m_proxyRequested&&!m_systemProxy.owned()&&!m_proxyChecking)setSystemProxy(true);
     });
-    if(m_options.tunEnabled)m_routingError=QStringLiteral("已保存的增强模式配置尚不受 Rust Core 支持；请明确关闭后再连接。配置保持原值。");
+    if(m_options.tunEnabled&&!tunSupported())m_routingError=QStringLiteral("TUN 启动组件或驱动缺失，请重新安装完整测试包，或先关闭已保存的增强模式。");
     connect(m_engine.get(), &ProxyEngine::statusChanged, this, &EngineController::statusChanged);
     connect(m_engine.get(),&ProxyEngine::configurationCommandFinished,this,&EngineController::policyCommandCompleted);
-    m_options.nodes=m_store.nodes();
+    m_options.nodes=availableNodes();
     connect(&m_store,&NodeStore::changed,this,[this]{
         const auto nodes=m_store.nodes();QSet<QString> present,removed,removedNames;
         for(const auto &node:nodes)present.insert(node.id);
@@ -377,7 +384,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             emit diagnostic("EngineController","NodeSourceRevoked",m_nodeError);
         }
         if(!m_connectionRequested) {
-            m_options.nodes=nodes;m_options.selectedNodeId=m_store.selectedId();
+            m_options.nodes=availableNodes();m_options.selectedNodeId=m_store.selectedId();
             const auto configuration=m_store.networkConfiguration();
             if(!removed.isEmpty()&&configuration.value("schema").toInt()==1) {
                 m_options.customRules.clear();for(const auto &rule:configuration.value("rules").toArray())m_options.customRules.append(rule.toString());
@@ -544,7 +551,7 @@ void EngineController::finishShutdownAfterProxyRelease() {
 void EngineController::refresh() { m_engine->refresh(); }
 
 QVariantList EngineController::nodes() const {
-    auto rows=m_store.publicRows(); const auto status=m_engine->status();
+    auto rows=nodeCatalog(); const auto status=m_engine->status();
     for (auto &value : rows) {
         auto row=value.toMap(); const bool active=processAlive() && row.value("id").toString()==status.selectedNodeId;
         row.insert("address",row.value("host").toString().isEmpty()?QStringLiteral("协议扩展配置"):row.value("host").toString()+":"+row.value("port").toString());
@@ -572,6 +579,73 @@ QVariantList EngineController::nodes() const {
         value=row;
     }
     return rows;
+}
+QList<ProxyNode> EngineController::availableNodes() const {
+    return scopedNodes(m_store.nodes(),m_store.networkConfiguration());
+}
+QVariantList EngineController::nodeCatalog() const {
+    auto rows=m_store.publicRows();
+    if(subscriptionScopeEnabled()) {
+        const auto source=activeSubscriptionId();
+        rows.removeIf([&](const auto &row){return row.toMap().value("sourceId").toString()!=source;});
+    }
+    return rows;
+}
+bool EngineController::selectSubscription(const QString &id) {
+    if(subscriptionScopeEnabled()&&activeSubscriptionId()==id)return true;
+    if(!m_store.configurationV2()) {m_policyError=QStringLiteral("请先确认并保存策略配置，再选择当前订阅。");emit policyChanged();return false;}
+    NodeStore::ImportPlan plan;
+    if(!m_store.prepareSelectSubscription(id,&plan)){m_policyError=m_store.error();emit policyChanged();return false;}
+    auto network=plan.retainedNetworkConfiguration();QSet<QString> allowed;
+    for(const auto &node:scopedNodes(plan.nodes(),network))allowed.insert(node.id);
+    auto snapshots=network.value("subscriptionPolicySnapshots").toObject();
+    if(!snapshots.contains("base"))snapshots.insert("base",m_policyDocument);
+    auto sourcePolicies=snapshots.value("sources").toObject();
+    const auto sources=m_store.subscriptions();
+    if(subscriptionScopeEnabled()&&(activeSubscriptionId().isEmpty()||std::any_of(sources.cbegin(),sources.cend(),
+        [this](const auto &source){return source.id==activeSubscriptionId();})))sourcePolicies.insert(activeSubscriptionId(),m_policyDocument);
+    const auto original=sourcePolicies.contains(id)?sourcePolicies.value(id).toObject():snapshots.value("base").toObject();
+    snapshots.insert("sources",sourcePolicies);network.insert("subscriptionPolicySnapshots",snapshots);
+    QSet<QString> groups;for(const auto &entry:original.value("groups").toArray())groups.insert(entry.toObject().value("id").toString());
+    const std::function<QJsonValue(const QJsonValue &)> restrictTarget=[&](const QJsonValue &value)->QJsonValue {
+        if(value.isArray()){QJsonArray result;for(const auto &entry:value.toArray())result.append(restrictTarget(entry));return result;}
+        if(!value.isObject())return value;
+        auto object=value.toObject();
+        if(object.value("kind")==QJsonValue("node")&&!allowed.contains(object.value("id").toString()))return QJsonObject{{"kind","reject"}};
+        if(object.value("kind")==QJsonValue("group")&&!groups.contains(object.value("id").toString()))return QJsonObject{{"kind","reject"}};
+        if(object.contains("members")) {
+            QJsonArray members;
+            for(const auto &entry:object.value("members").toArray()) {
+                const auto target=entry.toObject();
+                if(target.value("kind")!=QJsonValue("node")||allowed.contains(target.value("id").toString()))members.append(entry);
+            }
+            object.insert("members",members);
+            if(object.contains("selected")&&!members.contains(object.value("selected")))object.remove("selected");
+        }
+        for(auto it=object.begin();it!=object.end();++it)if(it.key()!="missing_targets")it.value()=restrictTarget(it.value());
+        return object;
+    };
+    auto document=restrictTarget(original).toObject();QSet<QString> changedGroups;
+    const auto originalGroups=original.value("groups").toArray(),restrictedGroups=document.value("groups").toArray();
+    for(qsizetype index=0;index<originalGroups.size();++index)if(originalGroups[index]!=restrictedGroups[index])changedGroups.insert(originalGroups[index].toObject().value("id").toString());
+    for(qsizetype pass=0;pass<restrictedGroups.size();++pass){const auto count=changedGroups.size();
+        for(const auto &entry:restrictedGroups){const auto group=entry.toObject();
+            for(const auto &member:group.value("members").toArray())if(member.toObject().value("kind")==QJsonValue("group")&&changedGroups.contains(member.toObject().value("id").toString()))changedGroups.insert(group.value("id").toString());
+        }
+        if(changedGroups.size()==count)break;
+    }
+    const auto previousDefault=original.value("default_policy").toObject().value("target").toObject();
+    if((previousDefault.value("kind")==QJsonValue("group")&&(!groups.contains(previousDefault.value("id").toString())||changedGroups.contains(previousDefault.value("id").toString())))||
+       (previousDefault.value("kind")==QJsonValue("node")&&!allowed.contains(previousDefault.value("id").toString()))){
+        auto policy=document.value("default_policy").toObject();policy.insert("target",QJsonObject{{"kind","unconfigured"}});document.insert("default_policy",policy);
+    }
+    document.insert("missing_targets",QJsonArray{});
+    network.insert("policyDocumentV2",document);
+    const bool accepted=applyCatalogTransaction(plan,network,[this](bool ok,const QString &error){
+        m_nodeError=ok?QString():error;emit nodesChanged();emit nodeCatalogChanged();emit optionsChanged();
+    },&m_policyError);
+    if(accepted)m_tests.cancel();
+    return accepted;
 }
 QVariantList EngineController::nodeDiagnosticRows() const {
     QVariantList result;
@@ -656,7 +730,7 @@ bool EngineController::chooseNode(const QString &id) {
         // A running session owns its original node snapshot. A refreshed or
         // newly imported node only becomes eligible after an explicit reconnect.
         auto candidate=active?m_options:EngineStartOptions{};
-        if(!active){candidate.nodes=m_store.nodes();candidate.routingMode="global";}
+        if(!active){candidate.nodes=availableNodes();candidate.routingMode="global";}
         candidate.selectedNodeId=id;candidate.directSession=false;
         // DIRECT bypasses node translation for traffic, but a saved selection
         // must still be eligible when the user later leaves explicit DIRECT.
@@ -696,14 +770,14 @@ void EngineController::connectNode(const QString &id) {
     // also check the user's actual routing and network options before changing
     // engine state. Do not silently replace saved rule mode with global mode.
     auto candidate=m_options;
-    candidate.nodes=m_store.nodes();candidate.selectedNodeId=id;candidate.directSession=false;
+    candidate.nodes=availableNodes();candidate.selectedNodeId=id;candidate.directSession=false;
     QJsonObject configuration;
     m_nodeError=RustCoreEngine::configuration(candidate,&configuration);
     if(!m_nodeError.isEmpty()){
         m_connectionRequested=false;emit selectionChanged();emit statusChanged();return;
     }
     m_connectionRequested=true;
-    m_options.nodes=m_store.nodes();m_options.selectedNodeId=id;m_options.directSession=false;
+    m_options.nodes=availableNodes();m_options.selectedNodeId=id;m_options.directSession=false;
     if(processAlive()){m_restartPending=true;m_engine->stop();}
     else m_engine->start(m_options);
 }
@@ -713,7 +787,7 @@ void EngineController::startConfiguredSession() {
         if(m_policyBusy||m_store.configurationRecoveryRequired()||m_policyDocument.isEmpty()){
             m_policyError=QStringLiteral("配置仍在保存或恢复，未启动连接。");emit policyChanged();return;
         }
-        auto candidate=m_options;candidate.nodes=m_store.nodes();candidate.policyDocument=m_policyDocument;
+        auto candidate=m_options;candidate.nodes=availableNodes();candidate.policyDocument=m_policyDocument;
         candidate.configurationStoreId=m_store.configurationStoreId();candidate.configurationRevision=m_store.configurationRevision();
         const auto saved=m_store.configurationReceipt();candidate.configurationDigest=saved.value("plan_digest").toString();
         candidate.configurationRequestId=newPolicyId();candidate.routingMode=m_policyDocument.value("mode").toString();candidate.directSession=candidate.routingMode=="direct";
@@ -727,7 +801,7 @@ void EngineController::startConfiguredSession() {
         m_nodeError=QStringLiteral("未选择可用节点；请选择节点或明确启用直接连接模式。未自动切换 DIRECT。");emit selectionChanged();emit statusChanged();return;
     }
     auto candidate=m_options;
-    candidate.nodes=m_store.nodes();candidate.selectedNodeId=m_store.selectedId();
+    candidate.nodes=availableNodes();candidate.selectedNodeId=m_store.selectedId();
     candidate.directSession=candidate.routingMode=="direct";
     QJsonObject configuration;
     const auto reason=RustCoreEngine::configuration(candidate,&configuration);
@@ -736,16 +810,16 @@ void EngineController::startConfiguredSession() {
     }
     m_nodeError.clear();
     m_connectionRequested=true;
-    m_options.nodes=m_store.nodes();m_options.selectedNodeId=m_store.selectedId();
+    m_options.nodes=availableNodes();m_options.selectedNodeId=m_store.selectedId();
     m_options.directSession=m_options.routingMode=="direct";
     if(processAlive()){cancelSystemProxyCheck();m_systemProxy.disable();m_restartPending=true;m_engine->stop();}
     else m_engine->start(m_options);
     emit statusChanged();
 }
 void EngineController::testNode(const QUrl &url) { if(!nodeBusy())m_engine->probeNode(url); }
-void EngineController::testAllNodes(const QUrl &url) { if(m_shuttingDown)return;if(m_store.configurationRecoveryRequired()||m_policyState=="reconciling"||(m_policyCatalog&&!m_policyCatalog->removedNodeIds().isEmpty())){m_nodeError=QStringLiteral("正在撤销或恢复节点，等待凭据撤销与测试内核释放后可重新测速。");emit selectionChanged();return;} auto options=m_options;options.nodes=m_store.nodes();QStringList ids;for(const auto &node:options.nodes)ids.append(node.id);m_tests.start(options,ids,url); }
-void EngineController::testNodes(const QStringList &ids,const QUrl &url) { if(m_shuttingDown)return;if(m_store.configurationRecoveryRequired()||m_policyState=="reconciling"||(m_policyCatalog&&!m_policyCatalog->removedNodeIds().isEmpty())){m_nodeError=QStringLiteral("正在撤销或恢复节点，等待凭据撤销与测试内核释放后可重新测速。");emit selectionChanged();return;} auto options=m_options;options.nodes=m_store.nodes();m_tests.start(options,ids,url); }
-void EngineController::testSelectedNode(const QString &id,const QUrl &url) { if(m_shuttingDown)return;if(m_store.configurationRecoveryRequired()||m_policyState=="reconciling"||(m_policyCatalog&&!m_policyCatalog->removedNodeIds().isEmpty())){m_nodeError=QStringLiteral("正在撤销或恢复节点，等待凭据撤销与测试内核释放后可重新测速。");emit selectionChanged();return;} auto options=m_options;options.nodes=m_store.nodes();m_tests.start(options,{id},url); }
+void EngineController::testAllNodes(const QUrl &url) { if(m_shuttingDown)return;if(m_policyBusy||m_store.configurationRecoveryRequired()||m_policyState=="reconciling"){m_nodeError=QStringLiteral("正在切换、撤销或恢复节点，等待配置与测试内核释放后可重新测速。");emit selectionChanged();return;} auto options=m_options;options.nodes=availableNodes();QStringList ids;for(const auto &node:options.nodes)ids.append(node.id);m_tests.start(options,ids,url); }
+void EngineController::testNodes(const QStringList &ids,const QUrl &url) { if(m_shuttingDown)return;if(m_policyBusy||m_store.configurationRecoveryRequired()||m_policyState=="reconciling"){m_nodeError=QStringLiteral("正在切换、撤销或恢复节点，等待配置与测试内核释放后可重新测速。");emit selectionChanged();return;} auto options=m_options;options.nodes=availableNodes();m_tests.start(options,ids,url); }
+void EngineController::testSelectedNode(const QString &id,const QUrl &url) { if(m_shuttingDown)return;if(m_policyBusy||m_store.configurationRecoveryRequired()||m_policyState=="reconciling"){m_nodeError=QStringLiteral("正在切换、撤销或恢复节点，等待配置与测试内核释放后可重新测速。");emit selectionChanged();return;} auto options=m_options;options.nodes=availableNodes();m_tests.start(options,{id},url); }
 void EngineController::disconnectNode() { stop(); }
 
 void EngineController::setRoutingMode(const QString &mode) {
@@ -760,7 +834,7 @@ void EngineController::setRoutingMode(const QString &mode) {
     }
     if(processAlive()){
         auto candidate=m_options;candidate.routingMode=mode;candidate.directSession=mode=="direct";
-        candidate.nodes=m_store.nodes();candidate.selectedNodeId=m_store.selectedId();
+        candidate.nodes=availableNodes();candidate.selectedNodeId=m_store.selectedId();
         QJsonObject configuration;const auto reason=RustCoreEngine::configuration(candidate,&configuration);
         if(!reason.isEmpty()){m_routingError=reason;emit statusChanged();return;}
     }
@@ -865,7 +939,7 @@ QString EngineController::proxyEnvironmentAdvice() const {
         "$env:HTTP_PROXY='http://127.0.0.1:%1'\n$env:HTTPS_PROXY='http://127.0.0.1:%1'\n"
         "$env:ALL_PROXY='http://127.0.0.1:%1'\n$env:NO_PROXY='localhost,127.0.0.1,::1'\n"
         "Codex 是否读取系统代理或这些变量取决于具体版本。完全退出后从该会话重新启动，已有进程不会自动继承。"
-        "当前 Rust Core 构建不提供 TUN；忽略代理设置的应用无法通过本页接入。"
+        "忽略系统代理的应用可先在概览配置 TUN，再从活动页开启代理并授权；实际接管以 TUN 运行状态为准。"
         "本页只提供建议，不写入环境变量、.codex 配置文件或密钥。").arg(m_options.proxyPort);
 }
 
@@ -910,6 +984,10 @@ QJsonObject EngineController::serializedNetworkConfiguration(const EngineStartOp
     if(!original.isUndefined())snapshot.insert("importedConfiguration",original);
     const auto outcomes=m_store.networkConfiguration().value("subscriptionImportResults");
     if(outcomes.isObject())snapshot.insert("subscriptionImportResults",outcomes);
+    const auto activeSource=m_store.networkConfiguration().value("activeSubscriptionId");
+    if(!activeSource.isUndefined())snapshot.insert("activeSubscriptionId",activeSource);
+    const auto sourcePolicies=m_store.networkConfiguration().value("subscriptionPolicySnapshots");
+    if(sourcePolicies.isObject())snapshot.insert("subscriptionPolicySnapshots",sourcePolicies);
     return snapshot;
 }
 bool EngineController::saveNetworkConfiguration() {
@@ -1073,7 +1151,7 @@ bool EngineController::configureDns(const QVariantMap &input) {
     QVariantMap configured{{"mode",mode},{"servers",servers.join(',')},{"encrypted",encrypted},{"hosts",hosts},
         {"useHosts",input.value("useHosts",true).toBool()},{"respectRules",input.value("respectRules",false).toBool()}};
     if(requested.contains("queryFamily"))configured.insert("queryFamily",requested.value("queryFamily"));
-    if(m_store.configurationV2()){auto candidate=m_options;candidate.nodes=m_store.nodes();candidate.dnsConfig=configured;return applyPolicyConfiguration(m_policyDocument,candidate);}
+    if(m_store.configurationV2()){auto candidate=m_options;candidate.nodes=availableNodes();candidate.dnsConfig=configured;return applyPolicyConfiguration(m_policyDocument,candidate);}
     const auto before=m_options.dnsConfig;m_options.dnsConfig=configured;
     if(saveNetworkConfiguration())return true;m_options.dnsConfig=before;emit optionsChanged();return false;
 }
@@ -1180,15 +1258,21 @@ bool EngineController::elevated() const {
     return false;
 #endif
 }
+bool EngineController::tunSupported() const {return RustCoreEngine::nativeTunAvailable();}
 bool EngineController::setTunEnabled(bool enabled) {
     m_routingError.clear();
-    if(enabled){m_routingError=QStringLiteral("Rust Core 暂不支持 TUN 增强模式；已保存配置保持不变。");emit statusChanged();return false;}
+    if(enabled&&!tunSupported()){m_routingError=QStringLiteral("TUN 启动组件或驱动缺失，请重新安装完整测试包。");emit statusChanged();return false;}
     if(!enabled&&m_options.meteredNetwork){m_routingError=QStringLiteral("计费网络模式正在使用增强模式，请先关闭计费网络模式。");emit statusChanged();return false;}
-    if(enabled&&!elevated()){m_routingError=QStringLiteral("请退出 Swirl，并以管理员身份运行后开启增强模式。");emit statusChanged();return false;}
-    if(busy()||nodeBusy()||routingBusy()){m_routingError=QStringLiteral("请先选择一个可用代理节点，并等待当前操作结束。");emit statusChanged();return false;}
+    if(processAlive()||m_systemProxy.owned()||m_systemProxy.busy()||busy()||nodeBusy()||routingBusy()){
+        m_routingError=QStringLiteral("请先在活动页关闭代理，等待网络恢复完成后再切换 TUN。");emit statusChanged();return false;
+    }
+    if(enabled&&!m_store.configurationV2()){m_routingError=QStringLiteral("请先在策略页确认并保存出口配置。");emit statusChanged();return false;}
+    if(m_store.configurationV2()){
+        auto candidate=m_options;candidate.nodes=availableNodes();candidate.tunEnabled=enabled;
+        return applyPolicyConfiguration(m_policyDocument,candidate);
+    }
     const bool previous=m_options.tunEnabled;m_options.tunEnabled=enabled;
     if(!saveNetworkConfiguration()){m_options.tunEnabled=previous;return false;}
-    if(enabled||processAlive())startConfiguredSession();
     emit statusChanged();return true;
 }
 
@@ -1317,7 +1401,7 @@ bool EngineController::recoverLan(){
 }
 
 bool EngineController::setGatewayForwarding(bool enabled) {
-    if(enabled){m_routingError=QStringLiteral("Rust Core 暂不支持 TUN 网关转发；网关配置保持不变。");emit statusChanged();return false;}
+    if(enabled){m_routingError=QStringLiteral("本测试版尚未接入 TUN 网关启动与恢复组件，暂无法开启。网关配置保持不变。");emit statusChanged();return false;}
     if(enabled&&m_options.meteredNetwork){m_routingError=QStringLiteral("请先关闭计费网络模式，再开启局域网网关。");emit statusChanged();return false;}
     if(enabled){if(m_options.gatewayForwarding)return true;m_tunBeforeGateway=m_options.tunEnabled;m_options.gatewayForwarding=true;
         if(setTunEnabled(true))return true;m_options.gatewayForwarding=false;return false;}
@@ -1385,9 +1469,9 @@ QVariantList EngineController::policyGroups() const {
 }
 QVariantList EngineController::policyTargetOptions() const {
     QVariantList result{{QVariantMap{{"kind","direct"},{"id",""},{"name","DIRECT"},{"available",true}}}};
-    for(const auto &row:m_store.publicRows()){
+    for(const auto &row:nodeCatalog()){
         const auto node=row.toMap();result.append(QVariantMap{{"kind","node"},{"id",node.value("id")},{"name",node.value("name")},
-            {"available",node.value("nativeExecutable")},{"reason",node.value("unsupportedReason")}});
+            {"sourceName",node.value("sourceName")},{"available",node.value("nativeExecutable")},{"reason",node.value("unsupportedReason")}});
     }
     for(const auto &entry:m_policyDocument.value("groups").toArray()){
         const auto group=entry.toObject();result.append(QVariantMap{{"kind","group"},{"id",group.value("id").toString()},
@@ -1611,7 +1695,7 @@ bool EngineController::applyReviewedSubscriptionConfiguration(NodeImportService:
     return accepted;
 }
 QVariantMap EngineController::validatePolicyDocument(const QVariantMap &input) {
-    auto options=m_options;options.nodes=m_store.nodes();
+    auto options=m_options;options.nodes=availableNodes();
     const auto response=RustCoreEngine::validateConfigurationV2(options,QJsonObject::fromVariantMap(input),newPolicyId());
     auto result=response.toVariantMap();const auto conflicts=response.value("validation").toObject().value("conflicts");
     if(conflicts.isArray())result.insert("conflicts",conflicts.toArray().toVariantList());
@@ -1624,7 +1708,7 @@ bool EngineController::confirmPolicyMigration() {
     m_policyError.clear();m_policyMigrationConfirmed=true;return applyPolicyDocument(m_policyDocument.toVariantMap());
 }
 bool EngineController::applyPolicyDocument(const QVariantMap &input) {
-    auto options=m_options;options.nodes=m_store.nodes();return applyPolicyConfiguration(QJsonObject::fromVariantMap(input),options);
+    auto options=m_options;options.nodes=availableNodes();return applyPolicyConfiguration(QJsonObject::fromVariantMap(input),options);
 }
 bool EngineController::applyCatalogTransaction(const NodeStore::ImportPlan &plan,const QJsonObject &retained,
                                               NodeImportService::ApplyCompletion completion,QString *error) {
@@ -1649,13 +1733,13 @@ bool EngineController::applyCatalogTransaction(const NodeStore::ImportPlan &plan
         tombstones.append(QJsonObject{{"kind","node"},{"id",id},{"safe_label",label},{"reason",sourceOwned?"missing_source":"deleted_target"}});
     }
     document.insert("missing_targets",tombstones);network.insert("policyDocumentV2",document);
-    auto options=m_options;options.nodes=plan.nodes();m_policyCatalog=plan;m_policyCatalogCompletion=std::move(completion);m_policyCandidateNetwork=network;
+    auto options=m_options;options.nodes=scopedNodes(plan.nodes(),network);m_policyCatalog=plan;m_policyCatalogCompletion=std::move(completion);m_policyCandidateNetwork=network;
     const bool accepted=applyPolicyConfiguration(document,options);
     if(!accepted){if(error)*error=m_policyError;m_policyCatalog.reset();m_policyCatalogCompletion={};}
     else if(!removedIds.isEmpty())m_tests.cancel();
     return accepted;
 }
-bool EngineController::applyPolicyConfiguration(const QJsonObject &document,const EngineStartOptions &options) {
+bool EngineController::applyPolicyConfiguration(const QJsonObject &document,const EngineStartOptions &inputOptions) {
     const auto reject=[this](const QString &error){m_policyError=error;emit policyChanged();return false;};
     if(m_shuttingDown||m_policyBusy||busy()||(!m_policyCatalog&&m_imports.busy())||m_store.saving())return reject(QStringLiteral("配置正在处理另一项修改，请等待完成后重试。"));
     if(m_moduleOverlayActive)return reject(QStringLiteral("请先停用配置模块，再编辑基础策略。"));
@@ -1676,16 +1760,23 @@ bool EngineController::applyPolicyConfiguration(const QJsonObject &document,cons
         if((kind=="node"&&removedNodes.contains(id))||(kind=="group"&&previousGroups.contains(id)&&!nextGroups.contains(id)))continue;
         return reject(QStringLiteral("缺失出口记录只能来自已保存的撤销记录或当前明确删除的节点、来源与策略组。"));
     }
+    auto network=m_policyCatalog?m_policyCandidateNetwork:serializedNetworkConfiguration(&inputOptions);if(network.isEmpty())return reject(m_networkError);
+    auto options=inputOptions;options.nodes=scopedNodes(options.nodes,network);
     QJsonObject candidate;const auto error=RustCoreEngine::configurationV2(options,document,&candidate);
     if(!error.isEmpty())return reject(error);
     const auto revision=m_store.issueConfigurationRevision();if(revision.isEmpty())return reject(m_store.error());
-    auto network=m_policyCatalog?m_policyCandidateNetwork:serializedNetworkConfiguration(&options);if(network.isEmpty())return reject(m_networkError);
     network.insert("policyDocumentV2",document);network.insert("dns",QJsonObject::fromVariantMap(options.dnsConfig));network.insert("proxyPort",int(options.proxyPort));
     if(!m_store.reserveConfigurationLease())return reject(m_store.error());
     m_policyBusy=true;m_policyOnline=processAlive();m_policyRollingBack=false;m_stopAfterPolicy=false;m_policyRecoveryAttempts=0;m_policyIntentDurable=false;
     m_policyWaitingForProbes=false;m_policyWaitingForStop=false;m_policyRestartRecovery=false;m_policyRecoveryAction.clear();
     m_policyRequestId=newPolicyId();m_policyCandidateRevision=revision;m_policyCandidate=document;m_policyRuntimeCandidate=candidate;
     m_policyCandidateOptions=options;m_policyCandidateOptions.policyDocument=document;m_policyCandidateNetwork=network;
+    m_policyRevokedNodeIds.clear();
+    if(m_policyCatalog)m_policyRevokedNodeIds=m_policyCatalog->removedNodeIds();
+    if(network.value("activeSubscriptionId")!=m_store.networkConfiguration().value("activeSubscriptionId")) {
+        QSet<QString> allowed;for(const auto &node:options.nodes)allowed.insert(node.id);
+        for(const auto &node:availableNodes())if(!allowed.contains(node.id)&&!m_policyRevokedNodeIds.contains(node.id))m_policyRevokedNodeIds.append(node.id);
+    }
     m_policyBaseReceipt=m_store.configurationReceipt();m_policyPrepared=m_engine->status().configurationReceipt;m_policyPrepared.remove("prepared_token");
     m_policyError.clear();m_policyState="preparing";emit policyChanged();emit statusChanged();
     dispatchPolicyCommand(m_policyOnline?QStringLiteral("prepare_configuration_v2"):QStringLiteral("validate_configuration_v2"));
@@ -1698,7 +1789,7 @@ QJsonObject EngineController::policyCommand(const QString &operation) const {
         request.insert("store_id",m_store.configurationStoreId());request.insert("base_saved_revision",m_store.configurationRevision());
         request.insert("candidate_revision",m_policyCandidateRevision);request.insert("expected_generation",m_policyPrepared.value("generation"));
         request.insert("base_applied_revision",m_policyPrepared.value("applied_revision"));request.insert("candidate",m_policyRuntimeCandidate);
-        if(m_policyCatalog&&!m_policyCatalog->removedNodeIds().isEmpty())request.insert("revoked_node_ids",QJsonArray::fromStringList(m_policyCatalog->removedNodeIds()));
+        if(!m_policyRevokedNodeIds.isEmpty())request.insert("revoked_node_ids",QJsonArray::fromStringList(m_policyRevokedNodeIds));
     }else if(operation=="activate_configuration_v2"){
         request.insert("prepared_token",m_policyPrepared.value("prepared_token"));request.insert("plan_digest",m_policyPrepared.value("plan_digest"));
         request.insert("expected_generation",m_policyPrepared.value("expected_generation"));request.insert("candidate_revision",m_policyCandidateRevision);
@@ -1734,6 +1825,7 @@ void EngineController::finishPolicyMutation(bool success,const QString &error) {
     // copies must not outlive their result, especially after credential revoke.
     m_policyCandidateOptions={};m_policyRuntimeCandidate={};m_policyCandidateNetwork={};m_policyCandidate={};
     m_policyPrepared={};m_policyBaseReceipt={};
+    m_policyRevokedNodeIds.clear();
     const auto requestId=m_policyRequestId;const bool stopAfter=m_stopAfterPolicy;
     emit policyChanged();emit optionsChanged();emit selectionChanged();emit statusChanged();
     emit policyApplyFinished(requestId,success);
@@ -1853,7 +1945,7 @@ void EngineController::policyCommandCompleted(const QString &requestId,const QJs
                 m_policyState="reconciling";m_policyError=QStringLiteral("内核最终回执与磁盘配置不一致，新请求应用结果待恢复。");emit policyChanged();return;
             }
             if(!m_policyRollingBack)m_policyReceipt=actual;
-            if(!m_policyRollingBack&&m_policyCatalog&&!m_policyCatalog->removedNodeIds().isEmpty()&&m_tests.busy()){
+            if(!m_policyRollingBack&&!m_policyRevokedNodeIds.isEmpty()&&m_tests.busy()){
                 m_policyWaitingForProbes=true;m_policyState="committing";emit policyChanged();return;
             }
             finishPolicyMutation(!m_policyRollingBack,m_policyRollingBack?m_policyError:QString());return;
@@ -1874,7 +1966,7 @@ void EngineController::connectConfiguredPolicy() {
 void EngineController::completePolicySavedOnly() {
     adoptDurableCatalogCache();
     m_policyOnline=false;m_policyReceipt=m_store.configurationReceipt();
-    if(m_policyCatalog&&!m_policyCatalog->removedNodeIds().isEmpty()&&m_tests.busy()){
+    if(!m_policyRevokedNodeIds.isEmpty()&&m_tests.busy()){
         m_policyWaitingForProbes=true;m_policyState="committing";emit policyChanged();return;
     }
     finishPolicyMutation(true);
@@ -1883,14 +1975,14 @@ void EngineController::adoptDurableCatalogCache() {
     if(!m_policyCatalog)return;
     // Disk adoption is authoritative even if the following finish ACK is lost.
     // Do not publish the candidate policy/mode as applied before its receipt.
-    m_options.nodes=m_store.nodes();m_policyCandidateOptions.nodes=m_options.nodes;
+    m_options.nodes=availableNodes();m_policyCandidateOptions.nodes=m_options.nodes;
 }
 bool EngineController::recoverPolicyConfiguration() {
     if(m_policyDiskWrite){m_policyError=QStringLiteral("原子保存仍在执行，等待其真实结果后才能恢复。");emit policyChanged();return false;}
     if(m_store.configurationRecoveryRequired()&&!m_policyBusy){
         NodeStore::ImportPlan plan;QJsonObject network;
         if(!m_store.configurationRecoveryPlan(&plan,&network)){m_policyError=m_store.error();emit policyChanged();return false;}
-        const auto pending=m_store.pendingConfigurationReceipt();auto options=m_options;options.nodes=plan.nodes();
+        const auto pending=m_store.pendingConfigurationReceipt();auto options=m_options;options.nodes=scopedNodes(plan.nodes(),network);
         options.dnsConfig=network.value("dns").toObject().toVariantMap();
         const auto document=network.value("policyDocumentV2").toObject();QJsonObject runtime;
         const auto error=RustCoreEngine::configurationV2(options,document,&runtime);

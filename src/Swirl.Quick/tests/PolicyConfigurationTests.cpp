@@ -131,6 +131,26 @@ class PolicyConfigurationTests final : public QObject {
         {"id","30000000-0000-4000-8000-000000000001"},{"name","Controlled service"},{"enabled",true},{"priority",10},
         {"domains",QJsonArray{QJsonObject{{"type","domain_suffix"},{"value","service.example.invalid"}}}},{"target",QJsonObject{{"kind","direct"}}}}});return result;}
     static QByteArray bytes(const QString &path){QFile file(path);if(!file.open(QIODevice::ReadOnly))return {};return file.readAll();}
+    struct SourcePools {QString a,b,nodeA,otherA,nodeB,independent;};
+    static SourcePools seedSourcePools(const QString &path) {
+        NodeStore store(path);SourcePools pool;
+        if(!store.saveSubscription({},"Source A",QUrl("https://a.fixture.invalid/sub"),360,false)||
+           !store.saveSubscription({},"Source B",QUrl("https://b.fixture.invalid/sub"),360,false))return {};
+        pool.a=store.subscriptions().first().id;pool.b=store.subscriptions().last().id;
+        const auto node=[](const QString &name,int port){ProxyNode result;result.id=QUuid::createUuid().toString(QUuid::WithoutBraces);
+            result.name=name;result.protocol="socks5";result.host="127.0.0.1";result.port=quint16(port);return result;};
+        const auto a=node("A first",9),otherA=node("A second",10),b=node("B first",11);auto independent=node("URL import",12);independent.importSource="url";
+        if(!store.importNodes({a,otherA},pool.a)||!store.importNodes({b},pool.b)||!store.importNodes({independent})||!store.select(a.id))return {};
+        pool.nodeA=a.id;pool.otherA=otherA.id;pool.nodeB=b.id;pool.independent=independent.id;return pool;
+    }
+    static QJsonObject sourcePolicy(const SourcePools &pool) {
+        auto policy=document();policy.insert("mode","global");
+        auto fallback=policy.value("default_policy").toObject();fallback.insert("target",QJsonObject{{"kind","node"},{"id",pool.nodeA}});policy.insert("default_policy",fallback);
+        const QJsonObject first{{"kind","node"},{"id",pool.nodeA}};
+        policy.insert("groups",QJsonArray{QJsonObject{{"id","20000000-0000-4000-8000-000000000007"},{"name","Mixed sources"},{"strategy","manual"},
+            {"members",QJsonArray{first,QJsonObject{{"kind","node"},{"id",pool.otherA}},QJsonObject{{"kind","node"},{"id",pool.nodeB}}}},{"selected",first}}});
+        return policy;
+    }
     static QString seedReviewSource(const QString &path,const QJsonObject &extra={},bool identity=true) {
         NodeStore store(path);
         if(!store.saveSubscription({},"Review source",QUrl("https://source.invalid/private-fixture-token"),360,false))return {};
@@ -171,6 +191,107 @@ private slots:
         QCOMPARE(stored.value("committed").toObject().value("snapshot").toObject().value("networkConfiguration").toObject().value("policyDocumentV2").toObject(),document());
         QCOMPARE(engine->operations,QStringList{"validate_configuration_v2"});QVERIFY(!bytes(dir.filePath("nodes.dpapi")).contains("default_policy"));
     }
+#ifndef SWIRL_PROXY_STOP_NEGATIVE_CONTROL
+    // The pinned controller predates these APIs; its six stop cases stay intact.
+    void subscriptionChoiceScopesCandidatesRuntimeAndColdReloadWithoutDeletingIndependentImports(){
+        QTemporaryDir dir;const auto path=dir.filePath("sources.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
+        {
+            EngineController controller(std::make_unique<ConfigurationPeer>(),nullptr,path);
+            QVERIFY(!controller.subscriptionScopeEnabled());QCOMPARE(controller.nodes().size(),4);
+            QVERIFY(controller.policyMigrationRequired());QVERIFY(controller.confirmPolicyMigration());
+            QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
+            QVERIFY(controller.applyPolicyDocument(sourcePolicy(pool).toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+            QVERIFY(controller.selectSubscription(pool.a));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY(controller.policyError().isEmpty());
+            QVERIFY(controller.subscriptionScopeEnabled());QCOMPARE(controller.activeSubscriptionId(),pool.a);QCOMPARE(controller.nodes().size(),2);QCOMPARE(controller.nodeCatalog().size(),2);
+            for(const auto &row:controller.nodeCatalog())QCOMPARE(row.toMap().value("sourceId").toString(),pool.a);
+            for(const auto &row:controller.policyTargetOptions())if(row.toMap().value("kind")==QString("node")){
+                const auto id=row.toMap().value("id").toString();QVERIFY(id==pool.nodeA||id==pool.otherA);QCOMPARE(row.toMap().value("sourceName").toString(),QString("Source A"));
+            }
+            QVERIFY(!controller.chooseNode(pool.nodeB));QVERIFY(controller.selectSubscription(pool.b));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
+            QCOMPARE(controller.nodes().size(),1);QCOMPARE(controller.nodes().first().toMap().value("id").toString(),pool.nodeB);QCOMPARE(controller.m_store.nodes().size(),4);
+            QCOMPARE(controller.defaultPolicy().value("target").toMap().value("kind").toString(),QString("unconfigured"));QCOMPARE(controller.routingMode(),QString("global"));
+            const auto group=controller.strategyGroups().first().toMap();QCOMPARE(group.value("members").toList().size(),1);QVERIFY(!group.contains("selected"));
+            QJsonObject runtime;QVERIFY(RustCoreEngine::configurationV2(controller.m_options,QJsonObject::fromVariantMap(controller.policyDocument()),&runtime).isEmpty());
+            for(const auto &entry:runtime.value("nodes").toArray())QCOMPARE(entry.toObject().value("id").toString(),pool.nodeB);
+            QVERIFY(controller.chooseNode(pool.nodeB));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);const auto savedB=controller.policyDocument();
+            QVERIFY(controller.selectSubscription(pool.a));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY(controller.policyError().isEmpty());
+            QCOMPARE(controller.defaultPolicy().value("target").toMap().value("id").toString(),pool.nodeA);QCOMPARE(controller.strategyGroups().first().toMap().value("members").toList().size(),2);
+            QVERIFY(controller.selectSubscription(pool.b));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY(controller.policyError().isEmpty());QCOMPARE(controller.policyDocument(),savedB);
+        }
+        EngineController reopened(std::make_unique<ConfigurationPeer>(),nullptr,path);QVERIFY(reopened.subscriptionScopeEnabled());QCOMPARE(reopened.activeSubscriptionId(),pool.b);
+        QCOMPARE(reopened.nodes().size(),1);QCOMPARE(reopened.m_store.nodes().size(),4);QVERIFY(!reopened.processAlive());
+        QVERIFY(reopened.imports()->removeSubscription(pool.b));QTRY_VERIFY_WITH_TIMEOUT(!reopened.imports()->busy(),5000);QVERIFY(reopened.policyError().isEmpty());
+        QCOMPARE(reopened.activeSubscriptionId(),pool.b);QVERIFY(reopened.nodes().isEmpty());QCOMPARE(reopened.m_store.nodes().size(),3);
+        QVERIFY(reopened.selectSubscription({}));QTRY_VERIFY_WITH_TIMEOUT(!reopened.policyBusy(),5000);QVERIFY(reopened.policyError().isEmpty());
+        QVERIFY(reopened.subscriptionScopeEnabled());QVERIFY(reopened.activeSubscriptionId().isEmpty());QCOMPARE(reopened.nodes().size(),1);
+        QCOMPARE(reopened.nodes().first().toMap().value("id").toString(),pool.independent);QCOMPARE(reopened.nodes().first().toMap().value("sourceName").toString(),QStringLiteral("独立链接导入"));
+        QCOMPARE(reopened.defaultPolicy().value("target").toMap().value("kind").toString(),QString("unconfigured"));QCOMPARE(reopened.routingMode(),QString("global"));
+    }
+    void returningToASubscriptionRestoresItsChosenGroupAndServiceInsteadOfDeletingThem(){
+        QTemporaryDir dir;const auto path=dir.filePath("source-policy-snapshots.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
+        EngineController controller(std::make_unique<ConfigurationPeer>(),nullptr,path);
+        QVERIFY(controller.policyMigrationRequired());QVERIFY(controller.confirmPolicyMigration());
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
+        QVERIFY(controller.applyPolicyDocument(sourcePolicy(pool).toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        QVERIFY(controller.selectSubscription(pool.a));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        auto policyA=controller.policyDocument();auto fallback=policyA.value("default_policy").toMap();
+        fallback.insert("target",QVariantMap{{"kind","group"},{"id","20000000-0000-4000-8000-000000000007"}});policyA.insert("default_policy",fallback);
+        policyA.insert("service_policies",changedDocument().value("service_policies").toArray().toVariantList());
+        QVERIFY(controller.applyPolicyDocument(policyA));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY(controller.policyError().isEmpty());
+        QVERIFY(controller.selectSubscription(pool.b));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY(controller.policyError().isEmpty());
+        QVERIFY(controller.chooseNode(pool.nodeB));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);const auto policyB=controller.policyDocument();
+        QVERIFY(controller.selectSubscription(pool.a));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));QCOMPARE(controller.policyDocument(),policyA);
+        QVERIFY(controller.selectSubscription(pool.b));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY(controller.policyError().isEmpty());QCOMPARE(controller.policyDocument(),policyB);
+        QCOMPARE(controller.m_store.nodes().size(),4);QCOMPARE(controller.imports()->providers().size(),2);
+    }
+    void runningSubscriptionSwitchRevokesOnlyTheOldPoolAndKeepsFailedChoiceAtomic(){
+        QTemporaryDir dir;const auto path=dir.filePath("online-sources.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
+        auto peer=std::make_unique<ConfigurationPeer>();auto *engine=peer.get();EngineController controller(std::move(peer),nullptr,path);
+        QVERIFY(controller.policyMigrationRequired());QVERIFY(controller.confirmPolicyMigration());
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
+        QVERIFY(controller.applyPolicyDocument(sourcePolicy(pool).toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        QVERIFY(controller.selectSubscription(pool.a));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY(controller.policyError().isEmpty());
+        controller.connectConfiguredPolicy();QVERIFY(controller.processAlive());const auto oldPolicy=controller.policyDocument();const auto oldBytes=bytes(path);
+        engine->rejectPrepare=true;QVERIFY(controller.selectSubscription(pool.b));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        QCOMPARE(controller.activeSubscriptionId(),pool.a);QCOMPARE(controller.policyDocument(),oldPolicy);QCOMPARE(bytes(path),oldBytes);QVERIFY(!controller.policyError().isEmpty());
+        engine->rejectPrepare=false;engine->rejectFinishOnce=true;QVERIFY(controller.selectSubscription(pool.b));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY(controller.policyError().isEmpty());
+        const auto revoked=engine->prepared.value("revoked_node_ids").toArray();QCOMPARE(revoked.size(),2);QVERIFY(revoked.contains(pool.nodeA));QVERIFY(revoked.contains(pool.otherA));
+        QVERIFY(!revoked.contains(pool.nodeB));QVERIFY(!revoked.contains(pool.independent));QCOMPARE(controller.activeSubscriptionId(),pool.b);QVERIFY(!engine->gate);
+        QVERIFY(engine->operations.contains("configuration_status_v2"));QVERIFY(!controller.policyReceipt().value("applied_revision").toString().isEmpty());
+        const auto runtime=engine->prepared.value("candidate").toObject();for(const auto &entry:runtime.value("nodes").toArray())QCOMPARE(entry.toObject().value("id").toString(),pool.nodeB);
+        const auto saved=envelope(path).value("committed").toObject().value("snapshot").toObject();
+        QCOMPARE(saved.value("networkConfiguration").toObject().value("activeSubscriptionId").toString(),pool.b);QCOMPARE(saved.value("nodes").toArray().size(),4);
+    }
+    void tunRequiresExplicitEncryptedDnsAndNeverEnablesGatewayAsASideEffect(){
+        QTemporaryDir dir;const auto path=dir.filePath("tun-configuration.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
+        NodeStore store(path);EngineStartOptions options;options.nodes=store.nodes();options.proxyPort=1080;options.tunEnabled=true;
+        const auto policy=sourcePolicy(pool);QJsonObject runtime;
+#ifdef Q_OS_WIN
+        QVERIFY(!RustCoreEngine::configurationV2(options,policy,&runtime).isEmpty());
+        options.dnsConfig={{"mode",2},{"servers","1.1.1.1"}};
+        QVERIFY(!RustCoreEngine::configurationV2(options,policy,&runtime).isEmpty());
+        options.dnsConfig={{"mode",0},{"encrypted","https://1.1.1.1/dns-query"}};
+        QVERIFY(RustCoreEngine::configurationV2(options,policy,&runtime).isEmpty());
+        QVERIFY(runtime.value("dns").toObject().value("servers").toArray().isEmpty());
+        QCOMPARE(runtime.value("dns").toObject().value("tls_servers").toArray().size(),1);
+        options.gatewayForwarding=true;
+        QVERIFY(!RustCoreEngine::configurationV2(options,policy,&runtime).isEmpty());
+#else
+        QVERIFY(!RustCoreEngine::configurationV2(options,policy,&runtime).isEmpty());
+#endif
+    }
+    void tunPreferenceCannotSwitchControllersWhileTheCurrentCoreIsAlive(){
+        QTemporaryDir dir;const auto path=dir.filePath("tun-live-choice.dpapi");const auto pool=seedSourcePools(path);QVERIFY(!pool.a.isEmpty());
+        auto peer=std::make_unique<ConfigurationPeer>();EngineController controller(std::move(peer),nullptr,path);
+        QVERIFY(controller.policyMigrationRequired());QVERIFY(controller.confirmPolicyMigration());
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);QVERIFY2(controller.policyError().isEmpty(),qPrintable(controller.policyError()));
+        QVERIFY(controller.applyPolicyDocument(sourcePolicy(pool).toVariantMap()));QTRY_VERIFY_WITH_TIMEOUT(!controller.policyBusy(),5000);
+        controller.connectConfiguredPolicy();QVERIFY(controller.processAlive());
+        controller.m_options.tunEnabled=true;const auto before=bytes(path);
+        QVERIFY(!controller.setTunEnabled(false));QVERIFY(controller.tunRequested());QVERIFY(controller.processAlive());
+        QCOMPARE(bytes(path),before);QVERIFY(!controller.routingError().isEmpty());
+    }
+#endif
     void acceptedMutationRejectsAConcurrentWriterWithoutReplacingItsRequest(){
         QTemporaryDir dir;EngineController controller(std::make_unique<ConfigurationPeer>(),nullptr,dir.filePath("nodes.dpapi"));
         QVERIFY(controller.applyPolicyDocument(document().toVariantMap()));const auto request=controller.policyRequestId();
