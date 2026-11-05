@@ -231,6 +231,9 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     connect(&m_telemetry,&TelemetryService::nativeProbeRequested,this,[this](const QUrl &url,quint64 tag){if(!m_shuttingDown)m_engine->probeNodeTagged(url,tag);});
     connect(m_engine.get(),&ProxyEngine::probeRequestRejected,&m_telemetry,&TelemetryService::rejectNativeProbe);
     connect(&m_tests,&NodeTestService::changed,this,&EngineController::nodesChanged);
+    connect(&m_tests,&NodeTestService::diagnostic,this,[this](const QString &code,const QString &message){
+        emit diagnostic(QStringLiteral("NodeTestService"),code,message);
+    });
     connect(m_engine.get(),&ProxyEngine::diagnostic,this,&EngineController::diagnostic);
     connect(m_engine.get(),&ProxyEngine::diagnostic,this,[this](const QString &module,const QString &code,const QString &message){
         if(module=="SwirlRust"&&(code=="SelectionUnsupported"||code=="SelectionFailed"))rollbackPendingSelection(message);
@@ -567,6 +570,10 @@ QVariantList EngineController::nodes() const {
         const auto connection=row.value("connectionState").toString();
         if(connection!=QStringLiteral("未连接"))nodeStatus=connection;
         row.insert("status",nodeStatus);
+        // Keep the stable status families used by filters, while the table
+        // explains the observed failure stage. Active connection state wins.
+        row.insert("statusDetail",connection==QStringLiteral("未连接")&&!m_tests.testing(id)&&!measured.isEmpty()&&!measured.value("success").toBool()
+            ?NodeTestService::failureStatusText(measured):nodeStatus);
         row.insert("testAvailable",!m_tests.testing(id)&&measured.value("success").toBool());
         // Never substitute a connection-state RTT for an HTTP node-probe measurement.
         row.insert("latency",QStringLiteral("—"));

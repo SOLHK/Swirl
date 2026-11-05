@@ -210,7 +210,7 @@ jobs:
           # Clear these before configure/build, so even a compiler failure cannot
           # upload old tests as evidence for the current source identity.
           Remove-Item -LiteralPath 'build-evidence/ctest-inventory.json' -Force -ErrorAction SilentlyContinue
-          foreach ($directory in @('hero-evidence','navigation-evidence','settings-material-evidence','policy-evidence','activity-layout','liquid-glass-evidence','system-proxy-exit','system-proxy-normal-stop')) {
+          foreach ($directory in @('hero-evidence','navigation-evidence','settings-material-evidence','policy-evidence','activity-layout','liquid-glass-evidence','system-proxy-exit','system-proxy-normal-stop','node-ui-evidence','node-ui-native-evidence')) {
             Remove-Item -LiteralPath (Join-Path 'build/swirl-quick' $directory) -Recurse -Force -ErrorAction SilentlyContinue
           }
           foreach ($file in @('Testing/Temporary/LastTest.log','engine-contract.txt','engine-real.txt','node-chain.txt','import-subscription.txt','native-engine.txt','stream-regression.txt','subscription-formats.txt','connection-rows.xml','policy-configuration.xml','policy-configuration.txt','swirl-telemetry-accounting.xml','swirl-system-proxy-state.xml','swirl-system-proxy-recovery.xml','swirl-system-proxy-app-exit.xml','swirl-system-proxy-normal-stop.xml','swirl-rust-qt-integration.xml')) {
@@ -389,7 +389,7 @@ jobs:
           # Run affected UI checks before packaging. The remaining registered suite
           # runs after the test installer is uploaded; these names are excluded there
           # so a required check is never repeated just to change stage ordering.
-          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(appearance-ui|node-ui|engine-ui|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|policy-ui|policy-configuration)$" --output-on-failure --no-tests=error --output-junit $criticalUiJunit
+          ctest --test-dir build/swirl-quick -C Release -R "^swirl-(appearance-ui|node-ui|node-ui-native-scaled|engine-ui|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|policy-ui|policy-configuration)$" --output-on-failure --no-tests=error --output-junit $criticalUiJunit
           $criticalUiExitCode = $LASTEXITCODE
           # Failure diagnostics rerun policy with the same output directory.
           # Preserve this first execution, including partial failure evidence,
@@ -407,6 +407,10 @@ jobs:
           # Keep the original full-application policy driver and its 120ms
           # assertion before packaging; a standalone QML pass cannot replace it.
           [xml]$criticalUiReport = Get-Content -LiteralPath $criticalUiJunit -Raw
+          foreach ($nodeCase in @('swirl-node-ui','swirl-node-ui-native-scaled')) {
+            $cases = @($criticalUiReport.SelectNodes("//testcase[@name='$nodeCase']"))
+            if ($cases.Count -ne 1 -or $cases[0].status -ne 'run' -or $cases[0].SelectNodes('failure|error|skipped').Count -ne 0) { throw "Required node rendering regression did not pass: $nodeCase" }
+          }
           $policyCases = @($criticalUiReport.SelectNodes('//testcase[@name="swirl-policy-ui"]'))
           if ($policyCases.Count -ne 1 -or $policyCases[0].status -ne 'run' -or $policyCases[0].SelectNodes('failure|error|skipped').Count -ne 0) { throw 'The full-application policy regression must actually pass before packaging.' }
           if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') {
@@ -967,7 +971,7 @@ jobs:
             Remove-Item -LiteralPath 'build/swirl-quick/activity-layout/activity-layout-report.json' -ErrorAction SilentlyContinue
             # Critical tests have already passed before packaging. Exclude only
             # those exact tests here to avoid paying for a second execution.
-            $excludedTests = 'appearance-ui|node-ui|engine-ui|overview-input|all-pages|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|policy-ui|policy-configuration|capture-network|native-tun-broker-control'
+            $excludedTests = 'appearance-ui|node-ui|node-ui-native-scaled|engine-ui|overview-input|all-pages|motion|apec-motion|apec-glass|hero|settings-material|navigation-ui|policy-ui|policy-configuration|capture-network|native-tun-broker-control'
             if ($env:SWIRL_CI_UI_ONLY -eq 'true') {
               # UI-only changes still run all parser, policy, storage, and local
               # regressions; skip only suites whose purpose is network/TLS traffic.
@@ -1148,6 +1152,8 @@ jobs:
             build-evidence/production-ui/
             build/swirl-quick/hero-evidence/
             build/swirl-quick/navigation-evidence/
+            build/swirl-quick/node-ui-evidence/
+            build/swirl-quick/node-ui-native-evidence/
             build/swirl-quick/settings-material-evidence/
             build/swirl-quick/Release/Swirl-diagnostics.txt
             build/swirl-quick/Release/Swirl-node-ui-diagnostics.txt

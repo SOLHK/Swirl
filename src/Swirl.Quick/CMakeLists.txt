@@ -592,7 +592,17 @@ if(SWIRL_BUILD_UI_TESTS OR SWIRL_BUILD_CORE_TESTS)
  target_compile_definitions(Swirl PRIVATE SWIRL_ACTIVITY_PERF_TRACE)
  target_compile_definitions(Swirl PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
  add_test(NAME swirl-node-ui COMMAND Swirl --node-self-test)
- set_tests_properties(swirl-node-ui PROPERTIES TIMEOUT 180 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
+ set_tests_properties(swirl-node-ui PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE
+  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY};SWIRL_UI_QA_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/node-ui-evidence")
+ if(WIN32)
+  # The reported overlap occurs in the native Windows text/rendering path.
+  # Keep the software regression and also exercise D3D11 with enlarged text.
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/node-ui-native-store")
+  add_test(NAME swirl-node-ui-native-scaled COMMAND Swirl --node-self-test)
+  set_tests_properties(swirl-node-ui-native-scaled PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE
+   ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;QT_SCALE_FACTOR=1.5;SWIRL_NODE_UI_REQUIRE_NATIVE=1;SWIRL_TEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/node-ui-native-store;SWIRL_UI_QA_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/node-ui-native-evidence"
+   ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:;QT_SCREEN_SCALE_FACTORS=unset:")
+ endif()
  add_test(NAME swirl-engine-ui COMMAND Swirl --engine-self-test)
  set_tests_properties(swirl-engine-ui PROPERTIES TIMEOUT 60
   ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")

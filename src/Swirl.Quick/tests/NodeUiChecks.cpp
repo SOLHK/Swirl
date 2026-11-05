@@ -4,8 +4,10 @@
 #include "LoopbackPortLease.h"
 #include "PolicySystemProxyBackend.h"
 #include "engine/EngineController.h"
+#include "app/NodeSectionModel.h"
 #include <QQuickWindow>
 #include <QQuickItem>
+#include <QSGRendererInterface>
 #include <QPointer>
 #include <QQmlContext>
 #include <QQmlExpression>
@@ -25,6 +27,7 @@
 #include <QJsonObject>
 #include <QJSValue>
 #include <QSet>
+#include <algorithm>
 #include <cstdio>
 #include <functional>
 #include <memory>
@@ -47,6 +50,13 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         }
         return ok;
     };
+    const auto graphicsApi=window->rendererInterface()->graphicsApi();
+    qInfo().noquote()<<"NODE_UI_RENDER_BACKEND"<<QJsonDocument(QJsonObject{
+        {"source_sha",QStringLiteral(SWIRL_SOURCE_SHA)},{"platform",QGuiApplication::platformName()},
+        {"graphics_api",int(graphicsApi)},{"device_pixel_ratio",window->devicePixelRatio()}}).toJson(QJsonDocument::Compact);
+    if(qEnvironmentVariableIntValue("SWIRL_NODE_UI_REQUIRE_NATIVE")==1&&
+       !check(QGuiApplication::platformName()=="windows"&&graphicsApi==QSGRendererInterface::Direct3D11,
+              "scaled native node regression actually uses Windows D3D11"))return 2;
     auto *proxyBackend=dynamic_cast<PolicySystemProxyBackend *>(controller->systemProxy()->backend());
     if(!check(proxyBackend!=nullptr,"node acceptance uses a per-instance system-proxy sandbox before any input"))return 2;
     std::function<QQuickItem *(QQuickItem *,const QString &)> find;
@@ -613,6 +623,157 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     eval("pageLoader.item.dismissDetail()");
     check(QTest::qWaitFor([&]{return hero&&!hero->property("opened").toBool()&&!hero->property("moving").toBool();},3500),"node library is visible before source-list capture");
     if(!qa.isEmpty()){QDir().mkpath(qa);window->grabWindow().save(qa+"/nodes-minimum-180.png");}
+    // Exercise the production sectioned table with public, isolated row data.
+    // A partially clipped header exposes even a transient scroll-to-row/restore
+    // cycle; checking only the final contentY would miss that regression.
+    if(table){
+        NodeViewModel probeRows;
+        probeRows.setFilters({{"sourceKind","subscription"},{"sort","name"}});
+        QVariantList probeValues;
+        for(int i=0;i<104;++i)probeValues.append(QVariantMap{
+            {"id",QString("probe-ui-%1").arg(i)},
+            {"name",QStringLiteral("香港 Node %1 清晰名称").arg(i,3,10,QChar('0'))},
+            {"protocol",i%2?"trojan":"ss"},{"regionName",QStringLiteral("香港")},
+            {"sourceKind","subscription"},{"sourceId",i<3?"a":"b"},
+            {"latency",QStringLiteral("—")},{"status",QStringLiteral("未测试")}});
+        probeRows.updateRows(probeValues);
+        NodeSectionModel probeSections;
+        probeSections.setProviders({QVariantMap{{"id","a"},{"name",QStringLiteral("测试来源 A")}},
+            QVariantMap{{"id","b"},{"name",QStringLiteral("测试来源 B")}}});
+        probeSections.setSource(&probeRows);
+        QQmlEngine::setObjectOwnership(&probeSections,QQmlEngine::CppOwnership);
+        const auto originalModel=table->property("externalModel");
+        const auto originalScroll=table->property("scrollPosition");
+        auto *viewport=find(table,"tableRowsViewport");
+        const int originalCount=viewport?viewport->property("count").toInt():0;
+        const int originalIndex=viewport?viewport->property("currentIndex").toInt():-1;
+        const bool attached=viewport&&table->setProperty("externalModel",QVariant::fromValue(static_cast<QObject *>(&probeSections)));
+        check(attached,"probe geometry fixture uses the real table with an isolated public-data model");
+        if(attached){
+            struct Geometry { QHash<QString,QRectF> cells; bool valid=false; int rows=0; };
+            const auto capture=[&]{
+                Geometry result;
+                auto *content=qobject_cast<QQuickItem *>(viewport->property("contentItem").value<QObject *>());
+                if(!content)return result;
+                const QRectF clip(0,0,viewport->width(),viewport->height());
+                QList<QPair<int,QRectF>> rowBounds;
+                QSet<QString> keys;
+                bool valid=true;
+                for(auto *row:content->childItems()){
+                    const auto value=row->property("record");
+                    const auto record=value.metaType()==QMetaType::fromType<QJSValue>()?value.value<QJSValue>().toVariant().toMap():value.toMap();
+                    const auto key=record.value("displayKey").toString();
+                    if(key.isEmpty()||!row->isVisible()||row->property("pooled").toBool()||effectiveOpacity(row)<0.01)continue;
+                    const int modelRow=probeSections.rowForDisplayKey(key);
+                    const auto expected=probeSections.get(modelRow);
+                    const bool section=record.value("rowKind")=="section";
+                    const auto status=expected.value("statusDetail",expected.value("status")).toString();
+                    bool foundName=false,foundStatus=false;
+                    QRectF bounds;
+                    int cellIndex=0;
+                    std::function<void(QQuickItem *)> collectText;
+                    collectText=[&](QQuickItem *child){
+                        if(!child->isVisible()||effectiveOpacity(child)<0.01)return;
+                        // These are rendered Text items, including their actual
+                        // parent transforms, rather than the delegate's layout y.
+                        if(child->inherits("QQuickText")&&(section||child->property("raw").isValid())){
+                            const auto text=child->property("text").toString();
+                            foundName|=text==expected.value(section?"sectionName":"name").toString();
+                            foundStatus|=text==status;
+                            const auto rect=child->mapRectToItem(viewport,QRectF(0,0,child->width(),child->height()));
+                            const auto cellKey=key+":"+QString::number(cellIndex++);
+                            if(rect.intersects(clip)){
+                                if(result.cells.contains(cellKey))valid=false;
+                                result.cells.insert(cellKey,rect);
+                                bounds=bounds.isNull()?rect:bounds.united(rect);
+                            }
+                        }
+                        for(auto *nested:child->childItems())collectText(nested);
+                    };
+                    collectText(row);
+                    if(bounds.isNull())continue;
+                    // Do not discard retired delegates here: a painted duplicate
+                    // or stale label must fail the check after motion settles.
+                    valid&=modelRow>=0&&!keys.contains(key)&&foundName&&(section||foundStatus)
+                        &&effectiveOpacity(row)>0.99&&qAbs(row->scale()-1)<0.001
+                        &&qAbs(row->property("visualOffsetY").toReal())<0.25;
+                    keys.insert(key);rowBounds.append(QPair<int,QRectF>(modelRow,bounds));
+                }
+                std::sort(rowBounds.begin(),rowBounds.end(),[](const auto &a,const auto &b){return a.second.top()<b.second.top();});
+                for(int i=1;i<rowBounds.size();++i)
+                    valid&=rowBounds[i-1].first<rowBounds[i].first&&rowBounds[i-1].second.bottom()<=rowBounds[i].second.top()+0.5;
+                result.rows=rowBounds.size();
+                result.valid=valid&&result.rows>=3&&!result.cells.isEmpty();
+                return result;
+            };
+            const auto settled=[&]{return viewport->property("count").toInt()==probeSections.rowCount()&&capture().valid;};
+            const bool ready=check(QTest::qWaitFor(settled,3500),"104-node table settles with unique, ordered, nonoverlapping rendered labels");
+            if(ready){
+                QMetaObject::invokeMethod(viewport,"positionViewAtIndex",Q_ARG(int,0),Q_ARG(int,0));
+                QTest::qWait(30);
+                viewport->setProperty("contentY",viewport->property("originY").toReal()+13);
+                QTest::qWait(30);
+                const auto before=capture();
+                const auto scrollBefore=viewport->property("contentY").toReal();
+                QSignalSpy scrollChanges(viewport,SIGNAL(contentYChanged()));
+                check(before.valid&&scrollChanges.isValid()
+                    &&qAbs(scrollBefore-viewport->property("originY").toReal()-13)<0.5,
+                    "probe fixture starts with readable cells and a partially clipped section header");
+                const auto sameGeometry=[&](const Geometry &now){
+                    if(!now.valid||now.cells.size()!=before.cells.size())return false;
+                    for(auto it=before.cells.cbegin();it!=before.cells.cend();++it){
+                        if(!now.cells.contains(it.key()))return false;
+                        const auto rect=now.cells.value(it.key());
+                        if(qAbs(rect.left()-it->left())>0.5||qAbs(rect.top()-it->top())>0.5
+                            ||qAbs(rect.width()-it->width())>0.5||qAbs(rect.height()-it->height())>0.5)return false;
+                    }
+                    return true;
+                };
+                bool continuous=true;
+                int firstUnstableBatch=-1;
+                for(int batchIndex=0;batchIndex<12;++batchIndex){
+                    for(int i=0;i<probeValues.size();++i){
+                        auto row=probeValues[i].toMap();
+                        row["latency"]=QString::number(20+batchIndex+i);
+                        row["status"]=batchIndex%2?QStringLiteral("超时"):QStringLiteral("测试中");
+                        if(batchIndex%2)row["statusDetail"]=QStringLiteral("DNS 超时");
+                        else row.remove("statusDetail");
+                        probeValues[i]=row;
+                    }
+                    probeRows.updateRows(probeValues);
+                    QTest::qWait(35); // Faster than the production 50 ms row refresh.
+                    const bool stable=sameGeometry(capture());
+                    continuous&=stable;
+                    if(!stable&&firstUnstableBatch<0)firstUnstableBatch=batchIndex;
+                }
+                QTest::qWait(250);
+                check(continuous&&sameGeometry(capture()),"probe bursts update real status text without moving or overlapping cells and section labels");
+                check(scrollChanges.isEmpty()&&qAbs(viewport->property("contentY").toReal()-scrollBefore)<0.5,
+                    "value-only probe updates never reposition a partially scrolled node viewport");
+                qInfo()<<"NODE_PROBE_GEOMETRY"<<"cells"<<before.cells.size()<<"rows"<<before.rows
+                       <<"scrollChanges"<<scrollChanges.size()<<"firstUnstableBatch"<<firstUnstableBatch;
+                if(!qa.isEmpty())window->grabWindow().save(qa+"/nodes-probe-status-updates.png");
+                probeRows.setFilters({{"sourceKind","subscription"},{"sort","name"},{"descending",true}});
+                QTest::qWait(35);
+                check(QTest::qWaitFor(settled,3500),"real node reordering still settles into unique, ordered, nonoverlapping rendered labels");
+                probeSections.toggleSection("subscription:a");
+                // Interrupt removal with another real projection to exercise
+                // retired delegate handling while exit motion is still active.
+                QTest::qWait(20);
+                probeRows.setFilters({{"sourceKind","subscription"},{"sort","name"}});
+                QTest::qWait(35);
+                check(QTest::qWaitFor(settled,3500),"collapse followed by reorder leaves no retired labels over live node rows");
+            }
+        }
+        table->setProperty("externalModel",originalModel);
+        QTest::qWait(300); // Keep fixture models alive until outgoing delegates retire.
+        if(viewport)viewport->setProperty("currentIndex",originalIndex);
+        table->setProperty("scrollPosition",originalScroll);
+        QTest::qWait(30);
+        check(viewport&&viewport->property("count").toInt()==originalCount
+            &&qAbs(table->property("scrollPosition").toReal()-originalScroll.toReal())<0.5,
+            "real controller model and scroll position are restored after isolated probe geometry checks");
+    }
     for(int i=0;i<180;++i){
         auto *viewport=item("tableRowsViewport");
         if(viewport)QMetaObject::invokeMethod(viewport,"positionViewAtIndex",Q_ARG(int,i),Q_ARG(int,0));

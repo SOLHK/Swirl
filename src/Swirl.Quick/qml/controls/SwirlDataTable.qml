@@ -33,6 +33,11 @@ Item {
         if(sectioned)return String(record.displayKey||record.id||"")
         return incrementalRows&&index>=0&&index<stableRows.count?String(stableRows.get(index).motionKey):String(record.id||record.name||"")
     }
+    function cellText(record,key) {
+        if(!record)return ""
+        const value=key==="status"&&record.statusDetail?record.statusDetail:record[key]
+        return String(value===undefined?"":value)
+    }
     function rowForKey(key) {
         if(externalModel!==null&&typeof externalModel.rowForDisplayKey==="function")return externalModel.rowForDisplayKey(key)
         for(let i=0;i<list.count;++i)if(displayKey(recordAt(i),i)===key)return i
@@ -48,7 +53,7 @@ Item {
     function animateVisibleRows() {
         if(!sectioned||!animateRowChanges||SwirlMotion.reduced||list.moving)return
         for(const item of list.contentItem.children) {
-            if(!item.presentationKey||item.pooled||item.y+item.height<list.contentY||item.y>list.contentY+list.height)continue
+            if(!item.presentationKey||!item.currentModelRow||item.y+item.height<list.contentY||item.y>list.contentY+list.height)continue
             const before=visiblePositions[item.presentationKey]
             if(before!==undefined)item.presentFrom(before-(item.y-list.contentY))
         }
@@ -81,7 +86,7 @@ Item {
         const positions={}
         if(sectioned&&animateRowChanges&&!SwirlMotion.reduced&&!list.moving)
             for(const item of list.contentItem.children)
-                if(item.presentationKey&&!item.pooled&&item.y+item.height>=list.contentY&&item.y<=list.contentY+list.height)
+                if(item.presentationKey&&item.currentModelRow&&item.y+item.height>=list.contentY&&item.y<=list.contentY+list.height)
                     positions[item.presentationKey]=item.y+item.visualOffsetY-list.contentY
         visiblePositions=positions
     }
@@ -228,7 +233,8 @@ Item {
                     id:recordRow
                     // Removed delegates can remain visible until the next model
                     // polish. Their retired contexts must not receive input.
-                    enabled:index>=0&&!pooled
+                    readonly property bool currentModelRow:index>=0&&!pooled
+                    enabled:currentModelRow
                     z:1
                     width:list.width; height:sectionRow?table.sectionHeight:table.itemHeight
                     property var record:table.externalModel!==null||table.incrementalRows?model.entry:modelData
@@ -254,7 +260,7 @@ Item {
                     property Item titleElement:null
                     Accessible.role:sectionRow?Accessible.Button:Accessible.ListItem
                     Accessible.selected:!sectionRow&&table.selectedId===String(record.id||record.name)
-                    Accessible.name:sectionRow?String(record.sectionName)+"，"+String(record.matchedCount)+"，"+(record.expanded?qsTr("已展开"):qsTr("已收起")):table.columns.map(c=>c.label+"："+String(recordRow.record[c.key]===undefined?"":recordRow.record[c.key])).join("，")
+                    Accessible.name:sectionRow?String(record.sectionName)+"，"+String(record.matchedCount)+"，"+(record.expanded?qsTr("已展开"):qsTr("已收起")):table.columns.map(c=>c.label+"："+table.cellText(recordRow.record,c.key)).join("，")
                     Accessible.onPressAction:table.chooseRow(recordRow,true)
                     Rectangle {
                     anchors.fill:parent
@@ -279,7 +285,7 @@ Item {
                                     anchors.leftMargin:table.cellPadding; anchors.rightMargin:Theme.dp(8)
                                     id:cell
                                     Component.onCompleted:if(modelData.key==="name")recordRow.titleElement=cell
-                                    readonly property string raw:String(recordRow.record[modelData.key]===undefined?"":recordRow.record[modelData.key])
+                                    readonly property string raw:table.cellText(recordRow.record,modelData.key)
                                     readonly property real measured:table.animateLatency && modelData.key==="latency" && raw.length && isFinite(Number(raw))?Number(raw):-1
                                     property real displayed:-1
                                     property real previous:-1
@@ -329,7 +335,7 @@ Item {
                             id:contextMenu
                             parent:mouse
                             payload:table.columns.map(function(c){
-                                return c.label + ": " + String(recordRow.record[c.key] === undefined?"":recordRow.record[c.key])
+                                return c.label + ": " + table.cellText(recordRow.record,c.key)
                             }).join("\n")
                         }
                     }

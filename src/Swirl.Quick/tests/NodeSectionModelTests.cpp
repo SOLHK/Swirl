@@ -127,7 +127,40 @@ private slots:
         for(int iteration=0;iteration<20;++iteration)source.updateRows(rows);
         model.setProviders({});QCOMPARE(about.size(),0);QCOMPARE(synced.size(),0);QCOMPARE(changed.size(),0);
     }
-    void largeReorderingIsOnePermutationAndLatencyUpdateIsOneProjection() {
+    void probeValueBurstsPreserveGeometryAndRealLatencyReorderingStillProjects() {
+        NodeViewModel source;QVariantList rows;
+        for(int row=0;row<104;++row)rows.append(node(QString::number(row),QString("Node %1").arg(row,3,10,QLatin1Char('0')),"subscription","a"));
+        source.updateRows(rows);NodeSectionModel model;
+        model.setProviders({QVariantMap{{"id","a"},{"name","Fixture"}}});model.setSource(&source);
+        QAbstractItemModelTester tester(&model,QAbstractItemModelTester::FailureReportingMode::QtTest);
+        const auto originalKeys=keys(model);
+        const QPersistentModelIndex retained(model.index(model.indexOfNode("52"),0));
+        QSignalSpy about(&model,&NodeSectionModel::aboutToSync),synced(&model,&NodeSectionModel::synced),
+            values(&model,&QAbstractItemModel::dataChanged),changed(&model,&NodeSectionModel::changed),
+            resets(&model,&QAbstractItemModel::modelReset);
+        // Model the three-worker probe pool completing a full batch. The
+        // visible cells must update without asking the view to reposition.
+        for(int first=0;first<rows.size();first+=3) {
+            for(int row=first;row<std::min(first+3,int(rows.size()));++row) {
+                auto value=rows.at(row).toMap();value["latency"]=QString::number(1000-row);
+                value["status"]=QStringLiteral("可用");value["testAvailable"]=true;rows[row]=value;
+            }
+            source.updateRows(rows);QCOMPARE(keys(model),originalKeys);
+            QVERIFY(retained.isValid());QCOMPARE(retained.data(Qt::UserRole).toMap().value("id").toString(),QString("52"));
+        }
+        QCOMPARE(about.size(),0);QCOMPARE(synced.size(),0);QVERIFY(!values.isEmpty());QCOMPARE(changed.size(),35);
+        QCOMPARE(model.get(model.indexOfNode("103")).value("latency").toString(),QString("897"));
+        QCOMPARE(model.get(model.indexOfNode("103")).value("status").toString(),QStringLiteral("可用"));
+        // Sorting, and then a result that actually changes that sort order,
+        // still produce one balanced projection each and preserve selection.
+        source.setFilters({{"sort","latency"}});
+        QCOMPARE(model.get(1).value("id").toString(),QString("103"));QCOMPARE(about.size(),1);QCOMPARE(synced.size(),1);
+        auto first=rows.first().toMap();first["latency"]="1";rows[0]=first;source.updateRows(rows);
+        QCOMPARE(model.get(1).value("id").toString(),QString("0"));QCOMPARE(about.size(),2);QCOMPARE(synced.size(),2);
+        QVERIFY(retained.isValid());QCOMPARE(retained.data(Qt::UserRole).toMap().value("id").toString(),QString("52"));
+        QCOMPARE(resets.size(),0);
+    }
+    void largeReorderingIsOnePermutationAndLatencyUpdatePreservesGeometry() {
         NodeViewModel source;QVariantList rows;
         for(int row=0;row<2000;++row)rows.append(node(QString::number(row),QString("Node %1").arg(row,4,10,QLatin1Char('0')),"subscription","a",row));
         source.updateRows(rows);NodeSectionModel model;model.setProviders({QVariantMap{{"id","a"},{"name","A"}}});model.setSource(&source);
@@ -139,9 +172,14 @@ private slots:
         QCOMPARE(model.get(1).value("id").toString(),QString("1999"));QCOMPARE(model.nodeIds().size(),2000);
         QCOMPARE(layouts.size(),1);QCOMPARE(moves.size(),0);QCOMPARE(batches.size(),1);QCOMPARE(resets.size(),0);
         QVERIFY(retained.isValid());QCOMPARE(retained.data(Qt::UserRole).toMap().value("id").toString(),QString("1500"));
-        batches.clear();
+        batches.clear();layouts.clear();moves.clear();
+        QSignalSpy values(&model,&QAbstractItemModel::dataChanged),changed(&model,&NodeSectionModel::changed);
         for(int row=0;row<rows.size();++row){auto value=rows.at(row).toMap();value["latency"]=QString::number(3000-row);rows[row]=value;}
-        source.updateRows(rows);QCOMPARE(batches.size(),1);QCOMPARE(resets.size(),0);
+        source.updateRows(rows);QCOMPARE(batches.size(),0);QCOMPARE(resets.size(),0);
+        QCOMPARE(layouts.size(),0);QCOMPARE(moves.size(),0);QVERIFY(!values.isEmpty());QCOMPARE(changed.size(),1);
+        QCOMPARE(model.get(model.indexOfNode("0")).value("latency").toString(),QString("3000"));
+        QCOMPARE(model.get(model.indexOfNode("1999")).value("latency").toString(),QString("1001"));
+        QVERIFY(retained.isValid());QCOMPARE(retained.data(Qt::UserRole).toMap().value("id").toString(),QString("1500"));
     }
     void destroyingOrReplacingSourceDoesNotLeaveNodeReferences() {
         auto source=std::make_unique<NodeViewModel>();source->updateRows({node("a","A")});

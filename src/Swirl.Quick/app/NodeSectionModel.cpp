@@ -146,9 +146,18 @@ void NodeSectionModel::rebuild() {
     const bool rowChanges=next!=m_rows;
     const bool changed=rowChanges||nodeIds!=m_nodeIds||total!=m_total;
     if(!changed)return;
-    if(rowChanges){emit aboutToSync();syncRows(next);}
+    // Probe results only change cell data. Saving/restoring the viewport and
+    // replaying row-position animations for each result interrupts scrolling
+    // and repeatedly retargets delegates while their text is being updated.
+    // Fixed-height rows need a projection only when their ordered keys change.
+    const bool projectionChanges=rowChanges&&(next.size()!=m_rows.size()||
+        !std::equal(next.cbegin(),next.cend(),m_rows.cbegin(),[](const auto &left,const auto &right){
+            return displayKey(left)==displayKey(right);
+        }));
+    if(projectionChanges)emit aboutToSync();
+    if(rowChanges)syncRows(next);
     m_nodeIds=std::move(nodeIds);m_total=total;++m_revision;
-    if(rowChanges)emit synced();
+    if(projectionChanges)emit synced();
     emit this->changed();
 }
 
