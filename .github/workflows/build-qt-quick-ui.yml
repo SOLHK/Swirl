@@ -63,6 +63,17 @@ jobs:
           else {
             Write-Host "Core, network, security, build, or mixed change set ($($changed.Count) files); require focused network/security tests and full regression."
           }
+      - name: Observe fixed Windows PowerShell startup environments
+        if: env.SWIRL_CI_NETWORK_CHANGE == 'true'
+        shell: pwsh
+        run: ./scripts/Measure-WindowsPowerShellStartup.ps1 -OutputPath build-evidence/powershell-startup.json
+      - name: Preserve early PowerShell startup observation
+        if: always() && env.SWIRL_CI_NETWORK_CHANGE == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Swirl-WindowsPowerShell-Startup-Observation
+          path: build-evidence/powershell-startup.json
+          if-no-files-found: error
       - name: Validate scoped Codex proxy launcher
         shell: pwsh
         run: ./tools/tests/Test-CodexProxyLauncher.ps1
