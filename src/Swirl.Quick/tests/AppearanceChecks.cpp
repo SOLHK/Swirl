@@ -41,6 +41,7 @@
 #include <QSGTransformNode>
 #include <private/qquickitem_p.h>
 #ifdef Q_OS_WIN
+#include <private/qdxgivsyncservice_p.h>
 #include <private/qrhid3d11_p.h>
 #endif
 
@@ -71,6 +72,9 @@ static QJsonObject appearanceSwapChainProbe(QQuickWindow *window) {
     result.insert("qtSwapInterval",qint64(chain->swapInterval));
     result.insert("qtSwapchainFlags",qint64(chain->swapChainFlags));
     result.insert("qtFrameLatencyWaitableObjectPresent",chain->frameLatencyWaitableObject!=nullptr);
+    // The platform's update-request watcher is independent of the swapchain
+    // waitable object. Observe its actual path before timed input, not per frame.
+    result.insert("qtVBlankServiceSupportsWindow",QDxgiVSyncService::instance()->supportsWindow(window));
     result.insert("dxgiSwapchainPresent",chain->swapChain!=nullptr);
     if(!chain->swapChain)return result;
     const auto hresult=[](HRESULT value){
