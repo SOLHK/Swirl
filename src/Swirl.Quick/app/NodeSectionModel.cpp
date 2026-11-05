@@ -12,10 +12,16 @@ bool hasContentFilter(const QVariantMap &filters) {
 }
 }
 
-NodeSectionModel::NodeSectionModel(QObject *parent):QAbstractListModel(parent),m_projectionTimer(this) {
+NodeSectionModel::NodeSectionModel(QObject *parent):QAbstractListModel(parent),m_projectionTimer(this),m_valueRefreshTimer(this) {
     m_projectionTimer.setSingleShot(true);
     m_projectionTimer.setTimerType(Qt::PreciseTimer);
     connect(&m_projectionTimer,&QTimer::timeout,this,&NodeSectionModel::commitPendingProjection);
+    m_valueRefreshTimer.setSingleShot(true);
+    connect(&m_valueRefreshTimer,&QTimer::timeout,this,[this]{
+        if(m_syncingRows)return;
+        m_valueRefreshPending=false;
+        rebuild(); // Read the latest source, including requests that superseded the first reentry.
+    });
 }
 int NodeSectionModel::rowCount(const QModelIndex &parent) const { return parent.isValid()?0:m_rows.size(); }
 QVariant NodeSectionModel::data(const QModelIndex &index,int role) const {
@@ -197,7 +203,18 @@ void NodeSectionModel::rebuild() {
         if(!delayed||m_flushRequested||!m_projectionDelayMs) {
             m_flushRequested=false;
             commitPendingProjection();
+            // A dataChanged observer can request a zero-delay structural
+            // change. Logical filters are current while row mutation waits.
+            if(guard&&m_syncingRows)emit this->changed();
         } else emit this->changed();
+        return;
+    }
+    if(rowChanges&&(m_syncingRows||m_valueRefreshPending)) {
+        // Reentrant value updates must not recurse through dataChanged. Keep
+        // the logical IDs above current and coalesce a fresh source read after
+        // this complete set of row notifications, without projection signals.
+        m_valueRefreshPending=true;
+        emit this->changed();
         return;
     }
     if(rowChanges)syncRows(next);
@@ -207,9 +224,9 @@ void NodeSectionModel::rebuild() {
 
 void NodeSectionModel::commitPendingProjection() {
     if(!m_projectionPending||m_committingProjection)return;
-    // Every aboutToSync listener must see the outgoing layout before a listener
-    // that disables motion can cause the corresponding commit.
-    if(m_notifyingProjection){m_flushRequested=true;return;}
+    // Complete both the projection notification and any in-flight row/value
+    // notification batch before mutating its model indexes.
+    if(m_notifyingProjection||m_syncingRows){m_flushRequested=true;return;}
     m_projectionTimer.stop();m_committingProjection=true;
     const QPointer<NodeSectionModel> guard(this);
     // Timers and GUI animation ticks need not run in the same order. Force the
@@ -243,6 +260,8 @@ void NodeSectionModel::rebuildIndex() {
     for(int row=0;row<m_rows.size();++row)m_rowByKey.insert(displayKey(m_rows.at(row)),row);
 }
 void NodeSectionModel::syncRows(const QList<QVariantMap> &next) {
+    Q_ASSERT(!m_syncingRows);
+    m_syncingRows=true;
     QSet<QString> keys;keys.reserve(next.size());
     for(const auto &row:next)keys.insert(displayKey(row));
     for(int last=m_rows.size()-1;last>=0;) {
@@ -289,4 +308,7 @@ void NodeSectionModel::syncRows(const QList<QVariantMap> &next) {
         emit dataChanged(index(first,0),index(last,0),{Qt::UserRole});
     }
     rebuildIndex();
+    m_syncingRows=false;
+    if(m_valueRefreshPending&&!m_valueRefreshTimer.isActive())m_valueRefreshTimer.start(0);
+    if(m_projectionPending&&m_flushRequested&&!m_committingProjection)m_projectionTimer.start(0);
 }

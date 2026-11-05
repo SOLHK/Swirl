@@ -72,6 +72,7 @@ private:
     QList<QVariantMap> m_rows;
     QList<QVariantMap> m_pendingRows;
     QTimer m_projectionTimer;
+    QTimer m_valueRefreshTimer;
     QHash<QString,int> m_rowByKey;
     QStringList m_nodeIds;
     QSet<QString> m_collapsed;
@@ -87,5 +88,7 @@ private:
     bool m_committingProjection=false;
     bool m_notifyingProjection=false;
     bool m_flushRequested=false;
+    bool m_syncingRows=false;
+    bool m_valueRefreshPending=false;
     quint64 m_pendingVersion=0;
 };
