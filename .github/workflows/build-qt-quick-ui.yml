@@ -341,7 +341,13 @@ jobs:
         run: |
           git fetch --no-tags --depth=1 origin 0a38491d2b87ba9790ebe4e9b797d30680c9e960
           if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch the exact proxy-stop negative-control source.' }
-          python tools/tests/test_system_proxy_stop_regression.py --build-dir build/swirl-quick --output build-evidence/system-proxy-stop
+          if ($env:SWIRL_CI_NETWORK_CHANGE -eq 'true') {
+            # The control reconfigures CMake twice. Preserve the initial native
+            # test registration opt-ins in both subprocess configurations.
+            cmake -E env SWIRL_SYSTEM_PROXY_TEST=1 SWIRL_NATIVE_TUN_ACCEPTANCE=1 python tools/tests/test_system_proxy_stop_regression.py --build-dir build/swirl-quick --output build-evidence/system-proxy-stop
+          } else {
+            python tools/tests/test_system_proxy_stop_regression.py --build-dir build/swirl-quick --output build-evidence/system-proxy-stop
+          }
           if ($LASTEXITCODE -ne 0) { throw 'Normal proxy-stop candidate or old-code negative control failed.' }
       # Qt's offscreen QPA font database reads appdir/lib/fonts and does not
       # automatically discover the fonts installed on a Windows CI runner.
