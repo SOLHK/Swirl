@@ -1454,10 +1454,18 @@ Item {
                         latencyObserver.setInterval(8);latencyObserver.setTimerType(Qt::PreciseTimer);
                         QElapsedTimer latencyClock;
                         int latencyBatches=0,frameSamples=0,timerSamples=0,readableFrames=0,readableTimers=0;
+                        int commitsWhileProducing=0,incomingAtCommit=0;
                         bool latencySampling=true;
                         Geometry lastLatencyGeometry;
                         QJsonArray latencySamples;
-                        QJsonObject lastLatencyObservation,firstReadableFrame,firstReadableTimer;
+                        QJsonObject lastLatencyObservation,firstReadableFrame,firstReadableTimer,phaseSampleCounts;
+                        // Diagnostic only: visibility still passes through the
+                        // unchanged rendered geometry gate below, not this flag.
+                        QObject::connect(&probeSections,&NodeSectionModel::synced,&latencyContext,[&]{
+                            if(!latencySampling||!latencyProducer.isActive())return;
+                            ++commitsWhileProducing;
+                            if(table->property("projectionPhase").toString()==QStringLiteral("in"))++incomingAtCommit;
+                        });
                         QObject::connect(&latencyProducer,&QTimer::timeout,&latencyContext,[&]{
                             ++latencyBatches;
                             const int rotation=latencyBatches%2?1:2;
@@ -1479,6 +1487,8 @@ Item {
                             if(frame)++frameSamples;else ++timerSamples;
                             const auto now=capture();
                             const auto order=visibleNodeOrder(now);
+                            const auto phase=table->property("projectionPhase").toString();
+                            phaseSampleCounts.insert(phase,phaseSampleCounts.value(phase).toInt()+1);
                             const bool changedOrder=!order.isEmpty()&&order!=initialLatencyOrder;
                             // capture.valid retains the original opacity>0.99,
                             // offset<0.25 and complete 0.5 geometry/identity gate.
@@ -1488,7 +1498,7 @@ Item {
                             QJsonObject observation{
                                 {"sample",QString::fromLatin1(origin)},{"elapsedMs",latencyClock.elapsed()},
                                 {"producerActive",latencyProducer.isActive()},{"updates",latencyBatches},
-                                {"phase",table->property("projectionPhase").toString()},
+                                {"phase",phase},
                                 {"opacity",table->property("projectionOpacity").toReal()},
                                 {"offset",table->property("projectionOffsetY").toReal()},
                                 {"pending",probeSections.projectionPending()},
@@ -1521,6 +1531,8 @@ Item {
                             {"sampleSemantics","GUI text geometry at timer or queued frameSwapped delivery; not GPU frame reconstruction"},
                             {"initialVisibleOrder",QJsonArray::fromStringList(initialLatencyOrder)},
                             {"updates",latencyBatches},{"frameSamples",frameSamples},{"timerSamples",timerSamples},
+                            {"commitsWhileProducing",commitsWhileProducing},{"incomingAtCommit",incomingAtCommit},
+                            {"phaseSampleCounts",phaseSampleCounts},
                             {"readableFrameSamples",readableFrames},{"readableTimerSamples",readableTimers},
                             {"producerActiveAtDecision",producerStillActive},{"readableWhileProducing",readableWhileProducing},
                             {"samples",latencySamples},{"lastObservation",lastLatencyObservation},

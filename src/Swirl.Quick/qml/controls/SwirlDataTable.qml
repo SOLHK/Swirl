@@ -24,6 +24,7 @@ Item {
     property var visiblePositions:({})
     property int projectionGeneration:0
     property bool stagedProjection:false
+    property bool projectionViewReady:false
     property string projectionPhase:"idle"
     property real projectionOpacity:1
     property real projectionOffsetY:0
@@ -120,25 +121,43 @@ Item {
         }
         visiblePositions={}
     }
+    function projectionCurrent(generation,model) {
+        return list!==null&&generation===projectionGeneration&&model===externalModel
+            &&(!stagedProjection||(projectionViewReady&&model!==null&&!model.projectionPending))
+    }
     function restoreViewport() {
         const observer=performanceObserver
         if(observer)observer.mark(9,true)
         try {
             const generation=projectionGeneration
-            if(followTail&&wasAtEnd){list.positionViewAtEnd();animateVisibleRows();return}
+            const model=externalModel
+            if(!projectionCurrent(generation,model))return
+            if(followTail&&wasAtEnd){
+                list.positionViewAtEnd()
+                if(!projectionCurrent(generation,model))return
+                if(stagedProjection)list.forceLayout()
+                if(projectionCurrent(generation,model))animateVisibleRows()
+                return
+            }
             const index=anchorKey.length?rowForKey(anchorKey):-1
             if(index<0){animateVisibleRows();return}
             list.positionViewAtIndex(index,ListView.Beginning)
-            Qt.callLater(function(){
+            const restore=function(){
                 const deferredObserver=table.performanceObserver
                 if(deferredObserver)deferredObserver.mark(10,true)
                 try {
-                    if(generation!==table.projectionGeneration)return
+                    if(!table.projectionCurrent(generation,model))return
+                    if(table.stagedProjection){
+                        list.forceLayout()
+                        if(!table.projectionCurrent(generation,model))return
+                    }
                     const item=list.itemAtIndex(index)
                     if(item)list.contentY=Math.max(list.originY,Math.min(item.y-table.anchorOffset,list.originY+Math.max(0,list.contentHeight-list.height)))
-                    table.animateVisibleRows()
+                    if(table.projectionCurrent(generation,model))table.animateVisibleRows()
                 } finally {if(deferredObserver)deferredObserver.mark(10,false)}
-            })
+            }
+            if(stagedProjection)restore()
+            else Qt.callLater(restore)
         } finally {if(observer)observer.mark(9,false)}
     }
     function beginProjection() {
@@ -165,18 +184,23 @@ Item {
     }
     function endProjection() {
         const generation=projectionGeneration
-        Qt.callLater(function(){
+        const model=externalModel
+        const finish=function(){
             const observer=table.performanceObserver
             if(observer)observer.mark(11,true)
             try {
-                if(generation!==table.projectionGeneration)return
-                if(table.stagedProjection&&table.externalModel!==null&&table.externalModel.projectionPending)return
+                if(!table.projectionCurrent(generation,model))return
                 if(observer)observer.mark(8,true)
                 try {list.forceLayout()}
                 finally {if(observer)observer.mark(8,false)}
-                table.restoreViewport()
+                if(table.projectionCurrent(generation,model))table.restoreViewport()
             } finally {if(observer)observer.mark(11,false)}
-        })
+        }
+        // synced follows the complete row transaction. Finish this committed
+        // layout and start its incoming pose before the next producer update
+        // can cancel deferred work and restart an exit at zero opacity.
+        if(stagedProjection)finish()
+        else Qt.callLater(finish)
     }
     Connections {target:stableRows;function onAboutToSync(){table.beginProjection()}function onSynced(){table.endProjection()}}
     Connections {target:table.sectioned||table.externalProjectionEvents?table.externalModel:null;ignoreUnknownSignals:true;function onAboutToSync(){table.beginProjection()}function onProjectionCommitting(){table.prepareProjectionCommit()}function onSynced(){table.endProjection()}}
@@ -279,6 +303,10 @@ Item {
                     move: Transition {enabled:table.animateRowChanges && !table.sectioned && !SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
                     displaced: Transition { enabled:table.animateRowChanges && !table.sectioned && !SwirlMotion.reduced; SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration} }
                 id:list
+                Component.onCompleted:{
+                    table.projectionViewReady=true
+                    if(table.stagedProjection&&table.projectionPhase==="commit")table.endProjection()
+                }
                 opacity:table.stagedProjection?table.projectionOpacity:1
                 objectName:"tableRowsViewport"
                 Repeater {model:table.fillEmptyRows?Math.max(0,Math.ceil((list.height-table.rows.length*table.itemHeight)/table.emptyStripeHeight)):0
